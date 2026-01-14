@@ -14,13 +14,21 @@
  *   node build.js --clean   - Remove the dist folder
  *
  * The build order is important - files are concatenated in dependency order:
- * 1. Constants.gs       - Must be first (defines all constants)
- * 2. FormulaService.gs  - Depends on Constants
- * 3. UIService.gs       - Depends on Constants
- * 4. GrievanceManager.gs- Depends on Constants, UIService
- * 5. Integrations.gs    - Depends on Constants, GrievanceManager
- * 6. Maintenance.gs     - Depends on Constants, FormulaService
- * 7. Main.gs            - Must be last (uses all modules)
+ * 1.  Constants.gs         - Must be first (defines all constants)
+ * 2.  PerformanceUndo.gs   - Core caching/undo system
+ * 3.  ComfortViewFeatures.gs - Accessibility/theming
+ * 4.  HiddenSheets.gs      - Hidden sheet management
+ * 5.  FormulaService.gs    - Depends on Constants
+ * 6.  UIService.gs         - Depends on Constants
+ * 7.  GrievanceManager.gs  - Depends on Constants, UIService
+ * 8.  Integrations.gs      - Depends on Constants, GrievanceManager
+ * 9.  DataIntegrity.gs     - Batch ops, validation, archiving
+ * 10. Maintenance.gs       - Depends on Constants, FormulaService
+ * 11. MobileQuickActions.gs- Quick actions, mobile UI
+ * 12. WebApp.gs            - Web app deployment
+ * 13. TestingValidation.gs - Test suites
+ * 14. DeveloperTools.gs    - Developer utilities
+ * 15. Main.gs              - Must be last (uses all modules)
  *
  * @fileoverview Build script for merging modular files
  * @version 1.0.0
@@ -37,13 +45,21 @@ const CONFIG = {
 
   // Files in build order (dependency order matters!)
   buildOrder: [
-    'Constants.gs',
-    'FormulaService.gs',
-    'UIService.gs',
-    'GrievanceManager.gs',
-    'Integrations.gs',
-    'Maintenance.gs',
-    'Main.gs'
+    'Constants.gs',           // Must be first - defines all constants
+    'PerformanceUndo.gs',     // Core caching/undo system
+    'ComfortViewFeatures.gs', // Accessibility/theming features
+    'HiddenSheets.gs',        // Hidden sheet management
+    'FormulaService.gs',      // Formula logic
+    'UIService.gs',           // UI components and dialogs
+    'GrievanceManager.gs',    // Grievance lifecycle management
+    'Integrations.gs',        // Drive, Calendar, notifications
+    'DataIntegrity.gs',       // Batch ops, validation, archiving
+    'Maintenance.gs',         // Admin tools and diagnostics
+    'MobileQuickActions.gs',  // Quick actions, mobile UI
+    'WebApp.gs',              // Web app deployment
+    'TestingValidation.gs',   // Test suites
+    'DeveloperTools.gs',      // Developer utilities
+    'Main.gs'                 // Entry point - must be last
   ],
 
   // Header to add to consolidated file
@@ -58,13 +74,21 @@ const CONFIG = {
  * Any changes made directly to this file will be overwritten on next build.
  *
  * To make changes, edit the source files in the /src directory:
- * - Constants.gs       : Configuration and constants
- * - UIService.gs       : UI components and dialogs
- * - GrievanceManager.gs: Grievance lifecycle management
- * - Integrations.gs    : Drive, Calendar, email services
- * - Maintenance.gs     : Admin tools and diagnostics
- * - FormulaService.gs  : Hidden sheet and formula logic
- * - Main.gs            : Entry point and triggers
+ * - Constants.gs         : Configuration and constants
+ * - PerformanceUndo.gs   : Caching and undo/redo system
+ * - ComfortViewFeatures.gs: ADHD/accessibility, themes, focus mode
+ * - HiddenSheets.gs      : Hidden sheet management
+ * - FormulaService.gs    : Hidden sheet and formula logic
+ * - UIService.gs         : UI components and dialogs
+ * - GrievanceManager.gs  : Grievance lifecycle management
+ * - Integrations.gs      : Drive, Calendar, email services
+ * - DataIntegrity.gs     : Batch operations, validation, archiving
+ * - Maintenance.gs       : Admin tools and diagnostics
+ * - MobileQuickActions.gs: Quick actions, mobile UI
+ * - WebApp.gs            : Web application deployment
+ * - TestingValidation.gs : Test suites and validation
+ * - DeveloperTools.gs    : Developer utilities
+ * - Main.gs              : Entry point and triggers
  *
  * Then run: node build.js
  *

@@ -4,29 +4,45 @@ A comprehensive Google Sheets-based dashboard for managing union grievances, mem
 
 ## Architecture Overview
 
-The dashboard has been refactored from a single monolithic file into seven specialized modules:
+The dashboard has been refactored from a single monolithic file into fifteen specialized modules:
 
 ```
 src/
-├── Constants.gs        # Single source of truth for configuration
-├── UIService.gs        # Dialogs, sidebars, and UI components
-├── GrievanceManager.gs # Grievance lifecycle management
-├── Integrations.gs     # Drive, Calendar, and email services
-├── Maintenance.gs      # Admin tools and diagnostics
-├── FormulaService.gs   # Hidden sheet and formula logic
-└── Main.gs             # Entry point and triggers
+├── Constants.gs          # Single source of truth for configuration
+├── PerformanceUndo.gs    # Caching system and undo/redo functionality
+├── ComfortViewFeatures.gs# ADHD/accessibility, themes, focus mode
+├── HiddenSheets.gs       # Hidden sheet management
+├── FormulaService.gs     # Hidden sheet and formula logic
+├── UIService.gs          # Dialogs, sidebars, and UI components
+├── GrievanceManager.gs   # Grievance lifecycle management
+├── Integrations.gs       # Drive, Calendar, and email services
+├── DataIntegrity.gs      # Batch operations, validation, archiving
+├── Maintenance.gs        # Admin tools and diagnostics
+├── MobileQuickActions.gs # Quick actions, mobile UI
+├── WebApp.gs             # Web application deployment
+├── TestingValidation.gs  # Test suites and validation
+├── DeveloperTools.gs     # Developer utilities
+└── Main.gs               # Entry point and triggers
 ```
 
 ### Module Descriptions
 
 | Module | Purpose | Key Functions |
 |--------|---------|---------------|
-| **Constants.gs** | Configuration constants, sheet names, column mappings, deadline rules | `SHEET_NAMES`, `DEADLINE_RULES`, `GRIEVANCE_STATUS` |
+| **Constants.gs** | Configuration constants, sheet names, column mappings, deadline rules | `SHEET_NAMES`, `DEADLINE_RULES`, `GRIEVANCE_STATUS`, `MEMBER_COLS`, `GRIEVANCE_COLS` |
+| **PerformanceUndo.gs** | CacheService performance optimization, undo/redo with 50 action history | `getCachedData`, `setCachedData`, `undoLastAction`, `redoAction` |
+| **ComfortViewFeatures.gs** | ADHD/accessibility features, themes, focus mode, pomodoro timer | `setTheme`, `toggleFocusMode`, `startPomodoroTimer`, `enableHighContrast` |
+| **HiddenSheets.gs** | Hidden sheet management with complex formulas | `setupHiddenSheet`, `protectHiddenSheets`, `updateHiddenCalculations` |
+| **FormulaService.gs** | Hidden calculation sheet management | `setupAllHiddenSheets`, `repairAllHiddenSheets` |
 | **UIService.gs** | All user interface components | `showDesktopSearch`, `showMultiSelectDialog`, `showQuickActionsMenu` |
 | **GrievanceManager.gs** | Grievance creation, step advancement, deadline calculations | `startNewGrievance`, `advanceGrievanceStep`, `recalcAllGrievancesBatched` |
 | **Integrations.gs** | External service connections | `setupDriveFolderForGrievance`, `syncDeadlinesToCalendar`, `clearAllCalendarEvents` |
+| **DataIntegrity.gs** | Batch operations, validation, orphan detection, auto-archive | `batchUpdateWithRetry`, `detectOrphanedRecords`, `autoArchiveOldRecords`, `validateDataIntegrity` |
 | **Maintenance.gs** | Administrative and diagnostic tools | `DIAGNOSE_SETUP`, `REPAIR_DASHBOARD`, `verifyHiddenSheets` |
-| **FormulaService.gs** | Hidden calculation sheet management | `setupAllHiddenSheets`, `repairAllHiddenSheets` |
+| **MobileQuickActions.gs** | Quick action dialogs, mobile-optimized UI | `showQuickActions`, `handleQuickAction`, `getMobileMenu` |
+| **WebApp.gs** | Web application deployment and endpoints | `doGet`, `doPost`, `getWebInterface` |
+| **TestingValidation.gs** | Automated test suites and validation | `runAllTests`, `validateSheetStructure`, `runPerformanceTests` |
+| **DeveloperTools.gs** | Developer utilities and debugging | `logDebug`, `exportConfig`, `showDeveloperPanel` |
 | **Main.gs** | Entry point, triggers, initialization | `onOpen`, `onEdit`, `initializeDashboard` |
 
 ## Benefits of Modular Architecture
@@ -114,9 +130,10 @@ dist/
 - Progress tracking via Current Step
 
 ### Member Directory
-- Complete member database
+- Complete member database (32 tracked columns)
 - Department and union status tracking
 - Data validation for email and phone
+- Member Satisfaction Survey processing (89 columns)
 
 ### Calendar Integration
 - Sync deadlines to Google Calendar
@@ -132,6 +149,39 @@ dist/
 - Six hidden calculation sheets power dashboard statistics
 - Automatic recalculation on data changes
 - Repair functions for recovery
+
+### Performance & Caching
+- CacheService integration for optimized data retrieval
+- Undo/Redo system with 50 action history
+- Batch operations with retry logic
+
+### Accessibility (Comfort View)
+- ADHD-friendly themes and focus mode
+- Pomodoro timer integration
+- High contrast and reduced motion options
+- Customizable color themes
+
+### Data Integrity
+- Orphan record detection
+- Steward workload balancing
+- Auto-archive for old records
+- Comprehensive data validation
+
+### Mobile & Quick Actions
+- Mobile-optimized UI components
+- Quick action dialogs for common tasks
+- Responsive design support
+
+### Web Application
+- Standalone web app deployment
+- REST API endpoints
+- Cross-origin request handling
+
+### Developer Tools
+- Debug logging utilities
+- Configuration export/import
+- Test suite automation
+- Performance profiling
 
 ## Deadline Rules (Article 23A)
 
