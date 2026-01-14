@@ -840,97 +840,9 @@ function getMultiSelectHtml(items, callback) {
 }
 
 // ============================================================================
-// QUICK ACTIONS MENU
+// Note: showQuickActionsMenu() is defined in MobileQuickActions.gs which
+// contains the comprehensive quick actions implementation.
 // ============================================================================
-
-/**
- * Shows quick actions menu based on current selection
- */
-function showQuickActionsMenu() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  const sheetName = sheet.getName();
-  const selection = sheet.getActiveRange();
-
-  let actions = [];
-
-  // Determine actions based on current sheet
-  if (sheetName === SHEET_NAMES.MEMBER_DIRECTORY) {
-    actions = [
-      { label: 'View Member Details', action: 'viewMemberDetails' },
-      { label: 'Edit Member', action: 'editMember' },
-      { label: 'Start Grievance for Member', action: 'startGrievanceForMember' },
-      { label: 'Send Email', action: 'sendEmailToMember' }
-    ];
-  } else if (sheetName === SHEET_NAMES.GRIEVANCE_TRACKER) {
-    actions = [
-      { label: 'View Grievance Details', action: 'viewGrievanceDetails' },
-      { label: 'Advance to Next Step', action: 'advanceGrievanceStep' },
-      { label: 'Add Note', action: 'addGrievanceNote' },
-      { label: 'Open Drive Folder', action: 'openGrievanceFolder' },
-      { label: 'Sync to Calendar', action: 'syncSingleGrievance' }
-    ];
-  }
-
-  if (actions.length === 0) {
-    SpreadsheetApp.getUi().alert('No quick actions available for this sheet.');
-    return;
-  }
-
-  const html = HtmlService.createHtmlOutput(getQuickActionsHtml(actions))
-    .setWidth(250)
-    .setHeight(200);
-
-  SpreadsheetApp.getUi().showModalDialog(html, 'Quick Actions');
-}
-
-/**
- * Generates HTML for quick actions menu
- * @param {Array} actions - Available actions
- * @return {string} HTML content
- */
-function getQuickActionsHtml(actions) {
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      ${getCommonStyles()}
-      <style>
-        .actions-list {
-          padding: 10px;
-        }
-        .action-item {
-          padding: 12px 15px;
-          border-radius: 6px;
-          cursor: pointer;
-          margin-bottom: 4px;
-          transition: background 0.2s;
-        }
-        .action-item:hover {
-          background: #e8f0fe;
-          color: ${UI_THEME.PRIMARY_COLOR};
-        }
-      </style>
-    </head>
-    <body>
-      <div class="actions-list">
-        ${actions.map(a => `
-          <div class="action-item" onclick="executeAction('${a.action}')">
-            ${a.label}
-          </div>
-        `).join('')}
-      </div>
-      <script>
-        function executeAction(action) {
-          google.script.run
-            .withSuccessHandler(function() { google.script.host.close(); })
-            .withFailureHandler(function(e) { alert('Error: ' + e.message); })
-            [action]();
-        }
-      </script>
-    </body>
-    </html>
-  `;
-}
 
 // ============================================================================
 // SIDEBAR

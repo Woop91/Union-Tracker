@@ -25,106 +25,10 @@
  */
 
 // ============================================================================
-// HIDDEN SHEET SETUP
-// ============================================================================
-
-/**
- * Sets up all hidden calculation sheets
- * Creates missing sheets and initializes their formulas
- * @return {Object} Result with counts of created/repaired sheets
- */
-function setupAllHiddenSheets() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const results = {
-    created: 0,
-    repaired: 0,
-    errors: []
-  };
-
-  // Setup each hidden sheet
-  const setupFunctions = {
-    [HIDDEN_SHEETS.CALC_MEMBERS]: setupCalcMembersSheet,
-    [HIDDEN_SHEETS.CALC_GRIEVANCES]: setupCalcGrievancesSheet,
-    [HIDDEN_SHEETS.CALC_DEADLINES]: setupCalcDeadlinesSheet,
-    [HIDDEN_SHEETS.CALC_STATS]: setupCalcStatsSheet,
-    [HIDDEN_SHEETS.CALC_SYNC]: setupCalcSyncSheet,
-    [HIDDEN_SHEETS.CALC_FORMULAS]: setupCalcFormulasSheet
-  };
-
-  for (const [sheetName, setupFn] of Object.entries(setupFunctions)) {
-    try {
-      let sheet = ss.getSheetByName(sheetName);
-      const wasCreated = !sheet;
-
-      if (!sheet) {
-        sheet = ss.insertSheet(sheetName);
-        results.created++;
-      }
-
-      // Run setup function
-      setupFn(sheet);
-
-      // Hide the sheet
-      sheet.hideSheet();
-
-      if (!wasCreated) {
-        results.repaired++;
-      }
-
-    } catch (error) {
-      console.error(`Error setting up ${sheetName}:`, error);
-      results.errors.push(`${sheetName}: ${error.message}`);
-    }
-  }
-
-  return results;
-}
-
-/**
- * Repairs all hidden sheets by regenerating their formulas
- * @return {Object} Result with repair count
- */
-function repairAllHiddenSheets() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let repaired = 0;
-
-  for (const sheetName of Object.values(HIDDEN_SHEETS)) {
-    const sheet = ss.getSheetByName(sheetName);
-    if (sheet) {
-      // Clear and regenerate
-      sheet.clear();
-
-      // Re-run setup based on sheet name
-      switch (sheetName) {
-        case HIDDEN_SHEETS.CALC_MEMBERS:
-          setupCalcMembersSheet(sheet);
-          break;
-        case HIDDEN_SHEETS.CALC_GRIEVANCES:
-          setupCalcGrievancesSheet(sheet);
-          break;
-        case HIDDEN_SHEETS.CALC_DEADLINES:
-          setupCalcDeadlinesSheet(sheet);
-          break;
-        case HIDDEN_SHEETS.CALC_STATS:
-          setupCalcStatsSheet(sheet);
-          break;
-        case HIDDEN_SHEETS.CALC_SYNC:
-          setupCalcSyncSheet(sheet);
-          break;
-        case HIDDEN_SHEETS.CALC_FORMULAS:
-          setupCalcFormulasSheet(sheet);
-          break;
-      }
-
-      repaired++;
-    }
-  }
-
-  return { repaired: repaired };
-}
-
-// ============================================================================
 // INDIVIDUAL SHEET SETUP FUNCTIONS
+// ============================================================================
+// Note: setupAllHiddenSheets() and repairAllHiddenSheets() are defined in
+// HiddenSheets.gs which contains the comprehensive hidden sheet management.
 // ============================================================================
 
 /**

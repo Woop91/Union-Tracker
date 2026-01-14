@@ -384,38 +384,7 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
   return { synced: true, created: true };
 }
 
-/**
- * Syncs a single grievance to calendar (used from UI)
- * @param {string} grievanceId - The grievance ID to sync
- * @return {Object} Result object
- */
-function syncSingleGrievanceToCalendar(grievanceId) {
-  try {
-    const grievance = getGrievanceById(grievanceId);
-    if (!grievance) {
-      return { success: false, error: 'Grievance not found' };
-    }
-
-    const calendar = getOrCreateDeadlinesCalendar();
-    const result = syncGrievanceDeadlinesToCalendar(grievance, calendar);
-
-    if (result.synced) {
-      showToast(`Deadline synced to calendar`, 'Success');
-    } else {
-      showToast(`Could not sync: ${result.reason}`, 'Info');
-    }
-
-    return {
-      success: true,
-      synced: result.synced,
-      message: result.synced ? 'Synced successfully' : result.reason
-    };
-
-  } catch (error) {
-    console.error('Error syncing single grievance:', error);
-    return { success: false, error: error.message };
-  }
-}
+// Note: syncSingleGrievanceToCalendar() is defined in MobileQuickActions.gs
 
 /**
  * Clears all calendar events created by the dashboard
