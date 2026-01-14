@@ -1,20 +1,21 @@
-# 🚀 Quick Deploy - SEIU 509 Dashboard
+# 🚀 Quick Deploy - Union Steward Dashboard
 
 ## One-File Deployment
 
-Deploy the **entire 509 Dashboard** using a **single file**.
+Deploy the **entire Union Steward Dashboard** using a **single consolidated file**.
 
 ---
 
 ## 📦 What You Get
 
-- ✅ **9 modules** in one auto-generated file (~660 KB)
+- ✅ **16 modules** in one auto-generated file (~1 MB)
 - ✅ **11 visible sheets** + 6 hidden calculation sheets
 - ✅ **Copy/paste deployment** - no complex setup
 - ✅ **Demo data seeding** (members + grievances)
 - ✅ **12-section Dashboard** with real-time metrics
-- ✅ **Comfort View** design and accessibility features
+- ✅ **Comfort View** accessibility features (ADHD-friendly)
 - ✅ **Mobile-optimized** quick actions and web app
+- ✅ **24,000+ lines** of battle-tested code
 
 ---
 
@@ -28,26 +29,27 @@ git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
 cd MULTIPLE-SCRIPS-REPO
 npm install
 npm run build
-# ConsolidatedDashboard.gs is now in dist/ folder
+# ConsolidatedDashboard.gs is now in dist/ folder (~1 MB)
 ```
 
 **Option B: Download directly**
-Download `ConsolidatedDashboard.gs` from the repository.
+Download `dist/ConsolidatedDashboard.gs` from the repository.
 
 ### **Step 2: Create a New Google Sheet**
 
 1. Go to [sheets.google.com](https://sheets.google.com)
 2. Click **"+ Blank"** to create a new spreadsheet
-3. Name it **"SEIU 509 Dashboard"**
+3. Name it **"Union Steward Dashboard"**
 
 ### **Step 3: Open Apps Script Editor**
 
 1. In your Google Sheet, click **Extensions → Apps Script**
 2. **Delete all the default code** (select all and delete)
+3. Rename the project to **"Union Dashboard Scripts"**
 
 ### **Step 4: Paste the Consolidated File**
 
-1. Open `ConsolidatedDashboard.gs` in your text editor
+1. Open `dist/ConsolidatedDashboard.gs` in your text editor
 2. **Select ALL** (Ctrl+A / Cmd+A)
 3. **Copy** (Ctrl+C / Cmd+C)
 4. **Paste** into the Apps Script editor
@@ -58,57 +60,74 @@ Download `ConsolidatedDashboard.gs` from the repository.
 1. Select **`CREATE_509_DASHBOARD`** from the function dropdown
 2. Click the **▶️ Run** button
 3. Click **"Review permissions"** → Choose your account
-4. Click **"Advanced"** → **"Go to 509 Dashboard Scripts (unsafe)"**
+4. Click **"Advanced"** → **"Go to Union Dashboard Scripts (unsafe)"**
 5. Click **"Allow"**
-6. The script creates all sheets (~10 seconds)
+6. The script creates all sheets (~10-15 seconds)
 
 ### **Step 6: Refresh the Page**
 
 1. Close the Apps Script editor tab
 2. Go back to your Google Sheet
 3. **Refresh the page** (F5)
-4. You should see custom menus appear
+4. You should see 6 custom menus appear:
+   - 📊 509 Dashboard
+   - 📋 Grievances
+   - 👁️ View
+   - ⚙️ Settings
+   - 🔧 Admin
+   - 🛡️ Data Integrity
 
 ### **Step 7: Seed Test Data (Optional)**
 
 1. Click **🔧 Admin → 🎭 Demo Data → 🚀 Seed All Sample Data**
-2. Wait for seeding to complete
+2. Wait for seeding to complete (~30 seconds)
 
 ---
 
 ## ✅ You're Done!
 
 Your dashboard is fully operational with:
-- ✅ Config sheet (dropdown values)
-- ✅ Member Directory (31 columns)
-- ✅ Grievance Log (34 columns)
-- ✅ 💼 Dashboard (12 analytics sections)
-- ✅ 📊 Dashboard (interactive metrics with My Cases tab for stewards)
-- ✅ 📊 Member Satisfaction (survey tracking)
-- ✅ 💡 Feedback & Development (bug/feature tracking)
-- ✅ ✅ Function Checklist (function reference)
-- ✅ 📚 Getting Started (setup instructions)
-- ✅ ❓ FAQ (common questions)
-- ✅ 📖 Config Guide (dropdown configuration help)
-- ✅ 6 hidden calculation sheets (self-healing formulas)
+
+### Visible Sheets
+- ✅ **Config** - Dropdown values and settings
+- ✅ **Member Directory** - 32 columns for member records
+- ✅ **Grievance Log** - 35 columns for grievance tracking
+- ✅ **💼 Dashboard** - 12 analytics sections
+- ✅ **📊 Interactive Dashboard** - Real-time metrics with My Cases tab
+- ✅ **📊 Member Satisfaction** - Survey response tracking
+- ✅ **💡 Feedback** - Bug/feature tracking
+- ✅ **✅ Function Checklist** - Function reference
+- ✅ **📚 Getting Started** - Setup instructions
+- ✅ **❓ FAQ** - Common questions
+- ✅ **📖 Config Guide** - Configuration help
+
+### Hidden Sheets (Auto-managed)
+- ✅ 6 calculation sheets with self-healing formulas
 
 ---
 
 ## 📁 What's Included in ConsolidatedDashboard.gs?
 
-**9 Modules (~460 KB total):**
+**16 Modules (~24,000 lines total):**
 
-| Module | Purpose |
-|--------|---------|
-| Constants.gs | SHEETS, COLORS, MEMBER_COLS, GRIEVANCE_COLS |
-| Code.gs | Main setup, menus, sheet creation, Dashboard |
-| HiddenSheets.gs | 6 self-healing calculation sheets |
-| ComfortViewFeatures.gs | Comfort View accessibility (themes, focus mode, pomodoro) |
-| MobileQuickActions.gs | Mobile UI, quick actions, modal popup |
-| PerformanceUndo.gs | Caching layer, undo/redo system |
-| DeveloperTools.gs | Demo data seeding and clearing (DELETE BEFORE PRODUCTION) |
-| WebApp.gs | Standalone web app for mobile access |
-| TestingValidation.gs | Test framework and data validation |
+| Module | Lines | Purpose |
+|--------|-------|---------|
+| Constants.gs | 824 | Sheet names, column mappings, deadline rules |
+| PerformanceUndo.gs | 295 | Caching layer, undo/redo (50 action history) |
+| ComfortViewFeatures.gs | 450 | ADHD accessibility, themes, focus mode, pomodoro |
+| HiddenSheets.gs | 2,737 | Self-healing hidden calculation sheets |
+| FormulaService.gs | 744 | Hidden sheet setup, search functions |
+| UIService.gs | 1,237 | Dialogs, sidebars, UI components |
+| GrievanceManager.gs | 1,048 | Grievance lifecycle, deadline calculations |
+| Integrations.gs | 678 | Google Drive, Calendar, email notifications |
+| DataIntegrity.gs | 1,482 | Batch operations, validation, archiving |
+| Maintenance.gs | 745 | DIAGNOSE_SETUP, REPAIR_DASHBOARD, audit logging |
+| MobileQuickActions.gs | 2,249 | Mobile UI, quick actions, modal popups |
+| WebApp.gs | 1,077 | Standalone web app for mobile access |
+| TestingValidation.gs | 475 | Test framework, data validation |
+| DeveloperTools.gs | 1,607 | Demo data seeding (DELETE BEFORE PRODUCTION) |
+| Code.gs | 7,607 | Core setup, forms, dashboard/sheet creation |
+| Main.gs | 767 | Entry point, onOpen, onEdit triggers |
 
 **Generated by:** `npm run build`
 
@@ -133,6 +152,33 @@ Your dashboard is fully operational with:
 
 ---
 
+## 🔑 Key Features
+
+### Grievance Management
+- Article 23A deadline calculations (Step 1: 7 days, Step 2: 7/14 days, Step 3: 10/21 days)
+- Auto-create Google Drive folders for each grievance
+- Sync deadlines to Google Calendar
+- Bulk status updates and step advancement
+
+### Member Directory
+- 32 tracked columns including multi-select fields
+- Name-based ID generation (e.g., MJOSM123)
+- Member Satisfaction Survey processing (89 columns)
+
+### Accessibility (Comfort View)
+- ADHD-friendly themes and focus mode
+- Pomodoro timer integration
+- High contrast options
+- Customizable color themes
+
+### Data Integrity
+- Orphan grievance detection
+- Steward workload balancing
+- Auto-archive for old records
+- Comprehensive validation
+
+---
+
 ## 🛠️ Troubleshooting
 
 ### **Menus don't appear?**
@@ -144,8 +190,29 @@ Your dashboard is fully operational with:
 - Close and reopen the Google Sheet
 
 ### **Dashboard shows errors?**
-- Run `REPAIR_DASHBOARD()` from Administrator menu
-- Run `DIAGNOSE_SETUP()` to check system health
+- Click **⚙️ Settings → 🔧 REPAIR DASHBOARD**
+- Click **🔧 Admin → 🔍 DIAGNOSE SETUP** to check system health
+
+### **Hidden sheets missing?**
+- Click **🔧 Admin → 🔧 Hidden Sheets → 🔧 Setup All Hidden Sheets**
+
+### **Slow performance?**
+- Click **🔧 Admin → 🗄️ Cache & Performance → 🔥 Warm Up Caches**
+
+---
+
+## 📱 Mobile Access
+
+### Web App Deployment
+1. In Apps Script editor, click **Deploy → New deployment**
+2. Select **Web app**
+3. Set "Execute as" to **Me**
+4. Set "Who has access" to **Anyone** (or your organization)
+5. Click **Deploy**
+6. Copy the URL and bookmark on your mobile device
+
+### Get Mobile URL
+- Click **📊 509 Dashboard → 📱 Get Mobile App URL**
 
 ---
 
@@ -153,13 +220,37 @@ Your dashboard is fully operational with:
 
 | File | Purpose |
 |------|---------|
-| README.md | Complete feature documentation |
-| AIR.md | Technical reference for developers |
+| README.md | Architecture overview and quick start |
+| AIR.md | Technical reference (Architecture & Implementation) |
 | USER_TUTORIALS.md | Step-by-step user guides |
-| COMFORT_VIEW_GUIDE.md | Accessibility features (Comfort View) |
+| COMFORT_VIEW_GUIDE.md | Accessibility features guide |
 | STEWARD_GUIDE.md | Guide for union stewards |
+| GRIEVANCE_WORKFLOW_GUIDE.md | Grievance process documentation |
+| TESTING.md | Test framework documentation |
 
 ---
 
-**Version:** 2.1.0
-**Last Updated:** 2026-01-04
+## 🔄 Updating
+
+To update to a new version:
+
+1. Pull the latest code: `git pull`
+2. Rebuild: `npm run build`
+3. Copy `dist/ConsolidatedDashboard.gs`
+4. In Apps Script editor, select all and paste
+5. Save and refresh your Google Sheet
+
+---
+
+## ⚠️ Before Production
+
+**Remove Demo Tools:**
+1. After seeding is complete, run **🔧 Admin → 🎭 Demo Data → ☢️ NUKE SEEDED DATA**
+2. This disables the Demo Data menu permanently
+3. For complete removal, delete `DeveloperTools.gs` section from the script
+
+---
+
+**Version:** 2.2.0
+**Build:** 16 files, 24,022 lines
+**Last Updated:** 2026-01-14
