@@ -248,5 +248,6 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-- **2.0.0** - Modular multi-file architecture
+- **2.2.0** - Complete feature parity with 16-module modular architecture
+- **2.0.0** - Initial modular multi-file architecture
 - **1.x** - Original monolithic version
