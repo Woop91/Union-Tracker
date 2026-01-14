@@ -40,17 +40,17 @@ const CONFIG = {
   outputFile: 'ConsolidatedDashboard.gs',
 
   // Files in build order (dependency order matters!)
-  // 9-FILE MODULAR ARCHITECTURE
+  // 9-FILE MODULAR ARCHITECTURE - Prefixed for GitHub grouping
   buildOrder: [
-    'Constants.gs',       // 1. Single source of truth - must be first
-    'MemberManager.gs',   // 2. Member directory operations
-    'GrievanceManager.gs',// 3. Grievance lifecycle management
-    'UIService.gs',       // 4. UI components, Comfort View, mobile UI
-    'Integrations.gs',    // 5. Drive, Calendar, WebApp, notifications
-    'Maintenance.gs',     // 6. Diagnostics, data integrity, caching
-    'DevTools.gs',        // 7. Test data & nuke/seed (DELETE BEFORE PRODUCTION)
-    'Code.gs',            // 8. Core setup, hidden sheets, formulas
-    'Main.gs'             // 9. Entry point - must be last
+    '01_Constants.gs',       // 1. Single source of truth - must be first
+    '02_MemberManager.gs',   // 2. Member directory operations
+    '03_GrievanceManager.gs',// 3. Grievance lifecycle management
+    '04_UIService.gs',       // 4. UI components, Comfort View, mobile UI
+    '05_Integrations.gs',    // 5. Drive, Calendar, WebApp, notifications
+    '06_Maintenance.gs',     // 6. Diagnostics, data integrity, caching
+    '07_DevTools.gs',        // 7. Test data & nuke/seed (DELETE BEFORE PRODUCTION)
+    '08_Code.gs',            // 8. Core setup, hidden sheets, formulas
+    '09_Main.gs'             // 9. Entry point - must be last
   ],
 
   // Header to add to consolidated file
