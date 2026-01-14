@@ -28,7 +28,8 @@
  * 12. WebApp.gs            - Web app deployment
  * 13. TestingValidation.gs - Test suites
  * 14. DeveloperTools.gs    - Developer utilities
- * 15. Main.gs              - Must be last (uses all modules)
+ * 15. Code.gs              - Core setup, forms, dashboard creation
+ * 16. Main.gs              - Must be last (uses all modules)
  *
  * @fileoverview Build script for merging modular files
  * @version 1.0.0
@@ -59,6 +60,7 @@ const CONFIG = {
     'WebApp.gs',              // Web app deployment
     'TestingValidation.gs',   // Test suites
     'DeveloperTools.gs',      // Developer utilities
+    'Code.gs',                // Core setup, forms, dashboard creation
     'Main.gs'                 // Entry point - must be last
   ],
 
@@ -88,6 +90,7 @@ const CONFIG = {
  * - WebApp.gs            : Web application deployment
  * - TestingValidation.gs : Test suites and validation
  * - DeveloperTools.gs    : Developer utilities
+ * - Code.gs              : Core setup, forms, dashboard creation
  * - Main.gs              : Entry point and triggers
  *
  * Then run: node build.js

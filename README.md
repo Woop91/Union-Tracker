@@ -4,7 +4,7 @@ A comprehensive Google Sheets-based dashboard for managing union grievances, mem
 
 ## Architecture Overview
 
-The dashboard has been refactored from a single monolithic file into fifteen specialized modules:
+The dashboard has been refactored from a single monolithic file into sixteen specialized modules:
 
 ```
 src/
@@ -22,6 +22,7 @@ src/
 ├── WebApp.gs             # Web application deployment
 ├── TestingValidation.gs  # Test suites and validation
 ├── DeveloperTools.gs     # Developer utilities
+├── Code.gs               # Core setup, forms, dashboard creation
 └── Main.gs               # Entry point and triggers
 ```
 
@@ -43,6 +44,7 @@ src/
 | **WebApp.gs** | Web application deployment and endpoints | `doGet`, `doPost`, `getWebInterface` |
 | **TestingValidation.gs** | Automated test suites and validation | `runAllTests`, `validateSheetStructure`, `runPerformanceTests` |
 | **DeveloperTools.gs** | Developer utilities and debugging | `logDebug`, `exportConfig`, `showDeveloperPanel` |
+| **Code.gs** | Core setup, forms, dashboard creation, multi-select | `CREATE_509_DASHBOARD`, `createConfigSheet`, `createMemberDirectory`, `createGrievanceLog` |
 | **Main.gs** | Entry point, triggers, initialization | `onOpen`, `onEdit`, `initializeDashboard` |
 
 ## Benefits of Modular Architecture
