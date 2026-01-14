@@ -33,14 +33,14 @@ src/
 | **Constants.gs** | Configuration constants, sheet names, column mappings, deadline rules | `SHEET_NAMES`, `DEADLINE_RULES`, `GRIEVANCE_STATUS`, `MEMBER_COLS`, `GRIEVANCE_COLS` |
 | **PerformanceUndo.gs** | CacheService performance optimization, undo/redo with 50 action history | `getCachedData`, `setCachedData`, `undoLastAction`, `redoAction` |
 | **ComfortViewFeatures.gs** | ADHD/accessibility features, themes, focus mode, pomodoro timer | `setTheme`, `toggleFocusMode`, `startPomodoroTimer`, `enableHighContrast` |
-| **HiddenSheets.gs** | Hidden sheet management with complex formulas | `setupHiddenSheet`, `protectHiddenSheets`, `updateHiddenCalculations` |
-| **FormulaService.gs** | Hidden calculation sheet management | `setupAllHiddenSheets`, `repairAllHiddenSheets` |
-| **UIService.gs** | All user interface components | `showDesktopSearch`, `showMultiSelectDialog`, `showQuickActionsMenu` |
+| **HiddenSheets.gs** | Hidden sheet management, auto-sync, data quality | `setupAllHiddenSheets`, `repairAllHiddenSheets`, `verifyHiddenSheets`, `syncGrievanceToMemberDirectory` |
+| **FormulaService.gs** | Hidden calculation sheet setup, search functions | `setupCalcMembersSheet`, `searchDashboard`, `getDashboardStats`, `advancedSearch` |
+| **UIService.gs** | Dialogs, sidebars, and UI components | `showDesktopSearch`, `showMultiSelectDialog`, `showDashboardSidebar`, `showAdvancedSearch` |
 | **GrievanceManager.gs** | Grievance creation, step advancement, deadline calculations | `startNewGrievance`, `advanceGrievanceStep`, `recalcAllGrievancesBatched` |
 | **Integrations.gs** | External service connections | `setupDriveFolderForGrievance`, `syncDeadlinesToCalendar`, `clearAllCalendarEvents` |
 | **DataIntegrity.gs** | Batch operations, validation, orphan detection, auto-archive | `batchUpdateWithRetry`, `detectOrphanedRecords`, `autoArchiveOldRecords`, `validateDataIntegrity` |
-| **Maintenance.gs** | Administrative and diagnostic tools | `DIAGNOSE_SETUP`, `REPAIR_DASHBOARD`, `verifyHiddenSheets` |
-| **MobileQuickActions.gs** | Quick action dialogs, mobile-optimized UI | `showQuickActions`, `handleQuickAction`, `getMobileMenu` |
+| **Maintenance.gs** | Administrative and diagnostic tools | `DIAGNOSE_SETUP`, `REPAIR_DASHBOARD`, `logAuditEvent`, `showDiagnosticsDialog` |
+| **MobileQuickActions.gs** | Quick action dialogs, mobile-optimized UI | `showQuickActionsMenu`, `showQuickActions`, `handleQuickAction`, `getMobileMenu` |
 | **WebApp.gs** | Web application deployment and endpoints | `doGet`, `doPost`, `getWebInterface` |
 | **TestingValidation.gs** | Automated test suites and validation | `runAllTests`, `validateSheetStructure`, `runPerformanceTests` |
 | **DeveloperTools.gs** | Developer utilities and debugging | `logDebug`, `exportConfig`, `showDeveloperPanel` |

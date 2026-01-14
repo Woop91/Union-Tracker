@@ -497,18 +497,18 @@ npm run watch        # Watch mode for development
 - `showToast()` - Toast notification helper
 - `showAlert()` - Alert dialog helper
 - `getCommonStyles()` - Shared CSS for dialogs
-- `showSidebar()` - Sidebar panel for extended UI
-- Sidebar generation and theme management
+- `showDashboardSidebar()` - Sidebar panel for extended UI
+- `showAdvancedSearch()` - Advanced search with filters
 
 **GrievanceManager.gs** (~1048 lines) - Grievance Lifecycle Management
 - `startNewGrievance()` - Open pre-filled grievance form
 - `advanceGrievanceStep()` - Advance grievance to next step
 - `recalcAllGrievancesBatched()` - Batch recalculate grievance deadlines
 - `onGrievanceFormSubmit()` - Handle form submission trigger
-- `calculateDeadlines()` - Calculate filing and response deadlines
+- `calculateInitialDeadlines()` - Calculate filing and response deadlines
 - `getGrievanceById()` - Lookup grievance by ID
-- `updateGrievanceStatus()` - Update grievance status field
-- Step advancement with deadline recalculation
+- `bulkUpdateGrievanceStatus()` - Bulk update grievance statuses
+- `resolveGrievance()` - Close grievance with outcome
 
 **Integrations.gs** (~678 lines) - External Services
 - Google Drive Integration:
@@ -527,15 +527,16 @@ npm run watch        # Watch mode for development
 - `REPAIR_DASHBOARD()` - Repair hidden sheets and triggers
 - `logAuditEvent()` - Log action to audit sheet
 - `showDiagnosticsDialog()` - Display diagnostics UI
-- `runRepairWithConfirmation()` - Repair with user confirmation
-- Error recovery and system validation
+- `showRepairDialog()` - Repair dialog with options
+- `NUCLEAR_RESET_HIDDEN_SHEETS()` - Complete hidden sheet reset
 
 **Main.gs** (~767 lines) - Entry Point & Triggers
 - `onOpen()` - Create menu system (5 menus + sub-menus)
 - `onEdit()` - Handle cell edit events
 - `initializeDashboard()` - First-time initialization
-- `installAllTriggers()` - Setup all script triggers
-- Trigger management for forms and auto-sync
+- `setupTriggers()` - Setup all script triggers
+- `dailyTrigger()` - Daily automated tasks
+- `startGrievanceForMember()` - Start grievance from Member Directory
 
 ---
 
@@ -1526,7 +1527,7 @@ The error occurred because `SEED_GRIEVANCES` and `SEED_MEMBERS` functions tried 
 
 **Links Tab Enhancement:**
 - Added "📦 GitHub Repository" link to External Links section
-- Links to https://github.com/Woop91/509-dashboard-second
+- Links to https://github.com/Woop91/MULTIPLE-SCRIPS-REPO
 
 **Files Changed:**
 - `MobileQuickActions.gs`: Lines 1260-1262 (renderResources updated)

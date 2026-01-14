@@ -24,10 +24,11 @@ Deploy the **entire 509 Dashboard** using a **single file**.
 
 **Option A: Build it yourself (recommended)**
 ```bash
-git clone https://github.com/Woop91/509-dashboard.git
-cd 509-dashboard
+git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
+cd MULTIPLE-SCRIPS-REPO
+npm install
 npm run build
-# ConsolidatedDashboard.gs is now ready (~460 KB)
+# ConsolidatedDashboard.gs is now in dist/ folder
 ```
 
 **Option B: Download directly**
