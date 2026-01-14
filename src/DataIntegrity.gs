@@ -1468,6 +1468,7 @@ function addDataIntegrityMenuItems() {
 
   ui.createMenu('🛡️ Data Integrity')
     .addItem('🔍 Find Orphaned Grievances', 'highlightOrphanedGrievances')
+    .addItem('🗂️ Clean Up Orphaned Folders', 'showOrphanedFolderCleanupDialog')
     .addItem('⚙️ Config Health Check', 'showConfigHealthCheck')
     .addSeparator()
     .addItem('📊 Steward Workload Dashboard', 'showStewardWorkloadDashboard')

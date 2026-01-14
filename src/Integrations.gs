@@ -675,3 +675,298 @@ function showClearCalendarConfirm() {
     }
   }
 }
+
+// ============================================================================
+// ORPHANED DRIVE FOLDER CLEANUP
+// ============================================================================
+
+/**
+ * Find Drive folders that are orphaned (no matching grievance in the sheet)
+ * @return {Object} Result with orphaned folders list
+ */
+function findOrphanedDriveFolders() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+    if (!grievanceSheet) {
+      return { success: false, error: 'Grievance Log not found' };
+    }
+
+    // Get all grievance IDs from the sheet
+    const lastRow = grievanceSheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: true, orphanedFolders: [], message: 'No grievances in sheet' };
+    }
+
+    const grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1)
+      .getValues()
+      .map(row => row[0])
+      .filter(id => id && id !== '');
+
+    const grievanceIdSet = {};
+    grievanceIds.forEach(id => { grievanceIdSet[id] = true; });
+
+    // Get root folder
+    const rootFolder = getOrCreateRootFolder();
+    const subFolders = rootFolder.getFolders();
+
+    const orphanedFolders = [];
+    const validFolders = [];
+
+    while (subFolders.hasNext()) {
+      const folder = subFolders.next();
+      const folderName = folder.getName();
+
+      // Extract grievance ID from folder name (format: "GXXXX123 - Name")
+      const match = folderName.match(/^([GM][A-Z]{4}\d{3,})/);
+
+      if (match) {
+        const folderId = match[1];
+        if (!grievanceIdSet[folderId]) {
+          orphanedFolders.push({
+            name: folderName,
+            id: folder.getId(),
+            url: folder.getUrl(),
+            created: folder.getDateCreated(),
+            grievanceId: folderId
+          });
+        } else {
+          validFolders.push({ name: folderName, grievanceId: folderId });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      orphanedFolders: orphanedFolders,
+      validCount: validFolders.length,
+      message: `Found ${orphanedFolders.length} orphaned folder(s) out of ${orphanedFolders.length + validFolders.length} total`
+    };
+
+  } catch (error) {
+    console.error('Error finding orphaned folders:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Delete orphaned Drive folders
+ * @param {string[]} folderIds - Array of folder IDs to delete
+ * @return {Object} Result with deletion count
+ */
+function deleteOrphanedFolders(folderIds) {
+  try {
+    if (!folderIds || folderIds.length === 0) {
+      return { success: true, deleted: 0, message: 'No folders to delete' };
+    }
+
+    let deleted = 0;
+    const errors = [];
+
+    for (const folderId of folderIds) {
+      try {
+        const folder = DriveApp.getFolderById(folderId);
+        folder.setTrashed(true);
+        deleted++;
+
+        // Rate limiting
+        if (deleted % 10 === 0) {
+          Utilities.sleep(200);
+        }
+      } catch (e) {
+        errors.push(`Folder ${folderId}: ${e.message}`);
+      }
+    }
+
+    // Log the cleanup action
+    if (typeof logIntegrityEvent === 'function') {
+      logIntegrityEvent('ORPHAN_FOLDER_CLEANUP',
+        `Deleted ${deleted} orphaned Drive folders`,
+        { deletedCount: deleted, errors: errors.length }
+      );
+    }
+
+    return {
+      success: true,
+      deleted: deleted,
+      errors: errors,
+      message: `Deleted ${deleted} folder(s)${errors.length > 0 ? ', ' + errors.length + ' errors' : ''}`
+    };
+
+  } catch (error) {
+    console.error('Error deleting orphaned folders:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Show dialog for orphaned folder cleanup
+ */
+function showOrphanedFolderCleanupDialog() {
+  const result = findOrphanedDriveFolders();
+
+  if (!result.success) {
+    SpreadsheetApp.getUi().alert('Error', result.error, SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  if (result.orphanedFolders.length === 0) {
+    SpreadsheetApp.getUi().alert(
+      '✅ No Orphaned Folders',
+      'All Drive folders have matching grievances in the Grievance Log.\n\n' +
+      'Valid folders found: ' + result.validCount,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Build HTML dialog
+  let folderListHtml = '';
+  result.orphanedFolders.forEach((folder, index) => {
+    const created = folder.created ? new Date(folder.created).toLocaleDateString() : 'Unknown';
+    folderListHtml += `
+      <tr>
+        <td><input type="checkbox" id="folder_${index}" value="${folder.id}" checked></td>
+        <td><a href="${folder.url}" target="_blank">${folder.name}</a></td>
+        <td>${folder.grievanceId}</td>
+        <td>${created}</td>
+      </tr>`;
+  });
+
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .warning { background: #FEF3C7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #F59E0B; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th { background: #7C3AED; color: white; padding: 10px; text-align: left; }
+        td { padding: 8px; border-bottom: 1px solid #E5E7EB; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-size: 14px; }
+        .btn-danger { background: #DC2626; color: white; }
+        .btn-danger:hover { background: #B91C1C; }
+        .btn-secondary { background: #6B7280; color: white; }
+        .summary { margin-top: 15px; padding: 10px; background: #F3F4F6; border-radius: 5px; }
+      </style>
+    </head>
+    <body>
+      <h2>🗂️ Orphaned Drive Folder Cleanup</h2>
+
+      <div class="warning">
+        <strong>⚠️ Warning:</strong> These folders exist in Google Drive but have no matching
+        grievance ID in the Grievance Log. They may have been left behind when grievances were deleted.
+      </div>
+
+      <table>
+        <tr>
+          <th>Select</th>
+          <th>Folder Name</th>
+          <th>Grievance ID</th>
+          <th>Created</th>
+        </tr>
+        ${folderListHtml}
+      </table>
+
+      <div class="summary">
+        <strong>Summary:</strong> ${result.orphanedFolders.length} orphaned folder(s) found,
+        ${result.validCount} valid folder(s) matched to grievances.
+      </div>
+
+      <div style="margin-top: 20px; text-align: right;">
+        <button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>
+        <button class="btn btn-danger" onclick="deleteSelected()">🗑️ Delete Selected</button>
+      </div>
+
+      <script>
+        function deleteSelected() {
+          const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+          const folderIds = Array.from(checkboxes).map(cb => cb.value);
+
+          if (folderIds.length === 0) {
+            alert('Please select at least one folder to delete.');
+            return;
+          }
+
+          if (!confirm('Are you sure you want to delete ' + folderIds.length + ' folder(s)? This will move them to Trash.')) {
+            return;
+          }
+
+          google.script.run
+            .withSuccessHandler(function(result) {
+              alert(result.message);
+              google.script.host.close();
+            })
+            .withFailureHandler(function(error) {
+              alert('Error: ' + error.message);
+            })
+            .deleteOrphanedFolders(folderIds);
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(700).setHeight(500);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Clean Up Orphaned Folders');
+}
+
+/**
+ * Scheduled cleanup of orphaned folders (for time-based trigger)
+ * Sends report to admin but doesn't delete without confirmation
+ */
+function runScheduledFolderAudit() {
+  const result = findOrphanedDriveFolders();
+
+  if (!result.success || result.orphanedFolders.length === 0) {
+    return;
+  }
+
+  // Get admin emails from Config
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) return;
+
+  const adminEmail = configSheet.getRange(3, CONFIG_COLS.ADMIN_EMAILS).getValue();
+
+  if (adminEmail) {
+    let body = `<h2>Orphaned Drive Folder Report</h2>
+      <p>The scheduled audit found ${result.orphanedFolders.length} orphaned folder(s) in the grievance Drive folder.</p>
+      <p>These folders have no matching grievance ID in the Grievance Log:</p>
+      <table style="border-collapse:collapse;">
+        <tr style="background:#f0f0f0;">
+          <th style="padding:8px;border:1px solid #ddd;">Folder Name</th>
+          <th style="padding:8px;border:1px solid #ddd;">Grievance ID</th>
+          <th style="padding:8px;border:1px solid #ddd;">Created</th>
+        </tr>`;
+
+    result.orphanedFolders.slice(0, 20).forEach(folder => {
+      const created = folder.created ? new Date(folder.created).toLocaleDateString() : 'Unknown';
+      body += `<tr>
+        <td style="padding:8px;border:1px solid #ddd;"><a href="${folder.url}">${folder.name}</a></td>
+        <td style="padding:8px;border:1px solid #ddd;">${folder.grievanceId}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${created}</td>
+      </tr>`;
+    });
+
+    if (result.orphanedFolders.length > 20) {
+      body += `<tr><td colspan="3" style="padding:8px;">...and ${result.orphanedFolders.length - 20} more</td></tr>`;
+    }
+
+    body += `</table>
+      <p style="margin-top:20px;">To clean up these folders, go to the dashboard and use:
+      <strong>Admin > Drive Integration > Clean Up Orphaned Folders</strong></p>
+      <p style="color:#666;font-size:12px;">--<br>509 Dashboard Automated Report</p>`;
+
+    try {
+      MailApp.sendEmail({
+        to: adminEmail,
+        subject: `[509 Dashboard] ${result.orphanedFolders.length} Orphaned Drive Folder(s) Found`,
+        htmlBody: body
+      });
+    } catch (e) {
+      console.error('Failed to send orphan folder report:', e);
+    }
+  }
+}

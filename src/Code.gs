@@ -61,55 +61,95 @@ function CREATE_509_DASHBOARD() {
 
   ss.toast('Starting dashboard creation...', '🏗️ Setup', 5);
 
+  // Track created sheets for potential rollback
+  var createdSheets = [];
+  var setupState = {
+    step: '',
+    success: false,
+    sheetsCreated: 0
+  };
+
   try {
-    // Create core data sheets
+    // Phase 1: Core data sheets (most critical)
+    setupState.step = 'Config sheet';
     createConfigSheet(ss);
-    ss.toast('Created Config sheet', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.CONFIG);
+    setupState.sheetsCreated++;
+    ss.toast('Created Config sheet (1/11)', '🏗️ Progress', 2);
 
+    setupState.step = 'Member Directory';
     createMemberDirectory(ss);
-    ss.toast('Created Member Directory', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.MEMBER_DIR);
+    setupState.sheetsCreated++;
+    ss.toast('Created Member Directory (2/11)', '🏗️ Progress', 2);
 
+    setupState.step = 'Grievance Log';
     createGrievanceLog(ss);
-    ss.toast('Created Grievance Log', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.GRIEVANCE_LOG);
+    setupState.sheetsCreated++;
+    ss.toast('Created Grievance Log (3/11)', '🏗️ Progress', 2);
 
-    // Setup hidden calculation sheets (needed before dashboards for formula references)
+    // Phase 2: Hidden calculation sheets
+    setupState.step = 'Hidden sheets';
     ss.toast('Setting up hidden sheets...', '🏗️ Progress', 3);
     setupHiddenSheets(ss);
 
-    // Create dashboard sheets (after hidden sheets so formulas can reference them)
+    // Phase 3: Dashboard and view sheets
+    setupState.step = 'Dashboard';
     createDashboard(ss);
-    ss.toast('Created Dashboard', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.DASHBOARD);
+    setupState.sheetsCreated++;
+    ss.toast('Created Dashboard (4/11)', '🏗️ Progress', 2);
 
+    setupState.step = 'Custom View';
     createInteractiveDashboard(ss);
-    ss.toast('Created Custom View', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.INTERACTIVE);
+    setupState.sheetsCreated++;
+    ss.toast('Created Custom View (5/11)', '🏗️ Progress', 2);
 
+    setupState.step = 'Member Satisfaction';
     createSatisfactionSheet(ss);
-    ss.toast('Created Member Satisfaction', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.SATISFACTION);
+    setupState.sheetsCreated++;
+    ss.toast('Created Member Satisfaction (6/11)', '🏗️ Progress', 2);
 
+    setupState.step = 'Feedback sheet';
     createFeedbackSheet(ss);
-    ss.toast('Created Feedback & Development', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.FEEDBACK);
+    setupState.sheetsCreated++;
+    ss.toast('Created Feedback & Development (7/11)', '🏗️ Progress', 2);
 
-    // Create Function Checklist (function reference guide with 13 phases)
+    // Phase 4: Documentation sheets (non-critical)
+    setupState.step = 'Function Checklist';
     createFunctionChecklistSheet_();
-    ss.toast('Created Function Checklist', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.FUNCTION_CHECKLIST);
+    setupState.sheetsCreated++;
+    ss.toast('Created Function Checklist (8/11)', '🏗️ Progress', 2);
 
-    // Create Getting Started guide
+    setupState.step = 'Getting Started';
     createGettingStartedSheet(ss);
-    ss.toast('Created Getting Started', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.GETTING_STARTED);
+    setupState.sheetsCreated++;
+    ss.toast('Created Getting Started (9/11)', '🏗️ Progress', 2);
 
-    // Create FAQ sheet
+    setupState.step = 'FAQ';
     createFAQSheet(ss);
-    ss.toast('Created FAQ', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.FAQ);
+    setupState.sheetsCreated++;
+    ss.toast('Created FAQ (10/11)', '🏗️ Progress', 2);
 
-    // Create Config Guide sheet
+    setupState.step = 'Config Guide';
     createConfigGuideSheet(ss);
-    ss.toast('Created Config Guide', '🏗️ Progress', 2);
+    createdSheets.push(SHEETS.CONFIG_GUIDE);
+    setupState.sheetsCreated++;
+    ss.toast('Created Config Guide (11/11)', '🏗️ Progress', 2);
 
-    // Save form URLs to Config sheet
+    // Phase 5: Final setup
+    setupState.step = 'Form URLs';
     saveFormUrlsToConfig_silent(ss);
     ss.toast('Saved form URLs to Config', '🏗️ Progress', 2);
 
-    // Setup data validations
+    setupState.step = 'Data validations';
     ss.toast('Setting up validations...', '🏗️ Progress', 3);
     setupDataValidations();
 
@@ -120,6 +160,7 @@ function CREATE_509_DASHBOARD() {
       ss.moveActiveSheet(1);
     }
 
+    setupState.success = true;
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
       '11 sheets created:\n' +
@@ -134,9 +175,80 @@ function CREATE_509_DASHBOARD() {
       'Use the Demo menu to seed sample data.', ui.ButtonSet.OK);
 
   } catch (error) {
-    Logger.log('Error in CREATE_509_DASHBOARD: ' + error.message);
-    ui.alert('❌ Error', 'An error occurred: ' + error.message, ui.ButtonSet.OK);
+    Logger.log('Error in CREATE_509_DASHBOARD at step "' + setupState.step + '": ' + error.message);
+
+    // Offer rollback for partial failures
+    var rollbackResponse = ui.alert(
+      '❌ Setup Failed',
+      'An error occurred while creating: ' + setupState.step + '\n\n' +
+      'Error: ' + error.message + '\n\n' +
+      'Sheets created before error: ' + setupState.sheetsCreated + '\n\n' +
+      'Would you like to roll back and delete the partially created sheets?\n\n' +
+      '• YES = Remove all sheets created during this attempt\n' +
+      '• NO = Keep partial setup (you can repair manually)',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (rollbackResponse === ui.Button.YES) {
+      rollbackDashboardCreation_(ss, createdSheets);
+      ui.alert('🔄 Rollback Complete',
+        'Removed ' + createdSheets.length + ' sheet(s) created during the failed setup.\n\n' +
+        'Please check the script logs for more details about the error.',
+        ui.ButtonSet.OK);
+    } else {
+      ui.alert('ℹ️ Partial Setup Retained',
+        setupState.sheetsCreated + ' sheet(s) were created before the error.\n\n' +
+        'You can try running REPAIR_DASHBOARD to fix the incomplete setup,\n' +
+        'or manually delete the partial sheets and start over.',
+        ui.ButtonSet.OK);
+    }
   }
+}
+
+/**
+ * Rollback helper - removes sheets created during a failed setup attempt
+ * @param {Spreadsheet} ss - Active spreadsheet
+ * @param {Array<string>} sheetNames - Names of sheets to remove
+ * @private
+ */
+function rollbackDashboardCreation_(ss, sheetNames) {
+  var removed = 0;
+  for (var i = 0; i < sheetNames.length; i++) {
+    try {
+      var sheet = ss.getSheetByName(sheetNames[i]);
+      if (sheet) {
+        ss.deleteSheet(sheet);
+        removed++;
+        Logger.log('Rollback: Removed sheet "' + sheetNames[i] + '"');
+      }
+    } catch (e) {
+      Logger.log('Rollback: Could not remove sheet "' + sheetNames[i] + '": ' + e.message);
+    }
+  }
+
+  // Also try to remove hidden sheets that may have been created
+  var hiddenSheets = [
+    SHEETS.GRIEVANCE_CALC,
+    SHEETS.GRIEVANCE_FORMULAS,
+    SHEETS.MEMBER_LOOKUP,
+    SHEETS.STEWARD_CONTACT_CALC,
+    SHEETS.DASHBOARD_CALC,
+    SHEETS.STEWARD_PERFORMANCE_CALC
+  ];
+
+  for (var j = 0; j < hiddenSheets.length; j++) {
+    try {
+      var hiddenSheet = ss.getSheetByName(hiddenSheets[j]);
+      if (hiddenSheet) {
+        ss.deleteSheet(hiddenSheet);
+        Logger.log('Rollback: Removed hidden sheet "' + hiddenSheets[j] + '"');
+      }
+    } catch (e) {
+      // Hidden sheet may not exist, ignore
+    }
+  }
+
+  Logger.log('Rollback complete: Removed ' + removed + ' visible sheets');
 }
 
 // ============================================================================
@@ -1909,6 +2021,8 @@ function createFeedbackSheet(ss) {
 
 /**
  * Get existing sheet or create new one
+ * WARNING: This function deletes existing sheets without confirmation.
+ * For user-facing operations, use getOrCreateSheetSafe() from DataIntegrity.gs instead.
  * @param {Spreadsheet} ss - Spreadsheet object
  * @param {string} name - Sheet name
  * @returns {Sheet} Sheet object
@@ -1918,6 +2032,44 @@ function getOrCreateSheet(ss, name) {
   if (sheet) {
     ss.deleteSheet(sheet);
   }
+  return ss.insertSheet(name);
+}
+
+/**
+ * Get existing sheet or create new one with user confirmation
+ * Shows a warning dialog before deleting sheets that contain data.
+ * @param {Spreadsheet} ss - Spreadsheet object
+ * @param {string} name - Sheet name
+ * @param {boolean} skipConfirmation - Skip the confirmation dialog (for batch operations)
+ * @returns {Sheet|null} Sheet object or null if user cancelled
+ */
+function getOrCreateSheetWithConfirmation(ss, name, skipConfirmation) {
+  var sheet = ss.getSheetByName(name);
+
+  if (sheet) {
+    // Check if sheet has data beyond the header
+    var hasData = sheet.getLastRow() > 1;
+
+    if (hasData && !skipConfirmation) {
+      var ui = SpreadsheetApp.getUi();
+      var response = ui.alert(
+        '⚠️ Sheet Contains Data',
+        'The sheet "' + name + '" already exists and contains data.\n\n' +
+        'All existing data in this sheet will be PERMANENTLY DELETED.\n\n' +
+        'Do you want to continue?',
+        ui.ButtonSet.YES_NO
+      );
+
+      if (response !== ui.Button.YES) {
+        Logger.log('User cancelled recreation of sheet: ' + name);
+        return null;
+      }
+    }
+
+    ss.deleteSheet(sheet);
+    Logger.log('Deleted existing sheet: ' + name);
+  }
+
   return ss.insertSheet(name);
 }
 
