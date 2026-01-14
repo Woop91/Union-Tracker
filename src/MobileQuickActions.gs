@@ -1230,15 +1230,15 @@ function getInteractiveDashboardHtml() {
     // Load overdue preview on overview
     'function loadOverduePreview(){' +
     '  google.script.run.withSuccessHandler(function(data){' +
-    '    var overdue=data.filter(function(g){return g.isOverdue});' +
-    '    if(overdue.length===0){document.getElementById("overview-overdue").innerHTML="";return}' +
+    '    var overdue=(data||[]).filter(function(g){return g.isOverdue});' +
+    '    if(overdue.length===0){document.getElementById("overview-overdue").innerHTML="<div style=\\"text-align:center;padding:15px;color:#10B981\\">✅ All cases on track!</div>";return}' +
     '    var html="<div class=\\"chart-container\\" style=\\"border-left:4px solid #dc2626\\"><div class=\\"chart-title\\">⚠️ Overdue Cases ("+overdue.length+")</div>";' +
     '    html+="<div class=\\"list-container\\">";' +
     '    overdue.slice(0,3).forEach(function(g){html+="<div class=\\"list-item\\" onclick=\\"showGrievanceDetail(\'"+g.id+"\')\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+g.id+" - "+g.memberName+"</div><div class=\\"list-item-subtitle\\">"+g.issueType+" • "+g.currentStep+"</div></div><span class=\\"badge badge-overdue\\">Overdue</span></div>"});' +
     '    if(overdue.length>3)html+="<button class=\\"action-btn action-btn-danger\\" style=\\"width:100%;margin-top:8px\\" onclick=\\"switchTab(\'grievances\',document.getElementById(\'tab-grievances\'));setTimeout(function(){filterGrievanceStatus(\'Overdue\',document.querySelector(\'[data-filter=Overdue]\'))},300)\\">View All "+overdue.length+" Overdue Cases</button>";' +
     '    html+="</div></div>";' +
     '    document.getElementById("overview-overdue").innerHTML=html;' +
-    '  }).getInteractiveGrievanceData();' +
+    '  }).withFailureHandler(function(e){document.getElementById("overview-overdue").innerHTML="<div class=\\"error-state\\">⚠️ Could not load overdue cases</div>"}).getInteractiveGrievanceData();' +
     '}' +
 
     // Load my cases (steward's assigned grievances)
