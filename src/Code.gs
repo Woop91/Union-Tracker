@@ -7171,6 +7171,12 @@ function getSatisfactionDashboardHtml() {
     '<script>' +
     'var allResponses=[];var currentFilter="all";var analyticsLoaded=false;var sectionsLoaded=false;' +
 
+    // Error handler helper
+    'function handleLoadError(containerId,msg,err){' +
+    '  var c=document.getElementById(containerId);' +
+    '  if(c)c.innerHTML="<div class=\\"empty-state\\" style=\\"color:#dc2626\\"><div class=\\"empty-state-icon\\">⚠️</div><p>"+msg+"</p><p style=\\"font-size:12px\\">"+((err&&err.message)||"Please try again")+"</p><button onclick=\\"location.reload()\\" style=\\"margin-top:10px;padding:8px 16px;border:none;border-radius:6px;background:#3b82f6;color:white;cursor:pointer\\">Retry</button></div>";' +
+    '}' +
+
     // Tab switching
     'function switchTab(tabName,btn){' +
     '  document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});' +
@@ -7201,7 +7207,7 @@ function getSatisfactionDashboardHtml() {
 
     // Load overview data
     'function loadOverview(){' +
-    '  google.script.run.withSuccessHandler(function(data){renderOverview(data)}).getSatisfactionOverviewData();' +
+    '  google.script.run.withSuccessHandler(function(data){renderOverview(data)}).withFailureHandler(function(e){handleLoadError("overview-stats","Failed to load overview",e)}).getSatisfactionOverviewData();' +
     '}' +
 
     // Render overview
@@ -7242,7 +7248,7 @@ function getSatisfactionDashboardHtml() {
 
     // Load responses
     'function loadResponses(){' +
-    '  google.script.run.withSuccessHandler(function(data){allResponses=data;renderResponses(data)}).getSatisfactionResponseData();' +
+    '  google.script.run.withSuccessHandler(function(data){allResponses=data||[];renderResponses(data)}).withFailureHandler(function(e){handleLoadError("responses-list","Failed to load responses",e)}).getSatisfactionResponseData();' +
     '}' +
 
     // Render responses with clickable details
@@ -7309,7 +7315,7 @@ function getSatisfactionDashboardHtml() {
     // Load sections data
     'function loadSections(){' +
     '  sectionsLoaded=true;' +
-    '  google.script.run.withSuccessHandler(function(data){renderSections(data)}).getSatisfactionSectionData();' +
+    '  google.script.run.withSuccessHandler(function(data){renderSections(data)}).withFailureHandler(function(e){sectionsLoaded=false;handleLoadError("sections-charts","Failed to load sections",e)}).getSatisfactionSectionData();' +
     '}' +
 
     // Render sections
@@ -7355,7 +7361,7 @@ function getSatisfactionDashboardHtml() {
     // Load analytics
     'function loadAnalytics(){' +
     '  analyticsLoaded=true;' +
-    '  google.script.run.withSuccessHandler(function(data){renderAnalytics(data)}).getSatisfactionAnalyticsData();' +
+    '  google.script.run.withSuccessHandler(function(data){renderAnalytics(data)}).withFailureHandler(function(e){analyticsLoaded=false;handleLoadError("analytics-content","Failed to load analytics",e)}).getSatisfactionAnalyticsData();' +
     '}' +
 
     // Render analytics/insights
@@ -7446,16 +7452,8 @@ function getSatisfactionOverviewData() {
 
   if (!sheet) return data;
 
-  // Check if there's data by looking at column A (Timestamp)
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  // Optimized: Use getLastRow() instead of iterating through A:A column
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return data;
 
@@ -7616,31 +7614,33 @@ function getSatisfactionResponseData() {
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
   if (!sheet) return [];
 
-  // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
-
+  // Optimized: Use getLastRow() instead of iterating through A:A column
+  var lastRow = sheet.getLastRow();
   if (lastRow <= 1) return [];
 
   var numRows = lastRow - 1;
   var tz = Session.getScriptTimeZone();
 
-  // Get worksite, role, shift, time in role, steward contact, and satisfaction scores
-  var worksiteData = sheet.getRange(2, SATISFACTION_COLS.Q1_WORKSITE, numRows, 1).getValues();
-  var roleData = sheet.getRange(2, SATISFACTION_COLS.Q2_ROLE, numRows, 1).getValues();
-  var shiftData = sheet.getRange(2, SATISFACTION_COLS.Q3_SHIFT, numRows, 1).getValues();
-  var timeData = sheet.getRange(2, SATISFACTION_COLS.Q4_TIME_IN_ROLE, numRows, 1).getValues();
-  var stewardContactData = sheet.getRange(2, SATISFACTION_COLS.Q5_STEWARD_CONTACT, numRows, 1).getValues();
-  var timestampData = sheet.getRange(2, 1, numRows, 1).getValues();
-  var satisfactionData = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, numRows, 4).getValues();
-  var stewardRatingsData = sheet.getRange(2, SATISFACTION_COLS.Q10_TIMELY_RESPONSE, numRows, 7).getValues();
+  // Optimized: Batch read all needed columns in single range
+  // Determine the range that covers all columns (1 to Q10 + 6)
+  var lastCol = SATISFACTION_COLS.Q10_TIMELY_RESPONSE + 6;
+  var allData = sheet.getRange(2, 1, numRows, lastCol).getValues();
+
+  // Extract columns from batch data (column indices are 0-based in array)
+  var timestampData = allData.map(function(row) { return [row[0]]; });
+  var worksiteData = allData.map(function(row) { return [row[SATISFACTION_COLS.Q1_WORKSITE - 1]]; });
+  var roleData = allData.map(function(row) { return [row[SATISFACTION_COLS.Q2_ROLE - 1]]; });
+  var shiftData = allData.map(function(row) { return [row[SATISFACTION_COLS.Q3_SHIFT - 1]]; });
+  var timeData = allData.map(function(row) { return [row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1]]; });
+  var stewardContactData = allData.map(function(row) { return [row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1]]; });
+  var satisfactionData = allData.map(function(row) {
+    var start = SATISFACTION_COLS.Q6_SATISFIED_REP - 1;
+    return row.slice(start, start + 4);
+  });
+  var stewardRatingsData = allData.map(function(row) {
+    var start = SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1;
+    return row.slice(start, start + 7);
+  });
 
   var responses = [];
   for (var i = 0; i < numRows; i++) {
@@ -7703,17 +7703,8 @@ function getSatisfactionSectionData() {
   var result = { sections: [] };
   if (!sheet) return result;
 
-  // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
-
+  // Optimized: Use getLastRow() instead of iterating through A:A column
+  var lastRow = sheet.getLastRow();
   if (lastRow <= 1) return result;
 
   var numRows = lastRow - 1;
@@ -8015,13 +8006,8 @@ function getSatisfactionLocationDrill(location) {
  * Helper function to get last row with data
  */
 function getSheetLastRow(sheet) {
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      return i;
-    }
-  }
-  return timestamps.length;
+  // Optimized: Use built-in getLastRow() instead of iterating through A:A column
+  return sheet.getLastRow();
 }
 
 /**
@@ -8041,17 +8027,8 @@ function getSatisfactionAnalyticsData() {
 
   if (!sheet) return result;
 
-  // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
-
+  // Optimized: Use getLastRow() instead of iterating through A:A column
+  var lastRow = sheet.getLastRow();
   if (lastRow <= 1) return result;
 
   var numRows = lastRow - 1;

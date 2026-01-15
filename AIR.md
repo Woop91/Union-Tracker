@@ -1134,6 +1134,45 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 
 ## Changelog
 
+### Version 2.2.1 / v3.49 (2026-01-14) - Reliability & Performance Improvements
+
+**WebApp.gs - Bug Fixes:**
+- Added missing `withFailureHandler()` on all `google.script.run` calls
+- Added null checks before `data.filter()` calls to prevent blank page crashes
+- Added retry logic with exponential backoff for network failures
+
+**WebApp.gs - Load More Pagination:**
+- Replaced Prev/Next pagination with "Load More" pattern
+- Grievance list: Initial 20 items, +20 per click
+- Member list: Initial 25 items, +25 per click
+- "Load More (X remaining)" button shows count
+
+**WebApp.gs - Caching & Offline:**
+- sessionStorage caching with 5-minute TTL
+- Offline detection via `navigator.onLine`
+- Memory cleanup on `pagehide` event
+- Empty overdue state now shows "All cases on track!"
+
+**Code.gs - Performance Optimizations:**
+- `getSheetLastRow()` - Uses built-in `sheet.getLastRow()` instead of iterating A:A column
+- `getSatisfactionOverviewData()` - Replaced A:A iteration with `getLastRow()`
+- `getSatisfactionResponseData()` - Consolidated 8 separate `getRange()` calls into single batch read
+- `getSatisfactionSectionData()` - Replaced A:A iteration with `getLastRow()`
+- `getSatisfactionAnalyticsData()` - Replaced A:A iteration with `getLastRow()`
+
+**Code.gs - Error Handlers:**
+- Added `handleLoadError()` helper function for consistent error display
+- `loadOverview()` - Added `withFailureHandler()` with retry button
+- `loadResponses()` - Added `withFailureHandler()` with retry button
+- `loadSections()` - Added `withFailureHandler()` with retry button
+- `loadAnalytics()` - Added `withFailureHandler()` with retry button
+
+**MobileQuickActions.gs - Error Handlers & Null Safety:**
+- `loadOverduePreview()` - Added `withFailureHandler()` and null check `(data||[])`
+- Empty overdue state now shows "All cases on track!" message
+
+---
+
 ### Version 2.2.0 / v3.48 (2026-01-14) - Survey Verification, Data Integrity & Steward Workload
 
 **New Survey Verification System:**

@@ -82,9 +82,9 @@ var COMMAND_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 2,
   MINOR: 2,
-  PATCH: 0,
-  BUILD: 'v3.48',
-  CODENAME: 'Survey Verification & Data Integrity'
+  PATCH: 1,
+  BUILD: 'v3.49',
+  CODENAME: 'Reliability & Performance Improvements'
 };
 
 // ============================================================================
