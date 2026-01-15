@@ -138,7 +138,7 @@ src/
 - **Data Integrity**: Batch operations, validation, orphan detection
 - **Audit Logging**: Track all changes with timestamps
 
-## Version
+## Advanced Features
 
 ### Drive Integration
 - Auto-create folder structure for each grievance
