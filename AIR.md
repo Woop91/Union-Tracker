@@ -166,11 +166,17 @@ npm run watch        # Watch mode for development
 
 ### File Descriptions (10-File Architecture)
 
-**01_Constants.gs** (~1079 lines) - Configuration & Column Mapping
+**01_Constants.gs** (~1200 lines) - Configuration & Column Mapping
 - `SHEETS` - Sheet name constants (3 data + 2 dashboard + 6 hidden)
+- `SHEET_NAMES` - Alias for `SHEETS` (backward compatibility)
 - `COLORS` - Brand color scheme
-- `MEMBER_COLS` - 31 Member Directory column positions
-- `GRIEVANCE_COLS` - 34 Grievance Log column positions
+- `MEMBER_COLS` - 32 Member Directory column positions (1-indexed for getRange)
+- `MEMBER_COLUMNS` - 0-indexed alias for legacy array access code
+- `GRIEVANCE_COLS` - 35 Grievance Log column positions (1-indexed for getRange)
+- `GRIEVANCE_COLUMNS` - 0-indexed alias for legacy array access code
+- `GRIEVANCE_STATUS` - Status string constants (OPEN, PENDING, RESOLVED, etc.)
+- `AUDIT_EVENTS` - Audit log event type constants
+- `BATCH_LIMITS` - Performance batch processing limits
 - `CONFIG_COLS` - Config sheet column positions (includes Strategic Command settings at AS-AW)
   - `TEMPLATE_ID: 50` and `PDF_FOLDER_ID: 51` for PDF automation
 - `COMMAND_CONFIG` - Strategic Command Center configuration **(v4.0)**:
@@ -681,6 +687,60 @@ var GRIEVANCE_COLS = {
   // Section 12: Drive Integration (AG-AH)
   DRIVE_FOLDER_ID: 33,    // AG
   DRIVE_FOLDER_URL: 34    // AH
+};
+```
+
+### Backward Compatibility Aliases
+
+The codebase uses two indexing conventions:
+- **1-indexed** (`MEMBER_COLS`, `GRIEVANCE_COLS`) - For `getRange(row, col)` calls
+- **0-indexed** (`MEMBER_COLUMNS`, `GRIEVANCE_COLUMNS`) - For array access `data[row][col]`
+
+```javascript
+// Legacy aliases for array-based code (0-indexed)
+var SHEET_NAMES = SHEETS;  // Alias for backward compatibility
+
+var GRIEVANCE_COLUMNS = {
+  GRIEVANCE_ID: 0,    // = GRIEVANCE_COLS.GRIEVANCE_ID - 1
+  MEMBER_ID: 1,
+  STATUS: 4,
+  CURRENT_STEP: 5,
+  FILING_DATE: 8,     // Alias for DATE_FILED
+  // ... (all columns with 0-indexed values)
+};
+
+var MEMBER_COLUMNS = {
+  ID: 0,              // = MEMBER_COLS.MEMBER_ID - 1
+  FIRST_NAME: 1,
+  LAST_NAME: 2,
+  DEPARTMENT: 3,      // Alias for JOB_TITLE
+  EMAIL: 7,
+  // ... (all columns with 0-indexed values)
+};
+
+// Status constants
+var GRIEVANCE_STATUS = {
+  OPEN: 'Open',
+  PENDING: 'Pending Info',
+  RESOLVED: 'Settled',
+  APPEALED: 'Appealed',
+  AT_ARBITRATION: 'In Arbitration',
+  CLOSED: 'Closed'
+};
+
+// Audit event types
+var AUDIT_EVENTS = {
+  GRIEVANCE_CREATED: 'GRIEVANCE_CREATED',
+  MEMBER_ADDED: 'MEMBER_ADDED',
+  SYSTEM_REPAIR: 'SYSTEM_REPAIR',
+  // ... (all event types)
+};
+
+// Performance limits
+var BATCH_LIMITS = {
+  MAX_ROWS_PER_BATCH: 100,
+  MAX_EXECUTION_TIME_MS: 300000,
+  PAUSE_BETWEEN_BATCHES_MS: 100
 };
 ```
 
