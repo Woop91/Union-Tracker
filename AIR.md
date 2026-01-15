@@ -1,7 +1,7 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 2.2.0 / v3.48 (Survey Verification, Data Integrity, Quarterly Tracking & Member Authentication)
-**Last Updated:** 2026-01-14
+**Version:** 3.6.0 / v3.48 (Strategic Command Center, Midnight Auto-Refresh, Dynamic Config)
+**Last Updated:** 2026-01-15
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
 ---
@@ -757,7 +757,7 @@ var FEEDBACK_COLS = {
 |---|------------|------|---------|
 | 6 | 📊 Member Satisfaction | Data | 68-question Google Form survey with dashboard, charts (82 cols + dashboard) |
 | 7 | 💡 Feedback & Development | Data | Bug/feature tracking with priority (11 columns) |
-| 8 | ✅ Function Checklist | Reference | Function reference guide organized by 13 phases |
+| 8 | ✅ Function Checklist | Reference | Function reference guide organized by 14 phases |
 
 ### Help & Documentation Sheets
 
@@ -801,7 +801,7 @@ var FEEDBACK_COLS = {
 
 ## Config Sheet & Dropdown Validations
 
-### Config Columns (15 columns + HOME_TOWNS at AF)
+### Config Columns (15 columns + HOME_TOWNS at AF + Strategic Command at AS-AW)
 
 | Column | Name | Used By |
 |--------|------|---------|
@@ -821,6 +821,11 @@ var FEEDBACK_COLS = {
 | N | (blank) | - |
 | O | Grievance Coordinators | Admin use |
 | AF | Home Towns | Member Directory (X) |
+| **AS** | **Chief Steward Email** | **Strategic Command Center (escalation alerts)** |
+| **AT** | **Unit Codes** | **Strategic Command Center (ID generation)** |
+| **AU** | **Archive Folder ID** | **Strategic Command Center (PDF archive)** |
+| **AV** | **Escalation Statuses** | **Strategic Command Center (alert triggers)** |
+| **AW** | **Escalation Steps** | **Strategic Command Center (alert triggers)** |
 
 ### Member Directory Dropdowns (16 columns)
 
@@ -874,9 +879,9 @@ Columns marked as **Multi-Select** support comma-separated values for multiple s
 
 ---
 
-## Menu System (5 Menus)
+## Menu System (6 Menus)
 
-The menu system has been reorganized from 9 menus to 5 logical groups:
+The menu system has been reorganized from 9 menus to 6 logical groups (5 original + Strategic Command Center):
 
 ```
 📊 509 Dashboard
@@ -969,6 +974,32 @@ The menu system has been reorganized from 9 menus to 5 logical groups:
     ├── ☢️ NUKE SEEDED DATA
     ├── 🧹 Clear Config Dropdowns Only
     └── 🔄 Restore Config & Dropdowns
+
+📊 509 Command (Strategic Command Center v3.6.0)
+├── 👁️ Executive Command (PII) - Internal dashboard with member names
+├── 🫂 Member Analytics (No PII) - PII-safe dashboard
+├── 📩 Send Member Dashboard Link
+├── 🚀 Strategic Pro Moves (submenu)
+│   ├── 🔥 Generate Unit Hot Zones
+│   ├── 🌟 Identify Rising Stars
+│   ├── 📉 Management Hostility Report
+│   └── 📝 Bargaining Cheat Sheet
+├── 🆔 ID & Data Engines (submenu)
+│   ├── 🆔 Generate Missing Member IDs
+│   ├── 🔍 Check Duplicate IDs
+│   └── 📄 Create PDF for Selected Grievance
+├── 👤 Steward Management (submenu)
+│   ├── ⬆️ Promote to Steward
+│   └── ⬇️ Demote Steward
+├── 🎨 Styling & Theme (submenu)
+│   ├── 🎨 Apply Global Styling
+│   └── 🔄 Reset to Default Theme
+└── ⚙️ Automation (submenu)
+    ├── 🔄 Force Global Refresh
+    ├── 🌙 Enable Midnight Auto-Refresh
+    ├── ❌ Disable Midnight Auto-Refresh
+    ├── 🔔 Enable 1AM Dashboard Refresh
+    └── 📑 Email Weekly PDF Snapshot
 
     NOTE: Delete DeveloperTools.gs before production to remove all demo functions
 ```
