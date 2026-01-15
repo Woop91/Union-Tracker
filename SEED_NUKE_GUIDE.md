@@ -423,11 +423,23 @@ Your dashboard is **production-ready**! 🚀
 ---
 
 **Last Updated**: 2026-01-15
-**Version**: 3.6.0
+**Version**: 4.0.0
 
 ---
 
-## Version 2.3.0 Notes - 9-File Modular Architecture
+## Version 4.0.0 Notes - 10-File Unified Master Engine
+
+In version 4.0.0, the system was upgraded to the Unified Master Engine with:
+
+- **New 10_CommandCenter.gs module** - Consolidated v4.0 features (1,489 lines)
+- **Production Mode with NUKE logic** - Demo Data menu auto-hides after NUKE_DATABASE()
+- **PDF Signature Engine** - Legal signature-ready PDF generation
+- **Analytics & Insights** - Unit Health Reports and Grievance Trends
+- **Mobile/Pocket View** - Field-optimized column hiding
+
+---
+
+## Version 2.3.0 Notes - 9-File Modular Architecture (Historical)
 
 In version 2.3.0, the codebase was reorganized into a 9-file modular structure:
 

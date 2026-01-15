@@ -1,10 +1,10 @@
-# Union Steward Dashboard - 9-File Modular Architecture
+# 509 Strategic Command Center - v4.0 Unified Master Engine
 
-A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **9-file modular architecture** following the Separation of Concerns principle.
+A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **10-file modular architecture** following the Separation of Concerns principle.
 
 ## Architecture Overview
 
-The dashboard uses a streamlined 9-file architecture for clarity and maintainability:
+The dashboard uses a streamlined 10-file architecture for clarity and maintainability:
 
 ```
 src/
@@ -16,6 +16,7 @@ src/
 ├── 06_Maintenance.gs      # Diagnostics, caching, performance
 ├── 07_DevTools.gs         # Test data generation (DELETE BEFORE PROD)
 ├── 08_Code.gs             # Core setup, hidden sheets, dashboard creation
+├── 10_CommandCenter.gs    # 509 Strategic Command Center Unified Master Engine (v4.0)
 └── 09_Main.gs             # Entry point and triggers
 ```
 
@@ -23,7 +24,7 @@ src/
 
 | Module | Purpose | Key Functions |
 |--------|---------|---------------|
-| **01_Constants.gs** | Configuration constants, sheet names, column mappings, deadline rules | `SHEETS`, `MEMBER_COLS`, `GRIEVANCE_COLS`, `CONFIG_COLS`, `COMMAND_CONFIG` |
+| **01_Constants.gs** | Configuration constants, sheet names, column mappings, deadline rules | `SHEETS`, `MEMBER_COLS`, `GRIEVANCE_COLS`, `CONFIG_COLS`, `COMMAND_CONFIG`, `VERSION_INFO` |
 | **02_MemberManager.gs** | Member directory operations, steward management, ID generation | `addMember`, `promoteToSteward`, `generateMissingMemberIDs`, `checkDuplicateMemberIDs` |
 | **03_GrievanceManager.gs** | Grievance creation, step advancement, deadline calculations | `startNewGrievance`, `advanceGrievanceStep`, `recalcAllGrievancesBatched` |
 | **04_UIService.gs** | Dialogs, Comfort View, mobile UI, Strategic Command Center dashboards | `showDesktopSearch`, `rebuildExecutiveDashboard`, `rebuildMemberAnalytics`, `setupMidnightTrigger` |
@@ -31,16 +32,27 @@ src/
 | **06_Maintenance.gs** | Admin tools, diagnostics, caching, performance optimization | `DIAGNOSE_SETUP`, `REPAIR_DASHBOARD`, `getCachedData`, `warmUpCaches` |
 | **07_DevTools.gs** | Test data generation and demo utilities (remove before production) | `seedAllSampleData`, `nukeDemoData`, `showDeveloperPanel` |
 | **08_Code.gs** | Core setup, hidden sheet management, dashboard creation | `CREATE_509_DASHBOARD`, `setupAllHiddenSheets`, `createConfigSheet` |
+| **10_CommandCenter.gs** | v4.0 Unified Master Engine - PDF engine, analytics, scaling hooks | `navToMobile`, `createGrievancePDF`, `showUnitHealthReport`, `calculateUnitHealth` |
 | **09_Main.gs** | Entry point, triggers, edit handlers | `onOpen`, `onEdit`, `initializeDashboard` |
 
-## Benefits of 9-File Architecture
+## v4.0 Features
+
+- **Security Fortress**: Audit Log & Sabotage Protection (>15 cells mass deletion detection)
+- **High-Performance Engine**: Batch Array Processing for 5,000+ members
+- **PDF Signature Engine**: Legal signature-ready PDF generation from templates
+- **Mobile/Pocket View**: Field-optimized column hiding for smartphone access
+- **Production Mode**: NUKE logic with UI self-hiding (Demo Data menu disappears)
+- **Analytics & Insights**: Unit Health Reports, Grievance Trends analysis
+- **Scaling Hooks**: OCR transcription and Sentiment analysis placeholders
+
+## Benefits of 10-File Architecture
 
 1. **Clear Separation**: Each file has one clear purpose
 2. **Easy Navigation**: Numbered prefixes show dependency order on GitHub
-3. **Production Ready**: Delete `07_DevTools.gs` before go-live (8 files in production)
+3. **Production Ready**: Delete `07_DevTools.gs` before go-live (9 files in production)
 4. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
 5. **Easier Maintenance**: Update union rules in one place (`01_Constants.gs`)
-6. **Scalability**: Handles 1,000+ members without performance issues
+6. **Scalability**: Handles 5,000+ members without performance issues
 
 ## Installation
 
