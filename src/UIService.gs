@@ -25,10 +25,6 @@
 
 /**
  * Creates the custom menu when the spreadsheet opens
- * Called automatically by onOpen trigger
- */
-/**
- * Creates the custom menu when the spreadsheet opens
  * Uses consistent iconography: 📊 for views, ➕ for actions
  * Called automatically by onOpen trigger
  */
@@ -88,6 +84,25 @@ function createDashboardMenu() {
 
     .addSeparator()
     .addItem('📖 Help & Documentation', 'showHelpDialog')
+    .addToUi();
+
+  // Strategic Command Center Menu (Separate top-level menu)
+  ui.createMenu('📊 509 Command')
+    .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
+    .addItem('🫂 Member Analytics (No PII)', 'rebuildMemberAnalytics')
+    .addSeparator()
+    .addItem('📩 Send Member Dashboard Link', 'sendMemberDashboardLink')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🚀 Strategic Pro Moves')
+      .addItem('🔥 Generate Unit Hot Zones', 'renderHotZones')
+      .addItem('🌟 Identify Rising Stars', 'identifyRisingStars')
+      .addItem('📉 Management Hostility Report', 'renderHostilityFunnel')
+      .addItem('📝 Bargaining Table Cheat Sheet', 'renderBargainingCheatSheet'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('⚙️ Automation')
+      .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
+      .addItem('🔔 Enable Midnight Auto-Update', 'createAutomationTriggers')
+      .addItem('📑 Email Weekly PDF Snapshot', 'emailExecutivePDF'))
     .addToUi();
 }
 
