@@ -56,22 +56,34 @@ function onOpen() {
 
 /**
  * Runs when a cell is edited
- * Handles auto-calculations and validations
+ * Handles auto-calculations, validations, security audit, and auto-styling
  * @param {Object} e - The edit event object
  */
 function onEdit(e) {
+  if (!e || !e.range) return;
+
   try {
     const sheet = e.range.getSheet();
     const sheetName = sheet.getName();
+    const row = e.range.getRow();
 
-    // Handle edits in Grievance Tracker
-    if (sheetName === SHEET_NAMES.GRIEVANCE_TRACKER) {
+    // Skip header rows
+    if (row <= 1) return;
+
+    // 1. Security Audit & Change Tracking (runs for all tracked sheets)
+    handleSecurityAudit_(e);
+
+    // 2. Handle edits in Grievance Log
+    if (sheetName === SHEETS.GRIEVANCE_LOG) {
       handleGrievanceEdit(e);
+      applyAutoStyleToRow_(sheet, row);  // Auto-styling
+      handleStageGateWorkflow_(e);        // Escalation alerts
     }
 
-    // Handle edits in Member Directory
-    if (sheetName === SHEET_NAMES.MEMBER_DIRECTORY) {
+    // 3. Handle edits in Member Directory
+    if (sheetName === SHEETS.MEMBER_DIR) {
       handleMemberEdit(e);
+      applyAutoStyleToRow_(sheet, row);  // Auto-styling
     }
 
   } catch (error) {
@@ -81,7 +93,163 @@ function onEdit(e) {
 }
 
 /**
- * Handles edits to the Grievance Tracker sheet
+ * Handles security audit logging for change tracking
+ * Logs all edits to the Audit Log sheet for accountability
+ * @param {Object} e - The edit event object
+ * @private
+ */
+function handleSecurityAudit_(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+
+    if (!auditSheet) {
+      // Create audit log sheet if it doesn't exist
+      auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
+      auditSheet.getRange('A1:E1').setValues([['Timestamp', 'User', 'Cell', 'Old Value', 'New Value']]);
+      auditSheet.getRange('A1:E1').setFontWeight('bold').setBackground(COLORS.CARD_DARK_BG).setFontColor(COLORS.CARD_DARK_TEXT);
+      auditSheet.hideSheet();
+    }
+
+    var userEmail = '';
+    try {
+      userEmail = Session.getActiveUser().getEmail() || 'Unknown';
+    } catch (authError) {
+      userEmail = 'Auth Required';
+    }
+
+    auditSheet.appendRow([
+      new Date(),
+      userEmail,
+      e.range.getA1Notation() + ' (' + e.range.getSheet().getName() + ')',
+      e.oldValue || '(empty)',
+      e.value || '(deleted)'
+    ]);
+  } catch (auditError) {
+    // Silently fail - don't break user's edit for audit logging
+    console.log('Audit log error: ' + auditError.message);
+  }
+}
+
+/**
+ * Applies automatic row styling based on theme settings
+ * Includes zebra striping and status-based coloring
+ * @param {Sheet} sheet - The sheet to style
+ * @param {number} row - The row number to style
+ * @private
+ */
+function applyAutoStyleToRow_(sheet, row) {
+  try {
+    var lastCol = sheet.getLastColumn();
+    if (lastCol < 1) return;
+
+    var rowRange = sheet.getRange(row, 1, 1, lastCol);
+
+    // Apply theme font
+    rowRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
+            .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
+            .setVerticalAlignment('middle');
+
+    // Zebra striping
+    if (row % 2 === 0) {
+      rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
+    }
+
+    // Status-based coloring (Grievance Log only)
+    if (sheet.getName() === SHEETS.GRIEVANCE_LOG) {
+      var statusCell = sheet.getRange(row, GRIEVANCE_COLS.STATUS);
+      var status = statusCell.getValue();
+
+      if (COMMAND_CONFIG.STATUS_COLORS[status]) {
+        var colors = COMMAND_CONFIG.STATUS_COLORS[status];
+        statusCell.setBackground(colors.bg)
+                  .setFontColor(colors.text)
+                  .setFontWeight('bold');
+      } else {
+        // Reset to default if status not in mapping
+        statusCell.setBackground(null)
+                  .setFontColor(null)
+                  .setFontWeight('normal');
+      }
+    }
+  } catch (styleError) {
+    console.log('Auto-style error: ' + styleError.message);
+  }
+}
+
+/**
+ * Handles stage-gate workflow and escalation alerts
+ * Sends email to Chief Steward when case escalates
+ * @param {Object} e - The edit event object
+ * @private
+ */
+function handleStageGateWorkflow_(e) {
+  try {
+    var sheet = e.range.getSheet();
+    var col = e.range.getColumn();
+    var row = e.range.getRow();
+    var newValue = e.value;
+
+    // Check if status column was edited (using dynamic column reference)
+    if (col === GRIEVANCE_COLS.STATUS) {
+      // Update timestamp
+      sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).setValue(new Date());
+
+      // Check if this is an escalation status
+      if (COMMAND_CONFIG.ESCALATION_STATUSES.indexOf(newValue) !== -1) {
+        var memberName = sheet.getRange(row, GRIEVANCE_COLS.FIRST_NAME).getValue() + ' ' +
+                        sheet.getRange(row, GRIEVANCE_COLS.LAST_NAME).getValue();
+        var caseID = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+
+        sendEscalationAlert_(memberName, caseID, newValue);
+      }
+    }
+
+    // Also check if Current Step column was edited
+    if (col === GRIEVANCE_COLS.CURRENT_STEP) {
+      if (COMMAND_CONFIG.ESCALATION_STATUSES.indexOf(newValue) !== -1) {
+        var memberName2 = sheet.getRange(row, GRIEVANCE_COLS.FIRST_NAME).getValue() + ' ' +
+                         sheet.getRange(row, GRIEVANCE_COLS.LAST_NAME).getValue();
+        var caseID2 = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+
+        sendEscalationAlert_(memberName2, caseID2, newValue);
+      }
+    }
+  } catch (workflowError) {
+    console.log('Workflow error: ' + workflowError.message);
+  }
+}
+
+/**
+ * Sends escalation alert email to Chief Steward
+ * @param {string} memberName - Name of the member
+ * @param {string} caseID - Grievance case ID
+ * @param {string} status - New status/step
+ * @private
+ */
+function sendEscalationAlert_(memberName, caseID, status) {
+  if (!COMMAND_CONFIG.CHIEF_STEWARD_EMAIL) {
+    console.log('Chief Steward email not configured - skipping escalation alert');
+    return;
+  }
+
+  try {
+    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Case Escalation Alert';
+    var body = 'ESCALATION NOTICE\n\n' +
+               'Case ' + caseID + ' for ' + memberName + ' has been escalated to: ' + status + '\n\n' +
+               'Immediate review is required.\n' +
+               COMMAND_CONFIG.EMAIL.FOOTER;
+
+    MailApp.sendEmail(COMMAND_CONFIG.CHIEF_STEWARD_EMAIL, subject, body);
+    SpreadsheetApp.getActiveSpreadsheet().toast('Escalation alert sent to Chief Steward', 'Alert Sent', 3);
+  } catch (emailError) {
+    console.log('Escalation email error: ' + emailError.message);
+  }
+}
+
+/**
+ * Handles edits to the Grievance Log sheet
+ * Uses dynamic column references from GRIEVANCE_COLS
  * @param {Object} e - The edit event object
  */
 function handleGrievanceEdit(e) {
@@ -93,37 +261,43 @@ function handleGrievanceEdit(e) {
 
   const sheet = e.range.getSheet();
 
-  // Auto-update Last Updated timestamp
-  if (col !== GRIEVANCE_COLUMNS.LAST_UPDATED + 1) {
-    sheet.getRange(row, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(new Date());
+  // Auto-update Next Action Due timestamp when any field changes
+  if (col !== GRIEVANCE_COLS.NEXT_ACTION_DUE) {
+    sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(new Date());
   }
 
   // If status changed, check for auto-actions
-  if (col === GRIEVANCE_COLUMNS.STATUS + 1) {
-    const settings = getSettings();
-    const grievanceId = sheet.getRange(row, GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1).getValue();
+  if (col === GRIEVANCE_COLS.STATUS) {
+    try {
+      const settings = typeof getSettings === 'function' ? getSettings() : {};
+      const grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
 
-    // Auto-sync to calendar if enabled
-    if (settings.autoSyncCalendar && grievanceId) {
-      syncSingleGrievanceToCalendar(grievanceId);
+      // Auto-sync to calendar if enabled
+      if (settings.autoSyncCalendar && grievanceId && typeof syncSingleGrievanceToCalendar === 'function') {
+        syncSingleGrievanceToCalendar(grievanceId);
+      }
+    } catch (settingsError) {
+      console.log('Settings error in handleGrievanceEdit: ' + settingsError.message);
     }
   }
 
-  // If step dates changed, recalculate deadlines
+  // If step dates changed, recalculate deadlines (using dynamic column references)
   const stepDateColumns = [
-    GRIEVANCE_COLUMNS.STEP_1_DATE + 1,
-    GRIEVANCE_COLUMNS.STEP_2_DATE + 1,
-    GRIEVANCE_COLUMNS.STEP_3_DATE + 1
+    GRIEVANCE_COLS.DATE_FILED,      // Step 1 filing
+    GRIEVANCE_COLS.STEP2_APPEAL_FILED,  // Step 2 appeal
+    GRIEVANCE_COLS.STEP3_APPEAL_FILED   // Step 3 appeal
   ];
 
   if (stepDateColumns.includes(col)) {
     const step = stepDateColumns.indexOf(col) + 1;
     const stepDate = e.value;
 
-    if (stepDate) {
+    if (stepDate && typeof calculateResponseDeadline === 'function') {
       const deadline = calculateResponseDeadline(step, new Date(stepDate));
       if (deadline) {
-        sheet.getRange(row, col + 1).setValue(deadline); // Due column is next to date
+        // Update the corresponding due column
+        const dueColumns = [GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_DUE, GRIEVANCE_COLS.DATE_CLOSED];
+        sheet.getRange(row, dueColumns[step - 1]).setValue(deadline);
       }
     }
   }
@@ -131,6 +305,7 @@ function handleGrievanceEdit(e) {
 
 /**
  * Handles edits to the Member Directory sheet
+ * Uses dynamic column references from MEMBER_COLS
  * @param {Object} e - The edit event object
  */
 function handleMemberEdit(e) {
@@ -142,15 +317,17 @@ function handleMemberEdit(e) {
 
   const sheet = e.range.getSheet();
 
-  // Auto-update Last Updated timestamp
-  if (col !== MEMBER_COLUMNS.LAST_UPDATED + 1) {
-    sheet.getRange(row, MEMBER_COLUMNS.LAST_UPDATED + 1).setValue(new Date());
+  // Auto-update Recent Contact Date when contact-related fields change
+  var contactColumns = [MEMBER_COLS.EMAIL, MEMBER_COLS.PHONE, MEMBER_COLS.CONTACT_NOTES];
+  if (contactColumns.includes(col)) {
+    sheet.getRange(row, MEMBER_COLS.RECENT_CONTACT_DATE).setValue(new Date());
   }
 
-  // Validate email format
-  if (col === MEMBER_COLUMNS.EMAIL + 1) {
+  // Validate email format (using dynamic column reference)
+  if (col === MEMBER_COLS.EMAIL) {
     const email = e.value;
-    if (email && !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
+    var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email && !emailPattern.test(email)) {
       SpreadsheetApp.getActiveSpreadsheet().toast(
         'Warning: Email format may be invalid',
         'Validation',
@@ -159,10 +336,11 @@ function handleMemberEdit(e) {
     }
   }
 
-  // Validate phone format
-  if (col === MEMBER_COLUMNS.PHONE + 1) {
+  // Validate phone format (using dynamic column reference)
+  if (col === MEMBER_COLS.PHONE) {
     const phone = e.value;
-    if (phone && !VALIDATION_RULES.PHONE_PATTERN.test(phone)) {
+    var phonePattern = /^\d{3}-\d{3}-\d{4}$/;
+    if (phone && !phonePattern.test(phone)) {
       SpreadsheetApp.getActiveSpreadsheet().toast(
         'Warning: Phone format may be invalid (expected: XXX-XXX-XXXX)',
         'Validation',

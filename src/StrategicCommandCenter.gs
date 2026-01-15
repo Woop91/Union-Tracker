@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * 509 DASHBOARD - STRATEGIC COMMAND CENTER BUILD (V 2.1.0)
+ * 509 DASHBOARD - STRATEGIC COMMAND CENTER MASTER ENGINE (V 3.6.0)
  * ============================================================================
  * CORE FEATURES:
  * 1. Dual-Dashboard Architecture:
@@ -10,6 +10,16 @@
  * 3. Strategic Intelligence: Hot Zone Heatmaps & Rising Star Identification.
  * 4. Automation: Midnight Auto-Refresh & Critical Performance Email Alerts.
  * 5. Peak Performance: Array-based batch processing for speed and reliability.
+ * 6. Auto-ID Generator & Duplicate Prevention
+ * 7. Legal Stage-Gate Workflow (Intake to Arbitration)
+ * 8. Automatic Chief Steward Escalation Alerts
+ * 9. Digital Signature Block PDF Generation
+ * 10. Automated Global UI Styling (Roboto Theme & Status Colors)
+ * ============================================================================
+ *
+ * OFFICIAL BRANDING PATHS:
+ * - All automated emails use: "[509 Strategic Command Center] Status Update"
+ * - All PDF metadata lists "509 Strategic Command Center" as the Author
  * ============================================================================
  */
 
@@ -944,13 +954,453 @@ function emailExecutivePDF() {
 
     MailApp.sendEmail({
       to: Session.getEffectiveUser().getEmail(),
-      subject: "Weekly Executive Summary - " + dateStr,
-      body: "Attached is the latest strategic briefing.\n\nGenerated from 509 Dashboard Strategic Command Center.",
+      subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Weekly Executive Summary - " + dateStr,
+      body: "Attached is the latest strategic briefing." + COMMAND_CONFIG.EMAIL.FOOTER,
       attachments: [blob]
     });
 
     SpreadsheetApp.getUi().alert('PDF report sent to your email.');
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error generating PDF: ' + e.message);
+  }
+}
+
+// ============================================================================
+// 6. AUTO-ID GENERATOR ENGINE
+// ============================================================================
+
+/**
+ * Generates missing Member IDs based on Unit Code
+ * Uses dynamic column references from MEMBER_COLS
+ * Format: [UNIT_PREFIX]-[SEQUENCE]-H (e.g., MS-101-H)
+ */
+function generateMissingMemberIDs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var countAdded = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    var unit = data[i][MEMBER_COLS.UNIT - 1];
+
+    // ID is empty but Unit is present
+    if (!memberId && unit) {
+      var prefix = COMMAND_CONFIG.UNIT_CODES[unit] || "GEN";
+      var nextNum = getNextMemberSequence_(prefix);
+      var newId = prefix + "-" + nextNum + "-H";
+
+      sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
+      countAdded++;
+    }
+  }
+
+  ss.toast(countAdded + ' IDs generated for the 509 Command Center.', 'ID Engine', 5);
+}
+
+/**
+ * Gets the next sequence number for a given prefix
+ * @param {string} prefix - The unit code prefix (e.g., "MS")
+ * @returns {number} The next sequence number
+ * @private
+ */
+function getNextMemberSequence_(prefix) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) return 100;
+
+  var ids = sheet.getRange(1, MEMBER_COLS.MEMBER_ID, sheet.getLastRow(), 1).getValues().flat();
+  var max = 100;
+
+  ids.forEach(function(id) {
+    if (typeof id === 'string' && id.startsWith(prefix + '-')) {
+      var parts = id.split('-');
+      if (parts.length >= 2) {
+        var n = parseInt(parts[1]);
+        if (!isNaN(n) && n > max) max = n;
+      }
+    }
+  });
+
+  return max + 1;
+}
+
+/**
+ * Checks for duplicate Member IDs and highlights them
+ */
+function checkDuplicateMemberIDs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var idCounts = {};
+  var duplicates = [];
+
+  // Count occurrences of each ID
+  for (var i = 1; i < data.length; i++) {
+    var id = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    if (id) {
+      idCounts[id] = (idCounts[id] || 0) + 1;
+      if (idCounts[id] === 2) {
+        duplicates.push(id);
+      }
+    }
+  }
+
+  if (duplicates.length === 0) {
+    ss.toast('No duplicate Member IDs found.', 'Duplicate Check', 3);
+  } else {
+    // Highlight duplicates
+    for (var j = 1; j < data.length; j++) {
+      var memberId = data[j][MEMBER_COLS.MEMBER_ID - 1];
+      if (duplicates.indexOf(memberId) !== -1) {
+        sheet.getRange(j + 1, MEMBER_COLS.MEMBER_ID).setBackground('#FCA5A5');
+      }
+    }
+    SpreadsheetApp.getUi().alert('Found ' + duplicates.length + ' duplicate IDs. They have been highlighted in red.');
+  }
+}
+
+// ============================================================================
+// 7. SIGNATURE PDF ENGINE
+// ============================================================================
+
+/**
+ * Creates a grievance PDF document with signature blocks
+ * Uses Google Docs template if configured, otherwise creates from scratch
+ * @param {Object} data - Grievance data object with name, details, etc.
+ * @returns {File} The created PDF file
+ */
+function createGrievancePDF(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Get or create archive folder
+  var folder;
+  if (COMMAND_CONFIG.ARCHIVE_FOLDER_ID) {
+    try {
+      folder = DriveApp.getFolderById(COMMAND_CONFIG.ARCHIVE_FOLDER_ID);
+    } catch (e) {
+      folder = DriveApp.createFolder('509 Grievance Archive');
+    }
+  } else {
+    // Create folder in root if not configured
+    var folders = DriveApp.getFoldersByName('509 Grievance Archive');
+    folder = folders.hasNext() ? folders.next() : DriveApp.createFolder('509 Grievance Archive');
+  }
+
+  var dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+
+  // Check if template is configured
+  if (COMMAND_CONFIG.TEMPLATE_ID) {
+    try {
+      var tempFile = DriveApp.getFileById(COMMAND_CONFIG.TEMPLATE_ID)
+        .makeCopy('SIGNATURE_REQUIRED_' + data.name + '_' + dateStr, folder);
+      var doc = DocumentApp.openById(tempFile.getId());
+      var body = doc.getBody();
+
+      // Replace placeholders
+      body.replaceText('{{MemberName}}', data.name || '');
+      body.replaceText('{{Date}}', dateStr);
+      body.replaceText('{{Details}}', data.details || '');
+      body.replaceText('{{GrievanceID}}', data.grievanceId || '');
+      body.replaceText('{{Status}}', data.status || '');
+
+      // Add signature blocks
+      body.appendParagraph(COMMAND_CONFIG.PDF.SIGNATURE_BLOCK);
+
+      doc.saveAndClose();
+
+      // Convert to PDF
+      var pdf = folder.createFile(tempFile.getAs(MimeType.PDF))
+        .setName('Grievance_UNSIGNED_' + data.name + '_' + dateStr + '.pdf');
+      tempFile.setTrashed(true);
+
+      return pdf;
+    } catch (e) {
+      Logger.log('Template error, creating from scratch: ' + e.message);
+    }
+  }
+
+  // Create document from scratch if no template
+  var doc = DocumentApp.create('SIGNATURE_REQUIRED_' + data.name + '_' + dateStr);
+  var body = doc.getBody();
+
+  // Header
+  body.appendParagraph(COMMAND_CONFIG.SYSTEM_NAME)
+    .setHeading(DocumentApp.ParagraphHeading.HEADING1)
+    .setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+  body.appendParagraph('GRIEVANCE DOCUMENT - REQUIRES SIGNATURE')
+    .setHeading(DocumentApp.ParagraphHeading.HEADING2)
+    .setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+
+  body.appendHorizontalRule();
+
+  // Grievance details
+  body.appendParagraph('Grievance ID: ' + (data.grievanceId || 'Pending'));
+  body.appendParagraph('Member Name: ' + (data.name || 'Not specified'));
+  body.appendParagraph('Date: ' + dateStr);
+  body.appendParagraph('Status: ' + (data.status || 'Open'));
+
+  body.appendParagraph('');
+  body.appendParagraph('Details:').setBold(true);
+  body.appendParagraph(data.details || 'No details provided.');
+
+  // Signature blocks
+  body.appendParagraph(COMMAND_CONFIG.PDF.SIGNATURE_BLOCK);
+
+  doc.saveAndClose();
+
+  // Move to archive folder and convert to PDF
+  var docFile = DriveApp.getFileById(doc.getId());
+  var pdf = folder.createFile(docFile.getAs(MimeType.PDF))
+    .setName('Grievance_UNSIGNED_' + data.name + '_' + dateStr + '.pdf');
+
+  docFile.setTrashed(true);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('PDF created: ' + pdf.getName(), 'PDF Engine', 5);
+  return pdf;
+}
+
+/**
+ * Creates PDF for the currently selected grievance row
+ */
+function createPDFForSelectedGrievance() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Grievance Log sheet not found.');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row < 2) {
+    SpreadsheetApp.getUi().alert('Please select a grievance row (not the header).');
+    return;
+  }
+
+  var data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  var grievanceData = {
+    grievanceId: data[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+    name: data[GRIEVANCE_COLS.FIRST_NAME - 1] + ' ' + data[GRIEVANCE_COLS.LAST_NAME - 1],
+    status: data[GRIEVANCE_COLS.STATUS - 1],
+    details: 'Category: ' + (data[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'N/A') +
+             '\nArticles: ' + (data[GRIEVANCE_COLS.ARTICLES - 1] || 'N/A') +
+             '\nLocation: ' + (data[GRIEVANCE_COLS.LOCATION - 1] || 'N/A') +
+             '\nSteward: ' + (data[GRIEVANCE_COLS.STEWARD - 1] || 'N/A') +
+             '\nResolution: ' + (data[GRIEVANCE_COLS.RESOLUTION - 1] || 'Pending')
+  };
+
+  var pdf = createGrievancePDF(grievanceData);
+
+  SpreadsheetApp.getUi().alert('PDF created successfully!\n\nFile: ' + pdf.getName() +
+    '\n\nYou can find it in your 509 Grievance Archive folder.');
+}
+
+// ============================================================================
+// 8. STEWARD PROMOTION ENGINE
+// ============================================================================
+
+/**
+ * Promotes the selected member to Steward status
+ * Sends steward toolkit email to the promoted member
+ */
+function promoteSelectedMemberToSteward() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row < 2) {
+    SpreadsheetApp.getUi().alert('Please select a member row (not the header).');
+    return;
+  }
+
+  // Check if already a steward
+  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
+  if (currentStatus === 'Yes') {
+    SpreadsheetApp.getUi().alert('This member is already a Steward.');
+    return;
+  }
+
+  // Promote to steward
+  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
+
+  // Get member details
+  var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var name = firstName + ' ' + lastName;
+
+  // Send toolkit email if email is available
+  if (email) {
+    sendStewardToolkit_(email, name);
+  }
+
+  SpreadsheetApp.getUi().alert(name + ' has been promoted to Steward!' +
+    (email ? '\n\nToolkit email sent to: ' + email : '\n\nNo email on file - please send toolkit manually.'));
+}
+
+/**
+ * Sends steward toolkit email to newly promoted steward
+ * @param {string} email - Steward's email address
+ * @param {string} name - Steward's name
+ * @private
+ */
+function sendStewardToolkit_(email, name) {
+  try {
+    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Welcome to the Steward Team!';
+    var body = 'Congratulations ' + name + '!\n\n' +
+      'You have been promoted to Union Steward. Welcome to the leadership team!\n\n' +
+      'STEWARD TOOLKIT:\n' +
+      '1. Access the Grievance Log to track and manage cases\n' +
+      '2. Use the Executive Command dashboard for your analytics\n' +
+      '3. Review the Member Directory for your assigned members\n' +
+      '4. Contact your Chief Steward for mentorship and guidance\n\n' +
+      'KEY RESPONSIBILITIES:\n' +
+      '- Represent members in grievance proceedings\n' +
+      '- Document workplace issues and contract violations\n' +
+      '- Maintain confidentiality of member information\n' +
+      '- Attend steward training and meetings\n\n' +
+      'We are stronger together!' +
+      COMMAND_CONFIG.EMAIL.FOOTER;
+
+    MailApp.sendEmail(email, subject, body);
+  } catch (e) {
+    Logger.log('Error sending steward toolkit: ' + e.message);
+  }
+}
+
+/**
+ * Demotes the selected steward back to regular member status
+ */
+function demoteSelectedSteward() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row < 2) {
+    SpreadsheetApp.getUi().alert('Please select a member row (not the header).');
+    return;
+  }
+
+  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
+  if (currentStatus !== 'Yes') {
+    SpreadsheetApp.getUi().alert('This member is not currently a Steward.');
+    return;
+  }
+
+  var name = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue() + ' ' +
+             sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert('Confirm Demotion',
+    'Are you sure you want to remove Steward status from ' + name + '?',
+    ui.ButtonSet.YES_NO);
+
+  if (response === ui.Button.YES) {
+    sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('No');
+    sheet.getRange(row, MEMBER_COLS.COMMITTEES).setValue('');  // Clear committee assignments
+    ui.alert(name + ' has been removed from Steward status.');
+  }
+}
+
+// ============================================================================
+// 9. GLOBAL UI STYLING ENGINE
+// ============================================================================
+
+/**
+ * Applies global Roboto theme styling to all data sheets
+ * Includes zebra striping and status-based coloring
+ */
+function applyGlobalStyling() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetsToStyle = [SHEETS.GRIEVANCE_LOG, SHEETS.MEMBER_DIR];
+
+  sheetsToStyle.forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+
+    if (lastRow < 2 || lastCol < 1) return;
+
+    // Apply header styling
+    var headerRange = sheet.getRange(1, 1, 1, lastCol);
+    headerRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
+               .setFontSize(11)
+               .setFontWeight('bold')
+               .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+               .setFontColor(COMMAND_CONFIG.THEME.HEADER_TEXT)
+               .setHorizontalAlignment('center');
+
+    // Apply data styling with zebra stripes
+    for (var row = 2; row <= lastRow; row++) {
+      var rowRange = sheet.getRange(row, 1, 1, lastCol);
+      rowRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
+              .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
+              .setVerticalAlignment('middle');
+
+      // Zebra striping
+      if (row % 2 === 0) {
+        rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
+      } else {
+        rowRange.setBackground(null);
+      }
+
+      // Status coloring for Grievance Log
+      if (sheetName === SHEETS.GRIEVANCE_LOG) {
+        var statusCell = sheet.getRange(row, GRIEVANCE_COLS.STATUS);
+        var status = statusCell.getValue();
+
+        if (COMMAND_CONFIG.STATUS_COLORS[status]) {
+          var colors = COMMAND_CONFIG.STATUS_COLORS[status];
+          statusCell.setBackground(colors.bg)
+                    .setFontColor(colors.text)
+                    .setFontWeight('bold');
+        }
+      }
+    }
+  });
+
+  ss.toast('Global styling applied to all data sheets.', 'Style Engine', 3);
+}
+
+/**
+ * Resets all custom formatting and applies default theme
+ */
+function resetToDefaultTheme() {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert('Reset Theme',
+    'This will reset all custom formatting. Continue?',
+    ui.ButtonSet.YES_NO);
+
+  if (response === ui.Button.YES) {
+    applyGlobalStyling();
+    ui.alert('Theme has been reset to defaults.');
   }
 }
