@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 2.3.0 / v3.50 (9-File Modular Architecture)
+**Version:** 3.6.0 / v3.50 (Strategic Command Center, 9-File Modular Architecture)
 **Last Updated:** 2026-01-15
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -365,13 +365,13 @@ npm run watch        # Watch mode for development
 - Menu Integration:
   - `addDataIntegrityMenuItems()` - Adds "🛡️ Data Integrity" menu
 
-**04_UIService.gs - Comfort View Section** (merged from ComfortViewFeatures.gs + MobileQuickActions.gs)
-- `showADHDControlPanel()` - Main Comfort View settings panel
-- `getADHDSettings()`, `saveADHDSettings()`, `resetADHDSettings()` - Settings management
-- `applyADHDSettings()` - Apply visual settings
+**04_UIService.gs** - Comfort View Accessibility & Theming (integrated)
+- `showComfortViewPanel()` - Main Comfort View settings panel
+- `getComfortViewSettings()`, `saveComfortViewSettings()`, `resetComfortViewSettings()` - Settings management
+- `applyComfortViewSettings()` - Apply visual settings
 - `activateFocusMode()`, `deactivateFocusMode()` - Focus mode (hide non-essential sheets)
 - `toggleZebraStripes()`, `applyZebraStripes()`, `removeZebraStripes()` - Row banding
-- `toggleGridlinesADHD()`, `hideAllGridlines()`, `showAllGridlines()` - Gridline control
+- `toggleGridlines()`, `hideAllGridlines()`, `showAllGridlines()` - Gridline control
 - `toggleReducedMotion()` - Animation preferences
 - `showQuickCaptureNotepad()` - Quick note-taking dialog
 - `startPomodoroTimer()` - Built-in pomodoro timer
@@ -379,7 +379,7 @@ npm run watch        # Watch mode for development
 - `showThemeManager()` - Theme selection UI
 - `applyTheme()`, `applyThemeToSheet()`, `previewTheme()` - Theme application
 - `getCurrentTheme()`, `resetToDefaultTheme()`, `quickToggleDarkMode()` - Theme utilities
-- `setupADHDDefaults()` - Initialize Comfort View defaults
+- `setupComfortViewDefaults()` - Initialize Comfort View defaults
 
 **07_DevTools.gs - Testing Section** (merged from TestingValidation.gs)
 - Testing Framework:
@@ -750,7 +750,7 @@ var FEEDBACK_COLS = {
 |---|------------|------|---------|
 | 6 | 📊 Member Satisfaction | Data | 68-question Google Form survey with dashboard, charts (82 cols + dashboard) |
 | 7 | 💡 Feedback & Development | Data | Bug/feature tracking with priority (11 columns) |
-| 8 | ✅ Function Checklist | Reference | Function reference guide organized by 13 phases |
+| 8 | ✅ Function Checklist | Reference | Function reference guide organized by 14 phases |
 
 ### Help & Documentation Sheets
 
@@ -794,7 +794,7 @@ var FEEDBACK_COLS = {
 
 ## Config Sheet & Dropdown Validations
 
-### Config Columns (15 columns + HOME_TOWNS at AF)
+### Config Columns (15 columns + HOME_TOWNS at AF + Strategic Command at AS-AW)
 
 | Column | Name | Used By |
 |--------|------|---------|
@@ -814,6 +814,11 @@ var FEEDBACK_COLS = {
 | N | (blank) | - |
 | O | Grievance Coordinators | Admin use |
 | AF | Home Towns | Member Directory (X) |
+| **AS** | **Chief Steward Email** | **Strategic Command Center (escalation alerts)** |
+| **AT** | **Unit Codes** | **Strategic Command Center (ID generation)** |
+| **AU** | **Archive Folder ID** | **Strategic Command Center (PDF archive)** |
+| **AV** | **Escalation Statuses** | **Strategic Command Center (alert triggers)** |
+| **AW** | **Escalation Steps** | **Strategic Command Center (alert triggers)** |
 
 ### Member Directory Dropdowns (16 columns)
 
@@ -867,9 +872,9 @@ Columns marked as **Multi-Select** support comma-separated values for multiple s
 
 ---
 
-## Menu System (5 Menus)
+## Menu System (6 Menus)
 
-The menu system has been reorganized from 9 menus to 5 logical groups:
+The menu system has been reorganized from 9 menus to 6 logical groups (5 original + Strategic Command Center):
 
 ```
 📊 509 Dashboard
@@ -962,6 +967,32 @@ The menu system has been reorganized from 9 menus to 5 logical groups:
     ├── ☢️ NUKE SEEDED DATA
     ├── 🧹 Clear Config Dropdowns Only
     └── 🔄 Restore Config & Dropdowns
+
+📊 509 Command (Strategic Command Center v3.6.0)
+├── 👁️ Executive Command (PII) - Internal dashboard with member names
+├── 🫂 Member Analytics (No PII) - PII-safe dashboard
+├── 📩 Send Member Dashboard Link
+├── 🚀 Strategic Pro Moves (submenu)
+│   ├── 🔥 Generate Unit Hot Zones
+│   ├── 🌟 Identify Rising Stars
+│   ├── 📉 Management Hostility Report
+│   └── 📝 Bargaining Cheat Sheet
+├── 🆔 ID & Data Engines (submenu)
+│   ├── 🆔 Generate Missing Member IDs
+│   ├── 🔍 Check Duplicate IDs
+│   └── 📄 Create PDF for Selected Grievance
+├── 👤 Steward Management (submenu)
+│   ├── ⬆️ Promote to Steward
+│   └── ⬇️ Demote Steward
+├── 🎨 Styling & Theme (submenu)
+│   ├── 🎨 Apply Global Styling
+│   └── 🔄 Reset to Default Theme
+└── ⚙️ Automation (submenu)
+    ├── 🔄 Force Global Refresh
+    ├── 🌙 Enable Midnight Auto-Refresh
+    ├── ❌ Disable Midnight Auto-Refresh
+    ├── 🔔 Enable 1AM Dashboard Refresh
+    └── 📑 Email Weekly PDF Snapshot
 
     NOTE: Delete 07_DevTools.gs before production to remove all demo functions
 ```
