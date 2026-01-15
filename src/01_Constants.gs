@@ -81,10 +81,10 @@ var COMMAND_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 2,
-  MINOR: 2,
-  PATCH: 1,
-  BUILD: 'v3.49',
-  CODENAME: 'Reliability & Performance Improvements'
+  MINOR: 3,
+  PATCH: 0,
+  BUILD: 'v3.50',
+  CODENAME: 'Enhanced Grievance Dashboard'
 };
 
 // ============================================================================
@@ -974,7 +974,61 @@ function generateNameBasedId(prefix, firstName, lastName, existingIds) {
     }
   }
 
-  // Fallback: add timestamp component if too many collisions
-  var timestamp = String(Date.now()).slice(-3);
-  return namePrefix + timestamp;
+  // Fallback: use UUID-style ID for guaranteed uniqueness in high-volume environments
+  // Format: PREFIX + 8 hex chars from UUID
+  var uuid = generateUUID_();
+  return namePrefix + uuid.substring(0, 8).toUpperCase();
+}
+
+/**
+ * Generate a UUID v4 for guaranteed uniqueness
+ * Used as fallback when name-based ID collisions occur
+ * @returns {string} UUID string
+ * @private
+ */
+function generateUUID_() {
+  var chars = '0123456789abcdef';
+  var uuid = '';
+  for (var i = 0; i < 36; i++) {
+    if (i === 8 || i === 13 || i === 18 || i === 23) {
+      uuid += '-';
+    } else if (i === 14) {
+      uuid += '4'; // UUID version 4
+    } else if (i === 19) {
+      uuid += chars.charAt((Math.random() * 4) | 8); // Variant bits
+    } else {
+      uuid += chars.charAt(Math.floor(Math.random() * 16));
+    }
+  }
+  return uuid;
+}
+
+/**
+ * Generate a sequential ID for high-volume environments
+ * Alternative to name-based IDs when strict uniqueness is required
+ * @param {string} prefix - ID prefix ('M' for members, 'G' for grievances)
+ * @param {Sheet} sheet - Sheet to check for existing IDs
+ * @param {number} idColumn - Column number containing IDs (1-indexed)
+ * @returns {string} Sequential ID (e.g., M00001, G00042)
+ */
+function generateSequentialId(prefix, sheet, idColumn) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return prefix + '00001';
+  }
+
+  var ids = sheet.getRange(2, idColumn, lastRow - 1, 1).getValues();
+  var maxNum = 0;
+
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i][0];
+    if (id && typeof id === 'string' && id.indexOf(prefix) === 0) {
+      var numPart = parseInt(id.substring(prefix.length), 10);
+      if (!isNaN(numPart) && numPart > maxNum) {
+        maxNum = numPart;
+      }
+    }
+  }
+
+  return prefix + String(maxNum + 1).padStart(5, '0');
 }

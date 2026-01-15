@@ -1,0 +1,2301 @@
+/**
+ * ============================================================================
+ * Integrations.gs - External Service Integration
+ * ============================================================================
+ *
+ * This module handles all interactions with external Google services:
+ * - Google Drive folder management for grievance documents
+ * - Google Calendar deadline synchronization
+ * - Email notifications
+ * - External API calls
+ *
+ * SEPARATION OF CONCERNS: Isolating external dependencies ensures that if
+ * one service (e.g., Drive) has an outage, core spreadsheet functionality
+ * remains responsive.
+ *
+ * @fileoverview External service integrations
+ * @version 2.0.0
+ * @requires Constants.gs
+ */
+
+// ============================================================================
+// GOOGLE DRIVE INTEGRATION
+// ============================================================================
+
+/**
+ * Gets or creates the root folder for grievance files
+ * @return {Folder} The root grievance folder
+ */
+function getOrCreateRootFolder() {
+  const folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
+  const folders = DriveApp.getFoldersByName(folderName);
+
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+
+  // Create the root folder
+  const newFolder = DriveApp.createFolder(folderName);
+
+  // Set folder color/description
+  newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
+
+  logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
+    folderId: newFolder.getId(),
+    folderName: folderName,
+    type: 'ROOT',
+    createdBy: Session.getActiveUser().getEmail()
+  });
+
+  return newFolder;
+}
+
+/**
+ * Sets up a Drive folder for a specific grievance
+ * @param {string} grievanceId - The grievance ID
+ * @return {Object} Result with folder URL or error
+ */
+function setupDriveFolderForGrievance(grievanceId) {
+  try {
+    // Get grievance data
+    const grievance = getGrievanceById(grievanceId);
+    if (!grievance) {
+      return { success: false, error: 'Grievance not found' };
+    }
+
+    const memberName = grievance['Member Name'] ||
+                       grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.MEMBER_NAME]];
+
+    // Create folder name from template
+    const folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE
+      .replace('{grievanceId}', grievanceId)
+      .replace('{memberName}', sanitizeFolderName(memberName));
+
+    // Get root folder
+    const rootFolder = getOrCreateRootFolder();
+
+    // Check if folder already exists
+    const existingFolders = rootFolder.getFoldersByName(folderName);
+    if (existingFolders.hasNext()) {
+      const existing = existingFolders.next();
+      return {
+        success: true,
+        folderId: existing.getId(),
+        folderUrl: existing.getUrl(),
+        message: 'Folder already exists'
+      };
+    }
+
+    // Create new folder
+    const newFolder = rootFolder.createFolder(folderName);
+
+    // Create standard subfolders
+    newFolder.createFolder('Step 1 - Informal');
+    newFolder.createFolder('Step 2 - Written');
+    newFolder.createFolder('Step 3 - Review');
+    newFolder.createFolder('Supporting Documents');
+
+    // Update grievance record with folder link
+    updateGrievanceFolderLink(grievanceId, newFolder.getUrl());
+
+    logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
+      grievanceId: grievanceId,
+      folderId: newFolder.getId(),
+      folderName: folderName,
+      createdBy: Session.getActiveUser().getEmail()
+    });
+
+    return {
+      success: true,
+      folderId: newFolder.getId(),
+      folderUrl: newFolder.getUrl(),
+      message: 'Folder created successfully'
+    };
+
+  } catch (error) {
+    console.error('Error creating Drive folder:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Creates Drive folders for multiple grievances in batches
+ * @param {string[]} grievanceIds - Array of grievance IDs
+ * @return {Object} Result with success count
+ */
+function batchCreateGrievanceFolders(grievanceIds) {
+  const results = {
+    success: 0,
+    failed: 0,
+    errors: []
+  };
+
+  const startTime = new Date().getTime();
+
+  for (let i = 0; i < grievanceIds.length; i++) {
+    // Check time limit
+    if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - 30000) {
+      results.errors.push('Time limit reached, some folders not created');
+      break;
+    }
+
+    // Batch pause
+    if (i > 0 && i % BATCH_LIMITS.MAX_API_CALLS_PER_BATCH === 0) {
+      Utilities.sleep(BATCH_LIMITS.PAUSE_BETWEEN_BATCHES_MS);
+    }
+
+    const result = setupDriveFolderForGrievance(grievanceIds[i]);
+
+    if (result.success) {
+      results.success++;
+    } else {
+      results.failed++;
+      results.errors.push(`${grievanceIds[i]}: ${result.error}`);
+    }
+  }
+
+  return {
+    success: true,
+    created: results.success,
+    failed: results.failed,
+    errors: results.errors,
+    message: `Created ${results.success} folders, ${results.failed} failed`
+  };
+}
+
+/**
+ * Updates the Drive folder link in grievance record
+ * @param {string} grievanceId - The grievance ID
+ * @param {string} folderUrl - The folder URL
+ */
+function updateGrievanceFolderLink(grievanceId, folderUrl) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      sheet.getRange(i + 1, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).setValue(folderUrl);
+      break;
+    }
+  }
+}
+
+/**
+ * Opens the Drive folder for selected grievance
+ */
+function openGrievanceFolder() {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  if (sheet.getName() !== SHEET_NAMES.GRIEVANCE_TRACKER) {
+    showAlert('Please select a grievance in the Grievance Tracker', 'Wrong Sheet');
+    return;
+  }
+
+  const row = sheet.getActiveRange().getRow();
+  if (row <= 1) return;
+
+  const folderUrl = sheet.getRange(row, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).getValue();
+
+  if (folderUrl) {
+    const html = HtmlService.createHtmlOutput(
+      `<script>window.open('${folderUrl}', '_blank'); google.script.host.close();</script>`
+    ).setWidth(100).setHeight(50);
+    SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
+  } else {
+    if (showConfirmation('No folder exists. Create one now?', 'Create Folder')) {
+      const grievanceId = sheet.getRange(row, GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1).getValue();
+      const result = setupDriveFolderForGrievance(grievanceId);
+      if (result.success) {
+        const html = HtmlService.createHtmlOutput(
+          `<script>window.open('${result.folderUrl}', '_blank'); google.script.host.close();</script>`
+        ).setWidth(100).setHeight(50);
+        SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
+      }
+    }
+  }
+}
+
+/**
+ * Sanitizes a string for use as a folder name
+ * @param {string} name - The name to sanitize
+ * @return {string} Sanitized folder name
+ */
+function sanitizeFolderName(name) {
+  if (!name) return 'Unknown';
+  return name
+    .replace(/[<>:"/\\|?*]/g, '')
+    .replace(/\s+/g, '_')
+    .substring(0, 50);
+}
+
+// ============================================================================
+// GOOGLE CALENDAR INTEGRATION
+// ============================================================================
+
+/**
+ * Gets or creates the grievance deadlines calendar
+ * @return {Calendar} The deadlines calendar
+ */
+function getOrCreateDeadlinesCalendar() {
+  const calendarName = CALENDAR_CONFIG.CALENDAR_NAME;
+
+  // Check owned calendars
+  const calendars = CalendarApp.getCalendarsByName(calendarName);
+  if (calendars.length > 0) {
+    return calendars[0];
+  }
+
+  // Create new calendar
+  const newCalendar = CalendarApp.createCalendar(calendarName, {
+    summary: 'Grievance deadline tracking - Auto-managed by Union Dashboard',
+    color: CalendarApp.Color.RED
+  });
+
+  return newCalendar;
+}
+
+/**
+ * Syncs all grievance deadlines to calendar
+ * @return {Object} Result with sync count
+ */
+function syncDeadlinesToCalendar() {
+  try {
+    const calendar = getOrCreateDeadlinesCalendar();
+    const openGrievances = getOpenGrievances();
+
+    let synced = 0;
+    let skipped = 0;
+    const startTime = new Date().getTime();
+
+    for (const grievance of openGrievances) {
+      // Check time limit
+      if (new Date().getTime() - startTime > BATCH_LIMITS.MAX_EXECUTION_TIME_MS - 30000) {
+        break;
+      }
+
+      const result = syncGrievanceDeadlinesToCalendar(
+        grievance,
+        calendar
+      );
+
+      if (result.synced) {
+        synced++;
+      } else {
+        skipped++;
+      }
+
+      // Rate limiting pause
+      if (synced % 20 === 0) {
+        Utilities.sleep(200);
+      }
+    }
+
+    logAuditEvent(AUDIT_EVENTS.CALENDAR_SYNCED, {
+      synced: synced,
+      skipped: skipped,
+      syncedBy: Session.getActiveUser().getEmail()
+    });
+
+    return {
+      success: true,
+      synced: synced,
+      skipped: skipped,
+      message: `Synced ${synced} grievances to calendar`
+    };
+
+  } catch (error) {
+    console.error('Error syncing to calendar:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Syncs a single grievance's deadlines to calendar
+ * @param {Object} grievance - Grievance data object
+ * @param {Calendar} calendar - Target calendar
+ * @return {Object} Sync result
+ */
+function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
+  const grievanceId = grievance['Grievance ID'] ||
+                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]];
+  const memberName = grievance['Member Name'] ||
+                     grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.MEMBER_NAME]];
+  const currentStep = grievance['Current Step'] ||
+                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
+
+  // Get the deadline for current step
+  let deadline;
+  switch (currentStep) {
+    case 1:
+      deadline = grievance['Step 1 Due'] ||
+                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
+      break;
+    case 2:
+      deadline = grievance['Step 2 Due'] ||
+                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
+      break;
+    case 3:
+      deadline = grievance['Step 3 Due'] ||
+                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
+      break;
+    default:
+      return { synced: false, reason: 'No applicable deadline' };
+  }
+
+  if (!(deadline instanceof Date)) {
+    return { synced: false, reason: 'Invalid deadline date' };
+  }
+
+  // Check if deadline is in the past
+  if (deadline < new Date()) {
+    return { synced: false, reason: 'Deadline already passed' };
+  }
+
+  // Create event title
+  const eventTitle = `[GRV] ${grievanceId} - Step ${currentStep} Due (${memberName})`;
+
+  // Check for existing event to avoid duplicates
+  const existingEvents = calendar.getEventsForDay(deadline, {
+    search: grievanceId
+  });
+
+  if (existingEvents.length > 0) {
+    // Update existing event
+    const event = existingEvents[0];
+    event.setTitle(eventTitle);
+    return { synced: true, updated: true };
+  }
+
+  // Create all-day event
+  const event = calendar.createAllDayEvent(eventTitle, deadline, {
+    description: `Grievance: ${grievanceId}\n` +
+                 `Member: ${memberName}\n` +
+                 `Step: ${currentStep}\n` +
+                 `Action Required: Response deadline\n\n` +
+                 `Auto-generated by Union Dashboard`
+  });
+
+  // Set reminders
+  event.removeAllReminders();
+  CALENDAR_CONFIG.REMINDER_DAYS.forEach(days => {
+    event.addEmailReminder(days * 24 * 60); // Convert days to minutes
+  });
+
+  return { synced: true, created: true };
+}
+
+// Note: syncSingleGrievanceToCalendar() is defined in MobileQuickActions.gs
+
+/**
+ * Clears all calendar events created by the dashboard
+ * @return {Object} Result with count of deleted events
+ */
+function clearAllCalendarEvents() {
+  try {
+    const calendar = getOrCreateDeadlinesCalendar();
+
+    // Get all events from now until 1 year from now
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + 1);
+
+    const events = calendar.getEvents(startDate, endDate, {
+      search: '[GRV]'
+    });
+
+    let deleted = 0;
+    for (const event of events) {
+      event.deleteEvent();
+      deleted++;
+
+      // Rate limiting
+      if (deleted % 50 === 0) {
+        Utilities.sleep(200);
+      }
+    }
+
+    return {
+      success: true,
+      deleted: deleted,
+      message: `Deleted ${deleted} calendar events`
+    };
+
+  } catch (error) {
+    console.error('Error clearing calendar:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ============================================================================
+// EMAIL NOTIFICATIONS
+// ============================================================================
+
+/**
+ * Sends deadline reminder email for upcoming grievances
+ * @param {number} daysAhead - Days to look ahead
+ * @return {Object} Result object
+ */
+function sendDeadlineReminders(daysAhead) {
+  try {
+    const deadlines = getUpcomingDeadlines(daysAhead || 7);
+    const userEmail = Session.getActiveUser().getEmail();
+
+    if (deadlines.length === 0) {
+      return { success: true, sent: false, message: 'No upcoming deadlines' };
+    }
+
+    // Build email body
+    let body = `<h2>Upcoming Grievance Deadlines</h2>`;
+    body += `<p>The following grievances have deadlines in the next ${daysAhead} days:</p>`;
+    body += `<table style="border-collapse: collapse; width: 100%;">`;
+    body += `<tr style="background: #f0f0f0;">
+               <th style="padding: 10px; border: 1px solid #ddd;">Grievance</th>
+               <th style="padding: 10px; border: 1px solid #ddd;">Member</th>
+               <th style="padding: 10px; border: 1px solid #ddd;">Step</th>
+               <th style="padding: 10px; border: 1px solid #ddd;">Due Date</th>
+               <th style="padding: 10px; border: 1px solid #ddd;">Days Left</th>
+             </tr>`;
+
+    deadlines.forEach(d => {
+      const urgent = d.daysLeft <= 3 ? 'style="background: #fee2e2;"' : '';
+      body += `<tr ${urgent}>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${d.grievanceId}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${d.memberName}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${d.step}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${d.date}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${d.daysLeft}</td>
+               </tr>`;
+    });
+
+    body += `</table>`;
+    body += `<p style="margin-top: 20px; color: #666; font-size: 12px;">
+               This is an automated reminder from the Union Dashboard.
+             </p>`;
+
+    // Send email
+    MailApp.sendEmail({
+      to: userEmail,
+      subject: `[Union Dashboard] ${deadlines.length} Upcoming Grievance Deadline${deadlines.length > 1 ? 's' : ''}`,
+      htmlBody: body
+    });
+
+    return {
+      success: true,
+      sent: true,
+      count: deadlines.length,
+      message: `Sent reminder for ${deadlines.length} deadlines`
+    };
+
+  } catch (error) {
+    console.error('Error sending reminders:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Sends email to a member
+ * @param {string} memberId - The member ID
+ * @param {string} subject - Email subject
+ * @param {string} body - Email body (HTML)
+ * @return {Object} Result object
+ */
+function sendEmailToMember(memberId, subject, body) {
+  try {
+    const member = getMemberById(memberId);
+    if (!member) {
+      return { success: false, error: 'Member not found' };
+    }
+
+    const email = member['Email'] || member[Object.keys(member)[MEMBER_COLUMNS.EMAIL]];
+    if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
+      return { success: false, error: 'Invalid email address' };
+    }
+
+    MailApp.sendEmail({
+      to: email,
+      subject: subject,
+      htmlBody: body
+    });
+
+    return {
+      success: true,
+      message: `Email sent to ${email}`
+    };
+
+  } catch (error) {
+    console.error('Error sending email:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// ============================================================================
+// UI DIALOGS FOR INTEGRATIONS
+// ============================================================================
+
+/**
+ * Shows calendar sync dialog
+ */
+function showCalendarSyncDialog() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      ${getCommonStyles()}
+      <style>
+        .sync-container { padding: 20px; }
+        .sync-option { margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        .sync-option h4 { margin: 0 0 8px 0; }
+        .sync-option p { margin: 0; color: #666; font-size: 13px; }
+        .action-buttons { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+        .status { margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 4px; display: none; }
+      </style>
+    </head>
+    <body>
+      <div class="sync-container">
+        <div class="sync-option">
+          <h4>Sync All Open Grievances</h4>
+          <p>Creates calendar events for all deadlines of open grievances</p>
+          <button class="btn btn-primary" onclick="syncAll()" style="margin-top: 10px;">
+            Sync All Deadlines
+          </button>
+        </div>
+
+        <div class="sync-option">
+          <h4>Clear All Events</h4>
+          <p>Removes all grievance-related events from the calendar</p>
+          <button class="btn btn-danger" onclick="clearAll()" style="margin-top: 10px;">
+            Clear Calendar
+          </button>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="action-buttons">
+          <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+        </div>
+      </div>
+
+      <script>
+        function showStatus(msg, isError) {
+          const el = document.getElementById('status');
+          el.style.display = 'block';
+          el.style.background = isError ? '#fee2e2' : '#d1fae5';
+          el.textContent = msg;
+        }
+
+        function syncAll() {
+          showStatus('Syncing...', false);
+          google.script.run
+            .withSuccessHandler(function(r) {
+              showStatus(r.success ? r.message : 'Error: ' + r.error, !r.success);
+            })
+            .syncDeadlinesToCalendar();
+        }
+
+        function clearAll() {
+          if (!confirm('Are you sure you want to clear all grievance events from the calendar?')) return;
+          showStatus('Clearing...', false);
+          google.script.run
+            .withSuccessHandler(function(r) {
+              showStatus(r.success ? r.message : 'Error: ' + r.error, !r.success);
+            })
+            .clearAllCalendarEvents();
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(450).setHeight(350);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Calendar Sync');
+}
+
+/**
+ * Shows upcoming deadlines dialog
+ */
+function showUpcomingDeadlines() {
+  const deadlines = getUpcomingDeadlines(14);
+
+  let tableRows = '';
+  if (deadlines.length === 0) {
+    tableRows = '<tr><td colspan="4" style="text-align:center; padding:20px;">No upcoming deadlines</td></tr>';
+  } else {
+    deadlines.forEach(d => {
+      const urgentStyle = d.daysLeft <= 3 ? 'background:#fee2e2;' : '';
+      tableRows += `<tr style="${urgentStyle}">
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.grievanceId}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.memberName}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.step}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.date} (${d.daysLeft} days)</td>
+      </tr>`;
+    });
+  }
+
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      ${getCommonStyles()}
+    </head>
+    <body style="padding: 20px;">
+      <h3 style="margin-bottom: 15px;">Upcoming Deadlines (Next 14 Days)</h3>
+      <table style="width:100%; border-collapse: collapse;">
+        <tr style="background:#f0f0f0;">
+          <th style="padding:10px; text-align:left; border-bottom:2px solid #ddd;">Grievance</th>
+          <th style="padding:10px; text-align:left; border-bottom:2px solid #ddd;">Member</th>
+          <th style="padding:10px; text-align:left; border-bottom:2px solid #ddd;">Step</th>
+          <th style="padding:10px; text-align:left; border-bottom:2px solid #ddd;">Due</th>
+        </tr>
+        ${tableRows}
+      </table>
+      <div style="margin-top:20px; text-align:right;">
+        <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+      </div>
+    </body>
+    </html>
+  `).setWidth(600).setHeight(400);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Upcoming Deadlines');
+}
+
+/**
+ * Shows confirmation dialog for clearing calendar
+ */
+function showClearCalendarConfirm() {
+  const result = showConfirmation(
+    'This will delete ALL grievance-related events from your calendar. This cannot be undone. Continue?',
+    'Clear Calendar Events'
+  );
+
+  if (result) {
+    const clearResult = clearAllCalendarEvents();
+    if (clearResult.success) {
+      showToast(clearResult.message, 'Calendar Cleared');
+    } else {
+      showAlert('Error: ' + clearResult.error, 'Error');
+    }
+  }
+}
+
+// ============================================================================
+// ORPHANED DRIVE FOLDER CLEANUP
+// ============================================================================
+
+/**
+ * Find Drive folders that are orphaned (no matching grievance in the sheet)
+ * @return {Object} Result with orphaned folders list
+ */
+function findOrphanedDriveFolders() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+    if (!grievanceSheet) {
+      return { success: false, error: 'Grievance Log not found' };
+    }
+
+    // Get all grievance IDs from the sheet
+    const lastRow = grievanceSheet.getLastRow();
+    if (lastRow < 2) {
+      return { success: true, orphanedFolders: [], message: 'No grievances in sheet' };
+    }
+
+    const grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1)
+      .getValues()
+      .map(row => row[0])
+      .filter(id => id && id !== '');
+
+    const grievanceIdSet = {};
+    grievanceIds.forEach(id => { grievanceIdSet[id] = true; });
+
+    // Get root folder
+    const rootFolder = getOrCreateRootFolder();
+    const subFolders = rootFolder.getFolders();
+
+    const orphanedFolders = [];
+    const validFolders = [];
+
+    while (subFolders.hasNext()) {
+      const folder = subFolders.next();
+      const folderName = folder.getName();
+
+      // Extract grievance ID from folder name (format: "GXXXX123 - Name")
+      const match = folderName.match(/^([GM][A-Z]{4}\d{3,})/);
+
+      if (match) {
+        const folderId = match[1];
+        if (!grievanceIdSet[folderId]) {
+          orphanedFolders.push({
+            name: folderName,
+            id: folder.getId(),
+            url: folder.getUrl(),
+            created: folder.getDateCreated(),
+            grievanceId: folderId
+          });
+        } else {
+          validFolders.push({ name: folderName, grievanceId: folderId });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      orphanedFolders: orphanedFolders,
+      validCount: validFolders.length,
+      message: `Found ${orphanedFolders.length} orphaned folder(s) out of ${orphanedFolders.length + validFolders.length} total`
+    };
+
+  } catch (error) {
+    console.error('Error finding orphaned folders:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Delete orphaned Drive folders
+ * @param {string[]} folderIds - Array of folder IDs to delete
+ * @return {Object} Result with deletion count
+ */
+function deleteOrphanedFolders(folderIds) {
+  try {
+    if (!folderIds || folderIds.length === 0) {
+      return { success: true, deleted: 0, message: 'No folders to delete' };
+    }
+
+    let deleted = 0;
+    const errors = [];
+
+    for (const folderId of folderIds) {
+      try {
+        const folder = DriveApp.getFolderById(folderId);
+        folder.setTrashed(true);
+        deleted++;
+
+        // Rate limiting
+        if (deleted % 10 === 0) {
+          Utilities.sleep(200);
+        }
+      } catch (e) {
+        errors.push(`Folder ${folderId}: ${e.message}`);
+      }
+    }
+
+    // Log the cleanup action
+    if (typeof logIntegrityEvent === 'function') {
+      logIntegrityEvent('ORPHAN_FOLDER_CLEANUP',
+        `Deleted ${deleted} orphaned Drive folders`,
+        { deletedCount: deleted, errors: errors.length }
+      );
+    }
+
+    return {
+      success: true,
+      deleted: deleted,
+      errors: errors,
+      message: `Deleted ${deleted} folder(s)${errors.length > 0 ? ', ' + errors.length + ' errors' : ''}`
+    };
+
+  } catch (error) {
+    console.error('Error deleting orphaned folders:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Show dialog for orphaned folder cleanup
+ */
+function showOrphanedFolderCleanupDialog() {
+  const result = findOrphanedDriveFolders();
+
+  if (!result.success) {
+    SpreadsheetApp.getUi().alert('Error', result.error, SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  if (result.orphanedFolders.length === 0) {
+    SpreadsheetApp.getUi().alert(
+      '✅ No Orphaned Folders',
+      'All Drive folders have matching grievances in the Grievance Log.\n\n' +
+      'Valid folders found: ' + result.validCount,
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Build HTML dialog
+  let folderListHtml = '';
+  result.orphanedFolders.forEach((folder, index) => {
+    const created = folder.created ? new Date(folder.created).toLocaleDateString() : 'Unknown';
+    folderListHtml += `
+      <tr>
+        <td><input type="checkbox" id="folder_${index}" value="${folder.id}" checked></td>
+        <td><a href="${folder.url}" target="_blank">${folder.name}</a></td>
+        <td>${folder.grievanceId}</td>
+        <td>${created}</td>
+      </tr>`;
+  });
+
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .warning { background: #FEF3C7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #F59E0B; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th { background: #7C3AED; color: white; padding: 10px; text-align: left; }
+        td { padding: 8px; border-bottom: 1px solid #E5E7EB; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-size: 14px; }
+        .btn-danger { background: #DC2626; color: white; }
+        .btn-danger:hover { background: #B91C1C; }
+        .btn-secondary { background: #6B7280; color: white; }
+        .summary { margin-top: 15px; padding: 10px; background: #F3F4F6; border-radius: 5px; }
+      </style>
+    </head>
+    <body>
+      <h2>🗂️ Orphaned Drive Folder Cleanup</h2>
+
+      <div class="warning">
+        <strong>⚠️ Warning:</strong> These folders exist in Google Drive but have no matching
+        grievance ID in the Grievance Log. They may have been left behind when grievances were deleted.
+      </div>
+
+      <table>
+        <tr>
+          <th>Select</th>
+          <th>Folder Name</th>
+          <th>Grievance ID</th>
+          <th>Created</th>
+        </tr>
+        ${folderListHtml}
+      </table>
+
+      <div class="summary">
+        <strong>Summary:</strong> ${result.orphanedFolders.length} orphaned folder(s) found,
+        ${result.validCount} valid folder(s) matched to grievances.
+      </div>
+
+      <div style="margin-top: 20px; text-align: right;">
+        <button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>
+        <button class="btn btn-danger" onclick="deleteSelected()">🗑️ Delete Selected</button>
+      </div>
+
+      <script>
+        function deleteSelected() {
+          const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+          const folderIds = Array.from(checkboxes).map(cb => cb.value);
+
+          if (folderIds.length === 0) {
+            alert('Please select at least one folder to delete.');
+            return;
+          }
+
+          if (!confirm('Are you sure you want to delete ' + folderIds.length + ' folder(s)? This will move them to Trash.')) {
+            return;
+          }
+
+          google.script.run
+            .withSuccessHandler(function(result) {
+              alert(result.message);
+              google.script.host.close();
+            })
+            .withFailureHandler(function(error) {
+              alert('Error: ' + error.message);
+            })
+            .deleteOrphanedFolders(folderIds);
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(700).setHeight(500);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Clean Up Orphaned Folders');
+}
+
+/**
+ * Scheduled cleanup of orphaned folders (for time-based trigger)
+ * Sends report to admin but doesn't delete without confirmation
+ */
+function runScheduledFolderAudit() {
+  const result = findOrphanedDriveFolders();
+
+  if (!result.success || result.orphanedFolders.length === 0) {
+    return;
+  }
+
+  // Get admin emails from Config
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) return;
+
+  const adminEmail = configSheet.getRange(3, CONFIG_COLS.ADMIN_EMAILS).getValue();
+
+  if (adminEmail) {
+    let body = `<h2>Orphaned Drive Folder Report</h2>
+      <p>The scheduled audit found ${result.orphanedFolders.length} orphaned folder(s) in the grievance Drive folder.</p>
+      <p>These folders have no matching grievance ID in the Grievance Log:</p>
+      <table style="border-collapse:collapse;">
+        <tr style="background:#f0f0f0;">
+          <th style="padding:8px;border:1px solid #ddd;">Folder Name</th>
+          <th style="padding:8px;border:1px solid #ddd;">Grievance ID</th>
+          <th style="padding:8px;border:1px solid #ddd;">Created</th>
+        </tr>`;
+
+    result.orphanedFolders.slice(0, 20).forEach(folder => {
+      const created = folder.created ? new Date(folder.created).toLocaleDateString() : 'Unknown';
+      body += `<tr>
+        <td style="padding:8px;border:1px solid #ddd;"><a href="${folder.url}">${folder.name}</a></td>
+        <td style="padding:8px;border:1px solid #ddd;">${folder.grievanceId}</td>
+        <td style="padding:8px;border:1px solid #ddd;">${created}</td>
+      </tr>`;
+    });
+
+    if (result.orphanedFolders.length > 20) {
+      body += `<tr><td colspan="3" style="padding:8px;">...and ${result.orphanedFolders.length - 20} more</td></tr>`;
+    }
+
+    body += `</table>
+      <p style="margin-top:20px;">To clean up these folders, go to the dashboard and use:
+      <strong>Admin > Drive Integration > Clean Up Orphaned Folders</strong></p>
+      <p style="color:#666;font-size:12px;">--<br>509 Dashboard Automated Report</p>`;
+
+    try {
+      MailApp.sendEmail({
+        to: adminEmail,
+        subject: `[509 Dashboard] ${result.orphanedFolders.length} Orphaned Drive Folder(s) Found`,
+        htmlBody: body
+      });
+    } catch (e) {
+      console.error('Failed to send orphan folder report:', e);
+    }
+  }
+}
+/**
+ * ============================================================================
+ * WEB APP DEPLOYMENT FOR MOBILE ACCESS
+ * ============================================================================
+ * This file enables the dashboard to be deployed as a standalone web app
+ * that can be accessed directly via URL on mobile devices.
+ *
+ * DEPLOYMENT INSTRUCTIONS:
+ * 1. Go to Extensions → Apps Script
+ * 2. Click "Deploy" → "New deployment"
+ * 3. Select "Web app" as the deployment type
+ * 4. Set "Execute as" to your account
+ * 5. Set "Who has access" to your organization or anyone
+ * 6. Click "Deploy" and copy the URL
+ * 7. Bookmark this URL on your mobile device for easy access
+ */
+
+/**
+ * Web app entry point - serves the mobile dashboard
+ * @param {Object} e - Event object with query parameters
+ * @returns {HtmlOutput} The HTML page to display
+ */
+function doGet(e) {
+  var page = e && e.parameter && e.parameter.page ? e.parameter.page : 'dashboard';
+
+  var html;
+  switch (page) {
+    case 'search':
+      html = getWebAppSearchHtml();
+      break;
+    case 'grievances':
+      html = getWebAppGrievanceListHtml();
+      break;
+    case 'members':
+      html = getWebAppMemberListHtml();
+      break;
+    case 'links':
+      html = getWebAppLinksHtml();
+      break;
+    case 'dashboard':
+    default:
+      html = getWebAppDashboardHtml();
+      break;
+  }
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('509 Dashboard')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+}
+
+/**
+ * Returns the main dashboard HTML for web app - FUTURISTIC REDESIGN
+ * Dark theme with glassmorphism, neon colors, 6 tabs
+ */
+function getWebAppDashboardHtml() {
+  var stats = getWebAppDashboardStats();
+  var baseUrl = ScriptApp.getService().getUrl();
+
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="apple-mobile-web-app-capable" content="yes">' +
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">' +
+    '<meta name="theme-color" content="#0a0a0f">' +
+    '<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><text y=\'.9em\' font-size=\'90\'>📊</text></svg>">' +
+    '<title>509 Dashboard</title>' +
+    '<style>' +
+    // CSS Variables
+    ':root{--bg-primary:#0a0a0f;--bg-secondary:#12121a;--bg-card:rgba(255,255,255,0.03);--glass:rgba(255,255,255,0.05);' +
+    '--text-primary:#f0f0f5;--text-secondary:#8888aa;--accent:#8b5cf6;--accent-glow:rgba(139,92,246,0.4);' +
+    '--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--neon-purple:#a855f7;--neon-blue:#3b82f6;--neon-pink:#ec4899}' +
+
+    // Reset & Base
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden}' +
+
+    // Glassmorphism utilities
+    '.glass{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.08)}' +
+
+    // Header
+    '.header{background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(59,130,246,0.1));border-bottom:1px solid rgba(255,255,255,0.08);padding:20px 16px;text-align:center}' +
+    '.header h1{font-size:clamp(20px,5vw,26px);font-weight:700;background:linear-gradient(135deg,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}' +
+    '.header .subtitle{font-size:12px;color:var(--text-secondary);margin-top:4px}' +
+
+    // Tab Navigation
+    '.tab-nav{display:flex;gap:6px;padding:12px 16px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;border-bottom:1px solid rgba(255,255,255,0.05)}' +
+    '.tab-nav::-webkit-scrollbar{display:none}' +
+    '.tab-btn{padding:10px 16px;border-radius:20px;font-size:13px;font-weight:500;white-space:nowrap;cursor:pointer;transition:all 0.3s;' +
+    'background:transparent;border:1px solid rgba(255,255,255,0.1);color:var(--text-secondary)}' +
+    '.tab-btn.active{background:linear-gradient(135deg,var(--accent),var(--neon-blue));color:white;border-color:transparent;box-shadow:0 4px 15px var(--accent-glow)}' +
+
+    // Container
+    '.container{padding:16px;max-width:600px;margin:0 auto;padding-bottom:90px}' +
+
+    // Tab Content
+    '.tab-content{display:none}' +
+    '.tab-content.active{display:block;animation:fadeIn 0.3s ease}' +
+    '@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}' +
+
+    // Stats Grid
+    '.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}' +
+    '.stat-card{background:var(--bg-card);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:16px 12px;text-align:center;cursor:pointer;transition:all 0.3s}' +
+    '.stat-card:active{transform:scale(0.96)}' +
+    '.stat-card:hover{border-color:var(--accent);box-shadow:0 0 20px var(--accent-glow)}' +
+    '.stat-value{font-size:clamp(24px,6vw,32px);font-weight:700;background:linear-gradient(135deg,var(--neon-purple),var(--neon-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}' +
+    '.stat-value.success{background:linear-gradient(135deg,var(--success),#34d399);-webkit-background-clip:text;background-clip:text}' +
+    '.stat-value.warning{background:linear-gradient(135deg,var(--warning),#fbbf24);-webkit-background-clip:text;background-clip:text}' +
+    '.stat-value.danger{background:linear-gradient(135deg,var(--danger),#f87171);-webkit-background-clip:text;background-clip:text}' +
+    '.stat-label{font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-top:6px}' +
+
+    // Alert Box
+    '.alert-box{background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,0.3);border-radius:16px;padding:16px;margin-bottom:20px}' +
+    '.alert-title{font-size:14px;font-weight:600;color:var(--danger);margin-bottom:10px;display:flex;align-items:center;gap:8px}' +
+    '.alert-item{background:var(--bg-secondary);border-radius:12px;padding:12px;margin-bottom:8px}' +
+    '.alert-item:last-child{margin-bottom:0}' +
+    '.alert-id{font-size:12px;color:var(--accent);font-weight:600}' +
+    '.alert-name{font-size:14px;color:var(--text-primary);margin-top:2px}' +
+    '.alert-detail{font-size:11px;color:var(--text-secondary);margin-top:2px}' +
+
+    // Action Cards
+    '.action-list{display:flex;flex-direction:column;gap:12px}' +
+    '.action-card{background:var(--bg-card);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all 0.3s;text-decoration:none;color:inherit}' +
+    '.action-card:active{transform:scale(0.98)}' +
+    '.action-card:hover{border-color:var(--accent);box-shadow:0 0 20px var(--accent-glow)}' +
+    '.action-icon{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(139,92,246,0.2),rgba(59,130,246,0.2));display:flex;align-items:center;justify-content:center;font-size:24px}' +
+    '.action-text .label{font-size:15px;font-weight:600;color:var(--text-primary)}' +
+    '.action-text .desc{font-size:12px;color:var(--text-secondary);margin-top:2px}' +
+
+    // Section Title
+    '.section-title{font-size:14px;font-weight:600;color:var(--text-secondary);margin:20px 0 12px;text-transform:uppercase;letter-spacing:1px}' +
+
+    // Filter Pills
+    '.filter-pills{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px}' +
+    '.filter-pill{padding:8px 14px;border-radius:20px;font-size:12px;background:var(--bg-card);border:1px solid rgba(255,255,255,0.08);color:var(--text-secondary);cursor:pointer;white-space:nowrap}' +
+    '.filter-pill.active{background:var(--accent);color:white;border-color:transparent}' +
+
+    // Search Box
+    '.search-box{position:relative;margin-bottom:16px}' +
+    '.search-input{width:100%;padding:14px 14px 14px 44px;background:var(--bg-card);border:1px solid rgba(255,255,255,0.08);border-radius:14px;color:var(--text-primary);font-size:15px}' +
+    '.search-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 15px var(--accent-glow)}' +
+    '.search-input::placeholder{color:var(--text-secondary)}' +
+    '.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--text-secondary)}' +
+
+    // List Items
+    '.list-item{background:var(--bg-card);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:14px;margin-bottom:10px;cursor:pointer;transition:all 0.3s}' +
+    '.list-item:hover{border-color:var(--accent)}' +
+    '.list-item .item-id{font-size:12px;color:var(--accent);font-weight:600}' +
+    '.list-item .item-name{font-size:15px;color:var(--text-primary);margin-top:2px}' +
+    '.list-item .item-meta{font-size:12px;color:var(--text-secondary);margin-top:4px}' +
+    '.list-item .item-status{display:inline-block;padding:4px 10px;border-radius:10px;font-size:11px;margin-top:6px}' +
+    '.list-item .item-status.open{background:rgba(16,185,129,0.2);color:var(--success)}' +
+    '.list-item .item-status.pending{background:rgba(245,158,11,0.2);color:var(--warning)}' +
+    '.list-item .item-status.overdue{background:rgba(239,68,68,0.2);color:var(--danger)}' +
+
+    // My Cases Stats
+    '.my-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}' +
+    '.my-stat{background:var(--bg-card);border-radius:12px;padding:12px 8px;text-align:center}' +
+    '.my-stat .value{font-size:20px;font-weight:700;color:var(--accent)}' +
+    '.my-stat .label{font-size:9px;color:var(--text-secondary);margin-top:4px;text-transform:uppercase}' +
+
+    // Empty State
+    '.empty-state{text-align:center;padding:40px 20px;color:var(--text-secondary)}' +
+    '.empty-state .icon{font-size:48px;margin-bottom:12px;opacity:0.5}' +
+
+    // Loading
+    '.loading{text-align:center;padding:30px;color:var(--text-secondary)}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.spinner{display:inline-block;width:24px;height:24px;border:2px solid var(--bg-card);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}' +
+
+    // Bottom Nav
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(10,10,15,0.95);backdrop-filter:blur(10px);display:flex;justify-content:space-around;padding:10px 0 max(10px,env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,0.08);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 12px;color:var(--text-secondary);text-decoration:none;font-size:10px;transition:all 0.3s}' +
+    '.nav-item.active{color:var(--accent)}' +
+    '.nav-item .icon{font-size:20px;margin-bottom:3px}' +
+
+    // Link Cards
+    '.link-card{background:var(--bg-card);border:1px solid rgba(255,255,255,0.06);border-radius:14px;padding:16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;cursor:pointer;text-decoration:none;color:inherit;transition:all 0.3s}' +
+    '.link-card:hover{border-color:var(--accent)}' +
+    '.link-icon{font-size:24px}' +
+    '.link-text{flex:1}' +
+    '.link-text .title{font-size:14px;font-weight:600;color:var(--text-primary)}' +
+    '.link-text .url{font-size:11px;color:var(--text-secondary);margin-top:2px}' +
+
+    '</style></head><body>' +
+
+    // Header
+    '<div class="header">' +
+    '<h1>📊 509 Dashboard</h1>' +
+    '<div class="subtitle">Union Grievance Management</div>' +
+    '</div>' +
+
+    // Tab Navigation
+    '<div class="tab-nav">' +
+    '<button class="tab-btn active" onclick="showTab(\'overview\')">Overview</button>' +
+    '<button class="tab-btn" onclick="showTab(\'mycases\')">My Cases</button>' +
+    '<button class="tab-btn" onclick="showTab(\'cases\')">Cases</button>' +
+    '<button class="tab-btn" onclick="showTab(\'members\')">Members</button>' +
+    '<button class="tab-btn" onclick="showTab(\'analytics\')">Analytics</button>' +
+    '<button class="tab-btn" onclick="showTab(\'links\')">Links</button>' +
+    '</div>' +
+
+    '<div class="container">' +
+
+    // Overview Tab
+    '<div id="tab-overview" class="tab-content active">' +
+    '<div class="stats-grid">' +
+    '<div class="stat-card" onclick="showTab(\'members\')"><div class="stat-value">' + stats.totalMembers + '</div><div class="stat-label">Members</div></div>' +
+    '<div class="stat-card" onclick="showTab(\'cases\')"><div class="stat-value">' + stats.totalGrievances + '</div><div class="stat-label">Grievances</div></div>' +
+    '<div class="stat-card" onclick="filterCases(\'active\')"><div class="stat-value success">' + stats.activeGrievances + '</div><div class="stat-label">Active</div></div>' +
+    '<div class="stat-card" onclick="filterCases(\'pending\')"><div class="stat-value warning">' + stats.pendingGrievances + '</div><div class="stat-label">Pending</div></div>' +
+    '<div class="stat-card" onclick="filterCases(\'overdue\')"><div class="stat-value danger">' + stats.overdueGrievances + '</div><div class="stat-label">Overdue</div></div>' +
+    '<div class="stat-card"><div class="stat-value success">' + stats.winRate + '</div><div class="stat-label">Win Rate</div></div>' +
+    '</div>' +
+    '<div id="overdue-alerts"></div>' +
+    '<div class="section-title">Quick Actions</div>' +
+    '<div class="action-list">' +
+    '<a class="action-card" href="' + baseUrl + '?page=search"><div class="action-icon">🔍</div><div class="action-text"><div class="label">Search</div><div class="desc">Find members or grievances</div></div></a>' +
+    '<div class="action-card" onclick="showTab(\'cases\')"><div class="action-icon">📋</div><div class="action-text"><div class="label">All Cases</div><div class="desc">Browse and filter grievances</div></div></div>' +
+    '<div class="action-card" onclick="showTab(\'members\')"><div class="action-icon">👥</div><div class="action-text"><div class="label">Members</div><div class="desc">View member directory</div></div></div>' +
+    '<div class="action-card" onclick="showTab(\'links\')"><div class="action-icon">🔗</div><div class="action-text"><div class="label">Links</div><div class="desc">Forms, resources, GitHub</div></div></div>' +
+    '</div></div>' +
+
+    // My Cases Tab
+    '<div id="tab-mycases" class="tab-content">' +
+    '<div class="my-stats">' +
+    '<div class="my-stat"><div class="value" id="my-active">-</div><div class="label">Active</div></div>' +
+    '<div class="my-stat"><div class="value" id="my-pending">-</div><div class="label">Pending</div></div>' +
+    '<div class="my-stat"><div class="value" id="my-overdue">-</div><div class="label">Overdue</div></div>' +
+    '<div class="my-stat"><div class="value" id="my-total">-</div><div class="label">Total</div></div>' +
+    '</div>' +
+    '<div class="filter-pills" id="my-filters">' +
+    '<div class="filter-pill active" onclick="filterMyCases(\'all\')">All</div>' +
+    '<div class="filter-pill" onclick="filterMyCases(\'active\')">Active</div>' +
+    '<div class="filter-pill" onclick="filterMyCases(\'overdue\')">Overdue</div>' +
+    '</div>' +
+    '<div id="my-cases-list"><div class="loading"><div class="spinner"></div><div style="margin-top:12px">Loading your cases...</div></div></div>' +
+    '</div>' +
+
+    // Cases Tab
+    '<div id="tab-cases" class="tab-content">' +
+    '<div class="search-box"><span class="search-icon">🔍</span><input class="search-input" placeholder="Search grievances..." oninput="searchCases(this.value)"></div>' +
+    '<div class="filter-pills" id="case-filters">' +
+    '<div class="filter-pill active" onclick="filterCases(\'all\')">All</div>' +
+    '<div class="filter-pill" onclick="filterCases(\'active\')">Active</div>' +
+    '<div class="filter-pill" onclick="filterCases(\'pending\')">Pending</div>' +
+    '<div class="filter-pill" onclick="filterCases(\'overdue\')">Overdue</div>' +
+    '</div>' +
+    '<div id="cases-list"><div class="loading"><div class="spinner"></div><div style="margin-top:12px">Loading cases...</div></div></div>' +
+    '</div>' +
+
+    // Members Tab
+    '<div id="tab-members" class="tab-content">' +
+    '<div class="search-box"><span class="search-icon">🔍</span><input class="search-input" placeholder="Search members..." oninput="searchMembers(this.value)"></div>' +
+    '<div id="members-list"><div class="loading"><div class="spinner"></div><div style="margin-top:12px">Loading members...</div></div></div>' +
+    '</div>' +
+
+    // Analytics Tab
+    '<div id="tab-analytics" class="tab-content">' +
+    '<div id="analytics-content"><div class="empty-state"><div class="icon">📊</div><div>Analytics coming soon</div></div></div>' +
+    '</div>' +
+
+    // Links Tab
+    '<div id="tab-links" class="tab-content">' +
+    '<div class="section-title">Resources</div>' +
+    '<div id="links-content"></div>' +
+    '</div>' +
+
+    '</div>' +
+
+    // Bottom Nav
+    '<nav class="bottom-nav">' +
+    '<a class="nav-item active" href="' + baseUrl + '"><span class="icon">📊</span>Home</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=search"><span class="icon">🔍</span>Search</a>' +
+    '<a class="nav-item" onclick="showTab(\'cases\')"><span class="icon">📋</span>Cases</a>' +
+    '<a class="nav-item" onclick="showTab(\'members\')"><span class="icon">👥</span>Members</a>' +
+    '<a class="nav-item" onclick="showTab(\'links\')"><span class="icon">🔗</span>Links</a>' +
+    '</nav>' +
+
+    // JavaScript
+    '<script>' +
+    'var baseUrl="' + baseUrl + '";' +
+    'var allCases=[];var allMembers=[];var myCases=[];var currentFilter="all";' +
+
+    // Tab switching
+    'function showTab(tab){' +
+    '  document.querySelectorAll(".tab-content").forEach(function(el){el.classList.remove("active")});' +
+    '  document.querySelectorAll(".tab-btn").forEach(function(el){el.classList.remove("active")});' +
+    '  document.getElementById("tab-"+tab).classList.add("active");' +
+    '  document.querySelectorAll(".tab-btn").forEach(function(el){if(el.textContent.toLowerCase().replace(" ","").indexOf(tab)>=0)el.classList.add("active")});' +
+    '  if(tab==="cases"&&allCases.length===0)loadCases();' +
+    '  if(tab==="members"&&allMembers.length===0)loadMembers();' +
+    '  if(tab==="mycases"&&myCases.length===0)loadMyCases();' +
+    '  if(tab==="links")loadLinks();' +
+    '}' +
+
+    // Load cases
+    'function loadCases(){' +
+    '  google.script.run.withSuccessHandler(function(data){' +
+    '    allCases=data||[];renderCases(allCases);' +
+    '  }).withFailureHandler(function(){' +
+    '    document.getElementById("cases-list").innerHTML="<div class=\\"empty-state\\"><div class=\\"icon\\">⚠️</div><div>Failed to load</div></div>";' +
+    '  }).getWebAppGrievanceList();' +
+    '}' +
+
+    // Render cases
+    'function renderCases(cases){' +
+    '  if(!cases||cases.length===0){document.getElementById("cases-list").innerHTML="<div class=\\"empty-state\\"><div class=\\"icon\\">📋</div><div>No cases found</div></div>";return}' +
+    '  var html="";cases.forEach(function(c){' +
+    '    var statusClass=c.isOverdue?"overdue":(c.status==="Pending Info"?"pending":"open");' +
+    '    html+="<div class=\\"list-item\\"><div class=\\"item-id\\">"+(c.id||"")+"</div><div class=\\"item-name\\">"+(c.name||"")+"</div><div class=\\"item-meta\\">"+(c.category||"")+" • "+(c.step||"")+"</div><div class=\\"item-status "+statusClass+"\\">"+(c.isOverdue?"Overdue":c.status||"")+"</div></div>";' +
+    '  });document.getElementById("cases-list").innerHTML=html;' +
+    '}' +
+
+    // Filter cases
+    'function filterCases(filter){' +
+    '  currentFilter=filter;' +
+    '  document.querySelectorAll("#case-filters .filter-pill").forEach(function(el){el.classList.remove("active")});' +
+    '  document.querySelectorAll("#case-filters .filter-pill").forEach(function(el){if(el.textContent.toLowerCase()===filter)el.classList.add("active")});' +
+    '  showTab("cases");' +
+    '  if(allCases.length===0)return;' +
+    '  var filtered=allCases;' +
+    '  if(filter==="active")filtered=allCases.filter(function(c){return c.status&&c.status!=="Resolved"&&c.status!=="Withdrawn"&&c.status!=="Closed"});' +
+    '  if(filter==="pending")filtered=allCases.filter(function(c){return c.status==="Pending Info"});' +
+    '  if(filter==="overdue")filtered=allCases.filter(function(c){return c.isOverdue});' +
+    '  renderCases(filtered);' +
+    '}' +
+
+    // Search cases
+    'function searchCases(q){' +
+    '  if(!q){renderCases(allCases);return}' +
+    '  q=q.toLowerCase();' +
+    '  var filtered=allCases.filter(function(c){return (c.id||"").toLowerCase().indexOf(q)>=0||(c.name||"").toLowerCase().indexOf(q)>=0||(c.category||"").toLowerCase().indexOf(q)>=0});' +
+    '  renderCases(filtered);' +
+    '}' +
+
+    // Load members
+    'function loadMembers(){' +
+    '  google.script.run.withSuccessHandler(function(data){' +
+    '    allMembers=data||[];renderMembers(allMembers);' +
+    '  }).withFailureHandler(function(){' +
+    '    document.getElementById("members-list").innerHTML="<div class=\\"empty-state\\"><div class=\\"icon\\">⚠️</div><div>Failed to load</div></div>";' +
+    '  }).getWebAppMemberList();' +
+    '}' +
+
+    // Render members
+    'function renderMembers(members){' +
+    '  if(!members||members.length===0){document.getElementById("members-list").innerHTML="<div class=\\"empty-state\\"><div class=\\"icon\\">👥</div><div>No members found</div></div>";return}' +
+    '  var html="";members.slice(0,50).forEach(function(m){' +
+    '    html+="<div class=\\"list-item\\"><div class=\\"item-id\\">"+(m.id||"")+"</div><div class=\\"item-name\\">"+(m.name||"")+"</div><div class=\\"item-meta\\">"+(m.location||"")+(m.isSteward?" • ⭐ Steward":"")+"</div></div>";' +
+    '  });document.getElementById("members-list").innerHTML=html;' +
+    '}' +
+
+    // Search members
+    'function searchMembers(q){' +
+    '  if(!q){renderMembers(allMembers);return}' +
+    '  q=q.toLowerCase();' +
+    '  var filtered=allMembers.filter(function(m){return (m.id||"").toLowerCase().indexOf(q)>=0||(m.name||"").toLowerCase().indexOf(q)>=0||(m.location||"").toLowerCase().indexOf(q)>=0});' +
+    '  renderMembers(filtered);' +
+    '}' +
+
+    // Load my cases
+    'function loadMyCases(){' +
+    '  google.script.run.withSuccessHandler(function(data){' +
+    '    myCases=data||[];' +
+    '    var active=myCases.filter(function(c){return c.status&&c.status!=="Resolved"&&c.status!=="Withdrawn"&&c.status!=="Closed"}).length;' +
+    '    var pending=myCases.filter(function(c){return c.status==="Pending Info"}).length;' +
+    '    var overdue=myCases.filter(function(c){return c.isOverdue}).length;' +
+    '    document.getElementById("my-active").textContent=active;' +
+    '    document.getElementById("my-pending").textContent=pending;' +
+    '    document.getElementById("my-overdue").textContent=overdue;' +
+    '    document.getElementById("my-total").textContent=myCases.length;' +
+    '    renderMyCases(myCases);' +
+    '  }).withFailureHandler(function(){' +
+    '    document.getElementById("my-cases-list").innerHTML="<div class=\\"empty-state\\"><div class=\\"icon\\">⚠️</div><div>Failed to load your cases</div></div>";' +
+    '  }).getMyStewardCases();' +
+    '}' +
+
+    // Render my cases
+    'function renderMyCases(cases){' +
+    '  if(!cases||cases.length===0){document.getElementById("my-cases-list").innerHTML="<div class=\\"empty-state\\"><div class=\\"icon\\">📋</div><div>No assigned cases</div></div>";return}' +
+    '  var html="";cases.forEach(function(c){' +
+    '    var statusClass=c.isOverdue?"overdue":(c.status==="Pending Info"?"pending":"open");' +
+    '    html+="<div class=\\"list-item\\"><div class=\\"item-id\\">"+(c.id||"")+"</div><div class=\\"item-name\\">"+(c.name||"")+"</div><div class=\\"item-meta\\">"+(c.category||"")+" • "+(c.step||"")+"</div><div class=\\"item-status "+statusClass+"\\">"+(c.isOverdue?"Overdue":c.status||"")+"</div></div>";' +
+    '  });document.getElementById("my-cases-list").innerHTML=html;' +
+    '}' +
+
+    // Filter my cases
+    'function filterMyCases(filter){' +
+    '  document.querySelectorAll("#my-filters .filter-pill").forEach(function(el){el.classList.remove("active")});' +
+    '  document.querySelectorAll("#my-filters .filter-pill").forEach(function(el){if(el.textContent.toLowerCase()===filter)el.classList.add("active")});' +
+    '  var filtered=myCases;' +
+    '  if(filter==="active")filtered=myCases.filter(function(c){return c.status&&c.status!=="Resolved"&&c.status!=="Withdrawn"&&c.status!=="Closed"});' +
+    '  if(filter==="overdue")filtered=myCases.filter(function(c){return c.isOverdue});' +
+    '  renderMyCases(filtered);' +
+    '}' +
+
+    // Load links
+    'function loadLinks(){' +
+    '  var html="";' +
+    '  html+="<a class=\\"link-card\\" href=\\"' + baseUrl + '?page=search\\"><span class=\\"link-icon\\">🔍</span><div class=\\"link-text\\"><div class=\\"title\\">Search</div><div class=\\"url\\">Find members and grievances</div></div></a>";' +
+    '  html+="<a class=\\"link-card\\" href=\\"https://github.com/Woop91/MULTIPLE-SCRIPS-REPO\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><div class=\\"link-text\\"><div class=\\"title\\">GitHub Repository</div><div class=\\"url\\">github.com/Woop91/MULTIPLE-SCRIPS-REPO</div></div></a>";' +
+    '  document.getElementById("links-content").innerHTML=html;' +
+    '}' +
+
+    // Load overdue alerts
+    'function loadOverdueAlerts(){' +
+    '  google.script.run.withSuccessHandler(function(data){' +
+    '    if(!data||!Array.isArray(data))return;' +
+    '    var overdue=data.filter(function(g){return g&&g.isOverdue});' +
+    '    if(overdue.length===0){document.getElementById("overdue-alerts").innerHTML="<div style=\\"text-align:center;padding:16px;color:var(--success)\\">✅ All cases on track!</div>";return}' +
+    '    var html="<div class=\\"alert-box\\"><div class=\\"alert-title\\">⚠️ Overdue Cases ("+overdue.length+")</div>";' +
+    '    overdue.slice(0,3).forEach(function(g){html+="<div class=\\"alert-item\\"><div class=\\"alert-id\\">"+(g.id||"")+"</div><div class=\\"alert-name\\">"+(g.name||"")+"</div><div class=\\"alert-detail\\">"+(g.category||"")+" • "+(g.step||"")+"</div></div>"});' +
+    '    if(overdue.length>3)html+="<div style=\\"text-align:center;margin-top:10px\\"><button onclick=\\"filterCases(\'overdue\')\\" style=\\"background:var(--danger);color:white;border:none;padding:10px 20px;border-radius:10px;font-size:13px;cursor:pointer\\">View All "+overdue.length+" Overdue</button></div>";' +
+    '    html+="</div>";document.getElementById("overdue-alerts").innerHTML=html;' +
+    '  }).getWebAppGrievanceList();' +
+    '}' +
+
+    // Initialize
+    'loadOverdueAlerts();' +
+    '</script>' +
+
+    '</body></html>';
+}
+
+/**
+ * Returns the search page HTML for web app
+ */
+function getWebAppSearchHtml() {
+  var baseUrl = ScriptApp.getService().getUrl();
+
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<title>Search - 509 Dashboard</title>' +
+    '<style>' +
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +
+
+    // Header with search
+    '.header{background:linear-gradient(135deg,#7C3AED,#5B21B6);color:white;padding:15px;position:sticky;top:0;z-index:100}' +
+    '.header h2{font-size:clamp(18px,4vw,22px);margin-bottom:12px;text-align:center}' +
+    '.search-container{position:relative}' +
+    '.search-input{width:100%;padding:14px 14px 14px 45px;border:none;border-radius:12px;font-size:16px;background:white;-webkit-appearance:none}' +
+    '.search-input:focus{outline:none;box-shadow:0 0 0 3px rgba(124,58,237,0.3)}' +
+    '.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:20px;color:#666}' +
+    '.clear-btn{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:20px;color:#999;background:none;border:none;cursor:pointer;display:none}' +
+
+    // Tabs
+    '.tabs{display:flex;background:white;border-bottom:1px solid #e0e0e0;position:sticky;top:76px;z-index:99}' +
+    '.tab{flex:1;padding:14px;text-align:center;font-size:14px;font-weight:500;color:#666;border:none;background:none;cursor:pointer;border-bottom:3px solid transparent;min-height:48px}' +
+    '.tab.active{color:#7C3AED;border-bottom-color:#7C3AED}' +
+
+    // Results
+    '.results{padding:15px}' +
+    '.result-card{background:white;padding:16px;border-radius:14px;box-shadow:0 2px 6px rgba(0,0,0,0.06);margin-bottom:12px}' +
+    '.result-type{font-size:12px;color:#7C3AED;font-weight:600;text-transform:uppercase;margin-bottom:6px}' +
+    '.result-title{font-size:17px;font-weight:600;color:#333;margin-bottom:4px}' +
+    '.result-detail{font-size:14px;color:#666;margin-top:4px}' +
+    '.result-badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;margin-top:8px}' +
+    '.badge-open{background:#FEE2E2;color:#DC2626}' +
+    '.badge-pending{background:#FEF3C7;color:#D97706}' +
+    '.badge-resolved{background:#D1FAE5;color:#059669}' +
+
+    // Empty state
+    '.empty-state{text-align:center;padding:60px 20px;color:#999}' +
+    '.empty-icon{font-size:48px;margin-bottom:15px}' +
+    '.empty-text{font-size:16px}' +
+
+    // Loading
+    '.loading{text-align:center;padding:40px;color:#666}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
+
+    // Bottom nav - 5 items
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
+    '.nav-item.active{color:#7C3AED}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+
+    '</style></head><body>' +
+
+    '<div class="header">' +
+    '<h2>🔍 Search</h2>' +
+    '<div class="search-container">' +
+    '<span class="search-icon">🔍</span>' +
+    '<input type="text" class="search-input" id="searchInput" placeholder="Search members or grievances..." oninput="handleSearch(this.value)" autocomplete="off" autocapitalize="off">' +
+    '<button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕</button>' +
+    '</div></div>' +
+
+    '<div class="tabs">' +
+    '<button class="tab active" data-tab="all" onclick="setTab(\'all\',this)">All</button>' +
+    '<button class="tab" data-tab="members" onclick="setTab(\'members\',this)">Members</button>' +
+    '<button class="tab" data-tab="grievances" onclick="setTab(\'grievances\',this)">Grievances</button>' +
+    '</div>' +
+
+    '<div class="results" id="results">' +
+    '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Type to search members or grievances</div></div>' +
+    '</div>' +
+
+    // Bottom Navigation - 5 items
+    '<nav class="bottom-nav">' +
+    '<a class="nav-item" href="' + baseUrl + '">' +
+    '<span class="nav-icon">📊</span>Home</a>' +
+    '<a class="nav-item active" href="' + baseUrl + '?page=search">' +
+    '<span class="nav-icon">🔍</span>Search</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=grievances">' +
+    '<span class="nav-icon">📋</span>Cases</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=members">' +
+    '<span class="nav-icon">👥</span>Members</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=links">' +
+    '<span class="nav-icon">🔗</span>Links</a>' +
+    '</nav>' +
+
+    '<script>' +
+    'var currentTab="all";' +
+    'var searchTimeout=null;' +
+    'var lastQuery="";' +
+
+    'function setTab(tab,btn){' +
+    '  currentTab=tab;' +
+    '  document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});' +
+    '  btn.classList.add("active");' +
+    '  if(lastQuery.length>=2)performSearch(lastQuery);' +
+    '}' +
+
+    'function handleSearch(q){' +
+    '  lastQuery=q;' +
+    '  document.getElementById("clearBtn").style.display=q?"block":"none";' +
+    '  if(searchTimeout)clearTimeout(searchTimeout);' +
+    '  if(!q||q.length<2){' +
+    '    showEmpty("Type at least 2 characters to search");' +
+    '    return;' +
+    '  }' +
+    '  showLoading();' +
+    '  searchTimeout=setTimeout(function(){performSearch(q)},300);' +
+    '}' +
+
+    'function performSearch(q){' +
+    '  google.script.run.withSuccessHandler(renderResults).withFailureHandler(showError).getWebAppSearchResults(q,currentTab);' +
+    '}' +
+
+    'function clearSearch(){' +
+    '  document.getElementById("searchInput").value="";' +
+    '  document.getElementById("clearBtn").style.display="none";' +
+    '  lastQuery="";' +
+    '  showEmpty("Type to search members or grievances");' +
+    '}' +
+
+    'function showEmpty(msg){' +
+    '  document.getElementById("results").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">🔍</div><div class=\\"empty-text\\">"+msg+"</div></div>";' +
+    '}' +
+
+    'function showLoading(){' +
+    '  document.getElementById("results").innerHTML="<div class=\\"loading\\"><div class=\\"spinner\\"></div><div style=\\"margin-top:15px\\">Searching...</div></div>";' +
+    '}' +
+
+    'function showError(err){' +
+    '  document.getElementById("results").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">⚠️</div><div class=\\"empty-text\\">Error: "+(err.message||"Unknown error")+"</div></div>";' +
+    '}' +
+
+    'function getBadgeClass(status){' +
+    '  if(!status)return"";' +
+    '  var s=status.toLowerCase();' +
+    '  if(s.indexOf("open")>=0)return"badge-open";' +
+    '  if(s.indexOf("pending")>=0)return"badge-pending";' +
+    '  if(s.indexOf("resolved")>=0||s.indexOf("closed")>=0||s.indexOf("withdrawn")>=0)return"badge-resolved";' +
+    '  return"";' +
+    '}' +
+
+    'function renderResults(data){' +
+    '  var c=document.getElementById("results");' +
+    '  if(!data||data.length===0){' +
+    '    showEmpty("No results found");' +
+    '    return;' +
+    '  }' +
+    '  c.innerHTML=data.map(function(r){' +
+    '    var badge=r.status?"<span class=\\"result-badge "+getBadgeClass(r.status)+"\\">"+r.status+"</span>":"";' +
+    '    return"<div class=\\"result-card\\">"+"<div class=\\"result-type\\">"+(r.type==="member"?"👤 Member":"📋 Grievance")+"</div>"+"<div class=\\"result-title\\">"+r.title+"</div>"+"<div class=\\"result-detail\\">"+r.subtitle+"</div>"+(r.detail?"<div class=\\"result-detail\\">"+r.detail+"</div>":"")+badge+"</div>";' +
+    '  }).join("");' +
+    '}' +
+
+    // Auto-focus search on load
+    'document.getElementById("searchInput").focus();' +
+    '</script>' +
+
+    '</body></html>';
+}
+
+/**
+ * Returns the grievance list HTML for web app (enhanced with Overdue filter, expandable details)
+ */
+function getWebAppGrievanceListHtml() {
+  var baseUrl = ScriptApp.getService().getUrl();
+
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<title>Grievances - 509 Dashboard</title>' +
+    '<style>' +
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +
+
+    // Header
+    '.header{background:linear-gradient(135deg,#7C3AED,#5B21B6);color:white;padding:15px 15px 12px;position:sticky;top:0;z-index:100}' +
+    '.header h2{font-size:clamp(18px,4vw,22px);text-align:center;margin-bottom:12px}' +
+
+    // Filter pills with Overdue
+    '.filters{display:flex;gap:8px;overflow-x:auto;padding:2px 0;-webkit-overflow-scrolling:touch}' +
+    '.filter-pill{flex-shrink:0;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:rgba(255,255,255,0.2);color:white}' +
+    '.filter-pill.active{background:white;color:#7C3AED}' +
+    '.filter-pill.danger{background:#DC2626;color:white}' +
+    '.filter-pill.danger.active{background:#FEE2E2;color:#DC2626}' +
+
+    // List with expandable cards
+    '.grievance-list{padding:15px}' +
+    '.grievance-card{background:white;padding:16px;border-radius:14px;box-shadow:0 2px 6px rgba(0,0,0,0.06);margin-bottom:12px;cursor:pointer;transition:all 0.2s}' +
+    '.grievance-card:active{transform:scale(0.99)}' +
+    '.grievance-card.overdue{border-left:4px solid #DC2626}' +
+    '.grievance-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}' +
+    '.grievance-id{font-size:15px;font-weight:700;color:#7C3AED}' +
+    '.grievance-status{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}' +
+    '.status-open{background:#FEE2E2;color:#DC2626}' +
+    '.status-pending{background:#FEF3C7;color:#D97706}' +
+    '.status-resolved{background:#D1FAE5;color:#059669}' +
+    '.status-overdue{background:#DC2626;color:white;animation:pulse 2s infinite}' +
+    '@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}' +
+    '.grievance-name{font-size:16px;font-weight:500;color:#333;margin-bottom:4px}' +
+    '.grievance-detail{font-size:13px;color:#666;margin-top:4px}' +
+    '.grievance-step{display:inline-block;padding:3px 8px;background:#E0E7FF;color:#4F46E5;border-radius:6px;font-size:11px;font-weight:500;margin-top:8px}' +
+
+    // Expandable details
+    '.grievance-details{display:none;margin-top:12px;padding-top:12px;border-top:1px solid #eee;font-size:13px}' +
+    '.grievance-card.expanded .grievance-details{display:block}' +
+    '.detail-row{display:flex;gap:8px;margin-bottom:6px}' +
+    '.detail-label{color:#666;min-width:90px}' +
+    '.detail-value{color:#333;font-weight:500}' +
+    '.detail-value.danger{color:#DC2626}' +
+
+    // Empty state
+    '.empty-state{text-align:center;padding:60px 20px;color:#999}' +
+    '.empty-icon{font-size:48px;margin-bottom:15px}' +
+
+    // Loading
+    '.loading{text-align:center;padding:40px;color:#666}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
+
+    // Count badge
+    '.count-badge{background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;font-size:12px;display:inline-block;margin-top:8px}' +
+
+    // Bottom nav - 5 items
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
+    '.nav-item.active{color:#7C3AED}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+
+    '</style></head><body>' +
+
+    '<div class="header">' +
+    '<h2>📋 Grievances</h2>' +
+    '<div class="filters">' +
+    '<button class="filter-pill active" data-filter="all" onclick="setFilter(\'all\',this)">All</button>' +
+    '<button class="filter-pill" data-filter="open" onclick="setFilter(\'open\',this)">Open</button>' +
+    '<button class="filter-pill" data-filter="pending" onclick="setFilter(\'pending\',this)">Pending</button>' +
+    '<button class="filter-pill danger" data-filter="overdue" onclick="setFilter(\'overdue\',this)">⚠️ Overdue</button>' +
+    '<button class="filter-pill" data-filter="resolved" onclick="setFilter(\'resolved\',this)">Resolved</button>' +
+    '</div>' +
+    '<div class="count-badge" id="countBadge">Loading...</div>' +
+    '</div>' +
+
+    '<div class="grievance-list" id="grievanceList">' +
+    '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading grievances...</div></div>' +
+    '</div>' +
+
+    // Bottom Navigation - 5 items
+    '<nav class="bottom-nav">' +
+    '<a class="nav-item" href="' + baseUrl + '">' +
+    '<span class="nav-icon">📊</span>Home</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=search">' +
+    '<span class="nav-icon">🔍</span>Search</a>' +
+    '<a class="nav-item active" href="' + baseUrl + '?page=grievances">' +
+    '<span class="nav-icon">📋</span>Cases</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=members">' +
+    '<span class="nav-icon">👥</span>Members</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=links">' +
+    '<span class="nav-icon">🔗</span>Links</a>' +
+    '</nav>' +
+
+    '<script>' +
+    'var allData=[];' +
+    'var currentFilter="all";' +
+    'var INITIAL_COUNT=20;' +
+    'var LOAD_MORE_COUNT=20;' +
+    'var displayedCount=INITIAL_COUNT;' +
+    'var CACHE_KEY="grievanceData";' +
+    'var CACHE_TTL=300000;' +
+
+    // Check URL for filter parameter
+    'var urlParams=new URLSearchParams(window.location.search);' +
+    'var initialFilter=urlParams.get("filter");' +
+
+    'function setFilter(filter,btn){' +
+    '  currentFilter=filter;' +
+    '  displayedCount=INITIAL_COUNT;' +
+    '  document.querySelectorAll(".filter-pill").forEach(function(p){p.classList.remove("active")});' +
+    '  if(btn)btn.classList.add("active");' +
+    '  renderList();' +
+    '}' +
+
+    'function getStatusClass(g){' +
+    '  if(g.isOverdue)return"status-overdue";' +
+    '  if(!g.status)return"";' +
+    '  var s=g.status.toLowerCase();' +
+    '  if(s.indexOf("open")>=0)return"status-open";' +
+    '  if(s.indexOf("pending")>=0)return"status-pending";' +
+    '  return"status-resolved";' +
+    '}' +
+
+    'function getStatusText(g){' +
+    '  if(g.isOverdue)return"⚠️ OVERDUE";' +
+    '  return g.status||"";' +
+    '}' +
+
+    'function matchesFilter(g){' +
+    '  if(currentFilter==="all")return true;' +
+    '  if(currentFilter==="overdue")return g.isOverdue;' +
+    '  if(!g.status)return false;' +
+    '  var s=g.status.toLowerCase();' +
+    '  if(currentFilter==="open")return s.indexOf("open")>=0;' +
+    '  if(currentFilter==="pending")return s.indexOf("pending")>=0;' +
+    '  if(currentFilter==="resolved")return s.indexOf("resolved")>=0||s.indexOf("withdrawn")>=0||s.indexOf("closed")>=0;' +
+    '  return true;' +
+    '}' +
+
+    'function toggleCard(el){el.classList.toggle("expanded")}' +
+
+    'function renderList(){' +
+    '  var filtered=allData.filter(function(g){return matchesFilter(g)});' +
+    '  var showing=filtered.slice(0,displayedCount);' +
+    '  var remaining=filtered.length-displayedCount;' +
+    '  document.getElementById("countBadge").textContent="Showing "+Math.min(displayedCount,filtered.length)+" of "+filtered.length;' +
+    '  var c=document.getElementById("grievanceList");' +
+    '  if(filtered.length===0){' +
+    '    c.innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">📋</div><div>No grievances found</div></div>";' +
+    '    return;' +
+    '  }' +
+    '  var html=showing.map(function(g){' +
+    '    var cardClass="grievance-card"+(g.isOverdue?" overdue":"");' +
+    '    var daysInfo=g.isOverdue?"<span class=\\"detail-value danger\\">⚠️ PAST DUE</span>":(typeof g.daysToDeadline==="number"?"<span class=\\"detail-value\\">"+g.daysToDeadline+" days</span>":"<span class=\\"detail-value\\">N/A</span>");' +
+    '    return"<div class=\\""+cardClass+"\\" onclick=\\"toggleCard(this)\\">"+"<div class=\\"grievance-header\\">"+"<span class=\\"grievance-id\\">"+(g.id||"")+"</span>"+"<span class=\\"grievance-status "+getStatusClass(g)+"\\">"+getStatusText(g)+"</span>"+"</div>"+"<div class=\\"grievance-name\\">"+(g.name||"Unknown")+"</div>"+(g.category?"<div class=\\"grievance-detail\\">"+g.category+"</div>":"")+(g.step?"<span class=\\"grievance-step\\">"+g.step+"</span>":"")+"<div class=\\"grievance-details\\">"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Filed:</span><span class=\\"detail-value\\">"+(g.filedDate||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🔔 Incident:</span><span class=\\"detail-value\\">"+(g.incidentDate||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">⏰ Next Due:</span>"+daysInfo+"</div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">⏱️ Days Open:</span><span class=\\"detail-value\\">"+(g.daysOpen||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+(g.location||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+(g.articles||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+(g.steward||"N/A")+"</span></div>"+(g.resolution?"<div class=\\"detail-row\\"><span class=\\"detail-label\\">✅ Resolution:</span><span class=\\"detail-value\\">"+g.resolution+"</span></div>":"")+"</div>"+"</div>";' +
+    '  }).join("");' +
+    '  if(remaining>0){html+="<div style=\\"text-align:center;padding:20px\\"><button onclick=\\"loadMore()\\" style=\\"padding:12px 24px;border:none;border-radius:8px;background:#7C3AED;color:white;font-size:14px;font-weight:500;cursor:pointer\\">Load More ("+remaining+" remaining)</button></div>"}' +
+    '  c.innerHTML=html;' +
+    '}' +
+    'function loadMore(){displayedCount+=LOAD_MORE_COUNT;renderList()}' +
+
+    'function getCache(){try{var c=sessionStorage.getItem(CACHE_KEY);if(c){var p=JSON.parse(c);if(Date.now()-p.timestamp<CACHE_TTL)return p.data}return null}catch(e){return null}}' +
+    'function setCache(data){try{sessionStorage.setItem(CACHE_KEY,JSON.stringify({data:data,timestamp:Date.now()}))}catch(e){}}' +
+    'function loadData(){' +
+    '  if(!navigator.onLine){document.getElementById("grievanceList").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">📡</div><div>You appear to be offline</div><button onclick=\\"loadData()\\" style=\\"margin-top:12px;padding:10px 20px;background:#7C3AED;color:white;border:none;border-radius:8px;cursor:pointer\\">Retry</button></div>";return}' +
+    '  var cached=getCache();if(cached){console.log("Using sessionStorage cache");allData=cached;if(initialFilter){currentFilter=initialFilter;var btn=document.querySelector("[data-filter=\\""+initialFilter+"\\"]");if(btn){document.querySelectorAll(".filter-pill").forEach(function(p){p.classList.remove("active")});btn.classList.add("active")}}renderList();return}' +
+    '  console.log("Loading grievance data...");' +
+    '  google.script.run.withSuccessHandler(function(data){' +
+    '    console.log("Data received:",data?data.length:0,"items");' +
+    '    allData=data||[];' +
+    '    setCache(allData);' +
+    '    if(initialFilter){' +
+    '      currentFilter=initialFilter;' +
+    '      var btn=document.querySelector("[data-filter=\\""+initialFilter+"\\"]");' +
+    '      if(btn){document.querySelectorAll(".filter-pill").forEach(function(p){p.classList.remove("active")});btn.classList.add("active")}' +
+    '    }' +
+    '    renderList();' +
+    '  }).withFailureHandler(function(err){' +
+    '    console.error("Failed to load data:",err);' +
+    '    document.getElementById("grievanceList").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">⚠️</div><div>Error loading data</div><button onclick=\\"loadData()\\" style=\\"margin-top:12px;padding:10px 20px;background:#7C3AED;color:white;border:none;border-radius:8px;cursor:pointer\\">Retry</button><div style=\\"font-size:11px;color:#999;margin-top:8px\\">"+String(err||"Unknown error")+"</div></div>";' +
+    '  }).getWebAppGrievanceList();' +
+    '}' +
+
+    'window.addEventListener("online",loadData);' +
+    'window.addEventListener("pagehide",function(){allData=null;try{sessionStorage.removeItem(CACHE_KEY)}catch(e){}});' +
+    'loadData();' +
+    '</script>' +
+
+    '</body></html>';
+}
+
+/**
+ * Returns the member list HTML for web app
+ */
+function getWebAppMemberListHtml() {
+  var baseUrl = ScriptApp.getService().getUrl();
+
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<title>Members - 509 Dashboard</title>' +
+    '<style>' +
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +
+
+    // Header with search
+    '.header{background:linear-gradient(135deg,#7C3AED,#5B21B6);color:white;padding:15px;position:sticky;top:0;z-index:100}' +
+    '.header h2{font-size:clamp(18px,4vw,22px);text-align:center;margin-bottom:12px}' +
+    '.search-container{position:relative}' +
+    '.search-input{width:100%;padding:12px 12px 12px 40px;border:none;border-radius:12px;font-size:15px;background:white}' +
+    '.search-input:focus{outline:none;box-shadow:0 0 0 3px rgba(124,58,237,0.3)}' +
+    '.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#666}' +
+
+    // Filter pills
+    '.filters{display:flex;gap:8px;overflow-x:auto;padding:8px 0 2px;-webkit-overflow-scrolling:touch}' +
+    '.filter-pill{flex-shrink:0;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:500;border:none;cursor:pointer;background:rgba(255,255,255,0.2);color:white}' +
+    '.filter-pill.active{background:white;color:#7C3AED}' +
+
+    // Count badge
+    '.count-badge{background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;font-size:12px;display:inline-block;margin-top:8px}' +
+
+    // Member list
+    '.member-list{padding:15px}' +
+    '.member-card{background:white;padding:16px;border-radius:14px;box-shadow:0 2px 6px rgba(0,0,0,0.06);margin-bottom:12px;cursor:pointer;transition:all 0.2s}' +
+    '.member-card:active{transform:scale(0.99)}' +
+    '.member-card.has-grievance{border-left:4px solid #F97316}' +
+    '.member-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}' +
+    '.member-name{font-size:16px;font-weight:600;color:#333}' +
+    '.member-id{font-size:12px;color:#7C3AED;font-weight:500}' +
+    '.member-title{font-size:14px;color:#666;margin-bottom:4px}' +
+    '.member-location{font-size:13px;color:#888}' +
+    '.member-badges{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}' +
+    '.badge{padding:3px 8px;border-radius:12px;font-size:11px;font-weight:500}' +
+    '.badge-steward{background:#DDD6FE;color:#7C3AED}' +
+    '.badge-grievance{background:#FEF3C7;color:#D97706}' +
+
+    // Expandable details
+    '.member-details{display:none;margin-top:12px;padding-top:12px;border-top:1px solid #eee;font-size:13px}' +
+    '.member-card.expanded .member-details{display:block}' +
+    '.detail-row{display:flex;gap:8px;margin-bottom:6px}' +
+    '.detail-label{color:#666;min-width:80px}' +
+    '.detail-value{color:#333;font-weight:500}' +
+
+    // Empty state
+    '.empty-state{text-align:center;padding:60px 20px;color:#999}' +
+    '.empty-icon{font-size:48px;margin-bottom:15px}' +
+
+    // Loading
+    '.loading{text-align:center;padding:40px;color:#666}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
+
+    // Bottom nav - 5 items
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
+    '.nav-item.active{color:#7C3AED}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+
+    '</style></head><body>' +
+
+    '<div class="header">' +
+    '<h2>👥 Members</h2>' +
+    '<div class="search-container">' +
+    '<span class="search-icon">🔍</span>' +
+    '<input type="text" class="search-input" id="searchInput" placeholder="Search by name, ID, title..." oninput="debounceSearch()">' +
+    '</div>' +
+    '<div class="filters">' +
+    '<button class="filter-pill active" data-filter="all" onclick="setFilter(\'all\',this)">All</button>' +
+    '<button class="filter-pill" data-filter="steward" onclick="setFilter(\'steward\',this)">Stewards</button>' +
+    '<button class="filter-pill" data-filter="grievance" onclick="setFilter(\'grievance\',this)">With Grievance</button>' +
+    '</div>' +
+    '<div class="count-badge" id="countBadge">Loading...</div>' +
+    '</div>' +
+
+    '<div class="member-list" id="memberList">' +
+    '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading members...</div></div>' +
+    '</div>' +
+
+    // Bottom Navigation - 5 items
+    '<nav class="bottom-nav">' +
+    '<a class="nav-item" href="' + baseUrl + '">' +
+    '<span class="nav-icon">📊</span>Home</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=search">' +
+    '<span class="nav-icon">🔍</span>Search</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=grievances">' +
+    '<span class="nav-icon">📋</span>Cases</a>' +
+    '<a class="nav-item active" href="' + baseUrl + '?page=members">' +
+    '<span class="nav-icon">👥</span>Members</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=links">' +
+    '<span class="nav-icon">🔗</span>Links</a>' +
+    '</nav>' +
+
+    '<script>' +
+    'var allData=[];' +
+    'var currentFilter="all";' +
+    'var INITIAL_COUNT=25;' +
+    'var LOAD_MORE_COUNT=25;' +
+    'var displayedCount=INITIAL_COUNT;' +
+    'var CACHE_KEY="memberData";' +
+    'var CACHE_TTL=300000;' +
+    'var searchTimeout=null;' +
+
+    'function setFilter(filter,btn){' +
+    '  currentFilter=filter;' +
+    '  displayedCount=INITIAL_COUNT;' +
+    '  document.querySelectorAll(".filter-pill").forEach(function(p){p.classList.remove("active")});' +
+    '  btn.classList.add("active");' +
+    '  filterMembers();' +
+    '}' +
+
+    'function toggleCard(el){el.classList.toggle("expanded")}' +
+
+    'function debounceSearch(){clearTimeout(searchTimeout);searchTimeout=setTimeout(function(){displayedCount=INITIAL_COUNT;filterMembers()},300)}' +
+
+    'function filterMembers(){' +
+    '  var query=(document.getElementById("searchInput").value||"").toLowerCase();' +
+    '  var filtered=allData.filter(function(m){' +
+    '    var matchesQuery=!query||query.length<2||(m.name||"").toLowerCase().indexOf(query)>=0||(m.id||"").toLowerCase().indexOf(query)>=0||(m.title||"").toLowerCase().indexOf(query)>=0||(m.location||"").toLowerCase().indexOf(query)>=0;' +
+    '    var matchesFilter=currentFilter==="all"||(currentFilter==="steward"&&m.isSteward)||(currentFilter==="grievance"&&m.hasOpenGrievance);' +
+    '    return matchesQuery&&matchesFilter;' +
+    '  });' +
+    '  var showing=filtered.slice(0,displayedCount);' +
+    '  var remaining=filtered.length-displayedCount;' +
+    '  document.getElementById("countBadge").textContent="Showing "+Math.min(displayedCount,filtered.length)+" of "+filtered.length;' +
+    '  renderList(showing,remaining);' +
+    '}' +
+
+    'function renderList(data,remaining){' +
+    '  var c=document.getElementById("memberList");' +
+    '  if(!data||data.length===0){' +
+    '    c.innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">👥</div><div>No members found</div></div>";' +
+    '    return;' +
+    '  }' +
+    '  var html=data.map(function(m){' +
+    '    var cardClass="member-card"+(m.hasOpenGrievance?" has-grievance":"");' +
+    '    var badges="";' +
+    '    if(m.isSteward)badges+="<span class=\\"badge badge-steward\\">🛡️ Steward</span>";' +
+    '    if(m.hasOpenGrievance)badges+="<span class=\\"badge badge-grievance\\">⚠️ Open Grievance</span>";' +
+    '    return"<div class=\\""+cardClass+"\\" onclick=\\"toggleCard(this)\\">"+"<div class=\\"member-header\\"><span class=\\"member-name\\">"+(m.name||"Unknown")+"</span><span class=\\"member-id\\">"+(m.id||"")+"</span></div>"+"<div class=\\"member-title\\">"+(m.title||"N/A")+"</div>"+"<div class=\\"member-location\\">📍 "+(m.location||"N/A")+"</div>"+(badges?"<div class=\\"member-badges\\">"+badges+"</div>":"")+"<div class=\\"member-details\\">"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📧 Email:</span><span class=\\"detail-value\\">"+(m.email||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📞 Phone:</span><span class=\\"detail-value\\">"+(m.phone||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🏢 Unit:</span><span class=\\"detail-value\\">"+(m.unit||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">👔 Supervisor:</span><span class=\\"detail-value\\">"+(m.supervisor||"N/A")+"</span></div>"+"</div>"+"</div>";' +
+    '  }).join("");' +
+    '  if(remaining>0){html+="<div style=\\"text-align:center;padding:20px\\"><button onclick=\\"loadMore()\\" style=\\"padding:12px 24px;border:none;border-radius:8px;background:#7C3AED;color:white;font-size:14px;font-weight:500;cursor:pointer\\">Load More ("+remaining+" remaining)</button></div>"}' +
+    '  c.innerHTML=html;' +
+    '}' +
+    'function loadMore(){displayedCount+=LOAD_MORE_COUNT;filterMembers()}' +
+
+    'function getCache(){try{var c=sessionStorage.getItem(CACHE_KEY);if(c){var p=JSON.parse(c);if(Date.now()-p.timestamp<CACHE_TTL)return p.data}return null}catch(e){return null}}' +
+    'function setCache(data){try{sessionStorage.setItem(CACHE_KEY,JSON.stringify({data:data,timestamp:Date.now()}))}catch(e){}}' +
+    'function loadData(){' +
+    '  if(!navigator.onLine){document.getElementById("memberList").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">📡</div><div>You appear to be offline</div><button onclick=\\"loadData()\\" style=\\"margin-top:12px;padding:8px 16px;background:#7C3AED;color:white;border:none;border-radius:8px;cursor:pointer\\">Retry</button></div>";return}' +
+    '  var cached=getCache();if(cached){allData=cached;filterMembers();return}' +
+    '  google.script.run.withSuccessHandler(function(data){' +
+    '    allData=data||[];' +
+    '    setCache(allData);' +
+    '    filterMembers();' +
+    '  }).withFailureHandler(function(err){' +
+    '    document.getElementById("memberList").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">⚠️</div><div>Error loading data</div><button onclick=\\"loadData()\\" style=\\"margin-top:12px;padding:8px 16px;background:#7C3AED;color:white;border:none;border-radius:8px;cursor:pointer\\">Retry</button></div>";' +
+    '  }).getWebAppMemberList();' +
+    '}' +
+
+    'window.addEventListener("online",loadData);' +
+    'window.addEventListener("pagehide",function(){allData=null;try{sessionStorage.removeItem(CACHE_KEY)}catch(e){}});' +
+    'loadData();' +
+    '</script>' +
+
+    '</body></html>';
+}
+
+/**
+ * Returns the links/resources page HTML for web app
+ */
+function getWebAppLinksHtml() {
+  var baseUrl = ScriptApp.getService().getUrl();
+
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<title>Links - 509 Dashboard</title>' +
+    '<style>' +
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +
+
+    // Header
+    '.header{background:linear-gradient(135deg,#7C3AED,#5B21B6);color:white;padding:20px;text-align:center;position:sticky;top:0;z-index:100}' +
+    '.header h2{font-size:clamp(18px,4vw,22px)}' +
+    '.header .subtitle{font-size:13px;opacity:0.9;margin-top:5px}' +
+
+    // Container
+    '.container{padding:15px;max-width:600px;margin:0 auto}' +
+
+    // Section titles
+    '.section-title{font-size:clamp(14px,3.5vw,18px);font-weight:600;color:#333;margin:20px 0 12px;padding-left:5px}' +
+
+    // Link cards
+    '.link-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}' +
+    '.link-card{background:white;padding:20px 16px;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);text-decoration:none;display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;transition:all 0.2s}' +
+    '.link-card:active{transform:scale(0.96);background:#f8f4ff}' +
+    '.link-icon{font-size:32px}' +
+    '.link-label{font-weight:600;color:#333;font-size:14px}' +
+    '.link-desc{font-size:12px;color:#666}' +
+
+    // Full-width link
+    '.link-card.full{grid-column:span 2;flex-direction:row;padding:16px;justify-content:flex-start;text-align:left}' +
+    '.link-card.full .link-icon{font-size:28px}' +
+    '.link-card.full .link-content{flex:1}' +
+
+    // GitHub special styling
+    '.link-card.github{background:linear-gradient(135deg,#24292e,#1a1e22);color:white}' +
+    '.link-card.github .link-label{color:white}' +
+    '.link-card.github .link-desc{color:rgba(255,255,255,0.7)}' +
+
+    // Loading
+    '.loading{text-align:center;padding:40px;color:#666}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
+
+    // Bottom nav - 5 items
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
+    '.nav-item.active{color:#7C3AED}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+
+    '</style></head><body>' +
+
+    '<div class="header">' +
+    '<h2>🔗 Links & Resources</h2>' +
+    '<div class="subtitle">Quick access to forms and tools</div>' +
+    '</div>' +
+
+    '<div class="container" id="linksContent">' +
+    '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading links...</div></div>' +
+    '</div>' +
+
+    // Bottom Navigation - 5 items
+    '<nav class="bottom-nav">' +
+    '<a class="nav-item" href="' + baseUrl + '">' +
+    '<span class="nav-icon">📊</span>Home</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=search">' +
+    '<span class="nav-icon">🔍</span>Search</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=grievances">' +
+    '<span class="nav-icon">📋</span>Cases</a>' +
+    '<a class="nav-item" href="' + baseUrl + '?page=members">' +
+    '<span class="nav-icon">👥</span>Members</a>' +
+    '<a class="nav-item active" href="' + baseUrl + '?page=links">' +
+    '<span class="nav-icon">🔗</span>Links</a>' +
+    '</nav>' +
+
+    '<script>' +
+    'function loadLinks(){' +
+    '  google.script.run.withSuccessHandler(function(links){' +
+    '    renderLinks(links);' +
+    '  }).withFailureHandler(function(err){' +
+    '    document.getElementById("linksContent").innerHTML="<div class=\\"loading\\">⚠️ Error loading links</div>";' +
+    '  }).getWebAppResourceLinks();' +
+    '}' +
+
+    'function renderLinks(links){' +
+    '  var html="";' +
+
+    '  // Forms section' +
+    '  html+="<div class=\\"section-title\\">📝 Forms</div>";' +
+    '  html+="<div class=\\"link-grid\\">";' +
+    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+links.grievanceForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
+    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+links.contactForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
+    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+links.satisfactionForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
+    '  if(!links.grievanceForm&&!links.contactForm&&!links.satisfactionForm){html+="<div class=\\"link-card full\\"><span class=\\"link-icon\\">ℹ️</span><div class=\\"link-content\\"><span class=\\"link-label\\">No Forms Configured</span><span class=\\"link-desc\\">Add form URLs to Config sheet</span></div></div>";}' +
+    '  html+="</div>";' +
+
+    '  // Resources section' +
+    '  html+="<div class=\\"section-title\\">🔧 Resources</div>";' +
+    '  html+="<div class=\\"link-grid\\">";' +
+    '  html+="<a class=\\"link-card\\" href=\\""+links.spreadsheetUrl+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
+    '  html+="<a class=\\"link-card github\\" href=\\""+links.githubRepo+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
+    '  html+="</div>";' +
+
+    '  document.getElementById("linksContent").innerHTML=html;' +
+    '}' +
+
+    'loadLinks();' +
+    '</script>' +
+
+    '</body></html>';
+}
+
+/**
+ * API function to get search results for web app
+ * @param {string} query - Search query
+ * @param {string} tab - Tab filter (all, members, grievances)
+ * @returns {Array} Search results
+ */
+function getWebAppSearchResults(query, tab) {
+  return getMobileSearchData(query, tab);
+}
+
+/**
+ * API function to get grievance list for web app (full fields like Interactive Dashboard)
+ * @returns {Array} Grievance data with all fields
+ */
+function getWebAppGrievanceList() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      Logger.log('getWebAppGrievanceList: No active spreadsheet');
+      return [];
+    }
+
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (!sheet) {
+      Logger.log('getWebAppGrievanceList: Grievance Log sheet not found');
+      return [];
+    }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log('getWebAppGrievanceList: No data rows in sheet');
+      return [];
+    }
+
+    var data = sheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.QUICK_ACTIONS).getValues();
+    var tz = Session.getScriptTimeZone();
+
+    var result = data.map(function(row) {
+      var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
+      // Skip blank rows - must have a valid grievance ID starting with G
+      if (!grievanceId || (typeof grievanceId === 'string' && !grievanceId.toString().match(/^G/i))) return null;
+
+      var filed = row[GRIEVANCE_COLS.DATE_FILED - 1];
+      var incident = row[GRIEVANCE_COLS.INCIDENT_DATE - 1];
+      var nextDue = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
+      var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+
+      return {
+        id: grievanceId,
+        memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1] || '',
+        name: ((row[GRIEVANCE_COLS.FIRST_NAME - 1] || '') + ' ' + (row[GRIEVANCE_COLS.LAST_NAME - 1] || '')).trim(),
+        status: row[GRIEVANCE_COLS.STATUS - 1] || 'Filed',
+        step: row[GRIEVANCE_COLS.CURRENT_STEP - 1] || 'Step I',
+        category: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'N/A',
+        articles: row[GRIEVANCE_COLS.ARTICLES - 1] || 'N/A',
+        filedDate: filed instanceof Date ? Utilities.formatDate(filed, tz, 'MM/dd/yyyy') : (filed || 'N/A'),
+        incidentDate: incident instanceof Date ? Utilities.formatDate(incident, tz, 'MM/dd/yyyy') : (incident || 'N/A'),
+        nextActionDue: nextDue instanceof Date ? Utilities.formatDate(nextDue, tz, 'MM/dd/yyyy') : (nextDue || 'N/A'),
+        daysToDeadline: daysToDeadline,
+        isOverdue: daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0),
+        daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || 0,
+        location: row[GRIEVANCE_COLS.LOCATION - 1] || 'N/A',
+        unit: row[GRIEVANCE_COLS.UNIT - 1] || 'N/A',
+        steward: row[GRIEVANCE_COLS.STEWARD - 1] || 'N/A',
+        resolution: row[GRIEVANCE_COLS.RESOLUTION - 1] || ''
+      };
+    }).filter(function(g) { return g !== null; }).slice(0, 100);
+
+    Logger.log('getWebAppGrievanceList: Returning ' + result.length + ' grievances');
+    return result;
+  } catch (e) {
+    Logger.log('getWebAppGrievanceList error: ' + e.toString());
+    throw new Error('Failed to load grievances: ' + e.message);
+  }
+}
+
+/**
+ * API function to get member list for web app
+ * @returns {Array} Member data
+ */
+function getWebAppMemberList() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      Logger.log('getWebAppMemberList: No active spreadsheet');
+      return [];
+    }
+
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet) {
+      Logger.log('getWebAppMemberList: Member Directory sheet not found');
+      return [];
+    }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log('getWebAppMemberList: No data rows in sheet');
+      return [];
+    }
+
+    var data = sheet.getRange(2, 1, lastRow - 1, MEMBER_COLS.QUICK_ACTIONS).getValues();
+
+    var result = data.map(function(row) {
+      var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
+      // Skip blank rows - must have a valid member ID starting with M
+      if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return null;
+
+      return {
+        id: memberId,
+        firstName: row[MEMBER_COLS.FIRST_NAME - 1] || '',
+        lastName: row[MEMBER_COLS.LAST_NAME - 1] || '',
+        name: ((row[MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (row[MEMBER_COLS.LAST_NAME - 1] || '')).trim(),
+        title: row[MEMBER_COLS.JOB_TITLE - 1] || 'N/A',
+        location: row[MEMBER_COLS.WORK_LOCATION - 1] || 'N/A',
+        unit: row[MEMBER_COLS.UNIT - 1] || 'N/A',
+        email: row[MEMBER_COLS.EMAIL - 1] || '',
+        phone: row[MEMBER_COLS.PHONE - 1] || '',
+        isSteward: row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes',
+        supervisor: row[MEMBER_COLS.SUPERVISOR - 1] || 'N/A',
+        hasOpenGrievance: row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] === 'Yes'
+      };
+    }).filter(function(m) { return m !== null; }).slice(0, 100);
+
+    Logger.log('getWebAppMemberList: Returning ' + result.length + ' members');
+    return result;
+  } catch (e) {
+    Logger.log('getWebAppMemberList error: ' + e.toString());
+    throw new Error('Failed to load members: ' + e.message);
+  }
+}
+
+/**
+ * API function to get resource links for web app
+ * @returns {Object} Resource links
+ */
+function getWebAppResourceLinks() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  var links = {
+    grievanceForm: '',
+    contactForm: '',
+    satisfactionForm: '',
+    spreadsheetUrl: ss.getUrl(),
+    orgWebsite: '',
+    githubRepo: 'https://github.com/Woop91/509-dashboard-second'
+  };
+
+  // Try to get form URLs from Config sheet
+  if (configSheet) {
+    try {
+      var configData = configSheet.getDataRange().getValues();
+      for (var i = 0; i < configData.length; i++) {
+        var row = configData[i];
+        for (var j = 0; j < row.length; j++) {
+          var val = String(row[j] || '').toLowerCase();
+          if (val.indexOf('grievance') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
+            links.grievanceForm = String(row[j + 1]);
+          } else if (val.indexOf('contact') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
+            links.contactForm = String(row[j + 1]);
+          } else if (val.indexOf('satisfaction') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
+            links.satisfactionForm = String(row[j + 1]);
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors reading config
+    }
+  }
+
+  return links;
+}
+
+/**
+ * API function to get dashboard stats with win rate for web app
+ * @returns {Object} Dashboard statistics
+ */
+function getWebAppDashboardStats() {
+  var stats = getMobileDashboardStats();
+
+  // Calculate win rate
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (sheet && sheet.getLastRow() > 1) {
+    var resolutions = sheet.getRange(2, GRIEVANCE_COLS.RESOLUTION, sheet.getLastRow() - 1, 1).getValues();
+    var won = 0, total = 0;
+    resolutions.forEach(function(row) {
+      var res = (row[0] || '').toString().toLowerCase();
+      if (res) {
+        total++;
+        if (res.indexOf('won') >= 0 || res.indexOf('favorable') >= 0) {
+          won++;
+        }
+      }
+    });
+    stats.winRate = total > 0 ? Math.round((won / total) * 100) + '%' : 'N/A';
+  } else {
+    stats.winRate = 'N/A';
+  }
+
+  // Also get total members
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (memberSheet && memberSheet.getLastRow() > 1) {
+    var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
+    var validMembers = memberIds.filter(function(row) {
+      var id = row[0] || '';
+      return id && id.toString().match(/^M/i);
+    }).length;
+    stats.totalMembers = validMembers;
+  } else {
+    stats.totalMembers = 0;
+  }
+
+  return stats;
+}
+
+/**
+ * Menu function to get the web app URL
+ */
+function showWebAppUrl() {
+  var url = ScriptApp.getService().getUrl();
+  if (!url) {
+    SpreadsheetApp.getUi().alert(
+      '📱 Web App Not Deployed',
+      'To access the dashboard on mobile:\n\n' +
+      '1. Go to Extensions → Apps Script\n' +
+      '2. Click "Deploy" → "New deployment"\n' +
+      '3. Select "Web app"\n' +
+      '4. Set "Who has access" appropriately\n' +
+      '5. Click "Deploy"\n' +
+      '6. Copy the URL and open it on your phone',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  var ui = SpreadsheetApp.getUi();
+  var result = ui.alert(
+    '📱 Mobile Dashboard URL',
+    'Open this URL on your mobile device:\n\n' + url + '\n\n' +
+    'Tip: Add it to your home screen for quick access!',
+    ui.ButtonSet.OK
+  );
+}

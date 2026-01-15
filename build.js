@@ -38,6 +38,7 @@ const CONFIG = {
   outputFile: 'ConsolidatedDashboard.gs',
 
   // Files in build order (dependency order matters!)
+  // 9-FILE MODULAR ARCHITECTURE - Prefixed for GitHub grouping
   buildOrder: [
     '01_Constants.gs',        // Must be first - defines all constants
     '02_MemberManager.gs',    // Member operations and directory management
@@ -76,6 +77,7 @@ const CONFIG = {
  *
  * Generated: {{TIMESTAMP}}
  * Version: 3.6.0
+ * Architecture: 9-File Modular
  * ============================================================================
  */
 

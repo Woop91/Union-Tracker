@@ -1,6 +1,6 @@
-# Union Steward Dashboard - Modular Architecture
+# Union Steward Dashboard - 9-File Modular Architecture
 
-A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **modular multi-file architecture** following the Separation of Concerns principle.
+A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **9-file modular architecture** following the Separation of Concerns principle.
 
 ## Architecture Overview
 
@@ -33,14 +33,14 @@ src/
 | **08_Code.gs** | Core setup, hidden sheet management, dashboard creation | `CREATE_509_DASHBOARD`, `setupAllHiddenSheets`, `createConfigSheet` |
 | **09_Main.gs** | Entry point, triggers, edit handlers | `onOpen`, `onEdit`, `initializeDashboard` |
 
-## Benefits of Modular Architecture
+## Benefits of 9-File Architecture
 
-1. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
-2. **Easier Maintenance**: Update union rules in one place (`Constants.gs`)
-3. **Reduced Risk**: UI changes don't risk breaking core data processing
-4. **Better Organization**: Find code faster with logical file separation
-5. **Team Development**: Multiple developers can work on different modules
-6. **Scalability**: Approach 5,000+ lines without chaos
+1. **Clear Separation**: Each file has one clear purpose
+2. **Easy Navigation**: Numbered prefixes show dependency order on GitHub
+3. **Production Ready**: Delete `07_DevTools.gs` before go-live (8 files in production)
+4. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
+5. **Easier Maintenance**: Update union rules in one place (`01_Constants.gs`)
+6. **Scalability**: Handles 1,000+ members without performance issues
 
 ## Installation
 
@@ -58,75 +58,87 @@ src/
    cd MULTIPLE-SCRIPS-REPO
    ```
 
-2. Install dependencies:
+2. Build the consolidated file:
    ```bash
-   npm install
+   node build.js
    ```
 
-3. Build the consolidated file:
-   ```bash
-   npm run build
-   ```
-
-4. Deploy to Google Apps Script:
+3. Deploy to Google Apps Script:
    - **Option A**: Copy `dist/ConsolidatedDashboard.gs` to your Google Apps Script project manually
    - **Option B**: Use clasp for automated deployment:
      ```bash
      clasp login
      clasp create --type sheets --title "Union Dashboard"
-     npm run deploy
+     clasp push
      ```
 
 ## Development Workflow
 
 ### Making Changes
 
-1. Edit files in the `src/` directory
+1. Edit files in the `src/` directory (numbered 01-09)
 2. Run the build to generate consolidated output:
    ```bash
-   npm run build
+   node build.js
    ```
-3. For continuous development, use watch mode:
-   ```bash
-   npm run watch
-   ```
+3. Copy `dist/ConsolidatedDashboard.gs` to Google Apps Script
+
+### Watch Mode (Development)
+
+```bash
+node build.js --watch
+```
+
+This automatically rebuilds when you save changes to any `.gs` file.
 
 ### Build Commands
 
-```bash
-npm run build      # Build consolidated file
-npm run watch      # Watch mode - rebuild on changes
-npm run clean      # Remove dist folder
-npm run manifest   # Generate appsscript.json
-npm run deploy     # Build + push with clasp
+| Command | Description |
+|---------|-------------|
+| `node build.js` | Build consolidated file |
+| `node build.js --watch` | Watch mode for development |
+| `node build.js --clean` | Remove dist folder |
+| `node build.js --manifest` | Generate appsscript.json |
+
+## Going Live (Production)
+
+Before deploying to production:
+
+1. **Run cleanup**: Execute `NUKE_SEEDED_DATA()` to remove all test data
+2. **Delete DevTools**: Remove `07_DevTools.gs` from the build order in `build.js`
+3. **Rebuild**: Run `node build.js` to create production bundle
+4. **Deploy**: Copy the consolidated file to your Apps Script project
+
+The Demo menu will automatically disappear when DevTools.gs is removed.
+
+## File Structure After Production
+
+```
+src/
+├── 01_Constants.gs       # Configuration
+├── 02_MemberManager.gs   # Member operations
+├── 03_GrievanceManager.gs# Grievance lifecycle
+├── 04_UIService.gs       # UI components
+├── 05_Integrations.gs    # External services
+├── 06_Maintenance.gs     # Admin tools
+├── 08_Code.gs            # Core setup
+└── 09_Main.gs            # Entry point
 ```
 
-### File Structure After Build
+**8 files in production** (DevTools removed)
 
-```
-dist/
-├── ConsolidatedDashboard.gs  # Combined file for deployment
-└── appsscript.json           # App manifest
-```
+## Key Features
 
-## Features
+- **Grievance Tracking**: Full lifecycle from filing to resolution
+- **Member Directory**: Contact info, job metadata, steward assignments
+- **Deadline Management**: Auto-calculated deadlines with Calendar sync
+- **Drive Integration**: Auto-created folders for each grievance
+- **Comfort View**: ADHD-friendly themes, focus mode, reduced motion
+- **Mobile UI**: Quick actions optimized for phone access
+- **Data Integrity**: Batch operations, validation, orphan detection
+- **Audit Logging**: Track all changes with timestamps
 
-### Grievance Management
-- Create and track grievances through all steps
-- Automatic deadline calculations based on Article 23A
-- Bulk status updates
-- Progress tracking via Current Step
-
-### Member Directory
-- Complete member database (32 tracked columns)
-- Department and union status tracking
-- Data validation for email and phone
-- Member Satisfaction Survey processing (89 columns)
-
-### Calendar Integration
-- Sync deadlines to Google Calendar
-- Configurable reminder days
-- Automatic event updates
+## Version
 
 ### Drive Integration
 - Auto-create folder structure for each grievance
@@ -287,6 +299,7 @@ MIT License - see LICENSE file for details.
 ## Version History
 
 - **3.6.0** - Strategic Command Center with dual-dashboards, midnight auto-refresh, dynamic config
+- **2.3.0** - Enhanced grievance dashboard with 9-file modular architecture
 - **2.2.0** - Complete feature parity with 16-module modular architecture
 - **2.0.0** - Initial modular multi-file architecture
 - **1.x** - Original monolithic version

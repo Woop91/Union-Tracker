@@ -1,7 +1,7 @@
 # 509 Dashboard - User Tutorials
 
-**Version:** 3.45
-**Last Updated:** 2025-12-13
+**Version:** 2.3.0
+**Last Updated:** 2026-01-15
 
 Quick, practical tutorials for common tasks in the 509 Dashboard.
 
@@ -336,9 +336,9 @@ After seeding, Member Directory columns auto-update when you edit Grievance Log:
 
 ### Final Cleanup (Recommended)
 
-After nuking, delete `DeveloperTools.gs` from the Apps Script editor:
+After nuking, delete `07_DevTools.gs` from the Apps Script editor:
 1. Go to **Extensions** → **Apps Script**
-2. Right-click `DeveloperTools.gs` → **Delete**
+2. Right-click `07_DevTools.gs` → **Delete**
 3. This permanently removes all demo functions
 
 ### After Nuking
@@ -535,5 +535,5 @@ If something goes wrong, use these repair functions:
 
 ---
 
-**Version:** 3.45
-**Last Updated:** 2025-12-13
+**Version:** 2.3.0
+**Last Updated:** 2026-01-15
