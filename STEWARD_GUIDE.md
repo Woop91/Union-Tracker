@@ -3,7 +3,7 @@
 
 ---
 
-## 🆕 NEW in v3.48: Steward Workload Dashboard & Mobile Portal!
+## 🆕 NEW in v3.50: Steward Workload Dashboard & Mobile Portal!
 
 ### 📊 Steward Workload Dashboard
 
@@ -590,7 +590,7 @@ Reach out to your fellow stewards or union leadership. We're all in this togethe
 ---
 
 **Last Updated**: January 2026
-**Version**: 3.48
+**Version**: 2.3.0
 **Created with**: Deep appreciation for steward dedication
 **Purpose**: Celebrating and supporting the backbone of Local 509 💙
 

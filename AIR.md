@@ -963,7 +963,7 @@ The menu system has been reorganized from 9 menus to 5 logical groups:
     ├── 🧹 Clear Config Dropdowns Only
     └── 🔄 Restore Config & Dropdowns
 
-    NOTE: Delete DeveloperTools.gs before production to remove all demo functions
+    NOTE: Delete 07_DevTools.gs before production to remove all demo functions
 ```
 
 ---
