@@ -17,19 +17,20 @@
  * - 06_Maintenance.gs      : Diagnostics, caching, performance
  * - 07_DevTools.gs         : Test data generation (DELETE BEFORE PROD)
  * - 08_Code.gs             : Core setup, hidden sheets, dashboard creation
+ * - 10_CommandCenter.gs    : 509 Strategic Command Center consolidated features
  * - 09_Main.gs             : Entry point and triggers
  *
  * Then run: node build.js
  *
- * Generated: 2026-01-15T04:30:05.507Z
- * Version: 3.6.0
- * Architecture: 9-File Modular
+ * Generated: 2026-01-15T12:57:14.860Z
+ * Version: 3.6.5
+ * Architecture: 10-File Modular (Strategic Command Center)
  * ============================================================================
  */
 
 
 // ============================================================================
-// SOURCE: 01_Constants.gs (1035 lines)
+// SOURCE: 01_Constants.gs (1071 lines)
 // ============================================================================
 
 /**
@@ -228,6 +229,40 @@ var COLORS = {
   ROW_ALT_GREEN: '#ECFDF5',     // Light green tint
   ROW_ALT_RED: '#FEF2F2',       // Light red tint
   ROW_ALT_BLUE: '#EFF6FF'       // Light blue tint
+};
+
+/**
+ * UI Theme constants for dialogs and sidebars
+ * Used in HTML templates for consistent styling
+ * @const {Object}
+ */
+var UI_THEME = {
+  // Primary Colors
+  PRIMARY_COLOR: '#7C3AED',       // Main brand purple
+  SECONDARY_COLOR: '#64748B',     // Secondary gray
+
+  // Text Colors
+  TEXT_PRIMARY: '#1F2937',        // Dark text
+  TEXT_SECONDARY: '#6B7280',      // Gray text
+
+  // UI Elements
+  BORDER_COLOR: '#E5E7EB',        // Light gray borders
+  BACKGROUND: '#F9FAFB',          // Light background
+  CARD_BG: '#FFFFFF',             // White card background
+
+  // Status Colors
+  SUCCESS_COLOR: '#10B981',       // Green
+  WARNING_COLOR: '#F59E0B',       // Amber
+  DANGER_COLOR: '#EF4444',        // Red
+  INFO_COLOR: '#3B82F6',          // Blue
+
+  // Dark Mode (for dark headers)
+  DARK_BG: '#1E293B',             // Dark slate
+  DARK_TEXT: '#F8FAFC',           // Light text on dark
+
+  // Gradients
+  GRADIENT_START: '#7C3AED',
+  GRADIENT_END: '#5B21B6'
 };
 
 /**
@@ -487,12 +522,14 @@ var CONFIG_COLS = {
   // ── FORM LINKS ── (AR)
   SATISFACTION_FORM_URL: 44,  // AR - Member Satisfaction Survey form URL
 
-  // ── STRATEGIC COMMAND CENTER ── (AS-AW)
+  // ── STRATEGIC COMMAND CENTER ── (AS-AZ)
   CHIEF_STEWARD_EMAIL: 45,    // AS - Email for escalation alerts
   UNIT_CODES: 46,             // AT - Unit code prefixes (format: "Unit Name:CODE,Unit2:CODE2")
   ARCHIVE_FOLDER_ID: 47,      // AU - Drive folder ID for archives
   ESCALATION_STATUSES: 48,    // AV - Status values that trigger alerts (comma-separated)
-  ESCALATION_STEPS: 49        // AW - Step values that trigger alerts (comma-separated)
+  ESCALATION_STEPS: 49,       // AW - Step values that trigger alerts (comma-separated)
+  TEMPLATE_ID: 50,            // AX - Google Doc template ID for grievance PDFs
+  PDF_FOLDER_ID: 51           // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
 };
 
 // ============================================================================
@@ -1069,7 +1106,7 @@ function generateSequentialId(prefix, sheet, idColumn) {
 
 
 // ============================================================================
-// SOURCE: 02_MemberManager.gs (326 lines)
+// SOURCE: 02_MemberManager.gs (656 lines)
 // ============================================================================
 
 /**
@@ -1398,9 +1435,339 @@ function syncMemberGrievanceData() {
   Logger.log('Member grievance data synced');
 }
 
+// ============================================================================
+// UNIT-BASED ID GENERATION (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Generates missing Member IDs for all members without one
+ * Uses unit-based prefixes from COMMAND_CONFIG or Config sheet
+ * Format: UNIT_CODE-SEQUENCE-H (e.g., MS-101-H)
+ */
+function generateMissingMemberIDs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory sheet not found');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var unitCodes = getUnitCodes_();
+  var countAdded = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var currentId = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    var unit = data[i][MEMBER_COLS.UNIT - 1];
+
+    // If ID is blank but member has data
+    if (!currentId && (unit || data[i][MEMBER_COLS.FIRST_NAME - 1])) {
+      var prefix = unitCodes[unit] || 'GEN';
+      var nextNum = getNextSequence_(prefix, sheet);
+      var newId = prefix + '-' + nextNum + '-H';
+
+      sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
+      countAdded++;
+    }
+  }
+
+  ss.toast('Generated ' + countAdded + ' new Member IDs', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  return countAdded;
+}
+
+/**
+ * Gets the next available sequence number for a given prefix
+ * Scans existing IDs to find the highest number and increments
+ * @param {string} prefix - The unit code prefix (e.g., "MS")
+ * @param {Sheet} sheet - The Member Directory sheet
+ * @returns {number} Next available sequence number
+ * @private
+ */
+function getNextSequence_(prefix, sheet) {
+  var ids = sheet.getRange(1, MEMBER_COLS.MEMBER_ID, sheet.getLastRow(), 1).getValues().flat();
+  var max = 100;
+
+  ids.forEach(function(id) {
+    if (typeof id === 'string' && id.startsWith(prefix + '-')) {
+      var parts = id.split('-');
+      if (parts.length >= 2) {
+        var n = parseInt(parts[1], 10);
+        if (!isNaN(n) && n > max) {
+          max = n;
+        }
+      }
+    }
+  });
+
+  return max + 1;
+}
+
+/**
+ * Checks for duplicate Member IDs and reports them
+ */
+function checkDuplicateMemberIDs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory sheet not found');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var idCounts = {};
+  var duplicates = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var id = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    if (id) {
+      if (idCounts[id]) {
+        idCounts[id].count++;
+        idCounts[id].rows.push(i + 1);
+      } else {
+        idCounts[id] = { count: 1, rows: [i + 1] };
+      }
+    }
+  }
+
+  for (var memberId in idCounts) {
+    if (idCounts[memberId].count > 1) {
+      duplicates.push({
+        id: memberId,
+        count: idCounts[memberId].count,
+        rows: idCounts[memberId].rows
+      });
+    }
+  }
+
+  if (duplicates.length === 0) {
+    SpreadsheetApp.getUi().alert('No duplicate Member IDs found.');
+  } else {
+    var message = 'Found ' + duplicates.length + ' duplicate ID(s):\n\n';
+    duplicates.forEach(function(dup) {
+      message += 'ID: ' + dup.id + ' (rows: ' + dup.rows.join(', ') + ')\n';
+    });
+    SpreadsheetApp.getUi().alert(message);
+  }
+
+  return duplicates;
+}
 
 // ============================================================================
-// SOURCE: 03_GrievanceManager.gs (1048 lines)
+// STEWARD PROMOTION/DEMOTION (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Promotes the currently selected member to Steward status
+ * Updates IS_STEWARD column and adds to Config steward list
+ */
+function promoteSelectedMemberToSteward() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('Please select a member row in the Member Directory sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a member row (not the header)');
+    return;
+  }
+
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var fullName = firstName + ' ' + lastName;
+  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
+
+  if (currentStatus === 'Yes' || currentStatus === true) {
+    ui.alert(fullName + ' is already a Steward');
+    return;
+  }
+
+  var response = ui.alert(
+    'Promote to Steward',
+    'Promote ' + fullName + ' to Steward?\n\nThis will:\n' +
+    '- Set "Is Steward" to Yes\n' +
+    '- Add to the Steward dropdown list',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  // Update member record
+  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
+
+  // Add to Config steward list
+  addToConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
+
+  ss.toast(fullName + ' has been promoted to Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Demotes the currently selected steward back to regular member
+ */
+function demoteSelectedSteward() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('Please select a steward row in the Member Directory sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a member row (not the header)');
+    return;
+  }
+
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var fullName = firstName + ' ' + lastName;
+  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
+
+  if (currentStatus !== 'Yes' && currentStatus !== true) {
+    ui.alert(fullName + ' is not currently a Steward');
+    return;
+  }
+
+  var response = ui.alert(
+    'Demote Steward',
+    'Demote ' + fullName + ' from Steward?\n\nThis will:\n' +
+    '- Set "Is Steward" to No\n' +
+    '- Remove from the Steward dropdown list',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  // Update member record
+  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('No');
+
+  // Remove from Config steward list
+  removeFromConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
+
+  ss.toast(fullName + ' has been demoted from Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Adds a value to a Config column dropdown list
+ * @param {number} configCol - The Config column number
+ * @param {string} value - The value to add
+ * @private
+ */
+function addToConfigDropdown_(configCol, value) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) return;
+
+  // Find first empty row in the column
+  var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
+  var emptyRow = 3;
+
+  for (var i = 0; i < colData.length; i++) {
+    if (!colData[i][0]) {
+      emptyRow = i + 3;
+      break;
+    }
+    emptyRow = i + 4;
+  }
+
+  configSheet.getRange(emptyRow, configCol).setValue(value);
+}
+
+/**
+ * Removes a value from a Config column dropdown list
+ * @param {number} configCol - The Config column number
+ * @param {string} value - The value to remove
+ * @private
+ */
+function removeFromConfigDropdown_(configCol, value) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) return;
+
+  var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
+
+  for (var i = 0; i < colData.length; i++) {
+    if (colData[i][0] === value) {
+      configSheet.getRange(i + 3, configCol).clearContent();
+      break;
+    }
+  }
+}
+
+// ============================================================================
+// BATCH PROCESSING (Performance Optimization)
+// ============================================================================
+
+/**
+ * Updates member data in batch mode for better performance
+ * Reads all data once, modifies in memory, writes back in one operation
+ * @param {string} memberId - The member ID to update
+ * @param {Object} newValuesObj - Object with field values to update
+ */
+function updateMemberDataBatch(memberId, newValuesObj) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  var range = sheet.getDataRange();
+  var data = range.getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+      // Modify array in memory
+      if (newValuesObj.email !== undefined) {
+        data[i][MEMBER_COLS.EMAIL - 1] = newValuesObj.email;
+      }
+      if (newValuesObj.phone !== undefined) {
+        data[i][MEMBER_COLS.PHONE - 1] = newValuesObj.phone;
+      }
+      if (newValuesObj.firstName !== undefined) {
+        data[i][MEMBER_COLS.FIRST_NAME - 1] = newValuesObj.firstName;
+      }
+      if (newValuesObj.lastName !== undefined) {
+        data[i][MEMBER_COLS.LAST_NAME - 1] = newValuesObj.lastName;
+      }
+      if (newValuesObj.unit !== undefined) {
+        data[i][MEMBER_COLS.UNIT - 1] = newValuesObj.unit;
+      }
+      if (newValuesObj.workLocation !== undefined) {
+        data[i][MEMBER_COLS.WORK_LOCATION - 1] = newValuesObj.workLocation;
+      }
+      if (newValuesObj.isSteward !== undefined) {
+        data[i][MEMBER_COLS.IS_STEWARD - 1] = newValuesObj.isSteward;
+      }
+
+      // Write the specific row back in one shot
+      sheet.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
+
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Member ' + memberId + ' updated via batch process',
+        COMMAND_CONFIG.SYSTEM_NAME,
+        3
+      );
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+// ============================================================================
+// SOURCE: 03_GrievanceManager.gs (1163 lines)
 // ============================================================================
 
 /**
@@ -2451,9 +2818,124 @@ function getEditGrievanceFormHtml(grievanceId) {
   `;
 }
 
+// ============================================================================
+// TRAFFIC LIGHT INDICATORS (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Applies visual traffic light indicators to grievance rows
+ * Colors the ID column based on days to deadline:
+ * - Red: Overdue (< 0 days)
+ * - Orange/Yellow: Urgent (1-3 days)
+ * - Green: On track (> 3 days)
+ */
+function applyTrafficLightIndicators() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error: Grievance Log sheet not found');
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    SpreadsheetApp.getActiveSpreadsheet().toast('No grievances to process', COMMAND_CONFIG.SYSTEM_NAME, 3);
+    return;
+  }
+
+  // Read all days to deadline values
+  var daysRange = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1);
+  var daysValues = daysRange.getValues();
+
+  // Build color array
+  var colors = [];
+  var statusCounts = { overdue: 0, urgent: 0, onTrack: 0 };
+
+  for (var i = 0; i < daysValues.length; i++) {
+    var days = daysValues[i][0];
+
+    if (typeof days !== 'number' || isNaN(days)) {
+      colors.push([null]);  // No color for empty/invalid cells
+    } else if (days < 0) {
+      colors.push([COLORS.STATUS_RED]);  // Red - Overdue
+      statusCounts.overdue++;
+    } else if (days <= 3) {
+      colors.push([COLORS.STATUS_ORANGE]);  // Orange - Urgent
+      statusCounts.urgent++;
+    } else {
+      colors.push([COLORS.STATUS_GREEN]);  // Green - On track
+      statusCounts.onTrack++;
+    }
+  }
+
+  // Batch apply background colors to the ID column (column A)
+  sheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, colors.length, 1).setBackgrounds(colors);
+
+  // Show summary toast
+  var message = 'Traffic lights applied: ' +
+                statusCounts.overdue + ' overdue, ' +
+                statusCounts.urgent + ' urgent, ' +
+                statusCounts.onTrack + ' on track';
+  SpreadsheetApp.getActiveSpreadsheet().toast(message, COMMAND_CONFIG.SYSTEM_NAME, 5);
+
+  return statusCounts;
+}
+
+/**
+ * Removes traffic light indicators from grievance rows
+ */
+function clearTrafficLightIndicators() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) return;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  // Clear background colors from ID column
+  sheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).setBackground(null);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('Traffic light indicators cleared', COMMAND_CONFIG.SYSTEM_NAME, 3);
+}
+
+/**
+ * Applies deadline-based row highlighting
+ * Highlights entire rows based on urgency level
+ */
+function highlightUrgentGrievances() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) return;
+
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow < 2) return;
+
+  var daysValues = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1).getValues();
+
+  // Apply row backgrounds based on urgency
+  for (var i = 0; i < daysValues.length; i++) {
+    var days = daysValues[i][0];
+    var rowRange = sheet.getRange(i + 2, 1, 1, lastCol);
+
+    if (typeof days !== 'number' || isNaN(days)) {
+      continue;
+    } else if (days < 0) {
+      rowRange.setBackground(COLORS.ROW_ALT_RED);  // Light red tint
+    } else if (days <= 3) {
+      rowRange.setBackground('#fefce8');  // Light yellow tint
+    }
+  }
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('Urgent grievances highlighted', COMMAND_CONFIG.SYSTEM_NAME, 3);
+}
+
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (6224 lines)
+// SOURCE: 04_UIService.gs (6433 lines)
 // ============================================================================
 
 /**
@@ -2921,6 +3403,215 @@ function toggleDarkMode() {
 
 function showThemeSettings() {
   showVisualControlPanel();
+}
+
+// ============================================================================
+// NAVIGATION HELPERS (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Navigate to Executive Dashboard
+ */
+function navToDash() {
+  navigateToSheet(SHEETS.DASHBOARD);
+}
+
+/**
+ * Navigate to Custom View / Interactive Dashboard
+ */
+function navToCustom() {
+  navigateToSheet(SHEETS.INTERACTIVE);
+}
+
+/**
+ * Navigate to Mobile View (if exists)
+ */
+function navToMobile() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var mobileSheet = ss.getSheetByName('📱 Mobile View');
+
+  if (mobileSheet) {
+    mobileSheet.activate();
+  } else {
+    // Fall back to showing the mobile-optimized sidebar
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Mobile View sheet not found. Use the web app for best mobile experience.',
+      COMMAND_CONFIG.SYSTEM_NAME,
+      5
+    );
+  }
+}
+
+/**
+ * Navigate to a specific sheet by name
+ * @param {string} sheetName - The sheet name to navigate to
+ */
+function navigateToSheet(sheetName) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+
+  if (sheet) {
+    sheet.activate();
+  } else {
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Sheet "' + sheetName + '" not found',
+      'Navigation Error',
+      3
+    );
+  }
+}
+
+// ============================================================================
+// GLOBAL STYLING (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Applies the system theme to all visible sheets
+ * Includes header styling, zebra striping, and font standardization
+ */
+function APPLY_SYSTEM_THEME() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var sheetsStyled = 0;
+
+  ss.toast('Applying theme to all sheets...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  sheets.forEach(function(sheet) {
+    var sheetName = sheet.getName();
+
+    // Skip hidden sheets
+    if (sheet.isSheetHidden()) return;
+
+    // Skip sheets starting with underscore (calculation sheets)
+    if (sheetName.startsWith('_')) return;
+
+    try {
+      applyThemeToSheet_(sheet);
+      sheetsStyled++;
+    } catch (e) {
+      Logger.log('Failed to style sheet ' + sheetName + ': ' + e.message);
+    }
+  });
+
+  ss.toast('Theme applied to ' + sheetsStyled + ' sheets', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Applies theme styling to a single sheet
+ * @param {Sheet} sheet - The sheet to style
+ * @private
+ */
+function applyThemeToSheet_(sheet) {
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+
+  if (lastRow < 1 || lastCol < 1) return;
+
+  // Style header row
+  var headerRange = sheet.getRange(1, 1, 1, lastCol);
+  headerRange.setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+             .setFontColor(COMMAND_CONFIG.THEME.HEADER_TEXT)
+             .setFontWeight('bold')
+             .setFontFamily(COMMAND_CONFIG.THEME.FONT)
+             .setFontSize(11)
+             .setVerticalAlignment('middle');
+
+  // Apply font to all data rows
+  if (lastRow > 1) {
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    dataRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
+             .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
+             .setVerticalAlignment('middle');
+
+    // Apply zebra striping
+    for (var row = 2; row <= lastRow; row++) {
+      var rowRange = sheet.getRange(row, 1, 1, lastCol);
+      if (row % 2 === 0) {
+        rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
+      } else {
+        rowRange.setBackground(null);
+      }
+    }
+  }
+
+  // Freeze header row
+  sheet.setFrozenRows(1);
+}
+
+/**
+ * Applies global styling to all visible sheets (alias for APPLY_SYSTEM_THEME)
+ */
+function applyGlobalStyling() {
+  APPLY_SYSTEM_THEME();
+}
+
+/**
+ * Resets all visible sheets to default styling
+ */
+function resetToDefaultTheme() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  var response = ui.alert(
+    'Reset Theme',
+    'This will reset all sheets to default styling (white background, black text).\n\nContinue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  var sheets = ss.getSheets();
+
+  sheets.forEach(function(sheet) {
+    if (sheet.isSheetHidden()) return;
+    if (sheet.getName().startsWith('_')) return;
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+
+    if (lastRow < 1 || lastCol < 1) return;
+
+    try {
+      var allRange = sheet.getRange(1, 1, lastRow, lastCol);
+      allRange.setBackground(null)
+              .setFontColor(null)
+              .setFontWeight('normal')
+              .setFontFamily('Arial')
+              .setFontSize(10);
+
+      // Keep headers bold
+      sheet.getRange(1, 1, 1, lastCol).setFontWeight('bold');
+    } catch (e) {
+      Logger.log('Failed to reset sheet ' + sheet.getName() + ': ' + e.message);
+    }
+  });
+
+  ss.toast('Theme reset to defaults', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Refreshes all visual elements and auto-styling
+ */
+function refreshAllVisuals() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  ss.toast('Refreshing all visuals...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  // Apply traffic light indicators
+  try {
+    applyTrafficLightIndicators();
+  } catch (e) {
+    Logger.log('Traffic lights error: ' + e.message);
+  }
+
+  // Apply global theme
+  try {
+    APPLY_SYSTEM_THEME();
+  } catch (e) {
+    Logger.log('Theme error: ' + e.message);
+  }
+
+  ss.toast('Visual refresh complete', COMMAND_CONFIG.SYSTEM_NAME, 5);
 }
 
 // ============================================================================
@@ -8682,7 +9373,7 @@ function resetToDefaultTheme() {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (1801 lines)
+// SOURCE: 05_Integrations.gs (2009 lines)
 // ============================================================================
 
 /**
@@ -9212,6 +9903,214 @@ function sendEmailToMember(memberId, subject, body) {
   } catch (error) {
     console.error('Error sending email:', error);
     return { success: false, error: error.message };
+  }
+}
+
+// ============================================================================
+// PDF SIGNATURE ENGINE (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Gets or creates an archive folder for a specific member
+ * Used for storing grievance PDFs and documents
+ * @param {string} name - Member's name
+ * @param {string} id - Member's ID
+ * @returns {Folder} The member's archive folder
+ */
+function getOrCreateMemberFolder(name, id) {
+  // Get archive folder ID from Config or COMMAND_CONFIG
+  var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
+
+  if (!archiveFolderId) {
+    // Fall back to creating in root folder
+    var rootFolder = getOrCreateRootFolder();
+    var folderName = name + ' (' + id + ')';
+    var folders = rootFolder.getFoldersByName(folderName);
+    return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
+  }
+
+  try {
+    var parentFolder = DriveApp.getFolderById(archiveFolderId);
+    var folderName = name + ' (' + id + ')';
+    var folders = parentFolder.getFoldersByName(folderName);
+    return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
+  } catch (e) {
+    Logger.log('Archive folder not found, using root: ' + e.message);
+    var rootFolder = getOrCreateRootFolder();
+    var folderName = name + ' (' + id + ')';
+    var folders = rootFolder.getFoldersByName(folderName);
+    return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
+  }
+}
+
+/**
+ * Creates a signature-ready PDF from a grievance template
+ * Merges data and adds signature blocks
+ * @param {Folder} folder - Target folder for the PDF
+ * @param {Object} data - Grievance data object
+ * @returns {File} The created PDF file
+ */
+function createSignatureReadyPDF(folder, data) {
+  // Get template ID from Config or COMMAND_CONFIG
+  var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID) || COMMAND_CONFIG.TEMPLATE_ID;
+
+  if (!templateId) {
+    throw new Error('Document template ID not configured. Please set TEMPLATE_ID in Config sheet.');
+  }
+
+  try {
+    // Copy template
+    var temp = DriveApp.getFileById(templateId).makeCopy('SIGNATURE_REQUIRED_' + data.name, folder);
+    var doc = DocumentApp.openById(temp.getId());
+    var body = doc.getBody();
+
+    // Replace placeholders with data
+    body.replaceText('{{MemberName}}', data.name || 'Unknown');
+    body.replaceText('{{MemberID}}', data.id || '000');
+    body.replaceText('{{Date}}', new Date().toLocaleDateString());
+    body.replaceText('{{Details}}', data.details || 'No details provided.');
+    body.replaceText('{{GrievanceID}}', data.grievanceId || '');
+    body.replaceText('{{Articles}}', data.articles || '');
+    body.replaceText('{{Status}}', data.status || '');
+    body.replaceText('{{Unit}}', data.unit || '');
+    body.replaceText('{{Location}}', data.location || '');
+    body.replaceText('{{Steward}}', data.steward || '');
+
+    // Append legal signature block
+    body.appendParagraph(COMMAND_CONFIG.PDF.SIGNATURE_BLOCK ||
+      '\n\n__________________________\nMember Signature\n\n__________________________\nSteward Signature\n\n__________________________\nDate');
+
+    doc.saveAndClose();
+
+    // Convert to PDF
+    var pdf = folder.createFile(temp.getAs(MimeType.PDF))
+                    .setName('Grievance_UNSIGNED_' + data.name + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+
+    // Remove the temp document
+    temp.setTrashed(true);
+
+    return pdf;
+
+  } catch (e) {
+    Logger.log('Error creating signature PDF: ' + e.message);
+    throw new Error('Failed to create PDF: ' + e.message);
+  }
+}
+
+/**
+ * Creates a PDF for the currently selected grievance
+ * Accessible from the 509 Command menu
+ */
+function createPDFForSelectedGrievance() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
+    ui.alert('Please select a grievance row in the Grievance Log sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a grievance row (not the header)');
+    return;
+  }
+
+  // Get grievance data
+  var data = {
+    grievanceId: sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue(),
+    name: sheet.getRange(row, GRIEVANCE_COLS.FIRST_NAME).getValue() + ' ' +
+          sheet.getRange(row, GRIEVANCE_COLS.LAST_NAME).getValue(),
+    id: sheet.getRange(row, GRIEVANCE_COLS.MEMBER_ID).getValue(),
+    status: sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue(),
+    articles: sheet.getRange(row, GRIEVANCE_COLS.ARTICLES).getValue(),
+    details: sheet.getRange(row, GRIEVANCE_COLS.RESOLUTION).getValue() || 'Pending',
+    unit: sheet.getRange(row, GRIEVANCE_COLS.UNIT).getValue(),
+    location: sheet.getRange(row, GRIEVANCE_COLS.LOCATION).getValue(),
+    steward: sheet.getRange(row, GRIEVANCE_COLS.STEWARD).getValue()
+  };
+
+  var response = ui.alert(
+    'Create Signature PDF',
+    'Create a signature-ready PDF for grievance ' + data.grievanceId + '?\n\n' +
+    'Member: ' + data.name + '\n' +
+    'Status: ' + data.status,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  try {
+    ss.toast('Creating PDF...', COMMAND_CONFIG.SYSTEM_NAME, 5);
+
+    // Get or create member folder
+    var folder = getOrCreateMemberFolder(data.name, data.id);
+
+    // Create the PDF
+    var pdf = createSignatureReadyPDF(folder, data);
+
+    // Update grievance record with PDF link
+    if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
+      sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folder.getUrl());
+    }
+
+    ui.alert(
+      'PDF Created',
+      'Signature-ready PDF has been created.\n\n' +
+      'File: ' + pdf.getName() + '\n' +
+      'Location: ' + folder.getName() + '\n\n' +
+      'Click OK to open the folder.',
+      ui.ButtonSet.OK
+    );
+
+    // Open folder in new tab
+    var html = HtmlService.createHtmlOutput(
+      '<script>window.open("' + folder.getUrl() + '", "_blank"); google.script.host.close();</script>'
+    ).setWidth(100).setHeight(50);
+    ui.showModalDialog(html, 'Opening folder...');
+
+  } catch (e) {
+    ui.alert('Error', 'Failed to create PDF: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Handles form submission for grievance intake forms
+ * Creates PDF and links it back to the log
+ * @param {Object} e - Form submission event object
+ */
+function onGrievanceFormSubmit(e) {
+  try {
+    var responses = e.namedValues;
+    var data = {
+      name: responses['Member Name'] ? responses['Member Name'][0] : 'Unknown',
+      id: responses['Member ID'] ? responses['Member ID'][0] : '000',
+      details: responses['Details'] ? responses['Details'][0] : 'No details provided.',
+      grievanceId: responses['Grievance ID'] ? responses['Grievance ID'][0] : '',
+      articles: responses['Articles'] ? responses['Articles'][0] : ''
+    };
+
+    // Create member folder and PDF
+    var memberFolder = getOrCreateMemberFolder(data.name, data.id);
+    var pdfFile = createSignatureReadyPDF(memberFolder, data);
+
+    // Link PDF back to the grievance log
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+    if (sheet) {
+      // Find the last row (where the form just added data) and add the PDF link
+      var lastRow = sheet.getLastRow();
+      if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
+        sheet.getRange(lastRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+      }
+    }
+
+    Logger.log('Form submission processed: ' + data.name + ' - PDF created');
+
+  } catch (e) {
+    Logger.log('Error processing form submission: ' + e.message);
   }
 }
 
@@ -10488,7 +11387,7 @@ function showWebAppUrl() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (2994 lines)
+// SOURCE: 06_Maintenance.gs (3146 lines)
 // ============================================================================
 
 /**
@@ -11074,6 +11973,158 @@ function NUCLEAR_WIPE_GRIEVANCES() {
     success: true,
     message: `Deleted ${lastRow - 1} grievance records`
   };
+}
+
+// ============================================================================
+// BACKUP & SNAPSHOT FUNCTIONS (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Creates a complete backup snapshot of the spreadsheet
+ * Copies entire spreadsheet to the archive folder with timestamp
+ */
+function createWeeklySnapshot() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  // Get archive folder ID from Config
+  var archiveFolderId = '';
+  try {
+    archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
+  } catch (e) {
+    // Fall back to a default if config is not available
+  }
+
+  if (!archiveFolderId) {
+    ui.alert(
+      'Archive Folder Not Configured',
+      'Please set the Archive Folder ID in the Config sheet (column AU) or COMMAND_CONFIG.ARCHIVE_FOLDER_ID.\n\n' +
+      'To find a folder ID:\n' +
+      '1. Open the target folder in Google Drive\n' +
+      '2. Copy the ID from the URL (after /folders/)',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  try {
+    var folder = DriveApp.getFolderById(archiveFolderId);
+    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd_HH-mm');
+    var snapshotName = '509_SNAPSHOT_' + date;
+
+    // Create the copy
+    DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
+
+    // Log the backup
+    logAuditEvent('SNAPSHOT_CREATED', {
+      snapshotName: snapshotName,
+      folderId: archiveFolderId,
+      createdBy: Session.getActiveUser().getEmail()
+    });
+
+    ui.alert('Snapshot Created', 'Backup saved to archive folder.\n\nFile: ' + snapshotName, ui.ButtonSet.OK);
+
+  } catch (e) {
+    ui.alert('Error', 'Failed to create snapshot: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Creates an automated snapshot (for scheduled triggers)
+ * Does not show UI alerts - just logs the action
+ */
+function createAutomatedSnapshot() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var archiveFolderId = '';
+  try {
+    archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
+  } catch (e) {
+    Logger.log('Could not get archive folder ID: ' + e.message);
+    return { success: false, error: 'Archive folder not configured' };
+  }
+
+  if (!archiveFolderId) {
+    Logger.log('Archive folder not configured');
+    return { success: false, error: 'Archive folder not configured' };
+  }
+
+  try {
+    var folder = DriveApp.getFolderById(archiveFolderId);
+    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
+    var snapshotName = '509_AUTO_SNAPSHOT_' + date;
+
+    DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
+
+    logAuditEvent('AUTO_SNAPSHOT_CREATED', {
+      snapshotName: snapshotName,
+      createdBy: 'Automated Trigger'
+    });
+
+    return { success: true, snapshotName: snapshotName };
+
+  } catch (e) {
+    Logger.log('Failed to create automated snapshot: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Sets up weekly snapshot trigger
+ * Creates a time-based trigger to run every Sunday at 2am
+ */
+function setupWeeklySnapshotTrigger() {
+  // Remove existing snapshot triggers
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'createAutomatedSnapshot') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  // Create new weekly trigger (Sunday at 2am)
+  ScriptApp.newTrigger('createAutomatedSnapshot')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(2)
+    .create();
+
+  SpreadsheetApp.getUi().alert(
+    'Weekly Snapshot Enabled',
+    'Automated backups will be created every Sunday at 2:00 AM.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Navigates to the Audit Log sheet
+ */
+function navigateToAuditLog() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+
+  if (!auditSheet) {
+    // Create audit log if it doesn't exist
+    auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
+    auditSheet.getRange('A1:F1').setValues([['Timestamp', 'User', 'Sheet', 'Cell', 'Old Value', 'New Value']]);
+    auditSheet.getRange('A1:F1')
+      .setFontWeight('bold')
+      .setBackground(COLORS.CARD_DARK_BG)
+      .setFontColor(COLORS.CARD_DARK_TEXT);
+    auditSheet.hideSheet();
+  }
+
+  // Unhide temporarily and activate
+  if (auditSheet.isSheetHidden()) {
+    auditSheet.showSheet();
+  }
+  auditSheet.activate();
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Showing Audit Log. It will be hidden again when you switch sheets.',
+    COMMAND_CONFIG.SYSTEM_NAME,
+    5
+  );
 }
 
 // ============================================================================
@@ -27548,7 +28599,641 @@ function advancedSearch(filters) {
 
 
 // ============================================================================
-// SOURCE: 09_Main.gs (1046 lines)
+// SOURCE: 10_CommandCenter.gs (629 lines)
+// ============================================================================
+
+/**
+ * ============================================================================
+ * 509 STRATEGIC COMMAND CENTER - CONSOLIDATED ENGINE (v3.6.5)
+ * ============================================================================
+ * AUTHOR: Gemini Assistant / Claude Assistant
+ * STATUS: Fully Integrated / Production Ready
+ *
+ * FEATURES:
+ * - Security: Audit Log & Sabotage Protection (>15 cells)
+ * - Workflow: Stage-Gate Case Tracking (Step 1 -> Arbitration)
+ * - Automation: Auto-ID Generator & Duplicate Prevention
+ * - UI/UX: Fully Automated "Roboto" Theme & Zebra Striping
+ * - Legal: Signature-Ready PDF Merge & Auto-Drive Archiving
+ *
+ * NOTE: This file provides consolidated access to Strategic Command Center
+ * features. Core implementations are in their respective module files.
+ * ============================================================================
+ */
+
+// ============================================================================
+// COMMAND CENTER CONFIGURATION
+// ============================================================================
+
+/**
+ * Alternative CONFIG object for legacy compatibility
+ * Maps to COMMAND_CONFIG in 01_Constants.gs
+ */
+var COMMAND_CENTER_CONFIG = {
+  SYSTEM_NAME: "509 Strategic Command Center",
+  LOG_SHEET_NAME: SHEETS.GRIEVANCE_LOG,      // Maps to existing SHEETS constant
+  DIR_SHEET_NAME: SHEETS.MEMBER_DIR,         // Maps to existing SHEETS constant
+  AUDIT_SHEET_NAME: SHEETS.AUDIT_LOG,        // Maps to existing SHEETS constant
+  TEMPLATE_ID: COMMAND_CONFIG.TEMPLATE_ID,
+  ARCHIVE_FOLDER_ID: COMMAND_CONFIG.ARCHIVE_FOLDER_ID,
+  CHIEF_STEWARD_EMAIL: COMMAND_CONFIG.CHIEF_STEWARD_EMAIL,
+  UNIT_CODES: COMMAND_CONFIG.UNIT_CODES,
+  THEME: COMMAND_CONFIG.THEME
+};
+
+// ============================================================================
+// COMMAND CENTER MENU
+// ============================================================================
+
+/**
+ * Creates the 509 Command Center menu
+ * Called by createDashboardMenu() in UIService.gs
+ */
+function createCommandCenterMenu() {
+  var ui = SpreadsheetApp.getUi();
+
+  ui.createMenu('📊 509 COMMAND CENTER')
+    .addItem('👁️ Refresh Dashboard UI', 'APPLY_SYSTEM_THEME')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('👤 Personnel Management')
+      .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
+      .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
+      .addItem('🌟 Promote Selected to Steward', 'promoteSelectedMemberToSteward')
+      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('📋 Grievance Tools')
+      .addItem('🚦 Apply Traffic Light Indicators', 'applyTrafficLightIndicators')
+      .addItem('🔄 Clear Traffic Lights', 'clearTrafficLightIndicators')
+      .addItem('📄 Create PDF for Selected', 'createPDFForSelectedGrievance'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🛡️ System Security')
+      .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
+      .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
+      .addItem('📜 View Audit Log', 'navigateToAuditLog'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🎨 Styling & Theme')
+      .addItem('🎨 Apply Global Theme', 'APPLY_SYSTEM_THEME')
+      .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
+      .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'))
+    .addToUi();
+}
+
+// ============================================================================
+// NAVIGATION SHORTCUTS
+// ============================================================================
+
+/**
+ * Quick navigation to Executive Dashboard
+ */
+function navigateToDashboard() {
+  navToDash();
+}
+
+/**
+ * Quick navigation to Custom View
+ */
+function navigateToCustomView() {
+  navToCustom();
+}
+
+/**
+ * Quick navigation to Mobile View
+ */
+function navigateToMobileView() {
+  navToMobile();
+}
+
+// ============================================================================
+// PRODUCTION MODE & NUKE FUNCTIONS
+// ============================================================================
+
+/**
+ * Checks if system is in production mode
+ * @returns {boolean} True if production mode is enabled
+ */
+function isProductionMode() {
+  return PropertiesService.getScriptProperties().getProperty('PRODUCTION_MODE') === 'true';
+}
+
+/**
+ * Enables production mode (hides demo tools)
+ */
+function enableProductionMode() {
+  PropertiesService.getScriptProperties().setProperty('PRODUCTION_MODE', 'true');
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Production Mode enabled. Reload the spreadsheet to see changes.',
+    COMMAND_CONFIG.SYSTEM_NAME,
+    5
+  );
+}
+
+/**
+ * Disables production mode (shows demo tools)
+ */
+function disableProductionMode() {
+  PropertiesService.getScriptProperties().setProperty('PRODUCTION_MODE', 'false');
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Production Mode disabled. Demo tools will be visible on reload.',
+    COMMAND_CONFIG.SYSTEM_NAME,
+    5
+  );
+}
+
+/**
+ * THE NUCLEAR OPTION - Wipes all data and enables production mode
+ * More aggressive than NUKE_SEEDED_DATA - clears ALL data, not just seeded
+ */
+function NUKE_DATABASE() {
+  var ui = SpreadsheetApp.getUi();
+  var confirm = ui.alert(
+    '☢️ NUCLEAR OPTION',
+    'This will:\n\n' +
+    '• DELETE ALL members from Member Directory\n' +
+    '• DELETE ALL grievances from Grievance Log\n' +
+    '• CLEAR Config dropdown values\n' +
+    '• ENABLE Production Mode (hide Demo menu)\n\n' +
+    'This action CANNOT be undone!\n\n' +
+    'Are you absolutely sure?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm !== ui.Button.YES) {
+    ui.alert('Cancelled', 'Nuclear operation cancelled.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Second confirmation
+  var confirm2 = ui.alert(
+    '⚠️ FINAL WARNING',
+    'You are about to permanently delete ALL data.\n\n' +
+    'Type YES to confirm this is intentional.',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm2 !== ui.Button.YES) {
+    ui.alert('Cancelled', 'Nuclear operation cancelled.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    // Clear Member Directory (preserve header row)
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (memberSheet && memberSheet.getLastRow() > 1) {
+      memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, memberSheet.getLastColumn())
+        .clearContent()
+        .setBackground(null)
+        .clearNote();
+    }
+
+    // Clear Grievance Log (preserve header row)
+    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+      grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, grievanceSheet.getLastColumn())
+        .clearContent()
+        .setBackground(null)
+        .clearNote();
+    }
+
+    // Clear Config dropdown values (rows 3+, columns A-E typical dropdowns)
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet && configSheet.getLastRow() > 2) {
+      configSheet.getRange(3, 1, Math.max(1, configSheet.getLastRow() - 2), 5)
+        .clearContent();
+    }
+
+    // Enable Production Mode
+    PropertiesService.getScriptProperties().setProperty('PRODUCTION_MODE', 'true');
+
+    // Clear demo tracking
+    PropertiesService.getScriptProperties().deleteProperty('SEEDED_MEMBER_IDS');
+    PropertiesService.getScriptProperties().deleteProperty('SEEDED_GRIEVANCE_IDS');
+
+    // Log the action
+    logAuditEvent('NUCLEAR_WIPE', {
+      performedBy: Session.getActiveUser().getEmail(),
+      timestamp: new Date().toISOString()
+    });
+
+    ui.alert(
+      '✅ Nuclear Operation Complete',
+      'All data has been wiped.\n\n' +
+      'Production Mode has been enabled.\n' +
+      'The Demo Data menu will be hidden on reload.\n\n' +
+      'Please reload the spreadsheet to see changes.',
+      ui.ButtonSet.OK
+    );
+
+  } catch (e) {
+    ui.alert('Error', 'Nuclear operation failed: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+// ============================================================================
+// DIAGNOSTIC & REPAIR FUNCTIONS
+// ============================================================================
+
+/**
+ * Runs a comprehensive diagnostic check on the dashboard setup
+ */
+function DIAGNOSE_SETUP() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  var report = '🔍 509 COMMAND CENTER DIAGNOSTIC REPORT\n';
+  report += '=' .repeat(50) + '\n\n';
+
+  // Check required sheets
+  var requiredSheets = [
+    SHEETS.CONFIG,
+    SHEETS.MEMBER_DIR,
+    SHEETS.GRIEVANCE_LOG,
+    SHEETS.DASHBOARD,
+    SHEETS.INTERACTIVE
+  ];
+
+  report += '📋 SHEET STATUS:\n';
+  var allSheetsOK = true;
+
+  requiredSheets.forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      var rows = sheet.getLastRow();
+      report += '  ✅ ' + sheetName + ' (' + rows + ' rows)\n';
+    } else {
+      report += '  ❌ ' + sheetName + ' (MISSING)\n';
+      allSheetsOK = false;
+    }
+  });
+
+  // Check hidden calculation sheets
+  report += '\n📊 HIDDEN CALCULATION SHEETS:\n';
+  var hiddenSheets = ['_Dashboard_Calc', '_Grievance_Calc', '_Member_Lookup'];
+
+  hiddenSheets.forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (sheet) {
+      report += '  ✅ ' + sheetName + '\n';
+    } else {
+      report += '  ⚠️ ' + sheetName + ' (not found - may need rebuild)\n';
+    }
+  });
+
+  // Check configuration
+  report += '\n⚙️ CONFIGURATION:\n';
+  report += '  Production Mode: ' + (isProductionMode() ? 'ENABLED' : 'DISABLED') + '\n';
+
+  try {
+    var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID);
+    report += '  PDF Template: ' + (templateId ? '✅ Configured' : '⚠️ Not set') + '\n';
+  } catch (e) {
+    report += '  PDF Template: ⚠️ Unable to check\n';
+  }
+
+  try {
+    var archiveId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID);
+    report += '  Archive Folder: ' + (archiveId ? '✅ Configured' : '⚠️ Not set') + '\n';
+  } catch (e) {
+    report += '  Archive Folder: ⚠️ Unable to check\n';
+  }
+
+  try {
+    var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
+    report += '  Chief Steward Email: ' + (chiefEmail ? '✅ ' + chiefEmail : '⚠️ Not set') + '\n';
+  } catch (e) {
+    report += '  Chief Steward Email: ⚠️ Unable to check\n';
+  }
+
+  // Check triggers
+  report += '\n⏰ TRIGGERS:\n';
+  var triggers = ScriptApp.getProjectTriggers();
+  if (triggers.length === 0) {
+    report += '  ⚠️ No triggers installed\n';
+  } else {
+    triggers.forEach(function(trigger) {
+      report += '  ✅ ' + trigger.getHandlerFunction() + ' (' + trigger.getEventType() + ')\n';
+    });
+  }
+
+  // Summary
+  report += '\n' + '=' .repeat(50) + '\n';
+  report += allSheetsOK ? '✅ All required sheets present\n' : '❌ Some sheets are missing\n';
+  report += '\nRun REPAIR_DASHBOARD() to fix issues.\n';
+
+  ui.alert('Diagnostic Results', report, ui.ButtonSet.OK);
+
+  return {
+    allSheetsOK: allSheetsOK,
+    report: report
+  };
+}
+
+/**
+ * Repairs the dashboard by rebuilding missing components
+ */
+function REPAIR_DASHBOARD() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var response = ui.alert(
+    '🛠️ Repair Dashboard',
+    'This will:\n\n' +
+    '• Rebuild missing hidden calculation sheets\n' +
+    '• Repair broken formulas\n' +
+    '• Refresh all visual styling\n\n' +
+    'Continue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  ss.toast('Starting repair...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  var repairLog = [];
+
+  try {
+    // Rebuild hidden sheets if missing
+    if (typeof setupAllHiddenSheets === 'function') {
+      var result = setupAllHiddenSheets();
+      repairLog.push('Hidden sheets: ' + (result.created || 0) + ' created');
+    }
+  } catch (e) {
+    repairLog.push('Hidden sheets: Error - ' + e.message);
+  }
+
+  try {
+    // Apply theme
+    APPLY_SYSTEM_THEME();
+    repairLog.push('Theme: Applied successfully');
+  } catch (e) {
+    repairLog.push('Theme: Error - ' + e.message);
+  }
+
+  try {
+    // Apply traffic lights
+    applyTrafficLightIndicators();
+    repairLog.push('Traffic lights: Applied successfully');
+  } catch (e) {
+    repairLog.push('Traffic lights: Error - ' + e.message);
+  }
+
+  try {
+    // Sync member data
+    if (typeof syncMemberGrievanceData === 'function') {
+      syncMemberGrievanceData();
+      repairLog.push('Member sync: Completed');
+    }
+  } catch (e) {
+    repairLog.push('Member sync: Error - ' + e.message);
+  }
+
+  // Log the repair
+  logAuditEvent('DASHBOARD_REPAIR', {
+    performedBy: Session.getActiveUser().getEmail(),
+    results: repairLog
+  });
+
+  ui.alert(
+    '🛠️ Repair Complete',
+    'Repair Results:\n\n' + repairLog.join('\n'),
+    ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Syncs grievance deadlines to Google Calendar
+ */
+function syncToCalendar() {
+  var ui = SpreadsheetApp.getUi();
+
+  var response = ui.alert(
+    '📅 Sync to Calendar',
+    'This will sync all open grievance deadlines to your Google Calendar.\n\n' +
+    'Continue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  try {
+    var result = syncDeadlinesToCalendar();
+
+    if (result.success) {
+      ui.alert(
+        '✅ Calendar Sync Complete',
+        'Synced ' + result.synced + ' grievances to calendar.\n' +
+        'Skipped ' + result.skipped + ' (no applicable deadlines).',
+        ui.ButtonSet.OK
+      );
+    } else {
+      ui.alert('Error', 'Sync failed: ' + result.error, ui.ButtonSet.OK);
+    }
+  } catch (e) {
+    ui.alert('Error', 'Calendar sync failed: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+// ============================================================================
+// BATCH PROCESSING WRAPPERS
+// ============================================================================
+
+/**
+ * Batch update member (wrapper for updateMemberDataBatch)
+ * @param {string} memberId - Member ID
+ * @param {Object} updateObj - Fields to update
+ */
+function updateMemberBatch(memberId, updateObj) {
+  return updateMemberDataBatch(memberId, updateObj);
+}
+
+// ============================================================================
+// QUICK ACTION FUNCTIONS
+// ============================================================================
+
+/**
+ * Shows quick member search dialog
+ */
+function showSearchDialog() {
+  var html = HtmlService.createHtmlOutput(getSearchDialogHtml_())
+    .setWidth(500)
+    .setHeight(400);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '🔍 Member Search');
+}
+
+/**
+ * Generates HTML for search dialog
+ * @private
+ */
+function getSearchDialogHtml_() {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: 'Google Sans', 'Roboto', sans-serif;
+          padding: 20px;
+          background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+          min-height: 100%;
+          color: #F8FAFC;
+        }
+        .search-container { margin-bottom: 20px; }
+        .search-input {
+          width: 100%;
+          padding: 12px 15px;
+          font-size: 16px;
+          border: 2px solid #334155;
+          border-radius: 8px;
+          background: #1E293B;
+          color: #F8FAFC;
+          outline: none;
+        }
+        .search-input:focus { border-color: #7C3AED; }
+        .search-input::placeholder { color: #64748B; }
+        .btn {
+          padding: 10px 20px;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          margin-right: 8px;
+          transition: all 0.2s;
+        }
+        .btn-primary {
+          background: linear-gradient(135deg, #7C3AED, #5B21B6);
+          color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(124,58,237,0.4); }
+        .btn-secondary {
+          background: #334155;
+          color: #F8FAFC;
+        }
+        .results {
+          margin-top: 20px;
+          max-height: 250px;
+          overflow-y: auto;
+          background: rgba(255,255,255,0.05);
+          border-radius: 8px;
+          padding: 10px;
+        }
+        .result-item {
+          padding: 10px;
+          border-bottom: 1px solid #334155;
+          cursor: pointer;
+        }
+        .result-item:hover { background: rgba(124,58,237,0.2); }
+        .result-item:last-child { border-bottom: none; }
+        .no-results { text-align: center; color: #64748B; padding: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="search-container">
+        <input type="text" class="search-input" id="searchQuery"
+               placeholder="Search by name, ID, or email..." autofocus>
+      </div>
+      <div>
+        <button class="btn btn-primary" onclick="doSearch()">🔍 Search</button>
+        <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>
+      </div>
+      <div class="results" id="results">
+        <div class="no-results">Enter a search term and click Search</div>
+      </div>
+
+      <script>
+        document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') doSearch();
+        });
+
+        function doSearch() {
+          var query = document.getElementById('searchQuery').value.trim();
+          if (!query) {
+            document.getElementById('results').innerHTML = '<div class="no-results">Please enter a search term</div>';
+            return;
+          }
+
+          document.getElementById('results').innerHTML = '<div class="no-results">Searching...</div>';
+
+          google.script.run
+            .withSuccessHandler(function(results) {
+              displayResults(results);
+            })
+            .withFailureHandler(function(e) {
+              document.getElementById('results').innerHTML = '<div class="no-results">Error: ' + e.message + '</div>';
+            })
+            .searchMembers(query);
+        }
+
+        function displayResults(results) {
+          var container = document.getElementById('results');
+
+          if (!results || results.length === 0) {
+            container.innerHTML = '<div class="no-results">No members found</div>';
+            return;
+          }
+
+          var html = '';
+          results.forEach(function(member) {
+            var name = (member['First Name'] || '') + ' ' + (member['Last Name'] || '');
+            var id = member['Member ID'] || 'N/A';
+            var email = member['Email'] || '';
+            html += '<div class="result-item" onclick="selectMember(\\'' + id + '\\')">';
+            html += '<strong>' + name + '</strong> (' + id + ')';
+            if (email) html += '<br><small>' + email + '</small>';
+            html += '</div>';
+          });
+
+          container.innerHTML = html;
+        }
+
+        function selectMember(memberId) {
+          google.script.run.navigateToMember(memberId);
+          google.script.host.close();
+        }
+      </script>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Navigates to a specific member row in Member Directory
+ * @param {string} memberId - The member ID to find
+ */
+function navigateToMember(memberId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory not found');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+      sheet.activate();
+      sheet.setActiveRange(sheet.getRange(i + 1, 1));
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Found: ' + memberId,
+        COMMAND_CONFIG.SYSTEM_NAME,
+        3
+      );
+      return;
+    }
+  }
+
+  SpreadsheetApp.getUi().alert('Member not found: ' + memberId);
+}
+
+
+// ============================================================================
+// SOURCE: 09_Main.gs (1094 lines)
 // ============================================================================
 
 /**
@@ -27648,6 +29333,7 @@ function onEdit(e) {
 /**
  * Handles security audit logging for change tracking
  * Logs all edits to the Audit Log sheet for accountability
+ * Includes sabotage protection for mass deletions (>15 cells)
  * @param {Object} e - The edit event object
  * @private
  */
@@ -27659,8 +29345,8 @@ function handleSecurityAudit_(e) {
     if (!auditSheet) {
       // Create audit log sheet if it doesn't exist
       auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-      auditSheet.getRange('A1:E1').setValues([['Timestamp', 'User', 'Cell', 'Old Value', 'New Value']]);
-      auditSheet.getRange('A1:E1').setFontWeight('bold').setBackground(COLORS.CARD_DARK_BG).setFontColor(COLORS.CARD_DARK_TEXT);
+      auditSheet.getRange('A1:F1').setValues([['Timestamp', 'User', 'Cell', 'Old Value', 'New Value', 'Alert']]);
+      auditSheet.getRange('A1:F1').setFontWeight('bold').setBackground(COLORS.CARD_DARK_BG).setFontColor(COLORS.CARD_DARK_TEXT);
       auditSheet.hideSheet();
     }
 
@@ -27671,13 +29357,60 @@ function handleSecurityAudit_(e) {
       userEmail = 'Auth Required';
     }
 
+    var range = e.range;
+    var numCells = range.getNumColumns() * range.getNumRows();
+    var alertMessage = '';
+
+    // SABOTAGE PROTECTION: Detect mass deletions (>15 cells cleared)
+    if (e.oldValue && !e.value && numCells > 15) {
+      alertMessage = 'MASS_DELETION_ALERT';
+
+      // Send alert to Chief Steward
+      var chiefEmail = '';
+      try {
+        chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
+      } catch (configError) {
+        // Config not available
+      }
+
+      if (chiefEmail) {
+        try {
+          MailApp.sendEmail({
+            to: chiefEmail,
+            subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' SABOTAGE ALERT',
+            body: 'Mass deletion detected in ' + COMMAND_CONFIG.SYSTEM_NAME + '.\n\n' +
+                  'User: ' + userEmail + '\n' +
+                  'Sheet: ' + range.getSheet().getName() + '\n' +
+                  'Range: ' + range.getA1Notation() + '\n' +
+                  'Cells Affected: ' + numCells + '\n' +
+                  'Time: ' + new Date().toLocaleString() + '\n\n' +
+                  'Please review immediately.' +
+                  COMMAND_CONFIG.EMAIL.FOOTER
+          });
+        } catch (emailError) {
+          Logger.log('Failed to send sabotage alert: ' + emailError.message);
+        }
+      }
+
+      // Log to console for visibility
+      Logger.log('SABOTAGE ALERT: Mass deletion by ' + userEmail + ' in ' +
+                 range.getSheet().getName() + ' (' + numCells + ' cells)');
+    }
+
+    // Detect large-scale changes (not necessarily malicious but notable)
+    if (numCells > 50) {
+      alertMessage = alertMessage || 'LARGE_CHANGE';
+    }
+
     auditSheet.appendRow([
       new Date(),
       userEmail,
-      e.range.getA1Notation() + ' (' + e.range.getSheet().getName() + ')',
+      range.getA1Notation() + ' (' + range.getSheet().getName() + ')',
       e.oldValue || '(empty)',
-      e.value || '(deleted)'
+      e.value || '(deleted)',
+      alertMessage
     ]);
+
   } catch (auditError) {
     // Silently fail - don't break user's edit for audit logging
     console.log('Audit log error: ' + auditError.message);
