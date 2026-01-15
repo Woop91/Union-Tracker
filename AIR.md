@@ -166,7 +166,7 @@ npm run watch        # Watch mode for development
 
 ### File Descriptions (10-File Architecture)
 
-**01_Constants.gs** (~800 lines) - Configuration & Column Mapping
+**01_Constants.gs** (~1070 lines) - Configuration & Column Mapping
 - `SHEETS` - Sheet name constants (3 data + 2 dashboard + 6 hidden)
 - `COLORS` - Brand color scheme
 - `MEMBER_COLS` - 31 Member Directory column positions
@@ -201,7 +201,7 @@ npm run watch        # Watch mode for development
 - `getMemberHeaders()` - Get all 31 member column headers
 - `getGrievanceHeaders()` - Get all 34 grievance column headers
 
-**02_MemberManager.gs** (~680 lines) - Member Directory Operations
+**02_MemberManager.gs** (~655 lines) - Member Directory Operations
 - Member CRUD Operations:
   - `addMember()` - Add new member to directory
   - `updateMember()` - Update existing member data
@@ -224,7 +224,7 @@ npm run watch        # Watch mode for development
 - Data Sync:
   - `syncMemberGrievanceData()` - Sync grievance counts to Member Directory
 
-**03_GrievanceManager.gs** (~1163 lines) - Grievance Lifecycle Management
+**03_GrievanceManager.gs** (~1162 lines) - Grievance Lifecycle Management
 - `startNewGrievance()` - Open pre-filled grievance form
 - `advanceGrievanceStep()` - Advance grievance to next step
 - `recalcAllGrievancesBatched()` - Batch recalculate grievance deadlines
@@ -238,7 +238,7 @@ npm run watch        # Watch mode for development
 - `bulkUpdateGrievanceStatus()` - Bulk update grievance statuses
 - `resolveGrievance()` - Close grievance with outcome
 
-**04_UIService.gs** (~4709 lines) - UI, Mobile, Comfort View & Strategic Command Center
+**04_UIService.gs** (~6432 lines) - UI, Mobile, Comfort View & Strategic Command Center
 *Consolidated from: UIService, ComfortViewFeatures, MobileQuickActions, StrategicCommandCenter*
 
 - UI Components & Dialogs:
@@ -311,7 +311,7 @@ npm run watch        # Watch mode for development
   - `setupMidnightTrigger()`, `removeMidnightTrigger()` - Daily refresh automation
   - `midnightAutoRefresh()` - 12AM dashboard refresh + overdue alerts
 
-**05_Integrations.gs** (~1408 lines) - External Services & WebApp
+**05_Integrations.gs** (~2008 lines) - External Services & WebApp
 *Consolidated from: Integrations, WebApp*
 
 - Google Drive Integration:
@@ -338,7 +338,7 @@ npm run watch        # Watch mode for development
   - `getWebAppLinksHtml()` - Forms and resources links page
   - `showWebAppUrl()` - Display web app URL after deployment
 
-**06_Maintenance.gs** (~2652 lines) - Admin Tools, Diagnostics, Caching & Validation
+**06_Maintenance.gs** (~3145 lines) - Admin Tools, Diagnostics, Caching & Validation
 *Consolidated from: Maintenance, PerformanceUndo, DataIntegrity, TestingValidation*
 
 - Diagnostics & Repair:
@@ -493,7 +493,7 @@ npm run watch        # Watch mode for development
 - Menu Integration:
   - `createCommandCenterMenu()` - Create 509 Command menu items
 
-**09_Main.gs** (~956 lines) - Entry Point & Triggers
+**09_Main.gs** (~1093 lines) - Entry Point & Triggers
 - Menu System:
   - `onOpen()` - Create 6 menus (509 Dashboard, Grievances, View, Settings, Admin, 509 Command)
 - Edit Handlers:
