@@ -4,23 +4,31 @@
  * Single source of truth for all configuration constants.
  * This file must be loaded first in the build order.
  *
- * @version 3.6.0
+ * @version 4.0.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
 // ============================================================================
-// STRATEGIC COMMAND CENTER CONFIG (v3.6.0)
+// STRATEGIC COMMAND CENTER CONFIG (v4.0)
 // ============================================================================
 
 /**
  * Strategic Command Center configuration
  * Controls system-wide settings for the 509 Dashboard
+ *
+ * v4.0 UNIFIED MASTER ENGINE FEATURES:
+ * - Security: Audit Log & Sabotage Protection (>15 cells)
+ * - Performance: Batch Array Processing (No-Lag Architecture)
+ * - Workflow: Stage-Gate Case Tracking & Auto-PDF Generation
+ * - Production: Nuke/Seed Isolation & UI Self-Hiding
+ * - Accessibility: Mobile/Pocket View & Search Engine
+ *
  * @const {Object}
  */
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "3.6.0",
+  VERSION: "4.0.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -80,11 +88,11 @@ var COMMAND_CONFIG = {
  * @const {Object}
  */
 var VERSION_INFO = {
-  MAJOR: 2,
-  MINOR: 3,
+  MAJOR: 4,
+  MINOR: 0,
   PATCH: 0,
-  BUILD: 'v3.50',
-  CODENAME: 'Enhanced Grievance Dashboard'
+  BUILD: 'v4.0.0',
+  CODENAME: 'Unified Master Engine'
 };
 
 // ============================================================================
