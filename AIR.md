@@ -372,13 +372,13 @@ npm run watch        # Watch mode for development
 - Menu Integration:
   - `addDataIntegrityMenuItems()` - Adds "🛡️ Data Integrity" menu
 
-**ComfortViewFeatures.gs** (~400 lines) - Comfort View Accessibility & Theming
-- `showADHDControlPanel()` - Main Comfort View settings panel
-- `getADHDSettings()`, `saveADHDSettings()`, `resetADHDSettings()` - Settings management
-- `applyADHDSettings()` - Apply visual settings
+**04_UIService.gs** - Comfort View Accessibility & Theming (integrated)
+- `showComfortViewPanel()` - Main Comfort View settings panel
+- `getComfortViewSettings()`, `saveComfortViewSettings()`, `resetComfortViewSettings()` - Settings management
+- `applyComfortViewSettings()` - Apply visual settings
 - `activateFocusMode()`, `deactivateFocusMode()` - Focus mode (hide non-essential sheets)
 - `toggleZebraStripes()`, `applyZebraStripes()`, `removeZebraStripes()` - Row banding
-- `toggleGridlinesADHD()`, `hideAllGridlines()`, `showAllGridlines()` - Gridline control
+- `toggleGridlines()`, `hideAllGridlines()`, `showAllGridlines()` - Gridline control
 - `toggleReducedMotion()` - Animation preferences
 - `showQuickCaptureNotepad()` - Quick note-taking dialog
 - `startPomodoroTimer()` - Built-in pomodoro timer
@@ -386,7 +386,7 @@ npm run watch        # Watch mode for development
 - `showThemeManager()` - Theme selection UI
 - `applyTheme()`, `applyThemeToSheet()`, `previewTheme()` - Theme application
 - `getCurrentTheme()`, `resetToDefaultTheme()`, `quickToggleDarkMode()` - Theme utilities
-- `setupADHDDefaults()` - Initialize Comfort View defaults
+- `setupComfortViewDefaults()` - Initialize Comfort View defaults
 
 **TestingValidation.gs** (~474 lines) - Testing Framework & Data Validation
 - Testing Framework:

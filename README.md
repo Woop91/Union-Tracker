@@ -4,50 +4,34 @@ A comprehensive Google Sheets-based dashboard for managing union grievances, mem
 
 ## Architecture Overview
 
-The dashboard has been refactored from a single monolithic file into seventeen specialized modules:
+The dashboard uses a streamlined 9-file architecture for clarity and maintainability:
 
 ```
 src/
-├── Constants.gs              # Single source of truth for configuration
-├── PerformanceUndo.gs        # Caching system and undo/redo functionality
-├── ComfortViewFeatures.gs    # ADHD/accessibility, themes, focus mode
-├── HiddenSheets.gs           # Hidden sheet management
-├── FormulaService.gs         # Hidden sheet and formula logic
-├── UIService.gs              # Dialogs, sidebars, and UI components
-├── GrievanceManager.gs       # Grievance lifecycle management
-├── Integrations.gs           # Drive, Calendar, and email services
-├── DataIntegrity.gs          # Batch operations, validation, archiving
-├── Maintenance.gs            # Admin tools and diagnostics
-├── MobileQuickActions.gs     # Quick actions, mobile UI
-├── WebApp.gs                 # Web application deployment
-├── TestingValidation.gs      # Test suites and validation
-├── DeveloperTools.gs         # Developer utilities
-├── StrategicCommandCenter.gs # Executive dashboards, automation (v3.6.0)
-├── Code.gs                   # Core setup, forms, dashboard creation
-└── Main.gs                   # Entry point and triggers
+├── 01_Constants.gs        # Single source of truth for configuration
+├── 02_MemberManager.gs    # Member operations and directory management
+├── 03_GrievanceManager.gs # Grievance lifecycle and deadline tracking
+├── 04_UIService.gs        # UI, Comfort View, mobile, Strategic Command Center
+├── 05_Integrations.gs     # Drive, Calendar, WebApp integration
+├── 06_Maintenance.gs      # Diagnostics, caching, performance
+├── 07_DevTools.gs         # Test data generation (DELETE BEFORE PROD)
+├── 08_Code.gs             # Core setup, hidden sheets, dashboard creation
+└── 09_Main.gs             # Entry point and triggers
 ```
 
 ### Module Descriptions
 
 | Module | Purpose | Key Functions |
 |--------|---------|---------------|
-| **Constants.gs** | Configuration constants, sheet names, column mappings, deadline rules | `SHEET_NAMES`, `DEADLINE_RULES`, `GRIEVANCE_STATUS`, `MEMBER_COLS`, `GRIEVANCE_COLS` |
-| **PerformanceUndo.gs** | CacheService performance optimization, undo/redo with 50 action history | `getCachedData`, `setCachedData`, `undoLastAction`, `redoAction` |
-| **ComfortViewFeatures.gs** | ADHD/accessibility features, themes, focus mode, pomodoro timer | `setTheme`, `toggleFocusMode`, `startPomodoroTimer`, `enableHighContrast` |
-| **HiddenSheets.gs** | Hidden sheet management, auto-sync, data quality | `setupAllHiddenSheets`, `repairAllHiddenSheets`, `verifyHiddenSheets`, `syncGrievanceToMemberDirectory` |
-| **FormulaService.gs** | Hidden calculation sheet setup, search functions | `setupCalcMembersSheet`, `searchDashboard`, `getDashboardStats`, `advancedSearch` |
-| **UIService.gs** | Dialogs, sidebars, and UI components | `showDesktopSearch`, `showMultiSelectDialog`, `showDashboardSidebar`, `showAdvancedSearch` |
-| **GrievanceManager.gs** | Grievance creation, step advancement, deadline calculations | `startNewGrievance`, `advanceGrievanceStep`, `recalcAllGrievancesBatched` |
-| **Integrations.gs** | External service connections | `setupDriveFolderForGrievance`, `syncDeadlinesToCalendar`, `clearAllCalendarEvents` |
-| **DataIntegrity.gs** | Batch operations, validation, orphan detection, auto-archive | `batchUpdateWithRetry`, `detectOrphanedRecords`, `autoArchiveOldRecords`, `validateDataIntegrity` |
-| **Maintenance.gs** | Administrative and diagnostic tools | `DIAGNOSE_SETUP`, `REPAIR_DASHBOARD`, `logAuditEvent`, `showDiagnosticsDialog` |
-| **MobileQuickActions.gs** | Quick action dialogs, mobile-optimized UI | `showQuickActionsMenu`, `showQuickActions`, `handleQuickAction`, `getMobileMenu` |
-| **WebApp.gs** | Web application deployment and endpoints | `doGet`, `doPost`, `getWebInterface` |
-| **TestingValidation.gs** | Automated test suites and validation | `runAllTests`, `validateSheetStructure`, `runPerformanceTests` |
-| **DeveloperTools.gs** | Developer utilities and debugging | `logDebug`, `exportConfig`, `showDeveloperPanel` |
-| **Code.gs** | Core setup, forms, dashboard creation, multi-select | `CREATE_509_DASHBOARD`, `createConfigSheet`, `createMemberDirectory`, `createGrievanceLog` |
-| **Main.gs** | Entry point, triggers, initialization | `onOpen`, `onEdit`, `initializeDashboard` |
-| **StrategicCommandCenter.gs** | Executive dashboards, strategic analytics, automation | `rebuildExecutiveDashboard`, `rebuildMemberAnalytics`, `midnightAutoRefresh` |
+| **01_Constants.gs** | Configuration constants, sheet names, column mappings, deadline rules | `SHEETS`, `MEMBER_COLS`, `GRIEVANCE_COLS`, `CONFIG_COLS`, `COMMAND_CONFIG` |
+| **02_MemberManager.gs** | Member directory operations, steward management, ID generation | `addMember`, `promoteToSteward`, `generateMissingMemberIDs`, `checkDuplicateMemberIDs` |
+| **03_GrievanceManager.gs** | Grievance creation, step advancement, deadline calculations | `startNewGrievance`, `advanceGrievanceStep`, `recalcAllGrievancesBatched` |
+| **04_UIService.gs** | Dialogs, Comfort View, mobile UI, Strategic Command Center dashboards | `showDesktopSearch`, `rebuildExecutiveDashboard`, `rebuildMemberAnalytics`, `setupMidnightTrigger` |
+| **05_Integrations.gs** | External service connections (Drive, Calendar, WebApp) | `setupDriveFolderForGrievance`, `syncDeadlinesToCalendar`, `doGet`, `doPost` |
+| **06_Maintenance.gs** | Admin tools, diagnostics, caching, performance optimization | `DIAGNOSE_SETUP`, `REPAIR_DASHBOARD`, `getCachedData`, `warmUpCaches` |
+| **07_DevTools.gs** | Test data generation and demo utilities (remove before production) | `seedAllSampleData`, `nukeDemoData`, `showDeveloperPanel` |
+| **08_Code.gs** | Core setup, hidden sheet management, dashboard creation | `CREATE_509_DASHBOARD`, `setupAllHiddenSheets`, `createConfigSheet` |
+| **09_Main.gs** | Entry point, triggers, edit handlers | `onOpen`, `onEdit`, `initializeDashboard` |
 
 ## Benefits of Modular Architecture
 
@@ -160,7 +144,7 @@ dist/
 - Batch operations with retry logic
 
 ### Accessibility (Comfort View)
-- ADHD-friendly themes and focus mode
+- Focus-friendly themes and distraction-free mode
 - Pomodoro timer integration
 - High contrast and reduced motion options
 - Customizable color themes
