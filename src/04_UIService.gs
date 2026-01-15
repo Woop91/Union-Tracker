@@ -1911,9 +1911,11 @@ function getMobileDashboardStats() {
   data.forEach(function(row) {
     var status = row[GRIEVANCE_COLS.STATUS - 1];
     var daysTo = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    if (status && status !== 'Resolved' && status !== 'Withdrawn') stats.activeGrievances++;
+    var isActive = status && status !== 'Resolved' && status !== 'Withdrawn' && status !== 'Closed';
+    if (isActive) stats.activeGrievances++;
     if (status === 'Pending Info') stats.pendingGrievances++;
-    if (daysTo !== null && daysTo !== '' && daysTo < 0 && status === 'Open') stats.overdueGrievances++;
+    // Count overdue for ANY active case (Open, Pending Info, etc.), not just 'Open'
+    if (daysTo !== null && daysTo !== '' && daysTo < 0 && isActive) stats.overdueGrievances++;
   });
   return stats;
 }
