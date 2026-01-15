@@ -34,7 +34,7 @@
  *
  * Then run: node build.js
  *
- * Generated: 2026-01-15T13:56:21.639Z
+ * Generated: 2026-01-15T14:04:31.543Z
  * Version: 4.0.0
  * Architecture: 10-File Modular (Unified Master Engine)
  * Status: Production Ready / Harmonized / High-Performance
@@ -28620,7 +28620,7 @@ function advancedSearch(filters) {
 
 
 // ============================================================================
-// SOURCE: 10_CommandCenter.gs (971 lines)
+// SOURCE: 10_CommandCenter.gs (1490 lines)
 // ============================================================================
 
 /**
@@ -28736,6 +28736,15 @@ function createCommandCenterMenu() {
       .addItem('🎨 Apply Global Theme', 'APPLY_SYSTEM_THEME')
       .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
       .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'));
+
+  menu.addSeparator();
+
+  // v4.0 Analytics & Scaling submenu
+  menu.addSubMenu(ui.createMenu('📈 Analytics & Insights')
+      .addItem('🏥 Unit Health Report', 'showUnitHealthReport')
+      .addItem('📊 Grievance Trends', 'showGrievanceTrends')
+      .addSeparator()
+      .addItem('📝 OCR Transcribe Form', 'showOCRDialog'));
 
   // v4.0 PRODUCTION MODE: Demo Data menu disappears after NUKE
   if (!isProductionMode()) {
@@ -29592,6 +29601,516 @@ function navigateToMember(memberId) {
   }
 
   SpreadsheetApp.getUi().alert('Member not found: ' + memberId);
+}
+
+// ============================================================================
+// GEMINI v4.0 UNIFIED MASTER ENGINE - LEGACY CONFIG MAPPING
+// ============================================================================
+
+/**
+ * Gemini v4.0 Legacy CONFIG Object
+ * Maps emoji-prefixed sheet names for backwards compatibility with
+ * standalone single-file deployments.
+ *
+ * This CONFIG mirrors the Gemini v4.0 unified architecture while
+ * maintaining compatibility with the modular SHEETS/COMMAND_CONFIG constants.
+ */
+var GEMINI_CONFIG = {
+  SYSTEM_NAME: "509 Strategic Command Center",
+  // Legacy emoji-prefixed sheet names (for standalone deployments)
+  LOG_SHEET_NAME: "📋 Grievance Log",
+  DIR_SHEET_NAME: "👤 Member Directory",
+  AUDIT_SHEET_NAME: "🛡️ Audit Log",
+  CONFIG_SHEET_NAME: "⚙️ Config",
+  DASHBOARD_NAME: "📊 Dashboard",
+  MOBILE_VIEW_NAME: "📱 Mobile View",
+  // These are read from Config sheet in modular build
+  TEMPLATE_ID: '',
+  ARCHIVE_FOLDER_ID: '',
+  CHIEF_STEWARD_EMAIL: '',
+  // Default unit codes (can be overridden in Config sheet)
+  UNIT_CODES: { "Main Station": "MS", "Field Ops": "FO", "Health": "HC" },
+  THEME: {
+    HEADER_BG: '#1e293b',
+    HEADER_TEXT: '#ffffff',
+    ALT_ROW: '#f8fafc',
+    FONT: 'Roboto'
+  },
+  // Production mode check
+  get PRODUCTION_MODE() {
+    return PropertiesService.getScriptProperties().getProperty('PRODUCTION_MODE') === 'true';
+  }
+};
+
+// ============================================================================
+// GEMINI v4.0 LEGAL & PDF SIGNATURE ENGINE
+// ============================================================================
+
+/**
+ * Gemini v4.0 Form Submission Handler
+ * Triggered when a grievance form is submitted.
+ * Creates member folder and signature-ready PDF automatically.
+ *
+ * @param {Object} e - Form submission event object
+ */
+function onGrievanceFormSubmit(e) {
+  try {
+    var responses = e.namedValues;
+    var data = {
+      name: responses['Member Name'] ? responses['Member Name'][0] : "Unknown",
+      id: responses['Member ID'] ? responses['Member ID'][0] : "000",
+      details: responses['Details'] ? responses['Details'][0] : "No details provided."
+    };
+
+    // Get or create member-specific folder
+    var memberFolder = getOrCreateMemberFolder(data.name, data.id);
+
+    // Create signature-ready PDF
+    var pdfFile = createGrievancePDF(memberFolder, data);
+
+    // Log PDF URL to Grievance Log
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var logSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) ||
+                   ss.getSheetByName(GEMINI_CONFIG.LOG_SHEET_NAME);
+
+    if (logSheet && logSheet.getLastRow() > 1) {
+      // Update Drive Folder URL column
+      logSheet.getRange(logSheet.getLastRow(), GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+    }
+
+    // Log the action
+    logAuditEvent('GRIEVANCE_PDF_CREATED', {
+      memberId: data.id,
+      memberName: data.name,
+      pdfUrl: pdfFile.getUrl()
+    });
+
+  } catch (error) {
+    console.error('Form submission error: ' + error.message);
+    logAuditEvent('FORM_SUBMISSION_ERROR', { error: error.message });
+  }
+}
+
+/**
+ * Gemini v4.0 Signature-Ready PDF Generator
+ * Creates a PDF from template with signature blocks for legal filing.
+ *
+ * @param {Folder} folder - Google Drive folder for the member
+ * @param {Object} data - Grievance data object
+ * @returns {File} The generated PDF file
+ */
+function createGrievancePDF(folder, data) {
+  // Get template ID from Config or COMMAND_CONFIG
+  var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID) || COMMAND_CONFIG.TEMPLATE_ID;
+
+  if (!templateId) {
+    throw new Error('PDF Template ID not configured. Set it in Config sheet column AX.');
+  }
+
+  // Make a copy of the template
+  var temp = DriveApp.getFileById(templateId).makeCopy('SIGN_REQ_' + data.name, folder);
+  var doc = DocumentApp.openById(temp.getId());
+  var body = doc.getBody();
+
+  // Replace placeholders with data
+  body.replaceText('{{MemberName}}', data.name);
+  body.replaceText('{{MemberID}}', data.id);
+  body.replaceText('{{Date}}', new Date().toLocaleDateString());
+  body.replaceText('{{Details}}', data.details);
+
+  // Add signature blocks
+  body.appendParagraph('\n\n' + COMMAND_CONFIG.PDF.SIGNATURE_BLOCK);
+
+  doc.saveAndClose();
+
+  // Convert to PDF
+  var pdf = folder.createFile(temp.getAs(MimeType.PDF))
+                  .setName('Grievance_UNSIGNED_' + data.name + '_' + new Date().toISOString().split('T')[0] + '.pdf');
+
+  // Trash the temporary doc copy
+  temp.setTrashed(true);
+
+  return pdf;
+}
+
+/**
+ * Gemini v4.0 Member Folder Creator
+ * Gets existing folder or creates new one for member documents.
+ *
+ * @param {string} name - Member name
+ * @param {string} id - Member ID
+ * @returns {Folder} Google Drive folder for the member
+ */
+function getOrCreateMemberFolder(name, id) {
+  // Get archive folder ID from Config
+  var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) ||
+                        getConfigValue_(CONFIG_COLS.DRIVE_FOLDER_ID) ||
+                        COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
+
+  if (!archiveFolderId) {
+    throw new Error('Archive Folder ID not configured. Set it in Config sheet.');
+  }
+
+  var parent = DriveApp.getFolderById(archiveFolderId);
+  var folderName = name + ' (' + id + ')';
+
+  // Check if folder already exists
+  var iter = parent.getFoldersByName(folderName);
+  if (iter.hasNext()) {
+    return iter.next();
+  }
+
+  // Create new folder
+  return parent.createFolder(folderName);
+}
+
+/**
+ * Gemini v4.0 Enhanced Escalation Alert
+ * Sends formatted escalation email to Chief Steward.
+ *
+ * @param {string} member - Member name
+ * @param {string} caseID - Grievance case ID
+ * @param {string} status - New status/step
+ */
+function sendGeminiEscalationAlert(member, caseID, status) {
+  var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL) ||
+                   COMMAND_CONFIG.CHIEF_STEWARD_EMAIL;
+
+  if (!chiefEmail) {
+    console.log('Chief Steward email not configured - skipping escalation alert');
+    return;
+  }
+
+  try {
+    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' 🚨 Escalation: ' + caseID;
+    var body = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n' +
+               '🚨 GRIEVANCE ESCALATION ALERT\n' +
+               '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+               'Case ID: ' + caseID + '\n' +
+               'Member: ' + member + '\n' +
+               'New Status: ' + status + '\n' +
+               'Timestamp: ' + new Date().toLocaleString() + '\n\n' +
+               'IMMEDIATE ACTION REQUIRED\n' +
+               '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' +
+               COMMAND_CONFIG.EMAIL.FOOTER;
+
+    MailApp.sendEmail(chiefEmail, subject, body);
+
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      '🚨 Escalation alert sent for ' + caseID,
+      COMMAND_CONFIG.SYSTEM_NAME,
+      3
+    );
+  } catch (e) {
+    console.error('Escalation email error: ' + e.message);
+  }
+}
+
+// ============================================================================
+// GEMINI v4.0 SCALING MODULES - OCR & SENTIMENT HOOKS
+// ============================================================================
+
+/**
+ * EXTENSION: CLOUD VISION OCR HOOK
+ * Prepares the system for future Google Cloud Vision integration.
+ * Requires: Enabling 'Cloud Vision API' in Google Cloud Console.
+ *
+ * @param {string} fileId - Google Drive file ID of the image to transcribe
+ * @returns {Object} Status object with transcription placeholder
+ */
+function transcribeHandwrittenForm(fileId) {
+  try {
+    var file = DriveApp.getFileById(fileId);
+    var imageBlob = file.getBlob();
+
+    // PLACEHOLDER: Call to Google Cloud Vision API would happen here
+    // Once Cloud Vision is enabled, this will parse handwritten text
+    // and auto-populate the Grievance Log
+
+    console.log('OCR Engine: Prepared to parse image ID ' + fileId);
+    console.log('File Name: ' + file.getName());
+    console.log('MIME Type: ' + imageBlob.getContentType());
+
+    return {
+      status: 'READY',
+      message: 'OCR Hook prepared. Enable Cloud Vision API to activate transcription.',
+      fileId: fileId,
+      fileName: file.getName()
+    };
+
+  } catch (e) {
+    console.error('OCR Hook error: ' + e.message);
+    return {
+      status: 'ERROR',
+      message: e.message
+    };
+  }
+}
+
+/**
+ * EXTENSION: SENTIMENT CORRELATION HOOK
+ * Compares grievance activity to survey results for unit health analysis.
+ * Flags units with high dissatisfaction but low representation.
+ *
+ * @param {string} unitName - The unit to analyze
+ * @returns {Object} Unit health analysis result
+ */
+function calculateUnitHealth(unitName) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Count grievances for this unit
+  var grievanceCount = getGrievanceCountForUnit(unitName);
+
+  // Get recent survey average (placeholder - connect to Typeform/SurveyMonkey)
+  var surveyScore = getRecentSurveyAverage(unitName);
+
+  var result = {
+    unit: unitName,
+    grievanceCount: grievanceCount,
+    surveyScore: surveyScore,
+    status: '',
+    recommendation: ''
+  };
+
+  // Sentiment correlation logic
+  if (surveyScore < 3 && grievanceCount === 0) {
+    result.status = '🚩 RED FLAG';
+    result.recommendation = 'High Dissatisfaction / Low Representation - Investigate immediately';
+  } else if (surveyScore < 5 && grievanceCount < 2) {
+    result.status = '⚠️ WARNING';
+    result.recommendation = 'Moderate dissatisfaction with limited grievance activity';
+  } else if (surveyScore >= 7) {
+    result.status = '✅ HEALTHY';
+    result.recommendation = 'Unit appears stable with adequate representation';
+  } else {
+    result.status = '📊 MONITORING';
+    result.recommendation = 'Standard activity levels - continue monitoring';
+  }
+
+  return result;
+}
+
+/**
+ * Helper: Count grievances for a specific unit
+ * @param {string} unitName - Unit name to count
+ * @returns {number} Number of grievances
+ */
+function getGrievanceCountForUnit(unitName) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+
+  var data = sheet.getRange(2, GRIEVANCE_COLS.UNIT, sheet.getLastRow() - 1, 1).getValues();
+  var count = 0;
+
+  data.forEach(function(row) {
+    if (row[0] === unitName) count++;
+  });
+
+  return count;
+}
+
+/**
+ * Helper: Get recent survey average for a unit
+ * PLACEHOLDER: Connect to Typeform/SurveyMonkey API when ready
+ *
+ * @param {string} unitName - Unit name
+ * @returns {number} Average survey score (1-10)
+ */
+function getRecentSurveyAverage(unitName) {
+  // PLACEHOLDER: This would connect to survey API
+  // For now, check if Satisfaction sheet exists and has data
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+
+  if (!satSheet || satSheet.getLastRow() < 2) {
+    // Return neutral score if no survey data
+    return 5;
+  }
+
+  // TODO: Implement actual survey score calculation
+  // when Typeform/SurveyMonkey integration is enabled
+
+  return 5; // Neutral placeholder
+}
+
+/**
+ * Show Unit Health Report Dialog
+ * Displays sentiment analysis for all units.
+ */
+function showUnitHealthReport() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Get all unique units from Config
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  var units = [];
+
+  if (configSheet) {
+    var unitData = configSheet.getRange(3, CONFIG_COLS.UNITS, 50, 1).getValues();
+    unitData.forEach(function(row) {
+      if (row[0]) units.push(row[0]);
+    });
+  }
+
+  if (units.length === 0) {
+    units = Object.keys(GEMINI_CONFIG.UNIT_CODES);
+  }
+
+  var report = '📊 UNIT HEALTH ANALYSIS REPORT\n';
+  report += '=' .repeat(45) + '\n\n';
+
+  units.forEach(function(unit) {
+    var health = calculateUnitHealth(unit);
+    report += health.status + ' ' + health.unit + '\n';
+    report += '  Grievances: ' + health.grievanceCount + '\n';
+    report += '  Survey Score: ' + health.surveyScore + '/10\n';
+    report += '  → ' + health.recommendation + '\n\n';
+  });
+
+  report += '=' .repeat(45) + '\n';
+  report += 'Connect Typeform/SurveyMonkey for live sentiment data.\n';
+
+  ui.alert('Unit Health Report', report, ui.ButtonSet.OK);
+}
+
+// ============================================================================
+// GEMINI v4.0 APPLY SYSTEM THEME (UI Refresh)
+// ============================================================================
+
+/**
+ * Gemini v4.0 System Theme Application
+ * Wrapper for APPLY_SYSTEM_THEME that ensures Gemini compatibility.
+ */
+function APPLY_GEMINI_THEME() {
+  // Use existing APPLY_SYSTEM_THEME if available
+  if (typeof APPLY_SYSTEM_THEME === 'function') {
+    APPLY_SYSTEM_THEME();
+    return;
+  }
+
+  // Fallback: Apply basic Roboto theme
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG];
+
+  sheets.forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (sheet && sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn())
+           .setFontFamily(GEMINI_CONFIG.THEME.FONT)
+           .setFontSize(10);
+    }
+  });
+
+  ss.toast('✅ Theme applied.', COMMAND_CONFIG.SYSTEM_NAME, 3);
+}
+
+// ============================================================================
+// ANALYTICS & INSIGHTS FUNCTIONS (v4.0 Scaling)
+// ============================================================================
+
+/**
+ * Shows grievance trends over time
+ * Displays counts per month and identifies patterns
+ */
+function showGrievanceTrends() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    ui.alert('No Grievance Data', 'No grievances found to analyze.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var header = data[0];
+
+  // Find date column (column A is typically Case ID, look for Date column)
+  var dateCol = header.indexOf('Date Filed');
+  if (dateCol === -1) dateCol = header.indexOf('Date');
+  if (dateCol === -1) dateCol = 1; // Default to column B
+
+  // Aggregate by month
+  var monthCounts = {};
+
+  for (var i = 1; i < data.length; i++) {
+    var dateVal = data[i][dateCol];
+    if (dateVal) {
+      var date = new Date(dateVal);
+      if (!isNaN(date.getTime())) {
+        var monthKey = date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+        monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
+      }
+    }
+  }
+
+  // Build report
+  var report = '📈 GRIEVANCE TRENDS\n';
+  report += '═'.repeat(40) + '\n\n';
+
+  var months = Object.keys(monthCounts).sort();
+  if (months.length === 0) {
+    report += 'No dated grievances found.\n';
+  } else {
+    report += 'Month          | Count | Trend\n';
+    report += '───────────────|───────|──────\n';
+
+    var prevCount = 0;
+    months.forEach(function(month) {
+      var count = monthCounts[month];
+      var trend = count > prevCount ? '📈 Up' : (count < prevCount ? '📉 Down' : '➡️ Flat');
+      report += month.padEnd(14) + ' | ' + String(count).padStart(5) + ' | ' + trend + '\n';
+      prevCount = count;
+    });
+
+    // Summary
+    var total = months.reduce(function(sum, m) { return sum + monthCounts[m]; }, 0);
+    var avg = (total / months.length).toFixed(1);
+    report += '\n───────────────────────────────\n';
+    report += 'Total: ' + total + ' grievances over ' + months.length + ' months\n';
+    report += 'Average: ' + avg + ' per month\n';
+  }
+
+  ui.alert('Grievance Trends', report, ui.ButtonSet.OK);
+}
+
+/**
+ * Shows OCR transcription dialog
+ * Placeholder for Cloud Vision API integration
+ */
+function showOCRDialog() {
+  var ui = SpreadsheetApp.getUi();
+
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    'body { font-family: Roboto, Arial, sans-serif; padding: 16px; }' +
+    'h3 { color: #1a73e8; margin-bottom: 16px; }' +
+    '.status { background: #e8f5e9; padding: 12px; border-radius: 8px; margin: 16px 0; }' +
+    '.warning { background: #fff3e0; padding: 12px; border-radius: 8px; margin: 16px 0; }' +
+    'input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }' +
+    'button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 12px; }' +
+    'button:hover { background: #1557b0; }' +
+    '</style>' +
+    '<h3>📝 OCR Transcription</h3>' +
+    '<div class="warning">' +
+    '<strong>⚠️ Cloud Vision API Required</strong><br>' +
+    'This feature requires Google Cloud Vision API to be enabled.' +
+    '</div>' +
+    '<p>Enter the Google Drive File ID of the handwritten form to transcribe:</p>' +
+    '<input type="text" id="fileId" placeholder="e.g., 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms">' +
+    '<div class="status">' +
+    '<strong>Status:</strong> Ready for Cloud Vision integration<br>' +
+    '<small>Contact system administrator to enable OCR capabilities.</small>' +
+    '</div>' +
+    '<button onclick="google.script.host.close()">Close</button>'
+  )
+  .setWidth(450)
+  .setHeight(350);
+
+  ui.showModalDialog(html, '📝 OCR Form Transcription');
 }
 
 
