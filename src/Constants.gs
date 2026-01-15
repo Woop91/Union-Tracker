@@ -455,7 +455,12 @@ var CONFIG_COLS = {
   MAIN_CONTACT_EMAIL: 43,     // AQ
 
   // ── FORM LINKS ── (AR)
-  SATISFACTION_FORM_URL: 44   // AR - Member Satisfaction Survey form URL
+  SATISFACTION_FORM_URL: 44,  // AR - Member Satisfaction Survey form URL
+
+  // ── STRATEGIC COMMAND CENTER ── (AS-AU)
+  CHIEF_STEWARD_EMAIL: 45,    // AS - Email for escalation alerts
+  UNIT_CODES: 46,             // AT - Unit code prefixes (future use)
+  ARCHIVE_FOLDER_ID: 47       // AU - Drive folder ID for archives (future use)
 };
 
 // ============================================================================

@@ -222,14 +222,18 @@ function handleStageGateWorkflow_(e) {
 
 /**
  * Sends escalation alert email to Chief Steward
+ * Reads email from Config sheet (column AS)
  * @param {string} memberName - Name of the member
  * @param {string} caseID - Grievance case ID
  * @param {string} status - New status/step
  * @private
  */
 function sendEscalationAlert_(memberName, caseID, status) {
-  if (!COMMAND_CONFIG.CHIEF_STEWARD_EMAIL) {
-    console.log('Chief Steward email not configured - skipping escalation alert');
+  // Get Chief Steward email from Config sheet
+  var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
+
+  if (!chiefStewardEmail) {
+    console.log('Chief Steward email not configured in Config sheet (column AS) - skipping escalation alert');
     return;
   }
 
@@ -240,10 +244,36 @@ function sendEscalationAlert_(memberName, caseID, status) {
                'Immediate review is required.\n' +
                COMMAND_CONFIG.EMAIL.FOOTER;
 
-    MailApp.sendEmail(COMMAND_CONFIG.CHIEF_STEWARD_EMAIL, subject, body);
+    MailApp.sendEmail(chiefStewardEmail, subject, body);
     SpreadsheetApp.getActiveSpreadsheet().toast('Escalation alert sent to Chief Steward', 'Alert Sent', 3);
   } catch (emailError) {
     console.log('Escalation email error: ' + emailError.message);
+  }
+}
+
+/**
+ * Gets a value from the Config sheet by column number
+ * Reads from row 3 (first data row after headers)
+ * @param {number} columnNum - Column number (1-indexed)
+ * @returns {string} The value from the Config sheet, or empty string if not found
+ * @private
+ */
+function getConfigValue_(columnNum) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+    if (!configSheet) {
+      console.log('Config sheet not found');
+      return '';
+    }
+
+    // Config values are typically in row 3 (row 1 = section headers, row 2 = column headers)
+    var value = configSheet.getRange(3, columnNum).getValue();
+    return value ? String(value).trim() : '';
+  } catch (e) {
+    console.log('Error reading config value: ' + e.message);
+    return '';
   }
 }
 
