@@ -2,9 +2,9 @@
 
 ## Overview
 
-The **Developer Tools** feature (in `DeveloperTools.gs`) allows you to seed demo data for testing and remove it when transitioning to production mode. This file is designed to be **deleted before production** - once you delete the file from the Apps Script editor, all demo functions are permanently gone.
+The **Developer Tools** feature (in `07_DevTools.gs`) allows you to seed demo data for testing and remove it when transitioning to production mode. This file is designed to be **deleted before production** - once you delete the file from the Apps Script editor, all demo functions are permanently gone.
 
-> **⚠️ IMPORTANT**: The `DeveloperTools.gs` file should be **DELETED FROM THE SCRIPT EDITOR** before going live. This ensures stewards cannot accidentally trigger a data wipe.
+> **⚠️ IMPORTANT**: The `07_DevTools.gs` file should be **DELETED FROM THE SCRIPT EDITOR** before going live. This ensures stewards cannot accidentally trigger a data wipe.
 
 ---
 
@@ -116,7 +116,7 @@ This is your last chance!
 
 ALL test data will be cleared and the Demo menu will be permanently hidden.
 
-To fully remove demo functionality, delete the DeveloperTools.gs file from the script editor after running this.
+To fully remove demo functionality, delete the 07_DevTools.gs file from the script editor after running this.
 
 Click YES to proceed.
 ```
@@ -159,7 +159,7 @@ After nuking, verify the system is ready:
 4. **Menu Changes**:
    - Demo menu is hidden (DEMO_MODE_DISABLED property set)
    - The Demo submenu will not appear in the Admin menu
-   - **To fully remove**: Delete `DeveloperTools.gs` from the script editor
+   - **To fully remove**: Delete `07_DevTools.gs` from the script editor
    - Once the file is deleted, all seed/nuke functions are permanently gone
 
 ### What Remains Intact
@@ -254,13 +254,13 @@ After nuking:
 - The Demo menu is hidden (based on a Script Property flag)
 - Config dropdowns are cleared
 
-**Note**: If you haven't deleted `DeveloperTools.gs` yet, the seed functions still exist. To re-seed:
+**Note**: If you haven't deleted `07_DevTools.gs` yet, the seed functions still exist. To re-seed:
 1. Delete the `DEMO_MODE_DISABLED` Script Property manually (Script Properties → Delete `DEMO_MODE_DISABLED`)
 2. Refresh the spreadsheet - the Demo menu will reappear
 3. Run seed functions again
 
 **Recovery options:**
-- **Re-enable Demo menu**: Script Properties → Delete `DEMO_MODE_DISABLED` (only works if DeveloperTools.gs still exists)
+- **Re-enable Demo menu**: Script Properties → Delete `DEMO_MODE_DISABLED` (only works if 07_DevTools.gs still exists)
 - **Restore from backup**: If you made a copy of the spreadsheet before nuking
 - **Fresh deployment**: Deploy a new copy from the original source code
 - **Import data**: Add your real data to start fresh (recommended approach)
@@ -268,7 +268,7 @@ After nuking:
 **Final Cleanup (Recommended):**
 After running NUKE and verifying you're ready for production:
 1. Open Extensions → Apps Script
-2. In the Files panel, right-click on `DeveloperTools.gs`
+2. In the Files panel, right-click on `07_DevTools.gs`
 3. Click "Delete" - this permanently removes all demo functionality
 
 ---
@@ -307,15 +307,15 @@ Since seed functions are permanently deleted after nuking, you cannot re-seed:
 
 ## 🔧 Manual File Deletion (Final Cleanup)
 
-The new DeveloperTools.gs approach uses **manual file deletion** instead of automatic code removal. This is simpler and more reliable.
+The new 07_DevTools.gs approach uses **manual file deletion** instead of automatic code removal. This is simpler and more reliable.
 
-### How to Delete DeveloperTools.gs
+### How to Delete 07_DevTools.gs
 
 After running NUKE and verifying your data is clean:
 
 1. Open your Google Sheet
 2. Go to **Extensions → Apps Script**
-3. In the left sidebar, find `DeveloperTools.gs`
+3. In the left sidebar, find `07_DevTools.gs`
 4. Right-click on the file name
 5. Click **"Delete"** or the trash icon
 6. Confirm the deletion
@@ -330,7 +330,7 @@ The manual deletion approach is better because:
 
 ### What Happens After Deletion?
 
-Once `DeveloperTools.gs` is deleted:
+Once `07_DevTools.gs` is deleted:
 - All `SEED_*` functions no longer exist
 - All `NUKE_*` functions no longer exist
 - The Demo menu never appears (even if you clear the DEMO_MODE_DISABLED property)
@@ -422,24 +422,24 @@ Your dashboard is **production-ready**! 🚀
 
 ---
 
-**Last Updated**: 2026-01-14
-**Version**: 2.0.0
+**Last Updated**: 2026-01-15
+**Version**: 2.3.0
 
 ---
 
-## Version 2.0.0 Notes - DeveloperTools.gs Separation
+## Version 2.3.0 Notes - 9-File Modular Architecture
 
-In version 2.0.0, the seed/nuke functionality was moved to a separate file for cleaner production deployment:
+In version 2.3.0, the codebase was reorganized into a 9-file modular structure:
 
-- **SeedNuke.gs renamed to DeveloperTools.gs** - Clear naming indicates this is for development only
+- **DevTools moved to 07_DevTools.gs** - Numbered prefix groups files together in GitHub
 - **Prominent warning banner** - File header states "DELETE THIS FILE BEFORE PRODUCTION"
 - **Conditional Demo menu** - Demo menu only appears if DEMO_MODE_DISABLED property is not set
 - **Manual file deletion** - No Apps Script API required; just delete the file from the editor
-- **Zero residue after deletion** - Once DeveloperTools.gs is deleted, all demo functions are gone
+- **Zero residue after deletion** - Once 07_DevTools.gs is deleted, all demo functions are gone
 
 **Production Deployment Steps:**
 1. Run `NUKE_SEEDED_DATA()` to clear test data (hides Demo menu)
-2. Delete `DeveloperTools.gs` from the Apps Script editor
+2. Delete `07_DevTools.gs` from the Apps Script editor
 3. Stewards cannot accidentally trigger data wipes
 
 ---
