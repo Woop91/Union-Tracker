@@ -31,32 +31,42 @@
  */
 function CREATE_509_DASHBOARD() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
+  var ui = null;
 
-  // Confirm with user
-  var response = ui.alert(
-    '🏗️ Create 509 Dashboard',
-    'This will create the 509 Dashboard with:\n\n' +
-    '• Config (dropdown sources)\n' +
-    '• Member Directory\n' +
-    '• Grievance Log\n' +
-    '• 💼 Dashboard (Executive metrics)\n' +
-    '• 🎯 Custom View (Customizable metrics)\n' +
-    '• 📊 Member Satisfaction (Survey tracking)\n' +
-    '• 💡 Feedback & Development (Bug/feature tracking)\n' +
-    '• ✅ Function Checklist (function reference)\n' +
-    '• 📚 Getting Started (setup instructions)\n' +
-    '• ❓ FAQ (common questions)\n' +
-    '• 📖 Config Guide (how to use Config tab)\n\n' +
-    'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
-    'Existing sheets with matching names will be recreated.\n\n' +
-    'Continue?',
-    ui.ButtonSet.YES_NO
-  );
+  // Try to get UI context - may not be available if called from trigger/API
+  try {
+    ui = SpreadsheetApp.getUi();
+  } catch (e) {
+    // UI not available - will proceed without confirmation dialog
+    Logger.log('UI not available, proceeding without confirmation: ' + e.message);
+  }
 
-  if (response !== ui.Button.YES) {
-    ui.alert('Setup cancelled.');
-    return;
+  // Confirm with user if UI is available
+  if (ui) {
+    var response = ui.alert(
+      '🏗️ Create 509 Dashboard',
+      'This will create the 509 Dashboard with:\n\n' +
+      '• Config (dropdown sources)\n' +
+      '• Member Directory\n' +
+      '• Grievance Log\n' +
+      '• 💼 Dashboard (Executive metrics)\n' +
+      '• 🎯 Custom View (Customizable metrics)\n' +
+      '• 📊 Member Satisfaction (Survey tracking)\n' +
+      '• 💡 Feedback & Development (Bug/feature tracking)\n' +
+      '• ✅ Function Checklist (function reference)\n' +
+      '• 📚 Getting Started (setup instructions)\n' +
+      '• ❓ FAQ (common questions)\n' +
+      '• 📖 Config Guide (how to use Config tab)\n\n' +
+      'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
+      'Existing sheets with matching names will be recreated.\n\n' +
+      'Continue?',
+      ui.ButtonSet.YES_NO
+    );
+
+    if (response !== ui.Button.YES) {
+      ui.alert('Setup cancelled.');
+      return;
+    }
   }
 
   ss.toast('Starting dashboard creation...', '🏗️ Setup', 5);
@@ -121,21 +131,25 @@ function CREATE_509_DASHBOARD() {
     }
 
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
-    ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
-      '11 sheets created:\n' +
-      '• Config, Member Directory, Grievance Log (data)\n' +
-      '• 💼 Dashboard, 🎯 Custom View (views)\n' +
-      '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
-      '• ✅ Function Checklist (function reference)\n' +
-      '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
-      'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
-      '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
-      'update automatically when you edit the sheets.\n\n' +
-      'Use the Demo menu to seed sample data.', ui.ButtonSet.OK);
+    if (ui) {
+      ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
+        '11 sheets created:\n' +
+        '• Config, Member Directory, Grievance Log (data)\n' +
+        '• 💼 Dashboard, 🎯 Custom View (views)\n' +
+        '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
+        '• ✅ Function Checklist (function reference)\n' +
+        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
+        'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
+        '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
+        'update automatically when you edit the sheets.\n\n' +
+        'Use the Demo menu to seed sample data.', ui.ButtonSet.OK);
+    }
 
   } catch (error) {
     Logger.log('Error in CREATE_509_DASHBOARD: ' + error.message);
-    ui.alert('❌ Error', 'An error occurred: ' + error.message, ui.ButtonSet.OK);
+    if (ui) {
+      ui.alert('❌ Error', 'An error occurred: ' + error.message, ui.ButtonSet.OK);
+    }
   }
 }
 
