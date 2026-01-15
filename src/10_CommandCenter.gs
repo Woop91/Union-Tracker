@@ -31,16 +31,43 @@
  * Alternative CONFIG object for legacy compatibility
  * Maps to COMMAND_CONFIG in 01_Constants.gs
  */
+/**
+ * Get COMMAND_CENTER_CONFIG lazily to avoid load-order issues
+ * This function ensures SHEETS and COMMAND_CONFIG are available before use
+ * @returns {Object} Command center configuration object
+ */
+function getCommandCenterConfig() {
+  return {
+    SYSTEM_NAME: "509 Strategic Command Center",
+    LOG_SHEET_NAME: SHEETS.GRIEVANCE_LOG,
+    DIR_SHEET_NAME: SHEETS.MEMBER_DIR,
+    AUDIT_SHEET_NAME: SHEETS.AUDIT_LOG,
+    TEMPLATE_ID: COMMAND_CONFIG.TEMPLATE_ID,
+    ARCHIVE_FOLDER_ID: COMMAND_CONFIG.ARCHIVE_FOLDER_ID,
+    CHIEF_STEWARD_EMAIL: COMMAND_CONFIG.CHIEF_STEWARD_EMAIL,
+    UNIT_CODES: COMMAND_CONFIG.UNIT_CODES,
+    THEME: COMMAND_CONFIG.THEME
+  };
+}
+
+// Legacy COMMAND_CENTER_CONFIG variable for backward compatibility
+// Uses hardcoded values to avoid load-order issues with global initialization
 var COMMAND_CENTER_CONFIG = {
   SYSTEM_NAME: "509 Strategic Command Center",
-  LOG_SHEET_NAME: SHEETS.GRIEVANCE_LOG,      // Maps to existing SHEETS constant
-  DIR_SHEET_NAME: SHEETS.MEMBER_DIR,         // Maps to existing SHEETS constant
-  AUDIT_SHEET_NAME: SHEETS.AUDIT_LOG,        // Maps to existing SHEETS constant
-  TEMPLATE_ID: COMMAND_CONFIG.TEMPLATE_ID,
-  ARCHIVE_FOLDER_ID: COMMAND_CONFIG.ARCHIVE_FOLDER_ID,
-  CHIEF_STEWARD_EMAIL: COMMAND_CONFIG.CHIEF_STEWARD_EMAIL,
-  UNIT_CODES: COMMAND_CONFIG.UNIT_CODES,
-  THEME: COMMAND_CONFIG.THEME
+  LOG_SHEET_NAME: 'Grievance Log',           // Hardcoded to avoid load-order issues
+  DIR_SHEET_NAME: 'Member Directory',        // Hardcoded to avoid load-order issues
+  AUDIT_SHEET_NAME: '_Audit_Log',            // Hardcoded to avoid load-order issues
+  TEMPLATE_ID: '',                           // Loaded dynamically via getCommandCenterConfig()
+  ARCHIVE_FOLDER_ID: '',                     // Loaded dynamically via getCommandCenterConfig()
+  CHIEF_STEWARD_EMAIL: '',                   // Loaded dynamically via getCommandCenterConfig()
+  UNIT_CODES: {},                            // Loaded dynamically via getCommandCenterConfig()
+  THEME: {
+    HEADER_BG: '#1e293b',
+    HEADER_TEXT: '#ffffff',
+    ALT_ROW: '#f8fafc',
+    FONT: 'Roboto',
+    FONT_SIZE: 10
+  }
 };
 
 // ============================================================================
