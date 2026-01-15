@@ -75,7 +75,7 @@ Download `dist/ConsolidatedDashboard.gs` from the repository.
    - 👁️ View
    - ⚙️ Settings
    - 🔧 Admin
-   - 🛡️ Data Integrity
+   - 📊 509 Command (Strategic Command Center)
 
 ### **Step 7: Seed Test Data (Optional)**
 
