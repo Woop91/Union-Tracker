@@ -244,7 +244,7 @@ To update to a new version:
 
 ---
 
-**Version:** 3.6.0
-**Architecture:** 9-File Modular
-**Build:** 9 files, 25,339 lines
+**Version:** 4.0.0 (Unified Master Engine)
+**Architecture:** 10-File Modular
+**Build:** 10 files, 31,121 lines
 **Last Updated:** 2026-01-15
