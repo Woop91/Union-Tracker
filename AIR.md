@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 3.6.5 / v3.48 (Strategic Command Center Master Engine, 10-File Architecture)
+**Version:** 4.0.0 (Unified Master Engine, 10-File Architecture)
 **Last Updated:** 2026-01-15
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -166,22 +166,25 @@ npm run watch        # Watch mode for development
 
 ### File Descriptions (10-File Architecture)
 
-**01_Constants.gs** (~1070 lines) - Configuration & Column Mapping
+**01_Constants.gs** (~1079 lines) - Configuration & Column Mapping
 - `SHEETS` - Sheet name constants (3 data + 2 dashboard + 6 hidden)
 - `COLORS` - Brand color scheme
 - `MEMBER_COLS` - 31 Member Directory column positions
 - `GRIEVANCE_COLS` - 34 Grievance Log column positions
 - `CONFIG_COLS` - Config sheet column positions (includes Strategic Command settings at AS-AW)
-  - **NEW in v3.6.5:** `TEMPLATE_ID: 50` and `PDF_FOLDER_ID: 51` for PDF automation
-- `COMMAND_CONFIG` - Strategic Command Center configuration (v3.6.5):
-  - `SYSTEM_NAME`, `VERSION` - System identification
+  - `TEMPLATE_ID: 50` and `PDF_FOLDER_ID: 51` for PDF automation
+- `COMMAND_CONFIG` - Strategic Command Center configuration **(v4.0)**:
+  - `SYSTEM_NAME`, `VERSION` (4.0.0) - System identification
   - `ESCALATION_STATUSES`, `ESCALATION_STEPS` - Alert triggers
   - `UNIT_CODES` - Dynamic from Config sheet
   - `THEME` - Roboto theme settings (header colors, alt rows, fonts)
   - `STATUS_COLORS` - Status-based coloring (Open=Yellow, Won=Green, Denied=Red, etc.)
   - `PDF` - PDF signature engine settings (SIGNATURE_BLOCK template)
   - `EMAIL` - Email configuration (SUBJECT_PREFIX)
-- `UI_THEME` **(NEW in v3.6.5)** - Global UI theme colors for dialogs and modals:
+- `VERSION_INFO` **(v4.0)** - Build version info:
+  - `MAJOR: 4`, `MINOR: 0`, `PATCH: 0`
+  - `BUILD: 'v4.0.0'`, `CODENAME: 'Unified Master Engine'`
+- `UI_THEME` - Global UI theme colors for dialogs and modals:
   - `PRIMARY_COLOR` (#7C3AED), `SECONDARY_COLOR` (#64748B)
   - `TEXT_PRIMARY`, `TEXT_SECONDARY`, `BORDER_COLOR`, `BACKGROUND`, `CARD_BG`
   - `SUCCESS_COLOR`, `WARNING_COLOR`, `DANGER_COLOR`, `INFO_COLOR`
@@ -472,26 +475,68 @@ npm run watch        # Watch mode for development
   - `getSatisfactionSectionData()`, `getSatisfactionAnalyticsData()`
   - `getSatisfactionTrendData()`, `getSatisfactionLocationDrill()`
 
-**10_CommandCenter.gs** (~628 lines) - 509 Strategic Command Center Consolidated Module **(NEW v3.6.5)**
+**10_CommandCenter.gs** (~1489 lines) - 509 Strategic Command Center Unified Master Engine **(v4.0)**
+
+- Menu System:
+  - `createCommandCenterMenu()` - Create 509 Command menu with v4.0 submenus (Field Accessibility, Personnel Management, Grievance Tools, System Security, Styling & Theme, Analytics & Insights, Demo Data)
+
+- Navigation & Field Accessibility **(NEW v4.0)**:
+  - `navigateToDashboard()`, `navigateToCustomView()`, `navigateToMobileView()` - Quick navigation helpers
+  - `navToMobile()` - Mobile/Pocket View (hide non-essential columns for smartphone access)
+  - `showAllMemberColumns()` - Restore full desktop view
+  - `refreshMemberView()` - Refresh current view
+
+- High-Performance ID Engine **(NEW v4.0)**:
+  - `getNextSequence(prefix)` - Sequential ID generator with Script Properties storage
+  - `generateMissingMemberIDsBatch()` - Batch array processing for 5,000+ members without lag
+  - `verifyIDGenerationEngine()` - Test and verify ID generation system
+
+- v4.0 Status & Diagnostics:
+  - `showV4StatusReport()` - Comprehensive v4.0 system status report
+  - `DIAGNOSE_SETUP()` - Diagnostic report (sheets, hidden sheets, triggers, configuration)
+  - `REPAIR_DASHBOARD()` - Rebuild missing hidden sheets, apply theme, traffic lights
+
 - Production Mode Management:
   - `isProductionMode()` - Check if production mode is enabled
   - `enableProductionMode()` - Enable production mode (hide Demo Data menu)
   - `disableProductionMode()` - Disable production mode
+
 - Nuclear Operations:
-  - `NUKE_DATABASE()` - Nuclear wipe with double confirmation (clears Member Directory, Grievance Log, Config dropdowns)
-- Diagnostics:
-  - `DIAGNOSE_SETUP()` - Comprehensive diagnostic report (sheets, hidden sheets, triggers)
-  - `REPAIR_DASHBOARD()` - Rebuild missing hidden sheets, apply theme, traffic lights
+  - `NUKE_DATABASE()` - Nuclear wipe with double confirmation (clears all data, enables production mode)
+
 - Calendar Sync:
   - `syncToCalendar()` - Sync grievance deadlines to Google Calendar
+
 - Search & Navigation:
   - `showSearchDialog()` - Modern search dialog with UI_THEME styling
   - `getSearchDialogHtml_()` - Generate search dialog HTML
   - `navigateToMember(memberId)` - Navigate to member row in sheet
+
 - Batch Operations:
   - `updateMemberBatch(memberId, updateObj)` - Batch update member data
-- Menu Integration:
-  - `createCommandCenterMenu()` - Create 509 Command menu items
+
+- GEMINI v4.0 Legacy Config **(NEW v4.0)**:
+  - `GEMINI_CONFIG` - Legacy configuration object with emoji sheet names for standalone deployments
+
+- PDF Signature Engine **(NEW v4.0)**:
+  - `onGrievanceFormSubmit(e)` - Form submission handler with auto-PDF generation
+  - `createGrievancePDF(folder, data)` - Create signature-ready PDF from template
+  - `getOrCreateMemberFolder(name, id)` - Get/create member-specific archive folder
+  - `sendGeminiEscalationAlert(member, caseID, status)` - Enhanced escalation email with formatting
+
+- Scaling Modules - OCR & Sentiment **(NEW v4.0)**:
+  - `transcribeHandwrittenForm(fileId)` - OCR hook for Google Cloud Vision API integration
+  - `calculateUnitHealth(unitName)` - Sentiment analysis correlating grievance counts with survey scores
+  - `getGrievanceCountForUnit(unitName)` - Count grievances for specific unit
+  - `getRecentSurveyAverage(unitName)` - Get survey score placeholder (ready for Typeform/SurveyMonkey API)
+
+- Analytics & Insights Menu **(NEW v4.0)**:
+  - `showUnitHealthReport()` - Display unit health analysis for all units
+  - `showGrievanceTrends()` - Monthly grievance trend analysis with up/down indicators
+  - `showOCRDialog()` - OCR transcription dialog (Cloud Vision API placeholder)
+
+- Theme Application:
+  - `APPLY_GEMINI_THEME()` - Apply system theme with Gemini compatibility
 
 **09_Main.gs** (~1093 lines) - Entry Point & Triggers
 - Menu System:
@@ -1142,6 +1187,73 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.0.0 (2026-01-15) - Unified Master Engine
+
+**v4.0 Architecture Upgrade:**
+- Complete upgrade from v3.6.5 to v4.0 Unified Master Engine
+- `10_CommandCenter.gs` expanded from ~628 lines to ~1489 lines
+- Total consolidated build: 31,121 lines (10 source files)
+
+**01_Constants.gs Updates:**
+- Updated `VERSION` to "4.0.0"
+- Added `VERSION_INFO` with `CODENAME: 'Unified Master Engine'`
+- v4.0 feature documentation in COMMAND_CONFIG header
+
+**GEMINI v4.0 Legacy Config (10_CommandCenter.gs):**
+- `GEMINI_CONFIG` - Legacy configuration object with emoji sheet names
+- Supports standalone deployments with `📋 Grievance Log`, `👤 Member Directory`, etc.
+- Dynamic `PRODUCTION_MODE` getter via Script Properties
+
+**Mobile/Pocket View - Field Accessibility (10_CommandCenter.gs):**
+- `navToMobile()` - Hide non-essential columns for smartphone access
+- `showAllMemberColumns()` - Restore full desktop view
+- `refreshMemberView()` - Refresh current view
+- Menu: 📱 Field Accessibility submenu
+
+**High-Performance ID Engine (10_CommandCenter.gs):**
+- `getNextSequence(prefix)` - Sequential ID generator with Script Properties
+- `generateMissingMemberIDsBatch()` - Batch array processing for 5,000+ members
+- `verifyIDGenerationEngine()` - ID generation verification and testing
+
+**v4.0 Status & Diagnostics (10_CommandCenter.gs):**
+- `showV4StatusReport()` - Comprehensive v4.0 system status report
+- Enhanced `DIAGNOSE_SETUP()` with production mode detection
+
+**PDF Signature Engine (10_CommandCenter.gs):**
+- `onGrievanceFormSubmit(e)` - Form submission handler with auto-PDF generation
+- `createGrievancePDF(folder, data)` - Create signature-ready PDF from template
+- `getOrCreateMemberFolder(name, id)` - Member-specific archive folder creation
+- `sendGeminiEscalationAlert(member, caseID, status)` - Enhanced escalation emails
+
+**Scaling Modules - OCR & Sentiment Hooks (10_CommandCenter.gs):**
+- `transcribeHandwrittenForm(fileId)` - OCR hook for Google Cloud Vision API
+- `calculateUnitHealth(unitName)` - Sentiment analysis (grievance counts vs survey scores)
+- `getGrievanceCountForUnit(unitName)` - Unit grievance counter
+- `getRecentSurveyAverage(unitName)` - Survey score placeholder (Typeform/SurveyMonkey ready)
+
+**Analytics & Insights Menu (10_CommandCenter.gs):**
+- `showUnitHealthReport()` - Unit health analysis for all units
+- `showGrievanceTrends()` - Monthly trend analysis with up/down indicators
+- `showOCRDialog()` - OCR transcription dialog (Cloud Vision placeholder)
+- Menu: 📈 Analytics & Insights submenu
+
+**Menu System Updates (10_CommandCenter.gs):**
+- New submenus: Field Accessibility, Analytics & Insights
+- Production Mode: Demo Data menu hidden after NUKE
+- Enhanced Personnel Management and System Security submenus
+
+**Theme Application:**
+- `APPLY_GEMINI_THEME()` - Apply system theme with Gemini compatibility
+
+**Files Modified:**
+- `01_Constants.gs` - Version 4.0.0, VERSION_INFO with Unified Master Engine
+- `10_CommandCenter.gs` - Expanded to ~1489 lines (+861 lines)
+- `build.js` - Updated header for v4.0 Unified Master Engine
+- `dist/ConsolidatedDashboard.gs` - Rebuilt (31,121 lines)
+- `AIR.md` - Updated documentation for v4.0
+
+---
 
 ### Version 3.6.5 (2026-01-15) - Strategic Command Center Master Engine
 
