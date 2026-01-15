@@ -874,6 +874,171 @@ function createAutomationTriggers() {
 }
 
 /**
+ * Sets up the midnight auto-refresh trigger
+ * Runs midnightAutoRefresh daily at midnight (12:00 AM)
+ */
+function setupMidnightTrigger() {
+  // Check for existing triggers to avoid duplicates
+  var triggers = ScriptApp.getProjectTriggers();
+  var hasExisting = false;
+
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'midnightAutoRefresh') {
+      hasExisting = true;
+      break;
+    }
+  }
+
+  if (hasExisting) {
+    SpreadsheetApp.getUi().alert('Midnight auto-refresh trigger already exists. No action needed.');
+    return;
+  }
+
+  // Create midnight trigger (12:00 AM)
+  ScriptApp.newTrigger('midnightAutoRefresh')
+    .timeBased()
+    .everyDays(1)
+    .atHour(0)
+    .nearMinute(0)
+    .create();
+
+  SpreadsheetApp.getUi().alert('Success: Midnight Auto-Refresh is now active.\n\nThe system will automatically refresh all dashboards and check alerts at 12:00 AM daily.');
+}
+
+/**
+ * Removes the midnight auto-refresh trigger
+ */
+function removeMidnightTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var removed = false;
+
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'midnightAutoRefresh') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      removed = true;
+    }
+  }
+
+  if (removed) {
+    SpreadsheetApp.getUi().alert('Midnight auto-refresh trigger has been removed.');
+  } else {
+    SpreadsheetApp.getUi().alert('No midnight trigger found to remove.');
+  }
+}
+
+/**
+ * Midnight Auto-Refresh function
+ * Called automatically by time-based trigger at midnight
+ * Refreshes dashboards, hidden sheets, and checks for critical alerts
+ */
+function midnightAutoRefresh() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var startTime = new Date();
+
+    Logger.log('Midnight Auto-Refresh started at ' + startTime.toISOString());
+
+    // 1. Refresh Executive Dashboard if it exists
+    if (ss.getSheetByName("Executive Command")) {
+      rebuildExecutiveDashboard();
+      Logger.log('Executive Command dashboard refreshed');
+    }
+
+    // 2. Refresh Member Analytics if it exists
+    if (ss.getSheetByName("Member Analytics")) {
+      rebuildMemberAnalytics();
+      Logger.log('Member Analytics dashboard refreshed');
+    }
+
+    // 3. Refresh hidden calculation sheets if function exists
+    if (typeof rebuildAllHiddenSheets === 'function') {
+      rebuildAllHiddenSheets();
+      Logger.log('Hidden calculation sheets refreshed');
+    }
+
+    // 4. Check for critical dashboard alerts
+    checkDashboardAlerts();
+    Logger.log('Dashboard alerts checked');
+
+    // 5. Check for overdue grievances and send reminders
+    checkOverdueGrievances_();
+
+    var endTime = new Date();
+    var duration = (endTime - startTime) / 1000;
+
+    Logger.log('Midnight Auto-Refresh completed in ' + duration + ' seconds');
+
+  } catch (e) {
+    Logger.log('Midnight Auto-Refresh error: ' + e.message);
+    // Optionally send error notification
+    try {
+      var adminEmail = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
+      if (adminEmail) {
+        MailApp.sendEmail(adminEmail,
+          COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Auto-Refresh Error',
+          'The midnight auto-refresh encountered an error:\n\n' + e.message + '\n\nPlease check the script logs for details.');
+      }
+    } catch (emailErr) {
+      Logger.log('Could not send error notification: ' + emailErr.message);
+    }
+  }
+}
+
+/**
+ * Checks for overdue grievances and sends reminder notifications
+ * @private
+ */
+function checkOverdueGrievances_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+    if (!grievanceSheet || grievanceSheet.getLastRow() < 2) return;
+
+    var data = grievanceSheet.getDataRange().getValues();
+    var overdueList = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var status = data[i][GRIEVANCE_COLS.STATUS - 1];
+      var daysToDeadline = data[i][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+
+      // Check for active cases that are overdue
+      if ((status === 'Open' || status === 'Pending Info') &&
+          (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0))) {
+        overdueList.push({
+          id: data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+          name: data[i][GRIEVANCE_COLS.FIRST_NAME - 1] + ' ' + data[i][GRIEVANCE_COLS.LAST_NAME - 1],
+          steward: data[i][GRIEVANCE_COLS.STEWARD - 1],
+          days: daysToDeadline
+        });
+      }
+    }
+
+    if (overdueList.length > 0) {
+      var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
+      if (chiefStewardEmail) {
+        var body = 'DAILY OVERDUE GRIEVANCE REPORT\n\n' +
+                   'The following ' + overdueList.length + ' grievance(s) have passed their deadline:\n\n';
+
+        overdueList.forEach(function(g) {
+          body += '- ' + g.id + ': ' + g.name + ' (Steward: ' + (g.steward || 'Unassigned') + ')\n';
+        });
+
+        body += '\nPlease take immediate action to address these cases.' + COMMAND_CONFIG.EMAIL.FOOTER;
+
+        MailApp.sendEmail(chiefStewardEmail,
+          COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Daily Overdue Report - ' + overdueList.length + ' Case(s)',
+          body);
+
+        Logger.log('Sent overdue report with ' + overdueList.length + ' cases');
+      }
+    }
+  } catch (e) {
+    Logger.log('Error checking overdue grievances: ' + e.message);
+  }
+}
+
+/**
  * Refreshes all dashboard visuals and checks alerts
  */
 function refreshAllVisuals() {
@@ -972,6 +1137,7 @@ function emailExecutivePDF() {
 /**
  * Generates missing Member IDs based on Unit Code
  * Uses dynamic column references from MEMBER_COLS
+ * Unit codes are read from Config sheet (column AT)
  * Format: [UNIT_PREFIX]-[SEQUENCE]-H (e.g., MS-101-H)
  */
 function generateMissingMemberIDs() {
@@ -986,13 +1152,16 @@ function generateMissingMemberIDs() {
   var data = sheet.getDataRange().getValues();
   var countAdded = 0;
 
+  // Get unit codes from Config sheet (falls back to defaults if not configured)
+  var unitCodes = getUnitCodes_();
+
   for (var i = 1; i < data.length; i++) {
     var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
     var unit = data[i][MEMBER_COLS.UNIT - 1];
 
     // ID is empty but Unit is present
     if (!memberId && unit) {
-      var prefix = COMMAND_CONFIG.UNIT_CODES[unit] || "GEN";
+      var prefix = unitCodes[unit] || "GEN";
       var nextNum = getNextMemberSequence_(prefix);
       var newId = prefix + "-" + nextNum + "-H";
 

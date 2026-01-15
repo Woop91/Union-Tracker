@@ -192,11 +192,15 @@ function handleStageGateWorkflow_(e) {
 
     // Check if status column was edited (using dynamic column reference)
     if (col === GRIEVANCE_COLS.STATUS) {
-      // Update timestamp
-      sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).setValue(new Date());
+      // Only update Date Closed timestamp for closed statuses
+      var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
+      if (closedStatuses.indexOf(newValue) !== -1) {
+        sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).setValue(new Date());
+      }
 
-      // Check if this is an escalation status
-      if (COMMAND_CONFIG.ESCALATION_STATUSES.indexOf(newValue) !== -1) {
+      // Check if this is an escalation status (reads from Config or falls back to default)
+      var escalationStatuses = getEscalationStatuses_();
+      if (escalationStatuses.indexOf(newValue) !== -1) {
         var memberName = sheet.getRange(row, GRIEVANCE_COLS.FIRST_NAME).getValue() + ' ' +
                         sheet.getRange(row, GRIEVANCE_COLS.LAST_NAME).getValue();
         var caseID = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
@@ -205,9 +209,10 @@ function handleStageGateWorkflow_(e) {
       }
     }
 
-    // Also check if Current Step column was edited
+    // Also check if Current Step column was edited (use ESCALATION_STEPS for step values)
     if (col === GRIEVANCE_COLS.CURRENT_STEP) {
-      if (COMMAND_CONFIG.ESCALATION_STATUSES.indexOf(newValue) !== -1) {
+      var escalationSteps = getEscalationSteps_();
+      if (escalationSteps.indexOf(newValue) !== -1) {
         var memberName2 = sheet.getRange(row, GRIEVANCE_COLS.FIRST_NAME).getValue() + ' ' +
                          sheet.getRange(row, GRIEVANCE_COLS.LAST_NAME).getValue();
         var caseID2 = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
@@ -275,6 +280,72 @@ function getConfigValue_(columnNum) {
     console.log('Error reading config value: ' + e.message);
     return '';
   }
+}
+
+/**
+ * Gets escalation status values from Config sheet or falls back to defaults
+ * Config format: comma-separated values (e.g., "In Arbitration,Appealed")
+ * @returns {Array} Array of status values that trigger escalation alerts
+ * @private
+ */
+function getEscalationStatuses_() {
+  var configValue = getConfigValue_(CONFIG_COLS.ESCALATION_STATUSES);
+
+  if (configValue) {
+    return configValue.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  }
+
+  // Fall back to defaults from COMMAND_CONFIG
+  return COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
+}
+
+/**
+ * Gets escalation step values from Config sheet or falls back to defaults
+ * Config format: comma-separated values (e.g., "Step II,Step III,Arbitration")
+ * @returns {Array} Array of step values that trigger escalation alerts
+ * @private
+ */
+function getEscalationSteps_() {
+  var configValue = getConfigValue_(CONFIG_COLS.ESCALATION_STEPS);
+
+  if (configValue) {
+    return configValue.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  }
+
+  // Fall back to defaults from COMMAND_CONFIG
+  return COMMAND_CONFIG.ESCALATION_STEPS || ['Step II', 'Step III', 'Arbitration'];
+}
+
+/**
+ * Gets unit codes mapping from Config sheet or falls back to defaults
+ * Config format: "Unit Name:CODE,Unit2:CODE2" (e.g., "Main Station:MS,Field Ops:FO")
+ * @returns {Object} Object mapping unit names to code prefixes
+ * @private
+ */
+function getUnitCodes_() {
+  var configValue = getConfigValue_(CONFIG_COLS.UNIT_CODES);
+
+  if (configValue) {
+    var unitCodes = {};
+    configValue.split(',').forEach(function(pair) {
+      var parts = pair.split(':');
+      if (parts.length === 2) {
+        unitCodes[parts[0].trim()] = parts[1].trim();
+      }
+    });
+    if (Object.keys(unitCodes).length > 0) {
+      return unitCodes;
+    }
+  }
+
+  // Fall back to default codes
+  return {
+    "Main Station": "MS",
+    "Field Ops": "FO",
+    "Health": "HC",
+    "Admin": "AD",
+    "Remote": "RM"
+  };
 }
 
 /**

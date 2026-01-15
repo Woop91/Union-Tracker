@@ -27,17 +27,14 @@ var COMMAND_CONFIG = {
   ARCHIVE_FOLDER_ID: '',  // Drive folder ID for archived documents
 
   // Alert Configuration
-  CHIEF_STEWARD_EMAIL: '',  // Email for escalation alerts
-  ESCALATION_STATUSES: ['Step 2', 'Step 3', 'Arbitration'],  // Statuses that trigger alerts
+  CHIEF_STEWARD_EMAIL: '',  // Read from Config sheet (CONFIG_COLS.CHIEF_STEWARD_EMAIL)
+  // Escalation triggers - for STATUS column use status values, for CURRENT_STEP use step values
+  ESCALATION_STATUSES: ['In Arbitration', 'Appealed'],  // Status values that trigger alerts
+  ESCALATION_STEPS: ['Step II', 'Step III', 'Arbitration'],  // Step values that trigger alerts
 
-  // Unit Code Prefixes for Auto-ID Generation
-  UNIT_CODES: {
-    "Main Station": "MS",
-    "Field Ops": "FO",
-    "Health": "HC",
-    "Admin": "AD",
-    "Remote": "RM"
-  },
+  // Unit Code Prefixes - Now read from Config sheet (CONFIG_COLS.UNIT_CODES)
+  // Format in Config: "Main Station:MS,Field Ops:FO,Health:HC,Admin:AD,Remote:RM"
+  UNIT_CODES: {},  // Populated dynamically from Config sheet
 
   // Theme Settings (Roboto-based)
   THEME: {
@@ -48,18 +45,17 @@ var COMMAND_CONFIG = {
     FONT_SIZE: 10
   },
 
-  // Status Color Mapping for Auto-Styling
+  // Status Color Mapping for Auto-Styling (matches DEFAULT_CONFIG.GRIEVANCE_STATUS)
   STATUS_COLORS: {
-    "Arbitration": { bg: "#fee2e2", text: "#991b1b" },
-    "Step 3": { bg: "#fef3c7", text: "#92400e" },
-    "Step 2": { bg: "#fef3c7", text: "#92400e" },
-    "Won": { bg: "#dcfce7", text: "#166534" },
-    "Resolved": { bg: "#dcfce7", text: "#166534" },
-    "Settled": { bg: "#dbeafe", text: "#1e40af" },
-    "Denied": { bg: "#fee2e2", text: "#991b1b" },
-    "Withdrawn": { bg: "#f1f5f9", text: "#475569" },
-    "Open": { bg: "#fef3c7", text: "#92400e" },
-    "Pending Info": { bg: "#e0e7ff", text: "#3730a3" }
+    "Open": { bg: "#fef3c7", text: "#92400e" },           // Yellow/Orange - Active case
+    "Pending Info": { bg: "#e0e7ff", text: "#3730a3" },   // Purple - Waiting on info
+    "Settled": { bg: "#dbeafe", text: "#1e40af" },        // Blue - Negotiated resolution
+    "Withdrawn": { bg: "#f1f5f9", text: "#475569" },      // Gray - Case withdrawn
+    "Denied": { bg: "#fee2e2", text: "#991b1b" },         // Red - Loss
+    "Won": { bg: "#dcfce7", text: "#166534" },            // Green - Victory
+    "Appealed": { bg: "#fef3c7", text: "#92400e" },       // Yellow - Escalated
+    "In Arbitration": { bg: "#fee2e2", text: "#991b1b" }, // Red - High stakes
+    "Closed": { bg: "#f1f5f9", text: "#475569" }          // Gray - Complete
   },
 
   // PDF Generation Settings
@@ -457,10 +453,12 @@ var CONFIG_COLS = {
   // ── FORM LINKS ── (AR)
   SATISFACTION_FORM_URL: 44,  // AR - Member Satisfaction Survey form URL
 
-  // ── STRATEGIC COMMAND CENTER ── (AS-AU)
+  // ── STRATEGIC COMMAND CENTER ── (AS-AW)
   CHIEF_STEWARD_EMAIL: 45,    // AS - Email for escalation alerts
-  UNIT_CODES: 46,             // AT - Unit code prefixes (future use)
-  ARCHIVE_FOLDER_ID: 47       // AU - Drive folder ID for archives (future use)
+  UNIT_CODES: 46,             // AT - Unit code prefixes (format: "Unit Name:CODE,Unit2:CODE2")
+  ARCHIVE_FOLDER_ID: 47,      // AU - Drive folder ID for archives
+  ESCALATION_STATUSES: 48,    // AV - Status values that trigger alerts (comma-separated)
+  ESCALATION_STEPS: 49        // AW - Step values that trigger alerts (comma-separated)
 };
 
 // ============================================================================

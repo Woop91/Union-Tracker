@@ -114,7 +114,9 @@ function createDashboardMenu() {
     .addSeparator()
     .addSubMenu(ui.createMenu('⚙️ Automation')
       .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
-      .addItem('🔔 Enable Midnight Auto-Update', 'createAutomationTriggers')
+      .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
+      .addItem('❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger')
+      .addItem('🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers')
       .addItem('📑 Email Weekly PDF Snapshot', 'emailExecutivePDF'))
     .addToUi();
 }
