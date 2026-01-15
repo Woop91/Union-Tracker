@@ -1205,9 +1205,10 @@ function getInteractiveDashboardHtml() {
     '    .getInteractiveOverviewData();' +
     '}' +
 
-    // Render overview with overdue section
+    // Render overview with overdue section and location breakdown
     'function renderOverview(data){' +
     '  var html="";' +
+    '  var colors=["#7C3AED","#059669","#1a73e8","#F97316","#DC2626","#8B5CF6","#10B981","#3B82F6"];' +
     '  html+="<div class=\\"stat-card\\" onclick=\\"switchTab(\'members\',document.getElementById(\'tab-members\'))\\"><div class=\\"stat-value\\">"+data.totalMembers+"</div><div class=\\"stat-label\\">Total Members</div></div>";' +
     '  html+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+data.activeStewards+"</div><div class=\\"stat-label\\">Stewards</div></div>";' +
     '  html+="<div class=\\"stat-card\\" onclick=\\"switchTab(\'grievances\',document.getElementById(\'tab-grievances\'))\\"><div class=\\"stat-value\\">"+data.totalGrievances+"</div><div class=\\"stat-label\\">Total Grievances</div></div>";' +
@@ -1221,6 +1222,21 @@ function getInteractiveDashboardHtml() {
     '  actions+="<button class=\\"action-btn action-btn-secondary\\" onclick=\\"google.script.run.showMyAssignedGrievances()\\">👤 My Cases</button>";' +
     '  actions+="<button class=\\"action-btn action-btn-secondary\\" onclick=\\"location.reload()\\">🔄 Refresh</button>";' +
     '  document.getElementById("overview-actions").innerHTML=actions;' +
+    // Location breakdown with bubble chart
+    '  if(data.byLocation&&data.byLocation.length>0){' +
+    '    var locHtml="<div class=\\"chart-container\\" style=\\"margin-top:15px\\"><div class=\\"chart-title\\">📍 Members by Location</div>";' +
+    '    locHtml+="<div style=\\"display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:10px\\">";' +
+    '    var maxLoc=Math.max.apply(null,data.byLocation.map(function(l){return l.count}))||1;' +
+    '    var totalM=data.totalMembers||1;' +
+    '    data.byLocation.forEach(function(loc,idx){' +
+    '      var pct=Math.round(loc.count/totalM*100);' +
+    '      var size=Math.max(55,Math.min(100,50+(loc.count/maxLoc*50)));' +
+    '      var clr=colors[idx%colors.length];' +
+    '      locHtml+="<div style=\\"text-align:center;cursor:pointer\\" onclick=\\"switchTab(\'analytics\',document.getElementById(\'tab-analytics\'))\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto;box-shadow:0 3px 10px rgba(0,0,0,0.15);transition:transform 0.2s\\" onmouseover=\\"this.style.transform=\'scale(1.05)\'\\" onmouseout=\\"this.style.transform=\'scale(1)\'\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:9px;opacity:0.9\\">"+pct+"%</span></div><div style=\\"font-size:10px;color:#666;margin-top:5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\\">"+loc.name+"</div></div>";' +
+    '    });' +
+    '    locHtml+="</div></div>";' +
+    '    document.getElementById("overview-actions").insertAdjacentHTML("afterend",locHtml);' +
+    '  }' +
     '  loadOverduePreview();' +
     '}' +
 
@@ -1574,52 +1590,128 @@ function getInteractiveDashboardHtml() {
     '    .getInteractiveResourceLinks();' +
     '}' +
 
-    // Render analytics
+    // Render analytics - ENHANCED VERSION
     'function renderAnalytics(data){' +
     '  var c=document.getElementById("analytics-charts");' +
     '  var html="";' +
-    // Member Directory Stats section
-    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">👥 Member Directory Statistics</div>";' +
+    '  var colors=["#7C3AED","#059669","#1a73e8","#F97316","#DC2626","#8B5CF6","#10B981","#3B82F6","#F59E0B","#EF4444"];' +
+
+    // ========== GRIEVANCE STATS SECTION ==========
+    '  html+="<div class=\\"chart-container\\" style=\\"border-left:4px solid #7C3AED\\"><div class=\\"chart-title\\">📊 Grievance Statistics</div>";' +
     '  html+="<div class=\\"stats-grid\\" style=\\"margin-bottom:15px\\">";' +
-    '  html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+data.memberStats.total+"</div><div class=\\"stat-label\\">Total Members</div></div>";' +
-    '  html+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+data.memberStats.stewards+"</div><div class=\\"stat-label\\">Stewards</div></div>";' +
-    '  html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+data.memberStats.withOpenGrievance+"</div><div class=\\"stat-label\\">With Open Case</div></div>";' +
-    '  html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+data.memberStats.stewardRatio+"</div><div class=\\"stat-label\\">Member:Steward</div></div>";' +
+    '  var totalG=data.statusCounts.open+data.statusCounts.pending+data.statusCounts.closed;' +
+    '  html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+totalG+"</div><div class=\\"stat-label\\">Total Cases</div></div>";' +
+    '  html+="<div class=\\"stat-card red\\"><div class=\\"stat-value\\">"+data.statusCounts.open+"</div><div class=\\"stat-label\\">Open</div></div>";' +
+    '  html+="<div class=\\"stat-card orange\\"><div class=\\"stat-value\\">"+data.statusCounts.pending+"</div><div class=\\"stat-label\\">Pending</div></div>";' +
+    '  html+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+(data.grievanceStats?data.grievanceStats.avgDaysToResolve:0)+"</div><div class=\\"stat-label\\">Avg Days to Resolve</div></div>";' +
     '  html+="</div></div>";' +
-    // Members by Location chart
-    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📍 Members by Location</div><div class=\\"bar-chart\\">";' +
-    '  var maxLoc=Math.max.apply(null,data.memberStats.byLocation.map(function(l){return l.count}))||1;' +
-    '  data.memberStats.byLocation.forEach(function(loc){' +
-    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:120px\\">"+loc.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(loc.count/maxLoc*100)+"%;background:#059669\\"></div></div><div class=\\"bar-value\\">"+loc.count+"</div></div>";' +
-    '  });' +
-    '  if(data.memberStats.byLocation.length===0)html+="<div class=\\"empty-state\\">No location data</div>";' +
-    '  html+="</div></div>";' +
-    // Members by Unit chart
-    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">🏢 Members by Unit</div><div class=\\"bar-chart\\">";' +
-    '  var maxUnit=Math.max.apply(null,data.memberStats.byUnit.map(function(u){return u.count}))||1;' +
-    '  data.memberStats.byUnit.forEach(function(unit){' +
-    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:120px\\">"+unit.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(unit.count/maxUnit*100)+"%;background:#1a73e8\\"></div></div><div class=\\"bar-value\\">"+unit.count+"</div></div>";' +
-    '  });' +
-    '  if(data.memberStats.byUnit.length===0)html+="<div class=\\"empty-state\\">No unit data</div>";' +
-    '  html+="</div></div>";' +
-    // Status distribution chart
-    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📊 Grievance Status Distribution</div><div class=\\"bar-chart\\">";' +
-    '  var total=data.statusCounts.open+data.statusCounts.pending+data.statusCounts.closed;' +
-    '  if(total>0){' +
-    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">Open</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(data.statusCounts.open/total*100)+"%;background:#dc2626\\"></div></div><div class=\\"bar-value\\">"+data.statusCounts.open+"</div></div>";' +
-    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">Pending</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(data.statusCounts.pending/total*100)+"%;background:#f97316\\"></div></div><div class=\\"bar-value\\">"+data.statusCounts.pending+"</div></div>";' +
-    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">Closed</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(data.statusCounts.closed/total*100)+"%;background:#059669\\"></div></div><div class=\\"bar-value\\">"+data.statusCounts.closed+"</div></div>";' +
+
+    // ========== GRIEVANCES BY STATUS (with colors and proportional bars) ==========
+    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📈 Grievances by Status</div><div class=\\"bar-chart\\">";' +
+    '  if(data.grievanceStats&&data.grievanceStats.byStatus&&data.grievanceStats.byStatus.length>0){' +
+    '    var maxStatus=Math.max.apply(null,data.grievanceStats.byStatus.map(function(s){return s.count}))||1;' +
+    '    data.grievanceStats.byStatus.forEach(function(status){' +
+    '      var pct=(status.count/maxStatus*100);' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">"+status.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+status.color+"\\"></div></div><div class=\\"bar-value\\">"+status.count+"</div></div>";' +
+    '    });' +
+    '  }else if(totalG>0){' +
+    '    var maxS=Math.max(data.statusCounts.open,data.statusCounts.pending,data.statusCounts.closed)||1;' +
+    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">Open</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(data.statusCounts.open/maxS*100)+"%;background:#DC2626\\"></div></div><div class=\\"bar-value\\">"+data.statusCounts.open+"</div></div>";' +
+    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">Pending</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(data.statusCounts.pending/maxS*100)+"%;background:#F97316\\"></div></div><div class=\\"bar-value\\">"+data.statusCounts.pending+"</div></div>";' +
+    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">Closed</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(data.statusCounts.closed/maxS*100)+"%;background:#059669\\"></div></div><div class=\\"bar-value\\">"+data.statusCounts.closed+"</div></div>";' +
     '  }else{html+="<div class=\\"empty-state\\">No grievances</div>"}' +
     '  html+="</div></div>";' +
-    // Issue category chart
-    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📋 Top Issue Categories</div><div class=\\"bar-chart\\">";' +
-    '  var maxCat=Math.max.apply(null,data.topCategories.map(function(c){return c.count}))||1;' +
-    '  data.topCategories.forEach(function(cat){' +
-    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:120px\\">"+cat.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+(cat.count/maxCat*100)+"%;background:#7C3AED\\"></div></div><div class=\\"bar-value\\">"+cat.count+"</div></div>";' +
-    '  });' +
-    '  if(data.topCategories.length===0)html+="<div class=\\"empty-state\\">No data</div>";' +
+
+    // ========== GRIEVANCES BY TYPE (Issue Categories) ==========
+    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📋 Grievances by Type (Issue Categories)</div><div class=\\"bar-chart\\">";' +
+    '  var catData=data.grievanceStats&&data.grievanceStats.byType?data.grievanceStats.byType:data.topCategories;' +
+    '  if(catData&&catData.length>0){' +
+    '    var maxCat=Math.max.apply(null,catData.map(function(c){return c.count}))||1;' +
+    '    catData.forEach(function(cat,idx){' +
+    '      var pct=(cat.count/maxCat*100);' +
+    '      var clr=colors[idx%colors.length];' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+cat.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+cat.count+"</div></div>";' +
+    '    });' +
+    '  }else{html+="<div class=\\"empty-state\\">No issue data</div>"}' +
     '  html+="</div></div>";' +
-    // Resolution summary
+
+    // ========== LOCATION BREAKDOWN ==========
+    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📍 Grievances by Location</div><div class=\\"bar-chart\\">";' +
+    '  if(data.grievanceStats&&data.grievanceStats.byLocation&&data.grievanceStats.byLocation.length>0){' +
+    '    var maxLoc=Math.max.apply(null,data.grievanceStats.byLocation.map(function(l){return l.total}))||1;' +
+    '    data.grievanceStats.byLocation.forEach(function(loc,idx){' +
+    '      var pct=(loc.total/maxLoc*100);' +
+    '      var clr=colors[idx%colors.length];' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+loc.name+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div>"+(loc.open>0?"<div style=\\"position:absolute;right:8px;top:2px;font-size:9px;color:#dc2626\\">"+loc.open+" open</div>":"")+"</div><div class=\\"bar-value\\">"+loc.total+"</div></div>";' +
+    '    });' +
+    '  }else{html+="<div class=\\"empty-state\\">No location data</div>"}' +
+    '  html+="</div></div>";' +
+
+    // ========== MONTH OVER MONTH TRENDS ==========
+    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📅 Month Over Month Trends</div>";' +
+    '  if(data.grievanceStats&&data.grievanceStats.monthlyTrends&&data.grievanceStats.monthlyTrends.length>0){' +
+    '    html+="<div style=\\"display:flex;gap:5px;justify-content:space-around;margin:15px 0\\">";' +
+    '    var maxMo=Math.max.apply(null,data.grievanceStats.monthlyTrends.map(function(m){return Math.max(m.filed,m.resolved)}))||1;' +
+    '    data.grievanceStats.monthlyTrends.forEach(function(mo){' +
+    '      var filedH=Math.max(mo.filed/maxMo*80,5);' +
+    '      var resolvedH=Math.max(mo.resolved/maxMo*80,5);' +
+    '      html+="<div style=\\"text-align:center;flex:1\\"><div style=\\"display:flex;gap:2px;justify-content:center;align-items:flex-end;height:90px\\">";' +
+    '      html+="<div style=\\"width:16px;background:#DC2626;height:"+filedH+"px;border-radius:3px 3px 0 0\\" title=\\"Filed: "+mo.filed+"\\"></div>";' +
+    '      html+="<div style=\\"width:16px;background:#059669;height:"+resolvedH+"px;border-radius:3px 3px 0 0\\" title=\\"Resolved: "+mo.resolved+"\\"></div>";' +
+    '      html+="</div><div style=\\"font-size:10px;color:#666;margin-top:4px\\">"+mo.month.split("-")[1]+"/"+mo.month.split("-")[0].slice(2)+"</div></div>";' +
+    '    });' +
+    '    html+="</div><div style=\\"display:flex;justify-content:center;gap:15px;font-size:11px;color:#666\\"><span><span style=\\"display:inline-block;width:10px;height:10px;background:#DC2626;border-radius:2px\\"></span> Filed</span><span><span style=\\"display:inline-block;width:10px;height:10px;background:#059669;border-radius:2px\\"></span> Resolved</span></div>";' +
+    '  }else{html+="<div class=\\"empty-state\\">No trend data available</div>"}' +
+    '  html+="</div>";' +
+
+    // ========== TOP 10 PERFORMERS BY SCORE ==========
+    '  html+="<div class=\\"chart-container\\" style=\\"border-left:4px solid #059669\\"><div class=\\"chart-title\\">🏆 Top 10 Performers by Score</div>";' +
+    '  if(data.stewardPerformance&&data.stewardPerformance.topPerformers&&data.stewardPerformance.topPerformers.length>0){' +
+    '    html+="<table style=\\"width:100%;border-collapse:collapse;font-size:12px\\"><tr style=\\"background:#f3f4f6\\"><th style=\\"padding:8px;text-align:left\\">Rank</th><th style=\\"padding:8px;text-align:left\\">Steward</th><th style=\\"padding:8px;text-align:center\\">Score</th><th style=\\"padding:8px;text-align:center\\">Win Rate</th><th style=\\"padding:8px;text-align:center\\">Avg Days</th></tr>";' +
+    '    data.stewardPerformance.topPerformers.forEach(function(p,i){' +
+    '      var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";' +
+    '      var scoreColor=p.score>=70?"#059669":p.score>=50?"#F97316":"#DC2626";' +
+    '      html+="<tr style=\\"border-bottom:1px solid #e5e7eb\\"><td style=\\"padding:8px\\">"+medal+(i+1)+"</td><td style=\\"padding:8px\\">"+p.name+"</td><td style=\\"padding:8px;text-align:center;font-weight:bold;color:"+scoreColor+"\\">"+Math.round(p.score)+"</td><td style=\\"padding:8px;text-align:center\\">"+(p.winRate||0)+"%</td><td style=\\"padding:8px;text-align:center\\">"+(p.avgDays||0)+"</td></tr>";' +
+    '    });' +
+    '    html+="</table>";' +
+    '  }else{html+="<div class=\\"empty-state\\">No performance data available.<br><small>Run Data Integrity Check to generate scores.</small></div>"}' +
+    '  html+="</div>";' +
+
+    // ========== TOP 10 BUSIEST STEWARDS ==========
+    '  html+="<div class=\\"chart-container\\" style=\\"border-left:4px solid #F97316\\"><div class=\\"chart-title\\">📊 Top 10 Busiest Stewards (Case Load)</div>";' +
+    '  if(data.stewardPerformance&&data.stewardPerformance.busiestStewards&&data.stewardPerformance.busiestStewards.length>0){' +
+    '    var maxCases=Math.max.apply(null,data.stewardPerformance.busiestStewards.map(function(s){return s.total}))||1;' +
+    '    html+="<div class=\\"bar-chart\\">";' +
+    '    data.stewardPerformance.busiestStewards.forEach(function(s,idx){' +
+    '      var pct=(s.total/maxCases*100);' +
+    '      var openPct=(s.open/s.total*100);' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:110px;font-size:11px\\">"+s.name+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:linear-gradient(90deg,#F97316 "+openPct+"%,#059669 "+openPct+"%)\\"></div></div><div class=\\"bar-value\\">"+s.total+" <small style=\\"color:#F97316\\">("+s.open+" open)</small></div></div>";' +
+    '    });' +
+    '    html+="</div>";' +
+    '  }else{html+="<div class=\\"empty-state\\">No steward case data</div>"}' +
+    '  html+="</div>";' +
+
+    // ========== SURVEY RESULTS SECTION ==========
+    '  html+="<div class=\\"chart-container\\" style=\\"border-left:4px solid #1a73e8\\"><div class=\\"chart-title\\">📊 Survey Results</div>";' +
+    '  if(data.surveyResults){' +
+    '    html+="<div class=\\"stats-grid\\" style=\\"margin-bottom:15px\\">";' +
+    '    html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+data.surveyResults.totalResponses+"</div><div class=\\"stat-label\\">Total Responses</div></div>";' +
+    '    html+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+(data.surveyResults.avgSatisfaction||"-")+"</div><div class=\\"stat-label\\">Avg Satisfaction (1-10)</div></div>";' +
+    '    html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+(data.surveyResults.responseRate||0)+"%</div><div class=\\"stat-label\\">Response Rate</div></div>";' +
+    '    html+="</div>";' +
+    '    if(data.surveyResults.bySection&&data.surveyResults.bySection.length>0){' +
+    '      html+="<div class=\\"chart-title\\" style=\\"font-size:12px;margin:10px 0\\">Satisfaction by Section</div><div class=\\"bar-chart\\">";' +
+    '      data.surveyResults.bySection.forEach(function(sec,idx){' +
+    '        var pct=(sec.avg/10*100);' +
+    '        var clr=sec.avg>=7?"#059669":sec.avg>=5?"#F97316":"#DC2626";' +
+    '        html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+sec.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+sec.avg+"</div></div>";' +
+    '      });' +
+    '      html+="</div>";' +
+    '    }else{html+="<div style=\\"color:#999;font-size:12px;text-align:center;padding:10px\\">No section data. Complete surveys to see breakdown.</div>"}' +
+    '  }else{html+="<div class=\\"empty-state\\">No survey data. Link Google Form to collect responses.</div>"}' +
+    '  html+="</div>";' +
+
+    // ========== RESOLUTION SUMMARY ==========
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">🏆 Resolution Summary</div>";' +
     '  html+="<div class=\\"stats-grid\\" style=\\"margin:0\\">";' +
     '  html+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+data.resolutions.won+"</div><div class=\\"stat-label\\">Won</div></div>";' +
@@ -1627,43 +1719,53 @@ function getInteractiveDashboardHtml() {
     '  html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+data.resolutions.withdrawn+"</div><div class=\\"stat-label\\">Withdrawn</div></div>";' +
     '  html+="<div class=\\"stat-card red\\"><div class=\\"stat-value\\">"+data.resolutions.denied+"</div><div class=\\"stat-label\\">Denied</div></div>";' +
     '  html+="</div></div>";' +
-    // Sankey Diagram - Grievance Flow
+
+    // ========== MEMBER DIRECTORY STATS ==========
+    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">👥 Member Directory Statistics</div>";' +
+    '  html+="<div class=\\"stats-grid\\" style=\\"margin-bottom:15px\\">";' +
+    '  html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+data.memberStats.total+"</div><div class=\\"stat-label\\">Total Members</div></div>";' +
+    '  html+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+data.memberStats.stewards+"</div><div class=\\"stat-label\\">Stewards</div></div>";' +
+    '  html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+data.memberStats.withOpenGrievance+"</div><div class=\\"stat-label\\">With Open Case</div></div>";' +
+    '  html+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+data.memberStats.stewardRatio+"</div><div class=\\"stat-label\\">Member:Steward</div></div>";' +
+    '  html+="</div></div>";' +
+
+    // ========== MEMBERS BY LOCATION (improved visualization) ==========
+    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📍 Members by Location</div>";' +
+    '  if(data.memberStats.byLocation&&data.memberStats.byLocation.length>0){' +
+    '    var maxLoc=Math.max.apply(null,data.memberStats.byLocation.map(function(l){return l.count}))||1;' +
+    '    var totalMembers=data.memberStats.total||1;' +
+    '    html+="<div style=\\"display:flex;flex-wrap:wrap;gap:8px;justify-content:center\\">";' +
+    '    data.memberStats.byLocation.forEach(function(loc,idx){' +
+    '      var pct=Math.round(loc.count/totalMembers*100);' +
+    '      var size=Math.max(60,Math.min(120,60+(loc.count/maxLoc*60)));' +
+    '      var clr=colors[idx%colors.length];' +
+    '      html+="<div style=\\"text-align:center;padding:10px\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:10px\\">"+pct+"%</span></div><div style=\\"font-size:11px;color:#666;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis\\">"+loc.name+"</div></div>";' +
+    '    });' +
+    '    html+="</div>";' +
+    '  }else{html+="<div class=\\"empty-state\\">No location data</div>"}' +
+    '  html+="</div>";' +
+
+    // ========== SANKEY DIAGRAM ==========
     '  var totalGrievances=data.statusCounts.open+data.statusCounts.pending+data.statusCounts.closed;' +
     '  if(totalGrievances>0){' +
-    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">🔀 Grievance Flow (Sankey Diagram)</div>";' +
+    '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">🔀 Grievance Flow</div>";' +
     '  html+="<div class=\\"sankey-container\\">";' +
     '  html+="<div class=\\"sankey-nodes\\">";' +
-    // Source column (Filed)
-    '  html+="<div class=\\"sankey-column\\">";' +
-    '  html+="<div class=\\"sankey-node source\\">Filed<br/>"+totalGrievances+"</div>";' +
-    '  html+="<div class=\\"sankey-label\\">Total Filed</div>";' +
-    '  html+="</div>";' +
-    // Status column
+    '  html+="<div class=\\"sankey-column\\"><div class=\\"sankey-node source\\">Filed<br/>"+totalGrievances+"</div><div class=\\"sankey-label\\">Total Filed</div></div>";' +
     '  html+="<div class=\\"sankey-column\\">";' +
     '  if(data.statusCounts.open>0)html+="<div class=\\"sankey-node status-open\\">Open<br/>"+data.statusCounts.open+"</div>";' +
     '  if(data.statusCounts.pending>0)html+="<div class=\\"sankey-node status-pending\\">Pending<br/>"+data.statusCounts.pending+"</div>";' +
     '  if(data.statusCounts.closed>0)html+="<div class=\\"sankey-node status-closed\\">Closed<br/>"+data.statusCounts.closed+"</div>";' +
-    '  html+="<div class=\\"sankey-label\\">Current Status</div>";' +
-    '  html+="</div>";' +
-    // Resolution column
+    '  html+="<div class=\\"sankey-label\\">Current Status</div></div>";' +
     '  html+="<div class=\\"sankey-column\\">";' +
     '  var totalResolved=data.resolutions.won+data.resolutions.settled+data.resolutions.withdrawn+data.resolutions.denied;' +
-    '  if(data.resolutions.won>0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:linear-gradient(135deg,#059669,#10b981)\\">Won<br/>"+data.resolutions.won+"</div>";' +
-    '  if(data.resolutions.settled>0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:linear-gradient(135deg,#f97316,#fb923c)\\">Settled<br/>"+data.resolutions.settled+"</div>";' +
-    '  if(data.resolutions.withdrawn>0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:linear-gradient(135deg,#6b7280,#9ca3af)\\">Withdrawn<br/>"+data.resolutions.withdrawn+"</div>";' +
-    '  if(data.resolutions.denied>0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:linear-gradient(135deg,#dc2626,#ef4444)\\">Denied<br/>"+data.resolutions.denied+"</div>";' +
-    '  if(totalResolved===0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:#ccc\\">Pending<br/>Resolution</div>";' +
-    '  html+="<div class=\\"sankey-label\\">Outcome</div>";' +
-    '  html+="</div>";' +
-    '  html+="</div>";' +  // End sankey-nodes
-    // Legend
-    '  html+="<div class=\\"sankey-legend\\">";' +
-    '  html+="<div class=\\"sankey-legend-item\\"><div class=\\"sankey-legend-color\\" style=\\"background:#7C3AED\\"></div>Filed</div>";' +
-    '  html+="<div class=\\"sankey-legend-item\\"><div class=\\"sankey-legend-color\\" style=\\"background:#dc2626\\"></div>Open</div>";' +
-    '  html+="<div class=\\"sankey-legend-item\\"><div class=\\"sankey-legend-color\\" style=\\"background:#f97316\\"></div>Pending</div>";' +
-    '  html+="<div class=\\"sankey-legend-item\\"><div class=\\"sankey-legend-color\\" style=\\"background:#059669\\"></div>Closed/Won</div>";' +
-    '  html+="</div>";' +
-    '  html+="</div></div>";' +  // End sankey-container and chart-container
+    '  if(data.resolutions.won>0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:linear-gradient(135deg,#059669,#10b981)\\">Won "+data.resolutions.won+"</div>";' +
+    '  if(data.resolutions.settled>0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:linear-gradient(135deg,#f97316,#fb923c)\\">Settled "+data.resolutions.settled+"</div>";' +
+    '  if(data.resolutions.withdrawn>0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:linear-gradient(135deg,#6b7280,#9ca3af)\\">Withdrawn "+data.resolutions.withdrawn+"</div>";' +
+    '  if(data.resolutions.denied>0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:linear-gradient(135deg,#dc2626,#ef4444)\\">Denied "+data.resolutions.denied+"</div>";' +
+    '  if(totalResolved===0)html+="<div class=\\"sankey-node resolution\\" style=\\"background:#ccc\\">Pending</div>";' +
+    '  html+="<div class=\\"sankey-label\\">Outcome</div></div>";' +
+    '  html+="</div></div></div>";' +
     '  }' +
     '  c.innerHTML=html;' +
     '}' +
@@ -1705,7 +1807,7 @@ function getInteractiveDashboardHtml() {
 }
 
 /**
- * Get overview data for interactive dashboard
+ * Get overview data for interactive dashboard - ENHANCED with location data
  */
 function getInteractiveOverviewData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1715,8 +1817,11 @@ function getInteractiveOverviewData() {
     totalGrievances: 0,
     openGrievances: 0,
     pendingInfo: 0,
-    winRate: '0%'
+    winRate: '0%',
+    byLocation: []  // NEW: Location breakdown for overview
   };
+
+  var locationMap = {};
 
   // Get member stats - only count rows with valid member IDs (starting with M)
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
@@ -1729,7 +1834,17 @@ function getInteractiveOverviewData() {
 
       data.totalMembers++;
       if (row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.activeStewards++;
+
+      // Count by location
+      var location = row[MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
+      if (!locationMap[location]) locationMap[location] = 0;
+      locationMap[location]++;
     });
+
+    // Convert location map to sorted array (top 8)
+    data.byLocation = Object.keys(locationMap).map(function(key) {
+      return { name: key, count: locationMap[key] };
+    }).sort(function(a, b) { return b.count - a.count; }).slice(0, 8);
   }
 
   // Get grievance stats - only count rows with valid grievance IDs (starting with G)
@@ -1749,7 +1864,7 @@ function getInteractiveOverviewData() {
       if (status === 'Open') data.openGrievances++;
       if (status === 'Pending Info') data.pendingInfo++;
       if (status !== 'Open' && status !== 'Pending Info') closedCount++;
-      if (resolution.toLowerCase().indexOf('won') >= 0) wonCount++;
+      if (resolution.toLowerCase().indexOf('won') >= 0 || resolution.toLowerCase().indexOf('favorable') >= 0) wonCount++;
     });
     if (closedCount > 0) {
       data.winRate = Math.round(wonCount / closedCount * 100) + '%';
@@ -1909,7 +2024,8 @@ function getMyStewardCases() {
 }
 
 /**
- * Get analytics data for interactive dashboard
+ * Get analytics data for interactive dashboard - ENHANCED VERSION
+ * Now includes: grievance stats, steward performance, survey results, trends
  */
 function getInteractiveAnalyticsData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1925,41 +2041,55 @@ function getInteractiveAnalyticsData() {
     },
     statusCounts: { open: 0, pending: 0, closed: 0 },
     topCategories: [],
-    resolutions: { won: 0, settled: 0, withdrawn: 0, denied: 0 }
+    resolutions: { won: 0, settled: 0, withdrawn: 0, denied: 0 },
+    // NEW: Enhanced grievance stats
+    grievanceStats: {
+      avgDaysToResolve: 0,
+      totalResolved: 0,
+      byType: [],
+      byStatus: [],
+      byLocation: [],
+      monthlyTrends: []
+    },
+    // NEW: Top performers and busiest stewards
+    stewardPerformance: {
+      topPerformers: [],
+      busiestStewards: []
+    },
+    // NEW: Survey results
+    surveyResults: {
+      totalResponses: 0,
+      avgSatisfaction: 0,
+      responseRate: 0,
+      bySection: []
+    }
   };
 
   // Get Member Directory statistics
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var locationMap = {};
+  var unitMap = {};
+
   if (memberSheet && memberSheet.getLastRow() > 1) {
     var memberData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, MEMBER_COLS.HAS_OPEN_GRIEVANCE).getValues();
-    var locationMap = {};
-    var unitMap = {};
 
     memberData.forEach(function(row) {
       var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
-      // Skip blank rows - must have a valid member ID starting with M
       if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return;
 
       data.memberStats.total++;
-
-      // Count stewards
       if (row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.memberStats.stewards++;
-
-      // Count members with open grievances
       if (row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] === 'Yes') data.memberStats.withOpenGrievance++;
 
-      // Count by location
       var location = row[MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
-      if (!locationMap[location]) locationMap[location] = 0;
-      locationMap[location]++;
+      if (!locationMap[location]) locationMap[location] = { members: 0, grievances: 0, open: 0 };
+      locationMap[location].members++;
 
-      // Count by unit
       var unit = row[MEMBER_COLS.UNIT - 1] || 'Unknown';
       if (!unitMap[unit]) unitMap[unit] = 0;
       unitMap[unit]++;
     });
 
-    // Calculate steward ratio
     if (data.memberStats.stewards > 0) {
       var ratio = Math.round(data.memberStats.total / data.memberStats.stewards);
       data.memberStats.stewardRatio = ratio + ':1';
@@ -1967,52 +2097,230 @@ function getInteractiveAnalyticsData() {
       data.memberStats.stewardRatio = 'N/A';
     }
 
-    // Get top 5 locations
     data.memberStats.byLocation = Object.keys(locationMap).map(function(key) {
-      return { name: key, count: locationMap[key] };
-    }).sort(function(a, b) { return b.count - a.count; }).slice(0, 5);
+      return { name: key, count: locationMap[key].members };
+    }).sort(function(a, b) { return b.count - a.count; }).slice(0, 10);
 
-    // Get top 5 units
     data.memberStats.byUnit = Object.keys(unitMap).map(function(key) {
       return { name: key, count: unitMap[key] };
     }).sort(function(a, b) { return b.count - a.count; }).slice(0, 5);
   }
 
-  // Get Grievance Log statistics
+  // Get Grievance Log statistics - ENHANCED
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-    var rows = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.RESOLUTION).getValues();
+    var rows = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.STEWARD).getValues();
     var categoryMap = {};
+    var statusMap = {};
+    var stewardCaseCount = {};
+    var grievanceLocationMap = {};
+    var monthlyMap = {};
+    var totalDaysToResolve = 0;
+    var resolvedCount = 0;
 
     rows.forEach(function(row) {
       var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
-      // Skip blank rows - must have a valid grievance ID starting with G
       if (!grievanceId || (typeof grievanceId === 'string' && !grievanceId.toString().match(/^G/i))) return;
 
       var status = row[GRIEVANCE_COLS.STATUS - 1] || '';
       var category = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
       var resolution = (row[GRIEVANCE_COLS.RESOLUTION - 1] || '').toLowerCase();
+      var steward = row[GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
+      var location = row[GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
+      var dateFiled = row[GRIEVANCE_COLS.DATE_FILED - 1];
+      var dateClosed = row[GRIEVANCE_COLS.DATE_CLOSED - 1];
+      var daysOpen = row[GRIEVANCE_COLS.DAYS_OPEN - 1];
 
       // Status counts
-      if (status === 'Open') data.statusCounts.open++;
-      else if (status === 'Pending Info') data.statusCounts.pending++;
-      else if (status) data.statusCounts.closed++;
+      if (status === 'Open') {
+        data.statusCounts.open++;
+        if (!statusMap['Open']) statusMap['Open'] = { count: 0, color: '#DC2626' };
+        statusMap['Open'].count++;
+      } else if (status === 'Pending Info') {
+        data.statusCounts.pending++;
+        if (!statusMap['Pending Info']) statusMap['Pending Info'] = { count: 0, color: '#F97316' };
+        statusMap['Pending Info'].count++;
+      } else if (status === 'Resolved' || status === 'Closed' || status === 'Withdrawn') {
+        data.statusCounts.closed++;
+        if (!statusMap[status]) statusMap[status] = { count: 0, color: '#059669' };
+        statusMap[status].count++;
+
+        // Calculate days to resolve
+        if (dateFiled instanceof Date && dateClosed instanceof Date) {
+          var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
+          if (days >= 0) {
+            totalDaysToResolve += days;
+            resolvedCount++;
+          }
+        } else if (typeof daysOpen === 'number' && daysOpen > 0) {
+          totalDaysToResolve += daysOpen;
+          resolvedCount++;
+        }
+      } else if (status) {
+        if (!statusMap[status]) statusMap[status] = { count: 0, color: '#6B7280' };
+        statusMap[status].count++;
+      }
 
       // Category counts
       if (!categoryMap[category]) categoryMap[category] = 0;
       categoryMap[category]++;
 
+      // Steward case counts
+      if (steward && steward !== 'Unassigned') {
+        if (!stewardCaseCount[steward]) stewardCaseCount[steward] = { total: 0, open: 0 };
+        stewardCaseCount[steward].total++;
+        if (status === 'Open' || status === 'Pending Info') stewardCaseCount[steward].open++;
+      }
+
+      // Location grievance counts
+      if (!grievanceLocationMap[location]) grievanceLocationMap[location] = { total: 0, open: 0 };
+      grievanceLocationMap[location].total++;
+      if (status === 'Open' || status === 'Pending Info') grievanceLocationMap[location].open++;
+
+      // Monthly trends
+      if (dateFiled instanceof Date) {
+        var monthKey = Utilities.formatDate(dateFiled, Session.getScriptTimeZone(), 'yyyy-MM');
+        if (!monthlyMap[monthKey]) monthlyMap[monthKey] = { filed: 0, resolved: 0 };
+        monthlyMap[monthKey].filed++;
+      }
+      if (dateClosed instanceof Date) {
+        var closeMonthKey = Utilities.formatDate(dateClosed, Session.getScriptTimeZone(), 'yyyy-MM');
+        if (!monthlyMap[closeMonthKey]) monthlyMap[closeMonthKey] = { filed: 0, resolved: 0 };
+        monthlyMap[closeMonthKey].resolved++;
+      }
+
       // Resolution counts
-      if (resolution.indexOf('won') >= 0) data.resolutions.won++;
+      if (resolution.indexOf('won') >= 0 || resolution.indexOf('favorable') >= 0) data.resolutions.won++;
       else if (resolution.indexOf('settled') >= 0) data.resolutions.settled++;
       else if (resolution.indexOf('withdrawn') >= 0) data.resolutions.withdrawn++;
       else if (resolution.indexOf('denied') >= 0 || resolution.indexOf('lost') >= 0) data.resolutions.denied++;
     });
 
-    // Get top 5 categories
+    // Average days to resolve
+    data.grievanceStats.avgDaysToResolve = resolvedCount > 0 ? Math.round(totalDaysToResolve / resolvedCount) : 0;
+    data.grievanceStats.totalResolved = resolvedCount;
+
+    // Top categories (issue types) - ALL of them, properly formatted
     data.topCategories = Object.keys(categoryMap).map(function(key) {
       return { name: key, count: categoryMap[key] };
-    }).sort(function(a, b) { return b.count - a.count; }).slice(0, 5);
+    }).sort(function(a, b) { return b.count - a.count; }).slice(0, 10);
+
+    // By type (same as categories but for the new section)
+    data.grievanceStats.byType = data.topCategories;
+
+    // By status with colors
+    data.grievanceStats.byStatus = Object.keys(statusMap).map(function(key) {
+      return { name: key, count: statusMap[key].count, color: statusMap[key].color };
+    }).sort(function(a, b) { return b.count - a.count; });
+
+    // Location breakdown for grievances
+    data.grievanceStats.byLocation = Object.keys(grievanceLocationMap).map(function(key) {
+      return { name: key, total: grievanceLocationMap[key].total, open: grievanceLocationMap[key].open };
+    }).sort(function(a, b) { return b.total - a.total; }).slice(0, 10);
+
+    // Monthly trends (last 6 months)
+    var sortedMonths = Object.keys(monthlyMap).sort().slice(-6);
+    data.grievanceStats.monthlyTrends = sortedMonths.map(function(key) {
+      return { month: key, filed: monthlyMap[key].filed, resolved: monthlyMap[key].resolved };
+    });
+
+    // Top 10 busiest stewards
+    data.stewardPerformance.busiestStewards = Object.keys(stewardCaseCount).map(function(key) {
+      return { name: key, total: stewardCaseCount[key].total, open: stewardCaseCount[key].open };
+    }).sort(function(a, b) { return b.total - a.total; }).slice(0, 10);
+  }
+
+  // Get Steward Performance data from hidden sheet
+  var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
+  if (perfSheet && perfSheet.getLastRow() > 1) {
+    try {
+      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), 10).getValues();
+      data.stewardPerformance.topPerformers = perfData
+        .filter(function(row) { return row[0] && row[9]; }) // Has name and score
+        .map(function(row) {
+          return {
+            name: row[0],
+            totalCases: row[1] || 0,
+            active: row[2] || 0,
+            closed: row[3] || 0,
+            won: row[4] || 0,
+            winRate: row[5] || 0,
+            avgDays: row[6] || 0,
+            score: row[9] || 0
+          };
+        })
+        .sort(function(a, b) { return b.score - a.score; })
+        .slice(0, 10);
+    } catch (e) {
+      Logger.log('Error reading steward performance: ' + e.message);
+    }
+  }
+
+  // Get Survey Results from Member Satisfaction sheet
+  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  if (satSheet && satSheet.getLastRow() > 1) {
+    try {
+      var satLastRow = satSheet.getLastRow();
+      var numResponses = satLastRow - 1;
+      data.surveyResults.totalResponses = numResponses;
+
+      // Calculate response rate (responses / total members)
+      if (data.memberStats.total > 0) {
+        data.surveyResults.responseRate = Math.round((numResponses / data.memberStats.total) * 100);
+      }
+
+      if (numResponses > 0) {
+        // Get satisfaction scores (Q6-Q9: columns G-J, indices 6-9)
+        var satScores = satSheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, numResponses, 4).getValues();
+        var totalSat = 0;
+        var validSatCount = 0;
+        satScores.forEach(function(row) {
+          for (var i = 0; i < 4; i++) {
+            var val = parseFloat(row[i]);
+            if (!isNaN(val) && val > 0) {
+              totalSat += val;
+              validSatCount++;
+            }
+          }
+        });
+        data.surveyResults.avgSatisfaction = validSatCount > 0 ? (totalSat / validSatCount).toFixed(1) : 0;
+
+        // Get section averages
+        var sections = [
+          { name: 'Overall Satisfaction', startCol: SATISFACTION_COLS.Q6_SATISFIED_REP, numCols: 4 },
+          { name: 'Steward Ratings', startCol: SATISFACTION_COLS.Q10_TIMELY_RESPONSE, numCols: 7 },
+          { name: 'Chapter Effectiveness', startCol: SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES, numCols: 5 },
+          { name: 'Local Leadership', startCol: SATISFACTION_COLS.Q26_DECISIONS_CLEAR, numCols: 6 },
+          { name: 'Contract Enforcement', startCol: SATISFACTION_COLS.Q32_ENFORCES_CONTRACT, numCols: 4 },
+          { name: 'Communication', startCol: SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE, numCols: 5 },
+          { name: 'Member Voice', startCol: SATISFACTION_COLS.Q46_VOICE_MATTERS, numCols: 5 },
+          { name: 'Value & Action', startCol: SATISFACTION_COLS.Q51_GOOD_VALUE, numCols: 5 }
+        ];
+
+        sections.forEach(function(section) {
+          try {
+            var sectionData = satSheet.getRange(2, section.startCol, numResponses, section.numCols).getValues();
+            var sectionTotal = 0;
+            var sectionValidCount = 0;
+            sectionData.forEach(function(row) {
+              for (var i = 0; i < section.numCols; i++) {
+                var val = parseFloat(row[i]);
+                if (!isNaN(val) && val > 0) {
+                  sectionTotal += val;
+                  sectionValidCount++;
+                }
+              }
+            });
+            var sectionAvg = sectionValidCount > 0 ? (sectionTotal / sectionValidCount).toFixed(1) : 0;
+            data.surveyResults.bySection.push({ name: section.name, avg: parseFloat(sectionAvg) });
+          } catch (e) {
+            data.surveyResults.bySection.push({ name: section.name, avg: 0 });
+          }
+        });
+      }
+    } catch (e) {
+      Logger.log('Error reading satisfaction data: ' + e.message);
+    }
   }
 
   return data;
