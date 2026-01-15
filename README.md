@@ -195,7 +195,7 @@ src/
 - Test suite automation
 - Performance profiling
 
-### Strategic Command Center (v3.6.0)
+### Strategic Command Center (v4.0.0)
 
 The 509 Strategic Command Center provides executive-level analytics and automation:
 

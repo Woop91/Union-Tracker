@@ -590,7 +590,7 @@ Reach out to your fellow stewards or union leadership. We're all in this togethe
 ---
 
 **Last Updated**: January 2026
-**Version**: 3.6.0
+**Version**: 4.0.0
 **Created with**: Deep appreciation for steward dedication
 **Purpose**: Celebrating and supporting the backbone of Local 509 💙
 
