@@ -2419,8 +2419,9 @@ function setupHiddenSheets(ss) {
   // Call the full hidden sheet setup from HiddenSheets.gs
   setupAllHiddenSheets();
 
-  // Install the auto-sync trigger
-  installAutoSyncTrigger();
+  // Install the auto-sync trigger using quick mode (no UI required)
+  // This allows it to work when called from triggers or API contexts
+  installAutoSyncTriggerQuick();
 }
 
 // ============================================================================

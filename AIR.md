@@ -442,7 +442,7 @@ Copy all 10 `.gs` files from `src/` to your Google Apps Script project. Each fil
 
 - Trigger & Repair:
   - `onEditAutoSync()` - Auto-sync trigger handler
-  - `installAutoSyncTrigger()`, `removeAutoSyncTrigger()` - Trigger management
+  - `installAutoSyncTrigger()`, `installAutoSyncTriggerQuick()`, `removeAutoSyncTrigger()` - Trigger management
   - `repairAllHiddenSheets()` - Self-healing repair function
   - `verifyHiddenSheets()` - Verification and diagnostics
 
@@ -470,6 +470,10 @@ Copy all 10 `.gs` files from `src/` to your Google Apps Script project. Each fil
 
 - Menu System:
   - `createCommandCenterMenu()` - Create 509 Command menu with v4.0 submenus (Field Accessibility, Personnel Management, Grievance Tools, System Security, Styling & Theme, Analytics & Insights, Demo Data)
+
+- Configuration **(v4.0.1)**:
+  - `COMMAND_CENTER_CONFIG` - Global config object with hardcoded sheet names (avoids load-order issues)
+  - `getCommandCenterConfig()` - Returns config with lazy-loaded `SHEETS`/`COMMAND_CONFIG` references (use for runtime access)
 
 - Navigation & Field Accessibility **(NEW v4.0)**:
   - `navigateToDashboard()`, `navigateToCustomView()`, `navigateToMobileView()` - Quick navigation helpers
@@ -1188,7 +1192,8 @@ The `onEditAutoSync` trigger automatically syncs data when:
 |----------|---------|
 | `setupAllHiddenSheets()` | Create all 6 hidden sheets with formulas |
 | `repairAllHiddenSheets()` | Recreate sheets, install trigger, sync data |
-| `installAutoSyncTrigger()` | Install the onEdit auto-sync trigger |
+| `installAutoSyncTrigger()` | Install the onEdit auto-sync trigger (requires UI) |
+| `installAutoSyncTriggerQuick()` | Install trigger silently without UI (used by setupHiddenSheets) |
 | `verifyHiddenSheets()` | Verify all sheets and triggers are working |
 | `syncAllData()` | Manual sync of all cross-sheet data |
 | `syncGrievanceToMemberDirectory()` | Sync grievance data to members |
@@ -1232,6 +1237,34 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.0.1 (2026-01-15) - Bug Fixes for Non-UI Contexts
+
+**Bug Fixes:**
+
+1. **SHEETS Reference Error (10_CommandCenter.gs:36)**
+   - **Issue:** `ReferenceError: SHEETS is not defined` when Google Apps Script loaded files in non-deterministic order
+   - **Root Cause:** `COMMAND_CENTER_CONFIG` global variable referenced `SHEETS` constants at initialization time, but `01_Constants.gs` wasn't always loaded first
+   - **Fix:** Hardcoded sheet name strings in `COMMAND_CENTER_CONFIG` global variable; added `getCommandCenterConfig()` function for lazy loading when runtime access to `SHEETS`/`COMMAND_CONFIG` is needed
+
+2. **SpreadsheetApp.getUi() Context Error (08_Code.gs - CREATE_509_DASHBOARD)**
+   - **Issue:** `Exception: Cannot call SpreadsheetApp.getUi() from this context` when `CREATE_509_DASHBOARD()` called from triggers or API
+   - **Root Cause:** `SpreadsheetApp.getUi()` only works when invoked directly from spreadsheet UI menu
+   - **Fix:** Wrapped `getUi()` in try-catch block; added null checks for all `ui.alert()` calls; function now proceeds without confirmation dialog when UI unavailable
+
+3. **SpreadsheetApp.getUi() Context Error (08_Code.gs - setupHiddenSheets)**
+   - **Issue:** Same UI context error occurring after hidden sheets were created
+   - **Root Cause:** `setupHiddenSheets()` called `installAutoSyncTrigger()` which shows a modal dialog requiring UI context
+   - **Fix:** Changed to call `installAutoSyncTriggerQuick()` instead, which installs the trigger silently without UI
+
+**New Function (10_CommandCenter.gs):**
+- `getCommandCenterConfig()` - Returns config object with lazy-loaded `SHEETS`/`COMMAND_CONFIG` references; use this when runtime access to constants is needed
+
+**Files Modified:**
+- `src/10_CommandCenter.gs` - Added `getCommandCenterConfig()`, hardcoded `COMMAND_CENTER_CONFIG` values
+- `src/08_Code.gs` - Wrapped UI calls in try-catch, changed `setupHiddenSheets()` to use `installAutoSyncTriggerQuick()`
+
+---
 
 ### Version 4.0.0 (2026-01-15) - Unified Master Engine
 
