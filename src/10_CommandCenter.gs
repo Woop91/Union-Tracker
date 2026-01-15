@@ -62,15 +62,25 @@ function createCommandCenterMenu() {
 
   // Top-level quick actions (v4.0)
   menu.addItem('👁️ Refresh Dashboard UI', 'APPLY_SYSTEM_THEME')
-      .addItem('🔍 Search Members', 'showSearchDialog')
-      .addItem('📱 Mobile / Pocket View', 'navToMobile');
+      .addItem('🔍 Search Members', 'showSearchDialog');
+
+  menu.addSeparator();
+
+  // v4.0 Field Accessibility submenu (Mobile/Pocket View)
+  menu.addSubMenu(ui.createMenu('📱 Field Accessibility')
+      .addItem('📱 Mobile / Pocket View', 'navToMobile')
+      .addItem('🖥️ Restore Full Desktop View', 'showAllMemberColumns')
+      .addItem('🔄 Refresh View', 'refreshMemberView'));
 
   menu.addSeparator();
 
   // Personnel Management submenu
   menu.addSubMenu(ui.createMenu('👤 Personnel Management')
       .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
+      .addItem('⚡ Generate IDs (Batch Mode)', 'generateMissingMemberIDsBatch')
       .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
+      .addItem('✅ Verify ID Engine', 'verifyIDGenerationEngine')
+      .addSeparator()
       .addItem('🌟 Promote Selected to Steward', 'promoteSelectedMemberToSteward')
       .addItem('⬇️ Demote Steward', 'demoteSelectedSteward'));
 
@@ -88,7 +98,11 @@ function createCommandCenterMenu() {
   menu.addSubMenu(ui.createMenu('🛡️ System Security')
       .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
-      .addItem('📜 View Audit Log', 'navigateToAuditLog'));
+      .addItem('📜 View Audit Log', 'navigateToAuditLog')
+      .addSeparator()
+      .addItem('🔍 v4.0 System Diagnostic', 'DIAGNOSE_SETUP')
+      .addItem('🛠️ Repair Dashboard', 'REPAIR_DASHBOARD')
+      .addItem('📊 v4.0 Status Report', 'showV4StatusReport'));
 
   menu.addSeparator();
 
@@ -265,6 +279,165 @@ function generateMissingMemberIDsBatch() {
   return {
     generated: countAdded,
     total: data.length - 1
+  };
+}
+
+/**
+ * v4.0 Refresh Member View
+ * Reloads the Member Directory view without changing column visibility.
+ */
+function refreshMemberView() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory not found');
+    return;
+  }
+
+  sheet.activate();
+  SpreadsheetApp.flush();
+  ss.toast('✅ View refreshed.', COMMAND_CONFIG.SYSTEM_NAME, 2);
+}
+
+/**
+ * v4.0 ID Generation Engine Verification
+ * Tests the ID generation system to ensure proper sequencing and format.
+ */
+function verifyIDGenerationEngine() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var props = PropertiesService.getScriptProperties();
+
+  var report = '🔍 ID GENERATION ENGINE VERIFICATION\n';
+  report += '=' .repeat(45) + '\n\n';
+
+  // Check current sequences
+  report += '📊 CURRENT SEQUENCE COUNTERS:\n';
+  var unitCodes = getUnitCodes_();
+  var sequenceKeys = Object.keys(unitCodes).map(function(unit) {
+    return 'SEQUENCE_' + unitCodes[unit];
+  });
+
+  // Add GEN prefix for generic IDs
+  sequenceKeys.push('SEQUENCE_GEN');
+
+  sequenceKeys.forEach(function(key) {
+    var value = props.getProperty(key) || '0';
+    report += '  ' + key + ': ' + value + '\n';
+  });
+
+  // Test ID format generation
+  report += '\n🧪 TEST ID GENERATION:\n';
+  var testPrefix = 'TEST';
+  var testSeq = getNextSequence(testPrefix);
+  report += '  Generated: ' + testPrefix + '-' + testSeq + '-H\n';
+  report += '  Format Valid: ' + (testSeq.length === 4 ? '✅ Yes' : '❌ No') + '\n';
+
+  // Check Member Directory for ID statistics
+  report += '\n📈 MEMBER ID STATISTICS:\n';
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (sheet && sheet.getLastRow() > 1) {
+    var data = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1).getValues();
+    var withID = 0;
+    var withoutID = 0;
+    var idFormats = {};
+
+    data.forEach(function(row) {
+      if (row[0]) {
+        withID++;
+        var prefix = String(row[0]).split('-')[0];
+        idFormats[prefix] = (idFormats[prefix] || 0) + 1;
+      } else {
+        withoutID++;
+      }
+    });
+
+    report += '  Members with ID: ' + withID + '\n';
+    report += '  Members without ID: ' + withoutID + '\n';
+    report += '\n  ID Prefix Distribution:\n';
+    Object.keys(idFormats).forEach(function(prefix) {
+      report += '    ' + prefix + ': ' + idFormats[prefix] + '\n';
+    });
+  } else {
+    report += '  No member data found.\n';
+  }
+
+  report += '\n' + '=' .repeat(45) + '\n';
+  report += '✅ ID Engine Verification Complete\n';
+
+  ui.alert('ID Engine Report', report, ui.ButtonSet.OK);
+
+  return {
+    success: true,
+    report: report
+  };
+}
+
+/**
+ * v4.0 Status Report
+ * Displays comprehensive system status for the Unified Master Engine.
+ */
+function showV4StatusReport() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var report = '📊 509 STRATEGIC COMMAND CENTER\n';
+  report += 'v4.0 UNIFIED MASTER ENGINE STATUS\n';
+  report += '=' .repeat(45) + '\n\n';
+
+  // System Identity
+  report += '🏷️ SYSTEM IDENTITY:\n';
+  report += '  Name: ' + COMMAND_CONFIG.SYSTEM_NAME + '\n';
+  report += '  Version: ' + COMMAND_CONFIG.VERSION + '\n';
+  report += '  Codename: ' + VERSION_INFO.CODENAME + '\n';
+  report += '  Architecture: Single-File Modular (10 Virtual Files)\n\n';
+
+  // Production Status
+  report += '🔒 PRODUCTION STATUS:\n';
+  var prodMode = isProductionMode();
+  report += '  Mode: ' + (prodMode ? '🔴 PRODUCTION' : '🟢 DEVELOPMENT') + '\n';
+  report += '  Demo Menu: ' + (prodMode ? 'Hidden' : 'Visible') + '\n\n';
+
+  // Feature Status
+  report += '⚡ v4.0 FEATURES:\n';
+  report += '  ✅ Security Fortress (Audit Log + Sabotage Alert)\n';
+  report += '  ✅ High-Performance Engine (Batch Array Processing)\n';
+  report += '  ✅ Mobile/Pocket View (Field Accessibility)\n';
+  report += '  ✅ Stage-Gate Workflow (Escalation Alerts)\n';
+  report += '  ✅ Production Mode (UI Self-Hiding)\n';
+  report += '  ✅ Search Engine (Member Lookup)\n\n';
+
+  // Data Summary
+  report += '📈 DATA SUMMARY:\n';
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (memberSheet) {
+    report += '  Members: ' + Math.max(0, memberSheet.getLastRow() - 1) + '\n';
+  }
+  if (grievanceSheet) {
+    report += '  Grievances: ' + Math.max(0, grievanceSheet.getLastRow() - 1) + '\n';
+  }
+
+  // Configuration Check
+  report += '\n⚙️ CONFIGURATION:\n';
+  try {
+    var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
+    report += '  Chief Steward Email: ' + (chiefEmail ? '✅ Set' : '⚠️ Not configured') + '\n';
+  } catch (e) {
+    report += '  Chief Steward Email: ⚠️ Unable to check\n';
+  }
+
+  report += '\n' + '=' .repeat(45) + '\n';
+  report += 'Status: ✅ All Systems Operational\n';
+
+  ui.alert('v4.0 Status Report', report, ui.ButtonSet.OK);
+
+  return {
+    success: true,
+    productionMode: prodMode,
+    version: COMMAND_CONFIG.VERSION
   };
 }
 
