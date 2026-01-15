@@ -58,7 +58,6 @@ src/
 
 ### Prerequisites
 
-- Node.js 14+ (for build tools)
 - Google account with Google Sheets
 - [clasp](https://github.com/google/clasp) CLI (optional, for deployment)
 
@@ -70,13 +69,8 @@ src/
    cd MULTIPLE-SCRIPS-REPO
    ```
 
-2. Build the consolidated file:
-   ```bash
-   node build.js
-   ```
-
-3. Deploy to Google Apps Script:
-   - **Option A**: Copy `dist/ConsolidatedDashboard.gs` to your Google Apps Script project manually
+2. Deploy to Google Apps Script:
+   - **Option A**: Copy each file from `src/` to your Google Apps Script project manually
    - **Option B**: Use clasp for automated deployment:
      ```bash
      clasp login
@@ -88,40 +82,32 @@ src/
 
 ### Making Changes
 
-1. Edit files in the `src/` directory (numbered 01-09)
-2. Run the build to generate consolidated output:
-   ```bash
-   node build.js
-   ```
-3. Copy `dist/ConsolidatedDashboard.gs` to Google Apps Script
+1. Edit files in the `src/` directory (numbered 01-10)
+2. Copy updated files to Google Apps Script
+3. Save and refresh your Google Sheet
 
-### Watch Mode (Development)
+### Source Files
 
-```bash
-node build.js --watch
-```
-
-This automatically rebuilds when you save changes to any `.gs` file.
-
-### Build Commands
-
-| Command | Description |
-|---------|-------------|
-| `node build.js` | Build consolidated file |
-| `node build.js --watch` | Watch mode for development |
-| `node build.js --clean` | Remove dist folder |
-| `node build.js --manifest` | Generate appsscript.json |
+| File | Purpose |
+|------|---------|
+| `01_Constants.gs` | Configuration constants, column mappings |
+| `02_MemberManager.gs` | Member operations and directory management |
+| `03_GrievanceManager.gs` | Grievance lifecycle and deadline tracking |
+| `04_UIService.gs` | UI, Comfort View, mobile, Strategic Command Center |
+| `05_Integrations.gs` | Drive, Calendar, WebApp integration |
+| `06_Maintenance.gs` | Diagnostics, caching, performance |
+| `07_DevTools.gs` | Test data generation (DELETE BEFORE PROD) |
+| `08_Code.gs` | Core setup, hidden sheets, dashboard creation |
+| `09_Main.gs` | Entry point and triggers |
+| `10_CommandCenter.gs` | Strategic Command Center features |
 
 ## Going Live (Production)
 
 Before deploying to production:
 
 1. **Run cleanup**: Execute `NUKE_SEEDED_DATA()` to remove all test data
-2. **Delete DevTools**: Remove `07_DevTools.gs` from the build order in `build.js`
-3. **Rebuild**: Run `node build.js` to create production bundle
-4. **Deploy**: Copy the consolidated file to your Apps Script project
-
-The Demo menu will automatically disappear when DevTools.gs is removed.
+2. **Delete DevTools**: Remove `07_DevTools.gs` from your Apps Script project
+3. **Save**: The Demo menu will automatically disappear
 
 ## File Structure After Production
 
