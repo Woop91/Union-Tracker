@@ -1045,3 +1045,118 @@ function getEditGrievanceFormHtml(grievanceId) {
     </html>
   `;
 }
+
+// ============================================================================
+// TRAFFIC LIGHT INDICATORS (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Applies visual traffic light indicators to grievance rows
+ * Colors the ID column based on days to deadline:
+ * - Red: Overdue (< 0 days)
+ * - Orange/Yellow: Urgent (1-3 days)
+ * - Green: On track (> 3 days)
+ */
+function applyTrafficLightIndicators() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error: Grievance Log sheet not found');
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    SpreadsheetApp.getActiveSpreadsheet().toast('No grievances to process', COMMAND_CONFIG.SYSTEM_NAME, 3);
+    return;
+  }
+
+  // Read all days to deadline values
+  var daysRange = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1);
+  var daysValues = daysRange.getValues();
+
+  // Build color array
+  var colors = [];
+  var statusCounts = { overdue: 0, urgent: 0, onTrack: 0 };
+
+  for (var i = 0; i < daysValues.length; i++) {
+    var days = daysValues[i][0];
+
+    if (typeof days !== 'number' || isNaN(days)) {
+      colors.push([null]);  // No color for empty/invalid cells
+    } else if (days < 0) {
+      colors.push([COLORS.STATUS_RED]);  // Red - Overdue
+      statusCounts.overdue++;
+    } else if (days <= 3) {
+      colors.push([COLORS.STATUS_ORANGE]);  // Orange - Urgent
+      statusCounts.urgent++;
+    } else {
+      colors.push([COLORS.STATUS_GREEN]);  // Green - On track
+      statusCounts.onTrack++;
+    }
+  }
+
+  // Batch apply background colors to the ID column (column A)
+  sheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, colors.length, 1).setBackgrounds(colors);
+
+  // Show summary toast
+  var message = 'Traffic lights applied: ' +
+                statusCounts.overdue + ' overdue, ' +
+                statusCounts.urgent + ' urgent, ' +
+                statusCounts.onTrack + ' on track';
+  SpreadsheetApp.getActiveSpreadsheet().toast(message, COMMAND_CONFIG.SYSTEM_NAME, 5);
+
+  return statusCounts;
+}
+
+/**
+ * Removes traffic light indicators from grievance rows
+ */
+function clearTrafficLightIndicators() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) return;
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  // Clear background colors from ID column
+  sheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).setBackground(null);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('Traffic light indicators cleared', COMMAND_CONFIG.SYSTEM_NAME, 3);
+}
+
+/**
+ * Applies deadline-based row highlighting
+ * Highlights entire rows based on urgency level
+ */
+function highlightUrgentGrievances() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) return;
+
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow < 2) return;
+
+  var daysValues = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1).getValues();
+
+  // Apply row backgrounds based on urgency
+  for (var i = 0; i < daysValues.length; i++) {
+    var days = daysValues[i][0];
+    var rowRange = sheet.getRange(i + 2, 1, 1, lastCol);
+
+    if (typeof days !== 'number' || isNaN(days)) {
+      continue;
+    } else if (days < 0) {
+      rowRange.setBackground(COLORS.ROW_ALT_RED);  // Light red tint
+    } else if (days <= 3) {
+      rowRange.setBackground('#fefce8');  // Light yellow tint
+    }
+  }
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('Urgent grievances highlighted', COMMAND_CONFIG.SYSTEM_NAME, 3);
+}

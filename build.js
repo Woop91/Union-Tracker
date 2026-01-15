@@ -22,7 +22,8 @@
  * 6.  06_Maintenance.gs      - Diagnostics, caching
  * 7.  07_DevTools.gs         - Test data (DELETE BEFORE PROD)
  * 8.  08_Code.gs             - Core setup, hidden sheets
- * 9.  09_Main.gs             - Entry point (must be last)
+ * 9.  10_CommandCenter.gs    - 509 Strategic Command Center consolidated features
+ * 10. 09_Main.gs             - Entry point (must be last)
  *
  * @fileoverview Build script for merging modular files
  * @version 2.0.0
@@ -38,7 +39,7 @@ const CONFIG = {
   outputFile: 'ConsolidatedDashboard.gs',
 
   // Files in build order (dependency order matters!)
-  // 9-FILE MODULAR ARCHITECTURE - Prefixed for GitHub grouping
+  // 10-FILE MODULAR ARCHITECTURE - Prefixed for GitHub grouping
   buildOrder: [
     '01_Constants.gs',        // Must be first - defines all constants
     '02_MemberManager.gs',    // Member operations and directory management
@@ -48,6 +49,7 @@ const CONFIG = {
     '06_Maintenance.gs',      // Diagnostics, caching, performance
     '07_DevTools.gs',         // Test data generation (DELETE BEFORE PROD)
     '08_Code.gs',             // Core setup, hidden sheets, dashboard creation
+    '10_CommandCenter.gs',    // 509 Strategic Command Center consolidated features
     '09_Main.gs'              // Entry point - must be last
   ],
 
@@ -71,13 +73,14 @@ const CONFIG = {
  * - 06_Maintenance.gs      : Diagnostics, caching, performance
  * - 07_DevTools.gs         : Test data generation (DELETE BEFORE PROD)
  * - 08_Code.gs             : Core setup, hidden sheets, dashboard creation
+ * - 10_CommandCenter.gs    : 509 Strategic Command Center consolidated features
  * - 09_Main.gs             : Entry point and triggers
  *
  * Then run: node build.js
  *
  * Generated: {{TIMESTAMP}}
- * Version: 3.6.0
- * Architecture: 9-File Modular
+ * Version: 3.6.5
+ * Architecture: 10-File Modular (Strategic Command Center)
  * ============================================================================
  */
 

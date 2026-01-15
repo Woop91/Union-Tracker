@@ -197,6 +197,40 @@ var COLORS = {
 };
 
 /**
+ * UI Theme constants for dialogs and sidebars
+ * Used in HTML templates for consistent styling
+ * @const {Object}
+ */
+var UI_THEME = {
+  // Primary Colors
+  PRIMARY_COLOR: '#7C3AED',       // Main brand purple
+  SECONDARY_COLOR: '#64748B',     // Secondary gray
+
+  // Text Colors
+  TEXT_PRIMARY: '#1F2937',        // Dark text
+  TEXT_SECONDARY: '#6B7280',      // Gray text
+
+  // UI Elements
+  BORDER_COLOR: '#E5E7EB',        // Light gray borders
+  BACKGROUND: '#F9FAFB',          // Light background
+  CARD_BG: '#FFFFFF',             // White card background
+
+  // Status Colors
+  SUCCESS_COLOR: '#10B981',       // Green
+  WARNING_COLOR: '#F59E0B',       // Amber
+  DANGER_COLOR: '#EF4444',        // Red
+  INFO_COLOR: '#3B82F6',          // Blue
+
+  // Dark Mode (for dark headers)
+  DARK_BG: '#1E293B',             // Dark slate
+  DARK_TEXT: '#F8FAFC',           // Light text on dark
+
+  // Gradients
+  GRADIENT_START: '#7C3AED',
+  GRADIENT_END: '#5B21B6'
+};
+
+/**
  * Menu Icon Mapping - Consistent Iconography
  * Action icons for tools, View icons for dashboards
  * @const {Object}
@@ -453,12 +487,14 @@ var CONFIG_COLS = {
   // ── FORM LINKS ── (AR)
   SATISFACTION_FORM_URL: 44,  // AR - Member Satisfaction Survey form URL
 
-  // ── STRATEGIC COMMAND CENTER ── (AS-AW)
+  // ── STRATEGIC COMMAND CENTER ── (AS-AZ)
   CHIEF_STEWARD_EMAIL: 45,    // AS - Email for escalation alerts
   UNIT_CODES: 46,             // AT - Unit code prefixes (format: "Unit Name:CODE,Unit2:CODE2")
   ARCHIVE_FOLDER_ID: 47,      // AU - Drive folder ID for archives
   ESCALATION_STATUSES: 48,    // AV - Status values that trigger alerts (comma-separated)
-  ESCALATION_STEPS: 49        // AW - Step values that trigger alerts (comma-separated)
+  ESCALATION_STEPS: 49,       // AW - Step values that trigger alerts (comma-separated)
+  TEMPLATE_ID: 50,            // AX - Google Doc template ID for grievance PDFs
+  PDF_FOLDER_ID: 51           // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
 };
 
 // ============================================================================

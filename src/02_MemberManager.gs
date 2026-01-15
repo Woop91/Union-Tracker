@@ -323,3 +323,333 @@ function syncMemberGrievanceData() {
 
   Logger.log('Member grievance data synced');
 }
+
+// ============================================================================
+// UNIT-BASED ID GENERATION (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Generates missing Member IDs for all members without one
+ * Uses unit-based prefixes from COMMAND_CONFIG or Config sheet
+ * Format: UNIT_CODE-SEQUENCE-H (e.g., MS-101-H)
+ */
+function generateMissingMemberIDs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory sheet not found');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var unitCodes = getUnitCodes_();
+  var countAdded = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var currentId = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    var unit = data[i][MEMBER_COLS.UNIT - 1];
+
+    // If ID is blank but member has data
+    if (!currentId && (unit || data[i][MEMBER_COLS.FIRST_NAME - 1])) {
+      var prefix = unitCodes[unit] || 'GEN';
+      var nextNum = getNextSequence_(prefix, sheet);
+      var newId = prefix + '-' + nextNum + '-H';
+
+      sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
+      countAdded++;
+    }
+  }
+
+  ss.toast('Generated ' + countAdded + ' new Member IDs', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  return countAdded;
+}
+
+/**
+ * Gets the next available sequence number for a given prefix
+ * Scans existing IDs to find the highest number and increments
+ * @param {string} prefix - The unit code prefix (e.g., "MS")
+ * @param {Sheet} sheet - The Member Directory sheet
+ * @returns {number} Next available sequence number
+ * @private
+ */
+function getNextSequence_(prefix, sheet) {
+  var ids = sheet.getRange(1, MEMBER_COLS.MEMBER_ID, sheet.getLastRow(), 1).getValues().flat();
+  var max = 100;
+
+  ids.forEach(function(id) {
+    if (typeof id === 'string' && id.startsWith(prefix + '-')) {
+      var parts = id.split('-');
+      if (parts.length >= 2) {
+        var n = parseInt(parts[1], 10);
+        if (!isNaN(n) && n > max) {
+          max = n;
+        }
+      }
+    }
+  });
+
+  return max + 1;
+}
+
+/**
+ * Checks for duplicate Member IDs and reports them
+ */
+function checkDuplicateMemberIDs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory sheet not found');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var idCounts = {};
+  var duplicates = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var id = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    if (id) {
+      if (idCounts[id]) {
+        idCounts[id].count++;
+        idCounts[id].rows.push(i + 1);
+      } else {
+        idCounts[id] = { count: 1, rows: [i + 1] };
+      }
+    }
+  }
+
+  for (var memberId in idCounts) {
+    if (idCounts[memberId].count > 1) {
+      duplicates.push({
+        id: memberId,
+        count: idCounts[memberId].count,
+        rows: idCounts[memberId].rows
+      });
+    }
+  }
+
+  if (duplicates.length === 0) {
+    SpreadsheetApp.getUi().alert('No duplicate Member IDs found.');
+  } else {
+    var message = 'Found ' + duplicates.length + ' duplicate ID(s):\n\n';
+    duplicates.forEach(function(dup) {
+      message += 'ID: ' + dup.id + ' (rows: ' + dup.rows.join(', ') + ')\n';
+    });
+    SpreadsheetApp.getUi().alert(message);
+  }
+
+  return duplicates;
+}
+
+// ============================================================================
+// STEWARD PROMOTION/DEMOTION (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Promotes the currently selected member to Steward status
+ * Updates IS_STEWARD column and adds to Config steward list
+ */
+function promoteSelectedMemberToSteward() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('Please select a member row in the Member Directory sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a member row (not the header)');
+    return;
+  }
+
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var fullName = firstName + ' ' + lastName;
+  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
+
+  if (currentStatus === 'Yes' || currentStatus === true) {
+    ui.alert(fullName + ' is already a Steward');
+    return;
+  }
+
+  var response = ui.alert(
+    'Promote to Steward',
+    'Promote ' + fullName + ' to Steward?\n\nThis will:\n' +
+    '- Set "Is Steward" to Yes\n' +
+    '- Add to the Steward dropdown list',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  // Update member record
+  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
+
+  // Add to Config steward list
+  addToConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
+
+  ss.toast(fullName + ' has been promoted to Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Demotes the currently selected steward back to regular member
+ */
+function demoteSelectedSteward() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('Please select a steward row in the Member Directory sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a member row (not the header)');
+    return;
+  }
+
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var fullName = firstName + ' ' + lastName;
+  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
+
+  if (currentStatus !== 'Yes' && currentStatus !== true) {
+    ui.alert(fullName + ' is not currently a Steward');
+    return;
+  }
+
+  var response = ui.alert(
+    'Demote Steward',
+    'Demote ' + fullName + ' from Steward?\n\nThis will:\n' +
+    '- Set "Is Steward" to No\n' +
+    '- Remove from the Steward dropdown list',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  // Update member record
+  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('No');
+
+  // Remove from Config steward list
+  removeFromConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
+
+  ss.toast(fullName + ' has been demoted from Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Adds a value to a Config column dropdown list
+ * @param {number} configCol - The Config column number
+ * @param {string} value - The value to add
+ * @private
+ */
+function addToConfigDropdown_(configCol, value) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) return;
+
+  // Find first empty row in the column
+  var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
+  var emptyRow = 3;
+
+  for (var i = 0; i < colData.length; i++) {
+    if (!colData[i][0]) {
+      emptyRow = i + 3;
+      break;
+    }
+    emptyRow = i + 4;
+  }
+
+  configSheet.getRange(emptyRow, configCol).setValue(value);
+}
+
+/**
+ * Removes a value from a Config column dropdown list
+ * @param {number} configCol - The Config column number
+ * @param {string} value - The value to remove
+ * @private
+ */
+function removeFromConfigDropdown_(configCol, value) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) return;
+
+  var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
+
+  for (var i = 0; i < colData.length; i++) {
+    if (colData[i][0] === value) {
+      configSheet.getRange(i + 3, configCol).clearContent();
+      break;
+    }
+  }
+}
+
+// ============================================================================
+// BATCH PROCESSING (Performance Optimization)
+// ============================================================================
+
+/**
+ * Updates member data in batch mode for better performance
+ * Reads all data once, modifies in memory, writes back in one operation
+ * @param {string} memberId - The member ID to update
+ * @param {Object} newValuesObj - Object with field values to update
+ */
+function updateMemberDataBatch(memberId, newValuesObj) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  var range = sheet.getDataRange();
+  var data = range.getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+      // Modify array in memory
+      if (newValuesObj.email !== undefined) {
+        data[i][MEMBER_COLS.EMAIL - 1] = newValuesObj.email;
+      }
+      if (newValuesObj.phone !== undefined) {
+        data[i][MEMBER_COLS.PHONE - 1] = newValuesObj.phone;
+      }
+      if (newValuesObj.firstName !== undefined) {
+        data[i][MEMBER_COLS.FIRST_NAME - 1] = newValuesObj.firstName;
+      }
+      if (newValuesObj.lastName !== undefined) {
+        data[i][MEMBER_COLS.LAST_NAME - 1] = newValuesObj.lastName;
+      }
+      if (newValuesObj.unit !== undefined) {
+        data[i][MEMBER_COLS.UNIT - 1] = newValuesObj.unit;
+      }
+      if (newValuesObj.workLocation !== undefined) {
+        data[i][MEMBER_COLS.WORK_LOCATION - 1] = newValuesObj.workLocation;
+      }
+      if (newValuesObj.isSteward !== undefined) {
+        data[i][MEMBER_COLS.IS_STEWARD - 1] = newValuesObj.isSteward;
+      }
+
+      // Write the specific row back in one shot
+      sheet.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
+
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Member ' + memberId + ' updated via batch process',
+        COMMAND_CONFIG.SYSTEM_NAME,
+        3
+      );
+      return true;
+    }
+  }
+
+  return false;
+}

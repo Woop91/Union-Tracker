@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 3.6.0 / v3.48 (Strategic Command Center, Midnight Auto-Refresh, Dynamic Config)
+**Version:** 3.6.5 / v3.48 (Strategic Command Center Master Engine, 10-File Architecture)
 **Last Updated:** 2026-01-15
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -126,22 +126,23 @@ When the "Start Grievance" checkbox (column AE) is checked in Member Directory:
 
 ## File Architecture
 
-### Modular Architecture (9 Source Files)
+### Modular Architecture (10 Source Files)
 
-This repository implements a **streamlined 9-file modular architecture** following the Separation of Concerns principle. Each module handles a specific aspect of the dashboard functionality.
+This repository implements a **streamlined 10-file modular architecture** following the Separation of Concerns principle. Each module handles a specific aspect of the dashboard functionality.
 
 ```
 MULTIPLE-SCRIPS-REPO/
-├── src/                        # Source files for build (9 modules)
-│   ├── 01_Constants.gs         # Configuration constants (SHEETS, COLORS, MEMBER_COLS, GRIEVANCE_COLS, COMMAND_CONFIG)
-│   ├── 02_MemberManager.gs     # Member operations, steward management, ID generation
-│   ├── 03_GrievanceManager.gs  # Grievance lifecycle, deadlines, step advancement
+├── src/                        # Source files for build (10 modules)
+│   ├── 01_Constants.gs         # Configuration constants (SHEETS, COLORS, MEMBER_COLS, GRIEVANCE_COLS, COMMAND_CONFIG, UI_THEME)
+│   ├── 02_MemberManager.gs     # Member operations, steward management, ID generation, batch processing
+│   ├── 03_GrievanceManager.gs  # Grievance lifecycle, deadlines, step advancement, traffic lights
 │   ├── 04_UIService.gs         # UI, Comfort View, mobile, Strategic Command Center dashboards
-│   ├── 05_Integrations.gs      # Google Drive, Calendar, WebApp, email notifications
-│   ├── 06_Maintenance.gs       # Admin tools, diagnostics, caching, validation
+│   ├── 05_Integrations.gs      # Google Drive, Calendar, WebApp, email notifications, PDF engine
+│   ├── 06_Maintenance.gs       # Admin tools, diagnostics, caching, validation, snapshots
 │   ├── 07_DevTools.gs          # Demo data seeding - DELETE BEFORE PRODUCTION
 │   ├── 08_Code.gs              # Core setup, hidden sheets, dashboard creation, multi-select
-│   ├── 09_Main.gs              # Entry point, onOpen, onEdit triggers
+│   ├── 10_CommandCenter.gs     # 509 Strategic Command Center consolidated features (NEW in v3.6.5)
+│   ├── 09_Main.gs              # Entry point, onOpen, onEdit triggers, sabotage protection
 │   └── MultiSelectDialog.html  # HTML template for multi-select UI
 ├── dist/                       # Build output
 │   └── ConsolidatedDashboard.gs # Combined file for deployment (auto-generated)
@@ -163,20 +164,28 @@ npm run build        # Build ConsolidatedDashboard.gs
 npm run watch        # Watch mode for development
 ```
 
-### File Descriptions (9-File Architecture)
+### File Descriptions (10-File Architecture)
 
-**01_Constants.gs** (~700 lines) - Configuration & Column Mapping
+**01_Constants.gs** (~800 lines) - Configuration & Column Mapping
 - `SHEETS` - Sheet name constants (3 data + 2 dashboard + 6 hidden)
 - `COLORS` - Brand color scheme
 - `MEMBER_COLS` - 31 Member Directory column positions
 - `GRIEVANCE_COLS` - 34 Grievance Log column positions
 - `CONFIG_COLS` - Config sheet column positions (includes Strategic Command settings at AS-AW)
-- `COMMAND_CONFIG` - Strategic Command Center configuration (v3.6.0):
+  - **NEW in v3.6.5:** `TEMPLATE_ID: 50` and `PDF_FOLDER_ID: 51` for PDF automation
+- `COMMAND_CONFIG` - Strategic Command Center configuration (v3.6.5):
   - `SYSTEM_NAME`, `VERSION` - System identification
   - `ESCALATION_STATUSES`, `ESCALATION_STEPS` - Alert triggers
   - `UNIT_CODES` - Dynamic from Config sheet
   - `THEME` - Roboto theme settings (header colors, alt rows, fonts)
   - `STATUS_COLORS` - Status-based coloring (Open=Yellow, Won=Green, Denied=Red, etc.)
+  - `PDF` - PDF signature engine settings (SIGNATURE_BLOCK template)
+  - `EMAIL` - Email configuration (SUBJECT_PREFIX)
+- `UI_THEME` **(NEW in v3.6.5)** - Global UI theme colors for dialogs and modals:
+  - `PRIMARY_COLOR` (#7C3AED), `SECONDARY_COLOR` (#64748B)
+  - `TEXT_PRIMARY`, `TEXT_SECONDARY`, `BORDER_COLOR`, `BACKGROUND`, `CARD_BG`
+  - `SUCCESS_COLOR`, `WARNING_COLOR`, `DANGER_COLOR`, `INFO_COLOR`
+  - `DARK_BG`, `DARK_TEXT`, `GRADIENT_START`, `GRADIENT_END`
 - `DEFAULT_CONFIG` - Default dropdown values
 - `MULTI_SELECT_COLS` - Configuration for multi-select columns
 - `getMultiSelectConfig()` - Get multi-select config for a column
@@ -192,7 +201,7 @@ npm run watch        # Watch mode for development
 - `getMemberHeaders()` - Get all 31 member column headers
 - `getGrievanceHeaders()` - Get all 34 grievance column headers
 
-**02_MemberManager.gs** (~350 lines) - Member Directory Operations
+**02_MemberManager.gs** (~680 lines) - Member Directory Operations
 - Member CRUD Operations:
   - `addMember()` - Add new member to directory
   - `updateMember()` - Update existing member data
@@ -200,23 +209,36 @@ npm run watch        # Watch mode for development
   - `searchMembers()` - Search members by name/email/ID
 - Member ID Generation:
   - `generateMemberID_()` - Generate unique Member ID (M + name prefix + digits)
+  - `generateMissingMemberIDs()` **(NEW v3.6.5)** - Batch generate unit-based IDs (e.g., MS-104-H)
+  - `getNextSequence_(prefix, sheet)` **(NEW v3.6.5)** - Get next sequence number for unit
+  - `checkDuplicateMemberIDs()` **(NEW v3.6.5)** - Find and report duplicate IDs
 - Steward Management:
   - `getAllStewards()` - Get all active stewards
   - `getStewardWorkload()` - Calculate steward case loads with win rates
+  - `promoteSelectedMemberToSteward()` **(NEW v3.6.5)** - One-click steward promotion
+  - `demoteSelectedSteward()` **(NEW v3.6.5)** - Steward demotion with cleanup
+  - `addToConfigDropdown_(configCol, value)` **(NEW v3.6.5)** - Add value to Config dropdown
+  - `removeFromConfigDropdown_(configCol, value)` **(NEW v3.6.5)** - Remove value from Config dropdown
+- Batch Processing:
+  - `updateMemberDataBatch(memberId, newValuesObj)` **(NEW v3.6.5)** - Batch update member data
 - Data Sync:
   - `syncMemberGrievanceData()` - Sync grievance counts to Member Directory
 
-**03_GrievanceManager.gs** (~1048 lines) - Grievance Lifecycle Management
+**03_GrievanceManager.gs** (~1163 lines) - Grievance Lifecycle Management
 - `startNewGrievance()` - Open pre-filled grievance form
 - `advanceGrievanceStep()` - Advance grievance to next step
 - `recalcAllGrievancesBatched()` - Batch recalculate grievance deadlines
 - `onGrievanceFormSubmit()` - Handle form submission trigger
 - `calculateInitialDeadlines()` - Calculate filing and response deadlines
+- Traffic Light Indicators **(NEW v3.6.5)**:
+  - `applyTrafficLightIndicators()` - Color ID column: Red (overdue), Orange (urgent), Green (on track)
+  - `clearTrafficLightIndicators()` - Remove all traffic light coloring
+  - `highlightUrgentGrievances()` - Highlight grievances due within 3 days
 - `getGrievanceById()` - Lookup grievance by ID
 - `bulkUpdateGrievanceStatus()` - Bulk update grievance statuses
 - `resolveGrievance()` - Close grievance with outcome
 
-**04_UIService.gs** (~4500 lines) - UI, Mobile, Comfort View & Strategic Command Center
+**04_UIService.gs** (~4709 lines) - UI, Mobile, Comfort View & Strategic Command Center
 *Consolidated from: UIService, ComfortViewFeatures, MobileQuickActions, StrategicCommandCenter*
 
 - UI Components & Dialogs:
@@ -226,6 +248,19 @@ npm run watch        # Watch mode for development
   - `getCommonStyles()` - Shared CSS for dialogs
   - `showDashboardSidebar()` - Sidebar panel for extended UI
   - `showAdvancedSearch()` - Advanced search with filters
+
+- Navigation Helpers **(NEW v3.6.5)**:
+  - `navToDash()` - Quick navigate to Dashboard
+  - `navToCustom()` - Quick navigate to Interactive Dashboard
+  - `navToMobile()` - Quick navigate to Mobile Dashboard
+  - `navigateToSheet(sheetName)` - Generic sheet navigation helper
+
+- Global Styling **(NEW v3.6.5)**:
+  - `APPLY_SYSTEM_THEME()` - Apply Roboto font, zebra stripes, dark headers to all visible sheets
+  - `applyThemeToSheet_(sheet)` - Apply theme to individual sheet
+  - `applyGlobalStyling()` - Wrapper for APPLY_SYSTEM_THEME
+  - `resetToDefaultTheme()` - Reset sheets to default Google Sheets styling
+  - `refreshAllVisuals()` - Refresh theme, traffic lights, and all visuals
 
 - Comfort View Accessibility:
   - `showComfortViewPanel()` - Main Comfort View settings panel
@@ -261,7 +296,7 @@ npm run watch        # Watch mode for development
   - `emailDashboardLinkToMember()` - Email dashboard access link
   - `emailGrievanceStatusToMember()` - Email grievance status update
 
-- Strategic Command Center (v3.6.0):
+- Strategic Command Center (v3.6.5):
   - `rebuildExecutiveDashboard()` - Executive Command (PII) dashboard
   - `rebuildMemberAnalytics()` - Member Analytics (No PII) dashboard
   - `generateUnitHotZones()` - Identify locations with 3+ active grievances
@@ -276,19 +311,24 @@ npm run watch        # Watch mode for development
   - `setupMidnightTrigger()`, `removeMidnightTrigger()` - Daily refresh automation
   - `midnightAutoRefresh()` - 12AM dashboard refresh + overdue alerts
 
-**05_Integrations.gs** (~1200 lines) - External Services & WebApp
+**05_Integrations.gs** (~1408 lines) - External Services & WebApp
 *Consolidated from: Integrations, WebApp*
 
 - Google Drive Integration:
   - `setupDriveFolderForGrievance()` - Create grievance folder with subfolders
   - `batchCreateGrievanceFolders()` - Bulk folder creation
   - `getOrCreateDeadlinesCalendar()` - Get/create calendar
+  - `getOrCreateMemberFolder(name, id)` **(NEW v3.6.5)** - Create member-specific archive folder
 - Calendar Integration:
   - `syncDeadlinesToCalendar()` - Sync all grievance deadlines
   - `clearAllCalendarEvents()` - Clear dashboard events
 - Email Notifications:
   - `sendDeadlineReminders()` - Send upcoming deadline alerts
   - `sendEmailToMember()` - Send email to specific member
+- PDF Signature Engine **(NEW v3.6.5)**:
+  - `createSignatureReadyPDF(folder, data)` - Merge data into PDF with legal signature blocks
+  - `createPDFForSelectedGrievance()` - Create PDF for currently selected grievance row
+  - `onGrievanceFormSubmit(e)` - Enhanced form handler with auto-PDF generation
 - Web App Entry Point:
   - `doGet(e)` - Web app entry point, routes to pages
   - `getWebAppDashboardHtml()` - Main dashboard with stats
@@ -298,7 +338,7 @@ npm run watch        # Watch mode for development
   - `getWebAppLinksHtml()` - Forms and resources links page
   - `showWebAppUrl()` - Display web app URL after deployment
 
-**06_Maintenance.gs** (~2500 lines) - Admin Tools, Diagnostics, Caching & Validation
+**06_Maintenance.gs** (~2652 lines) - Admin Tools, Diagnostics, Caching & Validation
 *Consolidated from: Maintenance, PerformanceUndo, DataIntegrity, TestingValidation*
 
 - Diagnostics & Repair:
@@ -307,6 +347,12 @@ npm run watch        # Watch mode for development
   - `logAuditEvent()` - Log action to audit sheet
   - `showDiagnosticsDialog()` - Display diagnostics UI
   - `NUCLEAR_RESET_HIDDEN_SHEETS()` - Complete hidden sheet reset
+
+- Snapshot & Backup **(NEW v3.6.5)**:
+  - `createWeeklySnapshot()` - Manual one-click backup to archive folder
+  - `createAutomatedSnapshot()` - Automated snapshot for trigger use
+  - `setupWeeklySnapshotTrigger()` - Setup Sunday 2AM automated backups
+  - `navigateToAuditLog()` - Quick navigation to audit log sheet
 
 - Caching Layer:
   - `getCachedData()` - Get data from cache or load
@@ -426,13 +472,39 @@ npm run watch        # Watch mode for development
   - `getSatisfactionSectionData()`, `getSatisfactionAnalyticsData()`
   - `getSatisfactionTrendData()`, `getSatisfactionLocationDrill()`
 
-**09_Main.gs** (~900 lines) - Entry Point & Triggers
+**10_CommandCenter.gs** (~628 lines) - 509 Strategic Command Center Consolidated Module **(NEW v3.6.5)**
+- Production Mode Management:
+  - `isProductionMode()` - Check if production mode is enabled
+  - `enableProductionMode()` - Enable production mode (hide Demo Data menu)
+  - `disableProductionMode()` - Disable production mode
+- Nuclear Operations:
+  - `NUKE_DATABASE()` - Nuclear wipe with double confirmation (clears Member Directory, Grievance Log, Config dropdowns)
+- Diagnostics:
+  - `DIAGNOSE_SETUP()` - Comprehensive diagnostic report (sheets, hidden sheets, triggers)
+  - `REPAIR_DASHBOARD()` - Rebuild missing hidden sheets, apply theme, traffic lights
+- Calendar Sync:
+  - `syncToCalendar()` - Sync grievance deadlines to Google Calendar
+- Search & Navigation:
+  - `showSearchDialog()` - Modern search dialog with UI_THEME styling
+  - `getSearchDialogHtml_()` - Generate search dialog HTML
+  - `navigateToMember(memberId)` - Navigate to member row in sheet
+- Batch Operations:
+  - `updateMemberBatch(memberId, updateObj)` - Batch update member data
+- Menu Integration:
+  - `createCommandCenterMenu()` - Create 509 Command menu items
+
+**09_Main.gs** (~956 lines) - Entry Point & Triggers
 - Menu System:
   - `onOpen()` - Create 6 menus (509 Dashboard, Grievances, View, Settings, Admin, 509 Command)
 - Edit Handlers:
   - `onEdit()` - Handle cell edit events with stage-gate workflow
   - `handleStageGateWorkflow_()` - Automatic escalation alerts on step changes
   - `sendEscalationAlert_()` - Email alerts to Chief Steward
+- Security **(Enhanced v3.6.5)**:
+  - `handleSecurityAudit_(e)` - Enhanced with sabotage protection
+    - Detects mass deletions (>15 cells cleared at once)
+    - Sends email alert to Chief Steward on sabotage detection
+    - Logs all edits to Audit Log sheet with timestamps
 - Config Helpers:
   - `getConfigValue_()` - Read values from Config sheet columns
   - `getEscalationStatuses_()`, `getEscalationSteps_()` - Dynamic escalation config
@@ -1070,6 +1142,96 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 3.6.5 (2026-01-15) - Strategic Command Center Master Engine
+
+**10-File Modular Architecture:**
+- Added new `10_CommandCenter.gs` (~628 lines) - Consolidated 509 Strategic Command Center module
+- Updated `build.js` to include 10th file in build order (before 09_Main.gs)
+- System now uses 10-file architecture instead of 9-file
+
+**New UI_THEME Constant (01_Constants.gs):**
+- Added `UI_THEME` constant for global UI theming across all dialogs and modals
+- Properties: PRIMARY_COLOR (#7C3AED), SECONDARY_COLOR (#64748B)
+- Text colors: TEXT_PRIMARY, TEXT_SECONDARY
+- UI elements: BORDER_COLOR, BACKGROUND, CARD_BG
+- Status colors: SUCCESS_COLOR, WARNING_COLOR, DANGER_COLOR, INFO_COLOR
+- Dark mode: DARK_BG, DARK_TEXT, GRADIENT_START, GRADIENT_END
+- **Bug Fix:** Resolved `ReferenceError: UI_THEME is not defined` in 04_UIService.gs dialogs
+
+**New CONFIG_COLS Additions (01_Constants.gs):**
+- `TEMPLATE_ID: 50` - Google Doc template ID for PDF generation
+- `PDF_FOLDER_ID: 51` - Google Drive folder ID for PDF archives
+
+**Member ID Generation System (02_MemberManager.gs):**
+- `generateMissingMemberIDs()` - Batch generate unit-based IDs (e.g., MS-104-H format)
+- `getNextSequence_(prefix, sheet)` - Get next sequence number for unit code
+- `checkDuplicateMemberIDs()` - Find and report duplicate Member IDs
+
+**Steward Management (02_MemberManager.gs):**
+- `promoteSelectedMemberToSteward()` - One-click promotion with Config dropdown update
+- `demoteSelectedSteward()` - Steward demotion with cleanup
+- `addToConfigDropdown_(configCol, value)` - Add values to Config dropdowns
+- `removeFromConfigDropdown_(configCol, value)` - Remove values from Config dropdowns
+
+**Batch Processing (02_MemberManager.gs):**
+- `updateMemberDataBatch(memberId, newValuesObj)` - Efficient batch updates
+
+**Traffic Light Indicators (03_GrievanceManager.gs):**
+- `applyTrafficLightIndicators()` - Color ID column: Red (overdue), Orange (≤3 days), Green (on track)
+- `clearTrafficLightIndicators()` - Remove all traffic light coloring
+- `highlightUrgentGrievances()` - Highlight grievances due within 3 days
+
+**Navigation Helpers (04_UIService.gs):**
+- `navToDash()`, `navToCustom()`, `navToMobile()` - Quick sheet navigation
+- `navigateToSheet(sheetName)` - Generic navigation helper
+
+**Global Styling System (04_UIService.gs):**
+- `APPLY_SYSTEM_THEME()` - Apply Roboto font, zebra striping, dark headers to all sheets
+- `applyThemeToSheet_(sheet)` - Apply theme to individual sheet
+- `resetToDefaultTheme()` - Reset to Google Sheets defaults
+- `refreshAllVisuals()` - Refresh theme, traffic lights, all visuals
+
+**PDF Signature Engine (05_Integrations.gs):**
+- `getOrCreateMemberFolder(name, id)` - Create member-specific archive folders
+- `createSignatureReadyPDF(folder, data)` - Merge template data, add legal signature blocks
+- `createPDFForSelectedGrievance()` - Create PDF for selected grievance row
+- Enhanced `onGrievanceFormSubmit(e)` with auto-PDF generation
+
+**Snapshot & Backup (06_Maintenance.gs):**
+- `createWeeklySnapshot()` - Manual one-click backup to archive folder
+- `createAutomatedSnapshot()` - Automated snapshot for trigger use
+- `setupWeeklySnapshotTrigger()` - Setup Sunday 2AM automated backups
+- `navigateToAuditLog()` - Quick navigation to audit log
+
+**Sabotage Protection (09_Main.gs):**
+- Enhanced `handleSecurityAudit_(e)` with mass deletion detection
+- Detects >15 cells cleared at once and triggers email alert
+- Logs all edits with timestamps to Audit Log sheet
+
+**10_CommandCenter.gs - New Consolidated Module:**
+- `createCommandCenterMenu()` - Menu integration
+- `isProductionMode()`, `enableProductionMode()`, `disableProductionMode()` - Production mode
+- `NUKE_DATABASE()` - Nuclear wipe with double confirmation
+- `DIAGNOSE_SETUP()` - Comprehensive diagnostic report
+- `REPAIR_DASHBOARD()` - Self-healing repair function
+- `syncToCalendar()` - Calendar sync for deadlines
+- `showSearchDialog()` - Modern search with UI_THEME styling
+- `navigateToMember(memberId)` - Member navigation
+- `updateMemberBatch(memberId, updateObj)` - Batch member updates
+
+**Files Modified:**
+- `01_Constants.gs` - Added UI_THEME, CONFIG_COLS.TEMPLATE_ID, CONFIG_COLS.PDF_FOLDER_ID
+- `02_MemberManager.gs` - Added ~330 lines (ID generation, steward management, batch ops)
+- `03_GrievanceManager.gs` - Added ~115 lines (traffic light indicators)
+- `04_UIService.gs` - Added ~209 lines (navigation helpers, global styling)
+- `05_Integrations.gs` - Added ~208 lines (PDF signature engine)
+- `06_Maintenance.gs` - Added ~152 lines (snapshot/backup functions)
+- `09_Main.gs` - Added ~56 lines (enhanced sabotage protection)
+- `10_CommandCenter.gs` - NEW FILE (~628 lines)
+- `build.js` - Updated to 10-file architecture
+
+---
 
 ### Version 2.2.0 / v3.48 (2026-01-14) - Survey Verification, Data Integrity & Steward Workload
 
