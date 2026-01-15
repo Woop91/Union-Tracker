@@ -18,13 +18,9 @@
 
 ## Quick Start
 
-> ⚠️ **IMPORTANT: Deploy ONLY `ConsolidatedDashboard.gs`**
-> The modular `.gs` files are source files used to generate ConsolidatedDashboard.gs.
-> Deploying multiple files will cause function conflicts and trigger errors.
-
-1. Copy **only** `ConsolidatedDashboard.gs` to Google Apps Script
-2. Run `CREATE_509_DASHBOARD()` to create 5 sheets + 6 hidden calculation sheets
-3. Use `🔧 Admin > 🎭 Demo Data > Seed All Sample Data` to populate test data
+1. Copy all 10 files from `src/` to Google Apps Script (create each as a separate script file)
+2. Run `CREATE_509_DASHBOARD()` to create sheets + 6 hidden calculation sheets
+3. Use `Dashboard > Admin > Demo Data > Seed All Sample Data` to populate test data
 4. Customize Config sheet with your organization's values
 
 ---
@@ -35,7 +31,7 @@ The following code sections are **USER APPROVED** and should **NOT be modified o
 
 ### Dashboard Modal Popup (formerly Custom View)
 
-**Location:** `ConsolidatedDashboard.gs` and `MobileQuickActions.gs`
+**Location:** `src/04_UIService.gs`
 
 **Protected Functions:**
 | Function | Purpose |
@@ -55,7 +51,7 @@ The following code sections are **USER APPROVED** and should **NOT be modified o
 
 ### Member Satisfaction Dashboard Modal (Enhanced v2.0)
 
-**Location:** `ConsolidatedDashboard.gs`
+**Location:** `src/04_UIService.gs`
 
 **Functions:**
 | Function | Purpose |
@@ -132,7 +128,7 @@ This repository implements a **streamlined 10-file modular architecture** follow
 
 ```
 MULTIPLE-SCRIPS-REPO/
-├── src/                        # Source files for build (10 modules)
+├── src/                        # Source files (10 modules) - copy all to Google Apps Script
 │   ├── 01_Constants.gs         # Configuration constants (SHEETS, COLORS, MEMBER_COLS, GRIEVANCE_COLS, COMMAND_CONFIG, UI_THEME)
 │   ├── 02_MemberManager.gs     # Member operations, steward management, ID generation, batch processing
 │   ├── 03_GrievanceManager.gs  # Grievance lifecycle, deadlines, step advancement, traffic lights
@@ -141,28 +137,17 @@ MULTIPLE-SCRIPS-REPO/
 │   ├── 06_Maintenance.gs       # Admin tools, diagnostics, caching, validation, snapshots
 │   ├── 07_DevTools.gs          # Demo data seeding - DELETE BEFORE PRODUCTION
 │   ├── 08_Code.gs              # Core setup, hidden sheets, dashboard creation, multi-select
-│   ├── 10_CommandCenter.gs     # 509 Strategic Command Center consolidated features (NEW in v3.6.5)
 │   ├── 09_Main.gs              # Entry point, onOpen, onEdit triggers, sabotage protection
-│   └── MultiSelectDialog.html  # HTML template for multi-select UI
-├── dist/                       # Build output
-│   └── ConsolidatedDashboard.gs # Combined file for deployment (auto-generated)
+│   └── 10_CommandCenter.gs     # 509 Strategic Command Center features
 ├── AIR.md                      # Architecture & Implementation Reference (this document)
 ├── README.md                   # Quick start guide
 ├── QUICK_DEPLOY.md             # 5-minute deployment guide
-├── build.js                    # Node.js build script
-├── package.json                # npm configuration
 └── appsscript.json             # Google Apps Script manifest
 ```
 
-### Build Process
+### Deployment
 
-The modular files are concatenated into a single `ConsolidatedDashboard.gs` for deployment:
-
-```bash
-npm install          # Install dependencies (first time only)
-npm run build        # Build ConsolidatedDashboard.gs
-npm run watch        # Watch mode for development
-```
+Copy all 10 `.gs` files from `src/` to your Google Apps Script project. Each file should be created as a separate script file in the Apps Script editor.
 
 ### File Descriptions (10-File Architecture)
 

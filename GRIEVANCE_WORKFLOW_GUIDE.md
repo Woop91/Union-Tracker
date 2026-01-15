@@ -70,7 +70,7 @@ To enable the full workflow with automatic form submissions:
 
 5. **Update the Configuration in Code:**
    - Open the Google Sheets Apps Script editor
-   - Find the file **Code.gs** (or **ConsolidatedDashboard.gs** if deployed)
+   - Find the file **08_Code.gs**
    - Update the `GRIEVANCE_FORM_CONFIG` object:
 
 ```javascript
