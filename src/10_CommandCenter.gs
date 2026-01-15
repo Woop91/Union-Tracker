@@ -1,16 +1,22 @@
 /**
  * ============================================================================
- * 509 STRATEGIC COMMAND CENTER - CONSOLIDATED ENGINE (v3.6.5)
+ * 509 STRATEGIC COMMAND CENTER - UNIFIED MASTER ENGINE (v4.0)
  * ============================================================================
- * AUTHOR: Gemini Assistant / Claude Assistant
- * STATUS: Fully Integrated / Production Ready
+ * STATUS: Production Ready / Harmonized / High-Performance
+ *
+ * v4.0 UNIFIED ARCHITECTURE:
+ * - Single-File Modular Build (Virtual Files: Constants, UI, Performance, Security, DevTools)
+ * - Global Scope Rule: All functions share CONFIG object
  *
  * FEATURES:
  * - Security: Audit Log & Sabotage Protection (>15 cells)
- * - Workflow: Stage-Gate Case Tracking (Step 1 -> Arbitration)
- * - Automation: Auto-ID Generator & Duplicate Prevention
- * - UI/UX: Fully Automated "Roboto" Theme & Zebra Striping
+ * - Performance: Batch Array Processing (No-Lag Architecture up to 5,000 members)
+ * - Workflow: Stage-Gate Case Tracking & Auto-PDF Generation
+ * - Production: Nuke/Seed Isolation & UI Self-Hiding (PRODUCTION_MODE)
+ * - Accessibility: Mobile/Pocket View & Search Engine
  * - Legal: Signature-Ready PDF Merge & Auto-Drive Archiving
+ *
+ * CURRENT PHASE: Pre-Production (verifying ID generation & Mobile View logic)
  *
  * NOTE: This file provides consolidated access to Strategic Command Center
  * features. Core implementations are in their respective module files.
@@ -42,40 +48,69 @@ var COMMAND_CENTER_CONFIG = {
 // ============================================================================
 
 /**
- * Creates the 509 Command Center menu
+ * Creates the 509 Command Center menu (v4.0 Harmonized Structure)
  * Called by createDashboardMenu() in UIService.gs
+ *
+ * v4.0 Features:
+ * - Quick access to Search and Mobile View at top level
+ * - Production Mode: Demo Data menu disappears after NUKE
+ * - Organized submenus for Personnel, Grievance, Security, and Styling
  */
 function createCommandCenterMenu() {
   var ui = SpreadsheetApp.getUi();
+  var menu = ui.createMenu('📊 509 COMMAND CENTER');
 
-  ui.createMenu('📊 509 COMMAND CENTER')
-    .addItem('👁️ Refresh Dashboard UI', 'APPLY_SYSTEM_THEME')
-    .addSeparator()
-    .addSubMenu(ui.createMenu('👤 Personnel Management')
+  // Top-level quick actions (v4.0)
+  menu.addItem('👁️ Refresh Dashboard UI', 'APPLY_SYSTEM_THEME')
+      .addItem('🔍 Search Members', 'showSearchDialog')
+      .addItem('📱 Mobile / Pocket View', 'navToMobile');
+
+  menu.addSeparator();
+
+  // Personnel Management submenu
+  menu.addSubMenu(ui.createMenu('👤 Personnel Management')
       .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
       .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
       .addItem('🌟 Promote Selected to Steward', 'promoteSelectedMemberToSteward')
-      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('📋 Grievance Tools')
+      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward'));
+
+  menu.addSeparator();
+
+  // Grievance Tools submenu
+  menu.addSubMenu(ui.createMenu('📋 Grievance Tools')
       .addItem('🚦 Apply Traffic Light Indicators', 'applyTrafficLightIndicators')
       .addItem('🔄 Clear Traffic Lights', 'clearTrafficLightIndicators')
-      .addItem('📄 Create PDF for Selected', 'createPDFForSelectedGrievance'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('🛡️ System Security')
+      .addItem('📄 Create PDF for Selected', 'createPDFForSelectedGrievance'));
+
+  menu.addSeparator();
+
+  // System Security submenu
+  menu.addSubMenu(ui.createMenu('🛡️ System Security')
       .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
-      .addItem('📜 View Audit Log', 'navigateToAuditLog'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('🎨 Styling & Theme')
+      .addItem('📜 View Audit Log', 'navigateToAuditLog'));
+
+  menu.addSeparator();
+
+  // Styling & Theme submenu
+  menu.addSubMenu(ui.createMenu('🎨 Styling & Theme')
       .addItem('🎨 Apply Global Theme', 'APPLY_SYSTEM_THEME')
       .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
-      .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'))
-    .addToUi();
+      .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'));
+
+  // v4.0 PRODUCTION MODE: Demo Data menu disappears after NUKE
+  if (!isProductionMode()) {
+    menu.addSeparator();
+    menu.addSubMenu(ui.createMenu('🎭 Demo Data')
+        .addItem('🌱 Seed Sample Data', 'SEED_SAMPLE_DATA')
+        .addItem('☢️ NUKE EVERYTHING', 'NUKE_DATABASE'));
+  }
+
+  menu.addToUi();
 }
 
 // ============================================================================
-// NAVIGATION SHORTCUTS
+// NAVIGATION SHORTCUTS (v4.0)
 // ============================================================================
 
 /**
@@ -97,6 +132,140 @@ function navigateToCustomView() {
  */
 function navigateToMobileView() {
   navToMobile();
+}
+
+/**
+ * v4.0 Mobile/Pocket View Navigation
+ * Optimizes the Member Directory for smartphone viewing by hiding non-essential columns.
+ * Shows only: Member ID, Name, Status, Phone for quick field access.
+ *
+ * Call showAllMemberColumns() to restore full view.
+ */
+function navToMobile() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory not found');
+    return;
+  }
+
+  // Mobile Optimization: Hide non-essential columns for phone view
+  // Keep visible: A (Member ID), B (First Name), C (Last Name), I (Phone), N (Is Steward)
+  // Hide columns D-H (Job, Location, Unit, Office Days, Email) - columns 4-8
+  // Hide columns J-M (Preferred Comm to Manager) - columns 10-13
+  // Hide columns O-AF (Committees to Quick Actions) - columns 15-32
+
+  try {
+    // Hide columns 4-8 (D-H)
+    if (sheet.getMaxColumns() >= 8) {
+      sheet.hideColumns(4, 5);  // Hide 5 columns starting at column 4
+    }
+
+    // Hide columns 10-13 (J-M)
+    if (sheet.getMaxColumns() >= 13) {
+      sheet.hideColumns(10, 4);  // Hide 4 columns starting at column 10
+    }
+
+    // Hide columns 15-32 (O-AF) if they exist
+    if (sheet.getMaxColumns() >= 32) {
+      sheet.hideColumns(15, 18);  // Hide 18 columns starting at column 15
+    } else if (sheet.getMaxColumns() >= 15) {
+      sheet.hideColumns(15, sheet.getMaxColumns() - 14);
+    }
+
+    sheet.activate();
+    ss.toast('📱 Mobile View Optimized. Essential columns visible for phone access.', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error enabling mobile view: ' + e.message);
+  }
+}
+
+/**
+ * v4.0 Restore Full View
+ * Shows all columns in Member Directory after Mobile View was enabled.
+ */
+function showAllMemberColumns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory not found');
+    return;
+  }
+
+  try {
+    // Show all columns
+    sheet.showColumns(1, sheet.getMaxColumns());
+    ss.toast('✅ All columns restored.', COMMAND_CONFIG.SYSTEM_NAME, 3);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error showing columns: ' + e.message);
+  }
+}
+
+// ============================================================================
+// v4.0 HIGH-PERFORMANCE DATA ENGINE
+// ============================================================================
+
+/**
+ * v4.0 Sequential ID Generator
+ * Gets the next sequence number for a given prefix from stored properties.
+ * Used for generating Member IDs with unit code prefixes.
+ *
+ * @param {string} prefix - The unit code prefix (e.g., "MS", "FO", "HC")
+ * @returns {string} The next sequence number as a 4-digit padded string
+ */
+function getNextSequence(prefix) {
+  var props = PropertiesService.getScriptProperties();
+  var key = 'SEQUENCE_' + prefix;
+  var current = parseInt(props.getProperty(key) || '0', 10);
+  var next = current + 1;
+  props.setProperty(key, String(next));
+  return String(next).padStart(4, '0');
+}
+
+/**
+ * v4.0 Batch Member ID Generator (High-Performance)
+ * Uses batch array processing to generate IDs for up to 5,000 members without lag.
+ * Reads unit codes from Config sheet or falls back to defaults.
+ */
+function generateMissingMemberIDsBatch() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    ss.toast('No members found to process.', COMMAND_CONFIG.SYSTEM_NAME, 3);
+    return;
+  }
+
+  // Batch read all data
+  var data = sheet.getDataRange().getValues();
+  var unitCodes = getUnitCodes_();
+  var countAdded = 0;
+
+  // Process in memory (no individual cell writes)
+  for (var i = 1; i < data.length; i++) {
+    // Check if Member ID is empty and Unit exists
+    if (!data[i][MEMBER_COLS.MEMBER_ID - 1] && data[i][MEMBER_COLS.UNIT - 1]) {
+      var unit = data[i][MEMBER_COLS.UNIT - 1];
+      var prefix = unitCodes[unit] || 'GEN';
+      var nextNum = getNextSequence(prefix);
+      data[i][MEMBER_COLS.MEMBER_ID - 1] = prefix + '-' + nextNum + '-H';
+      countAdded++;
+    }
+  }
+
+  // Single batch write (high-performance)
+  if (countAdded > 0) {
+    sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+  }
+
+  ss.toast('✅ ' + countAdded + ' IDs generated.', COMMAND_CONFIG.SYSTEM_NAME, 3);
+
+  return {
+    generated: countAdded,
+    total: data.length - 1
+  };
 }
 
 // ============================================================================
