@@ -25,37 +25,437 @@
 
 /**
  * Creates the custom menu when the spreadsheet opens
+ * Uses consistent iconography: 📊 for views, ➕ for actions
  * Called automatically by onOpen trigger
  */
 function createDashboardMenu() {
   const ui = SpreadsheetApp.getUi();
 
-  ui.createMenu('🏛️ Union Dashboard')
-    .addItem('📋 Dashboard Home', 'showDashboardSidebar')
+  // Main Menu: Union Dashboard
+  ui.createMenu('📊 Dashboard')
+    .addItem('📊 Dashboard Home', 'showDashboardSidebar')
+    .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
     .addSeparator()
+
+    // Search submenu - Action icons
     .addSubMenu(ui.createMenu('🔍 Search')
-      .addItem('Desktop Search', 'showDesktopSearch')
-      .addItem('Quick Search (Ctrl+Shift+F)', 'showQuickSearch')
-      .addItem('Advanced Search', 'showAdvancedSearch'))
-    .addSubMenu(ui.createMenu('📁 Grievances')
-      .addItem('New Grievance', 'showNewGrievanceDialog')
-      .addItem('Edit Selected', 'showEditGrievanceDialog')
-      .addItem('Bulk Update Status', 'showBulkStatusUpdate'))
+      .addItem('🔍 Desktop Search', 'showDesktopSearch')
+      .addItem('⚡ Quick Search', 'showQuickSearch')
+      .addItem('🔎 Advanced Search', 'showAdvancedSearch'))
+
+    // Grievances submenu - Mixed icons
+    .addSubMenu(ui.createMenu('📋 Grievances')
+      .addItem('➕ New Grievance', 'showNewGrievanceDialog')
+      .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
+      .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
+      .addSeparator()
+      .addItem('📈 Grievance Analytics', 'showInteractiveDashboardTab'))
+
+    // Members submenu - Mixed icons
     .addSubMenu(ui.createMenu('👥 Members')
-      .addItem('Add New Member', 'showNewMemberDialog')
-      .addItem('Import Members', 'showImportDialog')
-      .addItem('Export Directory', 'showExportDialog'))
+      .addItem('➕ Add New Member', 'showNewMemberDialog')
+      .addItem('📥 Import Members', 'showImportDialog')
+      .addItem('📤 Export Directory', 'showExportDialog')
+      .addSeparator()
+      .addItem('🛡️ Steward Directory', 'showStewardDirectory'))
+
+    // Calendar submenu - Action icons
     .addSubMenu(ui.createMenu('📅 Calendar')
-      .addItem('Sync Deadlines', 'showCalendarSyncDialog')
-      .addItem('View Upcoming', 'showUpcomingDeadlines')
-      .addItem('Clear Calendar Events', 'showClearCalendarConfirm'))
-    .addSubMenu(ui.createMenu('⚙️ Admin Tools')
-      .addItem('System Diagnostics', 'showDiagnosticsDialog')
-      .addItem('Repair Dashboard', 'showRepairDialog')
-      .addItem('Settings', 'showSettingsDialog'))
+      .addItem('🔗 Sync Deadlines', 'showCalendarSyncDialog')
+      .addItem('👁️ View Upcoming', 'showUpcomingDeadlines')
+      .addItem('🗑️ Clear Calendar Events', 'showClearCalendarConfirm'))
+
+    // View submenu - View icons (NEW)
+    .addSubMenu(ui.createMenu('👁️ View')
+      .addItem('📊 Executive Dashboard', 'showExecutiveDashboard')
+      .addItem('🎯 Custom View', 'showCustomView')
+      .addItem('⭐ Member Satisfaction', 'showSatisfactionDashboard')
+      .addSeparator()
+      .addItem('🌙 Toggle Dark Mode', 'toggleDarkMode')
+      .addItem('🎨 Theme Settings', 'showThemeSettings'))
+
+    // Admin submenu - Tool icons
+    .addSubMenu(ui.createMenu('🛠️ Admin')
+      .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
+      .addItem('🔧 Repair Dashboard', 'showRepairDialog')
+      .addItem('⚙️ Settings', 'showSettingsDialog')
+      .addSeparator()
+      .addItem('🔄 Refresh All Data', 'syncAllDashboardData'))
+
     .addSeparator()
-    .addItem('❓ Help & Documentation', 'showHelpDialog')
+    .addItem('📖 Help & Documentation', 'showHelpDialog')
     .addToUi();
+
+  // Strategic Command Center Menu (Separate top-level menu)
+  ui.createMenu('📊 509 Command')
+    .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
+    .addItem('🫂 Member Analytics (No PII)', 'rebuildMemberAnalytics')
+    .addSeparator()
+    .addItem('📩 Send Member Dashboard Link', 'sendMemberDashboardLink')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🚀 Strategic Pro Moves')
+      .addItem('🔥 Generate Unit Hot Zones', 'renderHotZones')
+      .addItem('🌟 Identify Rising Stars', 'identifyRisingStars')
+      .addItem('📉 Management Hostility Report', 'renderHostilityFunnel')
+      .addItem('📝 Bargaining Table Cheat Sheet', 'renderBargainingCheatSheet'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🆔 ID & Data Engines')
+      .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
+      .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
+      .addItem('📄 Create PDF for Selected Grievance', 'createPDFForSelectedGrievance'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('👤 Steward Management')
+      .addItem('⬆️ Promote to Steward', 'promoteSelectedMemberToSteward')
+      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🎨 Styling & Theme')
+      .addItem('🎨 Apply Global Styling', 'applyGlobalStyling')
+      .addItem('🔄 Reset to Default Theme', 'resetToDefaultTheme'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('⚙️ Automation')
+      .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
+      .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
+      .addItem('❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger')
+      .addItem('🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers')
+      .addItem('📑 Email Weekly PDF Snapshot', 'emailExecutivePDF'))
+    .addToUi();
+}
+
+/**
+ * Shows the Visual Control Panel sidebar
+ * Allows users to toggle visual settings like Dark Mode, Focus Mode, Zebra Stripes
+ */
+function showVisualControlPanel() {
+  const html = HtmlService.createHtmlOutput(getVisualControlPanelHtml())
+    .setTitle('🎛️ Visual Control Panel');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+/**
+ * Generates HTML for the Visual Control Panel sidebar
+ * @return {string} HTML content
+ */
+function getVisualControlPanelHtml() {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: 'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+          background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+          min-height: 100vh;
+          color: #F8FAFC;
+        }
+        .panel {
+          padding: 20px;
+        }
+        .panel-header {
+          text-align: center;
+          margin-bottom: 25px;
+        }
+        .panel-header h1 {
+          font-size: 20px;
+          font-weight: 600;
+          margin-bottom: 5px;
+        }
+        .panel-header p {
+          font-size: 12px;
+          color: #94A3B8;
+        }
+        .section {
+          background: rgba(255,255,255,0.05);
+          border-radius: 12px;
+          padding: 15px;
+          margin-bottom: 15px;
+        }
+        .section-title {
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          color: #94A3B8;
+          margin-bottom: 12px;
+        }
+        .toggle-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 10px 0;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-label {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .toggle-label span { font-size: 18px; }
+        .toggle-label div { font-size: 13px; }
+        .toggle-switch {
+          position: relative;
+          width: 50px;
+          height: 26px;
+        }
+        .toggle-switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0; left: 0; right: 0; bottom: 0;
+          background: #475569;
+          border-radius: 26px;
+          transition: 0.3s;
+        }
+        .slider:before {
+          position: absolute;
+          content: "";
+          height: 20px;
+          width: 20px;
+          left: 3px;
+          bottom: 3px;
+          background: white;
+          border-radius: 50%;
+          transition: 0.3s;
+        }
+        input:checked + .slider {
+          background: #7C3AED;
+        }
+        input:checked + .slider:before {
+          transform: translateX(24px);
+        }
+        .theme-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+          margin-top: 10px;
+        }
+        .theme-btn {
+          padding: 12px;
+          border-radius: 8px;
+          border: 2px solid transparent;
+          cursor: pointer;
+          text-align: center;
+          font-size: 12px;
+          transition: all 0.2s;
+        }
+        .theme-btn:hover { transform: scale(1.02); }
+        .theme-btn.active { border-color: #7C3AED; }
+        .theme-default { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }
+        .theme-dark { background: #1E293B; color: white; border: 1px solid #334155; }
+        .theme-light { background: #F8FAFC; color: #1E293B; }
+        .theme-contrast { background: #000; color: #FFD700; }
+        .action-btn {
+          width: 100%;
+          padding: 12px;
+          border: none;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          margin-top: 10px;
+          transition: all 0.2s;
+        }
+        .btn-primary {
+          background: linear-gradient(135deg, #7C3AED, #5B21B6);
+          color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(124,58,237,0.4); }
+        .btn-secondary {
+          background: rgba(255,255,255,0.1);
+          color: white;
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+        .status-bar {
+          margin-top: 20px;
+          padding: 10px;
+          background: rgba(16,185,129,0.2);
+          border-radius: 8px;
+          text-align: center;
+          font-size: 12px;
+          color: #10B981;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="panel">
+        <div class="panel-header">
+          <h1>🎛️ Visual Control Panel</h1>
+          <p>Customize your dashboard experience</p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Display Settings</div>
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <span>🌙</span>
+              <div>Dark Mode</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="darkMode" onchange="toggleSetting('darkMode')">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <span>🎯</span>
+              <div>Focus Mode</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="focusMode" onchange="toggleSetting('focusMode')">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <span>🦓</span>
+              <div>Zebra Stripes</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="zebraStripes" checked onchange="toggleSetting('zebraStripes')">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-label">
+              <span>📊</span>
+              <div>Show Charts</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="showCharts" checked onchange="toggleSetting('showCharts')">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Theme Selection</div>
+          <div class="theme-grid">
+            <div class="theme-btn theme-default active" onclick="selectTheme('default')">
+              🎨 Default
+            </div>
+            <div class="theme-btn theme-dark" onclick="selectTheme('dark')">
+              🌙 Dark
+            </div>
+            <div class="theme-btn theme-light" onclick="selectTheme('light')">
+              ☀️ Light
+            </div>
+            <div class="theme-btn theme-contrast" onclick="selectTheme('contrast')">
+              👁️ High Contrast
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Quick Actions</div>
+          <button class="action-btn btn-primary" onclick="refreshDashboard()">
+            🔄 Refresh Dashboard
+          </button>
+          <button class="action-btn btn-secondary" onclick="goToSheet('💼 Dashboard')">
+            📊 Open Executive Dashboard
+          </button>
+          <button class="action-btn btn-secondary" onclick="goToSheet('🎯 Custom View')">
+            🎯 Open Custom View
+          </button>
+        </div>
+
+        <div class="status-bar" id="statusBar">
+          ✅ Settings saved automatically
+        </div>
+      </div>
+
+      <script>
+        function toggleSetting(setting) {
+          const isChecked = document.getElementById(setting).checked;
+          google.script.run
+            .withSuccessHandler(showStatus)
+            .saveVisualSetting(setting, isChecked);
+        }
+
+        function selectTheme(theme) {
+          document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+          event.target.classList.add('active');
+          google.script.run
+            .withSuccessHandler(showStatus)
+            .applyDashboardTheme(theme);
+        }
+
+        function refreshDashboard() {
+          showStatus('Refreshing...');
+          google.script.run
+            .withSuccessHandler(function() { showStatus('Dashboard refreshed!'); })
+            .syncAllDashboardData();
+        }
+
+        function goToSheet(sheetName) {
+          google.script.run.navigateToSheet(sheetName);
+        }
+
+        function showStatus(msg) {
+          const bar = document.getElementById('statusBar');
+          bar.textContent = '✅ ' + (msg || 'Settings applied');
+          bar.style.background = 'rgba(16,185,129,0.2)';
+        }
+      </script>
+    </body>
+    </html>
+  `;
+}
+
+/**
+ * Saves a visual setting to user properties
+ * @param {string} setting - Setting name
+ * @param {boolean} value - Setting value
+ */
+function saveVisualSetting(setting, value) {
+  var userProps = PropertiesService.getUserProperties();
+  userProps.setProperty('visual_' + setting, value.toString());
+  return 'Setting saved';
+}
+
+/**
+ * Applies a dashboard theme
+ * @param {string} theme - Theme name (default, dark, light, contrast)
+ */
+function applyDashboardTheme(theme) {
+  var userProps = PropertiesService.getUserProperties();
+  userProps.setProperty('dashboard_theme', theme);
+  // Theme application would be done on next dashboard refresh
+  return 'Theme set to ' + theme;
+}
+
+/**
+ * Helper functions for navigation
+ */
+function showExecutiveDashboard() {
+  navigateToSheet(SHEETS.DASHBOARD);
+}
+
+function showCustomView() {
+  navigateToSheet(SHEETS.INTERACTIVE);
+}
+
+function showSatisfactionDashboard() {
+  navigateToSheet(SHEETS.SATISFACTION);
+}
+
+function showStewardDirectory() {
+  // Navigate to Member Directory filtered by stewards
+  navigateToSheet(SHEETS.MEMBER_DIR);
+  SpreadsheetApp.getActive().toast('Filter by "Is Steward = Yes" to see steward directory', 'Steward Directory', 5);
+}
+
+function toggleDarkMode() {
+  SpreadsheetApp.getActive().toast('Dark Mode toggle - use Visual Control Panel for full options', 'Theme', 3);
+  showVisualControlPanel();
+}
+
+function showThemeSettings() {
+  showVisualControlPanel();
 }
 
 // ============================================================================
