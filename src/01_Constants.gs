@@ -132,8 +132,16 @@ var SHEETS = {
   // Help & Documentation sheets
   GETTING_STARTED: '📚 Getting Started',
   FAQ: '❓ FAQ',
-  CONFIG_GUIDE: '📖 Config Guide'
+  CONFIG_GUIDE: '📖 Config Guide',
+  // Aliases for backward compatibility (some code uses these alternate names)
+  GRIEVANCE_TRACKER: 'Grievance Log',
+  MEMBER_DIRECTORY: 'Member Directory',
+  REPORTS: '💼 Dashboard'
 };
+
+// SHEET_NAMES alias for backward compatibility
+// Some code references SHEET_NAMES instead of SHEETS
+var SHEET_NAMES = SHEETS;
 
 // ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System
@@ -412,6 +420,159 @@ var GRIEVANCE_COLS = {
 
   // Section 13: Quick Actions (AI)
   QUICK_ACTIONS: 35       // AI - Checkbox to open Quick Actions dialog
+};
+
+// ============================================================================
+// BACKWARD COMPATIBILITY ALIASES (0-indexed for array access)
+// ============================================================================
+
+/**
+ * GRIEVANCE_COLUMNS - 0-indexed alias for legacy code
+ * Legacy code uses these as array indices (0-indexed)
+ * Modern GRIEVANCE_COLS is 1-indexed for getRange() calls
+ * @const {Object}
+ */
+var GRIEVANCE_COLUMNS = {
+  // Core fields (0-indexed)
+  GRIEVANCE_ID: 0,         // A - Grievance ID
+  MEMBER_ID: 1,            // B - Member ID
+  FIRST_NAME: 2,           // C - First Name
+  LAST_NAME: 3,            // D - Last Name
+  MEMBER_NAME: 2,          // Alias - uses FIRST_NAME column
+  STATUS: 4,               // E - Status
+  CURRENT_STEP: 5,         // F - Current Step
+
+  // Dates and deadlines (0-indexed)
+  INCIDENT_DATE: 6,        // G - Incident Date
+  FILING_DEADLINE: 7,      // H - Filing Deadline
+  FILING_DATE: 8,          // I - Date Filed (alias for DATE_FILED)
+  DATE_FILED: 8,           // I - Date Filed
+
+  // Step I (0-indexed)
+  STEP1_DUE: 9,            // J - Step I Decision Due
+  STEP_1_DUE: 9,           // Alias with underscore
+  STEP1_RCVD: 10,          // K - Step I Decision Received
+  STEP_1_DATE: 10,         // Alias
+  STEP_1_STATUS: 4,        // Uses STATUS column for step status
+
+  // Step II (0-indexed)
+  STEP2_APPEAL_DUE: 11,    // L - Step II Appeal Due
+  STEP2_APPEAL_FILED: 12,  // M - Step II Appeal Filed
+  STEP_2_DATE: 12,         // Alias
+  STEP2_DUE: 13,           // N - Step II Decision Due
+  STEP_2_DUE: 13,          // Alias with underscore
+  STEP2_RCVD: 14,          // O - Step II Decision Received
+  STEP_2_STATUS: 4,        // Uses STATUS column
+
+  // Step III (0-indexed)
+  STEP3_APPEAL_DUE: 15,    // P - Step III Appeal Due
+  STEP3_APPEAL_FILED: 16,  // Q - Step III Appeal Filed
+  STEP_3_DATE: 16,         // Alias
+  STEP3_DUE: 15,           // Same as appeal due
+  STEP_3_DUE: 15,          // Alias with underscore
+  STEP_3_STATUS: 4,        // Uses STATUS column
+  DATE_CLOSED: 17,         // R - Date Closed
+  ARBITRATION_DATE: 17,    // Alias for DATE_CLOSED
+
+  // Calculated metrics (0-indexed)
+  DAYS_OPEN: 18,           // S - Days Open
+  NEXT_ACTION_DUE: 19,     // T - Next Action Due
+  LAST_UPDATED: 19,        // Alias for NEXT_ACTION_DUE
+  DAYS_TO_DEADLINE: 20,    // U - Days to Deadline
+
+  // Case details (0-indexed)
+  ARTICLES: 21,            // V - Articles Violated
+  ISSUE_CATEGORY: 22,      // W - Issue Category
+  GRIEVANCE_TYPE: 22,      // Alias for ISSUE_CATEGORY
+  DESCRIPTION: 22,         // Alias - uses ISSUE_CATEGORY
+
+  // Contact & Location (0-indexed)
+  MEMBER_EMAIL: 23,        // X - Member Email
+  UNIT: 24,                // Y - Unit
+  LOCATION: 25,            // Z - Work Location
+  STEWARD: 26,             // AA - Assigned Steward
+
+  // Resolution (0-indexed)
+  RESOLUTION: 27,          // AB - Resolution Summary
+  OUTCOME: 27,             // Alias for RESOLUTION
+  NOTES: 27,               // Alias for RESOLUTION (used for notes)
+
+  // Coordinator (0-indexed)
+  MESSAGE_ALERT: 28,       // AC - Message Alert
+  COORDINATOR_MESSAGE: 29, // AD - Coordinator Message
+  ACKNOWLEDGED_BY: 30,     // AE - Acknowledged By
+  ACKNOWLEDGED_DATE: 31,   // AF - Acknowledged Date
+
+  // Drive (0-indexed)
+  DRIVE_FOLDER_ID: 32,     // AG - Drive Folder ID
+  DRIVE_FOLDER_URL: 33,    // AH - Drive Folder URL
+  DRIVE_FOLDER: 33,        // Alias for DRIVE_FOLDER_URL
+
+  // Quick Actions (0-indexed)
+  QUICK_ACTIONS: 34        // AI - Quick Actions
+};
+
+/**
+ * MEMBER_COLUMNS - 0-indexed alias for legacy code
+ * Legacy code uses these as array indices (0-indexed)
+ * Modern MEMBER_COLS is 1-indexed for getRange() calls
+ * @const {Object}
+ */
+var MEMBER_COLUMNS = {
+  // Core fields (0-indexed)
+  ID: 0,                   // A - Member ID
+  MEMBER_ID: 0,            // Alias
+  FIRST_NAME: 1,           // B - First Name
+  LAST_NAME: 2,            // C - Last Name
+  JOB_TITLE: 3,            // D - Job Title
+  DEPARTMENT: 3,           // Alias for JOB_TITLE
+
+  // Location & Work (0-indexed)
+  WORK_LOCATION: 4,        // E - Work Location
+  LOCATION: 4,             // Alias
+  UNIT: 5,                 // F - Unit
+  OFFICE_DAYS: 6,          // G - Office Days
+
+  // Contact (0-indexed)
+  EMAIL: 7,                // H - Email
+  PHONE: 8,                // I - Phone
+  PREFERRED_COMM: 9,       // J - Preferred Communication
+  BEST_TIME: 10,           // K - Best Time to Contact
+
+  // Organization (0-indexed)
+  SUPERVISOR: 11,          // L - Supervisor
+  MANAGER: 12,             // M - Manager
+  IS_STEWARD: 13,          // N - Is Steward
+  COMMITTEES: 14,          // O - Committees
+  ASSIGNED_STEWARD: 15,    // P - Assigned Steward
+
+  // Engagement (0-indexed)
+  LAST_VIRTUAL_MTG: 16,    // Q - Last Virtual Meeting
+  LAST_INPERSON_MTG: 17,   // R - Last In-Person Meeting
+  OPEN_RATE: 18,           // S - Open Rate
+  VOLUNTEER_HOURS: 19,     // T - Volunteer Hours
+
+  // Interests (0-indexed)
+  INTEREST_LOCAL: 20,      // U - Interest in Local
+  INTEREST_CHAPTER: 21,    // V - Interest in Chapter
+  INTEREST_ALLIED: 22,     // W - Interest in Allied
+  HOME_TOWN: 23,           // X - Home Town
+
+  // Contact Tracking (0-indexed)
+  RECENT_CONTACT_DATE: 24, // Y - Recent Contact Date
+  LAST_UPDATED: 24,        // Alias for tracking last update
+  CONTACT_STEWARD: 25,     // Z - Contact Steward
+  CONTACT_NOTES: 26,       // AA - Contact Notes
+
+  // Grievance fields (0-indexed)
+  HAS_OPEN_GRIEVANCE: 27,  // AB - Has Open Grievance
+  GRIEVANCE_STATUS: 28,    // AC - Grievance Status
+  STATUS: 28,              // Alias for member status
+  NEXT_DEADLINE: 29,       // AD - Next Deadline
+  START_GRIEVANCE: 30,     // AE - Start Grievance
+
+  // Quick Actions (0-indexed)
+  QUICK_ACTIONS: 31        // AF - Quick Actions
 };
 
 // ============================================================================
@@ -906,6 +1067,72 @@ var GRIEVANCE_STATUS_PRIORITY = {
   'Denied': 7,
   'Withdrawn': 8,
   'Closed': 9
+};
+
+/**
+ * Grievance status constants for programmatic access
+ * Use these constants instead of hardcoded strings
+ * @const {Object}
+ */
+var GRIEVANCE_STATUS = {
+  OPEN: 'Open',
+  PENDING: 'Pending Info',
+  PENDING_INFO: 'Pending Info',
+  SETTLED: 'Settled',
+  WITHDRAWN: 'Withdrawn',
+  DENIED: 'Denied',
+  WON: 'Won',
+  APPEALED: 'Appealed',
+  IN_ARBITRATION: 'In Arbitration',
+  AT_ARBITRATION: 'In Arbitration',
+  CLOSED: 'Closed',
+  RESOLVED: 'Settled'  // Alias for backward compatibility
+};
+
+/**
+ * Audit event types for logging
+ * @const {Object}
+ */
+var AUDIT_EVENTS = {
+  // Grievance events
+  GRIEVANCE_CREATED: 'GRIEVANCE_CREATED',
+  GRIEVANCE_UPDATED: 'GRIEVANCE_UPDATED',
+  GRIEVANCE_STEP_ADVANCED: 'GRIEVANCE_STEP_ADVANCED',
+  GRIEVANCE_RESOLVED: 'GRIEVANCE_RESOLVED',
+  GRIEVANCE_CLOSED: 'GRIEVANCE_CLOSED',
+
+  // Member events
+  MEMBER_ADDED: 'MEMBER_ADDED',
+  MEMBER_UPDATED: 'MEMBER_UPDATED',
+  MEMBER_DELETED: 'MEMBER_DELETED',
+
+  // System events
+  SYSTEM_REPAIR: 'SYSTEM_REPAIR',
+  SYSTEM_INITIALIZED: 'SYSTEM_INITIALIZED',
+  DASHBOARD_INITIALIZED: 'DASHBOARD_INITIALIZED',
+
+  // Integration events
+  FOLDER_CREATED: 'FOLDER_CREATED',
+  CALENDAR_SYNCED: 'CALENDAR_SYNCED',
+  EMAIL_SENT: 'EMAIL_SENT',
+  PDF_GENERATED: 'PDF_GENERATED',
+
+  // Settings events
+  SETTINGS_CHANGED: 'SETTINGS_CHANGED',
+  TRIGGER_INSTALLED: 'TRIGGER_INSTALLED',
+  TRIGGER_REMOVED: 'TRIGGER_REMOVED'
+};
+
+/**
+ * Batch processing limits for performance optimization
+ * @const {Object}
+ */
+var BATCH_LIMITS = {
+  MAX_ROWS_PER_BATCH: 100,           // Max rows to process in one batch
+  MAX_EXECUTION_TIME_MS: 300000,      // 5 minutes max execution time
+  PAUSE_BETWEEN_BATCHES_MS: 100,      // Pause between batches to avoid quota limits
+  MAX_PARALLEL_OPERATIONS: 10,        // Max concurrent operations
+  CACHE_EXPIRATION_SECONDS: 21600     // 6 hours cache expiration
 };
 
 // ============================================================================

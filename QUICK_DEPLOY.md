@@ -68,17 +68,13 @@ Download `dist/ConsolidatedDashboard.gs` from the repository.
 1. Close the Apps Script editor tab
 2. Go back to your Google Sheet
 3. **Refresh the page** (F5)
-4. You should see 6 custom menus appear:
-   - 📊 509 Dashboard
-   - 📋 Grievances
-   - 👁️ View
-   - ⚙️ Settings
-   - 🔧 Admin
-   - 📊 509 Command (Strategic Command Center)
+4. You should see **2 custom menus** appear:
+   - **📊 Dashboard** - Main menu with submenus for Search, Grievances, Members, Calendar, View, and Admin
+   - **📊 509 Command** - Strategic Command Center with analytics and automation
 
 ### **Step 7: Seed Test Data (Optional)**
 
-1. Click **🔧 Admin → 🎭 Demo Data → 🚀 Seed All Sample Data**
+1. Click **📊 Dashboard → 🛠️ Admin → 🎭 Demo Data → 🚀 Seed All Sample Data**
 2. Wait for seeding to complete (~30 seconds)
 
 ---
