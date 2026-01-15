@@ -466,6 +466,215 @@ function showThemeSettings() {
 }
 
 // ============================================================================
+// NAVIGATION HELPERS (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Navigate to Executive Dashboard
+ */
+function navToDash() {
+  navigateToSheet(SHEETS.DASHBOARD);
+}
+
+/**
+ * Navigate to Custom View / Interactive Dashboard
+ */
+function navToCustom() {
+  navigateToSheet(SHEETS.INTERACTIVE);
+}
+
+/**
+ * Navigate to Mobile View (if exists)
+ */
+function navToMobile() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var mobileSheet = ss.getSheetByName('📱 Mobile View');
+
+  if (mobileSheet) {
+    mobileSheet.activate();
+  } else {
+    // Fall back to showing the mobile-optimized sidebar
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Mobile View sheet not found. Use the web app for best mobile experience.',
+      COMMAND_CONFIG.SYSTEM_NAME,
+      5
+    );
+  }
+}
+
+/**
+ * Navigate to a specific sheet by name
+ * @param {string} sheetName - The sheet name to navigate to
+ */
+function navigateToSheet(sheetName) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+
+  if (sheet) {
+    sheet.activate();
+  } else {
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Sheet "' + sheetName + '" not found',
+      'Navigation Error',
+      3
+    );
+  }
+}
+
+// ============================================================================
+// GLOBAL STYLING (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Applies the system theme to all visible sheets
+ * Includes header styling, zebra striping, and font standardization
+ */
+function APPLY_SYSTEM_THEME() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var sheetsStyled = 0;
+
+  ss.toast('Applying theme to all sheets...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  sheets.forEach(function(sheet) {
+    var sheetName = sheet.getName();
+
+    // Skip hidden sheets
+    if (sheet.isSheetHidden()) return;
+
+    // Skip sheets starting with underscore (calculation sheets)
+    if (sheetName.startsWith('_')) return;
+
+    try {
+      applyThemeToSheet_(sheet);
+      sheetsStyled++;
+    } catch (e) {
+      Logger.log('Failed to style sheet ' + sheetName + ': ' + e.message);
+    }
+  });
+
+  ss.toast('Theme applied to ' + sheetsStyled + ' sheets', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Applies theme styling to a single sheet
+ * @param {Sheet} sheet - The sheet to style
+ * @private
+ */
+function applyThemeToSheet_(sheet) {
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+
+  if (lastRow < 1 || lastCol < 1) return;
+
+  // Style header row
+  var headerRange = sheet.getRange(1, 1, 1, lastCol);
+  headerRange.setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+             .setFontColor(COMMAND_CONFIG.THEME.HEADER_TEXT)
+             .setFontWeight('bold')
+             .setFontFamily(COMMAND_CONFIG.THEME.FONT)
+             .setFontSize(11)
+             .setVerticalAlignment('middle');
+
+  // Apply font to all data rows
+  if (lastRow > 1) {
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    dataRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
+             .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
+             .setVerticalAlignment('middle');
+
+    // Apply zebra striping
+    for (var row = 2; row <= lastRow; row++) {
+      var rowRange = sheet.getRange(row, 1, 1, lastCol);
+      if (row % 2 === 0) {
+        rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
+      } else {
+        rowRange.setBackground(null);
+      }
+    }
+  }
+
+  // Freeze header row
+  sheet.setFrozenRows(1);
+}
+
+/**
+ * Applies global styling to all visible sheets (alias for APPLY_SYSTEM_THEME)
+ */
+function applyGlobalStyling() {
+  APPLY_SYSTEM_THEME();
+}
+
+/**
+ * Resets all visible sheets to default styling
+ */
+function resetToDefaultTheme() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  var response = ui.alert(
+    'Reset Theme',
+    'This will reset all sheets to default styling (white background, black text).\n\nContinue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  var sheets = ss.getSheets();
+
+  sheets.forEach(function(sheet) {
+    if (sheet.isSheetHidden()) return;
+    if (sheet.getName().startsWith('_')) return;
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+
+    if (lastRow < 1 || lastCol < 1) return;
+
+    try {
+      var allRange = sheet.getRange(1, 1, lastRow, lastCol);
+      allRange.setBackground(null)
+              .setFontColor(null)
+              .setFontWeight('normal')
+              .setFontFamily('Arial')
+              .setFontSize(10);
+
+      // Keep headers bold
+      sheet.getRange(1, 1, 1, lastCol).setFontWeight('bold');
+    } catch (e) {
+      Logger.log('Failed to reset sheet ' + sheet.getName() + ': ' + e.message);
+    }
+  });
+
+  ss.toast('Theme reset to defaults', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Refreshes all visual elements and auto-styling
+ */
+function refreshAllVisuals() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  ss.toast('Refreshing all visuals...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  // Apply traffic light indicators
+  try {
+    applyTrafficLightIndicators();
+  } catch (e) {
+    Logger.log('Traffic lights error: ' + e.message);
+  }
+
+  // Apply global theme
+  try {
+    APPLY_SYSTEM_THEME();
+  } catch (e) {
+    Logger.log('Theme error: ' + e.message);
+  }
+
+  ss.toast('Visual refresh complete', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+// ============================================================================
 // SEARCH DIALOGS
 // ============================================================================
 

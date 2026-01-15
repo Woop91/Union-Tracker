@@ -529,6 +529,214 @@ function sendEmailToMember(memberId, subject, body) {
 }
 
 // ============================================================================
+// PDF SIGNATURE ENGINE (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Gets or creates an archive folder for a specific member
+ * Used for storing grievance PDFs and documents
+ * @param {string} name - Member's name
+ * @param {string} id - Member's ID
+ * @returns {Folder} The member's archive folder
+ */
+function getOrCreateMemberFolder(name, id) {
+  // Get archive folder ID from Config or COMMAND_CONFIG
+  var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
+
+  if (!archiveFolderId) {
+    // Fall back to creating in root folder
+    var rootFolder = getOrCreateRootFolder();
+    var folderName = name + ' (' + id + ')';
+    var folders = rootFolder.getFoldersByName(folderName);
+    return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
+  }
+
+  try {
+    var parentFolder = DriveApp.getFolderById(archiveFolderId);
+    var folderName = name + ' (' + id + ')';
+    var folders = parentFolder.getFoldersByName(folderName);
+    return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
+  } catch (e) {
+    Logger.log('Archive folder not found, using root: ' + e.message);
+    var rootFolder = getOrCreateRootFolder();
+    var folderName = name + ' (' + id + ')';
+    var folders = rootFolder.getFoldersByName(folderName);
+    return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
+  }
+}
+
+/**
+ * Creates a signature-ready PDF from a grievance template
+ * Merges data and adds signature blocks
+ * @param {Folder} folder - Target folder for the PDF
+ * @param {Object} data - Grievance data object
+ * @returns {File} The created PDF file
+ */
+function createSignatureReadyPDF(folder, data) {
+  // Get template ID from Config or COMMAND_CONFIG
+  var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID) || COMMAND_CONFIG.TEMPLATE_ID;
+
+  if (!templateId) {
+    throw new Error('Document template ID not configured. Please set TEMPLATE_ID in Config sheet.');
+  }
+
+  try {
+    // Copy template
+    var temp = DriveApp.getFileById(templateId).makeCopy('SIGNATURE_REQUIRED_' + data.name, folder);
+    var doc = DocumentApp.openById(temp.getId());
+    var body = doc.getBody();
+
+    // Replace placeholders with data
+    body.replaceText('{{MemberName}}', data.name || 'Unknown');
+    body.replaceText('{{MemberID}}', data.id || '000');
+    body.replaceText('{{Date}}', new Date().toLocaleDateString());
+    body.replaceText('{{Details}}', data.details || 'No details provided.');
+    body.replaceText('{{GrievanceID}}', data.grievanceId || '');
+    body.replaceText('{{Articles}}', data.articles || '');
+    body.replaceText('{{Status}}', data.status || '');
+    body.replaceText('{{Unit}}', data.unit || '');
+    body.replaceText('{{Location}}', data.location || '');
+    body.replaceText('{{Steward}}', data.steward || '');
+
+    // Append legal signature block
+    body.appendParagraph(COMMAND_CONFIG.PDF.SIGNATURE_BLOCK ||
+      '\n\n__________________________\nMember Signature\n\n__________________________\nSteward Signature\n\n__________________________\nDate');
+
+    doc.saveAndClose();
+
+    // Convert to PDF
+    var pdf = folder.createFile(temp.getAs(MimeType.PDF))
+                    .setName('Grievance_UNSIGNED_' + data.name + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+
+    // Remove the temp document
+    temp.setTrashed(true);
+
+    return pdf;
+
+  } catch (e) {
+    Logger.log('Error creating signature PDF: ' + e.message);
+    throw new Error('Failed to create PDF: ' + e.message);
+  }
+}
+
+/**
+ * Creates a PDF for the currently selected grievance
+ * Accessible from the 509 Command menu
+ */
+function createPDFForSelectedGrievance() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
+    ui.alert('Please select a grievance row in the Grievance Log sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a grievance row (not the header)');
+    return;
+  }
+
+  // Get grievance data
+  var data = {
+    grievanceId: sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue(),
+    name: sheet.getRange(row, GRIEVANCE_COLS.FIRST_NAME).getValue() + ' ' +
+          sheet.getRange(row, GRIEVANCE_COLS.LAST_NAME).getValue(),
+    id: sheet.getRange(row, GRIEVANCE_COLS.MEMBER_ID).getValue(),
+    status: sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue(),
+    articles: sheet.getRange(row, GRIEVANCE_COLS.ARTICLES).getValue(),
+    details: sheet.getRange(row, GRIEVANCE_COLS.RESOLUTION).getValue() || 'Pending',
+    unit: sheet.getRange(row, GRIEVANCE_COLS.UNIT).getValue(),
+    location: sheet.getRange(row, GRIEVANCE_COLS.LOCATION).getValue(),
+    steward: sheet.getRange(row, GRIEVANCE_COLS.STEWARD).getValue()
+  };
+
+  var response = ui.alert(
+    'Create Signature PDF',
+    'Create a signature-ready PDF for grievance ' + data.grievanceId + '?\n\n' +
+    'Member: ' + data.name + '\n' +
+    'Status: ' + data.status,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  try {
+    ss.toast('Creating PDF...', COMMAND_CONFIG.SYSTEM_NAME, 5);
+
+    // Get or create member folder
+    var folder = getOrCreateMemberFolder(data.name, data.id);
+
+    // Create the PDF
+    var pdf = createSignatureReadyPDF(folder, data);
+
+    // Update grievance record with PDF link
+    if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
+      sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folder.getUrl());
+    }
+
+    ui.alert(
+      'PDF Created',
+      'Signature-ready PDF has been created.\n\n' +
+      'File: ' + pdf.getName() + '\n' +
+      'Location: ' + folder.getName() + '\n\n' +
+      'Click OK to open the folder.',
+      ui.ButtonSet.OK
+    );
+
+    // Open folder in new tab
+    var html = HtmlService.createHtmlOutput(
+      '<script>window.open("' + folder.getUrl() + '", "_blank"); google.script.host.close();</script>'
+    ).setWidth(100).setHeight(50);
+    ui.showModalDialog(html, 'Opening folder...');
+
+  } catch (e) {
+    ui.alert('Error', 'Failed to create PDF: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Handles form submission for grievance intake forms
+ * Creates PDF and links it back to the log
+ * @param {Object} e - Form submission event object
+ */
+function onGrievanceFormSubmit(e) {
+  try {
+    var responses = e.namedValues;
+    var data = {
+      name: responses['Member Name'] ? responses['Member Name'][0] : 'Unknown',
+      id: responses['Member ID'] ? responses['Member ID'][0] : '000',
+      details: responses['Details'] ? responses['Details'][0] : 'No details provided.',
+      grievanceId: responses['Grievance ID'] ? responses['Grievance ID'][0] : '',
+      articles: responses['Articles'] ? responses['Articles'][0] : ''
+    };
+
+    // Create member folder and PDF
+    var memberFolder = getOrCreateMemberFolder(data.name, data.id);
+    var pdfFile = createSignatureReadyPDF(memberFolder, data);
+
+    // Link PDF back to the grievance log
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+    if (sheet) {
+      // Find the last row (where the form just added data) and add the PDF link
+      var lastRow = sheet.getLastRow();
+      if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
+        sheet.getRange(lastRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+      }
+    }
+
+    Logger.log('Form submission processed: ' + data.name + ' - PDF created');
+
+  } catch (e) {
+    Logger.log('Error processing form submission: ' + e.message);
+  }
+}
+
+// ============================================================================
 // UI DIALOGS FOR INTEGRATIONS
 // ============================================================================
 

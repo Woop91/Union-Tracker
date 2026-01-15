@@ -584,6 +584,158 @@ function NUCLEAR_WIPE_GRIEVANCES() {
 }
 
 // ============================================================================
+// BACKUP & SNAPSHOT FUNCTIONS (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Creates a complete backup snapshot of the spreadsheet
+ * Copies entire spreadsheet to the archive folder with timestamp
+ */
+function createWeeklySnapshot() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  // Get archive folder ID from Config
+  var archiveFolderId = '';
+  try {
+    archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
+  } catch (e) {
+    // Fall back to a default if config is not available
+  }
+
+  if (!archiveFolderId) {
+    ui.alert(
+      'Archive Folder Not Configured',
+      'Please set the Archive Folder ID in the Config sheet (column AU) or COMMAND_CONFIG.ARCHIVE_FOLDER_ID.\n\n' +
+      'To find a folder ID:\n' +
+      '1. Open the target folder in Google Drive\n' +
+      '2. Copy the ID from the URL (after /folders/)',
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
+  try {
+    var folder = DriveApp.getFolderById(archiveFolderId);
+    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd_HH-mm');
+    var snapshotName = '509_SNAPSHOT_' + date;
+
+    // Create the copy
+    DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
+
+    // Log the backup
+    logAuditEvent('SNAPSHOT_CREATED', {
+      snapshotName: snapshotName,
+      folderId: archiveFolderId,
+      createdBy: Session.getActiveUser().getEmail()
+    });
+
+    ui.alert('Snapshot Created', 'Backup saved to archive folder.\n\nFile: ' + snapshotName, ui.ButtonSet.OK);
+
+  } catch (e) {
+    ui.alert('Error', 'Failed to create snapshot: ' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Creates an automated snapshot (for scheduled triggers)
+ * Does not show UI alerts - just logs the action
+ */
+function createAutomatedSnapshot() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var archiveFolderId = '';
+  try {
+    archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
+  } catch (e) {
+    Logger.log('Could not get archive folder ID: ' + e.message);
+    return { success: false, error: 'Archive folder not configured' };
+  }
+
+  if (!archiveFolderId) {
+    Logger.log('Archive folder not configured');
+    return { success: false, error: 'Archive folder not configured' };
+  }
+
+  try {
+    var folder = DriveApp.getFolderById(archiveFolderId);
+    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
+    var snapshotName = '509_AUTO_SNAPSHOT_' + date;
+
+    DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
+
+    logAuditEvent('AUTO_SNAPSHOT_CREATED', {
+      snapshotName: snapshotName,
+      createdBy: 'Automated Trigger'
+    });
+
+    return { success: true, snapshotName: snapshotName };
+
+  } catch (e) {
+    Logger.log('Failed to create automated snapshot: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Sets up weekly snapshot trigger
+ * Creates a time-based trigger to run every Sunday at 2am
+ */
+function setupWeeklySnapshotTrigger() {
+  // Remove existing snapshot triggers
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'createAutomatedSnapshot') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  // Create new weekly trigger (Sunday at 2am)
+  ScriptApp.newTrigger('createAutomatedSnapshot')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(2)
+    .create();
+
+  SpreadsheetApp.getUi().alert(
+    'Weekly Snapshot Enabled',
+    'Automated backups will be created every Sunday at 2:00 AM.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Navigates to the Audit Log sheet
+ */
+function navigateToAuditLog() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+
+  if (!auditSheet) {
+    // Create audit log if it doesn't exist
+    auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
+    auditSheet.getRange('A1:F1').setValues([['Timestamp', 'User', 'Sheet', 'Cell', 'Old Value', 'New Value']]);
+    auditSheet.getRange('A1:F1')
+      .setFontWeight('bold')
+      .setBackground(COLORS.CARD_DARK_BG)
+      .setFontColor(COLORS.CARD_DARK_TEXT);
+    auditSheet.hideSheet();
+  }
+
+  // Unhide temporarily and activate
+  if (auditSheet.isSheetHidden()) {
+    auditSheet.showSheet();
+  }
+  auditSheet.activate();
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Showing Audit Log. It will be hidden again when you switch sheets.',
+    COMMAND_CONFIG.SYSTEM_NAME,
+    5
+  );
+}
+
+// ============================================================================
 // SETTINGS MANAGEMENT
 // ============================================================================
 

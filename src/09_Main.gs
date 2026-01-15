@@ -95,6 +95,7 @@ function onEdit(e) {
 /**
  * Handles security audit logging for change tracking
  * Logs all edits to the Audit Log sheet for accountability
+ * Includes sabotage protection for mass deletions (>15 cells)
  * @param {Object} e - The edit event object
  * @private
  */
@@ -106,8 +107,8 @@ function handleSecurityAudit_(e) {
     if (!auditSheet) {
       // Create audit log sheet if it doesn't exist
       auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-      auditSheet.getRange('A1:E1').setValues([['Timestamp', 'User', 'Cell', 'Old Value', 'New Value']]);
-      auditSheet.getRange('A1:E1').setFontWeight('bold').setBackground(COLORS.CARD_DARK_BG).setFontColor(COLORS.CARD_DARK_TEXT);
+      auditSheet.getRange('A1:F1').setValues([['Timestamp', 'User', 'Cell', 'Old Value', 'New Value', 'Alert']]);
+      auditSheet.getRange('A1:F1').setFontWeight('bold').setBackground(COLORS.CARD_DARK_BG).setFontColor(COLORS.CARD_DARK_TEXT);
       auditSheet.hideSheet();
     }
 
@@ -118,13 +119,60 @@ function handleSecurityAudit_(e) {
       userEmail = 'Auth Required';
     }
 
+    var range = e.range;
+    var numCells = range.getNumColumns() * range.getNumRows();
+    var alertMessage = '';
+
+    // SABOTAGE PROTECTION: Detect mass deletions (>15 cells cleared)
+    if (e.oldValue && !e.value && numCells > 15) {
+      alertMessage = 'MASS_DELETION_ALERT';
+
+      // Send alert to Chief Steward
+      var chiefEmail = '';
+      try {
+        chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
+      } catch (configError) {
+        // Config not available
+      }
+
+      if (chiefEmail) {
+        try {
+          MailApp.sendEmail({
+            to: chiefEmail,
+            subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' SABOTAGE ALERT',
+            body: 'Mass deletion detected in ' + COMMAND_CONFIG.SYSTEM_NAME + '.\n\n' +
+                  'User: ' + userEmail + '\n' +
+                  'Sheet: ' + range.getSheet().getName() + '\n' +
+                  'Range: ' + range.getA1Notation() + '\n' +
+                  'Cells Affected: ' + numCells + '\n' +
+                  'Time: ' + new Date().toLocaleString() + '\n\n' +
+                  'Please review immediately.' +
+                  COMMAND_CONFIG.EMAIL.FOOTER
+          });
+        } catch (emailError) {
+          Logger.log('Failed to send sabotage alert: ' + emailError.message);
+        }
+      }
+
+      // Log to console for visibility
+      Logger.log('SABOTAGE ALERT: Mass deletion by ' + userEmail + ' in ' +
+                 range.getSheet().getName() + ' (' + numCells + ' cells)');
+    }
+
+    // Detect large-scale changes (not necessarily malicious but notable)
+    if (numCells > 50) {
+      alertMessage = alertMessage || 'LARGE_CHANGE';
+    }
+
     auditSheet.appendRow([
       new Date(),
       userEmail,
-      e.range.getA1Notation() + ' (' + e.range.getSheet().getName() + ')',
+      range.getA1Notation() + ' (' + range.getSheet().getName() + ')',
       e.oldValue || '(empty)',
-      e.value || '(deleted)'
+      e.value || '(deleted)',
+      alertMessage
     ]);
+
   } catch (auditError) {
     // Silently fail - don't break user's edit for audit logging
     console.log('Audit log error: ' + auditError.message);
