@@ -132,8 +132,16 @@ var SHEETS = {
   // Help & Documentation sheets
   GETTING_STARTED: '📚 Getting Started',
   FAQ: '❓ FAQ',
-  CONFIG_GUIDE: '📖 Config Guide'
+  CONFIG_GUIDE: '📖 Config Guide',
+  // Aliases for backward compatibility (some code uses these alternate names)
+  GRIEVANCE_TRACKER: 'Grievance Log',
+  MEMBER_DIRECTORY: 'Member Directory',
+  REPORTS: '💼 Dashboard'
 };
+
+// SHEET_NAMES alias for backward compatibility
+// Some code references SHEET_NAMES instead of SHEETS
+var SHEET_NAMES = SHEETS;
 
 // ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System

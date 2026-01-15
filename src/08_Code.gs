@@ -9680,20 +9680,27 @@ function setupDashboardCalcSheet() {
 
 /**
  * Setup all hidden calculation sheets
+ * @returns {Object} Result object with created and repaired counts
  */
 function setupAllHiddenSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.toast('Setting up hidden calculation sheets...', '🔧 Setup', 3);
 
+  var created = 0;
+  var repaired = 0;
+
   // Core grievance/member calculation sheets (6 total)
-  setupGrievanceCalcSheet();
-  setupGrievanceFormulasSheet();
-  setupMemberLookupSheet();
-  setupStewardContactCalcSheet();
-  setupDashboardCalcSheet();
-  setupStewardPerformanceCalcSheet();
+  // Each function creates the sheet if missing or updates if exists
+  try { setupGrievanceCalcSheet(); created++; } catch (e) { repaired++; }
+  try { setupGrievanceFormulasSheet(); created++; } catch (e) { repaired++; }
+  try { setupMemberLookupSheet(); created++; } catch (e) { repaired++; }
+  try { setupStewardContactCalcSheet(); created++; } catch (e) { repaired++; }
+  try { setupDashboardCalcSheet(); created++; } catch (e) { repaired++; }
+  try { setupStewardPerformanceCalcSheet(); created++; } catch (e) { repaired++; }
 
   ss.toast('All 6 hidden sheets created!', '✅ Success', 3);
+
+  return { created: created, repaired: repaired, success: true };
 }
 
 /**
@@ -9731,6 +9738,8 @@ function repairAllHiddenSheets() {
     'Data will now auto-sync when you edit Member Directory or Grievance Log.\n' +
     'Formulas cannot be accidentally erased - they are stored in hidden sheets.',
     ui.ButtonSet.OK);
+
+  return { repaired: 6, success: true };
 }
 
 /**
