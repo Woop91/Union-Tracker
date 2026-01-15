@@ -65,7 +65,7 @@ var SHEETS = {
 };
 
 // ============================================================================
-// COLOR SCHEME
+// COLOR SCHEME - Enhanced Visual Theme System
 // ============================================================================
 
 /**
@@ -73,6 +73,7 @@ var SHEETS = {
  * @const {Object}
  */
 var COLORS = {
+  // Primary Brand Colors
   PRIMARY_PURPLE: '#7C3AED',    // Main brand purple
   UNION_GREEN: '#059669',       // Union/success green
   SOLIDARITY_RED: '#DC2626',    // Alert/urgent red
@@ -82,7 +83,93 @@ var COLORS = {
   TEXT_DARK: '#1F2937',         // Primary text
   WHITE: '#FFFFFF',             // White
   HEADER_BG: '#7C3AED',         // Header background (same as primary)
-  HEADER_TEXT: '#FFFFFF'        // Header text color
+  HEADER_TEXT: '#FFFFFF',       // Header text color
+
+  // Card Theme Colors (Dark Mode Headers)
+  CARD_DARK_BG: '#1E293B',      // Dark slate for card headers
+  CARD_DARK_TEXT: '#F8FAFC',    // Light text on dark backgrounds
+  CARD_GRADIENT_START: '#4C1D95', // Purple gradient start
+  CARD_GRADIENT_MID: '#5B21B6',   // Purple gradient middle
+  CARD_ACCENT_GLOW: '#A78BFA',    // Purple accent glow
+
+  // Status Colors (Enhanced)
+  STATUS_GREEN: '#10B981',      // Success/Won
+  STATUS_YELLOW: '#FBBF24',     // Warning/4-7 days
+  STATUS_ORANGE: '#F97316',     // Caution/1-3 days
+  STATUS_RED: '#EF4444',        // Danger/Overdue
+  STATUS_BLUE: '#3B82F6',       // Info/Pending
+
+  // Gradient Scale Colors (for heatmaps)
+  GRADIENT_LOW: '#D1FAE5',      // Light green (good)
+  GRADIENT_MID_LOW: '#FEF3C7',  // Light yellow
+  GRADIENT_MID: '#FED7AA',      // Light orange
+  GRADIENT_MID_HIGH: '#FECACA', // Light red
+  GRADIENT_HIGH: '#FCA5A5',     // Red (attention needed)
+
+  // Chart Colors
+  CHART_PURPLE: '#8B5CF6',
+  CHART_BLUE: '#3B82F6',
+  CHART_GREEN: '#10B981',
+  CHART_YELLOW: '#F59E0B',
+  CHART_RED: '#EF4444',
+  CHART_PINK: '#EC4899',
+  CHART_INDIGO: '#6366F1',
+  CHART_CYAN: '#06B6D4',
+
+  // Section Colors (Cohesive Theme)
+  SECTION_STATS: '#059669',     // Green - Quick Stats
+  SECTION_MEMBERS: '#3B82F6',   // Blue - Member Metrics
+  SECTION_GRIEVANCE: '#F97316', // Orange - Grievance Metrics
+  SECTION_TIMELINE: '#7C3AED',  // Purple - Timeline
+  SECTION_ANALYSIS: '#6366F1',  // Indigo - Analysis
+  SECTION_LOCATION: '#0891B2',  // Cyan - Location
+  SECTION_TRENDS: '#DC2626',    // Red - Trends
+  SECTION_PERFORMANCE: '#8B5CF6', // Violet - Performance
+
+  // Alternate Row Colors (Zebra Stripes)
+  ROW_ALT_LIGHT: '#F9FAFB',     // Very light gray
+  ROW_ALT_GREEN: '#ECFDF5',     // Light green tint
+  ROW_ALT_RED: '#FEF2F2',       // Light red tint
+  ROW_ALT_BLUE: '#EFF6FF'       // Light blue tint
+};
+
+/**
+ * Menu Icon Mapping - Consistent Iconography
+ * Action icons for tools, View icons for dashboards
+ * @const {Object}
+ */
+var MENU_ICONS = {
+  // Dashboard/View Icons (📊 style)
+  DASHBOARD: '📊',
+  MEMBERS: '👥',
+  GRIEVANCES: '📋',
+  CALENDAR: '📅',
+  REPORTS: '📈',
+  SATISFACTION: '⭐',
+
+  // Action Icons (➕ style)
+  ADD: '➕',
+  EDIT: '✏️',
+  DELETE: '🗑️',
+  SEARCH: '🔍',
+  REFRESH: '🔄',
+  SYNC: '🔗',
+  EXPORT: '📤',
+  IMPORT: '📥',
+
+  // Status Icons
+  SUCCESS: '✅',
+  WARNING: '⚠️',
+  ERROR: '❌',
+  INFO: 'ℹ️',
+  CLOCK: '⏰',
+
+  // Admin/Settings Icons
+  SETTINGS: '⚙️',
+  TOOLS: '🛠️',
+  ADMIN: '🔧',
+  HELP: '❓',
+  DOCS: '📖'
 };
 
 // ============================================================================

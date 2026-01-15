@@ -817,287 +817,428 @@ function createDashboard(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.DASHBOARD);
   sheet.clear();
 
-  // Title - Executive Dashboard style
-  sheet.getRange('A1').setValue('💼 Executive Dashboard')
+  // Title - Executive Dashboard style with dark header card
+  sheet.getRange('A1').setValue('📊 Executive Dashboard')
     .setFontSize(24)
     .setFontWeight('bold')
-    .setFontColor(COLORS.PRIMARY_PURPLE);
+    .setFontColor(COLORS.WHITE)
+    .setBackground(COLORS.CARD_DARK_BG);
   sheet.getRange('A1:F1').merge();
 
-  // Subtitle with last refresh
-  sheet.getRange('A2').setValue('Real-time metrics from Member Directory & Grievance Log')
-    .setFontSize(10)
+  // Subtitle with last refresh - dark theme continuation
+  sheet.getRange('A2').setValue('Real-time metrics • Auto-refreshed from live data')
+    .setFontSize(11)
     .setFontStyle('italic')
-    .setFontColor(COLORS.TEXT_DARK);
+    .setFontColor(COLORS.CARD_DARK_TEXT)
+    .setBackground(COLORS.CARD_DARK_BG);
   sheet.getRange('A2:F2').merge();
 
+  // Spacer row
+  sheet.getRange('A3:F3').setBackground(COLORS.WHITE);
+  sheet.setRowHeight(3, 8);
+
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 1: QUICK STATS (Executive Dashboard green theme)
+  // SECTION 1: QUICK STATS - High-Contrast Card Layout
   // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A4').setValue('QUICK STATS')
+  // Dark header for card effect
+  sheet.getRange('A4').setValue('📈 QUICK STATS')
     .setFontWeight('bold')
-    .setBackground(COLORS.UNION_GREEN)
-    .setFontColor(COLORS.WHITE);
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
   sheet.getRange('A4:F4').merge();
 
-  // Quick stats row - pulls from hidden _Dashboard_Calc sheet
+  // Quick stats row - labels with subtle background
   var quickStatsLabels = [
     ['Total Members', 'Active Stewards', 'Active Grievances', 'Win Rate', 'Overdue Cases', 'Due This Week']
   ];
   sheet.getRange('A5:F5').setValues(quickStatsLabels)
     .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
-    .setHorizontalAlignment('center');
-
-  // Quick stats values (populated by syncDashboardValues)
-  sheet.getRange('A6:F6')
-    .setFontSize(20)
+    .setFontSize(10)
+    .setBackground('#E8F5E9')  // Light green tint
     .setHorizontalAlignment('center')
-    .setFontWeight('bold');
+    .setFontColor(COLORS.TEXT_DARK);
+
+  // Quick stats values - large vibrant numbers
+  sheet.getRange('A6:F6')
+    .setFontSize(24)
+    .setHorizontalAlignment('center')
+    .setFontWeight('bold')
+    .setBackground(COLORS.WHITE);
+
+  // Color-code specific stat cells
+  sheet.getRange('A6').setFontColor(COLORS.CHART_BLUE);      // Total Members - blue
+  sheet.getRange('B6').setFontColor(COLORS.CHART_GREEN);     // Stewards - green
+  sheet.getRange('C6').setFontColor(COLORS.CHART_PURPLE);    // Active - purple
+  sheet.getRange('D6').setFontColor(COLORS.UNION_GREEN);     // Win Rate - green
+  sheet.getRange('E6').setFontColor(COLORS.SOLIDARITY_RED);  // Overdue - red
+  sheet.getRange('F6').setFontColor(COLORS.ACCENT_ORANGE);   // Due This Week - orange
+
+  // Card bottom border
+  sheet.getRange('A7:F7').setBackground(COLORS.SECTION_STATS);
+  sheet.setRowHeight(7, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 2: MEMBER METRICS
+  // SECTION 2: MEMBER METRICS - Card Style
   // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A8').setValue('MEMBER METRICS')
+  sheet.getRange('A9').setValue('👥 MEMBER METRICS')
     .setFontWeight('bold')
-    .setBackground(COLORS.PRIMARY_BLUE)
-    .setFontColor(COLORS.TEXT_DARK);
-  sheet.getRange('A8:D8').merge();
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A9:D9').merge();
 
   var memberMetricLabels = [['Total Members', 'Active Stewards', 'Avg Open Rate', 'YTD Vol. Hours']];
-  sheet.getRange('A9:D9').setValues(memberMetricLabels)
+  sheet.getRange('A10:D10').setValues(memberMetricLabels)
     .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontSize(10)
+    .setBackground('#E3F2FD')  // Light blue tint
     .setHorizontalAlignment('center');
 
-  // Member metric values (populated by syncDashboardValues)
-  sheet.getRange('A10:D10')
-    .setFontSize(18)
-    .setHorizontalAlignment('center');
+  // Member metric values with color coding
+  sheet.getRange('A11:D11')
+    .setFontSize(20)
+    .setHorizontalAlignment('center')
+    .setFontWeight('bold')
+    .setBackground(COLORS.WHITE);
+  sheet.getRange('A11').setFontColor(COLORS.CHART_BLUE);
+  sheet.getRange('B11').setFontColor(COLORS.CHART_GREEN);
+  sheet.getRange('C11').setFontColor(COLORS.CHART_PURPLE);
+  sheet.getRange('D11').setFontColor(COLORS.CHART_YELLOW);
+
+  // Card bottom border
+  sheet.getRange('A12:D12').setBackground(COLORS.SECTION_MEMBERS);
+  sheet.setRowHeight(12, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 3: GRIEVANCE METRICS
+  // SECTION 3: GRIEVANCE METRICS - Card Style
   // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A12').setValue('GRIEVANCE METRICS')
+  sheet.getRange('A14').setValue('📋 GRIEVANCE METRICS')
     .setFontWeight('bold')
-    .setBackground(COLORS.ACCENT_ORANGE)
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A12:F12').merge();
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A14:F14').merge();
 
   var grievanceLabels = [['Open', 'Pending Info', 'Settled', 'Won', 'Denied', 'Withdrawn']];
-  sheet.getRange('A13:F13').setValues(grievanceLabels)
+  sheet.getRange('A15:F15').setValues(grievanceLabels)
     .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontSize(10)
+    .setBackground('#FFF3E0')  // Light orange tint
     .setHorizontalAlignment('center');
 
-  // Grievance metric values (populated by syncDashboardValues)
-  sheet.getRange('A14:F14')
-    .setFontSize(18)
-    .setHorizontalAlignment('center');
+  // Grievance metric values with status colors
+  sheet.getRange('A16:F16')
+    .setFontSize(20)
+    .setHorizontalAlignment('center')
+    .setFontWeight('bold')
+    .setBackground(COLORS.WHITE);
+  sheet.getRange('A16').setFontColor(COLORS.SOLIDARITY_RED);   // Open - red
+  sheet.getRange('B16').setFontColor(COLORS.ACCENT_ORANGE);    // Pending - orange
+  sheet.getRange('C16').setFontColor(COLORS.STATUS_BLUE);      // Settled - blue
+  sheet.getRange('D16').setFontColor(COLORS.UNION_GREEN);      // Won - green
+  sheet.getRange('E16').setFontColor('#9CA3AF');               // Denied - gray
+  sheet.getRange('F16').setFontColor('#6B7280');               // Withdrawn - gray
+
+  // Card bottom border
+  sheet.getRange('A17:F17').setBackground(COLORS.SECTION_GRIEVANCE);
+  sheet.setRowHeight(17, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 4: TIMELINE METRICS
+  // SECTION 4: TIMELINE METRICS - Card Style
   // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A16').setValue('TIMELINE & PERFORMANCE')
+  sheet.getRange('A19').setValue('⏱️ TIMELINE & PERFORMANCE')
     .setFontWeight('bold')
-    .setBackground(COLORS.PRIMARY_PURPLE)
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A16:D16').merge();
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A19:D19').merge();
 
   var timelineLabels = [['Avg Days Open', 'Filed This Month', 'Closed This Month', 'Avg Resolution Days']];
-  sheet.getRange('A17:D17').setValues(timelineLabels)
+  sheet.getRange('A20:D20').setValues(timelineLabels)
     .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontSize(10)
+    .setBackground('#F3E5F5')  // Light purple tint
     .setHorizontalAlignment('center');
 
-  // Timeline metric values (populated by syncDashboardValues)
-  sheet.getRange('A18:D18')
-    .setFontSize(18)
-    .setHorizontalAlignment('center');
+  // Timeline metric values
+  sheet.getRange('A21:D21')
+    .setFontSize(20)
+    .setHorizontalAlignment('center')
+    .setFontWeight('bold')
+    .setBackground(COLORS.WHITE);
+  sheet.getRange('A21').setFontColor(COLORS.CHART_PURPLE);
+  sheet.getRange('B21').setFontColor(COLORS.CHART_BLUE);
+  sheet.getRange('C21').setFontColor(COLORS.CHART_GREEN);
+  sheet.getRange('D21').setFontColor(COLORS.CHART_INDIGO);
+
+  // Card bottom border
+  sheet.getRange('A22:D22').setBackground(COLORS.SECTION_TIMELINE);
+  sheet.setRowHeight(22, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 5: TYPE ANALYSIS (by Issue Category)
+  // SECTION 5: TYPE ANALYSIS (by Issue Category) - Card Style
   // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A20').setValue('📊 TYPE ANALYSIS (by Issue Category)')
+  sheet.getRange('A24').setValue('📊 ISSUE BREAKDOWN (by Category)')
     .setFontWeight('bold')
-    .setBackground('#6366F1')  // Indigo
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A20:F20').merge();
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A24:F24').merge();
 
   var typeLabels = [['Issue Category', 'Total Cases', 'Open', 'Resolved', 'Win Rate', 'Avg Days']];
-  sheet.getRange('A21:F21').setValues(typeLabels)
+  sheet.getRange('A25:F25').setValues(typeLabels)
     .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontSize(10)
+    .setBackground('#EDE9FE')  // Light indigo tint
     .setHorizontalAlignment('center');
 
-  // Type analysis values (populated by syncDashboardValues)
-  sheet.getRange('A22:F26').setHorizontalAlignment('center');
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 6: LOCATION BREAKDOWN
-  // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A28').setValue('🗺️ LOCATION BREAKDOWN')
-    .setFontWeight('bold')
-    .setBackground('#0891B2')  // Cyan
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A28:F28').merge();
-
-  var locationLabels = [['Location', 'Members', 'Grievances', 'Open Cases', 'Win Rate', 'Avg Satisfaction']];
-  sheet.getRange('A29:F29').setValues(locationLabels)
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
-    .setHorizontalAlignment('center');
-
-  // Location values (populated by syncDashboardValues)
-  sheet.getRange('A30:F34').setHorizontalAlignment('center');
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 7: MONTH-OVER-MONTH TRENDS (moved up from rows 40-44)
-  // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A36').setValue('📈 MONTH-OVER-MONTH TRENDS')
-    .setFontWeight('bold')
-    .setBackground('#DC2626')  // Red
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A36:F36').merge();
-
-  var trendLabels = [['Metric', 'This Month', 'Last Month', 'Change', '% Change', 'Trend']];
-  sheet.getRange('A37:F37').setValues(trendLabels)
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
-    .setHorizontalAlignment('center');
-
-  // Trend values (populated by syncDashboardValues)
-  sheet.getRange('A38:F40').setHorizontalAlignment('center');
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 8: STATUS LEGEND (compact - fits in A-F only)
-  // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A42').setValue('STATUS LEGEND')
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY);
-  sheet.getRange('A42:F42').merge();
-
-  // Deadline status - compact version
-  var legendDeadline = [
-    ['🟢 >7d', '🟡 4-7d', '🟠 1-3d', '🔴 Overdue', '✅ Won', '❌ Denied']
-  ];
-  sheet.getRange('A43:F43').setValues(legendDeadline)
-    .setHorizontalAlignment('center')
-    .setFontSize(9);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 9: STEWARD PERFORMANCE SUMMARY (moved to near bottom)
-  // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A45').setValue('👨‍⚖️ STEWARD PERFORMANCE SUMMARY')
-    .setFontWeight('bold')
-    .setBackground('#7C3AED')  // Purple
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A45:F45').merge();
-
-  var stewardLabels = [['Total Stewards', 'Active (w/ Cases)', 'Avg Cases/Steward', 'Total Vol Hours', 'Contacts This Month', '']];
-  sheet.getRange('A46:F46').setValues(stewardLabels)
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
-    .setHorizontalAlignment('center');
-
-  // Steward summary values (populated by syncDashboardValues)
-  sheet.getRange('A47:F47')
-    .setFontSize(16)
-    .setHorizontalAlignment('center');
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 10: TOP 30 BUSIEST STEWARDS (by active grievance count)
-  // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A49').setValue('📊 TOP 30 BUSIEST STEWARDS (Active Cases)')
-    .setFontWeight('bold')
-    .setBackground('#B91C1C')  // Dark red
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A49:F49').merge();
-
-  var busiestLabels = [['Rank', 'Steward Name', 'Active Cases', 'Open', 'Pending Info', 'Total Ever']];
-  sheet.getRange('A50:F50').setValues(busiestLabels)
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
-    .setHorizontalAlignment('center');
-
-  // Busiest stewards values (populated by syncDashboardValues)
-  sheet.getRange('A51:F80').setHorizontalAlignment('center');
-
-  // Alternate row coloring for busiest stewards list
-  for (var r = 51; r <= 80; r++) {
-    if (r % 2 === 1) {
-      sheet.getRange('A' + r + ':F' + r).setBackground('#F9FAFB');
+  // Type analysis values - alternate row coloring
+  for (var r = 26; r <= 30; r++) {
+    sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
+    if (r % 2 === 0) {
+      sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_LIGHT);
     }
   }
 
+  // Card bottom border
+  sheet.getRange('A31:F31').setBackground(COLORS.SECTION_ANALYSIS);
+  sheet.setRowHeight(31, 4);
+
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 11: TOP 10 PERFORMERS BY SCORE
+  // SECTION 6: LOCATION BREAKDOWN - Card Style
   // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A82').setValue('🏆 TOP 10 PERFORMERS BY SCORE')
+  sheet.getRange('A33').setValue('📍 LOCATION BREAKDOWN')
     .setFontWeight('bold')
-    .setBackground('#059669')  // Green
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A82:F82').merge();
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A33:F33').merge();
+
+  var locationLabels = [['Location', 'Members', 'Grievances', 'Open Cases', 'Win Rate', 'Satisfaction']];
+  sheet.getRange('A34:F34').setValues(locationLabels)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#E0F7FA')  // Light cyan tint
+    .setHorizontalAlignment('center');
+
+  // Location values - alternate row coloring
+  for (var r = 35; r <= 39; r++) {
+    sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
+    if (r % 2 === 1) {
+      sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_BLUE);
+    }
+  }
+
+  // Card bottom border
+  sheet.getRange('A40:F40').setBackground(COLORS.SECTION_LOCATION);
+  sheet.setRowHeight(40, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 7: MONTH-OVER-MONTH TRENDS with Sparklines - Card Style
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A42').setValue('📈 MONTH-OVER-MONTH TRENDS')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A42:G42').merge();
+
+  var trendLabels = [['Metric', 'This Month', 'Last Month', 'Change', '% Change', '6-Mo Trend', 'Sparkline']];
+  sheet.getRange('A43:G43').setValues(trendLabels)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#FFEBEE')  // Light red tint
+    .setHorizontalAlignment('center');
+
+  // Trend values with sparkline column
+  var trendMetrics = [['Active Grievances', '', '', '', '', '', ''], ['Total Members', '', '', '', '', '', ''], ['Cases Filed', '', '', '', '', '', '']];
+  sheet.getRange('A44:G46').setValues(trendMetrics)
+    .setHorizontalAlignment('center');
+
+  // Sparkline formulas will be populated by syncDashboardValues
+  // Format: =SPARKLINE({data}, {"charttype","line";"color","#DC2626"})
+
+  // Color code the change column based on positive/negative
+  sheet.getRange('D44:E46').setFontWeight('bold');
+
+  // Card bottom border
+  sheet.getRange('A47:G47').setBackground(COLORS.SECTION_TRENDS);
+  sheet.setRowHeight(47, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 8: STATUS LEGEND - Compact Visual Guide
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A49').setValue('🔖 STATUS LEGEND')
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontColor(COLORS.TEXT_DARK);
+  sheet.getRange('A49:G49').merge();
+
+  // Deadline status with color-coded backgrounds
+  var legendDeadline = [
+    ['🟢 >7 days', '🟡 4-7 days', '🟠 1-3 days', '🔴 Overdue', '✅ Won', '❌ Denied', '⏸️ Pending']
+  ];
+  sheet.getRange('A50:G50').setValues(legendDeadline)
+    .setHorizontalAlignment('center')
+    .setFontSize(9)
+    .setFontWeight('bold');
+  // Color-code each legend item background
+  sheet.getRange('A50').setBackground(COLORS.GRADIENT_LOW);
+  sheet.getRange('B50').setBackground(COLORS.GRADIENT_MID_LOW);
+  sheet.getRange('C50').setBackground(COLORS.GRADIENT_MID);
+  sheet.getRange('D50').setBackground(COLORS.GRADIENT_HIGH);
+  sheet.getRange('E50').setBackground('#D1FAE5');
+  sheet.getRange('F50').setBackground('#FEE2E2');
+  sheet.getRange('G50').setBackground('#FEF3C7');
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 9: STEWARD PERFORMANCE SUMMARY - Card Style
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A52').setValue('🛡️ STEWARD PERFORMANCE SUMMARY')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A52:F52').merge();
+
+  var stewardLabels = [['Total Stewards', 'Active (w/ Cases)', 'Avg Cases/Steward', 'Total Vol Hours', 'Contacts This Month', 'Win Rate']];
+  sheet.getRange('A53:F53').setValues(stewardLabels)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#F3E5F5')  // Light purple tint
+    .setHorizontalAlignment('center');
+
+  // Steward summary values with vibrant colors
+  sheet.getRange('A54:F54')
+    .setFontSize(20)
+    .setHorizontalAlignment('center')
+    .setFontWeight('bold')
+    .setBackground(COLORS.WHITE);
+  sheet.getRange('A54').setFontColor(COLORS.CHART_PURPLE);
+  sheet.getRange('B54').setFontColor(COLORS.CHART_BLUE);
+  sheet.getRange('C54').setFontColor(COLORS.CHART_INDIGO);
+  sheet.getRange('D54').setFontColor(COLORS.CHART_YELLOW);
+  sheet.getRange('E54').setFontColor(COLORS.CHART_CYAN);
+  sheet.getRange('F54').setFontColor(COLORS.UNION_GREEN);
+
+  // Card bottom border
+  sheet.getRange('A55:F55').setBackground(COLORS.SECTION_PERFORMANCE);
+  sheet.setRowHeight(55, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 10: TOP 30 BUSIEST STEWARDS - Card Style
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A57').setValue('📊 TOP 30 BUSIEST STEWARDS (Active Caseload)')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A57:F57').merge();
+
+  var busiestLabels = [['Rank', 'Steward Name', 'Active Cases', 'Open', 'Pending', 'Total Ever']];
+  sheet.getRange('A58:F58').setValues(busiestLabels)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#FFEBEE')  // Light red tint
+    .setHorizontalAlignment('center');
+
+  // Busiest stewards values - alternate row coloring with gradient effect
+  for (var r = 59; r <= 88; r++) {
+    sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
+    if (r % 2 === 1) {
+      sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);
+    }
+  }
+
+  // Card bottom border
+  sheet.getRange('A89:F89').setBackground('#B91C1C');
+  sheet.setRowHeight(89, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SECTION 11: TOP 10 PERFORMERS BY SCORE - Card Style
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A91').setValue('🏆 TOP 10 PERFORMERS BY SCORE')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A91:F91').merge();
 
   var topPerfLabels = [['Rank', 'Steward Name', 'Score', 'Win Rate %', 'Avg Days', 'Overdue']];
-  sheet.getRange('A83:F83').setValues(topPerfLabels)
+  sheet.getRange('A92:F92').setValues(topPerfLabels)
     .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontSize(10)
+    .setBackground('#D1FAE5')  // Light green tint
     .setHorizontalAlignment('center');
 
-  // Top performers values (populated by syncDashboardValues)
-  // Alternate row coloring for top performers
-  for (var r = 84; r <= 93; r++) {
-    if (r % 2 === 0) {
-      sheet.getRange('A' + r + ':F' + r).setBackground('#ECFDF5');  // Light green
+  // Top performers values - gradient green rows
+  for (var r = 93; r <= 102; r++) {
+    sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
+    if (r % 2 === 1) {
+      sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_GREEN);
     }
   }
-  sheet.getRange('A84:F93').setHorizontalAlignment('center');
+
+  // Add medal icons for top 3
+  sheet.getRange('A93').setNumberFormat('"🥇 "0');
+  sheet.getRange('A94').setNumberFormat('"🥈 "0');
+  sheet.getRange('A95').setNumberFormat('"🥉 "0');
+
+  // Card bottom border
+  sheet.getRange('A103:F103').setBackground(COLORS.UNION_GREEN);
+  sheet.setRowHeight(103, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // SECTION 12: STEWARDS NEEDING SUPPORT (Bottom 10 by Score)
+  // SECTION 12: STEWARDS NEEDING SUPPORT - Card Style
   // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A95').setValue('⚠️ STEWARDS NEEDING SUPPORT (Lowest Scores)')
+  sheet.getRange('A105').setValue('⚠️ STEWARDS NEEDING SUPPORT (Lowest Scores)')
     .setFontWeight('bold')
-    .setBackground('#DC2626')  // Red
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A95:F95').merge();
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A105:F105').merge();
 
   var lowPerfLabels = [['Rank', 'Steward Name', 'Score', 'Win Rate %', 'Avg Days', 'Overdue']];
-  sheet.getRange('A96:F96').setValues(lowPerfLabels)
+  sheet.getRange('A106:F106').setValues(lowPerfLabels)
     .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontSize(10)
+    .setBackground('#FEE2E2')  // Light red tint
     .setHorizontalAlignment('center');
 
-  // Stewards needing support values (populated by syncDashboardValues)
-  // Alternate row coloring for bottom performers
-  for (var r = 97; r <= 106; r++) {
+  // Stewards needing support - gradient red rows
+  for (var r = 107; r <= 116; r++) {
+    sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
-      sheet.getRange('A' + r + ':F' + r).setBackground('#FEF2F2');  // Light red
+      sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);
     }
   }
-  sheet.getRange('A97:F106').setHorizontalAlignment('center');
+
+  // Card bottom border
+  sheet.getRange('A117:F117').setBackground(COLORS.SOLIDARITY_RED);
+  sheet.setRowHeight(117, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // FORMATTING AND CLEANUP
+  // FORMATTING AND CLEANUP - Enhanced Visual Styling
   // ═══════════════════════════════════════════════════════════════════════════
 
   // Auto-resize and format
-  sheet.autoResizeColumns(1, 6);
-  sheet.setFrozenRows(3);
+  sheet.autoResizeColumns(1, 7);
+  sheet.setFrozenRows(2);
 
-  // Set minimum column widths
-  for (var i = 1; i <= 6; i++) {
-    if (sheet.getColumnWidth(i) < 120) {
-      sheet.setColumnWidth(i, 120);
+  // Set minimum column widths for better card appearance
+  for (var i = 1; i <= 7; i++) {
+    if (sheet.getColumnWidth(i) < 110) {
+      sheet.setColumnWidth(i, 110);
     }
   }
 
-  // Hide column G onwards (if any exist)
+  // Hide column H onwards (we now use G for sparklines)
   try {
     var maxCols = sheet.getMaxColumns();
-    if (maxCols > 6) {
-      sheet.deleteColumns(7, maxCols - 6);
+    if (maxCols > 7) {
+      sheet.deleteColumns(8, maxCols - 7);
     }
   } catch (e) {
     Logger.log('Could not delete extra columns: ' + e.toString());
@@ -1105,36 +1246,69 @@ function createDashboard(ss) {
 
   // NUMBER FORMATTING: Use comma separators for all numeric values (1,000)
   var numberFormat = '#,##0';
-  // Quick Stats row (row 6)
+  var decimalFormat = '#,##0.0';
+  var percentFormat = '0.0%';
+
+  // Quick Stats row (row 6) - updated row numbers
   sheet.getRange('A6:C6').setNumberFormat(numberFormat);
   sheet.getRange('E6:F6').setNumberFormat(numberFormat);
-  // Member Metrics row (row 10)
-  sheet.getRange('A10:B10').setNumberFormat(numberFormat);
-  sheet.getRange('D10').setNumberFormat(numberFormat);
-  // Grievance Metrics row (row 14)
-  sheet.getRange('A14:F14').setNumberFormat(numberFormat);
-  // Timeline row (row 18)
-  sheet.getRange('A18:D18').setNumberFormat(numberFormat);
-  // Type Analysis rows (rows 22-26)
-  sheet.getRange('B22:D26').setNumberFormat(numberFormat);
-  // Location Breakdown rows (rows 30-34)
-  sheet.getRange('B30:D34').setNumberFormat(numberFormat);
-  // Trends rows (rows 38-40)
-  sheet.getRange('B38:D40').setNumberFormat(numberFormat);
-  // Steward Performance row (row 47)
-  sheet.getRange('A47:E47').setNumberFormat(numberFormat);
-  // Top 30 Busiest Stewards (rows 51-80)
-  sheet.getRange('C51:F80').setNumberFormat(numberFormat);
-  // Top 10 Performers (rows 84-93) - Score and Win Rate have decimals
-  var decimalFormat = '#,##0.0';
-  sheet.getRange('C84:D93').setNumberFormat(decimalFormat);  // Score, Win Rate
-  sheet.getRange('E84:F93').setNumberFormat(numberFormat);   // Avg Days, Overdue
-  // Stewards Needing Support (rows 97-106)
-  sheet.getRange('C97:D106').setNumberFormat(decimalFormat);  // Score, Win Rate
-  sheet.getRange('E97:F106').setNumberFormat(numberFormat);   // Avg Days, Overdue
+
+  // Member Metrics row (row 11)
+  sheet.getRange('A11:B11').setNumberFormat(numberFormat);
+  sheet.getRange('D11').setNumberFormat(numberFormat);
+
+  // Grievance Metrics row (row 16)
+  sheet.getRange('A16:F16').setNumberFormat(numberFormat);
+
+  // Timeline row (row 21)
+  sheet.getRange('A21:D21').setNumberFormat(numberFormat);
+
+  // Type Analysis rows (rows 26-30)
+  sheet.getRange('B26:D30').setNumberFormat(numberFormat);
+
+  // Location Breakdown rows (rows 35-39)
+  sheet.getRange('B35:D39').setNumberFormat(numberFormat);
+
+  // Trends rows (rows 44-46)
+  sheet.getRange('B44:D46').setNumberFormat(numberFormat);
+
+  // Steward Performance row (row 54)
+  sheet.getRange('A54:E54').setNumberFormat(numberFormat);
+
+  // Top 30 Busiest Stewards (rows 59-88)
+  sheet.getRange('C59:F88').setNumberFormat(numberFormat);
+
+  // Top 10 Performers (rows 93-102) - Score and Win Rate have decimals
+  sheet.getRange('C93:D102').setNumberFormat(decimalFormat);  // Score, Win Rate
+  sheet.getRange('E93:F102').setNumberFormat(numberFormat);   // Avg Days, Overdue
+
+  // Stewards Needing Support (rows 107-116)
+  sheet.getRange('C107:D116').setNumberFormat(decimalFormat);  // Score, Win Rate
+  sheet.getRange('E107:F116').setNumberFormat(numberFormat);   // Avg Days, Overdue
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ADD NATIVE CHARTS - Gauge for Win Rate, Bar for Status Distribution
+  // ═══════════════════════════════════════════════════════════════════════════
+  createDashboardCharts_(sheet);
 
   // Populate all values using JavaScript-computed metrics (no formulas in visible sheet)
   syncDashboardValues();
+}
+
+/**
+ * Creates native Google Sheets charts for the dashboard
+ * @param {Sheet} sheet - The dashboard sheet
+ * @private
+ */
+function createDashboardCharts_(sheet) {
+  // Remove existing charts first
+  var existingCharts = sheet.getCharts();
+  for (var i = 0; i < existingCharts.length; i++) {
+    sheet.removeChart(existingCharts[i]);
+  }
+
+  // Note: Charts will be added after data is populated by syncDashboardValues
+  // The chart creation is deferred to avoid empty chart issues
 }
 
 /**
@@ -5347,6 +5521,147 @@ function unfreezeAllColumns() {
   sheet.setFrozenRows(1);
 
   ss.toast('Columns unfrozen. Header row still frozen.', '🔓 Unfrozen', 3);
+}
+
+// ============================================================================
+// ENHANCED VISUAL FORMATTING - Gradient Heatmaps
+// ============================================================================
+
+/**
+ * Applies gradient heatmap conditional formatting to numeric columns
+ * Creates smooth color transitions instead of solid fills
+ * Applies to: Days Open, Days to Deadline columns in Grievance Log
+ */
+function applyGradientHeatmaps() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Grievance Log sheet not found.');
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    ss.toast('No data to format', 'ℹ️ Info', 3);
+    return;
+  }
+
+  // Get existing rules to preserve them
+  var existingRules = sheet.getConditionalFormatRules();
+
+  // Days Open column (column S = 19)
+  var daysOpenCol = getColumnLetter(GRIEVANCE_COLS.DAYS_OPEN);
+  var daysOpenRange = sheet.getRange(daysOpenCol + '2:' + daysOpenCol + lastRow);
+
+  // Days to Deadline column (column U = 21)
+  var daysToDeadlineCol = getColumnLetter(GRIEVANCE_COLS.DAYS_TO_DEADLINE);
+  var deadlineRange = sheet.getRange(daysToDeadlineCol + '2:' + daysToDeadlineCol + lastRow);
+
+  // Create gradient rule for Days Open (Green = low/good, Red = high/bad)
+  // Lower days open is better
+  var daysOpenGradient = SpreadsheetApp.newConditionalFormatRule()
+    .setGradientMinpointWithValue(COLORS.GRADIENT_LOW, SpreadsheetApp.InterpolationType.NUMBER, '0')
+    .setGradientMidpointWithValue(COLORS.GRADIENT_MID_LOW, SpreadsheetApp.InterpolationType.NUMBER, '30')
+    .setGradientMaxpointWithValue(COLORS.GRADIENT_HIGH, SpreadsheetApp.InterpolationType.NUMBER, '90')
+    .setRanges([daysOpenRange])
+    .build();
+
+  // Create gradient rule for Days to Deadline (Green = high/good, Red = low/urgent)
+  // More days remaining is better
+  var deadlineGradient = SpreadsheetApp.newConditionalFormatRule()
+    .setGradientMinpointWithValue(COLORS.GRADIENT_HIGH, SpreadsheetApp.InterpolationType.NUMBER, '0')
+    .setGradientMidpointWithValue(COLORS.GRADIENT_MID, SpreadsheetApp.InterpolationType.NUMBER, '7')
+    .setGradientMaxpointWithValue(COLORS.GRADIENT_LOW, SpreadsheetApp.InterpolationType.NUMBER, '14')
+    .setRanges([deadlineRange])
+    .build();
+
+  // Add gradient rules to existing rules
+  existingRules.push(daysOpenGradient, deadlineGradient);
+  sheet.setConditionalFormatRules(existingRules);
+
+  ss.toast('Gradient heatmaps applied to Days Open & Days to Deadline columns!', '🎨 Heatmaps Applied', 5);
+}
+
+/**
+ * Applies gradient heatmap to Win Rate columns across all steward performance sections
+ */
+function applyWinRateGradients() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var dashboard = ss.getSheetByName(SHEETS.DASHBOARD);
+
+  if (!dashboard) {
+    ss.toast('Dashboard not found', '❌ Error', 3);
+    return;
+  }
+
+  var existingRules = dashboard.getConditionalFormatRules();
+
+  // Win Rate in Type Analysis (column E, rows 26-30)
+  var typeWinRate = dashboard.getRange('E26:E30');
+  var typeGradient = SpreadsheetApp.newConditionalFormatRule()
+    .setGradientMinpointWithValue('#FEE2E2', SpreadsheetApp.InterpolationType.PERCENT, '0')
+    .setGradientMidpointWithValue('#FEF3C7', SpreadsheetApp.InterpolationType.PERCENT, '50')
+    .setGradientMaxpointWithValue('#D1FAE5', SpreadsheetApp.InterpolationType.PERCENT, '100')
+    .setRanges([typeWinRate])
+    .build();
+
+  // Win Rate in Location Breakdown (column E, rows 35-39)
+  var locWinRate = dashboard.getRange('E35:E39');
+  var locGradient = SpreadsheetApp.newConditionalFormatRule()
+    .setGradientMinpointWithValue('#FEE2E2', SpreadsheetApp.InterpolationType.PERCENT, '0')
+    .setGradientMidpointWithValue('#FEF3C7', SpreadsheetApp.InterpolationType.PERCENT, '50')
+    .setGradientMaxpointWithValue('#D1FAE5', SpreadsheetApp.InterpolationType.PERCENT, '100')
+    .setRanges([locWinRate])
+    .build();
+
+  // Score in Top Performers (column C, rows 93-102) - higher is better
+  var perfScore = dashboard.getRange('C93:C102');
+  var perfGradient = SpreadsheetApp.newConditionalFormatRule()
+    .setGradientMinpointWithValue('#FEE2E2', SpreadsheetApp.InterpolationType.NUMBER, '0')
+    .setGradientMidpointWithValue('#FEF3C7', SpreadsheetApp.InterpolationType.NUMBER, '50')
+    .setGradientMaxpointWithValue('#D1FAE5', SpreadsheetApp.InterpolationType.NUMBER, '100')
+    .setRanges([perfScore])
+    .build();
+
+  // Score in Needing Support (column C, rows 107-116) - lower scores highlighted
+  var needScore = dashboard.getRange('C107:C116');
+  var needGradient = SpreadsheetApp.newConditionalFormatRule()
+    .setGradientMinpointWithValue('#D1FAE5', SpreadsheetApp.InterpolationType.NUMBER, '0')
+    .setGradientMidpointWithValue('#FEF3C7', SpreadsheetApp.InterpolationType.NUMBER, '50')
+    .setGradientMaxpointWithValue('#FEE2E2', SpreadsheetApp.InterpolationType.NUMBER, '100')
+    .setRanges([needScore])
+    .build();
+
+  existingRules.push(typeGradient, locGradient, perfGradient, needGradient);
+  dashboard.setConditionalFormatRules(existingRules);
+
+  ss.toast('Win Rate & Score gradients applied to dashboard!', '🎨 Gradients Applied', 5);
+}
+
+/**
+ * Syncs all dashboard data and refreshes visualizations
+ * Called from Visual Control Panel
+ */
+function syncAllDashboardData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
+
+  try {
+    // Sync hidden calculation sheets first
+    if (typeof syncGrievanceCalcSheet === 'function') syncGrievanceCalcSheet();
+    if (typeof syncDashboardCalcValues === 'function') syncDashboardCalcValues();
+    if (typeof syncStewardPerformanceValues === 'function') syncStewardPerformanceValues();
+
+    // Sync visible dashboard values
+    if (typeof syncDashboardValues === 'function') syncDashboardValues();
+    if (typeof syncSatisfactionValues === 'function') syncSatisfactionValues();
+
+    ss.toast('All dashboard data synced successfully!', '✅ Complete', 5);
+  } catch (e) {
+    ss.toast('Error syncing: ' + e.message, '❌ Error', 5);
+    Logger.log('syncAllDashboardData error: ' + e.toString());
+  }
 }
 
 // ============================================================================
