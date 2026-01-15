@@ -1297,6 +1297,7 @@ function createDashboard(ss) {
 
 /**
  * Creates native Google Sheets charts for the dashboard
+ * Adds a chart options section where users can select which charts to display
  * @param {Sheet} sheet - The dashboard sheet
  * @private
  */
@@ -1307,8 +1308,309 @@ function createDashboardCharts_(sheet) {
     sheet.removeChart(existingCharts[i]);
   }
 
-  // Note: Charts will be added after data is populated by syncDashboardValues
-  // The chart creation is deferred to avoid empty chart issues
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CHART OPTIONS SECTION - User selects which charts to display
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A119').setValue('📊 CHART OPTIONS - Select charts to display')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A119:G119').merge();
+
+  // Instructions
+  sheet.getRange('A120').setValue('Enter chart number in cell G120 and run "Generate Selected Chart" from Dashboard menu')
+    .setFontStyle('italic')
+    .setFontSize(10)
+    .setFontColor('#6B7280');
+  sheet.getRange('A120:F120').merge();
+  sheet.getRange('G120').setValue(1)
+    .setBackground('#FEF3C7')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center');
+
+  // Chart options table header
+  var chartHeader = [['#', 'Chart Type', 'Description', 'Data Source', 'Best For', 'Preview']];
+  sheet.getRange('A121:F121').setValues(chartHeader)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#E0E7FF')
+    .setHorizontalAlignment('center');
+
+  // Chart options data
+  var chartOptions = [
+    ['1', '🎯 Gauge Chart', 'Win Rate as dial/speedometer', 'Win Rate %', 'KPI at-a-glance', '◐'],
+    ['2', '📊 Bar Chart - Status', 'Horizontal bars by status', 'Open/Pending/Closed counts', 'Status distribution', '▰▰▰'],
+    ['3', '🥧 Pie Chart - Issues', 'Pie slices by issue type', 'Issue Category breakdown', 'Category proportions', '◕'],
+    ['4', '📈 Line Chart - Trends', 'Monthly trend lines', '6-month grievance history', 'Trend analysis', '📉'],
+    ['5', '📊 Column Chart', 'Vertical bars by location', 'Location breakdown', 'Comparing locations', '▮▮▮'],
+    ['6', '🎯 Scorecard', 'Big number with trend arrow', 'Any single metric', 'Executive summary', '↑42'],
+    ['7', '🔥 Heatmap Table', 'Color-coded data grid', 'Steward performance matrix', 'Pattern spotting', '🟩🟨🟥'],
+    ['8', '📊 Stacked Bar', 'Stacked horizontal bars', 'Status by steward', 'Composition analysis', '▰▰▱'],
+    ['9', '🍩 Donut Chart', 'Pie with center hole', 'Resolution outcomes', 'Outcome breakdown', '◎'],
+    ['10', '📈 Area Chart', 'Filled line chart', 'Cumulative trends', 'Volume over time', '▓▓░']
+  ];
+
+  sheet.getRange('A122:F131').setValues(chartOptions)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+
+  // Alternate row coloring for chart options
+  for (var r = 122; r <= 131; r++) {
+    if (r % 2 === 0) {
+      sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_LIGHT);
+    }
+  }
+
+  // Style the # column
+  sheet.getRange('A122:A131')
+    .setFontWeight('bold')
+    .setFontColor(COLORS.PRIMARY_PURPLE);
+
+  // Card bottom border
+  sheet.getRange('A132:G132').setBackground(COLORS.CHART_INDIGO);
+  sheet.setRowHeight(132, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CHART DISPLAY AREA - Where selected chart will appear
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A134').setValue('📈 CHART DISPLAY AREA')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A134:G134').merge();
+
+  // Placeholder for chart
+  sheet.getRange('A135').setValue('Select a chart option above and run "Generate Selected Chart" to display here')
+    .setFontStyle('italic')
+    .setFontColor('#9CA3AF')
+    .setHorizontalAlignment('center');
+  sheet.getRange('A135:G145').merge()
+    .setBackground('#F9FAFB')
+    .setVerticalAlignment('middle');
+
+  // Border around chart area
+  sheet.getRange('A135:G145').setBorder(true, true, true, true, false, false, '#E5E7EB', SpreadsheetApp.BorderStyle.SOLID);
+}
+
+/**
+ * Generates the selected chart based on user's choice in cell G120
+ * Call this from the menu after user selects a chart number
+ */
+function generateSelectedChart() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.DASHBOARD);
+
+  if (!sheet) {
+    ss.toast('Dashboard sheet not found', '❌ Error', 3);
+    return;
+  }
+
+  var chartNum = sheet.getRange('G120').getValue();
+  if (!chartNum || chartNum < 1 || chartNum > 10) {
+    ss.toast('Please enter a valid chart number (1-10) in cell G120', '⚠️ Invalid Selection', 5);
+    return;
+  }
+
+  ss.toast('Generating chart #' + chartNum + '...', '📊 Creating Chart', 2);
+
+  // Remove existing charts in the display area
+  var existingCharts = sheet.getCharts();
+  for (var i = 0; i < existingCharts.length; i++) {
+    sheet.removeChart(existingCharts[i]);
+  }
+
+  var chart;
+  var chartBuilder;
+
+  switch (parseInt(chartNum)) {
+    case 1: // Gauge Chart - Win Rate
+      // Google Sheets doesn't have native gauge, so we create a styled scorecard
+      createGaugeStyleChart_(sheet);
+      break;
+
+    case 2: // Bar Chart - Status Distribution
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.BAR)
+        .addRange(sheet.getRange('A15:A16')) // Labels
+        .addRange(sheet.getRange('A16:F16')) // Values (Open, Pending, etc.)
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Grievance Status Distribution')
+        .setOption('legend', {position: 'bottom'})
+        .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.ACCENT_ORANGE, COLORS.STATUS_BLUE, COLORS.UNION_GREEN, '#9CA3AF', '#6B7280'])
+        .setOption('width', 600)
+        .setOption('height', 300);
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 3: // Pie Chart - Issue Categories
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.PIE)
+        .addRange(sheet.getRange('A26:B30')) // Issue Category and Total
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Grievances by Issue Category')
+        .setOption('pieHole', 0)
+        .setOption('legend', {position: 'right'})
+        .setOption('width', 600)
+        .setOption('height', 300);
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 4: // Line Chart - Trends
+      createTrendLineChart_(sheet);
+      break;
+
+    case 5: // Column Chart - Location
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.COLUMN)
+        .addRange(sheet.getRange('A35:B39')) // Location and Members
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Members by Location')
+        .setOption('legend', {position: 'none'})
+        .setOption('colors', [COLORS.CHART_CYAN])
+        .setOption('width', 600)
+        .setOption('height', 300);
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 6: // Scorecard
+      createScorecardChart_(sheet);
+      break;
+
+    case 7: // Heatmap Table
+      ss.toast('Heatmap applied! Check "Apply Gradient Heatmaps" in Admin menu for color scales.', '🔥 Heatmap', 5);
+      applyWinRateGradients();
+      break;
+
+    case 8: // Stacked Bar
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.BAR)
+        .addRange(sheet.getRange('A26:D30')) // Category with Open/Resolved
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Cases by Issue Category (Open vs Resolved)')
+        .setOption('isStacked', true)
+        .setOption('legend', {position: 'bottom'})
+        .setOption('width', 600)
+        .setOption('height', 300);
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 9: // Donut Chart
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.PIE)
+        .addRange(sheet.getRange('A26:B30'))
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Issue Category Distribution')
+        .setOption('pieHole', 0.4) // Makes it a donut
+        .setOption('legend', {position: 'right'})
+        .setOption('width', 600)
+        .setOption('height', 300);
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 10: // Area Chart
+      createAreaChart_(sheet);
+      break;
+
+    default:
+      ss.toast('Chart type not yet implemented', 'ℹ️ Info', 3);
+  }
+
+  ss.toast('Chart generated! Scroll down to "Chart Display Area" to view.', '✅ Done', 5);
+}
+
+/**
+ * Creates a gauge-style display (Google Sheets doesn't have native gauge)
+ * @private
+ */
+function createGaugeStyleChart_(sheet) {
+  // Create a text-based gauge representation
+  var winRate = sheet.getRange('D6').getValue() || '0%';
+  var gaugeText = '═══════════════════════════════════════\n' +
+                  '           🎯 WIN RATE GAUGE\n' +
+                  '═══════════════════════════════════════\n\n' +
+                  '                 ' + winRate + '\n\n' +
+                  '    ◀━━━━━━━━━━━━━━━━━━━━━━━━━━━▶\n' +
+                  '    0%        50%        100%\n\n' +
+                  '═══════════════════════════════════════';
+
+  sheet.getRange('A135').setValue(gaugeText)
+    .setFontFamily('Courier New')
+    .setFontSize(14)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBackground('#F0FDF4');
+  sheet.getRange('A135:G145').merge();
+}
+
+/**
+ * Creates a scorecard-style display
+ * @private
+ */
+function createScorecardChart_(sheet) {
+  var openCases = sheet.getRange('A16').getValue() || 0;
+  var scorecardText = '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n' +
+                      '┃         📊 OPEN GRIEVANCES          ┃\n' +
+                      '┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫\n' +
+                      '┃                                     ┃\n' +
+                      '┃              ' + openCases + '                    ┃\n' +
+                      '┃                                     ┃\n' +
+                      '┃           ▲ Active Cases            ┃\n' +
+                      '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛';
+
+  sheet.getRange('A135').setValue(scorecardText)
+    .setFontFamily('Courier New')
+    .setFontSize(14)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBackground('#FEF3C7');
+  sheet.getRange('A135:G145').merge();
+}
+
+/**
+ * Creates a trend line chart placeholder
+ * @private
+ */
+function createTrendLineChart_(sheet) {
+  // Use trend data from rows 44-46
+  var chartBuilder = sheet.newChart()
+    .setChartType(Charts.ChartType.LINE)
+    .addRange(sheet.getRange('A44:C46'))
+    .setPosition(135, 1, 0, 0)
+    .setOption('title', 'Month-Over-Month Trends')
+    .setOption('legend', {position: 'bottom'})
+    .setOption('curveType', 'function')
+    .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.CHART_BLUE])
+    .setOption('width', 600)
+    .setOption('height', 300);
+
+  var chart = chartBuilder.build();
+  sheet.insertChart(chart);
+}
+
+/**
+ * Creates an area chart
+ * @private
+ */
+function createAreaChart_(sheet) {
+  var chartBuilder = sheet.newChart()
+    .setChartType(Charts.ChartType.AREA)
+    .addRange(sheet.getRange('A44:C46'))
+    .setPosition(135, 1, 0, 0)
+    .setOption('title', 'Cumulative Trend Analysis')
+    .setOption('legend', {position: 'bottom'})
+    .setOption('colors', [COLORS.CHART_PURPLE, COLORS.CHART_BLUE])
+    .setOption('width', 600)
+    .setOption('height', 300);
+
+  var chart = chartBuilder.build();
+  sheet.insertChart(chart);
 }
 
 /**
