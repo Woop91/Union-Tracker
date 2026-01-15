@@ -1,8 +1,7 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
+# Build output (dist/ is now tracked for consolidated file)
 
 # Clasp authentication
 .clasprc.json
