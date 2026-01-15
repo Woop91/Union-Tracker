@@ -244,7 +244,7 @@ To update to a new version:
 
 ---
 
-**Version:** 2.3.0
+**Version:** 3.6.0
 **Architecture:** 9-File Modular
 **Build:** 9 files, 25,339 lines
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-01-15

@@ -137,7 +137,7 @@ MULTIPLE-SCRIPS-REPO/
 │   ├── 01_Constants.gs         # Single source of truth (IDs, sheet names, column mappings, policy rules)
 │   ├── 02_MemberManager.gs     # Member directory operations, form submissions
 │   ├── 03_GrievanceManager.gs  # Grievance lifecycle, deadlines, step advancement
-│   ├── 04_UIService.gs         # UI components, Comfort View, mobile UI, dialogs
+│   ├── 04_UIService.gs         # UI, Comfort View, mobile, Strategic Command Center
 │   ├── 05_Integrations.gs      # Google Drive, Calendar, WebApp, notifications
 │   ├── 06_Maintenance.gs       # Diagnostics, data integrity, caching, audits
 │   ├── 07_DevTools.gs          # Demo data seeding - DELETE BEFORE PRODUCTION
@@ -484,7 +484,7 @@ npm run watch        # Watch mode for development
 - `quickSearchDashboard()` - Fast search with limited results
 - `advancedSearch()` - Search with filters
 
-**04_UIService.gs** (~3,934 lines) - UI Components, Comfort View, Mobile UI
+**04_UIService.gs** (~3,934 lines) - UI Components, Comfort View, Mobile UI, Strategic Command Center
 - `showDesktopSearch()` - Desktop search dialog
 - `showMultiSelectDialog()` - Multi-select checkbox dialog
 - `showToast()` - Toast notification helper
