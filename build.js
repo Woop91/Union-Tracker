@@ -23,7 +23,8 @@ const BUILD_ORDER = [
   '07_DevTools.gs',
   '08_Code.gs',
   '09_Main.gs',
-  '10_CommandCenter.gs'
+  '10_CommandCenter.gs',
+  '11_SecureMemberDashboard.gs'
 ];
 
 const HTML_FILES = [
@@ -48,7 +49,7 @@ function build() {
  * 509 DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
- * Version: 4.0.1
+ * Version: 4.2.0
  * Build Date: ${new Date().toISOString().split('T')[0]}
  *
  * This file is auto-generated from the src/ directory.
