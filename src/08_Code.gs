@@ -719,6 +719,8 @@ function createGrievanceLog(ss) {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
+    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
   } catch (e) {
     Logger.log('Column group setup skipped: ' + e.toString());
@@ -5818,6 +5820,8 @@ function setupTimelineColumnGroups() {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
+    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
 
     // Collapse Step II and III by default (Step I usually visible)
     sheet.collapseAllColumnGroups();
