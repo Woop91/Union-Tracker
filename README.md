@@ -1,4 +1,4 @@
-# 509 Strategic Command Center - v4.2.0 Modal Command Center
+# 509 Strategic Command Center - v4.2.1 Complete Menu System
 
 A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements an **11-file modular architecture** following the Separation of Concerns principle.
 
@@ -174,6 +174,42 @@ src/
 - **Mobile UI**: Quick actions optimized for phone access
 - **Data Integrity**: Batch operations, validation, orphan detection
 - **Audit Logging**: Track all changes with timestamps
+
+## Menu System Overview (v4.2.1)
+
+The dashboard provides 3 comprehensive menus with 100+ functions:
+
+### 📊 Dashboard (Main Menu)
+| Submenu | Key Features |
+|---------|--------------|
+| 🔍 Search | Desktop, Quick, and Advanced search |
+| 📋 Grievances | Create, edit, bulk update, view active, analytics |
+| 👥 Members | Add, find, import/export, steward directory |
+| 📅 Calendar | Sync deadlines, view upcoming, clear events |
+| 📁 Google Drive | Setup folders, view files, batch create |
+| 🔔 Notifications | Settings, test notifications |
+| 👁️ View | Dashboards, mobile URL, dark mode, themes |
+| ♿ Comfort View | Focus mode, zebra stripes, pomodoro, notepad |
+| 📝 Multi-Select | Editor, auto-open triggers |
+| 🛠️ Admin | Diagnostics, sync, validation, cache, setup |
+
+### 📊 509 Command (Strategic)
+| Submenu | Key Features |
+|---------|--------------|
+| 👁️ Command Center | Executive/Member dashboards, steward performance |
+| 🎯 Strategic Intelligence | Hot zones, rising stars, hostility report |
+| 📊 Analytics & Charts | Treemap, sentiment trends, workload report |
+| 🆔 ID & Data Engines | ID generation, duplicate check, PDF creation |
+| 👤 Steward Management | Promote/demote, contact forms, surveys |
+
+### 📊 509 COMMAND CENTER (Field Operations)
+| Submenu | Key Features |
+|---------|--------------|
+| 📱 Field Accessibility | Mobile view, get mobile URL |
+| 📈 Analytics & Insights | Unit health, grievance trends, precedents |
+| 🌐 Web App & Portal | Build portals, send emails, JSON APIs |
+
+See [AIR.md](AIR.md) for the complete menu structure documentation.
 
 ## Advanced Features
 

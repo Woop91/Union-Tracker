@@ -4,9 +4,14 @@
 
 ### One-Click Setup
 1. Open your 509 Dashboard
-2. Click **View** → **Comfort View** → **Setup Comfort View**
-3. Wait 30 seconds
+2. Click **📊 Dashboard** → **♿ Comfort View** → **♿ Comfort View Panel**
+3. Use the panel to enable your preferred settings
 4. Done! Your dashboard is now optimized for visual comfort
+
+### Alternative: Setup Defaults
+1. Click **📊 Dashboard** → **🛠️ Admin** → **🏗️ Setup** → **🎨 Setup Comfort View Defaults**
+2. Wait 30 seconds
+3. All default accessibility settings will be applied
 
 ---
 
