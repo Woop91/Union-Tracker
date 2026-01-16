@@ -1,7 +1,7 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.0.0 (Unified Master Engine, 10-File Architecture)
-**Last Updated:** 2026-01-15
+**Version:** 4.0.2 (Unified Master Engine, 10-File Architecture)
+**Last Updated:** 2026-01-16
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
 ---
@@ -305,6 +305,10 @@ Copy all 10 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `setupMidnightTrigger()`, `removeMidnightTrigger()` - Daily refresh automation
   - `midnightAutoRefresh()` - 12AM dashboard refresh + overdue alerts
 
+- Command Center (v4.0.2):
+  - `emailDashboardLink()` - Send dashboard URL to selected member from Member Directory
+  - `showStewardPerformanceModal()` - Steward performance metrics modal (active cases, win rates)
+
 **05_Integrations.gs** (~2008 lines) - External Services & WebApp
 *Consolidated from: Integrations, WebApp*
 
@@ -465,6 +469,12 @@ Copy all 10 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `getSatisfactionOverviewData()`, `getSatisfactionResponseData()`
   - `getSatisfactionSectionData()`, `getSatisfactionAnalyticsData()`
   - `getSatisfactionTrendData()`, `getSatisfactionLocationDrill()`
+
+- Secure Member Dashboard (v4.0.2):
+  - `showPublicMemberDashboard()` - Interactive modal with Google Charts (pie, gauge, area), Material Icons, live steward search
+  - `getSecureMemberDashboardHtml()` - HTML generator with Roboto typography and modern UI
+  - `getAggregateSatisfactionStats()` - Aggregate survey data (trust, steward ratings, leadership, communication) without PII
+  - `getStewardCoverageStats()` - Steward-to-member coverage ratio and percentage for progress bars
 
 **10_CommandCenter.gs** (~1489 lines) - 509 Strategic Command Center Unified Master Engine **(v4.0)**
 
@@ -1047,10 +1057,16 @@ The menu system has been reorganized from 9 menus to 6 logical groups (5 origina
     ├── 🧹 Clear Config Dropdowns Only
     └── 🔄 Restore Config & Dropdowns
 
-📊 509 Command (Strategic Command Center v3.6.0)
+📊 509 Command (Strategic Command Center v4.0.2)
 ├── 👁️ Executive Command (PII) - Internal dashboard with member names
-├── 🫂 Member Analytics (No PII) - PII-safe dashboard
-├── 📩 Send Member Dashboard Link
+├── 👁️ Command Center (submenu) - **NEW v4.0.2**
+│   ├── 👥 Member Dashboard (No PII) - Interactive modal with Google Charts, Material Icons
+│   ├── 🛡️ Steward Performance - Performance metrics for all stewards
+│   └── 📧 Email Dashboard to Selected - Send dashboard link to selected member
+├── 🔍 Desktop Search
+├── 📋 Grievances (submenu)
+│   ├── ➕ New Grievance
+│   └── ✏️ Edit Selected
 ├── 🚀 Strategic Pro Moves (submenu)
 │   ├── 🔥 Generate Unit Hot Zones
 │   ├── 🌟 Identify Rising Stars
@@ -1237,6 +1253,59 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.0.2 (2026-01-16) - Secure Member Dashboard with Google Charts
+
+**New Features:**
+
+1. **Secure Member Dashboard Modal (`showPublicMemberDashboard`)**
+   - Interactive modal with Google Charts integration
+   - Donut pie chart for grievance issue category breakdown
+   - Gauge chart for member trust score visualization
+   - Area chart for trust score trends over time
+   - Progress bars for union goals (steward coverage, survey participation)
+   - Live search filter for steward directory with email links
+   - Material Icons integration for professional UI
+   - Roboto typography for modern appearance
+   - **Zero PII exposure** - only aggregate statistics displayed
+
+2. **Steward Performance Modal (`showStewardPerformanceModal`)**
+   - Performance metrics dashboard for all stewards
+   - Shows active cases, total cases, and win rates per steward
+   - Overall union win rate calculation
+   - Color-coded performance indicators
+
+3. **Email Dashboard Link (`emailDashboardLink`)**
+   - Send dashboard URL to selected member from Member Directory
+   - Automatically pulls member email and name from selected row
+   - PII-protected view link with usage instructions
+
+**New Helper Functions (08_Code.gs):**
+
+| Function | Purpose |
+|----------|---------|
+| `getAggregateSatisfactionStats()` | Aggregates survey data (trust, steward ratings, leadership, communication) without exposing individual PII |
+| `getStewardCoverageStats()` | Calculates steward-to-member coverage ratio and percentage for progress tracking |
+| `getSecureMemberDashboardHtml()` | Generates HTML with Google Charts, Material Icons, and live search |
+
+**Updated Functions:**
+
+- `getGrievanceStats()` (03_GrievanceManager.gs) - Now includes `categoryData` array for Google Charts pie chart visualization
+
+**Menu Updates (04_UIService.gs):**
+
+- Added new "Command Center" submenu to 509 Command menu:
+  - Member Dashboard (No PII)
+  - Steward Performance
+  - Email Dashboard to Selected
+- Added Desktop Search and Grievances submenus for quick access
+
+**Files Modified:**
+- `src/03_GrievanceManager.gs` - Enhanced `getGrievanceStats()` with category data
+- `src/04_UIService.gs` - Added `emailDashboardLink()`, `showStewardPerformanceModal()`, updated menu
+- `src/08_Code.gs` - Added `getAggregateSatisfactionStats()`, `getStewardCoverageStats()`, replaced `showPublicMemberDashboard()`
+
+---
 
 ### Version 4.0.1 (2026-01-15) - Bug Fixes for Non-UI Contexts
 
