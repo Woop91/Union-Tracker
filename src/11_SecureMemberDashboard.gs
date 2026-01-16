@@ -65,14 +65,16 @@ function scrubObjectPII(obj) {
 }
 
 // ============================================================================
-// DATA FETCHING FUNCTIONS (NO PII)
+// DATA FETCHING FUNCTIONS (NO PII) - Secure Member Dashboard
 // ============================================================================
+// NOTE: These functions are prefixed with "Secure" to avoid conflicts with
+// similarly-named functions in other files (03_GrievanceManager.gs, etc.)
 
 /**
  * Gets grievance statistics for public display (no PII)
- * @returns {Object} Statistics object
+ * @returns {Object} Statistics object with winRate
  */
-function getGrievanceStats() {
+function getSecureGrievanceStats_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -128,7 +130,7 @@ function getGrievanceStats() {
  * Gets all stewards for public display (names and units only - no PII)
  * @returns {Array} Array of steward objects with scrubbed data
  */
-function getAllStewards() {
+function getSecureAllStewards_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -157,7 +159,7 @@ function getAllStewards() {
  * Gets aggregate satisfaction statistics (no individual PII)
  * @returns {Object} Aggregate stats object
  */
-function getAggregateSatisfactionStats() {
+function getSecureSatisfactionStats_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
@@ -337,7 +339,7 @@ function getSentimentTrendData_() {
  */
 function getStewardWorkload() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var stewards = getAllStewards();
+  var stewards = getSecureAllStewards_();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet || grievanceSheet.getLastRow() < 2) {
@@ -441,9 +443,9 @@ function getResourceDriveUrl_() {
  * No PII visible - includes Weingarten Rights, Charts, and Steward Search
  */
 function showPublicMemberDashboard() {
-  var stats = getGrievanceStats();
-  var stewards = getAllStewards();
-  var satisfaction = getAggregateSatisfactionStats();
+  var stats = getSecureGrievanceStats_();
+  var stewards = getSecureAllStewards_();
+  var satisfaction = getSecureSatisfactionStats_();
   var analytics = getAdvancedAnalytics();
   var workload = getStewardWorkload();
 
@@ -850,7 +852,7 @@ function showPublicMemberDashboard() {
  */
 function showStewardPerformanceModal() {
   var workload = getStewardWorkload();
-  var stats = getGrievanceStats();
+  var stats = getSecureGrievanceStats_();
 
   var html = '<!DOCTYPE html>' +
     '<html>' +
@@ -1193,7 +1195,7 @@ function showSentimentTrendChart() {
  */
 function showStewardWorkloadReport() {
   var workload = getStewardWorkload();
-  var stats = getGrievanceStats();
+  var stats = getSecureGrievanceStats_();
 
   // Calculate summary stats
   var totalCases = workload.reduce(function(sum, s) { return sum + s.count; }, 0);
@@ -1334,9 +1336,9 @@ function buildMemberPortal(memberId) {
  * @returns {HtmlOutput} Public portal HTML
  */
 function buildPublicPortal() {
-  var stats = getGrievanceStats();
-  var stewards = getAllStewards();
-  var satisfaction = getAggregateSatisfactionStats();
+  var stats = getSecureGrievanceStats_();
+  var stewards = getSecureAllStewards_();
+  var satisfaction = getSecureSatisfactionStats_();
 
   var html = getPublicPortalHtml_(stats, stewards, satisfaction);
   return HtmlService.createHtmlOutput(html)
@@ -1439,8 +1441,8 @@ function sendMemberDashboardEmail(memberId) {
  * @private
  */
 function getMemberPortalHtml_(profile) {
-  var stewards = getAllStewards();
-  var stats = getGrievanceStats();
+  var stewards = getSecureAllStewards_();
+  var stats = getSecureGrievanceStats_();
   var CONTRACT_PDF_URL = getContractPdfUrl_();
   var RESOURCE_DRIVE_URL = getResourceDriveUrl_();
 
