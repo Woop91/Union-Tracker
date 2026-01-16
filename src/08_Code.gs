@@ -2132,7 +2132,7 @@ function createFeedbackSheet(ss) {
   sheet.setColumnWidth(FEEDBACK_COLS.NOTES, 200);
 
   // Category dropdown
-  var categoryOptions = ['Dashboard', 'Member Directory', 'Grievance Log', 'Config', 'Search', 'Mobile', 'Reports', 'Performance', 'UI/UX', 'Other'];
+  var categoryOptions = ['Dashboard', 'Member Directory', 'Grievance Log', 'Config', 'Search', 'Mobile', 'Reports', 'Performance', 'UI/UX', 'Integration', 'Other'];
   var categoryRule = SpreadsheetApp.newDataValidation()
     .requireValueInList(categoryOptions, true)
     .setAllowInvalid(false)
