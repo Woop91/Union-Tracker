@@ -1,7 +1,7 @@
 # 509 Dashboard - User Tutorials
 
-**Version:** 4.0.0
-**Last Updated:** 2026-01-15
+**Version:** 4.0.3
+**Last Updated:** 2026-01-16
 
 Quick, practical tutorials for common tasks in the 509 Dashboard.
 
@@ -535,5 +535,5 @@ If something goes wrong, use these repair functions:
 
 ---
 
-**Version:** 4.0.0
-**Last Updated:** 2026-01-15
+**Version:** 4.0.3
+**Last Updated:** 2026-01-16

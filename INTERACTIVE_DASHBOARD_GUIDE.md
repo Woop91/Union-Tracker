@@ -551,7 +551,7 @@ Potential additions (from Future Features sheet):
 ---
 
 **Created for SEIU Local 509 (Units 8 & 10)**
-**Version:** 4.0.0
+**Version:** 4.0.3
 **Last Updated:** January 2026
 
 *Empowering union representatives with data-driven insights* 📊✊
