@@ -97,7 +97,9 @@ function createCommandCenterMenu() {
   menu.addSubMenu(ui.createMenu('📱 Field Accessibility')
       .addItem('📱 Mobile / Pocket View', 'navToMobile')
       .addItem('🖥️ Restore Full Desktop View', 'showAllMemberColumns')
-      .addItem('🔄 Refresh View', 'refreshMemberView'));
+      .addItem('🔄 Refresh View', 'refreshMemberView')
+      .addSeparator()
+      .addItem('📱 Get Mobile App URL', 'showWebAppUrl'));
 
   menu.addSeparator();
 
@@ -148,6 +150,26 @@ function createCommandCenterMenu() {
       .addItem('📚 Search Precedents', 'showSearchPrecedents')
       .addSeparator()
       .addItem('📝 OCR Transcribe Form', 'showOCRDialog'));
+
+  menu.addSeparator();
+
+  // Strategic Intelligence submenu
+  menu.addSubMenu(ui.createMenu('🎯 Strategic Intelligence')
+      .addItem('🔥 Generate Unit Hot Zones', 'renderHotZones')
+      .addItem('🌟 Identify Rising Stars', 'identifyRisingStars')
+      .addItem('📉 Management Hostility Report', 'renderHostilityFunnel')
+      .addItem('📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet'));
+
+  menu.addSeparator();
+
+  // Web App & Portal submenu
+  menu.addSubMenu(ui.createMenu('🌐 Web App & Portal')
+      .addItem('👤 Build Member Portal', 'buildMemberPortal')
+      .addItem('📊 Build Public Portal', 'buildPublicPortal')
+      .addItem('📧 Send Portal Email', 'sendMemberDashboardEmail')
+      .addSeparator()
+      .addItem('📈 Get Dashboard Stats (JSON)', 'getDashboardStats')
+      .addItem('📊 Get Analytics Stats (JSON)', 'getMemberAnalyticsStats'));
 
   // v4.0 PRODUCTION MODE: Demo Data menu disappears after NUKE
   if (!isProductionMode()) {

@@ -1030,113 +1030,117 @@ Columns marked as **Multi-Select** support comma-separated values for multiple s
 
 ---
 
-## Menu System (6 Menus)
+## Menu System (3 Menus) - Updated v4.2.1
 
-The menu system has been reorganized from 9 menus to 6 logical groups (5 original + Strategic Command Center):
+The menu system provides comprehensive access to all dashboard features through 3 logical menus:
 
 ```
-📊 509 Dashboard
-├── 📊 Dashboard (with My Cases tab for stewards)
-├── 📋 Dashboard Pend
-├── 📊 Member Satisfaction (enhanced with trends & drill-down)
-├── 📱 Mobile Dashboard
-├── 🔍 Search Members
-└── 📱 Get Mobile App URL
-
-📋 Grievances
-├── ➕ Start New Grievance
-├── 📋 View Active Grievances
-├── 📊 Sort by Status Priority
-├── 🔄 Refresh Grievance Data
-├── 🔄 Refresh Member Data
-├── 📁 Drive Folders (submenu)
+📊 Dashboard (Main Menu)
+├── 📊 Dashboard Home
+├── 🎛️ Visual Control Panel
+├── 🔍 Search (submenu)
+│   ├── 🔍 Desktop Search
+│   ├── ⚡ Quick Search
+│   └── 🔎 Advanced Search
+├── 📋 Grievances (submenu)
+│   ├── ➕ New Grievance
+│   ├── ➕ Start New Grievance
+│   ├── ✏️ Edit Selected
+│   ├── 🔄 Bulk Update Status
+│   ├── 📋 View Active Grievances
+│   ├── 📈 Grievance Analytics
+│   ├── 🔄 Refresh Grievance Formulas
+│   └── 🔗 Setup Live Grievance Links
+├── 👥 Members (submenu)
+│   ├── ➕ Add New Member
+│   ├── 🔍 Find Existing Member
+│   ├── 📥 Import Members
+│   ├── 📤 Export Directory
+│   ├── 🛡️ Steward Directory
+│   └── 🔄 Refresh Member Directory Data
+├── 📅 Calendar (submenu)
+│   ├── 🔗 Sync Deadlines to Calendar
+│   ├── 👁️ View Upcoming Deadlines
+│   └── 🗑️ Clear All Calendar Events
+├── 📁 Google Drive (submenu)
 │   ├── 📁 Setup Folder for Grievance
 │   ├── 📁 View Grievance Files
-│   └── 📁 Batch Create All Folders
-├── 📅 Calendar (submenu)
-│   ├── 📅 Sync Deadlines to Calendar
-│   ├── 📅 View Upcoming Deadlines
-│   └── 🗑️ Clear Calendar Events
-└── 📬 Notifications (submenu)
-    ├── ⚙️ Notification Settings
-    ├── ⚙️ Alert Settings
-    ├── 📧 Send Steward Alerts Now
-    └── 🧪 Test Notifications
-
-👁️ View
-├── 📅 Simplify Timeline (Hide Steps)
-├── 📅 Show Full Timeline
-├── ♿ Comfort View (submenu)
+│   └── 📁 Batch Create Folders
+├── 🔔 Notifications (submenu)
+│   ├── ⚙️ Notification Settings
+│   └── 🧪 Test Notifications
+├── 👁️ View (submenu)
+│   ├── 📊 Executive Dashboard
+│   ├── ⭐ Member Satisfaction
+│   ├── 📊 Rebuild Dashboard
+│   ├── 🔄 Refresh All Formulas
+│   ├── 📱 Get Mobile App URL
+│   ├── 📱 Mobile Dashboard
+│   ├── 🌙 Toggle Dark Mode
+│   └── 🎨 Theme Settings
+├── ♿ Comfort View (submenu) - **ADHD-Friendly Features**
 │   ├── ♿ Comfort View Panel
 │   ├── 🎯 Focus Mode
-│   ├── 🔲 Zebra Stripes
-│   ├── 📝 Quick Capture
-│   └── 🍅 Pomodoro
-├── 🎨 Theming (submenu)
+│   ├── 🔲 Toggle Zebra Stripes
+│   ├── 📝 Quick Capture Notepad
+│   ├── 🍅 Pomodoro Timer
 │   ├── 🎨 Theme Manager
-│   ├── 🌙 Dark Mode
-│   └── 🔄 Reset Theme
-└── 🎨 Comfort View Setup (submenu)
-    ├── 🎨 Setup Comfort View
-    └── ↩️ Undo Comfort View
-
-⚙️ Settings
-├── 📊 Rebuild Dashboard
-├── 🔄 Refresh All Formulas
-├── ⚙️ Setup Data Validations
-├── 🔧 REPAIR DASHBOARD
-├── ☑️ Multi-Select (submenu)
+│   └── 🌙 Quick Toggle Dark Mode
+├── 📝 Multi-Select (submenu)
 │   ├── 📝 Open Editor
 │   ├── ⚡ Enable Auto-Open
 │   └── 🚫 Disable Auto-Open
-├── 🔗 Live Formulas (submenu)
-│   ├── 🔗 Setup Live Grievance Links
-│   └── 👤 Clear Member ID Validation
-├── ⚡ Triggers (submenu)
-│   ├── ⚡ Install Auto-Sync Trigger
-│   └── 🚫 Remove Auto-Sync Trigger
-├── ✅ Validation (submenu)
-│   ├── 🔍 Run Bulk Validation
-│   ├── ⚙️ Validation Settings
-│   ├── 🧹 Clear Validation Indicators
-│   └── ⚡ Install Validation Trigger
-└── 🎨 Comfort View Setup (submenu)
+├── 🛠️ Admin (submenu)
+│   ├── 🩺 System Diagnostics
+│   ├── 🔧 Repair Dashboard
+│   ├── ⚙️ Settings
+│   ├── 🔄 Data Sync (nested submenu)
+│   │   ├── 🔄 Sync All Data Now
+│   │   ├── 🔄 Sync Grievance → Members
+│   │   ├── 🔄 Sync Members → Grievances
+│   │   ├── ⚡ Install Auto-Sync Trigger
+│   │   └── 🚫 Remove Auto-Sync Trigger
+│   ├── ✅ Validation (nested submenu)
+│   │   ├── 🔍 Run Bulk Validation
+│   │   ├── ⚙️ Validation Settings
+│   │   ├── 🧹 Clear Indicators
+│   │   └── ⚡ Install Validation Trigger
+│   ├── 🗄️ Cache & Performance (nested submenu)
+│   │   ├── 🗄️ Cache Status
+│   │   ├── 🔥 Warm Up Caches
+│   │   └── 🗑️ Clear All Caches
+│   ├── 🏗️ Setup (nested submenu)
+│   │   ├── 🔧 Setup All Hidden Sheets
+│   │   ├── 🔧 Repair All Hidden Sheets
+│   │   ├── 🔍 Verify Hidden Sheets
+│   │   ├── ⚙️ Setup Data Validations
+│   │   └── 🎨 Setup Comfort View Defaults
+│   └── 🎭 Demo Data (nested submenu)
+│       ├── 🚀 Seed All Sample Data
+│       ├── 👥 Seed Members Only...
+│       ├── 📋 Seed Grievances Only...
+│       └── ☢️ NUKE SEEDED DATA
+├── ⚡ Quick Actions
+└── 📖 Help & Documentation
 
-🔧 Admin
-├── 🔍 DIAGNOSE SETUP
-├── 🔍 Verify Hidden Sheets
-├── 🔧 Hidden Sheets (submenu)
-│   ├── 🔧 Setup All Hidden Sheets
-│   └── 🔧 Repair All Hidden Sheets
-├── 🔄 Data Sync (submenu)
-│   ├── 🔄 Sync All Data Now
-│   ├── 🔄 Sync Grievance → Members
-│   └── 🔄 Sync Members → Grievances
-├── 🧪 Testing (submenu)
-│   ├── 🧪 Run All Tests
-│   ├── ⚡ Quick Tests
-│   └── 📊 View Test Results
-├── 🗄️ Cache (submenu)
-│   ├── 🗄️ Cache Status
-│   ├── 🔥 Warm Caches
-│   └── 🗑️ Clear Caches
-└── 🎭 Demo Data (submenu) - Only visible if DEMO_MODE_DISABLED != 'true'
-    ├── 🚀 Seed All Sample Data
-    ├── ☢️ NUKE SEEDED DATA
-    ├── 🧹 Clear Config Dropdowns Only
-    └── 🔄 Restore Config & Dropdowns
-
-📊 509 Command (Strategic Command Center v4.0.2)
-├── 👁️ Executive Command (PII) - Internal dashboard with member names
-├── 👁️ Command Center (submenu) - **NEW v4.0.2**
-│   ├── 👥 Member Dashboard (No PII) - Interactive modal with Google Charts, Material Icons
-│   ├── 🛡️ Steward Performance - Performance metrics for all stewards
-│   └── 📧 Email Dashboard to Selected - Send dashboard link to selected member
+📊 509 Command (Strategic Command Center v4.2.1)
+├── 👁️ Command Center (submenu)
+│   ├── 👁️ Executive Command (PII)
+│   ├── 👥 Member Analytics (No PII)
+│   ├── 👥 Member Dashboard (No PII)
+│   ├── 🛡️ Steward Performance
+│   ├── 📧 Email Dashboard to Selected
+│   └── 📩 Send Member Dashboard Link
 ├── 🔍 Desktop Search
 ├── 📋 Grievances (submenu)
 │   ├── ➕ New Grievance
-│   └── ✏️ Edit Selected
-├── 🚀 Strategic Pro Moves (submenu)
+│   ├── ✏️ Edit Selected
+│   └── 📋 View Active Grievances
+├── 📊 Analytics & Charts (submenu)
+│   ├── 📈 Unit Density Treemap
+│   ├── 📉 Sentiment Trend Chart
+│   └── ⚖️ Steward Workload Report
+├── 🎯 Strategic Intelligence (submenu) - **NEW v4.2.1**
 │   ├── 🔥 Generate Unit Hot Zones
 │   ├── 🌟 Identify Rising Stars
 │   ├── 📉 Management Hostility Report
@@ -1147,7 +1151,9 @@ The menu system has been reorganized from 9 menus to 6 logical groups (5 origina
 │   └── 📄 Create PDF for Selected Grievance
 ├── 👤 Steward Management (submenu)
 │   ├── ⬆️ Promote to Steward
-│   └── ⬇️ Demote Steward
+│   ├── ⬇️ Demote Steward
+│   ├── 📧 Send Contact Form
+│   └── 📊 Send Satisfaction Survey
 ├── 🎨 Styling & Theme (submenu)
 │   ├── 🎨 Apply Global Styling
 │   └── 🔄 Reset to Default Theme
@@ -1158,7 +1164,57 @@ The menu system has been reorganized from 9 menus to 6 logical groups (5 origina
     ├── 🔔 Enable 1AM Dashboard Refresh
     └── 📑 Email Weekly PDF Snapshot
 
-    NOTE: Delete DeveloperTools.gs before production to remove all demo functions
+📊 509 COMMAND CENTER (Alternative Strategic Menu)
+├── 👁️ Refresh Dashboard UI
+├── 🔍 Search Members
+├── 📱 Field Accessibility (submenu)
+│   ├── 📱 Mobile / Pocket View
+│   ├── 🖥️ Restore Full Desktop View
+│   ├── 🔄 Refresh View
+│   └── 📱 Get Mobile App URL
+├── 👤 Personnel Management (submenu)
+│   ├── 🆔 Generate Missing Member IDs
+│   ├── ⚡ Generate IDs (Batch Mode)
+│   ├── 🔍 Check Duplicate IDs
+│   ├── ✅ Verify ID Engine
+│   ├── 🌟 Promote Selected to Steward
+│   └── ⬇️ Demote Steward
+├── 📋 Grievance Tools (submenu)
+│   ├── 🚦 Apply Traffic Light Indicators
+│   ├── 🔄 Clear Traffic Lights
+│   └── 📄 Create PDF for Selected
+├── 🛡️ System Security (submenu)
+│   ├── 📸 Create Manual Snapshot
+│   ├── 📅 Setup Weekly Backup
+│   ├── 📜 View Audit Log
+│   ├── 🔍 v4.0 System Diagnostic
+│   ├── 🛠️ Repair Dashboard
+│   └── 📊 v4.0 Status Report
+├── 🎨 Styling & Theme (submenu)
+│   ├── 🎨 Apply Global Theme
+│   ├── 🔄 Reset to Default
+│   └── ✨ Refresh All Visuals
+├── 📈 Analytics & Insights (submenu)
+│   ├── 🏥 Unit Health Report
+│   ├── 📊 Grievance Trends
+│   ├── 📚 Search Precedents
+│   └── 📝 OCR Transcribe Form
+├── 🎯 Strategic Intelligence (submenu) - **NEW v4.2.1**
+│   ├── 🔥 Generate Unit Hot Zones
+│   ├── 🌟 Identify Rising Stars
+│   ├── 📉 Management Hostility Report
+│   └── 📝 Bargaining Cheat Sheet
+├── 🌐 Web App & Portal (submenu) - **NEW v4.2.1**
+│   ├── 👤 Build Member Portal
+│   ├── 📊 Build Public Portal
+│   ├── 📧 Send Portal Email
+│   ├── 📈 Get Dashboard Stats (JSON)
+│   └── 📊 Get Analytics Stats (JSON)
+└── 🎭 Demo Data (submenu) - Only visible if NOT in Production Mode
+    ├── 🌱 Seed Sample Data
+    └── ☢️ NUKE EVERYTHING
+
+NOTE: Delete 07_DevTools.gs before production to remove all demo functions
 ```
 
 ---
