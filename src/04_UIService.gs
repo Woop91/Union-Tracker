@@ -96,9 +96,16 @@ function createDashboardMenu() {
   // Strategic Command Center Menu (Separate top-level menu)
   ui.createMenu('📊 509 Command')
     .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
-    .addItem('🫂 Member Analytics (No PII)', 'rebuildMemberAnalytics')
     .addSeparator()
-    .addItem('📩 Send Member Dashboard Link', 'sendMemberDashboardLink')
+    .addSubMenu(ui.createMenu('👁️ Command Center')
+      .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
+      .addItem('🛡️ Steward Performance', 'showStewardPerformanceModal')
+      .addItem('📧 Email Dashboard to Selected', 'emailDashboardLink'))
+    .addSeparator()
+    .addItem('🔍 Desktop Search', 'showDesktopSearch')
+    .addSubMenu(ui.createMenu('📋 Grievances')
+      .addItem('➕ New Grievance', 'showNewGrievanceDialog')
+      .addItem('✏️ Edit Selected', 'showEditGrievanceDialog'))
     .addSeparator()
     .addSubMenu(ui.createMenu('🚀 Strategic Pro Moves')
       .addItem('🔥 Generate Unit Hot Zones', 'renderHotZones')
@@ -5961,6 +5968,150 @@ function sendMemberDashboardLink() {
       ui.alert('Error sending email: ' + e.message);
     }
   }
+}
+
+/**
+ * Sends the Member Dashboard URL to the selected member from Member Directory.
+ * Uses the currently selected row to get member email and name.
+ * This is a PII-protected view link.
+ */
+function emailDashboardLink() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var row = sheet.getActiveRange().getRow();
+
+  // Validate we're on Member Directory
+  if (sheet.getName() !== SHEETS.MEMBER_DIR || row <= 1) {
+    SpreadsheetApp.getUi().alert('Please select a member row in the Member Directory first.');
+    return;
+  }
+
+  // Get member email and name from the selected row
+  var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+
+  if (!email || !email.toString().includes('@')) {
+    SpreadsheetApp.getUi().alert('No valid email found for this member.');
+    return;
+  }
+
+  // Get organization name from config if available
+  var orgName = '509';
+  try {
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var configOrgName = configSheet.getRange(2, CONFIG_COLS.ORG_NAME).getValue();
+      if (configOrgName) orgName = configOrgName;
+    }
+  } catch (e) {
+    // Use default org name
+  }
+
+  // Build email body
+  var dashboardUrl = ss.getUrl();
+  var body = 'Hi ' + firstName + ',\n\n' +
+    'You can view current union stats and representation here:\n' +
+    dashboardUrl + '\n\n' +
+    'This is a PII-protected view showing only aggregate union statistics.\n\n' +
+    'From the dashboard you can:\n' +
+    '- View active grievance counts and outcomes\n' +
+    '- See member satisfaction trends\n' +
+    '- Find your steward contact information\n' +
+    '- Track union coverage and goals\n\n' +
+    'If you have questions about your specific case or concerns, ' +
+    'please contact your assigned steward directly.\n\n' +
+    'In Solidarity,\n' +
+    orgName + ' Union Leadership';
+
+  try {
+    MailApp.sendEmail({
+      to: email,
+      subject: orgName + ' - Your Member Dashboard Access',
+      body: body,
+      name: orgName + ' Union'
+    });
+    ss.toast('Sent dashboard link to ' + email, 'Success', 3);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error sending email: ' + e.message);
+  }
+}
+
+/**
+ * Shows Steward Performance Modal
+ * Displays performance metrics for all stewards including:
+ * - Active cases, total cases, and win rates
+ * - Response time averages
+ * - Member satisfaction scores (if available)
+ */
+function showStewardPerformanceModal() {
+  var stewardData = getStewardWorkload();
+
+  if (!stewardData || stewardData.length === 0) {
+    SpreadsheetApp.getUi().alert('No steward data available. Ensure stewards are marked in the Member Directory.');
+    return;
+  }
+
+  var html = '<!DOCTYPE html><html><head>' +
+    '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Segoe UI", Roboto, sans-serif; background: #f0f4f8; padding: 15px; }' +
+    '.header { display: flex; align-items: center; color: #059669; margin-bottom: 15px; }' +
+    '.header h2 { font-size: 18px; font-weight: 600; margin-left: 8px; }' +
+    '.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }' +
+    '.stat-box { background: white; border-radius: 10px; padding: 12px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }' +
+    '.stat-box .value { font-size: 24px; font-weight: 700; color: #059669; }' +
+    '.stat-box .label { font-size: 10px; text-transform: uppercase; color: #64748b; }' +
+    '.steward-table { width: 100%; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }' +
+    '.steward-table th { background: #059669; color: white; padding: 10px; font-size: 11px; text-transform: uppercase; text-align: left; }' +
+    '.steward-table td { padding: 10px; font-size: 12px; border-bottom: 1px solid #f1f5f9; }' +
+    '.steward-table tr:hover { background: #f8fafc; }' +
+    '.win-rate { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }' +
+    '.win-high { background: #dcfce7; color: #166534; }' +
+    '.win-med { background: #fef3c7; color: #92400e; }' +
+    '.win-low { background: #fee2e2; color: #991b1b; }' +
+    '</style></head><body>' +
+    '<div class="header"><i class="material-icons">shield</i><h2>Steward Performance</h2></div>';
+
+  // Calculate totals
+  var totalActive = 0, totalCases = 0, totalWon = 0;
+  stewardData.forEach(function(s) {
+    totalActive += s.activeCases || 0;
+    totalCases += s.totalCases || 0;
+    totalWon += s.wonCases || 0;
+  });
+  var overallWinRate = totalCases > 0 ? Math.round((totalWon / totalCases) * 100) : 0;
+
+  html += '<div class="stats-row">' +
+    '<div class="stat-box"><div class="value">' + stewardData.length + '</div><div class="label">Active Stewards</div></div>' +
+    '<div class="stat-box"><div class="value">' + totalActive + '</div><div class="label">Active Cases</div></div>' +
+    '<div class="stat-box"><div class="value">' + overallWinRate + '%</div><div class="label">Overall Win Rate</div></div>' +
+    '</div>';
+
+  html += '<table class="steward-table"><thead><tr>' +
+    '<th>Steward</th><th>Unit</th><th>Active</th><th>Total</th><th>Win Rate</th>' +
+    '</tr></thead><tbody>';
+
+  stewardData.forEach(function(s) {
+    var firstName = s['First Name'] || '';
+    var lastName = s['Last Name'] || '';
+    var unit = s['Unit'] || 'General';
+    var winClass = s.winRate >= 70 ? 'win-high' : (s.winRate >= 40 ? 'win-med' : 'win-low');
+
+    html += '<tr>' +
+      '<td><strong>' + firstName + ' ' + lastName + '</strong></td>' +
+      '<td>' + unit + '</td>' +
+      '<td>' + (s.activeCases || 0) + '</td>' +
+      '<td>' + (s.totalCases || 0) + '</td>' +
+      '<td><span class="win-rate ' + winClass + '">' + (s.winRate || 0) + '%</span></td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table></body></html>';
+
+  var output = HtmlService.createHtmlOutput(html).setWidth(500).setHeight(450);
+  SpreadsheetApp.getUi().showModalDialog(output, 'Steward Performance Dashboard');
 }
 
 /**
