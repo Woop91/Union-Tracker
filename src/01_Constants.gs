@@ -158,6 +158,21 @@ var SHEETS = {
 // Some code references SHEET_NAMES instead of SHEETS
 var SHEET_NAMES = SHEETS;
 
+/**
+ * Hidden sheets used for calculations (prefixed with underscore)
+ * These are auto-created and hidden from users
+ * @const {Object}
+ */
+var HIDDEN_SHEETS = {
+  CALC_STATS: '_Dashboard_Calc',
+  CALC_FORMULAS: '_Grievance_Formulas',
+  GRIEVANCE_CALC: '_Grievance_Calc',
+  MEMBER_LOOKUP: '_Member_Lookup',
+  STEWARD_CONTACT_CALC: '_Steward_Contact_Calc',
+  STEWARD_PERFORMANCE_CALC: '_Steward_Performance_Calc',
+  AUDIT_LOG: '_Audit_Log'
+};
+
 // ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System
 // ============================================================================
