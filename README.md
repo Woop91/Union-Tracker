@@ -1,4 +1,4 @@
-# 509 Strategic Command Center - v4.0 Unified Master Engine
+# 509 Strategic Command Center - v4.0.2 Unified Master Engine
 
 A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **10-file modular architecture** following the Separation of Concerns principle.
 
@@ -44,6 +44,16 @@ src/
 - **Production Mode**: NUKE logic with UI self-hiding (Demo Data menu disappears)
 - **Analytics & Insights**: Unit Health Reports, Grievance Trends analysis
 - **Scaling Hooks**: OCR transcription and Sentiment analysis placeholders
+
+## v4.0.2 Features (NEW)
+
+- **Secure Member Dashboard**: Interactive modal with Google Charts (pie chart for issue categories, gauge for trust score, area chart for trends)
+- **Material Icons Integration**: Professional iconography throughout the UI
+- **Live Steward Search**: Real-time filtering of steward directory by name, unit, or location
+- **Progress Tracking**: Visual progress bars for union goals (steward coverage, survey participation)
+- **Steward Performance Modal**: View active cases, total cases, and win rates for all stewards
+- **Email Dashboard Link**: One-click email sending of dashboard URL to selected members
+- **Zero PII Exposure**: All member-facing views show only aggregate statistics
 
 ## Benefits of 10-File Architecture
 

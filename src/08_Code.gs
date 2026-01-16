@@ -5068,164 +5068,170 @@ function rejectFlaggedSubmission(rowNum) {
 // ============================================================================
 
 /**
- * Show the public member dashboard
- * Displays anonymized statistics accessible to all members
+ * COMMAND CENTER: PROFESSIONAL MEMBER PORTAL (FULLY LOADED)
+ * High-performance modal with interactive Google Charts, Satisfaction data,
+ * Material Icons, Trend Stats, Progress Tracking, and Live Steward Search.
+ * No PII is exposed - only aggregate statistics.
  */
 function showPublicMemberDashboard() {
-  var html = HtmlService.createHtmlOutput(getPublicMemberDashboardHtml())
-    .setWidth(950)
-    .setHeight(700);
-  SpreadsheetApp.getUi().showModalDialog(html, '📊 Member Dashboard - Union Statistics');
+  var stats = getGrievanceStats();
+  var stewards = getAllStewards();
+  var satisfaction = getAggregateSatisfactionStats();
+  var coverage = getStewardCoverageStats();
+
+  var html = getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage);
+  var output = HtmlService.createHtmlOutput(html).setWidth(520).setHeight(720);
+  SpreadsheetApp.getUi().showModalDialog(output, '509 Member Command Center');
 }
 
 /**
- * Get HTML for public member dashboard
+ * Generates HTML for the secure member dashboard
+ * @param {Object} stats - Grievance statistics
+ * @param {Array} stewards - Array of steward objects
+ * @param {Object} satisfaction - Satisfaction statistics
+ * @param {Object} coverage - Steward coverage statistics
  * @returns {string} HTML content
  */
-function getPublicMemberDashboardHtml() {
-  return '<!DOCTYPE html><html><head><base target="_top">' +
+function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
+  // Prepare steward data for display (sanitize for JSON)
+  var stewardList = stewards.slice(0, 12).map(function(s) {
+    return {
+      firstName: (s['First Name'] || '').toString().replace(/"/g, '\\"'),
+      lastName: (s['Last Name'] || '').toString().replace(/"/g, '\\"'),
+      unit: (s['Unit'] || 'General').toString().replace(/"/g, '\\"'),
+      location: (s['Work Location'] || '').toString().replace(/"/g, '\\"'),
+      email: (s['Email'] || '').toString().replace(/"/g, '\\"')
+    };
+  });
+
+  // Build trend data for area chart
+  var trendChartData = [['Quarter', 'Trust Score']];
+  if (satisfaction.trendData && satisfaction.trendData.length > 0) {
+    satisfaction.trendData.forEach(function(item) {
+      trendChartData.push(item);
+    });
+  } else {
+    trendChartData.push(['Current', satisfaction.avgTrust || 7]);
+  }
+
+  return '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">' +
+    '<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>' +
     '<style>' +
-    ':root{--purple:#5B4B9E;--green:#059669;--blue:#1a73e8}' +
-    '*{box-sizing:border-box;margin:0;padding:0}' +
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f5f5;padding:20px}' +
-    '.dashboard{max-width:900px;margin:0 auto}' +
-    '.tabs{display:flex;gap:5px;margin-bottom:20px;border-bottom:2px solid #ddd;padding-bottom:10px}' +
-    '.tab{padding:12px 20px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:500;color:#666;border-radius:8px 8px 0 0;transition:all 0.2s}' +
-    '.tab:hover{background:#e8e8e8}' +
-    '.tab.active{background:var(--purple);color:white}' +
-    '.tab-content{display:none;background:white;border-radius:12px;padding:25px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}' +
-    '.tab-content.active{display:block}' +
-    '.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:25px}' +
-    '.stat-card{background:linear-gradient(135deg,var(--purple),#7B6BB8);color:white;padding:20px;border-radius:12px;text-align:center}' +
-    '.stat-card.green{background:linear-gradient(135deg,var(--green),#10B981)}' +
-    '.stat-card.blue{background:linear-gradient(135deg,var(--blue),#3B82F6)}' +
-    '.stat-value{font-size:36px;font-weight:bold}' +
-    '.stat-label{font-size:13px;opacity:0.9;margin-top:5px}' +
-    '.section{margin-bottom:25px}' +
-    '.section-title{font-size:18px;font-weight:600;color:#333;margin-bottom:15px;padding-bottom:10px;border-bottom:2px solid #eee}' +
-    '.bar-chart{margin:15px 0}' +
-    '.bar-row{display:flex;align-items:center;margin-bottom:10px}' +
-    '.bar-label{width:150px;font-size:13px;color:#555}' +
-    '.bar-container{flex:1;height:24px;background:#eee;border-radius:12px;overflow:hidden}' +
-    '.bar-fill{height:100%;border-radius:12px;transition:width 0.5s}' +
-    '.bar-value{width:50px;text-align:right;font-size:13px;font-weight:500;margin-left:10px}' +
-    '.steward-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:15px}' +
-    '.steward-card{background:#f8f9fa;border-radius:12px;padding:20px;border-left:4px solid var(--purple)}' +
-    '.steward-name{font-weight:600;font-size:16px;color:#333}' +
-    '.steward-info{font-size:13px;color:#666;margin-top:8px}' +
-    '.steward-info div{margin-bottom:5px}' +
-    '.loading{text-align:center;padding:40px;color:#666}' +
-    '</style></head><body>' +
-    '<div class="dashboard">' +
-    '<div class="tabs">' +
-    '<button class="tab active" onclick="switchTab(\'overview\',this)">📊 Overview</button>' +
-    '<button class="tab" onclick="switchTab(\'survey\',this)">📋 Survey Results</button>' +
-    '<button class="tab" onclick="switchTab(\'grievances\',this)">⚖️ Grievance Stats</button>' +
-    '<button class="tab" onclick="switchTab(\'stewards\',this)">👥 Steward Directory</button>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Roboto", "Segoe UI", sans-serif; background: #f0f4f8; color: #1e293b; padding: 15px; }' +
+    '.header { display: flex; align-items: center; color: #4338ca; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #e0e7ff; }' +
+    '.header h2 { font-size: 18px; font-weight: 700; margin-left: 8px; }' +
+    '.card { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 12px; }' +
+    '.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }' +
+    '.stat-card { background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%); color: white; padding: 15px; border-radius: 10px; text-align: center; }' +
+    '.stat-card.green { background: linear-gradient(135deg, #059669 0%, #047857 100%); }' +
+    '.stat-card.blue { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); }' +
+    '.stat-val { font-size: 28px; font-weight: 800; display: block; }' +
+    '.stat-label { font-size: 11px; text-transform: uppercase; opacity: 0.9; font-weight: 500; }' +
+    '.section-title { font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }' +
+    '.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }' +
+    '.chart-container { height: 140px; width: 100%; }' +
+    '.progress-section { margin-bottom: 8px; }' +
+    '.progress-header { display: flex; justify-content: space-between; font-size: 12px; color: #475569; margin-bottom: 4px; }' +
+    '.progress-bg { background: #e2e8f0; border-radius: 10px; height: 10px; width: 100%; }' +
+    '.progress-fill { background: linear-gradient(90deg, #7C3AED, #a78bfa); height: 100%; border-radius: 10px; transition: width 0.5s ease; }' +
+    '.search-box { width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; margin-bottom: 10px; }' +
+    '.search-box:focus { outline: none; border-color: #7C3AED; box-shadow: 0 0 0 2px rgba(124,58,237,0.1); }' +
+    '.steward-list { max-height: 180px; overflow-y: auto; }' +
+    '.steward-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }' +
+    '.steward-row:last-child { border-bottom: none; }' +
+    '.steward-name { font-size: 13px; font-weight: 500; }' +
+    '.steward-unit { background: #eff6ff; color: #1e40af; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }' +
+    '.steward-actions { display: flex; gap: 6px; }' +
+    '.steward-actions a { color: #64748b; text-decoration: none; transition: color 0.2s; }' +
+    '.steward-actions a:hover { color: #7C3AED; }' +
+    '.footer { font-size: 9px; color: #94a3b8; text-align: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #e2e8f0; }' +
+    '.trend-area { margin-top: 10px; }' +
+    '</style>' +
+    '<script type="text/javascript">' +
+    'google.charts.load("current", {"packages":["corechart", "gauge"]});' +
+    'google.charts.setOnLoadCallback(drawCharts);' +
+    'function drawCharts() {' +
+    // Issue Mix Pie Chart
+    '  var issueData = google.visualization.arrayToDataTable(' + JSON.stringify(stats.categoryData || [['Category', 'Count'], ['No Data', 1]]) + ');' +
+    '  var issueOptions = { pieHole: 0.4, chartArea: {width:"90%",height:"90%"}, legend: "none", colors: ["#7C3AED", "#059669", "#F97316", "#3B82F6", "#EC4899", "#6366F1"], pieSliceText: "label", fontSize: 10 };' +
+    '  new google.visualization.PieChart(document.getElementById("issue_chart")).draw(issueData, issueOptions);' +
+    // Trust Gauge
+    '  var gaugeData = google.visualization.arrayToDataTable([["Label", "Value"],["Trust", ' + (satisfaction.avgTrust || 0) + ']]);' +
+    '  var gaugeOptions = { width: 130, height: 130, greenFrom: 7, greenTo: 10, yellowFrom: 5, yellowTo: 7, redFrom: 0, redTo: 5, max: 10, minorTicks: 5 };' +
+    '  new google.visualization.Gauge(document.getElementById("gauge_div")).draw(gaugeData, gaugeOptions);' +
+    // Trend Area Chart
+    '  var trendData = google.visualization.arrayToDataTable(' + JSON.stringify(trendChartData) + ');' +
+    '  var trendOptions = { legend: "none", chartArea: {width:"85%",height:"70%"}, colors: ["#7C3AED"], areaOpacity: 0.3, hAxis: {textStyle:{fontSize:9}}, vAxis: {minValue:0,maxValue:10,textStyle:{fontSize:9}}, lineWidth: 2 };' +
+    '  new google.visualization.AreaChart(document.getElementById("trend_chart")).draw(trendData, trendOptions);' +
+    '}' +
+    // Steward search filter
+    'var stewards = ' + JSON.stringify(stewardList) + ';' +
+    'function filterStewards(query) {' +
+    '  var q = query.toLowerCase();' +
+    '  var list = document.getElementById("steward-list");' +
+    '  var html = "";' +
+    '  stewards.forEach(function(s) {' +
+    '    var fullName = s.firstName + " " + s.lastName;' +
+    '    var searchText = (fullName + " " + s.unit + " " + s.location).toLowerCase();' +
+    '    if (!q || searchText.indexOf(q) !== -1) {' +
+    '      html += "<div class=\\"steward-row\\">";' +
+    '      html += "<div><span class=\\"steward-name\\">" + s.firstName + " " + s.lastName + "</span></div>";' +
+    '      html += "<div class=\\"steward-actions\\">";' +
+    '      html += "<span class=\\"steward-unit\\">" + s.unit + "</span>";' +
+    '      if (s.email) { html += " <a href=\\"mailto:" + s.email + "\\" title=\\"Email\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">email</i></a>"; }' +
+    '      html += "</div></div>";' +
+    '    }' +
+    '  });' +
+    '  if (!html) { html = "<div style=\\"text-align:center;padding:15px;color:#94a3b8\\">No stewards found</div>"; }' +
+    '  list.innerHTML = html;' +
+    '}' +
+    'document.addEventListener("DOMContentLoaded", function() { filterStewards(""); });' +
+    '</script>' +
+    '</head>' +
+    '<body>' +
+    '<div class="header"><i class="material-icons">verified_user</i><h2>509 MEMBER PORTAL</h2></div>' +
+    // Stats Grid
+    '<div class="stat-grid">' +
+    '<div class="stat-card"><span class="stat-val">' + (stats.open || 0) + '</span><span class="stat-label">Active Cases</span></div>' +
+    '<div class="stat-card green"><span class="stat-val">' + (stats.resolved || 0) + '</span><span class="stat-label">Resolved (YTD)</span></div>' +
     '</div>' +
-    '<div id="overview" class="tab-content active"><div class="loading">Loading...</div></div>' +
-    '<div id="survey" class="tab-content"><div class="loading">Loading...</div></div>' +
-    '<div id="grievances" class="tab-content"><div class="loading">Loading...</div></div>' +
-    '<div id="stewards" class="tab-content"><div class="loading">Loading...</div></div>' +
+    // Charts Row
+    '<div class="chart-row">' +
+    '<div class="card"><div class="section-title"><i class="material-icons" style="font-size:14px">pie_chart</i> Issue Mix</div><div id="issue_chart" class="chart-container"></div></div>' +
+    '<div class="card" style="text-align:center;"><div class="section-title"><i class="material-icons" style="font-size:14px">speed</i> Member Trust</div><div id="gauge_div" style="display:inline-block;margin-top:5px"></div></div>' +
     '</div>' +
-    '<script>' +
-    'var loadedTabs={};' +
-    'function switchTab(id,btn){' +
-    '  document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});' +
-    '  document.querySelectorAll(".tab-content").forEach(function(c){c.classList.remove("active")});' +
-    '  btn.classList.add("active");' +
-    '  document.getElementById(id).classList.add("active");' +
-    '  if(!loadedTabs[id])loadTab(id);' +
-    '}' +
-    'function loadTab(id){' +
-    '  loadedTabs[id]=true;' +
-    '  if(id==="overview")google.script.run.withSuccessHandler(renderOverview).getPublicOverviewData();' +
-    '  else if(id==="survey")google.script.run.withSuccessHandler(renderSurvey).getPublicSurveyData(includeHistory);' +
-    '  else if(id==="grievances")google.script.run.withSuccessHandler(renderGrievances).getPublicGrievanceData();' +
-    '  else if(id==="stewards")google.script.run.withSuccessHandler(renderStewards).getPublicStewardData();' +
-    '}' +
-    'function renderOverview(d){' +
-    '  var h="<div class=\\"stats-grid\\">";' +
-    '  h+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+d.totalMembers+"</div><div class=\\"stat-label\\">Total Members</div></div>";' +
-    '  h+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+d.totalStewards+"</div><div class=\\"stat-label\\">Active Stewards</div></div>";' +
-    '  h+="<div class=\\"stat-card blue\\"><div class=\\"stat-value\\">"+d.totalGrievances+"</div><div class=\\"stat-label\\">Total Grievances</div></div>";' +
-    '  h+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+d.winRate+"%</div><div class=\\"stat-label\\">Grievance Win Rate</div></div>";' +
-    '  h+="</div>";' +
-    '  h+="<div class=\\"section\\"><div class=\\"section-title\\">📍 Members by Location</div><div class=\\"bar-chart\\">";' +
-    '  d.locationBreakdown.forEach(function(l){' +
-    '    var pct=d.totalMembers>0?Math.round(l.count/d.totalMembers*100):0;' +
-    '    h+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+l.location+"</div>";' +
-    '    h+="<div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:#5B4B9E\\"></div></div>";' +
-    '    h+="<div class=\\"bar-value\\">"+l.count+"</div></div>";' +
-    '  });' +
-    '  h+="</div></div>";' +
-    '  document.getElementById("overview").innerHTML=h;' +
-    '}' +
-    'var includeHistory=false;' +
-    'function renderSurvey(d){' +
-    '  var h="<div class=\\"toggle-row\\" style=\\"display:flex;align-items:center;justify-content:flex-end;margin-bottom:15px;gap:10px\\"><label style=\\"font-size:13px;color:#666\\">Include historical responses:</label><input type=\\"checkbox\\" id=\\"historyToggle\\" "+(includeHistory?"checked":"")+" onchange=\\"toggleHistory(this.checked)\\" style=\\"width:18px;height:18px;cursor:pointer\\"></div>";' +
-    '  h+="<div class=\\"stats-grid\\">";' +
-    '  h+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+(d.verifiedResponses||d.totalResponses)+"</div><div class=\\"stat-label\\">Verified Responses</div></div>";' +
-    '  h+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+d.avgSatisfaction.toFixed(1)+"</div><div class=\\"stat-label\\">Avg Satisfaction (1-10)</div></div>";' +
-    '  h+="<div class=\\"stat-card blue\\"><div class=\\"stat-value\\">"+d.responseRate+"%</div><div class=\\"stat-label\\">Response Rate</div></div>";' +
-    '  h+="</div>";' +
-    '  if(d.includesHistory){h+="<div style=\\"background:#FEF3C7;padding:10px;border-radius:8px;margin-bottom:15px;font-size:13px;color:#92400E\\">⚠️ Showing all responses including historical (superseded) entries</div>";}' +
-    '  h+="<div class=\\"section\\"><div class=\\"section-title\\">📊 Satisfaction by Section</div><div class=\\"bar-chart\\">";' +
-    '  d.sectionScores.forEach(function(s){' +
-    '    var pct=Math.round(s.score*10);' +
-    '    var color=s.score>=7?"#059669":s.score>=5?"#F59E0B":"#EF4444";' +
-    '    h+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+s.section+"</div>";' +
-    '    h+="<div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"></div></div>";' +
-    '    h+="<div class=\\"bar-value\\">"+s.score.toFixed(1)+"</div></div>";' +
-    '  });' +
-    '  h+="</div></div>";' +
-    '  document.getElementById("survey").innerHTML=h;' +
-    '}' +
-    'function toggleHistory(val){includeHistory=val;loadedTabs["survey"]=false;loadTab("survey");}' +
-    'function renderGrievances(d){' +
-    '  var h="<div class=\\"stats-grid\\">";' +
-    '  h+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+d.open+"</div><div class=\\"stat-label\\">Open Grievances</div></div>";' +
-    '  h+="<div class=\\"stat-card green\\"><div class=\\"stat-value\\">"+d.won+"</div><div class=\\"stat-label\\">Won</div></div>";' +
-    '  h+="<div class=\\"stat-card blue\\"><div class=\\"stat-value\\">"+d.settled+"</div><div class=\\"stat-label\\">Settled</div></div>";' +
-    '  h+="<div class=\\"stat-card\\"><div class=\\"stat-value\\">"+d.avgDaysToResolve+"</div><div class=\\"stat-label\\">Avg Days to Resolve</div></div>";' +
-    '  h+="</div>";' +
-    '  h+="<div class=\\"section\\"><div class=\\"section-title\\">📊 Grievances by Type</div><div class=\\"bar-chart\\">";' +
-    '  d.byType.forEach(function(t){' +
-    '    var pct=d.total>0?Math.round(t.count/d.total*100):0;' +
-    '    h+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+t.type+"</div>";' +
-    '    h+="<div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:#5B4B9E\\"></div></div>";' +
-    '    h+="<div class=\\"bar-value\\">"+t.count+"</div></div>";' +
-    '  });' +
-    '  h+="</div></div>";' +
-    '  h+="<div class=\\"section\\"><div class=\\"section-title\\">📊 Grievances by Status</div><div class=\\"bar-chart\\">";' +
-    '  d.byStatus.forEach(function(s){' +
-    '    var pct=d.total>0?Math.round(s.count/d.total*100):0;' +
-    '    var color=s.status==="Open"?"#3B82F6":s.status==="Won"?"#059669":"#6B7280";' +
-    '    h+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+s.status+"</div>";' +
-    '    h+="<div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"></div></div>";' +
-    '    h+="<div class=\\"bar-value\\">"+s.count+"</div></div>";' +
-    '  });' +
-    '  h+="</div></div>";' +
-    '  document.getElementById("grievances").innerHTML=h;' +
-    '}' +
-    'function renderStewards(d){' +
-    '  var h="<div class=\\"section\\"><div class=\\"section-title\\">👥 Your Union Stewards ("+d.stewards.length+")</div>";' +
-    '  h+="<p style=\\"color:#666;margin-bottom:20px\\">Contact your steward for help with workplace issues, grievances, or union questions.</p>";' +
-    '  h+="<div class=\\"steward-grid\\">";' +
-    '  d.stewards.forEach(function(s){' +
-    '    h+="<div class=\\"steward-card\\">";' +
-    '    h+="<div class=\\"steward-name\\">"+s.name+"</div>";' +
-    '    h+="<div class=\\"steward-info\\">";' +
-    '    h+="<div>📍 "+s.location+"</div>";' +
-    '    h+="<div>📅 Office Days: "+s.officeDays+"</div>";' +
-    '    h+="<div>📧 "+s.email+"</div>";' +
-    '    h+="</div></div>";' +
-    '  });' +
-    '  h+="</div></div>";' +
-    '  document.getElementById("stewards").innerHTML=h;' +
-    '}' +
-    'loadTab("overview");' +
-    '</script></body></html>';
+    // Progress Bars
+    '<div class="card">' +
+    '<div class="section-title"><i class="material-icons" style="font-size:14px">trending_up</i> Union Goals</div>' +
+    '<div class="progress-section">' +
+    '<div class="progress-header"><span>Steward Coverage</span><span>' + (coverage.coveragePercent || 0) + '%</span></div>' +
+    '<div class="progress-bg"><div class="progress-fill" style="width:' + Math.min(100, coverage.coveragePercent || 0) + '%"></div></div>' +
+    '</div>' +
+    '<div class="progress-section">' +
+    '<div class="progress-header"><span>Survey Participation</span><span>' + (satisfaction.responseCount > 0 ? Math.min(100, Math.round((satisfaction.responseCount / coverage.memberCount) * 100)) : 0) + '%</span></div>' +
+    '<div class="progress-bg"><div class="progress-fill" style="width:' + (satisfaction.responseCount > 0 ? Math.min(100, Math.round((satisfaction.responseCount / Math.max(1, coverage.memberCount)) * 100)) : 0) + '%"></div></div>' +
+    '</div>' +
+    '</div>' +
+    // Trust Trend
+    '<div class="card trend-area">' +
+    '<div class="section-title"><i class="material-icons" style="font-size:14px">show_chart</i> Trust Score Trend</div>' +
+    '<div id="trend_chart" style="height:80px;width:100%"></div>' +
+    '</div>' +
+    // Steward Directory with Search
+    '<div class="card">' +
+    '<div class="section-title"><i class="material-icons" style="font-size:14px">groups</i> Find Your Steward</div>' +
+    '<input type="text" class="search-box" placeholder="Search by name, unit, or location..." oninput="filterStewards(this.value)">' +
+    '<div id="steward-list" class="steward-list"></div>' +
+    '</div>' +
+    // Footer
+    '<div class="footer"><i class="material-icons" style="font-size:11px;vertical-align:middle">lock</i> Protected View - No Private PII Displayed</div>' +
+    '</body>' +
+    '</html>';
 }
 
 /**
@@ -5518,6 +5524,156 @@ function getPublicStewardData() {
   result.stewards.sort(function(a, b) { return a.name.localeCompare(b.name); });
 
   return result;
+}
+
+/**
+ * Aggregates survey data into chart-ready, non-PII formats.
+ * Returns only aggregate metrics without exposing individual survey responses.
+ * @returns {Object} Aggregate satisfaction statistics
+ */
+function getAggregateSatisfactionStats() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    return {
+      avgTrust: 0,
+      avgStewardRating: 0,
+      avgLeadership: 0,
+      avgCommunication: 0,
+      responseCount: 0,
+      trendData: []
+    };
+  }
+
+  // Get data starting from row 2 (skip header)
+  var lastRow = sheet.getLastRow();
+  var data = sheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.AVG_SCHEDULING || 82).getValues();
+
+  // Filter to only verified and latest responses
+  var validRows = data.filter(function(row) {
+    var verified = row[SATISFACTION_COLS.VERIFIED - 1];
+    var isLatest = row[SATISFACTION_COLS.IS_LATEST - 1];
+    return verified === 'Yes' && isLatest === 'Yes';
+  });
+
+  if (validRows.length === 0) {
+    return {
+      avgTrust: 0,
+      avgStewardRating: 0,
+      avgLeadership: 0,
+      avgCommunication: 0,
+      responseCount: 0,
+      trendData: []
+    };
+  }
+
+  // Calculate averages from the summary columns
+  var trustSum = 0, stewardSum = 0, leadershipSum = 0, commSum = 0;
+  var trustCount = 0, stewardCount = 0, leadershipCount = 0, commCount = 0;
+
+  // Also track trend data by quarter
+  var quarterData = {};
+
+  for (var i = 0; i < validRows.length; i++) {
+    var row = validRows[i];
+
+    // Trust (Q7_TRUST_UNION)
+    var trust = parseFloat(row[SATISFACTION_COLS.Q7_TRUST_UNION - 1]);
+    if (!isNaN(trust)) {
+      trustSum += trust;
+      trustCount++;
+    }
+
+    // Steward Rating (average of Q10-Q16)
+    var stewardAvg = parseFloat(row[SATISFACTION_COLS.AVG_STEWARD_RATING - 1]);
+    if (!isNaN(stewardAvg)) {
+      stewardSum += stewardAvg;
+      stewardCount++;
+    }
+
+    // Leadership (average of Q26-Q31)
+    var leadershipAvg = parseFloat(row[SATISFACTION_COLS.AVG_LEADERSHIP - 1]);
+    if (!isNaN(leadershipAvg)) {
+      leadershipSum += leadershipAvg;
+      leadershipCount++;
+    }
+
+    // Communication (average of Q41-Q45)
+    var commAvg = parseFloat(row[SATISFACTION_COLS.AVG_COMMUNICATION - 1]);
+    if (!isNaN(commAvg)) {
+      commSum += commAvg;
+      commCount++;
+    }
+
+    // Track by quarter for trend
+    var quarter = row[SATISFACTION_COLS.QUARTER - 1];
+    if (quarter && trust) {
+      if (!quarterData[quarter]) {
+        quarterData[quarter] = { sum: 0, count: 0 };
+      }
+      quarterData[quarter].sum += trust;
+      quarterData[quarter].count++;
+    }
+  }
+
+  // Build trend data for charts (last 6 quarters)
+  var trendData = [];
+  var quarters = Object.keys(quarterData).sort().slice(-6);
+  quarters.forEach(function(q) {
+    var avg = quarterData[q].count > 0 ? quarterData[q].sum / quarterData[q].count : 0;
+    trendData.push([q, parseFloat(avg.toFixed(1))]);
+  });
+
+  return {
+    avgTrust: trustCount > 0 ? parseFloat((trustSum / trustCount).toFixed(1)) : 0,
+    avgStewardRating: stewardCount > 0 ? parseFloat((stewardSum / stewardCount).toFixed(1)) : 0,
+    avgLeadership: leadershipCount > 0 ? parseFloat((leadershipSum / leadershipCount).toFixed(1)) : 0,
+    avgCommunication: commCount > 0 ? parseFloat((commSum / commCount).toFixed(1)) : 0,
+    responseCount: validRows.length,
+    trendData: trendData
+  };
+}
+
+/**
+ * Gets steward coverage ratio for progress tracking
+ * @returns {Object} Coverage statistics
+ */
+function getStewardCoverageStats() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!memberSheet || memberSheet.getLastRow() < 2) {
+    return { ratio: 0, stewardCount: 0, memberCount: 0, targetRatio: 15 };
+  }
+
+  var data = memberSheet.getDataRange().getValues();
+  var stewardCount = 0;
+  var memberCount = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    if (!memberId) continue;
+
+    memberCount++;
+    var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+    if (isSteward === true || isSteward === 'Yes' || isSteward === 'TRUE') {
+      stewardCount++;
+    }
+  }
+
+  // Calculate ratio as members per steward (lower is better coverage)
+  var ratio = stewardCount > 0 ? Math.round(memberCount / stewardCount) : 0;
+  var targetRatio = 15; // Target: 1 steward per 15 members
+  var coveragePercent = ratio > 0 ? Math.min(100, Math.round((targetRatio / ratio) * 100)) : 0;
+
+  return {
+    ratio: ratio,
+    stewardCount: stewardCount,
+    memberCount: memberCount,
+    targetRatio: targetRatio,
+    coveragePercent: coveragePercent
+  };
 }
 
 /**

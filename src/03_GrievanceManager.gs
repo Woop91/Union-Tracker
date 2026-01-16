@@ -641,22 +641,42 @@ function getUpcomingDeadlines(daysAhead) {
 
 /**
  * Gets grievance statistics for dashboard
- * @return {Object} Statistics object
+ * Includes category breakdown for charts
+ * @return {Object} Statistics object with categoryData for Google Charts
  */
 function getGrievanceStats() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
-  const data = sheet.getDataRange().getValues();
 
+  if (!sheet || sheet.getLastRow() < 2) {
+    return {
+      open: 0,
+      pending: 0,
+      resolved: 0,
+      closedThisYear: 0,
+      total: 0,
+      categoryData: [['Category', 'Count'], ['No Data', 1]]
+    };
+  }
+
+  const data = sheet.getDataRange().getValues();
   const currentYear = new Date().getFullYear();
   let open = 0;
   let pending = 0;
   let resolved = 0;
   let closedThisYear = 0;
+  let won = 0;
+
+  // Track categories for chart data
+  const categoryCounts = {};
 
   for (let i = 1; i < data.length; i++) {
     const status = data[i][GRIEVANCE_COLUMNS.STATUS];
     const lastUpdated = data[i][GRIEVANCE_COLUMNS.LAST_UPDATED];
+    const category = data[i][GRIEVANCE_COLUMNS.ISSUE_CATEGORY] || 'Other';
+
+    // Count by category
+    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
 
     switch (status) {
       case GRIEVANCE_STATUS.OPEN:
@@ -666,7 +686,15 @@ function getGrievanceStats() {
       case GRIEVANCE_STATUS.APPEALED:
         pending++;
         break;
+      case GRIEVANCE_STATUS.WON:
+        won++;
+        resolved++;
+        if (lastUpdated instanceof Date && lastUpdated.getFullYear() === currentYear) {
+          closedThisYear++;
+        }
+        break;
       case GRIEVANCE_STATUS.RESOLVED:
+      case GRIEVANCE_STATUS.SETTLED:
       case GRIEVANCE_STATUS.CLOSED:
         if (lastUpdated instanceof Date && lastUpdated.getFullYear() === currentYear) {
           closedThisYear++;
@@ -676,12 +704,30 @@ function getGrievanceStats() {
     }
   }
 
+  // Build categoryData array for Google Charts
+  // Format: [['Category', 'Count'], ['Discipline', 5], ['Scheduling', 3], ...]
+  const categoryData = [['Category', 'Count']];
+  const sortedCategories = Object.keys(categoryCounts)
+    .sort((a, b) => categoryCounts[b] - categoryCounts[a])
+    .slice(0, 6); // Top 6 categories for cleaner charts
+
+  sortedCategories.forEach(cat => {
+    categoryData.push([cat, categoryCounts[cat]]);
+  });
+
+  // Ensure we have at least one data point
+  if (categoryData.length === 1) {
+    categoryData.push(['No Data', 0]);
+  }
+
   return {
     open: open,
     pending: pending,
     resolved: resolved,
+    won: won,
     closedThisYear: closedThisYear,
-    total: data.length - 1
+    total: data.length - 1,
+    categoryData: categoryData
   };
 }
 
