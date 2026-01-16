@@ -1,4 +1,4 @@
-# 509 Strategic Command Center - v4.0.3 Unified Master Engine
+# 509 Strategic Command Center - v4.2.0 Modal Command Center
 
 A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements an **11-file modular architecture** following the Separation of Concerns principle.
 
@@ -18,7 +18,7 @@ src/
 ├── 08_Code.gs                   # Core setup, hidden sheets, dashboard creation
 ├── 09_Main.gs                   # Entry point and triggers
 ├── 10_CommandCenter.gs          # 509 Strategic Command Center Unified Master Engine (v4.0)
-└── 11_SecureMemberDashboard.gs  # Material Design member portal with analytics (v4.0.3)
+└── 11_SecureMemberDashboard.gs  # Material Design member portal, Web App & secure portal (v4.2.0)
 ```
 
 ### Module Descriptions
@@ -57,7 +57,19 @@ src/
 - **Email Dashboard Link**: One-click email sending of dashboard URL to selected members
 - **Zero PII Exposure**: All member-facing views show only aggregate statistics
 
-## v4.0.3 Features (NEW)
+## v4.2.0 Features (CURRENT)
+
+- **Modal SPA Architecture**: All dashboards converted from sheet-based to responsive modal dialogs
+- **Executive Dashboard Modal**: Chart.js visualizations with win rate donut, status pie, and trends line chart
+- **Bridge Pattern Implementation**: Server-side JSON aggregation with client-side rendering for performance
+- **Web App Entry Point**: `doGet(e)` handler for URL parameter routing (`?member=ID` for personalized portal)
+- **Secure Member Portal**: Personalized member view via URL with PII protection and safety valve scrubbing
+- **Public Statistics Portal**: Aggregate union statistics portal for public-facing deployment
+- **Email Portal Links**: Send personalized dashboard URLs directly to members
+- **Code Cleanup**: Removed 9 orphaned sheet-based helper functions, resolved 3 duplicate function conflicts
+- **Dark Gradient Theme**: Professional dark theme with Chart.js visualizations across all modals
+
+## v4.0.3 Features
 
 - **Material Design Integration**: Full Material Design UI with Google Material Icons and Roboto typography
 - **Google Charts Analytics**: Interactive Treemap for unit density visualization and Area Charts for sentiment trends
@@ -323,6 +335,8 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
+- **4.2.0** - Modal Command Center: All dashboards converted to modal SPA architecture, Web App entry point with member portal, removed orphaned code
+- **4.1.0** - Multi-Key Smart Match for duplicate prevention, Analytics wiring, Search Precedents feature
 - **4.0.3** - Material Design Integration with Google Charts, Safety Valve PII scrubbing, Weingarten Rights utility (11-file architecture)
 - **4.0.2** - Secure Member Dashboard with live steward search and zero PII exposure
 - **4.0.0** - Unified Master Engine with PDF generation, mobile view, analytics hooks

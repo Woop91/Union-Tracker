@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.1.0 (Unified Master Engine, 11-File Architecture)
+**Version:** 4.2.0 (Modal Command Center, 11-File Architecture)
 **Last Updated:** 2026-01-16
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -92,9 +92,14 @@ The following code sections are **USER APPROVED** and should **NOT be modified o
 | `showPublicMemberDashboard()` | Opens the Material Design member portal (No PII) |
 | `showStewardPerformanceModal()` | Opens steward performance dashboard |
 | `safetyValveScrub(data)` | PII auto-redaction for phone numbers and SSNs |
-| `getGrievanceStats()` | Fetches aggregate grievance statistics |
-| `getAllStewards()` | Fetches steward list with scrubbed data |
-| `getAggregateSatisfactionStats()` | Fetches satisfaction survey aggregates |
+| `getSecureGrievanceStats_()` | Fetches aggregate grievance statistics (renamed v4.2.0) |
+| `getSecureAllStewards_()` | Fetches steward list with scrubbed data (renamed v4.2.0) |
+| `getSecureSatisfactionStats_()` | Fetches satisfaction survey aggregates (renamed v4.2.0) |
+| `doGet(e)` | Web app entry point for URL parameter routing (v4.2.0) |
+| `buildMemberPortal(memberId)` | Personalized member portal generator (v4.2.0) |
+| `buildPublicPortal()` | Public aggregate statistics portal (v4.2.0) |
+| `getMemberProfile(memberId)` | Member data fetching with PII protection (v4.2.0) |
+| `sendMemberDashboardEmail(memberId)` | Email portal link to members (v4.2.0) |
 | `getAdvancedAnalytics()` | Fetches treemap and sentiment trend data |
 | `getStewardWorkload()` | Fetches steward workload balancing metrics |
 | `showUnitDensityTreemap()` | Standalone treemap chart modal |
@@ -1317,6 +1322,51 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.2.0 (2026-01-16) - Modal Command Center
+
+**Architecture Overhaul:**
+
+1. **Sheet-Based Dashboards Converted to Modal SPA Architecture**
+   - `rebuildExecutiveDashboard()` now opens a responsive modal dialog instead of rendering to sheets
+   - `rebuildMemberAnalytics()` converted to modal with Bridge Pattern (server-side aggregation + client-side rendering)
+   - `renderHotZones()`, `identifyRisingStars()`, `renderBargainingCheatSheet()`, `renderHostilityFunnel()` all converted to modal dialogs
+   - Executive Dashboard features Chart.js visualizations (win rate donut, status pie, trends line chart)
+   - All dashboards use dark gradient theme for professional appearance
+
+2. **Web App & Secure Member Portal**
+   - `doGet(e)` handler for URL parameter routing
+   - `buildMemberPortal(memberId)` - Personalized member portal via `?member=ID` URL parameter
+   - `buildPublicPortal()` - Public-facing aggregate statistics portal
+   - `getMemberProfile(memberId)` - Fetches member data with PII protection
+   - `sendMemberDashboardEmail(memberId)` - Email personalized portal link to members
+   - Safety valve PII scrubbing active for all web-exposed data
+
+3. **Removed Orphaned Sheet-Based Helper Functions**
+   - `renderKPISection(sheet)` - Removed (was only for sheet dashboards)
+   - `setupKPICard(sheet, range, ...)` - Removed (KPIs now in modal HTML)
+   - `renderStewardList(sheet, startCell)` - Removed (steward list now modal-rendered)
+   - `createStewardInsightPanel(sheet, startCell)` - Removed (insights now modal-rendered)
+   - `getColNumber_(col)` - Removed (helper no longer needed)
+   - `addMemberHappinessGauge(sheet, row, col)` - Removed (gauge now in modal)
+   - `addParticipationFunnel(sheet, row, col)` - Removed (funnel now in modal)
+   - `renderMembershipHeatmap(sheet, startCell)` - Removed (heatmap now in modal)
+   - `addSentimentTrendChart(sheet, startCell)` - Removed (trend chart now in modal)
+   - **Retained:** `getExecutiveMetrics_()` - Still used by `checkDashboardAlerts()`
+
+4. **Resolved Duplicate Function Conflicts**
+   - `getGrievanceStats()` renamed to `getSecureGrievanceStats_()` in 11_SecureMemberDashboard.gs
+   - `getAllStewards()` renamed to `getSecureAllStewards_()` in 11_SecureMemberDashboard.gs
+   - `getAggregateSatisfactionStats()` renamed to `getSecureSatisfactionStats_()` in 11_SecureMemberDashboard.gs
+   - Prevents Google Apps Script runtime conflicts with same-named functions in other files
+
+**Technical Details:**
+- `01_Constants.gs` - VERSION_INFO updated to 4.2.0 "Modal Command Center"
+- `04_UIService.gs` - rebuildExecutiveDashboard(), rebuildMemberAnalytics(), modal HTML generators
+- `11_SecureMemberDashboard.gs` - doGet(), buildMemberPortal(), buildPublicPortal(), renamed functions
+- `08_Code.gs` - Phase 19 added to Function Checklist (Web App & Member Portal)
+
+---
 
 ### Version 4.1.0 (2026-01-16) - Multi-Key Smart Match & Analytics Wiring
 
