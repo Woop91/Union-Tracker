@@ -1,14 +1,14 @@
 # Quick Deploy - Union Steward Dashboard
 
-## 10-File Modular Deployment
+## 11-File Modular Deployment
 
-Deploy the **Union Steward Dashboard** using the **10 source files** in the `src/` folder.
+Deploy the **Union Steward Dashboard** using the **11 source files** in the `src/` folder.
 
 ---
 
 ## What You Get
 
-- 10 modular source files for easy maintenance
+- 11 modular source files for easy maintenance
 - 11 visible sheets + 6 hidden calculation sheets
 - Demo data seeding (members + grievances)
 - 12-section Dashboard with real-time metrics
@@ -58,6 +58,7 @@ For each file in the `src/` folder, create a new script file in Apps Script:
 | `08_Code` | `src/08_Code.gs` |
 | `09_Main` | `src/09_Main.gs` |
 | `10_CommandCenter` | `src/10_CommandCenter.gs` |
+| `11_SecureMemberDashboard` | `src/11_SecureMemberDashboard.gs` |
 
 5. **Save** the project (Ctrl+S)
 
@@ -122,6 +123,7 @@ Your dashboard is fully operational with:
 | `08_Code.gs` | Core setup, hidden sheets, dashboard creation |
 | `09_Main.gs` | Entry point and triggers |
 | `10_CommandCenter.gs` | Strategic Command Center features |
+| `11_SecureMemberDashboard.gs` | Material Design member portal with analytics |
 
 ---
 
@@ -164,6 +166,6 @@ To update to a new version:
 
 ---
 
-**Version:** 4.0.0 (Unified Master Engine)
-**Architecture:** 10-File Modular
-**Last Updated:** 2026-01-15
+**Version:** 4.0.3 (Unified Master Engine)
+**Architecture:** 11-File Modular
+**Last Updated:** 2026-01-16
