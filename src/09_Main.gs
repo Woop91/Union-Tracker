@@ -86,6 +86,13 @@ function onEdit(e) {
       applyAutoStyleToRow_(sheet, row);  // Auto-styling
     }
 
+    // 4. Handle edits in Case Checklist (auto-update progress)
+    if (sheetName === 'Case Checklist' || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
+      if (typeof handleChecklistEdit === 'function') {
+        handleChecklistEdit(e);
+      }
+    }
+
   } catch (error) {
     console.error('Error in onEdit:', error);
     // Don't show error to user for automatic functions

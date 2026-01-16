@@ -104,11 +104,11 @@ var DRIVE_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 2,
+  MINOR: 3,
   PATCH: 0,
-  BUILD: 'v4.2.0',
-  CURRENT: '4.2.0',
-  CODENAME: 'Modal Command Center'
+  BUILD: 'v4.3.0',
+  CURRENT: '4.3.0',
+  CODENAME: 'Checklist Tracking'
 };
 
 // ============================================================================
@@ -141,6 +141,8 @@ var SHEETS = {
   FUNCTION_CHECKLIST: 'Function Checklist',
   // Audit Log (hidden)
   AUDIT_LOG: '_Audit_Log',
+  // Case Checklist
+  CASE_CHECKLIST: 'Case Checklist',
   // Satisfaction & Feedback sheets
   SATISFACTION: '📊 Member Satisfaction',
   FEEDBACK: '💡 Feedback & Development',
@@ -449,7 +451,11 @@ var GRIEVANCE_COLS = {
   DRIVE_FOLDER_URL: 34,   // AH - Google Drive folder URL
 
   // Section 13: Quick Actions (AI)
-  QUICK_ACTIONS: 35       // AI - Checkbox to open Quick Actions dialog
+  QUICK_ACTIONS: 35,      // AI - Checkbox to open Quick Actions dialog
+
+  // Section 14: Action Type & Checklist (AJ-AK)
+  ACTION_TYPE: 36,        // AJ - Action Type (Grievance, Records Request, etc.)
+  CHECKLIST_PROGRESS: 37  // AK - Checklist Progress (e.g., "5/8" or "62%")
 };
 
 // ============================================================================
@@ -539,7 +545,11 @@ var GRIEVANCE_COLUMNS = {
   DRIVE_FOLDER: 33,        // Alias for DRIVE_FOLDER_URL
 
   // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 34        // AI - Quick Actions
+  QUICK_ACTIONS: 34,       // AI - Quick Actions
+
+  // Action Type & Checklist (0-indexed)
+  ACTION_TYPE: 35,         // AJ - Action Type
+  CHECKLIST_PROGRESS: 36   // AK - Checklist Progress
 };
 
 /**
@@ -992,7 +1002,9 @@ function mapGrievanceRow(row) {
     acknowledgedBy: row[GRIEVANCE_COLS.ACKNOWLEDGED_BY - 1] || '',
     acknowledgedDate: row[GRIEVANCE_COLS.ACKNOWLEDGED_DATE - 1] || '',
     driveFolderId: row[GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1] || '',
-    driveFolderUrl: row[GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1] || ''
+    driveFolderUrl: row[GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1] || '',
+    actionType: row[GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance',
+    checklistProgress: row[GRIEVANCE_COLS.CHECKLIST_PROGRESS - 1] || ''
   };
 }
 
@@ -1032,7 +1044,8 @@ function getGrievanceHeaders() {
     'Resolution',
     'Message Alert', 'Coordinator Message', 'Acknowledged By', 'Acknowledged Date',
     'Drive Folder ID', 'Drive Folder URL',
-    '⚡ Actions'
+    '⚡ Actions',
+    'Action Type', 'Checklist Progress'
   ];
 }
 
@@ -1302,6 +1315,293 @@ function generateUUID_() {
     }
   }
   return uuid;
+}
+
+// ============================================================================
+// ACTION TYPE CONFIGURATION (Grievances + Other Actions)
+// ============================================================================
+
+/**
+ * Action types for tracking different case types
+ * Allows the system to handle grievances AND other member advocacy actions
+ * @const {Object}
+ */
+var ACTION_TYPES = {
+  GRIEVANCE: 'Grievance',
+  RECORDS_REQUEST: 'Records Request',
+  INFO_REQUEST: 'Information Request',
+  WEINGARTEN: 'Weingarten',
+  ULP: 'ULP Filing',
+  EEOC_MCAD: 'EEOC/MCAD',
+  ACCOMMODATION: 'Accommodation',
+  OTHER_ADMIN: 'Other Admin'
+};
+
+/**
+ * Action type display names and configuration
+ * @const {Array}
+ */
+var ACTION_TYPE_CONFIG = [
+  { value: 'Grievance', label: 'Grievance', icon: '📋', usesGrievanceSteps: true, color: '#F97316' },
+  { value: 'Records Request', label: 'Records Request (Art. 21)', icon: '📁', usesGrievanceSteps: false, color: '#3B82F6' },
+  { value: 'Information Request', label: 'Union Information Request', icon: '📄', usesGrievanceSteps: false, color: '#8B5CF6' },
+  { value: 'Weingarten', label: 'Weingarten Documentation', icon: '🛡️', usesGrievanceSteps: false, color: '#10B981' },
+  { value: 'ULP Filing', label: 'Unfair Labor Practice (DLR)', icon: '⚖️', usesGrievanceSteps: false, color: '#EF4444' },
+  { value: 'EEOC/MCAD', label: 'EEOC/MCAD Complaint', icon: '🏛️', usesGrievanceSteps: false, color: '#EC4899' },
+  { value: 'Accommodation', label: 'ADA/Reasonable Accommodation', icon: '♿', usesGrievanceSteps: false, color: '#06B6D4' },
+  { value: 'Other Admin', label: 'Other Administrative Action', icon: '📝', usesGrievanceSteps: false, color: '#64748B' }
+];
+
+/**
+ * Get action type configuration by value
+ * @param {string} actionType - The action type value
+ * @returns {Object|null} Action type config if found
+ */
+function getActionTypeConfig(actionType) {
+  for (var i = 0; i < ACTION_TYPE_CONFIG.length; i++) {
+    if (ACTION_TYPE_CONFIG[i].value === actionType) {
+      return ACTION_TYPE_CONFIG[i];
+    }
+  }
+  return null;
+}
+
+// ============================================================================
+// CHECKLIST CONFIGURATION
+// ============================================================================
+
+/**
+ * Checklist sheet name
+ * @const {string}
+ */
+var CHECKLIST_SHEET_NAME = 'Case Checklist';
+
+/**
+ * Checklist column positions (1-indexed)
+ * @const {Object}
+ */
+var CHECKLIST_COLS = {
+  CHECKLIST_ID: 1,       // A - Unique checklist item ID
+  CASE_ID: 2,            // B - Links to Grievance ID or Action ID
+  ACTION_TYPE: 3,        // C - Type of case (Grievance, Records Request, etc.)
+  ITEM_TEXT: 4,          // D - Description of checklist item
+  CATEGORY: 5,           // E - Document, Meeting, Deadline, Evidence, Communication
+  REQUIRED: 6,           // F - Yes/No - Is this item required?
+  COMPLETED: 7,          // G - Checkbox - Has item been completed?
+  COMPLETED_BY: 8,       // H - Who completed this item
+  COMPLETED_DATE: 9,     // I - When item was completed
+  DUE_DATE: 10,          // J - Optional due date for time-sensitive items
+  NOTES: 11,             // K - Additional notes
+  SORT_ORDER: 12         // L - For custom ordering of items
+};
+
+/**
+ * Checklist item categories
+ * @const {Array}
+ */
+var CHECKLIST_CATEGORIES = [
+  'Document',
+  'Meeting',
+  'Deadline',
+  'Evidence',
+  'Communication',
+  'Follow-up',
+  'Other'
+];
+
+/**
+ * Default checklist templates by action type and issue category
+ * Each template contains items that are auto-populated when a new case is created
+ * @const {Object}
+ */
+var CHECKLIST_TEMPLATES = {
+  // Standard Grievance Templates
+  'Grievance': {
+    '_default': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles', category: 'Document', required: true },
+      { text: 'Written statement from member', category: 'Evidence', required: true },
+      { text: 'Witness statements (if applicable)', category: 'Evidence', required: false },
+      { text: 'Relevant emails/communications', category: 'Evidence', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Discipline': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of discipline letter/notice', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles (Art. 13)', category: 'Document', required: true },
+      { text: 'Member\'s written response to discipline', category: 'Document', required: true },
+      { text: 'Prior discipline history obtained', category: 'Evidence', required: true },
+      { text: 'Comparator cases researched', category: 'Evidence', required: false },
+      { text: 'Weingarten documentation (if applicable)', category: 'Document', required: false },
+      { text: 'Witness statements', category: 'Evidence', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Workload': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles', category: 'Document', required: true },
+      { text: 'Workload documentation (caseload reports, etc.)', category: 'Evidence', required: true },
+      { text: 'Written statement describing workload issues', category: 'Evidence', required: true },
+      { text: 'Time/task analysis if available', category: 'Evidence', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Scheduling': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles (Art. 6)', category: 'Document', required: true },
+      { text: 'Copy of schedule showing violation', category: 'Evidence', required: true },
+      { text: 'Written statement from member', category: 'Evidence', required: true },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Pay': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles (Art. 8)', category: 'Document', required: true },
+      { text: 'Pay stubs showing discrepancy', category: 'Evidence', required: true },
+      { text: 'Written statement from member', category: 'Evidence', required: true },
+      { text: 'Calculation of amount owed', category: 'Document', required: true },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Harassment': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles', category: 'Document', required: true },
+      { text: 'Detailed written statement from member', category: 'Evidence', required: true },
+      { text: 'Timeline of incidents', category: 'Evidence', required: true },
+      { text: 'Witness statements', category: 'Evidence', required: false },
+      { text: 'Copies of any written communications', category: 'Evidence', required: false },
+      { text: 'Prior complaints documented', category: 'Evidence', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Discrimination': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles (Art. 5)', category: 'Document', required: true },
+      { text: 'Detailed written statement from member', category: 'Evidence', required: true },
+      { text: 'Comparator evidence (how others treated)', category: 'Evidence', required: true },
+      { text: 'Timeline of incidents', category: 'Evidence', required: true },
+      { text: 'Witness statements', category: 'Evidence', required: false },
+      { text: 'EEOC/MCAD filing discussed with member', category: 'Communication', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ]
+  },
+
+  // Records Request Templates
+  'Records Request': {
+    '_default': [
+      { text: 'Written request submitted to HR', category: 'Document', required: true },
+      { text: 'Member signed authorization form', category: 'Document', required: true },
+      { text: 'Request receipt confirmation', category: 'Document', required: false },
+      { text: 'Copy of records received', category: 'Document', required: true },
+      { text: 'Records reviewed with member', category: 'Communication', required: true },
+      { text: 'Member signed acknowledgment of receipt', category: 'Document', required: false }
+    ]
+  },
+
+  // Information Request Templates
+  'Information Request': {
+    '_default': [
+      { text: 'Written information request drafted', category: 'Document', required: true },
+      { text: 'Request submitted to employer', category: 'Document', required: true },
+      { text: 'Submission receipt confirmation', category: 'Document', required: false },
+      { text: 'Response received from employer', category: 'Document', required: true },
+      { text: 'Information reviewed and analyzed', category: 'Follow-up', required: true }
+    ]
+  },
+
+  // Weingarten Templates
+  'Weingarten': {
+    '_default': [
+      { text: 'Member requested representation', category: 'Document', required: true },
+      { text: 'Date/time of meeting documented', category: 'Document', required: true },
+      { text: 'Meeting attendees documented', category: 'Document', required: true },
+      { text: 'Notes from meeting', category: 'Document', required: true },
+      { text: 'Member debriefed after meeting', category: 'Communication', required: true },
+      { text: 'Follow-up actions identified', category: 'Follow-up', required: false }
+    ]
+  },
+
+  // ULP Filing Templates
+  'ULP Filing': {
+    '_default': [
+      { text: 'ULP charge form completed', category: 'Document', required: true },
+      { text: 'Supporting documentation gathered', category: 'Evidence', required: true },
+      { text: 'Charge filed with DLR/NLRB', category: 'Document', required: true },
+      { text: 'Filing confirmation received', category: 'Document', required: true },
+      { text: 'Member notified of filing', category: 'Communication', required: true },
+      { text: 'Case number assigned', category: 'Document', required: true },
+      { text: 'Investigation meeting scheduled', category: 'Meeting', required: false },
+      { text: 'Settlement discussions (if any)', category: 'Meeting', required: false }
+    ]
+  },
+
+  // EEOC/MCAD Templates
+  'EEOC/MCAD': {
+    '_default': [
+      { text: 'Intake questionnaire completed', category: 'Document', required: true },
+      { text: 'Supporting documentation gathered', category: 'Evidence', required: true },
+      { text: 'Charge filed with EEOC/MCAD', category: 'Document', required: true },
+      { text: 'Right to Sue letter requested (if applicable)', category: 'Document', required: false },
+      { text: 'Filing confirmation received', category: 'Document', required: true },
+      { text: 'Member notified of filing', category: 'Communication', required: true },
+      { text: 'Investigation meeting scheduled', category: 'Meeting', required: false },
+      { text: 'Mediation scheduled (if offered)', category: 'Meeting', required: false }
+    ]
+  },
+
+  // Accommodation Templates
+  'Accommodation': {
+    '_default': [
+      { text: 'Accommodation request form completed', category: 'Document', required: true },
+      { text: 'Medical documentation obtained', category: 'Document', required: true },
+      { text: 'Request submitted to employer', category: 'Document', required: true },
+      { text: 'Interactive process meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Meeting notes documented', category: 'Document', required: true },
+      { text: 'Employer response received', category: 'Document', required: true },
+      { text: 'Accommodation implemented/denied', category: 'Follow-up', required: true },
+      { text: 'Member notified of outcome', category: 'Communication', required: true }
+    ]
+  },
+
+  // Other Admin Templates
+  'Other Admin': {
+    '_default': [
+      { text: 'Issue documented', category: 'Document', required: true },
+      { text: 'Action request submitted', category: 'Document', required: true },
+      { text: 'Response received', category: 'Document', required: false },
+      { text: 'Member notified of outcome', category: 'Communication', required: true }
+    ]
+  }
+};
+
+/**
+ * Get checklist template for an action type and issue category
+ * @param {string} actionType - The action type (e.g., 'Grievance', 'Records Request')
+ * @param {string} issueCategory - The issue category (e.g., 'Discipline', 'Pay') - only for grievances
+ * @returns {Array} Array of checklist item templates
+ */
+function getChecklistTemplate(actionType, issueCategory) {
+  var templates = CHECKLIST_TEMPLATES[actionType];
+  if (!templates) {
+    return CHECKLIST_TEMPLATES['Other Admin']['_default'];
+  }
+
+  // For grievances, check for category-specific template
+  if (actionType === 'Grievance' && issueCategory && templates[issueCategory]) {
+    return templates[issueCategory];
+  }
+
+  // Return default template for this action type
+  return templates['_default'] || [];
 }
 
 /**

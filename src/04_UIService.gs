@@ -44,12 +44,13 @@ function createDashboardMenu() {
       .addItem('🔎 Advanced Search', 'showAdvancedSearch'))
 
     // Grievances submenu - Mixed icons
-    .addSubMenu(ui.createMenu('📋 Grievances')
-      .addItem('➕ New Grievance', 'showNewGrievanceDialog')
+    .addSubMenu(ui.createMenu('📋 Cases & Grievances')
+      .addItem('➕ New Case/Grievance', 'showNewGrievanceDialog')
       .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
-      .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
+      .addItem('✅ View Checklist', 'showChecklistDialog')
       .addSeparator()
-      .addItem('📈 Grievance Analytics', 'showInteractiveDashboardTab'))
+      .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
+      .addItem('📈 Case Analytics', 'showInteractiveDashboardTab'))
 
     // Members submenu - Mixed icons
     .addSubMenu(ui.createMenu('👥 Members')
@@ -100,9 +101,10 @@ function createDashboardMenu() {
       .addItem('📧 Email Dashboard to Selected', 'emailDashboardLink'))
     .addSeparator()
     .addItem('🔍 Desktop Search', 'showDesktopSearch')
-    .addSubMenu(ui.createMenu('📋 Grievances')
-      .addItem('➕ New Grievance', 'showNewGrievanceDialog')
-      .addItem('✏️ Edit Selected', 'showEditGrievanceDialog'))
+    .addSubMenu(ui.createMenu('📋 Cases & Grievances')
+      .addItem('➕ New Case/Grievance', 'showNewGrievanceDialog')
+      .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
+      .addItem('✅ View Checklist', 'showChecklistDialog'))
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 Analytics & Charts')
       .addItem('📈 Unit Density Treemap', 'showUnitDensityTreemap')
