@@ -4,7 +4,7 @@
  * Single source of truth for all configuration constants.
  * This file must be loaded first in the build order.
  *
- * @version 4.0.3
+ * @version 4.1.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -28,7 +28,7 @@
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.0.3",
+  VERSION: "4.1.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -89,9 +89,9 @@ var COMMAND_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 0,
-  PATCH: 3,
-  BUILD: 'v4.0.3',
+  MINOR: 1,
+  PATCH: 0,
+  BUILD: 'v4.1.0',
   CODENAME: 'Unified Master Engine'
 };
 

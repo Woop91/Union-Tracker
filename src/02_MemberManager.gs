@@ -443,6 +443,110 @@ function checkDuplicateMemberIDs() {
   return duplicates;
 }
 
+/**
+ * Multi-Key Smart Match (v4.1)
+ * Hierarchical matching across Member ID, Email, and Name.
+ * Used during form submissions and bulk imports to prevent duplicate records.
+ *
+ * Match Priority:
+ *   1. Exact Member ID match (highest confidence)
+ *   2. Exact Email match (high confidence)
+ *   3. Exact First + Last Name match (fallback)
+ *
+ * @param {Object} searchParams - Search parameters object
+ * @param {string} [searchParams.memberId] - Member ID to search for
+ * @param {string} [searchParams.email] - Email address to search for
+ * @param {string} [searchParams.firstName] - First name to search for
+ * @param {string} [searchParams.lastName] - Last name to search for
+ * @param {Array<Array>} dataArray - 2D array of Member Directory data (batch processed)
+ * @returns {Object|null} Match result with row number and match type, or null if no match
+ *
+ * @example
+ * var data = sheet.getDataRange().getValues();
+ * var match = findExistingMember({
+ *   memberId: 'MS-101-H',
+ *   email: 'john.doe@email.com',
+ *   firstName: 'John',
+ *   lastName: 'Doe'
+ * }, data);
+ *
+ * if (match) {
+ *   // Update existing record at match.row
+ *   Logger.log('Found via ' + match.matchType + ' at row ' + match.row);
+ * } else {
+ *   // Create new record
+ * }
+ */
+function findExistingMember(searchParams, dataArray) {
+  var searchId = searchParams.memberId || '';
+  var searchEmail = searchParams.email || '';
+  var searchFirstName = searchParams.firstName || '';
+  var searchLastName = searchParams.lastName || '';
+
+  // Column indices (0-based for array access)
+  var COL_ID = MEMBER_COLS.MEMBER_ID - 1;        // 0
+  var COL_FIRST = MEMBER_COLS.FIRST_NAME - 1;    // 1
+  var COL_LAST = MEMBER_COLS.LAST_NAME - 1;      // 2
+  var COL_EMAIL = MEMBER_COLS.EMAIL - 1;         // 7
+
+  // Normalize search values
+  var normId = searchId.toString().trim();
+  var normEmail = searchEmail.toString().trim().toLowerCase();
+  var normFirst = searchFirstName.toString().trim().toLowerCase();
+  var normLast = searchLastName.toString().trim().toLowerCase();
+
+  // Track potential name match (lower priority)
+  var nameMatch = null;
+
+  for (var i = 1; i < dataArray.length; i++) {
+    var row = dataArray[i];
+
+    // Extract and normalize row values
+    var rowId = row[COL_ID] ? row[COL_ID].toString().trim() : '';
+    var rowEmail = row[COL_EMAIL] ? row[COL_EMAIL].toString().trim().toLowerCase() : '';
+    var rowFirst = row[COL_FIRST] ? row[COL_FIRST].toString().trim().toLowerCase() : '';
+    var rowLast = row[COL_LAST] ? row[COL_LAST].toString().trim().toLowerCase() : '';
+
+    // Priority 1: Exact Member ID match (immediate return)
+    if (normId && rowId && rowId === normId) {
+      return {
+        row: i + 1,  // Convert to 1-indexed sheet row
+        matchType: 'MEMBER_ID',
+        confidence: 'HIGH'
+      };
+    }
+
+    // Priority 2: Exact Email match (immediate return)
+    if (normEmail && rowEmail && rowEmail === normEmail) {
+      return {
+        row: i + 1,
+        matchType: 'EMAIL',
+        confidence: 'HIGH'
+      };
+    }
+
+    // Priority 3: Name match (store but continue searching for higher-priority match)
+    if (!nameMatch && normFirst && normLast && rowFirst && rowLast) {
+      if (rowFirst === normFirst && rowLast === normLast) {
+        nameMatch = {
+          row: i + 1,
+          matchType: 'NAME',
+          confidence: 'MEDIUM'
+        };
+        // Don't return yet - keep searching for ID/Email match
+      }
+    }
+  }
+
+  // Return name match if found (no higher-priority match existed)
+  if (nameMatch) {
+    return nameMatch;
+  }
+
+  // No match found - safe to create new record
+  return null;
+}
+
 // ============================================================================
 // STEWARD PROMOTION/DEMOTION (Strategic Command Center)
 // ============================================================================

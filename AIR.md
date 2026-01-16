@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.0.3 (Unified Master Engine, 11-File Architecture)
+**Version:** 4.1.0 (Unified Master Engine, 11-File Architecture)
 **Last Updated:** 2026-01-16
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -237,6 +237,7 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `generateMissingMemberIDs()` **(NEW v3.6.5)** - Batch generate unit-based IDs (e.g., MS-104-H)
   - `getNextSequence_(prefix, sheet)` **(NEW v3.6.5)** - Get next sequence number for unit
   - `checkDuplicateMemberIDs()` **(NEW v3.6.5)** - Find and report duplicate IDs
+  - `findExistingMember(searchParams, dataArray)` **(NEW v4.1)** - Multi-key smart match for duplicate prevention
 - Steward Management:
   - `getAllStewards()` - Get all active stewards
   - `getStewardWorkload()` - Calculate steward case loads with win rates
@@ -1313,6 +1314,30 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.1.0 (2026-01-16) - Multi-Key Smart Match for Duplicate Prevention
+
+**New Features:**
+
+1. **Multi-Key Smart Match (`findExistingMember`)**
+   - Hierarchical matching algorithm for form submissions and bulk imports
+   - **Priority 1:** Exact Member ID match (highest confidence)
+   - **Priority 2:** Exact Email match (high confidence)
+   - **Priority 3:** Exact First + Last Name match (fallback)
+   - Returns match result with row number, match type, and confidence level
+   - Prevents duplicate "ghost" records during data entry
+
+2. **Enhanced Contact Form Processing**
+   - `onContactFormSubmit` now uses multi-key matching
+   - Logs match type and confidence for audit trail
+   - Supports optional Member ID field from form submissions
+
+**Technical Details:**
+- Located in `02_MemberManager.gs`
+- Uses 0-indexed array access for batch processing efficiency
+- Continues searching for higher-priority matches even after finding name match
+
+---
 
 ### Version 4.0.2 (2026-01-16) - Secure Member Dashboard with Google Charts
 

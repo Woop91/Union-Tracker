@@ -4129,19 +4129,21 @@ function onContactFormSubmit(e) {
       return;
     }
 
-    // Find the member by first name + last name
+    // Multi-Key Smart Match: Check ID, Email, then Name (hierarchical)
     var data = memberSheet.getDataRange().getValues();
-    var memberRow = -1;
+    var memberId = getFormValue_(responses, 'Member ID');  // Optional field from form
 
-    for (var i = 1; i < data.length; i++) {
-      var rowFirstName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim().toLowerCase();
-      var rowLastName = (data[i][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim().toLowerCase();
+    var match = findExistingMember({
+      memberId: memberId,
+      email: email,
+      firstName: firstName,
+      lastName: lastName
+    }, data);
 
-      if (rowFirstName === firstName.toLowerCase().trim() &&
-          rowLastName === lastName.toLowerCase().trim()) {
-        memberRow = i + 1; // Convert to 1-indexed row number
-        break;
-      }
+    var memberRow = match ? match.row : -1;
+
+    if (match) {
+      Logger.log('Found existing member via ' + match.matchType + ' match (confidence: ' + match.confidence + ') at row ' + match.row);
     }
 
     if (memberRow === -1) {
