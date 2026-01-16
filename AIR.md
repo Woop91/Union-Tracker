@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.0.2 (Unified Master Engine, 10-File Architecture)
+**Version:** 4.0.3 (Unified Master Engine, 11-File Architecture)
 **Last Updated:** 2026-01-16
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -18,7 +18,7 @@
 
 ## Quick Start
 
-1. Copy all 10 files from `src/` to Google Apps Script (create each as a separate script file)
+1. Copy all 11 files from `src/` to Google Apps Script (create each as a separate script file)
 2. Run `CREATE_509_DASHBOARD()` to create sheets + 6 hidden calculation sheets
 3. Use `Dashboard > Admin > Demo Data > Seed All Sample Data` to populate test data
 4. Customize Config sheet with your organization's values
@@ -82,6 +82,36 @@ The following code sections are **USER APPROVED** and should **NOT be modified o
 
 **Why Added:** Provides interactive survey analysis without leaving the spreadsheet, matching the Dashboard modal pattern.
 
+### Secure Member Dashboard (Material Design v4.0.3)
+
+**Location:** `src/11_SecureMemberDashboard.gs`
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `showPublicMemberDashboard()` | Opens the Material Design member portal (No PII) |
+| `showStewardPerformanceModal()` | Opens steward performance dashboard |
+| `safetyValveScrub(data)` | PII auto-redaction for phone numbers and SSNs |
+| `getGrievanceStats()` | Fetches aggregate grievance statistics |
+| `getAllStewards()` | Fetches steward list with scrubbed data |
+| `getAggregateSatisfactionStats()` | Fetches satisfaction survey aggregates |
+| `getAdvancedAnalytics()` | Fetches treemap and sentiment trend data |
+| `getStewardWorkload()` | Fetches steward workload balancing metrics |
+| `showUnitDensityTreemap()` | Standalone treemap chart modal |
+| `showSentimentTrendChart()` | Standalone sentiment trend chart modal |
+| `showStewardWorkloadReport()` | Steward workload balancing report |
+
+**Features:**
+- **Material Design UI** - Google Material Icons, Roboto font, dark theme with gradients
+- **Weingarten Rights Utility** - Emergency rights statement with tap-to-expand
+- **Live Steward Search** - Client-side filtering for instant results
+- **Google Charts Integration** - Treemap and Area Charts for analytics
+- **Safety Valve (PII Scrubbing)** - Auto-redacts phone numbers and SSN patterns
+- **Steward Workload Balancing** - Flags overloaded stewards, shows capacity
+- **Unit Density Heat Map** - Visual representation of grievance activity by unit
+
+**Why Added:** Provides a secure, professional member-facing portal that can be shared publicly without exposing PII.
+
 ---
 
 ## No Formulas in Visible Sheets Architecture
@@ -122,13 +152,13 @@ When the "Start Grievance" checkbox (column AE) is checked in Member Directory:
 
 ## File Architecture
 
-### Modular Architecture (10 Source Files)
+### Modular Architecture (11 Source Files)
 
-This repository implements a **streamlined 10-file modular architecture** following the Separation of Concerns principle. Each module handles a specific aspect of the dashboard functionality.
+This repository implements a **streamlined 11-file modular architecture** following the Separation of Concerns principle. Each module handles a specific aspect of the dashboard functionality.
 
 ```
 MULTIPLE-SCRIPS-REPO/
-├── src/                        # Source files (10 modules) - copy all to Google Apps Script
+├── src/                        # Source files (11 modules) - copy all to Google Apps Script
 │   ├── 01_Constants.gs         # Configuration constants (SHEETS, COLORS, MEMBER_COLS, GRIEVANCE_COLS, COMMAND_CONFIG, UI_THEME)
 │   ├── 02_MemberManager.gs     # Member operations, steward management, ID generation, batch processing
 │   ├── 03_GrievanceManager.gs  # Grievance lifecycle, deadlines, step advancement, traffic lights
@@ -138,7 +168,8 @@ MULTIPLE-SCRIPS-REPO/
 │   ├── 07_DevTools.gs          # Demo data seeding - DELETE BEFORE PRODUCTION
 │   ├── 08_Code.gs              # Core setup, hidden sheets, dashboard creation, multi-select
 │   ├── 09_Main.gs              # Entry point, onOpen, onEdit triggers, sabotage protection
-│   └── 10_CommandCenter.gs     # 509 Strategic Command Center features
+│   ├── 10_CommandCenter.gs     # 509 Strategic Command Center features
+│   └── 11_SecureMemberDashboard.gs  # Material Design member portal, analytics, PII scrubbing
 ├── AIR.md                      # Architecture & Implementation Reference (this document)
 ├── README.md                   # Quick start guide
 ├── QUICK_DEPLOY.md             # 5-minute deployment guide
@@ -147,9 +178,9 @@ MULTIPLE-SCRIPS-REPO/
 
 ### Deployment
 
-Copy all 10 `.gs` files from `src/` to your Google Apps Script project. Each file should be created as a separate script file in the Apps Script editor.
+Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each file should be created as a separate script file in the Apps Script editor.
 
-### File Descriptions (10-File Architecture)
+### File Descriptions (11-File Architecture)
 
 **01_Constants.gs** (~1200 lines) - Configuration & Column Mapping
 - `SHEETS` - Sheet name constants (3 data + 2 dashboard + 6 hidden)
@@ -565,6 +596,35 @@ Copy all 10 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `dailyTrigger()` - Daily automated tasks
 - Member Actions:
   - `startGrievanceForMember()` - Start grievance from Member Directory
+
+**11_SecureMemberDashboard.gs** (~1375 lines) - Material Design Member Portal **(NEW v4.0.3)**
+
+- PII Safety Valve:
+  - `safetyValveScrub(data)` - Auto-redact phone numbers and SSN patterns from strings
+  - `scrubObjectPII(obj)` - Scrub all string values in an object
+
+- Data Fetching (No PII):
+  - `getGrievanceStats()` - Aggregate statistics (total, open, won, win rate)
+  - `getAllStewards()` - Steward list with names and units only (scrubbed)
+  - `getAggregateSatisfactionStats()` - Trust scores and satisfaction averages
+
+- Advanced Analytics:
+  - `getAdvancedAnalytics()` - Treemap data (unit density) and sentiment trends
+  - `getSentimentTrendData_()` - Monthly trust score trends from surveys
+  - `getStewardWorkload()` - Workload balancing with overload detection
+
+- Material Design Dashboards:
+  - `showPublicMemberDashboard()` - Full member portal with Google Charts, Weingarten Rights, steward search
+  - `showStewardPerformanceModal()` - Steward performance dashboard with workload metrics
+  - `rebuildExecutiveDashboard()` - Executive dashboard with conditional formatting
+
+- Standalone Analytics Charts:
+  - `showUnitDensityTreemap()` - Interactive treemap of unit grievance heat
+  - `showSentimentTrendChart()` - Area chart of union morale over time
+  - `showStewardWorkloadReport()` - Detailed workload balancing report
+
+- Email Integration:
+  - `emailDashboardLink()` - Email member dashboard access to selected member
 
 ---
 
