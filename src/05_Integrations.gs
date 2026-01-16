@@ -52,6 +52,7 @@ function getOrCreateRootFolder() {
 
 /**
  * Sets up a Drive folder for a specific grievance
+ * Folder naming format: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
  * @param {string} grievanceId - The grievance ID
  * @return {Object} Result with folder URL or error
  */
@@ -63,13 +64,36 @@ function setupDriveFolderForGrievance(grievanceId) {
       return { success: false, error: 'Grievance not found' };
     }
 
-    const memberName = grievance['Member Name'] ||
-                       grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.MEMBER_NAME]];
+    // Extract fields for folder naming
+    const firstName = grievance['First Name'] || grievance.firstName || '';
+    const lastName = grievance['Last Name'] || grievance.lastName || '';
+    const issueCategory = grievance['Issue Category'] || grievance.issueCategory || 'General';
+    const dateFiled = grievance['Date Filed'] || grievance.dateFiled || new Date();
+
+    // Format date as YYYY-MM
+    const dateStr = Utilities.formatDate(
+      new Date(dateFiled),
+      Session.getScriptTimeZone(),
+      'yyyy-MM'
+    );
 
     // Create folder name from template
-    const folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE
-      .replace('{grievanceId}', grievanceId)
-      .replace('{memberName}', sanitizeFolderName(memberName));
+    // Format: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+    let folderName;
+    if (firstName && lastName) {
+      folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE
+        .replace('{date}', dateStr)
+        .replace('{lastName}', sanitizeFolderName(lastName))
+        .replace('{firstName}', sanitizeFolderName(firstName))
+        .replace('{issueCategory}', sanitizeFolderName(issueCategory))
+        .replace('{grievanceId}', grievanceId);
+    } else {
+      // Fallback if name not available
+      folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE_SIMPLE
+        .replace('{date}', dateStr)
+        .replace('{grievanceId}', grievanceId)
+        .replace('{issueCategory}', sanitizeFolderName(issueCategory));
+    }
 
     // Get root folder
     const rootFolder = getOrCreateRootFolder();

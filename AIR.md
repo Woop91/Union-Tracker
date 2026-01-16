@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.0.3 (Unified Master Engine, 11-File Architecture)
+**Version:** 4.1.0 (Unified Master Engine, 11-File Architecture)
 **Last Updated:** 2026-01-16
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -237,6 +237,7 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `generateMissingMemberIDs()` **(NEW v3.6.5)** - Batch generate unit-based IDs (e.g., MS-104-H)
   - `getNextSequence_(prefix, sheet)` **(NEW v3.6.5)** - Get next sequence number for unit
   - `checkDuplicateMemberIDs()` **(NEW v3.6.5)** - Find and report duplicate IDs
+  - `findExistingMember(searchParams, dataArray)` **(NEW v4.1)** - Multi-key smart match for duplicate prevention
 - Steward Management:
   - `getAllStewards()` - Get all active stewards
   - `getStewardWorkload()` - Calculate steward case loads with win rates
@@ -569,6 +570,9 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
 - Analytics & Insights Menu **(NEW v4.0)**:
   - `showUnitHealthReport()` - Display unit health analysis for all units
   - `showGrievanceTrends()` - Monthly grievance trend analysis with up/down indicators
+  - `showSearchPrecedents()` **(NEW v4.1)** - Search historical grievance outcomes for past practice
+  - `searchPrecedentsData(query, outcomeFilter)` **(NEW v4.1)** - Backend search for precedent data
+  - `getRecentSurveyAverage(unitName)` **(WIRED v4.1)** - Now reads from Member Satisfaction sheet
   - `showOCRDialog()` - OCR transcription dialog (Cloud Vision API placeholder)
 
 - Theme Application:
@@ -1313,6 +1317,52 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.1.0 (2026-01-16) - Multi-Key Smart Match & Analytics Wiring
+
+**New Features:**
+
+1. **Multi-Key Smart Match (`findExistingMember`)**
+   - Hierarchical matching algorithm for form submissions and bulk imports
+   - **Priority 1:** Exact Member ID match (highest confidence)
+   - **Priority 2:** Exact Email match (high confidence)
+   - **Priority 3:** Exact First + Last Name match (fallback)
+   - Returns match result with row number, match type, and confidence level
+   - Prevents duplicate "ghost" records during data entry
+
+2. **Unit Health Sentiment Analysis (Fully Wired)**
+   - `getRecentSurveyAverage()` now reads from Member Satisfaction sheet
+   - Filters by worksite/unit with partial matching
+   - Only includes verified, latest survey responses
+   - Uses AVG_OVERALL_SAT column with Q6-Q9 fallback calculation
+   - `showUnitHealthReport()` enhanced with categorized output (Red Flags, Warnings, Stable)
+
+3. **Search Precedents (`showSearchPrecedents`)**
+   - New dialog for searching historical grievance outcomes
+   - Helps stewards cite "Past Practice" during Step 1 meetings
+   - Filters by outcome: Won, Settled, Denied, Withdrawn
+   - Shows issue category, article, location, and resolution text
+   - Copy-to-clipboard functionality for easy citation
+   - Located in Analytics & Insights menu
+
+4. **Roadmap Items Auto-Population**
+   - Feedback & Development sheet now pre-populated with external API feature requests
+   - Constant Contact / CRM Sync, OCR Transcription, Typeform/SurveyMonkey integration
+   - Clear descriptions of API requirements for each feature
+
+5. **Enhanced Contact Form Processing**
+   - `onContactFormSubmit` now uses multi-key matching
+   - Logs match type and confidence for audit trail
+
+6. **Grievance Log Column Grouping**
+   - Coordinator columns (Message Alert, Coordinator Message, Acknowledged By) now grouped
+
+**Technical Details:**
+- `02_MemberManager.gs` - findExistingMember() function
+- `10_CommandCenter.gs` - getRecentSurveyAverage(), showSearchPrecedents(), searchPrecedentsData()
+- `08_Code.gs` - populateRoadmapItems(), column grouping for coordinator fields
+
+---
 
 ### Version 4.0.2 (2026-01-16) - Secure Member Dashboard with Google Charts
 

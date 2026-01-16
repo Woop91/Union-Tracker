@@ -123,12 +123,9 @@ function CREATE_509_DASHBOARD() {
     ss.toast('Setting up validations...', '🏗️ Progress', 3);
     setupDataValidations();
 
-    // Move Config to first position
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-    if (configSheet) {
-      ss.setActiveSheet(configSheet);
-      ss.moveActiveSheet(1);
-    }
+    // Reorder sheets to standard layout
+    reorderSheetsToStandard(ss);
+    ss.toast('Sheets reordered', '🏗️ Progress', 2);
 
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
@@ -719,6 +716,8 @@ function createGrievanceLog(ss) {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
+    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
   } catch (e) {
     Logger.log('Column group setup skipped: ' + e.toString());
@@ -2387,10 +2386,56 @@ function createFeedbackSheet(ss) {
     sheet.deleteColumns(16, maxCols - 15);
   }
 
+  // Populate roadmap items (external API features requiring development)
+  populateRoadmapItems(sheet);
+
   // Populate computed values (no formulas in visible sheet)
   syncFeedbackValues();
 
   Logger.log('Feedback & Development sheet created');
+}
+
+/**
+ * Populate roadmap items that require external API integrations
+ * These are feature requests that need developer attention
+ * @param {Sheet} sheet - Feedback sheet object
+ */
+function populateRoadmapItems(sheet) {
+  var now = new Date();
+  var timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+
+  // Roadmap items requiring external APIs - start at row 5
+  var roadmapItems = [
+    // Row 2
+    [timestamp, 'System', 'Integration', 'Feature Request', 'Medium',
+     'Constant Contact / CRM Sync',
+     'REST API bridge to sync Member Directory with Constant Contact mailing lists. Ensures union-wide communications always use up-to-date contact info. Requires Constant Contact API key and OAuth setup.',
+     'New', '', '', 'External API: Constant Contact v3 API'],
+    // Row 3
+    [timestamp, 'System', 'Integration', 'Feature Request', 'Low',
+     'OCR Form Transcription (Cloud Vision)',
+     'Use Google Cloud Vision API to read photos of handwritten grievance forms and auto-populate the Grievance Log. UI placeholder exists at showOCRDialog(). Requires Cloud Vision API enablement and billing.',
+     'New', '', '', 'External API: Google Cloud Vision API'],
+    // Row 4
+    [timestamp, 'System', 'Integration', 'Feature Request', 'Low',
+     'Typeform/SurveyMonkey Survey Sync',
+     'Pull real-time member satisfaction scores from external survey platforms (Typeform or SurveyMonkey) instead of using Google Forms. Would enhance the Unit Health Report with live third-party data.',
+     'New', '', '', 'External API: Typeform API or SurveyMonkey API'],
+    // Row 5 - bonus item
+    [timestamp, 'System', 'Reports', 'Feature Request', 'Low',
+     'Advanced Precedent Search with AI',
+     'Enhance Search Precedents to use AI/ML for semantic matching of grievance outcomes. Would allow natural language queries like "overtime disputes in warehouse" to find relevant past practice examples.',
+     'New', '', '', 'Requires: Google Vertex AI or similar ML API']
+  ];
+
+  // Only add if rows are empty (don't overwrite existing data)
+  var existingData = sheet.getRange(2, 1, 4, 1).getValues();
+  var hasExistingData = existingData.some(function(row) { return row[0] !== ''; });
+
+  if (!hasExistingData) {
+    sheet.getRange(2, 1, roadmapItems.length, roadmapItems[0].length).setValues(roadmapItems);
+    Logger.log('Populated ' + roadmapItems.length + ' roadmap items in Feedback sheet');
+  }
 }
 
 // ============================================================================
@@ -2422,6 +2467,61 @@ function setupHiddenSheets(ss) {
   // Install the auto-sync trigger using quick mode (no UI required)
   // This allows it to work when called from triggers or API contexts
   installAutoSyncTriggerQuick();
+}
+
+// ============================================================================
+// SHEET ORDERING
+// ============================================================================
+
+/**
+ * Reorder sheets to the standard layout for user-friendly navigation
+ * Order: Getting Started, FAQ, Member Directory, Grievance Log, Feedback & Dev,
+ *        Function Checklist, Config Guide, Config, Dashboard
+ *
+ * Hidden sheets (prefixed with _) remain at the end
+ *
+ * @param {Spreadsheet} ss - Optional spreadsheet object (defaults to active)
+ */
+function reorderSheetsToStandard(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+
+  // Define the desired order of visible sheets
+  var desiredOrder = [
+    SHEETS.GETTING_STARTED,       // 📚 Getting Started
+    SHEETS.FAQ,                   // ❓ FAQ
+    SHEETS.MEMBER_DIR,            // Member Directory
+    SHEETS.GRIEVANCE_LOG,         // Grievance Log
+    SHEETS.FEEDBACK,              // 💡 Feedback & Development
+    SHEETS.FUNCTION_CHECKLIST,    // Function Checklist
+    SHEETS.CONFIG_GUIDE,          // 📖 Config Guide
+    'Config',                     // Config
+    SHEETS.DASHBOARD,             // 💼 Dashboard
+    SHEETS.INTERACTIVE,           // 🎯 Custom View
+    SHEETS.SATISFACTION           // 📊 Member Satisfaction
+  ];
+
+  var position = 1;
+
+  for (var i = 0; i < desiredOrder.length; i++) {
+    var sheetName = desiredOrder[i];
+    var sheet = ss.getSheetByName(sheetName);
+
+    if (sheet) {
+      ss.setActiveSheet(sheet);
+      ss.moveActiveSheet(position);
+      position++;
+    }
+  }
+
+  // Move the first sheet to active after reordering
+  var firstSheet = ss.getSheetByName(SHEETS.GETTING_STARTED) ||
+                   ss.getSheetByName(SHEETS.MEMBER_DIR) ||
+                   ss.getSheets()[0];
+  if (firstSheet) {
+    ss.setActiveSheet(firstSheet);
+  }
+
+  Logger.log('Sheets reordered to standard layout');
 }
 
 // ============================================================================
@@ -2803,12 +2903,15 @@ function createFunctionChecklistSheet_() {
     ['3️⃣ Dashboards', '👤 Dashboard', '📱 Mobile Dashboard', 'showMobileDashboard', 'Touch-friendly dashboard for phones and tablets'],
     ['3️⃣ Dashboards', '👤 Dashboard', '📱 Get Mobile App URL', 'showWebAppUrl', 'Displays the web app URL for mobile bookmarking'],
     ['3️⃣ Dashboards', '👤 Dashboard', '⚡ Quick Actions', 'showQuickActionsMenu', 'Popup menu for common actions (add member, new grievance, etc.)'],
+    ['3️⃣ Dashboards', '👤 Dashboard', '📊 Member Satisfaction', 'showSatisfactionDashboard', 'Survey results dashboard with trends and insights'],
+    ['3️⃣ Dashboards', '👤 Dashboard', '🔒 Secure Member Portal', 'showPublicMemberDashboard', 'PII-safe member dashboard with charts and stats'],
     ['3️⃣ Dashboards', '📊 Sheet Manager', '📊 Rebuild Dashboard', 'rebuildDashboard', 'Recreates the Dashboard sheet with fresh formulas'],
     ['3️⃣ Dashboards', '📊 Sheet Manager', '📈 Refresh Interactive Charts', 'refreshInteractiveCharts', 'Updates all charts in Custom View with current data'],
     ['3️⃣ Dashboards', '📊 Sheet Manager', '🔄 Refresh All Formulas', 'refreshAllFormulas', 'Recalculates all formulas across all sheets'],
 
     // ═══ PHASE 4: Search ═══
     ['4️⃣ Search', '🔍 Search', '🔍 Search Members', 'searchMembers', 'Opens search dialog to find members by name, ID, email, or location'],
+    ['4️⃣ Search', '🔍 Search', '🔍 Desktop Search', 'showDesktopSearch', 'Comprehensive search across members and grievances'],
 
     // ═══ PHASE 5: Grievance Management ═══
     ['5️⃣ Grievances', '👤 Grievance Tools', '➕ Start New Grievance', 'startNewGrievance', 'Opens form to create new grievance with auto-generated ID'],
@@ -2881,20 +2984,44 @@ function createFunctionChecklistSheet_() {
     ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger', 'Creates daily 12AM trigger for dashboard refresh and overdue alerts'],
     ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger', 'Removes the midnight auto-refresh trigger'],
     ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers', 'Creates daily 1AM trigger for visual refresh'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '📑 Email Weekly PDF Snapshot', 'emailExecutivePDF', 'Sends spreadsheet as PDF to your email']
+    ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '📑 Email Weekly PDF Snapshot', 'emailExecutivePDF', 'Sends spreadsheet as PDF to your email'],
+
+    // ═══ PHASE 15: Analytics & Insights (v4.1) ═══
+    ['1️⃣5️⃣ Analytics', '📊 509 Command > Analytics', '🏥 Unit Health Report', 'showUnitHealthReport', 'Sentiment analysis correlating grievance counts with survey scores'],
+    ['1️⃣5️⃣ Analytics', '📊 509 Command > Analytics', '📊 Grievance Trends', 'showGrievanceTrends', 'Monthly grievance trend analysis with up/down indicators'],
+    ['1️⃣5️⃣ Analytics', '📊 509 Command > Analytics', '📚 Search Precedents', 'showSearchPrecedents', 'Search historical grievance outcomes for past practice citations'],
+    ['1️⃣5️⃣ Analytics', '📊 509 Command > Analytics', '📝 OCR Transcribe Form', 'showOCRDialog', 'Cloud Vision API placeholder for handwritten form transcription'],
+
+    // ═══ PHASE 16: Member Management (v4.1) ═══
+    ['1️⃣6️⃣ Members', '👤 Member Tools', '➕ Add New Member', 'addMember', 'Adds a new member to the Member Directory'],
+    ['1️⃣6️⃣ Members', '👤 Member Tools', '🔄 Update Member', 'updateMember', 'Updates an existing member record'],
+    ['1️⃣6️⃣ Members', '👤 Member Tools', '🔍 Find Existing Member', 'findExistingMember', 'Multi-key smart match (ID, Email, Name) for duplicate prevention'],
+    ['1️⃣6️⃣ Members', '👤 Member Tools', '📧 Send Contact Form', 'sendContactInfoForm', 'Sends contact info update form to selected member'],
+    ['1️⃣6️⃣ Members', '👤 Member Tools', '📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink', 'Gets link to member satisfaction survey'],
+
+    // ═══ PHASE 17: Forms & Submissions (v4.1) ═══
+    ['1️⃣7️⃣ Forms', 'Form Triggers', '📝 On Grievance Submit', 'onGrievanceFormSubmit', 'Handles grievance form submissions with auto-ID and PDF'],
+    ['1️⃣7️⃣ Forms', 'Form Triggers', '📝 On Contact Submit', 'onContactFormSubmit', 'Handles contact form with multi-key duplicate prevention'],
+    ['1️⃣7️⃣ Forms', 'Form Triggers', '📝 On Satisfaction Submit', 'onSatisfactionFormSubmit', 'Handles satisfaction survey with email verification'],
+
+    // ═══ PHASE 18: Navigation & Views (v4.1) ═══
+    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
+    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '🖥️ Show All Columns', 'showAllMemberColumns', 'Restores all columns after mobile view'],
+    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📊 Go to Dashboard', 'navigateToDashboard', 'Navigate to Executive Dashboard'],
+    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '🎯 Go to Custom View', 'navigateToCustomView', 'Navigate to Custom View sheet']
   ];
 
-  // Build rows with header
-  var rows = [['✓', 'Phase', 'Menu', 'Item', 'Function', 'Description', 'Notes']];
+  // Build rows with header (8 columns: checkbox, Phase, Menu, Item, Function, Description, Notes, Notes 2)
+  var rows = [['✓', 'Phase', 'Menu', 'Item', 'Function', 'Description', 'Notes', 'Notes 2']];
   for (var i = 0; i < menuItems.length; i++) {
-    rows.push([false, menuItems[i][0], menuItems[i][1], menuItems[i][2], menuItems[i][3], menuItems[i][4], '']);
+    rows.push([false, menuItems[i][0], menuItems[i][1], menuItems[i][2], menuItems[i][3], menuItems[i][4], '', '']);
   }
 
   // Write all data
-  sheet.getRange(1, 1, rows.length, 7).setValues(rows);
+  sheet.getRange(1, 1, rows.length, 8).setValues(rows);
 
   // Format header
-  sheet.getRange(1, 1, 1, 7)
+  sheet.getRange(1, 1, 1, 8)
     .setFontWeight('bold')
     .setBackground(COLORS.PRIMARY_PURPLE || '#7C3AED')
     .setFontColor(COLORS.WHITE || '#FFFFFF')
@@ -2906,13 +3033,14 @@ function createFunctionChecklistSheet_() {
   }
 
   // Set column widths
-  sheet.setColumnWidth(1, 40);
-  sheet.setColumnWidth(2, 150);
-  sheet.setColumnWidth(3, 150);
-  sheet.setColumnWidth(4, 250);
-  sheet.setColumnWidth(5, 250);
-  sheet.setColumnWidth(6, 350);
-  sheet.setColumnWidth(7, 250);
+  sheet.setColumnWidth(1, 40);   // Checkbox
+  sheet.setColumnWidth(2, 130);  // Phase
+  sheet.setColumnWidth(3, 180);  // Menu
+  sheet.setColumnWidth(4, 220);  // Item
+  sheet.setColumnWidth(5, 220);  // Function
+  sheet.setColumnWidth(6, 320);  // Description
+  sheet.setColumnWidth(7, 200);  // Notes
+  sheet.setColumnWidth(8, 200);  // Notes 2
 
   // Freeze header
   sheet.setFrozenRows(1);
@@ -2920,7 +3048,7 @@ function createFunctionChecklistSheet_() {
   // Alternating colors
   for (var r = 2; r <= rows.length; r++) {
     if (r % 2 === 0) {
-      sheet.getRange(r, 1, 1, 7).setBackground('#F9FAFB');
+      sheet.getRange(r, 1, 1, 8).setBackground('#F9FAFB');
     }
   }
 
@@ -2928,14 +3056,14 @@ function createFunctionChecklistSheet_() {
   var rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$A2=TRUE')
     .setBackground('#E8F5E9')
-    .setRanges([sheet.getRange(2, 1, rows.length - 1, 7)])
+    .setRanges([sheet.getRange(2, 1, rows.length - 1, 8)])
     .build();
   sheet.setConditionalFormatRules([rule]);
 
-  // Delete excess columns after G (column 7)
+  // Delete excess columns after H (column 8)
   var maxCols = sheet.getMaxColumns();
-  if (maxCols > 7) {
-    sheet.deleteColumns(8, maxCols - 7);
+  if (maxCols > 8) {
+    sheet.deleteColumns(9, maxCols - 8);
   }
 
   return sheet;
@@ -3835,16 +3963,28 @@ function getExistingGrievanceIds_(sheet) {
  * Create a Drive folder for a grievance from form data
  * @private
  */
-function createGrievanceFolderFromData_(grievanceId, memberId, firstName, lastName) {
+function createGrievanceFolderFromData_(grievanceId, memberId, firstName, lastName, issueCategory, dateFiled) {
   try {
     // Get or create root folder
     var rootFolder = getOrCreateDashboardFolder_();
 
-    // Create folder name: GXXX123 - FirstName LastName (MemberID)
-    var memberName = ((firstName || '') + ' ' + (lastName || '')).trim() || 'Unknown';
-    var folderName = grievanceId + ' - ' + memberName;
-    if (memberId) {
-      folderName += ' (' + memberId + ')';
+    // Format date as YYYY-MM (default to current date if not provided)
+    var date = dateFiled ? new Date(dateFiled) : new Date();
+    var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+
+    // Build folder name: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+    // Example: "2026-01 - Smith, John - Scheduling - G-2026-001"
+    var folderName;
+    var sanitizedFirst = sanitizeFolderName_(firstName || '');
+    var sanitizedLast = sanitizeFolderName_(lastName || '');
+    var sanitizedCategory = sanitizeFolderName_(issueCategory || 'General');
+
+    if (sanitizedFirst && sanitizedLast) {
+      folderName = dateStr + ' - ' + sanitizedLast + ', ' + sanitizedFirst +
+                   ' - ' + sanitizedCategory + ' - ' + grievanceId;
+    } else {
+      // Fallback if name not available
+      folderName = dateStr + ' - ' + grievanceId + ' - ' + sanitizedCategory;
     }
 
     // Check if folder already exists
@@ -3874,6 +4014,21 @@ function createGrievanceFolderFromData_(grievanceId, memberId, firstName, lastNa
     Logger.log('Error creating grievance folder: ' + e.message);
     return { id: '', url: '' };
   }
+}
+
+/**
+ * Sanitize folder name by removing invalid characters
+ * @param {string} name - Name to sanitize
+ * @returns {string} Sanitized name
+ * @private
+ */
+function sanitizeFolderName_(name) {
+  if (!name) return '';
+  // Remove characters invalid for Google Drive folder names
+  return name.toString().trim()
+    .replace(/[\/\\:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .substring(0, 50); // Limit length
 }
 
 /**
@@ -4129,19 +4284,21 @@ function onContactFormSubmit(e) {
       return;
     }
 
-    // Find the member by first name + last name
+    // Multi-Key Smart Match: Check ID, Email, then Name (hierarchical)
     var data = memberSheet.getDataRange().getValues();
-    var memberRow = -1;
+    var memberId = getFormValue_(responses, 'Member ID');  // Optional field from form
 
-    for (var i = 1; i < data.length; i++) {
-      var rowFirstName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim().toLowerCase();
-      var rowLastName = (data[i][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim().toLowerCase();
+    var match = findExistingMember({
+      memberId: memberId,
+      email: email,
+      firstName: firstName,
+      lastName: lastName
+    }, data);
 
-      if (rowFirstName === firstName.toLowerCase().trim() &&
-          rowLastName === lastName.toLowerCase().trim()) {
-        memberRow = i + 1; // Convert to 1-indexed row number
-        break;
-      }
+    var memberRow = match ? match.row : -1;
+
+    if (match) {
+      Logger.log('Found existing member via ' + match.matchType + ' match (confidence: ' + match.confidence + ') at row ' + match.row);
     }
 
     if (memberRow === -1) {
@@ -5816,6 +5973,8 @@ function setupTimelineColumnGroups() {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
+    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
 
     // Collapse Step II and III by default (Step I usually visible)
     sheet.collapseAllColumnGroups();
@@ -9550,9 +9709,10 @@ function autoCreateMissingGrievanceFolders_() {
 
   for (var i = 0; i < data.length; i++) {
     var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var memberId = data[i][GRIEVANCE_COLS.MEMBER_ID - 1];
     var firstName = data[i][GRIEVANCE_COLS.FIRST_NAME - 1];
     var lastName = data[i][GRIEVANCE_COLS.LAST_NAME - 1];
+    var issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'General';
+    var dateFiled = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
     var existingFolderId = data[i][GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1];
 
     // Skip if no grievance ID or already has a folder
@@ -9564,11 +9724,21 @@ function autoCreateMissingGrievanceFolders_() {
     }
 
     try {
-      // Create folder name: GXXX123 - FirstName LastName (MemberID)
-      var memberName = ((firstName || '') + ' ' + (lastName || '')).trim() || 'Unknown';
-      var folderName = grievanceId + ' - ' + memberName;
-      if (memberId) {
-        folderName += ' (' + memberId + ')';
+      // Format date as YYYY-MM (default to current date if not provided)
+      var date = dateFiled ? new Date(dateFiled) : new Date();
+      var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+
+      // Create folder name: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+      var sanitizedFirst = sanitizeFolderName_(firstName || '');
+      var sanitizedLast = sanitizeFolderName_(lastName || '');
+      var sanitizedCategory = sanitizeFolderName_(issueCategory);
+
+      var folderName;
+      if (sanitizedFirst && sanitizedLast) {
+        folderName = dateStr + ' - ' + sanitizedLast + ', ' + sanitizedFirst +
+                     ' - ' + sanitizedCategory + ' - ' + grievanceId;
+      } else {
+        folderName = dateStr + ' - ' + grievanceId + ' - ' + sanitizedCategory;
       }
 
       // Create the folder
