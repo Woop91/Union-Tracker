@@ -570,6 +570,9 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
 - Analytics & Insights Menu **(NEW v4.0)**:
   - `showUnitHealthReport()` - Display unit health analysis for all units
   - `showGrievanceTrends()` - Monthly grievance trend analysis with up/down indicators
+  - `showSearchPrecedents()` **(NEW v4.1)** - Search historical grievance outcomes for past practice
+  - `searchPrecedentsData(query, outcomeFilter)` **(NEW v4.1)** - Backend search for precedent data
+  - `getRecentSurveyAverage(unitName)` **(WIRED v4.1)** - Now reads from Member Satisfaction sheet
   - `showOCRDialog()` - OCR transcription dialog (Cloud Vision API placeholder)
 
 - Theme Application:
@@ -1315,7 +1318,7 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 
 ## Changelog
 
-### Version 4.1.0 (2026-01-16) - Multi-Key Smart Match for Duplicate Prevention
+### Version 4.1.0 (2026-01-16) - Multi-Key Smart Match & Analytics Wiring
 
 **New Features:**
 
@@ -1327,15 +1330,37 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
    - Returns match result with row number, match type, and confidence level
    - Prevents duplicate "ghost" records during data entry
 
-2. **Enhanced Contact Form Processing**
+2. **Unit Health Sentiment Analysis (Fully Wired)**
+   - `getRecentSurveyAverage()` now reads from Member Satisfaction sheet
+   - Filters by worksite/unit with partial matching
+   - Only includes verified, latest survey responses
+   - Uses AVG_OVERALL_SAT column with Q6-Q9 fallback calculation
+   - `showUnitHealthReport()` enhanced with categorized output (Red Flags, Warnings, Stable)
+
+3. **Search Precedents (`showSearchPrecedents`)**
+   - New dialog for searching historical grievance outcomes
+   - Helps stewards cite "Past Practice" during Step 1 meetings
+   - Filters by outcome: Won, Settled, Denied, Withdrawn
+   - Shows issue category, article, location, and resolution text
+   - Copy-to-clipboard functionality for easy citation
+   - Located in Analytics & Insights menu
+
+4. **Roadmap Items Auto-Population**
+   - Feedback & Development sheet now pre-populated with external API feature requests
+   - Constant Contact / CRM Sync, OCR Transcription, Typeform/SurveyMonkey integration
+   - Clear descriptions of API requirements for each feature
+
+5. **Enhanced Contact Form Processing**
    - `onContactFormSubmit` now uses multi-key matching
    - Logs match type and confidence for audit trail
-   - Supports optional Member ID field from form submissions
+
+6. **Grievance Log Column Grouping**
+   - Coordinator columns (Message Alert, Coordinator Message, Acknowledged By) now grouped
 
 **Technical Details:**
-- Located in `02_MemberManager.gs`
-- Uses 0-indexed array access for batch processing efficiency
-- Continues searching for higher-priority matches even after finding name match
+- `02_MemberManager.gs` - findExistingMember() function
+- `10_CommandCenter.gs` - getRecentSurveyAverage(), showSearchPrecedents(), searchPrecedentsData()
+- `08_Code.gs` - populateRoadmapItems(), column grouping for coordinator fields
 
 ---
 

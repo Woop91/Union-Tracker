@@ -2389,10 +2389,56 @@ function createFeedbackSheet(ss) {
     sheet.deleteColumns(16, maxCols - 15);
   }
 
+  // Populate roadmap items (external API features requiring development)
+  populateRoadmapItems(sheet);
+
   // Populate computed values (no formulas in visible sheet)
   syncFeedbackValues();
 
   Logger.log('Feedback & Development sheet created');
+}
+
+/**
+ * Populate roadmap items that require external API integrations
+ * These are feature requests that need developer attention
+ * @param {Sheet} sheet - Feedback sheet object
+ */
+function populateRoadmapItems(sheet) {
+  var now = new Date();
+  var timestamp = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+
+  // Roadmap items requiring external APIs - start at row 5
+  var roadmapItems = [
+    // Row 2
+    [timestamp, 'System', 'Integration', 'Feature Request', 'Medium',
+     'Constant Contact / CRM Sync',
+     'REST API bridge to sync Member Directory with Constant Contact mailing lists. Ensures union-wide communications always use up-to-date contact info. Requires Constant Contact API key and OAuth setup.',
+     'New', '', '', 'External API: Constant Contact v3 API'],
+    // Row 3
+    [timestamp, 'System', 'Integration', 'Feature Request', 'Low',
+     'OCR Form Transcription (Cloud Vision)',
+     'Use Google Cloud Vision API to read photos of handwritten grievance forms and auto-populate the Grievance Log. UI placeholder exists at showOCRDialog(). Requires Cloud Vision API enablement and billing.',
+     'New', '', '', 'External API: Google Cloud Vision API'],
+    // Row 4
+    [timestamp, 'System', 'Integration', 'Feature Request', 'Low',
+     'Typeform/SurveyMonkey Survey Sync',
+     'Pull real-time member satisfaction scores from external survey platforms (Typeform or SurveyMonkey) instead of using Google Forms. Would enhance the Unit Health Report with live third-party data.',
+     'New', '', '', 'External API: Typeform API or SurveyMonkey API'],
+    // Row 5 - bonus item
+    [timestamp, 'System', 'Reports', 'Feature Request', 'Low',
+     'Advanced Precedent Search with AI',
+     'Enhance Search Precedents to use AI/ML for semantic matching of grievance outcomes. Would allow natural language queries like "overtime disputes in warehouse" to find relevant past practice examples.',
+     'New', '', '', 'Requires: Google Vertex AI or similar ML API']
+  ];
+
+  // Only add if rows are empty (don't overwrite existing data)
+  var existingData = sheet.getRange(2, 1, 4, 1).getValues();
+  var hasExistingData = existingData.some(function(row) { return row[0] !== ''; });
+
+  if (!hasExistingData) {
+    sheet.getRange(2, 1, roadmapItems.length, roadmapItems[0].length).setValues(roadmapItems);
+    Logger.log('Populated ' + roadmapItems.length + ' roadmap items in Feedback sheet');
+  }
 }
 
 // ============================================================================

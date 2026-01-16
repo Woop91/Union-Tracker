@@ -145,6 +145,7 @@ function createCommandCenterMenu() {
   menu.addSubMenu(ui.createMenu('📈 Analytics & Insights')
       .addItem('🏥 Unit Health Report', 'showUnitHealthReport')
       .addItem('📊 Grievance Trends', 'showGrievanceTrends')
+      .addItem('📚 Search Precedents', 'showSearchPrecedents')
       .addSeparator()
       .addItem('📝 OCR Transcribe Form', 'showOCRDialog'));
 
@@ -1315,32 +1316,70 @@ function getGrievanceCountForUnit(unitName) {
 
 /**
  * Helper: Get recent survey average for a unit
- * PLACEHOLDER: Connect to Typeform/SurveyMonkey API when ready
+ * Reads from Member Satisfaction sheet, filtering by worksite/unit.
  *
- * @param {string} unitName - Unit name
- * @returns {number} Average survey score (1-10)
+ * @param {string} unitName - Unit name to filter by
+ * @returns {number} Average survey score (1-10), or 5 if no data
  */
 function getRecentSurveyAverage(unitName) {
-  // PLACEHOLDER: This would connect to survey API
-  // For now, check if Satisfaction sheet exists and has data
-
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
   if (!satSheet || satSheet.getLastRow() < 2) {
-    // Return neutral score if no survey data
-    return 5;
+    return 5; // Neutral score if no survey data
   }
 
-  // TODO: Implement actual survey score calculation
-  // when Typeform/SurveyMonkey integration is enabled
+  var lastRow = satSheet.getLastRow();
+  var data = satSheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.REVIEWER_NOTES).getValues();
 
-  return 5; // Neutral placeholder
+  var scores = [];
+  var unitLower = unitName.toString().trim().toLowerCase();
+
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+
+    // Only include verified, latest responses
+    var verified = row[SATISFACTION_COLS.VERIFIED - 1];
+    var isLatest = row[SATISFACTION_COLS.IS_LATEST - 1];
+
+    if (verified !== 'Yes' || isLatest !== 'Yes') continue;
+
+    // Check if worksite matches unit (partial match for flexibility)
+    var worksite = (row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '').toString().trim().toLowerCase();
+
+    if (worksite.indexOf(unitLower) !== -1 || unitLower.indexOf(worksite) !== -1) {
+      // Get overall satisfaction average (pre-calculated column)
+      var avgScore = parseFloat(row[SATISFACTION_COLS.AVG_OVERALL_SAT - 1]);
+
+      if (!isNaN(avgScore) && avgScore > 0) {
+        scores.push(avgScore);
+      } else {
+        // Fallback: calculate from individual questions Q6-Q9
+        var q6 = parseFloat(row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1]) || 0;
+        var q7 = parseFloat(row[SATISFACTION_COLS.Q7_TRUST_UNION - 1]) || 0;
+        var q8 = parseFloat(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]) || 0;
+        var q9 = parseFloat(row[SATISFACTION_COLS.Q9_RECOMMEND - 1]) || 0;
+
+        var count = (q6 > 0 ? 1 : 0) + (q7 > 0 ? 1 : 0) + (q8 > 0 ? 1 : 0) + (q9 > 0 ? 1 : 0);
+        if (count > 0) {
+          scores.push((q6 + q7 + q8 + q9) / count);
+        }
+      }
+    }
+  }
+
+  if (scores.length === 0) {
+    return 5; // Neutral if no matching responses
+  }
+
+  // Calculate average of all matching scores
+  var total = scores.reduce(function(sum, val) { return sum + val; }, 0);
+  return Math.round((total / scores.length) * 10) / 10; // Round to 1 decimal
 }
 
 /**
  * Show Unit Health Report Dialog
- * Displays sentiment analysis for all units.
+ * Displays sentiment analysis for all units using Member Satisfaction data.
  */
 function showUnitHealthReport() {
   var ui = SpreadsheetApp.getUi();
@@ -1362,18 +1401,40 @@ function showUnitHealthReport() {
   }
 
   var report = '📊 UNIT HEALTH ANALYSIS REPORT\n';
-  report += '=' .repeat(45) + '\n\n';
+  report += '═'.repeat(45) + '\n\n';
+
+  var redFlags = [];
+  var warnings = [];
+  var healthy = [];
 
   units.forEach(function(unit) {
     var health = calculateUnitHealth(unit);
-    report += health.status + ' ' + health.unit + '\n';
-    report += '  Grievances: ' + health.grievanceCount + '\n';
-    report += '  Survey Score: ' + health.surveyScore + '/10\n';
-    report += '  → ' + health.recommendation + '\n\n';
+    var entry = health.status + ' ' + health.unit + '\n';
+    entry += '  Grievances: ' + health.grievanceCount + ' | Survey: ' + health.surveyScore + '/10\n';
+    entry += '  → ' + health.recommendation + '\n';
+
+    if (health.status.indexOf('RED FLAG') !== -1) {
+      redFlags.push(entry);
+    } else if (health.status.indexOf('WARNING') !== -1) {
+      warnings.push(entry);
+    } else {
+      healthy.push(entry);
+    }
   });
 
-  report += '=' .repeat(45) + '\n';
-  report += 'Connect Typeform/SurveyMonkey for live sentiment data.\n';
+  // Show red flags first, then warnings, then healthy
+  if (redFlags.length > 0) {
+    report += '⚠️ REQUIRES ATTENTION:\n' + redFlags.join('\n') + '\n';
+  }
+  if (warnings.length > 0) {
+    report += '📋 MONITORING:\n' + warnings.join('\n') + '\n';
+  }
+  if (healthy.length > 0) {
+    report += '✅ STABLE:\n' + healthy.join('\n');
+  }
+
+  report += '\n' + '═'.repeat(45) + '\n';
+  report += 'Data source: Member Satisfaction Survey + Grievance Log';
 
   ui.alert('Unit Health Report', report, ui.ButtonSet.OK);
 }
@@ -1513,4 +1574,210 @@ function showOCRDialog() {
   .setHeight(350);
 
   ui.showModalDialog(html, '📝 OCR Form Transcription');
+}
+
+// ============================================================================
+// SEARCH PRECEDENTS (v4.1 - Historical Grievance Outcomes)
+// ============================================================================
+
+/**
+ * Shows Search Precedents dialog for finding historical grievance outcomes.
+ * Helps stewards cite "Past Practice" during Step 1 meetings.
+ */
+function showSearchPrecedents() {
+  var ui = SpreadsheetApp.getUi();
+
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    'body { font-family: Roboto, Arial, sans-serif; padding: 16px; margin: 0; }' +
+    'h3 { color: #1e293b; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; }' +
+    '.search-box { display: flex; gap: 8px; margin-bottom: 16px; }' +
+    'input, select { padding: 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; }' +
+    'input[type="text"] { flex: 1; }' +
+    'select { min-width: 140px; }' +
+    'button { background: #1e293b; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; }' +
+    'button:hover { background: #334155; }' +
+    '.results { max-height: 320px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; }' +
+    '.result-item { padding: 12px; border-bottom: 1px solid #f1f5f9; }' +
+    '.result-item:last-child { border-bottom: none; }' +
+    '.result-item:hover { background: #f8fafc; }' +
+    '.result-header { display: flex; justify-content: space-between; margin-bottom: 6px; }' +
+    '.result-id { font-weight: 600; color: #1e293b; }' +
+    '.result-status { font-size: 12px; padding: 2px 8px; border-radius: 12px; }' +
+    '.status-won { background: #dcfce7; color: #166534; }' +
+    '.status-lost { background: #fee2e2; color: #991b1b; }' +
+    '.status-settled { background: #dbeafe; color: #1e40af; }' +
+    '.status-withdrawn { background: #f3f4f6; color: #6b7280; }' +
+    '.result-meta { font-size: 13px; color: #64748b; margin-bottom: 4px; }' +
+    '.result-outcome { font-size: 13px; color: #334155; background: #f8fafc; padding: 8px; border-radius: 4px; margin-top: 6px; }' +
+    '.empty { text-align: center; padding: 40px; color: #94a3b8; }' +
+    '.help-text { font-size: 12px; color: #64748b; margin-bottom: 12px; }' +
+    '.copy-btn { font-size: 11px; padding: 4px 8px; background: #e2e8f0; color: #475569; margin-left: 8px; }' +
+    '.copy-btn:hover { background: #cbd5e1; }' +
+    '</style>' +
+    '<h3>📚 Search Precedents</h3>' +
+    '<p class="help-text">Find resolved grievances to cite as "Past Practice" in Step 1 meetings.</p>' +
+    '<div class="search-box">' +
+    '  <input type="text" id="searchQuery" placeholder="Search by keyword, article, or issue...">' +
+    '  <select id="filterOutcome">' +
+    '    <option value="">All Outcomes</option>' +
+    '    <option value="won">Won / Sustained</option>' +
+    '    <option value="settled">Settled</option>' +
+    '    <option value="lost">Denied / Lost</option>' +
+    '    <option value="withdrawn">Withdrawn</option>' +
+    '  </select>' +
+    '  <button onclick="searchPrecedents()">Search</button>' +
+    '</div>' +
+    '<div id="results" class="results">' +
+    '  <div class="empty">Enter search terms to find historical grievances</div>' +
+    '</div>' +
+    '<script>' +
+    'function searchPrecedents() {' +
+    '  var query = document.getElementById("searchQuery").value;' +
+    '  var outcomeFilter = document.getElementById("filterOutcome").value;' +
+    '  document.getElementById("results").innerHTML = "<div class=\\"empty\\">Searching...</div>";' +
+    '  google.script.run.withSuccessHandler(displayResults).searchPrecedentsData(query, outcomeFilter);' +
+    '}' +
+    'function displayResults(data) {' +
+    '  var container = document.getElementById("results");' +
+    '  if (!data || data.length === 0) {' +
+    '    container.innerHTML = "<div class=\\"empty\\">No matching precedents found</div>";' +
+    '    return;' +
+    '  }' +
+    '  var html = "";' +
+    '  data.forEach(function(item) {' +
+    '    var statusClass = "status-" + item.outcomeClass;' +
+    '    html += "<div class=\\"result-item\\">" +' +
+    '      "<div class=\\"result-header\\">" +' +
+    '        "<span class=\\"result-id\\">" + item.id + "</span>" +' +
+    '        "<span class=\\"result-status " + statusClass + "\\">" + item.outcome + "</span>" +' +
+    '      "</div>" +' +
+    '      "<div class=\\"result-meta\\"><strong>" + item.issueCategory + "</strong> | " + item.article + "</div>" +' +
+    '      "<div class=\\"result-meta\\">" + item.memberName + " • " + item.location + " • " + item.dateResolved + "</div>" +' +
+    '      (item.resolution ? "<div class=\\"result-outcome\\"><strong>Resolution:</strong> " + item.resolution + "<button class=\\"copy-btn\\" onclick=\\"copyText(\'" + item.id + ": " + item.resolution.replace(/\'/g, "") + "\')\\">Copy</button></div>" : "") +' +
+    '    "</div>";' +
+    '  });' +
+    '  container.innerHTML = html;' +
+    '}' +
+    'function copyText(text) {' +
+    '  navigator.clipboard.writeText(text).then(function() {' +
+    '    alert("Copied to clipboard!");' +
+    '  });' +
+    '}' +
+    'document.getElementById("searchQuery").addEventListener("keypress", function(e) {' +
+    '  if (e.key === "Enter") searchPrecedents();' +
+    '});' +
+    '</script>'
+  )
+  .setWidth(600)
+  .setHeight(520);
+
+  ui.showModalDialog(html, '📚 Search Precedents - Past Practice');
+}
+
+/**
+ * Backend function to search resolved grievances for precedent data.
+ * Called from the Search Precedents dialog.
+ *
+ * @param {string} query - Search query (keyword, article, issue)
+ * @param {string} outcomeFilter - Filter by outcome type (won, lost, settled, withdrawn, or empty for all)
+ * @returns {Array} Array of matching grievance objects
+ */
+function searchPrecedentsData(query, outcomeFilter) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    return [];
+  }
+
+  var lastRow = sheet.getLastRow();
+  var data = sheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.QUICK_ACTIONS).getValues();
+
+  var results = [];
+  var queryLower = (query || '').toString().toLowerCase().trim();
+
+  // Closed/resolved statuses to include
+  var closedStatuses = ['closed', 'resolved', 'won', 'lost', 'denied', 'sustained', 'settled', 'withdrawn', 'dismissed'];
+
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+
+    // Get status and check if closed/resolved
+    var status = (row[GRIEVANCE_COLS.STATUS - 1] || '').toString().toLowerCase();
+    var isClosed = closedStatuses.some(function(s) { return status.indexOf(s) !== -1; });
+
+    if (!isClosed) continue;
+
+    // Get grievance data
+    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
+    var firstName = row[GRIEVANCE_COLS.FIRST_NAME - 1] || '';
+    var lastName = row[GRIEVANCE_COLS.LAST_NAME - 1] || '';
+    var issueCategory = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
+    var article = row[GRIEVANCE_COLS.ARTICLE - 1] || '';
+    var location = row[GRIEVANCE_COLS.LOCATION - 1] || '';
+    var resolution = row[GRIEVANCE_COLS.RESOLUTION - 1] || '';
+    var dateResolved = '';
+
+    // Try to get resolution date from Step III received or last updated field
+    var step3Rcvd = row[GRIEVANCE_COLS.STEP3_RCVD - 1];
+    if (step3Rcvd) {
+      dateResolved = Utilities.formatDate(new Date(step3Rcvd), Session.getScriptTimeZone(), 'MMM yyyy');
+    }
+
+    // Determine outcome class for styling
+    var outcomeClass = 'settled';
+    var outcomeDisplay = status;
+
+    if (status.indexOf('won') !== -1 || status.indexOf('sustained') !== -1) {
+      outcomeClass = 'won';
+      outcomeDisplay = 'Won';
+    } else if (status.indexOf('lost') !== -1 || status.indexOf('denied') !== -1 || status.indexOf('dismissed') !== -1) {
+      outcomeClass = 'lost';
+      outcomeDisplay = 'Denied';
+    } else if (status.indexOf('settled') !== -1) {
+      outcomeClass = 'settled';
+      outcomeDisplay = 'Settled';
+    } else if (status.indexOf('withdrawn') !== -1) {
+      outcomeClass = 'withdrawn';
+      outcomeDisplay = 'Withdrawn';
+    }
+
+    // Apply outcome filter
+    if (outcomeFilter) {
+      if (outcomeFilter === 'won' && outcomeClass !== 'won') continue;
+      if (outcomeFilter === 'lost' && outcomeClass !== 'lost') continue;
+      if (outcomeFilter === 'settled' && outcomeClass !== 'settled') continue;
+      if (outcomeFilter === 'withdrawn' && outcomeClass !== 'withdrawn') continue;
+    }
+
+    // Apply search query filter
+    if (queryLower) {
+      var searchable = [
+        grievanceId, firstName, lastName, issueCategory, article, location, resolution, status
+      ].join(' ').toLowerCase();
+
+      if (searchable.indexOf(queryLower) === -1) continue;
+    }
+
+    results.push({
+      id: grievanceId,
+      memberName: firstName + ' ' + lastName,
+      issueCategory: issueCategory || 'N/A',
+      article: article || 'N/A',
+      location: location || 'N/A',
+      outcome: outcomeDisplay,
+      outcomeClass: outcomeClass,
+      resolution: resolution,
+      dateResolved: dateResolved || 'N/A'
+    });
+  }
+
+  // Sort by most recent first (by ID, assuming IDs are chronological)
+  results.sort(function(a, b) {
+    return b.id.localeCompare(a.id);
+  });
+
+  // Limit to 50 results
+  return results.slice(0, 50);
 }
