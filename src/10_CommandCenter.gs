@@ -172,13 +172,6 @@ function navigateToDashboard() {
 }
 
 /**
- * Quick navigation to Custom View
- */
-function navigateToCustomView() {
-  navToCustom();
-}
-
-/**
  * Quick navigation to Mobile View
  */
 function navigateToMobileView() {

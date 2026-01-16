@@ -50,7 +50,6 @@ function CREATE_509_DASHBOARD() {
       '• Member Directory\n' +
       '• Grievance Log\n' +
       '• 💼 Dashboard (Executive metrics)\n' +
-      '• 🎯 Custom View (Customizable metrics)\n' +
       '• 📊 Member Satisfaction (Survey tracking)\n' +
       '• 💡 Feedback & Development (Bug/feature tracking)\n' +
       '• ✅ Function Checklist (function reference)\n' +
@@ -90,9 +89,6 @@ function CREATE_509_DASHBOARD() {
     createDashboard(ss);
     ss.toast('Created Dashboard', '🏗️ Progress', 2);
 
-    createInteractiveDashboard(ss);
-    ss.toast('Created Custom View', '🏗️ Progress', 2);
-
     createSatisfactionSheet(ss);
     ss.toast('Created Member Satisfaction', '🏗️ Progress', 2);
 
@@ -130,9 +126,9 @@ function CREATE_509_DASHBOARD() {
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
-        '11 sheets created:\n' +
+        '10 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
-        '• 💼 Dashboard, 🎯 Custom View (views)\n' +
+        '• 💼 Dashboard (views)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
         '• ✅ Function Checklist (function reference)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
@@ -1626,124 +1622,6 @@ function createAreaChart_(sheet) {
   sheet.insertChart(chart);
 }
 
-/**
- * Create or recreate the Custom View sheet
- * Allows users to select metrics and visualization preferences
- */
-function createInteractiveDashboard(ss) {
-  var sheet = getOrCreateSheet(ss, SHEETS.INTERACTIVE);
-  sheet.clear();
-
-  // Title
-  sheet.getRange('A1').setValue('🎯 Custom View')
-    .setFontSize(20)
-    .setFontWeight('bold')
-    .setFontColor(COLORS.PRIMARY_PURPLE);
-  sheet.getRange('A1:F1').merge();
-
-  // Instructions
-  sheet.getRange('A3').setValue('Select metrics and chart types using the dropdowns below. Metrics auto-update from live data.')
-    .setFontStyle('italic');
-  sheet.getRange('A3:F3').merge();
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // METRIC SELECTION ROW
-  // ═══════════════════════════════════════════════════════════════════════════
-  var controlLabels = [['Metric 1', 'Metric 2', 'Metric 3', 'Time Range', 'Show Trend', 'Theme']];
-  sheet.getRange('A5:F5').setValues(controlLabels)
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY);
-
-  // Default selections
-  var defaultSelections = [['Total Members', 'Open Grievances', 'Win Rate', 'All Time', 'Yes', 'Default']];
-  sheet.getRange('A6:F6').setValues(defaultSelections);
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SELECTED METRICS DISPLAY
-  // ═══════════════════════════════════════════════════════════════════════════
-  sheet.getRange('A8').setValue('SELECTED METRICS')
-    .setFontWeight('bold')
-    .setBackground(COLORS.UNION_GREEN)
-    .setFontColor(COLORS.WHITE);
-  sheet.getRange('A8:F8').merge();
-
-  // Headers for metrics
-  sheet.getRange('A9:C9').setValues([['Metric', 'Current Value', 'Description']])
-    .setFontWeight('bold')
-    .setBackground(COLORS.LIGHT_GRAY);
-
-  // Dynamic metric formulas based on selection
-  var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var mStewardCol = getColumnLetter(MEMBER_COLS.IS_STEWARD);
-  var gIdCol = getColumnLetter(GRIEVANCE_COLS.GRIEVANCE_ID);
-  var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
-  var gResolutionCol = getColumnLetter(GRIEVANCE_COLS.RESOLUTION);
-
-  // Metric lookup table (row 10-17)
-  var metricData = [
-    ['Total Members', '=COUNTA(\'' + SHEETS.MEMBER_DIR + '\'!' + mIdCol + ':' + mIdCol + ')-1', 'Total union members in directory'],
-    ['Active Stewards', '=COUNTIF(\'' + SHEETS.MEMBER_DIR + '\'!' + mStewardCol + ':' + mStewardCol + ',"Yes")', 'Members marked as stewards'],
-    ['Total Grievances', '=COUNTA(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gIdCol + ':' + gIdCol + ')-1', 'All grievances filed'],
-    ['Open Grievances', '=COUNTIF(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gStatusCol + ':' + gStatusCol + ',"Open")', 'Currently open cases'],
-    ['Pending Info', '=COUNTIF(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gStatusCol + ':' + gStatusCol + ',"Pending Info")', 'Cases awaiting information'],
-    ['Settled', '=COUNTIF(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gStatusCol + ':' + gStatusCol + ',"Settled")', 'Cases settled'],
-    ['Won', '=COUNTIF(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gStatusCol + ':' + gStatusCol + ',"Won")', 'Cases won'],
-    ['Win Rate', '=IFERROR(ROUND(COUNTIF(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gStatusCol + ':' + gStatusCol + ',"Won")/(COUNTA(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gIdCol + ':' + gIdCol + ')-1)*100,1)&"%","0%")', 'Win percentage of all cases']
-  ];
-
-  for (var i = 0; i < metricData.length; i++) {
-    sheet.getRange(10 + i, 1).setValue(metricData[i][0]);
-    sheet.getRange(10 + i, 2).setFormula(metricData[i][1]);
-    sheet.getRange(10 + i, 3).setValue(metricData[i][2]);
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // DROPDOWN VALIDATIONS
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Metric dropdown options
-  var metricOptions = ['Total Members', 'Active Stewards', 'Total Grievances', 'Open Grievances', 'Pending Info', 'Settled', 'Won', 'Win Rate'];
-  var metricRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(metricOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange('A6').setDataValidation(metricRule);
-  sheet.getRange('B6').setDataValidation(metricRule);
-  sheet.getRange('C6').setDataValidation(metricRule);
-
-  // Time range options
-  var timeOptions = ['All Time', 'This Month', 'This Quarter', 'This Year', 'Last 30 Days', 'Last 90 Days'];
-  var timeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(timeOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange('D6').setDataValidation(timeRule);
-
-  // Yes/No options
-  var yesNoRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['Yes', 'No'], true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange('E6').setDataValidation(yesNoRule);
-
-  // Theme options
-  var themeOptions = ['Default', 'Dark', 'High Contrast', 'Print Friendly'];
-  var themeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(themeOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange('F6').setDataValidation(themeRule);
-
-  // Format
-  sheet.autoResizeColumns(1, 6);
-  sheet.setColumnWidth(3, 250);
-
-  // Delete excess columns after F (column 6)
-  var maxCols = sheet.getMaxColumns();
-  if (maxCols > 6) {
-    sheet.deleteColumns(7, maxCols - 6);
-  }
-}
-
 // ============================================================================
 // MEMBER SATISFACTION SHEET
 // ============================================================================
@@ -2898,7 +2776,6 @@ function createFunctionChecklistSheet_() {
     ['2️⃣ Sync', '⚙️ Admin > Setup', '🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger', 'Removes the automatic sync trigger (manual sync still works)'],
 
     // ═══ PHASE 3: Core Dashboards ═══
-    ['3️⃣ Dashboards', '👤 Dashboard', '🎯 Custom View', 'showInteractiveDashboardTab', 'Opens the Custom View sheet with configurable metrics'],
     ['3️⃣ Dashboards', '👤 Dashboard', '📋 View Active Grievances', 'viewActiveGrievances', 'Shows filtered list of all open/pending grievances'],
     ['3️⃣ Dashboards', '👤 Dashboard', '📱 Mobile Dashboard', 'showMobileDashboard', 'Touch-friendly dashboard for phones and tablets'],
     ['3️⃣ Dashboards', '👤 Dashboard', '📱 Get Mobile App URL', 'showWebAppUrl', 'Displays the web app URL for mobile bookmarking'],
@@ -2906,7 +2783,6 @@ function createFunctionChecklistSheet_() {
     ['3️⃣ Dashboards', '👤 Dashboard', '📊 Member Satisfaction', 'showSatisfactionDashboard', 'Survey results dashboard with trends and insights'],
     ['3️⃣ Dashboards', '👤 Dashboard', '🔒 Secure Member Portal', 'showPublicMemberDashboard', 'PII-safe member dashboard with charts and stats'],
     ['3️⃣ Dashboards', '📊 Sheet Manager', '📊 Rebuild Dashboard', 'rebuildDashboard', 'Recreates the Dashboard sheet with fresh formulas'],
-    ['3️⃣ Dashboards', '📊 Sheet Manager', '📈 Refresh Interactive Charts', 'refreshInteractiveCharts', 'Updates all charts in Custom View with current data'],
     ['3️⃣ Dashboards', '📊 Sheet Manager', '🔄 Refresh All Formulas', 'refreshAllFormulas', 'Recalculates all formulas across all sheets'],
 
     // ═══ PHASE 4: Search ═══
@@ -2967,13 +2843,6 @@ function createFunctionChecklistSheet_() {
     ['1️⃣3️⃣ Test', '🧪 Testing', '📊 View Test Results', 'viewTestResults', 'Shows results from last test run with pass/fail details'],
 
     // ═══ PHASE 14: Strategic Command Center (509 Command Menu) ═══
-    ['1️⃣4️⃣ Command', '📊 509 Command', '👁️ Executive Command (PII)', 'rebuildExecutiveDashboard', 'Internal dashboard with PII - KPIs, steward workload, grievance insights'],
-    ['1️⃣4️⃣ Command', '📊 509 Command', '🫂 Member Analytics (No PII)', 'rebuildMemberAnalytics', 'PII-safe dashboard with morale gauge, pipeline funnel, heatmaps'],
-    ['1️⃣4️⃣ Command', '📊 509 Command', '📩 Send Member Dashboard Link', 'sendMemberDashboardLink', 'Emails link to Member Analytics dashboard to specified recipient'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'Identifies locations with 3+ active grievances'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '🌟 Identify Rising Stars', 'identifyRisingStars', 'Shows top steward performers by score and win rate'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📉 Management Hostility Report', 'renderHostilityFunnel', 'Analyzes denial rates across grievance steps'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'Strategic data for contract negotiations'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates IDs using unit codes from Config sheet'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs', 'Finds and highlights duplicate Member IDs'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '📄 Create PDF for Grievance', 'createPDFForSelectedGrievance', 'Generates PDF with signature blocks for selected grievance'],
@@ -3210,7 +3079,6 @@ function createGettingStartedSheet(ss) {
 
   var dashboardInfo = [
     ['💼 Dashboard', 'Executive overview with key metrics, steward performance, and trends'],
-    ['🎯 Custom View', 'Interactive popup with tabbed views - Overview, Members, Grievances, Analytics'],
     ['📊 Member Satisfaction', 'Survey results dashboard (requires linked Google Form)'],
     ['📱 Mobile Dashboard', 'Touch-friendly view for phones and tablets']
   ];
@@ -6331,30 +6199,6 @@ function viewTestResults() {
 }
 
 // ============================================================================
-// NAVIGATION FUNCTIONS (Menu Items)
-// ============================================================================
-
-/**
- * Refresh Custom View charts and data
- */
-function refreshInteractiveCharts() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Refreshing Custom View...', '📈 Refresh', 2);
-
-  var sheet = ss.getSheetByName(SHEETS.INTERACTIVE);
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Custom View not found. Run REPAIR DASHBOARD to create it.');
-    return;
-  }
-
-  // Force recalculation by flushing
-  SpreadsheetApp.flush();
-
-  // Navigate to it
-  ss.setActiveSheet(sheet);
-  ss.toast('Custom View refreshed!', '✅ Done', 2);
-}
-
 // ============================================================================
 // GOOGLE DRIVE INTEGRATION
 // ============================================================================

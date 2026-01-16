@@ -2751,6 +2751,54 @@ function cleanupTestData() {
   });
 }
 
+/**
+ * Removes deprecated tabs from the spreadsheet (v4.0.3 cleanup)
+ * Run this once to remove tabs that are no longer used:
+ * - 🎯 Custom View
+ * - Member Analytics
+ * - Executive Command
+ */
+function removeDeprecatedTabs() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var tabsToRemove = ['🎯 Custom View', 'Member Analytics', 'Executive Command'];
+  var removed = [];
+  var notFound = [];
+
+  for (var i = 0; i < tabsToRemove.length; i++) {
+    var tabName = tabsToRemove[i];
+    var sheet = ss.getSheetByName(tabName);
+
+    if (sheet) {
+      try {
+        ss.deleteSheet(sheet);
+        removed.push(tabName);
+      } catch (e) {
+        // Cannot delete the only sheet
+        Logger.log('Could not delete ' + tabName + ': ' + e.message);
+      }
+    } else {
+      notFound.push(tabName);
+    }
+  }
+
+  var message = '';
+  if (removed.length > 0) {
+    message += 'Removed: ' + removed.join(', ') + '\n\n';
+  }
+  if (notFound.length > 0) {
+    message += 'Not found (already removed): ' + notFound.join(', ');
+  }
+
+  if (message === '') {
+    message = 'No deprecated tabs found to remove.';
+  }
+
+  ui.alert('Tab Cleanup Complete', message, ui.ButtonSet.OK);
+  ss.toast('Deprecated tabs cleanup complete', 'Success', 3);
+}
+
 // ==================== UNIT TESTS ====================
 
 function testMemberColsConstants() {

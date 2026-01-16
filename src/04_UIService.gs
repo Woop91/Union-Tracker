@@ -68,7 +68,6 @@ function createDashboardMenu() {
     // View submenu - View icons (NEW)
     .addSubMenu(ui.createMenu('👁️ View')
       .addItem('📊 Executive Dashboard', 'showExecutiveDashboard')
-      .addItem('🎯 Custom View', 'showCustomView')
       .addItem('⭐ Member Satisfaction', 'showSatisfactionDashboard')
       .addSeparator()
       .addItem('🌙 Toggle Dark Mode', 'toggleDarkMode')
@@ -95,8 +94,6 @@ function createDashboardMenu() {
 
   // Strategic Command Center Menu (Separate top-level menu)
   ui.createMenu('📊 509 Command')
-    .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
-    .addSeparator()
     .addSubMenu(ui.createMenu('👁️ Command Center')
       .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
       .addItem('🛡️ Steward Performance', 'showStewardPerformanceModal')
@@ -106,12 +103,6 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('📋 Grievances')
       .addItem('➕ New Grievance', 'showNewGrievanceDialog')
       .addItem('✏️ Edit Selected', 'showEditGrievanceDialog'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('🚀 Strategic Pro Moves')
-      .addItem('🔥 Generate Unit Hot Zones', 'renderHotZones')
-      .addItem('🌟 Identify Rising Stars', 'identifyRisingStars')
-      .addItem('📉 Management Hostility Report', 'renderHostilityFunnel')
-      .addItem('📝 Bargaining Table Cheat Sheet', 'renderBargainingCheatSheet'))
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 Analytics & Charts')
       .addItem('📈 Unit Density Treemap', 'showUnitDensityTreemap')
@@ -454,10 +445,6 @@ function showExecutiveDashboard() {
   navigateToSheet(SHEETS.DASHBOARD);
 }
 
-function showCustomView() {
-  navigateToSheet(SHEETS.INTERACTIVE);
-}
-
 function showSatisfactionDashboard() {
   navigateToSheet(SHEETS.SATISFACTION);
 }
@@ -486,13 +473,6 @@ function showThemeSettings() {
  */
 function navToDash() {
   navigateToSheet(SHEETS.DASHBOARD);
-}
-
-/**
- * Navigate to Custom View / Interactive Dashboard
- */
-function navToCustom() {
-  navigateToSheet(SHEETS.INTERACTIVE);
 }
 
 /**
@@ -5807,19 +5787,7 @@ function midnightAutoRefresh() {
 
     Logger.log('Midnight Auto-Refresh started at ' + startTime.toISOString());
 
-    // 1. Refresh Executive Dashboard if it exists
-    if (ss.getSheetByName("Executive Command")) {
-      rebuildExecutiveDashboard();
-      Logger.log('Executive Command dashboard refreshed');
-    }
-
-    // 2. Refresh Member Analytics if it exists
-    if (ss.getSheetByName("Member Analytics")) {
-      rebuildMemberAnalytics();
-      Logger.log('Member Analytics dashboard refreshed');
-    }
-
-    // 3. Refresh hidden calculation sheets if function exists
+    // 1. Refresh hidden calculation sheets if function exists
     if (typeof rebuildAllHiddenSheets === 'function') {
       rebuildAllHiddenSheets();
       Logger.log('Hidden calculation sheets refreshed');
@@ -5914,14 +5882,9 @@ function refreshAllVisuals() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // Refresh Executive Dashboard if it exists
-    if (ss.getSheetByName("Executive Command")) {
-      rebuildExecutiveDashboard();
-    }
-
-    // Refresh Member Analytics if it exists
-    if (ss.getSheetByName("Member Analytics")) {
-      rebuildMemberAnalytics();
+    // Refresh hidden calculation sheets
+    if (typeof rebuildAllHiddenSheets === 'function') {
+      rebuildAllHiddenSheets();
     }
 
     // Check for alerts
