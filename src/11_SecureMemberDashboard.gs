@@ -1023,101 +1023,13 @@ function emailDashboardLink() {
 }
 
 // ============================================================================
-// EXECUTIVE DASHBOARD REBUILD (Material Design Enhanced)
+// EXECUTIVE DASHBOARD (Now Modal-Based - See 04_UIService.gs)
 // ============================================================================
-
-/**
- * Rebuilds the executive dashboard with Material Design charts
- * PII-exposed version for leadership
- */
-function rebuildExecutiveDashboard() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  ss.toast('Building Executive Dashboard...', COMMAND_CONFIG.SYSTEM_NAME, 10);
-
-  var stats = getGrievanceStats();
-  var satisfaction = getAggregateSatisfactionStats();
-  var workload = getStewardWorkload();
-  var analytics = getAdvancedAnalytics();
-
-  // Navigate to or create the dashboard sheet
-  var dashSheet = ss.getSheetByName(SHEETS.DASHBOARD);
-
-  if (!dashSheet) {
-    dashSheet = ss.insertSheet(SHEETS.DASHBOARD);
-  }
-
-  dashSheet.activate();
-
-  // Clear existing content
-  dashSheet.clear();
-
-  // Set up header
-  dashSheet.getRange('A1').setValue('509 STRATEGIC COMMAND CENTER - EXECUTIVE DASHBOARD');
-  dashSheet.getRange('A1').setFontSize(16).setFontWeight('bold').setFontColor('#7C3AED');
-
-  dashSheet.getRange('A2').setValue('Last Updated: ' + new Date().toLocaleString());
-  dashSheet.getRange('A2').setFontSize(10).setFontColor('#64748B');
-
-  // Key Metrics Section
-  dashSheet.getRange('A4').setValue('KEY METRICS');
-  dashSheet.getRange('A4').setFontWeight('bold').setBackground('#1E293B').setFontColor('#F8FAFC');
-
-  var metricsData = [
-    ['Metric', 'Value', 'Status'],
-    ['Total Grievances', stats.total, ''],
-    ['Open Cases', stats.open, stats.open > 10 ? 'HIGH' : 'NORMAL'],
-    ['Win Rate', stats.winRate + '%', stats.winRate >= 70 ? 'EXCELLENT' : stats.winRate >= 50 ? 'GOOD' : 'NEEDS IMPROVEMENT'],
-    ['Trust Score', satisfaction.avgTrust + '/10', satisfaction.avgTrust >= 7 ? 'HEALTHY' : 'MONITOR'],
-    ['Active Stewards', workload.length, '']
-  ];
-
-  dashSheet.getRange(5, 1, metricsData.length, 3).setValues(metricsData);
-  dashSheet.getRange(5, 1, 1, 3).setFontWeight('bold').setBackground('#F1F5F9');
-
-  // Steward Workload Section
-  dashSheet.getRange('A12').setValue('STEWARD WORKLOAD');
-  dashSheet.getRange('A12').setFontWeight('bold').setBackground('#1E293B').setFontColor('#F8FAFC');
-
-  var workloadData = [['Steward', 'Unit', 'Cases', 'Status']];
-  workload.forEach(function(s) {
-    workloadData.push([s.name, s.unit, s.count, s.status]);
-  });
-
-  dashSheet.getRange(13, 1, workloadData.length, 4).setValues(workloadData);
-  dashSheet.getRange(13, 1, 1, 4).setFontWeight('bold').setBackground('#F1F5F9');
-
-  // Apply conditional formatting for workload status
-  var statusRange = dashSheet.getRange(14, 4, workload.length, 1);
-  var rule1 = SpreadsheetApp.newConditionalFormatRule()
-    .whenTextEqualTo('OVERLOAD')
-    .setBackground('#FEE2E2')
-    .setFontColor('#991B1B')
-    .setRanges([statusRange])
-    .build();
-  var rule2 = SpreadsheetApp.newConditionalFormatRule()
-    .whenTextEqualTo('Heavy')
-    .setBackground('#FEF3C7')
-    .setFontColor('#92400E')
-    .setRanges([statusRange])
-    .build();
-  var rule3 = SpreadsheetApp.newConditionalFormatRule()
-    .whenTextEqualTo('Available')
-    .setBackground('#DCFCE7')
-    .setFontColor('#166534')
-    .setRanges([statusRange])
-    .build();
-
-  var rules = dashSheet.getConditionalFormatRules();
-  rules.push(rule1, rule2, rule3);
-  dashSheet.setConditionalFormatRules(rules);
-
-  // Auto-resize columns
-  dashSheet.autoResizeColumns(1, 4);
-
-  ss.toast('Executive Dashboard rebuilt successfully!', COMMAND_CONFIG.SYSTEM_NAME, 5);
-}
+// The rebuildExecutiveDashboard() function has been moved to 04_UIService.gs
+// and converted to a modal-based SPA architecture using the Bridge Pattern.
+// This provides better performance and user experience.
+//
+// See: launchExecutiveDashboard() and getDashboardStats() in 04_UIService.gs
 
 // ============================================================================
 // STANDALONE ANALYTICS CHARTS
@@ -1372,4 +1284,355 @@ function showStewardWorkloadReport() {
     .setHeight(500);
 
   SpreadsheetApp.getUi().showModalDialog(output, 'Steward Workload Report');
+}
+
+// ============================================================================
+// SECURE MEMBER PORTAL - WEB APP
+// ============================================================================
+
+/**
+ * Web App entry point - handles URL parameters for member portal
+ * Deploy as: File > Deploy > New Deployment > Web App
+ * Access URL: https://script.google.com/.../exec?id=MEMBER_ID
+ *
+ * @param {Object} e - Event object with query parameters
+ * @returns {HtmlOutput} HTML page for display
+ */
+function doGet(e) {
+  var memberId = e && e.parameter && e.parameter.id;
+
+  if (memberId) {
+    // Return personalized member portal
+    return buildMemberPortal(memberId);
+  }
+
+  // Return public dashboard (no PII)
+  return buildPublicPortal();
+}
+
+/**
+ * Builds personalized member portal for specific member ID
+ * @param {string} memberId - The member ID to look up
+ * @returns {HtmlOutput} Personalized portal HTML
+ */
+function buildMemberPortal(memberId) {
+  var profile = getMemberProfile(memberId);
+
+  if (!profile) {
+    return HtmlService.createHtmlOutput(getErrorPageHtml_('Member not found'))
+      .setTitle('509 Member Portal - Error');
+  }
+
+  var html = getMemberPortalHtml_(profile);
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('509 Member Portal - ' + profile.firstName)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Builds public portal (no member ID required)
+ * @returns {HtmlOutput} Public portal HTML
+ */
+function buildPublicPortal() {
+  var stats = getGrievanceStats();
+  var stewards = getAllStewards();
+  var satisfaction = getAggregateSatisfactionStats();
+
+  var html = getPublicPortalHtml_(stats, stewards, satisfaction);
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('509 Union Member Portal')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Gets member profile by ID (with PII scrubbing for sensitive fields)
+ * @param {string} memberId - The member ID to look up
+ * @returns {Object|null} Member profile object or null if not found
+ */
+function getMemberProfile(memberId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!memberSheet || memberSheet.getLastRow() < 2) return null;
+
+  var data = memberSheet.getDataRange().getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] == memberId) {
+      return {
+        memberId: memberId,
+        firstName: data[i][MEMBER_COLS.FIRST_NAME - 1] || '',
+        lastName: data[i][MEMBER_COLS.LAST_NAME - 1] || '',
+        unit: data[i][MEMBER_COLS.UNIT - 1] || 'General',
+        workLocation: data[i][MEMBER_COLS.WORK_LOCATION - 1] || '',
+        duesPaying: data[i][MEMBER_COLS.DUES_PAYING - 1] === 'Yes',
+        isSteward: data[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes',
+        volunteerHours: parseFloat(data[i][MEMBER_COLS.VOLUNTEER_HOURS - 1]) || 0
+        // Note: Email and phone intentionally excluded for security
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Sends member dashboard email with personalized portal link
+ * @param {string} memberId - The member ID to send link to
+ */
+function sendMemberDashboardEmail(memberId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!memberSheet) {
+    SpreadsheetApp.getUi().alert('Member Directory not found.');
+    return;
+  }
+
+  var data = memberSheet.getDataRange().getValues();
+  var member = null;
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] == memberId) {
+      member = {
+        email: data[i][MEMBER_COLS.EMAIL - 1],
+        firstName: data[i][MEMBER_COLS.FIRST_NAME - 1]
+      };
+      break;
+    }
+  }
+
+  if (!member || !member.email) {
+    SpreadsheetApp.getUi().alert('Member email not found.');
+    return;
+  }
+
+  // Note: Replace with actual deployed web app URL
+  var webAppUrl = ScriptApp.getService().getUrl();
+  var portalUrl = webAppUrl + '?id=' + memberId;
+
+  var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Your Personal Union Portal';
+  var body = 'Hello ' + member.firstName + ',\n\n' +
+    'Access your personalized Union Member Portal:\n\n' +
+    portalUrl + '\n\n' +
+    'Your portal includes:\n' +
+    '- Emergency Weingarten Rights card\n' +
+    '- Your steward contact information\n' +
+    '- Union resources and contract links\n' +
+    '- Satisfaction survey link\n\n' +
+    'Keep this link private - it is personalized for you.\n\n' +
+    'In Solidarity,\n' +
+    '509 Strategic Command Center';
+
+  try {
+    MailApp.sendEmail(member.email, subject, body);
+    SpreadsheetApp.getUi().alert('Portal link sent to ' + member.email);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error sending email: ' + e.message);
+  }
+}
+
+/**
+ * Generates personalized member portal HTML
+ * @param {Object} profile - Member profile object
+ * @returns {string} Complete HTML for the portal
+ * @private
+ */
+function getMemberPortalHtml_(profile) {
+  var stewards = getAllStewards();
+  var stats = getGrievanceStats();
+  var CONTRACT_PDF_URL = getContractPdfUrl_();
+  var RESOURCE_DRIVE_URL = getResourceDriveUrl_();
+
+  return '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">' +
+    '  <style>' +
+    '    * { box-sizing: border-box; margin: 0; padding: 0; }' +
+    '    body { font-family: "Roboto", sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; color: #F8FAFC; }' +
+    '    .container { max-width: 600px; margin: 0 auto; padding: 20px; }' +
+    '    .header { background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%); padding: 24px; border-radius: 16px; margin-bottom: 20px; text-align: center; }' +
+    '    .header h1 { font-size: 18px; font-weight: 500; margin-bottom: 8px; }' +
+    '    .header .welcome { font-size: 24px; font-weight: 700; }' +
+    '    .member-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 20px; font-size: 12px; margin-top: 12px; }' +
+    '    .rights-box { background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%); border: 2px solid #dc2626; border-radius: 12px; padding: 20px; margin-bottom: 20px; }' +
+    '    .rights-header { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fecaca; margin-bottom: 12px; font-size: 14px; }' +
+    '    .rights-text { font-size: 15px; line-height: 1.6; font-weight: 500; }' +
+    '    .card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1); }' +
+    '    .card-title { display: flex; align-items: center; gap: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #94A3B8; margin-bottom: 12px; }' +
+    '    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }' +
+    '    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; transition: all 0.2s; }' +
+    '    .btn-purple { background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%); color: white; }' +
+    '    .btn-green { background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; }' +
+    '    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }' +
+    '    .steward-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }' +
+    '    .steward-item:last-child { border-bottom: none; }' +
+    '    .pill { background: rgba(124,58,237,0.2); color: #A78BFA; padding: 4px 10px; border-radius: 20px; font-size: 11px; }' +
+    '    .stats-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }' +
+    '    .stat { background: rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; text-align: center; }' +
+    '    .stat-value { font-size: 24px; font-weight: 700; color: #60A5FA; }' +
+    '    .stat-label { font-size: 10px; color: #94A3B8; text-transform: uppercase; }' +
+    '    .footer { text-align: center; font-size: 10px; color: #64748B; padding: 20px 0; }' +
+    '  </style>' +
+    '</head>' +
+    '<body>' +
+    '  <div class="container">' +
+    '    <div class="header">' +
+    '      <h1>509 MEMBER PORTAL</h1>' +
+    '      <div class="welcome">Welcome, ' + profile.firstName + '!</div>' +
+    '      <div class="member-badge">' +
+    '        <i class="material-icons" style="font-size:16px">' + (profile.isSteward ? 'verified' : 'person') + '</i>' +
+    '        ' + (profile.isSteward ? 'Union Steward' : 'Union Member') + ' - ' + profile.unit +
+    '      </div>' +
+    '    </div>' +
+    '    ' +
+    '    <div class="rights-box">' +
+    '      <div class="rights-header"><i class="material-icons">gavel</i> WEINGARTEN RIGHTS</div>' +
+    '      <div class="rights-text">"If this discussion could in any way lead to my being disciplined or terminated, I respectfully request that my union representative be present. Until my representative arrives, I choose not to answer questions or write any statements."</div>' +
+    '    </div>' +
+    '    ' +
+    '    <div class="btn-grid">' +
+    '      <a href="' + CONTRACT_PDF_URL + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
+    '      <a href="' + RESOURCE_DRIVE_URL + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
+    '    </div>' +
+    '    ' +
+    '    <div class="card">' +
+    '      <div class="card-title"><i class="material-icons">people</i> Your Stewards</div>' +
+    stewards.slice(0, 5).map(function(s) {
+      return '<div class="steward-item"><span>' + s['First Name'] + ' ' + s['Last Name'] + '</span><span class="pill">' + s['Unit'] + '</span></div>';
+    }).join('') +
+    '    </div>' +
+    '    ' +
+    '    <div class="card">' +
+    '      <div class="card-title"><i class="material-icons">bar_chart</i> Union Stats</div>' +
+    '      <div class="stats-row">' +
+    '        <div class="stat"><div class="stat-value">' + stats.winRate + '%</div><div class="stat-label">Win Rate</div></div>' +
+    '        <div class="stat"><div class="stat-value">' + stats.open + '</div><div class="stat-label">Active Cases</div></div>' +
+    '      </div>' +
+    '    </div>' +
+    '    ' +
+    '    <div class="footer">' +
+    '      <i class="material-icons" style="font-size:12px;vertical-align:middle">lock</i> ' +
+    '      Secure Member Portal | Member ID: ' + profile.memberId +
+    '    </div>' +
+    '  </div>' +
+    '</body>' +
+    '</html>';
+}
+
+/**
+ * Generates public portal HTML (no member ID required)
+ * @param {Object} stats - Grievance statistics
+ * @param {Array} stewards - List of stewards
+ * @param {Object} satisfaction - Satisfaction stats
+ * @returns {string} Complete HTML for public portal
+ * @private
+ */
+function getPublicPortalHtml_(stats, stewards, satisfaction) {
+  var CONTRACT_PDF_URL = getContractPdfUrl_();
+  var RESOURCE_DRIVE_URL = getResourceDriveUrl_();
+
+  return '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">' +
+    '  <style>' +
+    '    * { box-sizing: border-box; margin: 0; padding: 0; }' +
+    '    body { font-family: "Roboto", sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; color: #F8FAFC; }' +
+    '    .container { max-width: 600px; margin: 0 auto; padding: 20px; }' +
+    '    .header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid rgba(124,58,237,0.3); }' +
+    '    .header h1 { font-size: 20px; font-weight: 500; }' +
+    '    .header .material-icons { color: #7C3AED; font-size: 28px; }' +
+    '    .rights-box { background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%); border: 2px solid #dc2626; border-radius: 12px; padding: 20px; margin-bottom: 20px; }' +
+    '    .rights-header { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fecaca; margin-bottom: 12px; }' +
+    '    .rights-text { font-size: 14px; line-height: 1.6; font-weight: 500; }' +
+    '    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }' +
+    '    .btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 13px; }' +
+    '    .btn-purple { background: linear-gradient(135deg, #7C3AED 0%, #5B21B6 100%); color: white; }' +
+    '    .btn-green { background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; }' +
+    '    .card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.1); }' +
+    '    .card-title { display: flex; align-items: center; gap: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #94A3B8; margin-bottom: 12px; }' +
+    '    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }' +
+    '    .stat { background: rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; text-align: center; }' +
+    '    .stat-value { font-size: 24px; font-weight: 700; }' +
+    '    .stat-value.green { color: #10B981; }' +
+    '    .stat-value.blue { color: #60A5FA; }' +
+    '    .stat-label { font-size: 10px; color: #94A3B8; text-transform: uppercase; }' +
+    '    .steward-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }' +
+    '    .steward-item:last-child { border-bottom: none; }' +
+    '    .pill { background: rgba(124,58,237,0.2); color: #A78BFA; padding: 4px 10px; border-radius: 20px; font-size: 11px; }' +
+    '    .footer { text-align: center; font-size: 10px; color: #64748B; padding: 20px 0; }' +
+    '  </style>' +
+    '</head>' +
+    '<body>' +
+    '  <div class="container">' +
+    '    <div class="header"><i class="material-icons">shield</i><h1>509 Union Member Portal</h1></div>' +
+    '    ' +
+    '    <div class="rights-box">' +
+    '      <div class="rights-header"><i class="material-icons">gavel</i> WEINGARTEN RIGHTS</div>' +
+    '      <div class="rights-text">"If this discussion could in any way lead to my being disciplined or terminated, I respectfully request that my union representative be present."</div>' +
+    '    </div>' +
+    '    ' +
+    '    <div class="btn-grid">' +
+    '      <a href="' + CONTRACT_PDF_URL + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
+    '      <a href="' + RESOURCE_DRIVE_URL + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
+    '    </div>' +
+    '    ' +
+    '    <div class="card">' +
+    '      <div class="card-title"><i class="material-icons">bar_chart</i> Union Statistics</div>' +
+    '      <div class="stats-grid">' +
+    '        <div class="stat"><div class="stat-value green">' + satisfaction.avgTrust + '/10</div><div class="stat-label">Trust Score</div></div>' +
+    '        <div class="stat"><div class="stat-value blue">' + stats.winRate + '%</div><div class="stat-label">Win Rate</div></div>' +
+    '        <div class="stat"><div class="stat-value blue">' + stats.open + '</div><div class="stat-label">Active Cases</div></div>' +
+    '        <div class="stat"><div class="stat-value green">' + stats.total + '</div><div class="stat-label">Total Cases</div></div>' +
+    '      </div>' +
+    '    </div>' +
+    '    ' +
+    '    <div class="card">' +
+    '      <div class="card-title"><i class="material-icons">people</i> Find a Steward</div>' +
+    stewards.map(function(s) {
+      return '<div class="steward-item"><span>' + s['First Name'] + ' ' + s['Last Name'] + '</span><span class="pill">' + s['Unit'] + '</span></div>';
+    }).join('') +
+    '    </div>' +
+    '    ' +
+    '    <div class="footer"><i class="material-icons" style="font-size:12px;vertical-align:middle">lock</i> No PII Visible | Public Portal v' + VERSION_INFO.CURRENT + '</div>' +
+    '  </div>' +
+    '</body>' +
+    '</html>';
+}
+
+/**
+ * Generates error page HTML
+ * @param {string} message - Error message to display
+ * @returns {string} Error page HTML
+ * @private
+ */
+function getErrorPageHtml_(message) {
+  return '<!DOCTYPE html>' +
+    '<html>' +
+    '<head>' +
+    '  <meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">' +
+    '  <style>' +
+    '    body { font-family: "Roboto", sans-serif; background: #0F172A; min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #F8FAFC; }' +
+    '    .error-box { text-align: center; padding: 40px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 16px; max-width: 400px; }' +
+    '    .error-icon { font-size: 48px; color: #ef4444; margin-bottom: 16px; }' +
+    '    .error-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }' +
+    '    .error-msg { color: #94A3B8; }' +
+    '  </style>' +
+    '</head>' +
+    '<body>' +
+    '  <div class="error-box">' +
+    '    <i class="material-icons error-icon">error_outline</i>' +
+    '    <div class="error-title">Access Error</div>' +
+    '    <div class="error-msg">' + message + '</div>' +
+    '  </div>' +
+    '</body>' +
+    '</html>';
 }

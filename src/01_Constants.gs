@@ -104,10 +104,11 @@ var DRIVE_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 1,
+  MINOR: 2,
   PATCH: 0,
-  BUILD: 'v4.1.0',
-  CODENAME: 'Unified Master Engine'
+  BUILD: 'v4.2.0',
+  CURRENT: '4.2.0',
+  CODENAME: 'Modal Command Center'
 };
 
 // ============================================================================

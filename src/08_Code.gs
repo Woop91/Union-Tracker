@@ -2842,7 +2842,14 @@ function createFunctionChecklistSheet_() {
     ['1️⃣3️⃣ Test', '🧪 Testing', '⚡ Run Quick Tests', 'runQuickTests', 'Runs essential tests only (30 seconds)'],
     ['1️⃣3️⃣ Test', '🧪 Testing', '📊 View Test Results', 'viewTestResults', 'Shows results from last test run with pass/fail details'],
 
-    // ═══ PHASE 14: Strategic Command Center (509 Command Menu) ═══
+    // ═══ PHASE 14: Strategic Command Center (509 Command Menu) - Modal Architecture ═══
+    ['1️⃣4️⃣ Command', '📊 509 Command', '👁️ Executive Command (PII)', 'rebuildExecutiveDashboard', 'MODAL: Internal dashboard with KPIs, steward workload, Chart.js visuals'],
+    ['1️⃣4️⃣ Command', '📊 509 Command', '🫂 Member Analytics (No PII)', 'rebuildMemberAnalytics', 'MODAL: PII-safe dashboard with morale gauge, pipeline, sentiment trends'],
+    ['1️⃣4️⃣ Command', '📊 509 Command', '📩 Send Member Dashboard Link', 'sendMemberDashboardLink', 'Emails member portal access instructions to specified recipient'],
+    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'MODAL: Identifies locations with 3+ active grievances'],
+    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '🌟 Identify Rising Stars', 'identifyRisingStars', 'MODAL: Shows top steward performers by score and win rate'],
+    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📉 Management Hostility Report', 'renderHostilityFunnel', 'MODAL: Analyzes denial rates across grievance steps'],
+    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'MODAL: Strategic data for contract negotiations'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates IDs using unit codes from Config sheet'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs', 'Finds and highlights duplicate Member IDs'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '📄 Create PDF for Grievance', 'createPDFForSelectedGrievance', 'Generates PDF with signature blocks for selected grievance'],
@@ -2877,7 +2884,16 @@ function createFunctionChecklistSheet_() {
     ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
     ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '🖥️ Show All Columns', 'showAllMemberColumns', 'Restores all columns after mobile view'],
     ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📊 Go to Dashboard', 'navigateToDashboard', 'Navigate to Executive Dashboard'],
-    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '🎯 Go to Custom View', 'navigateToCustomView', 'Navigate to Custom View sheet']
+    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '🎯 Go to Custom View', 'navigateToCustomView', 'Navigate to Custom View sheet'],
+
+    // ═══ PHASE 19: Web App & Member Portal (v4.2) ═══
+    ['1️⃣9️⃣ Web App', '🌐 Web App', '🚀 doGet Entry Point', 'doGet', 'Web app entry point - handles ?id= parameter for member portal'],
+    ['1️⃣9️⃣ Web App', '🌐 Web App', '🔐 Build Member Portal', 'buildMemberPortal', 'Creates personalized portal for member ID with Weingarten rights'],
+    ['1️⃣9️⃣ Web App', '🌐 Web App', '📊 Build Public Portal', 'buildPublicPortal', 'Creates PII-free public union portal with steward list'],
+    ['1️⃣9️⃣ Web App', '🌐 Web App', '👤 Get Member Profile', 'getMemberProfile', 'Fetches member data by ID (PII scrubbed for security)'],
+    ['1️⃣9️⃣ Web App', '🌐 Web App', '📧 Send Portal Email', 'sendMemberDashboardEmail', 'Emails personalized portal link to member'],
+    ['1️⃣9️⃣ Web App', '📊 Bridge Pattern', '📈 Get Dashboard Stats', 'getDashboardStats', 'Server-side JSON aggregator for Executive Dashboard modal'],
+    ['1️⃣9️⃣ Web App', '📊 Bridge Pattern', '📊 Get Analytics Stats', 'getMemberAnalyticsStats', 'Server-side JSON aggregator for Member Analytics modal']
   ];
 
   // Build rows with header (8 columns: checkbox, Phase, Menu, Item, Function, Description, Notes, Notes 2)
