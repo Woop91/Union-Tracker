@@ -97,7 +97,9 @@ function createCommandCenterMenu() {
   menu.addSubMenu(ui.createMenu('📱 Field Accessibility')
       .addItem('📱 Mobile / Pocket View', 'navToMobile')
       .addItem('🖥️ Restore Full Desktop View', 'showAllMemberColumns')
-      .addItem('🔄 Refresh View', 'refreshMemberView'));
+      .addItem('🔄 Refresh View', 'refreshMemberView')
+      .addSeparator()
+      .addItem('📱 Get Mobile App URL', 'showWebAppUrl'));
 
   menu.addSeparator();
 

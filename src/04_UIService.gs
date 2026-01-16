@@ -70,6 +70,8 @@ function createDashboardMenu() {
       .addItem('📊 Executive Dashboard', 'showExecutiveDashboard')
       .addItem('⭐ Member Satisfaction', 'showSatisfactionDashboard')
       .addSeparator()
+      .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
+      .addSeparator()
       .addItem('🌙 Toggle Dark Mode', 'toggleDarkMode')
       .addItem('🎨 Theme Settings', 'showThemeSettings'))
 
