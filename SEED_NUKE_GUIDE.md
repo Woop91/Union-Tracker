@@ -422,16 +422,28 @@ Your dashboard is **production-ready**! 🚀
 
 ---
 
-**Last Updated**: 2026-01-15
-**Version**: 4.0.0
+**Last Updated**: 2026-01-16
+**Version**: 4.0.3
 
 ---
 
-## Version 4.0.0 Notes - 10-File Unified Master Engine
+## Version 4.0.3 Notes - 11-File Unified Master Engine
+
+In version 4.0.3, the system was upgraded with Material Design integration:
+
+- **New 11_SecureMemberDashboard.gs module** - Material Design member portal with Google Charts (1,375 lines)
+- **Google Charts Integration** - Interactive Treemap and Area Charts for analytics
+- **Safety Valve PII Scrubbing** - Auto-redaction of phone numbers and SSN patterns
+- **Weingarten Rights Utility** - Emergency rights statement for member protection
+- **Steward Workload Balancing** - Flags overloaded stewards with visual indicators
+
+---
+
+## Version 4.0.0 Notes - 10-File Unified Master Engine (Historical)
 
 In version 4.0.0, the system was upgraded to the Unified Master Engine with:
 
-- **New 10_CommandCenter.gs module** - Consolidated v4.0 features (1,489 lines)
+- **10_CommandCenter.gs module** - Consolidated v4.0 features (1,489 lines)
 - **Production Mode with NUKE logic** - Demo Data menu auto-hides after NUKE_DATABASE()
 - **PDF Signature Engine** - Legal signature-ready PDF generation
 - **Analytics & Insights** - Unit Health Reports and Grievance Trends

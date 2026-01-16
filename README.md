@@ -1,23 +1,24 @@
-# 509 Strategic Command Center - v4.0.2 Unified Master Engine
+# 509 Strategic Command Center - v4.0.3 Unified Master Engine
 
-A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **10-file modular architecture** following the Separation of Concerns principle.
+A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements an **11-file modular architecture** following the Separation of Concerns principle.
 
 ## Architecture Overview
 
-The dashboard uses a streamlined 10-file architecture for clarity and maintainability:
+The dashboard uses a streamlined 11-file architecture for clarity and maintainability:
 
 ```
 src/
-├── 01_Constants.gs        # Single source of truth for configuration
-├── 02_MemberManager.gs    # Member operations and directory management
-├── 03_GrievanceManager.gs # Grievance lifecycle and deadline tracking
-├── 04_UIService.gs        # UI, Comfort View, mobile, Strategic Command Center
-├── 05_Integrations.gs     # Drive, Calendar, WebApp integration
-├── 06_Maintenance.gs      # Diagnostics, caching, performance
-├── 07_DevTools.gs         # Test data generation (DELETE BEFORE PROD)
-├── 08_Code.gs             # Core setup, hidden sheets, dashboard creation
-├── 10_CommandCenter.gs    # 509 Strategic Command Center Unified Master Engine (v4.0)
-└── 09_Main.gs             # Entry point and triggers
+├── 01_Constants.gs              # Single source of truth for configuration
+├── 02_MemberManager.gs          # Member operations and directory management
+├── 03_GrievanceManager.gs       # Grievance lifecycle and deadline tracking
+├── 04_UIService.gs              # UI, Comfort View, mobile, Strategic Command Center
+├── 05_Integrations.gs           # Drive, Calendar, WebApp integration
+├── 06_Maintenance.gs            # Diagnostics, caching, performance
+├── 07_DevTools.gs               # Test data generation (DELETE BEFORE PROD)
+├── 08_Code.gs                   # Core setup, hidden sheets, dashboard creation
+├── 09_Main.gs                   # Entry point and triggers
+├── 10_CommandCenter.gs          # 509 Strategic Command Center Unified Master Engine (v4.0)
+└── 11_SecureMemberDashboard.gs  # Material Design member portal with analytics (v4.0.3)
 ```
 
 ### Module Descriptions
@@ -33,6 +34,7 @@ src/
 | **07_DevTools.gs** | Test data generation and demo utilities (remove before production) | `seedAllSampleData`, `nukeDemoData`, `showDeveloperPanel` |
 | **08_Code.gs** | Core setup, hidden sheet management, dashboard creation | `CREATE_509_DASHBOARD`, `setupAllHiddenSheets`, `createConfigSheet` |
 | **10_CommandCenter.gs** | v4.0 Unified Master Engine - PDF engine, analytics, scaling hooks | `navToMobile`, `createGrievancePDF`, `showUnitHealthReport`, `calculateUnitHealth` |
+| **11_SecureMemberDashboard.gs** | Material Design member portal with Google Charts, PII protection | `showPublicMemberDashboard`, `showStewardPerformanceModal`, `safetyValveScrub`, `getAdvancedAnalytics` |
 | **09_Main.gs** | Entry point, triggers, edit handlers | `onOpen`, `onEdit`, `initializeDashboard` |
 
 ## v4.0 Features
@@ -45,7 +47,7 @@ src/
 - **Analytics & Insights**: Unit Health Reports, Grievance Trends analysis
 - **Scaling Hooks**: OCR transcription and Sentiment analysis placeholders
 
-## v4.0.2 Features (NEW)
+## v4.0.2 Features
 
 - **Secure Member Dashboard**: Interactive modal with Google Charts (pie chart for issue categories, gauge for trust score, area chart for trends)
 - **Material Icons Integration**: Professional iconography throughout the UI
@@ -55,11 +57,23 @@ src/
 - **Email Dashboard Link**: One-click email sending of dashboard URL to selected members
 - **Zero PII Exposure**: All member-facing views show only aggregate statistics
 
-## Benefits of 10-File Architecture
+## v4.0.3 Features (NEW)
+
+- **Material Design Integration**: Full Material Design UI with Google Material Icons and Roboto typography
+- **Google Charts Analytics**: Interactive Treemap for unit density visualization and Area Charts for sentiment trends
+- **Safety Valve PII Scrubbing**: Auto-redaction of phone numbers and SSN patterns from public-facing dashboards
+- **Weingarten Rights Utility**: Emergency rights statement with tap-to-expand for member protection during meetings
+- **Unit Density Heat Map**: Visual representation of grievance activity by unit (green → yellow → red coloring)
+- **Sentiment Trend Analysis**: Union morale tracking over time from survey data
+- **Steward Workload Balancing**: Workload metrics with overload detection (flags stewards with 8+ active cases)
+- **Standalone Analytics Charts**: Dedicated modals for Treemap, Sentiment Trend, and Workload Report
+- **High-Contrast Dark Theme**: Professional dark gradient backgrounds optimized for readability
+
+## Benefits of 11-File Architecture
 
 1. **Clear Separation**: Each file has one clear purpose
 2. **Easy Navigation**: Numbered prefixes show dependency order on GitHub
-3. **Production Ready**: Delete `07_DevTools.gs` before go-live (9 files in production)
+3. **Production Ready**: Delete `07_DevTools.gs` before go-live (10 files in production)
 4. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
 5. **Easier Maintenance**: Update union rules in one place (`01_Constants.gs`)
 6. **Scalability**: Handles 5,000+ members without performance issues
@@ -92,7 +106,7 @@ src/
 
 ### Making Changes
 
-1. Edit files in the `src/` directory (numbered 01-10)
+1. Edit files in the `src/` directory (numbered 01-11)
 2. Copy updated files to Google Apps Script
 3. Save and refresh your Google Sheet
 
@@ -110,6 +124,7 @@ src/
 | `08_Code.gs` | Core setup, hidden sheets, dashboard creation |
 | `09_Main.gs` | Entry point and triggers |
 | `10_CommandCenter.gs` | Strategic Command Center features |
+| `11_SecureMemberDashboard.gs` | Material Design member portal with analytics |
 
 ## Going Live (Production)
 
@@ -123,17 +138,19 @@ Before deploying to production:
 
 ```
 src/
-├── 01_Constants.gs       # Configuration
-├── 02_MemberManager.gs   # Member operations
-├── 03_GrievanceManager.gs# Grievance lifecycle
-├── 04_UIService.gs       # UI components
-├── 05_Integrations.gs    # External services
-├── 06_Maintenance.gs     # Admin tools
-├── 08_Code.gs            # Core setup
-└── 09_Main.gs            # Entry point
+├── 01_Constants.gs              # Configuration
+├── 02_MemberManager.gs          # Member operations
+├── 03_GrievanceManager.gs       # Grievance lifecycle
+├── 04_UIService.gs              # UI components
+├── 05_Integrations.gs           # External services
+├── 06_Maintenance.gs            # Admin tools
+├── 08_Code.gs                   # Core setup
+├── 09_Main.gs                   # Entry point
+├── 10_CommandCenter.gs          # Strategic Command Center
+└── 11_SecureMemberDashboard.gs  # Material Design member portal
 ```
 
-**8 files in production** (DevTools removed)
+**10 files in production** (DevTools removed)
 
 ## Key Features
 
@@ -306,6 +323,9 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
+- **4.0.3** - Material Design Integration with Google Charts, Safety Valve PII scrubbing, Weingarten Rights utility (11-file architecture)
+- **4.0.2** - Secure Member Dashboard with live steward search and zero PII exposure
+- **4.0.0** - Unified Master Engine with PDF generation, mobile view, analytics hooks
 - **3.6.0** - Strategic Command Center with dual-dashboards, midnight auto-refresh, dynamic config
 - **2.3.0** - Enhanced grievance dashboard with 9-file modular architecture
 - **2.2.0** - Complete feature parity with 16-module modular architecture
