@@ -24,7 +24,8 @@ const BUILD_ORDER = [
   '08_Code.gs',
   '09_Main.gs',
   '10_CommandCenter.gs',
-  '11_SecureMemberDashboard.gs'
+  '11_SecureMemberDashboard.gs',
+  '12_ChecklistManager.gs'
 ];
 
 const HTML_FILES = [

@@ -113,12 +113,48 @@ function onGrievanceFormSubmit(formData) {
     grievanceType: formData.grievanceType,
     articleViolated: formData.articleViolated,
     description: formData.description,
-    notes: formData.notes
+    notes: formData.notes,
+    actionType: formData.actionType || 'Grievance'
   };
 
   const result = startNewGrievance(grievanceData);
 
   if (result.success) {
+    // Set the Action Type on the new row
+    try {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+      if (grievanceSheet && GRIEVANCE_COLS.ACTION_TYPE) {
+        // Find the row with this grievance ID
+        const lastRow = grievanceSheet.getLastRow();
+        const grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
+        for (let i = 0; i < grievanceIds.length; i++) {
+          if (grievanceIds[i][0] === result.grievanceId) {
+            grievanceSheet.getRange(i + 2, GRIEVANCE_COLS.ACTION_TYPE).setValue(grievanceData.actionType);
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.log('Note: Could not set action type: ' + e.message);
+    }
+
+    // Create checklist from template
+    if (typeof createChecklistFromTemplate === 'function' && formData.createChecklist !== false) {
+      try {
+        const checklistResult = createChecklistFromTemplate(
+          result.grievanceId,
+          grievanceData.actionType,
+          grievanceData.grievanceType
+        );
+        if (checklistResult.success) {
+          console.log('Checklist created with ' + checklistResult.count + ' items');
+        }
+      } catch (e) {
+        console.log('Note: Checklist creation skipped: ' + e.message);
+      }
+    }
+
     // Optionally create Drive folder
     if (formData.createFolder) {
       setupDriveFolderForGrievance(result.grievanceId);
@@ -909,22 +945,43 @@ function getNewGrievanceFormHtml() {
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Grievance Type *</label>
+              <label class="form-label">Action Type *</label>
+              <select class="form-select" id="actionType" required onchange="updateFormForActionType()">
+                <option value="Grievance">Grievance</option>
+                <option value="Records Request">Records Request (Art. 21)</option>
+                <option value="Information Request">Union Information Request</option>
+                <option value="Weingarten">Weingarten Documentation</option>
+                <option value="ULP Filing">Unfair Labor Practice (DLR)</option>
+                <option value="EEOC/MCAD">EEOC/MCAD Complaint</option>
+                <option value="Accommodation">ADA/Reasonable Accommodation</option>
+                <option value="Other Admin">Other Administrative Action</option>
+              </select>
+            </div>
+            <div class="form-group" id="grievanceTypeGroup">
+              <label class="form-label">Issue Category *</label>
               <select class="form-select" id="grievanceType" required>
-                <option value="">Select type...</option>
+                <option value="">Select category...</option>
                 <option value="Contract Violation">Contract Violation</option>
                 <option value="Discipline">Discipline</option>
-                <option value="Discharge">Discharge</option>
-                <option value="Working Conditions">Working Conditions</option>
+                <option value="Workload">Workload</option>
+                <option value="Scheduling">Scheduling</option>
+                <option value="Pay">Pay</option>
+                <option value="Benefits">Benefits</option>
                 <option value="Safety">Safety</option>
+                <option value="Harassment">Harassment</option>
+                <option value="Discrimination">Discrimination</option>
                 <option value="Other">Other</option>
               </select>
             </div>
+          </div>
+
+          <div class="form-row" id="articleGroup">
             <div class="form-group">
               <label class="form-label">Article Violated</label>
               <input type="text" class="form-input" id="articleViolated"
                      placeholder="e.g., Article 23A, Section 5">
             </div>
+            <div class="form-group"></div>
           </div>
 
           <div class="form-group">
@@ -941,12 +998,16 @@ function getNewGrievanceFormHtml() {
 
           <div class="checkbox-row">
             <label class="checkbox-label">
+              <input type="checkbox" id="createChecklist" checked>
+              Create checklist from template
+            </label>
+            <label class="checkbox-label">
               <input type="checkbox" id="createFolder" checked>
-              Create Drive folder for documents
+              Create Drive folder
             </label>
             <label class="checkbox-label">
               <input type="checkbox" id="syncCalendar" checked>
-              Sync deadlines to calendar
+              Sync to calendar
             </label>
           </div>
 
@@ -963,18 +1024,57 @@ function getNewGrievanceFormHtml() {
         // Set default date to today
         document.getElementById('filingDate').valueAsDate = new Date();
 
+        // Update form visibility based on action type
+        function updateFormForActionType() {
+          const actionType = document.getElementById('actionType').value;
+          const isGrievance = actionType === 'Grievance';
+
+          // Show/hide Issue Category (only for Grievances)
+          document.getElementById('grievanceTypeGroup').style.display = isGrievance ? 'block' : 'none';
+          document.getElementById('grievanceType').required = isGrievance;
+
+          // Show/hide Articles Violated (only for Grievances)
+          document.getElementById('articleGroup').style.display = isGrievance ? 'flex' : 'none';
+
+          // Update submit button text
+          const btn = document.querySelector('button[type="submit"]');
+          btn.textContent = isGrievance ? 'Create Grievance' : 'Create ' + actionType;
+
+          // Update description placeholder based on action type
+          const desc = document.getElementById('description');
+          if (isGrievance) {
+            desc.placeholder = 'Describe the grievance in detail...';
+          } else if (actionType === 'Records Request') {
+            desc.placeholder = 'Describe what records are being requested...';
+          } else if (actionType === 'Weingarten') {
+            desc.placeholder = 'Describe the meeting and representation provided...';
+          } else if (actionType === 'ULP Filing') {
+            desc.placeholder = 'Describe the unfair labor practice...';
+          } else {
+            desc.placeholder = 'Describe the action or request in detail...';
+          }
+        }
+
+        // Initialize form state
+        updateFormForActionType();
+
         document.getElementById('grievanceForm').addEventListener('submit', function(e) {
           e.preventDefault();
 
           const memberSelect = document.getElementById('memberId');
+          const actionType = document.getElementById('actionType').value;
+          const isGrievance = actionType === 'Grievance';
+
           const formData = {
             memberId: memberSelect.value,
             memberName: memberSelect.options[memberSelect.selectedIndex].text.split(' (')[0],
             filingDate: document.getElementById('filingDate').value,
-            grievanceType: document.getElementById('grievanceType').value,
+            actionType: actionType,
+            grievanceType: isGrievance ? document.getElementById('grievanceType').value : actionType,
             articleViolated: document.getElementById('articleViolated').value,
             description: document.getElementById('description').value,
             notes: document.getElementById('notes').value,
+            createChecklist: document.getElementById('createChecklist').checked,
             createFolder: document.getElementById('createFolder').checked,
             syncCalendar: document.getElementById('syncCalendar').checked
           };

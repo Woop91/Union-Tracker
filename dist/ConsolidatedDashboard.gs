@@ -21,6 +21,7 @@
  *   - 09_Main.gs
  *   - 10_CommandCenter.gs
  *   - 11_SecureMemberDashboard.gs
+ *   - 12_ChecklistManager.gs
  *
  * HTML Files (embedded):
  *  *   - MultiSelectDialog.html
@@ -29,7 +30,7 @@
  */
 
 // ============================================================================
-// SOURCE: 01_Constants.gs (1336 lines)
+// SOURCE: 01_Constants.gs (1636 lines)
 // ============================================================================
 
 /**
@@ -138,11 +139,11 @@ var DRIVE_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 2,
+  MINOR: 3,
   PATCH: 0,
-  BUILD: 'v4.2.0',
-  CURRENT: '4.2.0',
-  CODENAME: 'Modal Command Center'
+  BUILD: 'v4.3.0',
+  CURRENT: '4.3.0',
+  CODENAME: 'Checklist Tracking'
 };
 
 // ============================================================================
@@ -175,6 +176,8 @@ var SHEETS = {
   FUNCTION_CHECKLIST: 'Function Checklist',
   // Audit Log (hidden)
   AUDIT_LOG: '_Audit_Log',
+  // Case Checklist
+  CASE_CHECKLIST: 'Case Checklist',
   // Satisfaction & Feedback sheets
   SATISFACTION: '📊 Member Satisfaction',
   FEEDBACK: '💡 Feedback & Development',
@@ -483,7 +486,11 @@ var GRIEVANCE_COLS = {
   DRIVE_FOLDER_URL: 34,   // AH - Google Drive folder URL
 
   // Section 13: Quick Actions (AI)
-  QUICK_ACTIONS: 35       // AI - Checkbox to open Quick Actions dialog
+  QUICK_ACTIONS: 35,      // AI - Checkbox to open Quick Actions dialog
+
+  // Section 14: Action Type & Checklist (AJ-AK)
+  ACTION_TYPE: 36,        // AJ - Action Type (Grievance, Records Request, etc.)
+  CHECKLIST_PROGRESS: 37  // AK - Checklist Progress (e.g., "5/8" or "62%")
 };
 
 // ============================================================================
@@ -573,7 +580,11 @@ var GRIEVANCE_COLUMNS = {
   DRIVE_FOLDER: 33,        // Alias for DRIVE_FOLDER_URL
 
   // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 34        // AI - Quick Actions
+  QUICK_ACTIONS: 34,       // AI - Quick Actions
+
+  // Action Type & Checklist (0-indexed)
+  ACTION_TYPE: 35,         // AJ - Action Type
+  CHECKLIST_PROGRESS: 36   // AK - Checklist Progress
 };
 
 /**
@@ -1026,7 +1037,9 @@ function mapGrievanceRow(row) {
     acknowledgedBy: row[GRIEVANCE_COLS.ACKNOWLEDGED_BY - 1] || '',
     acknowledgedDate: row[GRIEVANCE_COLS.ACKNOWLEDGED_DATE - 1] || '',
     driveFolderId: row[GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1] || '',
-    driveFolderUrl: row[GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1] || ''
+    driveFolderUrl: row[GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1] || '',
+    actionType: row[GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance',
+    checklistProgress: row[GRIEVANCE_COLS.CHECKLIST_PROGRESS - 1] || ''
   };
 }
 
@@ -1066,7 +1079,8 @@ function getGrievanceHeaders() {
     'Resolution',
     'Message Alert', 'Coordinator Message', 'Acknowledged By', 'Acknowledged Date',
     'Drive Folder ID', 'Drive Folder URL',
-    '⚡ Actions'
+    '⚡ Actions',
+    'Action Type', 'Checklist Progress'
   ];
 }
 
@@ -1336,6 +1350,293 @@ function generateUUID_() {
     }
   }
   return uuid;
+}
+
+// ============================================================================
+// ACTION TYPE CONFIGURATION (Grievances + Other Actions)
+// ============================================================================
+
+/**
+ * Action types for tracking different case types
+ * Allows the system to handle grievances AND other member advocacy actions
+ * @const {Object}
+ */
+var ACTION_TYPES = {
+  GRIEVANCE: 'Grievance',
+  RECORDS_REQUEST: 'Records Request',
+  INFO_REQUEST: 'Information Request',
+  WEINGARTEN: 'Weingarten',
+  ULP: 'ULP Filing',
+  EEOC_MCAD: 'EEOC/MCAD',
+  ACCOMMODATION: 'Accommodation',
+  OTHER_ADMIN: 'Other Admin'
+};
+
+/**
+ * Action type display names and configuration
+ * @const {Array}
+ */
+var ACTION_TYPE_CONFIG = [
+  { value: 'Grievance', label: 'Grievance', icon: '📋', usesGrievanceSteps: true, color: '#F97316' },
+  { value: 'Records Request', label: 'Records Request (Art. 21)', icon: '📁', usesGrievanceSteps: false, color: '#3B82F6' },
+  { value: 'Information Request', label: 'Union Information Request', icon: '📄', usesGrievanceSteps: false, color: '#8B5CF6' },
+  { value: 'Weingarten', label: 'Weingarten Documentation', icon: '🛡️', usesGrievanceSteps: false, color: '#10B981' },
+  { value: 'ULP Filing', label: 'Unfair Labor Practice (DLR)', icon: '⚖️', usesGrievanceSteps: false, color: '#EF4444' },
+  { value: 'EEOC/MCAD', label: 'EEOC/MCAD Complaint', icon: '🏛️', usesGrievanceSteps: false, color: '#EC4899' },
+  { value: 'Accommodation', label: 'ADA/Reasonable Accommodation', icon: '♿', usesGrievanceSteps: false, color: '#06B6D4' },
+  { value: 'Other Admin', label: 'Other Administrative Action', icon: '📝', usesGrievanceSteps: false, color: '#64748B' }
+];
+
+/**
+ * Get action type configuration by value
+ * @param {string} actionType - The action type value
+ * @returns {Object|null} Action type config if found
+ */
+function getActionTypeConfig(actionType) {
+  for (var i = 0; i < ACTION_TYPE_CONFIG.length; i++) {
+    if (ACTION_TYPE_CONFIG[i].value === actionType) {
+      return ACTION_TYPE_CONFIG[i];
+    }
+  }
+  return null;
+}
+
+// ============================================================================
+// CHECKLIST CONFIGURATION
+// ============================================================================
+
+/**
+ * Checklist sheet name
+ * @const {string}
+ */
+var CHECKLIST_SHEET_NAME = 'Case Checklist';
+
+/**
+ * Checklist column positions (1-indexed)
+ * @const {Object}
+ */
+var CHECKLIST_COLS = {
+  CHECKLIST_ID: 1,       // A - Unique checklist item ID
+  CASE_ID: 2,            // B - Links to Grievance ID or Action ID
+  ACTION_TYPE: 3,        // C - Type of case (Grievance, Records Request, etc.)
+  ITEM_TEXT: 4,          // D - Description of checklist item
+  CATEGORY: 5,           // E - Document, Meeting, Deadline, Evidence, Communication
+  REQUIRED: 6,           // F - Yes/No - Is this item required?
+  COMPLETED: 7,          // G - Checkbox - Has item been completed?
+  COMPLETED_BY: 8,       // H - Who completed this item
+  COMPLETED_DATE: 9,     // I - When item was completed
+  DUE_DATE: 10,          // J - Optional due date for time-sensitive items
+  NOTES: 11,             // K - Additional notes
+  SORT_ORDER: 12         // L - For custom ordering of items
+};
+
+/**
+ * Checklist item categories
+ * @const {Array}
+ */
+var CHECKLIST_CATEGORIES = [
+  'Document',
+  'Meeting',
+  'Deadline',
+  'Evidence',
+  'Communication',
+  'Follow-up',
+  'Other'
+];
+
+/**
+ * Default checklist templates by action type and issue category
+ * Each template contains items that are auto-populated when a new case is created
+ * @const {Object}
+ */
+var CHECKLIST_TEMPLATES = {
+  // Standard Grievance Templates
+  'Grievance': {
+    '_default': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles', category: 'Document', required: true },
+      { text: 'Written statement from member', category: 'Evidence', required: true },
+      { text: 'Witness statements (if applicable)', category: 'Evidence', required: false },
+      { text: 'Relevant emails/communications', category: 'Evidence', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Discipline': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of discipline letter/notice', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles (Art. 13)', category: 'Document', required: true },
+      { text: 'Member\'s written response to discipline', category: 'Document', required: true },
+      { text: 'Prior discipline history obtained', category: 'Evidence', required: true },
+      { text: 'Comparator cases researched', category: 'Evidence', required: false },
+      { text: 'Weingarten documentation (if applicable)', category: 'Document', required: false },
+      { text: 'Witness statements', category: 'Evidence', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Workload': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles', category: 'Document', required: true },
+      { text: 'Workload documentation (caseload reports, etc.)', category: 'Evidence', required: true },
+      { text: 'Written statement describing workload issues', category: 'Evidence', required: true },
+      { text: 'Time/task analysis if available', category: 'Evidence', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Scheduling': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles (Art. 6)', category: 'Document', required: true },
+      { text: 'Copy of schedule showing violation', category: 'Evidence', required: true },
+      { text: 'Written statement from member', category: 'Evidence', required: true },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Pay': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles (Art. 8)', category: 'Document', required: true },
+      { text: 'Pay stubs showing discrepancy', category: 'Evidence', required: true },
+      { text: 'Written statement from member', category: 'Evidence', required: true },
+      { text: 'Calculation of amount owed', category: 'Document', required: true },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Harassment': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles', category: 'Document', required: true },
+      { text: 'Detailed written statement from member', category: 'Evidence', required: true },
+      { text: 'Timeline of incidents', category: 'Evidence', required: true },
+      { text: 'Witness statements', category: 'Evidence', required: false },
+      { text: 'Copies of any written communications', category: 'Evidence', required: false },
+      { text: 'Prior complaints documented', category: 'Evidence', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ],
+    'Discrimination': [
+      { text: 'Signed grievance form from member', category: 'Document', required: true },
+      { text: 'Copy of relevant contract articles (Art. 5)', category: 'Document', required: true },
+      { text: 'Detailed written statement from member', category: 'Evidence', required: true },
+      { text: 'Comparator evidence (how others treated)', category: 'Evidence', required: true },
+      { text: 'Timeline of incidents', category: 'Evidence', required: true },
+      { text: 'Witness statements', category: 'Evidence', required: false },
+      { text: 'EEOC/MCAD filing discussed with member', category: 'Communication', required: false },
+      { text: 'Step I meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Management response received', category: 'Document', required: true },
+      { text: 'Member notified of decision', category: 'Communication', required: true }
+    ]
+  },
+
+  // Records Request Templates
+  'Records Request': {
+    '_default': [
+      { text: 'Written request submitted to HR', category: 'Document', required: true },
+      { text: 'Member signed authorization form', category: 'Document', required: true },
+      { text: 'Request receipt confirmation', category: 'Document', required: false },
+      { text: 'Copy of records received', category: 'Document', required: true },
+      { text: 'Records reviewed with member', category: 'Communication', required: true },
+      { text: 'Member signed acknowledgment of receipt', category: 'Document', required: false }
+    ]
+  },
+
+  // Information Request Templates
+  'Information Request': {
+    '_default': [
+      { text: 'Written information request drafted', category: 'Document', required: true },
+      { text: 'Request submitted to employer', category: 'Document', required: true },
+      { text: 'Submission receipt confirmation', category: 'Document', required: false },
+      { text: 'Response received from employer', category: 'Document', required: true },
+      { text: 'Information reviewed and analyzed', category: 'Follow-up', required: true }
+    ]
+  },
+
+  // Weingarten Templates
+  'Weingarten': {
+    '_default': [
+      { text: 'Member requested representation', category: 'Document', required: true },
+      { text: 'Date/time of meeting documented', category: 'Document', required: true },
+      { text: 'Meeting attendees documented', category: 'Document', required: true },
+      { text: 'Notes from meeting', category: 'Document', required: true },
+      { text: 'Member debriefed after meeting', category: 'Communication', required: true },
+      { text: 'Follow-up actions identified', category: 'Follow-up', required: false }
+    ]
+  },
+
+  // ULP Filing Templates
+  'ULP Filing': {
+    '_default': [
+      { text: 'ULP charge form completed', category: 'Document', required: true },
+      { text: 'Supporting documentation gathered', category: 'Evidence', required: true },
+      { text: 'Charge filed with DLR/NLRB', category: 'Document', required: true },
+      { text: 'Filing confirmation received', category: 'Document', required: true },
+      { text: 'Member notified of filing', category: 'Communication', required: true },
+      { text: 'Case number assigned', category: 'Document', required: true },
+      { text: 'Investigation meeting scheduled', category: 'Meeting', required: false },
+      { text: 'Settlement discussions (if any)', category: 'Meeting', required: false }
+    ]
+  },
+
+  // EEOC/MCAD Templates
+  'EEOC/MCAD': {
+    '_default': [
+      { text: 'Intake questionnaire completed', category: 'Document', required: true },
+      { text: 'Supporting documentation gathered', category: 'Evidence', required: true },
+      { text: 'Charge filed with EEOC/MCAD', category: 'Document', required: true },
+      { text: 'Right to Sue letter requested (if applicable)', category: 'Document', required: false },
+      { text: 'Filing confirmation received', category: 'Document', required: true },
+      { text: 'Member notified of filing', category: 'Communication', required: true },
+      { text: 'Investigation meeting scheduled', category: 'Meeting', required: false },
+      { text: 'Mediation scheduled (if offered)', category: 'Meeting', required: false }
+    ]
+  },
+
+  // Accommodation Templates
+  'Accommodation': {
+    '_default': [
+      { text: 'Accommodation request form completed', category: 'Document', required: true },
+      { text: 'Medical documentation obtained', category: 'Document', required: true },
+      { text: 'Request submitted to employer', category: 'Document', required: true },
+      { text: 'Interactive process meeting scheduled', category: 'Meeting', required: true },
+      { text: 'Meeting notes documented', category: 'Document', required: true },
+      { text: 'Employer response received', category: 'Document', required: true },
+      { text: 'Accommodation implemented/denied', category: 'Follow-up', required: true },
+      { text: 'Member notified of outcome', category: 'Communication', required: true }
+    ]
+  },
+
+  // Other Admin Templates
+  'Other Admin': {
+    '_default': [
+      { text: 'Issue documented', category: 'Document', required: true },
+      { text: 'Action request submitted', category: 'Document', required: true },
+      { text: 'Response received', category: 'Document', required: false },
+      { text: 'Member notified of outcome', category: 'Communication', required: true }
+    ]
+  }
+};
+
+/**
+ * Get checklist template for an action type and issue category
+ * @param {string} actionType - The action type (e.g., 'Grievance', 'Records Request')
+ * @param {string} issueCategory - The issue category (e.g., 'Discipline', 'Pay') - only for grievances
+ * @returns {Array} Array of checklist item templates
+ */
+function getChecklistTemplate(actionType, issueCategory) {
+  var templates = CHECKLIST_TEMPLATES[actionType];
+  if (!templates) {
+    return CHECKLIST_TEMPLATES['Other Admin']['_default'];
+  }
+
+  // For grievances, check for category-specific template
+  if (actionType === 'Grievance' && issueCategory && templates[issueCategory]) {
+    return templates[issueCategory];
+  }
+
+  // Return default template for this action type
+  return templates['_default'] || [];
 }
 
 /**
@@ -2135,7 +2436,7 @@ function updateMemberDataBatch(memberId, newValuesObj) {
 
 
 // ============================================================================
-// SOURCE: 03_GrievanceManager.gs (1209 lines)
+// SOURCE: 03_GrievanceManager.gs (1309 lines)
 // ============================================================================
 
 /**
@@ -2253,12 +2554,48 @@ function onGrievanceFormSubmit(formData) {
     grievanceType: formData.grievanceType,
     articleViolated: formData.articleViolated,
     description: formData.description,
-    notes: formData.notes
+    notes: formData.notes,
+    actionType: formData.actionType || 'Grievance'
   };
 
   const result = startNewGrievance(grievanceData);
 
   if (result.success) {
+    // Set the Action Type on the new row
+    try {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+      if (grievanceSheet && GRIEVANCE_COLS.ACTION_TYPE) {
+        // Find the row with this grievance ID
+        const lastRow = grievanceSheet.getLastRow();
+        const grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
+        for (let i = 0; i < grievanceIds.length; i++) {
+          if (grievanceIds[i][0] === result.grievanceId) {
+            grievanceSheet.getRange(i + 2, GRIEVANCE_COLS.ACTION_TYPE).setValue(grievanceData.actionType);
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.log('Note: Could not set action type: ' + e.message);
+    }
+
+    // Create checklist from template
+    if (typeof createChecklistFromTemplate === 'function' && formData.createChecklist !== false) {
+      try {
+        const checklistResult = createChecklistFromTemplate(
+          result.grievanceId,
+          grievanceData.actionType,
+          grievanceData.grievanceType
+        );
+        if (checklistResult.success) {
+          console.log('Checklist created with ' + checklistResult.count + ' items');
+        }
+      } catch (e) {
+        console.log('Note: Checklist creation skipped: ' + e.message);
+      }
+    }
+
     // Optionally create Drive folder
     if (formData.createFolder) {
       setupDriveFolderForGrievance(result.grievanceId);
@@ -3049,22 +3386,43 @@ function getNewGrievanceFormHtml() {
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Grievance Type *</label>
+              <label class="form-label">Action Type *</label>
+              <select class="form-select" id="actionType" required onchange="updateFormForActionType()">
+                <option value="Grievance">Grievance</option>
+                <option value="Records Request">Records Request (Art. 21)</option>
+                <option value="Information Request">Union Information Request</option>
+                <option value="Weingarten">Weingarten Documentation</option>
+                <option value="ULP Filing">Unfair Labor Practice (DLR)</option>
+                <option value="EEOC/MCAD">EEOC/MCAD Complaint</option>
+                <option value="Accommodation">ADA/Reasonable Accommodation</option>
+                <option value="Other Admin">Other Administrative Action</option>
+              </select>
+            </div>
+            <div class="form-group" id="grievanceTypeGroup">
+              <label class="form-label">Issue Category *</label>
               <select class="form-select" id="grievanceType" required>
-                <option value="">Select type...</option>
+                <option value="">Select category...</option>
                 <option value="Contract Violation">Contract Violation</option>
                 <option value="Discipline">Discipline</option>
-                <option value="Discharge">Discharge</option>
-                <option value="Working Conditions">Working Conditions</option>
+                <option value="Workload">Workload</option>
+                <option value="Scheduling">Scheduling</option>
+                <option value="Pay">Pay</option>
+                <option value="Benefits">Benefits</option>
                 <option value="Safety">Safety</option>
+                <option value="Harassment">Harassment</option>
+                <option value="Discrimination">Discrimination</option>
                 <option value="Other">Other</option>
               </select>
             </div>
+          </div>
+
+          <div class="form-row" id="articleGroup">
             <div class="form-group">
               <label class="form-label">Article Violated</label>
               <input type="text" class="form-input" id="articleViolated"
                      placeholder="e.g., Article 23A, Section 5">
             </div>
+            <div class="form-group"></div>
           </div>
 
           <div class="form-group">
@@ -3081,12 +3439,16 @@ function getNewGrievanceFormHtml() {
 
           <div class="checkbox-row">
             <label class="checkbox-label">
+              <input type="checkbox" id="createChecklist" checked>
+              Create checklist from template
+            </label>
+            <label class="checkbox-label">
               <input type="checkbox" id="createFolder" checked>
-              Create Drive folder for documents
+              Create Drive folder
             </label>
             <label class="checkbox-label">
               <input type="checkbox" id="syncCalendar" checked>
-              Sync deadlines to calendar
+              Sync to calendar
             </label>
           </div>
 
@@ -3103,18 +3465,57 @@ function getNewGrievanceFormHtml() {
         // Set default date to today
         document.getElementById('filingDate').valueAsDate = new Date();
 
+        // Update form visibility based on action type
+        function updateFormForActionType() {
+          const actionType = document.getElementById('actionType').value;
+          const isGrievance = actionType === 'Grievance';
+
+          // Show/hide Issue Category (only for Grievances)
+          document.getElementById('grievanceTypeGroup').style.display = isGrievance ? 'block' : 'none';
+          document.getElementById('grievanceType').required = isGrievance;
+
+          // Show/hide Articles Violated (only for Grievances)
+          document.getElementById('articleGroup').style.display = isGrievance ? 'flex' : 'none';
+
+          // Update submit button text
+          const btn = document.querySelector('button[type="submit"]');
+          btn.textContent = isGrievance ? 'Create Grievance' : 'Create ' + actionType;
+
+          // Update description placeholder based on action type
+          const desc = document.getElementById('description');
+          if (isGrievance) {
+            desc.placeholder = 'Describe the grievance in detail...';
+          } else if (actionType === 'Records Request') {
+            desc.placeholder = 'Describe what records are being requested...';
+          } else if (actionType === 'Weingarten') {
+            desc.placeholder = 'Describe the meeting and representation provided...';
+          } else if (actionType === 'ULP Filing') {
+            desc.placeholder = 'Describe the unfair labor practice...';
+          } else {
+            desc.placeholder = 'Describe the action or request in detail...';
+          }
+        }
+
+        // Initialize form state
+        updateFormForActionType();
+
         document.getElementById('grievanceForm').addEventListener('submit', function(e) {
           e.preventDefault();
 
           const memberSelect = document.getElementById('memberId');
+          const actionType = document.getElementById('actionType').value;
+          const isGrievance = actionType === 'Grievance';
+
           const formData = {
             memberId: memberSelect.value,
             memberName: memberSelect.options[memberSelect.selectedIndex].text.split(' (')[0],
             filingDate: document.getElementById('filingDate').value,
-            grievanceType: document.getElementById('grievanceType').value,
+            actionType: actionType,
+            grievanceType: isGrievance ? document.getElementById('grievanceType').value : actionType,
             articleViolated: document.getElementById('articleViolated').value,
             description: document.getElementById('description').value,
             notes: document.getElementById('notes').value,
+            createChecklist: document.getElementById('createChecklist').checked,
             createFolder: document.getElementById('createFolder').checked,
             syncCalendar: document.getElementById('syncCalendar').checked
           };
@@ -3349,7 +3750,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (6659 lines)
+// SOURCE: 04_UIService.gs (6661 lines)
 // ============================================================================
 
 /**
@@ -3398,12 +3799,13 @@ function createDashboardMenu() {
       .addItem('🔎 Advanced Search', 'showAdvancedSearch'))
 
     // Grievances submenu - Mixed icons
-    .addSubMenu(ui.createMenu('📋 Grievances')
-      .addItem('➕ New Grievance', 'showNewGrievanceDialog')
+    .addSubMenu(ui.createMenu('📋 Cases & Grievances')
+      .addItem('➕ New Case/Grievance', 'showNewGrievanceDialog')
       .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
-      .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
+      .addItem('✅ View Checklist', 'showChecklistDialog')
       .addSeparator()
-      .addItem('📈 Grievance Analytics', 'showInteractiveDashboardTab'))
+      .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
+      .addItem('📈 Case Analytics', 'showInteractiveDashboardTab'))
 
     // Members submenu - Mixed icons
     .addSubMenu(ui.createMenu('👥 Members')
@@ -3454,9 +3856,10 @@ function createDashboardMenu() {
       .addItem('📧 Email Dashboard to Selected', 'emailDashboardLink'))
     .addSeparator()
     .addItem('🔍 Desktop Search', 'showDesktopSearch')
-    .addSubMenu(ui.createMenu('📋 Grievances')
-      .addItem('➕ New Grievance', 'showNewGrievanceDialog')
-      .addItem('✏️ Edit Selected', 'showEditGrievanceDialog'))
+    .addSubMenu(ui.createMenu('📋 Cases & Grievances')
+      .addItem('➕ New Case/Grievance', 'showNewGrievanceDialog')
+      .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
+      .addItem('✅ View Checklist', 'showChecklistDialog'))
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 Analytics & Charts')
       .addItem('📈 Unit Density Treemap', 'showUnitDensityTreemap')
@@ -29521,7 +29924,7 @@ function advancedSearch(filters) {
 
 
 // ============================================================================
-// SOURCE: 09_Main.gs (1094 lines)
+// SOURCE: 09_Main.gs (1101 lines)
 // ============================================================================
 
 /**
@@ -29610,6 +30013,13 @@ function onEdit(e) {
     if (sheetName === SHEETS.MEMBER_DIR) {
       handleMemberEdit(e);
       applyAutoStyleToRow_(sheet, row);  // Auto-styling
+    }
+
+    // 4. Handle edits in Case Checklist (auto-update progress)
+    if (sheetName === 'Case Checklist' || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
+      if (typeof handleChecklistEdit === 'function') {
+        handleChecklistEdit(e);
+      }
     }
 
   } catch (error) {
@@ -34044,6 +34454,1109 @@ function getErrorPageHtml_(message) {
     '  </div>' +
     '</body>' +
     '</html>';
+}
+
+
+// ============================================================================
+// SOURCE: 12_ChecklistManager.gs (1098 lines)
+// ============================================================================
+
+/**
+ * 509 Dashboard - Checklist Manager
+ *
+ * Manages case checklists for grievances and other action types.
+ * Provides functions for creating, updating, and tracking checklist items.
+ *
+ * @version 4.3.0
+ * @license Free for use by non-profit collective bargaining groups and unions
+ */
+
+// ============================================================================
+// CHECKLIST SHEET MANAGEMENT
+// ============================================================================
+
+/**
+ * Get or create the Case Checklist sheet
+ * @returns {Sheet} The Case Checklist sheet
+ */
+function getOrCreateChecklistSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CHECKLIST_SHEET_NAME);
+
+  if (!sheet) {
+    sheet = createChecklistSheet_(ss);
+  }
+
+  return sheet;
+}
+
+/**
+ * Create the Case Checklist sheet with proper structure
+ * @param {Spreadsheet} ss - The spreadsheet
+ * @returns {Sheet} The created sheet
+ * @private
+ */
+function createChecklistSheet_(ss) {
+  var sheet = ss.insertSheet(CHECKLIST_SHEET_NAME);
+
+  // Set up headers
+  var headers = [
+    'Checklist ID',
+    'Case ID',
+    'Action Type',
+    'Item',
+    'Category',
+    'Required',
+    'Completed',
+    'Completed By',
+    'Completed Date',
+    'Due Date',
+    'Notes',
+    'Sort Order'
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+  // Format header row
+  var headerRange = sheet.getRange(1, 1, 1, headers.length);
+  headerRange
+    .setBackground(COLORS.HEADER_BG || '#7C3AED')
+    .setFontColor(COLORS.WHITE || '#FFFFFF')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center');
+
+  // Set column widths
+  sheet.setColumnWidth(CHECKLIST_COLS.CHECKLIST_ID, 100);
+  sheet.setColumnWidth(CHECKLIST_COLS.CASE_ID, 120);
+  sheet.setColumnWidth(CHECKLIST_COLS.ACTION_TYPE, 130);
+  sheet.setColumnWidth(CHECKLIST_COLS.ITEM_TEXT, 350);
+  sheet.setColumnWidth(CHECKLIST_COLS.CATEGORY, 120);
+  sheet.setColumnWidth(CHECKLIST_COLS.REQUIRED, 80);
+  sheet.setColumnWidth(CHECKLIST_COLS.COMPLETED, 90);
+  sheet.setColumnWidth(CHECKLIST_COLS.COMPLETED_BY, 150);
+  sheet.setColumnWidth(CHECKLIST_COLS.COMPLETED_DATE, 120);
+  sheet.setColumnWidth(CHECKLIST_COLS.DUE_DATE, 100);
+  sheet.setColumnWidth(CHECKLIST_COLS.NOTES, 250);
+  sheet.setColumnWidth(CHECKLIST_COLS.SORT_ORDER, 80);
+
+  // Add data validation for Required column (Yes/No)
+  var requiredRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Yes', 'No'], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, CHECKLIST_COLS.REQUIRED, 1000, 1).setDataValidation(requiredRule);
+
+  // Add checkboxes for Completed column
+  sheet.getRange(2, CHECKLIST_COLS.COMPLETED, 1000, 1).insertCheckboxes();
+
+  // Add data validation for Category column
+  var categoryRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(CHECKLIST_CATEGORIES, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, CHECKLIST_COLS.CATEGORY, 1000, 1).setDataValidation(categoryRule);
+
+  // Add data validation for Action Type column
+  var actionTypes = ACTION_TYPE_CONFIG.map(function(config) { return config.value; });
+  var actionTypeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(actionTypes, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, CHECKLIST_COLS.ACTION_TYPE, 1000, 1).setDataValidation(actionTypeRule);
+
+  // Freeze header row
+  sheet.setFrozenRows(1);
+
+  // Protect header row
+  var protection = sheet.protect().setDescription('Checklist Sheet Structure');
+  protection.setUnprotectedRanges([sheet.getRange(2, 1, sheet.getMaxRows() - 1, headers.length)]);
+
+  return sheet;
+}
+
+// ============================================================================
+// CHECKLIST ITEM MANAGEMENT
+// ============================================================================
+
+/**
+ * Generate a unique checklist item ID
+ * @returns {string} Unique checklist ID (e.g., CL-00001)
+ */
+function generateChecklistId_() {
+  var sheet = getOrCreateChecklistSheet();
+  var lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return 'CL-00001';
+  }
+
+  var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
+  var maxNum = 0;
+
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i][0];
+    if (id && typeof id === 'string' && id.indexOf('CL-') === 0) {
+      var numPart = parseInt(id.substring(3), 10);
+      if (!isNaN(numPart) && numPart > maxNum) {
+        maxNum = numPart;
+      }
+    }
+  }
+
+  return 'CL-' + String(maxNum + 1).padStart(5, '0');
+}
+
+/**
+ * Create checklist items for a case from a template
+ * @param {string} caseId - The case/grievance ID
+ * @param {string} actionType - The action type (Grievance, Records Request, etc.)
+ * @param {string} issueCategory - The issue category (for grievances only)
+ * @returns {Object} Result with success status and items created
+ */
+function createChecklistFromTemplate(caseId, actionType, issueCategory) {
+  if (!caseId) {
+    return { success: false, error: 'Case ID is required' };
+  }
+
+  // Default to Grievance if not specified
+  actionType = actionType || 'Grievance';
+
+  // Get the template items
+  var templateItems = getChecklistTemplate(actionType, issueCategory);
+
+  if (!templateItems || templateItems.length === 0) {
+    return { success: false, error: 'No template found for this action type' };
+  }
+
+  var sheet = getOrCreateChecklistSheet();
+  var itemsCreated = [];
+
+  // Prepare rows to add
+  var rows = [];
+  for (var i = 0; i < templateItems.length; i++) {
+    var item = templateItems[i];
+    var checklistId = generateChecklistId_();
+
+    var row = [];
+    row[CHECKLIST_COLS.CHECKLIST_ID - 1] = checklistId;
+    row[CHECKLIST_COLS.CASE_ID - 1] = caseId;
+    row[CHECKLIST_COLS.ACTION_TYPE - 1] = actionType;
+    row[CHECKLIST_COLS.ITEM_TEXT - 1] = item.text;
+    row[CHECKLIST_COLS.CATEGORY - 1] = item.category;
+    row[CHECKLIST_COLS.REQUIRED - 1] = item.required ? 'Yes' : 'No';
+    row[CHECKLIST_COLS.COMPLETED - 1] = false;
+    row[CHECKLIST_COLS.COMPLETED_BY - 1] = '';
+    row[CHECKLIST_COLS.COMPLETED_DATE - 1] = '';
+    row[CHECKLIST_COLS.DUE_DATE - 1] = '';
+    row[CHECKLIST_COLS.NOTES - 1] = '';
+    row[CHECKLIST_COLS.SORT_ORDER - 1] = i + 1;
+
+    rows.push(row);
+    itemsCreated.push({
+      id: checklistId,
+      text: item.text,
+      category: item.category,
+      required: item.required
+    });
+  }
+
+  // Add all rows at once for efficiency
+  if (rows.length > 0) {
+    var lastRow = sheet.getLastRow();
+    var startRow = lastRow + 1;
+    sheet.getRange(startRow, 1, rows.length, 12).setValues(rows);
+
+    // Add checkboxes to the new rows
+    sheet.getRange(startRow, CHECKLIST_COLS.COMPLETED, rows.length, 1).insertCheckboxes();
+  }
+
+  // Update the checklist progress on the grievance
+  updateChecklistProgress(caseId);
+
+  // Log the action
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('CHECKLIST_CREATED', caseId, {
+      actionType: actionType,
+      issueCategory: issueCategory,
+      itemCount: itemsCreated.length
+    });
+  }
+
+  return {
+    success: true,
+    itemsCreated: itemsCreated,
+    count: itemsCreated.length
+  };
+}
+
+/**
+ * Get all checklist items for a case
+ * @param {string} caseId - The case/grievance ID
+ * @returns {Array} Array of checklist item objects
+ */
+function getChecklistItems(caseId) {
+  if (!caseId) {
+    return [];
+  }
+
+  var sheet = getOrCreateChecklistSheet();
+  var lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return [];
+  }
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+  var items = [];
+
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    if (row[CHECKLIST_COLS.CASE_ID - 1] === caseId) {
+      items.push({
+        checklistId: row[CHECKLIST_COLS.CHECKLIST_ID - 1],
+        caseId: row[CHECKLIST_COLS.CASE_ID - 1],
+        actionType: row[CHECKLIST_COLS.ACTION_TYPE - 1],
+        itemText: row[CHECKLIST_COLS.ITEM_TEXT - 1],
+        category: row[CHECKLIST_COLS.CATEGORY - 1],
+        required: row[CHECKLIST_COLS.REQUIRED - 1] === 'Yes',
+        completed: row[CHECKLIST_COLS.COMPLETED - 1] === true,
+        completedBy: row[CHECKLIST_COLS.COMPLETED_BY - 1],
+        completedDate: row[CHECKLIST_COLS.COMPLETED_DATE - 1],
+        dueDate: row[CHECKLIST_COLS.DUE_DATE - 1],
+        notes: row[CHECKLIST_COLS.NOTES - 1],
+        sortOrder: row[CHECKLIST_COLS.SORT_ORDER - 1],
+        rowIndex: i + 2  // 1-indexed, accounting for header
+      });
+    }
+  }
+
+  // Sort by sort order
+  items.sort(function(a, b) {
+    return (a.sortOrder || 999) - (b.sortOrder || 999);
+  });
+
+  return items;
+}
+
+/**
+ * Get checklist progress for a case
+ * @param {string} caseId - The case/grievance ID
+ * @returns {Object} Progress object with completed, total, percentage, and display string
+ */
+function getChecklistProgress(caseId) {
+  var items = getChecklistItems(caseId);
+
+  if (items.length === 0) {
+    return {
+      completed: 0,
+      total: 0,
+      percentage: 0,
+      display: 'No checklist',
+      requiredCompleted: 0,
+      requiredTotal: 0
+    };
+  }
+
+  var completed = 0;
+  var requiredCompleted = 0;
+  var requiredTotal = 0;
+
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].completed) {
+      completed++;
+      if (items[i].required) {
+        requiredCompleted++;
+      }
+    }
+    if (items[i].required) {
+      requiredTotal++;
+    }
+  }
+
+  var percentage = Math.round((completed / items.length) * 100);
+
+  return {
+    completed: completed,
+    total: items.length,
+    percentage: percentage,
+    display: completed + '/' + items.length + ' (' + percentage + '%)',
+    requiredCompleted: requiredCompleted,
+    requiredTotal: requiredTotal,
+    allRequiredComplete: requiredCompleted >= requiredTotal
+  };
+}
+
+/**
+ * Update checklist progress on the Grievance Log
+ * @param {string} caseId - The case/grievance ID
+ */
+function updateChecklistProgress(caseId) {
+  var progress = getChecklistProgress(caseId);
+
+  // Find the grievance row and update the progress column
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!grievanceSheet) {
+    return;
+  }
+
+  var lastRow = grievanceSheet.getLastRow();
+  if (lastRow < 2) {
+    return;
+  }
+
+  var grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
+
+  for (var i = 0; i < grievanceIds.length; i++) {
+    if (grievanceIds[i][0] === caseId) {
+      var row = i + 2;
+      grievanceSheet.getRange(row, GRIEVANCE_COLS.CHECKLIST_PROGRESS).setValue(progress.display);
+      break;
+    }
+  }
+}
+
+/**
+ * Mark a checklist item as completed or uncompleted
+ * @param {string} checklistId - The checklist item ID
+ * @param {boolean} completed - Whether the item is completed
+ * @param {string} completedBy - Who completed the item (optional, defaults to current user)
+ * @returns {Object} Result object
+ */
+function setChecklistItemCompleted(checklistId, completed, completedBy) {
+  var sheet = getOrCreateChecklistSheet();
+  var lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return { success: false, error: 'Checklist item not found' };
+  }
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
+      var row = i + 2;
+      var caseId = data[i][CHECKLIST_COLS.CASE_ID - 1];
+
+      // Update completed status
+      sheet.getRange(row, CHECKLIST_COLS.COMPLETED).setValue(completed);
+
+      if (completed) {
+        // Set completed by and date
+        var user = completedBy || Session.getActiveUser().getEmail() || 'Unknown';
+        sheet.getRange(row, CHECKLIST_COLS.COMPLETED_BY).setValue(user);
+        sheet.getRange(row, CHECKLIST_COLS.COMPLETED_DATE).setValue(new Date());
+      } else {
+        // Clear completed by and date
+        sheet.getRange(row, CHECKLIST_COLS.COMPLETED_BY).setValue('');
+        sheet.getRange(row, CHECKLIST_COLS.COMPLETED_DATE).setValue('');
+      }
+
+      // Update progress on the grievance
+      updateChecklistProgress(caseId);
+
+      return { success: true, caseId: caseId };
+    }
+  }
+
+  return { success: false, error: 'Checklist item not found' };
+}
+
+/**
+ * Add a custom checklist item to a case
+ * @param {string} caseId - The case/grievance ID
+ * @param {string} itemText - The item description
+ * @param {string} category - The category (Document, Meeting, etc.)
+ * @param {boolean} required - Whether the item is required
+ * @param {Date} dueDate - Optional due date
+ * @returns {Object} Result with the new item
+ */
+function addChecklistItem(caseId, itemText, category, required, dueDate) {
+  if (!caseId || !itemText) {
+    return { success: false, error: 'Case ID and item text are required' };
+  }
+
+  // Validate category
+  category = category || 'Other';
+  if (CHECKLIST_CATEGORIES.indexOf(category) === -1) {
+    category = 'Other';
+  }
+
+  var sheet = getOrCreateChecklistSheet();
+  var checklistId = generateChecklistId_();
+
+  // Get current max sort order for this case
+  var items = getChecklistItems(caseId);
+  var maxSortOrder = 0;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].sortOrder > maxSortOrder) {
+      maxSortOrder = items[i].sortOrder;
+    }
+  }
+
+  // Get action type from the grievance
+  var actionType = 'Grievance';
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (grievanceSheet) {
+    var lastRow = grievanceSheet.getLastRow();
+    if (lastRow >= 2) {
+      var grievanceData = grievanceSheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.ACTION_TYPE).getValues();
+      for (var j = 0; j < grievanceData.length; j++) {
+        if (grievanceData[j][0] === caseId) {
+          actionType = grievanceData[j][GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance';
+          break;
+        }
+      }
+    }
+  }
+
+  var row = [
+    checklistId,
+    caseId,
+    actionType,
+    itemText,
+    category,
+    required ? 'Yes' : 'No',
+    false,
+    '',
+    '',
+    dueDate || '',
+    '',
+    maxSortOrder + 1
+  ];
+
+  sheet.appendRow(row);
+
+  // Add checkbox to the new row
+  var newRow = sheet.getLastRow();
+  sheet.getRange(newRow, CHECKLIST_COLS.COMPLETED).insertCheckboxes();
+
+  // Update progress
+  updateChecklistProgress(caseId);
+
+  return {
+    success: true,
+    item: {
+      checklistId: checklistId,
+      caseId: caseId,
+      itemText: itemText,
+      category: category,
+      required: required
+    }
+  };
+}
+
+/**
+ * Delete a checklist item
+ * @param {string} checklistId - The checklist item ID
+ * @returns {Object} Result object
+ */
+function deleteChecklistItem(checklistId) {
+  var sheet = getOrCreateChecklistSheet();
+  var lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return { success: false, error: 'Checklist item not found' };
+  }
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][0] === checklistId) {
+      var caseId = data[i][1];
+      var row = i + 2;
+      sheet.deleteRow(row);
+
+      // Update progress
+      updateChecklistProgress(caseId);
+
+      return { success: true, caseId: caseId };
+    }
+  }
+
+  return { success: false, error: 'Checklist item not found' };
+}
+
+/**
+ * Update a checklist item's text or properties
+ * @param {string} checklistId - The checklist item ID
+ * @param {Object} updates - Object with properties to update (itemText, category, required, dueDate, notes)
+ * @returns {Object} Result object
+ */
+function updateChecklistItem(checklistId, updates) {
+  var sheet = getOrCreateChecklistSheet();
+  var lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return { success: false, error: 'Checklist item not found' };
+  }
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+
+  for (var i = 0; i < data.length; i++) {
+    if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
+      var row = i + 2;
+
+      if (updates.itemText !== undefined) {
+        sheet.getRange(row, CHECKLIST_COLS.ITEM_TEXT).setValue(updates.itemText);
+      }
+      if (updates.category !== undefined) {
+        sheet.getRange(row, CHECKLIST_COLS.CATEGORY).setValue(updates.category);
+      }
+      if (updates.required !== undefined) {
+        sheet.getRange(row, CHECKLIST_COLS.REQUIRED).setValue(updates.required ? 'Yes' : 'No');
+      }
+      if (updates.dueDate !== undefined) {
+        sheet.getRange(row, CHECKLIST_COLS.DUE_DATE).setValue(updates.dueDate);
+      }
+      if (updates.notes !== undefined) {
+        sheet.getRange(row, CHECKLIST_COLS.NOTES).setValue(updates.notes);
+      }
+
+      return { success: true };
+    }
+  }
+
+  return { success: false, error: 'Checklist item not found' };
+}
+
+/**
+ * Delete all checklist items for a case
+ * @param {string} caseId - The case/grievance ID
+ * @returns {Object} Result with count of deleted items
+ */
+function deleteAllChecklistItems(caseId) {
+  var sheet = getOrCreateChecklistSheet();
+  var lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return { success: true, deletedCount: 0 };
+  }
+
+  var data = sheet.getRange(2, CHECKLIST_COLS.CASE_ID, lastRow - 1, 1).getValues();
+  var rowsToDelete = [];
+
+  // Find rows to delete (in reverse order to avoid index shifting)
+  for (var i = data.length - 1; i >= 0; i--) {
+    if (data[i][0] === caseId) {
+      rowsToDelete.push(i + 2);
+    }
+  }
+
+  // Delete rows in reverse order
+  for (var j = 0; j < rowsToDelete.length; j++) {
+    sheet.deleteRow(rowsToDelete[j]);
+  }
+
+  return { success: true, deletedCount: rowsToDelete.length };
+}
+
+// ============================================================================
+// CHECKLIST UI HELPERS
+// ============================================================================
+
+/**
+ * Get checklist data formatted for UI display
+ * @param {string} caseId - The case/grievance ID
+ * @returns {Object} Formatted data for UI
+ */
+function getChecklistForUI(caseId) {
+  var items = getChecklistItems(caseId);
+  var progress = getChecklistProgress(caseId);
+
+  // Group items by category
+  var byCategory = {};
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var cat = item.category || 'Other';
+    if (!byCategory[cat]) {
+      byCategory[cat] = [];
+    }
+    byCategory[cat].push(item);
+  }
+
+  return {
+    caseId: caseId,
+    items: items,
+    byCategory: byCategory,
+    progress: progress,
+    categories: Object.keys(byCategory)
+  };
+}
+
+/**
+ * Get all available checklist templates for a given action type
+ * @param {string} actionType - The action type
+ * @returns {Array} Array of template names
+ */
+function getAvailableTemplates(actionType) {
+  var templates = CHECKLIST_TEMPLATES[actionType];
+  if (!templates) {
+    return ['_default'];
+  }
+  return Object.keys(templates);
+}
+
+// ============================================================================
+// BATCH OPERATIONS
+// ============================================================================
+
+/**
+ * Update checklist progress for all open cases
+ * Useful for maintenance/sync operations
+ */
+function updateAllChecklistProgress() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!grievanceSheet) {
+    return { success: false, error: 'Grievance Log not found' };
+  }
+
+  var lastRow = grievanceSheet.getLastRow();
+  if (lastRow < 2) {
+    return { success: true, updatedCount: 0 };
+  }
+
+  var grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
+  var updatedCount = 0;
+
+  for (var i = 0; i < grievanceIds.length; i++) {
+    var caseId = grievanceIds[i][0];
+    if (caseId) {
+      updateChecklistProgress(caseId);
+      updatedCount++;
+    }
+
+    // Pause every 50 items to avoid timeout
+    if (updatedCount % 50 === 0) {
+      Utilities.sleep(100);
+    }
+  }
+
+  return { success: true, updatedCount: updatedCount };
+}
+
+/**
+ * Create checklists for all existing grievances that don't have one
+ * Useful for migrating existing data
+ */
+function createChecklistsForExistingCases() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!grievanceSheet) {
+    return { success: false, error: 'Grievance Log not found' };
+  }
+
+  var lastRow = grievanceSheet.getLastRow();
+  if (lastRow < 2) {
+    return { success: true, createdCount: 0 };
+  }
+
+  var data = grievanceSheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.CHECKLIST_PROGRESS).getValues();
+  var createdCount = 0;
+
+  for (var i = 0; i < data.length; i++) {
+    var caseId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+    var actionType = data[i][GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance';
+    var issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1];
+    var checklistProgress = data[i][GRIEVANCE_COLS.CHECKLIST_PROGRESS - 1];
+
+    // Skip if already has a checklist
+    if (checklistProgress && checklistProgress !== 'No checklist') {
+      continue;
+    }
+
+    // Check if items exist
+    var existingItems = getChecklistItems(caseId);
+    if (existingItems.length > 0) {
+      // Just update the progress display
+      updateChecklistProgress(caseId);
+      continue;
+    }
+
+    // Create checklist from template
+    var result = createChecklistFromTemplate(caseId, actionType, issueCategory);
+    if (result.success) {
+      createdCount++;
+    }
+
+    // Pause every 10 items to avoid timeout
+    if (createdCount % 10 === 0) {
+      Utilities.sleep(100);
+    }
+  }
+
+  return { success: true, createdCount: createdCount };
+}
+
+// ============================================================================
+// ONOPEN / ONEDIT INTEGRATION
+// ============================================================================
+
+/**
+ * Handle checkbox changes in the checklist sheet
+ * Called from the main onEdit trigger
+ * @param {Object} e - The edit event object
+ */
+function handleChecklistEdit(e) {
+  if (!e || !e.range) {
+    return;
+  }
+
+  var sheet = e.range.getSheet();
+  if (sheet.getName() !== CHECKLIST_SHEET_NAME) {
+    return;
+  }
+
+  var row = e.range.getRow();
+  var col = e.range.getColumn();
+
+  // Only handle edits to the Completed column (not header row)
+  if (row < 2 || col !== CHECKLIST_COLS.COMPLETED) {
+    return;
+  }
+
+  var completed = e.value === 'TRUE' || e.value === true;
+  var caseId = sheet.getRange(row, CHECKLIST_COLS.CASE_ID).getValue();
+
+  if (completed) {
+    // Set completed by and date
+    var user = Session.getActiveUser().getEmail() || 'Unknown';
+    sheet.getRange(row, CHECKLIST_COLS.COMPLETED_BY).setValue(user);
+    sheet.getRange(row, CHECKLIST_COLS.COMPLETED_DATE).setValue(new Date());
+  } else {
+    // Clear completed by and date
+    sheet.getRange(row, CHECKLIST_COLS.COMPLETED_BY).setValue('');
+    sheet.getRange(row, CHECKLIST_COLS.COMPLETED_DATE).setValue('');
+  }
+
+  // Update progress on the grievance
+  if (caseId) {
+    updateChecklistProgress(caseId);
+  }
+}
+
+// ============================================================================
+// CHECKLIST UI DIALOGS
+// ============================================================================
+
+/**
+ * Show checklist dialog for the selected grievance
+ */
+function showChecklistDialog() {
+  var sheet = SpreadsheetApp.getActiveSheet();
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG && sheet.getName() !== 'Grievance Log') {
+    SpreadsheetApp.getUi().alert('Please select a case in the Grievance Log sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    SpreadsheetApp.getUi().alert('Please select a case row');
+    return;
+  }
+
+  var caseId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+  if (!caseId) {
+    SpreadsheetApp.getUi().alert('No case ID found in selected row');
+    return;
+  }
+
+  var html = HtmlService.createHtmlOutput(getChecklistDialogHtml(caseId))
+    .setWidth(700)
+    .setHeight(600);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Case Checklist: ' + caseId);
+}
+
+/**
+ * Generate HTML for the checklist dialog
+ * @param {string} caseId - The case/grievance ID
+ * @returns {string} HTML content
+ */
+function getChecklistDialogHtml(caseId) {
+  var checklistData = getChecklistForUI(caseId);
+  var items = checklistData.items;
+  var progress = checklistData.progress;
+
+  // Build items HTML grouped by category
+  var itemsHtml = '';
+  var categories = checklistData.categories;
+
+  if (items.length === 0) {
+    itemsHtml = '<div class="no-items">No checklist items yet. Click "Add from Template" to create a checklist.</div>';
+  } else {
+    for (var c = 0; c < categories.length; c++) {
+      var cat = categories[c];
+      var catItems = checklistData.byCategory[cat];
+
+      itemsHtml += '<div class="category-section">';
+      itemsHtml += '<div class="category-header">' + cat + ' (' + catItems.length + ')</div>';
+
+      for (var i = 0; i < catItems.length; i++) {
+        var item = catItems[i];
+        var checkedAttr = item.completed ? 'checked' : '';
+        var completedClass = item.completed ? 'completed' : '';
+        var requiredBadge = item.required ? '<span class="badge required">Required</span>' : '';
+
+        itemsHtml += '<div class="checklist-item ' + completedClass + '">';
+        itemsHtml += '  <label class="checkbox-container">';
+        itemsHtml += '    <input type="checkbox" ' + checkedAttr + ' onchange="toggleItem(\'' + item.checklistId + '\', this.checked)">';
+        itemsHtml += '    <span class="checkmark"></span>';
+        itemsHtml += '  </label>';
+        itemsHtml += '  <div class="item-content">';
+        itemsHtml += '    <div class="item-text">' + item.itemText + ' ' + requiredBadge + '</div>';
+        if (item.completed && item.completedBy) {
+          itemsHtml += '    <div class="item-meta">Completed by ' + item.completedBy + '</div>';
+        }
+        itemsHtml += '  </div>';
+        itemsHtml += '  <button class="btn-icon" onclick="deleteItem(\'' + item.checklistId + '\')" title="Delete item">x</button>';
+        itemsHtml += '</div>';
+      }
+
+      itemsHtml += '</div>';
+    }
+  }
+
+  // Calculate progress bar
+  var progressPct = progress.percentage || 0;
+  var progressColor = progressPct >= 100 ? '#10B981' : (progressPct >= 50 ? '#F59E0B' : '#EF4444');
+
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<base target="_top">' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Google Sans", -apple-system, BlinkMacSystemFont, sans-serif; background: #F9FAFB; color: #1F2937; }' +
+    '.container { padding: 20px; }' +
+    '.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }' +
+    '.progress-section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }' +
+    '.progress-label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }' +
+    '.progress-bar { height: 8px; background: #E5E7EB; border-radius: 4px; overflow: hidden; }' +
+    '.progress-fill { height: 100%; background: ' + progressColor + '; border-radius: 4px; transition: width 0.3s; }' +
+    '.checklist-container { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); max-height: 350px; overflow-y: auto; }' +
+    '.category-section { margin-bottom: 16px; }' +
+    '.category-header { font-size: 12px; font-weight: 600; color: #6B7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #E5E7EB; }' +
+    '.checklist-item { display: flex; align-items: center; padding: 10px; border-radius: 8px; margin-bottom: 6px; background: #F9FAFB; transition: all 0.2s; }' +
+    '.checklist-item:hover { background: #F3F4F6; }' +
+    '.checklist-item.completed { opacity: 0.7; }' +
+    '.checklist-item.completed .item-text { text-decoration: line-through; color: #9CA3AF; }' +
+    '.checkbox-container { position: relative; width: 24px; height: 24px; margin-right: 12px; flex-shrink: 0; }' +
+    '.checkbox-container input { opacity: 0; width: 24px; height: 24px; cursor: pointer; }' +
+    '.checkmark { position: absolute; top: 0; left: 0; width: 24px; height: 24px; background: white; border: 2px solid #D1D5DB; border-radius: 6px; pointer-events: none; }' +
+    '.checkbox-container input:checked ~ .checkmark { background: #7C3AED; border-color: #7C3AED; }' +
+    '.checkbox-container input:checked ~ .checkmark:after { content: ""; position: absolute; left: 7px; top: 3px; width: 6px; height: 12px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }' +
+    '.item-content { flex: 1; }' +
+    '.item-text { font-size: 14px; }' +
+    '.item-meta { font-size: 11px; color: #9CA3AF; margin-top: 2px; }' +
+    '.badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }' +
+    '.badge.required { background: #FEE2E2; color: #991B1B; }' +
+    '.btn-icon { background: none; border: none; color: #9CA3AF; cursor: pointer; font-size: 16px; padding: 4px 8px; border-radius: 4px; }' +
+    '.btn-icon:hover { background: #FEE2E2; color: #EF4444; }' +
+    '.no-items { text-align: center; padding: 40px; color: #6B7280; }' +
+    '.actions { display: flex; gap: 10px; margin-top: 20px; justify-content: space-between; }' +
+    '.btn { padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }' +
+    '.btn-primary { background: #7C3AED; color: white; }' +
+    '.btn-primary:hover { background: #6D28D9; }' +
+    '.btn-secondary { background: #E5E7EB; color: #374151; }' +
+    '.btn-secondary:hover { background: #D1D5DB; }' +
+    '.btn-success { background: #10B981; color: white; }' +
+    '.btn-success:hover { background: #059669; }' +
+    '.add-item-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #E5E7EB; }' +
+    '.add-form { display: flex; gap: 8px; }' +
+    '.add-form input { flex: 1; padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px; }' +
+    '.add-form select { padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 6px; font-size: 14px; }' +
+    '</style>' +
+    '</head><body>' +
+    '<div class="container">' +
+    '  <div class="progress-section">' +
+    '    <div class="progress-label">' +
+    '      <span>Progress</span>' +
+    '      <span>' + progress.completed + ' of ' + progress.total + ' complete (' + progressPct + '%)</span>' +
+    '    </div>' +
+    '    <div class="progress-bar">' +
+    '      <div class="progress-fill" style="width: ' + progressPct + '%"></div>' +
+    '    </div>' +
+    '    <div style="margin-top: 8px; font-size: 12px; color: #6B7280;">' +
+    '      Required items: ' + progress.requiredCompleted + ' of ' + progress.requiredTotal + ' complete' +
+    '    </div>' +
+    '  </div>' +
+    '  <div class="checklist-container">' +
+    itemsHtml +
+    '  </div>' +
+    '  <div class="add-item-section">' +
+    '    <div class="add-form">' +
+    '      <input type="text" id="newItemText" placeholder="Add custom checklist item...">' +
+    '      <select id="newItemCategory">' +
+    '        <option value="Document">Document</option>' +
+    '        <option value="Meeting">Meeting</option>' +
+    '        <option value="Evidence">Evidence</option>' +
+    '        <option value="Communication">Communication</option>' +
+    '        <option value="Follow-up">Follow-up</option>' +
+    '        <option value="Other">Other</option>' +
+    '      </select>' +
+    '      <button class="btn btn-success" onclick="addItem()">Add</button>' +
+    '    </div>' +
+    '  </div>' +
+    '  <div class="actions">' +
+    '    <div>' +
+    (items.length === 0 ?
+    '      <button class="btn btn-primary" onclick="createFromTemplate()">Add from Template</button>' : '') +
+    '    </div>' +
+    '    <button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '  </div>' +
+    '</div>' +
+    '<script>' +
+    'var caseId = "' + caseId + '";' +
+    'function toggleItem(checklistId, completed) {' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function() { location.reload(); })' +
+    '    .withFailureHandler(function(e) { alert("Error: " + e.message); })' +
+    '    .setChecklistItemCompleted(checklistId, completed);' +
+    '}' +
+    'function deleteItem(checklistId) {' +
+    '  if (!confirm("Delete this checklist item?")) return;' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function() { location.reload(); })' +
+    '    .withFailureHandler(function(e) { alert("Error: " + e.message); })' +
+    '    .deleteChecklistItem(checklistId);' +
+    '}' +
+    'function addItem() {' +
+    '  var text = document.getElementById("newItemText").value.trim();' +
+    '  var category = document.getElementById("newItemCategory").value;' +
+    '  if (!text) { alert("Please enter item text"); return; }' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function() { location.reload(); })' +
+    '    .withFailureHandler(function(e) { alert("Error: " + e.message); })' +
+    '    .addChecklistItem(caseId, text, category, false, null);' +
+    '}' +
+    'function createFromTemplate() {' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(result) {' +
+    '      if (result.success) { location.reload(); }' +
+    '      else { alert("Error: " + result.error); }' +
+    '    })' +
+    '    .withFailureHandler(function(e) { alert("Error: " + e.message); })' +
+    '    .createChecklistForSelectedCase();' +
+    '}' +
+    '</script>' +
+    '</body></html>';
+}
+
+/**
+ * Create checklist for the currently selected case
+ * Called from the checklist dialog
+ */
+function createChecklistForSelectedCase() {
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var row = sheet.getActiveRange().getRow();
+
+  if (row <= 1) {
+    return { success: false, error: 'No case selected' };
+  }
+
+  var caseId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+  var actionType = sheet.getRange(row, GRIEVANCE_COLS.ACTION_TYPE).getValue() || 'Grievance';
+  var issueCategory = sheet.getRange(row, GRIEVANCE_COLS.ISSUE_CATEGORY).getValue();
+
+  return createChecklistFromTemplate(caseId, actionType, issueCategory);
+}
+
+// ============================================================================
+// ACTION TYPE MANAGEMENT
+// ============================================================================
+
+/**
+ * Update the Action Type column in the Grievance Log
+ * Adds the column if it doesn't exist and sets up validation
+ */
+function setupActionTypeColumn() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!grievanceSheet) {
+    return { success: false, error: 'Grievance Log not found' };
+  }
+
+  // Check if Action Type header exists
+  var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
+  var actionTypeCol = headers.indexOf('Action Type') + 1;
+
+  if (actionTypeCol === 0) {
+    // Add the column header
+    grievanceSheet.getRange(1, GRIEVANCE_COLS.ACTION_TYPE).setValue('Action Type');
+    grievanceSheet.getRange(1, GRIEVANCE_COLS.CHECKLIST_PROGRESS).setValue('Checklist Progress');
+    actionTypeCol = GRIEVANCE_COLS.ACTION_TYPE;
+  }
+
+  // Set up data validation for Action Type
+  var actionTypes = ACTION_TYPE_CONFIG.map(function(config) { return config.value; });
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(actionTypes, true)
+    .setAllowInvalid(false)
+    .build();
+
+  var lastRow = grievanceSheet.getLastRow();
+  if (lastRow >= 2) {
+    grievanceSheet.getRange(2, actionTypeCol, lastRow - 1, 1).setDataValidation(rule);
+
+    // Set default value for existing rows without an action type
+    var existingValues = grievanceSheet.getRange(2, actionTypeCol, lastRow - 1, 1).getValues();
+    for (var i = 0; i < existingValues.length; i++) {
+      if (!existingValues[i][0]) {
+        grievanceSheet.getRange(i + 2, actionTypeCol).setValue('Grievance');
+      }
+    }
+  }
+
+  return { success: true };
+}
+
+/**
+ * Get a summary of cases by action type
+ * @returns {Object} Summary with counts by action type
+ */
+function getCasesByActionType() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!grievanceSheet) {
+    return {};
+  }
+
+  var lastRow = grievanceSheet.getLastRow();
+  if (lastRow < 2) {
+    return {};
+  }
+
+  var data = grievanceSheet.getRange(2, GRIEVANCE_COLS.ACTION_TYPE, lastRow - 1, 1).getValues();
+  var statusData = grievanceSheet.getRange(2, GRIEVANCE_COLS.STATUS, lastRow - 1, 1).getValues();
+
+  var summary = {};
+  var openStatuses = ['Open', 'Pending Info', 'Appealed', 'In Arbitration'];
+
+  for (var i = 0; i < data.length; i++) {
+    var actionType = data[i][0] || 'Grievance';
+    var status = statusData[i][0];
+
+    if (!summary[actionType]) {
+      summary[actionType] = { total: 0, open: 0, closed: 0 };
+    }
+
+    summary[actionType].total++;
+
+    if (openStatuses.indexOf(status) !== -1) {
+      summary[actionType].open++;
+    } else {
+      summary[actionType].closed++;
+    }
+  }
+
+  return summary;
 }
 
 
