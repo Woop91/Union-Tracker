@@ -1623,6 +1623,357 @@ function createAreaChart_(sheet) {
 }
 
 // ============================================================================
+// INTERACTIVE DASHBOARD (CUSTOM VIEW)
+// ============================================================================
+
+/**
+ * Create or recreate the Interactive Dashboard sheet (🎯 Custom View)
+ * Allows users to select custom metrics and time ranges
+ * @param {Spreadsheet} ss - Spreadsheet object
+ */
+function createInteractiveDashboard(ss) {
+  var sheet = getOrCreateSheet(ss, SHEETS.INTERACTIVE);
+  sheet.clear();
+
+  // Ensure sheet has enough columns
+  var requiredCols = 10;
+  var currentCols = sheet.getMaxColumns();
+  if (currentCols < requiredCols) {
+    sheet.insertColumnsAfter(currentCols, requiredCols - currentCols);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HEADER SECTION
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A1').setValue('🎯 Custom View Dashboard')
+    .setFontSize(22)
+    .setFontWeight('bold')
+    .setFontColor(COLORS.WHITE)
+    .setBackground(COLORS.PRIMARY_PURPLE);
+  sheet.getRange('A1:G1').merge();
+
+  sheet.getRange('A2').setValue('Select metrics and time ranges to build your custom dashboard view')
+    .setFontSize(11)
+    .setFontStyle('italic')
+    .setFontColor(COLORS.CARD_DARK_TEXT)
+    .setBackground(COLORS.CARD_DARK_BG);
+  sheet.getRange('A2:G2').merge();
+
+  // Spacer row
+  sheet.getRange('A3:G3').setBackground(COLORS.WHITE);
+  sheet.setRowHeight(3, 8);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // METRIC SELECTION SECTION
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A4').setValue('📊 METRIC SELECTION')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A4:G4').merge();
+
+  // Metric options table
+  var metricHeaders = [['#', 'Metric Name', 'Description', 'Category', 'Current Value', 'Trend', 'Select']];
+  sheet.getRange('A5:G5').setValues(metricHeaders)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#E0E7FF')
+    .setHorizontalAlignment('center');
+
+  // Available metrics
+  var metrics = [
+    ['1', 'Total Members', 'Count of all union members', 'Members', '', '—', '☐'],
+    ['2', 'Active Stewards', 'Members designated as stewards', 'Members', '', '—', '☐'],
+    ['3', 'Open Grievances', 'Currently active cases', 'Grievances', '', '—', '☐'],
+    ['4', 'Pending Info', 'Cases awaiting information', 'Grievances', '', '—', '☐'],
+    ['5', 'Win Rate', 'Percentage of favorable outcomes', 'Performance', '', '—', '☐'],
+    ['6', 'Avg Resolution Days', 'Average days to resolve a case', 'Performance', '', '—', '☐'],
+    ['7', 'Overdue Cases', 'Cases past their deadline', 'Urgency', '', '—', '☐'],
+    ['8', 'Due This Week', 'Cases due within 7 days', 'Urgency', '', '—', '☐'],
+    ['9', 'Member Satisfaction', 'Average satisfaction rating', 'Feedback', '', '—', '☐'],
+    ['10', 'Cases by Category', 'Breakdown by issue type', 'Analysis', '', '—', '☐']
+  ];
+
+  sheet.getRange('A6:G15').setValues(metrics)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+
+  // Alternate row coloring
+  for (var r = 6; r <= 15; r++) {
+    if (r % 2 === 0) {
+      sheet.getRange('A' + r + ':G' + r).setBackground(COLORS.ROW_ALT_LIGHT);
+    }
+  }
+
+  // Style the # column
+  sheet.getRange('A6:A15')
+    .setFontWeight('bold')
+    .setFontColor(COLORS.PRIMARY_PURPLE);
+
+  // Card bottom border
+  sheet.getRange('A16:G16').setBackground(COLORS.PRIMARY_PURPLE);
+  sheet.setRowHeight(16, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TIME RANGE OPTIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A18').setValue('📅 TIME RANGE OPTIONS')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A18:G18').merge();
+
+  var timeHeaders = [['Option', 'Description', 'Start Date', 'End Date', 'Days', 'Selected']];
+  sheet.getRange('A19:F19').setValues(timeHeaders)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#FEF3C7')
+    .setHorizontalAlignment('center');
+
+  var timeOptions = [
+    ['Last 7 Days', 'Past week of data', '=TODAY()-7', '=TODAY()', '7', '●'],
+    ['Last 30 Days', 'Past month of data', '=TODAY()-30', '=TODAY()', '30', '○'],
+    ['Last 90 Days', 'Past quarter of data', '=TODAY()-90', '=TODAY()', '90', '○'],
+    ['Year to Date', 'Current calendar year', '=DATE(YEAR(TODAY()),1,1)', '=TODAY()', '=TODAY()-DATE(YEAR(TODAY()),1,1)', '○'],
+    ['All Time', 'All available data', 'N/A', 'N/A', 'All', '○']
+  ];
+
+  sheet.getRange('A20:F24').setValues(timeOptions)
+    .setHorizontalAlignment('center');
+
+  // Alternate row coloring for time options
+  for (var t = 20; t <= 24; t++) {
+    if (t % 2 === 0) {
+      sheet.getRange('A' + t + ':F' + t).setBackground('#FFFBEB');
+    }
+  }
+
+  // Card bottom border
+  sheet.getRange('A25:G25').setBackground(COLORS.ACCENT_ORANGE);
+  sheet.setRowHeight(25, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // THEME OPTIONS
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A27').setValue('🎨 THEME OPTIONS')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A27:G27').merge();
+
+  var themeHeaders = [['Theme', 'Primary Color', 'Accent Color', 'Style', 'Preview', 'Selected']];
+  sheet.getRange('A28:F28').setValues(themeHeaders)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#E0F2FE')
+    .setHorizontalAlignment('center');
+
+  var themes = [
+    ['Union Purple', '#7C3AED', '#059669', 'Professional', '▓▓▓', '●'],
+    ['Executive Blue', '#1a73e8', '#34A853', 'Corporate', '▓▓▓', '○'],
+    ['Solidarity Red', '#DC2626', '#F97316', 'Bold', '▓▓▓', '○'],
+    ['Forest Green', '#059669', '#10B981', 'Natural', '▓▓▓', '○']
+  ];
+
+  sheet.getRange('A29:F32').setValues(themes)
+    .setHorizontalAlignment('center');
+
+  // Apply theme preview colors
+  sheet.getRange('E29').setFontColor('#7C3AED');
+  sheet.getRange('E30').setFontColor('#1a73e8');
+  sheet.getRange('E31').setFontColor('#DC2626');
+  sheet.getRange('E32').setFontColor('#059669');
+
+  // Alternate row coloring for themes
+  for (var th = 29; th <= 32; th++) {
+    if (th % 2 === 1) {
+      sheet.getRange('A' + th + ':F' + th).setBackground('#F0F9FF');
+    }
+  }
+
+  // Card bottom border
+  sheet.getRange('A33:G33').setBackground(COLORS.CHART_BLUE);
+  sheet.setRowHeight(33, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // QUICK STATS DISPLAY (Auto-populated)
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A35').setValue('📈 QUICK STATS (Auto-Updated)')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A35:G35').merge();
+
+  var quickStatsLabels = [['Total Members', 'Active Stewards', 'Open Cases', 'Win Rate', 'Overdue', 'Avg Days Open']];
+  sheet.getRange('A36:F36').setValues(quickStatsLabels)
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setBackground('#D1FAE5')
+    .setHorizontalAlignment('center');
+
+  // Quick stats values - these will be populated by syncInteractiveDashboard
+  sheet.getRange('A37:F37')
+    .setFontSize(20)
+    .setHorizontalAlignment('center')
+    .setFontWeight('bold')
+    .setBackground(COLORS.WHITE);
+
+  // Color-code stat cells
+  sheet.getRange('A37').setFontColor(COLORS.CHART_BLUE);
+  sheet.getRange('B37').setFontColor(COLORS.CHART_GREEN);
+  sheet.getRange('C37').setFontColor(COLORS.CHART_PURPLE);
+  sheet.getRange('D37').setFontColor(COLORS.UNION_GREEN);
+  sheet.getRange('E37').setFontColor(COLORS.SOLIDARITY_RED);
+  sheet.getRange('F37').setFontColor(COLORS.ACCENT_ORANGE);
+
+  // Card bottom border
+  sheet.getRange('A38:G38').setBackground(COLORS.UNION_GREEN);
+  sheet.setRowHeight(38, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INSTRUCTIONS SECTION
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.getRange('A40').setValue('📝 HOW TO USE THIS DASHBOARD')
+    .setFontWeight('bold')
+    .setFontSize(12)
+    .setBackground(COLORS.CARD_DARK_BG)
+    .setFontColor(COLORS.CARD_DARK_TEXT);
+  sheet.getRange('A40:G40').merge();
+
+  var instructions = [
+    ['1. Select Metrics', 'Click the checkbox (☐→☑) next to metrics you want to track'],
+    ['2. Choose Time Range', 'Select a time period by clicking the radio button (○→●)'],
+    ['3. Pick a Theme', 'Choose your preferred color theme for the dashboard'],
+    ['4. Refresh Data', 'Use the menu: 📊 509 Dashboard → 🔄 Refresh Dashboard'],
+    ['5. View Results', 'Your selected metrics will appear in the Quick Stats section above']
+  ];
+
+  sheet.getRange('A41:B45').setValues(instructions)
+    .setVerticalAlignment('top');
+  sheet.getRange('A41:A45')
+    .setFontWeight('bold')
+    .setFontColor(COLORS.PRIMARY_PURPLE);
+
+  // Card bottom border
+  sheet.getRange('A46:G46').setBackground(COLORS.CHART_INDIGO);
+  sheet.setRowHeight(46, 4);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FORMATTING AND CLEANUP
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Set column widths
+  sheet.setColumnWidth(1, 120);  // A - Option/Metric #
+  sheet.setColumnWidth(2, 160);  // B - Name
+  sheet.setColumnWidth(3, 200);  // C - Description
+  sheet.setColumnWidth(4, 100);  // D - Category
+  sheet.setColumnWidth(5, 100);  // E - Value
+  sheet.setColumnWidth(6, 80);   // F - Trend
+  sheet.setColumnWidth(7, 80);   // G - Select
+
+  // Freeze header rows
+  sheet.setFrozenRows(2);
+
+  // Hide columns beyond G
+  try {
+    var maxCols = sheet.getMaxColumns();
+    if (maxCols > 7) {
+      sheet.hideColumns(8, maxCols - 7);
+    }
+  } catch (e) {
+    Logger.log('Could not hide columns: ' + e.message);
+  }
+
+  // Sync values
+  syncInteractiveDashboardValues();
+}
+
+/**
+ * Sync values for the Interactive Dashboard (🎯 Custom View)
+ * Populates the Quick Stats section with current data
+ */
+function syncInteractiveDashboardValues() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.INTERACTIVE);
+  if (!sheet) return;
+
+  // Get data from Member Directory
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var totalMembers = 0;
+  var activeStewards = 0;
+
+  if (memberSheet && memberSheet.getLastRow() > 1) {
+    var memberData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, MEMBER_COLS.IS_STEWARD).getValues();
+    memberData.forEach(function(row) {
+      var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
+      if (!memberId || !memberId.toString().match(/^M/i)) return;
+      totalMembers++;
+      if (row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes') activeStewards++;
+    });
+  }
+
+  // Get data from Grievance Log
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  var openCases = 0;
+  var wonCount = 0;
+  var closedCount = 0;
+  var overdueCount = 0;
+  var totalDaysOpen = 0;
+  var daysOpenCount = 0;
+
+  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+    var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.DAYS_OPEN).getValues();
+    grievanceData.forEach(function(row) {
+      var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
+      if (!grievanceId || !grievanceId.toString().match(/^G/i)) return;
+
+      var status = row[GRIEVANCE_COLS.STATUS - 1] || '';
+      var resolution = (row[GRIEVANCE_COLS.RESOLUTION - 1] || '').toLowerCase();
+      var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+      var daysOpen = row[GRIEVANCE_COLS.DAYS_OPEN - 1];
+
+      if (status === 'Open') openCases++;
+      if (status !== 'Open' && status !== 'Pending Info') closedCount++;
+      if (resolution.indexOf('won') >= 0) wonCount++;
+
+      if (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0)) {
+        overdueCount++;
+      }
+
+      if (typeof daysOpen === 'number' && daysOpen > 0) {
+        totalDaysOpen += daysOpen;
+        daysOpenCount++;
+      }
+    });
+  }
+
+  var winRate = closedCount > 0 ? Math.round((wonCount / closedCount) * 100) + '%' : 'N/A';
+  var avgDaysOpen = daysOpenCount > 0 ? Math.round(totalDaysOpen / daysOpenCount) : 0;
+
+  // Update Quick Stats values (row 37)
+  sheet.getRange('A37').setValue(totalMembers);
+  sheet.getRange('B37').setValue(activeStewards);
+  sheet.getRange('C37').setValue(openCases);
+  sheet.getRange('D37').setValue(winRate);
+  sheet.getRange('E37').setValue(overdueCount);
+  sheet.getRange('F37').setValue(avgDaysOpen);
+
+  // Update metric values in the selection table (column E, rows 6-15)
+  sheet.getRange('E6').setValue(totalMembers);
+  sheet.getRange('E7').setValue(activeStewards);
+  sheet.getRange('E8').setValue(openCases);
+  // E9 - Pending Info would need to be calculated
+  sheet.getRange('E10').setValue(winRate);
+  sheet.getRange('E11').setValue(avgDaysOpen);
+  sheet.getRange('E12').setValue(overdueCount);
+  // E13-E15 can be populated with additional metrics as needed
+}
+
+// ============================================================================
 // MEMBER SATISFACTION SHEET
 // ============================================================================
 

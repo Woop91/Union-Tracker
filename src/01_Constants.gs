@@ -125,6 +125,7 @@ var SHEETS = {
   GRIEVANCE_LOG: 'Grievance Log',
   // Dashboard sheets
   DASHBOARD: '💼 Dashboard',
+  INTERACTIVE: '🎯 Custom View',
   // Hidden calculation sheets (self-healing formulas)
   GRIEVANCE_CALC: '_Grievance_Calc',
   GRIEVANCE_FORMULAS: '_Grievance_Formulas',
