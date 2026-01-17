@@ -31,8 +31,8 @@
 function createDashboardMenu() {
   const ui = SpreadsheetApp.getUi();
 
-  // Main Menu: Union Dashboard
-  ui.createMenu('📊 Dashboard')
+  // Main Menu: Union Hub
+  ui.createMenu('📊 Union Hub')
     .addItem('📊 Dashboard Home', 'showDashboardSidebar')
     .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
     .addSeparator()
@@ -169,8 +169,8 @@ function createDashboardMenu() {
       .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'))
     .addToUi();
 
-  // Strategic Command Center Menu (Separate top-level menu)
-  ui.createMenu('📊 509 Command')
+  // Strategic Operations Menu (Separate top-level menu)
+  ui.createMenu('🎯 Strategic Ops')
     .addSubMenu(ui.createMenu('👁️ Command Center')
       .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
       .addItem('👥 Member Analytics (No PII)', 'rebuildMemberAnalytics')
