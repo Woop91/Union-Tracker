@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 1,
-  BUILD: 'v4.3.1',
-  CURRENT: '4.3.1',
-  CODENAME: 'Menu Restructure + Checklist Tracking'
+  PATCH: 2,
+  BUILD: 'v4.3.2',
+  CURRENT: '4.3.2',
+  CODENAME: 'Modal Dashboard Consolidation'
 };
 
 // ============================================================================
@@ -124,6 +124,8 @@ var SHEETS = {
   MEMBER_DIR: 'Member Directory',
   GRIEVANCE_LOG: 'Grievance Log',
   // Dashboard sheets
+  // @deprecated v4.3.2 - Dashboard sheet is deprecated. Use modal dashboards instead.
+  // Access via: Union Hub > Dashboards menu. Use removeDeprecatedTabs() to remove.
   DASHBOARD: '💼 Dashboard',
   // Hidden calculation sheets (self-healing formulas)
   GRIEVANCE_CALC: '_Grievance_Calc',

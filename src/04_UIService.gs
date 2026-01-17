@@ -86,16 +86,19 @@ function createDashboardMenu() {
       .addItem('⚙️ Notification Settings', 'showNotificationSettings')
       .addItem('🧪 Test Notifications', 'testDeadlineNotifications'))
 
-    // View submenu - View icons
-    .addSubMenu(ui.createMenu('👁️ View')
-      .addItem('📊 Executive Dashboard', 'showExecutiveDashboard')
+    // View submenu - View icons (All dashboards are now modals)
+    .addSubMenu(ui.createMenu('📊 Dashboards')
+      .addItem('📊 Interactive Dashboard', 'showInteractiveDashboardTab')
+      .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
+      .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
+      .addItem('🛡️ Steward Performance', 'showStewardPerformanceModal')
       .addItem('⭐ Member Satisfaction', 'showSatisfactionDashboard')
-      .addItem('📊 Rebuild Dashboard', 'rebuildDashboard')
+      .addSeparator()
+      .addItem('📱 Mobile Dashboard', 'showMobileDashboard'))
+    .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
-      .addSeparator()
-      .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
-      .addItem('📱 Mobile Dashboard', 'showMobileDashboard')
-      .addSeparator()
+      .addItem('📱 Get Mobile App URL', 'showWebAppUrl'))
+    .addSubMenu(ui.createMenu('🎨 Appearance')
       .addItem('🌙 Toggle Dark Mode', 'toggleDarkMode')
       .addItem('🎨 Theme Settings', 'showThemeSettings'))
 
@@ -168,9 +171,9 @@ function createDashboardMenu() {
 
   // Strategic Operations Menu (Separate top-level menu)
   ui.createMenu('🎯 Strategic Ops')
-    .addSubMenu(ui.createMenu('👁️ Command Center')
+    .addSubMenu(ui.createMenu('📊 Dashboards')
+      .addItem('📊 Interactive Dashboard', 'showInteractiveDashboardTab')
       .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
-      .addItem('👥 Member Analytics (No PII)', 'rebuildMemberAnalytics')
       .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
       .addItem('🛡️ Steward Performance', 'showStewardPerformanceModal')
       .addSeparator()
@@ -522,9 +525,11 @@ function applyDashboardTheme(theme) {
 
 /**
  * Helper functions for navigation
+ * Note: Dashboards are now modal-based for better UX
  */
 function showExecutiveDashboard() {
-  navigateToSheet(SHEETS.DASHBOARD);
+  // Redirects to Interactive Dashboard modal (was: sheet navigation)
+  showInteractiveDashboardTab();
 }
 
 function showSatisfactionDashboard() {
@@ -551,10 +556,11 @@ function showThemeSettings() {
 // ============================================================================
 
 /**
- * Navigate to Executive Dashboard
+ * Navigate to Executive Dashboard (now launches modal)
  */
 function navToDash() {
-  navigateToSheet(SHEETS.DASHBOARD);
+  // Launches Interactive Dashboard modal (was: sheet navigation)
+  showInteractiveDashboardTab();
 }
 
 /**
@@ -5306,303 +5312,12 @@ function getExecutiveMetrics_() {
 }
 
 // ============================================================================
-// 3. MEMBER ANALYTICS DASHBOARD (PUBLIC - NO PII)
+// 3. MEMBER ANALYTICS DASHBOARD - REMOVED (v4.3.2)
 // ============================================================================
-
-/**
- * Launches the Member Analytics Dashboard Modal (PII-safe)
- * Uses Bridge Pattern: Server-side data aggregation + Client-side rendering
- */
-function rebuildMemberAnalytics() {
-  launchMemberAnalyticsDashboard();
-}
-
-/**
- * Launches the Member Analytics Modal with Chart.js visualizations
- * No PII visible - aggregate metrics only
- */
-function launchMemberAnalyticsDashboard() {
-  var html = HtmlService.createHtmlOutput(getMemberAnalyticsHtml_())
-    .setWidth(950)
-    .setHeight(700);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '509 MEMBER ANALYTICS - PII PROTECTED');
-}
-
-/**
- * High-Performance Member Analytics Aggregator (Bridge Pattern)
- * Returns JSON data for client-side rendering - NO PII
- * @returns {string} JSON string with member analytics data
- */
-function getMemberAnalyticsStats() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
-
-  var stats = {
-    totalMembers: 0,
-    stewardCount: 0,
-    duesPayingCount: 0,
-    volunteerHours: 0,
-    locationBreakdown: {},
-    unitBreakdown: {},
-    moraleScore: 7.5,
-    trustScore: 7.5,
-    satisfactionScore: 7.2,
-    sentimentTrend: [],
-    leadershipPipeline: { total: 0, duesPaying: 0, active: 0, stewards: 0 },
-    grievancesByArticle: {},
-    avgSettlementDays: 0,
-    step1DenialRate: 0
-  };
-
-  // Process Member Directory (aggregate only - no PII)
-  if (memberSheet && memberSheet.getLastRow() > 1) {
-    var memberData = memberSheet.getDataRange().getValues();
-    for (var m = 1; m < memberData.length; m++) {
-      if (memberData[m][MEMBER_COLS.MEMBER_ID - 1]) {
-        stats.totalMembers++;
-
-        // Count stewards
-        if (memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') stats.stewardCount++;
-
-        // Count dues paying
-        if (memberData[m][MEMBER_COLS.DUES_PAYING - 1] === 'Yes') stats.duesPayingCount++;
-
-        // Sum volunteer hours
-        var hours = parseFloat(memberData[m][MEMBER_COLS.VOLUNTEER_HOURS - 1]) || 0;
-        stats.volunteerHours += hours;
-
-        // Location breakdown (aggregate counts only)
-        var location = memberData[m][MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
-        if (!stats.locationBreakdown[location]) stats.locationBreakdown[location] = 0;
-        stats.locationBreakdown[location]++;
-
-        // Unit breakdown
-        var unit = memberData[m][MEMBER_COLS.UNIT - 1] || 'Unknown';
-        if (!stats.unitBreakdown[unit]) stats.unitBreakdown[unit] = 0;
-        stats.unitBreakdown[unit]++;
-      }
-    }
-
-    // Calculate leadership pipeline
-    stats.leadershipPipeline.total = stats.totalMembers;
-    stats.leadershipPipeline.duesPaying = stats.duesPayingCount;
-    stats.leadershipPipeline.active = memberData.filter(function(row, i) {
-      return i > 0 && (parseFloat(row[MEMBER_COLS.VOLUNTEER_HOURS - 1]) || 0) > 0;
-    }).length;
-    stats.leadershipPipeline.stewards = stats.stewardCount;
-  }
-
-  // Process Satisfaction Survey
-  if (satSheet && satSheet.getLastRow() > 1) {
-    var satData = satSheet.getDataRange().getValues();
-    var trustScores = [];
-    var satScores = [];
-    var monthlyTrust = {};
-
-    for (var s = 1; s < satData.length; s++) {
-      var trustVal = parseFloat(satData[s][7]); // Q7_TRUST_UNION
-      var satVal = parseFloat(satData[s][6]);   // Q6_SATISFIED_REP
-      var timestamp = satData[s][0];
-
-      if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
-        trustScores.push(trustVal);
-        if (timestamp) {
-          var date = new Date(timestamp);
-          var monthKey = date.toLocaleString('default', { month: 'short' });
-          if (!monthlyTrust[monthKey]) monthlyTrust[monthKey] = { sum: 0, count: 0 };
-          monthlyTrust[monthKey].sum += trustVal;
-          monthlyTrust[monthKey].count++;
-        }
-      }
-      if (!isNaN(satVal) && satVal >= 1 && satVal <= 10) satScores.push(satVal);
-    }
-
-    if (trustScores.length > 0) {
-      stats.trustScore = Math.round((trustScores.reduce(function(a, b) { return a + b; }, 0) / trustScores.length) * 10) / 10;
-    }
-    if (satScores.length > 0) {
-      stats.satisfactionScore = Math.round((satScores.reduce(function(a, b) { return a + b; }, 0) / satScores.length) * 10) / 10;
-    }
-    stats.moraleScore = Math.round(((stats.trustScore + stats.satisfactionScore) / 2) * 10) / 10;
-
-    // Build sentiment trend
-    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    months.forEach(function(month) {
-      if (monthlyTrust[month]) {
-        stats.sentimentTrend.push({ month: month, score: Math.round((monthlyTrust[month].sum / monthlyTrust[month].count) * 10) / 10 });
-      }
-    });
-  }
-
-  // Process Grievance Log for bargaining data
-  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-    var grievanceData = grievanceSheet.getDataRange().getValues();
-    var step1Total = 0;
-    var step1Denials = 0;
-    var settlementDays = [];
-
-    for (var g = 1; g < grievanceData.length; g++) {
-      // Count by contract article
-      var article = grievanceData[g][GRIEVANCE_COLS.CONTRACT_ARTICLE - 1];
-      if (article) {
-        if (!stats.grievancesByArticle[article]) stats.grievancesByArticle[article] = 0;
-        stats.grievancesByArticle[article]++;
-      }
-
-      // Track step 1 denial rate
-      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
-        step1Total++;
-        var status = grievanceData[g][GRIEVANCE_COLS.STATUS - 1];
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) {
-          step1Denials++;
-        }
-      }
-
-      // Calculate settlement time
-      var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
-      var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
-      if (dateFiled instanceof Date && dateClosed instanceof Date) {
-        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
-        if (days > 0) settlementDays.push(days);
-      }
-    }
-
-    stats.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
-    stats.avgSettlementDays = settlementDays.length > 0 ?
-      Math.round(settlementDays.reduce(function(a, b) { return a + b; }, 0) / settlementDays.length) : 0;
-  }
-
-  return JSON.stringify(stats);
-}
-
-/**
- * Generates the Member Analytics HTML with Chart.js (NO PII)
- * @returns {string} Complete HTML for the modal
- * @private
- */
-function getMemberAnalyticsHtml_() {
-  return '<!DOCTYPE html>' +
-    '<html>' +
-    '<head>' +
-    '  <base target="_top">' +
-    '  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">' +
-    '  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>' +
-    '  <style>' +
-    '    * { box-sizing: border-box; margin: 0; padding: 0; }' +
-    '    body { font-family: "Roboto", sans-serif; background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); color: #f8fafc; min-height: 100vh; padding: 20px; }' +
-    '    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid rgba(59, 130, 246, 0.3); }' +
-    '    .header h1 { font-size: 20px; font-weight: 700; color: #60a5fa; }' +
-    '    .pii-badge { background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 6px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; border: 1px solid rgba(16, 185, 129, 0.3); }' +
-    '    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }' +
-    '    .kpi-card { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; text-align: center; }' +
-    '    .kpi-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }' +
-    '    .kpi-value { font-size: 28px; font-weight: 900; }' +
-    '    .kpi-value.green { color: #34d399; }' +
-    '    .kpi-value.blue { color: #60a5fa; }' +
-    '    .kpi-value.purple { color: #a78bfa; }' +
-    '    .kpi-value.amber { color: #fbbf24; }' +
-    '    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }' +
-    '    .chart-card { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; }' +
-    '    .chart-title { font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }' +
-    '    .bargaining-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }' +
-    '    .bargaining-card { background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 12px; text-align: center; }' +
-    '    .bargaining-label { font-size: 9px; color: #fbbf24; text-transform: uppercase; letter-spacing: 1px; }' +
-    '    .bargaining-value { font-size: 20px; font-weight: 700; color: #fcd34d; margin-top: 4px; }' +
-    '    .bargaining-status { font-size: 9px; color: #94a3b8; margin-top: 4px; }' +
-    '    canvas { max-height: 180px !important; }' +
-    '    .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); }' +
-    '    .btn { padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }' +
-    '    .btn-primary { background: #3b82f6; color: white; }' +
-    '    .btn-primary:hover { background: #2563eb; }' +
-    '    .loading { text-align: center; padding: 60px; color: #94a3b8; }' +
-    '  </style>' +
-    '</head>' +
-    '<body>' +
-    '  <div class="header">' +
-    '    <h1>UNION STRENGTH & SENTIMENT REPORT</h1>' +
-    '    <div class="pii-badge">🔒 PII Protected</div>' +
-    '  </div>' +
-    '  <div id="content"><div class="loading">Loading analytics data...</div></div>' +
-    '  <div class="footer">' +
-    '    <div style="font-size:10px;color:#64748b;">Aggregate metrics only - No personal data displayed</div>' +
-    '    <button class="btn btn-primary" onclick="google.script.host.close()">Close</button>' +
-    '  </div>' +
-    '  <script>' +
-    '    window.onload = function() {' +
-    '      google.script.run.withSuccessHandler(renderAnalytics).withFailureHandler(showError).getMemberAnalyticsStats();' +
-    '    };' +
-    '    function showError(err) {' +
-    '      document.getElementById("content").innerHTML = "<div class=\\"loading\\">Error: " + err.message + "</div>";' +
-    '    }' +
-    '    function renderAnalytics(jsonStats) {' +
-    '      var stats = JSON.parse(jsonStats);' +
-    '      var html = "";' +
-    '      // KPI Row' +
-    '      html += "<div class=\\"kpi-row\\">";' +
-    '      html += "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Members</div><div class=\\"kpi-value blue\\">" + stats.totalMembers + "</div></div>";' +
-    '      html += "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale Score</div><div class=\\"kpi-value green\\">" + stats.moraleScore + "/10</div></div>";' +
-    '      html += "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Trust Score</div><div class=\\"kpi-value purple\\">" + stats.trustScore + "/10</div></div>";' +
-    '      html += "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Active Stewards</div><div class=\\"kpi-value amber\\">" + stats.stewardCount + "</div></div>";' +
-    '      html += "</div>";' +
-    '      // Charts Row 1' +
-    '      html += "<div class=\\"charts-row\\">";' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Leadership Pipeline</div><canvas id=\\"pipelineChart\\"></canvas></div>";' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Sentiment Trend</div><canvas id=\\"trendChart\\"></canvas></div>";' +
-    '      html += "</div>";' +
-    '      // Charts Row 2' +
-    '      html += "<div class=\\"charts-row\\">";' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Membership by Location</div><canvas id=\\"locationChart\\"></canvas></div>";' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Grievances by Contract Article</div><canvas id=\\"articleChart\\"></canvas></div>";' +
-    '      html += "</div>";' +
-    '      // Bargaining Data' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Strategic Bargaining Intelligence</div><div class=\\"bargaining-grid\\">";' +
-    '      html += "<div class=\\"bargaining-card\\"><div class=\\"bargaining-label\\">Step 1 Denial Rate</div><div class=\\"bargaining-value\\">" + stats.step1DenialRate + "%</div><div class=\\"bargaining-status\\">" + (stats.step1DenialRate > 60 ? "High Hostility" : "Normal") + "</div></div>";' +
-    '      html += "<div class=\\"bargaining-card\\"><div class=\\"bargaining-label\\">Avg Settlement</div><div class=\\"bargaining-value\\">" + stats.avgSettlementDays + " Days</div><div class=\\"bargaining-status\\">" + (stats.avgSettlementDays > 45 ? "Slower" : "Normal") + "</div></div>";' +
-    '      html += "<div class=\\"bargaining-card\\"><div class=\\"bargaining-label\\">Dues Paying Rate</div><div class=\\"bargaining-value\\">" + (stats.totalMembers > 0 ? Math.round((stats.duesPayingCount / stats.totalMembers) * 100) : 0) + "%</div><div class=\\"bargaining-status\\">Solidarity</div></div>";' +
-    '      html += "</div></div>";' +
-    '      document.getElementById("content").innerHTML = html;' +
-    '      renderCharts(stats);' +
-    '    }' +
-    '    function renderCharts(stats) {' +
-    '      // Leadership Pipeline (Funnel as horizontal bar)' +
-    '      new Chart(document.getElementById("pipelineChart"), {' +
-    '        type: "bar",' +
-    '        data: { labels: ["Total", "Dues Paying", "Active", "Stewards"], datasets: [{ label: "Members", data: [stats.leadershipPipeline.total, stats.leadershipPipeline.duesPaying, stats.leadershipPipeline.active, stats.leadershipPipeline.stewards], backgroundColor: ["#3b82f6", "#60a5fa", "#34d399", "#fbbf24"] }] },' +
-    '        options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: "#94a3b8" } }, y: { ticks: { color: "#cbd5e1" } } } }' +
-    '      });' +
-    '      // Sentiment Trend' +
-    '      var trendLabels = stats.sentimentTrend.map(function(t) { return t.month; });' +
-    '      var trendData = stats.sentimentTrend.map(function(t) { return t.score; });' +
-    '      if (trendLabels.length === 0) { trendLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]; trendData = [7.2, 7.4, 7.6, 7.5, 7.8, 7.9]; }' +
-    '      new Chart(document.getElementById("trendChart"), {' +
-    '        type: "line",' +
-    '        data: { labels: trendLabels, datasets: [{ label: "Trust Score", data: trendData, borderColor: "#a78bfa", backgroundColor: "rgba(167,139,250,0.2)", fill: true, tension: 0.4 }] },' +
-    '        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 10, ticks: { color: "#94a3b8" } }, x: { ticks: { color: "#94a3b8" } } } }' +
-    '      });' +
-    '      // Location Breakdown' +
-    '      var locLabels = Object.keys(stats.locationBreakdown).slice(0, 8);' +
-    '      var locData = locLabels.map(function(l) { return stats.locationBreakdown[l]; });' +
-    '      new Chart(document.getElementById("locationChart"), {' +
-    '        type: "doughnut",' +
-    '        data: { labels: locLabels, datasets: [{ data: locData, backgroundColor: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"] }] },' +
-    '        options: { responsive: true, plugins: { legend: { position: "right", labels: { color: "#cbd5e1", font: { size: 10 } } } } }' +
-    '      });' +
-    '      // Grievances by Article' +
-    '      var artLabels = Object.keys(stats.grievancesByArticle).slice(0, 6);' +
-    '      var artData = artLabels.map(function(a) { return stats.grievancesByArticle[a]; });' +
-    '      new Chart(document.getElementById("articleChart"), {' +
-    '        type: "bar",' +
-    '        data: { labels: artLabels.length > 0 ? artLabels : ["Art 5", "Art 7", "Art 12"], datasets: [{ label: "Cases", data: artData.length > 0 ? artData : [3, 5, 2], backgroundColor: "#f59e0b" }] },' +
-    '        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: "#94a3b8" } }, x: { ticks: { color: "#94a3b8" } } } }' +
-    '      });' +
-    '    }' +
-    '  </script>' +
-    '</body>' +
-    '</html>';
-}
+// Member Analytics functionality has been deprecated and removed.
+// Use the Interactive Dashboard (showInteractiveDashboardTab) instead,
+// which provides similar aggregate metrics in a consolidated view.
+// ============================================================================
 
 // ============================================================================
 // 4. STRATEGIC PRO MOVES & ALERTS
