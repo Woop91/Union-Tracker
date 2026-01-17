@@ -64,7 +64,14 @@ function createDashboardMenu() {
       .addItem('📤 Export Directory', 'showExportDialog')
       .addSeparator()
       .addItem('🛡️ Steward Directory', 'showStewardDirectory')
-      .addItem('🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas'))
+      .addItem('🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas')
+      .addSeparator()
+      .addItem('📧 Send Contact Form', 'sendContactInfoForm')
+      .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink')
+      .addSeparator()
+      .addSubMenu(ui.createMenu('🆔 ID & Data Management')
+        .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
+        .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')))
 
     // Calendar submenu - Action icons
     .addSubMenu(ui.createMenu('📅 Calendar')
