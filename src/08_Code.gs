@@ -5815,7 +5815,6 @@ function rebuildDashboard() {
 
   // Recreate dashboard sheets with latest layout
   createDashboard(ss);
-  createInteractiveDashboard(ss);
 
   // Refresh hidden sheet formulas and sync data
   refreshAllHiddenFormulas();

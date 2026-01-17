@@ -455,10 +455,9 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `rebuildDashboard()` - Refresh data and validations
   - `refreshAllFormulas()` - Refresh all formulas and sync
 
-- Sheet Creation (11 functions):
+- Sheet Creation (10 functions):
   - `createConfigSheet()`, `createMemberDirectory()`, `createGrievanceLog()`
-  - `createDashboard()`, `createInteractiveDashboard()`
-  - `createSatisfactionSheet()`, `createFeedbackSheet()`
+  - `createDashboard()`, `createSatisfactionSheet()`, `createFeedbackSheet()`
   - `createFunctionChecklistSheet_()` - Includes Phase 14: Strategic Command Center
   - `createGettingStartedSheet()`, `createFAQSheet()`, `createConfigGuideSheet()`
 
@@ -1384,6 +1383,33 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.2.3 (2026-01-17) - Custom View Deprecation Cleanup
+
+**Deprecation Cleanup:**
+
+Completed removal of deprecated Custom View (🎯 Interactive Dashboard) sheet functionality:
+
+1. **Removed Stale Function Call**
+   - Removed orphaned `createInteractiveDashboard(ss)` call from `rebuildDashboard()`
+   - This call was left behind from incomplete deprecation in earlier commit
+
+2. **Documentation Updates**
+   - Updated function count: Sheet Creation now 10 functions (was 11)
+   - Removed `createInteractiveDashboard()` from function registry
+   - Updated INTERACTIVE_DASHBOARD_GUIDE.md to reflect sheet-based dashboard deprecation
+   - Modal popup dashboard (`📊 509 Dashboard > 📊 Dashboard`) remains the primary dashboard
+
+**Background:**
+The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-based Interactive Dashboard popup, which provides a better mobile experience and doesn't create additional sheet tabs. The `SHEETS.INTERACTIVE` constant and `createInteractiveDashboard()` function were removed, but the call in `rebuildDashboard()` was accidentally retained.
+
+**Files Changed:**
+- `src/08_Code.gs` - Removed stale `createInteractiveDashboard(ss)` call
+- `dist/ConsolidatedDashboard.gs` - Same removal
+- `AIR.md` - Updated function registry and added this changelog entry
+- `INTERACTIVE_DASHBOARD_GUIDE.md` - Updated to clarify modal vs sheet-based dashboards
+
+---
 
 ### Version 4.2.0 (2026-01-16) - Modal Command Center
 
@@ -2926,10 +2952,12 @@ Grievance Log ──────────────┘
 
 **Code Changes:**
 
-- Constants.gs: Added DASHBOARD, INTERACTIVE, DASHBOARD_CALC to SHEETS
-- Code.gs: Added `createDashboard()`, `createInteractiveDashboard()` (~300 lines)
+- Constants.gs: Added DASHBOARD, DASHBOARD_CALC to SHEETS
+- Code.gs: Added `createDashboard()` (~300 lines)
 - HiddenSheets.gs: Added `setupDashboardCalcSheet()` (~70 lines)
 - Updated CREATE_509_DASHBOARD, DIAGNOSE_SETUP, REPAIR_DASHBOARD for 5 sheets
+
+> **Note:** `createInteractiveDashboard()` and SHEETS.INTERACTIVE were later deprecated in v4.2.3.
 
 ---
 

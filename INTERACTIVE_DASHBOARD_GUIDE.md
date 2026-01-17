@@ -2,37 +2,27 @@
 
 ## Overview
 
-There are **two** Interactive Dashboard options available:
+The **Interactive Dashboard** provides a comprehensive view of your union's grievance management data through a mobile-friendly modal popup interface.
 
-### 1. 📊 Dashboard Modal Popup (⚠️ PROTECTED)
+### 📊 Dashboard Modal Popup (⚠️ PROTECTED)
 
 **Menu:** `📊 509 Dashboard > 📊 Dashboard`
 
 A **popup modal dialog** with a tabbed interface featuring:
 - **Overview Tab** - Quick stats and metrics at a glance
-- **My Cases Tab** (NEW) - Stewards can view their assigned grievances with stats and filtering
-- **Grievances Tab** - Status-filtered grievance list
+- **My Cases Tab** - Stewards can view their assigned grievances with stats and filtering
+- **Grievances Tab** - Status-filtered grievance list with search
 - **Members Tab** - Searchable member directory with filtering
-- **Analytics Tab** - Bar charts for status distribution and categories
+- **Analytics Tab** - Bar charts for status distribution, categories, and Sankey flow diagram
 
 > ⚠️ **PROTECTED CODE:** This feature is user-approved and should not be modified.
 > See AIR.md "Protected Code" section for details.
 
-### 2. 📊 Sheet-Based Dashboard
-
-**Tab:** `🎯 Custom View` (spreadsheet tab)
-
-A **customizable spreadsheet tab** that lets you:
-- ✅ Select which metrics to display
-- ✅ Choose chart types (Pie, Donut, Bar, Line, Column, Area)
-- ✅ Compare multiple metrics side-by-side
-- ✅ Customize themes and colors
-- ✅ View warehouse-style location analytics
-- ✅ Access real-time data visualization
+**Mobile-Friendly:** Touch-optimized with responsive design for use on phones and tablets.
 
 ---
 
-## 📊 Dashboard Modal Popup (Protected)
+## 📊 Dashboard Features
 
 Access via: `📊 509 Dashboard > 📊 Dashboard`
 
@@ -40,45 +30,53 @@ This opens a popup with 5 tabs:
 
 | Tab | Features |
 |-----|----------|
-| **Overview** | Total members, stewards, grievance counts, win rate |
-| **My Cases** (NEW) | Steward's assigned grievances with stats and status filtering |
-| **Grievances** | Status filter buttons, search, click for details |
-| **Members** | Searchable list, click to view details |
-| **Analytics** | Bar charts, location/unit breakdowns, resolution stats |
-
-**Mobile-Friendly:** Touch-optimized with responsive design.
+| **Overview** | Total members, stewards, grievance counts, win rate, quick navigation |
+| **My Cases** | Steward's assigned grievances with stats and status filtering |
+| **Grievances** | Status filter buttons, search, expandable details, quick actions |
+| **Members** | Searchable list with filters (location, unit, office days), click to view/edit |
+| **Analytics** | Bar charts, location/unit breakdowns, resolution stats, Sankey diagram |
 
 ---
 
-## 📊 Sheet-Based Dashboard Guide
+## 🗄️ Sheet-Based Dashboard (DEPRECATED)
 
-## 🚀 Quick Start
-
-### Step 1: Access the Custom View Dashboard
-1. Open your 509 Dashboard spreadsheet
-2. Click the **🎯 Custom View** tab at the bottom of the spreadsheet
-3. The sheet will open with pre-configured controls
-
-### Step 2: Setup Controls (First Time Only)
-1. Go to **📊 Sheet Manager** → **Setup** → **Setup Data Validations**
-2. This creates dropdown menus for metric and chart selection
-
-### Step 3: Customize Your Dashboard
-1. Use the dropdowns in **Row 7** to select:
-   - **Metric 1**: Choose your primary metric (e.g., "Total Members")
-   - **Chart Type 1**: Select how to display it (e.g., "Donut Chart")
-   - **Metric 2**: Choose a comparison metric (e.g., "Active Grievances")
-   - **Chart Type 2**: Select its chart type (e.g., "Bar Chart")
-   - **Theme**: Pick your color scheme (e.g., "Union Blue")
-   - **Enable Comparison**: Set to "Yes" to show both metrics
-
-### Step 4: Refresh Charts
-1. After making selections, click **📊 Sheet Manager** → **📈 Refresh Interactive Charts**
-2. The dashboard will update with your chosen metrics and visualizations
+> ⚠️ **DEPRECATED:** The sheet-based `🎯 Custom View` tab has been deprecated as of v4.2.3.
+>
+> The modal popup dashboard provides a better user experience with:
+> - Mobile-friendly responsive design
+> - No additional sheet tabs cluttering the spreadsheet
+> - Faster loading and better performance
+> - Touch-optimized interface
+>
+> If you have an existing `🎯 Custom View` tab, you can safely delete it.
+> Use `📊 509 Dashboard > 📊 Dashboard` for all dashboard functionality.
 
 ---
 
-## 🎛️ Control Panel Features
+## 📱 Web App Access
+
+The dashboard is also available as a standalone web app for mobile access:
+
+1. Go to **Extensions → Apps Script**
+2. Click **Deploy → New deployment**
+3. Select **Web app**
+4. Set access permissions and deploy
+5. Copy the URL and bookmark on your mobile device
+
+The web app provides the same dashboard features optimized for mobile browsers.
+
+---
+
+---
+
+# 📚 Archived Documentation
+
+> ⚠️ **ARCHIVED:** The sections below document the deprecated sheet-based `🎯 Custom View` dashboard.
+> This functionality has been removed. The documentation is retained for historical reference only.
+
+---
+
+## 🎛️ Control Panel Features (DEPRECATED)
 
 ### Available Metrics
 
