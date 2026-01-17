@@ -1030,12 +1030,12 @@ Columns marked as **Multi-Select** support comma-separated values for multiple s
 
 ---
 
-## Menu System (3 Menus) - Updated v4.2.1
+## Menu System (4 Menus) - Updated v4.2.2
 
-The menu system provides comprehensive access to all dashboard features through 3 logical menus:
+The menu system provides comprehensive access to all dashboard features through 4 logical top-level menus:
 
 ```
-📊 Dashboard (Main Menu)
+📊 Union Hub (Main Menu)
 ├── 📊 Dashboard Home
 ├── 🎛️ Visual Control Panel
 ├── 🔍 Search (submenu)
@@ -1057,7 +1057,12 @@ The menu system provides comprehensive access to all dashboard features through 
 │   ├── 📥 Import Members
 │   ├── 📤 Export Directory
 │   ├── 🛡️ Steward Directory
-│   └── 🔄 Refresh Member Directory Data
+│   ├── 🔄 Refresh Member Directory Data
+│   ├── 📧 Send Contact Form
+│   ├── 📊 Send Satisfaction Survey
+│   └── 🆔 ID & Data Management (nested submenu)
+│       ├── 🆔 Generate Missing Member IDs
+│       └── 🔍 Check Duplicate IDs
 ├── 📅 Calendar (submenu)
 │   ├── 🔗 Sync Deadlines to Calendar
 │   ├── 👁️ View Upcoming Deadlines
@@ -1090,40 +1095,47 @@ The menu system provides comprehensive access to all dashboard features through 
 │   ├── 📝 Open Editor
 │   ├── ⚡ Enable Auto-Open
 │   └── 🚫 Disable Auto-Open
-├── 🛠️ Admin (submenu)
-│   ├── 🩺 System Diagnostics
-│   ├── 🔧 Repair Dashboard
-│   ├── ⚙️ Settings
-│   ├── 🔄 Data Sync (nested submenu)
-│   │   ├── 🔄 Sync All Data Now
-│   │   ├── 🔄 Sync Grievance → Members
-│   │   ├── 🔄 Sync Members → Grievances
-│   │   ├── ⚡ Install Auto-Sync Trigger
-│   │   └── 🚫 Remove Auto-Sync Trigger
-│   ├── ✅ Validation (nested submenu)
-│   │   ├── 🔍 Run Bulk Validation
-│   │   ├── ⚙️ Validation Settings
-│   │   ├── 🧹 Clear Indicators
-│   │   └── ⚡ Install Validation Trigger
-│   ├── 🗄️ Cache & Performance (nested submenu)
-│   │   ├── 🗄️ Cache Status
-│   │   ├── 🔥 Warm Up Caches
-│   │   └── 🗑️ Clear All Caches
-│   ├── 🏗️ Setup (nested submenu)
-│   │   ├── 🔧 Setup All Hidden Sheets
-│   │   ├── 🔧 Repair All Hidden Sheets
-│   │   ├── 🔍 Verify Hidden Sheets
-│   │   ├── ⚙️ Setup Data Validations
-│   │   └── 🎨 Setup Comfort View Defaults
-│   └── 🎭 Demo Data (nested submenu)
-│       ├── 🚀 Seed All Sample Data
-│       ├── 👥 Seed Members Only...
-│       ├── 📋 Seed Grievances Only...
-│       └── ☢️ NUKE SEEDED DATA
 ├── ⚡ Quick Actions
 └── 📖 Help & Documentation
 
-📊 509 Command (Strategic Command Center v4.2.1)
+🛠️ Admin (Separate Top-Level Menu)
+├── 🩺 System Diagnostics
+├── 🔧 Repair Dashboard
+├── ⚙️ Settings
+├── ⚙️ Automation (submenu)
+│   ├── 🔄 Force Global Refresh
+│   ├── 🌙 Enable Midnight Auto-Refresh
+│   ├── ❌ Disable Midnight Auto-Refresh
+│   ├── 🔔 Enable 1AM Dashboard Refresh
+│   └── 📑 Email Weekly PDF Snapshot
+├── 🔄 Data Sync (submenu)
+│   ├── 🔄 Sync All Data Now
+│   ├── 🔄 Sync Grievance → Members
+│   ├── 🔄 Sync Members → Grievances
+│   ├── ⚡ Install Auto-Sync Trigger
+│   └── 🚫 Remove Auto-Sync Trigger
+├── ✅ Validation (submenu)
+│   ├── 🔍 Run Bulk Validation
+│   ├── ⚙️ Validation Settings
+│   ├── 🧹 Clear Indicators
+│   └── ⚡ Install Validation Trigger
+├── 🗄️ Cache & Performance (submenu)
+│   ├── 🗄️ Cache Status
+│   ├── 🔥 Warm Up Caches
+│   └── 🗑️ Clear All Caches
+├── 🏗️ Setup (submenu)
+│   ├── 🔧 Setup All Hidden Sheets
+│   ├── 🔧 Repair All Hidden Sheets
+│   ├── 🔍 Verify Hidden Sheets
+│   ├── ⚙️ Setup Data Validations
+│   └── 🎨 Setup Comfort View Defaults
+└── 🎭 Demo Data (submenu)
+    ├── 🚀 Seed All Sample Data
+    ├── 👥 Seed Members Only...
+    ├── 📋 Seed Grievances Only...
+    └── ☢️ NUKE SEEDED DATA
+
+🎯 Strategic Ops (Strategic Operations Menu)
 ├── 👁️ Command Center (submenu)
 │   ├── 👁️ Executive Command (PII)
 │   ├── 👥 Member Analytics (No PII)
@@ -1140,7 +1152,7 @@ The menu system provides comprehensive access to all dashboard features through 
 │   ├── 📈 Unit Density Treemap
 │   ├── 📉 Sentiment Trend Chart
 │   └── ⚖️ Steward Workload Report
-├── 🎯 Strategic Intelligence (submenu) - **NEW v4.2.1**
+├── 🎯 Strategic Intelligence (submenu)
 │   ├── 🔥 Generate Unit Hot Zones
 │   ├── 🌟 Identify Rising Stars
 │   ├── 📉 Management Hostility Report
@@ -1154,17 +1166,11 @@ The menu system provides comprehensive access to all dashboard features through 
 │   ├── ⬇️ Demote Steward
 │   ├── 📧 Send Contact Form
 │   └── 📊 Send Satisfaction Survey
-├── 🎨 Styling & Theme (submenu)
-│   ├── 🎨 Apply Global Styling
-│   └── 🔄 Reset to Default Theme
-└── ⚙️ Automation (submenu)
-    ├── 🔄 Force Global Refresh
-    ├── 🌙 Enable Midnight Auto-Refresh
-    ├── ❌ Disable Midnight Auto-Refresh
-    ├── 🔔 Enable 1AM Dashboard Refresh
-    └── 📑 Email Weekly PDF Snapshot
+└── 🎨 Styling & Theme (submenu)
+    ├── 🎨 Apply Global Styling
+    └── 🔄 Reset to Default Theme
 
-📊 509 COMMAND CENTER (Alternative Strategic Menu)
+📱 Field Portal (Mobile/Field Operations Menu)
 ├── 👁️ Refresh Dashboard UI
 ├── 🔍 Search Members
 ├── 📱 Field Accessibility (submenu)
@@ -1199,12 +1205,12 @@ The menu system provides comprehensive access to all dashboard features through 
 │   ├── 📊 Grievance Trends
 │   ├── 📚 Search Precedents
 │   └── 📝 OCR Transcribe Form
-├── 🎯 Strategic Intelligence (submenu) - **NEW v4.2.1**
+├── 🎯 Strategic Intelligence (submenu)
 │   ├── 🔥 Generate Unit Hot Zones
 │   ├── 🌟 Identify Rising Stars
 │   ├── 📉 Management Hostility Report
 │   └── 📝 Bargaining Cheat Sheet
-├── 🌐 Web App & Portal (submenu) - **NEW v4.2.1**
+├── 🌐 Web App & Portal (submenu)
 │   ├── 👤 Build Member Portal
 │   ├── 📊 Build Public Portal
 │   ├── 📧 Send Portal Email

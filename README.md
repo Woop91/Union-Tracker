@@ -175,25 +175,34 @@ src/
 - **Data Integrity**: Batch operations, validation, orphan detection
 - **Audit Logging**: Track all changes with timestamps
 
-## Menu System Overview (v4.2.1)
+## Menu System Overview (v4.2.2)
 
-The dashboard provides 3 comprehensive menus with 100+ functions:
+The dashboard provides 4 comprehensive top-level menus with 100+ functions:
 
-### 📊 Dashboard (Main Menu)
+### 📊 Union Hub (Main Menu)
 | Submenu | Key Features |
 |---------|--------------|
 | 🔍 Search | Desktop, Quick, and Advanced search |
 | 📋 Grievances | Create, edit, bulk update, view active, analytics |
-| 👥 Members | Add, find, import/export, steward directory |
+| 👥 Members | Add, find, import/export, steward directory, contact forms, surveys, ID management |
 | 📅 Calendar | Sync deadlines, view upcoming, clear events |
 | 📁 Google Drive | Setup folders, view files, batch create |
 | 🔔 Notifications | Settings, test notifications |
 | 👁️ View | Dashboards, mobile URL, dark mode, themes |
 | ♿ Comfort View | Focus mode, zebra stripes, pomodoro, notepad |
 | 📝 Multi-Select | Editor, auto-open triggers |
-| 🛠️ Admin | Diagnostics, sync, validation, cache, setup |
 
-### 📊 509 Command (Strategic)
+### 🛠️ Admin (System Administration)
+| Submenu | Key Features |
+|---------|--------------|
+| ⚙️ Automation | Auto-refresh, midnight triggers, email snapshots |
+| 🔄 Data Sync | Sync all data, grievance/member sync, triggers |
+| ✅ Validation | Bulk validation, settings, indicators |
+| 🗄️ Cache | Cache status, warm up, clear caches |
+| 🏗️ Setup | Hidden sheets, data validations, defaults |
+| 🎭 Demo Data | Seed sample data, nuke seeded data |
+
+### 🎯 Strategic Ops (Strategic Operations)
 | Submenu | Key Features |
 |---------|--------------|
 | 👁️ Command Center | Executive/Member dashboards, steward performance |
@@ -202,7 +211,7 @@ The dashboard provides 3 comprehensive menus with 100+ functions:
 | 🆔 ID & Data Engines | ID generation, duplicate check, PDF creation |
 | 👤 Steward Management | Promote/demote, contact forms, surveys |
 
-### 📊 509 COMMAND CENTER (Field Operations)
+### 📱 Field Portal (Mobile/Field Operations)
 | Submenu | Key Features |
 |---------|--------------|
 | 📱 Field Accessibility | Mobile view, get mobile URL |

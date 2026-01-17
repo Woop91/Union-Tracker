@@ -85,7 +85,7 @@ var COMMAND_CENTER_CONFIG = {
  */
 function createCommandCenterMenu() {
   var ui = SpreadsheetApp.getUi();
-  var menu = ui.createMenu('📊 509 COMMAND CENTER');
+  var menu = ui.createMenu('📱 Field Portal');
 
   // Top-level quick actions (v4.0)
   menu.addItem('👁️ Refresh Dashboard UI', 'APPLY_SYSTEM_THEME')
