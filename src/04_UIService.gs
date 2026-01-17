@@ -211,6 +211,9 @@ function createDashboardMenu() {
       .addItem('🎨 Apply Global Styling', 'applyGlobalStyling')
       .addItem('🔄 Reset to Default Theme', 'resetToDefaultTheme'))
     .addToUi();
+
+  // Create the Field Portal menu (from CommandCenter.gs)
+  createCommandCenterMenu();
 }
 
 /**
