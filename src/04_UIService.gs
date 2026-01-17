@@ -31,8 +31,8 @@
 function createDashboardMenu() {
   const ui = SpreadsheetApp.getUi();
 
-  // Main Menu: Union Dashboard
-  ui.createMenu('📊 Dashboard')
+  // Main Menu: Union Hub
+  ui.createMenu('📊 Union Hub')
     .addItem('📊 Dashboard Home', 'showDashboardSidebar')
     .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
     .addSeparator()
@@ -60,7 +60,14 @@ function createDashboardMenu() {
       .addItem('📤 Export Directory', 'showExportDialog')
       .addSeparator()
       .addItem('🛡️ Steward Directory', 'showStewardDirectory')
-      .addItem('🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas'))
+      .addItem('🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas')
+      .addSeparator()
+      .addItem('📧 Send Contact Form', 'sendContactInfoForm')
+      .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink')
+      .addSeparator()
+      .addSubMenu(ui.createMenu('🆔 ID & Data Management')
+        .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
+        .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')))
 
     // Calendar submenu - Action icons
     .addSubMenu(ui.createMenu('📅 Calendar')
@@ -110,49 +117,57 @@ function createDashboardMenu() {
       .addItem('⚡ Enable Auto-Open', 'installMultiSelectTrigger')
       .addItem('🚫 Disable Auto-Open', 'removeMultiSelectTrigger'))
 
-    // Admin submenu - Tool icons
-    .addSubMenu(ui.createMenu('🛠️ Admin')
-      .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
-      .addItem('🔧 Repair Dashboard', 'showRepairDialog')
-      .addItem('⚙️ Settings', 'showSettingsDialog')
-      .addSeparator()
-      .addSubMenu(ui.createMenu('🔄 Data Sync')
-        .addItem('🔄 Sync All Data Now', 'syncAllData')
-        .addItem('🔄 Sync Grievance → Members', 'syncGrievanceToMemberDirectory')
-        .addItem('🔄 Sync Members → Grievances', 'syncMemberToGrievanceLog')
-        .addSeparator()
-        .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
-        .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
-      .addSubMenu(ui.createMenu('✅ Validation')
-        .addItem('🔍 Run Bulk Validation', 'runBulkValidation')
-        .addItem('⚙️ Validation Settings', 'showValidationSettings')
-        .addItem('🧹 Clear Indicators', 'clearValidationIndicators')
-        .addItem('⚡ Install Validation Trigger', 'installValidationTrigger'))
-      .addSubMenu(ui.createMenu('🗄️ Cache & Performance')
-        .addItem('🗄️ Cache Status', 'showCacheStatusDashboard')
-        .addItem('🔥 Warm Up Caches', 'warmUpCaches')
-        .addItem('🗑️ Clear All Caches', 'invalidateAllCaches'))
-      .addSubMenu(ui.createMenu('🏗️ Setup')
-        .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
-        .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
-        .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
-        .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-        .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'))
-      .addSeparator()
-      .addSubMenu(ui.createMenu('🎭 Demo Data')
-        .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
-        .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
-        .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
-        .addSeparator()
-        .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA')))
-
     .addSeparator()
     .addItem('⚡ Quick Actions', 'showQuickActionsMenu')
     .addItem('📖 Help & Documentation', 'showHelpDialog')
     .addToUi();
 
-  // Strategic Command Center Menu (Separate top-level menu)
-  ui.createMenu('📊 509 Command')
+  // Admin Menu (Separate top-level menu)
+  ui.createMenu('🛠️ Admin')
+    .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
+    .addItem('🔍 Modal Diagnostics', 'showModalDiagnostics')
+    .addItem('🔧 Repair Dashboard', 'showRepairDialog')
+    .addItem('⚙️ Settings', 'showSettingsDialog')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('⚙️ Automation')
+      .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
+      .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
+      .addItem('❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger')
+      .addItem('🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers')
+      .addItem('📑 Email Weekly PDF Snapshot', 'emailExecutivePDF'))
+    .addSubMenu(ui.createMenu('🔄 Data Sync')
+      .addItem('🔄 Sync All Data Now', 'syncAllData')
+      .addItem('🔄 Sync Grievance → Members', 'syncGrievanceToMemberDirectory')
+      .addItem('🔄 Sync Members → Grievances', 'syncMemberToGrievanceLog')
+      .addSeparator()
+      .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
+      .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
+    .addSubMenu(ui.createMenu('✅ Validation')
+      .addItem('🔍 Run Bulk Validation', 'runBulkValidation')
+      .addItem('⚙️ Validation Settings', 'showValidationSettings')
+      .addItem('🧹 Clear Indicators', 'clearValidationIndicators')
+      .addItem('⚡ Install Validation Trigger', 'installValidationTrigger'))
+    .addSubMenu(ui.createMenu('🗄️ Cache & Performance')
+      .addItem('🗄️ Cache Status', 'showCacheStatusDashboard')
+      .addItem('🔥 Warm Up Caches', 'warmUpCaches')
+      .addItem('🗑️ Clear All Caches', 'invalidateAllCaches'))
+    .addSubMenu(ui.createMenu('🏗️ Setup')
+      .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
+      .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
+      .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
+      .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
+      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'))
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🎭 Demo Data')
+      .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
+      .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
+      .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
+      .addSeparator()
+      .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'))
+    .addToUi();
+
+  // Strategic Operations Menu (Separate top-level menu)
+  ui.createMenu('🎯 Strategic Ops')
     .addSubMenu(ui.createMenu('👁️ Command Center')
       .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
       .addItem('👥 Member Analytics (No PII)', 'rebuildMemberAnalytics')
@@ -192,14 +207,10 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('🎨 Styling & Theme')
       .addItem('🎨 Apply Global Styling', 'applyGlobalStyling')
       .addItem('🔄 Reset to Default Theme', 'resetToDefaultTheme'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('⚙️ Automation')
-      .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
-      .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
-      .addItem('❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger')
-      .addItem('🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers')
-      .addItem('📑 Email Weekly PDF Snapshot', 'emailExecutivePDF'))
     .addToUi();
+
+  // Create the Field Portal menu (from CommandCenter.gs)
+  createCommandCenterMenu();
 }
 
 /**
@@ -3417,7 +3428,12 @@ function getInteractiveDashboardHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
 
     // Error state
-    '.error-state{text-align:center;padding:30px;color:#dc2626;background:#fef2f2;border-radius:8px;margin:10px}' +
+    '.error-state{text-align:center;padding:30px;color:#dc2626;background:#fef2f2;border-radius:8px;margin:10px;border:1px solid #fecaca}' +
+    '.error-state::before{content:"⚠️ ";font-size:20px}' +
+    '.loading-state{text-align:center;padding:40px;color:#6b7280}' +
+    '.loading-spinner{display:inline-block;width:24px;height:24px;border:3px solid #e5e7eb;border-top-color:#7c3aed;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.debug-info{font-size:10px;color:#9ca3af;margin-top:5px;font-family:monospace}' +
 
     // Sankey Diagram
     '.sankey-container{position:relative;padding:15px 0}' +
@@ -3543,8 +3559,12 @@ function getInteractiveDashboardHtml() {
     '<script>' +
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
-    // Error handler wrapper
-    'function safeRun(fn,fallback){try{fn()}catch(e){console.error(e);if(fallback)fallback(e)}}' +
+    // Debug mode and error handler wrapper
+    'var DEBUG_MODE=true;' +
+    'function log(msg,data){if(DEBUG_MODE){console.log("[Dashboard] "+msg,data||"")}}' +
+    'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+e.message)}' +
+    'function safeRun(fn,fallback){try{fn()}catch(e){console.error("[Dashboard]",e);if(fallback)fallback(e)}}' +
+    'function showLoading(elementId,msg){var el=document.getElementById(elementId);if(el)el.innerHTML="<div class=\\"loading-state\\"><div class=\\"loading-spinner\\"></div><div>"+(msg||"Loading...")+"</div></div>"}' +
 
     // Tab switching with error handling
     'function switchTab(tabName,btn){' +
@@ -3563,9 +3583,19 @@ function getInteractiveDashboardHtml() {
 
     // Load overview data with error handling
     'function loadOverview(){' +
+    '  log("Loading overview data...");' +
+    '  showLoading("overview-stats","Loading dashboard stats...");' +
     '  google.script.run' +
-    '    .withSuccessHandler(function(data){safeRun(function(){renderOverview(data)},function(){document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Error loading stats</div>"})})'  +
-    '    .withFailureHandler(function(e){document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Failed to load: "+e.message+"</div>"})' +
+    '    .withSuccessHandler(function(data){' +
+    '      log("Overview data received:",data);' +
+    '      safeRun(function(){renderOverview(data)},function(e){' +
+    '        document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Error rendering stats<div class=\\"debug-info\\">"+e.message+"</div></div>"' +
+    '      })' +
+    '    })'  +
+    '    .withFailureHandler(function(e){' +
+    '      logError("Failed to load overview",e);' +
+    '      document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Failed to load stats<div class=\\"debug-info\\">"+e.message+"<br>Check: Admin → Modal Diagnostics</div></div>"' +
+    '    })' +
     '    .getInteractiveOverviewData();' +
     '}' +
 
@@ -3623,9 +3653,11 @@ function getInteractiveDashboardHtml() {
 
     // Load my cases (steward's assigned grievances)
     'function loadMyCases(){' +
+    '  log("Loading my cases...");' +
+    '  showLoading("mycases-list","Loading your assigned cases...");' +
     '  google.script.run' +
-    '    .withSuccessHandler(function(data){myCases=data||[];renderMyCases(myCases);renderMyCasesStats(data)})'  +
-    '    .withFailureHandler(function(e){document.getElementById("mycases-list").innerHTML="<div class=\\"error-state\\">Failed to load your cases: "+e.message+"</div>"})' +
+    '    .withSuccessHandler(function(data){log("My cases received:",data?data.length:0);myCases=data||[];renderMyCases(myCases);renderMyCasesStats(data)})'  +
+    '    .withFailureHandler(function(e){logError("Failed to load my cases",e);document.getElementById("mycases-list").innerHTML="<div class=\\"error-state\\">Failed to load your cases<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
     '    .getMyStewardCases();' +
     '}' +
 
@@ -3688,9 +3720,11 @@ function getInteractiveDashboardHtml() {
 
     // Load members with filters
     'function loadMembers(){' +
+    '  log("Loading members...");' +
+    '  showLoading("members-list","Loading member directory...");' +
     '  google.script.run' +
-    '    .withSuccessHandler(function(data){allMembers=data||[];renderMembers(allMembers);loadMemberFilters()})'  +
-    '    .withFailureHandler(function(e){document.getElementById("members-list").innerHTML="<div class=\\"error-state\\">Failed to load members</div>"})' +
+    '    .withSuccessHandler(function(data){log("Members received:",data?data.length:0);allMembers=data||[];renderMembers(allMembers);loadMemberFilters()})'  +
+    '    .withFailureHandler(function(e){logError("Failed to load members",e);document.getElementById("members-list").innerHTML="<div class=\\"error-state\\">Failed to load members<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
     '    .getInteractiveMemberData();' +
     '}' +
 
@@ -3863,9 +3897,11 @@ function getInteractiveDashboardHtml() {
 
     // Load grievances
     'function loadGrievances(){' +
+    '  log("Loading grievances...");' +
+    '  showLoading("grievances-list","Loading grievance log...");' +
     '  google.script.run' +
-    '    .withSuccessHandler(function(data){allGrievances=data||[];renderGrievances(allGrievances)})'  +
-    '    .withFailureHandler(function(e){document.getElementById("grievances-list").innerHTML="<div class=\\"error-state\\">Failed to load grievances</div>"})' +
+    '    .withSuccessHandler(function(data){log("Grievances received:",data?data.length:0);allGrievances=data||[];renderGrievances(allGrievances)})'  +
+    '    .withFailureHandler(function(e){logError("Failed to load grievances",e);document.getElementById("grievances-list").innerHTML="<div class=\\"error-state\\">Failed to load grievances<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
     '    .getInteractiveGrievanceData();' +
     '}' +
 

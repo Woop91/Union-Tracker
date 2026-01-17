@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 0,
-  BUILD: 'v4.3.0',
-  CURRENT: '4.3.0',
-  CODENAME: 'Checklist Tracking'
+  PATCH: 1,
+  BUILD: 'v4.3.1',
+  CURRENT: '4.3.1',
+  CODENAME: 'Menu Restructure + Checklist Tracking'
 };
 
 // ============================================================================
