@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 2,
-  PATCH: 1,
-  BUILD: 'v4.2.1',
-  CURRENT: '4.2.1',
-  CODENAME: 'Complete Menu System'
+  PATCH: 2,
+  BUILD: 'v4.2.2',
+  CURRENT: '4.2.2',
+  CODENAME: 'Menu Restructure'
 };
 
 // ============================================================================

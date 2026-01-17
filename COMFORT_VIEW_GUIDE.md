@@ -4,12 +4,12 @@
 
 ### One-Click Setup
 1. Open your 509 Dashboard
-2. Click **📊 Dashboard** → **♿ Comfort View** → **♿ Comfort View Panel**
+2. Click **📊 Union Hub** → **♿ Comfort View** → **♿ Comfort View Panel**
 3. Use the panel to enable your preferred settings
 4. Done! Your dashboard is now optimized for visual comfort
 
 ### Alternative: Setup Defaults
-1. Click **📊 Dashboard** → **🛠️ Admin** → **🏗️ Setup** → **🎨 Setup Comfort View Defaults**
+1. Click **🛠️ Admin** → **🏗️ Setup** → **🎨 Setup Comfort View Defaults**
 2. Wait 30 seconds
 3. All default accessibility settings will be applied
 
@@ -48,7 +48,7 @@
 1. **Dashboard** ← START HERE
    - YOUR personalized dashboard with My Cases tab for stewards
    - Overview, Grievances, Members, Analytics tabs
-   - Opens via menu: 📊 509 Dashboard > 📊 Dashboard
+   - Opens via menu: 📊 Union Hub > 📊 Dashboard
 
 2. **Dashboard Pend** (formerly Smart Dashboard)
    - Quick overview with pending items
@@ -69,7 +69,7 @@
 ## How to Use Your Dashboard (Optimized for Visual Comfort)
 
 ### Morning Routine (2 minutes)
-1. Open spreadsheet → Click **📊 509 Dashboard > 📊 Dashboard**
+1. Open spreadsheet → Click **📊 Union Hub > 📊 Dashboard**
 2. Look at 4 big number cards at top
 3. Check **My Cases** tab if you're a steward
 4. Done! You're updated
@@ -313,7 +313,7 @@ When you open the tab, you'll see:
 
 ### Morning (2 min)
 1. Open spreadsheet
-2. Click **📊 509 Dashboard > 📊 Dashboard**
+2. Click **📊 Union Hub > 📊 Dashboard**
 3. Look at 4 big numbers:
    - Total Members (blue)
    - Active Grievances (orange)
@@ -344,7 +344,7 @@ When you open the tab, you'll see:
 ### Quick Check on Phone
 1. Open Google Sheets app
 2. Open 509 Dashboard
-3. Tap **📊 509 Dashboard > 📊 Dashboard**
+3. Tap **📊 Union Hub > 📊 Dashboard**
 4. Pinch to zoom on big numbers
 5. Glance at colors
 6. Done!
