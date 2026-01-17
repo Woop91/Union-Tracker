@@ -3349,7 +3349,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (6744 lines)
+// SOURCE: 04_UIService.gs (6770 lines)
 // ============================================================================
 
 /**
@@ -3483,6 +3483,7 @@ function createDashboardMenu() {
   // Admin Menu (Separate top-level menu)
   ui.createMenu('🛠️ Admin')
     .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
+    .addItem('🔍 Modal Diagnostics', 'showModalDiagnostics')
     .addItem('🔧 Repair Dashboard', 'showRepairDialog')
     .addItem('⚙️ Settings', 'showSettingsDialog')
     .addSeparator()
@@ -6785,7 +6786,12 @@ function getInteractiveDashboardHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
 
     // Error state
-    '.error-state{text-align:center;padding:30px;color:#dc2626;background:#fef2f2;border-radius:8px;margin:10px}' +
+    '.error-state{text-align:center;padding:30px;color:#dc2626;background:#fef2f2;border-radius:8px;margin:10px;border:1px solid #fecaca}' +
+    '.error-state::before{content:"⚠️ ";font-size:20px}' +
+    '.loading-state{text-align:center;padding:40px;color:#6b7280}' +
+    '.loading-spinner{display:inline-block;width:24px;height:24px;border:3px solid #e5e7eb;border-top-color:#7c3aed;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:10px}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.debug-info{font-size:10px;color:#9ca3af;margin-top:5px;font-family:monospace}' +
 
     // Sankey Diagram
     '.sankey-container{position:relative;padding:15px 0}' +
@@ -6911,8 +6917,12 @@ function getInteractiveDashboardHtml() {
     '<script>' +
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
-    // Error handler wrapper
-    'function safeRun(fn,fallback){try{fn()}catch(e){console.error(e);if(fallback)fallback(e)}}' +
+    // Debug mode and error handler wrapper
+    'var DEBUG_MODE=true;' +
+    'function log(msg,data){if(DEBUG_MODE){console.log("[Dashboard] "+msg,data||"")}}' +
+    'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+e.message)}' +
+    'function safeRun(fn,fallback){try{fn()}catch(e){console.error("[Dashboard]",e);if(fallback)fallback(e)}}' +
+    'function showLoading(elementId,msg){var el=document.getElementById(elementId);if(el)el.innerHTML="<div class=\\"loading-state\\"><div class=\\"loading-spinner\\"></div><div>"+(msg||"Loading...")+"</div></div>"}' +
 
     // Tab switching with error handling
     'function switchTab(tabName,btn){' +
@@ -6931,9 +6941,19 @@ function getInteractiveDashboardHtml() {
 
     // Load overview data with error handling
     'function loadOverview(){' +
+    '  log("Loading overview data...");' +
+    '  showLoading("overview-stats","Loading dashboard stats...");' +
     '  google.script.run' +
-    '    .withSuccessHandler(function(data){safeRun(function(){renderOverview(data)},function(){document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Error loading stats</div>"})})'  +
-    '    .withFailureHandler(function(e){document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Failed to load: "+e.message+"</div>"})' +
+    '    .withSuccessHandler(function(data){' +
+    '      log("Overview data received:",data);' +
+    '      safeRun(function(){renderOverview(data)},function(e){' +
+    '        document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Error rendering stats<div class=\\"debug-info\\">"+e.message+"</div></div>"' +
+    '      })' +
+    '    })'  +
+    '    .withFailureHandler(function(e){' +
+    '      logError("Failed to load overview",e);' +
+    '      document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Failed to load stats<div class=\\"debug-info\\">"+e.message+"<br>Check: Admin → Modal Diagnostics</div></div>"' +
+    '    })' +
     '    .getInteractiveOverviewData();' +
     '}' +
 
@@ -6991,9 +7011,11 @@ function getInteractiveDashboardHtml() {
 
     // Load my cases (steward's assigned grievances)
     'function loadMyCases(){' +
+    '  log("Loading my cases...");' +
+    '  showLoading("mycases-list","Loading your assigned cases...");' +
     '  google.script.run' +
-    '    .withSuccessHandler(function(data){myCases=data||[];renderMyCases(myCases);renderMyCasesStats(data)})'  +
-    '    .withFailureHandler(function(e){document.getElementById("mycases-list").innerHTML="<div class=\\"error-state\\">Failed to load your cases: "+e.message+"</div>"})' +
+    '    .withSuccessHandler(function(data){log("My cases received:",data?data.length:0);myCases=data||[];renderMyCases(myCases);renderMyCasesStats(data)})'  +
+    '    .withFailureHandler(function(e){logError("Failed to load my cases",e);document.getElementById("mycases-list").innerHTML="<div class=\\"error-state\\">Failed to load your cases<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
     '    .getMyStewardCases();' +
     '}' +
 
@@ -7056,9 +7078,11 @@ function getInteractiveDashboardHtml() {
 
     // Load members with filters
     'function loadMembers(){' +
+    '  log("Loading members...");' +
+    '  showLoading("members-list","Loading member directory...");' +
     '  google.script.run' +
-    '    .withSuccessHandler(function(data){allMembers=data||[];renderMembers(allMembers);loadMemberFilters()})'  +
-    '    .withFailureHandler(function(e){document.getElementById("members-list").innerHTML="<div class=\\"error-state\\">Failed to load members</div>"})' +
+    '    .withSuccessHandler(function(data){log("Members received:",data?data.length:0);allMembers=data||[];renderMembers(allMembers);loadMemberFilters()})'  +
+    '    .withFailureHandler(function(e){logError("Failed to load members",e);document.getElementById("members-list").innerHTML="<div class=\\"error-state\\">Failed to load members<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
     '    .getInteractiveMemberData();' +
     '}' +
 
@@ -7231,9 +7255,11 @@ function getInteractiveDashboardHtml() {
 
     // Load grievances
     'function loadGrievances(){' +
+    '  log("Loading grievances...");' +
+    '  showLoading("grievances-list","Loading grievance log...");' +
     '  google.script.run' +
-    '    .withSuccessHandler(function(data){allGrievances=data||[];renderGrievances(allGrievances)})'  +
-    '    .withFailureHandler(function(e){document.getElementById("grievances-list").innerHTML="<div class=\\"error-state\\">Failed to load grievances</div>"})' +
+    '    .withSuccessHandler(function(data){log("Grievances received:",data?data.length:0);allGrievances=data||[];renderGrievances(allGrievances)})'  +
+    '    .withFailureHandler(function(e){logError("Failed to load grievances",e);document.getElementById("grievances-list").innerHTML="<div class=\\"error-state\\">Failed to load grievances<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
     '    .getInteractiveGrievanceData();' +
     '}' +
 
@@ -12136,7 +12162,7 @@ function showWebAppUrl() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3194 lines)
+// SOURCE: 06_Maintenance.gs (3471 lines)
 // ============================================================================
 
 /**
@@ -12303,6 +12329,283 @@ function DIAGNOSE_SETUP() {
   });
 
   return results;
+}
+
+// ============================================================================
+// MODAL DIAGNOSTICS (v4.2.2)
+// ============================================================================
+
+/**
+ * Diagnoses why modals might not be loading data
+ * Checks sheet names, structure, data, and simulates modal data loading
+ * @return {Object} Diagnostic results
+ */
+function diagnoseModalIssues() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var results = {
+    status: 'OK',
+    sheetChecks: [],
+    dataChecks: [],
+    modalTests: [],
+    errors: [],
+    warnings: []
+  };
+
+  // Get all actual sheet names in the spreadsheet
+  var actualSheets = ss.getSheets().map(function(s) { return s.getName(); });
+
+  // 1. Check required sheets exist with exact names
+  var requiredSheets = {
+    'Member Directory': SHEETS.MEMBER_DIR,
+    'Grievance Log': SHEETS.GRIEVANCE_LOG,
+    'Member Satisfaction': SHEETS.SATISFACTION,
+    'Config': SHEETS.CONFIG,
+    '💼 Dashboard': SHEETS.DASHBOARD
+  };
+
+  for (var displayName in requiredSheets) {
+    var expectedName = requiredSheets[displayName];
+    var found = actualSheets.indexOf(expectedName) !== -1;
+    results.sheetChecks.push({
+      name: expectedName,
+      expected: expectedName,
+      found: found,
+      status: found ? 'OK' : 'MISSING'
+    });
+    if (!found) {
+      results.errors.push('Sheet "' + expectedName + '" not found. Modals expecting this sheet will fail.');
+      results.status = 'ERROR';
+    }
+  }
+
+  // 2. Check sheet structure (column counts)
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (memberSheet) {
+    var memberCols = memberSheet.getLastColumn();
+    var memberRows = memberSheet.getLastRow();
+    var expectedMemberCols = MEMBER_COLS.QUICK_ACTIONS; // 32
+    results.dataChecks.push({
+      sheet: 'Member Directory',
+      columns: memberCols,
+      expectedColumns: expectedMemberCols,
+      rows: memberRows,
+      dataRows: Math.max(0, memberRows - 1),
+      status: memberCols >= expectedMemberCols ? 'OK' : 'WARNING'
+    });
+    if (memberCols < expectedMemberCols) {
+      results.warnings.push('Member Directory has ' + memberCols + ' columns, expected ' + expectedMemberCols + '. Some data may not load correctly.');
+      if (results.status === 'OK') results.status = 'WARNING';
+    }
+    if (memberRows <= 1) {
+      results.warnings.push('Member Directory is empty (no data rows). Modals will show zeros.');
+    }
+  }
+
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (grievanceSheet) {
+    var grievCols = grievanceSheet.getLastColumn();
+    var grievRows = grievanceSheet.getLastRow();
+    var expectedGrievCols = GRIEVANCE_COLS.QUICK_ACTIONS; // 35
+    results.dataChecks.push({
+      sheet: 'Grievance Log',
+      columns: grievCols,
+      expectedColumns: expectedGrievCols,
+      rows: grievRows,
+      dataRows: Math.max(0, grievRows - 1),
+      status: grievCols >= expectedGrievCols ? 'OK' : 'WARNING'
+    });
+    if (grievCols < expectedGrievCols) {
+      results.warnings.push('Grievance Log has ' + grievCols + ' columns, expected ' + expectedGrievCols + '. Some data may not load correctly.');
+      if (results.status === 'OK') results.status = 'WARNING';
+    }
+    if (grievRows <= 1) {
+      results.warnings.push('Grievance Log is empty (no data rows). Modals will show zeros.');
+    }
+  }
+
+  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  if (satSheet) {
+    var satCols = satSheet.getLastColumn();
+    var satRows = satSheet.getLastRow();
+    results.dataChecks.push({
+      sheet: 'Member Satisfaction',
+      columns: satCols,
+      rows: satRows,
+      dataRows: Math.max(0, satRows - 1),
+      status: 'OK'
+    });
+    if (satRows <= 1) {
+      results.warnings.push('Member Satisfaction is empty. Satisfaction Dashboard will show no data.');
+    }
+  }
+
+  // 3. Test modal data functions
+  try {
+    var overviewData = getInteractiveOverviewData();
+    results.modalTests.push({
+      function: 'getInteractiveOverviewData',
+      status: 'OK',
+      data: {
+        totalMembers: overviewData.totalMembers,
+        activeStewards: overviewData.activeStewards,
+        totalGrievances: overviewData.totalGrievances,
+        openGrievances: overviewData.openGrievances
+      }
+    });
+  } catch (e) {
+    results.modalTests.push({
+      function: 'getInteractiveOverviewData',
+      status: 'ERROR',
+      error: e.message
+    });
+    results.errors.push('Dashboard modal data function failed: ' + e.message);
+    results.status = 'ERROR';
+  }
+
+  try {
+    var memberData = getInteractiveMemberData();
+    results.modalTests.push({
+      function: 'getInteractiveMemberData',
+      status: 'OK',
+      data: { memberCount: memberData.length }
+    });
+  } catch (e) {
+    results.modalTests.push({
+      function: 'getInteractiveMemberData',
+      status: 'ERROR',
+      error: e.message
+    });
+    results.errors.push('Member data function failed: ' + e.message);
+    results.status = 'ERROR';
+  }
+
+  try {
+    var grievanceData = getInteractiveGrievanceData();
+    results.modalTests.push({
+      function: 'getInteractiveGrievanceData',
+      status: 'OK',
+      data: { grievanceCount: grievanceData.length }
+    });
+  } catch (e) {
+    results.modalTests.push({
+      function: 'getInteractiveGrievanceData',
+      status: 'ERROR',
+      error: e.message
+    });
+    results.errors.push('Grievance data function failed: ' + e.message);
+    results.status = 'ERROR';
+  }
+
+  // Test satisfaction data if sheet exists
+  if (satSheet) {
+    try {
+      var satData = getSatisfactionOverviewData();
+      results.modalTests.push({
+        function: 'getSatisfactionOverviewData',
+        status: 'OK',
+        data: { totalResponses: satData.totalResponses }
+      });
+    } catch (e) {
+      results.modalTests.push({
+        function: 'getSatisfactionOverviewData',
+        status: 'ERROR',
+        error: e.message
+      });
+      results.errors.push('Satisfaction data function failed: ' + e.message);
+      results.status = 'ERROR';
+    }
+  }
+
+  // Summary
+  results.summary = results.status === 'OK'
+    ? 'All modal checks passed. Data should load correctly.'
+    : results.status === 'WARNING'
+    ? 'Some warnings detected. Modals may have partial data.'
+    : 'Errors detected. Modals may fail to load data.';
+
+  return results;
+}
+
+/**
+ * Shows modal diagnostic results in a dialog
+ */
+function showModalDiagnostics() {
+  var results = diagnoseModalIssues();
+
+  var html = '<!DOCTYPE html><html><head><base target="_top">' +
+    '<style>' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,Roboto,sans-serif;padding:20px;background:#f5f5f5}' +
+    '.card{background:white;border-radius:8px;padding:15px;margin-bottom:15px;box-shadow:0 1px 3px rgba(0,0,0,0.1)}' +
+    '.title{font-size:18px;font-weight:600;margin-bottom:15px}' +
+    '.status-ok{color:#059669;background:#d1fae5;padding:4px 12px;border-radius:20px;font-weight:600}' +
+    '.status-warning{color:#d97706;background:#fef3c7;padding:4px 12px;border-radius:20px;font-weight:600}' +
+    '.status-error{color:#dc2626;background:#fee2e2;padding:4px 12px;border-radius:20px;font-weight:600}' +
+    '.section-title{font-weight:600;margin:10px 0 5px;color:#374151}' +
+    '.item{padding:6px 0;border-bottom:1px solid #f3f4f6;font-size:13px}' +
+    '.item:last-child{border-bottom:none}' +
+    '.check-ok{color:#059669}.check-warn{color:#d97706}.check-error{color:#dc2626}' +
+    'table{width:100%;border-collapse:collapse;font-size:12px}' +
+    'th,td{padding:8px;text-align:left;border-bottom:1px solid #e5e7eb}' +
+    'th{background:#f9fafb;font-weight:600}' +
+    '.btn{padding:10px 20px;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-top:10px}' +
+    '.btn-primary{background:#7c3aed;color:white}' +
+    '</style></head><body>' +
+    '<div class="card">' +
+    '<div class="title">🔍 Modal Diagnostics</div>' +
+    '<span class="status-' + results.status.toLowerCase() + '">' + results.status + '</span>' +
+    '<p style="margin-top:10px;color:#6b7280">' + results.summary + '</p>' +
+    '</div>';
+
+  // Sheet Checks
+  html += '<div class="card"><div class="section-title">📋 Sheet Checks</div><table>' +
+    '<tr><th>Sheet Name</th><th>Status</th></tr>';
+  results.sheetChecks.forEach(function(check) {
+    var icon = check.found ? '✅' : '❌';
+    html += '<tr><td>' + check.name + '</td><td>' + icon + ' ' + check.status + '</td></tr>';
+  });
+  html += '</table></div>';
+
+  // Data Checks
+  if (results.dataChecks.length > 0) {
+    html += '<div class="card"><div class="section-title">📊 Data Structure</div><table>' +
+      '<tr><th>Sheet</th><th>Columns</th><th>Data Rows</th><th>Status</th></tr>';
+    results.dataChecks.forEach(function(check) {
+      var colInfo = check.columns + (check.expectedColumns ? '/' + check.expectedColumns : '');
+      var icon = check.status === 'OK' ? '✅' : '⚠️';
+      html += '<tr><td>' + check.sheet + '</td><td>' + colInfo + '</td><td>' + check.dataRows + '</td><td>' + icon + '</td></tr>';
+    });
+    html += '</table></div>';
+  }
+
+  // Modal Function Tests
+  html += '<div class="card"><div class="section-title">🧪 Modal Data Function Tests</div><table>' +
+    '<tr><th>Function</th><th>Status</th><th>Result</th></tr>';
+  results.modalTests.forEach(function(test) {
+    var icon = test.status === 'OK' ? '✅' : '❌';
+    var result = test.status === 'OK' ? JSON.stringify(test.data) : test.error;
+    html += '<tr><td><code>' + test.function + '</code></td><td>' + icon + '</td><td style="font-size:11px">' + result + '</td></tr>';
+  });
+  html += '</table></div>';
+
+  // Errors & Warnings
+  if (results.errors.length > 0) {
+    html += '<div class="card" style="border-left:4px solid #dc2626"><div class="section-title check-error">❌ Errors</div>';
+    results.errors.forEach(function(e) { html += '<div class="item">' + e + '</div>'; });
+    html += '</div>';
+  }
+  if (results.warnings.length > 0) {
+    html += '<div class="card" style="border-left:4px solid #d97706"><div class="section-title check-warn">⚠️ Warnings</div>';
+    results.warnings.forEach(function(w) { html += '<div class="item">' + w + '</div>'; });
+    html += '</div>';
+  }
+
+  html += '<button class="btn btn-primary" onclick="google.script.host.close()">Close</button>' +
+    '</body></html>';
+
+  var output = HtmlService.createHtmlOutput(html)
+    .setWidth(600)
+    .setHeight(550);
+  SpreadsheetApp.getUi().showModalDialog(output, '🔍 Modal Diagnostics - v4.2.2');
 }
 
 /**
