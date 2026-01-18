@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 4,
-  BUILD: 'v4.3.4',
-  CURRENT: '4.3.4',
-  CODENAME: 'Satisfaction Analytics'
+  PATCH: 5,
+  BUILD: 'v4.3.5',
+  CURRENT: '4.3.5',
+  CODENAME: 'Production Polish'
 };
 
 // ============================================================================

@@ -537,6 +537,8 @@ function NUKE_DATABASE() {
     '• CLEAR Config dropdown values\n' +
     '• DELETE Function Checklist sheet\n' +
     '• DELETE _Audit_Log hidden sheet\n' +
+    '• REMOVE demo references from documentation tabs\n' +
+    '• APPLY professional tab colors\n' +
     '• ENABLE Production Mode (hide Demo menu)\n\n' +
     '⏱️ IMPORTANT: This process takes approximately 3-5 MINUTES.\n' +
     '⚠️ WAIT until the "Running script" dialog disappears!\n\n' +
@@ -606,6 +608,12 @@ function NUKE_DATABASE() {
       try { ss.deleteSheet(auditLogSheet); } catch (e) { Logger.log('Could not delete _Audit_Log: ' + e.message); }
     }
 
+    // Clean up demo references from documentation tabs
+    cleanupDocumentationTabs_(ss);
+
+    // Apply professional tab colors
+    applyTabColors_(ss);
+
     // Enable Production Mode
     PropertiesService.getScriptProperties().setProperty('PRODUCTION_MODE', 'true');
 
@@ -623,7 +631,8 @@ function NUKE_DATABASE() {
       '✅ Nuclear Operation Complete',
       'All data has been wiped.\n\n' +
       'Production Mode has been enabled.\n' +
-      'The Demo Data menu will be hidden on reload.\n\n' +
+      'The Demo Data menu will be hidden on reload.\n' +
+      'Tab colors have been applied.\n\n' +
       'Please reload the spreadsheet to see changes.',
       ui.ButtonSet.OK
     );
@@ -631,6 +640,178 @@ function NUKE_DATABASE() {
   } catch (e) {
     ui.alert('Error', 'Nuclear operation failed: ' + e.message, ui.ButtonSet.OK);
   }
+}
+
+// ============================================================================
+// NUKE HELPER FUNCTIONS - Documentation & Tab Colors
+// ============================================================================
+
+/**
+ * Cleans up demo/seed/nuke references from documentation tabs
+ * Called during NUKE to remove developer-focused content
+ * Also adds a repo link to FAQ for users wanting seed/nuke features
+ * @param {Spreadsheet} ss - The active spreadsheet
+ * @private
+ */
+function cleanupDocumentationTabs_(ss) {
+  var docSheets = [
+    SHEETS.FAQ,
+    SHEETS.CONFIG_GUIDE,
+    SHEETS.GETTING_STARTED
+  ];
+
+  // Patterns to identify rows mentioning seed/nuke/demo features
+  var demoPatterns = [
+    /\bseed\b/i,
+    /\bnuke\b/i,
+    /\bdemo data\b/i,
+    /\bsample data\b/i,
+    /\btest data\b/i,
+    /SEED_/i,
+    /NUKE_/i,
+    /🎭.*demo/i
+  ];
+
+  docSheets.forEach(function(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+
+    try {
+      var data = sheet.getDataRange().getValues();
+      var rowsToUpdate = [];
+
+      // Find rows that contain demo-related content
+      for (var i = 0; i < data.length; i++) {
+        var rowText = data[i].join(' ');
+        var shouldClean = demoPatterns.some(function(pattern) {
+          return pattern.test(rowText);
+        });
+
+        if (shouldClean) {
+          // Clear this row's content (but preserve row structure)
+          rowsToUpdate.push(i + 1); // 1-indexed
+        }
+      }
+
+      // Clear identified rows
+      rowsToUpdate.forEach(function(row) {
+        try {
+          sheet.getRange(row, 1, 1, sheet.getLastColumn()).clearContent();
+        } catch (e) {
+          Logger.log('Could not clear row ' + row + ' in ' + sheetName + ': ' + e.message);
+        }
+      });
+
+      Logger.log('Cleaned ' + rowsToUpdate.length + ' demo-related rows from ' + sheetName);
+    } catch (e) {
+      Logger.log('Error cleaning ' + sheetName + ': ' + e.message);
+    }
+  });
+
+  // Add repo link to FAQ for users who want to start fresh with seed/nuke
+  addRepoLinkToFAQ_(ss);
+}
+
+/**
+ * Adds a link to the GitHub repo in the FAQ sheet
+ * For users who want to create their own copy with seed/nuke features
+ * @param {Spreadsheet} ss - The active spreadsheet
+ * @private
+ */
+function addRepoLinkToFAQ_(ss) {
+  var faqSheet = ss.getSheetByName(SHEETS.FAQ);
+  if (!faqSheet) return;
+
+  try {
+    // Find the last row with content
+    var lastRow = faqSheet.getLastRow();
+
+    // Add some spacing and the repo link section
+    var linkRow = lastRow + 2;
+
+    // Add header for the section
+    faqSheet.getRange(linkRow, 1).setValue('📦 Want to Create Your Own Copy?');
+    faqSheet.getRange(linkRow, 1).setFontWeight('bold').setFontSize(12);
+
+    // Add description
+    faqSheet.getRange(linkRow + 1, 1).setValue(
+      'To create a new spreadsheet with seed data and demo features, visit our GitHub repository:'
+    );
+
+    // Add the repo link
+    var repoUrl = 'https://github.com/Woop91/MULTIPLE-SCRIPS-REPO';
+    faqSheet.getRange(linkRow + 2, 1).setValue(repoUrl);
+    faqSheet.getRange(linkRow + 2, 1)
+      .setFontColor('#1a73e8')
+      .setFontWeight('bold');
+
+    // Add instructions
+    faqSheet.getRange(linkRow + 3, 1).setValue(
+      'The repository includes instructions for setting up a fresh copy with sample data generation (Seed) and data reset (Nuke) features.'
+    );
+
+    Logger.log('Added repo link to FAQ sheet');
+  } catch (e) {
+    Logger.log('Error adding repo link to FAQ: ' + e.message);
+  }
+}
+
+/**
+ * Applies professional tab colors to spreadsheet sheets
+ * - Data sheets (Grievance Log, Member Directory): Blue
+ * - Documentation (Getting Started, FAQ, Config Guide): Green
+ * @param {Spreadsheet} ss - The active spreadsheet
+ * @private
+ */
+function applyTabColors_(ss) {
+  // Tab color definitions
+  var TAB_COLORS = {
+    DATA: '#1a73e8',        // Google Blue - for data sheets
+    DOCS: '#34a853',        // Google Green - for documentation
+    HIDDEN: '#9e9e9e',      // Gray - for hidden/calc sheets
+    SATISFACTION: '#ea4335' // Red - for satisfaction survey
+  };
+
+  // Data sheets - Blue
+  var dataSheets = [SHEETS.GRIEVANCE_LOG, SHEETS.MEMBER_DIR];
+  dataSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      try { sheet.setTabColor(TAB_COLORS.DATA); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    }
+  });
+
+  // Documentation sheets - Green
+  var docSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ, SHEETS.CONFIG_GUIDE];
+  docSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      try { sheet.setTabColor(TAB_COLORS.DOCS); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    }
+  });
+
+  // Satisfaction sheet - Red
+  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  if (satSheet) {
+    try { satSheet.setTabColor(TAB_COLORS.SATISFACTION); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+  }
+
+  // Config sheet - special orange
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (configSheet) {
+    try { configSheet.setTabColor('#ff9800'); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+  }
+
+  Logger.log('Tab colors applied successfully');
+}
+
+/**
+ * Manually applies tab colors (can be called from menu)
+ */
+function applyTabColors() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  applyTabColors_(ss);
+  ss.toast('Tab colors applied!', 'Success', 3);
 }
 
 // ============================================================================

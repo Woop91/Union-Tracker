@@ -111,7 +111,7 @@ function createDashboardMenu() {
     .addToUi();
 
   // Admin Menu (Separate top-level menu)
-  ui.createMenu('🛠️ Admin')
+  var adminMenu = ui.createMenu('🛠️ Admin')
     .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
     .addItem('🔍 Modal Diagnostics', 'showModalDiagnostics')
     .addItem('🔧 Repair Dashboard', 'showRepairDialog')
@@ -144,15 +144,20 @@ function createDashboardMenu() {
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('🎭 Demo Data')
-      .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
-      .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
-      .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
-      .addSeparator()
-      .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'))
-    .addToUi();
+      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'));
+
+  // Only show Demo Data menu if NOT in production mode
+  if (!isProductionMode()) {
+    adminMenu.addSeparator()
+      .addSubMenu(ui.createMenu('🎭 Demo Data')
+        .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
+        .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
+        .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
+        .addSeparator()
+        .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
+  }
+
+  adminMenu.addToUi();
 
   // Strategic Operations Menu (Simplified v4.3.2)
   ui.createMenu('🎯 Strategic Ops')
