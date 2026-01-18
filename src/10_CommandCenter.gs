@@ -263,6 +263,43 @@ function showAllMemberColumns() {
   }
 }
 
+/**
+ * Toggle Mobile View - Easy one-click toggle between mobile and full view
+ * Checks current state and switches to the opposite view
+ * Accessible from top-level Union Hub menu for mobile users
+ */
+function toggleMobileView() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory not found');
+    return;
+  }
+
+  // Check if we're currently in mobile view by checking if column D is hidden
+  // Column D (Job Title) is always hidden in mobile view
+  try {
+    // Use properties to track mobile view state
+    var props = PropertiesService.getUserProperties();
+    var isMobileView = props.getProperty('MOBILE_VIEW_ENABLED') === 'true';
+
+    if (isMobileView) {
+      // Switch to full view
+      showAllMemberColumns();
+      props.setProperty('MOBILE_VIEW_ENABLED', 'false');
+    } else {
+      // Switch to mobile view
+      navToMobile();
+      props.setProperty('MOBILE_VIEW_ENABLED', 'true');
+    }
+  } catch (e) {
+    // Fallback: just try to show all columns (safe default)
+    showAllMemberColumns();
+    SpreadsheetApp.getUi().alert('Restored to full view. Use this toggle to switch between mobile and desktop views.');
+  }
+}
+
 // ============================================================================
 // v4.0 HIGH-PERFORMANCE DATA ENGINE
 // ============================================================================

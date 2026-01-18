@@ -34,6 +34,7 @@ function createDashboardMenu() {
   // Main Menu: Union Hub
   ui.createMenu('📊 Union Hub')
     .addItem('📊 Dashboard Home', 'showDashboardSidebar')
+    .addItem('📱 Toggle Mobile View', 'toggleMobileView')
     .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
     .addSeparator()
 
@@ -147,7 +148,11 @@ function createDashboardMenu() {
       .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
       .addSeparator()
       .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
-      .addItem('❓ Create FAQ Sheet', 'createFAQSheet'));
+      .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
+      .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+      .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('📱 Add Mobile Dashboard Link to Config', 'addMobileDashboardLinkToConfig')
+      .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
@@ -156,6 +161,8 @@ function createDashboardMenu() {
         .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
         .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
         .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
+        .addSeparator()
+        .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
         .addSeparator()
         .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
   }
@@ -732,7 +739,16 @@ function resetToDefaultTheme() {
 function refreshVisualsSimple_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  ss.toast('Refreshing all visuals...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+  ss.toast('Refreshing visuals and data...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  // Refresh hidden calculation sheets if available
+  try {
+    if (typeof rebuildAllHiddenSheets === 'function') {
+      rebuildAllHiddenSheets();
+    }
+  } catch (e) {
+    Logger.log('Hidden sheets refresh error: ' + e.message);
+  }
 
   // Apply traffic light indicators
   try {
@@ -748,7 +764,14 @@ function refreshVisualsSimple_() {
     Logger.log('Theme error: ' + e.message);
   }
 
-  ss.toast('Visual refresh complete', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  // Check for alerts
+  try {
+    checkDashboardAlerts();
+  } catch (e) {
+    Logger.log('Alert check error: ' + e.message);
+  }
+
+  ss.toast('Refresh complete', COMMAND_CONFIG.SYSTEM_NAME, 5);
 }
 
 // ============================================================================
@@ -1982,17 +2005,7 @@ function showAlert(message, title) {
   SpreadsheetApp.getUi().alert(title || 'Alert', message, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
-/**
- * Navigates to a specific sheet
- * @param {string} sheetName - Name of sheet to navigate to
- */
-function navigateToSheet(sheetName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (sheet) {
-    ss.setActiveSheet(sheet);
-  }
-}
+// navigateToSheet() - REMOVED DUPLICATE - see line 565 for main definition
 
 /**
  * Navigates to a specific record (row) in the appropriate sheet
@@ -2372,6 +2385,315 @@ function showQuickCaptureNotepad() {
   .setHeight(450);
 
   SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture Notepad');
+}
+
+/**
+ * Shows import dialog for bulk member import from CSV
+ * Provides paste area for CSV data with preview and validation
+ */
+function showImportDialog() {
+  var html = HtmlService.createHtmlOutput(getImportDialogHtml_())
+    .setWidth(700)
+    .setHeight(600);
+  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members from CSV');
+}
+
+/**
+ * Generates HTML for import dialog
+ * @private
+ */
+function getImportDialogHtml_() {
+  return '<!DOCTYPE html>' +
+    '<html><head><base target="_top">' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Roboto", Arial, sans-serif; padding: 20px; background: #f5f5f5; }' +
+    '.container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }' +
+    'h2 { color: #1a73e8; margin-bottom: 15px; font-size: 18px; }' +
+    '.section { margin-bottom: 20px; }' +
+    '.section-title { font-weight: bold; color: #333; margin-bottom: 8px; font-size: 14px; }' +
+    'textarea { width: 100%; height: 200px; border: 2px solid #e0e0e0; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; resize: vertical; }' +
+    'textarea:focus { border-color: #1a73e8; outline: none; }' +
+    '.format-hint { background: #e8f0fe; padding: 12px; border-radius: 6px; font-size: 12px; color: #1967d2; margin-bottom: 15px; }' +
+    '.format-hint code { background: #fff; padding: 2px 6px; border-radius: 3px; }' +
+    '.preview { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; max-height: 150px; overflow-y: auto; font-size: 12px; display: none; }' +
+    '.preview-row { padding: 4px 0; border-bottom: 1px solid #eee; }' +
+    '.preview-row:last-child { border-bottom: none; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 15px; }' +
+    'button { padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; }' +
+    '.btn-primary { background: #1a73e8; color: white; }' +
+    '.btn-primary:hover { background: #1557b0; }' +
+    '.btn-secondary { background: #f1f3f4; color: #5f6368; }' +
+    '.btn-secondary:hover { background: #e8eaed; }' +
+    '.status { padding: 10px; border-radius: 6px; margin-top: 10px; display: none; }' +
+    '.status.success { background: #e6f4ea; color: #137333; }' +
+    '.status.error { background: #fce8e6; color: #c5221f; }' +
+    '.count { font-weight: bold; color: #1a73e8; }' +
+    '</style></head><body>' +
+    '<div class="container">' +
+    '<h2>📥 Import Members from CSV</h2>' +
+    '<div class="format-hint">' +
+    '<strong>Required columns:</strong> First Name, Last Name<br>' +
+    '<strong>Optional:</strong> Email, Phone, Job Title, Unit, Work Location, Supervisor, Is Steward, Dues Paying<br>' +
+    '<strong>Format:</strong> Paste CSV with headers in first row. Use comma separator.' +
+    '</div>' +
+    '<div class="section">' +
+    '<div class="section-title">Paste CSV Data:</div>' +
+    '<textarea id="csvData" placeholder="First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Clerk,Admin&#10;Jane,Smith,jane@example.com,555-5678,Manager,Operations"></textarea>' +
+    '</div>' +
+    '<div class="section">' +
+    '<div class="section-title">Preview (<span id="rowCount" class="count">0</span> rows):</div>' +
+    '<div id="preview" class="preview"></div>' +
+    '</div>' +
+    '<div id="status" class="status"></div>' +
+    '<div class="btn-row">' +
+    '<button class="btn-secondary" onclick="previewData()">👁️ Preview</button>' +
+    '<button class="btn-primary" onclick="importData()">📥 Import</button>' +
+    '<button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
+    '</div></div>' +
+    '<script>' +
+    'function previewData() {' +
+    '  var csv = document.getElementById("csvData").value.trim();' +
+    '  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }' +
+    '  var rows = parseCSV(csv);' +
+    '  if (rows.length < 2) { showStatus("Need at least a header row and one data row", "error"); return; }' +
+    '  document.getElementById("rowCount").textContent = rows.length - 1;' +
+    '  var previewHtml = "<div class=\\"preview-row\\"><strong>" + rows[0].join(" | ") + "</strong></div>";' +
+    '  for (var i = 1; i < Math.min(rows.length, 6); i++) {' +
+    '    previewHtml += "<div class=\\"preview-row\\">" + rows[i].join(" | ") + "</div>";' +
+    '  }' +
+    '  if (rows.length > 6) previewHtml += "<div class=\\"preview-row\\">... and " + (rows.length - 6) + " more rows</div>";' +
+    '  document.getElementById("preview").innerHTML = previewHtml;' +
+    '  document.getElementById("preview").style.display = "block";' +
+    '  showStatus("Preview ready. Click Import to add " + (rows.length - 1) + " members.", "success");' +
+    '}' +
+    'function parseCSV(csv) {' +
+    '  var lines = csv.split(/\\r?\\n/);' +
+    '  return lines.filter(function(line) { return line.trim(); }).map(function(line) {' +
+    '    var result = []; var cell = ""; var inQuotes = false;' +
+    '    for (var i = 0; i < line.length; i++) {' +
+    '      var c = line[i];' +
+    '      if (c === "\\"") { inQuotes = !inQuotes; }' +
+    '      else if (c === "," && !inQuotes) { result.push(cell.trim()); cell = ""; }' +
+    '      else { cell += c; }' +
+    '    }' +
+    '    result.push(cell.trim());' +
+    '    return result;' +
+    '  });' +
+    '}' +
+    'function importData() {' +
+    '  var csv = document.getElementById("csvData").value.trim();' +
+    '  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }' +
+    '  showStatus("Importing...", "success");' +
+    '  google.script.run.withSuccessHandler(function(result) {' +
+    '    if (result.success) {' +
+    '      showStatus("✅ Successfully imported " + result.count + " members!", "success");' +
+    '      setTimeout(function() { google.script.host.close(); }, 2000);' +
+    '    } else {' +
+    '      showStatus("❌ " + result.error, "error");' +
+    '    }' +
+    '  }).withFailureHandler(function(err) {' +
+    '    showStatus("❌ Error: " + err.message, "error");' +
+    '  }).processMemberImport(csv);' +
+    '}' +
+    'function showStatus(msg, type) {' +
+    '  var el = document.getElementById("status");' +
+    '  el.textContent = msg;' +
+    '  el.className = "status " + type;' +
+    '  el.style.display = "block";' +
+    '}' +
+    '</script></body></html>';
+}
+
+/**
+ * Processes member import from CSV data
+ * @param {string} csvData - Raw CSV data
+ * @returns {Object} Result with success status and count/error
+ */
+function processMemberImport(csvData) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+    if (!sheet) {
+      return { success: false, error: 'Member Directory sheet not found' };
+    }
+
+    // Parse CSV
+    var lines = csvData.split(/\r?\n/).filter(function(l) { return l.trim(); });
+    if (lines.length < 2) {
+      return { success: false, error: 'Need at least header and one data row' };
+    }
+
+    // Parse header and map columns
+    var headers = parseCSVLine_(lines[0]);
+    var columnMap = mapImportColumns_(headers);
+
+    if (!columnMap.firstName || !columnMap.lastName) {
+      return { success: false, error: 'Required columns missing: First Name, Last Name' };
+    }
+
+    // Get existing data to find last row
+    var lastRow = sheet.getLastRow();
+
+    // Process data rows
+    var importedCount = 0;
+    for (var i = 1; i < lines.length; i++) {
+      var values = parseCSVLine_(lines[i]);
+      if (!values || values.length === 0) continue;
+
+      // Build row data
+      var rowData = [];
+      rowData[MEMBER_COLS.FIRST_NAME - 1] = values[columnMap.firstName] || '';
+      rowData[MEMBER_COLS.LAST_NAME - 1] = values[columnMap.lastName] || '';
+      rowData[MEMBER_COLS.EMAIL - 1] = columnMap.email !== undefined ? values[columnMap.email] || '' : '';
+      rowData[MEMBER_COLS.PHONE - 1] = columnMap.phone !== undefined ? values[columnMap.phone] || '' : '';
+      rowData[MEMBER_COLS.JOB_TITLE - 1] = columnMap.jobTitle !== undefined ? values[columnMap.jobTitle] || '' : '';
+      rowData[MEMBER_COLS.UNIT - 1] = columnMap.unit !== undefined ? values[columnMap.unit] || '' : '';
+      rowData[MEMBER_COLS.WORK_LOCATION - 1] = columnMap.workLocation !== undefined ? values[columnMap.workLocation] || '' : '';
+      rowData[MEMBER_COLS.SUPERVISOR - 1] = columnMap.supervisor !== undefined ? values[columnMap.supervisor] || '' : '';
+      rowData[MEMBER_COLS.IS_STEWARD - 1] = columnMap.isSteward !== undefined ? (values[columnMap.isSteward] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'No';
+      rowData[MEMBER_COLS.DUES_PAYING - 1] = columnMap.duesPaying !== undefined ? (values[columnMap.duesPaying] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'Yes';
+
+      // Fill empty cells
+      while (rowData.length < sheet.getLastColumn()) {
+        rowData.push('');
+      }
+
+      // Append row
+      sheet.appendRow(rowData);
+      importedCount++;
+    }
+
+    // Generate Member IDs for imported rows
+    if (typeof generateMissingMemberIDs === 'function') {
+      generateMissingMemberIDs();
+    }
+
+    return { success: true, count: importedCount };
+
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Parses a single CSV line handling quoted values
+ * @private
+ */
+function parseCSVLine_(line) {
+  var result = [];
+  var cell = '';
+  var inQuotes = false;
+
+  for (var i = 0; i < line.length; i++) {
+    var c = line.charAt(i);
+    if (c === '"') {
+      inQuotes = !inQuotes;
+    } else if (c === ',' && !inQuotes) {
+      result.push(cell.trim());
+      cell = '';
+    } else {
+      cell += c;
+    }
+  }
+  result.push(cell.trim());
+  return result;
+}
+
+/**
+ * Maps CSV headers to member column indices
+ * @private
+ */
+function mapImportColumns_(headers) {
+  var map = {};
+  var headerLower = headers.map(function(h) { return (h || '').toLowerCase().replace(/[^a-z]/g, ''); });
+
+  for (var i = 0; i < headerLower.length; i++) {
+    var h = headerLower[i];
+    if (h === 'firstname' || h === 'first') map.firstName = i;
+    else if (h === 'lastname' || h === 'last') map.lastName = i;
+    else if (h === 'email' || h === 'emailaddress') map.email = i;
+    else if (h === 'phone' || h === 'phonenumber') map.phone = i;
+    else if (h === 'jobtitle' || h === 'title' || h === 'position') map.jobTitle = i;
+    else if (h === 'unit' || h === 'department' || h === 'dept') map.unit = i;
+    else if (h === 'worklocation' || h === 'location' || h === 'worksite') map.workLocation = i;
+    else if (h === 'supervisor' || h === 'manager') map.supervisor = i;
+    else if (h === 'issteward' || h === 'steward') map.isSteward = i;
+    else if (h === 'duespaying' || h === 'dues') map.duesPaying = i;
+  }
+
+  return map;
+}
+
+/**
+ * Shows export dialog for member directory export
+ * Creates downloadable CSV file
+ */
+function showExportDialog() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    SpreadsheetApp.getUi().alert('No member data to export.');
+    return;
+  }
+
+  // Get data
+  var data = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+
+  // Convert to CSV
+  var csv = data.map(function(row) {
+    return row.map(function(cell) {
+      var str = String(cell === null || cell === undefined ? '' : cell);
+      // Escape quotes and wrap in quotes if contains comma, quote, or newline
+      if (str.indexOf(',') >= 0 || str.indexOf('"') >= 0 || str.indexOf('\n') >= 0) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }).join(',');
+  }).join('\n');
+
+  // Create temporary file in Drive
+  var fileName = 'MemberDirectory_Export_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmm') + '.csv';
+  var blob = Utilities.newBlob(csv, 'text/csv', fileName);
+  var file = DriveApp.createFile(blob);
+
+  // Make file accessible
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  // Show download link
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    'body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }' +
+    '.success { color: #137333; font-size: 48px; margin-bottom: 10px; }' +
+    'h2 { color: #333; margin-bottom: 20px; }' +
+    '.info { background: #e8f0fe; padding: 15px; border-radius: 8px; margin: 20px 0; }' +
+    '.btn { display: inline-block; background: #1a73e8; color: white; padding: 12px 24px; ' +
+    'text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px; }' +
+    '.btn:hover { background: #1557b0; }' +
+    '.btn-secondary { background: #5f6368; }' +
+    '.note { color: #666; font-size: 12px; margin-top: 20px; }' +
+    '</style>' +
+    '<div class="success">✅</div>' +
+    '<h2>Export Ready!</h2>' +
+    '<div class="info">' +
+    '<strong>' + (lastRow - 1) + ' members</strong> exported to CSV<br>' +
+    'File: ' + fileName +
+    '</div>' +
+    '<a href="' + file.getDownloadUrl() + '" target="_blank" class="btn">📥 Download CSV</a>' +
+    '<a href="' + file.getUrl() + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
+    '<p class="note">File will be available in your Google Drive.<br>Link expires when you close this dialog.</p>' +
+    '<script>setTimeout(function() { google.script.host.setHeight(350); }, 100);</script>'
+  ).setWidth(450).setHeight(350);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📤 Export Complete');
 }
 
 function setBreakReminders(minutes) {
@@ -5240,15 +5562,7 @@ function saveInteractiveMember(memberData, mode) {
 // 1. NAVIGATION HELPERS
 // ============================================================================
 
-/**
- * Jump to a specific sheet via code
- * @param {string} sheetName - Name of the sheet to navigate to
- */
-function navigateToSheet(sheetName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (sheet) ss.setActiveSheet(sheet);
-}
+// navigateToSheet() - REMOVED DUPLICATE - see line 565 for main definition
 
 // ============================================================================
 // 2. EXECUTIVE COMMAND MODAL (SPA Architecture - Bridge Pattern)
@@ -6542,10 +6856,12 @@ function checkOverdueGrievances_() {
 }
 
 /**
- * Refreshes all dashboard visuals and checks alerts
- * Note: Executive and Member dashboards are now modal-based and refresh on-demand
+ * @deprecated v4.3.9 - REMOVED DUPLICATE
+ * Use refreshAllVisuals() at line 729 instead.
+ * This duplicate focused on data refresh while the main one focuses on visuals.
+ * The main function now handles both.
  */
-function refreshAllVisuals() {
+function refreshAllVisuals_DataRefresh_DEPRECATED() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -7033,8 +7349,9 @@ function createPDFForSelectedGrievance() {
  * Promotes the selected member to Steward status
  * Sends steward toolkit email to the promoted member
  * Requires two confirmation dialogs for safety
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:559
  */
-function promoteSelectedMemberToSteward() {
+function promoteSelectedMemberToSteward_UIService_DEPRECATED() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var ui = SpreadsheetApp.getUi();
@@ -7144,8 +7461,9 @@ function sendStewardToolkit_(email, name) {
 /**
  * Demotes the selected steward back to regular member status
  * Requires two confirmation dialogs for safety
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:632
  */
-function demoteSelectedSteward() {
+function demoteSelectedSteward_UIService_DEPRECATED() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var ui = SpreadsheetApp.getUi();

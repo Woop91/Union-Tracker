@@ -3714,8 +3714,10 @@ function createFeaturesReferenceSheet(ss) {
 /**
  * Show desktop search modal - comprehensive search for members and grievances
  * Enhanced version of mobile search with more fields and filtering options
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:124
+ * Note: This was a wrapper for UI, the primary does actual searching with query param
  */
-function searchMembers() {
+function searchMembers_Code_DEPRECATED() {
   showDesktopSearch();
 }
 
@@ -5405,8 +5407,9 @@ function rejectFlaggedSubmission(rowNum) {
  * High-performance modal with interactive Google Charts, Satisfaction data,
  * Material Icons, Trend Stats, Progress Tracking, and Live Steward Search.
  * No PII is exposed - only aggregate statistics.
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 11_SecureMemberDashboard.gs:501
  */
-function showPublicMemberDashboard() {
+function showPublicMemberDashboard_Code_DEPRECATED() {
   var stats = getGrievanceStats();
   var stewards = getAllStewards();
   var satisfaction = getAggregateSatisfactionStats();
@@ -10179,7 +10182,7 @@ function setupAllHiddenSheets() {
   var created = 0;
   var repaired = 0;
 
-  // Core grievance/member calculation sheets (6 total)
+  // Core grievance/member calculation sheets (7 total)
   // Each function creates the sheet if missing or updates if exists
   try { setupGrievanceCalcSheet(); created++; } catch (e) { repaired++; }
   try { setupGrievanceFormulasSheet(); created++; } catch (e) { repaired++; }
@@ -10187,8 +10190,9 @@ function setupAllHiddenSheets() {
   try { setupStewardContactCalcSheet(); created++; } catch (e) { repaired++; }
   try { setupDashboardCalcSheet(); created++; } catch (e) { repaired++; }
   try { setupStewardPerformanceCalcSheet(); created++; } catch (e) { repaired++; }
+  try { setupChecklistCalcSheet(); created++; } catch (e) { repaired++; }
 
-  ss.toast('All 6 hidden sheets created!', '✅ Success', 3);
+  ss.toast('All 7 hidden sheets created!', '✅ Success', 3);
 
   return { created: created, repaired: repaired, success: true };
 }
@@ -10213,6 +10217,7 @@ function repairAllHiddenSheets() {
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();
   syncMemberToGrievanceLog();
+  syncChecklistCalcToGrievanceLog();
 
   // Repair checkboxes
   repairGrievanceCheckboxes();
@@ -10221,15 +10226,15 @@ function repairAllHiddenSheets() {
   ss.toast('Hidden sheets repaired and synced!', '✅ Success', 5);
   ui.alert('✅ Repair Complete',
     'Hidden calculation sheets have been repaired:\n\n' +
-    '• 6 hidden sheets recreated with self-healing formulas\n' +
+    '• 7 hidden sheets recreated with self-healing formulas\n' +
     '• Auto-sync trigger installed\n' +
-    '• All data synced (grievances, members, dashboard)\n' +
+    '• All data synced (grievances, members, dashboard, checklists)\n' +
     '• Checkboxes repaired in Grievance Log and Member Directory\n\n' +
     'Data will now auto-sync when you edit Member Directory or Grievance Log.\n' +
     'Formulas cannot be accidentally erased - they are stored in hidden sheets.',
     ui.ButtonSet.OK);
 
-  return { repaired: 6, success: true };
+  return { repaired: 7, success: true };
 }
 
 /**
@@ -10244,14 +10249,15 @@ function verifyHiddenSheets() {
   report.push('============================');
   report.push('');
 
-  // Check each hidden sheet (6 hidden sheets)
+  // Check each hidden sheet (7 hidden sheets)
   var hiddenSheets = [
     {name: SHEETS.GRIEVANCE_CALC, purpose: 'Grievance → Member Directory'},
     {name: SHEETS.GRIEVANCE_FORMULAS, purpose: 'Self-healing Grievance formulas'},
     {name: SHEETS.MEMBER_LOOKUP, purpose: 'Member → Grievance Log'},
     {name: SHEETS.STEWARD_CONTACT_CALC, purpose: 'Steward contact tracking'},
     {name: SHEETS.DASHBOARD_CALC, purpose: 'Dashboard summary metrics'},
-    {name: SHEETS.STEWARD_PERFORMANCE_CALC, purpose: 'Steward performance scores'}
+    {name: SHEETS.STEWARD_PERFORMANCE_CALC, purpose: 'Steward performance scores'},
+    {name: HIDDEN_SHEETS.CHECKLIST_CALC, purpose: 'Case Checklist progress calculations'}
   ];
 
   report.push('📋 HIDDEN SHEETS:');
@@ -10304,6 +10310,7 @@ function syncAllData() {
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();
   syncMemberToGrievanceLog();
+  syncChecklistCalcToGrievanceLog();
 
   // Repair checkboxes after sync
   repairGrievanceCheckboxes();
@@ -12176,8 +12183,9 @@ function getCalcValue(sheetName, cellRef) {
  * Gets dashboard statistics from the calc sheet
  * Used by the sidebar
  * @return {Object} Statistics object
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 04_UIService.gs:5078
  */
-function getDashboardStats() {
+function getDashboardStats_Code_DEPRECATED() {
   const statsSheet = SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(HIDDEN_SHEETS.CALC_STATS);
 
@@ -12266,8 +12274,9 @@ function getMemberList() {
  * Gets member by ID
  * @param {string} memberId - The member ID
  * @return {Object|null} Member object or null
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:97
  */
-function getMemberById(memberId) {
+function getMemberById_Code_DEPRECATED(memberId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
