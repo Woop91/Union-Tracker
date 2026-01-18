@@ -3294,7 +3294,7 @@ function getMobileDashboardStats() {
     var daysTo = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
     if (status && status !== 'Resolved' && status !== 'Withdrawn') stats.activeGrievances++;
     if (status === 'Pending Info') stats.pendingGrievances++;
-    if (daysTo !== null && daysTo !== '' && daysTo < 0 && status === 'Open') stats.overdueGrievances++;
+    if ((daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0)) && status === 'Open') stats.overdueGrievances++;
   });
   return stats;
 }
