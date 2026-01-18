@@ -1282,3 +1282,402 @@ function startGrievanceForMember() {
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Loading...');
 }
+
+// ============================================================================
+// IMPORT/EXPORT DIALOGS (Added to fix missing menu functions)
+// ============================================================================
+
+/**
+ * Shows import members dialog
+ * Allows importing members from CSV/Excel format
+ */
+function showImportDialog() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 25px; border-radius: 8px; max-width: 500px; margin: 0 auto; }
+        h2 { color: #1a73e8; margin-top: 0; }
+        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
+        .format-section { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .format-section h4 { margin-top: 0; color: #333; }
+        .format-section code { background: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        textarea { width: 100%; height: 150px; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; }
+        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
+        .primary { background: #1a73e8; color: white; }
+        .secondary { background: #e0e0e0; color: #333; }
+        .result { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>📥 Import Members</h2>
+        <div class="info">
+          💡 Paste member data in CSV format. Each line represents one member.
+        </div>
+        <div class="format-section">
+          <h4>Expected Format (comma-separated):</h4>
+          <code>First Name, Last Name, Employee ID, Department, Job Title, Email, Phone</code>
+        </div>
+        <textarea id="importData" placeholder="John,Doe,EMP001,Engineering,Developer,john@example.com,555-1234
+Jane,Smith,EMP002,HR,Manager,jane@example.com,555-5678"></textarea>
+        <div>
+          <button class="primary" onclick="importMembers()">📥 Import</button>
+          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
+        </div>
+        <div id="result" class="result"></div>
+      </div>
+      <script>
+        function importMembers() {
+          var data = document.getElementById('importData').value.trim();
+          if (!data) {
+            showResult('Please paste some data to import', 'error');
+            return;
+          }
+          google.script.run
+            .withSuccessHandler(function(result) {
+              showResult('Successfully imported ' + result.count + ' members', 'success');
+            })
+            .withFailureHandler(function(e) {
+              showResult('Error: ' + e.message, 'error');
+            })
+            .importMembersFromText(data);
+        }
+        function showResult(msg, type) {
+          var el = document.getElementById('result');
+          el.textContent = msg;
+          el.className = 'result ' + type;
+          el.style.display = 'block';
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(550).setHeight(500);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members');
+}
+
+/**
+ * Imports members from text (CSV format)
+ * @param {string} text - CSV formatted text
+ * @returns {Object} Result with count of imported members
+ */
+function importMembersFromText(text) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  const lines = text.split('\\n').filter(line => line.trim());
+  let imported = 0;
+
+  for (const line of lines) {
+    const parts = line.split(',').map(p => p.trim());
+    if (parts.length >= 2) {
+      const newRow = [
+        '',                    // ID (will be auto-generated)
+        parts[0] || '',        // First Name
+        parts[1] || '',        // Last Name
+        parts[2] || '',        // Employee ID
+        parts[3] || '',        // Department
+        parts[4] || '',        // Job Title
+        '',                    // Hire Date
+        parts[5] || '',        // Email
+        parts[6] || ''         // Phone
+      ];
+      sheet.appendRow(newRow);
+      imported++;
+    }
+  }
+
+  // Generate IDs for imported members
+  if (typeof generateMissingMemberIDs === 'function') {
+    generateMissingMemberIDs();
+  }
+
+  return { success: true, count: imported };
+}
+
+/**
+ * Shows export directory dialog
+ * Allows exporting member directory to various formats
+ */
+function showExportDialog() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
+        h2 { color: #1a73e8; margin-top: 0; }
+        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
+        .option { display: flex; align-items: center; padding: 15px; margin: 10px 0; background: #f8f9fa; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
+        .option:hover { background: #e8f0fe; }
+        .option.selected { border-color: #1a73e8; background: #e8f0fe; }
+        .option-icon { font-size: 32px; margin-right: 15px; }
+        .option-text h4 { margin: 0 0 5px 0; }
+        .option-text p { margin: 0; font-size: 12px; color: #666; }
+        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
+        .primary { background: #1a73e8; color: white; }
+        .secondary { background: #e0e0e0; color: #333; }
+        .button-row { margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>📤 Export Directory</h2>
+        <div class="info">
+          💡 Export member directory data to your preferred format.
+        </div>
+        <div class="option selected" onclick="selectOption(this, 'csv')">
+          <div class="option-icon">📄</div>
+          <div class="option-text">
+            <h4>CSV File</h4>
+            <p>Comma-separated values for Excel/Sheets</p>
+          </div>
+        </div>
+        <div class="option" onclick="selectOption(this, 'email')">
+          <div class="option-icon">📧</div>
+          <div class="option-text">
+            <h4>Email Report</h4>
+            <p>Send formatted report to your email</p>
+          </div>
+        </div>
+        <div class="option" onclick="selectOption(this, 'print')">
+          <div class="option-icon">🖨️</div>
+          <div class="option-text">
+            <h4>Print View</h4>
+            <p>Open print-friendly view in browser</p>
+          </div>
+        </div>
+        <div class="button-row">
+          <button class="primary" onclick="doExport()">📤 Export</button>
+          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
+        </div>
+      </div>
+      <script>
+        var selectedFormat = 'csv';
+        function selectOption(el, format) {
+          document.querySelectorAll('.option').forEach(function(o) { o.classList.remove('selected'); });
+          el.classList.add('selected');
+          selectedFormat = format;
+        }
+        function doExport() {
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (result.url) {
+                window.open(result.url, '_blank');
+              }
+              alert(result.message || 'Export complete!');
+              google.script.host.close();
+            })
+            .withFailureHandler(function(e) {
+              alert('Error: ' + e.message);
+            })
+            .exportMemberDirectory(selectedFormat);
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(500).setHeight(450);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📤 Export Directory');
+}
+
+/**
+ * Exports member directory to specified format
+ * @param {string} format - Export format (csv, email, print)
+ * @returns {Object} Result with success message
+ */
+function exportMemberDirectory(format) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  const data = sheet.getDataRange().getValues();
+
+  switch (format) {
+    case 'csv':
+      // Create CSV content
+      const csv = data.map(row => row.join(',')).join('\\n');
+      const blob = Utilities.newBlob(csv, 'text/csv', 'MemberDirectory.csv');
+      const file = DriveApp.createFile(blob);
+      return {
+        success: true,
+        message: 'CSV file created! Opening...',
+        url: file.getUrl()
+      };
+
+    case 'email':
+      // Send email with summary
+      const email = Session.getActiveUser().getEmail();
+      const subject = '509 Member Directory Export - ' + new Date().toLocaleDateString();
+      let body = 'Member Directory Export\\n\\n';
+      body += 'Total Members: ' + (data.length - 1) + '\\n\\n';
+      body += 'Spreadsheet: ' + ss.getUrl();
+      GmailApp.sendEmail(email, subject, body);
+      return { success: true, message: 'Report sent to ' + email };
+
+    case 'print':
+      // Return URL to spreadsheet for printing
+      return {
+        success: true,
+        message: 'Opening print view...',
+        url: ss.getUrl() + '#gid=' + sheet.getSheetId()
+      };
+
+    default:
+      throw new Error('Unknown export format: ' + format);
+  }
+}
+
+/**
+ * Wrapper function for findExistingMember that can be called from menu
+ * Shows a search dialog to find existing members
+ */
+function findExistingMember() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
+        h2 { color: #1a73e8; margin-top: 0; }
+        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
+        .field { margin: 15px 0; }
+        .field label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        .field input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
+        .primary { background: #1a73e8; color: white; }
+        .secondary { background: #e0e0e0; color: #333; }
+        .button-row { margin-top: 20px; }
+        .results { margin-top: 15px; max-height: 200px; overflow-y: auto; }
+        .result-item { padding: 10px; background: #f8f9fa; margin: 5px 0; border-radius: 4px; cursor: pointer; }
+        .result-item:hover { background: #e8f0fe; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>🔍 Find Member</h2>
+        <div class="info">
+          💡 Search by name, email, or member ID to find existing members.
+        </div>
+        <div class="field">
+          <label>Search Term</label>
+          <input type="text" id="searchTerm" placeholder="Enter name, email, or member ID..." autofocus>
+        </div>
+        <div class="button-row">
+          <button class="primary" onclick="searchMembers()">🔍 Search</button>
+          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
+        </div>
+        <div id="results" class="results"></div>
+      </div>
+      <script>
+        document.getElementById('searchTerm').addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') searchMembers();
+        });
+        function searchMembers() {
+          var term = document.getElementById('searchTerm').value.trim();
+          if (!term) { alert('Please enter a search term'); return; }
+          google.script.run
+            .withSuccessHandler(function(results) {
+              var html = '';
+              if (results.length === 0) {
+                html = '<div class="result-item">No members found</div>';
+              } else {
+                results.forEach(function(m) {
+                  html += '<div class="result-item" onclick="goToMember(' + m.row + ')">' +
+                    '<strong>' + m.name + '</strong><br>' +
+                    '<small>' + (m.id || 'No ID') + ' • ' + (m.email || 'No email') + '</small>' +
+                    '</div>';
+                });
+              }
+              document.getElementById('results').innerHTML = html;
+            })
+            .withFailureHandler(function(e) {
+              document.getElementById('results').innerHTML = '<div class="result-item">Error: ' + e.message + '</div>';
+            })
+            .searchMembersForDialog(term);
+        }
+        function goToMember(row) {
+          google.script.run.navigateToMemberRow(row);
+          google.script.host.close();
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(500).setHeight(450);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '🔍 Find Member');
+}
+
+/**
+ * Searches members for the find dialog
+ * @param {string} term - Search term
+ * @returns {Array} Array of matching members
+ */
+function searchMembersForDialog(term) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  const data = sheet.getDataRange().getValues();
+  const results = [];
+  const searchLower = term.toLowerCase();
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const firstName = (row[MEMBER_COLUMNS.FIRST_NAME] || '').toString().toLowerCase();
+    const lastName = (row[MEMBER_COLUMNS.LAST_NAME] || '').toString().toLowerCase();
+    const email = (row[MEMBER_COLUMNS.EMAIL] || '').toString().toLowerCase();
+    const memberId = (row[MEMBER_COLUMNS.ID] || '').toString().toLowerCase();
+
+    if (firstName.includes(searchLower) ||
+        lastName.includes(searchLower) ||
+        email.includes(searchLower) ||
+        memberId.includes(searchLower)) {
+      results.push({
+        row: i + 1,
+        name: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
+        email: row[MEMBER_COLUMNS.EMAIL],
+        id: row[MEMBER_COLUMNS.ID]
+      });
+
+      if (results.length >= 10) break; // Limit results
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Navigates to a specific member row
+ * @param {number} row - Row number to navigate to
+ */
+function navigateToMemberRow(row) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+
+  if (sheet) {
+    sheet.activate();
+    sheet.getRange(row, 1).activate();
+    SpreadsheetApp.flush();
+  }
+}

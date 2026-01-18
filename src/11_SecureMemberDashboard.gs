@@ -1400,14 +1400,16 @@ function showStewardWorkloadReport_LEGACY() {
 // ============================================================================
 
 /**
- * Web App entry point - handles URL parameters for member portal
- * Deploy as: File > Deploy > New Deployment > Web App
- * Access URL: https://script.google.com/.../exec?id=MEMBER_ID
+ * Member Portal entry point (Legacy - now consolidated in 05_Integrations.gs doGet)
+ * NOTE: Renamed to avoid duplicate. The main doGet() in 05_Integrations.gs now handles
+ * both mobile dashboard and member portal requests.
+ * Use ?id=MEMBER_ID to access personalized portal via the main doGet()
  *
  * @param {Object} e - Event object with query parameters
  * @returns {HtmlOutput} HTML page for display
+ * @deprecated Use doGet() in 05_Integrations.gs - supports both ?id=MEMBER_ID and ?page=dashboard/search/etc
  */
-function doGet(e) {
+function doGet_MemberPortal_(e) {
   var memberId = e && e.parameter && e.parameter.id;
 
   if (memberId) {

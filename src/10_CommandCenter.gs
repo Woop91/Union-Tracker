@@ -129,8 +129,8 @@ function createCommandCenterMenu() {
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
       .addItem('📜 View Audit Log', 'navigateToAuditLog')
       .addSeparator()
-      .addItem('🔍 v4.0 System Diagnostic', 'DIAGNOSE_SETUP')
-      .addItem('🛠️ Repair Dashboard', 'REPAIR_DASHBOARD')
+      .addItem('🔍 v4.0 System Diagnostic', 'showDiagnosticReport')
+      .addItem('🛠️ Repair Dashboard', 'repairDashboardWithUI')
       .addItem('📊 v4.0 Status Report', 'showV4StatusReport'));
 
   menu.addSeparator();
@@ -764,42 +764,56 @@ function addRepoLinkToFAQ_(ss) {
  * @private
  */
 function applyTabColors_(ss) {
-  // Tab color definitions
+  // Tab color definitions - Updated per user requirements
   var TAB_COLORS = {
-    DATA: '#1a73e8',        // Google Blue - for data sheets
-    DOCS: '#34a853',        // Google Green - for documentation
-    HIDDEN: '#9e9e9e',      // Gray - for hidden/calc sheets
-    SATISFACTION: '#ea4335' // Red - for satisfaction survey
+    RED: '#ea4335',         // Red - Getting Started, FAQ
+    PURPLE: '#7c3aed',      // Purple - Member Directory, Grievance Log
+    YELLOW: '#fbbc04',      // Yellow - Feedback and Development, Function Checklist
+    ORANGE: '#ff9800',      // Orange - Config, Config Guide
+    BLUE: '#1a73e8',        // Blue - Member Satisfaction
+    HIDDEN: '#9e9e9e'       // Gray - for hidden/calc sheets
   };
 
-  // Data sheets - Blue
-  var dataSheets = [SHEETS.GRIEVANCE_LOG, SHEETS.MEMBER_DIR];
-  dataSheets.forEach(function(name) {
+  // Red tabs - Getting Started, FAQ
+  var redSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ];
+  redSheets.forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.DATA); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+      try { sheet.setTabColor(TAB_COLORS.RED); } catch (e) { Logger.log('Tab color error: ' + e.message); }
     }
   });
 
-  // Documentation sheets - Green
-  var docSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ, SHEETS.CONFIG_GUIDE];
-  docSheets.forEach(function(name) {
+  // Purple tabs - Member Directory, Grievance Log
+  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG];
+  purpleSheets.forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.DOCS); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+      try { sheet.setTabColor(TAB_COLORS.PURPLE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
     }
   });
 
-  // Satisfaction sheet - Red
+  // Yellow tabs - Feedback and Development, Function Checklist
+  var yellowSheets = [SHEETS.FEEDBACK, SHEETS.FUNCTION_CHECKLIST];
+  yellowSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      try { sheet.setTabColor(TAB_COLORS.YELLOW); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    }
+  });
+
+  // Orange tabs - Config, Config Guide
+  var orangeSheets = [SHEETS.CONFIG, SHEETS.CONFIG_GUIDE];
+  orangeSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      try { sheet.setTabColor(TAB_COLORS.ORANGE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    }
+  });
+
+  // Blue tabs - Member Satisfaction
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
   if (satSheet) {
-    try { satSheet.setTabColor(TAB_COLORS.SATISFACTION); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-  }
-
-  // Config sheet - special orange
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (configSheet) {
-    try { configSheet.setTabColor('#ff9800'); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    try { satSheet.setTabColor(TAB_COLORS.BLUE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
   }
 
   Logger.log('Tab colors applied successfully');
@@ -819,9 +833,11 @@ function applyTabColors() {
 // ============================================================================
 
 /**
- * Runs a comprehensive diagnostic check on the dashboard setup
+ * Runs a comprehensive diagnostic check and shows UI report
+ * NOTE: Renamed from DIAGNOSE_SETUP to avoid duplicate with 06_Maintenance.gs
+ * This version shows a UI alert; use DIAGNOSE_SETUP() from 06_Maintenance.gs for programmatic results
  */
-function DIAGNOSE_SETUP() {
+function showDiagnosticReport() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
 
@@ -914,9 +930,11 @@ function DIAGNOSE_SETUP() {
 }
 
 /**
- * Repairs the dashboard by rebuilding missing components
+ * Repairs the dashboard with UI confirmation dialog
+ * NOTE: Renamed from REPAIR_DASHBOARD to avoid conflict with 06_Maintenance.gs version
+ * This version shows UI; use REPAIR_DASHBOARD() from 06_Maintenance.gs for programmatic repair
  */
-function REPAIR_DASHBOARD() {
+function repairDashboardWithUI() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -1259,13 +1277,14 @@ var GEMINI_CONFIG = {
 // ============================================================================
 
 /**
- * Gemini v4.0 Form Submission Handler
- * Triggered when a grievance form is submitted.
- * Creates member folder and signature-ready PDF automatically.
+ * Gemini v4.0 Form Submission Handler (Legacy - use onGrievanceFormSubmit in 05_Integrations.gs instead)
+ * NOTE: Renamed to avoid duplicate function definition conflict.
+ * The primary implementation is in 05_Integrations.gs
  *
  * @param {Object} e - Form submission event object
+ * @deprecated Use onGrievanceFormSubmit in 05_Integrations.gs
  */
-function onGrievanceFormSubmit(e) {
+function onGrievanceFormSubmit_Legacy_(e) {
   try {
     var responses = e.namedValues;
     var data = {
@@ -1346,14 +1365,15 @@ function createGrievancePDF(folder, data) {
 }
 
 /**
- * Gemini v4.0 Member Folder Creator
- * Gets existing folder or creates new one for member documents.
+ * Gemini v4.0 Member Folder Creator (Legacy)
+ * NOTE: Renamed to avoid duplicate - use getOrCreateMemberFolder() in 05_Integrations.gs instead
  *
  * @param {string} name - Member name
  * @param {string} id - Member ID
  * @returns {Folder} Google Drive folder for the member
+ * @deprecated Use getOrCreateMemberFolder in 05_Integrations.gs (has better error handling)
  */
-function getOrCreateMemberFolder(name, id) {
+function getOrCreateMemberFolder_Legacy_(name, id) {
   // Get archive folder ID from Config
   var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) ||
                         getConfigValue_(CONFIG_COLS.DRIVE_FOLDER_ID) ||

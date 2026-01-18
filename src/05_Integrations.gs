@@ -925,11 +925,26 @@ function showClearCalendarConfirm() {
  */
 
 /**
- * Web app entry point - serves the mobile dashboard
+ * Web app entry point - serves the mobile dashboard and member portal
+ * Consolidated to handle both mobile dashboard pages and member portal requests
  * @param {Object} e - Event object with query parameters
  * @returns {HtmlOutput} The HTML page to display
  */
 function doGet(e) {
+  // Check for member ID parameter (member portal mode)
+  var memberId = e && e.parameter && e.parameter.id;
+  if (memberId) {
+    // Delegate to member portal (defined in 11_SecureMemberDashboard.gs)
+    if (typeof buildMemberPortal === 'function') {
+      return buildMemberPortal(memberId);
+    }
+    // Fallback to public portal
+    if (typeof buildPublicPortal === 'function') {
+      return buildPublicPortal();
+    }
+  }
+
+  // Standard page routing for mobile dashboard
   var page = e && e.parameter && e.parameter.page ? e.parameter.page : 'dashboard';
 
   var html;
@@ -946,6 +961,12 @@ function doGet(e) {
     case 'links':
       html = getWebAppLinksHtml();
       break;
+    case 'portal':
+      // Public portal without member ID
+      if (typeof buildPublicPortal === 'function') {
+        return buildPublicPortal();
+      }
+      // Fall through to dashboard
     case 'dashboard':
     default:
       html = getWebAppDashboardHtml();

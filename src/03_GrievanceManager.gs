@@ -100,11 +100,12 @@ function startNewGrievance(grievanceData) {
 }
 
 /**
- * Handles grievance form submission from dialog
- * @param {Object} formData - Form data from UI
+ * Handles grievance dialog form submission from UI modal
+ * NOTE: Renamed from onGrievanceFormSubmit to avoid conflict with Google Form trigger handler
+ * @param {Object} formData - Form data from UI dialog
  * @return {Object} Result object
  */
-function onGrievanceFormSubmit(formData) {
+function handleGrievanceDialogSubmit(formData) {
   // Map form data to grievance data structure
   const grievanceData = {
     memberId: formData.memberId,
@@ -1090,7 +1091,7 @@ function getNewGrievanceFormHtml() {
             .withFailureHandler(function(e) {
               alert('Error: ' + e.message);
             })
-            .onGrievanceFormSubmit(formData);
+            .handleGrievanceDialogSubmit(formData);
         });
       </script>
     </body>
