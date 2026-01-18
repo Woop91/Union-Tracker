@@ -149,7 +149,8 @@ function createCommandCenterMenu() {
       .addItem('📊 Grievance Trends', 'showGrievanceTrends')
       .addItem('📚 Search Precedents', 'showSearchPrecedents')
       .addSeparator()
-      .addItem('📝 OCR Transcribe Form', 'showOCRDialog'));
+      .addItem('📝 OCR Transcribe Form', 'showOCRDialog')
+      .addItem('🔧 OCR Setup', 'setupOCRApiKey'));
 
   menu.addSeparator();
 
@@ -2305,6 +2306,230 @@ function showOCRDialog() {
   .setHeight(480);
 
   ui.showModalDialog(html, '📝 WGER OCR Transcription');
+}
+
+/**
+ * OCR Setup Helper - Guides users through Cloud Vision API configuration
+ * Checks current status, provides instructions, and allows API key entry
+ */
+function setupOCRApiKey() {
+  var ui = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var currentKey = props.getProperty('CLOUD_VISION_API_KEY');
+
+  // Check current status
+  var statusMessage = currentKey
+    ? '✅ API Key Configured (ends with: ...' + currentKey.slice(-6) + ')'
+    : '❌ API Key Not Configured';
+
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    '* { box-sizing: border-box; }' +
+    'body { font-family: "Google Sans", Roboto, Arial, sans-serif; padding: 24px; margin: 0; background: #F8FAFC; color: #1E293B; }' +
+    'h2 { margin: 0 0 8px 0; color: #1E293B; }' +
+    '.status { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; }' +
+    '.status.configured { background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }' +
+    '.status.not-configured { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }' +
+    '.section { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }' +
+    '.section h3 { margin: 0 0 12px 0; font-size: 16px; color: #334155; }' +
+    '.step { display: flex; gap: 12px; margin-bottom: 12px; }' +
+    '.step-num { width: 28px; height: 28px; background: #7C3AED; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; flex-shrink: 0; }' +
+    '.step-text { font-size: 14px; line-height: 1.5; color: #475569; }' +
+    '.step-text a { color: #7C3AED; }' +
+    '.input-group { margin-top: 16px; }' +
+    '.input-group label { display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px; }' +
+    'input[type="text"] { width: 100%; padding: 12px; border: 2px solid #E2E8F0; border-radius: 8px; font-size: 14px; font-family: monospace; }' +
+    'input[type="text"]:focus { outline: none; border-color: #7C3AED; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 20px; }' +
+    'button { flex: 1; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
+    '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }' +
+    '.btn-secondary { background: #E2E8F0; color: #475569; }' +
+    '.btn-secondary:hover { background: #CBD5E1; }' +
+    '.btn-test { background: #0EA5E9; color: white; }' +
+    '.btn-test:hover { background: #0284C7; }' +
+    '.result { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; display: none; }' +
+    '.result.success { display: block; background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }' +
+    '.result.error { display: block; background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }' +
+    '.result.info { display: block; background: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD; }' +
+    '.free-tier { background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 13px; color: #166534; }' +
+    '</style>' +
+    '<h2>🔧 OCR Setup</h2>' +
+    '<div class="status ' + (currentKey ? 'configured' : 'not-configured') + '">' + statusMessage + '</div>' +
+
+    '<div class="section">' +
+    '<h3>📋 Setup Instructions</h3>' +
+    '<div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://console.cloud.google.com/apis/library/vision.googleapis.com" target="_blank">Google Cloud Console → Vision API</a></div></div>' +
+    '<div class="step"><div class="step-num">2</div><div class="step-text">Click <strong>"Enable"</strong> to activate Cloud Vision API for your project</div></div>' +
+    '<div class="step"><div class="step-num">3</div><div class="step-text">Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank">APIs & Services → Credentials</a></div></div>' +
+    '<div class="step"><div class="step-num">4</div><div class="step-text">Click <strong>"+ CREATE CREDENTIALS"</strong> → <strong>"API key"</strong></div></div>' +
+    '<div class="step"><div class="step-num">5</div><div class="step-text">Copy the API key and paste it below</div></div>' +
+    '<div class="free-tier">💰 <strong>Free Tier:</strong> 1,000 OCR requests/month at no cost. Most unions will never exceed this.</div>' +
+    '</div>' +
+
+    '<div class="section">' +
+    '<h3>🔑 Enter API Key</h3>' +
+    '<div class="input-group">' +
+    '<label>Cloud Vision API Key</label>' +
+    '<input type="text" id="apiKey" placeholder="AIzaSy..." value="' + (currentKey || '') + '">' +
+    '</div>' +
+    '<div class="btn-row">' +
+    '<button class="btn-primary" onclick="saveKey()">💾 Save Key</button>' +
+    '<button class="btn-test" onclick="testKey()">🧪 Test OCR</button>' +
+    '</div>' +
+    '<div id="result" class="result"></div>' +
+    '</div>' +
+
+    '<div class="btn-row">' +
+    '<button class="btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '</div>' +
+
+    '<script>' +
+    'function saveKey() {' +
+    '  var key = document.getElementById("apiKey").value.trim();' +
+    '  if (!key) {' +
+    '    showResult("error", "Please enter an API key");' +
+    '    return;' +
+    '  }' +
+    '  showResult("info", "Saving...");' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(result) {' +
+    '      if (result.success) {' +
+    '        showResult("success", "✅ " + result.message);' +
+    '      } else {' +
+    '        showResult("error", "❌ " + result.message);' +
+    '      }' +
+    '    })' +
+    '    .withFailureHandler(function(e) {' +
+    '      showResult("error", "❌ Error: " + e.message);' +
+    '    })' +
+    '    .saveOCRApiKey(key);' +
+    '}' +
+    'function testKey() {' +
+    '  showResult("info", "🔄 Testing OCR... (this may take a few seconds)");' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(result) {' +
+    '      if (result.success) {' +
+    '        showResult("success", "✅ " + result.message);' +
+    '      } else {' +
+    '        showResult("error", "❌ " + result.message);' +
+    '      }' +
+    '    })' +
+    '    .withFailureHandler(function(e) {' +
+    '      showResult("error", "❌ Error: " + e.message);' +
+    '    })' +
+    '    .testOCRConnection();' +
+    '}' +
+    'function showResult(type, message) {' +
+    '  var el = document.getElementById("result");' +
+    '  el.className = "result " + type;' +
+    '  el.textContent = message;' +
+    '}' +
+    '</script>'
+  )
+  .setWidth(520)
+  .setHeight(620);
+
+  ui.showModalDialog(html, '🔧 OCR Setup - Cloud Vision API');
+}
+
+/**
+ * Saves the Cloud Vision API key to Script Properties
+ * @param {string} apiKey - The API key to save
+ * @returns {Object} Result with success status
+ */
+function saveOCRApiKey(apiKey) {
+  try {
+    if (!apiKey || apiKey.trim().length < 10) {
+      return { success: false, message: 'Invalid API key format' };
+    }
+
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('CLOUD_VISION_API_KEY', apiKey.trim());
+
+    // Log the configuration for audit
+    logAuditEvent('OCR_API_KEY_CONFIGURED', {
+      configuredBy: Session.getActiveUser().getEmail(),
+      keyPreview: '...' + apiKey.slice(-6)
+    });
+
+    return { success: true, message: 'API key saved successfully! You can now use OCR features.' };
+  } catch (e) {
+    return { success: false, message: 'Failed to save: ' + e.message };
+  }
+}
+
+/**
+ * Tests the OCR connection by making a simple API validation call
+ * @returns {Object} Result with success status
+ */
+function testOCRConnection() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var apiKey = props.getProperty('CLOUD_VISION_API_KEY');
+
+    if (!apiKey) {
+      return { success: false, message: 'No API key configured. Please save an API key first.' };
+    }
+
+    // Make a minimal test request to validate the API key
+    var testRequest = {
+      requests: [{
+        image: {
+          content: Utilities.base64Encode(Utilities.newBlob('Test').getBytes())
+        },
+        features: [{
+          type: 'TEXT_DETECTION',
+          maxResults: 1
+        }]
+      }]
+    };
+
+    var response = UrlFetchApp.fetch(
+      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      {
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify(testRequest),
+        muteHttpExceptions: true
+      }
+    );
+
+    var responseCode = response.getResponseCode();
+    var responseBody = response.getContentText();
+
+    if (responseCode === 200) {
+      return { success: true, message: 'OCR connection successful! API key is valid and working.' };
+    } else if (responseCode === 400) {
+      // 400 with valid key often means the test image was invalid, but key works
+      var errorData = JSON.parse(responseBody);
+      if (errorData.error && errorData.error.message.indexOf('image') !== -1) {
+        return { success: true, message: 'API key is valid! OCR is ready to use.' };
+      }
+      return { success: false, message: 'API Error: ' + (errorData.error ? errorData.error.message : responseBody) };
+    } else if (responseCode === 403) {
+      return { success: false, message: 'API key invalid or Cloud Vision API not enabled. Check your Google Cloud Console.' };
+    } else {
+      return { success: false, message: 'Unexpected response (' + responseCode + '): ' + responseBody.substring(0, 200) };
+    }
+
+  } catch (e) {
+    return { success: false, message: 'Connection test failed: ' + e.message };
+  }
+}
+
+/**
+ * Checks if OCR is configured and ready to use
+ * @returns {Object} Status object
+ */
+function getOCRStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = props.getProperty('CLOUD_VISION_API_KEY');
+
+  return {
+    configured: !!apiKey,
+    message: apiKey ? 'OCR is configured and ready' : 'OCR requires setup - run setupOCRApiKey()'
+  };
 }
 
 // ============================================================================

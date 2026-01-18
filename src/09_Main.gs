@@ -649,8 +649,8 @@ function showHelpDialog() {
         .search-input { width: 100%; padding: 12px 16px 12px 44px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #e2e8f0; font-size: 14px; }
         .search-input:focus { outline: none; border-color: #3b82f6; }
         .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #64748b; }
-        .tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
-        .tab { padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; cursor: pointer; font-size: 12px; color: #94a3b8; transition: all 0.2s; }
+        .tabs { display: flex; gap: 6px; margin: 16px 0; flex-wrap: wrap; }
+        .tab { padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; cursor: pointer; font-size: 11px; color: #94a3b8; transition: all 0.2s; }
         .tab:hover { background: rgba(255,255,255,0.1); }
         .tab.active { background: #3b82f6; border-color: #3b82f6; color: white; }
         .section { margin-bottom: 20px; }
@@ -659,6 +659,7 @@ function showHelpDialog() {
         .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
         .card-title { font-weight: 500; color: #e2e8f0; margin-bottom: 6px; font-size: 13px; }
         .card-desc { color: #94a3b8; font-size: 12px; line-height: 1.5; }
+        .card-path { color: #60a5fa; font-size: 10px; font-family: monospace; margin-top: 6px; }
         .menu-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 6px; }
         .menu-item:hover { background: rgba(255,255,255,0.08); }
         .menu-path { color: #60a5fa; font-size: 11px; font-family: monospace; margin-bottom: 4px; }
@@ -667,11 +668,18 @@ function showHelpDialog() {
         .faq-item { border-left: 3px solid #3b82f6; padding-left: 12px; margin-bottom: 12px; }
         .faq-q { font-weight: 500; color: #e2e8f0; margin-bottom: 6px; font-size: 13px; }
         .faq-a { color: #94a3b8; font-size: 12px; line-height: 1.6; }
+        .faq-category { font-size: 12px; font-weight: 600; color: #10b981; margin: 16px 0 8px 0; padding: 6px 10px; background: rgba(16,185,129,0.1); border-radius: 6px; display: inline-block; }
+        .feature-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; padding: 8px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 6px; font-size: 12px; }
+        .feature-row:hover { background: rgba(255,255,255,0.08); }
+        .feature-name { font-weight: 500; color: #e2e8f0; }
+        .feature-desc { color: #94a3b8; }
+        .feature-category { font-size: 11px; font-weight: 600; color: #f59e0b; margin: 14px 0 8px 0; padding: 4px 8px; background: rgba(245,158,11,0.1); border-radius: 4px; display: inline-block; }
         .highlight { background: #fbbf24; color: #0f172a; padding: 0 2px; border-radius: 2px; }
         .hidden { display: none; }
         .repo-link { display: inline-flex; align-items: center; gap: 6px; color: #60a5fa; text-decoration: none; font-size: 12px; margin-top: 8px; }
         .repo-link:hover { text-decoration: underline; }
         .version { color: #64748b; font-size: 11px; text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .result-count { font-size: 11px; color: #64748b; margin: 8px 0; }
       </style>
     </head>
     <body>
@@ -679,15 +687,17 @@ function showHelpDialog() {
         <div class="search-box">
           <div style="position: relative;">
             <span class="material-icons search-icon">search</span>
-            <input type="text" class="search-input" id="searchInput" placeholder="Search help topics, menus, or FAQ..." oninput="filterContent()">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search features, help topics, menus, or FAQ..." oninput="filterContent()">
           </div>
+          <div class="result-count" id="resultCount"></div>
         </div>
 
         <div class="tabs">
           <div class="tab active" onclick="showTab('overview')">Overview</div>
-          <div class="tab" onclick="showTab('menus')">Menu Reference</div>
+          <div class="tab" onclick="showTab('features')">Features</div>
+          <div class="tab" onclick="showTab('menus')">Menus</div>
           <div class="tab" onclick="showTab('faq')">FAQ</div>
-          <div class="tab" onclick="showTab('shortcuts')">Quick Tips</div>
+          <div class="tab" onclick="showTab('shortcuts')">Tips</div>
         </div>
 
         <div id="content">
@@ -696,82 +706,258 @@ function showHelpDialog() {
             <div class="section">
               <div class="section-title"><span class="material-icons">dashboard</span>Two-Dashboard Architecture</div>
               <div class="card">
-                <div class="card-title">🛡️ Steward Dashboard (Internal)</div>
-                <div class="card-desc">Comprehensive dashboard for stewards with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, and Satisfaction. Contains member names and PII - for internal use only.</div>
+                <div class="card-title">Steward Dashboard (Internal)</div>
+                <div class="card-desc">Comprehensive dashboard with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction. Contains PII - for internal use only.</div>
+                <div class="card-path">Strategic Ops > Command Center > Steward Dashboard</div>
               </div>
               <div class="card">
-                <div class="card-title">👥 Member Dashboard (Public)</div>
+                <div class="card-title">Member Dashboard (Public)</div>
                 <div class="card-desc">PII-safe dashboard for sharing with members. Shows aggregate union stats, steward directory, and satisfaction scores without personal information.</div>
+                <div class="card-path">Strategic Ops > Command Center > Member Dashboard</div>
               </div>
             </div>
 
             <div class="section">
-              <div class="section-title"><span class="material-icons">star</span>Key Features</div>
+              <div class="section-title"><span class="material-icons">star</span>Key Capabilities</div>
               <div class="card">
                 <div class="card-title">Grievance Tracking</div>
-                <div class="card-desc">Track grievances through all steps with automatic deadline calculations based on Article 23A.</div>
+                <div class="card-desc">Full lifecycle management from filing to resolution with automatic Article 23A deadline calculations.</div>
               </div>
               <div class="card">
                 <div class="card-title">Member Directory</div>
-                <div class="card-desc">Maintain member records with contact info, union status, and steward assignments.</div>
+                <div class="card-desc">31-column member records with contact info, union status, steward assignments, and auto-calculated grievance status.</div>
               </div>
               <div class="card">
-                <div class="card-title">Satisfaction Surveys</div>
-                <div class="card-desc">8-section member satisfaction analysis covering steward ratings, leadership, communication, and more.</div>
+                <div class="card-title">Strategic Intelligence</div>
+                <div class="card-desc">Unit Hot Zones, Rising Stars, Management Hostility Reports, and Bargaining Cheat Sheets for contract negotiations.</div>
               </div>
               <div class="card">
-                <div class="card-title">Calendar & Drive Integration</div>
-                <div class="card-desc">Sync deadlines to Google Calendar and auto-create Drive folders for documentation.</div>
+                <div class="card-title">Integrations</div>
+                <div class="card-desc">Google Calendar sync, Drive folder auto-creation, email notifications, PDF generation, and Web App deployment.</div>
               </div>
+            </div>
+          </div>
+
+          <!-- FEATURES TAB (NEW) -->
+          <div id="features-tab" class="tab-content hidden">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">apps</span>Complete Features Reference</div>
+
+              <div class="feature-category">Dashboard & Analytics</div>
+              <div class="feature-row"><div class="feature-name">Steward Dashboard</div><div class="feature-desc">Internal 6-tab dashboard with PII (Strategic Ops > Command Center)</div></div>
+              <div class="feature-row"><div class="feature-name">Member Dashboard</div><div class="feature-desc">PII-safe public dashboard with aggregate stats</div></div>
+              <div class="feature-row"><div class="feature-name">Steward Performance</div><div class="feature-desc">View win rates, active cases, total cases for all stewards</div></div>
+              <div class="feature-row"><div class="feature-name">Satisfaction Analysis</div><div class="feature-desc">8-section survey analysis with trends and breakdowns</div></div>
+
+              <div class="feature-category">Search & Discovery</div>
+              <div class="feature-row"><div class="feature-name">Desktop Search</div><div class="feature-desc">Advanced search with filters by status/department/date</div></div>
+              <div class="feature-row"><div class="feature-name">Quick Search</div><div class="feature-desc">Fast minimal interface with partial name matching</div></div>
+              <div class="feature-row"><div class="feature-name">Mobile Search</div><div class="feature-desc">Touch-optimized search for field use</div></div>
+              <div class="feature-row"><div class="feature-name">Live Steward Search</div><div class="feature-desc">Real-time client-side filtering in Member Dashboard</div></div>
+
+              <div class="feature-category">Grievance Management</div>
+              <div class="feature-row"><div class="feature-name">New Case/Grievance</div><div class="feature-desc">Pre-filled form with auto-calculated deadlines</div></div>
+              <div class="feature-row"><div class="feature-name">Advance Step</div><div class="feature-desc">Move grievance through Step I → II → III → Arbitration</div></div>
+              <div class="feature-row"><div class="feature-name">Auto Deadlines</div><div class="feature-desc">Article 23A calculations (7/14/10/21/30 day rules)</div></div>
+              <div class="feature-row"><div class="feature-name">Message Alert Flag</div><div class="feature-desc">Highlight urgent cases in yellow, move to top</div></div>
+              <div class="feature-row"><div class="feature-name">Bulk Status Update</div><div class="feature-desc">Update multiple grievances at once</div></div>
+
+              <div class="feature-category">Member Management</div>
+              <div class="feature-row"><div class="feature-name">Add/Find Members</div><div class="feature-desc">Registration form and search functionality</div></div>
+              <div class="feature-row"><div class="feature-name">Generate Member IDs</div><div class="feature-desc">Auto-create IDs (M + First2 + Last2 + 3 digits)</div></div>
+              <div class="feature-row"><div class="feature-name">Check Duplicates</div><div class="feature-desc">Find and highlight duplicate Member IDs</div></div>
+              <div class="feature-row"><div class="feature-name">Import/Export</div><div class="feature-desc">Bulk data import and CSV export</div></div>
+
+              <div class="feature-category">Steward Tools</div>
+              <div class="feature-row"><div class="feature-name">Promote/Demote</div><div class="feature-desc">One-click steward status changes with toolkit emails</div></div>
+              <div class="feature-row"><div class="feature-name">Workload Report</div><div class="feature-desc">Capacity analysis, overload detection (8+ cases)</div></div>
+              <div class="feature-row"><div class="feature-name">Rising Stars</div><div class="feature-desc">Top performers by score and win rate</div></div>
+              <div class="feature-row"><div class="feature-name">Steward Directory</div><div class="feature-desc">Contact info for all stewards</div></div>
+
+              <div class="feature-category">Calendar & Drive</div>
+              <div class="feature-row"><div class="feature-name">Sync Deadlines</div><div class="feature-desc">Create Google Calendar events for all deadlines</div></div>
+              <div class="feature-row"><div class="feature-name">Drive Folders</div><div class="feature-desc">Auto-create folders with step subfolders</div></div>
+              <div class="feature-row"><div class="feature-name">Batch Create</div><div class="feature-desc">Create folders for multiple grievances</div></div>
+
+              <div class="feature-category">Strategic Intelligence</div>
+              <div class="feature-row"><div class="feature-name">Unit Hot Zones</div><div class="feature-desc">Locations with 3+ active grievances</div></div>
+              <div class="feature-row"><div class="feature-name">Hostility Report</div><div class="feature-desc">Management denial rate analysis</div></div>
+              <div class="feature-row"><div class="feature-name">Bargaining Sheet</div><div class="feature-desc">Strategic contract negotiation data</div></div>
+              <div class="feature-row"><div class="feature-name">Treemap</div><div class="feature-desc">Visual heat map of grievance activity</div></div>
+              <div class="feature-row"><div class="feature-name">Sentiment Trends</div><div class="feature-desc">Union morale tracking over time</div></div>
+
+              <div class="feature-category">Accessibility</div>
+              <div class="feature-row"><div class="feature-name">Focus Mode</div><div class="feature-desc">Distraction-free view, hides non-essential sheets</div></div>
+              <div class="feature-row"><div class="feature-name">Zebra Stripes</div><div class="feature-desc">Alternating row colors for readability</div></div>
+              <div class="feature-row"><div class="feature-name">Dark Mode</div><div class="feature-desc">Dark gradient backgrounds on all modals</div></div>
+              <div class="feature-row"><div class="feature-name">High Contrast</div><div class="feature-desc">Enhanced visibility for accessibility</div></div>
+
+              <div class="feature-category">Security & Audit</div>
+              <div class="feature-row"><div class="feature-name">Audit Logging</div><div class="feature-desc">Track all changes with timestamps and users</div></div>
+              <div class="feature-row"><div class="feature-name">Sabotage Protection</div><div class="feature-desc">Mass deletion detection (>15 cells) with alerts</div></div>
+              <div class="feature-row"><div class="feature-name">PII Scrubbing</div><div class="feature-desc">Auto-redact phone/SSN from public dashboards</div></div>
+              <div class="feature-row"><div class="feature-name">Weingarten Rights</div><div class="feature-desc">Emergency rights statement utility</div></div>
+
+              <div class="feature-category">Administration</div>
+              <div class="feature-row"><div class="feature-name">System Diagnostics</div><div class="feature-desc">Comprehensive health check on all components</div></div>
+              <div class="feature-row"><div class="feature-name">Repair Dashboard</div><div class="feature-desc">Auto-fix missing sheets, broken formulas</div></div>
+              <div class="feature-row"><div class="feature-name">Midnight Trigger</div><div class="feature-desc">Daily 12AM refresh and overdue alerts</div></div>
+              <div class="feature-row"><div class="feature-name">Hidden Sheets</div><div class="feature-desc">6 auto-calculating sheets for formulas</div></div>
+
+              <div class="feature-category">Mobile & Web</div>
+              <div class="feature-row"><div class="feature-name">Pocket View</div><div class="feature-desc">Hide columns for phone access</div></div>
+              <div class="feature-row"><div class="feature-name">Web App</div><div class="feature-desc">Standalone deployment with URL routing</div></div>
+              <div class="feature-row"><div class="feature-name">Member Portal</div><div class="feature-desc">Personalized view via ?member=ID URL</div></div>
+              <div class="feature-row"><div class="feature-name">Email Links</div><div class="feature-desc">Send portal URLs to members</div></div>
+
+              <div class="feature-category">Documents</div>
+              <div class="feature-row"><div class="feature-name">PDF Generation</div><div class="feature-desc">Signature-ready PDFs with legal blocks</div></div>
+              <div class="feature-row"><div class="feature-name">Email PDFs</div><div class="feature-desc">Send generated documents via email</div></div>
+            </div>
+
+            <div style="margin-top: 12px; padding: 10px; background: rgba(59,130,246,0.1); border-radius: 8px; font-size: 11px; color: #94a3b8;">
+              <strong style="color: #60a5fa;">Tip:</strong> For a printable reference, go to Admin > Setup > Create Features Reference Sheet
             </div>
           </div>
 
           <!-- MENU REFERENCE TAB -->
           <div id="menus-tab" class="tab-content hidden">
             <div class="section">
-              <div class="section-title"><span class="material-icons">menu</span>🏛️ Union Hub Menu</div>
-              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">👥 Member Dashboard</div><div class="menu-desc">Opens the public-safe member dashboard with aggregate stats</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">🛡️ Steward Dashboard</div><div class="menu-desc">Opens the internal steward dashboard with full analytics</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Union Hub > Quick Search</div><div class="menu-name">🔍 Quick Search</div><div class="menu-desc">Fast search across members and grievances</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Union Hub > Multi-Select Panel</div><div class="menu-name">📋 Multi-Select Panel</div><div class="menu-desc">Select multiple grievances for bulk operations</div></div></div>
+              <div class="section-title"><span class="material-icons">menu</span>Union Hub Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">Member Dashboard</div><div class="menu-desc">Public-safe dashboard with aggregate stats</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">Steward Dashboard</div><div class="menu-desc">Internal dashboard with full analytics</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Search</div><div class="menu-name">Quick/Desktop/Advanced Search</div><div class="menu-desc">Multiple search interfaces</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Cases</div><div class="menu-name">New Case, Edit, Checklist</div><div class="menu-desc">Grievance management</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Members</div><div class="menu-name">Add, Find, Import, Export</div><div class="menu-desc">Member directory operations</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Calendar</div><div class="menu-name">Sync, View, Clear</div><div class="menu-desc">Google Calendar integration</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Drive</div><div class="menu-name">Setup, View, Batch Create</div><div class="menu-desc">Google Drive folder management</div></div></div>
             </div>
 
             <div class="section">
-              <div class="section-title"><span class="material-icons">menu</span>🎯 Strategic Ops Menu</div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops</div><div class="menu-name">👥 Member Dashboard</div><div class="menu-desc">PII-safe aggregate statistics portal</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops</div><div class="menu-name">🛡️ Steward Dashboard</div><div class="menu-desc">Internal analytics with all 6 tabs</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">➕ New Case/Grievance</div><div class="menu-desc">Open the new grievance filing form</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">✏️ Edit Selected</div><div class="menu-desc">Edit the currently selected grievance</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops > ID Engines</div><div class="menu-name">🆔 Generate Missing Member IDs</div><div class="menu-desc">Auto-generate IDs for members without one</div></div></div>
+              <div class="section-title"><span class="material-icons">menu</span>Strategic Ops Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Command Center</div><div class="menu-name">Dashboards & Performance</div><div class="menu-desc">Both dashboards and steward performance</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">New, Edit, Checklist</div><div class="menu-desc">Grievance operations</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > ID Engines</div><div class="menu-name">Generate IDs, Check Duplicates, PDF</div><div class="menu-desc">ID and document generation</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Steward Mgmt</div><div class="menu-name">Promote, Demote, Forms, Surveys</div><div class="menu-desc">Steward management tools</div></div></div>
             </div>
 
             <div class="section">
-              <div class="section-title"><span class="material-icons">menu</span>🛠️ Admin Menu</div>
-              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">🩺 System Diagnostics</div><div class="menu-desc">Run health check on all system components</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">🔧 Repair Dashboard</div><div class="menu-desc">Fix common issues automatically</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Admin > Data Sync</div><div class="menu-name">🔄 Sync All Data Now</div><div class="menu-desc">Synchronize member and grievance data</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Admin > Validation</div><div class="menu-name">🔍 Run Bulk Validation</div><div class="menu-desc">Validate all data for consistency</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Admin > Setup</div><div class="menu-name">🔧 Setup All Hidden Sheets</div><div class="menu-desc">Initialize all calculation sheets</div></div></div>
+              <div class="section-title"><span class="material-icons">menu</span>Admin Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">Diagnostics, Repair, Settings</div><div class="menu-desc">System health and fixes</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Automation</div><div class="menu-name">Refresh, Triggers, Email</div><div class="menu-desc">Automated tasks</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Data Sync</div><div class="menu-name">Sync All, Triggers</div><div class="menu-desc">Data synchronization</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Validation</div><div class="menu-name">Run, Settings, Indicators</div><div class="menu-desc">Data validation</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Setup</div><div class="menu-name">Hidden Sheets, Validations, Features</div><div class="menu-desc">System setup including Features Reference Sheet</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Demo Data</div><div class="menu-name">Seed, NUKE</div><div class="menu-desc">Test data management (dev only)</div></div></div>
             </div>
 
             <div class="section">
-              <div class="section-title"><span class="material-icons">menu</span>📊 509 Dashboard Menu</div>
-              <div class="menu-item"><div><div class="menu-path">509 Dashboard</div><div class="menu-name">📊 Dashboard</div><div class="menu-desc">Legacy 5-tab dashboard modal</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Field Access</div><div class="menu-name">📱 Pocket/Mobile View</div><div class="menu-desc">Optimize display for mobile devices</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Personnel</div><div class="menu-name">➕ Add New Member</div><div class="menu-desc">Open the member registration form</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Styling</div><div class="menu-name">🎨 Apply Global Styling</div><div class="menu-desc">Apply Roboto theme and zebra stripes</div></div></div>
+              <div class="section-title"><span class="material-icons">menu</span>Field Portal Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Field Portal > Accessibility</div><div class="menu-name">Mobile View, Get URL</div><div class="menu-desc">Mobile optimization</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Field Portal > Analytics</div><div class="menu-name">Unit Health, Trends, Precedents</div><div class="menu-desc">Field analytics</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Field Portal > Web App</div><div class="menu-name">Deploy, Portals, Email Links</div><div class="menu-desc">Web app management</div></div></div>
             </div>
           </div>
 
-          <!-- FAQ TAB -->
+          <!-- FAQ TAB (ENHANCED - ALL 15+ FAQs) -->
           <div id="faq-tab" class="tab-content hidden">
             <div class="section">
               <div class="section-title"><span class="material-icons">help</span>Frequently Asked Questions</div>
 
+              <div class="faq-category">Getting Started</div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I set up the dashboard for the first time?</div>
+                <div class="faq-a">Go to <strong>Admin > System Diagnostics</strong> to check your system, then customize the <strong>Config</strong> tab with your organization's dropdown values (job titles, locations, stewards, etc.).</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Can I use this with existing member data?</div>
+                <div class="faq-a">Yes! You can paste member data into the <strong>Member Directory</strong> tab. Just make sure the columns match and Member IDs follow the format (MJOHN123).</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I test the system without real data?</div>
+                <div class="faq-a">Use <strong>Admin > Demo Data > Seed All Sample Data</strong> to generate 1,000 test members and 300 grievances. Use <strong>NUKE SEEDED DATA</strong> when done testing.</div>
+              </div>
+
+              <div class="faq-category">Member Directory</div>
+
+              <div class="faq-item">
+                <div class="faq-q">What format should Member IDs use?</div>
+                <div class="faq-a">Format is <strong>M + first 2 letters of first name + first 2 letters of last name + 3 random digits</strong>. Example: John Smith = MJOSM123</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Why are some columns not editable (AB-AD)?</div>
+                <div class="faq-a">Columns AB-AD are <strong>auto-calculated</strong> from the Grievance Log: Has Open Grievance, Grievance Status, and Days to Deadline update automatically when you edit grievances.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I assign a steward to multiple members?</div>
+                <div class="faq-a">Use the <strong>Assigned Steward</strong> dropdown in column P. You can use the multi-select editor from <strong>Union Hub > Multi-Select</strong>.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">What does the "Start Grievance" checkbox do?</div>
+                <div class="faq-a">Checking this opens a <strong>pre-filled grievance form</strong> for that member. The checkbox auto-resets after use.</div>
+              </div>
+
+              <div class="faq-category">Grievances</div>
+
               <div class="faq-item">
                 <div class="faq-q">How do I file a new grievance?</div>
-                <div class="faq-a">Go to <strong>Strategic Ops > Cases & Grievances > ➕ New Case/Grievance</strong>. Fill in the member info, select the grievance type, and provide details. Deadlines are calculated automatically.</div>
+                <div class="faq-a">Go to <strong>Strategic Ops > Cases > New Case/Grievance</strong>. Fill in the member info, select the grievance type, and provide details. Deadlines are calculated automatically.</div>
               </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How are deadlines calculated?</div>
+                <div class="faq-a">Based on <strong>Article 23A</strong>: Filing = Incident + 21 days, Step I = Filed + 30 days, Step II Appeal = Step I Decision + 10 days, Step II Decision = Appeal + 30 days. Arbitration within 30 days of Step 3.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">What does "Message Alert" do?</div>
+                <div class="faq-a">When checked, the row is <strong>highlighted yellow</strong> and moves to the top of the list when sorted. Use it to flag urgent cases.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Why does Days to Deadline show "Overdue"?</div>
+                <div class="faq-a">This means the next deadline has <strong>passed</strong>. Check the Next Action Due column to see which deadline is overdue and take action.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I create a folder for grievance documents?</div>
+                <div class="faq-a">Select the grievance row, then go to <strong>Union Hub > Drive > Setup Folder</strong>. This creates a Google Drive folder with subfolders for each step.</div>
+              </div>
+
+              <div class="faq-category">Troubleshooting</div>
+
+              <div class="faq-item">
+                <div class="faq-q">Dropdowns are empty or not working</div>
+                <div class="faq-a">Check the <strong>Config</strong> tab - the corresponding column may be empty. Run <strong>Admin > Setup > Setup Data Validations</strong> to reapply dropdowns.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Data isn't syncing between sheets</div>
+                <div class="faq-a">Run <strong>Admin > Data Sync > Install Auto-Sync Trigger</strong>. Also try <strong>Admin > Data Sync > Sync All Data Now</strong> for immediate sync.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">The dashboard shows wrong numbers</div>
+                <div class="faq-a">Try <strong>Admin > Repair Dashboard</strong>. If issues persist, run <strong>Admin > Setup > Repair All Hidden Sheets</strong> to rebuild calculation sheets.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">I accidentally deleted data - can I undo?</div>
+                <div class="faq-a">Use <strong>Ctrl+Z</strong> (or Cmd+Z on Mac) immediately. For older changes, go to <strong>File > Version history > See version history</strong>.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Menus are not appearing</div>
+                <div class="faq-a">Close and reopen the spreadsheet. If still missing, go to <strong>Extensions > Apps Script</strong> and run the <code>onOpen</code> function manually.</div>
+              </div>
+
+              <div class="faq-category">Advanced</div>
 
               <div class="faq-item">
                 <div class="faq-q">What's the difference between the two dashboards?</div>
@@ -779,44 +965,19 @@ function showHelpDialog() {
               </div>
 
               <div class="faq-item">
-                <div class="faq-q">How do deadline calculations work?</div>
-                <div class="faq-a">Based on Article 23A: Step 1 has ${DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE} days for response, Step 2 has ${DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL} days to appeal, Step 3 has ${DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL} days, and Arbitration must be demanded within ${DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND} days of Step 3.</div>
+                <div class="faq-q">Can multiple people use this at the same time?</div>
+                <div class="faq-a">Yes! Google Sheets supports <strong>real-time collaboration</strong>. Changes sync automatically between users.</div>
               </div>
 
               <div class="faq-item">
-                <div class="faq-q">Why are some cells showing errors?</div>
-                <div class="faq-a">Run <strong>Admin > 🩺 System Diagnostics</strong> to check for issues. Then try <strong>Admin > 🔧 Repair Dashboard</strong> to fix common problems automatically.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">How do I search for a member or grievance?</div>
-                <div class="faq-a">Use <strong>Union Hub > 🔍 Quick Search</strong> or <strong>Strategic Ops > 🔍 Desktop Search</strong> for advanced filtering options.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">How do I sync deadlines to Google Calendar?</div>
-                <div class="faq-a">Select a grievance, then use <strong>509 Dashboard > Calendar > 📅 Create Calendar Event</strong>. This creates reminder events for all deadline dates.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">What does the Satisfaction tab show?</div>
-                <div class="faq-a">It analyzes member satisfaction surveys across 8 sections: Overall Satisfaction, Steward Ratings, Chapter Effectiveness, Local Leadership, Contract Enforcement, Communication Quality, Member Voice, and Value & Action.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">How do I apply zebra stripes to all rows?</div>
-                <div class="faq-a">Go to <strong>509 Dashboard > Styling > 🎨 Apply Global Styling</strong>. This applies Roboto font and zebra stripes to all rows in Member Directory and Grievance Log.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">How do I start fresh with a new spreadsheet?</div>
-                <div class="faq-a">Visit our GitHub repository to get a fresh copy with seed data and demo features. See the link below.</div>
+                <div class="faq-q">How do I customize deadline days?</div>
+                <div class="faq-a">The default deadlines (21, 30, 10 days) are configured in the <strong>Config</strong> tab columns AA-AD. You can modify these values for your contract.</div>
               </div>
             </div>
 
             <a href="https://github.com/Woop91/MULTIPLE-SCRIPS-REPO" target="_blank" class="repo-link">
               <span class="material-icons" style="font-size: 16px;">open_in_new</span>
-              Get a fresh copy from GitHub (with Seed & Nuke features)
+              GitHub Repository (fresh copies, documentation, updates)
             </a>
           </div>
 
@@ -826,33 +987,43 @@ function showHelpDialog() {
               <div class="section-title"><span class="material-icons">bolt</span>Quick Tips</div>
 
               <div class="card">
-                <div class="card-title">🔍 Quick Search</div>
-                <div class="card-desc">Use Union Hub > Quick Search to find any member or grievance instantly. Supports partial name matching.</div>
+                <div class="card-title">Quick Search</div>
+                <div class="card-desc">Use <strong>Union Hub > Quick Search</strong> to find any member or grievance instantly. Supports partial name matching.</div>
               </div>
 
               <div class="card">
-                <div class="card-title">📊 Dashboard Views</div>
-                <div class="card-desc">Use Steward Dashboard for internal analysis, Member Dashboard for sharing with members (PII-safe).</div>
+                <div class="card-title">Dashboard Views</div>
+                <div class="card-desc">Use <strong>Steward Dashboard</strong> for internal analysis, <strong>Member Dashboard</strong> for sharing with members (PII-safe).</div>
               </div>
 
               <div class="card">
-                <div class="card-title">📱 Mobile Access</div>
-                <div class="card-desc">Enable Pocket/Mobile View to hide non-essential columns when using on phones or tablets.</div>
+                <div class="card-title">Mobile Access</div>
+                <div class="card-desc">Enable <strong>Pocket/Mobile View</strong> to hide non-essential columns when using on phones or tablets.</div>
               </div>
 
               <div class="card">
-                <div class="card-title">🔄 Data Sync</div>
-                <div class="card-desc">Run Admin > Data Sync > Sync All Data Now periodically to ensure member and grievance data stays linked.</div>
+                <div class="card-title">Data Sync</div>
+                <div class="card-desc">Run <strong>Admin > Data Sync > Sync All Data Now</strong> periodically to ensure member and grievance data stays linked.</div>
               </div>
 
               <div class="card">
-                <div class="card-title">🎨 Visual Styling</div>
-                <div class="card-desc">Apply Global Styling adds zebra stripes to ALL rows (not just data rows) for consistent appearance.</div>
+                <div class="card-title">Visual Styling</div>
+                <div class="card-desc"><strong>Visual Control Panel</strong> (Union Hub) lets you toggle dark mode, zebra stripes, and focus mode.</div>
               </div>
 
               <div class="card">
-                <div class="card-title">⚡ Auto-Triggers</div>
-                <div class="card-desc">Install auto-sync and midnight refresh triggers from Admin menu to keep data current automatically.</div>
+                <div class="card-title">Auto-Triggers</div>
+                <div class="card-desc">Install <strong>auto-sync</strong> and <strong>midnight refresh</strong> triggers from Admin menu to keep data current automatically.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">Features Reference Sheet</div>
+                <div class="card-desc">Create a printable features sheet via <strong>Admin > Setup > Create Features Reference Sheet</strong>.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">Keyboard Shortcut</div>
+                <div class="card-desc">Use <strong>Ctrl+F</strong> (Cmd+F on Mac) in any sheet to search within the spreadsheet itself.</div>
               </div>
             </div>
           </div>
@@ -865,54 +1036,51 @@ function showHelpDialog() {
 
       <script>
         function showTab(tabName) {
-          // Hide all tabs
           document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-
-          // Show selected tab
           document.getElementById(tabName + '-tab').classList.remove('hidden');
           event.target.classList.add('active');
+          document.getElementById('resultCount').textContent = '';
         }
 
         function filterContent() {
-          const query = document.getElementById('searchInput').value.toLowerCase();
-          const items = document.querySelectorAll('.card, .menu-item, .faq-item');
+          const query = document.getElementById('searchInput').value.toLowerCase().trim();
+          const allItems = document.querySelectorAll('.card, .menu-item, .faq-item, .feature-row');
+          let visibleCount = 0;
 
-          items.forEach(item => {
-            const text = item.textContent.toLowerCase();
-            if (query === '' || text.includes(query)) {
+          if (query === '') {
+            allItems.forEach(item => {
               item.classList.remove('hidden');
-              // Highlight matches
-              if (query !== '') {
-                highlightText(item, query);
-              } else {
-                removeHighlight(item);
-              }
+              item.style.borderLeft = '';
+            });
+            document.getElementById('resultCount').textContent = '';
+            return;
+          }
+
+          // Show all tabs when searching
+          document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('hidden'));
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+          allItems.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            if (text.includes(query)) {
+              item.classList.remove('hidden');
+              item.style.borderLeft = '3px solid #fbbf24';
+              visibleCount++;
             } else {
               item.classList.add('hidden');
+              item.style.borderLeft = '';
             }
           });
 
-          // Show all tabs when searching
-          if (query !== '') {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('hidden'));
-          }
-        }
-
-        function highlightText(element, query) {
-          // Simple highlight - just mark parent as searched
-          element.style.borderLeft = '3px solid #fbbf24';
-        }
-
-        function removeHighlight(element) {
-          element.style.borderLeft = '';
+          document.getElementById('resultCount').textContent = visibleCount + ' results found';
         }
       </script>
     </body>
     </html>
-  `).setWidth(650).setHeight(700);
+  `).setWidth(700).setHeight(750);
 
-  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help Guide - 509 Dashboard');
+  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - 509 Dashboard v' + VERSION_INFO.CURRENT);
 }
 
 // ============================================================================

@@ -1386,27 +1386,32 @@ function createDashboardCharts_(sheet) {
     ['7', '🔥 Heatmap Table', 'Color-coded data grid', 'Steward performance matrix', 'Pattern spotting', '🟩🟨🟥'],
     ['8', '📊 Stacked Bar', 'Stacked horizontal bars', 'Status by steward', 'Composition analysis', '▰▰▱'],
     ['9', '🍩 Donut Chart', 'Pie with center hole', 'Resolution outcomes', 'Outcome breakdown', '◎'],
-    ['10', '📈 Area Chart', 'Filled line chart', 'Cumulative trends', 'Volume over time', '▓▓░']
+    ['10', '📈 Area Chart', 'Filled line chart', 'Cumulative trends', 'Volume over time', '▓▓░'],
+    ['11', '📊 Combo Chart', 'Bars + line overlay', 'Volume + Rate comparison', 'Dual metrics', '▮📈'],
+    ['12', '🔵 Scatter Plot', 'X-Y point distribution', 'Response time vs outcomes', 'Correlation analysis', '⋮⋮'],
+    ['13', '📊 Histogram', 'Frequency distribution bars', 'Case duration ranges', 'Distribution shape', '▁▃▅▇▅▃'],
+    ['14', '📋 Summary Table', 'Key metrics in tabular form', 'All KPI summaries', 'Quick reference', '☰'],
+    ['15', '🎯 Steward Leaderboard', 'Ranked performance list', 'Steward metrics', 'Performance ranking', '🥇🥈🥉']
   ];
 
-  sheet.getRange('A122:F131').setValues(chartOptions)
+  sheet.getRange('A122:F136').setValues(chartOptions)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
 
   // Alternate row coloring for chart options
-  for (var r = 122; r <= 131; r++) {
+  for (var r = 122; r <= 136; r++) {
     if (r % 2 === 0) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_LIGHT);
     }
   }
 
   // Style the # column
-  sheet.getRange('A122:A131')
+  sheet.getRange('A122:A136')
     .setFontWeight('bold')
     .setFontColor(COLORS.PRIMARY_PURPLE);
 
   // Card bottom border
-  sheet.getRange('A132:G132').setBackground(COLORS.CHART_INDIGO);
+  sheet.getRange('A137:G137').setBackground(COLORS.CHART_INDIGO);
   sheet.setRowHeight(132, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1446,8 +1451,8 @@ function generateSelectedChart() {
   }
 
   var chartNum = sheet.getRange('G120').getValue();
-  if (!chartNum || chartNum < 1 || chartNum > 10) {
-    ss.toast('Please enter a valid chart number (1-10) in cell G120', '⚠️ Invalid Selection', 5);
+  if (!chartNum || chartNum < 1 || chartNum > 15) {
+    ss.toast('Please enter a valid chart number (1-15) in cell G120', '⚠️ Invalid Selection', 5);
     return;
   }
 
@@ -1556,8 +1561,50 @@ function generateSelectedChart() {
       createAreaChart_(sheet);
       break;
 
+    case 11: // Combo Chart - Bars + Line overlay
+      createComboChart_(sheet);
+      break;
+
+    case 12: // Scatter Plot
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.SCATTER)
+        .addRange(sheet.getRange('A35:C39')) // X, Y data points
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Response Time vs Outcome Analysis')
+        .setOption('legend', {position: 'bottom'})
+        .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.UNION_GREEN])
+        .setOption('width', 600)
+        .setOption('height', 300)
+        .setOption('pointSize', 8);
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 13: // Histogram
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.HISTOGRAM)
+        .addRange(sheet.getRange('B26:B30')) // Numeric values for distribution
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Case Duration Distribution')
+        .setOption('legend', {position: 'none'})
+        .setOption('colors', [COLORS.CHART_CYAN])
+        .setOption('width', 600)
+        .setOption('height', 300)
+        .setOption('histogram', {bucketSize: 5});
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 14: // Summary Table
+      createSummaryTableChart_(sheet);
+      break;
+
+    case 15: // Steward Leaderboard
+      createStewardLeaderboardChart_(sheet);
+      break;
+
     default:
-      ss.toast('Chart type not yet implemented', 'ℹ️ Info', 3);
+      ss.toast('Enter 1-15 in cell G120 to select a chart type. See options table above.', 'ℹ️ Chart Help', 5);
   }
 
   ss.toast('Chart generated! Scroll down to "Chart Display Area" to view.', '✅ Done', 5);
@@ -1649,6 +1696,107 @@ function createAreaChart_(sheet) {
 
   var chart = chartBuilder.build();
   sheet.insertChart(chart);
+}
+
+/**
+ * Creates a combo chart (bars with line overlay)
+ * @private
+ */
+function createComboChart_(sheet) {
+  var chartBuilder = sheet.newChart()
+    .setChartType(Charts.ChartType.COMBO)
+    .addRange(sheet.getRange('A26:C30')) // Category, Count, Percentage
+    .setPosition(135, 1, 0, 0)
+    .setOption('title', 'Cases by Category with Trend Line')
+    .setOption('legend', {position: 'bottom'})
+    .setOption('seriesType', 'bars')
+    .setOption('series', {1: {type: 'line'}}) // Second series as line
+    .setOption('colors', [COLORS.CHART_BLUE, COLORS.SOLIDARITY_RED])
+    .setOption('width', 600)
+    .setOption('height', 300);
+
+  var chart = chartBuilder.build();
+  sheet.insertChart(chart);
+}
+
+/**
+ * Creates a summary table display
+ * @private
+ */
+function createSummaryTableChart_(sheet) {
+  var openCases = sheet.getRange('A16').getValue() || 0;
+  var resolvedCases = sheet.getRange('D16').getValue() || 0;
+  var winRate = sheet.getRange('D6').getValue() || '0%';
+  var avgDays = sheet.getRange('E6').getValue() || 'N/A';
+
+  var tableText = '╔═══════════════════════════════════════════════════════╗\n' +
+                  '║            📋 KPI SUMMARY TABLE                       ║\n' +
+                  '╠═══════════════════════════════════════════════════════╣\n' +
+                  '║  Metric                    │  Value                   ║\n' +
+                  '╠═══════════════════════════════════════════════════════╣\n' +
+                  '║  Open Cases                │  ' + padRight(String(openCases), 23) + '║\n' +
+                  '║  Resolved Cases            │  ' + padRight(String(resolvedCases), 23) + '║\n' +
+                  '║  Win Rate                  │  ' + padRight(String(winRate), 23) + '║\n' +
+                  '║  Avg Resolution Time       │  ' + padRight(String(avgDays), 23) + '║\n' +
+                  '╚═══════════════════════════════════════════════════════╝';
+
+  sheet.getRange('A135').setValue(tableText)
+    .setFontFamily('Courier New')
+    .setFontSize(12)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBackground('#F0F9FF');
+  sheet.getRange('A135:G145').merge();
+}
+
+/**
+ * Creates a steward leaderboard display
+ * @private
+ */
+function createStewardLeaderboardChart_(sheet) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var stewardSheet = ss.getSheetByName(SHEETS.STEWARDS);
+
+  var leaderboardText = '╔═══════════════════════════════════════════════════════╗\n' +
+                        '║       🏆 STEWARD PERFORMANCE LEADERBOARD              ║\n' +
+                        '╠═══════════════════════════════════════════════════════╣\n';
+
+  if (stewardSheet) {
+    // Get top 5 stewards by cases handled (column B has name, column C has case count)
+    var stewardData = stewardSheet.getRange('B4:C8').getValues();
+    var rank = 1;
+    var medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+
+    for (var i = 0; i < stewardData.length; i++) {
+      if (stewardData[i][0]) {
+        var name = padRight(String(stewardData[i][0]), 25);
+        var cases = stewardData[i][1] || 0;
+        leaderboardText += '║  ' + medals[rank-1] + ' ' + name + ' │  ' + padRight(String(cases) + ' cases', 15) + '║\n';
+        rank++;
+      }
+    }
+  } else {
+    leaderboardText += '║  No steward data available                            ║\n';
+  }
+
+  leaderboardText += '╚═══════════════════════════════════════════════════════╝';
+
+  sheet.getRange('A135').setValue(leaderboardText)
+    .setFontFamily('Courier New')
+    .setFontSize(12)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBackground('#FDF4FF');
+  sheet.getRange('A135:G145').merge();
+}
+
+/**
+ * Pads a string on the right to reach a target length
+ * @private
+ */
+function padRight(str, len) {
+  while (str.length < len) str += ' ';
+  return str.substring(0, len);
 }
 
 // ============================================================================
@@ -3509,6 +3657,204 @@ function createFAQSheet(ss) {
   return sheet;
 }
 
+/**
+ * Creates a comprehensive Features Reference sheet with searchable features list
+ * v4.3.8 - Complete features catalog with categories, descriptions, and menu paths
+ */
+function createFeaturesReferenceSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = '📋 Features Reference';
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (sheet) {
+    sheet.clear();
+  } else {
+    sheet = ss.insertSheet(sheetName);
+  }
+
+  // Define colors
+  var headerBg = '#3B82F6';       // Blue header
+  var categoryBg = '#DBEAFE';     // Light blue for categories
+  var featureBg = '#FFFFFF';      // White for features
+  var menuPathBg = '#F3F4F6';     // Light gray for menu paths
+  var white = '#FFFFFF';
+
+  var row = 1;
+
+  // ═══ MAIN HEADER ═══
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('📋 FEATURES REFERENCE - 509 Strategic Command Center v' + VERSION_INFO.CURRENT)
+    .setBackground(headerBg)
+    .setFontColor(white)
+    .setFontWeight('bold')
+    .setFontSize(18)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(row, 50);
+
+  row += 2;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('Complete searchable reference of all features. Use Ctrl+F (Cmd+F on Mac) to search. See FEATURES.md for detailed documentation.')
+    .setFontSize(11)
+    .setFontColor('#6B7280')
+    .setHorizontalAlignment('center')
+    .setWrap(true);
+
+  // ═══ COLUMN HEADERS ═══
+  row += 2;
+  var headers = ['Category', 'Feature', 'Description', 'Menu Path', 'Keywords'];
+  sheet.getRange(row, 1, 1, 5).setValues([headers])
+    .setBackground('#1E40AF')
+    .setFontColor(white)
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+  sheet.setRowHeight(row, 30);
+  var headerRow = row;
+
+  // ═══ FEATURES DATA ═══
+  var features = [
+    // Dashboard & Analytics
+    ['Dashboard & Analytics', 'Steward Dashboard', 'Internal 6-tab dashboard with Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction. Contains PII.', 'Strategic Ops > Command Center > Steward Dashboard', 'internal, analytics, PII, workload'],
+    ['Dashboard & Analytics', 'Member Dashboard', 'PII-safe dashboard for sharing with members. Shows aggregate stats without personal info.', 'Strategic Ops > Command Center > Member Dashboard', 'public, aggregate, safe, sharing'],
+    ['Dashboard & Analytics', 'Executive Dashboard', 'Legacy 5-tab modal with Overview, My Cases, Grievances, Members, Analytics tabs.', 'Union Hub > Dashboards > Dashboard', 'executive, overview, legacy'],
+    ['Dashboard & Analytics', 'Steward Performance', 'View active cases, total cases, and win rates for all stewards.', 'Strategic Ops > Command Center > Steward Performance', 'performance, win rate, cases'],
+
+    // Search & Discovery
+    ['Search & Discovery', 'Desktop Search', 'Advanced search with tabs for All/Members/Grievances, filters by status/department/date.', 'Strategic Ops > Desktop Search', 'advanced, filter, desktop'],
+    ['Search & Discovery', 'Quick Search', 'Minimal interface for fast member/grievance lookup. Supports partial name matching.', 'Union Hub > Quick Search', 'fast, simple, minimal'],
+    ['Search & Discovery', 'Advanced Search', 'Fullscreen search with complex filtering and multiple criteria support.', 'Union Hub > Search > Advanced Search', 'fullscreen, complex, criteria'],
+    ['Search & Discovery', 'Mobile Search', 'Touch-optimized search for field use on phones and tablets.', 'Field Portal > Mobile Search', 'mobile, touch, field'],
+    ['Search & Discovery', 'Searchable Help Guide', '4-tab help modal with real-time search across Overview, Menu Reference, FAQ, Quick Tips.', 'Union Hub > Help & Documentation', 'help, FAQ, documentation'],
+
+    // Grievance Management
+    ['Grievance Management', 'New Case/Grievance', 'Opens pre-filled grievance form. Calculates deadlines automatically per Article 23A.', 'Strategic Ops > Cases > New Case/Grievance', 'create, file, new'],
+    ['Grievance Management', 'Edit Grievance', 'Modify details of the currently selected grievance row.', 'Strategic Ops > Cases > Edit Selected', 'edit, modify, update'],
+    ['Grievance Management', 'Advance Step', 'Move grievance to next step (Step I → Step II → Step III → Arbitration).', 'Strategic Ops > Cases > Advance Step', 'step, advance, escalate'],
+    ['Grievance Management', 'Bulk Status Update', 'Update status for multiple selected grievances at once.', 'Union Hub > Grievances > Bulk Update', 'bulk, batch, multiple'],
+    ['Grievance Management', 'Auto Deadlines', 'Article 23A: Step 1 (7d), Step 2 Appeal (7d), Step 2 (14d), Step 3 (10d/21d), Arb (30d).', 'Automatic calculation', 'deadline, calculate, Article 23A'],
+    ['Grievance Management', 'Message Alert Flag', 'Checkbox to highlight urgent cases in yellow and move to top when sorted.', 'Grievance Log column', 'urgent, flag, priority'],
+
+    // Member Management
+    ['Member Management', 'Add New Member', 'Open member registration form with all fields.', 'Union Hub > Members > Add New Member', 'add, register, new'],
+    ['Member Management', 'Find Member', 'Search for specific member by name, ID, or other criteria.', 'Union Hub > Members > Find Member', 'find, search, lookup'],
+    ['Member Management', 'Import Members', 'Bulk import member data from external sources.', 'Union Hub > Members > Import Members', 'import, bulk, external'],
+    ['Member Management', 'Export Members', 'Export member directory to CSV or other formats.', 'Union Hub > Members > Export Members', 'export, CSV, download'],
+    ['Member Management', 'Generate Member IDs', 'Creates IDs in format M + First2 + Last2 + 3 digits (e.g., MJOSM123).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
+    ['Member Management', 'Check Duplicate IDs', 'Finds and highlights duplicate Member IDs in the directory.', 'Strategic Ops > ID Engines > Check Duplicates', 'duplicate, check, validate'],
+
+    // Steward Tools
+    ['Steward Tools', 'Promote to Steward', 'Change member status to steward, sends toolkit email.', 'Strategic Ops > Steward Management > Promote', 'promote, steward, new'],
+    ['Steward Tools', 'Demote from Steward', 'Remove steward status from member.', 'Strategic Ops > Steward Management > Demote', 'demote, remove, former'],
+    ['Steward Tools', 'Steward Directory', 'View list of all stewards with contact information.', 'Union Hub > Members > Steward Directory', 'steward, directory, contact'],
+    ['Steward Tools', 'Workload Report', 'Capacity analysis with overload detection (flags 8+ active cases).', 'Strategic Ops > Analytics > Workload Report', 'workload, capacity, overload'],
+    ['Steward Tools', 'Rising Stars', 'Highlights top-performing stewards by score and win rate.', 'Strategic Ops > Strategic Intelligence > Rising Stars', 'top, performance, best'],
+
+    // Calendar & Drive
+    ['Calendar & Drive', 'Sync Deadlines', 'Creates Google Calendar events for all grievance deadlines.', 'Union Hub > Calendar > Sync Deadlines', 'sync, calendar, events'],
+    ['Calendar & Drive', 'Setup Drive Folder', 'Auto-creates Drive folder with subfolders for each step.', 'Union Hub > Google Drive > Setup Folder', 'folder, drive, create'],
+    ['Calendar & Drive', 'View Grievance Files', 'Open the Drive folder for selected grievance.', 'Union Hub > Google Drive > View Files', 'view, files, open'],
+    ['Calendar & Drive', 'Batch Create Folders', 'Create Drive folders for multiple grievances at once.', 'Union Hub > Google Drive > Batch Create', 'batch, bulk, folders'],
+
+    // Accessibility
+    ['Accessibility', 'Focus Mode', 'Distraction-free view, hides non-essential sheets.', 'Union Hub > Comfort View > Focus Mode', 'focus, distraction-free, ADHD'],
+    ['Accessibility', 'Zebra Stripes', 'Alternating row colors for easier reading.', 'Union Hub > Comfort View > Zebra Stripes', 'zebra, stripes, alternating'],
+    ['Accessibility', 'High Contrast', 'Enhanced contrast for visibility.', 'Union Hub > Comfort View > High Contrast', 'contrast, visibility, accessibility'],
+    ['Accessibility', 'Dark Mode', 'Dark gradient backgrounds across all modals.', 'Union Hub > View > Dark Mode', 'dark, theme, night'],
+    ['Accessibility', 'Global Styling', 'Applies Roboto font and zebra stripes to all rows.', '509 Dashboard > Styling > Apply Global', 'styling, font, Roboto'],
+
+    // Strategic Intelligence
+    ['Strategic Intelligence', 'Unit Hot Zones', 'Identifies locations with 3+ active grievances.', 'Strategic Ops > Strategic Intelligence > Hot Zones', 'hot zones, problem, locations'],
+    ['Strategic Intelligence', 'Hostility Report', 'Analyzes denial rates across grievance steps.', 'Strategic Ops > Strategic Intelligence > Hostility', 'denial, management, hostility'],
+    ['Strategic Intelligence', 'Bargaining Sheet', 'Strategic data for contract negotiations.', 'Strategic Ops > Strategic Intelligence > Bargaining', 'bargaining, contract, negotiation'],
+    ['Strategic Intelligence', 'Treemap', 'Visual heat map of grievance activity by unit.', 'Strategic Ops > Analytics > Treemap', 'treemap, density, heatmap'],
+    ['Strategic Intelligence', 'Sentiment Trends', 'Union morale tracking over time from survey data.', 'Strategic Ops > Analytics > Sentiment Trends', 'sentiment, morale, trends'],
+
+    // Administration
+    ['Administration', 'System Diagnostics', 'Comprehensive health check on all components.', 'Admin > System Diagnostics', 'diagnostics, health, check'],
+    ['Administration', 'Repair Dashboard', 'Auto-fix common issues (missing sheets, broken formulas).', 'Admin > Repair Dashboard', 'repair, fix, auto'],
+    ['Administration', 'Midnight Trigger', 'Daily 12AM refresh of dashboards and overdue alerts.', 'Admin > Automation > Midnight Trigger', 'midnight, daily, refresh'],
+    ['Administration', 'Bulk Validation', 'Validate all data for consistency and errors.', 'Admin > Validation > Run Bulk', 'validate, bulk, check'],
+    ['Administration', 'Setup Hidden Sheets', 'Initialize all 6 calculation sheets.', 'Admin > Setup > Hidden Sheets', 'hidden, setup, initialize'],
+
+    // Mobile & Web
+    ['Mobile & Web', 'Pocket/Mobile View', 'Hides non-essential columns for phone access.', '509 Dashboard > Field Access > Mobile View', 'mobile, pocket, phone'],
+    ['Mobile & Web', 'Web App Deploy', 'Create standalone web application from dashboard.', 'Field Portal > Web App > Deploy', 'deploy, web app, standalone'],
+    ['Mobile & Web', 'Member Portal', 'Personalized member view via URL (?member=ID).', 'Via Web App URL', 'portal, personal, member'],
+    ['Mobile & Web', 'Email Portal Links', 'Send personalized dashboard URLs to members.', 'Field Portal > Web App > Email Links', 'email, portal, personalized'],
+
+    // Security
+    ['Security & Audit', 'Audit Logging', 'Track all changes with timestamps and user info.', 'Automatic (_Audit_Log sheet)', 'audit, log, tracking'],
+    ['Security & Audit', 'Sabotage Protection', 'Detects mass deletion (>15 cells) and alerts.', 'Automatic on edit', 'sabotage, protection, deletion'],
+    ['Security & Audit', 'PII Scrubbing', 'Auto-redacts phone/SSN from public dashboards.', 'Automatic in Member Dashboard', 'PII, scrub, redact, privacy'],
+    ['Security & Audit', 'Weingarten Rights', 'Emergency rights statement with tap-to-expand.', 'Within Member Dashboard', 'Weingarten, rights, legal'],
+
+    // Documents
+    ['Documents', 'Create PDF', 'Generate signature-ready PDF with legal blocks.', 'Strategic Ops > ID Engines > Create PDF', 'PDF, generate, signature'],
+    ['Documents', 'Email PDF', 'Send generated PDFs via email.', 'After PDF generation', 'email, PDF, send'],
+
+    // Demo Tools
+    ['Demo Tools', 'Seed Sample Data', 'Generate 1,000 test members and 300 grievances.', 'Admin > Demo Data > Seed All', 'seed, demo, test'],
+    ['Demo Tools', 'NUKE Seeded Data', 'Remove all demo data (preserves real data).', 'Admin > Demo Data > NUKE', 'nuke, delete, cleanup']
+  ];
+
+  // Write all features
+  row++;
+  var startDataRow = row;
+  for (var i = 0; i < features.length; i++) {
+    sheet.getRange(row, 1, 1, 5).setValues([features[i]]);
+
+    // Alternate row colors
+    var bgColor = (i % 2 === 0) ? featureBg : menuPathBg;
+    sheet.getRange(row, 1, 1, 5).setBackground(bgColor);
+
+    // Category column styling
+    if (i === 0 || features[i][0] !== features[i-1][0]) {
+      sheet.getRange(row, 1).setFontWeight('bold').setBackground(categoryBg);
+    }
+
+    sheet.setRowHeight(row, 28);
+    row++;
+  }
+
+  // ═══ FOOTER ═══
+  row += 1;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('Total Features: ' + features.length + ' | Use Ctrl+F to search | See FEATURES.md for complete documentation')
+    .setFontColor('#6B7280')
+    .setFontStyle('italic')
+    .setHorizontalAlignment('center')
+    .setBackground('#F9FAFB');
+
+  // Set column widths
+  sheet.setColumnWidth(1, 160);  // Category
+  sheet.setColumnWidth(2, 160);  // Feature
+  sheet.setColumnWidth(3, 350);  // Description
+  sheet.setColumnWidth(4, 280);  // Menu Path
+  sheet.setColumnWidth(5, 200);  // Keywords
+
+  // Delete excess columns
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols > 5) {
+    sheet.deleteColumns(6, maxCols - 5);
+  }
+
+  // Freeze header rows
+  sheet.setFrozenRows(headerRow);
+
+  // Enable text wrapping for description column
+  sheet.getRange(startDataRow, 3, features.length, 1).setWrap(true);
+
+  // Apply filter to data
+  var dataRange = sheet.getRange(headerRow, 1, features.length + 1, 5);
+  dataRange.createFilter();
+
+  // Set tab color to blue (documentation)
+  sheet.setTabColor('#3B82F6');
+
+  return sheet;
+}
+
 // ============================================================================
 // MENU HANDLER FUNCTIONS
 // ============================================================================
@@ -3516,8 +3862,10 @@ function createFAQSheet(ss) {
 /**
  * Show desktop search modal - comprehensive search for members and grievances
  * Enhanced version of mobile search with more fields and filtering options
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:124
+ * Note: This was a wrapper for UI, the primary does actual searching with query param
  */
-function searchMembers() {
+function searchMembers_Code_DEPRECATED() {
   showDesktopSearch();
 }
 
@@ -5207,8 +5555,9 @@ function rejectFlaggedSubmission(rowNum) {
  * High-performance modal with interactive Google Charts, Satisfaction data,
  * Material Icons, Trend Stats, Progress Tracking, and Live Steward Search.
  * No PII is exposed - only aggregate statistics.
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 11_SecureMemberDashboard.gs:501
  */
-function showPublicMemberDashboard() {
+function showPublicMemberDashboard_Code_DEPRECATED() {
   var stats = getGrievanceStats();
   var stewards = getAllStewards();
   var satisfaction = getAggregateSatisfactionStats();
@@ -11982,8 +12331,9 @@ function getCalcValue(sheetName, cellRef) {
  * Gets dashboard statistics from the calc sheet
  * Used by the sidebar
  * @return {Object} Statistics object
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 04_UIService.gs:5078
  */
-function getDashboardStats() {
+function getDashboardStats_Code_DEPRECATED() {
   const statsSheet = SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(HIDDEN_SHEETS.CALC_STATS);
 
@@ -12072,8 +12422,9 @@ function getMemberList() {
  * Gets member by ID
  * @param {string} memberId - The member ID
  * @return {Object|null} Member object or null
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:97
  */
-function getMemberById(memberId) {
+function getMemberById_Code_DEPRECATED(memberId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 

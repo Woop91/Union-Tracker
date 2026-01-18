@@ -106,10 +106,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 8,
-  BUILD: 'v4.3.8',
-  CURRENT: '4.3.8',
-CODENAME: 'Searchable Help Guide'
+  PATCH: 9,
+  BUILD: 'v4.3.9',
+  CURRENT: '4.3.9',
+  CODENAME: 'Code Audit & Cleanup'
 };
 
 // ============================================================================
@@ -155,6 +155,7 @@ var SHEETS = {
   GETTING_STARTED: '📚 Getting Started',
   FAQ: '❓ FAQ',
   CONFIG_GUIDE: '📖 Config Guide',
+  FEATURES_REFERENCE: '📋 Features Reference',
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
@@ -1148,6 +1149,19 @@ var GRIEVANCE_STATUS = {
   AT_ARBITRATION: 'In Arbitration',
   CLOSED: 'Closed',
   RESOLVED: 'Settled'  // Alias for backward compatibility
+};
+
+/**
+ * Deadline rules for grievance step calculations
+ * Defines the number of days for responses and appeals at each step
+ * Used by deadline calculation functions throughout the system
+ * @const {Object}
+ */
+var DEADLINE_RULES = {
+  STEP_1: { DAYS_FOR_RESPONSE: 7 },
+  STEP_2: { DAYS_TO_APPEAL: 7, DAYS_FOR_RESPONSE: 14 },
+  STEP_3: { DAYS_TO_APPEAL: 10, DAYS_FOR_RESPONSE: 21 },
+  ARBITRATION: { DAYS_TO_DEMAND: 30 }
 };
 
 /**

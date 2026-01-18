@@ -1056,6 +1056,11 @@ function showClearCalendarConfirm() {
  * Consolidated to handle both mobile dashboard pages and member portal requests
  * @param {Object} e - Event object with query parameters
  * @returns {HtmlOutput} The HTML page to display
+ *
+ * URL Parameters:
+ * - id=<memberId> - Returns personalized member portal
+ * - page=search|grievances|members|links|dashboard|portal - Returns specific page
+ * - (no params) - Returns default dashboard
  */
 function doGet(e) {
   // Check for member ID parameter (member portal mode)
@@ -2176,5 +2181,85 @@ function showWebAppUrl() {
     'Open this URL on your mobile device:\n\n' + url + '\n\n' +
     'Tip: Add it to your home screen for quick access!',
     ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Add Mobile Dashboard link to Config sheet for easy mobile access
+ * Creates a clickable hyperlink cell that works on mobile devices
+ */
+function addMobileDashboardLinkToConfig() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) {
+    SpreadsheetApp.getUi().alert('Error', 'Config sheet not found', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  var url = ScriptApp.getService().getUrl();
+  if (!url) {
+    SpreadsheetApp.getUi().alert(
+      '📱 Web App Not Deployed',
+      'To use this feature, you must first deploy the web app:\n\n' +
+      '1. Go to Extensions → Apps Script\n' +
+      '2. Click "Deploy" → "New deployment"\n' +
+      '3. Select "Web app"\n' +
+      '4. Set "Who has access" to "Anyone" or appropriate setting\n' +
+      '5. Click "Deploy"\n' +
+      '6. Then run this function again',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Find first empty row in column AZ (or create Mobile Dashboard URL section)
+  var lastRow = configSheet.getLastRow();
+  var targetRow = 2;
+  var targetCol = 52; // Column AZ
+
+  // Check if header exists
+  var headerCell = configSheet.getRange(1, targetCol);
+  if (!headerCell.getValue()) {
+    headerCell.setValue('📱 Mobile Dashboard URL');
+    headerCell.setFontWeight('bold');
+    headerCell.setBackground('#1a73e8');
+    headerCell.setFontColor('#ffffff');
+  }
+
+  // Add the hyperlink
+  var linkCell = configSheet.getRange(targetRow, targetCol);
+  linkCell.setFormula('=HYPERLINK("' + url + '", "📱 Tap to Open Dashboard")');
+  linkCell.setFontSize(14);
+  linkCell.setFontWeight('bold');
+  linkCell.setFontColor('#1a73e8');
+  linkCell.setBackground('#e8f0fe');
+
+  // Also add plain URL below for copying
+  var urlCell = configSheet.getRange(targetRow + 1, targetCol);
+  urlCell.setValue(url);
+  urlCell.setFontSize(10);
+  urlCell.setWrap(true);
+
+  // Add instructions
+  var instructionCell = configSheet.getRange(targetRow + 2, targetCol);
+  instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
+  instructionCell.setFontSize(9);
+  instructionCell.setFontColor('#666666');
+  instructionCell.setWrap(true);
+
+  // Set column width
+  configSheet.setColumnWidth(targetCol, 300);
+
+  SpreadsheetApp.getUi().alert(
+    '📱 Mobile Dashboard Link Added!',
+    'A clickable link has been added to column AZ of the Config sheet.\n\n' +
+    'To access on mobile:\n' +
+    '1. Open this spreadsheet in Google Sheets mobile app\n' +
+    '2. Go to the Config tab\n' +
+    '3. Scroll to column AZ\n' +
+    '4. Tap the blue "Tap to Open Dashboard" link\n\n' +
+    'URL: ' + url,
+    SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
