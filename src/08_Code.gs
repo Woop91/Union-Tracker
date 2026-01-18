@@ -48,7 +48,8 @@ function CREATE_509_DASHBOARD() {
       'This will create the 509 Dashboard with:\n\n' +
       '• Config (dropdown sources)\n' +
       '• Member Directory\n' +
-      '• Grievance Log\n' +
+      '• Grievance Log (with Action Type dropdown)\n' +
+      '• ✅ Case Checklist (track grievance tasks)\n' +
       '• 📊 Member Satisfaction (Survey tracking)\n' +
       '• 💡 Feedback & Development (Bug/feature tracking)\n' +
       '• ✅ Function Checklist (function reference)\n' +
@@ -81,6 +82,13 @@ function CREATE_509_DASHBOARD() {
 
     createGrievanceLog(ss);
     ss.toast('Created Grievance Log', '🏗️ Progress', 2);
+
+    // Setup Action Type dropdown and Case Checklist sheet
+    setupActionTypeColumn();
+    ss.toast('Setup Action Type dropdown', '🏗️ Progress', 2);
+
+    getOrCreateChecklistSheet();
+    ss.toast('Created Case Checklist sheet', '🏗️ Progress', 2);
 
     // Setup hidden calculation sheets (needed before dashboards for formula references)
     ss.toast('Setting up hidden sheets...', '🏗️ Progress', 3);
@@ -127,11 +135,13 @@ function CREATE_509_DASHBOARD() {
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
-        '9 sheets created:\n' +
+        '10 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
+        '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
         '• ✅ Function Checklist (function reference)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
+        '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
         'Access via: Union Hub > Dashboards menu.\n\n' +
         'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
