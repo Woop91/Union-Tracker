@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 7,
-  BUILD: 'v4.3.7',
-  CURRENT: '4.3.7',
-  CODENAME: 'Dynamic Row Styling'
+  PATCH: 8,
+  BUILD: 'v4.3.8',
+  CURRENT: '4.3.8',
+  CODENAME: 'Modal Consolidation'
 };
 
 // ============================================================================
@@ -146,6 +146,8 @@ var SHEETS = {
   // Case Checklist
   CASE_CHECKLIST: 'Case Checklist',
   // Satisfaction & Feedback sheets
+  // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
+  // Data is preserved for modal access. Use removeDeprecatedTabs() to hide.
   SATISFACTION: '📊 Member Satisfaction',
   FEEDBACK: '💡 Feedback & Development',
   // Help & Documentation sheets

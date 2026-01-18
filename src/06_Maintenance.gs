@@ -3029,29 +3029,39 @@ function cleanupTestData() {
 }
 
 /**
- * Removes deprecated tabs from the spreadsheet (v4.3.2 cleanup)
+ * Removes deprecated tabs from the spreadsheet (v4.3.8 cleanup)
  * Run this once to remove tabs that are no longer used:
- * - 🎯 Custom View
- * - Member Analytics
- * - Executive Command
- * - 💼 Dashboard (now modal-based - use showInteractiveDashboardTab())
+ * - 🎯 Custom View (deleted)
+ * - Member Analytics (deleted)
+ * - Executive Command (deleted)
+ * - 💼 Dashboard (deleted - now modal-based via showInteractiveDashboardTab())
+ * - 📊 Member Satisfaction (hidden - now modal-based via showSatisfactionDashboard())
+ *
+ * Note: Member Satisfaction is HIDDEN (not deleted) because it stores Google Form
+ * responses that the satisfaction modal reads from.
  */
 function removeDeprecatedTabs() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var tabsToRemove = ['🎯 Custom View', 'Member Analytics', 'Executive Command', '💼 Dashboard'];
-  var removed = [];
+  // Tabs to DELETE (no longer needed)
+  var tabsToDelete = ['🎯 Custom View', 'Member Analytics', 'Executive Command', '💼 Dashboard'];
+  // Tabs to HIDE (data still needed by modals)
+  var tabsToHide = ['📊 Member Satisfaction'];
+
+  var deleted = [];
+  var hidden = [];
   var notFound = [];
 
-  for (var i = 0; i < tabsToRemove.length; i++) {
-    var tabName = tabsToRemove[i];
+  // Delete deprecated tabs
+  for (var i = 0; i < tabsToDelete.length; i++) {
+    var tabName = tabsToDelete[i];
     var sheet = ss.getSheetByName(tabName);
 
     if (sheet) {
       try {
         ss.deleteSheet(sheet);
-        removed.push(tabName);
+        deleted.push(tabName);
       } catch (e) {
         // Cannot delete the only sheet
         Logger.log('Could not delete ' + tabName + ': ' + e.message);
@@ -3061,9 +3071,29 @@ function removeDeprecatedTabs() {
     }
   }
 
+  // Hide tabs that still store data for modals
+  for (var j = 0; j < tabsToHide.length; j++) {
+    var hideName = tabsToHide[j];
+    var hideSheet = ss.getSheetByName(hideName);
+
+    if (hideSheet) {
+      try {
+        hideSheet.hideSheet();
+        hidden.push(hideName);
+      } catch (e) {
+        Logger.log('Could not hide ' + hideName + ': ' + e.message);
+      }
+    } else {
+      notFound.push(hideName);
+    }
+  }
+
   var message = '';
-  if (removed.length > 0) {
-    message += 'Removed: ' + removed.join(', ') + '\n\n';
+  if (deleted.length > 0) {
+    message += 'Deleted: ' + deleted.join(', ') + '\n\n';
+  }
+  if (hidden.length > 0) {
+    message += 'Hidden: ' + hidden.join(', ') + '\n(Data preserved for modal access)\n\n';
   }
   if (notFound.length > 0) {
     message += 'Not found (already removed): ' + notFound.join(', ');
