@@ -95,7 +95,7 @@ function createCommandCenterMenu() {
 
   // v4.0 Field Accessibility submenu (Mobile/Pocket View)
   menu.addSubMenu(ui.createMenu('📱 Field Accessibility')
-      .addItem('📱 Mobile / Pocket View', 'navToMobile')
+      .addItem('📱 Pocket View', 'navToMobile')
       .addItem('🖥️ Restore Full Desktop View', 'showAllMemberColumns')
       .addItem('🔄 Refresh View', 'refreshMemberView')
       .addSeparator()
