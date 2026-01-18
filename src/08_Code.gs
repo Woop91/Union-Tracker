@@ -3509,6 +3509,206 @@ function createFAQSheet(ss) {
   return sheet;
 }
 
+/**
+ * Creates a comprehensive Features Reference sheet with searchable features list
+ * v4.3.8 - Complete features catalog with categories, descriptions, and menu paths
+ */
+function createFeaturesReferenceSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = '📋 Features Reference';
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (sheet) {
+    sheet.clear();
+  } else {
+    sheet = ss.insertSheet(sheetName);
+  }
+
+  // Define colors
+  var headerBg = '#3B82F6';       // Blue header
+  var categoryBg = '#DBEAFE';     // Light blue for categories
+  var featureBg = '#FFFFFF';      // White for features
+  var menuPathBg = '#F3F4F6';     // Light gray for menu paths
+  var textColor = '#1F2937';
+  var white = '#FFFFFF';
+  var linkColor = '#2563EB';
+
+  var row = 1;
+
+  // ═══ MAIN HEADER ═══
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('📋 FEATURES REFERENCE - 509 Strategic Command Center v' + VERSION_INFO.CURRENT)
+    .setBackground(headerBg)
+    .setFontColor(white)
+    .setFontWeight('bold')
+    .setFontSize(18)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(row, 50);
+
+  row += 2;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('Complete searchable reference of all features. Use Ctrl+F (Cmd+F on Mac) to search. See FEATURES.md for detailed documentation.')
+    .setFontSize(11)
+    .setFontColor('#6B7280')
+    .setHorizontalAlignment('center')
+    .setWrap(true);
+
+  // ═══ COLUMN HEADERS ═══
+  row += 2;
+  var headers = ['Category', 'Feature', 'Description', 'Menu Path', 'Keywords'];
+  sheet.getRange(row, 1, 1, 5).setValues([headers])
+    .setBackground('#1E40AF')
+    .setFontColor(white)
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+  sheet.setRowHeight(row, 30);
+  var headerRow = row;
+
+  // ═══ FEATURES DATA ═══
+  var features = [
+    // Dashboard & Analytics
+    ['Dashboard & Analytics', 'Steward Dashboard', 'Internal 6-tab dashboard with Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction. Contains PII.', 'Strategic Ops > Command Center > Steward Dashboard', 'internal, analytics, PII, workload'],
+    ['Dashboard & Analytics', 'Member Dashboard', 'PII-safe dashboard for sharing with members. Shows aggregate stats without personal info.', 'Strategic Ops > Command Center > Member Dashboard', 'public, aggregate, safe, sharing'],
+    ['Dashboard & Analytics', 'Executive Dashboard', 'Legacy 5-tab modal with Overview, My Cases, Grievances, Members, Analytics tabs.', 'Union Hub > Dashboards > Dashboard', 'executive, overview, legacy'],
+    ['Dashboard & Analytics', 'Steward Performance', 'View active cases, total cases, and win rates for all stewards.', 'Strategic Ops > Command Center > Steward Performance', 'performance, win rate, cases'],
+
+    // Search & Discovery
+    ['Search & Discovery', 'Desktop Search', 'Advanced search with tabs for All/Members/Grievances, filters by status/department/date.', 'Strategic Ops > Desktop Search', 'advanced, filter, desktop'],
+    ['Search & Discovery', 'Quick Search', 'Minimal interface for fast member/grievance lookup. Supports partial name matching.', 'Union Hub > Quick Search', 'fast, simple, minimal'],
+    ['Search & Discovery', 'Advanced Search', 'Fullscreen search with complex filtering and multiple criteria support.', 'Union Hub > Search > Advanced Search', 'fullscreen, complex, criteria'],
+    ['Search & Discovery', 'Mobile Search', 'Touch-optimized search for field use on phones and tablets.', 'Field Portal > Mobile Search', 'mobile, touch, field'],
+    ['Search & Discovery', 'Searchable Help Guide', '4-tab help modal with real-time search across Overview, Menu Reference, FAQ, Quick Tips.', 'Union Hub > Help & Documentation', 'help, FAQ, documentation'],
+
+    // Grievance Management
+    ['Grievance Management', 'New Case/Grievance', 'Opens pre-filled grievance form. Calculates deadlines automatically per Article 23A.', 'Strategic Ops > Cases > New Case/Grievance', 'create, file, new'],
+    ['Grievance Management', 'Edit Grievance', 'Modify details of the currently selected grievance row.', 'Strategic Ops > Cases > Edit Selected', 'edit, modify, update'],
+    ['Grievance Management', 'Advance Step', 'Move grievance to next step (Step I → Step II → Step III → Arbitration).', 'Strategic Ops > Cases > Advance Step', 'step, advance, escalate'],
+    ['Grievance Management', 'Bulk Status Update', 'Update status for multiple selected grievances at once.', 'Union Hub > Grievances > Bulk Update', 'bulk, batch, multiple'],
+    ['Grievance Management', 'Auto Deadlines', 'Article 23A: Step 1 (7d), Step 2 Appeal (7d), Step 2 (14d), Step 3 (10d/21d), Arb (30d).', 'Automatic calculation', 'deadline, calculate, Article 23A'],
+    ['Grievance Management', 'Message Alert Flag', 'Checkbox to highlight urgent cases in yellow and move to top when sorted.', 'Grievance Log column', 'urgent, flag, priority'],
+
+    // Member Management
+    ['Member Management', 'Add New Member', 'Open member registration form with all fields.', 'Union Hub > Members > Add New Member', 'add, register, new'],
+    ['Member Management', 'Find Member', 'Search for specific member by name, ID, or other criteria.', 'Union Hub > Members > Find Member', 'find, search, lookup'],
+    ['Member Management', 'Import Members', 'Bulk import member data from external sources.', 'Union Hub > Members > Import Members', 'import, bulk, external'],
+    ['Member Management', 'Export Members', 'Export member directory to CSV or other formats.', 'Union Hub > Members > Export Members', 'export, CSV, download'],
+    ['Member Management', 'Generate Member IDs', 'Creates IDs in format M + First2 + Last2 + 3 digits (e.g., MJOSM123).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
+    ['Member Management', 'Check Duplicate IDs', 'Finds and highlights duplicate Member IDs in the directory.', 'Strategic Ops > ID Engines > Check Duplicates', 'duplicate, check, validate'],
+
+    // Steward Tools
+    ['Steward Tools', 'Promote to Steward', 'Change member status to steward, sends toolkit email.', 'Strategic Ops > Steward Management > Promote', 'promote, steward, new'],
+    ['Steward Tools', 'Demote from Steward', 'Remove steward status from member.', 'Strategic Ops > Steward Management > Demote', 'demote, remove, former'],
+    ['Steward Tools', 'Steward Directory', 'View list of all stewards with contact information.', 'Union Hub > Members > Steward Directory', 'steward, directory, contact'],
+    ['Steward Tools', 'Workload Report', 'Capacity analysis with overload detection (flags 8+ active cases).', 'Strategic Ops > Analytics > Workload Report', 'workload, capacity, overload'],
+    ['Steward Tools', 'Rising Stars', 'Highlights top-performing stewards by score and win rate.', 'Strategic Ops > Strategic Intelligence > Rising Stars', 'top, performance, best'],
+
+    // Calendar & Drive
+    ['Calendar & Drive', 'Sync Deadlines', 'Creates Google Calendar events for all grievance deadlines.', 'Union Hub > Calendar > Sync Deadlines', 'sync, calendar, events'],
+    ['Calendar & Drive', 'Setup Drive Folder', 'Auto-creates Drive folder with subfolders for each step.', 'Union Hub > Google Drive > Setup Folder', 'folder, drive, create'],
+    ['Calendar & Drive', 'View Grievance Files', 'Open the Drive folder for selected grievance.', 'Union Hub > Google Drive > View Files', 'view, files, open'],
+    ['Calendar & Drive', 'Batch Create Folders', 'Create Drive folders for multiple grievances at once.', 'Union Hub > Google Drive > Batch Create', 'batch, bulk, folders'],
+
+    // Accessibility
+    ['Accessibility', 'Focus Mode', 'Distraction-free view, hides non-essential sheets.', 'Union Hub > Comfort View > Focus Mode', 'focus, distraction-free, ADHD'],
+    ['Accessibility', 'Zebra Stripes', 'Alternating row colors for easier reading.', 'Union Hub > Comfort View > Zebra Stripes', 'zebra, stripes, alternating'],
+    ['Accessibility', 'High Contrast', 'Enhanced contrast for visibility.', 'Union Hub > Comfort View > High Contrast', 'contrast, visibility, accessibility'],
+    ['Accessibility', 'Dark Mode', 'Dark gradient backgrounds across all modals.', 'Union Hub > View > Dark Mode', 'dark, theme, night'],
+    ['Accessibility', 'Global Styling', 'Applies Roboto font and zebra stripes to all rows.', '509 Dashboard > Styling > Apply Global', 'styling, font, Roboto'],
+
+    // Strategic Intelligence
+    ['Strategic Intelligence', 'Unit Hot Zones', 'Identifies locations with 3+ active grievances.', 'Strategic Ops > Strategic Intelligence > Hot Zones', 'hot zones, problem, locations'],
+    ['Strategic Intelligence', 'Hostility Report', 'Analyzes denial rates across grievance steps.', 'Strategic Ops > Strategic Intelligence > Hostility', 'denial, management, hostility'],
+    ['Strategic Intelligence', 'Bargaining Sheet', 'Strategic data for contract negotiations.', 'Strategic Ops > Strategic Intelligence > Bargaining', 'bargaining, contract, negotiation'],
+    ['Strategic Intelligence', 'Treemap', 'Visual heat map of grievance activity by unit.', 'Strategic Ops > Analytics > Treemap', 'treemap, density, heatmap'],
+    ['Strategic Intelligence', 'Sentiment Trends', 'Union morale tracking over time from survey data.', 'Strategic Ops > Analytics > Sentiment Trends', 'sentiment, morale, trends'],
+
+    // Administration
+    ['Administration', 'System Diagnostics', 'Comprehensive health check on all components.', 'Admin > System Diagnostics', 'diagnostics, health, check'],
+    ['Administration', 'Repair Dashboard', 'Auto-fix common issues (missing sheets, broken formulas).', 'Admin > Repair Dashboard', 'repair, fix, auto'],
+    ['Administration', 'Midnight Trigger', 'Daily 12AM refresh of dashboards and overdue alerts.', 'Admin > Automation > Midnight Trigger', 'midnight, daily, refresh'],
+    ['Administration', 'Bulk Validation', 'Validate all data for consistency and errors.', 'Admin > Validation > Run Bulk', 'validate, bulk, check'],
+    ['Administration', 'Setup Hidden Sheets', 'Initialize all 6 calculation sheets.', 'Admin > Setup > Hidden Sheets', 'hidden, setup, initialize'],
+
+    // Mobile & Web
+    ['Mobile & Web', 'Pocket/Mobile View', 'Hides non-essential columns for phone access.', '509 Dashboard > Field Access > Mobile View', 'mobile, pocket, phone'],
+    ['Mobile & Web', 'Web App Deploy', 'Create standalone web application from dashboard.', 'Field Portal > Web App > Deploy', 'deploy, web app, standalone'],
+    ['Mobile & Web', 'Member Portal', 'Personalized member view via URL (?member=ID).', 'Via Web App URL', 'portal, personal, member'],
+    ['Mobile & Web', 'Email Portal Links', 'Send personalized dashboard URLs to members.', 'Field Portal > Web App > Email Links', 'email, portal, personalized'],
+
+    // Security
+    ['Security & Audit', 'Audit Logging', 'Track all changes with timestamps and user info.', 'Automatic (_Audit_Log sheet)', 'audit, log, tracking'],
+    ['Security & Audit', 'Sabotage Protection', 'Detects mass deletion (>15 cells) and alerts.', 'Automatic on edit', 'sabotage, protection, deletion'],
+    ['Security & Audit', 'PII Scrubbing', 'Auto-redacts phone/SSN from public dashboards.', 'Automatic in Member Dashboard', 'PII, scrub, redact, privacy'],
+    ['Security & Audit', 'Weingarten Rights', 'Emergency rights statement with tap-to-expand.', 'Within Member Dashboard', 'Weingarten, rights, legal'],
+
+    // Documents
+    ['Documents', 'Create PDF', 'Generate signature-ready PDF with legal blocks.', 'Strategic Ops > ID Engines > Create PDF', 'PDF, generate, signature'],
+    ['Documents', 'Email PDF', 'Send generated PDFs via email.', 'After PDF generation', 'email, PDF, send'],
+
+    // Demo Tools
+    ['Demo Tools', 'Seed Sample Data', 'Generate 1,000 test members and 300 grievances.', 'Admin > Demo Data > Seed All', 'seed, demo, test'],
+    ['Demo Tools', 'NUKE Seeded Data', 'Remove all demo data (preserves real data).', 'Admin > Demo Data > NUKE', 'nuke, delete, cleanup']
+  ];
+
+  // Write all features
+  row++;
+  var startDataRow = row;
+  for (var i = 0; i < features.length; i++) {
+    sheet.getRange(row, 1, 1, 5).setValues([features[i]]);
+
+    // Alternate row colors
+    var bgColor = (i % 2 === 0) ? featureBg : menuPathBg;
+    sheet.getRange(row, 1, 1, 5).setBackground(bgColor);
+
+    // Category column styling
+    if (i === 0 || features[i][0] !== features[i-1][0]) {
+      sheet.getRange(row, 1).setFontWeight('bold').setBackground(categoryBg);
+    }
+
+    sheet.setRowHeight(row, 28);
+    row++;
+  }
+
+  // ═══ FOOTER ═══
+  row += 1;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('Total Features: ' + features.length + ' | Use Ctrl+F to search | See FEATURES.md for complete documentation')
+    .setFontColor('#6B7280')
+    .setFontStyle('italic')
+    .setHorizontalAlignment('center')
+    .setBackground('#F9FAFB');
+
+  // Set column widths
+  sheet.setColumnWidth(1, 160);  // Category
+  sheet.setColumnWidth(2, 160);  // Feature
+  sheet.setColumnWidth(3, 350);  // Description
+  sheet.setColumnWidth(4, 280);  // Menu Path
+  sheet.setColumnWidth(5, 200);  // Keywords
+
+  // Delete excess columns
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols > 5) {
+    sheet.deleteColumns(6, maxCols - 5);
+  }
+
+  // Freeze header rows
+  sheet.setFrozenRows(headerRow);
+
+  // Enable text wrapping for description column
+  sheet.getRange(startDataRow, 3, features.length, 1).setWrap(true);
+
+  // Apply filter to data
+  var dataRange = sheet.getRange(headerRow, 1, features.length + 1, 5);
+  dataRange.createFilter();
+
+  // Set tab color to blue (documentation)
+  sheet.setTabColor('#3B82F6');
+
+  return sheet;
+}
+
 // ============================================================================
 // MENU HANDLER FUNCTIONS
 // ============================================================================

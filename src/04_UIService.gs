@@ -144,7 +144,10 @@ function createDashboardMenu() {
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'));
+      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
+      .addSeparator()
+      .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
+      .addItem('❓ Create FAQ Sheet', 'createFAQSheet'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
