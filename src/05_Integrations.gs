@@ -67,32 +67,28 @@ function setupDriveFolderForGrievance(grievanceId) {
     // Extract fields for folder naming
     const firstName = grievance['First Name'] || grievance.firstName || '';
     const lastName = grievance['Last Name'] || grievance.lastName || '';
-    const issueCategory = grievance['Issue Category'] || grievance.issueCategory || 'General';
     const dateFiled = grievance['Date Filed'] || grievance.dateFiled || new Date();
 
-    // Format date as YYYY-MM
+    // Format date as YYYY-MM-DD (full date the claim was initiated)
     const dateStr = Utilities.formatDate(
       new Date(dateFiled),
       Session.getScriptTimeZone(),
-      'yyyy-MM'
+      'yyyy-MM-dd'
     );
 
     // Create folder name from template
-    // Format: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+    // Simplified Format: LastName, FirstName - YYYY-MM-DD
     let folderName;
     if (firstName && lastName) {
       folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE
         .replace('{date}', dateStr)
         .replace('{lastName}', sanitizeFolderName(lastName))
-        .replace('{firstName}', sanitizeFolderName(firstName))
-        .replace('{issueCategory}', sanitizeFolderName(issueCategory))
-        .replace('{grievanceId}', grievanceId);
+        .replace('{firstName}', sanitizeFolderName(firstName));
     } else {
-      // Fallback if name not available
+      // Fallback if name not available: GrievanceID - Date
       folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE_SIMPLE
         .replace('{date}', dateStr)
-        .replace('{grievanceId}', grievanceId)
-        .replace('{issueCategory}', sanitizeFolderName(issueCategory));
+        .replace('{grievanceId}', grievanceId);
     }
 
     // Get root folder

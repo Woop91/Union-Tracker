@@ -30,7 +30,7 @@
  */
 
 // ============================================================================
-// SOURCE: 01_Constants.gs (1653 lines)
+// SOURCE: 01_Constants.gs (1654 lines)
 // ============================================================================
 
 /**
@@ -116,17 +116,18 @@ var COMMAND_CONFIG = {
 
 /**
  * Drive folder configuration for grievance document management
- * Folder naming format: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
- * Example: "2026-01 - Smith, John - Scheduling - G-2026-001"
+ * Simplified folder naming format: LastName, FirstName - YYYY-MM-DD
+ * Example: "Smith, John - 2026-01-15"
  *
  * @const {Object}
  */
 var DRIVE_CONFIG = {
   ROOT_FOLDER_NAME: '509 Dashboard - Grievance Files',
-  // Template uses placeholders: {date}, {lastName}, {firstName}, {issueCategory}, {grievanceId}
-  SUBFOLDER_TEMPLATE: '{date} - {lastName}, {firstName} - {issueCategory} - {grievanceId}',
+  // Simplified template: Member Name and Date Filed
+  // Template uses placeholders: {date}, {lastName}, {firstName}
+  SUBFOLDER_TEMPLATE: '{lastName}, {firstName} - {date}',
   // Fallback if member name not available
-  SUBFOLDER_TEMPLATE_SIMPLE: '{date} - {grievanceId} - {issueCategory}'
+  SUBFOLDER_TEMPLATE_SIMPLE: '{grievanceId} - {date}'
 };
 
 // ============================================================================
@@ -143,7 +144,7 @@ var VERSION_INFO = {
   PATCH: 8,
   BUILD: 'v4.3.8',
   CURRENT: '4.3.8',
-  CODENAME: 'Modal Consolidation'
+CODENAME: 'Searchable Help Guide'
 };
 
 // ============================================================================
@@ -1688,7 +1689,7 @@ function generateSequentialId(prefix, sheet, idColumn) {
 
 
 // ============================================================================
-// SOURCE: 02_MemberManager.gs (862 lines)
+// SOURCE: 02_MemberManager.gs (1158 lines)
 // ============================================================================
 
 /**
@@ -2507,18 +2508,314 @@ function updateMemberDataBatch(memberId, newValuesObj) {
 
 /**
  * Shows the import members dialog
- * Allows importing members from CSV or other spreadsheets
+ * Allows importing members from CSV data with column mapping
  */
 function showImportMembersDialog() {
-  var ui = SpreadsheetApp.getUi();
-  ui.alert('📥 Import Members',
-    'Import functionality coming soon!\n\n' +
-    'For now, you can:\n' +
-    '1. Copy data directly into the Member Directory sheet\n' +
-    '2. Use File > Import to import a CSV file\n' +
-    '3. Use the Add New Member dialog to add members one at a time\n\n' +
-    'Tip: Make sure your data matches the column headers in Member Directory.',
-    ui.ButtonSet.OK);
+  var html = HtmlService.createHtmlOutput(getImportMembersHtml_())
+    .setWidth(700)
+    .setHeight(600);
+  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members');
+}
+
+/**
+ * Generates HTML for the import members dialog
+ * @returns {string} HTML content
+ * @private
+ */
+function getImportMembersHtml_() {
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 20px; color: #F8FAFC; }' +
+    'h3 { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }' +
+    '.step { margin-bottom: 20px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid #334155; }' +
+    '.step-title { font-weight: 600; margin-bottom: 12px; color: #A78BFA; }' +
+    'textarea { width: 100%; height: 120px; padding: 12px; border: 2px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-family: monospace; font-size: 12px; resize: vertical; }' +
+    'textarea:focus { border-color: #7C3AED; outline: none; }' +
+    '.mapping-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 200px; overflow-y: auto; }' +
+    '.mapping-row { display: flex; align-items: center; gap: 8px; padding: 6px; background: rgba(255,255,255,0.03); border-radius: 4px; }' +
+    '.mapping-row label { flex: 1; font-size: 13px; color: #94A3B8; }' +
+    'select { padding: 6px 10px; border: 1px solid #334155; border-radius: 4px; background: #1E293B; color: #F8FAFC; font-size: 12px; min-width: 140px; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 16px; }' +
+    'button { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; flex: 1; }' +
+    '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }' +
+    '.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }' +
+    '.btn-secondary { background: #334155; color: #F8FAFC; }' +
+    '.preview { margin-top: 12px; font-size: 12px; color: #64748B; }' +
+    '.preview-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }' +
+    '.preview-table th, .preview-table td { padding: 6px 8px; border: 1px solid #334155; text-align: left; }' +
+    '.preview-table th { background: #334155; color: #F8FAFC; }' +
+    '.preview-table td { background: rgba(255,255,255,0.02); }' +
+    '.status { padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 13px; }' +
+    '.status.success { background: rgba(16,185,129,0.2); border: 1px solid #10B981; }' +
+    '.status.error { background: rgba(239,68,68,0.2); border: 1px solid #EF4444; }' +
+    '.help { font-size: 12px; color: #64748B; margin-top: 8px; }' +
+    '</style>' +
+    '</head><body>' +
+    '<h3>📥 Import Members from CSV</h3>' +
+    '' +
+    '<div class="step">' +
+    '  <div class="step-title">Step 1: Paste CSV Data</div>' +
+    '  <textarea id="csvData" placeholder="Paste your CSV data here...&#10;&#10;Example:&#10;First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Analyst,Main Station&#10;Jane,Smith,jane@example.com,555-5678,Manager,Field Ops"></textarea>' +
+    '  <div class="help">Paste data from Excel, Google Sheets, or a CSV file. First row should be headers.</div>' +
+    '</div>' +
+    '' +
+    '<div class="step" id="mappingStep" style="display:none;">' +
+    '  <div class="step-title">Step 2: Map Columns</div>' +
+    '  <div class="mapping-grid" id="mappingGrid"></div>' +
+    '  <div class="preview" id="preview"></div>' +
+    '</div>' +
+    '' +
+    '<div class="btn-row">' +
+    '  <button class="btn-secondary" id="parseBtn" onclick="parseCSV()">Parse CSV</button>' +
+    '  <button class="btn-primary" id="importBtn" onclick="importMembers()" disabled>Import Members</button>' +
+    '  <button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
+    '</div>' +
+    '' +
+    '<div id="statusArea"></div>' +
+    '' +
+    '<script>' +
+    'var parsedData = [];' +
+    'var csvHeaders = [];' +
+    'var targetFields = [' +
+    '  {key: "firstName", label: "First Name", required: true},' +
+    '  {key: "lastName", label: "Last Name", required: true},' +
+    '  {key: "email", label: "Email", required: false},' +
+    '  {key: "phone", label: "Phone", required: false},' +
+    '  {key: "jobTitle", label: "Job Title", required: false},' +
+    '  {key: "workLocation", label: "Work Location", required: false},' +
+    '  {key: "unit", label: "Unit", required: false},' +
+    '  {key: "supervisor", label: "Supervisor", required: false},' +
+    '  {key: "manager", label: "Manager", required: false}' +
+    '];' +
+    '' +
+    'function parseCSV() {' +
+    '  var csvText = document.getElementById("csvData").value.trim();' +
+    '  if (!csvText) { showStatus("Please paste CSV data first", true); return; }' +
+    '  ' +
+    '  var lines = csvText.split(/\\r?\\n/);' +
+    '  if (lines.length < 2) { showStatus("CSV must have header row and at least one data row", true); return; }' +
+    '  ' +
+    '  csvHeaders = parseCSVLine(lines[0]);' +
+    '  parsedData = [];' +
+    '  for (var i = 1; i < lines.length; i++) {' +
+    '    if (lines[i].trim()) parsedData.push(parseCSVLine(lines[i]));' +
+    '  }' +
+    '  ' +
+    '  buildMappingUI();' +
+    '  showPreview();' +
+    '  document.getElementById("mappingStep").style.display = "block";' +
+    '  document.getElementById("importBtn").disabled = false;' +
+    '  showStatus("Parsed " + parsedData.length + " rows. Map columns and click Import.", false);' +
+    '}' +
+    '' +
+    'function parseCSVLine(line) {' +
+    '  var result = [];' +
+    '  var current = "";' +
+    '  var inQuotes = false;' +
+    '  for (var i = 0; i < line.length; i++) {' +
+    '    var c = line[i];' +
+    '    if (c === \'"\' && (i === 0 || line[i-1] !== \'\\\\\')) { inQuotes = !inQuotes; }' +
+    '    else if ((c === "," || c === "\\t") && !inQuotes) { result.push(current.trim()); current = ""; }' +
+    '    else { current += c; }' +
+    '  }' +
+    '  result.push(current.trim());' +
+    '  return result;' +
+    '}' +
+    '' +
+    'function buildMappingUI() {' +
+    '  var grid = document.getElementById("mappingGrid");' +
+    '  grid.innerHTML = "";' +
+    '  targetFields.forEach(function(field) {' +
+    '    var row = document.createElement("div");' +
+    '    row.className = "mapping-row";' +
+    '    var label = document.createElement("label");' +
+    '    label.textContent = field.label + (field.required ? " *" : "");' +
+    '    var select = document.createElement("select");' +
+    '    select.id = "map_" + field.key;' +
+    '    select.innerHTML = "<option value=\\"\\">-- Skip --</option>";' +
+    '    csvHeaders.forEach(function(h, idx) {' +
+    '      var opt = document.createElement("option");' +
+    '      opt.value = idx;' +
+    '      opt.textContent = h;' +
+    '      if (h.toLowerCase().replace(/[^a-z]/g, "").indexOf(field.key.toLowerCase()) !== -1 ||' +
+    '          field.key.toLowerCase().indexOf(h.toLowerCase().replace(/[^a-z]/g, "")) !== -1) {' +
+    '        opt.selected = true;' +
+    '      }' +
+    '      select.appendChild(opt);' +
+    '    });' +
+    '    row.appendChild(label);' +
+    '    row.appendChild(select);' +
+    '    grid.appendChild(row);' +
+    '  });' +
+    '}' +
+    '' +
+    'function showPreview() {' +
+    '  var preview = document.getElementById("preview");' +
+    '  var rows = parsedData.slice(0, 3);' +
+    '  if (rows.length === 0) { preview.innerHTML = ""; return; }' +
+    '  var html = "<strong>Preview (first " + rows.length + " rows):</strong><table class=\\"preview-table\\"><tr>";' +
+    '  csvHeaders.forEach(function(h) { html += "<th>" + h + "</th>"; });' +
+    '  html += "</tr>";' +
+    '  rows.forEach(function(row) {' +
+    '    html += "<tr>";' +
+    '    row.forEach(function(cell) { html += "<td>" + (cell || "-") + "</td>"; });' +
+    '    html += "</tr>";' +
+    '  });' +
+    '  html += "</table>";' +
+    '  preview.innerHTML = html;' +
+    '}' +
+    '' +
+    'function importMembers() {' +
+    '  var mapping = {};' +
+    '  targetFields.forEach(function(field) {' +
+    '    var sel = document.getElementById("map_" + field.key);' +
+    '    if (sel.value !== "") mapping[field.key] = parseInt(sel.value);' +
+    '  });' +
+    '  ' +
+    '  if (mapping.firstName === undefined || mapping.lastName === undefined) {' +
+    '    showStatus("First Name and Last Name are required mappings", true);' +
+    '    return;' +
+    '  }' +
+    '  ' +
+    '  document.getElementById("importBtn").disabled = true;' +
+    '  document.getElementById("importBtn").textContent = "Importing...";' +
+    '  ' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(result) {' +
+    '      if (result.success) {' +
+    '        showStatus("Successfully imported " + result.imported + " members! " + (result.skipped > 0 ? "(" + result.skipped + " skipped as duplicates)" : ""), false);' +
+    '        document.getElementById("importBtn").textContent = "Done!";' +
+    '      } else {' +
+    '        showStatus("Import failed: " + result.message, true);' +
+    '        document.getElementById("importBtn").disabled = false;' +
+    '        document.getElementById("importBtn").textContent = "Import Members";' +
+    '      }' +
+    '    })' +
+    '    .withFailureHandler(function(e) {' +
+    '      showStatus("Error: " + e.message, true);' +
+    '      document.getElementById("importBtn").disabled = false;' +
+    '      document.getElementById("importBtn").textContent = "Import Members";' +
+    '    })' +
+    '    .importMembersFromData(parsedData, mapping);' +
+    '}' +
+    '' +
+    'function showStatus(msg, isError) {' +
+    '  var area = document.getElementById("statusArea");' +
+    '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + msg + "</div>";' +
+    '}' +
+    '</script>' +
+    '</body></html>';
+}
+
+/**
+ * Imports members from parsed CSV data
+ * @param {Array<Array>} data - 2D array of CSV data (without headers)
+ * @param {Object} mapping - Column mapping object {fieldName: columnIndex}
+ * @returns {Object} Result with imported count and any errors
+ */
+function importMembersFromData(data, mapping) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+    if (!sheet) {
+      return { success: false, message: 'Member Directory sheet not found' };
+    }
+
+    // Get existing data for duplicate checking
+    var existingData = sheet.getDataRange().getValues();
+    var existingEmails = {};
+    var existingNames = {};
+
+    for (var i = 1; i < existingData.length; i++) {
+      var email = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+      var name = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
+      if (email) existingEmails[email] = true;
+      if (name) existingNames[name] = true;
+    }
+
+    var imported = 0;
+    var skipped = 0;
+    var newRows = [];
+
+    for (var j = 0; j < data.length; j++) {
+      var row = data[j];
+
+      var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
+      var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
+      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+
+      // Skip if no name
+      if (!firstName && !lastName) {
+        skipped++;
+        continue;
+      }
+
+      // Check for duplicates
+      var emailLower = email.toLowerCase();
+      var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
+
+      if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
+        skipped++;
+        continue;
+      }
+
+      // Mark as existing to prevent duplicates within import batch
+      if (emailLower) existingEmails[emailLower] = true;
+      existingNames[nameLower] = true;
+
+      // Generate Member ID
+      var memberId = generateMemberID_(firstName, lastName);
+
+      // Build new row with empty values for all columns
+      var newRow = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
+      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+
+      if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
+      if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
+      if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
+      if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
+      if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
+      if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
+      if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
+
+      // Default Is Steward to No
+      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+
+      newRows.push(newRow);
+      imported++;
+    }
+
+    // Batch write all new rows
+    if (newRows.length > 0) {
+      var lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+    }
+
+    // Log the import
+    logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
+      action: 'BULK_IMPORT',
+      importedCount: imported,
+      skippedCount: skipped,
+      importedBy: Session.getActiveUser().getEmail()
+    });
+
+    return {
+      success: true,
+      imported: imported,
+      skipped: skipped,
+      message: 'Import completed'
+    };
+
+  } catch (e) {
+    console.error('Import error: ' + e.message);
+    return { success: false, message: e.message };
+  }
 }
 
 /**
@@ -2555,7 +2852,7 @@ function showExportMembersDialog() {
 
 
 // ============================================================================
-// SOURCE: 03_GrievanceManager.gs (1309 lines)
+// SOURCE: 03_GrievanceManager.gs (1310 lines)
 // ============================================================================
 
 /**
@@ -2660,11 +2957,12 @@ function startNewGrievance(grievanceData) {
 }
 
 /**
- * Handles grievance form submission from dialog
- * @param {Object} formData - Form data from UI
+ * Handles grievance dialog form submission from UI modal
+ * NOTE: Renamed from onGrievanceFormSubmit to avoid conflict with Google Form trigger handler
+ * @param {Object} formData - Form data from UI dialog
  * @return {Object} Result object
  */
-function onGrievanceFormSubmit(formData) {
+function handleGrievanceDialogSubmit(formData) {
   // Map form data to grievance data structure
   const grievanceData = {
     memberId: formData.memberId,
@@ -3650,7 +3948,7 @@ function getNewGrievanceFormHtml() {
             .withFailureHandler(function(e) {
               alert('Error: ' + e.message);
             })
-            .onGrievanceFormSubmit(formData);
+            .handleGrievanceDialogSubmit(formData);
         });
       </script>
     </body>
@@ -3869,7 +4167,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (7098 lines)
+// SOURCE: 04_UIService.gs (7249 lines)
 // ============================================================================
 
 /**
@@ -3908,6 +4206,7 @@ function createDashboardMenu() {
   // Main Menu: Union Hub
   ui.createMenu('📊 Union Hub')
     .addItem('📊 Dashboard Home', 'showDashboardSidebar')
+    .addItem('📱 Toggle Mobile View', 'toggleMobileView')
     .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
     .addSeparator()
 
@@ -4018,7 +4317,10 @@ function createDashboardMenu() {
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'));
+      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
+      .addSeparator()
+      .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+      .addItem('🎨 Apply Tab Colors', 'applyTabColors'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
@@ -4596,9 +4898,11 @@ function resetToDefaultTheme() {
 }
 
 /**
- * Refreshes all visual elements and auto-styling
+ * Refreshes visual elements - simple version
+ * NOTE: Renamed to avoid duplicate. Use refreshAllVisuals() defined later in this file for full refresh.
+ * @deprecated Use refreshAllVisuals() at line ~6399
  */
-function refreshAllVisuals() {
+function refreshVisualsSimple_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   ss.toast('Refreshing all visuals...', COMMAND_CONFIG.SYSTEM_NAME, 10);
@@ -6082,26 +6386,165 @@ function deactivateFocusMode() {
   ss.toast('✅ Focus mode deactivated', 'Focus Mode', 3);
 }
 
-// ==================== QUICK CAPTURE & TIMER ====================
+// ==================== QUICK CAPTURE NOTEPAD ====================
 
-// ==================== DEPRECATED FEATURES (v4.3.2) ====================
-// Quick Capture Notepad and Pomodoro Timer have been removed.
-// These functions are kept for backwards compatibility but show deprecation notices.
+/**
+ * Quick Capture Notepad - Fast note-taking without losing focus
+ * Notes are stored per-user in Script Properties
+ */
 
-/** @deprecated v4.3.2 - Feature removed */
-function getQuickCaptureNotes() { return ''; }
-
-/** @deprecated v4.3.2 - Feature removed */
-function saveQuickCaptureNotes(notes) { }
-
-/** @deprecated v4.3.2 - Feature removed */
-function showQuickCaptureNotepad() {
-  SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
+/**
+ * Gets the current user's quick capture notes
+ * @returns {string} The saved notes or empty string
+ */
+function getQuickCaptureNotes() {
+  var userProps = PropertiesService.getUserProperties();
+  return userProps.getProperty('quickCaptureNotes') || '';
 }
 
-/** @deprecated v4.3.2 - Feature removed */
-function startPomodoroTimer() {
-  SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
+/**
+ * Saves quick capture notes for the current user
+ * @param {string} notes - The notes to save
+ * @returns {Object} Result object with success status
+ */
+function saveQuickCaptureNotes(notes) {
+  try {
+    var userProps = PropertiesService.getUserProperties();
+    userProps.setProperty('quickCaptureNotes', notes || '');
+    userProps.setProperty('quickCaptureLastSaved', new Date().toISOString());
+    return { success: true, message: 'Notes saved' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Clears the quick capture notes
+ * @returns {Object} Result object with success status
+ */
+function clearQuickCaptureNotes() {
+  try {
+    var userProps = PropertiesService.getUserProperties();
+    userProps.deleteProperty('quickCaptureNotes');
+    userProps.deleteProperty('quickCaptureLastSaved');
+    return { success: true, message: 'Notes cleared' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Gets metadata about the quick capture notes
+ * @returns {Object} Object with lastSaved timestamp and character count
+ */
+function getQuickCaptureMetadata() {
+  var userProps = PropertiesService.getUserProperties();
+  var notes = userProps.getProperty('quickCaptureNotes') || '';
+  var lastSaved = userProps.getProperty('quickCaptureLastSaved') || null;
+  return {
+    charCount: notes.length,
+    wordCount: notes.trim() ? notes.trim().split(/\s+/).length : 0,
+    lastSaved: lastSaved
+  };
+}
+
+/**
+ * Shows the Quick Capture Notepad dialog
+ * A fast notepad for capturing thoughts without losing focus
+ */
+function showQuickCaptureNotepad() {
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 16px; color: #F8FAFC; }' +
+    '.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
+    'h3 { font-size: 18px; display: flex; align-items: center; gap: 8px; }' +
+    '.meta { font-size: 12px; color: #64748B; }' +
+    'textarea { width: 100%; height: 280px; padding: 12px; border: 2px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-size: 14px; font-family: inherit; resize: none; outline: none; }' +
+    'textarea:focus { border-color: #7C3AED; }' +
+    'textarea::placeholder { color: #64748B; }' +
+    '.btn-row { display: flex; gap: 8px; margin-top: 12px; }' +
+    'button { flex: 1; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
+    '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }' +
+    '.btn-secondary { background: #334155; color: #F8FAFC; }' +
+    '.btn-danger { background: #DC2626; color: white; }' +
+    '.status { margin-top: 8px; font-size: 12px; color: #10B981; text-align: center; opacity: 0; transition: opacity 0.3s; }' +
+    '.status.show { opacity: 1; }' +
+    '</style>' +
+    '<div class="header">' +
+    '  <h3>📝 Quick Capture</h3>' +
+    '  <span class="meta" id="meta"></span>' +
+    '</div>' +
+    '<textarea id="notes" placeholder="Capture your thoughts quickly...\\n\\nUse this notepad to jot down ideas, reminders, or notes without losing focus on your current task.\\n\\nYour notes are auto-saved when you click Save."></textarea>' +
+    '<div class="btn-row">' +
+    '  <button class="btn-primary" onclick="saveNotes()">💾 Save</button>' +
+    '  <button class="btn-secondary" onclick="copyNotes()">📋 Copy</button>' +
+    '  <button class="btn-danger" onclick="clearNotes()">🗑️ Clear</button>' +
+    '  <button class="btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '</div>' +
+    '<div class="status" id="status"></div>' +
+    '<script>' +
+    'var notesEl = document.getElementById("notes");' +
+    'var statusEl = document.getElementById("status");' +
+    'var metaEl = document.getElementById("meta");' +
+    '' +
+    'google.script.run.withSuccessHandler(function(notes) {' +
+    '  notesEl.value = notes || "";' +
+    '  updateMeta();' +
+    '}).getQuickCaptureNotes();' +
+    '' +
+    'notesEl.addEventListener("input", updateMeta);' +
+    '' +
+    'function updateMeta() {' +
+    '  var text = notesEl.value;' +
+    '  var words = text.trim() ? text.trim().split(/\\s+/).length : 0;' +
+    '  metaEl.textContent = words + " words, " + text.length + " chars";' +
+    '}' +
+    '' +
+    'function showStatus(msg, isError) {' +
+    '  statusEl.textContent = msg;' +
+    '  statusEl.style.color = isError ? "#EF4444" : "#10B981";' +
+    '  statusEl.classList.add("show");' +
+    '  setTimeout(function() { statusEl.classList.remove("show"); }, 2000);' +
+    '}' +
+    '' +
+    'function saveNotes() {' +
+    '  google.script.run.withSuccessHandler(function(result) {' +
+    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + result.message, !result.success);' +
+    '  }).saveQuickCaptureNotes(notesEl.value);' +
+    '}' +
+    '' +
+    'function copyNotes() {' +
+    '  navigator.clipboard.writeText(notesEl.value).then(function() {' +
+    '    showStatus("📋 Copied to clipboard!");' +
+    '  }).catch(function() {' +
+    '    showStatus("❌ Failed to copy", true);' +
+    '  });' +
+    '}' +
+    '' +
+    'function clearNotes() {' +
+    '  if (confirm("Clear all notes? This cannot be undone.")) {' +
+    '    notesEl.value = "";' +
+    '    google.script.run.withSuccessHandler(function(result) {' +
+    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + result.message, !result.success);' +
+    '      updateMeta();' +
+    '    }).clearQuickCaptureNotes();' +
+    '  }' +
+    '}' +
+    '' +
+    'notesEl.addEventListener("keydown", function(e) {' +
+    '  if ((e.ctrlKey || e.metaKey) && e.key === "s") {' +
+    '    e.preventDefault();' +
+    '    saveNotes();' +
+    '  }' +
+    '});' +
+    '</script>'
+  )
+  .setWidth(500)
+  .setHeight(450);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture Notepad');
 }
 
 function setBreakReminders(minutes) {
@@ -6161,7 +6604,12 @@ function previewTheme(themeKey) {
   SpreadsheetApp.getActiveSpreadsheet().toast('👁️ Previewing ' + theme.name, 'Preview', 5);
 }
 
-function resetToDefaultTheme() {
+/**
+ * Resets to default theme using theme system
+ * NOTE: Renamed to avoid duplicate. Use resetToDefaultTheme() for hard reset to defaults.
+ * This version uses the theme system; resetToDefaultTheme() clears all styling.
+ */
+function resetToDefaultThemeViaSystem_() {
   applyTheme(THEME_CONFIG.DEFAULT_THEME, 'all');
 }
 
@@ -10504,12 +10952,11 @@ function emailExecutivePDF() {
 // ============================================================================
 
 /**
- * Generates missing Member IDs based on Unit Code
- * Uses dynamic column references from MEMBER_COLS
- * Unit codes are read from Config sheet (column AT)
- * Format: [UNIT_PREFIX]-[SEQUENCE]-H (e.g., MS-101-H)
+ * Generates missing Member IDs - UI Service version (Legacy)
+ * NOTE: Renamed to avoid duplicate. Use generateMissingMemberIDs() from 02_MemberManager.gs
+ * @deprecated Use generateMissingMemberIDs() from 02_MemberManager.gs
  */
-function generateMissingMemberIDs() {
+function generateMissingMemberIDs_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -10571,9 +11018,11 @@ function getNextMemberSequence_(prefix) {
 }
 
 /**
- * Checks for duplicate Member IDs and highlights them
+ * Checks for duplicate Member IDs - UI Service version (Legacy)
+ * NOTE: Renamed to avoid duplicate. Use checkDuplicateMemberIDs() from 02_MemberManager.gs
+ * @deprecated Use checkDuplicateMemberIDs() from 02_MemberManager.gs
  */
-function checkDuplicateMemberIDs() {
+function checkDuplicateMemberIDs_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -10972,7 +11421,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2164 lines)
+// SOURCE: 05_Integrations.gs (2181 lines)
 // ============================================================================
 
 /**
@@ -11044,32 +11493,28 @@ function setupDriveFolderForGrievance(grievanceId) {
     // Extract fields for folder naming
     const firstName = grievance['First Name'] || grievance.firstName || '';
     const lastName = grievance['Last Name'] || grievance.lastName || '';
-    const issueCategory = grievance['Issue Category'] || grievance.issueCategory || 'General';
     const dateFiled = grievance['Date Filed'] || grievance.dateFiled || new Date();
 
-    // Format date as YYYY-MM
+    // Format date as YYYY-MM-DD (full date the claim was initiated)
     const dateStr = Utilities.formatDate(
       new Date(dateFiled),
       Session.getScriptTimeZone(),
-      'yyyy-MM'
+      'yyyy-MM-dd'
     );
 
     // Create folder name from template
-    // Format: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+    // Simplified Format: LastName, FirstName - YYYY-MM-DD
     let folderName;
     if (firstName && lastName) {
       folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE
         .replace('{date}', dateStr)
         .replace('{lastName}', sanitizeFolderName(lastName))
-        .replace('{firstName}', sanitizeFolderName(firstName))
-        .replace('{issueCategory}', sanitizeFolderName(issueCategory))
-        .replace('{grievanceId}', grievanceId);
+        .replace('{firstName}', sanitizeFolderName(firstName));
     } else {
-      // Fallback if name not available
+      // Fallback if name not available: GrievanceID - Date
       folderName = DRIVE_CONFIG.SUBFOLDER_TEMPLATE_SIMPLE
         .replace('{date}', dateStr)
-        .replace('{grievanceId}', grievanceId)
-        .replace('{issueCategory}', sanitizeFolderName(issueCategory));
+        .replace('{grievanceId}', grievanceId);
     }
 
     // Get root folder
@@ -12033,11 +12478,26 @@ function showClearCalendarConfirm() {
  */
 
 /**
- * Web app entry point - serves the mobile dashboard
+ * Web app entry point - serves the mobile dashboard and member portal
+ * Consolidated to handle both mobile dashboard pages and member portal requests
  * @param {Object} e - Event object with query parameters
  * @returns {HtmlOutput} The HTML page to display
  */
 function doGet(e) {
+  // Check for member ID parameter (member portal mode)
+  var memberId = e && e.parameter && e.parameter.id;
+  if (memberId) {
+    // Delegate to member portal (defined in 11_SecureMemberDashboard.gs)
+    if (typeof buildMemberPortal === 'function') {
+      return buildMemberPortal(memberId);
+    }
+    // Fallback to public portal
+    if (typeof buildPublicPortal === 'function') {
+      return buildPublicPortal();
+    }
+  }
+
+  // Standard page routing for mobile dashboard
   var page = e && e.parameter && e.parameter.page ? e.parameter.page : 'dashboard';
 
   var html;
@@ -12054,6 +12514,12 @@ function doGet(e) {
     case 'links':
       html = getWebAppLinksHtml();
       break;
+    case 'portal':
+      // Public portal without member ID
+      if (typeof buildPublicPortal === 'function') {
+        return buildPublicPortal();
+      }
+      // Fall through to dashboard
     case 'dashboard':
     default:
       html = getWebAppDashboardHtml();
@@ -13141,7 +13607,7 @@ function showWebAppUrl() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3502 lines)
+// SOURCE: 06_Maintenance.gs (3491 lines)
 // ============================================================================
 
 /**
@@ -13768,6 +14234,74 @@ function REPAIR_DASHBOARD() {
   }
 
   return results;
+}
+
+/**
+ * Removes deprecated tabs from the spreadsheet
+ * Currently removes:
+ * - 💼 Dashboard (deprecated in v4.3.2 - use modal dashboards instead)
+ *
+ * Run this function to clean up legacy tabs that are no longer needed.
+ * @return {Object} Results with list of removed tabs
+ */
+function removeDeprecatedTabs() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  const removed = [];
+  const errors = [];
+
+  // List of deprecated tabs to remove
+  const deprecatedTabs = [
+    { name: '💼 Dashboard', reason: 'Replaced by modal dashboards in v4.3.2' }
+  ];
+
+  // Confirm with user
+  const tabNames = deprecatedTabs.map(t => t.name).join(', ');
+  const response = ui.alert(
+    '🗑️ Remove Deprecated Tabs',
+    'This will permanently delete the following tabs:\n\n' +
+    deprecatedTabs.map(t => '• ' + t.name + '\n  (' + t.reason + ')').join('\n\n') +
+    '\n\nThis action cannot be undone. Continue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) {
+    ss.toast('Cancelled', 'Remove Deprecated Tabs', 3);
+    return { cancelled: true };
+  }
+
+  // Remove each deprecated tab
+  for (const tab of deprecatedTabs) {
+    const sheet = ss.getSheetByName(tab.name);
+    if (sheet) {
+      try {
+        ss.deleteSheet(sheet);
+        removed.push(tab.name);
+        Logger.log('Removed deprecated tab: ' + tab.name);
+      } catch (e) {
+        errors.push({ name: tab.name, error: e.message });
+        Logger.log('Error removing ' + tab.name + ': ' + e.message);
+      }
+    }
+  }
+
+  // Show results
+  if (removed.length > 0) {
+    ss.toast('Removed: ' + removed.join(', '), 'Cleanup Complete', 5);
+  } else {
+    ss.toast('No deprecated tabs found', 'Cleanup Complete', 3);
+  }
+
+  // Log the action
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('DEPRECATED_TABS_REMOVED', {
+      removed: removed,
+      errors: errors,
+      performedBy: Session.getActiveUser().getEmail()
+    });
+  }
+
+  return { removed: removed, errors: errors };
 }
 
 /**
@@ -16172,85 +16706,6 @@ function cleanupTestData() {
       if (String(data[i][0]).indexOf('TEST-') === 0) sheet.deleteRow(i + 2);
     }
   });
-}
-
-/**
- * Removes deprecated tabs from the spreadsheet (v4.3.8 cleanup)
- * Run this once to remove tabs that are no longer used:
- * - 🎯 Custom View (deleted)
- * - Member Analytics (deleted)
- * - Executive Command (deleted)
- * - 💼 Dashboard (deleted - now modal-based via showInteractiveDashboardTab())
- * - 📊 Member Satisfaction (hidden - now modal-based via showSatisfactionDashboard())
- *
- * Note: Member Satisfaction is HIDDEN (not deleted) because it stores Google Form
- * responses that the satisfaction modal reads from.
- */
-function removeDeprecatedTabs() {
-  var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // Tabs to DELETE (no longer needed)
-  var tabsToDelete = ['🎯 Custom View', 'Member Analytics', 'Executive Command', '💼 Dashboard'];
-  // Tabs to HIDE (data still needed by modals)
-  var tabsToHide = ['📊 Member Satisfaction'];
-
-  var deleted = [];
-  var hidden = [];
-  var notFound = [];
-
-  // Delete deprecated tabs
-  for (var i = 0; i < tabsToDelete.length; i++) {
-    var tabName = tabsToDelete[i];
-    var sheet = ss.getSheetByName(tabName);
-
-    if (sheet) {
-      try {
-        ss.deleteSheet(sheet);
-        deleted.push(tabName);
-      } catch (e) {
-        // Cannot delete the only sheet
-        Logger.log('Could not delete ' + tabName + ': ' + e.message);
-      }
-    } else {
-      notFound.push(tabName);
-    }
-  }
-
-  // Hide tabs that still store data for modals
-  for (var j = 0; j < tabsToHide.length; j++) {
-    var hideName = tabsToHide[j];
-    var hideSheet = ss.getSheetByName(hideName);
-
-    if (hideSheet) {
-      try {
-        hideSheet.hideSheet();
-        hidden.push(hideName);
-      } catch (e) {
-        Logger.log('Could not hide ' + hideName + ': ' + e.message);
-      }
-    } else {
-      notFound.push(hideName);
-    }
-  }
-
-  var message = '';
-  if (deleted.length > 0) {
-    message += 'Deleted: ' + deleted.join(', ') + '\n\n';
-  }
-  if (hidden.length > 0) {
-    message += 'Hidden: ' + hidden.join(', ') + '\n(Data preserved for modal access)\n\n';
-  }
-  if (notFound.length > 0) {
-    message += 'Not found (already removed): ' + notFound.join(', ');
-  }
-
-  if (message === '') {
-    message = 'No deprecated tabs found to remove.';
-  }
-
-  ui.alert('Tab Cleanup Complete', message, ui.ButtonSet.OK);
-  ss.toast('Deprecated tabs cleanup complete', 'Success', 3);
 }
 
 // ==================== UNIT TESTS ====================
@@ -18753,7 +19208,7 @@ function onEditValidation(e) {
 
 
 // ============================================================================
-// SOURCE: 08_Code.gs (12273 lines)
+// SOURCE: 08_Code.gs (12271 lines)
 // ============================================================================
 
 /**
@@ -21603,7 +22058,6 @@ function createFunctionChecklistSheet_() {
     ['9️⃣ Access', '♿ Comfort View', '🎯 Focus Mode', 'activateFocusMode', 'Highlights current row, dims distractions, reduces visual noise'],
     ['9️⃣ Access', '♿ Comfort View', '🔲 Toggle Zebra Stripes', 'toggleZebraStripes', 'Alternating row colors for easier row tracking'],
     ['9️⃣ Access', '♿ Comfort View', '📝 Quick Capture', 'showQuickCaptureNotepad', 'Fast notepad for capturing thoughts without losing focus'],
-    ['9️⃣ Access', '♿ Comfort View', '🍅 Pomodoro Timer', 'startPomodoroTimer', '25-minute focus timer with break reminders'],
     ['9️⃣ Access', '🔧 Theming', '🎨 Theme Manager', 'showThemeManager', 'Choose from preset themes or customize colors'],
     ['9️⃣ Access', '🔧 Theming', '🌙 Toggle Dark Mode', 'quickToggleDarkMode', 'Switch between light and dark color schemes'],
     ['9️⃣ Access', '🔧 Theming', '🔄 Reset Theme', 'resetToDefaultTheme', 'Restores default purple/green color scheme'],
@@ -21702,7 +22156,6 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🎯 Focus Mode', 'activateFocusMode', 'Highlights current row, dims distractions'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🔲 Toggle Zebra Stripes', 'toggleZebraStripes', 'Alternating row colors for easier tracking'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '📝 Quick Capture Notepad', 'showQuickCaptureNotepad', 'Fast notepad for capturing thoughts'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🍅 Pomodoro Timer', 'startPomodoroTimer', '25-minute focus timer with break reminders'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🎨 Theme Manager', 'showThemeManager', 'Choose from preset themes or customize colors'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🌙 Quick Toggle Dark Mode', 'quickToggleDarkMode', 'Switch between light and dark color schemes'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '📝 Open Editor', 'openCellMultiSelectEditor', 'Select multiple values for multi-select columns'],
@@ -31031,7 +31484,7 @@ function advancedSearch(filters) {
 
 
 // ============================================================================
-// SOURCE: 09_Main.gs (1101 lines)
+// SOURCE: 09_Main.gs (1684 lines)
 // ============================================================================
 
 /**
@@ -31667,104 +32120,288 @@ function removeTriggers() {
 // ============================================================================
 
 /**
- * Shows the help dialog
+ * Shows the searchable Help Guide modal with menu breakdown and FAQ
+ * v4.3.7 - Complete rewrite with search, menu reference, and FAQ
  */
 function showHelpDialog() {
   const html = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
     <head>
-      ${getCommonStyles()}
+      <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600&display=swap" rel="stylesheet">
       <style>
-        .help-container { padding: 20px; }
-        .help-section { margin-bottom: 25px; }
-        .help-title { font-size: 18px; font-weight: 600; margin-bottom: 10px; color: #1a73e8; }
-        .help-text { color: #5f6368; line-height: 1.6; }
-        .shortcut-list { margin: 10px 0; }
-        .shortcut-item { display: flex; margin: 8px 0; }
-        .shortcut-key { background: #f1f3f4; padding: 4px 8px; border-radius: 4px;
-                        font-family: monospace; margin-right: 10px; min-width: 120px; }
-        .version { color: #999; font-size: 12px; margin-top: 20px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Roboto', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; min-height: 100vh; }
+        .container { padding: 16px; max-height: 100vh; overflow-y: auto; }
+        .search-box { position: sticky; top: 0; background: #1e293b; padding: 12px 0; z-index: 10; }
+        .search-input { width: 100%; padding: 12px 16px 12px 44px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #e2e8f0; font-size: 14px; }
+        .search-input:focus { outline: none; border-color: #3b82f6; }
+        .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #64748b; }
+        .tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+        .tab { padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; cursor: pointer; font-size: 12px; color: #94a3b8; transition: all 0.2s; }
+        .tab:hover { background: rgba(255,255,255,0.1); }
+        .tab.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+        .section { margin-bottom: 20px; }
+        .section-title { font-size: 14px; font-weight: 600; color: #60a5fa; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .section-title .material-icons { font-size: 18px; }
+        .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .card-title { font-weight: 500; color: #e2e8f0; margin-bottom: 6px; font-size: 13px; }
+        .card-desc { color: #94a3b8; font-size: 12px; line-height: 1.5; }
+        .menu-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 6px; }
+        .menu-item:hover { background: rgba(255,255,255,0.08); }
+        .menu-path { color: #60a5fa; font-size: 11px; font-family: monospace; margin-bottom: 4px; }
+        .menu-name { font-weight: 500; color: #e2e8f0; font-size: 13px; }
+        .menu-desc { color: #94a3b8; font-size: 11px; margin-top: 4px; }
+        .faq-item { border-left: 3px solid #3b82f6; padding-left: 12px; margin-bottom: 12px; }
+        .faq-q { font-weight: 500; color: #e2e8f0; margin-bottom: 6px; font-size: 13px; }
+        .faq-a { color: #94a3b8; font-size: 12px; line-height: 1.6; }
+        .highlight { background: #fbbf24; color: #0f172a; padding: 0 2px; border-radius: 2px; }
+        .hidden { display: none; }
+        .repo-link { display: inline-flex; align-items: center; gap: 6px; color: #60a5fa; text-decoration: none; font-size: 12px; margin-top: 8px; }
+        .repo-link:hover { text-decoration: underline; }
+        .version { color: #64748b; font-size: 11px; text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
       </style>
     </head>
     <body>
-      <div class="help-container">
-        <div class="help-section">
-          <div class="help-title">Union Steward Dashboard</div>
-          <div class="help-text">
-            A comprehensive tool for managing union grievances, member records,
-            and tracking deadlines based on your collective bargaining agreement.
+      <div class="container">
+        <div class="search-box">
+          <div style="position: relative;">
+            <span class="material-icons search-icon">search</span>
+            <input type="text" class="search-input" id="searchInput" placeholder="Search help topics, menus, or FAQ..." oninput="filterContent()">
           </div>
         </div>
 
-        <div class="help-section">
-          <div class="help-title">Key Features</div>
-          <div class="help-text">
-            <ul>
-              <li><strong>Grievance Tracking</strong> - Manage grievances through all steps with automatic deadline calculations</li>
-              <li><strong>Member Directory</strong> - Maintain member records with contact information and union status</li>
-              <li><strong>Calendar Integration</strong> - Sync deadlines to Google Calendar for reminders</li>
-              <li><strong>Drive Integration</strong> - Auto-create folders for grievance documentation</li>
-              <li><strong>Self-Healing Formulas</strong> - Dashboard statistics update automatically</li>
-            </ul>
-          </div>
+        <div class="tabs">
+          <div class="tab active" onclick="showTab('overview')">Overview</div>
+          <div class="tab" onclick="showTab('menus')">Menu Reference</div>
+          <div class="tab" onclick="showTab('faq')">FAQ</div>
+          <div class="tab" onclick="showTab('shortcuts')">Quick Tips</div>
         </div>
 
-        <div class="help-section">
-          <div class="help-title">Quick Access</div>
-          <div class="shortcut-list">
-            <div class="shortcut-item">
-              <span class="shortcut-key">Union Dashboard menu</span>
-              <span>Access all dashboard features</span>
+        <div id="content">
+          <!-- OVERVIEW TAB -->
+          <div id="overview-tab" class="tab-content">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">dashboard</span>Two-Dashboard Architecture</div>
+              <div class="card">
+                <div class="card-title">🛡️ Steward Dashboard (Internal)</div>
+                <div class="card-desc">Comprehensive dashboard for stewards with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, and Satisfaction. Contains member names and PII - for internal use only.</div>
+              </div>
+              <div class="card">
+                <div class="card-title">👥 Member Dashboard (Public)</div>
+                <div class="card-desc">PII-safe dashboard for sharing with members. Shows aggregate union stats, steward directory, and satisfaction scores without personal information.</div>
+              </div>
             </div>
-            <div class="shortcut-item">
-              <span class="shortcut-key">Search > Quick Search</span>
-              <span>Fast search across all records</span>
-            </div>
-            <div class="shortcut-item">
-              <span class="shortcut-key">Grievances > New</span>
-              <span>File a new grievance</span>
-            </div>
-            <div class="shortcut-item">
-              <span class="shortcut-key">Admin > Diagnostics</span>
-              <span>Check system health</span>
+
+            <div class="section">
+              <div class="section-title"><span class="material-icons">star</span>Key Features</div>
+              <div class="card">
+                <div class="card-title">Grievance Tracking</div>
+                <div class="card-desc">Track grievances through all steps with automatic deadline calculations based on Article 23A.</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Member Directory</div>
+                <div class="card-desc">Maintain member records with contact info, union status, and steward assignments.</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Satisfaction Surveys</div>
+                <div class="card-desc">8-section member satisfaction analysis covering steward ratings, leadership, communication, and more.</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Calendar & Drive Integration</div>
+                <div class="card-desc">Sync deadlines to Google Calendar and auto-create Drive folders for documentation.</div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="help-section">
-          <div class="help-title">Deadline Rules (Article 23A)</div>
-          <div class="help-text">
-            <ul>
-              <li><strong>Step 1</strong> - ${DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE} days for management response</li>
-              <li><strong>Step 2</strong> - ${DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL} days to appeal, ${DEADLINE_RULES.STEP_2.DAYS_FOR_RESPONSE} days for response</li>
-              <li><strong>Step 3</strong> - ${DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL} days to appeal, ${DEADLINE_RULES.STEP_3.DAYS_FOR_RESPONSE} days for response</li>
-              <li><strong>Arbitration</strong> - ${DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND} days to demand after Step 3</li>
-            </ul>
+          <!-- MENU REFERENCE TAB -->
+          <div id="menus-tab" class="tab-content hidden">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">menu</span>🏛️ Union Hub Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">👥 Member Dashboard</div><div class="menu-desc">Opens the public-safe member dashboard with aggregate stats</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">🛡️ Steward Dashboard</div><div class="menu-desc">Opens the internal steward dashboard with full analytics</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Quick Search</div><div class="menu-name">🔍 Quick Search</div><div class="menu-desc">Fast search across members and grievances</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Multi-Select Panel</div><div class="menu-name">📋 Multi-Select Panel</div><div class="menu-desc">Select multiple grievances for bulk operations</div></div></div>
+            </div>
+
+            <div class="section">
+              <div class="section-title"><span class="material-icons">menu</span>🎯 Strategic Ops Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops</div><div class="menu-name">👥 Member Dashboard</div><div class="menu-desc">PII-safe aggregate statistics portal</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops</div><div class="menu-name">🛡️ Steward Dashboard</div><div class="menu-desc">Internal analytics with all 6 tabs</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">➕ New Case/Grievance</div><div class="menu-desc">Open the new grievance filing form</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">✏️ Edit Selected</div><div class="menu-desc">Edit the currently selected grievance</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > ID Engines</div><div class="menu-name">🆔 Generate Missing Member IDs</div><div class="menu-desc">Auto-generate IDs for members without one</div></div></div>
+            </div>
+
+            <div class="section">
+              <div class="section-title"><span class="material-icons">menu</span>🛠️ Admin Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">🩺 System Diagnostics</div><div class="menu-desc">Run health check on all system components</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">🔧 Repair Dashboard</div><div class="menu-desc">Fix common issues automatically</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Data Sync</div><div class="menu-name">🔄 Sync All Data Now</div><div class="menu-desc">Synchronize member and grievance data</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Validation</div><div class="menu-name">🔍 Run Bulk Validation</div><div class="menu-desc">Validate all data for consistency</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Setup</div><div class="menu-name">🔧 Setup All Hidden Sheets</div><div class="menu-desc">Initialize all calculation sheets</div></div></div>
+            </div>
+
+            <div class="section">
+              <div class="section-title"><span class="material-icons">menu</span>📊 509 Dashboard Menu</div>
+              <div class="menu-item"><div><div class="menu-path">509 Dashboard</div><div class="menu-name">📊 Dashboard</div><div class="menu-desc">Legacy 5-tab dashboard modal</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Field Access</div><div class="menu-name">📱 Pocket/Mobile View</div><div class="menu-desc">Optimize display for mobile devices</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Personnel</div><div class="menu-name">➕ Add New Member</div><div class="menu-desc">Open the member registration form</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Styling</div><div class="menu-name">🎨 Apply Global Styling</div><div class="menu-desc">Apply Roboto theme and zebra stripes</div></div></div>
+            </div>
           </div>
-        </div>
 
-        <div class="help-section">
-          <div class="help-title">Need Help?</div>
-          <div class="help-text">
-            For technical issues, run <strong>Admin Tools > System Diagnostics</strong> to check for problems.
-            Use <strong>Repair Dashboard</strong> to fix common issues automatically.
+          <!-- FAQ TAB -->
+          <div id="faq-tab" class="tab-content hidden">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">help</span>Frequently Asked Questions</div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I file a new grievance?</div>
+                <div class="faq-a">Go to <strong>Strategic Ops > Cases & Grievances > ➕ New Case/Grievance</strong>. Fill in the member info, select the grievance type, and provide details. Deadlines are calculated automatically.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">What's the difference between the two dashboards?</div>
+                <div class="faq-a">The <strong>Steward Dashboard</strong> is for internal use with full PII and 6 analytical tabs. The <strong>Member Dashboard</strong> is PII-safe for sharing with members, showing only aggregate statistics.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do deadline calculations work?</div>
+                <div class="faq-a">Based on Article 23A: Step 1 has ${DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE} days for response, Step 2 has ${DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL} days to appeal, Step 3 has ${DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL} days, and Arbitration must be demanded within ${DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND} days of Step 3.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Why are some cells showing errors?</div>
+                <div class="faq-a">Run <strong>Admin > 🩺 System Diagnostics</strong> to check for issues. Then try <strong>Admin > 🔧 Repair Dashboard</strong> to fix common problems automatically.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I search for a member or grievance?</div>
+                <div class="faq-a">Use <strong>Union Hub > 🔍 Quick Search</strong> or <strong>Strategic Ops > 🔍 Desktop Search</strong> for advanced filtering options.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I sync deadlines to Google Calendar?</div>
+                <div class="faq-a">Select a grievance, then use <strong>509 Dashboard > Calendar > 📅 Create Calendar Event</strong>. This creates reminder events for all deadline dates.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">What does the Satisfaction tab show?</div>
+                <div class="faq-a">It analyzes member satisfaction surveys across 8 sections: Overall Satisfaction, Steward Ratings, Chapter Effectiveness, Local Leadership, Contract Enforcement, Communication Quality, Member Voice, and Value & Action.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I apply zebra stripes to all rows?</div>
+                <div class="faq-a">Go to <strong>509 Dashboard > Styling > 🎨 Apply Global Styling</strong>. This applies Roboto font and zebra stripes to all rows in Member Directory and Grievance Log.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I start fresh with a new spreadsheet?</div>
+                <div class="faq-a">Visit our GitHub repository to get a fresh copy with seed data and demo features. See the link below.</div>
+              </div>
+            </div>
+
+            <a href="https://github.com/Woop91/MULTIPLE-SCRIPS-REPO" target="_blank" class="repo-link">
+              <span class="material-icons" style="font-size: 16px;">open_in_new</span>
+              Get a fresh copy from GitHub (with Seed & Nuke features)
+            </a>
+          </div>
+
+          <!-- SHORTCUTS TAB -->
+          <div id="shortcuts-tab" class="tab-content hidden">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">bolt</span>Quick Tips</div>
+
+              <div class="card">
+                <div class="card-title">🔍 Quick Search</div>
+                <div class="card-desc">Use Union Hub > Quick Search to find any member or grievance instantly. Supports partial name matching.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">📊 Dashboard Views</div>
+                <div class="card-desc">Use Steward Dashboard for internal analysis, Member Dashboard for sharing with members (PII-safe).</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">📱 Mobile Access</div>
+                <div class="card-desc">Enable Pocket/Mobile View to hide non-essential columns when using on phones or tablets.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">🔄 Data Sync</div>
+                <div class="card-desc">Run Admin > Data Sync > Sync All Data Now periodically to ensure member and grievance data stays linked.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">🎨 Visual Styling</div>
+                <div class="card-desc">Apply Global Styling adds zebra stripes to ALL rows (not just data rows) for consistent appearance.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">⚡ Auto-Triggers</div>
+                <div class="card-desc">Install auto-sync and midnight refresh triggers from Admin menu to keep data current automatically.</div>
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="version">
-          Dashboard Version 2.0.0 | Modular Architecture
-        </div>
-
-        <div style="margin-top: 20px; text-align: right;">
-          <button class="btn btn-primary" onclick="google.script.host.close()">Got it!</button>
+          509 Dashboard v${VERSION_INFO.CURRENT} | ${VERSION_INFO.CODENAME}
         </div>
       </div>
+
+      <script>
+        function showTab(tabName) {
+          // Hide all tabs
+          document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+          // Show selected tab
+          document.getElementById(tabName + '-tab').classList.remove('hidden');
+          event.target.classList.add('active');
+        }
+
+        function filterContent() {
+          const query = document.getElementById('searchInput').value.toLowerCase();
+          const items = document.querySelectorAll('.card, .menu-item, .faq-item');
+
+          items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            if (query === '' || text.includes(query)) {
+              item.classList.remove('hidden');
+              // Highlight matches
+              if (query !== '') {
+                highlightText(item, query);
+              } else {
+                removeHighlight(item);
+              }
+            } else {
+              item.classList.add('hidden');
+            }
+          });
+
+          // Show all tabs when searching
+          if (query !== '') {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('hidden'));
+          }
+        }
+
+        function highlightText(element, query) {
+          // Simple highlight - just mark parent as searched
+          element.style.borderLeft = '3px solid #fbbf24';
+        }
+
+        function removeHighlight(element) {
+          element.style.borderLeft = '';
+        }
+      </script>
     </body>
     </html>
-  `).setWidth(550).setHeight(600);
+  `).setWidth(650).setHeight(700);
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Help & Documentation');
+  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help Guide - 509 Dashboard');
 }
 
 // ============================================================================
@@ -32135,9 +32772,408 @@ function startGrievanceForMember() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Loading...');
 }
 
+// ============================================================================
+// IMPORT/EXPORT DIALOGS (Added to fix missing menu functions)
+// ============================================================================
+
+/**
+ * Shows import members dialog
+ * Allows importing members from CSV/Excel format
+ */
+function showImportDialog() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 25px; border-radius: 8px; max-width: 500px; margin: 0 auto; }
+        h2 { color: #1a73e8; margin-top: 0; }
+        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
+        .format-section { background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .format-section h4 { margin-top: 0; color: #333; }
+        .format-section code { background: #e0e0e0; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+        textarea { width: 100%; height: 150px; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; font-size: 12px; }
+        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
+        .primary { background: #1a73e8; color: white; }
+        .secondary { background: #e0e0e0; color: #333; }
+        .result { margin-top: 15px; padding: 10px; border-radius: 4px; display: none; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>📥 Import Members</h2>
+        <div class="info">
+          💡 Paste member data in CSV format. Each line represents one member.
+        </div>
+        <div class="format-section">
+          <h4>Expected Format (comma-separated):</h4>
+          <code>First Name, Last Name, Employee ID, Department, Job Title, Email, Phone</code>
+        </div>
+        <textarea id="importData" placeholder="John,Doe,EMP001,Engineering,Developer,john@example.com,555-1234
+Jane,Smith,EMP002,HR,Manager,jane@example.com,555-5678"></textarea>
+        <div>
+          <button class="primary" onclick="importMembers()">📥 Import</button>
+          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
+        </div>
+        <div id="result" class="result"></div>
+      </div>
+      <script>
+        function importMembers() {
+          var data = document.getElementById('importData').value.trim();
+          if (!data) {
+            showResult('Please paste some data to import', 'error');
+            return;
+          }
+          google.script.run
+            .withSuccessHandler(function(result) {
+              showResult('Successfully imported ' + result.count + ' members', 'success');
+            })
+            .withFailureHandler(function(e) {
+              showResult('Error: ' + e.message, 'error');
+            })
+            .importMembersFromText(data);
+        }
+        function showResult(msg, type) {
+          var el = document.getElementById('result');
+          el.textContent = msg;
+          el.className = 'result ' + type;
+          el.style.display = 'block';
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(550).setHeight(500);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members');
+}
+
+/**
+ * Imports members from text (CSV format)
+ * @param {string} text - CSV formatted text
+ * @returns {Object} Result with count of imported members
+ */
+function importMembersFromText(text) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  const lines = text.split('\\n').filter(line => line.trim());
+  let imported = 0;
+
+  for (const line of lines) {
+    const parts = line.split(',').map(p => p.trim());
+    if (parts.length >= 2) {
+      const newRow = [
+        '',                    // ID (will be auto-generated)
+        parts[0] || '',        // First Name
+        parts[1] || '',        // Last Name
+        parts[2] || '',        // Employee ID
+        parts[3] || '',        // Department
+        parts[4] || '',        // Job Title
+        '',                    // Hire Date
+        parts[5] || '',        // Email
+        parts[6] || ''         // Phone
+      ];
+      sheet.appendRow(newRow);
+      imported++;
+    }
+  }
+
+  // Generate IDs for imported members
+  if (typeof generateMissingMemberIDs === 'function') {
+    generateMissingMemberIDs();
+  }
+
+  return { success: true, count: imported };
+}
+
+/**
+ * Shows export directory dialog
+ * Allows exporting member directory to various formats
+ */
+function showExportDialog() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
+        h2 { color: #1a73e8; margin-top: 0; }
+        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
+        .option { display: flex; align-items: center; padding: 15px; margin: 10px 0; background: #f8f9fa; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
+        .option:hover { background: #e8f0fe; }
+        .option.selected { border-color: #1a73e8; background: #e8f0fe; }
+        .option-icon { font-size: 32px; margin-right: 15px; }
+        .option-text h4 { margin: 0 0 5px 0; }
+        .option-text p { margin: 0; font-size: 12px; color: #666; }
+        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
+        .primary { background: #1a73e8; color: white; }
+        .secondary { background: #e0e0e0; color: #333; }
+        .button-row { margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>📤 Export Directory</h2>
+        <div class="info">
+          💡 Export member directory data to your preferred format.
+        </div>
+        <div class="option selected" onclick="selectOption(this, 'csv')">
+          <div class="option-icon">📄</div>
+          <div class="option-text">
+            <h4>CSV File</h4>
+            <p>Comma-separated values for Excel/Sheets</p>
+          </div>
+        </div>
+        <div class="option" onclick="selectOption(this, 'email')">
+          <div class="option-icon">📧</div>
+          <div class="option-text">
+            <h4>Email Report</h4>
+            <p>Send formatted report to your email</p>
+          </div>
+        </div>
+        <div class="option" onclick="selectOption(this, 'print')">
+          <div class="option-icon">🖨️</div>
+          <div class="option-text">
+            <h4>Print View</h4>
+            <p>Open print-friendly view in browser</p>
+          </div>
+        </div>
+        <div class="button-row">
+          <button class="primary" onclick="doExport()">📤 Export</button>
+          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
+        </div>
+      </div>
+      <script>
+        var selectedFormat = 'csv';
+        function selectOption(el, format) {
+          document.querySelectorAll('.option').forEach(function(o) { o.classList.remove('selected'); });
+          el.classList.add('selected');
+          selectedFormat = format;
+        }
+        function doExport() {
+          google.script.run
+            .withSuccessHandler(function(result) {
+              if (result.url) {
+                window.open(result.url, '_blank');
+              }
+              alert(result.message || 'Export complete!');
+              google.script.host.close();
+            })
+            .withFailureHandler(function(e) {
+              alert('Error: ' + e.message);
+            })
+            .exportMemberDirectory(selectedFormat);
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(500).setHeight(450);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📤 Export Directory');
+}
+
+/**
+ * Exports member directory to specified format
+ * @param {string} format - Export format (csv, email, print)
+ * @returns {Object} Result with success message
+ */
+function exportMemberDirectory(format) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  const data = sheet.getDataRange().getValues();
+
+  switch (format) {
+    case 'csv':
+      // Create CSV content
+      const csv = data.map(row => row.join(',')).join('\\n');
+      const blob = Utilities.newBlob(csv, 'text/csv', 'MemberDirectory.csv');
+      const file = DriveApp.createFile(blob);
+      return {
+        success: true,
+        message: 'CSV file created! Opening...',
+        url: file.getUrl()
+      };
+
+    case 'email':
+      // Send email with summary
+      const email = Session.getActiveUser().getEmail();
+      const subject = '509 Member Directory Export - ' + new Date().toLocaleDateString();
+      let body = 'Member Directory Export\\n\\n';
+      body += 'Total Members: ' + (data.length - 1) + '\\n\\n';
+      body += 'Spreadsheet: ' + ss.getUrl();
+      GmailApp.sendEmail(email, subject, body);
+      return { success: true, message: 'Report sent to ' + email };
+
+    case 'print':
+      // Return URL to spreadsheet for printing
+      return {
+        success: true,
+        message: 'Opening print view...',
+        url: ss.getUrl() + '#gid=' + sheet.getSheetId()
+      };
+
+    default:
+      throw new Error('Unknown export format: ' + format);
+  }
+}
+
+/**
+ * Wrapper function for findExistingMember that can be called from menu
+ * Shows a search dialog to find existing members
+ */
+function findExistingMember() {
+  const html = HtmlService.createHtmlOutput(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <base target="_top">
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
+        h2 { color: #1a73e8; margin-top: 0; }
+        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 13px; }
+        .field { margin: 15px 0; }
+        .field label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        .field input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        button { padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px; }
+        .primary { background: #1a73e8; color: white; }
+        .secondary { background: #e0e0e0; color: #333; }
+        .button-row { margin-top: 20px; }
+        .results { margin-top: 15px; max-height: 200px; overflow-y: auto; }
+        .result-item { padding: 10px; background: #f8f9fa; margin: 5px 0; border-radius: 4px; cursor: pointer; }
+        .result-item:hover { background: #e8f0fe; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h2>🔍 Find Member</h2>
+        <div class="info">
+          💡 Search by name, email, or member ID to find existing members.
+        </div>
+        <div class="field">
+          <label>Search Term</label>
+          <input type="text" id="searchTerm" placeholder="Enter name, email, or member ID..." autofocus>
+        </div>
+        <div class="button-row">
+          <button class="primary" onclick="searchMembers()">🔍 Search</button>
+          <button class="secondary" onclick="google.script.host.close()">Cancel</button>
+        </div>
+        <div id="results" class="results"></div>
+      </div>
+      <script>
+        document.getElementById('searchTerm').addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') searchMembers();
+        });
+        function searchMembers() {
+          var term = document.getElementById('searchTerm').value.trim();
+          if (!term) { alert('Please enter a search term'); return; }
+          google.script.run
+            .withSuccessHandler(function(results) {
+              var html = '';
+              if (results.length === 0) {
+                html = '<div class="result-item">No members found</div>';
+              } else {
+                results.forEach(function(m) {
+                  html += '<div class="result-item" onclick="goToMember(' + m.row + ')">' +
+                    '<strong>' + m.name + '</strong><br>' +
+                    '<small>' + (m.id || 'No ID') + ' • ' + (m.email || 'No email') + '</small>' +
+                    '</div>';
+                });
+              }
+              document.getElementById('results').innerHTML = html;
+            })
+            .withFailureHandler(function(e) {
+              document.getElementById('results').innerHTML = '<div class="result-item">Error: ' + e.message + '</div>';
+            })
+            .searchMembersForDialog(term);
+        }
+        function goToMember(row) {
+          google.script.run.navigateToMemberRow(row);
+          google.script.host.close();
+        }
+      </script>
+    </body>
+    </html>
+  `).setWidth(500).setHeight(450);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '🔍 Find Member');
+}
+
+/**
+ * Searches members for the find dialog
+ * @param {string} term - Search term
+ * @returns {Array} Array of matching members
+ */
+function searchMembersForDialog(term) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  const data = sheet.getDataRange().getValues();
+  const results = [];
+  const searchLower = term.toLowerCase();
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const firstName = (row[MEMBER_COLUMNS.FIRST_NAME] || '').toString().toLowerCase();
+    const lastName = (row[MEMBER_COLUMNS.LAST_NAME] || '').toString().toLowerCase();
+    const email = (row[MEMBER_COLUMNS.EMAIL] || '').toString().toLowerCase();
+    const memberId = (row[MEMBER_COLUMNS.ID] || '').toString().toLowerCase();
+
+    if (firstName.includes(searchLower) ||
+        lastName.includes(searchLower) ||
+        email.includes(searchLower) ||
+        memberId.includes(searchLower)) {
+      results.push({
+        row: i + 1,
+        name: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
+        email: row[MEMBER_COLUMNS.EMAIL],
+        id: row[MEMBER_COLUMNS.ID]
+      });
+
+      if (results.length >= 10) break; // Limit results
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Navigates to a specific member row
+ * @param {number} row - Row number to navigate to
+ */
+function navigateToMemberRow(row) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+
+  if (sheet) {
+    sheet.activate();
+    sheet.getRange(row, 1).activate();
+    SpreadsheetApp.flush();
+  }
+}
+
 
 // ============================================================================
-// SOURCE: 10_CommandCenter.gs (1993 lines)
+// SOURCE: 10_CommandCenter.gs (2515 lines)
 // ============================================================================
 
 /**
@@ -32271,8 +33307,8 @@ function createCommandCenterMenu() {
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
       .addItem('📜 View Audit Log', 'navigateToAuditLog')
       .addSeparator()
-      .addItem('🔍 v4.0 System Diagnostic', 'DIAGNOSE_SETUP')
-      .addItem('🛠️ Repair Dashboard', 'REPAIR_DASHBOARD')
+      .addItem('🔍 v4.0 System Diagnostic', 'showDiagnosticReport')
+      .addItem('🛠️ Repair Dashboard', 'repairDashboardWithUI')
       .addItem('📊 v4.0 Status Report', 'showV4StatusReport'));
 
   menu.addSeparator();
@@ -32402,6 +33438,43 @@ function showAllMemberColumns() {
     ss.toast('✅ All columns restored.', COMMAND_CONFIG.SYSTEM_NAME, 3);
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error showing columns: ' + e.message);
+  }
+}
+
+/**
+ * Toggle Mobile View - Easy one-click toggle between mobile and full view
+ * Checks current state and switches to the opposite view
+ * Accessible from top-level Union Hub menu for mobile users
+ */
+function toggleMobileView() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory not found');
+    return;
+  }
+
+  // Check if we're currently in mobile view by checking if column D is hidden
+  // Column D (Job Title) is always hidden in mobile view
+  try {
+    // Use properties to track mobile view state
+    var props = PropertiesService.getUserProperties();
+    var isMobileView = props.getProperty('MOBILE_VIEW_ENABLED') === 'true';
+
+    if (isMobileView) {
+      // Switch to full view
+      showAllMemberColumns();
+      props.setProperty('MOBILE_VIEW_ENABLED', 'false');
+    } else {
+      // Switch to mobile view
+      navToMobile();
+      props.setProperty('MOBILE_VIEW_ENABLED', 'true');
+    }
+  } catch (e) {
+    // Fallback: just try to show all columns (safe default)
+    showAllMemberColumns();
+    SpreadsheetApp.getUi().alert('Restored to full view. Use this toggle to switch between mobile and desktop views.');
   }
 }
 
@@ -32906,42 +33979,56 @@ function addRepoLinkToFAQ_(ss) {
  * @private
  */
 function applyTabColors_(ss) {
-  // Tab color definitions
+  // Tab color definitions - Updated per user requirements
   var TAB_COLORS = {
-    DATA: '#1a73e8',        // Google Blue - for data sheets
-    DOCS: '#34a853',        // Google Green - for documentation
-    HIDDEN: '#9e9e9e',      // Gray - for hidden/calc sheets
-    SATISFACTION: '#ea4335' // Red - for satisfaction survey
+    RED: '#ea4335',         // Red - Getting Started, FAQ
+    PURPLE: '#7c3aed',      // Purple - Member Directory, Grievance Log
+    YELLOW: '#fbbc04',      // Yellow - Feedback and Development, Function Checklist
+    ORANGE: '#ff9800',      // Orange - Config, Config Guide
+    BLUE: '#1a73e8',        // Blue - Member Satisfaction
+    HIDDEN: '#9e9e9e'       // Gray - for hidden/calc sheets
   };
 
-  // Data sheets - Blue
-  var dataSheets = [SHEETS.GRIEVANCE_LOG, SHEETS.MEMBER_DIR];
-  dataSheets.forEach(function(name) {
+  // Red tabs - Getting Started, FAQ
+  var redSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ];
+  redSheets.forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.DATA); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+      try { sheet.setTabColor(TAB_COLORS.RED); } catch (e) { Logger.log('Tab color error: ' + e.message); }
     }
   });
 
-  // Documentation sheets - Green
-  var docSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ, SHEETS.CONFIG_GUIDE];
-  docSheets.forEach(function(name) {
+  // Purple tabs - Member Directory, Grievance Log
+  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG];
+  purpleSheets.forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.DOCS); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+      try { sheet.setTabColor(TAB_COLORS.PURPLE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
     }
   });
 
-  // Satisfaction sheet - Red
+  // Yellow tabs - Feedback and Development, Function Checklist
+  var yellowSheets = [SHEETS.FEEDBACK, SHEETS.FUNCTION_CHECKLIST];
+  yellowSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      try { sheet.setTabColor(TAB_COLORS.YELLOW); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    }
+  });
+
+  // Orange tabs - Config, Config Guide
+  var orangeSheets = [SHEETS.CONFIG, SHEETS.CONFIG_GUIDE];
+  orangeSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      try { sheet.setTabColor(TAB_COLORS.ORANGE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    }
+  });
+
+  // Blue tabs - Member Satisfaction
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
   if (satSheet) {
-    try { satSheet.setTabColor(TAB_COLORS.SATISFACTION); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-  }
-
-  // Config sheet - special orange
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (configSheet) {
-    try { configSheet.setTabColor('#ff9800'); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    try { satSheet.setTabColor(TAB_COLORS.BLUE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
   }
 
   Logger.log('Tab colors applied successfully');
@@ -32961,9 +34048,11 @@ function applyTabColors() {
 // ============================================================================
 
 /**
- * Runs a comprehensive diagnostic check on the dashboard setup
+ * Runs a comprehensive diagnostic check and shows UI report
+ * NOTE: Renamed from DIAGNOSE_SETUP to avoid duplicate with 06_Maintenance.gs
+ * This version shows a UI alert; use DIAGNOSE_SETUP() from 06_Maintenance.gs for programmatic results
  */
-function DIAGNOSE_SETUP() {
+function showDiagnosticReport() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
 
@@ -33056,9 +34145,11 @@ function DIAGNOSE_SETUP() {
 }
 
 /**
- * Repairs the dashboard by rebuilding missing components
+ * Repairs the dashboard with UI confirmation dialog
+ * NOTE: Renamed from REPAIR_DASHBOARD to avoid conflict with 06_Maintenance.gs version
+ * This version shows UI; use REPAIR_DASHBOARD() from 06_Maintenance.gs for programmatic repair
  */
-function REPAIR_DASHBOARD() {
+function repairDashboardWithUI() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -33401,13 +34492,14 @@ var GEMINI_CONFIG = {
 // ============================================================================
 
 /**
- * Gemini v4.0 Form Submission Handler
- * Triggered when a grievance form is submitted.
- * Creates member folder and signature-ready PDF automatically.
+ * Gemini v4.0 Form Submission Handler (Legacy - use onGrievanceFormSubmit in 05_Integrations.gs instead)
+ * NOTE: Renamed to avoid duplicate function definition conflict.
+ * The primary implementation is in 05_Integrations.gs
  *
  * @param {Object} e - Form submission event object
+ * @deprecated Use onGrievanceFormSubmit in 05_Integrations.gs
  */
-function onGrievanceFormSubmit(e) {
+function onGrievanceFormSubmit_Legacy_(e) {
   try {
     var responses = e.namedValues;
     var data = {
@@ -33488,14 +34580,15 @@ function createGrievancePDF(folder, data) {
 }
 
 /**
- * Gemini v4.0 Member Folder Creator
- * Gets existing folder or creates new one for member documents.
+ * Gemini v4.0 Member Folder Creator (Legacy)
+ * NOTE: Renamed to avoid duplicate - use getOrCreateMemberFolder() in 05_Integrations.gs instead
  *
  * @param {string} name - Member name
  * @param {string} id - Member ID
  * @returns {Folder} Google Drive folder for the member
+ * @deprecated Use getOrCreateMemberFolder in 05_Integrations.gs (has better error handling)
  */
-function getOrCreateMemberFolder(name, id) {
+function getOrCreateMemberFolder_Legacy_(name, id) {
   // Get archive folder ID from Config
   var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) ||
                         getConfigValue_(CONFIG_COLS.DRIVE_FOLDER_ID) ||
@@ -33565,40 +34658,438 @@ function sendGeminiEscalationAlert(member, caseID, status) {
 // ============================================================================
 
 /**
- * EXTENSION: CLOUD VISION OCR HOOK
+ * WGER OCR FUNCTION
+ * Main OCR function for transcribing handwritten forms and documents.
+ * Uses Google Cloud Vision API for text detection and extraction.
+ *
+ * Supported formats: PNG, JPG, JPEG, GIF, BMP, WEBP, PDF (first page)
+ *
+ * @param {string} fileId - Google Drive file ID of the image/document to transcribe
+ * @param {Object} options - Optional configuration object
+ * @param {string} options.mode - OCR mode: 'TEXT' (default), 'DOCUMENT', 'HANDWRITING'
+ * @param {boolean} options.autoPopulate - If true, attempts to auto-populate grievance fields
+ * @param {string} options.targetGrievanceId - Grievance ID to populate (if autoPopulate is true)
+ * @returns {Object} Result object with extracted text and metadata
+ */
+function wger(fileId, options) {
+  options = options || {};
+  var mode = options.mode || 'TEXT';
+  var autoPopulate = options.autoPopulate || false;
+  var targetGrievanceId = options.targetGrievanceId || null;
+
+  try {
+    // Validate file ID
+    if (!fileId || typeof fileId !== 'string') {
+      return {
+        success: false,
+        status: 'ERROR',
+        message: 'Invalid file ID provided',
+        text: ''
+      };
+    }
+
+    var file = DriveApp.getFileById(fileId);
+    var fileName = file.getName();
+    var mimeType = file.getMimeType();
+    var imageBlob = file.getBlob();
+
+    // Validate file type
+    var supportedTypes = [
+      'image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/webp',
+      'application/pdf'
+    ];
+
+    if (supportedTypes.indexOf(mimeType) === -1) {
+      return {
+        success: false,
+        status: 'UNSUPPORTED_FORMAT',
+        message: 'Unsupported file format: ' + mimeType + '. Supported: PNG, JPG, GIF, BMP, WEBP, PDF',
+        fileName: fileName,
+        text: ''
+      };
+    }
+
+    // Log OCR request for audit
+    logAuditEvent('OCR_REQUEST', {
+      fileId: fileId,
+      fileName: fileName,
+      mimeType: mimeType,
+      mode: mode,
+      requestedBy: Session.getActiveUser().getEmail()
+    });
+
+    // Perform OCR using Google Cloud Vision API
+    var ocrResult = performCloudVisionOCR_(imageBlob, mode);
+
+    if (!ocrResult.success) {
+      return {
+        success: false,
+        status: 'OCR_FAILED',
+        message: ocrResult.message,
+        fileName: fileName,
+        text: ''
+      };
+    }
+
+    var extractedText = ocrResult.text;
+
+    // Auto-populate grievance fields if requested
+    var populationResult = null;
+    if (autoPopulate && targetGrievanceId && extractedText) {
+      populationResult = autoPopulateGrievanceFromOCR_(extractedText, targetGrievanceId);
+    }
+
+    // Log successful OCR
+    logAuditEvent('OCR_COMPLETED', {
+      fileId: fileId,
+      fileName: fileName,
+      textLength: extractedText.length,
+      autoPopulated: autoPopulate && populationResult && populationResult.success
+    });
+
+    return {
+      success: true,
+      status: 'SUCCESS',
+      message: 'OCR completed successfully',
+      fileId: fileId,
+      fileName: fileName,
+      mimeType: mimeType,
+      mode: mode,
+      text: extractedText,
+      textLength: extractedText.length,
+      wordCount: extractedText.split(/\s+/).filter(function(w) { return w.length > 0; }).length,
+      populationResult: populationResult,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (e) {
+    console.error('WGER OCR error: ' + e.message);
+    logAuditEvent('OCR_ERROR', {
+      fileId: fileId,
+      error: e.message
+    });
+
+    return {
+      success: false,
+      status: 'ERROR',
+      message: 'OCR failed: ' + e.message,
+      text: ''
+    };
+  }
+}
+
+/**
+ * Performs OCR using Google Cloud Vision API
+ * @param {Blob} imageBlob - Image blob to process
+ * @param {string} mode - OCR mode (TEXT, DOCUMENT, HANDWRITING)
+ * @returns {Object} Result with success status and extracted text
+ * @private
+ */
+function performCloudVisionOCR_(imageBlob, mode) {
+  try {
+    // Get API key from script properties (set via Script Properties or Config)
+    var apiKey = PropertiesService.getScriptProperties().getProperty('CLOUD_VISION_API_KEY');
+
+    if (!apiKey) {
+      // Fallback: Try to use built-in Cloud Vision (requires Cloud project linking)
+      return performBuiltInOCR_(imageBlob, mode);
+    }
+
+    // Prepare Cloud Vision API request
+    var base64Image = Utilities.base64Encode(imageBlob.getBytes());
+
+    // Select feature type based on mode
+    var featureType = 'TEXT_DETECTION';
+    if (mode === 'DOCUMENT') {
+      featureType = 'DOCUMENT_TEXT_DETECTION';
+    } else if (mode === 'HANDWRITING') {
+      featureType = 'DOCUMENT_TEXT_DETECTION'; // Best for handwriting
+    }
+
+    var requestBody = {
+      requests: [{
+        image: {
+          content: base64Image
+        },
+        features: [{
+          type: featureType,
+          maxResults: 1
+        }]
+      }]
+    };
+
+    var response = UrlFetchApp.fetch(
+      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      {
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify(requestBody),
+        muteHttpExceptions: true
+      }
+    );
+
+    var responseCode = response.getResponseCode();
+    var responseText = response.getContentText();
+
+    if (responseCode !== 200) {
+      console.error('Cloud Vision API error: ' + responseText);
+      return {
+        success: false,
+        message: 'Cloud Vision API returned error code: ' + responseCode
+      };
+    }
+
+    var result = JSON.parse(responseText);
+
+    // Extract text from response
+    var extractedText = '';
+    if (result.responses && result.responses[0]) {
+      var annotations = result.responses[0];
+
+      if (featureType === 'DOCUMENT_TEXT_DETECTION' && annotations.fullTextAnnotation) {
+        extractedText = annotations.fullTextAnnotation.text || '';
+      } else if (annotations.textAnnotations && annotations.textAnnotations.length > 0) {
+        extractedText = annotations.textAnnotations[0].description || '';
+      }
+    }
+
+    return {
+      success: true,
+      text: extractedText.trim()
+    };
+
+  } catch (e) {
+    console.error('Cloud Vision OCR error: ' + e.message);
+    return {
+      success: false,
+      message: 'Cloud Vision API call failed: ' + e.message
+    };
+  }
+}
+
+/**
+ * Fallback OCR using Google's built-in capabilities
+ * Attempts to use Google Drive's built-in OCR for PDFs
+ * @param {Blob} imageBlob - Image blob to process
+ * @param {string} mode - OCR mode
+ * @returns {Object} Result with success status and extracted text
+ * @private
+ */
+function performBuiltInOCR_(imageBlob, mode) {
+  try {
+    var mimeType = imageBlob.getContentType();
+
+    // For images, we need Cloud Vision API
+    if (mimeType.indexOf('image/') === 0) {
+      return {
+        success: false,
+        message: 'Cloud Vision API key not configured. Set CLOUD_VISION_API_KEY in Script Properties to enable image OCR.'
+      };
+    }
+
+    // For PDFs, try Google Drive's OCR conversion
+    if (mimeType === 'application/pdf') {
+      // Create a temporary file in Drive with OCR enabled
+      var resource = {
+        title: 'OCR_TEMP_' + new Date().getTime(),
+        mimeType: 'application/pdf'
+      };
+
+      // Upload and convert to Google Doc (which applies OCR)
+      var tempFile = Drive.Files.insert(resource, imageBlob, {
+        ocr: true,
+        ocrLanguage: 'en'
+      });
+
+      // Get the converted document content
+      var doc = DocumentApp.openById(tempFile.id);
+      var extractedText = doc.getBody().getText();
+
+      // Clean up temp file
+      DriveApp.getFileById(tempFile.id).setTrashed(true);
+
+      return {
+        success: true,
+        text: extractedText.trim()
+      };
+    }
+
+    return {
+      success: false,
+      message: 'Could not perform OCR. Please configure Cloud Vision API key.'
+    };
+
+  } catch (e) {
+    return {
+      success: false,
+      message: 'Built-in OCR failed: ' + e.message + '. Configure Cloud Vision API key for better results.'
+    };
+  }
+}
+
+/**
+ * Attempts to auto-populate grievance fields from OCR text
+ * Uses pattern matching to identify common grievance form fields
+ * @param {string} text - Extracted OCR text
+ * @param {string} grievanceId - Target grievance ID
+ * @returns {Object} Result indicating what fields were populated
+ * @private
+ */
+function autoPopulateGrievanceFromOCR_(text, grievanceId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+    if (!sheet) {
+      return { success: false, message: 'Grievance Log not found' };
+    }
+
+    // Find the grievance row
+    var data = sheet.getDataRange().getValues();
+    var grievanceRow = -1;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+        grievanceRow = i + 1;
+        break;
+      }
+    }
+
+    if (grievanceRow === -1) {
+      return { success: false, message: 'Grievance not found: ' + grievanceId };
+    }
+
+    var fieldsPopulated = [];
+    var textLower = text.toLowerCase();
+
+    // Pattern matching for common grievance form fields
+    var patterns = {
+      incidentDate: /(?:incident\s*date|date\s*of\s*incident|occurred\s*on)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      articles: /(?:article|art\.?)\s*(\d+)/gi,
+      issueCategory: /(?:discipline|workload|scheduling|pay|benefits|safety|harassment|discrimination)/i
+    };
+
+    // Try to extract incident date
+    var dateMatch = text.match(patterns.incidentDate);
+    if (dateMatch) {
+      try {
+        var parsedDate = new Date(dateMatch[1]);
+        if (!isNaN(parsedDate.getTime())) {
+          sheet.getRange(grievanceRow, GRIEVANCE_COLS.INCIDENT_DATE).setValue(parsedDate);
+          fieldsPopulated.push('Incident Date');
+        }
+      } catch (e) {
+        // Date parsing failed, skip
+      }
+    }
+
+    // Try to extract articles violated
+    var articleMatches = [];
+    var articleMatch;
+    while ((articleMatch = patterns.articles.exec(text)) !== null) {
+      articleMatches.push('Art. ' + articleMatch[1]);
+    }
+    if (articleMatches.length > 0) {
+      var uniqueArticles = articleMatches.filter(function(v, i, a) { return a.indexOf(v) === i; });
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ARTICLES).setValue(uniqueArticles.join(', '));
+      fieldsPopulated.push('Articles');
+    }
+
+    // Try to identify issue category
+    var categoryMatch = text.match(patterns.issueCategory);
+    if (categoryMatch) {
+      var category = categoryMatch[0].charAt(0).toUpperCase() + categoryMatch[0].slice(1).toLowerCase();
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(category);
+      fieldsPopulated.push('Issue Category');
+    }
+
+    // Store the full OCR text in resolution notes for reference
+    var existingResolution = sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).getValue() || '';
+    var ocrNote = '[OCR Extract ' + new Date().toLocaleDateString() + ']: ' + text.substring(0, 500);
+    if (text.length > 500) ocrNote += '...';
+
+    if (existingResolution) {
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(existingResolution + '\n\n' + ocrNote);
+    } else {
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(ocrNote);
+    }
+    fieldsPopulated.push('Resolution Notes (OCR text)');
+
+    return {
+      success: true,
+      message: 'Populated ' + fieldsPopulated.length + ' fields',
+      fieldsPopulated: fieldsPopulated
+    };
+
+  } catch (e) {
+    return {
+      success: false,
+      message: 'Auto-populate failed: ' + e.message
+    };
+  }
+}
+
+/**
+ * Quick OCR function - simplified wrapper for common use cases
+ * @param {string} fileId - Google Drive file ID
+ * @returns {string} Extracted text, or error message
+ */
+function wgerQuick(fileId) {
+  var result = wger(fileId, { mode: 'TEXT' });
+  if (result.success) {
+    return result.text;
+  }
+  return 'Error: ' + result.message;
+}
+
+/**
+ * OCR with handwriting optimization
+ * @param {string} fileId - Google Drive file ID
+ * @returns {Object} Full result object
+ */
+function wgerHandwriting(fileId) {
+  return wger(fileId, { mode: 'HANDWRITING' });
+}
+
+/**
+ * OCR with document layout preservation
+ * @param {string} fileId - Google Drive file ID
+ * @returns {Object} Full result object
+ */
+function wgerDocument(fileId) {
+  return wger(fileId, { mode: 'DOCUMENT' });
+}
+
+/**
+ * EXTENSION: CLOUD VISION OCR HOOK (Legacy - calls wger)
  * Prepares the system for future Google Cloud Vision integration.
  * Requires: Enabling 'Cloud Vision API' in Google Cloud Console.
  *
  * @param {string} fileId - Google Drive file ID of the image to transcribe
  * @returns {Object} Status object with transcription placeholder
+ * @deprecated Use wger() instead
  */
 function transcribeHandwrittenForm(fileId) {
-  try {
-    var file = DriveApp.getFileById(fileId);
-    var imageBlob = file.getBlob();
+  // Use the new wger OCR function
+  var result = wger(fileId, { mode: 'HANDWRITING' });
 
-    // PLACEHOLDER: Call to Google Cloud Vision API would happen here
-    // Once Cloud Vision is enabled, this will parse handwritten text
-    // and auto-populate the Grievance Log
-
-    console.log('OCR Engine: Prepared to parse image ID ' + fileId);
-    console.log('File Name: ' + file.getName());
-    console.log('MIME Type: ' + imageBlob.getContentType());
-
+  // Return in legacy format for backward compatibility
+  if (result.success) {
     return {
-      status: 'READY',
-      message: 'OCR Hook prepared. Enable Cloud Vision API to activate transcription.',
+      status: 'SUCCESS',
+      message: 'OCR completed via wger function',
       fileId: fileId,
-      fileName: file.getName()
-    };
-
-  } catch (e) {
-    console.error('OCR Hook error: ' + e.message);
-    return {
-      status: 'ERROR',
-      message: e.message
+      fileName: result.fileName,
+      text: result.text
     };
   }
+
+  return {
+    status: result.status || 'ERROR',
+    message: result.message,
+    fileId: fileId,
+    fileName: result.fileName || ''
+  };
 }
 
 /**
@@ -33893,38 +35384,105 @@ function showGrievanceTrends() {
 
 /**
  * Shows OCR transcription dialog
- * Placeholder for Cloud Vision API integration
+ * Uses the wger OCR function for text extraction
  */
 function showOCRDialog() {
   var ui = SpreadsheetApp.getUi();
 
   var html = HtmlService.createHtmlOutput(
     '<style>' +
-    'body { font-family: Roboto, Arial, sans-serif; padding: 16px; }' +
-    'h3 { color: #1a73e8; margin-bottom: 16px; }' +
-    '.status { background: #e8f5e9; padding: 12px; border-radius: 8px; margin: 16px 0; }' +
-    '.warning { background: #fff3e0; padding: 12px; border-radius: 8px; margin: 16px 0; }' +
-    'input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }' +
-    'button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 12px; }' +
-    'button:hover { background: #1557b0; }' +
+    '* { box-sizing: border-box; }' +
+    'body { font-family: "Google Sans", Roboto, Arial, sans-serif; padding: 20px; margin: 0; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; color: #F8FAFC; }' +
+    'h3 { color: #F8FAFC; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; }' +
+    '.input-group { margin-bottom: 16px; }' +
+    '.input-group label { display: block; font-size: 13px; color: #94A3B8; margin-bottom: 6px; }' +
+    'input, select { width: 100%; padding: 12px; border: 2px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-size: 14px; outline: none; }' +
+    'input:focus, select:focus { border-color: #7C3AED; }' +
+    'input::placeholder { color: #64748B; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 16px; }' +
+    'button { flex: 1; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
+    '.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(124,58,237,0.4); }' +
+    '.btn-secondary { background: #334155; color: #F8FAFC; }' +
+    '.btn-secondary:hover { background: #475569; }' +
+    '.result-box { margin-top: 16px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid #334155; max-height: 200px; overflow-y: auto; }' +
+    '.result-box.success { border-color: #10B981; }' +
+    '.result-box.error { border-color: #EF4444; }' +
+    '.result-header { font-size: 12px; color: #94A3B8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }' +
+    '.result-text { font-size: 14px; white-space: pre-wrap; word-break: break-word; }' +
+    '.stats { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: #64748B; }' +
+    '.loading { text-align: center; padding: 20px; }' +
+    '.spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #334155; border-top-color: #7C3AED; border-radius: 50%; animation: spin 1s linear infinite; }' +
+    '@keyframes spin { to { transform: rotate(360deg); } }' +
+    '.help-text { font-size: 12px; color: #64748B; margin-top: 4px; }' +
     '</style>' +
-    '<h3>📝 OCR Transcription</h3>' +
-    '<div class="warning">' +
-    '<strong>⚠️ Cloud Vision API Required</strong><br>' +
-    'This feature requires Google Cloud Vision API to be enabled.' +
+    '<h3>📝 WGER OCR Transcription</h3>' +
+    '<div class="input-group">' +
+    '  <label>Google Drive File ID or URL</label>' +
+    '  <input type="text" id="fileId" placeholder="Paste file ID or Drive URL...">' +
+    '  <div class="help-text">Supports: PNG, JPG, GIF, BMP, WEBP, PDF</div>' +
     '</div>' +
-    '<p>Enter the Google Drive File ID of the handwritten form to transcribe:</p>' +
-    '<input type="text" id="fileId" placeholder="e.g., 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms">' +
-    '<div class="status">' +
-    '<strong>Status:</strong> Ready for Cloud Vision integration<br>' +
-    '<small>Contact system administrator to enable OCR capabilities.</small>' +
+    '<div class="input-group">' +
+    '  <label>OCR Mode</label>' +
+    '  <select id="ocrMode">' +
+    '    <option value="TEXT">Standard Text Detection</option>' +
+    '    <option value="HANDWRITING">Handwriting Optimized</option>' +
+    '    <option value="DOCUMENT">Document Layout Preservation</option>' +
+    '  </select>' +
     '</div>' +
-    '<button onclick="google.script.host.close()">Close</button>'
+    '<div class="btn-row">' +
+    '  <button class="btn-primary" onclick="runOCR()">🔍 Extract Text</button>' +
+    '  <button class="btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '</div>' +
+    '<div id="resultContainer"></div>' +
+    '<script>' +
+    'function extractFileId(input) {' +
+    '  input = input.trim();' +
+    '  var driveMatch = input.match(/[-\\w]{25,}/);' +
+    '  return driveMatch ? driveMatch[0] : input;' +
+    '}' +
+    'function runOCR() {' +
+    '  var rawInput = document.getElementById("fileId").value;' +
+    '  var fileId = extractFileId(rawInput);' +
+    '  var mode = document.getElementById("ocrMode").value;' +
+    '  if (!fileId) {' +
+    '    showResult({ success: false, message: "Please enter a valid file ID or URL" });' +
+    '    return;' +
+    '  }' +
+    '  document.getElementById("resultContainer").innerHTML = "<div class=\\"loading\\"><div class=\\"spinner\\"></div><div style=\\"margin-top:12px\\">Processing OCR...</div></div>";' +
+    '  google.script.run.withSuccessHandler(showResult).withFailureHandler(function(e) {' +
+    '    showResult({ success: false, message: e.message });' +
+    '  }).wger(fileId, { mode: mode });' +
+    '}' +
+    'function showResult(result) {' +
+    '  var container = document.getElementById("resultContainer");' +
+    '  if (result.success) {' +
+    '    container.innerHTML = "<div class=\\"result-box success\\">" +' +
+    '      "<div class=\\"result-header\\">✅ Extracted Text</div>" +' +
+    '      "<div class=\\"result-text\\">" + escapeHtml(result.text || "(No text found)") + "</div>" +' +
+    '      "<div class=\\"stats\\"><span>📄 " + (result.wordCount || 0) + " words</span><span>📏 " + (result.textLength || 0) + " chars</span></div>" +' +
+    '    "</div>";' +
+    '  } else {' +
+    '    container.innerHTML = "<div class=\\"result-box error\\">" +' +
+    '      "<div class=\\"result-header\\">❌ OCR Failed</div>" +' +
+    '      "<div class=\\"result-text\\">" + escapeHtml(result.message || "Unknown error") + "</div>" +' +
+    '    "</div>";' +
+    '  }' +
+    '}' +
+    'function escapeHtml(text) {' +
+    '  var div = document.createElement("div");' +
+    '  div.textContent = text;' +
+    '  return div.innerHTML;' +
+    '}' +
+    'document.getElementById("fileId").addEventListener("keypress", function(e) {' +
+    '  if (e.key === "Enter") runOCR();' +
+    '});' +
+    '</script>'
   )
-  .setWidth(450)
-  .setHeight(350);
+  .setWidth(500)
+  .setHeight(480);
 
-  ui.showModalDialog(html, '📝 OCR Form Transcription');
+  ui.showModalDialog(html, '📝 WGER OCR Transcription');
 }
 
 // ============================================================================
@@ -34135,7 +35693,7 @@ function searchPrecedentsData(query, outcomeFilter) {
 
 
 // ============================================================================
-// SOURCE: 11_SecureMemberDashboard.gs (1857 lines)
+// SOURCE: 11_SecureMemberDashboard.gs (1859 lines)
 // ============================================================================
 
 /**
@@ -35540,14 +37098,16 @@ function showStewardWorkloadReport_LEGACY() {
 // ============================================================================
 
 /**
- * Web App entry point - handles URL parameters for member portal
- * Deploy as: File > Deploy > New Deployment > Web App
- * Access URL: https://script.google.com/.../exec?id=MEMBER_ID
+ * Member Portal entry point (Legacy - now consolidated in 05_Integrations.gs doGet)
+ * NOTE: Renamed to avoid duplicate. The main doGet() in 05_Integrations.gs now handles
+ * both mobile dashboard and member portal requests.
+ * Use ?id=MEMBER_ID to access personalized portal via the main doGet()
  *
  * @param {Object} e - Event object with query parameters
  * @returns {HtmlOutput} HTML page for display
+ * @deprecated Use doGet() in 05_Integrations.gs - supports both ?id=MEMBER_ID and ?page=dashboard/search/etc
  */
-function doGet(e) {
+function doGet_MemberPortal_(e) {
   var memberId = e && e.parameter && e.parameter.id;
 
   if (memberId) {
