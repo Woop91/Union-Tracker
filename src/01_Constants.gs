@@ -1191,6 +1191,7 @@ var BATCH_LIMITS = {
   MAX_EXECUTION_TIME_MS: 300000,      // 5 minutes max execution time
   PAUSE_BETWEEN_BATCHES_MS: 100,      // Pause between batches to avoid quota limits
   MAX_PARALLEL_OPERATIONS: 10,        // Max concurrent operations
+  MAX_API_CALLS_PER_BATCH: 50,        // Max API calls before pausing (Drive, Calendar, etc.)
   CACHE_EXPIRATION_SECONDS: 21600     // 6 hours cache expiration
 };
 

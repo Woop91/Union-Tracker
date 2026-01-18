@@ -161,9 +161,9 @@ function createCommandCenterMenu() {
 
   // Web App & Portal submenu
   menu.addSubMenu(ui.createMenu('🌐 Web App & Portal')
-      .addItem('👤 Build Member Portal', 'buildMemberPortal')
+      .addItem('👤 Build Member Portal', 'buildPortalForSelectedMember')
       .addItem('📊 Build Public Portal', 'buildPublicPortal')
-      .addItem('📧 Send Portal Email', 'sendMemberDashboardEmail'));
+      .addItem('📧 Send Portal Email', 'sendPortalEmailToSelectedMember'));
 
   // v4.0 PRODUCTION MODE: Demo Data menu disappears after NUKE
   if (!isProductionMode()) {
@@ -1923,7 +1923,7 @@ function searchPrecedentsData(query, outcomeFilter) {
     var firstName = row[GRIEVANCE_COLS.FIRST_NAME - 1] || '';
     var lastName = row[GRIEVANCE_COLS.LAST_NAME - 1] || '';
     var issueCategory = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
-    var article = row[GRIEVANCE_COLS.ARTICLE - 1] || '';
+    var article = row[GRIEVANCE_COLS.ARTICLES - 1] || '';
     var location = row[GRIEVANCE_COLS.LOCATION - 1] || '';
     var resolution = row[GRIEVANCE_COLS.RESOLUTION - 1] || '';
     var dateResolved = '';

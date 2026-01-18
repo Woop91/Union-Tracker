@@ -188,6 +188,137 @@ function batchCreateGrievanceFolders(grievanceIds) {
 }
 
 /**
+ * Menu wrapper: Setup Drive folder for the currently selected grievance
+ * Gets the grievance ID from the active row in Grievance Log
+ */
+function setupFolderForSelectedGrievance() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+
+  // Check if we're in the Grievance Log
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
+    ui.alert('📁 Setup Grievance Folder',
+      'Please select a grievance row in the Grievance Log sheet first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var range = ss.getActiveRange();
+  var row = range.getRow();
+
+  // Skip header row
+  if (row < 2) {
+    ui.alert('📁 Setup Grievance Folder',
+      'Please select a data row (not the header).',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get grievance ID from column A
+  var grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+
+  if (!grievanceId) {
+    ui.alert('📁 Setup Grievance Folder',
+      'No Grievance ID found in the selected row.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Check if folder already exists
+  var existingUrl = sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
+  if (existingUrl) {
+    var response = ui.alert('📁 Folder Already Exists',
+      'A folder already exists for grievance ' + grievanceId + '.\n\n' +
+      'Would you like to open it?',
+      ui.ButtonSet.YES_NO);
+
+    if (response === ui.Button.YES) {
+      var html = HtmlService.createHtmlOutput(
+        '<script>window.open("' + existingUrl + '", "_blank"); google.script.host.close();</script>'
+      ).setWidth(1).setHeight(1);
+      ui.showModalDialog(html, 'Opening folder...');
+    }
+    return;
+  }
+
+  // Create the folder
+  ss.toast('Creating folder for ' + grievanceId + '...', '📁 Drive', 3);
+  var result = setupDriveFolderForGrievance(grievanceId);
+
+  if (result.success) {
+    ui.alert('✅ Folder Created',
+      'Folder created for grievance ' + grievanceId + '.\n\n' +
+      'The folder URL has been saved to the Grievance Log.',
+      ui.ButtonSet.OK);
+  } else {
+    ui.alert('❌ Error',
+      'Failed to create folder: ' + result.error,
+      ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Menu wrapper: Batch create folders for all grievances missing folders
+ */
+function batchCreateAllMissingFolders() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    ui.alert('Error', 'Grievance Log not found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    ui.alert('📁 Batch Create Folders', 'No grievances found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get grievance IDs and folder URLs
+  var data = sheet.getRange(2, 1, lastRow - 1, Math.max(GRIEVANCE_COLS.GRIEVANCE_ID, GRIEVANCE_COLS.DRIVE_FOLDER_URL)).getValues();
+
+  var missingFolders = [];
+  for (var i = 0; i < data.length; i++) {
+    var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+    var folderUrl = data[i][GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1];
+
+    if (grievanceId && !folderUrl) {
+      missingFolders.push(grievanceId);
+    }
+  }
+
+  if (missingFolders.length === 0) {
+    ui.alert('📁 Batch Create Folders',
+      'All grievances already have folders!',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var response = ui.alert('📁 Batch Create Folders',
+    'Found ' + missingFolders.length + ' grievances without folders.\n\n' +
+    'Create folders for all of them?\n\n' +
+    'This may take a few minutes for large numbers.',
+    ui.ButtonSet.YES_NO);
+
+  if (response !== ui.Button.YES) {
+    return;
+  }
+
+  ss.toast('Creating ' + missingFolders.length + ' folders...', '📁 Drive', 10);
+
+  var result = batchCreateGrievanceFolders(missingFolders);
+
+  ui.alert('📁 Batch Create Complete',
+    'Created: ' + result.created + ' folders\n' +
+    'Failed: ' + result.failed + '\n\n' +
+    (result.errors.length > 0 ? 'Errors:\n' + result.errors.slice(0, 5).join('\n') : ''),
+    ui.ButtonSet.OK);
+}
+
+/**
  * Updates the Drive folder link in grievance record
  * @param {string} grievanceId - The grievance ID
  * @param {string} folderUrl - The folder URL

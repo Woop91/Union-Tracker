@@ -30,7 +30,7 @@
  */
 
 // ============================================================================
-// SOURCE: 01_Constants.gs (1652 lines)
+// SOURCE: 01_Constants.gs (1653 lines)
 // ============================================================================
 
 /**
@@ -1226,6 +1226,7 @@ var BATCH_LIMITS = {
   MAX_EXECUTION_TIME_MS: 300000,      // 5 minutes max execution time
   PAUSE_BETWEEN_BATCHES_MS: 100,      // Pause between batches to avoid quota limits
   MAX_PARALLEL_OPERATIONS: 10,        // Max concurrent operations
+  MAX_API_CALLS_PER_BATCH: 50,        // Max API calls before pausing (Drive, Calendar, etc.)
   CACHE_EXPIRATION_SECONDS: 21600     // 6 hours cache expiration
 };
 
@@ -1687,7 +1688,7 @@ function generateSequentialId(prefix, sheet, idColumn) {
 
 
 // ============================================================================
-// SOURCE: 02_MemberManager.gs (810 lines)
+// SOURCE: 02_MemberManager.gs (862 lines)
 // ============================================================================
 
 /**
@@ -2498,6 +2499,58 @@ function updateMemberDataBatch(memberId, newValuesObj) {
   }
 
   return false;
+}
+
+// ============================================================================
+// IMPORT/EXPORT DIALOGS
+// ============================================================================
+
+/**
+ * Shows the import members dialog
+ * Allows importing members from CSV or other spreadsheets
+ */
+function showImportMembersDialog() {
+  var ui = SpreadsheetApp.getUi();
+  ui.alert('📥 Import Members',
+    'Import functionality coming soon!\n\n' +
+    'For now, you can:\n' +
+    '1. Copy data directly into the Member Directory sheet\n' +
+    '2. Use File > Import to import a CSV file\n' +
+    '3. Use the Add New Member dialog to add members one at a time\n\n' +
+    'Tip: Make sure your data matches the column headers in Member Directory.',
+    ui.ButtonSet.OK);
+}
+
+/**
+ * Shows the export members dialog
+ * Allows exporting members to CSV or Google Sheets
+ */
+function showExportMembersDialog() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    ui.alert('Error', 'Member Directory not found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var memberCount = lastRow > 1 ? lastRow - 1 : 0;
+
+  var response = ui.alert('📤 Export Members',
+    'Export ' + memberCount + ' members?\n\n' +
+    'Options:\n' +
+    '• Download as CSV: File > Download > Comma-separated values (.csv)\n' +
+    '• Download as Excel: File > Download > Microsoft Excel (.xlsx)\n' +
+    '• Copy to another sheet: Right-click the Member Directory tab > Copy to\n\n' +
+    'Would you like to navigate to the Member Directory sheet now?',
+    ui.ButtonSet.YES_NO);
+
+  if (response === ui.Button.YES) {
+    ss.setActiveSheet(sheet);
+    sheet.getRange('A1').activate();
+  }
 }
 
 
@@ -3876,9 +3929,9 @@ function createDashboardMenu() {
     // Members submenu - Mixed icons
     .addSubMenu(ui.createMenu('👥 Members')
       .addItem('➕ Add New Member', 'showNewMemberDialog')
-      .addItem('🔍 Find Existing Member', 'findExistingMember')
-      .addItem('📥 Import Members', 'showImportDialog')
-      .addItem('📤 Export Directory', 'showExportDialog')
+      .addItem('🔍 Find Existing Member', 'showSearchDialog')
+      .addItem('📥 Import Members', 'showImportMembersDialog')
+      .addItem('📤 Export Directory', 'showExportMembersDialog')
       .addSeparator()
       .addItem('🛡️ Steward Directory', 'showStewardDirectory')
       .addItem('🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas')
@@ -3898,9 +3951,9 @@ function createDashboardMenu() {
 
     // Drive submenu - Folder icons
     .addSubMenu(ui.createMenu('📁 Google Drive')
-      .addItem('📁 Setup Folder for Grievance', 'setupDriveFolderForGrievance')
+      .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
       .addItem('📁 View Grievance Files', 'showGrievanceFiles')
-      .addItem('📁 Batch Create Folders', 'batchCreateGrievanceFolders'))
+      .addItem('📁 Batch Create Folders', 'batchCreateAllMissingFolders'))
 
     // Notifications submenu
     .addSubMenu(ui.createMenu('🔔 Notifications')
@@ -9339,7 +9392,7 @@ function getStewardDashboardData() {
       var status = (grievanceData[g][GRIEVANCE_COLS.STATUS - 1] || '').toString();
       var steward = grievanceData[g][GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
       var location = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
-      var article = grievanceData[g][GRIEVANCE_COLS.CONTRACT_ARTICLE - 1];
+      var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
 
       if (!grievanceData[g][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) continue;
       data.totalGrievances++;
@@ -9771,7 +9824,7 @@ function renderBargainingCheatSheet_LEGACY() {
         if (days > 0) settlementDays.push(days);
       }
 
-      var article = grievanceData[g][GRIEVANCE_COLS.CONTRACT_ARTICLE - 1];
+      var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
       if (article) {
         articleViolations[article] = (articleViolations[article] || 0) + 1;
       }
@@ -10919,7 +10972,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2033 lines)
+// SOURCE: 05_Integrations.gs (2164 lines)
 // ============================================================================
 
 /**
@@ -11109,6 +11162,137 @@ function batchCreateGrievanceFolders(grievanceIds) {
     errors: results.errors,
     message: `Created ${results.success} folders, ${results.failed} failed`
   };
+}
+
+/**
+ * Menu wrapper: Setup Drive folder for the currently selected grievance
+ * Gets the grievance ID from the active row in Grievance Log
+ */
+function setupFolderForSelectedGrievance() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+
+  // Check if we're in the Grievance Log
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
+    ui.alert('📁 Setup Grievance Folder',
+      'Please select a grievance row in the Grievance Log sheet first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var range = ss.getActiveRange();
+  var row = range.getRow();
+
+  // Skip header row
+  if (row < 2) {
+    ui.alert('📁 Setup Grievance Folder',
+      'Please select a data row (not the header).',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get grievance ID from column A
+  var grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+
+  if (!grievanceId) {
+    ui.alert('📁 Setup Grievance Folder',
+      'No Grievance ID found in the selected row.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Check if folder already exists
+  var existingUrl = sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
+  if (existingUrl) {
+    var response = ui.alert('📁 Folder Already Exists',
+      'A folder already exists for grievance ' + grievanceId + '.\n\n' +
+      'Would you like to open it?',
+      ui.ButtonSet.YES_NO);
+
+    if (response === ui.Button.YES) {
+      var html = HtmlService.createHtmlOutput(
+        '<script>window.open("' + existingUrl + '", "_blank"); google.script.host.close();</script>'
+      ).setWidth(1).setHeight(1);
+      ui.showModalDialog(html, 'Opening folder...');
+    }
+    return;
+  }
+
+  // Create the folder
+  ss.toast('Creating folder for ' + grievanceId + '...', '📁 Drive', 3);
+  var result = setupDriveFolderForGrievance(grievanceId);
+
+  if (result.success) {
+    ui.alert('✅ Folder Created',
+      'Folder created for grievance ' + grievanceId + '.\n\n' +
+      'The folder URL has been saved to the Grievance Log.',
+      ui.ButtonSet.OK);
+  } else {
+    ui.alert('❌ Error',
+      'Failed to create folder: ' + result.error,
+      ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Menu wrapper: Batch create folders for all grievances missing folders
+ */
+function batchCreateAllMissingFolders() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    ui.alert('Error', 'Grievance Log not found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    ui.alert('📁 Batch Create Folders', 'No grievances found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get grievance IDs and folder URLs
+  var data = sheet.getRange(2, 1, lastRow - 1, Math.max(GRIEVANCE_COLS.GRIEVANCE_ID, GRIEVANCE_COLS.DRIVE_FOLDER_URL)).getValues();
+
+  var missingFolders = [];
+  for (var i = 0; i < data.length; i++) {
+    var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+    var folderUrl = data[i][GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1];
+
+    if (grievanceId && !folderUrl) {
+      missingFolders.push(grievanceId);
+    }
+  }
+
+  if (missingFolders.length === 0) {
+    ui.alert('📁 Batch Create Folders',
+      'All grievances already have folders!',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var response = ui.alert('📁 Batch Create Folders',
+    'Found ' + missingFolders.length + ' grievances without folders.\n\n' +
+    'Create folders for all of them?\n\n' +
+    'This may take a few minutes for large numbers.',
+    ui.ButtonSet.YES_NO);
+
+  if (response !== ui.Button.YES) {
+    return;
+  }
+
+  ss.toast('Creating ' + missingFolders.length + ' folders...', '📁 Drive', 10);
+
+  var result = batchCreateGrievanceFolders(missingFolders);
+
+  ui.alert('📁 Batch Create Complete',
+    'Created: ' + result.created + ' folders\n' +
+    'Failed: ' + result.failed + '\n\n' +
+    (result.errors.length > 0 ? 'Errors:\n' + result.errors.slice(0, 5).join('\n') : ''),
+    ui.ButtonSet.OK);
 }
 
 /**
@@ -24152,7 +24336,7 @@ function getPublicGrievanceData() {
 
     var status = data[i][GRIEVANCE_COLS.STATUS - 1] || 'Unknown';
     var resolution = (data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '').toString();
-    var gType = data[i][GRIEVANCE_COLS.GRIEVANCE_TYPE - 1] || 'Other';
+    var gType = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
 
     // Count by status
     statusCounts[status] = (statusCounts[status] || 0) + 1;
@@ -24173,7 +24357,7 @@ function getPublicGrievanceData() {
 
     // Calculate days to resolve for closed grievances
     if (status === 'Closed' || status === 'Resolved') {
-      var dateOpened = data[i][GRIEVANCE_COLS.DATE_OPENED - 1];
+      var dateOpened = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
       var dateClosed = data[i][GRIEVANCE_COLS.DATE_CLOSED - 1];
       if (dateOpened && dateClosed) {
         var days = Math.round((new Date(dateClosed) - new Date(dateOpened)) / (1000 * 60 * 60 * 24));
@@ -32119,9 +32303,9 @@ function createCommandCenterMenu() {
 
   // Web App & Portal submenu
   menu.addSubMenu(ui.createMenu('🌐 Web App & Portal')
-      .addItem('👤 Build Member Portal', 'buildMemberPortal')
+      .addItem('👤 Build Member Portal', 'buildPortalForSelectedMember')
       .addItem('📊 Build Public Portal', 'buildPublicPortal')
-      .addItem('📧 Send Portal Email', 'sendMemberDashboardEmail'));
+      .addItem('📧 Send Portal Email', 'sendPortalEmailToSelectedMember'));
 
   // v4.0 PRODUCTION MODE: Demo Data menu disappears after NUKE
   if (!isProductionMode()) {
@@ -33881,7 +34065,7 @@ function searchPrecedentsData(query, outcomeFilter) {
     var firstName = row[GRIEVANCE_COLS.FIRST_NAME - 1] || '';
     var lastName = row[GRIEVANCE_COLS.LAST_NAME - 1] || '';
     var issueCategory = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
-    var article = row[GRIEVANCE_COLS.ARTICLE - 1] || '';
+    var article = row[GRIEVANCE_COLS.ARTICLES - 1] || '';
     var location = row[GRIEVANCE_COLS.LOCATION - 1] || '';
     var resolution = row[GRIEVANCE_COLS.RESOLUTION - 1] || '';
     var dateResolved = '';
@@ -33951,7 +34135,7 @@ function searchPrecedentsData(query, outcomeFilter) {
 
 
 // ============================================================================
-// SOURCE: 11_SecureMemberDashboard.gs (1748 lines)
+// SOURCE: 11_SecureMemberDashboard.gs (1857 lines)
 // ============================================================================
 
 /**
@@ -35376,6 +35560,115 @@ function doGet(e) {
 }
 
 /**
+ * Menu wrapper: Build portal for the currently selected member
+ * Gets the member ID from the active row in Member Directory
+ */
+function buildPortalForSelectedMember() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+
+  // Check if we're in the Member Directory
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('👤 Build Member Portal',
+      'Please select a member row in the Member Directory sheet first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var range = ss.getActiveRange();
+  var row = range.getRow();
+
+  // Skip header row
+  if (row < 2) {
+    ui.alert('👤 Build Member Portal',
+      'Please select a data row (not the header).',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get member ID from column A
+  var memberId = sheet.getRange(row, MEMBER_COLS.MEMBER_ID).getValue();
+
+  if (!memberId) {
+    ui.alert('👤 Build Member Portal',
+      'No Member ID found in the selected row.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Build and show the portal
+  var portal = buildMemberPortal(memberId);
+  ui.showModalDialog(portal, '509 Member Portal');
+}
+
+/**
+ * Menu wrapper: Send portal email to the currently selected member
+ * Gets the member ID from the active row in Member Directory
+ */
+function sendPortalEmailToSelectedMember() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+
+  // Check if we're in the Member Directory
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('📧 Send Portal Email',
+      'Please select a member row in the Member Directory sheet first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var range = ss.getActiveRange();
+  var row = range.getRow();
+
+  // Skip header row
+  if (row < 2) {
+    ui.alert('📧 Send Portal Email',
+      'Please select a data row (not the header).',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get member ID and email from the row
+  var memberId = sheet.getRange(row, MEMBER_COLS.MEMBER_ID).getValue();
+  var memberEmail = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+
+  if (!memberId) {
+    ui.alert('📧 Send Portal Email',
+      'No Member ID found in the selected row.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  if (!memberEmail) {
+    ui.alert('📧 Send Portal Email',
+      'No email address found for this member.\n\n' +
+      'Please add an email address to the Member Directory first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var response = ui.alert('📧 Send Portal Email',
+    'Send portal access email to:\n\n' +
+    firstName + ' (' + memberEmail + ')?\n\n' +
+    'This will send them a link to access their personalized member portal.',
+    ui.ButtonSet.YES_NO);
+
+  if (response !== ui.Button.YES) {
+    return;
+  }
+
+  // Send the email
+  sendMemberDashboardEmail(memberId);
+
+  ui.alert('✅ Email Sent',
+    'Portal access email sent to ' + memberEmail,
+    ui.ButtonSet.OK);
+}
+
+/**
  * Builds personalized member portal for specific member ID
  * @param {string} memberId - The member ID to look up
  * @returns {HtmlOutput} Personalized portal HTML
@@ -35430,7 +35723,7 @@ function getMemberProfile(memberId) {
         lastName: data[i][MEMBER_COLS.LAST_NAME - 1] || '',
         unit: data[i][MEMBER_COLS.UNIT - 1] || 'General',
         workLocation: data[i][MEMBER_COLS.WORK_LOCATION - 1] || '',
-        duesPaying: data[i][MEMBER_COLS.DUES_PAYING - 1] === 'Yes',
+        duesPaying: true, // Default to true (DUES_PAYING column not in current schema)
         isSteward: data[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes',
         volunteerHours: parseFloat(data[i][MEMBER_COLS.VOLUNTEER_HOURS - 1]) || 0
         // Note: Email and phone intentionally excluded for security
