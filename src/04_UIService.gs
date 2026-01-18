@@ -55,9 +55,9 @@ function createDashboardMenu() {
     // Members submenu - Mixed icons
     .addSubMenu(ui.createMenu('👥 Members')
       .addItem('➕ Add New Member', 'showNewMemberDialog')
-      .addItem('🔍 Find Existing Member', 'findExistingMember')
-      .addItem('📥 Import Members', 'showImportDialog')
-      .addItem('📤 Export Directory', 'showExportDialog')
+      .addItem('🔍 Find Existing Member', 'showSearchDialog')
+      .addItem('📥 Import Members', 'showImportMembersDialog')
+      .addItem('📤 Export Directory', 'showExportMembersDialog')
       .addSeparator()
       .addItem('🛡️ Steward Directory', 'showStewardDirectory')
       .addItem('🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas')
@@ -77,9 +77,9 @@ function createDashboardMenu() {
 
     // Drive submenu - Folder icons
     .addSubMenu(ui.createMenu('📁 Google Drive')
-      .addItem('📁 Setup Folder for Grievance', 'setupDriveFolderForGrievance')
+      .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
       .addItem('📁 View Grievance Files', 'showGrievanceFiles')
-      .addItem('📁 Batch Create Folders', 'batchCreateGrievanceFolders'))
+      .addItem('📁 Batch Create Folders', 'batchCreateAllMissingFolders'))
 
     // Notifications submenu
     .addSubMenu(ui.createMenu('🔔 Notifications')
@@ -5525,7 +5525,7 @@ function getStewardDashboardData() {
       var status = (grievanceData[g][GRIEVANCE_COLS.STATUS - 1] || '').toString();
       var steward = grievanceData[g][GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
       var location = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
-      var article = grievanceData[g][GRIEVANCE_COLS.CONTRACT_ARTICLE - 1];
+      var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
 
       if (!grievanceData[g][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) continue;
       data.totalGrievances++;
@@ -5957,7 +5957,7 @@ function renderBargainingCheatSheet_LEGACY() {
         if (days > 0) settlementDays.push(days);
       }
 
-      var article = grievanceData[g][GRIEVANCE_COLS.CONTRACT_ARTICLE - 1];
+      var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
       if (article) {
         articleViolations[article] = (articleViolations[article] || 0) + 1;
       }

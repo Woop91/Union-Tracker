@@ -5578,7 +5578,7 @@ function getPublicGrievanceData() {
 
     var status = data[i][GRIEVANCE_COLS.STATUS - 1] || 'Unknown';
     var resolution = (data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '').toString();
-    var gType = data[i][GRIEVANCE_COLS.GRIEVANCE_TYPE - 1] || 'Other';
+    var gType = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
 
     // Count by status
     statusCounts[status] = (statusCounts[status] || 0) + 1;
@@ -5599,7 +5599,7 @@ function getPublicGrievanceData() {
 
     // Calculate days to resolve for closed grievances
     if (status === 'Closed' || status === 'Resolved') {
-      var dateOpened = data[i][GRIEVANCE_COLS.DATE_OPENED - 1];
+      var dateOpened = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
       var dateClosed = data[i][GRIEVANCE_COLS.DATE_CLOSED - 1];
       if (dateOpened && dateClosed) {
         var days = Math.round((new Date(dateClosed) - new Date(dateOpened)) / (1000 * 60 * 60 * 24));

@@ -807,3 +807,55 @@ function updateMemberDataBatch(memberId, newValuesObj) {
 
   return false;
 }
+
+// ============================================================================
+// IMPORT/EXPORT DIALOGS
+// ============================================================================
+
+/**
+ * Shows the import members dialog
+ * Allows importing members from CSV or other spreadsheets
+ */
+function showImportMembersDialog() {
+  var ui = SpreadsheetApp.getUi();
+  ui.alert('📥 Import Members',
+    'Import functionality coming soon!\n\n' +
+    'For now, you can:\n' +
+    '1. Copy data directly into the Member Directory sheet\n' +
+    '2. Use File > Import to import a CSV file\n' +
+    '3. Use the Add New Member dialog to add members one at a time\n\n' +
+    'Tip: Make sure your data matches the column headers in Member Directory.',
+    ui.ButtonSet.OK);
+}
+
+/**
+ * Shows the export members dialog
+ * Allows exporting members to CSV or Google Sheets
+ */
+function showExportMembersDialog() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    ui.alert('Error', 'Member Directory not found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var memberCount = lastRow > 1 ? lastRow - 1 : 0;
+
+  var response = ui.alert('📤 Export Members',
+    'Export ' + memberCount + ' members?\n\n' +
+    'Options:\n' +
+    '• Download as CSV: File > Download > Comma-separated values (.csv)\n' +
+    '• Download as Excel: File > Download > Microsoft Excel (.xlsx)\n' +
+    '• Copy to another sheet: Right-click the Member Directory tab > Copy to\n\n' +
+    'Would you like to navigate to the Member Directory sheet now?',
+    ui.ButtonSet.YES_NO);
+
+  if (response === ui.Button.YES) {
+    ss.setActiveSheet(sheet);
+    sheet.getRange('A1').activate();
+  }
+}

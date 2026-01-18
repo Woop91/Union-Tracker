@@ -1422,6 +1422,115 @@ function doGet_MemberPortal_(e) {
 }
 
 /**
+ * Menu wrapper: Build portal for the currently selected member
+ * Gets the member ID from the active row in Member Directory
+ */
+function buildPortalForSelectedMember() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+
+  // Check if we're in the Member Directory
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('👤 Build Member Portal',
+      'Please select a member row in the Member Directory sheet first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var range = ss.getActiveRange();
+  var row = range.getRow();
+
+  // Skip header row
+  if (row < 2) {
+    ui.alert('👤 Build Member Portal',
+      'Please select a data row (not the header).',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get member ID from column A
+  var memberId = sheet.getRange(row, MEMBER_COLS.MEMBER_ID).getValue();
+
+  if (!memberId) {
+    ui.alert('👤 Build Member Portal',
+      'No Member ID found in the selected row.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Build and show the portal
+  var portal = buildMemberPortal(memberId);
+  ui.showModalDialog(portal, '509 Member Portal');
+}
+
+/**
+ * Menu wrapper: Send portal email to the currently selected member
+ * Gets the member ID from the active row in Member Directory
+ */
+function sendPortalEmailToSelectedMember() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+
+  // Check if we're in the Member Directory
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('📧 Send Portal Email',
+      'Please select a member row in the Member Directory sheet first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var range = ss.getActiveRange();
+  var row = range.getRow();
+
+  // Skip header row
+  if (row < 2) {
+    ui.alert('📧 Send Portal Email',
+      'Please select a data row (not the header).',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Get member ID and email from the row
+  var memberId = sheet.getRange(row, MEMBER_COLS.MEMBER_ID).getValue();
+  var memberEmail = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+
+  if (!memberId) {
+    ui.alert('📧 Send Portal Email',
+      'No Member ID found in the selected row.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  if (!memberEmail) {
+    ui.alert('📧 Send Portal Email',
+      'No email address found for this member.\n\n' +
+      'Please add an email address to the Member Directory first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var response = ui.alert('📧 Send Portal Email',
+    'Send portal access email to:\n\n' +
+    firstName + ' (' + memberEmail + ')?\n\n' +
+    'This will send them a link to access their personalized member portal.',
+    ui.ButtonSet.YES_NO);
+
+  if (response !== ui.Button.YES) {
+    return;
+  }
+
+  // Send the email
+  sendMemberDashboardEmail(memberId);
+
+  ui.alert('✅ Email Sent',
+    'Portal access email sent to ' + memberEmail,
+    ui.ButtonSet.OK);
+}
+
+/**
  * Builds personalized member portal for specific member ID
  * @param {string} memberId - The member ID to look up
  * @returns {HtmlOutput} Personalized portal HTML
@@ -1476,7 +1585,7 @@ function getMemberProfile(memberId) {
         lastName: data[i][MEMBER_COLS.LAST_NAME - 1] || '',
         unit: data[i][MEMBER_COLS.UNIT - 1] || 'General',
         workLocation: data[i][MEMBER_COLS.WORK_LOCATION - 1] || '',
-        duesPaying: data[i][MEMBER_COLS.DUES_PAYING - 1] === 'Yes',
+        duesPaying: true, // Default to true (DUES_PAYING column not in current schema)
         isSteward: data[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes',
         volunteerHours: parseFloat(data[i][MEMBER_COLS.VOLUNTEER_HOURS - 1]) || 0
         // Note: Email and phone intentionally excluded for security
