@@ -3047,7 +3047,7 @@ function createFunctionChecklistSheet_() {
     // ═══ PHASE 16: Member Management (v4.1) ═══
     ['1️⃣6️⃣ Members', '👤 Member Tools', '➕ Add New Member', 'addMember', 'Adds a new member to the Member Directory'],
     ['1️⃣6️⃣ Members', '👤 Member Tools', '🔄 Update Member', 'updateMember', 'Updates an existing member record'],
-    ['1️⃣6️⃣ Members', '👤 Member Tools', '🔍 Find Existing Member', 'findExistingMember', 'Multi-key smart match (ID, Email, Name) for duplicate prevention'],
+    ['1️⃣6️⃣ Members', '👤 Member Tools', '🔍 Find Existing Member', 'showFindMemberDialog', 'Multi-key smart match (ID, Email, Name) for duplicate prevention'],
     ['1️⃣6️⃣ Members', '👤 Member Tools', '📧 Send Contact Form', 'sendContactInfoForm', 'Sends contact info update form to selected member'],
     ['1️⃣6️⃣ Members', '👤 Member Tools', '📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink', 'Gets link to member satisfaction survey'],
 
@@ -3076,7 +3076,7 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📋 Grievances', '📋 View Active Grievances', 'viewActiveGrievances', 'Shows filtered list of all open/pending grievances'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📋 Grievances', '🔄 Refresh Grievance Formulas', 'recalcAllGrievancesBatched', 'Recalculates deadline and status formulas'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📋 Grievances', '🔗 Setup Live Grievance Links', 'setupLiveGrievanceFormulas', 'Creates formulas linking grievances to member data'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👥 Members', '🔍 Find Existing Member', 'findExistingMember', 'Multi-key smart match for duplicate prevention'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👥 Members', '🔍 Find Existing Member', 'showFindMemberDialog', 'Multi-key smart match for duplicate prevention'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👥 Members', '🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas', 'Updates calculated columns in Member Directory'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📁 Google Drive', '📁 Setup Folder for Grievance', 'setupDriveFolderForGrievance', 'Creates organized folder structure for grievance documents'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📁 Google Drive', '📁 View Grievance Files', 'showGrievanceFiles', 'Shows all files associated with selected grievance'],
