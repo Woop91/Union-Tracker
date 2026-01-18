@@ -749,14 +749,17 @@ var CONFIG_COLS = {
   // ── FORM LINKS ── (AR)
   SATISFACTION_FORM_URL: 44,  // AR - Member Satisfaction Survey form URL
 
-  // ── STRATEGIC COMMAND CENTER ── (AS-AZ)
+  // ── STRATEGIC COMMAND CENTER ── (AS-AY)
   CHIEF_STEWARD_EMAIL: 45,    // AS - Email for escalation alerts
   UNIT_CODES: 46,             // AT - Unit code prefixes (format: "Unit Name:CODE,Unit2:CODE2")
   ARCHIVE_FOLDER_ID: 47,      // AU - Drive folder ID for archives
   ESCALATION_STATUSES: 48,    // AV - Status values that trigger alerts (comma-separated)
   ESCALATION_STEPS: 49,       // AW - Step values that trigger alerts (comma-separated)
   TEMPLATE_ID: 50,            // AX - Google Doc template ID for grievance PDFs
-  PDF_FOLDER_ID: 51           // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
+  PDF_FOLDER_ID: 51,          // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
+
+  // ── CONTRACT & RESOURCES ── (AZ)
+  CONTRACT_PDF_URL: 52        // AZ - URL to union contract PDF (Google Drive or external link)
 };
 
 // ============================================================================
@@ -36153,24 +36156,23 @@ function getStewardWorkload() {
 
 /**
  * Gets contract PDF URL from Config sheet
- * @returns {string} Contract PDF URL
+ * Uses CONFIG_COLS.CONTRACT_PDF_URL (column AZ) for the contract link
+ * @returns {string} Contract PDF URL or '#' if not configured
  */
 function getContractPdfUrl_() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
-      // Check for a Contract URL in config - using a placeholder column
-      // Users should update this in their Config sheet
-      var url = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).getValue();
-      if (url && url.toString().indexOf('pdf') > -1) {
-        return url;
+      var url = configSheet.getRange(2, CONFIG_COLS.CONTRACT_PDF_URL).getValue();
+      if (url && url.toString().trim() !== '') {
+        return url.toString().trim();
       }
     }
   } catch (e) {
     Logger.log('Contract URL error: ' + e.message);
   }
-  return '#'; // Placeholder
+  return '#'; // Not configured
 }
 
 /**
