@@ -549,8 +549,9 @@ function navToDash() {
 
 /**
  * Navigate to Mobile View (if exists)
+ * NOTE: Duplicate exists in 10_CommandCenter.gs - this version kept for compatibility
  */
-function navToMobile() {
+function navToMobile_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var mobileSheet = ss.getSheetByName('📱 Mobile View');
 
@@ -772,6 +773,63 @@ function refreshVisualsSimple_() {
   }
 
   ss.toast('Refresh complete', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Refreshes all visual elements, data calculations, and alerts
+ * Main entry point for Force Global Refresh menu item
+ */
+function refreshAllVisuals() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  ss.toast('Refreshing all visuals and data...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  // Refresh hidden calculation sheets if available
+  try {
+    if (typeof rebuildAllHiddenSheets === 'function') {
+      rebuildAllHiddenSheets();
+    }
+  } catch (e) {
+    Logger.log('Hidden sheets refresh error: ' + e.message);
+  }
+
+  // Apply traffic light indicators
+  try {
+    if (typeof applyTrafficLightIndicators === 'function') {
+      applyTrafficLightIndicators();
+    }
+  } catch (e) {
+    Logger.log('Traffic lights error: ' + e.message);
+  }
+
+  // Apply global theme
+  try {
+    if (typeof APPLY_SYSTEM_THEME === 'function') {
+      APPLY_SYSTEM_THEME();
+    }
+  } catch (e) {
+    Logger.log('Theme error: ' + e.message);
+  }
+
+  // Check for alerts
+  try {
+    if (typeof checkDashboardAlerts === 'function') {
+      checkDashboardAlerts();
+    }
+  } catch (e) {
+    Logger.log('Alert check error: ' + e.message);
+  }
+
+  // Sync checklist progress if available
+  try {
+    if (typeof syncChecklistCalcToGrievanceLog === 'function') {
+      syncChecklistCalcToGrievanceLog();
+    }
+  } catch (e) {
+    Logger.log('Checklist sync error: ' + e.message);
+  }
+
+  ss.toast('All visuals refreshed!', COMMAND_CONFIG.SYSTEM_NAME, 5);
 }
 
 // ============================================================================
@@ -2226,6 +2284,61 @@ function deactivateFocusMode() {
   ss.toast('✅ Focus mode deactivated', 'Focus Mode', 3);
 }
 
+// ==================== POMODORO TIMER ====================
+
+/**
+ * Starts a simple Pomodoro timer using Google Sheets toast notifications
+ * Shows a 25-minute work session reminder
+ */
+function startPomodoroTimer() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Show starting message
+  ss.toast('🍅 Pomodoro started! Focus for 25 minutes.\n\nYou\'ll get a notification when the session ends.', 'Pomodoro Timer', 10);
+
+  // Create a time-driven trigger for 25 minutes from now
+  var triggerTime = new Date(new Date().getTime() + 25 * 60 * 1000);
+
+  // Store the start time
+  PropertiesService.getUserProperties().setProperty('pomodoroStart', new Date().toISOString());
+
+  // For immediate feedback, show a modal with timer info
+  var html = HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><html><head><base target="_top"><style>' +
+    'body{font-family:Arial,sans-serif;padding:30px;text-align:center;background:linear-gradient(135deg,#ff6b6b,#ee5a24)}' +
+    '.timer{font-size:72px;color:white;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}' +
+    '.label{color:white;font-size:18px;margin-top:10px;opacity:0.9}' +
+    '.tip{background:rgba(255,255,255,0.2);padding:15px;border-radius:8px;margin-top:20px;color:white}' +
+    'button{background:white;color:#ee5a24;border:none;padding:12px 24px;border-radius:25px;font-size:16px;cursor:pointer;margin-top:20px}' +
+    '</style></head><body>' +
+    '<div class="timer" id="time">25:00</div>' +
+    '<div class="label">🍅 Focus Time Remaining</div>' +
+    '<div class="tip">💡 Tip: Close this window and focus on your task.<br>A toast notification will remind you when time is up.</div>' +
+    '<button onclick="google.script.host.close()">Start Focusing</button>' +
+    '<script>' +
+    'var seconds = 25 * 60;' +
+    'var timer = setInterval(function(){' +
+    '  seconds--;' +
+    '  if(seconds <= 0){clearInterval(timer);document.getElementById("time").innerHTML="Done!";return;}' +
+    '  var m = Math.floor(seconds/60);' +
+    '  var s = seconds % 60;' +
+    '  document.getElementById("time").innerHTML = m + ":" + (s < 10 ? "0" : "") + s;' +
+    '},1000);' +
+    '</script></body></html>'
+  ).setWidth(350).setHeight(350);
+
+  ui.showModelessDialog(html, '🍅 Pomodoro Timer');
+}
+
+/**
+ * Called when Pomodoro timer ends (placeholder for trigger-based implementation)
+ */
+function onPomodoroEnd_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast('🍅 Pomodoro complete! Take a 5-minute break.', 'Break Time!', 30);
+}
+
 // ==================== QUICK CAPTURE NOTEPAD ====================
 
 /**
@@ -2390,8 +2503,9 @@ function showQuickCaptureNotepad() {
 /**
  * Shows import dialog for bulk member import from CSV
  * Provides paste area for CSV data with preview and validation
+ * NOTE: Duplicate exists in 09_Main.gs - keeping both for compatibility
  */
-function showImportDialog() {
+function showImportDialog_UIService_() {
   var html = HtmlService.createHtmlOutput(getImportDialogHtml_())
     .setWidth(700)
     .setHeight(600);
@@ -2629,8 +2743,9 @@ function mapImportColumns_(headers) {
 /**
  * Shows export dialog for member directory export
  * Creates downloadable CSV file
+ * NOTE: Duplicate exists in 09_Main.gs - keeping both for compatibility
  */
-function showExportDialog() {
+function showExportDialog_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -6926,8 +7041,10 @@ function sendMemberDashboardLink() {
  * Sends the Member Dashboard URL to the selected member from Member Directory.
  * Uses the currently selected row to get member email and name.
  * This is a PII-protected view link.
+ * NOTE: Duplicate exists in 11_SecureMemberDashboard.gs - this version kept for compatibility
+ * @deprecated Use emailDashboardLink() in 11_SecureMemberDashboard.gs
  */
-function emailDashboardLink() {
+function emailDashboardLink_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
   var row = sheet.getActiveRange().getRow();
@@ -6995,8 +7112,10 @@ function emailDashboardLink() {
  * - Active cases, total cases, and win rates
  * - Response time averages
  * - Member satisfaction scores (if available)
+ * NOTE: Duplicate exists in 11_SecureMemberDashboard.gs - this version kept for compatibility
+ * @deprecated Use showStewardPerformanceModal() in 11_SecureMemberDashboard.gs
  */
-function showStewardPerformanceModal() {
+function showStewardPerformanceModal_UIService_() {
   var stewardData = getStewardWorkload();
 
   if (!stewardData || stewardData.length === 0) {
@@ -7210,10 +7329,11 @@ function checkDuplicateMemberIDs_UIService_() {
 /**
  * Creates a grievance PDF document with signature blocks
  * Uses Google Docs template if configured, otherwise creates from scratch
+ * NOTE: createGrievancePDF(folder, data) exists in 10_CommandCenter.gs with different signature
  * @param {Object} data - Grievance data object with name, details, etc.
  * @returns {File} The created PDF file
  */
-function createGrievancePDF(data) {
+function createGrievancePDF_UIService_(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Get or create archive folder
@@ -7306,8 +7426,10 @@ function createGrievancePDF(data) {
 
 /**
  * Creates PDF for the currently selected grievance row
+ * NOTE: Duplicate exists in 05_Integrations.gs - this version is kept for backwards compatibility
+ * @deprecated Use createPDFForSelectedGrievance() in 05_Integrations.gs
  */
-function createPDFForSelectedGrievance() {
+function createPDFForSelectedGrievance_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 

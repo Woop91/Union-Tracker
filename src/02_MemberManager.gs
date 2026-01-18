@@ -231,10 +231,12 @@ function getAllStewards() {
 }
 
 /**
- * Gets steward workload statistics
- * @returns {Array} Array of steward workload objects
+ * Gets detailed steward workload statistics including win rates
+ * NOTE: A simpler getStewardWorkload() exists in 11_SecureMemberDashboard.gs for dashboard use
+ * This version provides detailed metrics: activeCases, totalCases, wonCases, winRate
+ * @returns {Array} Array of steward workload objects with detailed metrics
  */
-function getStewardWorkload() {
+function getStewardWorkloadDetailed() {
   var stewards = getAllStewards();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
