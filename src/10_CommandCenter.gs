@@ -1443,40 +1443,438 @@ function sendGeminiEscalationAlert(member, caseID, status) {
 // ============================================================================
 
 /**
- * EXTENSION: CLOUD VISION OCR HOOK
+ * WGER OCR FUNCTION
+ * Main OCR function for transcribing handwritten forms and documents.
+ * Uses Google Cloud Vision API for text detection and extraction.
+ *
+ * Supported formats: PNG, JPG, JPEG, GIF, BMP, WEBP, PDF (first page)
+ *
+ * @param {string} fileId - Google Drive file ID of the image/document to transcribe
+ * @param {Object} options - Optional configuration object
+ * @param {string} options.mode - OCR mode: 'TEXT' (default), 'DOCUMENT', 'HANDWRITING'
+ * @param {boolean} options.autoPopulate - If true, attempts to auto-populate grievance fields
+ * @param {string} options.targetGrievanceId - Grievance ID to populate (if autoPopulate is true)
+ * @returns {Object} Result object with extracted text and metadata
+ */
+function wger(fileId, options) {
+  options = options || {};
+  var mode = options.mode || 'TEXT';
+  var autoPopulate = options.autoPopulate || false;
+  var targetGrievanceId = options.targetGrievanceId || null;
+
+  try {
+    // Validate file ID
+    if (!fileId || typeof fileId !== 'string') {
+      return {
+        success: false,
+        status: 'ERROR',
+        message: 'Invalid file ID provided',
+        text: ''
+      };
+    }
+
+    var file = DriveApp.getFileById(fileId);
+    var fileName = file.getName();
+    var mimeType = file.getMimeType();
+    var imageBlob = file.getBlob();
+
+    // Validate file type
+    var supportedTypes = [
+      'image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'image/webp',
+      'application/pdf'
+    ];
+
+    if (supportedTypes.indexOf(mimeType) === -1) {
+      return {
+        success: false,
+        status: 'UNSUPPORTED_FORMAT',
+        message: 'Unsupported file format: ' + mimeType + '. Supported: PNG, JPG, GIF, BMP, WEBP, PDF',
+        fileName: fileName,
+        text: ''
+      };
+    }
+
+    // Log OCR request for audit
+    logAuditEvent('OCR_REQUEST', {
+      fileId: fileId,
+      fileName: fileName,
+      mimeType: mimeType,
+      mode: mode,
+      requestedBy: Session.getActiveUser().getEmail()
+    });
+
+    // Perform OCR using Google Cloud Vision API
+    var ocrResult = performCloudVisionOCR_(imageBlob, mode);
+
+    if (!ocrResult.success) {
+      return {
+        success: false,
+        status: 'OCR_FAILED',
+        message: ocrResult.message,
+        fileName: fileName,
+        text: ''
+      };
+    }
+
+    var extractedText = ocrResult.text;
+
+    // Auto-populate grievance fields if requested
+    var populationResult = null;
+    if (autoPopulate && targetGrievanceId && extractedText) {
+      populationResult = autoPopulateGrievanceFromOCR_(extractedText, targetGrievanceId);
+    }
+
+    // Log successful OCR
+    logAuditEvent('OCR_COMPLETED', {
+      fileId: fileId,
+      fileName: fileName,
+      textLength: extractedText.length,
+      autoPopulated: autoPopulate && populationResult && populationResult.success
+    });
+
+    return {
+      success: true,
+      status: 'SUCCESS',
+      message: 'OCR completed successfully',
+      fileId: fileId,
+      fileName: fileName,
+      mimeType: mimeType,
+      mode: mode,
+      text: extractedText,
+      textLength: extractedText.length,
+      wordCount: extractedText.split(/\s+/).filter(function(w) { return w.length > 0; }).length,
+      populationResult: populationResult,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (e) {
+    console.error('WGER OCR error: ' + e.message);
+    logAuditEvent('OCR_ERROR', {
+      fileId: fileId,
+      error: e.message
+    });
+
+    return {
+      success: false,
+      status: 'ERROR',
+      message: 'OCR failed: ' + e.message,
+      text: ''
+    };
+  }
+}
+
+/**
+ * Performs OCR using Google Cloud Vision API
+ * @param {Blob} imageBlob - Image blob to process
+ * @param {string} mode - OCR mode (TEXT, DOCUMENT, HANDWRITING)
+ * @returns {Object} Result with success status and extracted text
+ * @private
+ */
+function performCloudVisionOCR_(imageBlob, mode) {
+  try {
+    // Get API key from script properties (set via Script Properties or Config)
+    var apiKey = PropertiesService.getScriptProperties().getProperty('CLOUD_VISION_API_KEY');
+
+    if (!apiKey) {
+      // Fallback: Try to use built-in Cloud Vision (requires Cloud project linking)
+      return performBuiltInOCR_(imageBlob, mode);
+    }
+
+    // Prepare Cloud Vision API request
+    var base64Image = Utilities.base64Encode(imageBlob.getBytes());
+
+    // Select feature type based on mode
+    var featureType = 'TEXT_DETECTION';
+    if (mode === 'DOCUMENT') {
+      featureType = 'DOCUMENT_TEXT_DETECTION';
+    } else if (mode === 'HANDWRITING') {
+      featureType = 'DOCUMENT_TEXT_DETECTION'; // Best for handwriting
+    }
+
+    var requestBody = {
+      requests: [{
+        image: {
+          content: base64Image
+        },
+        features: [{
+          type: featureType,
+          maxResults: 1
+        }]
+      }]
+    };
+
+    var response = UrlFetchApp.fetch(
+      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      {
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify(requestBody),
+        muteHttpExceptions: true
+      }
+    );
+
+    var responseCode = response.getResponseCode();
+    var responseText = response.getContentText();
+
+    if (responseCode !== 200) {
+      console.error('Cloud Vision API error: ' + responseText);
+      return {
+        success: false,
+        message: 'Cloud Vision API returned error code: ' + responseCode
+      };
+    }
+
+    var result = JSON.parse(responseText);
+
+    // Extract text from response
+    var extractedText = '';
+    if (result.responses && result.responses[0]) {
+      var annotations = result.responses[0];
+
+      if (featureType === 'DOCUMENT_TEXT_DETECTION' && annotations.fullTextAnnotation) {
+        extractedText = annotations.fullTextAnnotation.text || '';
+      } else if (annotations.textAnnotations && annotations.textAnnotations.length > 0) {
+        extractedText = annotations.textAnnotations[0].description || '';
+      }
+    }
+
+    return {
+      success: true,
+      text: extractedText.trim()
+    };
+
+  } catch (e) {
+    console.error('Cloud Vision OCR error: ' + e.message);
+    return {
+      success: false,
+      message: 'Cloud Vision API call failed: ' + e.message
+    };
+  }
+}
+
+/**
+ * Fallback OCR using Google's built-in capabilities
+ * Attempts to use Google Drive's built-in OCR for PDFs
+ * @param {Blob} imageBlob - Image blob to process
+ * @param {string} mode - OCR mode
+ * @returns {Object} Result with success status and extracted text
+ * @private
+ */
+function performBuiltInOCR_(imageBlob, mode) {
+  try {
+    var mimeType = imageBlob.getContentType();
+
+    // For images, we need Cloud Vision API
+    if (mimeType.indexOf('image/') === 0) {
+      return {
+        success: false,
+        message: 'Cloud Vision API key not configured. Set CLOUD_VISION_API_KEY in Script Properties to enable image OCR.'
+      };
+    }
+
+    // For PDFs, try Google Drive's OCR conversion
+    if (mimeType === 'application/pdf') {
+      // Create a temporary file in Drive with OCR enabled
+      var resource = {
+        title: 'OCR_TEMP_' + new Date().getTime(),
+        mimeType: 'application/pdf'
+      };
+
+      // Upload and convert to Google Doc (which applies OCR)
+      var tempFile = Drive.Files.insert(resource, imageBlob, {
+        ocr: true,
+        ocrLanguage: 'en'
+      });
+
+      // Get the converted document content
+      var doc = DocumentApp.openById(tempFile.id);
+      var extractedText = doc.getBody().getText();
+
+      // Clean up temp file
+      DriveApp.getFileById(tempFile.id).setTrashed(true);
+
+      return {
+        success: true,
+        text: extractedText.trim()
+      };
+    }
+
+    return {
+      success: false,
+      message: 'Could not perform OCR. Please configure Cloud Vision API key.'
+    };
+
+  } catch (e) {
+    return {
+      success: false,
+      message: 'Built-in OCR failed: ' + e.message + '. Configure Cloud Vision API key for better results.'
+    };
+  }
+}
+
+/**
+ * Attempts to auto-populate grievance fields from OCR text
+ * Uses pattern matching to identify common grievance form fields
+ * @param {string} text - Extracted OCR text
+ * @param {string} grievanceId - Target grievance ID
+ * @returns {Object} Result indicating what fields were populated
+ * @private
+ */
+function autoPopulateGrievanceFromOCR_(text, grievanceId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+    if (!sheet) {
+      return { success: false, message: 'Grievance Log not found' };
+    }
+
+    // Find the grievance row
+    var data = sheet.getDataRange().getValues();
+    var grievanceRow = -1;
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+        grievanceRow = i + 1;
+        break;
+      }
+    }
+
+    if (grievanceRow === -1) {
+      return { success: false, message: 'Grievance not found: ' + grievanceId };
+    }
+
+    var fieldsPopulated = [];
+    var textLower = text.toLowerCase();
+
+    // Pattern matching for common grievance form fields
+    var patterns = {
+      incidentDate: /(?:incident\s*date|date\s*of\s*incident|occurred\s*on)[:\s]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      articles: /(?:article|art\.?)\s*(\d+)/gi,
+      issueCategory: /(?:discipline|workload|scheduling|pay|benefits|safety|harassment|discrimination)/i
+    };
+
+    // Try to extract incident date
+    var dateMatch = text.match(patterns.incidentDate);
+    if (dateMatch) {
+      try {
+        var parsedDate = new Date(dateMatch[1]);
+        if (!isNaN(parsedDate.getTime())) {
+          sheet.getRange(grievanceRow, GRIEVANCE_COLS.INCIDENT_DATE).setValue(parsedDate);
+          fieldsPopulated.push('Incident Date');
+        }
+      } catch (e) {
+        // Date parsing failed, skip
+      }
+    }
+
+    // Try to extract articles violated
+    var articleMatches = [];
+    var articleMatch;
+    while ((articleMatch = patterns.articles.exec(text)) !== null) {
+      articleMatches.push('Art. ' + articleMatch[1]);
+    }
+    if (articleMatches.length > 0) {
+      var uniqueArticles = articleMatches.filter(function(v, i, a) { return a.indexOf(v) === i; });
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ARTICLES).setValue(uniqueArticles.join(', '));
+      fieldsPopulated.push('Articles');
+    }
+
+    // Try to identify issue category
+    var categoryMatch = text.match(patterns.issueCategory);
+    if (categoryMatch) {
+      var category = categoryMatch[0].charAt(0).toUpperCase() + categoryMatch[0].slice(1).toLowerCase();
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(category);
+      fieldsPopulated.push('Issue Category');
+    }
+
+    // Store the full OCR text in resolution notes for reference
+    var existingResolution = sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).getValue() || '';
+    var ocrNote = '[OCR Extract ' + new Date().toLocaleDateString() + ']: ' + text.substring(0, 500);
+    if (text.length > 500) ocrNote += '...';
+
+    if (existingResolution) {
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(existingResolution + '\n\n' + ocrNote);
+    } else {
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(ocrNote);
+    }
+    fieldsPopulated.push('Resolution Notes (OCR text)');
+
+    return {
+      success: true,
+      message: 'Populated ' + fieldsPopulated.length + ' fields',
+      fieldsPopulated: fieldsPopulated
+    };
+
+  } catch (e) {
+    return {
+      success: false,
+      message: 'Auto-populate failed: ' + e.message
+    };
+  }
+}
+
+/**
+ * Quick OCR function - simplified wrapper for common use cases
+ * @param {string} fileId - Google Drive file ID
+ * @returns {string} Extracted text, or error message
+ */
+function wgerQuick(fileId) {
+  var result = wger(fileId, { mode: 'TEXT' });
+  if (result.success) {
+    return result.text;
+  }
+  return 'Error: ' + result.message;
+}
+
+/**
+ * OCR with handwriting optimization
+ * @param {string} fileId - Google Drive file ID
+ * @returns {Object} Full result object
+ */
+function wgerHandwriting(fileId) {
+  return wger(fileId, { mode: 'HANDWRITING' });
+}
+
+/**
+ * OCR with document layout preservation
+ * @param {string} fileId - Google Drive file ID
+ * @returns {Object} Full result object
+ */
+function wgerDocument(fileId) {
+  return wger(fileId, { mode: 'DOCUMENT' });
+}
+
+/**
+ * EXTENSION: CLOUD VISION OCR HOOK (Legacy - calls wger)
  * Prepares the system for future Google Cloud Vision integration.
  * Requires: Enabling 'Cloud Vision API' in Google Cloud Console.
  *
  * @param {string} fileId - Google Drive file ID of the image to transcribe
  * @returns {Object} Status object with transcription placeholder
+ * @deprecated Use wger() instead
  */
 function transcribeHandwrittenForm(fileId) {
-  try {
-    var file = DriveApp.getFileById(fileId);
-    var imageBlob = file.getBlob();
+  // Use the new wger OCR function
+  var result = wger(fileId, { mode: 'HANDWRITING' });
 
-    // PLACEHOLDER: Call to Google Cloud Vision API would happen here
-    // Once Cloud Vision is enabled, this will parse handwritten text
-    // and auto-populate the Grievance Log
-
-    console.log('OCR Engine: Prepared to parse image ID ' + fileId);
-    console.log('File Name: ' + file.getName());
-    console.log('MIME Type: ' + imageBlob.getContentType());
-
+  // Return in legacy format for backward compatibility
+  if (result.success) {
     return {
-      status: 'READY',
-      message: 'OCR Hook prepared. Enable Cloud Vision API to activate transcription.',
+      status: 'SUCCESS',
+      message: 'OCR completed via wger function',
       fileId: fileId,
-      fileName: file.getName()
-    };
-
-  } catch (e) {
-    console.error('OCR Hook error: ' + e.message);
-    return {
-      status: 'ERROR',
-      message: e.message
+      fileName: result.fileName,
+      text: result.text
     };
   }
+
+  return {
+    status: result.status || 'ERROR',
+    message: result.message,
+    fileId: fileId,
+    fileName: result.fileName || ''
+  };
 }
 
 /**
@@ -1771,38 +2169,105 @@ function showGrievanceTrends() {
 
 /**
  * Shows OCR transcription dialog
- * Placeholder for Cloud Vision API integration
+ * Uses the wger OCR function for text extraction
  */
 function showOCRDialog() {
   var ui = SpreadsheetApp.getUi();
 
   var html = HtmlService.createHtmlOutput(
     '<style>' +
-    'body { font-family: Roboto, Arial, sans-serif; padding: 16px; }' +
-    'h3 { color: #1a73e8; margin-bottom: 16px; }' +
-    '.status { background: #e8f5e9; padding: 12px; border-radius: 8px; margin: 16px 0; }' +
-    '.warning { background: #fff3e0; padding: 12px; border-radius: 8px; margin: 16px 0; }' +
-    'input { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px; }' +
-    'button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 12px; }' +
-    'button:hover { background: #1557b0; }' +
+    '* { box-sizing: border-box; }' +
+    'body { font-family: "Google Sans", Roboto, Arial, sans-serif; padding: 20px; margin: 0; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; color: #F8FAFC; }' +
+    'h3 { color: #F8FAFC; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; }' +
+    '.input-group { margin-bottom: 16px; }' +
+    '.input-group label { display: block; font-size: 13px; color: #94A3B8; margin-bottom: 6px; }' +
+    'input, select { width: 100%; padding: 12px; border: 2px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-size: 14px; outline: none; }' +
+    'input:focus, select:focus { border-color: #7C3AED; }' +
+    'input::placeholder { color: #64748B; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 16px; }' +
+    'button { flex: 1; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
+    '.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(124,58,237,0.4); }' +
+    '.btn-secondary { background: #334155; color: #F8FAFC; }' +
+    '.btn-secondary:hover { background: #475569; }' +
+    '.result-box { margin-top: 16px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid #334155; max-height: 200px; overflow-y: auto; }' +
+    '.result-box.success { border-color: #10B981; }' +
+    '.result-box.error { border-color: #EF4444; }' +
+    '.result-header { font-size: 12px; color: #94A3B8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }' +
+    '.result-text { font-size: 14px; white-space: pre-wrap; word-break: break-word; }' +
+    '.stats { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: #64748B; }' +
+    '.loading { text-align: center; padding: 20px; }' +
+    '.spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #334155; border-top-color: #7C3AED; border-radius: 50%; animation: spin 1s linear infinite; }' +
+    '@keyframes spin { to { transform: rotate(360deg); } }' +
+    '.help-text { font-size: 12px; color: #64748B; margin-top: 4px; }' +
     '</style>' +
-    '<h3>📝 OCR Transcription</h3>' +
-    '<div class="warning">' +
-    '<strong>⚠️ Cloud Vision API Required</strong><br>' +
-    'This feature requires Google Cloud Vision API to be enabled.' +
+    '<h3>📝 WGER OCR Transcription</h3>' +
+    '<div class="input-group">' +
+    '  <label>Google Drive File ID or URL</label>' +
+    '  <input type="text" id="fileId" placeholder="Paste file ID or Drive URL...">' +
+    '  <div class="help-text">Supports: PNG, JPG, GIF, BMP, WEBP, PDF</div>' +
     '</div>' +
-    '<p>Enter the Google Drive File ID of the handwritten form to transcribe:</p>' +
-    '<input type="text" id="fileId" placeholder="e.g., 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms">' +
-    '<div class="status">' +
-    '<strong>Status:</strong> Ready for Cloud Vision integration<br>' +
-    '<small>Contact system administrator to enable OCR capabilities.</small>' +
+    '<div class="input-group">' +
+    '  <label>OCR Mode</label>' +
+    '  <select id="ocrMode">' +
+    '    <option value="TEXT">Standard Text Detection</option>' +
+    '    <option value="HANDWRITING">Handwriting Optimized</option>' +
+    '    <option value="DOCUMENT">Document Layout Preservation</option>' +
+    '  </select>' +
     '</div>' +
-    '<button onclick="google.script.host.close()">Close</button>'
+    '<div class="btn-row">' +
+    '  <button class="btn-primary" onclick="runOCR()">🔍 Extract Text</button>' +
+    '  <button class="btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '</div>' +
+    '<div id="resultContainer"></div>' +
+    '<script>' +
+    'function extractFileId(input) {' +
+    '  input = input.trim();' +
+    '  var driveMatch = input.match(/[-\\w]{25,}/);' +
+    '  return driveMatch ? driveMatch[0] : input;' +
+    '}' +
+    'function runOCR() {' +
+    '  var rawInput = document.getElementById("fileId").value;' +
+    '  var fileId = extractFileId(rawInput);' +
+    '  var mode = document.getElementById("ocrMode").value;' +
+    '  if (!fileId) {' +
+    '    showResult({ success: false, message: "Please enter a valid file ID or URL" });' +
+    '    return;' +
+    '  }' +
+    '  document.getElementById("resultContainer").innerHTML = "<div class=\\"loading\\"><div class=\\"spinner\\"></div><div style=\\"margin-top:12px\\">Processing OCR...</div></div>";' +
+    '  google.script.run.withSuccessHandler(showResult).withFailureHandler(function(e) {' +
+    '    showResult({ success: false, message: e.message });' +
+    '  }).wger(fileId, { mode: mode });' +
+    '}' +
+    'function showResult(result) {' +
+    '  var container = document.getElementById("resultContainer");' +
+    '  if (result.success) {' +
+    '    container.innerHTML = "<div class=\\"result-box success\\">" +' +
+    '      "<div class=\\"result-header\\">✅ Extracted Text</div>" +' +
+    '      "<div class=\\"result-text\\">" + escapeHtml(result.text || "(No text found)") + "</div>" +' +
+    '      "<div class=\\"stats\\"><span>📄 " + (result.wordCount || 0) + " words</span><span>📏 " + (result.textLength || 0) + " chars</span></div>" +' +
+    '    "</div>";' +
+    '  } else {' +
+    '    container.innerHTML = "<div class=\\"result-box error\\">" +' +
+    '      "<div class=\\"result-header\\">❌ OCR Failed</div>" +' +
+    '      "<div class=\\"result-text\\">" + escapeHtml(result.message || "Unknown error") + "</div>" +' +
+    '    "</div>";' +
+    '  }' +
+    '}' +
+    'function escapeHtml(text) {' +
+    '  var div = document.createElement("div");' +
+    '  div.textContent = text;' +
+    '  return div.innerHTML;' +
+    '}' +
+    'document.getElementById("fileId").addEventListener("keypress", function(e) {' +
+    '  if (e.key === "Enter") runOCR();' +
+    '});' +
+    '</script>'
   )
-  .setWidth(450)
-  .setHeight(350);
+  .setWidth(500)
+  .setHeight(480);
 
-  ui.showModalDialog(html, '📝 OCR Form Transcription');
+  ui.showModalDialog(html, '📝 WGER OCR Transcription');
 }
 
 // ============================================================================
