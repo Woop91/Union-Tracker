@@ -19755,7 +19755,7 @@ function onEditValidation(e) {
 
 
 // ============================================================================
-// SOURCE: 08_Code.gs (12622 lines)
+// SOURCE: 08_Code.gs (12629 lines)
 // ============================================================================
 
 /**
@@ -20484,9 +20484,13 @@ function createGrievanceLog(ss) {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
-    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
-    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    // Group Coordinator columns AC-AF (Message Alert, Coordinator Message, Acknowledged By, Acknowledged Date)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
+    // Collapse all groups by default (including coordinator columns AC-AF)
+    sheet.collapseAllColumnGroups();
+    // Hide Drive Folder ID column (AG) - internal use only
+    sheet.hideColumns(GRIEVANCE_COLS.DRIVE_FOLDER_ID, 1);
   } catch (e) {
     Logger.log('Column group setup skipped: ' + e.toString());
   }
@@ -26055,11 +26059,14 @@ function setupTimelineColumnGroups() {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
-    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
-    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    // Group Coordinator columns AC-AF (Message Alert, Coordinator Message, Acknowledged By, Acknowledged Date)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
 
-    // Collapse Step II and III by default (Step I usually visible)
+    // Collapse all groups by default (including coordinator columns AC-AF)
     sheet.collapseAllColumnGroups();
+
+    // Hide Drive Folder ID column (AG) - internal use only
+    sheet.hideColumns(GRIEVANCE_COLS.DRIVE_FOLDER_ID, 1);
 
     ss.toast('Column groups created! Click +/- to expand/collapse step details', '✅ Done', 5);
   } catch (e) {
