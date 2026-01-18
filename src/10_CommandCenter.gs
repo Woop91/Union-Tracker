@@ -766,10 +766,11 @@ function addRepoLinkToFAQ_(ss) {
 function applyTabColors_(ss) {
   // Tab color definitions - Updated per user requirements
   var TAB_COLORS = {
-    RED: '#ea4335',         // Red - Getting Started, FAQ, Config Guide
+    RED: '#ea4335',         // Red - Getting Started, FAQ
     PURPLE: '#7c3aed',      // Purple - Member Directory, Grievance Log
     YELLOW: '#fbbc04',      // Yellow - Feedback and Development, Function Checklist
     ORANGE: '#ff9800',      // Orange - Config, Config Guide
+    BLUE: '#1a73e8',        // Blue - Member Satisfaction
     HIDDEN: '#9e9e9e'       // Gray - for hidden/calc sheets
   };
 
@@ -808,6 +809,12 @@ function applyTabColors_(ss) {
       try { sheet.setTabColor(TAB_COLORS.ORANGE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
     }
   });
+
+  // Blue tabs - Member Satisfaction
+  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  if (satSheet) {
+    try { satSheet.setTabColor(TAB_COLORS.BLUE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+  }
 
   Logger.log('Tab colors applied successfully');
 }

@@ -625,6 +625,74 @@ function REPAIR_DASHBOARD() {
 }
 
 /**
+ * Removes deprecated tabs from the spreadsheet
+ * Currently removes:
+ * - 💼 Dashboard (deprecated in v4.3.2 - use modal dashboards instead)
+ *
+ * Run this function to clean up legacy tabs that are no longer needed.
+ * @return {Object} Results with list of removed tabs
+ */
+function removeDeprecatedTabs() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  const removed = [];
+  const errors = [];
+
+  // List of deprecated tabs to remove
+  const deprecatedTabs = [
+    { name: '💼 Dashboard', reason: 'Replaced by modal dashboards in v4.3.2' }
+  ];
+
+  // Confirm with user
+  const tabNames = deprecatedTabs.map(t => t.name).join(', ');
+  const response = ui.alert(
+    '🗑️ Remove Deprecated Tabs',
+    'This will permanently delete the following tabs:\n\n' +
+    deprecatedTabs.map(t => '• ' + t.name + '\n  (' + t.reason + ')').join('\n\n') +
+    '\n\nThis action cannot be undone. Continue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) {
+    ss.toast('Cancelled', 'Remove Deprecated Tabs', 3);
+    return { cancelled: true };
+  }
+
+  // Remove each deprecated tab
+  for (const tab of deprecatedTabs) {
+    const sheet = ss.getSheetByName(tab.name);
+    if (sheet) {
+      try {
+        ss.deleteSheet(sheet);
+        removed.push(tab.name);
+        Logger.log('Removed deprecated tab: ' + tab.name);
+      } catch (e) {
+        errors.push({ name: tab.name, error: e.message });
+        Logger.log('Error removing ' + tab.name + ': ' + e.message);
+      }
+    }
+  }
+
+  // Show results
+  if (removed.length > 0) {
+    ss.toast('Removed: ' + removed.join(', '), 'Cleanup Complete', 5);
+  } else {
+    ss.toast('No deprecated tabs found', 'Cleanup Complete', 3);
+  }
+
+  // Log the action
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('DEPRECATED_TABS_REMOVED', {
+      removed: removed,
+      errors: errors,
+      performedBy: Session.getActiveUser().getEmail()
+    });
+  }
+
+  return { removed: removed, errors: errors };
+}
+
+/**
  * Sets up basic structure for a sheet based on type
  * @param {Sheet} sheet - The sheet to set up
  * @param {string} sheetType - The type key from SHEET_NAMES
