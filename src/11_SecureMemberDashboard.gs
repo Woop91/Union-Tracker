@@ -1038,10 +1038,15 @@ function emailDashboardLink() {
 // ============================================================================
 
 /**
- * Shows the Unit Density Treemap in a modal dialog
- * Displays units by member count with grievance heat coloring
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Unit density is now in the unified Steward Dashboard (Analytics tab).
  */
 function showUnitDensityTreemap() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function showUnitDensityTreemap_LEGACY() {
   var analytics = getAdvancedAnalytics();
 
   var html = '<!DOCTYPE html>' +
@@ -1113,10 +1118,15 @@ function showUnitDensityTreemap() {
 }
 
 /**
- * Shows the Sentiment Trend Chart in a modal dialog
- * Displays union morale over time
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Sentiment trends are now in the unified Steward Dashboard (Overview tab).
  */
 function showSentimentTrendChart() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function showSentimentTrendChart_LEGACY() {
   var analytics = getAdvancedAnalytics();
 
   var html = '<!DOCTYPE html>' +
@@ -1190,10 +1200,15 @@ function showSentimentTrendChart() {
 }
 
 /**
- * Shows the Steward Workload Report in a modal dialog
- * Displays all stewards with workload balancing metrics
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Workload metrics are now in the unified Steward Dashboard (Workload tab).
  */
 function showStewardWorkloadReport() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function showStewardWorkloadReport_LEGACY() {
   var workload = getStewardWorkload();
   var stats = getSecureGrievanceStats_();
 

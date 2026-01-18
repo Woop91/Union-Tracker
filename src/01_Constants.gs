@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 2,
-  BUILD: 'v4.3.2',
-  CURRENT: '4.3.2',
-  CODENAME: 'Modal Dashboard Consolidation'
+  PATCH: 3,
+  BUILD: 'v4.3.3',
+  CURRENT: '4.3.3',
+  CODENAME: 'Unified Two-Dashboard Architecture'
 };
 
 // ============================================================================
@@ -278,6 +278,18 @@ var UI_THEME = {
   // Gradients
   GRADIENT_START: '#7C3AED',
   GRADIENT_END: '#5B21B6'
+};
+
+/**
+ * Standard dialog sizes for modals and sidebars
+ * @const {Object}
+ */
+var DIALOG_SIZES = {
+  SMALL: { width: 400, height: 300 },
+  MEDIUM: { width: 600, height: 500 },
+  LARGE: { width: 800, height: 650 },
+  FULLSCREEN: { width: 1000, height: 750 },
+  SIDEBAR: { width: 300 }
 };
 
 /**

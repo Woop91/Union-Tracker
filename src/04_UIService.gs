@@ -86,33 +86,18 @@ function createDashboardMenu() {
       .addItem('⚙️ Notification Settings', 'showNotificationSettings')
       .addItem('🧪 Test Notifications', 'testDeadlineNotifications'))
 
-    // View submenu - View icons (All dashboards are now modals)
+    // Dashboards - Two unified dashboards (v4.3.2)
     .addSubMenu(ui.createMenu('📊 Dashboards')
-      .addItem('📊 Interactive Dashboard', 'showInteractiveDashboardTab')
-      .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
       .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
-      .addItem('🛡️ Steward Performance', 'showStewardPerformanceModal')
-      .addItem('⭐ Member Satisfaction', 'showSatisfactionDashboard')
+      .addItem('🛡️ Steward Dashboard (PII)', 'showStewardDashboard')
       .addSeparator()
       .addItem('📱 Mobile Dashboard', 'showMobileDashboard'))
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
       .addItem('📱 Get Mobile App URL', 'showWebAppUrl'))
-    .addSubMenu(ui.createMenu('🎨 Appearance')
-      .addItem('🌙 Toggle Dark Mode', 'toggleDarkMode')
-      .addItem('🎨 Theme Settings', 'showThemeSettings'))
 
-    // Accessibility/Comfort View submenu
-    .addSubMenu(ui.createMenu('♿ Comfort View')
-      .addItem('♿ Comfort View Panel', 'showADHDControlPanel')
-      .addItem('🎯 Focus Mode', 'activateFocusMode')
-      .addItem('🔲 Toggle Zebra Stripes', 'toggleZebraStripes')
-      .addSeparator()
-      .addItem('📝 Quick Capture Notepad', 'showQuickCaptureNotepad')
-      .addItem('🍅 Pomodoro Timer', 'startPomodoroTimer')
-      .addSeparator()
-      .addItem('🎨 Theme Manager', 'showThemeManager')
-      .addItem('🌙 Quick Toggle Dark Mode', 'quickToggleDarkMode'))
+    // Appearance & Comfort View consolidated into Visual Control Panel
+    .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
 
     // Multi-Select Tools submenu
     .addSubMenu(ui.createMenu('📝 Multi-Select')
@@ -169,16 +154,10 @@ function createDashboardMenu() {
       .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'))
     .addToUi();
 
-  // Strategic Operations Menu (Separate top-level menu)
+  // Strategic Operations Menu (Simplified v4.3.2)
   ui.createMenu('🎯 Strategic Ops')
-    .addSubMenu(ui.createMenu('📊 Dashboards')
-      .addItem('📊 Interactive Dashboard', 'showInteractiveDashboardTab')
-      .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
-      .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
-      .addItem('🛡️ Steward Performance', 'showStewardPerformanceModal')
-      .addSeparator()
-      .addItem('📧 Email Dashboard to Selected', 'emailDashboardLink')
-      .addItem('📩 Send Member Dashboard Link', 'sendMemberDashboardLink'))
+    .addItem('👥 Member Dashboard', 'showPublicMemberDashboard')
+    .addItem('🛡️ Steward Dashboard', 'showStewardDashboard')
     .addSeparator()
     .addItem('🔍 Desktop Search', 'showDesktopSearch')
     .addSubMenu(ui.createMenu('📋 Cases & Grievances')
@@ -186,30 +165,15 @@ function createDashboardMenu() {
       .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
       .addItem('✅ View Checklist', 'showChecklistDialog'))
     .addSeparator()
-    .addSubMenu(ui.createMenu('📊 Analytics & Charts')
-      .addItem('📈 Unit Density Treemap', 'showUnitDensityTreemap')
-      .addItem('📉 Sentiment Trend Chart', 'showSentimentTrendChart')
-      .addItem('⚖️ Steward Workload Report', 'showStewardWorkloadReport'))
-    .addSubMenu(ui.createMenu('🎯 Strategic Intelligence')
-      .addItem('🔥 Generate Unit Hot Zones', 'renderHotZones')
-      .addItem('🌟 Identify Rising Stars', 'identifyRisingStars')
-      .addItem('📉 Management Hostility Report', 'renderHostilityFunnel')
-      .addItem('📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet'))
-    .addSeparator()
     .addSubMenu(ui.createMenu('🆔 ID & Data Engines')
       .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
       .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
       .addItem('📄 Create PDF for Selected Grievance', 'createPDFForSelectedGrievance'))
-    .addSeparator()
     .addSubMenu(ui.createMenu('👤 Steward Management')
       .addItem('⬆️ Promote to Steward', 'promoteSelectedMemberToSteward')
       .addItem('⬇️ Demote Steward', 'demoteSelectedSteward')
       .addItem('📧 Send Contact Form', 'sendContactInfoForm')
       .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('🎨 Styling & Theme')
-      .addItem('🎨 Apply Global Styling', 'applyGlobalStyling')
-      .addItem('🔄 Reset to Default Theme', 'resetToDefaultTheme'))
     .addToUi();
 
   // Create the Field Portal menu (from CommandCenter.gs)
@@ -2109,26 +2073,24 @@ function deactivateFocusMode() {
 
 // ==================== QUICK CAPTURE & TIMER ====================
 
-function getQuickCaptureNotes() {
-  return PropertiesService.getUserProperties().getProperty('quickCaptureNotes') || '';
-}
+// ==================== DEPRECATED FEATURES (v4.3.2) ====================
+// Quick Capture Notepad and Pomodoro Timer have been removed.
+// These functions are kept for backwards compatibility but show deprecation notices.
 
-function saveQuickCaptureNotes(notes) {
-  PropertiesService.getUserProperties().setProperty('quickCaptureNotes', notes);
-}
+/** @deprecated v4.3.2 - Feature removed */
+function getQuickCaptureNotes() { return ''; }
 
+/** @deprecated v4.3.2 - Feature removed */
+function saveQuickCaptureNotes(notes) { }
+
+/** @deprecated v4.3.2 - Feature removed */
 function showQuickCaptureNotepad() {
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>body{font-family:Arial;padding:20px}textarea{width:100%;height:300px;padding:10px;border:2px solid #ddd;border-radius:4px}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;margin:10px 5px 0 0}</style></head><body><h3>📝 Quick Capture</h3><textarea id="notes" placeholder="Type your thoughts..."></textarea><br><button onclick="save()">💾 Save</button><button onclick="google.script.host.close()">Close</button><script>google.script.run.withSuccessHandler(function(n){document.getElementById("notes").value=n||""}).getQuickCaptureNotes();function save(){google.script.run.saveQuickCaptureNotes(document.getElementById("notes").value);alert("Saved!")}</script></body></html>'
-  ).setWidth(500).setHeight(450);
-  SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture');
+  SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
 }
 
+/** @deprecated v4.3.2 - Feature removed */
 function startPomodoroTimer() {
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>body{font-family:Arial;padding:40px;text-align:center;background:#1a73e8;color:white}.timer{font-size:72px;font-weight:bold;margin:40px 0;font-family:monospace}button{background:white;color:#1a73e8;border:none;padding:15px 30px;font-size:16px;border-radius:8px;cursor:pointer;margin:10px}</style></head><body><h2>🍅 Pomodoro Timer</h2><div id="status">Focus Session</div><div class="timer" id="timer">25:00</div><button onclick="toggle()">▶️ Start</button><button onclick="google.script.host.close()">Close</button><script>var left=25*60,running=false,iv;function toggle(){if(running){clearInterval(iv);running=false}else{running=true;iv=setInterval(function(){if(left>0){left--;var m=Math.floor(left/60),s=left%60;document.getElementById("timer").textContent=(m<10?"0":"")+m+":"+(s<10?"0":"")+s}else{clearInterval(iv);alert("Session complete!")}},1000)}}</script></body></html>'
-  ).setWidth(400).setHeight(350);
-  SpreadsheetApp.getUi().showModelessDialog(html, '🍅 Pomodoro Timer');
+  SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
 }
 
 function setBreakReminders(minutes) {
@@ -3302,12 +3264,15 @@ function syncSingleGrievanceToCalendar(grievanceId) {
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
 /**
- * Shows the Custom View with tabbed interface
- * Features: Overview, Members, Grievances, and Analytics tabs
- *
- * ⚠️ PROTECTED FUNCTION - DO NOT MODIFY ⚠️
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Interactive dashboard is now consolidated into Steward Dashboard.
  */
 function showInteractiveDashboardTab() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function kept for reference */
+function showInteractiveDashboardTab_LEGACY() {
   var html = HtmlService.createHtmlOutput(getInteractiveDashboardHtml())
     .setWidth(900)
     .setHeight(750);
@@ -5004,11 +4969,11 @@ function navigateToSheet(sheetName) {
 // ============================================================================
 
 /**
- * Launches the Executive Command Center Modal
- * Uses Bridge Pattern: Server-side data aggregation + Client-side rendering
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Executive metrics are now in the unified Steward Dashboard.
  */
 function rebuildExecutiveDashboard() {
-  launchExecutiveDashboard();
+  showStewardDashboard();
 }
 
 /**
@@ -5312,12 +5277,375 @@ function getExecutiveMetrics_() {
 }
 
 // ============================================================================
-// 3. MEMBER ANALYTICS DASHBOARD - REMOVED (v4.3.2)
+// 3. UNIFIED STEWARD DASHBOARD (v4.3.2)
 // ============================================================================
-// Member Analytics functionality has been deprecated and removed.
-// Use the Interactive Dashboard (showInteractiveDashboardTab) instead,
-// which provides similar aggregate metrics in a consolidated view.
+// Consolidates all analytics, charts, and reports into a single tabbed interface.
+// This replaces the individual chart modals for a unified experience.
 // ============================================================================
+
+/**
+ * Shows the unified Steward Dashboard with all analytics
+ * Contains all charts and statistical data for stewards
+ */
+function showStewardDashboard() {
+  var html = HtmlService.createHtmlOutput(getStewardDashboardHtml_())
+    .setWidth(DIALOG_SIZES.FULLSCREEN.width)
+    .setHeight(DIALOG_SIZES.FULLSCREEN.height);
+  SpreadsheetApp.getUi().showModalDialog(html, '509 STEWARD COMMAND CENTER');
+}
+
+/**
+ * Gets comprehensive steward analytics data (Bridge Pattern)
+ * @returns {string} JSON with all dashboard data
+ */
+function getStewardDashboardData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+
+  var data = {
+    // KPIs
+    totalMembers: 0,
+    stewardCount: 0,
+    totalGrievances: 0,
+    openGrievances: 0,
+    wins: 0,
+    losses: 0,
+    settled: 0,
+    winRate: 0,
+    overdueCount: 0,
+    moraleScore: 7.5,
+
+    // Breakdowns
+    unitBreakdown: {},
+    locationBreakdown: {},
+    stewardWorkload: [],
+    hotZones: [],
+    risingStars: [],
+
+    // Bargaining Data
+    step1DenialRate: 0,
+    avgSettlementDays: 0,
+    topViolatedArticle: 'N/A',
+    articleViolations: {},
+
+    // Chart Data
+    statusDistribution: { open: 0, pending: 0, won: 0, denied: 0, settled: 0 },
+    monthlyTrend: [],
+    sentimentTrend: []
+  };
+
+  // Process Members
+  if (memberSheet && memberSheet.getLastRow() > 1) {
+    var memberData = memberSheet.getDataRange().getValues();
+    for (var m = 1; m < memberData.length; m++) {
+      if (memberData[m][MEMBER_COLS.MEMBER_ID - 1]) {
+        data.totalMembers++;
+        if (memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.stewardCount++;
+
+        var location = memberData[m][MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
+        var unit = memberData[m][MEMBER_COLS.UNIT - 1] || 'Unknown';
+        if (!data.locationBreakdown[location]) data.locationBreakdown[location] = 0;
+        data.locationBreakdown[location]++;
+        if (!data.unitBreakdown[unit]) data.unitBreakdown[unit] = 0;
+        data.unitBreakdown[unit]++;
+      }
+    }
+  }
+
+  // Process Grievances
+  var stewardCases = {};
+  var locationCases = {};
+  var step1Total = 0, step1Denials = 0;
+  var settlementDays = [];
+
+  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+    var grievanceData = grievanceSheet.getDataRange().getValues();
+    for (var g = 1; g < grievanceData.length; g++) {
+      var status = (grievanceData[g][GRIEVANCE_COLS.STATUS - 1] || '').toString();
+      var steward = grievanceData[g][GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
+      var location = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
+      var article = grievanceData[g][GRIEVANCE_COLS.CONTRACT_ARTICLE - 1];
+
+      if (!grievanceData[g][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) continue;
+      data.totalGrievances++;
+
+      // Status distribution
+      switch(status.toLowerCase()) {
+        case 'open': data.statusDistribution.open++; data.openGrievances++; break;
+        case 'pending info': data.statusDistribution.pending++; data.openGrievances++; break;
+        case 'won': case 'sustained': data.statusDistribution.won++; data.wins++; break;
+        case 'denied': case 'lost': data.statusDistribution.denied++; data.losses++; break;
+        case 'settled': data.statusDistribution.settled++; data.settled++; break;
+      }
+
+      // Steward workload
+      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info') {
+        if (!stewardCases[steward]) stewardCases[steward] = 0;
+        stewardCases[steward]++;
+      }
+
+      // Hot zones (locations with active cases)
+      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info') {
+        if (!locationCases[location]) locationCases[location] = 0;
+        locationCases[location]++;
+      }
+
+      // Article violations
+      if (article) {
+        if (!data.articleViolations[article]) data.articleViolations[article] = 0;
+        data.articleViolations[article]++;
+      }
+
+      // Step 1 denial rate
+      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
+        step1Total++;
+        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) step1Denials++;
+      }
+
+      // Settlement time
+      var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
+      var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
+      if (dateFiled instanceof Date && dateClosed instanceof Date) {
+        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
+        if (days > 0) settlementDays.push(days);
+      }
+
+      // Check overdue
+      var step1Due = grievanceData[g][GRIEVANCE_COLS.STEP1_DUE - 1];
+      if (step1Due && new Date(step1Due) < new Date() && (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info')) {
+        data.overdueCount++;
+      }
+    }
+  }
+
+  // Calculate derived metrics
+  var totalClosed = data.wins + data.losses + data.settled;
+  data.winRate = totalClosed > 0 ? Math.round((data.wins / totalClosed) * 100) : 0;
+  data.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
+  data.avgSettlementDays = settlementDays.length > 0 ? Math.round(settlementDays.reduce(function(a,b){return a+b;},0) / settlementDays.length) : 0;
+
+  // Build steward workload array
+  for (var s in stewardCases) {
+    var count = stewardCases[s];
+    var statusLabel = count > 8 ? 'OVERLOAD' : count > 5 ? 'Heavy' : 'Available';
+    var color = count > 8 ? '#ef4444' : count > 5 ? '#f59e0b' : '#22c55e';
+    data.stewardWorkload.push({ name: s, count: count, status: statusLabel, color: color });
+  }
+  data.stewardWorkload.sort(function(a,b){return b.count - a.count;});
+
+  // Build hot zones (locations with 3+ active cases)
+  for (var loc in locationCases) {
+    if (locationCases[loc] >= 3) {
+      data.hotZones.push({ location: loc, count: locationCases[loc] });
+    }
+  }
+  data.hotZones.sort(function(a,b){return b.count - a.count;});
+
+  // Top violated article
+  var maxViolations = 0;
+  for (var art in data.articleViolations) {
+    if (data.articleViolations[art] > maxViolations) {
+      maxViolations = data.articleViolations[art];
+      data.topViolatedArticle = art;
+    }
+  }
+
+  // Process Satisfaction Survey for morale and sentiment
+  if (satSheet && satSheet.getLastRow() > 1) {
+    var satData = satSheet.getDataRange().getValues();
+    var trustScores = [];
+    var monthlyTrust = {};
+
+    for (var i = 1; i < satData.length; i++) {
+      var trustVal = parseFloat(satData[i][7]); // Q7_TRUST_UNION
+      var timestamp = satData[i][0];
+
+      if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
+        trustScores.push(trustVal);
+        if (timestamp) {
+          var date = new Date(timestamp);
+          var monthKey = date.toLocaleString('default', { month: 'short' });
+          if (!monthlyTrust[monthKey]) monthlyTrust[monthKey] = { sum: 0, count: 0 };
+          monthlyTrust[monthKey].sum += trustVal;
+          monthlyTrust[monthKey].count++;
+        }
+      }
+    }
+
+    if (trustScores.length > 0) {
+      data.moraleScore = Math.round((trustScores.reduce(function(a,b){return a+b;},0) / trustScores.length) * 10) / 10;
+    }
+
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    months.forEach(function(month) {
+      if (monthlyTrust[month]) {
+        data.sentimentTrend.push({ month: month, score: Math.round((monthlyTrust[month].sum / monthlyTrust[month].count) * 10) / 10 });
+      }
+    });
+  }
+
+  return JSON.stringify(data);
+}
+
+/**
+ * Generates the Steward Dashboard HTML with tabbed interface
+ * @returns {string} Complete HTML for the modal
+ * @private
+ */
+function getStewardDashboardHtml_() {
+  return '<!DOCTYPE html>' +
+    '<html><head><base target="_top">' +
+    '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">' +
+    '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Roboto", sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f8fafc; min-height: 100vh; }' +
+    '.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }' +
+    '.header h1 { font-size: 20px; font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 10px; }' +
+    '.header .material-icons { font-size: 28px; }' +
+    '.pii-badge { background: rgba(239,68,68,0.2); color: #fca5a5; padding: 6px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; }' +
+    '.tabs { display: flex; gap: 4px; padding: 0 24px; background: rgba(0,0,0,0.2); }' +
+    '.tab { padding: 12px 20px; cursor: pointer; font-size: 12px; font-weight: 500; color: #94a3b8; border-bottom: 2px solid transparent; transition: all 0.2s; }' +
+    '.tab:hover { color: #e2e8f0; }' +
+    '.tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }' +
+    '.content { padding: 20px 24px; overflow-y: auto; max-height: calc(100vh - 140px); }' +
+    '.tab-content { display: none; }' +
+    '.tab-content.active { display: block; }' +
+    '.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }' +
+    '.kpi-card { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; text-align: center; }' +
+    '.kpi-card.alert { border-color: #ef4444; }' +
+    '.kpi-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }' +
+    '.kpi-value { font-size: 28px; font-weight: 900; }' +
+    '.kpi-value.green { color: #34d399; } .kpi-value.red { color: #f87171; } .kpi-value.blue { color: #60a5fa; } .kpi-value.yellow { color: #fbbf24; } .kpi-value.purple { color: #a78bfa; }' +
+    '.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }' +
+    '.chart-card { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; }' +
+    '.chart-title { font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }' +
+    '.chart-title .material-icons { font-size: 18px; color: #60a5fa; }' +
+    'canvas { max-height: 200px !important; }' +
+    '.list-container { max-height: 200px; overflow-y: auto; }' +
+    '.list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }' +
+    '.list-item:last-child { border-bottom: none; }' +
+    '.badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }' +
+    '.bargain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }' +
+    '.bargain-card { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); border-radius: 10px; padding: 16px; text-align: center; }' +
+    '.bargain-label { font-size: 10px; color: #fbbf24; text-transform: uppercase; letter-spacing: 1px; }' +
+    '.bargain-value { font-size: 24px; font-weight: 700; color: #fcd34d; margin-top: 6px; }' +
+    '.bargain-status { font-size: 10px; color: #94a3b8; margin-top: 4px; }' +
+    '.hot-zone { display: flex; justify-content: space-between; padding: 12px; background: rgba(239,68,68,0.1); border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #ef4444; }' +
+    '.footer { display: flex; justify-content: space-between; padding: 12px 24px; border-top: 1px solid rgba(255,255,255,0.1); }' +
+    '.btn { padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }' +
+    '.btn-primary { background: #3b82f6; color: white; } .btn-primary:hover { background: #2563eb; }' +
+    '.loading { text-align: center; padding: 60px; color: #94a3b8; }' +
+    '</style></head><body>' +
+    '<div class="header"><h1><i class="material-icons">analytics</i>STEWARD COMMAND CENTER</h1><span class="pii-badge">INTERNAL USE ONLY</span></div>' +
+    '<div class="tabs">' +
+    '<div class="tab active" onclick="showTab(\'overview\')">Overview</div>' +
+    '<div class="tab" onclick="showTab(\'workload\')">Workload</div>' +
+    '<div class="tab" onclick="showTab(\'analytics\')">Analytics</div>' +
+    '<div class="tab" onclick="showTab(\'hotspots\')">Hot Spots</div>' +
+    '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
+    '</div>' +
+    '<div class="content"><div id="main-content"><div class="loading">Loading dashboard data...</div></div></div>' +
+    '<div class="footer"><span style="font-size:11px;color:#64748b">Data refreshes on open</span><button class="btn btn-primary" onclick="google.script.host.close()">Close</button></div>' +
+    '<script>' +
+    'var dashData = null;' +
+    'window.onload = function() { google.script.run.withSuccessHandler(render).withFailureHandler(showError).getStewardDashboardData(); };' +
+    'function showError(e) { document.getElementById("main-content").innerHTML = "<div class=\\"loading\\">Error: " + e.message + "</div>"; }' +
+    'function showTab(tab) { document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")}); document.querySelector(".tab[onclick*=\\\""+tab+"\\\"]").classList.add("active"); renderTab(tab); }' +
+    'function render(json) { dashData = JSON.parse(json); renderTab("overview"); }' +
+    'function renderTab(tab) {' +
+    '  var d = dashData; var html = "";' +
+    '  if (tab === "overview") {' +
+    '    html = "<div class=\\"kpi-grid\\">" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">" + d.totalMembers + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">" + d.stewardCount + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">" + d.openGrievances + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate</div><div class=\\"kpi-value green\\">" + d.winRate + "%</div></div>" +' +
+    '      "<div class=\\"kpi-card " + (d.overdueCount > 0 ? "alert" : "") + "\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">" + d.overdueCount + "</div></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"charts-row\\">" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status Distribution</div><canvas id=\\"statusChart\\"></canvas></div>" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"charts-row\\">" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Cases by Location</div><canvas id=\\"locationChart\\"></canvas></div>" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">gavel</i>Article Violations</div><canvas id=\\"articleChart\\"></canvas></div>" +' +
+    '    "</div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '    renderOverviewCharts();' +
+    '  } else if (tab === "workload") {' +
+    '    var totalCases = d.stewardWorkload.reduce(function(s,w){return s+w.count;},0);' +
+    '    var avgCases = d.stewardWorkload.length > 0 ? (totalCases/d.stewardWorkload.length).toFixed(1) : 0;' +
+    '    var overloaded = d.stewardWorkload.filter(function(w){return w.status==="OVERLOAD";}).length;' +
+    '    html = "<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(4,1fr)\\">" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Stewards</div><div class=\\"kpi-value blue\\">" + d.stewardCount + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Active Cases</div><div class=\\"kpi-value yellow\\">" + totalCases + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg per Steward</div><div class=\\"kpi-value green\\">" + avgCases + "</div></div>" +' +
+    '      "<div class=\\"kpi-card " + (overloaded>0?"alert":"") + "\\"><div class=\\"kpi-label\\">Overloaded</div><div class=\\"kpi-value red\\">" + overloaded + "</div></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">assignment_ind</i>Steward Caseload</div><div class=\\"list-container\\">";' +
+    '    d.stewardWorkload.forEach(function(w) {' +
+    '      html += "<div class=\\"list-item\\"><span>" + w.name + "</span><span class=\\"badge\\" style=\\"background:" + w.color + ";color:white\\">" + w.count + " cases - " + w.status + "</span></div>";' +
+    '    });' +
+    '    html += "</div></div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '  } else if (tab === "analytics") {' +
+    '    html = "<div class=\\"charts-row\\">" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">donut_large</i>Unit Distribution</div><canvas id=\\"unitChart\\"></canvas></div>" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Outcomes</div><canvas id=\\"outcomeChart\\"></canvas></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">mood</i>Member Satisfaction Score: " + d.moraleScore + "/10</div>" +' +
+    '    "<div style=\\"height:20px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin-top:12px\\"><div style=\\"height:100%;width:" + (d.moraleScore*10) + "%;background:linear-gradient(90deg,#22c55e,#3b82f6)\\"></div></div></div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '    renderAnalyticsCharts();' +
+    '  } else if (tab === "hotspots") {' +
+    '    html = "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">local_fire_department</i>Hot Zones (3+ Active Cases)</div>";' +
+    '    if (d.hotZones.length === 0) { html += "<div style=\\"text-align:center;padding:40px;color:#94a3b8\\">No hot zones detected - All clear!</div>"; }' +
+    '    else { d.hotZones.forEach(function(h) { html += "<div class=\\"hot-zone\\"><span>" + h.location + "</span><span class=\\"badge\\" style=\\"background:#ef4444;color:white\\">" + h.count + " cases</span></div>"; }); }' +
+    '    html += "</div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '  } else if (tab === "bargaining") {' +
+    '    html = "<div class=\\"bargain-grid\\">" +' +
+    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Step 1 Denial Rate</div><div class=\\"bargain-value\\">" + d.step1DenialRate + "%</div><div class=\\"bargain-status\\">" + (d.step1DenialRate > 60 ? "High Hostility" : "Normal Range") + "</div></div>" +' +
+    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Avg Settlement Time</div><div class=\\"bargain-value\\">" + d.avgSettlementDays + " Days</div><div class=\\"bargain-status\\">" + (d.avgSettlementDays > 45 ? "Slower than normal" : "Within range") + "</div></div>" +' +
+    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Most Violated Article</div><div class=\\"bargain-value\\">" + d.topViolatedArticle + "</div><div class=\\"bargain-status\\">Focus area</div></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">article</i>Violations by Contract Article</div><canvas id=\\"bargainChart\\"></canvas></div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '    renderBargainChart();' +
+    '  }' +
+    '}' +
+    'function renderOverviewCharts() {' +
+    '  var d = dashData;' +
+    '  new Chart(document.getElementById("statusChart"),{type:"doughnut",data:{labels:["Open","Pending","Won","Denied","Settled"],datasets:[{data:[d.statusDistribution.open,d.statusDistribution.pending,d.statusDistribution.won,d.statusDistribution.denied,d.statusDistribution.settled],backgroundColor:["#3b82f6","#f59e0b","#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
+    '  var trendLabels = d.sentimentTrend.length > 0 ? d.sentimentTrend.map(function(t){return t.month;}) : ["Jan","Feb","Mar","Apr","May","Jun"];' +
+    '  var trendData = d.sentimentTrend.length > 0 ? d.sentimentTrend.map(function(t){return t.score;}) : [7.2,7.4,7.5,7.6,7.8,7.9];' +
+    '  new Chart(document.getElementById("trendChart"),{type:"line",data:{labels:trendLabels,datasets:[{label:"Trust Score",data:trendData,borderColor:"#a78bfa",backgroundColor:"rgba(167,139,250,0.2)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:0,max:10,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '  var locLabels = Object.keys(d.locationBreakdown).slice(0,6);' +
+    '  var locData = locLabels.map(function(l){return d.locationBreakdown[l];});' +
+    '  new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
+    '  var artLabels = Object.keys(d.articleViolations).slice(0,6);' +
+    '  var artData = artLabels.map(function(a){return d.articleViolations[a];});' +
+    '  new Chart(document.getElementById("articleChart"),{type:"bar",data:{labels:artLabels.length>0?artLabels:["Art 5","Art 7","Art 12"],datasets:[{label:"Cases",data:artData.length>0?artData:[3,5,2],backgroundColor:"#f59e0b"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '}' +
+    'function renderAnalyticsCharts() {' +
+    '  var d = dashData;' +
+    '  var unitLabels = Object.keys(d.unitBreakdown).slice(0,8);' +
+    '  var unitData = unitLabels.map(function(u){return d.unitBreakdown[u];});' +
+    '  new Chart(document.getElementById("unitChart"),{type:"doughnut",data:{labels:unitLabels,datasets:[{data:unitData,backgroundColor:["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
+    '  new Chart(document.getElementById("outcomeChart"),{type:"bar",data:{labels:["Won","Denied","Settled"],datasets:[{label:"Cases",data:[d.wins,d.losses,d.settled],backgroundColor:["#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '}' +
+    'function renderBargainChart() {' +
+    '  var d = dashData;' +
+    '  var artLabels = Object.keys(d.articleViolations).slice(0,8);' +
+    '  var artData = artLabels.map(function(a){return d.articleViolations[a];});' +
+    '  new Chart(document.getElementById("bargainChart"),{type:"bar",data:{labels:artLabels.length>0?artLabels:["Art 5","Art 7","Art 12"],datasets:[{label:"Violations",data:artData.length>0?artData:[3,5,2],backgroundColor:"#fbbf24"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '}' +
+    '</script></body></html>';
+}
 
 // ============================================================================
 // 4. STRATEGIC PRO MOVES & ALERTS
@@ -5349,9 +5677,15 @@ function checkDashboardAlerts() {
 }
 
 /**
- * Renders strategic bargaining data cheat sheet (Modal Dialog)
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * All analytics are now in the unified Steward Dashboard (Bargaining tab).
  */
 function renderBargainingCheatSheet() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function renderBargainingCheatSheet_LEGACY() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   var step1Denials = 0;
@@ -5424,9 +5758,15 @@ function renderBargainingCheatSheet() {
 }
 
 /**
- * Generates unit hot zones report showing problem areas (Modal Dialog)
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Hot Zones are now in the unified Steward Dashboard (Hot Spots tab).
  */
 function renderHotZones() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function renderHotZones_LEGACY() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -5478,9 +5818,15 @@ function renderHotZones() {
 }
 
 /**
- * Identifies rising star stewards based on performance (Modal Dialog)
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Steward metrics are now in the unified Steward Dashboard (Workload tab).
  */
 function identifyRisingStars() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function identifyRisingStars_LEGACY() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
 
@@ -5541,9 +5887,15 @@ function identifyRisingStars() {
 }
 
 /**
- * Generates management hostility funnel report (Modal Dialog)
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Hostility metrics are now in the unified Steward Dashboard (Bargaining tab).
  */
 function renderHostilityFunnel() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function renderHostilityFunnel_LEGACY() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
