@@ -4,6 +4,10 @@
 
 ---
 
+> **Development Notice:** This system is currently in the **review and feedback phase** (approximately one month). We welcome all feedback, bug reports, and feature suggestions. Feel free to copy the sheet, forms, and core repository at any time to explore and customize for your own union's needs.
+
+---
+
 Dear Fellow Union Members and Stewards,
 
 Welcome to our new digital union management system! This comprehensive platform is designed to streamline communication, protect member information, and empower stewards with the tools they need to effectively represent our membership.
@@ -16,13 +20,13 @@ Welcome to our new digital union management system! This comprehensive platform 
 
 | Resource | Link | Description |
 |----------|------|-------------|
-| **Member Directory Sheet** | [YOUR_SHEET_LINK] | Central hub for all member data |
-| **Contact Update Form** | [CONTACT_FORM_URL] | Update your contact information |
-| **Satisfaction Survey** | [SATISFACTION_FORM_URL] | Provide feedback on union services |
-| **Grievance Filing Form** | [GRIEVANCE_FORM_URL] | File a new grievance |
+| **Grievance Filing Form** | [Open Form](https://docs.google.com/forms/d/e/1FAIpQLSeOs6Kxqca85DYRF1wTP634gMNdEirZdi5mg7aUIY5q7dIfRg/viewform) | File a new grievance |
+| **Satisfaction Survey** | [Open Survey](https://docs.google.com/forms/d/e/1FAIpQLSeR4VxrGTEvK-PaQP2S8JXn6xwTwp-vkR9tI5c3PRvfhr75nA/viewform) | Provide feedback on union services |
+| **Contact Update Form** | [Open Form](https://docs.google.com/forms/d/e/1FAIpQLSeOs6Kxqca85DYRF1wTP634gMNdEirZdi5mg7aUIY5q7dIfRg/viewform) | Update your contact information |
+| **Web App Dashboard** | [Open Dashboard](https://script.google.com/macros/s/AKfycbyAknT0zxuuSmCHVDg64uu3DmUJtk1h2uKoFX4mFLKWa_hoWXKjmFaHwbXK1XKkDcsBYQ/exec) | Full dashboard (desktop) |
+| **Mobile Dashboard** | [Open Mobile](https://script.google.com/macros/s/AKfycbxaRlF89LEwb6gJrJtojqo51P2UyzZJSJgFAzDTqGNUvn5VMMdl/exec) | Touch-optimized for phones/tablets |
 | **Member Dashboard** | Access via menu: `Union Hub → Dashboards → Member Dashboard` | View chapter data (no personal info) |
 | **Steward Dashboard** | Access via menu: `Union Hub → Dashboards → Steward Dashboard` | Internal analytics (stewards only) |
-| **Mobile Dashboard** | Access via menu: `Union Hub → Dashboards → Mobile Dashboard` | Touch-optimized for phones/tablets |
 
 ---
 
@@ -364,6 +368,40 @@ Read the documentation sheets within the spreadsheet for detailed information on
 
 ---
 
+## Function Checklist
+
+The sheet includes a **Function Checklist** tab that documents:
+- All available features and where to find them
+- What each function does and what to expect
+- A notes section for your feedback on each feature
+
+---
+
+## Want to Copy This for Your Union?
+
+This system is **free for use by non-profit collective bargaining groups and unions**. You can:
+
+1. **Copy the Google Sheet**: File → Make a copy
+2. **Copy the Google Forms**: Each form can be copied from the form editor
+3. **Clone the GitHub Repository**: Contains all the Apps Script code
+
+Feel free to customize everything to match your union's contract deadlines, terminology, and workflows.
+
+---
+
+## Feedback & Development Phase
+
+We are currently in a **month-long review and feedback phase**. During this time:
+
+- Test all features thoroughly
+- Report any bugs or issues in the **Feedback & Development tab**
+- Suggest new features or improvements
+- Share your experience with other stewards
+
+Your feedback directly shapes the development of this tool!
+
+---
+
 **Welcome aboard, and thank you for your commitment to our union!**
 
 *In Solidarity,*
@@ -371,4 +409,4 @@ Read the documentation sheets within the spreadsheet for detailed information on
 
 ---
 
-*Version 4.3.8 | Questions? Contact wardis@pm.me*
+*Version 4.3.8 | Questions or Feedback? Contact wardis@pm.me*
