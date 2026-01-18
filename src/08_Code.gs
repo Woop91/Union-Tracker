@@ -4294,23 +4294,21 @@ function createGrievanceFolderFromData_(grievanceId, memberId, firstName, lastNa
     // Get or create root folder
     var rootFolder = getOrCreateDashboardFolder_();
 
-    // Format date as YYYY-MM (default to current date if not provided)
+    // Format date as YYYY-MM-DD (default to current date if not provided)
     var date = dateFiled ? new Date(dateFiled) : new Date();
-    var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+    var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-    // Build folder name: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
-    // Example: "2026-01 - Smith, John - Scheduling - G-2026-001"
+    // Build folder name: LastName, FirstName - YYYY-MM-DD
+    // Example: "Smith, John - 2026-01-15"
     var folderName;
     var sanitizedFirst = sanitizeFolderName_(firstName || '');
     var sanitizedLast = sanitizeFolderName_(lastName || '');
-    var sanitizedCategory = sanitizeFolderName_(issueCategory || 'General');
 
     if (sanitizedFirst && sanitizedLast) {
-      folderName = dateStr + ' - ' + sanitizedLast + ', ' + sanitizedFirst +
-                   ' - ' + sanitizedCategory + ' - ' + grievanceId;
+      folderName = sanitizedLast + ', ' + sanitizedFirst + ' - ' + dateStr;
     } else {
       // Fallback if name not available
-      folderName = dateStr + ' - ' + grievanceId + ' - ' + sanitizedCategory;
+      folderName = grievanceId + ' - ' + dateStr;
     }
 
     // Check if folder already exists
@@ -10024,21 +10022,19 @@ function autoCreateMissingGrievanceFolders_() {
     }
 
     try {
-      // Format date as YYYY-MM (default to current date if not provided)
+      // Format date as YYYY-MM-DD (default to current date if not provided)
       var date = dateFiled ? new Date(dateFiled) : new Date();
-      var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+      var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-      // Create folder name: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+      // Create folder name: LastName, FirstName - YYYY-MM-DD
       var sanitizedFirst = sanitizeFolderName_(firstName || '');
       var sanitizedLast = sanitizeFolderName_(lastName || '');
-      var sanitizedCategory = sanitizeFolderName_(issueCategory);
 
       var folderName;
       if (sanitizedFirst && sanitizedLast) {
-        folderName = dateStr + ' - ' + sanitizedLast + ', ' + sanitizedFirst +
-                     ' - ' + sanitizedCategory + ' - ' + grievanceId;
+        folderName = sanitizedLast + ', ' + sanitizedFirst + ' - ' + dateStr;
       } else {
-        folderName = dateStr + ' - ' + grievanceId + ' - ' + sanitizedCategory;
+        folderName = grievanceId + ' - ' + dateStr;
       }
 
       // Create the folder
