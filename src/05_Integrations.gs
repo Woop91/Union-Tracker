@@ -2205,30 +2205,22 @@ function getWebAppDashboardStats() {
 }
 
 /**
- * Menu function to get the web app URL
+ * Menu function to show instructions for getting the mobile dashboard URL
  */
 function showWebAppUrl() {
-  var url = ScriptApp.getService().getUrl();
-  if (!url) {
-    SpreadsheetApp.getUi().alert(
-      '📱 Web App Not Deployed',
-      'To access the dashboard on mobile:\n\n' +
-      '1. Go to Extensions → Apps Script\n' +
-      '2. Click "Deploy" → "New deployment"\n' +
-      '3. Select "Web app"\n' +
-      '4. Set "Who has access" appropriately\n' +
-      '5. Click "Deploy"\n' +
-      '6. Copy the URL and open it on your phone',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
-    return;
-  }
-
   var ui = SpreadsheetApp.getUi();
-  var result = ui.alert(
+  ui.alert(
     '📱 Mobile Dashboard URL',
-    'Open this URL on your mobile device:\n\n' + url + '\n\n' +
-    'Tip: Add it to your home screen for quick access!',
+    'To get your mobile dashboard URL:\n\n' +
+    '1. Go to Extensions → Apps Script\n' +
+    '2. Click "Deploy" → "Manage deployments"\n' +
+    '3. Copy the Web app URL\n\n' +
+    'If you haven\'t deployed yet:\n' +
+    '1. Click "Deploy" → "New deployment"\n' +
+    '2. Select type: "Web app"\n' +
+    '3. Set "Who has access" to your preference\n' +
+    '4. Click "Deploy" and copy the URL\n\n' +
+    'Open that URL on your phone and add it to your home screen for quick access!',
     ui.ButtonSet.OK
   );
 }
@@ -2239,25 +2231,36 @@ function showWebAppUrl() {
  */
 function addMobileDashboardLinkToConfig() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
 
   if (!configSheet) {
-    SpreadsheetApp.getUi().alert('Error', 'Config sheet not found', SpreadsheetApp.getUi().ButtonSet.OK);
+    ui.alert('Error', 'Config sheet not found', ui.ButtonSet.OK);
     return;
   }
 
-  var url = ScriptApp.getService().getUrl();
-  if (!url) {
-    SpreadsheetApp.getUi().alert(
-      '📱 Web App Not Deployed',
-      'To use this feature, you must first deploy the web app:\n\n' +
-      '1. Go to Extensions → Apps Script\n' +
-      '2. Click "Deploy" → "New deployment"\n' +
-      '3. Select "Web app"\n' +
-      '4. Set "Who has access" to "Anyone" or appropriate setting\n' +
-      '5. Click "Deploy"\n' +
-      '6. Then run this function again',
-      SpreadsheetApp.getUi().ButtonSet.OK
+  // Prompt user to enter the URL from Manage deployments
+  var response = ui.prompt(
+    '📱 Add Mobile Dashboard Link',
+    'To get your web app URL:\n' +
+    '1. Go to Extensions → Apps Script\n' +
+    '2. Click "Deploy" → "Manage deployments"\n' +
+    '3. Copy the Web app URL\n\n' +
+    'Paste the URL below:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    return;
+  }
+
+  var url = response.getResponseText().trim();
+  if (!url || !url.match(/^https:\/\/script\.google\.com/)) {
+    ui.alert(
+      'Invalid URL',
+      'Please enter a valid Google Apps Script web app URL.\n\n' +
+      'It should look like:\nhttps://script.google.com/macros/s/XXXXX/exec',
+      ui.ButtonSet.OK
     );
     return;
   }
