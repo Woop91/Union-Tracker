@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.3.8 (Searchable Help Guide, Two-Dashboard Architecture)
+**Version:** 4.3.10 (OCR Fully Wired, Chart Types 11-15, Code Audit Fixes)
 **Last Updated:** 2026-01-18
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -243,6 +243,7 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `getNextSequence_(prefix, sheet)` **(NEW v3.6.5)** - Get next sequence number for unit
   - `checkDuplicateMemberIDs()` **(NEW v3.6.5)** - Find and report duplicate IDs
   - `findExistingMember(searchParams, dataArray)` **(NEW v4.1)** - Multi-key smart match for duplicate prevention
+  - `showFindMemberDialog()` **(v4.3.10)** - UI wrapper for member search (renamed from findExistingMember to avoid conflict)
 - Steward Management:
   - `getAllStewards()` - Get all active stewards
   - `getStewardWorkload()` - Calculate steward case loads with win rates
@@ -470,6 +471,13 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `setupDashboardCalcSheet()` - Dashboard summary metrics
   - `setupStewardPerformanceCalcSheet()` - Performance scores
 
+- Chart System **(v4.3.10 - 15 Chart Types)**:
+  - `generateSelectedChart()` - Main chart generator (reads G120 for selection)
+  - `createChartOptionsTable_()` - Builds visual chart selection table
+  - Chart Types 1-10: Gauge, Bar, Pie, Line, Column, Scorecard, Heatmap, Stacked Bar, Donut, Area
+  - Chart Types 11-15 **(NEW v4.3.10)**: Combo, Scatter, Histogram, Summary Table, Steward Leaderboard
+  - Helper functions: `createGaugeStyleChart_()`, `createScorecardChart_()`, `createTrendLineChart_()`, `createAreaChart_()`, `createComboChart_()`, `createSummaryTableChart_()`, `createStewardLeaderboardChart_()`, `padRight()`
+
 - Value Sync Functions (No Formulas in Visible Sheets):
   - `syncDashboardValues()` - Compute and write Dashboard metrics as VALUES
   - `computeDashboardMetrics_()` - Calculate 100+ Dashboard metrics
@@ -565,8 +573,16 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `getOrCreateMemberFolder(name, id)` - Get/create member-specific archive folder
   - `sendGeminiEscalationAlert(member, caseID, status)` - Enhanced escalation email with formatting
 
-- Scaling Modules - OCR & Sentiment **(NEW v4.0)**:
-  - `transcribeHandwrittenForm(fileId)` - OCR hook for Google Cloud Vision API integration
+- Scaling Modules - OCR & Sentiment **(FULLY WIRED v4.3.10)**:
+  - `wger(fileId, options)` - Main OCR function with TEXT/DOCUMENT/HANDWRITING modes
+  - `wgerQuick(fileId)` - Quick text extraction wrapper
+  - `wgerHandwriting(fileId)` - Handwriting-optimized OCR
+  - `wgerDocument(fileId)` - Document layout preservation OCR
+  - `transcribeHandwrittenForm(fileId)` - Legacy wrapper (calls wger)
+  - `setupOCRApiKey()` - Guided Cloud Vision API key configuration dialog
+  - `saveOCRApiKey(apiKey)` - Saves API key to Script Properties
+  - `testOCRConnection()` - Validates API key works
+  - `getOCRStatus()` - Checks if OCR is configured
   - `calculateUnitHealth(unitName)` - Sentiment analysis correlating grievance counts with survey scores
   - `getGrievanceCountForUnit(unitName)` - Count grievances for specific unit
   - `getRecentSurveyAverage(unitName)` - Get survey score placeholder (ready for Typeform/SurveyMonkey API)
@@ -577,7 +593,8 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `showSearchPrecedents()` **(NEW v4.1)** - Search historical grievance outcomes for past practice
   - `searchPrecedentsData(query, outcomeFilter)` **(NEW v4.1)** - Backend search for precedent data
   - `getRecentSurveyAverage(unitName)` **(WIRED v4.1)** - Now reads from Member Satisfaction sheet
-  - `showOCRDialog()` - OCR transcription dialog (Cloud Vision API placeholder)
+  - `showOCRDialog()` - OCR transcription dialog (fully wired to Cloud Vision API)
+  - `setupOCRApiKey()` - OCR setup helper with guided API key configuration
 
 - Theme Application:
   - `APPLY_GEMINI_THEME()` - Apply system theme with Gemini compatibility
@@ -1203,7 +1220,8 @@ The menu system provides comprehensive access to all dashboard features through 
 │   ├── 🏥 Unit Health Report
 │   ├── 📊 Grievance Trends
 │   ├── 📚 Search Precedents
-│   └── 📝 OCR Transcribe Form
+│   ├── 📝 OCR Transcribe Form
+│   └── 🔧 OCR Setup
 ├── 🎯 Strategic Intelligence (submenu)
 │   ├── 🔥 Generate Unit Hot Zones
 │   ├── 🌟 Identify Rising Stars
@@ -1809,7 +1827,8 @@ The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-base
 **Analytics & Insights Menu (10_CommandCenter.gs):**
 - `showUnitHealthReport()` - Unit health analysis for all units
 - `showGrievanceTrends()` - Monthly trend analysis with up/down indicators
-- `showOCRDialog()` - OCR transcription dialog (Cloud Vision placeholder)
+- `showOCRDialog()` - OCR transcription dialog (fully wired to Cloud Vision API)
+- `setupOCRApiKey()` - OCR setup helper with guided Cloud Vision API key configuration
 - Menu: 📈 Analytics & Insights submenu
 
 **Menu System Updates (10_CommandCenter.gs):**
