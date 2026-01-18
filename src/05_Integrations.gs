@@ -925,12 +925,27 @@ function showClearCalendarConfirm() {
  */
 
 /**
- * Web app entry point - serves the mobile dashboard
+ * Web app entry point - unified handler for all web app requests
+ * Handles member portal (with id), page navigation, and default dashboard
+ *
  * @param {Object} e - Event object with query parameters
  * @returns {HtmlOutput} The HTML page to display
+ *
+ * URL Parameters:
+ * - id=<memberId> - Returns personalized member portal
+ * - page=search|grievances|members|links|dashboard|portal - Returns specific page
+ * - (no params) - Returns default dashboard
  */
 function doGet(e) {
-  var page = e && e.parameter && e.parameter.page ? e.parameter.page : 'dashboard';
+  var params = e && e.parameter ? e.parameter : {};
+
+  // Check for member ID first (personalized portal)
+  if (params.id) {
+    return buildMemberPortal(params.id);
+  }
+
+  // Check for page parameter
+  var page = params.page || 'dashboard';
 
   var html;
   switch (page) {
@@ -946,6 +961,9 @@ function doGet(e) {
     case 'links':
       html = getWebAppLinksHtml();
       break;
+    case 'portal':
+      // Public portal (no PII) - uses secure member dashboard functions
+      return buildPublicPortal();
     case 'dashboard':
     default:
       html = getWebAppDashboardHtml();

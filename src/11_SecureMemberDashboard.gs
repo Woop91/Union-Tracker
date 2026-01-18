@@ -1400,22 +1400,20 @@ function showStewardWorkloadReport_LEGACY() {
 // ============================================================================
 
 /**
- * Web App entry point - handles URL parameters for member portal
- * Deploy as: File > Deploy > New Deployment > Web App
- * Access URL: https://script.google.com/.../exec?id=MEMBER_ID
+ * @deprecated v4.3.9 - Use unified doGet() in 05_Integrations.gs instead
+ * The unified doGet handles: ?id=<memberId>, ?page=portal, and all other pages
  *
- * @param {Object} e - Event object with query parameters
- * @returns {HtmlOutput} HTML page for display
+ * This function is renamed to avoid duplicate definition conflicts.
+ * The buildMemberPortal() and buildPublicPortal() functions are still used
+ * by the unified doGet() in 05_Integrations.gs.
  */
-function doGet(e) {
+function doGet_SecureMemberDashboard_DEPRECATED(e) {
   var memberId = e && e.parameter && e.parameter.id;
 
   if (memberId) {
-    // Return personalized member portal
     return buildMemberPortal(memberId);
   }
 
-  // Return public dashboard (no PII)
   return buildPublicPortal();
 }
 
