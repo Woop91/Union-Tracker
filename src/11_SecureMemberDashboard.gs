@@ -1064,12 +1064,20 @@ function emailDashboardLink() {
     return;
   }
 
-  var data = sheet.getRange(row, 1, 1, MEMBER_COLS.EMAIL).getValues()[0];
+  // Get member data including Member ID for personalized portal link
+  var dataRange = sheet.getRange(row, 1, 1, Math.max(MEMBER_COLS.EMAIL, MEMBER_COLS.MEMBER_ID, MEMBER_COLS.FIRST_NAME));
+  var data = dataRange.getValues()[0];
   var email = data[MEMBER_COLS.EMAIL - 1];
   var firstName = data[MEMBER_COLS.FIRST_NAME - 1];
+  var memberId = data[MEMBER_COLS.MEMBER_ID - 1];
 
   if (!email) {
     ui.alert('No email address found for this member.');
+    return;
+  }
+
+  if (!memberId) {
+    ui.alert('No Member ID found for this member. Cannot generate portal link.');
     return;
   }
 
@@ -1084,18 +1092,24 @@ function emailDashboardLink() {
   if (response !== ui.Button.YES) return;
 
   try {
-    var spreadsheetUrl = ss.getUrl();
+    // Use the deployed web app URL, not the spreadsheet URL
+    var webAppUrl = ScriptApp.getService().getUrl();
+    if (!webAppUrl) {
+      ui.alert('Error', 'Web app is not deployed. Please deploy the web app first via Extensions > Apps Script > Deploy.', ui.ButtonSet.OK);
+      return;
+    }
+    var portalUrl = webAppUrl + '?id=' + memberId;
+
     var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Your Member Dashboard Access';
     var body = 'Hello ' + firstName + ',\n\n' +
-               'You can access your Union Member Dashboard at the following link:\n\n' +
-               spreadsheetUrl + '\n\n' +
-               'From the spreadsheet, go to:\n' +
-               '509 Command > Command Center > Member Dashboard (No PII)\n\n' +
+               'You can access your personalized Union Member Dashboard at the following link:\n\n' +
+               portalUrl + '\n\n' +
                'This dashboard gives you access to:\n' +
                '- Your Weingarten Rights (emergency reference)\n' +
                '- Union contract and resources\n' +
                '- Steward contact information\n' +
                '- Grievance statistics\n\n' +
+               'Keep this link private - it is personalized for you.\n\n' +
                'If you have any questions, contact your steward.\n\n' +
                'In Solidarity,' +
                COMMAND_CONFIG.EMAIL.FOOTER;
