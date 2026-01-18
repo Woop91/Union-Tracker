@@ -144,9 +144,7 @@ function createDashboardMenu() {
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
-      .addSeparator()
-      .addItem('🗑️ Remove Deprecated Tabs', 'removeDeprecatedTabs'));
+      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
