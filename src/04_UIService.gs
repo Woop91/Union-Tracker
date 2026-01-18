@@ -2210,26 +2210,165 @@ function deactivateFocusMode() {
   ss.toast('✅ Focus mode deactivated', 'Focus Mode', 3);
 }
 
-// ==================== QUICK CAPTURE & TIMER ====================
+// ==================== QUICK CAPTURE NOTEPAD ====================
 
-// ==================== DEPRECATED FEATURES (v4.3.2) ====================
-// Quick Capture Notepad and Pomodoro Timer have been removed.
-// These functions are kept for backwards compatibility but show deprecation notices.
+/**
+ * Quick Capture Notepad - Fast note-taking without losing focus
+ * Notes are stored per-user in Script Properties
+ */
 
-/** @deprecated v4.3.2 - Feature removed */
-function getQuickCaptureNotes() { return ''; }
-
-/** @deprecated v4.3.2 - Feature removed */
-function saveQuickCaptureNotes(notes) { }
-
-/** @deprecated v4.3.2 - Feature removed */
-function showQuickCaptureNotepad() {
-  SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
+/**
+ * Gets the current user's quick capture notes
+ * @returns {string} The saved notes or empty string
+ */
+function getQuickCaptureNotes() {
+  var userProps = PropertiesService.getUserProperties();
+  return userProps.getProperty('quickCaptureNotes') || '';
 }
 
-/** @deprecated v4.3.2 - Feature removed */
-function startPomodoroTimer() {
-  SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
+/**
+ * Saves quick capture notes for the current user
+ * @param {string} notes - The notes to save
+ * @returns {Object} Result object with success status
+ */
+function saveQuickCaptureNotes(notes) {
+  try {
+    var userProps = PropertiesService.getUserProperties();
+    userProps.setProperty('quickCaptureNotes', notes || '');
+    userProps.setProperty('quickCaptureLastSaved', new Date().toISOString());
+    return { success: true, message: 'Notes saved' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Clears the quick capture notes
+ * @returns {Object} Result object with success status
+ */
+function clearQuickCaptureNotes() {
+  try {
+    var userProps = PropertiesService.getUserProperties();
+    userProps.deleteProperty('quickCaptureNotes');
+    userProps.deleteProperty('quickCaptureLastSaved');
+    return { success: true, message: 'Notes cleared' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Gets metadata about the quick capture notes
+ * @returns {Object} Object with lastSaved timestamp and character count
+ */
+function getQuickCaptureMetadata() {
+  var userProps = PropertiesService.getUserProperties();
+  var notes = userProps.getProperty('quickCaptureNotes') || '';
+  var lastSaved = userProps.getProperty('quickCaptureLastSaved') || null;
+  return {
+    charCount: notes.length,
+    wordCount: notes.trim() ? notes.trim().split(/\s+/).length : 0,
+    lastSaved: lastSaved
+  };
+}
+
+/**
+ * Shows the Quick Capture Notepad dialog
+ * A fast notepad for capturing thoughts without losing focus
+ */
+function showQuickCaptureNotepad() {
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 16px; color: #F8FAFC; }' +
+    '.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
+    'h3 { font-size: 18px; display: flex; align-items: center; gap: 8px; }' +
+    '.meta { font-size: 12px; color: #64748B; }' +
+    'textarea { width: 100%; height: 280px; padding: 12px; border: 2px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-size: 14px; font-family: inherit; resize: none; outline: none; }' +
+    'textarea:focus { border-color: #7C3AED; }' +
+    'textarea::placeholder { color: #64748B; }' +
+    '.btn-row { display: flex; gap: 8px; margin-top: 12px; }' +
+    'button { flex: 1; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
+    '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }' +
+    '.btn-secondary { background: #334155; color: #F8FAFC; }' +
+    '.btn-danger { background: #DC2626; color: white; }' +
+    '.status { margin-top: 8px; font-size: 12px; color: #10B981; text-align: center; opacity: 0; transition: opacity 0.3s; }' +
+    '.status.show { opacity: 1; }' +
+    '</style>' +
+    '<div class="header">' +
+    '  <h3>📝 Quick Capture</h3>' +
+    '  <span class="meta" id="meta"></span>' +
+    '</div>' +
+    '<textarea id="notes" placeholder="Capture your thoughts quickly...\\n\\nUse this notepad to jot down ideas, reminders, or notes without losing focus on your current task.\\n\\nYour notes are auto-saved when you click Save."></textarea>' +
+    '<div class="btn-row">' +
+    '  <button class="btn-primary" onclick="saveNotes()">💾 Save</button>' +
+    '  <button class="btn-secondary" onclick="copyNotes()">📋 Copy</button>' +
+    '  <button class="btn-danger" onclick="clearNotes()">🗑️ Clear</button>' +
+    '  <button class="btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '</div>' +
+    '<div class="status" id="status"></div>' +
+    '<script>' +
+    'var notesEl = document.getElementById("notes");' +
+    'var statusEl = document.getElementById("status");' +
+    'var metaEl = document.getElementById("meta");' +
+    '' +
+    'google.script.run.withSuccessHandler(function(notes) {' +
+    '  notesEl.value = notes || "";' +
+    '  updateMeta();' +
+    '}).getQuickCaptureNotes();' +
+    '' +
+    'notesEl.addEventListener("input", updateMeta);' +
+    '' +
+    'function updateMeta() {' +
+    '  var text = notesEl.value;' +
+    '  var words = text.trim() ? text.trim().split(/\\s+/).length : 0;' +
+    '  metaEl.textContent = words + " words, " + text.length + " chars";' +
+    '}' +
+    '' +
+    'function showStatus(msg, isError) {' +
+    '  statusEl.textContent = msg;' +
+    '  statusEl.style.color = isError ? "#EF4444" : "#10B981";' +
+    '  statusEl.classList.add("show");' +
+    '  setTimeout(function() { statusEl.classList.remove("show"); }, 2000);' +
+    '}' +
+    '' +
+    'function saveNotes() {' +
+    '  google.script.run.withSuccessHandler(function(result) {' +
+    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + result.message, !result.success);' +
+    '  }).saveQuickCaptureNotes(notesEl.value);' +
+    '}' +
+    '' +
+    'function copyNotes() {' +
+    '  navigator.clipboard.writeText(notesEl.value).then(function() {' +
+    '    showStatus("📋 Copied to clipboard!");' +
+    '  }).catch(function() {' +
+    '    showStatus("❌ Failed to copy", true);' +
+    '  });' +
+    '}' +
+    '' +
+    'function clearNotes() {' +
+    '  if (confirm("Clear all notes? This cannot be undone.")) {' +
+    '    notesEl.value = "";' +
+    '    google.script.run.withSuccessHandler(function(result) {' +
+    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + result.message, !result.success);' +
+    '      updateMeta();' +
+    '    }).clearQuickCaptureNotes();' +
+    '  }' +
+    '}' +
+    '' +
+    'notesEl.addEventListener("keydown", function(e) {' +
+    '  if ((e.ctrlKey || e.metaKey) && e.key === "s") {' +
+    '    e.preventDefault();' +
+    '    saveNotes();' +
+    '  }' +
+    '});' +
+    '</script>'
+  )
+  .setWidth(500)
+  .setHeight(450);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture Notepad');
 }
 
 function setBreakReminders(minutes) {
