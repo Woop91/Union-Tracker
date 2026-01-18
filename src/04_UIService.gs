@@ -3759,18 +3759,24 @@ function emailDashboardLinkToMember(memberId) {
     return;
   }
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var dashboardUrl = ss.getUrl();
+  // Use the deployed web app URL with personalized member ID parameter
+  var webAppUrl = ScriptApp.getService().getUrl();
+  if (!webAppUrl) {
+    SpreadsheetApp.getUi().alert('Web app is not deployed. Please deploy the web app first via Extensions > Apps Script > Deploy.');
+    return;
+  }
+  var portalUrl = webAppUrl + '?id=' + memberId;
   var orgName = getOrgNameFromConfig_();
 
   var subject = orgName + ' - Member Dashboard Access';
   var body = 'Dear ' + memberData.firstName + ',\n\n' +
-    'You can access your union member dashboard and track your information at:\n\n' +
-    'Dashboard Link: ' + dashboardUrl + '\n\n' +
+    'You can access your personalized union member dashboard at:\n\n' +
+    'Dashboard Link: ' + portalUrl + '\n\n' +
     'From the dashboard you can:\n' +
     '- View your member profile\n' +
     '- Track grievance status (if applicable)\n' +
     '- Stay updated on union activities\n\n' +
+    'Keep this link private - it is personalized for you.\n\n' +
     'If you have any questions, please contact your steward.\n\n' +
     'In Solidarity,\n' +
     orgName;
