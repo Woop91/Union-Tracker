@@ -154,6 +154,8 @@ function createDashboardMenu() {
         .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
         .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
         .addSeparator()
+        .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+        .addSeparator()
         .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
   }
 
@@ -2131,6 +2133,47 @@ function showQuickCaptureNotepad() {
 /** @deprecated v4.3.2 - Feature removed */
 function startPomodoroTimer() {
   SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
+}
+
+/**
+ * Shows import dialog for bulk member import
+ * @todo Implement CSV import functionality
+ */
+function showImportDialog() {
+  SpreadsheetApp.getUi().alert(
+    '📥 Import Members',
+    'Bulk import from CSV is not yet implemented.\n\n' +
+    'To add members:\n' +
+    '1. Use "Add New Member" from the Members menu\n' +
+    '2. Or paste data directly into the Member Directory sheet\n\n' +
+    'This feature is planned for a future release.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Shows export dialog for member directory export
+ * @todo Implement CSV/Excel export functionality
+ */
+function showExportDialog() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    return;
+  }
+
+  // For now, just show download instructions
+  SpreadsheetApp.getUi().alert(
+    '📤 Export Directory',
+    'To export the Member Directory:\n\n' +
+    '1. Go to the Member Directory sheet\n' +
+    '2. Click File > Download\n' +
+    '3. Choose your format (CSV, Excel, PDF)\n\n' +
+    'Direct export functionality is planned for a future release.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 }
 
 function setBreakReminders(minutes) {
