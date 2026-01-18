@@ -154,6 +154,7 @@ var SHEETS = {
   GETTING_STARTED: '📚 Getting Started',
   FAQ: '❓ FAQ',
   CONFIG_GUIDE: '📖 Config Guide',
+  FEATURES_REFERENCE: '📋 Features Reference',
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
