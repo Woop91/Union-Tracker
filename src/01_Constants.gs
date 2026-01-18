@@ -1150,6 +1150,19 @@ var GRIEVANCE_STATUS = {
 };
 
 /**
+ * Deadline rules for grievance step calculations
+ * Defines the number of days for responses and appeals at each step
+ * Used by deadline calculation functions throughout the system
+ * @const {Object}
+ */
+var DEADLINE_RULES = {
+  STEP_1: { DAYS_FOR_RESPONSE: 7 },
+  STEP_2: { DAYS_TO_APPEAL: 7, DAYS_FOR_RESPONSE: 14 },
+  STEP_3: { DAYS_TO_APPEAL: 10, DAYS_FOR_RESPONSE: 21 },
+  ARBITRATION: { DAYS_TO_DEMAND: 30 }
+};
+
+/**
  * Audit event types for logging
  * @const {Object}
  */
