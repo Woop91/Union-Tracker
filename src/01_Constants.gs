@@ -108,7 +108,7 @@ var VERSION_INFO = {
   PATCH: 8,
   BUILD: 'v4.3.8',
   CURRENT: '4.3.8',
-  CODENAME: 'Modal Consolidation'
+CODENAME: 'Searchable Help Guide'
 };
 
 // ============================================================================

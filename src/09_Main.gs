@@ -631,104 +631,288 @@ function removeTriggers() {
 // ============================================================================
 
 /**
- * Shows the help dialog
+ * Shows the searchable Help Guide modal with menu breakdown and FAQ
+ * v4.3.7 - Complete rewrite with search, menu reference, and FAQ
  */
 function showHelpDialog() {
   const html = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
     <head>
-      ${getCommonStyles()}
+      <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600&display=swap" rel="stylesheet">
       <style>
-        .help-container { padding: 20px; }
-        .help-section { margin-bottom: 25px; }
-        .help-title { font-size: 18px; font-weight: 600; margin-bottom: 10px; color: #1a73e8; }
-        .help-text { color: #5f6368; line-height: 1.6; }
-        .shortcut-list { margin: 10px 0; }
-        .shortcut-item { display: flex; margin: 8px 0; }
-        .shortcut-key { background: #f1f3f4; padding: 4px 8px; border-radius: 4px;
-                        font-family: monospace; margin-right: 10px; min-width: 120px; }
-        .version { color: #999; font-size: 12px; margin-top: 20px; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Roboto', sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; min-height: 100vh; }
+        .container { padding: 16px; max-height: 100vh; overflow-y: auto; }
+        .search-box { position: sticky; top: 0; background: #1e293b; padding: 12px 0; z-index: 10; }
+        .search-input { width: 100%; padding: 12px 16px 12px 44px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #e2e8f0; font-size: 14px; }
+        .search-input:focus { outline: none; border-color: #3b82f6; }
+        .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #64748b; }
+        .tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+        .tab { padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; cursor: pointer; font-size: 12px; color: #94a3b8; transition: all 0.2s; }
+        .tab:hover { background: rgba(255,255,255,0.1); }
+        .tab.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+        .section { margin-bottom: 20px; }
+        .section-title { font-size: 14px; font-weight: 600; color: #60a5fa; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .section-title .material-icons { font-size: 18px; }
+        .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .card-title { font-weight: 500; color: #e2e8f0; margin-bottom: 6px; font-size: 13px; }
+        .card-desc { color: #94a3b8; font-size: 12px; line-height: 1.5; }
+        .menu-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 6px; }
+        .menu-item:hover { background: rgba(255,255,255,0.08); }
+        .menu-path { color: #60a5fa; font-size: 11px; font-family: monospace; margin-bottom: 4px; }
+        .menu-name { font-weight: 500; color: #e2e8f0; font-size: 13px; }
+        .menu-desc { color: #94a3b8; font-size: 11px; margin-top: 4px; }
+        .faq-item { border-left: 3px solid #3b82f6; padding-left: 12px; margin-bottom: 12px; }
+        .faq-q { font-weight: 500; color: #e2e8f0; margin-bottom: 6px; font-size: 13px; }
+        .faq-a { color: #94a3b8; font-size: 12px; line-height: 1.6; }
+        .highlight { background: #fbbf24; color: #0f172a; padding: 0 2px; border-radius: 2px; }
+        .hidden { display: none; }
+        .repo-link { display: inline-flex; align-items: center; gap: 6px; color: #60a5fa; text-decoration: none; font-size: 12px; margin-top: 8px; }
+        .repo-link:hover { text-decoration: underline; }
+        .version { color: #64748b; font-size: 11px; text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
       </style>
     </head>
     <body>
-      <div class="help-container">
-        <div class="help-section">
-          <div class="help-title">Union Steward Dashboard</div>
-          <div class="help-text">
-            A comprehensive tool for managing union grievances, member records,
-            and tracking deadlines based on your collective bargaining agreement.
+      <div class="container">
+        <div class="search-box">
+          <div style="position: relative;">
+            <span class="material-icons search-icon">search</span>
+            <input type="text" class="search-input" id="searchInput" placeholder="Search help topics, menus, or FAQ..." oninput="filterContent()">
           </div>
         </div>
 
-        <div class="help-section">
-          <div class="help-title">Key Features</div>
-          <div class="help-text">
-            <ul>
-              <li><strong>Grievance Tracking</strong> - Manage grievances through all steps with automatic deadline calculations</li>
-              <li><strong>Member Directory</strong> - Maintain member records with contact information and union status</li>
-              <li><strong>Calendar Integration</strong> - Sync deadlines to Google Calendar for reminders</li>
-              <li><strong>Drive Integration</strong> - Auto-create folders for grievance documentation</li>
-              <li><strong>Self-Healing Formulas</strong> - Dashboard statistics update automatically</li>
-            </ul>
-          </div>
+        <div class="tabs">
+          <div class="tab active" onclick="showTab('overview')">Overview</div>
+          <div class="tab" onclick="showTab('menus')">Menu Reference</div>
+          <div class="tab" onclick="showTab('faq')">FAQ</div>
+          <div class="tab" onclick="showTab('shortcuts')">Quick Tips</div>
         </div>
 
-        <div class="help-section">
-          <div class="help-title">Quick Access</div>
-          <div class="shortcut-list">
-            <div class="shortcut-item">
-              <span class="shortcut-key">Union Dashboard menu</span>
-              <span>Access all dashboard features</span>
+        <div id="content">
+          <!-- OVERVIEW TAB -->
+          <div id="overview-tab" class="tab-content">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">dashboard</span>Two-Dashboard Architecture</div>
+              <div class="card">
+                <div class="card-title">🛡️ Steward Dashboard (Internal)</div>
+                <div class="card-desc">Comprehensive dashboard for stewards with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, and Satisfaction. Contains member names and PII - for internal use only.</div>
+              </div>
+              <div class="card">
+                <div class="card-title">👥 Member Dashboard (Public)</div>
+                <div class="card-desc">PII-safe dashboard for sharing with members. Shows aggregate union stats, steward directory, and satisfaction scores without personal information.</div>
+              </div>
             </div>
-            <div class="shortcut-item">
-              <span class="shortcut-key">Search > Quick Search</span>
-              <span>Fast search across all records</span>
-            </div>
-            <div class="shortcut-item">
-              <span class="shortcut-key">Grievances > New</span>
-              <span>File a new grievance</span>
-            </div>
-            <div class="shortcut-item">
-              <span class="shortcut-key">Admin > Diagnostics</span>
-              <span>Check system health</span>
+
+            <div class="section">
+              <div class="section-title"><span class="material-icons">star</span>Key Features</div>
+              <div class="card">
+                <div class="card-title">Grievance Tracking</div>
+                <div class="card-desc">Track grievances through all steps with automatic deadline calculations based on Article 23A.</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Member Directory</div>
+                <div class="card-desc">Maintain member records with contact info, union status, and steward assignments.</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Satisfaction Surveys</div>
+                <div class="card-desc">8-section member satisfaction analysis covering steward ratings, leadership, communication, and more.</div>
+              </div>
+              <div class="card">
+                <div class="card-title">Calendar & Drive Integration</div>
+                <div class="card-desc">Sync deadlines to Google Calendar and auto-create Drive folders for documentation.</div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="help-section">
-          <div class="help-title">Deadline Rules (Article 23A)</div>
-          <div class="help-text">
-            <ul>
-              <li><strong>Step 1</strong> - ${DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE} days for management response</li>
-              <li><strong>Step 2</strong> - ${DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL} days to appeal, ${DEADLINE_RULES.STEP_2.DAYS_FOR_RESPONSE} days for response</li>
-              <li><strong>Step 3</strong> - ${DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL} days to appeal, ${DEADLINE_RULES.STEP_3.DAYS_FOR_RESPONSE} days for response</li>
-              <li><strong>Arbitration</strong> - ${DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND} days to demand after Step 3</li>
-            </ul>
+          <!-- MENU REFERENCE TAB -->
+          <div id="menus-tab" class="tab-content hidden">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">menu</span>🏛️ Union Hub Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">👥 Member Dashboard</div><div class="menu-desc">Opens the public-safe member dashboard with aggregate stats</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">🛡️ Steward Dashboard</div><div class="menu-desc">Opens the internal steward dashboard with full analytics</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Quick Search</div><div class="menu-name">🔍 Quick Search</div><div class="menu-desc">Fast search across members and grievances</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Multi-Select Panel</div><div class="menu-name">📋 Multi-Select Panel</div><div class="menu-desc">Select multiple grievances for bulk operations</div></div></div>
+            </div>
+
+            <div class="section">
+              <div class="section-title"><span class="material-icons">menu</span>🎯 Strategic Ops Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops</div><div class="menu-name">👥 Member Dashboard</div><div class="menu-desc">PII-safe aggregate statistics portal</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops</div><div class="menu-name">🛡️ Steward Dashboard</div><div class="menu-desc">Internal analytics with all 6 tabs</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">➕ New Case/Grievance</div><div class="menu-desc">Open the new grievance filing form</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">✏️ Edit Selected</div><div class="menu-desc">Edit the currently selected grievance</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > ID Engines</div><div class="menu-name">🆔 Generate Missing Member IDs</div><div class="menu-desc">Auto-generate IDs for members without one</div></div></div>
+            </div>
+
+            <div class="section">
+              <div class="section-title"><span class="material-icons">menu</span>🛠️ Admin Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">🩺 System Diagnostics</div><div class="menu-desc">Run health check on all system components</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">🔧 Repair Dashboard</div><div class="menu-desc">Fix common issues automatically</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Data Sync</div><div class="menu-name">🔄 Sync All Data Now</div><div class="menu-desc">Synchronize member and grievance data</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Validation</div><div class="menu-name">🔍 Run Bulk Validation</div><div class="menu-desc">Validate all data for consistency</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Setup</div><div class="menu-name">🔧 Setup All Hidden Sheets</div><div class="menu-desc">Initialize all calculation sheets</div></div></div>
+            </div>
+
+            <div class="section">
+              <div class="section-title"><span class="material-icons">menu</span>📊 509 Dashboard Menu</div>
+              <div class="menu-item"><div><div class="menu-path">509 Dashboard</div><div class="menu-name">📊 Dashboard</div><div class="menu-desc">Legacy 5-tab dashboard modal</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Field Access</div><div class="menu-name">📱 Pocket/Mobile View</div><div class="menu-desc">Optimize display for mobile devices</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Personnel</div><div class="menu-name">➕ Add New Member</div><div class="menu-desc">Open the member registration form</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Styling</div><div class="menu-name">🎨 Apply Global Styling</div><div class="menu-desc">Apply Roboto theme and zebra stripes</div></div></div>
+            </div>
           </div>
-        </div>
 
-        <div class="help-section">
-          <div class="help-title">Need Help?</div>
-          <div class="help-text">
-            For technical issues, run <strong>Admin Tools > System Diagnostics</strong> to check for problems.
-            Use <strong>Repair Dashboard</strong> to fix common issues automatically.
+          <!-- FAQ TAB -->
+          <div id="faq-tab" class="tab-content hidden">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">help</span>Frequently Asked Questions</div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I file a new grievance?</div>
+                <div class="faq-a">Go to <strong>Strategic Ops > Cases & Grievances > ➕ New Case/Grievance</strong>. Fill in the member info, select the grievance type, and provide details. Deadlines are calculated automatically.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">What's the difference between the two dashboards?</div>
+                <div class="faq-a">The <strong>Steward Dashboard</strong> is for internal use with full PII and 6 analytical tabs. The <strong>Member Dashboard</strong> is PII-safe for sharing with members, showing only aggregate statistics.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do deadline calculations work?</div>
+                <div class="faq-a">Based on Article 23A: Step 1 has ${DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE} days for response, Step 2 has ${DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL} days to appeal, Step 3 has ${DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL} days, and Arbitration must be demanded within ${DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND} days of Step 3.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Why are some cells showing errors?</div>
+                <div class="faq-a">Run <strong>Admin > 🩺 System Diagnostics</strong> to check for issues. Then try <strong>Admin > 🔧 Repair Dashboard</strong> to fix common problems automatically.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I search for a member or grievance?</div>
+                <div class="faq-a">Use <strong>Union Hub > 🔍 Quick Search</strong> or <strong>Strategic Ops > 🔍 Desktop Search</strong> for advanced filtering options.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I sync deadlines to Google Calendar?</div>
+                <div class="faq-a">Select a grievance, then use <strong>509 Dashboard > Calendar > 📅 Create Calendar Event</strong>. This creates reminder events for all deadline dates.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">What does the Satisfaction tab show?</div>
+                <div class="faq-a">It analyzes member satisfaction surveys across 8 sections: Overall Satisfaction, Steward Ratings, Chapter Effectiveness, Local Leadership, Contract Enforcement, Communication Quality, Member Voice, and Value & Action.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I apply zebra stripes to all rows?</div>
+                <div class="faq-a">Go to <strong>509 Dashboard > Styling > 🎨 Apply Global Styling</strong>. This applies Roboto font and zebra stripes to all rows in Member Directory and Grievance Log.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I start fresh with a new spreadsheet?</div>
+                <div class="faq-a">Visit our GitHub repository to get a fresh copy with seed data and demo features. See the link below.</div>
+              </div>
+            </div>
+
+            <a href="https://github.com/Woop91/MULTIPLE-SCRIPS-REPO" target="_blank" class="repo-link">
+              <span class="material-icons" style="font-size: 16px;">open_in_new</span>
+              Get a fresh copy from GitHub (with Seed & Nuke features)
+            </a>
+          </div>
+
+          <!-- SHORTCUTS TAB -->
+          <div id="shortcuts-tab" class="tab-content hidden">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">bolt</span>Quick Tips</div>
+
+              <div class="card">
+                <div class="card-title">🔍 Quick Search</div>
+                <div class="card-desc">Use Union Hub > Quick Search to find any member or grievance instantly. Supports partial name matching.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">📊 Dashboard Views</div>
+                <div class="card-desc">Use Steward Dashboard for internal analysis, Member Dashboard for sharing with members (PII-safe).</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">📱 Mobile Access</div>
+                <div class="card-desc">Enable Pocket/Mobile View to hide non-essential columns when using on phones or tablets.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">🔄 Data Sync</div>
+                <div class="card-desc">Run Admin > Data Sync > Sync All Data Now periodically to ensure member and grievance data stays linked.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">🎨 Visual Styling</div>
+                <div class="card-desc">Apply Global Styling adds zebra stripes to ALL rows (not just data rows) for consistent appearance.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">⚡ Auto-Triggers</div>
+                <div class="card-desc">Install auto-sync and midnight refresh triggers from Admin menu to keep data current automatically.</div>
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="version">
-          Dashboard Version 2.0.0 | Modular Architecture
-        </div>
-
-        <div style="margin-top: 20px; text-align: right;">
-          <button class="btn btn-primary" onclick="google.script.host.close()">Got it!</button>
+          509 Dashboard v${VERSION_INFO.CURRENT} | ${VERSION_INFO.CODENAME}
         </div>
       </div>
+
+      <script>
+        function showTab(tabName) {
+          // Hide all tabs
+          document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+          // Show selected tab
+          document.getElementById(tabName + '-tab').classList.remove('hidden');
+          event.target.classList.add('active');
+        }
+
+        function filterContent() {
+          const query = document.getElementById('searchInput').value.toLowerCase();
+          const items = document.querySelectorAll('.card, .menu-item, .faq-item');
+
+          items.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            if (query === '' || text.includes(query)) {
+              item.classList.remove('hidden');
+              // Highlight matches
+              if (query !== '') {
+                highlightText(item, query);
+              } else {
+                removeHighlight(item);
+              }
+            } else {
+              item.classList.add('hidden');
+            }
+          });
+
+          // Show all tabs when searching
+          if (query !== '') {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('hidden'));
+          }
+        }
+
+        function highlightText(element, query) {
+          // Simple highlight - just mark parent as searched
+          element.style.borderLeft = '3px solid #fbbf24';
+        }
+
+        function removeHighlight(element) {
+          element.style.borderLeft = '';
+        }
+      </script>
     </body>
     </html>
-  `).setWidth(550).setHeight(600);
+  `).setWidth(650).setHeight(700);
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Help & Documentation');
+  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help Guide - 509 Dashboard');
 }
 
 // ============================================================================

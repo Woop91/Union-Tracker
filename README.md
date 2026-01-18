@@ -1,4 +1,4 @@
-# 509 Strategic Command Center - v4.3.7 Complete Menu System
+# 509 Strategic Command Center - v4.3.8 Complete Menu System
 
 A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements an **11-file modular architecture** following the Separation of Concerns principle.
 
@@ -59,6 +59,7 @@ src/
 
 ## v4.3.x Features (CURRENT)
 
+- **Searchable Help Guide**: Modal help system with 4 tabs (Overview, Menu Reference, FAQ, Quick Tips), real-time search filtering
 - **Two-Dashboard Architecture**: Unified Steward Dashboard (internal, with PII) and Member Dashboard (public, no PII)
 - **Steward Dashboard**: 6 tabs - Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction
 - **Member Satisfaction Analysis**: 8 survey sections with scores, progress bars, and question breakdowns
@@ -67,6 +68,7 @@ src/
 - **Professional Tab Colors**: Blue (data sheets), Green (documentation), Red (satisfaction), Orange (config)
 - **Dynamic Row Styling**: `applyZebraStripes()` and `applyThemeToSheet_()` use `getMaxRows()` to style ALL rows
 - **DIALOG_SIZES Constant**: Standard modal dimensions (SMALL, MEDIUM, LARGE, FULLSCREEN, SIDEBAR)
+- **Removed Features**: Pomodoro Timer and Quick Capture Notepad removed from menus
 
 ## v4.2.0 Features
 
@@ -391,7 +393,7 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-- **4.3.8** - Modal Consolidation: Member Satisfaction sheet now hidden, access via modal only
+- **4.3.8** - Searchable Help Guide & Modal Consolidation: Help modal with menu reference/FAQ, Member Satisfaction sheet hidden
 - **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
 - **4.3.6** - Full Row Styling: Zebra stripes and themes apply to all rows in data sheets
 - **4.3.5** - Production Polish: Demo menu fix, NUKE cleans docs and applies tab colors

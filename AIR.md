@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.3.7 (Dynamic Row Styling, Two-Dashboard Architecture)
+**Version:** 4.3.8 (Searchable Help Guide, Two-Dashboard Architecture)
 **Last Updated:** 2026-01-18
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -1384,7 +1384,27 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 
 ## Changelog
 
-### Version 4.3.8 (2026-01-18) - Modal Consolidation
+### Version 4.3.8 (2026-01-18) - Searchable Help Guide & Modal Consolidation
+
+**New Help Guide Modal:**
+- Complete rewrite of `showHelpDialog()` with searchable interface
+- 4 tabs: Overview, Menu Reference, FAQ, Quick Tips
+- Real-time search filtering across all content
+- Dark gradient theme consistent with other modals
+
+**Menu Reference Tab:**
+- Comprehensive breakdown of all menus
+- Each menu item shows: path, name, and description
+- Covers Union Hub, Strategic Ops, Admin, and 509 Dashboard menus
+
+**FAQ Section:**
+- 9 frequently asked questions with detailed answers
+- Covers grievance filing, dashboard differences, deadlines, troubleshooting
+- Includes link to GitHub repo for fresh copies
+
+**Verified Removals:**
+- Pomodoro Timer removed from all menus (function exists but shows "removed" message)
+- Quick Capture Notepad removed from all menus (function exists but shows "removed" message)
 
 **Deprecated Tab Cleanup:**
 - Added `📊 Member Satisfaction` to `removeDeprecatedTabs()` function
@@ -1398,9 +1418,10 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 - Added clear messaging about deleted vs hidden tabs
 
 **Files Changed:**
+- `src/09_Main.gs` - Complete rewrite of showHelpDialog()
 - `src/06_Maintenance.gs` - Updated removeDeprecatedTabs() with hide functionality
 - `src/04_UIService.gs` - Renamed sheet navigation function to deprecated
-- `src/01_Constants.gs` - Version 4.3.8, SATISFACTION deprecation comment
+- `src/01_Constants.gs` - Version 4.3.8
 
 ---
 
