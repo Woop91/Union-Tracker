@@ -129,8 +129,8 @@ function createCommandCenterMenu() {
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
       .addItem('📜 View Audit Log', 'navigateToAuditLog')
       .addSeparator()
-      .addItem('🔍 v4.0 System Diagnostic', 'DIAGNOSE_SETUP')
-      .addItem('🛠️ Repair Dashboard', 'REPAIR_DASHBOARD')
+      .addItem('🔍 v4.0 System Diagnostic', 'showDiagnosticReport')
+      .addItem('🛠️ Repair Dashboard', 'repairDashboardWithUI')
       .addItem('📊 v4.0 Status Report', 'showV4StatusReport'));
 
   menu.addSeparator();
@@ -819,9 +819,11 @@ function applyTabColors() {
 // ============================================================================
 
 /**
- * Runs a comprehensive diagnostic check on the dashboard setup
+ * Runs a comprehensive diagnostic check and shows UI report
+ * NOTE: Renamed from DIAGNOSE_SETUP to avoid duplicate with 06_Maintenance.gs
+ * This version shows a UI alert; use DIAGNOSE_SETUP() from 06_Maintenance.gs for programmatic results
  */
-function DIAGNOSE_SETUP() {
+function showDiagnosticReport() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
 
@@ -914,9 +916,11 @@ function DIAGNOSE_SETUP() {
 }
 
 /**
- * Repairs the dashboard by rebuilding missing components
+ * Repairs the dashboard with UI confirmation dialog
+ * NOTE: Renamed from REPAIR_DASHBOARD to avoid conflict with 06_Maintenance.gs version
+ * This version shows UI; use REPAIR_DASHBOARD() from 06_Maintenance.gs for programmatic repair
  */
-function REPAIR_DASHBOARD() {
+function repairDashboardWithUI() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -1259,13 +1263,14 @@ var GEMINI_CONFIG = {
 // ============================================================================
 
 /**
- * Gemini v4.0 Form Submission Handler
- * Triggered when a grievance form is submitted.
- * Creates member folder and signature-ready PDF automatically.
+ * Gemini v4.0 Form Submission Handler (Legacy - use onGrievanceFormSubmit in 05_Integrations.gs instead)
+ * NOTE: Renamed to avoid duplicate function definition conflict.
+ * The primary implementation is in 05_Integrations.gs
  *
  * @param {Object} e - Form submission event object
+ * @deprecated Use onGrievanceFormSubmit in 05_Integrations.gs
  */
-function onGrievanceFormSubmit(e) {
+function onGrievanceFormSubmit_Legacy_(e) {
   try {
     var responses = e.namedValues;
     var data = {
@@ -1346,14 +1351,15 @@ function createGrievancePDF(folder, data) {
 }
 
 /**
- * Gemini v4.0 Member Folder Creator
- * Gets existing folder or creates new one for member documents.
+ * Gemini v4.0 Member Folder Creator (Legacy)
+ * NOTE: Renamed to avoid duplicate - use getOrCreateMemberFolder() in 05_Integrations.gs instead
  *
  * @param {string} name - Member name
  * @param {string} id - Member ID
  * @returns {Folder} Google Drive folder for the member
+ * @deprecated Use getOrCreateMemberFolder in 05_Integrations.gs (has better error handling)
  */
-function getOrCreateMemberFolder(name, id) {
+function getOrCreateMemberFolder_Legacy_(name, id) {
   // Get archive folder ID from Config
   var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) ||
                         getConfigValue_(CONFIG_COLS.DRIVE_FOLDER_ID) ||

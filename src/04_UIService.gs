@@ -722,9 +722,11 @@ function resetToDefaultTheme() {
 }
 
 /**
- * Refreshes all visual elements and auto-styling
+ * Refreshes visual elements - simple version
+ * NOTE: Renamed to avoid duplicate. Use refreshAllVisuals() defined later in this file for full refresh.
+ * @deprecated Use refreshAllVisuals() at line ~6399
  */
-function refreshAllVisuals() {
+function refreshVisualsSimple_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   ss.toast('Refreshing all visuals...', COMMAND_CONFIG.SYSTEM_NAME, 10);
@@ -2287,7 +2289,12 @@ function previewTheme(themeKey) {
   SpreadsheetApp.getActiveSpreadsheet().toast('👁️ Previewing ' + theme.name, 'Preview', 5);
 }
 
-function resetToDefaultTheme() {
+/**
+ * Resets to default theme using theme system
+ * NOTE: Renamed to avoid duplicate. Use resetToDefaultTheme() for hard reset to defaults.
+ * This version uses the theme system; resetToDefaultTheme() clears all styling.
+ */
+function resetToDefaultThemeViaSystem_() {
   applyTheme(THEME_CONFIG.DEFAULT_THEME, 'all');
 }
 
@@ -6630,12 +6637,11 @@ function emailExecutivePDF() {
 // ============================================================================
 
 /**
- * Generates missing Member IDs based on Unit Code
- * Uses dynamic column references from MEMBER_COLS
- * Unit codes are read from Config sheet (column AT)
- * Format: [UNIT_PREFIX]-[SEQUENCE]-H (e.g., MS-101-H)
+ * Generates missing Member IDs - UI Service version (Legacy)
+ * NOTE: Renamed to avoid duplicate. Use generateMissingMemberIDs() from 02_MemberManager.gs
+ * @deprecated Use generateMissingMemberIDs() from 02_MemberManager.gs
  */
-function generateMissingMemberIDs() {
+function generateMissingMemberIDs_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -6697,9 +6703,11 @@ function getNextMemberSequence_(prefix) {
 }
 
 /**
- * Checks for duplicate Member IDs and highlights them
+ * Checks for duplicate Member IDs - UI Service version (Legacy)
+ * NOTE: Renamed to avoid duplicate. Use checkDuplicateMemberIDs() from 02_MemberManager.gs
+ * @deprecated Use checkDuplicateMemberIDs() from 02_MemberManager.gs
  */
-function checkDuplicateMemberIDs() {
+function checkDuplicateMemberIDs_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
