@@ -2983,17 +2983,17 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Web App & Portal', '📊 Get Analytics Stats (JSON)', 'getMemberAnalyticsStats', 'Server-side JSON for analytics']
   ];
 
-  // Build rows with header (8 columns: checkbox, Phase, Menu, Item, Function, Description, Notes, Notes 2)
-  var rows = [['✓', 'Phase', 'Menu', 'Item', 'Function', 'Description', 'Notes', 'Notes 2']];
+  // Build rows with header (7 columns: checkbox, Menu, Item, Function, Description, Notes, Notes 2)
+  var rows = [['✓', 'Menu', 'Item', 'Function', 'Description', 'Notes', 'Notes 2']];
   for (var i = 0; i < menuItems.length; i++) {
-    rows.push([false, menuItems[i][0], menuItems[i][1], menuItems[i][2], menuItems[i][3], menuItems[i][4], '', '']);
+    rows.push([false, menuItems[i][1], menuItems[i][2], menuItems[i][3], menuItems[i][4], '', '']);
   }
 
   // Write all data
-  sheet.getRange(1, 1, rows.length, 8).setValues(rows);
+  sheet.getRange(1, 1, rows.length, 7).setValues(rows);
 
   // Format header
-  sheet.getRange(1, 1, 1, 8)
+  sheet.getRange(1, 1, 1, 7)
     .setFontWeight('bold')
     .setBackground(COLORS.PRIMARY_PURPLE || '#7C3AED')
     .setFontColor(COLORS.WHITE || '#FFFFFF')
@@ -3006,13 +3006,12 @@ function createFunctionChecklistSheet_() {
 
   // Set column widths
   sheet.setColumnWidth(1, 40);   // Checkbox
-  sheet.setColumnWidth(2, 130);  // Phase
-  sheet.setColumnWidth(3, 180);  // Menu
-  sheet.setColumnWidth(4, 220);  // Item
-  sheet.setColumnWidth(5, 220);  // Function
-  sheet.setColumnWidth(6, 320);  // Description
-  sheet.setColumnWidth(7, 200);  // Notes
-  sheet.setColumnWidth(8, 200);  // Notes 2
+  sheet.setColumnWidth(2, 200);  // Menu
+  sheet.setColumnWidth(3, 220);  // Item
+  sheet.setColumnWidth(4, 220);  // Function
+  sheet.setColumnWidth(5, 350);  // Description
+  sheet.setColumnWidth(6, 200);  // Notes
+  sheet.setColumnWidth(7, 200);  // Notes 2
 
   // Freeze header
   sheet.setFrozenRows(1);
@@ -3020,7 +3019,7 @@ function createFunctionChecklistSheet_() {
   // Alternating colors
   for (var r = 2; r <= rows.length; r++) {
     if (r % 2 === 0) {
-      sheet.getRange(r, 1, 1, 8).setBackground('#F9FAFB');
+      sheet.getRange(r, 1, 1, 7).setBackground('#F9FAFB');
     }
   }
 
@@ -3028,14 +3027,14 @@ function createFunctionChecklistSheet_() {
   var rule = SpreadsheetApp.newConditionalFormatRule()
     .whenFormulaSatisfied('=$A2=TRUE')
     .setBackground('#E8F5E9')
-    .setRanges([sheet.getRange(2, 1, rows.length - 1, 8)])
+    .setRanges([sheet.getRange(2, 1, rows.length - 1, 7)])
     .build();
   sheet.setConditionalFormatRules([rule]);
 
-  // Delete excess columns after H (column 8)
+  // Delete excess columns after G (column 7)
   var maxCols = sheet.getMaxColumns();
-  if (maxCols > 8) {
-    sheet.deleteColumns(9, maxCols - 8);
+  if (maxCols > 7) {
+    sheet.deleteColumns(8, maxCols - 7);
   }
 
   return sheet;

@@ -554,6 +554,7 @@ function findExistingMember(searchParams, dataArray) {
 /**
  * Promotes the currently selected member to Steward status
  * Updates IS_STEWARD column and adds to Config steward list
+ * Requires two confirmation dialogs for safety
  */
 function promoteSelectedMemberToSteward() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -581,15 +582,39 @@ function promoteSelectedMemberToSteward() {
     return;
   }
 
-  var response = ui.alert(
-    'Promote to Steward',
-    'Promote ' + fullName + ' to Steward?\n\nThis will:\n' +
-    '- Set "Is Steward" to Yes\n' +
-    '- Add to the Steward dropdown list',
+  // WARNING 1: Initial confirmation
+  var response1 = ui.alert(
+    '⬆️ Promote to Steward - Step 1 of 2',
+    'You are about to promote ' + fullName + ' to Steward status.\n\n' +
+    'This will:\n' +
+    '• Set "Is Steward" to Yes\n' +
+    '• Add to the Steward dropdown list\n' +
+    '• Grant access to steward-level functions\n\n' +
+    'Do you want to proceed?',
     ui.ButtonSet.YES_NO
   );
 
-  if (response !== ui.Button.YES) return;
+  if (response1 !== ui.Button.YES) {
+    ui.alert('Promotion cancelled.');
+    return;
+  }
+
+  // WARNING 2: Final confirmation
+  var response2 = ui.alert(
+    '⚠️ Final Confirmation - Step 2 of 2',
+    'PLEASE CONFIRM: You are promoting ' + fullName + ' to Steward.\n\n' +
+    'This action grants significant responsibilities including:\n' +
+    '• Representing members in grievances\n' +
+    '• Access to sensitive member information\n' +
+    '• Authority to act on behalf of the union\n\n' +
+    'Are you absolutely sure you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response2 !== ui.Button.YES) {
+    ui.alert('Promotion cancelled.');
+    return;
+  }
 
   // Update member record
   sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
@@ -597,11 +622,12 @@ function promoteSelectedMemberToSteward() {
   // Add to Config steward list
   addToConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
 
-  ss.toast(fullName + ' has been promoted to Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  ss.toast('✅ ' + fullName + ' has been promoted to Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
 }
 
 /**
  * Demotes the currently selected steward back to regular member
+ * Requires two confirmation dialogs for safety
  */
 function demoteSelectedSteward() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -629,15 +655,39 @@ function demoteSelectedSteward() {
     return;
   }
 
-  var response = ui.alert(
-    'Demote Steward',
-    'Demote ' + fullName + ' from Steward?\n\nThis will:\n' +
-    '- Set "Is Steward" to No\n' +
-    '- Remove from the Steward dropdown list',
+  // WARNING 1: Initial confirmation
+  var response1 = ui.alert(
+    '⬇️ Demote Steward - Step 1 of 2',
+    'You are about to remove Steward status from ' + fullName + '.\n\n' +
+    'This will:\n' +
+    '• Set "Is Steward" to No\n' +
+    '• Remove from the Steward dropdown list\n' +
+    '• Remove steward-level access\n\n' +
+    'Do you want to proceed?',
     ui.ButtonSet.YES_NO
   );
 
-  if (response !== ui.Button.YES) return;
+  if (response1 !== ui.Button.YES) {
+    ui.alert('Demotion cancelled.');
+    return;
+  }
+
+  // WARNING 2: Final confirmation
+  var response2 = ui.alert(
+    '⚠️ Final Confirmation - Step 2 of 2',
+    'PLEASE CONFIRM: You are removing Steward status from ' + fullName + '.\n\n' +
+    'This is a significant action that:\n' +
+    '• Removes their authority to represent members\n' +
+    '• Should be documented appropriately\n' +
+    '• May require notification to the member\n\n' +
+    'Are you absolutely sure you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response2 !== ui.Button.YES) {
+    ui.alert('Demotion cancelled.');
+    return;
+  }
 
   // Update member record
   sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('No');
@@ -645,7 +695,7 @@ function demoteSelectedSteward() {
   // Remove from Config steward list
   removeFromConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
 
-  ss.toast(fullName + ' has been demoted from Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  ss.toast('✅ ' + fullName + ' has been demoted from Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
 }
 
 /**

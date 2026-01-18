@@ -6785,44 +6785,82 @@ function createPDFForSelectedGrievance() {
 /**
  * Promotes the selected member to Steward status
  * Sends steward toolkit email to the promoted member
+ * Requires two confirmation dialogs for safety
  */
 function promoteSelectedMemberToSteward() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var ui = SpreadsheetApp.getUi();
 
   if (!sheet) {
-    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    ui.alert('Member Directory sheet not found.');
     return;
   }
 
   var row = sheet.getActiveRange().getRow();
   if (row < 2) {
-    SpreadsheetApp.getUi().alert('Please select a member row (not the header).');
+    ui.alert('Please select a member row (not the header).');
     return;
   }
+
+  // Get member details early for confirmation dialogs
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var name = firstName + ' ' + lastName;
 
   // Check if already a steward
   var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
   if (currentStatus === 'Yes') {
-    SpreadsheetApp.getUi().alert('This member is already a Steward.');
+    ui.alert('This member is already a Steward.');
+    return;
+  }
+
+  // WARNING 1: Initial confirmation
+  var response1 = ui.alert(
+    '⬆️ Promote to Steward - Step 1 of 2',
+    'You are about to promote ' + name + ' to Steward status.\n\n' +
+    'This will:\n' +
+    '• Set "Is Steward" to Yes\n' +
+    '• Send steward toolkit email (if email on file)\n' +
+    '• Grant access to steward-level functions\n\n' +
+    'Do you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response1 !== ui.Button.YES) {
+    ui.alert('Promotion cancelled.');
+    return;
+  }
+
+  // WARNING 2: Final confirmation
+  var response2 = ui.alert(
+    '⚠️ Final Confirmation - Step 2 of 2',
+    'PLEASE CONFIRM: You are promoting ' + name + ' to Steward.\n\n' +
+    'This action grants significant responsibilities including:\n' +
+    '• Representing members in grievances\n' +
+    '• Access to sensitive member information\n' +
+    '• Authority to act on behalf of the union\n\n' +
+    'Are you absolutely sure you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response2 !== ui.Button.YES) {
+    ui.alert('Promotion cancelled.');
     return;
   }
 
   // Promote to steward
   sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
 
-  // Get member details
+  // Get email for toolkit
   var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
-  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
-  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
-  var name = firstName + ' ' + lastName;
 
   // Send toolkit email if email is available
   if (email) {
     sendStewardToolkit_(email, name);
   }
 
-  SpreadsheetApp.getUi().alert(name + ' has been promoted to Steward!' +
+  ui.alert('✅ ' + name + ' has been promoted to Steward!' +
     (email ? '\n\nToolkit email sent to: ' + email : '\n\nNo email on file - please send toolkit manually.'));
 }
 
@@ -6858,41 +6896,75 @@ function sendStewardToolkit_(email, name) {
 
 /**
  * Demotes the selected steward back to regular member status
+ * Requires two confirmation dialogs for safety
  */
 function demoteSelectedSteward() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var ui = SpreadsheetApp.getUi();
 
   if (!sheet) {
-    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    ui.alert('Member Directory sheet not found.');
     return;
   }
 
   var row = sheet.getActiveRange().getRow();
   if (row < 2) {
-    SpreadsheetApp.getUi().alert('Please select a member row (not the header).');
+    ui.alert('Please select a member row (not the header).');
     return;
   }
+
+  // Get member details early for confirmation dialogs
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var name = firstName + ' ' + lastName;
 
   var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
   if (currentStatus !== 'Yes') {
-    SpreadsheetApp.getUi().alert('This member is not currently a Steward.');
+    ui.alert('This member is not currently a Steward.');
     return;
   }
 
-  var name = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue() + ' ' +
-             sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  // WARNING 1: Initial confirmation
+  var response1 = ui.alert(
+    '⬇️ Demote Steward - Step 1 of 2',
+    'You are about to remove Steward status from ' + name + '.\n\n' +
+    'This will:\n' +
+    '• Set "Is Steward" to No\n' +
+    '• Clear committee assignments\n' +
+    '• Remove steward-level access\n\n' +
+    'Do you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
 
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.alert('Confirm Demotion',
-    'Are you sure you want to remove Steward status from ' + name + '?',
-    ui.ButtonSet.YES_NO);
-
-  if (response === ui.Button.YES) {
-    sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('No');
-    sheet.getRange(row, MEMBER_COLS.COMMITTEES).setValue('');  // Clear committee assignments
-    ui.alert(name + ' has been removed from Steward status.');
+  if (response1 !== ui.Button.YES) {
+    ui.alert('Demotion cancelled.');
+    return;
   }
+
+  // WARNING 2: Final confirmation
+  var response2 = ui.alert(
+    '⚠️ Final Confirmation - Step 2 of 2',
+    'PLEASE CONFIRM: You are removing Steward status from ' + name + '.\n\n' +
+    'This is a significant action that:\n' +
+    '• Removes their authority to represent members\n' +
+    '• Should be documented appropriately\n' +
+    '• May require notification to the member\n\n' +
+    'Are you absolutely sure you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response2 !== ui.Button.YES) {
+    ui.alert('Demotion cancelled.');
+    return;
+  }
+
+  // Demote steward
+  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('No');
+  sheet.getRange(row, MEMBER_COLS.COMMITTEES).setValue('');  // Clear committee assignments
+
+  ui.alert('✅ ' + name + ' has been removed from Steward status.\n\n' +
+    'Committee assignments have been cleared.');
 }
 
 // ============================================================================
