@@ -9981,7 +9981,7 @@ function setupAllHiddenSheets() {
   var created = 0;
   var repaired = 0;
 
-  // Core grievance/member calculation sheets (6 total)
+  // Core grievance/member calculation sheets (7 total)
   // Each function creates the sheet if missing or updates if exists
   try { setupGrievanceCalcSheet(); created++; } catch (e) { repaired++; }
   try { setupGrievanceFormulasSheet(); created++; } catch (e) { repaired++; }
@@ -9989,8 +9989,9 @@ function setupAllHiddenSheets() {
   try { setupStewardContactCalcSheet(); created++; } catch (e) { repaired++; }
   try { setupDashboardCalcSheet(); created++; } catch (e) { repaired++; }
   try { setupStewardPerformanceCalcSheet(); created++; } catch (e) { repaired++; }
+  try { setupChecklistCalcSheet(); created++; } catch (e) { repaired++; }
 
-  ss.toast('All 6 hidden sheets created!', '✅ Success', 3);
+  ss.toast('All 7 hidden sheets created!', '✅ Success', 3);
 
   return { created: created, repaired: repaired, success: true };
 }
@@ -10015,6 +10016,7 @@ function repairAllHiddenSheets() {
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();
   syncMemberToGrievanceLog();
+  syncChecklistCalcToGrievanceLog();
 
   // Repair checkboxes
   repairGrievanceCheckboxes();
@@ -10023,15 +10025,15 @@ function repairAllHiddenSheets() {
   ss.toast('Hidden sheets repaired and synced!', '✅ Success', 5);
   ui.alert('✅ Repair Complete',
     'Hidden calculation sheets have been repaired:\n\n' +
-    '• 6 hidden sheets recreated with self-healing formulas\n' +
+    '• 7 hidden sheets recreated with self-healing formulas\n' +
     '• Auto-sync trigger installed\n' +
-    '• All data synced (grievances, members, dashboard)\n' +
+    '• All data synced (grievances, members, dashboard, checklists)\n' +
     '• Checkboxes repaired in Grievance Log and Member Directory\n\n' +
     'Data will now auto-sync when you edit Member Directory or Grievance Log.\n' +
     'Formulas cannot be accidentally erased - they are stored in hidden sheets.',
     ui.ButtonSet.OK);
 
-  return { repaired: 6, success: true };
+  return { repaired: 7, success: true };
 }
 
 /**
@@ -10046,14 +10048,15 @@ function verifyHiddenSheets() {
   report.push('============================');
   report.push('');
 
-  // Check each hidden sheet (6 hidden sheets)
+  // Check each hidden sheet (7 hidden sheets)
   var hiddenSheets = [
     {name: SHEETS.GRIEVANCE_CALC, purpose: 'Grievance → Member Directory'},
     {name: SHEETS.GRIEVANCE_FORMULAS, purpose: 'Self-healing Grievance formulas'},
     {name: SHEETS.MEMBER_LOOKUP, purpose: 'Member → Grievance Log'},
     {name: SHEETS.STEWARD_CONTACT_CALC, purpose: 'Steward contact tracking'},
     {name: SHEETS.DASHBOARD_CALC, purpose: 'Dashboard summary metrics'},
-    {name: SHEETS.STEWARD_PERFORMANCE_CALC, purpose: 'Steward performance scores'}
+    {name: SHEETS.STEWARD_PERFORMANCE_CALC, purpose: 'Steward performance scores'},
+    {name: HIDDEN_SHEETS.CHECKLIST_CALC, purpose: 'Case Checklist progress calculations'}
   ];
 
   report.push('📋 HIDDEN SHEETS:');
@@ -10106,6 +10109,7 @@ function syncAllData() {
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();
   syncMemberToGrievanceLog();
+  syncChecklistCalcToGrievanceLog();
 
   // Repair checkboxes after sync
   repairGrievanceCheckboxes();

@@ -177,7 +177,8 @@ var HIDDEN_SHEETS = {
   MEMBER_LOOKUP: '_Member_Lookup',
   STEWARD_CONTACT_CALC: '_Steward_Contact_Calc',
   STEWARD_PERFORMANCE_CALC: '_Steward_Performance_Calc',
-  AUDIT_LOG: '_Audit_Log'
+  AUDIT_LOG: '_Audit_Log',
+  CHECKLIST_CALC: '_Checklist_Calc'
 };
 
 // ============================================================================

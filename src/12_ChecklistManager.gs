@@ -104,9 +104,8 @@ function createChecklistSheet_(ss) {
   // Freeze header row
   sheet.setFrozenRows(1);
 
-  // Protect header row
-  var protection = sheet.protect().setDescription('Checklist Sheet Structure');
-  protection.setUnprotectedRanges([sheet.getRange(2, 1, sheet.getMaxRows() - 1, headers.length)]);
+  // No protection - sheet is fully dynamic like all other tabs
+  // Self-healing formulas in _Checklist_Calc handle calculations
 
   return sheet;
 }
@@ -1094,4 +1093,188 @@ function getCasesByActionType() {
   }
 
   return summary;
+}
+
+// ============================================================================
+// HIDDEN SHEET: _Checklist_Calc (Self-Healing Formulas)
+// ============================================================================
+
+/**
+ * Setup the hidden _Checklist_Calc sheet with self-healing formulas
+ * This follows the same pattern as other hidden sheets in the system
+ * Formulas automatically calculate progress per case
+ */
+function setupChecklistCalcSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = HIDDEN_SHEETS.CHECKLIST_CALC || '_Checklist_Calc';
+  var sheet = ss.getSheetByName(sheetName);
+
+  // Create if doesn't exist
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+  }
+
+  // Clear and rebuild (self-healing)
+  sheet.clear();
+
+  // Headers
+  var headers = [
+    'Case ID',
+    'Items Total',
+    'Items Completed',
+    'Progress %',
+    'Required Total',
+    'Required Complete',
+    'All Required Done',
+    'Display String'
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setBackground(COLORS.LIGHT_GRAY || '#F3F4F6');
+
+  // Get the checklist sheet name for formula references
+  var clSheet = "'" + (CHECKLIST_SHEET_NAME || 'Case Checklist') + "'";
+
+  // Column letters for checklist columns
+  var caseIdCol = 'B';      // CHECKLIST_COLS.CASE_ID = 2
+  var completedCol = 'G';   // CHECKLIST_COLS.COMPLETED = 7
+  var requiredCol = 'F';    // CHECKLIST_COLS.REQUIRED = 6
+
+  // Column A: Unique Case IDs from checklist
+  // ARRAYFORMULA with UNIQUE to get all case IDs
+  sheet.getRange('A2').setFormula(
+    '=IFERROR(UNIQUE(FILTER(' + clSheet + '!' + caseIdCol + ':' + caseIdCol + ',' +
+    clSheet + '!' + caseIdCol + ':' + caseIdCol + '<>"","")))'
+  );
+
+  // Column B: Total items per case (COUNTIF)
+  sheet.getRange('B2').setFormula(
+    '=ARRAYFORMULA(IF(A2:A="","",COUNTIF(' + clSheet + '!' + caseIdCol + ':' + caseIdCol + ',A2:A)))'
+  );
+
+  // Column C: Completed items per case (COUNTIFS where completed=TRUE)
+  sheet.getRange('C2').setFormula(
+    '=ARRAYFORMULA(IF(A2:A="","",COUNTIFS(' + clSheet + '!' + caseIdCol + ':' + caseIdCol + ',A2:A,' +
+    clSheet + '!' + completedCol + ':' + completedCol + ',TRUE)))'
+  );
+
+  // Column D: Progress percentage
+  sheet.getRange('D2').setFormula(
+    '=ARRAYFORMULA(IF(B2:B=0,0,ROUND(C2:C/B2:B*100,0)))'
+  );
+
+  // Column E: Required items total per case
+  sheet.getRange('E2').setFormula(
+    '=ARRAYFORMULA(IF(A2:A="","",COUNTIFS(' + clSheet + '!' + caseIdCol + ':' + caseIdCol + ',A2:A,' +
+    clSheet + '!' + requiredCol + ':' + requiredCol + ',"Yes")))'
+  );
+
+  // Column F: Required items completed per case
+  sheet.getRange('F2').setFormula(
+    '=ARRAYFORMULA(IF(A2:A="","",COUNTIFS(' + clSheet + '!' + caseIdCol + ':' + caseIdCol + ',A2:A,' +
+    clSheet + '!' + requiredCol + ':' + requiredCol + ',"Yes",' +
+    clSheet + '!' + completedCol + ':' + completedCol + ',TRUE)))'
+  );
+
+  // Column G: All required done? (Yes/No)
+  sheet.getRange('G2').setFormula(
+    '=ARRAYFORMULA(IF(A2:A="","",IF(E2:E=0,"N/A",IF(F2:F>=E2:E,"Yes","No"))))'
+  );
+
+  // Column H: Display string (e.g., "5/10 (50%)")
+  sheet.getRange('H2').setFormula(
+    '=ARRAYFORMULA(IF(A2:A="","",C2:C&"/"&B2:B&" ("&D2:D&"%)"))'
+  );
+
+  // Set column widths
+  sheet.setColumnWidth(1, 120);  // Case ID
+  sheet.setColumnWidth(2, 80);   // Items Total
+  sheet.setColumnWidth(3, 100);  // Items Completed
+  sheet.setColumnWidth(4, 80);   // Progress %
+  sheet.setColumnWidth(5, 100);  // Required Total
+  sheet.setColumnWidth(6, 110);  // Required Complete
+  sheet.setColumnWidth(7, 100);  // All Required Done
+  sheet.setColumnWidth(8, 120);  // Display String
+
+  // Hide the sheet
+  sheet.hideSheet();
+
+  Logger.log('_Checklist_Calc sheet setup complete with self-healing formulas');
+  return sheet;
+}
+
+/**
+ * Sync checklist progress from _Checklist_Calc to Grievance Log
+ * Pushes calculated values from hidden sheet to the visible Checklist Progress column
+ */
+function syncChecklistCalcToGrievanceLog() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Get hidden calc sheet
+  var calcSheetName = HIDDEN_SHEETS.CHECKLIST_CALC || '_Checklist_Calc';
+  var calcSheet = ss.getSheetByName(calcSheetName);
+
+  if (!calcSheet) {
+    // Auto-create if missing (self-healing)
+    calcSheet = setupChecklistCalcSheet();
+  }
+
+  // Get grievance log
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!grievanceSheet) {
+    Logger.log('Grievance Log not found');
+    return { success: false, error: 'Grievance Log not found' };
+  }
+
+  var grievanceLastRow = grievanceSheet.getLastRow();
+  if (grievanceLastRow < 2) {
+    return { success: true, updatedCount: 0 };
+  }
+
+  // Build lookup from calc sheet (Case ID -> Display String)
+  var calcLastRow = calcSheet.getLastRow();
+  var progressLookup = {};
+
+  if (calcLastRow >= 2) {
+    var calcData = calcSheet.getRange(2, 1, calcLastRow - 1, 8).getValues();
+    for (var i = 0; i < calcData.length; i++) {
+      var caseId = calcData[i][0];
+      var displayString = calcData[i][7];  // Column H: Display String
+      if (caseId) {
+        progressLookup[caseId] = displayString || 'No checklist';
+      }
+    }
+  }
+
+  // Get grievance IDs and update progress column
+  var grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, grievanceLastRow - 1, 1).getValues();
+  var progressValues = [];
+  var updatedCount = 0;
+
+  for (var j = 0; j < grievanceIds.length; j++) {
+    var gId = grievanceIds[j][0];
+    var progress = progressLookup[gId] || 'No checklist';
+    progressValues.push([progress]);
+    if (progressLookup[gId]) {
+      updatedCount++;
+    }
+  }
+
+  // Batch write progress values
+  if (progressValues.length > 0) {
+    grievanceSheet.getRange(2, GRIEVANCE_COLS.CHECKLIST_PROGRESS, progressValues.length, 1)
+      .setValues(progressValues);
+  }
+
+  Logger.log('Synced checklist progress: ' + updatedCount + ' cases updated');
+  return { success: true, updatedCount: updatedCount };
+}
+
+/**
+ * Repair/rebuild the checklist calc sheet
+ * Called by repairAllHiddenSheets()
+ */
+function repairChecklistCalcSheet() {
+  return setupChecklistCalcSheet();
 }
