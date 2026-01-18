@@ -814,18 +814,314 @@ function updateMemberDataBatch(memberId, newValuesObj) {
 
 /**
  * Shows the import members dialog
- * Allows importing members from CSV or other spreadsheets
+ * Allows importing members from CSV data with column mapping
  */
 function showImportMembersDialog() {
-  var ui = SpreadsheetApp.getUi();
-  ui.alert('📥 Import Members',
-    'Import functionality coming soon!\n\n' +
-    'For now, you can:\n' +
-    '1. Copy data directly into the Member Directory sheet\n' +
-    '2. Use File > Import to import a CSV file\n' +
-    '3. Use the Add New Member dialog to add members one at a time\n\n' +
-    'Tip: Make sure your data matches the column headers in Member Directory.',
-    ui.ButtonSet.OK);
+  var html = HtmlService.createHtmlOutput(getImportMembersHtml_())
+    .setWidth(700)
+    .setHeight(600);
+  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members');
+}
+
+/**
+ * Generates HTML for the import members dialog
+ * @returns {string} HTML content
+ * @private
+ */
+function getImportMembersHtml_() {
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 20px; color: #F8FAFC; }' +
+    'h3 { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }' +
+    '.step { margin-bottom: 20px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid #334155; }' +
+    '.step-title { font-weight: 600; margin-bottom: 12px; color: #A78BFA; }' +
+    'textarea { width: 100%; height: 120px; padding: 12px; border: 2px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-family: monospace; font-size: 12px; resize: vertical; }' +
+    'textarea:focus { border-color: #7C3AED; outline: none; }' +
+    '.mapping-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 200px; overflow-y: auto; }' +
+    '.mapping-row { display: flex; align-items: center; gap: 8px; padding: 6px; background: rgba(255,255,255,0.03); border-radius: 4px; }' +
+    '.mapping-row label { flex: 1; font-size: 13px; color: #94A3B8; }' +
+    'select { padding: 6px 10px; border: 1px solid #334155; border-radius: 4px; background: #1E293B; color: #F8FAFC; font-size: 12px; min-width: 140px; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 16px; }' +
+    'button { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; flex: 1; }' +
+    '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }' +
+    '.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }' +
+    '.btn-secondary { background: #334155; color: #F8FAFC; }' +
+    '.preview { margin-top: 12px; font-size: 12px; color: #64748B; }' +
+    '.preview-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }' +
+    '.preview-table th, .preview-table td { padding: 6px 8px; border: 1px solid #334155; text-align: left; }' +
+    '.preview-table th { background: #334155; color: #F8FAFC; }' +
+    '.preview-table td { background: rgba(255,255,255,0.02); }' +
+    '.status { padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 13px; }' +
+    '.status.success { background: rgba(16,185,129,0.2); border: 1px solid #10B981; }' +
+    '.status.error { background: rgba(239,68,68,0.2); border: 1px solid #EF4444; }' +
+    '.help { font-size: 12px; color: #64748B; margin-top: 8px; }' +
+    '</style>' +
+    '</head><body>' +
+    '<h3>📥 Import Members from CSV</h3>' +
+    '' +
+    '<div class="step">' +
+    '  <div class="step-title">Step 1: Paste CSV Data</div>' +
+    '  <textarea id="csvData" placeholder="Paste your CSV data here...&#10;&#10;Example:&#10;First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Analyst,Main Station&#10;Jane,Smith,jane@example.com,555-5678,Manager,Field Ops"></textarea>' +
+    '  <div class="help">Paste data from Excel, Google Sheets, or a CSV file. First row should be headers.</div>' +
+    '</div>' +
+    '' +
+    '<div class="step" id="mappingStep" style="display:none;">' +
+    '  <div class="step-title">Step 2: Map Columns</div>' +
+    '  <div class="mapping-grid" id="mappingGrid"></div>' +
+    '  <div class="preview" id="preview"></div>' +
+    '</div>' +
+    '' +
+    '<div class="btn-row">' +
+    '  <button class="btn-secondary" id="parseBtn" onclick="parseCSV()">Parse CSV</button>' +
+    '  <button class="btn-primary" id="importBtn" onclick="importMembers()" disabled>Import Members</button>' +
+    '  <button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
+    '</div>' +
+    '' +
+    '<div id="statusArea"></div>' +
+    '' +
+    '<script>' +
+    'var parsedData = [];' +
+    'var csvHeaders = [];' +
+    'var targetFields = [' +
+    '  {key: "firstName", label: "First Name", required: true},' +
+    '  {key: "lastName", label: "Last Name", required: true},' +
+    '  {key: "email", label: "Email", required: false},' +
+    '  {key: "phone", label: "Phone", required: false},' +
+    '  {key: "jobTitle", label: "Job Title", required: false},' +
+    '  {key: "workLocation", label: "Work Location", required: false},' +
+    '  {key: "unit", label: "Unit", required: false},' +
+    '  {key: "supervisor", label: "Supervisor", required: false},' +
+    '  {key: "manager", label: "Manager", required: false}' +
+    '];' +
+    '' +
+    'function parseCSV() {' +
+    '  var csvText = document.getElementById("csvData").value.trim();' +
+    '  if (!csvText) { showStatus("Please paste CSV data first", true); return; }' +
+    '  ' +
+    '  var lines = csvText.split(/\\r?\\n/);' +
+    '  if (lines.length < 2) { showStatus("CSV must have header row and at least one data row", true); return; }' +
+    '  ' +
+    '  csvHeaders = parseCSVLine(lines[0]);' +
+    '  parsedData = [];' +
+    '  for (var i = 1; i < lines.length; i++) {' +
+    '    if (lines[i].trim()) parsedData.push(parseCSVLine(lines[i]));' +
+    '  }' +
+    '  ' +
+    '  buildMappingUI();' +
+    '  showPreview();' +
+    '  document.getElementById("mappingStep").style.display = "block";' +
+    '  document.getElementById("importBtn").disabled = false;' +
+    '  showStatus("Parsed " + parsedData.length + " rows. Map columns and click Import.", false);' +
+    '}' +
+    '' +
+    'function parseCSVLine(line) {' +
+    '  var result = [];' +
+    '  var current = "";' +
+    '  var inQuotes = false;' +
+    '  for (var i = 0; i < line.length; i++) {' +
+    '    var c = line[i];' +
+    '    if (c === \'"\' && (i === 0 || line[i-1] !== \'\\\\\')) { inQuotes = !inQuotes; }' +
+    '    else if ((c === "," || c === "\\t") && !inQuotes) { result.push(current.trim()); current = ""; }' +
+    '    else { current += c; }' +
+    '  }' +
+    '  result.push(current.trim());' +
+    '  return result;' +
+    '}' +
+    '' +
+    'function buildMappingUI() {' +
+    '  var grid = document.getElementById("mappingGrid");' +
+    '  grid.innerHTML = "";' +
+    '  targetFields.forEach(function(field) {' +
+    '    var row = document.createElement("div");' +
+    '    row.className = "mapping-row";' +
+    '    var label = document.createElement("label");' +
+    '    label.textContent = field.label + (field.required ? " *" : "");' +
+    '    var select = document.createElement("select");' +
+    '    select.id = "map_" + field.key;' +
+    '    select.innerHTML = "<option value=\\"\\">-- Skip --</option>";' +
+    '    csvHeaders.forEach(function(h, idx) {' +
+    '      var opt = document.createElement("option");' +
+    '      opt.value = idx;' +
+    '      opt.textContent = h;' +
+    '      if (h.toLowerCase().replace(/[^a-z]/g, "").indexOf(field.key.toLowerCase()) !== -1 ||' +
+    '          field.key.toLowerCase().indexOf(h.toLowerCase().replace(/[^a-z]/g, "")) !== -1) {' +
+    '        opt.selected = true;' +
+    '      }' +
+    '      select.appendChild(opt);' +
+    '    });' +
+    '    row.appendChild(label);' +
+    '    row.appendChild(select);' +
+    '    grid.appendChild(row);' +
+    '  });' +
+    '}' +
+    '' +
+    'function showPreview() {' +
+    '  var preview = document.getElementById("preview");' +
+    '  var rows = parsedData.slice(0, 3);' +
+    '  if (rows.length === 0) { preview.innerHTML = ""; return; }' +
+    '  var html = "<strong>Preview (first " + rows.length + " rows):</strong><table class=\\"preview-table\\"><tr>";' +
+    '  csvHeaders.forEach(function(h) { html += "<th>" + h + "</th>"; });' +
+    '  html += "</tr>";' +
+    '  rows.forEach(function(row) {' +
+    '    html += "<tr>";' +
+    '    row.forEach(function(cell) { html += "<td>" + (cell || "-") + "</td>"; });' +
+    '    html += "</tr>";' +
+    '  });' +
+    '  html += "</table>";' +
+    '  preview.innerHTML = html;' +
+    '}' +
+    '' +
+    'function importMembers() {' +
+    '  var mapping = {};' +
+    '  targetFields.forEach(function(field) {' +
+    '    var sel = document.getElementById("map_" + field.key);' +
+    '    if (sel.value !== "") mapping[field.key] = parseInt(sel.value);' +
+    '  });' +
+    '  ' +
+    '  if (mapping.firstName === undefined || mapping.lastName === undefined) {' +
+    '    showStatus("First Name and Last Name are required mappings", true);' +
+    '    return;' +
+    '  }' +
+    '  ' +
+    '  document.getElementById("importBtn").disabled = true;' +
+    '  document.getElementById("importBtn").textContent = "Importing...";' +
+    '  ' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(result) {' +
+    '      if (result.success) {' +
+    '        showStatus("Successfully imported " + result.imported + " members! " + (result.skipped > 0 ? "(" + result.skipped + " skipped as duplicates)" : ""), false);' +
+    '        document.getElementById("importBtn").textContent = "Done!";' +
+    '      } else {' +
+    '        showStatus("Import failed: " + result.message, true);' +
+    '        document.getElementById("importBtn").disabled = false;' +
+    '        document.getElementById("importBtn").textContent = "Import Members";' +
+    '      }' +
+    '    })' +
+    '    .withFailureHandler(function(e) {' +
+    '      showStatus("Error: " + e.message, true);' +
+    '      document.getElementById("importBtn").disabled = false;' +
+    '      document.getElementById("importBtn").textContent = "Import Members";' +
+    '    })' +
+    '    .importMembersFromData(parsedData, mapping);' +
+    '}' +
+    '' +
+    'function showStatus(msg, isError) {' +
+    '  var area = document.getElementById("statusArea");' +
+    '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + msg + "</div>";' +
+    '}' +
+    '</script>' +
+    '</body></html>';
+}
+
+/**
+ * Imports members from parsed CSV data
+ * @param {Array<Array>} data - 2D array of CSV data (without headers)
+ * @param {Object} mapping - Column mapping object {fieldName: columnIndex}
+ * @returns {Object} Result with imported count and any errors
+ */
+function importMembersFromData(data, mapping) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+    if (!sheet) {
+      return { success: false, message: 'Member Directory sheet not found' };
+    }
+
+    // Get existing data for duplicate checking
+    var existingData = sheet.getDataRange().getValues();
+    var existingEmails = {};
+    var existingNames = {};
+
+    for (var i = 1; i < existingData.length; i++) {
+      var email = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+      var name = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
+      if (email) existingEmails[email] = true;
+      if (name) existingNames[name] = true;
+    }
+
+    var imported = 0;
+    var skipped = 0;
+    var newRows = [];
+
+    for (var j = 0; j < data.length; j++) {
+      var row = data[j];
+
+      var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
+      var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
+      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+
+      // Skip if no name
+      if (!firstName && !lastName) {
+        skipped++;
+        continue;
+      }
+
+      // Check for duplicates
+      var emailLower = email.toLowerCase();
+      var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
+
+      if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
+        skipped++;
+        continue;
+      }
+
+      // Mark as existing to prevent duplicates within import batch
+      if (emailLower) existingEmails[emailLower] = true;
+      existingNames[nameLower] = true;
+
+      // Generate Member ID
+      var memberId = generateMemberID_(firstName, lastName);
+
+      // Build new row with empty values for all columns
+      var newRow = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
+      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+
+      if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
+      if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
+      if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
+      if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
+      if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
+      if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
+      if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
+
+      // Default Is Steward to No
+      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+
+      newRows.push(newRow);
+      imported++;
+    }
+
+    // Batch write all new rows
+    if (newRows.length > 0) {
+      var lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+    }
+
+    // Log the import
+    logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
+      action: 'BULK_IMPORT',
+      importedCount: imported,
+      skippedCount: skipped,
+      importedBy: Session.getActiveUser().getEmail()
+    });
+
+    return {
+      success: true,
+      imported: imported,
+      skipped: skipped,
+      message: 'Import completed'
+    };
+
+  } catch (e) {
+    console.error('Import error: ' + e.message);
+    return { success: false, message: e.message };
+  }
 }
 
 /**
