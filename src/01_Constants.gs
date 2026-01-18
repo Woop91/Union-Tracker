@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 5,
-  BUILD: 'v4.3.5',
-  CURRENT: '4.3.5',
-  CODENAME: 'Production Polish'
+  PATCH: 6,
+  BUILD: 'v4.3.6',
+  CURRENT: '4.3.6',
+  CODENAME: 'Full Row Styling'
 };
 
 // ============================================================================

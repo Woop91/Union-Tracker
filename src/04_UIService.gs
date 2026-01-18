@@ -607,14 +607,21 @@ function APPLY_SYSTEM_THEME() {
 
 /**
  * Applies theme styling to a single sheet
+ * For data sheets (Member Directory, Grievance Log), applies to ALL rows (1000)
  * @param {Sheet} sheet - The sheet to style
  * @private
  */
 function applyThemeToSheet_(sheet) {
-  var lastRow = sheet.getLastRow();
+  var sheetName = sheet.getName();
   var lastCol = sheet.getLastColumn();
 
-  if (lastRow < 1 || lastCol < 1) return;
+  if (lastCol < 1) lastCol = 26; // Default columns for empty sheets
+
+  // For data sheets, style ALL rows (1000) for consistent appearance
+  var isDataSheet = (sheetName === SHEETS.MEMBER_DIR || sheetName === SHEETS.GRIEVANCE_LOG);
+  var rowsToStyle = isDataSheet ? 1000 : sheet.getLastRow();
+
+  if (rowsToStyle < 1) return;
 
   // Style header row
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
@@ -626,19 +633,30 @@ function applyThemeToSheet_(sheet) {
              .setVerticalAlignment('middle');
 
   // Apply font to all data rows
-  if (lastRow > 1) {
-    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+  if (rowsToStyle > 1) {
+    var dataRange = sheet.getRange(2, 1, rowsToStyle - 1, lastCol);
     dataRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
              .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
              .setVerticalAlignment('middle');
 
-    // Apply zebra striping
-    for (var row = 2; row <= lastRow; row++) {
-      var rowRange = sheet.getRange(row, 1, 1, lastCol);
-      if (row % 2 === 0) {
-        rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
-      } else {
-        rowRange.setBackground(null);
+    // Use banding for efficient zebra striping on data sheets
+    if (isDataSheet) {
+      var bandings = dataRange.getBandings();
+      if (bandings.length > 0) bandings[0].remove();
+      dataRange.applyRowBanding()
+        .setHeaderRowColor(null)
+        .setFirstRowColor('#ffffff')
+        .setSecondRowColor(COMMAND_CONFIG.THEME.ALT_ROW || '#f8f9fa');
+    } else {
+      // Row-by-row for other sheets (smaller data sets)
+      var actualLastRow = sheet.getLastRow();
+      for (var row = 2; row <= actualLastRow; row++) {
+        var rowRange = sheet.getRange(row, 1, 1, lastCol);
+        if (row % 2 === 0) {
+          rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
+        } else {
+          rowRange.setBackground(null);
+        }
       }
     }
   }
@@ -1982,11 +2000,23 @@ function toggleGridlinesADHD() {
 }
 
 function applyZebraStripes(sheet) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-  var range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+  var sheetName = sheet.getName();
+
+  // For data sheets (Member Directory, Grievance Log), apply to ALL rows (1000)
+  // This ensures zebra stripes appear even on empty rows for future data entry
+  var isDataSheet = (sheetName === SHEETS.MEMBER_DIR || sheetName === SHEETS.GRIEVANCE_LOG);
+  var totalRows = isDataSheet ? 1000 : sheet.getLastRow();
+
+  if (totalRows < 2) return;
+
+  var lastCol = sheet.getLastColumn() || 26; // Default to 26 columns if sheet is empty
+  var range = sheet.getRange(2, 1, totalRows - 1, lastCol);
+
+  // Remove existing bandings first
   var bandings = range.getBandings();
   if (bandings.length > 0) bandings[0].remove();
+
+  // Apply fresh banding
   range.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false);
 }
 
@@ -6861,78 +6891,33 @@ function demoteSelectedSteward() {
 }
 
 // ============================================================================
-// 9. GLOBAL UI STYLING ENGINE
+// 9. GLOBAL UI STYLING ENGINE (Status Colors)
 // ============================================================================
 
 /**
- * Applies global Roboto theme styling to all data sheets
- * Includes zebra striping and status-based coloring
+ * Applies status-based coloring to the Grievance Log
+ * Called separately to update colors when statuses change
  */
-function applyGlobalStyling() {
+function applyStatusColors() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetsToStyle = [SHEETS.GRIEVANCE_LOG, SHEETS.MEMBER_DIR];
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
-  sheetsToStyle.forEach(function(sheetName) {
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) return;
+  if (!sheet) return;
 
-    var lastRow = sheet.getLastRow();
-    var lastCol = sheet.getLastColumn();
+  var lastDataRow = sheet.getLastRow();
+  if (lastDataRow < 2) return;
 
-    if (lastRow < 2 || lastCol < 1) return;
+  for (var row = 2; row <= lastDataRow; row++) {
+    var statusCell = sheet.getRange(row, GRIEVANCE_COLS.STATUS);
+    var status = statusCell.getValue();
 
-    // Apply header styling
-    var headerRange = sheet.getRange(1, 1, 1, lastCol);
-    headerRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
-               .setFontSize(11)
-               .setFontWeight('bold')
-               .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
-               .setFontColor(COMMAND_CONFIG.THEME.HEADER_TEXT)
-               .setHorizontalAlignment('center');
-
-    // Apply data styling with zebra stripes
-    for (var row = 2; row <= lastRow; row++) {
-      var rowRange = sheet.getRange(row, 1, 1, lastCol);
-      rowRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
-              .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
-              .setVerticalAlignment('middle');
-
-      // Zebra striping
-      if (row % 2 === 0) {
-        rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
-      } else {
-        rowRange.setBackground(null);
-      }
-
-      // Status coloring for Grievance Log
-      if (sheetName === SHEETS.GRIEVANCE_LOG) {
-        var statusCell = sheet.getRange(row, GRIEVANCE_COLS.STATUS);
-        var status = statusCell.getValue();
-
-        if (COMMAND_CONFIG.STATUS_COLORS[status]) {
-          var colors = COMMAND_CONFIG.STATUS_COLORS[status];
-          statusCell.setBackground(colors.bg)
-                    .setFontColor(colors.text)
-                    .setFontWeight('bold');
-        }
-      }
+    if (status && COMMAND_CONFIG.STATUS_COLORS[status]) {
+      var colors = COMMAND_CONFIG.STATUS_COLORS[status];
+      statusCell.setBackground(colors.bg)
+                .setFontColor(colors.text)
+                .setFontWeight('bold');
     }
-  });
-
-  ss.toast('Global styling applied to all data sheets.', 'Style Engine', 3);
-}
-
-/**
- * Resets all custom formatting and applies default theme
- */
-function resetToDefaultTheme() {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.alert('Reset Theme',
-    'This will reset all custom formatting. Continue?',
-    ui.ButtonSet.YES_NO);
-
-  if (response === ui.Button.YES) {
-    applyGlobalStyling();
-    ui.alert('Theme has been reset to defaults.');
   }
+
+  ss.toast('Status colors applied to Grievance Log.', 'Style Engine', 3);
 }
