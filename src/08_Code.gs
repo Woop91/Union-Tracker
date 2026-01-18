@@ -2694,7 +2694,7 @@ function onSelectionChangeMultiSelect(e) {
   props.setProperty('lastMultiSelectCell', currentCell);
 
   // Auto-open the multi-select dialog
-  showMultiSelectDialog();
+  openCellMultiSelectEditor();
 }
 
 /**
@@ -2841,7 +2841,7 @@ function createFunctionChecklistSheet_() {
     ['9️⃣ Access', '🔧 Theming', '🔄 Reset Theme', 'resetToDefaultTheme', 'Restores default purple/green color scheme'],
 
     // ═══ PHASE 10: Productivity Tools ═══
-    ['🔟 Tools', '🔧 Multi-Select', '📝 Open Editor', 'showMultiSelectDialog', 'Select multiple values for multi-select columns'],
+    ['🔟 Tools', '🔧 Multi-Select', '📝 Open Editor', 'openCellMultiSelectEditor', 'Select multiple values for multi-select columns'],
     ['🔟 Tools', '🔧 Multi-Select', '⚡ Enable Auto-Open', 'installMultiSelectTrigger', 'Auto-opens multi-select dialog when clicking multi-select cells'],
     ['🔟 Tools', '🔧 Multi-Select', '🚫 Disable Auto-Open', 'removeMultiSelectTrigger', 'Stops auto-opening multi-select dialog'],
 
@@ -2937,7 +2937,7 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🍅 Pomodoro Timer', 'startPomodoroTimer', '25-minute focus timer with break reminders'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🎨 Theme Manager', 'showThemeManager', 'Choose from preset themes or customize colors'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🌙 Quick Toggle Dark Mode', 'quickToggleDarkMode', 'Switch between light and dark color schemes'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '📝 Open Editor', 'showMultiSelectDialog', 'Select multiple values for multi-select columns'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '📝 Open Editor', 'openCellMultiSelectEditor', 'Select multiple values for multi-select columns'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '⚡ Enable Auto-Open', 'installMultiSelectTrigger', 'Auto-opens multi-select dialog when clicking cells'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '🚫 Disable Auto-Open', 'removeMultiSelectTrigger', 'Stops auto-opening multi-select dialog'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Data Sync', '🔄 Sync All Data Now', 'syncAllData', 'Manually syncs all data between sheets'],

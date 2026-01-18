@@ -101,7 +101,7 @@ function createDashboardMenu() {
 
     // Multi-Select Tools submenu
     .addSubMenu(ui.createMenu('📝 Multi-Select')
-      .addItem('📝 Open Editor', 'showMultiSelectDialog')
+      .addItem('📝 Open Editor', 'openCellMultiSelectEditor')
       .addItem('⚡ Enable Auto-Open', 'installMultiSelectTrigger')
       .addItem('🚫 Disable Auto-Open', 'removeMultiSelectTrigger'))
 
@@ -1379,6 +1379,103 @@ function getAdvancedSearchHtml() {
 // ============================================================================
 // MULTI-SELECT DIALOGS
 // ============================================================================
+
+/**
+ * Opens the multi-select editor for the currently selected cell
+ * Called from menu: Tools > Multi-Select > Open Editor
+ * Validates the cell is in Member Directory and is a multi-select column
+ */
+function openCellMultiSelectEditor() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var range = ss.getActiveRange();
+
+  // Validate we're in Member Directory
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('Multi-Select Editor',
+      'Please select a cell in the Member Directory sheet.\n\n' +
+      'Multi-select columns include:\n' +
+      '• Office Days\n' +
+      '• Preferred Communication\n' +
+      '• Best Time to Contact\n' +
+      '• Committees\n' +
+      '• Assigned Steward(s)',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Validate single cell selection
+  if (!range || range.getNumRows() > 1 || range.getNumColumns() > 1) {
+    ui.alert('Multi-Select Editor',
+      'Please select a single cell in a multi-select column.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var row = range.getRow();
+  var col = range.getColumn();
+
+  // Skip header row
+  if (row < 2) {
+    ui.alert('Multi-Select Editor',
+      'Please select a data cell (not the header row).',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Check if this is a multi-select column
+  var config = getMultiSelectConfig(col);
+  if (!config) {
+    ui.alert('Multi-Select Editor',
+      'This column does not support multi-select.\n\n' +
+      'Multi-select columns include:\n' +
+      '• Office Days\n' +
+      '• Preferred Communication\n' +
+      '• Best Time to Contact\n' +
+      '• Committees\n' +
+      '• Assigned Steward(s)',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Store target cell coordinates for the callback
+  var props = PropertiesService.getDocumentProperties();
+  props.setProperty('multiSelectRow', row.toString());
+  props.setProperty('multiSelectCol', col.toString());
+
+  // Get current cell value to pre-select items
+  var currentValue = range.getValue().toString();
+  var currentSelections = currentValue ? currentValue.split(',').map(function(s) { return s.trim(); }) : [];
+
+  // Load available options from Config sheet
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) {
+    ui.alert('Error', 'Config sheet not found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var options = getConfigValues(configSheet, config.configCol);
+  if (options.length === 0) {
+    ui.alert('Multi-Select Editor',
+      'No options found in the Config sheet for ' + config.label + '.\n\n' +
+      'Please add options to the Config sheet first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Build items array with selection state
+  var items = options.map(function(option) {
+    return {
+      id: option,
+      label: option,
+      selected: currentSelections.indexOf(option) !== -1
+    };
+  });
+
+  // Show the dialog
+  showMultiSelectDialog('Select ' + config.label, items, 'applyMultiSelectValue');
+}
 
 /**
  * Shows multi-select dialog for bulk operations
