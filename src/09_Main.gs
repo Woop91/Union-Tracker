@@ -1712,10 +1712,10 @@ function exportMemberDirectory(format) {
 }
 
 /**
- * Wrapper function for findExistingMember that can be called from menu
  * Shows a search dialog to find existing members
+ * Menu wrapper - calls the backend findExistingMember() with user input
  */
-function findExistingMember() {
+function showFindMemberDialog() {
   const html = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
