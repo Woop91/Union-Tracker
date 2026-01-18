@@ -501,8 +501,13 @@ function showExecutiveDashboard() {
   showInteractiveDashboardTab();
 }
 
-function showSatisfactionDashboard() {
-  navigateToSheet(SHEETS.SATISFACTION);
+/**
+ * @deprecated v4.3.8 - Sheet is now hidden. Modal version in 08_Code.gs is used instead.
+ * Keeping for backward compatibility - redirects to modal.
+ */
+function showSatisfactionDashboard_DEPRECATED() {
+  // The modal version showSatisfactionDashboard() in 08_Code.gs handles this now
+  // This function is deprecated - the sheet is hidden
 }
 
 function showStewardDirectory() {

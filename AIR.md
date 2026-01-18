@@ -1384,6 +1384,26 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 
 ## Changelog
 
+### Version 4.3.8 (2026-01-18) - Modal Consolidation
+
+**Deprecated Tab Cleanup:**
+- Added `📊 Member Satisfaction` to `removeDeprecatedTabs()` function
+- Member Satisfaction sheet is now HIDDEN (not deleted) to preserve Google Form data
+- Modal `showSatisfactionDashboard()` in 08_Code.gs is the primary access method
+- Sheet navigation function renamed to `showSatisfactionDashboard_DEPRECATED()` in 04_UIService.gs
+
+**Updated removeDeprecatedTabs():**
+- Tabs to DELETE: Custom View, Member Analytics, Executive Command, Dashboard
+- Tabs to HIDE: Member Satisfaction (data preserved for modal access)
+- Added clear messaging about deleted vs hidden tabs
+
+**Files Changed:**
+- `src/06_Maintenance.gs` - Updated removeDeprecatedTabs() with hide functionality
+- `src/04_UIService.gs` - Renamed sheet navigation function to deprecated
+- `src/01_Constants.gs` - Version 4.3.8, SATISFACTION deprecation comment
+
+---
+
 ### Version 4.3.7 (2026-01-18) - Dynamic Row Styling
 
 **Styling Enhancement:**

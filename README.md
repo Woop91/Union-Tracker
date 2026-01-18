@@ -391,6 +391,7 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
+- **4.3.8** - Modal Consolidation: Member Satisfaction sheet now hidden, access via modal only
 - **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
 - **4.3.6** - Full Row Styling: Zebra stripes and themes apply to all rows in data sheets
 - **4.3.5** - Production Polish: Demo menu fix, NUKE cleans docs and applies tab colors
