@@ -724,9 +724,13 @@ function createGrievanceLog(ss) {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
-    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
-    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    // Group Coordinator columns AC-AF (Message Alert, Coordinator Message, Acknowledged By, Acknowledged Date)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
+    // Collapse all groups by default (including coordinator columns AC-AF)
+    sheet.collapseAllColumnGroups();
+    // Hide Drive Folder ID column (AG) - internal use only
+    sheet.hideColumns(GRIEVANCE_COLS.DRIVE_FOLDER_ID, 1);
   } catch (e) {
     Logger.log('Column group setup skipped: ' + e.toString());
   }
@@ -4294,23 +4298,21 @@ function createGrievanceFolderFromData_(grievanceId, memberId, firstName, lastNa
     // Get or create root folder
     var rootFolder = getOrCreateDashboardFolder_();
 
-    // Format date as YYYY-MM (default to current date if not provided)
+    // Format date as YYYY-MM-DD (default to current date if not provided)
     var date = dateFiled ? new Date(dateFiled) : new Date();
-    var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+    var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-    // Build folder name: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
-    // Example: "2026-01 - Smith, John - Scheduling - G-2026-001"
+    // Build folder name: LastName, FirstName - YYYY-MM-DD
+    // Example: "Smith, John - 2026-01-15"
     var folderName;
     var sanitizedFirst = sanitizeFolderName_(firstName || '');
     var sanitizedLast = sanitizeFolderName_(lastName || '');
-    var sanitizedCategory = sanitizeFolderName_(issueCategory || 'General');
 
     if (sanitizedFirst && sanitizedLast) {
-      folderName = dateStr + ' - ' + sanitizedLast + ', ' + sanitizedFirst +
-                   ' - ' + sanitizedCategory + ' - ' + grievanceId;
+      folderName = sanitizedLast + ', ' + sanitizedFirst + ' - ' + dateStr;
     } else {
       // Fallback if name not available
-      folderName = dateStr + ' - ' + grievanceId + ' - ' + sanitizedCategory;
+      folderName = grievanceId + ' - ' + dateStr;
     }
 
     // Check if folder already exists
@@ -6297,11 +6299,14 @@ function setupTimelineColumnGroups() {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
-    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
-    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    // Group Coordinator columns AC-AF (Message Alert, Coordinator Message, Acknowledged By, Acknowledged Date)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
 
-    // Collapse Step II and III by default (Step I usually visible)
+    // Collapse all groups by default (including coordinator columns AC-AF)
     sheet.collapseAllColumnGroups();
+
+    // Hide Drive Folder ID column (AG) - internal use only
+    sheet.hideColumns(GRIEVANCE_COLS.DRIVE_FOLDER_ID, 1);
 
     ss.toast('Column groups created! Click +/- to expand/collapse step details', '✅ Done', 5);
   } catch (e) {
@@ -10024,21 +10029,19 @@ function autoCreateMissingGrievanceFolders_() {
     }
 
     try {
-      // Format date as YYYY-MM (default to current date if not provided)
+      // Format date as YYYY-MM-DD (default to current date if not provided)
       var date = dateFiled ? new Date(dateFiled) : new Date();
-      var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+      var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-      // Create folder name: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+      // Create folder name: LastName, FirstName - YYYY-MM-DD
       var sanitizedFirst = sanitizeFolderName_(firstName || '');
       var sanitizedLast = sanitizeFolderName_(lastName || '');
-      var sanitizedCategory = sanitizeFolderName_(issueCategory);
 
       var folderName;
       if (sanitizedFirst && sanitizedLast) {
-        folderName = dateStr + ' - ' + sanitizedLast + ', ' + sanitizedFirst +
-                     ' - ' + sanitizedCategory + ' - ' + grievanceId;
+        folderName = sanitizedLast + ', ' + sanitizedFirst + ' - ' + dateStr;
       } else {
-        folderName = dateStr + ' - ' + grievanceId + ' - ' + sanitizedCategory;
+        folderName = grievanceId + ' - ' + dateStr;
       }
 
       // Create the folder

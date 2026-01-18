@@ -52,7 +52,7 @@ function getOrCreateRootFolder() {
 
 /**
  * Sets up a Drive folder for a specific grievance
- * Folder naming format: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+ * Folder naming format: LastName, FirstName - YYYY-MM-DD
  * @param {string} grievanceId - The grievance ID
  * @return {Object} Result with folder URL or error
  */
