@@ -81,17 +81,18 @@ var COMMAND_CONFIG = {
 
 /**
  * Drive folder configuration for grievance document management
- * Folder naming format: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
- * Example: "2026-01 - Smith, John - Scheduling - G-2026-001"
+ * Folder naming format: LastName, FirstName - YYYY-MM-DD
+ * Example: "Smith, John - 2026-01-15"
  *
  * @const {Object}
  */
 var DRIVE_CONFIG = {
   ROOT_FOLDER_NAME: '509 Dashboard - Grievance Files',
   // Template uses placeholders: {date}, {lastName}, {firstName}, {issueCategory}, {grievanceId}
-  SUBFOLDER_TEMPLATE: '{date} - {lastName}, {firstName} - {issueCategory} - {grievanceId}',
+  // Simplified format: Member Name - Date Filed
+  SUBFOLDER_TEMPLATE: '{lastName}, {firstName} - {date}',
   // Fallback if member name not available
-  SUBFOLDER_TEMPLATE_SIMPLE: '{date} - {grievanceId} - {issueCategory}'
+  SUBFOLDER_TEMPLATE_SIMPLE: '{grievanceId} - {date}'
 };
 
 // ============================================================================

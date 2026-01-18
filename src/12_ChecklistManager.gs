@@ -1095,3 +1095,96 @@ function getCasesByActionType() {
 
   return summary;
 }
+
+// ============================================================================
+// CHECKLIST SHEET PROTECTION MANAGEMENT
+// ============================================================================
+
+/**
+ * Unlock the Checklist sheet by removing all protections
+ * Call this from Admin > Setup > Unlock Checklist Sheet menu
+ */
+function unlockChecklistSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CHECKLIST_SHEET_NAME);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert(
+      'Checklist Sheet Not Found',
+      'The Case Checklist sheet does not exist. It will be created when you first use a checklist feature.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Get all protections on the sheet
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+
+  if (protections.length === 0) {
+    SpreadsheetApp.getUi().alert(
+      'Already Unlocked',
+      'The Checklist sheet has no protections. It is already fully editable.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Remove all protections
+  var removed = 0;
+  protections.forEach(function(protection) {
+    if (protection.canEdit()) {
+      protection.remove();
+      removed++;
+    }
+  });
+
+  // Also check for range protections
+  var rangeProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+  rangeProtections.forEach(function(protection) {
+    if (protection.canEdit()) {
+      protection.remove();
+      removed++;
+    }
+  });
+
+  SpreadsheetApp.getUi().alert(
+    'Checklist Sheet Unlocked',
+    'Removed ' + removed + ' protection(s) from the Checklist sheet.\n\n' +
+    'The sheet is now fully editable. Note: The protection was originally added to prevent ' +
+    'accidental modification of the sheet structure (headers, formulas).\n\n' +
+    'If you want to re-protect the sheet later, run the sheet setup function.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Re-protect the Checklist sheet (keeps data rows editable)
+ * Only protects the header row
+ */
+function reprotectChecklistSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CHECKLIST_SHEET_NAME);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error', 'Checklist sheet not found', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  // First remove any existing protections
+  var existingProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  existingProtections.forEach(function(p) { if (p.canEdit()) p.remove(); });
+
+  // Add protection that only protects header row
+  var protection = sheet.protect().setDescription('Checklist Sheet Structure');
+  var lastCol = sheet.getLastColumn() || 12;
+  var lastRow = Math.max(sheet.getLastRow(), 1000);
+
+  // Allow editing everything except row 1 (header)
+  protection.setUnprotectedRanges([sheet.getRange(2, 1, lastRow - 1, lastCol)]);
+
+  SpreadsheetApp.getUi().alert(
+    'Checklist Sheet Protected',
+    'The header row is now protected. All data rows remain editable.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
