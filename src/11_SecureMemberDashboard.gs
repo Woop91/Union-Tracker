@@ -450,24 +450,23 @@ function getStewardWorkload() {
 
 /**
  * Gets contract PDF URL from Config sheet
- * @returns {string} Contract PDF URL
+ * Uses CONFIG_COLS.CONTRACT_PDF_URL (column AZ) for the contract link
+ * @returns {string} Contract PDF URL or '#' if not configured
  */
 function getContractPdfUrl_() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
-      // Check for a Contract URL in config - using a placeholder column
-      // Users should update this in their Config sheet
-      var url = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).getValue();
-      if (url && url.toString().indexOf('pdf') > -1) {
-        return url;
+      var url = configSheet.getRange(2, CONFIG_COLS.CONTRACT_PDF_URL).getValue();
+      if (url && url.toString().trim() !== '') {
+        return url.toString().trim();
       }
     }
   } catch (e) {
     Logger.log('Contract URL error: ' + e.message);
   }
-  return '#'; // Placeholder
+  return '#'; // Not configured
 }
 
 /**

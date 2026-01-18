@@ -749,14 +749,17 @@ var CONFIG_COLS = {
   // ── FORM LINKS ── (AR)
   SATISFACTION_FORM_URL: 44,  // AR - Member Satisfaction Survey form URL
 
-  // ── STRATEGIC COMMAND CENTER ── (AS-AZ)
+  // ── STRATEGIC COMMAND CENTER ── (AS-AY)
   CHIEF_STEWARD_EMAIL: 45,    // AS - Email for escalation alerts
   UNIT_CODES: 46,             // AT - Unit code prefixes (format: "Unit Name:CODE,Unit2:CODE2")
   ARCHIVE_FOLDER_ID: 47,      // AU - Drive folder ID for archives
   ESCALATION_STATUSES: 48,    // AV - Status values that trigger alerts (comma-separated)
   ESCALATION_STEPS: 49,       // AW - Step values that trigger alerts (comma-separated)
   TEMPLATE_ID: 50,            // AX - Google Doc template ID for grievance PDFs
-  PDF_FOLDER_ID: 51           // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
+  PDF_FOLDER_ID: 51,          // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
+
+  // ── CONTRACT & RESOURCES ── (AZ)
+  CONTRACT_PDF_URL: 52        // AZ - URL to union contract PDF (Google Drive or external link)
 };
 
 // ============================================================================
@@ -11164,8 +11167,9 @@ function createGrievancePDF(data) {
 
 /**
  * Creates PDF for the currently selected grievance row
+ * @deprecated Use createPDFForSelectedGrievance() - this is a legacy version
  */
-function createPDFForSelectedGrievance() {
+function createPDFForSelectedGrievance_Legacy_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -12199,6 +12203,7 @@ function createSignatureReadyPDF(folder, data) {
 
 /**
  * Creates a PDF for the currently selected grievance
+ * Saves to member's Drive folder and optionally emails to member
  * Accessible from the 509 Command menu
  */
 function createPDFForSelectedGrievance() {
@@ -12217,7 +12222,7 @@ function createPDFForSelectedGrievance() {
     return;
   }
 
-  // Get grievance data
+  // Get grievance data including member email
   var data = {
     grievanceId: sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue(),
     name: sheet.getRange(row, GRIEVANCE_COLS.FIRST_NAME).getValue() + ' ' +
@@ -12228,14 +12233,16 @@ function createPDFForSelectedGrievance() {
     details: sheet.getRange(row, GRIEVANCE_COLS.RESOLUTION).getValue() || 'Pending',
     unit: sheet.getRange(row, GRIEVANCE_COLS.UNIT).getValue(),
     location: sheet.getRange(row, GRIEVANCE_COLS.LOCATION).getValue(),
-    steward: sheet.getRange(row, GRIEVANCE_COLS.STEWARD).getValue()
+    steward: sheet.getRange(row, GRIEVANCE_COLS.STEWARD).getValue(),
+    memberEmail: sheet.getRange(row, GRIEVANCE_COLS.MEMBER_EMAIL).getValue()
   };
 
   var response = ui.alert(
     'Create Signature PDF',
     'Create a signature-ready PDF for grievance ' + data.grievanceId + '?\n\n' +
     'Member: ' + data.name + '\n' +
-    'Status: ' + data.status,
+    'Status: ' + data.status + '\n' +
+    'Email: ' + (data.memberEmail || 'Not on file'),
     ui.ButtonSet.YES_NO
   );
 
@@ -12250,19 +12257,27 @@ function createPDFForSelectedGrievance() {
     // Create the PDF
     var pdf = createSignatureReadyPDF(folder, data);
 
-    // Update grievance record with PDF link
+    // Update grievance record with PDF link and folder URL
     if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
       sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folder.getUrl());
     }
 
-    ui.alert(
-      'PDF Created',
-      'Signature-ready PDF has been created.\n\n' +
+    // Ask if user wants to email the PDF to member
+    var emailResponse = ui.alert(
+      'Email PDF to Member?',
+      'PDF created successfully!\n\n' +
       'File: ' + pdf.getName() + '\n' +
-      'Location: ' + folder.getName() + '\n\n' +
-      'Click OK to open the folder.',
-      ui.ButtonSet.OK
+      'Saved to: ' + folder.getName() + '\n\n' +
+      (data.memberEmail
+        ? 'Would you like to email this PDF to ' + data.memberEmail + '?'
+        : 'No email on file for this member. Add email to column X to enable this feature.'),
+      data.memberEmail ? ui.ButtonSet.YES_NO : ui.ButtonSet.OK
     );
+
+    if (emailResponse === ui.Button.YES && data.memberEmail) {
+      sendGrievancePdfEmail_(data, pdf);
+      ss.toast('PDF emailed to ' + data.memberEmail, COMMAND_CONFIG.SYSTEM_NAME, 5);
+    }
 
     // Open folder in new tab
     var html = HtmlService.createHtmlOutput(
@@ -12273,6 +12288,44 @@ function createPDFForSelectedGrievance() {
   } catch (e) {
     ui.alert('Error', 'Failed to create PDF: ' + e.message, ui.ButtonSet.OK);
   }
+}
+
+/**
+ * Sends grievance PDF to member via email
+ * @param {Object} data - Grievance data object with memberEmail
+ * @param {File} pdf - The PDF file to attach
+ * @private
+ */
+function sendGrievancePdfEmail_(data, pdf) {
+  var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Grievance Form - ' + data.grievanceId;
+
+  var body = 'Dear ' + data.name + ',\n\n' +
+    'Please find attached your grievance form for case ' + data.grievanceId + '.\n\n' +
+    'GRIEVANCE DETAILS:\n' +
+    '─────────────────────────────────\n' +
+    'Grievance ID: ' + data.grievanceId + '\n' +
+    'Status: ' + data.status + '\n' +
+    'Articles: ' + (data.articles || 'N/A') + '\n' +
+    'Unit: ' + (data.unit || 'N/A') + '\n' +
+    'Location: ' + (data.location || 'N/A') + '\n' +
+    'Assigned Steward: ' + (data.steward || 'N/A') + '\n' +
+    '─────────────────────────────────\n\n' +
+    'NEXT STEPS:\n' +
+    '1. Review the attached form for accuracy\n' +
+    '2. Sign where indicated\n' +
+    '3. Return the signed form to your steward\n\n' +
+    'If you have any questions, please contact your steward.\n' +
+    COMMAND_CONFIG.EMAIL.FOOTER;
+
+  MailApp.sendEmail({
+    to: data.memberEmail,
+    subject: subject,
+    body: body,
+    attachments: [pdf.getAs(MimeType.PDF)],
+    name: COMMAND_CONFIG.SYSTEM_NAME || 'Union Grievance System'
+  });
+
+  Logger.log('Grievance PDF emailed to: ' + data.memberEmail);
 }
 
 /**
@@ -36153,24 +36206,23 @@ function getStewardWorkload() {
 
 /**
  * Gets contract PDF URL from Config sheet
- * @returns {string} Contract PDF URL
+ * Uses CONFIG_COLS.CONTRACT_PDF_URL (column AZ) for the contract link
+ * @returns {string} Contract PDF URL or '#' if not configured
  */
 function getContractPdfUrl_() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
-      // Check for a Contract URL in config - using a placeholder column
-      // Users should update this in their Config sheet
-      var url = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).getValue();
-      if (url && url.toString().indexOf('pdf') > -1) {
-        return url;
+      var url = configSheet.getRange(2, CONFIG_COLS.CONTRACT_PDF_URL).getValue();
+      if (url && url.toString().trim() !== '') {
+        return url.toString().trim();
       }
     }
   } catch (e) {
     Logger.log('Contract URL error: ' + e.message);
   }
-  return '#'; // Placeholder
+  return '#'; // Not configured
 }
 
 /**
