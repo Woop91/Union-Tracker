@@ -1386,27 +1386,32 @@ function createDashboardCharts_(sheet) {
     ['7', '🔥 Heatmap Table', 'Color-coded data grid', 'Steward performance matrix', 'Pattern spotting', '🟩🟨🟥'],
     ['8', '📊 Stacked Bar', 'Stacked horizontal bars', 'Status by steward', 'Composition analysis', '▰▰▱'],
     ['9', '🍩 Donut Chart', 'Pie with center hole', 'Resolution outcomes', 'Outcome breakdown', '◎'],
-    ['10', '📈 Area Chart', 'Filled line chart', 'Cumulative trends', 'Volume over time', '▓▓░']
+    ['10', '📈 Area Chart', 'Filled line chart', 'Cumulative trends', 'Volume over time', '▓▓░'],
+    ['11', '📊 Combo Chart', 'Bars + line overlay', 'Volume + Rate comparison', 'Dual metrics', '▮📈'],
+    ['12', '🔵 Scatter Plot', 'X-Y point distribution', 'Response time vs outcomes', 'Correlation analysis', '⋮⋮'],
+    ['13', '📊 Histogram', 'Frequency distribution bars', 'Case duration ranges', 'Distribution shape', '▁▃▅▇▅▃'],
+    ['14', '📋 Summary Table', 'Key metrics in tabular form', 'All KPI summaries', 'Quick reference', '☰'],
+    ['15', '🎯 Steward Leaderboard', 'Ranked performance list', 'Steward metrics', 'Performance ranking', '🥇🥈🥉']
   ];
 
-  sheet.getRange('A122:F131').setValues(chartOptions)
+  sheet.getRange('A122:F136').setValues(chartOptions)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
 
   // Alternate row coloring for chart options
-  for (var r = 122; r <= 131; r++) {
+  for (var r = 122; r <= 136; r++) {
     if (r % 2 === 0) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_LIGHT);
     }
   }
 
   // Style the # column
-  sheet.getRange('A122:A131')
+  sheet.getRange('A122:A136')
     .setFontWeight('bold')
     .setFontColor(COLORS.PRIMARY_PURPLE);
 
   // Card bottom border
-  sheet.getRange('A132:G132').setBackground(COLORS.CHART_INDIGO);
+  sheet.getRange('A137:G137').setBackground(COLORS.CHART_INDIGO);
   sheet.setRowHeight(132, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1446,8 +1451,8 @@ function generateSelectedChart() {
   }
 
   var chartNum = sheet.getRange('G120').getValue();
-  if (!chartNum || chartNum < 1 || chartNum > 10) {
-    ss.toast('Please enter a valid chart number (1-10) in cell G120', '⚠️ Invalid Selection', 5);
+  if (!chartNum || chartNum < 1 || chartNum > 15) {
+    ss.toast('Please enter a valid chart number (1-15) in cell G120', '⚠️ Invalid Selection', 5);
     return;
   }
 
@@ -1556,8 +1561,50 @@ function generateSelectedChart() {
       createAreaChart_(sheet);
       break;
 
+    case 11: // Combo Chart - Bars + Line overlay
+      createComboChart_(sheet);
+      break;
+
+    case 12: // Scatter Plot
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.SCATTER)
+        .addRange(sheet.getRange('A35:C39')) // X, Y data points
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Response Time vs Outcome Analysis')
+        .setOption('legend', {position: 'bottom'})
+        .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.UNION_GREEN])
+        .setOption('width', 600)
+        .setOption('height', 300)
+        .setOption('pointSize', 8);
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 13: // Histogram
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.HISTOGRAM)
+        .addRange(sheet.getRange('B26:B30')) // Numeric values for distribution
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Case Duration Distribution')
+        .setOption('legend', {position: 'none'})
+        .setOption('colors', [COLORS.CHART_CYAN])
+        .setOption('width', 600)
+        .setOption('height', 300)
+        .setOption('histogram', {bucketSize: 5});
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 14: // Summary Table
+      createSummaryTableChart_(sheet);
+      break;
+
+    case 15: // Steward Leaderboard
+      createStewardLeaderboardChart_(sheet);
+      break;
+
     default:
-      ss.toast('Chart type not yet implemented', 'ℹ️ Info', 3);
+      ss.toast('Enter 1-15 in cell G120 to select a chart type. See options table above.', 'ℹ️ Chart Help', 5);
   }
 
   ss.toast('Chart generated! Scroll down to "Chart Display Area" to view.', '✅ Done', 5);
@@ -1649,6 +1696,107 @@ function createAreaChart_(sheet) {
 
   var chart = chartBuilder.build();
   sheet.insertChart(chart);
+}
+
+/**
+ * Creates a combo chart (bars with line overlay)
+ * @private
+ */
+function createComboChart_(sheet) {
+  var chartBuilder = sheet.newChart()
+    .setChartType(Charts.ChartType.COMBO)
+    .addRange(sheet.getRange('A26:C30')) // Category, Count, Percentage
+    .setPosition(135, 1, 0, 0)
+    .setOption('title', 'Cases by Category with Trend Line')
+    .setOption('legend', {position: 'bottom'})
+    .setOption('seriesType', 'bars')
+    .setOption('series', {1: {type: 'line'}}) // Second series as line
+    .setOption('colors', [COLORS.CHART_BLUE, COLORS.SOLIDARITY_RED])
+    .setOption('width', 600)
+    .setOption('height', 300);
+
+  var chart = chartBuilder.build();
+  sheet.insertChart(chart);
+}
+
+/**
+ * Creates a summary table display
+ * @private
+ */
+function createSummaryTableChart_(sheet) {
+  var openCases = sheet.getRange('A16').getValue() || 0;
+  var resolvedCases = sheet.getRange('D16').getValue() || 0;
+  var winRate = sheet.getRange('D6').getValue() || '0%';
+  var avgDays = sheet.getRange('E6').getValue() || 'N/A';
+
+  var tableText = '╔═══════════════════════════════════════════════════════╗\n' +
+                  '║            📋 KPI SUMMARY TABLE                       ║\n' +
+                  '╠═══════════════════════════════════════════════════════╣\n' +
+                  '║  Metric                    │  Value                   ║\n' +
+                  '╠═══════════════════════════════════════════════════════╣\n' +
+                  '║  Open Cases                │  ' + padRight(String(openCases), 23) + '║\n' +
+                  '║  Resolved Cases            │  ' + padRight(String(resolvedCases), 23) + '║\n' +
+                  '║  Win Rate                  │  ' + padRight(String(winRate), 23) + '║\n' +
+                  '║  Avg Resolution Time       │  ' + padRight(String(avgDays), 23) + '║\n' +
+                  '╚═══════════════════════════════════════════════════════╝';
+
+  sheet.getRange('A135').setValue(tableText)
+    .setFontFamily('Courier New')
+    .setFontSize(12)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBackground('#F0F9FF');
+  sheet.getRange('A135:G145').merge();
+}
+
+/**
+ * Creates a steward leaderboard display
+ * @private
+ */
+function createStewardLeaderboardChart_(sheet) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var stewardSheet = ss.getSheetByName(SHEETS.STEWARDS);
+
+  var leaderboardText = '╔═══════════════════════════════════════════════════════╗\n' +
+                        '║       🏆 STEWARD PERFORMANCE LEADERBOARD              ║\n' +
+                        '╠═══════════════════════════════════════════════════════╣\n';
+
+  if (stewardSheet) {
+    // Get top 5 stewards by cases handled (column B has name, column C has case count)
+    var stewardData = stewardSheet.getRange('B4:C8').getValues();
+    var rank = 1;
+    var medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+
+    for (var i = 0; i < stewardData.length; i++) {
+      if (stewardData[i][0]) {
+        var name = padRight(String(stewardData[i][0]), 25);
+        var cases = stewardData[i][1] || 0;
+        leaderboardText += '║  ' + medals[rank-1] + ' ' + name + ' │  ' + padRight(String(cases) + ' cases', 15) + '║\n';
+        rank++;
+      }
+    }
+  } else {
+    leaderboardText += '║  No steward data available                            ║\n';
+  }
+
+  leaderboardText += '╚═══════════════════════════════════════════════════════╝';
+
+  sheet.getRange('A135').setValue(leaderboardText)
+    .setFontFamily('Courier New')
+    .setFontSize(12)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBackground('#FDF4FF');
+  sheet.getRange('A135:G145').merge();
+}
+
+/**
+ * Pads a string on the right to reach a target length
+ * @private
+ */
+function padRight(str, len) {
+  while (str.length < len) str += ' ';
+  return str.substring(0, len);
 }
 
 // ============================================================================
