@@ -764,43 +764,50 @@ function addRepoLinkToFAQ_(ss) {
  * @private
  */
 function applyTabColors_(ss) {
-  // Tab color definitions
+  // Tab color definitions - Updated per user requirements
   var TAB_COLORS = {
-    DATA: '#1a73e8',        // Google Blue - for data sheets
-    DOCS: '#34a853',        // Google Green - for documentation
-    HIDDEN: '#9e9e9e',      // Gray - for hidden/calc sheets
-    SATISFACTION: '#ea4335' // Red - for satisfaction survey
+    RED: '#ea4335',         // Red - Getting Started, FAQ, Config Guide
+    PURPLE: '#7c3aed',      // Purple - Member Directory, Grievance Log
+    YELLOW: '#fbbc04',      // Yellow - Feedback and Development, Function Checklist
+    ORANGE: '#ff9800',      // Orange - Config, Config Guide
+    HIDDEN: '#9e9e9e'       // Gray - for hidden/calc sheets
   };
 
-  // Data sheets - Blue
-  var dataSheets = [SHEETS.GRIEVANCE_LOG, SHEETS.MEMBER_DIR];
-  dataSheets.forEach(function(name) {
+  // Red tabs - Getting Started, FAQ
+  var redSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ];
+  redSheets.forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.DATA); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+      try { sheet.setTabColor(TAB_COLORS.RED); } catch (e) { Logger.log('Tab color error: ' + e.message); }
     }
   });
 
-  // Documentation sheets - Green
-  var docSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ, SHEETS.CONFIG_GUIDE];
-  docSheets.forEach(function(name) {
+  // Purple tabs - Member Directory, Grievance Log
+  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG];
+  purpleSheets.forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.DOCS); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+      try { sheet.setTabColor(TAB_COLORS.PURPLE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
     }
   });
 
-  // Satisfaction sheet - Red
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
-  if (satSheet) {
-    try { satSheet.setTabColor(TAB_COLORS.SATISFACTION); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-  }
+  // Yellow tabs - Feedback and Development, Function Checklist
+  var yellowSheets = [SHEETS.FEEDBACK, SHEETS.FUNCTION_CHECKLIST];
+  yellowSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      try { sheet.setTabColor(TAB_COLORS.YELLOW); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    }
+  });
 
-  // Config sheet - special orange
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (configSheet) {
-    try { configSheet.setTabColor('#ff9800'); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-  }
+  // Orange tabs - Config, Config Guide
+  var orangeSheets = [SHEETS.CONFIG, SHEETS.CONFIG_GUIDE];
+  orangeSheets.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (sheet) {
+      try { sheet.setTabColor(TAB_COLORS.ORANGE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    }
+  });
 
   Logger.log('Tab colors applied successfully');
 }
