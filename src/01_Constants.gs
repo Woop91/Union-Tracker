@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 6,
-  BUILD: 'v4.3.6',
-  CURRENT: '4.3.6',
-  CODENAME: 'Full Row Styling'
+  PATCH: 7,
+  BUILD: 'v4.3.7',
+  CURRENT: '4.3.7',
+  CODENAME: 'Dynamic Row Styling'
 };
 
 // ============================================================================

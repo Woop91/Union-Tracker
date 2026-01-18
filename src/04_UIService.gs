@@ -607,7 +607,7 @@ function APPLY_SYSTEM_THEME() {
 
 /**
  * Applies theme styling to a single sheet
- * For data sheets (Member Directory, Grievance Log), applies to ALL rows (1000)
+ * For data sheets (Member Directory, Grievance Log), applies to ALL rows in the sheet
  * @param {Sheet} sheet - The sheet to style
  * @private
  */
@@ -617,9 +617,9 @@ function applyThemeToSheet_(sheet) {
 
   if (lastCol < 1) lastCol = 26; // Default columns for empty sheets
 
-  // For data sheets, style ALL rows (1000) for consistent appearance
+  // For data sheets, style ALL rows using getMaxRows() for consistent appearance
   var isDataSheet = (sheetName === SHEETS.MEMBER_DIR || sheetName === SHEETS.GRIEVANCE_LOG);
-  var rowsToStyle = isDataSheet ? 1000 : sheet.getLastRow();
+  var rowsToStyle = isDataSheet ? sheet.getMaxRows() : sheet.getLastRow();
 
   if (rowsToStyle < 1) return;
 
@@ -2002,10 +2002,10 @@ function toggleGridlinesADHD() {
 function applyZebraStripes(sheet) {
   var sheetName = sheet.getName();
 
-  // For data sheets (Member Directory, Grievance Log), apply to ALL rows (1000)
-  // This ensures zebra stripes appear even on empty rows for future data entry
+  // For data sheets (Member Directory, Grievance Log), apply to ALL rows in the sheet
+  // Uses getMaxRows() to cover all existing and future rows
   var isDataSheet = (sheetName === SHEETS.MEMBER_DIR || sheetName === SHEETS.GRIEVANCE_LOG);
-  var totalRows = isDataSheet ? 1000 : sheet.getLastRow();
+  var totalRows = isDataSheet ? sheet.getMaxRows() : sheet.getLastRow();
 
   if (totalRows < 2) return;
 
