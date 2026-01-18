@@ -18,8 +18,10 @@ When you execute the **Nuke Seed Data** function, the system will:
 3. **Clear Survey Responses**: Clears all survey data from Member Satisfaction (preserves sheet structure)
 4. **Delete Feedback Sheet**: Completely removes the Feedback & Development sheet
 5. **Delete Menu Checklist**: Completely removes the Menu Checklist sheet
-6. **Clear Steward Workload**: Remove all test steward assignments
-7. **Clear Config Demo Data**: Remove demo entries from Config tab (if any exist):
+6. **Delete Function Checklist**: Completely removes the Function Checklist sheet **(v4.3.4+)**
+7. **Delete _Audit_Log**: Completely removes the hidden _Audit_Log sheet **(v4.3.4+)**
+8. **Clear Steward Workload**: Remove all test steward assignments
+9. **Clear Config Demo Data**: Remove demo entries from Config tab (if any exist):
    - Job Titles (Column A)
    - Office Locations (Column B)
    - Units (Column C)
@@ -32,9 +34,25 @@ When you execute the **Nuke Seed Data** function, the system will:
 
    > **NOTE (v3.11+):** These fields are now LEFT EMPTY during CREATE_509_DASHBOARD. Users populate them with their own data. If no user data was added, there's nothing to clear.
 
+### Documentation Cleanup (v4.3.5+)
+10. **Clean Documentation Tabs**: Removes seed/nuke/demo references from:
+    - FAQ sheet
+    - Config Guide sheet
+    - Getting Started sheet
+11. **Add Repo Link**: Adds a section to FAQ with link to GitHub repo for users wanting to create a fresh copy with demo features
+
+### Tab Coloring (v4.3.5+)
+12. **Apply Professional Tab Colors**:
+    - Blue (#1a73e8): Grievance Log, Member Directory
+    - Green (#34a853): Getting Started, FAQ, Config Guide
+    - Red (#ea4335): Satisfaction Survey
+    - Orange (#ff9800): Config
+
 ### Demo Mode Disabling
-8. **Disable Demo Menu**: Sets a flag (`DEMO_MODE_DISABLED`) to hide the "🎭 Demo Data" submenu on next refresh
-9. **Clear Tracking**: Removes the tracked seeded ID lists from Script Properties
+13. **Disable Demo Menu**: Sets `PRODUCTION_MODE` property to hide the "🎭 Demo Data" submenu on next refresh
+14. **Clear Tracking**: Removes the tracked seeded ID lists from Script Properties
+
+> **⏱️ IMPORTANT (v4.3.4+):** The NUKE operation takes approximately **3-5 minutes**. Wait for the "Running script" dialog to disappear before closing the spreadsheet.
 
 ### Preserved Items
 10. **Preserve Organization Info**: Keep your real organization settings:
@@ -380,7 +398,10 @@ Once `07_DevTools.gs` is deleted:
 - ❌ Survey responses from Member Satisfaction (data cleared, sheet preserved)
 - ❌ Feedback & Development sheet (entire sheet)
 - ❌ Menu Checklist sheet (entire sheet)
+- ❌ Function Checklist sheet (entire sheet) **(v4.3.4+)**
+- ❌ _Audit_Log hidden sheet (entire sheet) **(v4.3.4+)**
 - ❌ Config demo data (job titles, locations, units, supervisors, managers, stewards, coordinators, home towns, office addresses)
+- ❌ Seed/nuke/demo references in FAQ, Config Guide, Getting Started **(v4.3.5+)**
 
 ### What Gets Preserved
 - ✅ Headers and structure
@@ -389,6 +410,8 @@ Once `07_DevTools.gs` is deleted:
 - ✅ Dashboards and charts
 - ✅ All formulas and formatting
 - ✅ Menu system
+- ✅ Professional tab colors applied **(v4.3.5+)**
+- ✅ GitHub repo link added to FAQ for future reference **(v4.3.5+)**
 
 ### Post-Nuke Priorities
 1. Enter steward contact info
@@ -422,8 +445,35 @@ Your dashboard is **production-ready**! 🚀
 
 ---
 
-**Last Updated**: 2026-01-16
-**Version**: 4.0.3
+**Last Updated**: 2026-01-18
+**Version**: 4.3.7
+
+---
+
+## Version 4.3.x Notes - Production Polish & Two-Dashboard Architecture
+
+In version 4.3.x, the NUKE functionality was significantly enhanced:
+
+**v4.3.7 - Dynamic Row Styling:**
+- Zebra stripes and themes now apply to ALL rows using `getMaxRows()`
+- Covers any number of rows the sheet may have now or in the future
+
+**v4.3.5 - Production Polish:**
+- Fixed Demo Data menu showing after NUKE in Admin menu
+- NUKE now cleans up documentation tabs (FAQ, Config Guide, Getting Started)
+- Adds GitHub repo link to FAQ for users wanting fresh copy with demo features
+- Applies professional tab colors during NUKE
+
+**v4.3.4 - NUKE Timing & Cleanup:**
+- Added 3-5 minute warning in NUKE confirmation dialogs
+- Added toast notification with timing warning
+- NUKE now also deletes Function Checklist sheet
+- NUKE now also deletes _Audit_Log hidden sheet
+
+**v4.3.3 - Two-Dashboard Architecture:**
+- Unified Steward Dashboard with 6 tabs (Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction)
+- Member Dashboard for public/member view without PII
+- Added DIALOG_SIZES constant for standard modal dimensions
 
 ---
 

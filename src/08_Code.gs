@@ -49,13 +49,14 @@ function CREATE_509_DASHBOARD() {
       '• Config (dropdown sources)\n' +
       '• Member Directory\n' +
       '• Grievance Log\n' +
-      '• 💼 Dashboard (Executive metrics)\n' +
       '• 📊 Member Satisfaction (Survey tracking)\n' +
       '• 💡 Feedback & Development (Bug/feature tracking)\n' +
       '• ✅ Function Checklist (function reference)\n' +
       '• 📚 Getting Started (setup instructions)\n' +
       '• ❓ FAQ (common questions)\n' +
       '• 📖 Config Guide (how to use Config tab)\n\n' +
+      'Note: All dashboards are now modal-based (popup windows).\n' +
+      'Access them via: Union Hub > Dashboards menu.\n\n' +
       'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
       'Existing sheets with matching names will be recreated.\n\n' +
       'Continue?',
@@ -85,9 +86,9 @@ function CREATE_509_DASHBOARD() {
     ss.toast('Setting up hidden sheets...', '🏗️ Progress', 3);
     setupHiddenSheets(ss);
 
-    // Create dashboard sheets (after hidden sheets so formulas can reference them)
-    createDashboard(ss);
-    ss.toast('Created Dashboard', '🏗️ Progress', 2);
+    // Note: Dashboard sheet creation removed in v4.3.2
+    // All dashboards are now modal-based for better UX
+    // Access via: 📊 Union Hub > 📊 Dashboards menu
 
     createSatisfactionSheet(ss);
     ss.toast('Created Member Satisfaction', '🏗️ Progress', 2);
@@ -126,12 +127,13 @@ function CREATE_509_DASHBOARD() {
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
-        '10 sheets created:\n' +
+        '9 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
-        '• 💼 Dashboard (views)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
         '• ✅ Function Checklist (function reference)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
+        '📊 Dashboards are now modal-based (popup windows).\n' +
+        'Access via: Union Hub > Dashboards menu.\n\n' +
         'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
         '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
         'update automatically when you edit the sheets.\n\n' +
@@ -818,11 +820,28 @@ function createGrievanceLog(ss) {
 
 
 /**
+ * @deprecated v4.3.2 - Dashboard sheet is deprecated. Use modal dashboards instead.
+ * Access dashboards via: Union Hub > Dashboards menu
+ * - showInteractiveDashboardTab() - Interactive Dashboard
+ * - rebuildExecutiveDashboard() - Executive Command (PII)
+ * - showPublicMemberDashboard() - Member Dashboard (No PII)
+ * - showStewardPerformanceModal() - Steward Performance
+ *
+ * This function is kept for backwards compatibility but is no longer
+ * called during setup. Use removeDeprecatedTabs() to remove the sheet.
+ *
  * Create or recreate the unified Dashboard sheet (Executive Dashboard theme)
  * Combines member metrics, grievance metrics, and key performance indicators
  * Uses Executive Dashboard's green QUICK STATS theme
  */
 function createDashboard(ss) {
+  // Show deprecation warning
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Dashboard sheet is deprecated. Use Union Hub > Dashboards menu for modal dashboards.',
+    '⚠️ Deprecated',
+    5
+  );
+
   var sheet = getOrCreateSheet(ss, SHEETS.DASHBOARD);
   sheet.clear();
 
@@ -5809,20 +5828,18 @@ function refreshMemberDirectoryFormulas() {
   ss.toast('Member Directory refreshed!', '✅ Success', 3);
 }
 
+/**
+ * @deprecated v4.3.2 - Dashboard sheet is deprecated. Launches Interactive Dashboard modal.
+ */
 function rebuildDashboard() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Rebuilding dashboard sheets...', '🔄 Rebuild', 3);
+  ss.toast('Dashboard sheets are now modal-based. Opening Interactive Dashboard...', '📊 Dashboard', 3);
 
-  // Recreate dashboard sheets with latest layout
-  createDashboard(ss);
-
-  // Refresh hidden sheet formulas and sync data
+  // Refresh hidden sheet formulas and sync data (still useful)
   refreshAllHiddenFormulas();
 
-  // Reapply data validations
-  setupDataValidations();
-
-  ss.toast('Dashboard rebuilt with all 9 sections!', '✅ Success', 3);
+  // Launch the Interactive Dashboard modal instead of rebuilding sheet
+  showInteractiveDashboardTab();
 }
 
 /**

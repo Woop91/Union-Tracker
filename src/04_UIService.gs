@@ -86,30 +86,18 @@ function createDashboardMenu() {
       .addItem('⚙️ Notification Settings', 'showNotificationSettings')
       .addItem('🧪 Test Notifications', 'testDeadlineNotifications'))
 
-    // View submenu - View icons
-    .addSubMenu(ui.createMenu('👁️ View')
-      .addItem('📊 Executive Dashboard', 'showExecutiveDashboard')
-      .addItem('⭐ Member Satisfaction', 'showSatisfactionDashboard')
-      .addItem('📊 Rebuild Dashboard', 'rebuildDashboard')
+    // Dashboards - Two unified dashboards (v4.3.2)
+    .addSubMenu(ui.createMenu('📊 Dashboards')
+      .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
+      .addItem('🛡️ Steward Dashboard (PII)', 'showStewardDashboard')
+      .addSeparator()
+      .addItem('📱 Mobile Dashboard', 'showMobileDashboard'))
+    .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
-      .addSeparator()
-      .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
-      .addItem('📱 Mobile Dashboard', 'showMobileDashboard')
-      .addSeparator()
-      .addItem('🌙 Toggle Dark Mode', 'toggleDarkMode')
-      .addItem('🎨 Theme Settings', 'showThemeSettings'))
+      .addItem('📱 Get Mobile App URL', 'showWebAppUrl'))
 
-    // Accessibility/Comfort View submenu
-    .addSubMenu(ui.createMenu('♿ Comfort View')
-      .addItem('♿ Comfort View Panel', 'showADHDControlPanel')
-      .addItem('🎯 Focus Mode', 'activateFocusMode')
-      .addItem('🔲 Toggle Zebra Stripes', 'toggleZebraStripes')
-      .addSeparator()
-      .addItem('📝 Quick Capture Notepad', 'showQuickCaptureNotepad')
-      .addItem('🍅 Pomodoro Timer', 'startPomodoroTimer')
-      .addSeparator()
-      .addItem('🎨 Theme Manager', 'showThemeManager')
-      .addItem('🌙 Quick Toggle Dark Mode', 'quickToggleDarkMode'))
+    // Appearance & Comfort View consolidated into Visual Control Panel
+    .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
 
     // Multi-Select Tools submenu
     .addSubMenu(ui.createMenu('📝 Multi-Select')
@@ -123,7 +111,7 @@ function createDashboardMenu() {
     .addToUi();
 
   // Admin Menu (Separate top-level menu)
-  ui.createMenu('🛠️ Admin')
+  var adminMenu = ui.createMenu('🛠️ Admin')
     .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
     .addItem('🔍 Modal Diagnostics', 'showModalDiagnostics')
     .addItem('🔧 Repair Dashboard', 'showRepairDialog')
@@ -156,26 +144,25 @@ function createDashboardMenu() {
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('🎭 Demo Data')
-      .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
-      .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
-      .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
-      .addSeparator()
-      .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'))
-    .addToUi();
+      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'));
 
-  // Strategic Operations Menu (Separate top-level menu)
+  // Only show Demo Data menu if NOT in production mode
+  if (!isProductionMode()) {
+    adminMenu.addSeparator()
+      .addSubMenu(ui.createMenu('🎭 Demo Data')
+        .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
+        .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
+        .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
+        .addSeparator()
+        .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
+  }
+
+  adminMenu.addToUi();
+
+  // Strategic Operations Menu (Simplified v4.3.2)
   ui.createMenu('🎯 Strategic Ops')
-    .addSubMenu(ui.createMenu('👁️ Command Center')
-      .addItem('👁️ Executive Command (PII)', 'rebuildExecutiveDashboard')
-      .addItem('👥 Member Analytics (No PII)', 'rebuildMemberAnalytics')
-      .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
-      .addItem('🛡️ Steward Performance', 'showStewardPerformanceModal')
-      .addSeparator()
-      .addItem('📧 Email Dashboard to Selected', 'emailDashboardLink')
-      .addItem('📩 Send Member Dashboard Link', 'sendMemberDashboardLink'))
+    .addItem('👥 Member Dashboard', 'showPublicMemberDashboard')
+    .addItem('🛡️ Steward Dashboard', 'showStewardDashboard')
     .addSeparator()
     .addItem('🔍 Desktop Search', 'showDesktopSearch')
     .addSubMenu(ui.createMenu('📋 Cases & Grievances')
@@ -183,30 +170,15 @@ function createDashboardMenu() {
       .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
       .addItem('✅ View Checklist', 'showChecklistDialog'))
     .addSeparator()
-    .addSubMenu(ui.createMenu('📊 Analytics & Charts')
-      .addItem('📈 Unit Density Treemap', 'showUnitDensityTreemap')
-      .addItem('📉 Sentiment Trend Chart', 'showSentimentTrendChart')
-      .addItem('⚖️ Steward Workload Report', 'showStewardWorkloadReport'))
-    .addSubMenu(ui.createMenu('🎯 Strategic Intelligence')
-      .addItem('🔥 Generate Unit Hot Zones', 'renderHotZones')
-      .addItem('🌟 Identify Rising Stars', 'identifyRisingStars')
-      .addItem('📉 Management Hostility Report', 'renderHostilityFunnel')
-      .addItem('📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet'))
-    .addSeparator()
     .addSubMenu(ui.createMenu('🆔 ID & Data Engines')
       .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
       .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
       .addItem('📄 Create PDF for Selected Grievance', 'createPDFForSelectedGrievance'))
-    .addSeparator()
     .addSubMenu(ui.createMenu('👤 Steward Management')
       .addItem('⬆️ Promote to Steward', 'promoteSelectedMemberToSteward')
       .addItem('⬇️ Demote Steward', 'demoteSelectedSteward')
       .addItem('📧 Send Contact Form', 'sendContactInfoForm')
       .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('🎨 Styling & Theme')
-      .addItem('🎨 Apply Global Styling', 'applyGlobalStyling')
-      .addItem('🔄 Reset to Default Theme', 'resetToDefaultTheme'))
     .addToUi();
 
   // Create the Field Portal menu (from CommandCenter.gs)
@@ -522,9 +494,11 @@ function applyDashboardTheme(theme) {
 
 /**
  * Helper functions for navigation
+ * Note: Dashboards are now modal-based for better UX
  */
 function showExecutiveDashboard() {
-  navigateToSheet(SHEETS.DASHBOARD);
+  // Redirects to Interactive Dashboard modal (was: sheet navigation)
+  showInteractiveDashboardTab();
 }
 
 function showSatisfactionDashboard() {
@@ -551,10 +525,11 @@ function showThemeSettings() {
 // ============================================================================
 
 /**
- * Navigate to Executive Dashboard
+ * Navigate to Executive Dashboard (now launches modal)
  */
 function navToDash() {
-  navigateToSheet(SHEETS.DASHBOARD);
+  // Launches Interactive Dashboard modal (was: sheet navigation)
+  showInteractiveDashboardTab();
 }
 
 /**
@@ -632,14 +607,21 @@ function APPLY_SYSTEM_THEME() {
 
 /**
  * Applies theme styling to a single sheet
+ * For data sheets (Member Directory, Grievance Log), applies to ALL rows in the sheet
  * @param {Sheet} sheet - The sheet to style
  * @private
  */
 function applyThemeToSheet_(sheet) {
-  var lastRow = sheet.getLastRow();
+  var sheetName = sheet.getName();
   var lastCol = sheet.getLastColumn();
 
-  if (lastRow < 1 || lastCol < 1) return;
+  if (lastCol < 1) lastCol = 26; // Default columns for empty sheets
+
+  // For data sheets, style ALL rows using getMaxRows() for consistent appearance
+  var isDataSheet = (sheetName === SHEETS.MEMBER_DIR || sheetName === SHEETS.GRIEVANCE_LOG);
+  var rowsToStyle = isDataSheet ? sheet.getMaxRows() : sheet.getLastRow();
+
+  if (rowsToStyle < 1) return;
 
   // Style header row
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
@@ -651,19 +633,30 @@ function applyThemeToSheet_(sheet) {
              .setVerticalAlignment('middle');
 
   // Apply font to all data rows
-  if (lastRow > 1) {
-    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+  if (rowsToStyle > 1) {
+    var dataRange = sheet.getRange(2, 1, rowsToStyle - 1, lastCol);
     dataRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
              .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
              .setVerticalAlignment('middle');
 
-    // Apply zebra striping
-    for (var row = 2; row <= lastRow; row++) {
-      var rowRange = sheet.getRange(row, 1, 1, lastCol);
-      if (row % 2 === 0) {
-        rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
-      } else {
-        rowRange.setBackground(null);
+    // Use banding for efficient zebra striping on data sheets
+    if (isDataSheet) {
+      var bandings = dataRange.getBandings();
+      if (bandings.length > 0) bandings[0].remove();
+      dataRange.applyRowBanding()
+        .setHeaderRowColor(null)
+        .setFirstRowColor('#ffffff')
+        .setSecondRowColor(COMMAND_CONFIG.THEME.ALT_ROW || '#f8f9fa');
+    } else {
+      // Row-by-row for other sheets (smaller data sets)
+      var actualLastRow = sheet.getLastRow();
+      for (var row = 2; row <= actualLastRow; row++) {
+        var rowRange = sheet.getRange(row, 1, 1, lastCol);
+        if (row % 2 === 0) {
+          rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
+        } else {
+          rowRange.setBackground(null);
+        }
       }
     }
   }
@@ -2007,11 +2000,23 @@ function toggleGridlinesADHD() {
 }
 
 function applyZebraStripes(sheet) {
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
-  var range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
+  var sheetName = sheet.getName();
+
+  // For data sheets (Member Directory, Grievance Log), apply to ALL rows in the sheet
+  // Uses getMaxRows() to cover all existing and future rows
+  var isDataSheet = (sheetName === SHEETS.MEMBER_DIR || sheetName === SHEETS.GRIEVANCE_LOG);
+  var totalRows = isDataSheet ? sheet.getMaxRows() : sheet.getLastRow();
+
+  if (totalRows < 2) return;
+
+  var lastCol = sheet.getLastColumn() || 26; // Default to 26 columns if sheet is empty
+  var range = sheet.getRange(2, 1, totalRows - 1, lastCol);
+
+  // Remove existing bandings first
   var bandings = range.getBandings();
   if (bandings.length > 0) bandings[0].remove();
+
+  // Apply fresh banding
   range.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false);
 }
 
@@ -2103,26 +2108,24 @@ function deactivateFocusMode() {
 
 // ==================== QUICK CAPTURE & TIMER ====================
 
-function getQuickCaptureNotes() {
-  return PropertiesService.getUserProperties().getProperty('quickCaptureNotes') || '';
-}
+// ==================== DEPRECATED FEATURES (v4.3.2) ====================
+// Quick Capture Notepad and Pomodoro Timer have been removed.
+// These functions are kept for backwards compatibility but show deprecation notices.
 
-function saveQuickCaptureNotes(notes) {
-  PropertiesService.getUserProperties().setProperty('quickCaptureNotes', notes);
-}
+/** @deprecated v4.3.2 - Feature removed */
+function getQuickCaptureNotes() { return ''; }
 
+/** @deprecated v4.3.2 - Feature removed */
+function saveQuickCaptureNotes(notes) { }
+
+/** @deprecated v4.3.2 - Feature removed */
 function showQuickCaptureNotepad() {
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>body{font-family:Arial;padding:20px}textarea{width:100%;height:300px;padding:10px;border:2px solid #ddd;border-radius:4px}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;margin:10px 5px 0 0}</style></head><body><h3>📝 Quick Capture</h3><textarea id="notes" placeholder="Type your thoughts..."></textarea><br><button onclick="save()">💾 Save</button><button onclick="google.script.host.close()">Close</button><script>google.script.run.withSuccessHandler(function(n){document.getElementById("notes").value=n||""}).getQuickCaptureNotes();function save(){google.script.run.saveQuickCaptureNotes(document.getElementById("notes").value);alert("Saved!")}</script></body></html>'
-  ).setWidth(500).setHeight(450);
-  SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture');
+  SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
 }
 
+/** @deprecated v4.3.2 - Feature removed */
 function startPomodoroTimer() {
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>body{font-family:Arial;padding:40px;text-align:center;background:#1a73e8;color:white}.timer{font-size:72px;font-weight:bold;margin:40px 0;font-family:monospace}button{background:white;color:#1a73e8;border:none;padding:15px 30px;font-size:16px;border-radius:8px;cursor:pointer;margin:10px}</style></head><body><h2>🍅 Pomodoro Timer</h2><div id="status">Focus Session</div><div class="timer" id="timer">25:00</div><button onclick="toggle()">▶️ Start</button><button onclick="google.script.host.close()">Close</button><script>var left=25*60,running=false,iv;function toggle(){if(running){clearInterval(iv);running=false}else{running=true;iv=setInterval(function(){if(left>0){left--;var m=Math.floor(left/60),s=left%60;document.getElementById("timer").textContent=(m<10?"0":"")+m+":"+(s<10?"0":"")+s}else{clearInterval(iv);alert("Session complete!")}},1000)}}</script></body></html>'
-  ).setWidth(400).setHeight(350);
-  SpreadsheetApp.getUi().showModelessDialog(html, '🍅 Pomodoro Timer');
+  SpreadsheetApp.getUi().alert('This feature has been removed in v4.3.2.');
 }
 
 function setBreakReminders(minutes) {
@@ -3296,12 +3299,15 @@ function syncSingleGrievanceToCalendar(grievanceId) {
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
 /**
- * Shows the Custom View with tabbed interface
- * Features: Overview, Members, Grievances, and Analytics tabs
- *
- * ⚠️ PROTECTED FUNCTION - DO NOT MODIFY ⚠️
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Interactive dashboard is now consolidated into Steward Dashboard.
  */
 function showInteractiveDashboardTab() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function kept for reference */
+function showInteractiveDashboardTab_LEGACY() {
   var html = HtmlService.createHtmlOutput(getInteractiveDashboardHtml())
     .setWidth(900)
     .setHeight(750);
@@ -4998,11 +5004,11 @@ function navigateToSheet(sheetName) {
 // ============================================================================
 
 /**
- * Launches the Executive Command Center Modal
- * Uses Bridge Pattern: Server-side data aggregation + Client-side rendering
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Executive metrics are now in the unified Steward Dashboard.
  */
 function rebuildExecutiveDashboard() {
-  launchExecutiveDashboard();
+  showStewardDashboard();
 }
 
 /**
@@ -5306,106 +5312,214 @@ function getExecutiveMetrics_() {
 }
 
 // ============================================================================
-// 3. MEMBER ANALYTICS DASHBOARD (PUBLIC - NO PII)
+// 3. UNIFIED STEWARD DASHBOARD (v4.3.2)
+// ============================================================================
+// Consolidates all analytics, charts, and reports into a single tabbed interface.
+// This replaces the individual chart modals for a unified experience.
 // ============================================================================
 
 /**
- * Launches the Member Analytics Dashboard Modal (PII-safe)
- * Uses Bridge Pattern: Server-side data aggregation + Client-side rendering
+ * Shows the unified Steward Dashboard with all analytics
+ * Contains all charts and statistical data for stewards
  */
-function rebuildMemberAnalytics() {
-  launchMemberAnalyticsDashboard();
+function showStewardDashboard() {
+  var html = HtmlService.createHtmlOutput(getStewardDashboardHtml_())
+    .setWidth(DIALOG_SIZES.FULLSCREEN.width)
+    .setHeight(DIALOG_SIZES.FULLSCREEN.height);
+  SpreadsheetApp.getUi().showModalDialog(html, '509 STEWARD COMMAND CENTER');
 }
 
 /**
- * Launches the Member Analytics Modal with Chart.js visualizations
- * No PII visible - aggregate metrics only
+ * Gets comprehensive steward analytics data (Bridge Pattern)
+ * @returns {string} JSON with all dashboard data
  */
-function launchMemberAnalyticsDashboard() {
-  var html = HtmlService.createHtmlOutput(getMemberAnalyticsHtml_())
-    .setWidth(950)
-    .setHeight(700);
-
-  SpreadsheetApp.getUi().showModalDialog(html, '509 MEMBER ANALYTICS - PII PROTECTED');
-}
-
-/**
- * High-Performance Member Analytics Aggregator (Bridge Pattern)
- * Returns JSON data for client-side rendering - NO PII
- * @returns {string} JSON string with member analytics data
- */
-function getMemberAnalyticsStats() {
+function getStewardDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
-  var stats = {
+  var data = {
+    // KPIs
     totalMembers: 0,
     stewardCount: 0,
-    duesPayingCount: 0,
-    volunteerHours: 0,
-    locationBreakdown: {},
-    unitBreakdown: {},
+    totalGrievances: 0,
+    openGrievances: 0,
+    wins: 0,
+    losses: 0,
+    settled: 0,
+    winRate: 0,
+    overdueCount: 0,
     moraleScore: 7.5,
-    trustScore: 7.5,
-    satisfactionScore: 7.2,
-    sentimentTrend: [],
-    leadershipPipeline: { total: 0, duesPaying: 0, active: 0, stewards: 0 },
-    grievancesByArticle: {},
+
+    // Breakdowns
+    unitBreakdown: {},
+    locationBreakdown: {},
+    stewardWorkload: [],
+    hotZones: [],
+    risingStars: [],
+
+    // Bargaining Data
+    step1DenialRate: 0,
     avgSettlementDays: 0,
-    step1DenialRate: 0
+    topViolatedArticle: 'N/A',
+    articleViolations: {},
+
+    // Chart Data
+    statusDistribution: { open: 0, pending: 0, won: 0, denied: 0, settled: 0 },
+    monthlyTrend: [],
+    sentimentTrend: [],
+
+    // Satisfaction Survey Data (Section Averages)
+    satisfactionData: {
+      responseCount: 0,
+      sections: [
+        { name: 'Overall Satisfaction', key: 'overall', score: 0, questions: ['Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Recommend'] },
+        { name: 'Steward Ratings', key: 'steward', score: 0, questions: ['Timely Response', 'Treated Respect', 'Explained Options', 'Followed Through', 'Advocated', 'Safe Concerns', 'Confidentiality'] },
+        { name: 'Chapter Effectiveness', key: 'chapter', score: 0, questions: ['Understand Issues', 'Chapter Comm', 'Organizes', 'Reach Chapter', 'Fair Rep'] },
+        { name: 'Local Leadership', key: 'leadership', score: 0, questions: ['Decisions Clear', 'Understand Process', 'Transparent Finance', 'Accountable', 'Fair Processes', 'Welcomes Opinions'] },
+        { name: 'Contract Enforcement', key: 'contract', score: 0, questions: ['Enforces Contract', 'Realistic Timelines', 'Clear Updates', 'Frontline Priority'] },
+        { name: 'Communication Quality', key: 'communication', score: 0, questions: ['Clear Actionable', 'Enough Info', 'Find Easily', 'All Shifts', 'Meetings Worth'] },
+        { name: 'Member Voice', key: 'voice', score: 0, questions: ['Voice Matters', 'Seeks Input', 'Dignity', 'Newer Supported', 'Conflict Respect'] },
+        { name: 'Value & Action', key: 'value', score: 0, questions: ['Good Value', 'Priorities Needs', 'Prepared Mobilize', 'Win Together'] }
+      ]
+    }
   };
 
-  // Process Member Directory (aggregate only - no PII)
+  // Process Members
   if (memberSheet && memberSheet.getLastRow() > 1) {
     var memberData = memberSheet.getDataRange().getValues();
     for (var m = 1; m < memberData.length; m++) {
       if (memberData[m][MEMBER_COLS.MEMBER_ID - 1]) {
-        stats.totalMembers++;
+        data.totalMembers++;
+        if (memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.stewardCount++;
 
-        // Count stewards
-        if (memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') stats.stewardCount++;
-
-        // Count dues paying
-        if (memberData[m][MEMBER_COLS.DUES_PAYING - 1] === 'Yes') stats.duesPayingCount++;
-
-        // Sum volunteer hours
-        var hours = parseFloat(memberData[m][MEMBER_COLS.VOLUNTEER_HOURS - 1]) || 0;
-        stats.volunteerHours += hours;
-
-        // Location breakdown (aggregate counts only)
         var location = memberData[m][MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
-        if (!stats.locationBreakdown[location]) stats.locationBreakdown[location] = 0;
-        stats.locationBreakdown[location]++;
-
-        // Unit breakdown
         var unit = memberData[m][MEMBER_COLS.UNIT - 1] || 'Unknown';
-        if (!stats.unitBreakdown[unit]) stats.unitBreakdown[unit] = 0;
-        stats.unitBreakdown[unit]++;
+        if (!data.locationBreakdown[location]) data.locationBreakdown[location] = 0;
+        data.locationBreakdown[location]++;
+        if (!data.unitBreakdown[unit]) data.unitBreakdown[unit] = 0;
+        data.unitBreakdown[unit]++;
       }
     }
-
-    // Calculate leadership pipeline
-    stats.leadershipPipeline.total = stats.totalMembers;
-    stats.leadershipPipeline.duesPaying = stats.duesPayingCount;
-    stats.leadershipPipeline.active = memberData.filter(function(row, i) {
-      return i > 0 && (parseFloat(row[MEMBER_COLS.VOLUNTEER_HOURS - 1]) || 0) > 0;
-    }).length;
-    stats.leadershipPipeline.stewards = stats.stewardCount;
   }
 
-  // Process Satisfaction Survey
+  // Process Grievances
+  var stewardCases = {};
+  var locationCases = {};
+  var step1Total = 0, step1Denials = 0;
+  var settlementDays = [];
+
+  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+    var grievanceData = grievanceSheet.getDataRange().getValues();
+    for (var g = 1; g < grievanceData.length; g++) {
+      var status = (grievanceData[g][GRIEVANCE_COLS.STATUS - 1] || '').toString();
+      var steward = grievanceData[g][GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
+      var location = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
+      var article = grievanceData[g][GRIEVANCE_COLS.CONTRACT_ARTICLE - 1];
+
+      if (!grievanceData[g][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) continue;
+      data.totalGrievances++;
+
+      // Status distribution
+      switch(status.toLowerCase()) {
+        case 'open': data.statusDistribution.open++; data.openGrievances++; break;
+        case 'pending info': data.statusDistribution.pending++; data.openGrievances++; break;
+        case 'won': case 'sustained': data.statusDistribution.won++; data.wins++; break;
+        case 'denied': case 'lost': data.statusDistribution.denied++; data.losses++; break;
+        case 'settled': data.statusDistribution.settled++; data.settled++; break;
+      }
+
+      // Steward workload
+      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info') {
+        if (!stewardCases[steward]) stewardCases[steward] = 0;
+        stewardCases[steward]++;
+      }
+
+      // Hot zones (locations with active cases)
+      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info') {
+        if (!locationCases[location]) locationCases[location] = 0;
+        locationCases[location]++;
+      }
+
+      // Article violations
+      if (article) {
+        if (!data.articleViolations[article]) data.articleViolations[article] = 0;
+        data.articleViolations[article]++;
+      }
+
+      // Step 1 denial rate
+      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
+        step1Total++;
+        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) step1Denials++;
+      }
+
+      // Settlement time
+      var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
+      var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
+      if (dateFiled instanceof Date && dateClosed instanceof Date) {
+        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
+        if (days > 0) settlementDays.push(days);
+      }
+
+      // Check overdue
+      var step1Due = grievanceData[g][GRIEVANCE_COLS.STEP1_DUE - 1];
+      if (step1Due && new Date(step1Due) < new Date() && (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info')) {
+        data.overdueCount++;
+      }
+    }
+  }
+
+  // Calculate derived metrics
+  var totalClosed = data.wins + data.losses + data.settled;
+  data.winRate = totalClosed > 0 ? Math.round((data.wins / totalClosed) * 100) : 0;
+  data.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
+  data.avgSettlementDays = settlementDays.length > 0 ? Math.round(settlementDays.reduce(function(a,b){return a+b;},0) / settlementDays.length) : 0;
+
+  // Build steward workload array
+  for (var s in stewardCases) {
+    var count = stewardCases[s];
+    var statusLabel = count > 8 ? 'OVERLOAD' : count > 5 ? 'Heavy' : 'Available';
+    var color = count > 8 ? '#ef4444' : count > 5 ? '#f59e0b' : '#22c55e';
+    data.stewardWorkload.push({ name: s, count: count, status: statusLabel, color: color });
+  }
+  data.stewardWorkload.sort(function(a,b){return b.count - a.count;});
+
+  // Build hot zones (locations with 3+ active cases)
+  for (var loc in locationCases) {
+    if (locationCases[loc] >= 3) {
+      data.hotZones.push({ location: loc, count: locationCases[loc] });
+    }
+  }
+  data.hotZones.sort(function(a,b){return b.count - a.count;});
+
+  // Top violated article
+  var maxViolations = 0;
+  for (var art in data.articleViolations) {
+    if (data.articleViolations[art] > maxViolations) {
+      maxViolations = data.articleViolations[art];
+      data.topViolatedArticle = art;
+    }
+  }
+
+  // Process Satisfaction Survey for morale, sentiment, and section scores
   if (satSheet && satSheet.getLastRow() > 1) {
     var satData = satSheet.getDataRange().getValues();
     var trustScores = [];
-    var satScores = [];
     var monthlyTrust = {};
 
-    for (var s = 1; s < satData.length; s++) {
-      var trustVal = parseFloat(satData[s][7]); // Q7_TRUST_UNION
-      var satVal = parseFloat(satData[s][6]);   // Q6_SATISFIED_REP
-      var timestamp = satData[s][0];
+    // Section score accumulators (using summary columns BT-CD if available, else calculate)
+    var sectionScores = {
+      overall: [], steward: [], chapter: [], leadership: [],
+      contract: [], communication: [], voice: [], value: []
+    };
+
+    for (var i = 1; i < satData.length; i++) {
+      if (!satData[i][0]) continue; // Skip empty rows
+      data.satisfactionData.responseCount++;
+
+      var trustVal = parseFloat(satData[i][7]); // Q7_TRUST_UNION (col H, index 7)
+      var timestamp = satData[i][0];
 
       if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
         trustScores.push(trustVal);
@@ -5417,191 +5531,256 @@ function getMemberAnalyticsStats() {
           monthlyTrust[monthKey].count++;
         }
       }
-      if (!isNaN(satVal) && satVal >= 1 && satVal <= 10) satScores.push(satVal);
+
+      // Calculate section averages from summary columns (BT onwards = index 71+)
+      // Or calculate from raw question columns if summaries not available
+      var avgOverall = parseFloat(satData[i][71]) || 0; // BT
+      var avgSteward = parseFloat(satData[i][72]) || 0; // BU
+      var avgChapter = parseFloat(satData[i][74]) || 0; // BW
+      var avgLeadership = parseFloat(satData[i][75]) || 0; // BX
+      var avgContract = parseFloat(satData[i][76]) || 0; // BY
+      var avgComm = parseFloat(satData[i][78]) || 0; // CA
+      var avgVoice = parseFloat(satData[i][79]) || 0; // CB
+      var avgValue = parseFloat(satData[i][80]) || 0; // CC
+
+      // If summary columns empty, calculate from raw questions
+      if (avgOverall === 0) {
+        var q6 = parseFloat(satData[i][6]) || 0, q7 = parseFloat(satData[i][7]) || 0;
+        var q8 = parseFloat(satData[i][8]) || 0, q9 = parseFloat(satData[i][9]) || 0;
+        avgOverall = (q6 + q7 + q8 + q9) / 4;
+      }
+
+      if (avgOverall > 0) sectionScores.overall.push(avgOverall);
+      if (avgSteward > 0) sectionScores.steward.push(avgSteward);
+      if (avgChapter > 0) sectionScores.chapter.push(avgChapter);
+      if (avgLeadership > 0) sectionScores.leadership.push(avgLeadership);
+      if (avgContract > 0) sectionScores.contract.push(avgContract);
+      if (avgComm > 0) sectionScores.communication.push(avgComm);
+      if (avgVoice > 0) sectionScores.voice.push(avgVoice);
+      if (avgValue > 0) sectionScores.value.push(avgValue);
     }
+
+    // Calculate final section averages
+    function avg(arr) { return arr.length > 0 ? Math.round((arr.reduce(function(a,b){return a+b;},0) / arr.length) * 10) / 10 : 0; }
+    data.satisfactionData.sections[0].score = avg(sectionScores.overall);
+    data.satisfactionData.sections[1].score = avg(sectionScores.steward);
+    data.satisfactionData.sections[2].score = avg(sectionScores.chapter);
+    data.satisfactionData.sections[3].score = avg(sectionScores.leadership);
+    data.satisfactionData.sections[4].score = avg(sectionScores.contract);
+    data.satisfactionData.sections[5].score = avg(sectionScores.communication);
+    data.satisfactionData.sections[6].score = avg(sectionScores.voice);
+    data.satisfactionData.sections[7].score = avg(sectionScores.value);
 
     if (trustScores.length > 0) {
-      stats.trustScore = Math.round((trustScores.reduce(function(a, b) { return a + b; }, 0) / trustScores.length) * 10) / 10;
+      data.moraleScore = Math.round((trustScores.reduce(function(a,b){return a+b;},0) / trustScores.length) * 10) / 10;
     }
-    if (satScores.length > 0) {
-      stats.satisfactionScore = Math.round((satScores.reduce(function(a, b) { return a + b; }, 0) / satScores.length) * 10) / 10;
-    }
-    stats.moraleScore = Math.round(((stats.trustScore + stats.satisfactionScore) / 2) * 10) / 10;
 
-    // Build sentiment trend
     var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     months.forEach(function(month) {
       if (monthlyTrust[month]) {
-        stats.sentimentTrend.push({ month: month, score: Math.round((monthlyTrust[month].sum / monthlyTrust[month].count) * 10) / 10 });
+        data.sentimentTrend.push({ month: month, score: Math.round((monthlyTrust[month].sum / monthlyTrust[month].count) * 10) / 10 });
       }
     });
   }
 
-  // Process Grievance Log for bargaining data
-  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-    var grievanceData = grievanceSheet.getDataRange().getValues();
-    var step1Total = 0;
-    var step1Denials = 0;
-    var settlementDays = [];
-
-    for (var g = 1; g < grievanceData.length; g++) {
-      // Count by contract article
-      var article = grievanceData[g][GRIEVANCE_COLS.CONTRACT_ARTICLE - 1];
-      if (article) {
-        if (!stats.grievancesByArticle[article]) stats.grievancesByArticle[article] = 0;
-        stats.grievancesByArticle[article]++;
-      }
-
-      // Track step 1 denial rate
-      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
-        step1Total++;
-        var status = grievanceData[g][GRIEVANCE_COLS.STATUS - 1];
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) {
-          step1Denials++;
-        }
-      }
-
-      // Calculate settlement time
-      var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
-      var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
-      if (dateFiled instanceof Date && dateClosed instanceof Date) {
-        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
-        if (days > 0) settlementDays.push(days);
-      }
-    }
-
-    stats.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
-    stats.avgSettlementDays = settlementDays.length > 0 ?
-      Math.round(settlementDays.reduce(function(a, b) { return a + b; }, 0) / settlementDays.length) : 0;
-  }
-
-  return JSON.stringify(stats);
+  return JSON.stringify(data);
 }
 
 /**
- * Generates the Member Analytics HTML with Chart.js (NO PII)
+ * Generates the Steward Dashboard HTML with tabbed interface
  * @returns {string} Complete HTML for the modal
  * @private
  */
-function getMemberAnalyticsHtml_() {
+function getStewardDashboardHtml_() {
   return '<!DOCTYPE html>' +
-    '<html>' +
-    '<head>' +
-    '  <base target="_top">' +
-    '  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">' +
-    '  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>' +
-    '  <style>' +
-    '    * { box-sizing: border-box; margin: 0; padding: 0; }' +
-    '    body { font-family: "Roboto", sans-serif; background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); color: #f8fafc; min-height: 100vh; padding: 20px; }' +
-    '    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid rgba(59, 130, 246, 0.3); }' +
-    '    .header h1 { font-size: 20px; font-weight: 700; color: #60a5fa; }' +
-    '    .pii-badge { background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 6px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; border: 1px solid rgba(16, 185, 129, 0.3); }' +
-    '    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }' +
-    '    .kpi-card { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; text-align: center; }' +
-    '    .kpi-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }' +
-    '    .kpi-value { font-size: 28px; font-weight: 900; }' +
-    '    .kpi-value.green { color: #34d399; }' +
-    '    .kpi-value.blue { color: #60a5fa; }' +
-    '    .kpi-value.purple { color: #a78bfa; }' +
-    '    .kpi-value.amber { color: #fbbf24; }' +
-    '    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }' +
-    '    .chart-card { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; }' +
-    '    .chart-title { font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }' +
-    '    .bargaining-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }' +
-    '    .bargaining-card { background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 12px; text-align: center; }' +
-    '    .bargaining-label { font-size: 9px; color: #fbbf24; text-transform: uppercase; letter-spacing: 1px; }' +
-    '    .bargaining-value { font-size: 20px; font-weight: 700; color: #fcd34d; margin-top: 4px; }' +
-    '    .bargaining-status { font-size: 9px; color: #94a3b8; margin-top: 4px; }' +
-    '    canvas { max-height: 180px !important; }' +
-    '    .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); }' +
-    '    .btn { padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }' +
-    '    .btn-primary { background: #3b82f6; color: white; }' +
-    '    .btn-primary:hover { background: #2563eb; }' +
-    '    .loading { text-align: center; padding: 60px; color: #94a3b8; }' +
-    '  </style>' +
-    '</head>' +
-    '<body>' +
-    '  <div class="header">' +
-    '    <h1>UNION STRENGTH & SENTIMENT REPORT</h1>' +
-    '    <div class="pii-badge">🔒 PII Protected</div>' +
-    '  </div>' +
-    '  <div id="content"><div class="loading">Loading analytics data...</div></div>' +
-    '  <div class="footer">' +
-    '    <div style="font-size:10px;color:#64748b;">Aggregate metrics only - No personal data displayed</div>' +
-    '    <button class="btn btn-primary" onclick="google.script.host.close()">Close</button>' +
-    '  </div>' +
-    '  <script>' +
-    '    window.onload = function() {' +
-    '      google.script.run.withSuccessHandler(renderAnalytics).withFailureHandler(showError).getMemberAnalyticsStats();' +
-    '    };' +
-    '    function showError(err) {' +
-    '      document.getElementById("content").innerHTML = "<div class=\\"loading\\">Error: " + err.message + "</div>";' +
-    '    }' +
-    '    function renderAnalytics(jsonStats) {' +
-    '      var stats = JSON.parse(jsonStats);' +
-    '      var html = "";' +
-    '      // KPI Row' +
-    '      html += "<div class=\\"kpi-row\\">";' +
-    '      html += "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Members</div><div class=\\"kpi-value blue\\">" + stats.totalMembers + "</div></div>";' +
-    '      html += "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale Score</div><div class=\\"kpi-value green\\">" + stats.moraleScore + "/10</div></div>";' +
-    '      html += "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Trust Score</div><div class=\\"kpi-value purple\\">" + stats.trustScore + "/10</div></div>";' +
-    '      html += "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Active Stewards</div><div class=\\"kpi-value amber\\">" + stats.stewardCount + "</div></div>";' +
-    '      html += "</div>";' +
-    '      // Charts Row 1' +
-    '      html += "<div class=\\"charts-row\\">";' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Leadership Pipeline</div><canvas id=\\"pipelineChart\\"></canvas></div>";' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Sentiment Trend</div><canvas id=\\"trendChart\\"></canvas></div>";' +
-    '      html += "</div>";' +
-    '      // Charts Row 2' +
-    '      html += "<div class=\\"charts-row\\">";' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Membership by Location</div><canvas id=\\"locationChart\\"></canvas></div>";' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Grievances by Contract Article</div><canvas id=\\"articleChart\\"></canvas></div>";' +
-    '      html += "</div>";' +
-    '      // Bargaining Data' +
-    '      html += "<div class=\\"chart-card\\"><div class=\\"chart-title\\">Strategic Bargaining Intelligence</div><div class=\\"bargaining-grid\\">";' +
-    '      html += "<div class=\\"bargaining-card\\"><div class=\\"bargaining-label\\">Step 1 Denial Rate</div><div class=\\"bargaining-value\\">" + stats.step1DenialRate + "%</div><div class=\\"bargaining-status\\">" + (stats.step1DenialRate > 60 ? "High Hostility" : "Normal") + "</div></div>";' +
-    '      html += "<div class=\\"bargaining-card\\"><div class=\\"bargaining-label\\">Avg Settlement</div><div class=\\"bargaining-value\\">" + stats.avgSettlementDays + " Days</div><div class=\\"bargaining-status\\">" + (stats.avgSettlementDays > 45 ? "Slower" : "Normal") + "</div></div>";' +
-    '      html += "<div class=\\"bargaining-card\\"><div class=\\"bargaining-label\\">Dues Paying Rate</div><div class=\\"bargaining-value\\">" + (stats.totalMembers > 0 ? Math.round((stats.duesPayingCount / stats.totalMembers) * 100) : 0) + "%</div><div class=\\"bargaining-status\\">Solidarity</div></div>";' +
+    '<html><head><base target="_top">' +
+    '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">' +
+    '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Roboto", sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f8fafc; min-height: 100vh; }' +
+    '.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }' +
+    '.header h1 { font-size: 20px; font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 10px; }' +
+    '.header .material-icons { font-size: 28px; }' +
+    '.pii-badge { background: rgba(239,68,68,0.2); color: #fca5a5; padding: 6px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; }' +
+    '.tabs { display: flex; gap: 4px; padding: 0 24px; background: rgba(0,0,0,0.2); }' +
+    '.tab { padding: 12px 20px; cursor: pointer; font-size: 12px; font-weight: 500; color: #94a3b8; border-bottom: 2px solid transparent; transition: all 0.2s; }' +
+    '.tab:hover { color: #e2e8f0; }' +
+    '.tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }' +
+    '.content { padding: 20px 24px; overflow-y: auto; max-height: calc(100vh - 140px); }' +
+    '.tab-content { display: none; }' +
+    '.tab-content.active { display: block; }' +
+    '.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }' +
+    '.kpi-card { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; text-align: center; }' +
+    '.kpi-card.alert { border-color: #ef4444; }' +
+    '.kpi-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }' +
+    '.kpi-value { font-size: 28px; font-weight: 900; }' +
+    '.kpi-value.green { color: #34d399; } .kpi-value.red { color: #f87171; } .kpi-value.blue { color: #60a5fa; } .kpi-value.yellow { color: #fbbf24; } .kpi-value.purple { color: #a78bfa; }' +
+    '.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }' +
+    '.chart-card { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; }' +
+    '.chart-title { font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }' +
+    '.chart-title .material-icons { font-size: 18px; color: #60a5fa; }' +
+    'canvas { max-height: 200px !important; }' +
+    '.list-container { max-height: 200px; overflow-y: auto; }' +
+    '.list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }' +
+    '.list-item:last-child { border-bottom: none; }' +
+    '.badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }' +
+    '.bargain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }' +
+    '.bargain-card { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); border-radius: 10px; padding: 16px; text-align: center; }' +
+    '.bargain-label { font-size: 10px; color: #fbbf24; text-transform: uppercase; letter-spacing: 1px; }' +
+    '.bargain-value { font-size: 24px; font-weight: 700; color: #fcd34d; margin-top: 6px; }' +
+    '.bargain-status { font-size: 10px; color: #94a3b8; margin-top: 4px; }' +
+    '.hot-zone { display: flex; justify-content: space-between; padding: 12px; background: rgba(239,68,68,0.1); border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #ef4444; }' +
+    '.footer { display: flex; justify-content: space-between; padding: 12px 24px; border-top: 1px solid rgba(255,255,255,0.1); }' +
+    '.btn { padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }' +
+    '.btn-primary { background: #3b82f6; color: white; } .btn-primary:hover { background: #2563eb; }' +
+    '.loading { text-align: center; padding: 60px; color: #94a3b8; }' +
+    '.sat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }' +
+    '.sat-response-count { background: rgba(96,165,250,0.2); color: #60a5fa; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; }' +
+    '.sat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }' +
+    '.sat-section { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; }' +
+    '.sat-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
+    '.sat-section-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }' +
+    '.sat-section-score { font-size: 20px; font-weight: 900; }' +
+    '.sat-score-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 12px; }' +
+    '.sat-score-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }' +
+    '.sat-questions { font-size: 11px; color: #94a3b8; line-height: 1.6; }' +
+    '.sat-question-item { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }' +
+    '.sat-question-item:last-child { border-bottom: none; }' +
+    '.sat-overall-chart { margin-top: 20px; }' +
+    '</style></head><body>' +
+    '<div class="header"><h1><i class="material-icons">analytics</i>STEWARD COMMAND CENTER</h1><span class="pii-badge">INTERNAL USE ONLY</span></div>' +
+    '<div class="tabs">' +
+    '<div class="tab active" onclick="showTab(\'overview\')">Overview</div>' +
+    '<div class="tab" onclick="showTab(\'workload\')">Workload</div>' +
+    '<div class="tab" onclick="showTab(\'analytics\')">Analytics</div>' +
+    '<div class="tab" onclick="showTab(\'hotspots\')">Hot Spots</div>' +
+    '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
+    '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
+    '</div>' +
+    '<div class="content"><div id="main-content"><div class="loading">Loading dashboard data...</div></div></div>' +
+    '<div class="footer"><span style="font-size:11px;color:#64748b">Data refreshes on open</span><button class="btn btn-primary" onclick="google.script.host.close()">Close</button></div>' +
+    '<script>' +
+    'var dashData = null;' +
+    'window.onload = function() { google.script.run.withSuccessHandler(render).withFailureHandler(showError).getStewardDashboardData(); };' +
+    'function showError(e) { document.getElementById("main-content").innerHTML = "<div class=\\"loading\\">Error: " + e.message + "</div>"; }' +
+    'function showTab(tab) { document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")}); document.querySelector(".tab[onclick*=\\\""+tab+"\\\"]").classList.add("active"); renderTab(tab); }' +
+    'function render(json) { dashData = JSON.parse(json); renderTab("overview"); }' +
+    'function renderTab(tab) {' +
+    '  var d = dashData; var html = "";' +
+    '  if (tab === "overview") {' +
+    '    html = "<div class=\\"kpi-grid\\">" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">" + d.totalMembers + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">" + d.stewardCount + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">" + d.openGrievances + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate</div><div class=\\"kpi-value green\\">" + d.winRate + "%</div></div>" +' +
+    '      "<div class=\\"kpi-card " + (d.overdueCount > 0 ? "alert" : "") + "\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">" + d.overdueCount + "</div></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"charts-row\\">" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status Distribution</div><canvas id=\\"statusChart\\"></canvas></div>" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"charts-row\\">" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Cases by Location</div><canvas id=\\"locationChart\\"></canvas></div>" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">gavel</i>Article Violations</div><canvas id=\\"articleChart\\"></canvas></div>" +' +
+    '    "</div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '    renderOverviewCharts();' +
+    '  } else if (tab === "workload") {' +
+    '    var totalCases = d.stewardWorkload.reduce(function(s,w){return s+w.count;},0);' +
+    '    var avgCases = d.stewardWorkload.length > 0 ? (totalCases/d.stewardWorkload.length).toFixed(1) : 0;' +
+    '    var overloaded = d.stewardWorkload.filter(function(w){return w.status==="OVERLOAD";}).length;' +
+    '    html = "<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(4,1fr)\\">" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Stewards</div><div class=\\"kpi-value blue\\">" + d.stewardCount + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Active Cases</div><div class=\\"kpi-value yellow\\">" + totalCases + "</div></div>" +' +
+    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg per Steward</div><div class=\\"kpi-value green\\">" + avgCases + "</div></div>" +' +
+    '      "<div class=\\"kpi-card " + (overloaded>0?"alert":"") + "\\"><div class=\\"kpi-label\\">Overloaded</div><div class=\\"kpi-value red\\">" + overloaded + "</div></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">assignment_ind</i>Steward Caseload</div><div class=\\"list-container\\">";' +
+    '    d.stewardWorkload.forEach(function(w) {' +
+    '      html += "<div class=\\"list-item\\"><span>" + w.name + "</span><span class=\\"badge\\" style=\\"background:" + w.color + ";color:white\\">" + w.count + " cases - " + w.status + "</span></div>";' +
+    '    });' +
+    '    html += "</div></div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '  } else if (tab === "analytics") {' +
+    '    html = "<div class=\\"charts-row\\">" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">donut_large</i>Unit Distribution</div><canvas id=\\"unitChart\\"></canvas></div>" +' +
+    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Outcomes</div><canvas id=\\"outcomeChart\\"></canvas></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">mood</i>Member Satisfaction Score: " + d.moraleScore + "/10</div>" +' +
+    '    "<div style=\\"height:20px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin-top:12px\\"><div style=\\"height:100%;width:" + (d.moraleScore*10) + "%;background:linear-gradient(90deg,#22c55e,#3b82f6)\\"></div></div></div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '    renderAnalyticsCharts();' +
+    '  } else if (tab === "hotspots") {' +
+    '    html = "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">local_fire_department</i>Hot Zones (3+ Active Cases)</div>";' +
+    '    if (d.hotZones.length === 0) { html += "<div style=\\"text-align:center;padding:40px;color:#94a3b8\\">No hot zones detected - All clear!</div>"; }' +
+    '    else { d.hotZones.forEach(function(h) { html += "<div class=\\"hot-zone\\"><span>" + h.location + "</span><span class=\\"badge\\" style=\\"background:#ef4444;color:white\\">" + h.count + " cases</span></div>"; }); }' +
+    '    html += "</div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '  } else if (tab === "bargaining") {' +
+    '    html = "<div class=\\"bargain-grid\\">" +' +
+    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Step 1 Denial Rate</div><div class=\\"bargain-value\\">" + d.step1DenialRate + "%</div><div class=\\"bargain-status\\">" + (d.step1DenialRate > 60 ? "High Hostility" : "Normal Range") + "</div></div>" +' +
+    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Avg Settlement Time</div><div class=\\"bargain-value\\">" + d.avgSettlementDays + " Days</div><div class=\\"bargain-status\\">" + (d.avgSettlementDays > 45 ? "Slower than normal" : "Within range") + "</div></div>" +' +
+    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Most Violated Article</div><div class=\\"bargain-value\\">" + d.topViolatedArticle + "</div><div class=\\"bargain-status\\">Focus area</div></div>" +' +
+    '    "</div>" +' +
+    '    "<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">article</i>Violations by Contract Article</div><canvas id=\\"bargainChart\\"></canvas></div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '    renderBargainChart();' +
+    '  } else if (tab === "satisfaction") {' +
+    '    var sat = d.satisfactionData;' +
+    '    html = "<div class=\\"sat-header\\"><h2 style=\\"color:#e2e8f0;font-size:16px\\"><i class=\\"material-icons\\" style=\\"vertical-align:middle;margin-right:8px;color:#22c55e\\">sentiment_satisfied</i>Member Satisfaction Survey Analysis</h2><span class=\\"sat-response-count\\">" + sat.responseCount + " Responses</span></div>";' +
+    '    html += "<div class=\\"sat-grid\\">";' +
+    '    sat.sections.forEach(function(section) {' +
+    '      var scoreColor = section.score >= 7 ? "#22c55e" : section.score >= 5 ? "#f59e0b" : "#ef4444";' +
+    '      var pct = (section.score / 10) * 100;' +
+    '      html += "<div class=\\"sat-section\\">";' +
+    '      html += "<div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">" + section.name + "</span><span class=\\"sat-section-score\\" style=\\"color:" + scoreColor + "\\">" + section.score + "/10</span></div>";' +
+    '      html += "<div class=\\"sat-score-bar\\"><div class=\\"sat-score-fill\\" style=\\"width:" + pct + "%;background:" + scoreColor + "\\"></div></div>";' +
+    '      html += "<div class=\\"sat-questions\\">";' +
+    '      section.questions.forEach(function(q) { html += "<div class=\\"sat-question-item\\">" + q + "</div>"; });' +
     '      html += "</div></div>";' +
-    '      document.getElementById("content").innerHTML = html;' +
-    '      renderCharts(stats);' +
-    '    }' +
-    '    function renderCharts(stats) {' +
-    '      // Leadership Pipeline (Funnel as horizontal bar)' +
-    '      new Chart(document.getElementById("pipelineChart"), {' +
-    '        type: "bar",' +
-    '        data: { labels: ["Total", "Dues Paying", "Active", "Stewards"], datasets: [{ label: "Members", data: [stats.leadershipPipeline.total, stats.leadershipPipeline.duesPaying, stats.leadershipPipeline.active, stats.leadershipPipeline.stewards], backgroundColor: ["#3b82f6", "#60a5fa", "#34d399", "#fbbf24"] }] },' +
-    '        options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { color: "#94a3b8" } }, y: { ticks: { color: "#cbd5e1" } } } }' +
-    '      });' +
-    '      // Sentiment Trend' +
-    '      var trendLabels = stats.sentimentTrend.map(function(t) { return t.month; });' +
-    '      var trendData = stats.sentimentTrend.map(function(t) { return t.score; });' +
-    '      if (trendLabels.length === 0) { trendLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]; trendData = [7.2, 7.4, 7.6, 7.5, 7.8, 7.9]; }' +
-    '      new Chart(document.getElementById("trendChart"), {' +
-    '        type: "line",' +
-    '        data: { labels: trendLabels, datasets: [{ label: "Trust Score", data: trendData, borderColor: "#a78bfa", backgroundColor: "rgba(167,139,250,0.2)", fill: true, tension: 0.4 }] },' +
-    '        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 10, ticks: { color: "#94a3b8" } }, x: { ticks: { color: "#94a3b8" } } } }' +
-    '      });' +
-    '      // Location Breakdown' +
-    '      var locLabels = Object.keys(stats.locationBreakdown).slice(0, 8);' +
-    '      var locData = locLabels.map(function(l) { return stats.locationBreakdown[l]; });' +
-    '      new Chart(document.getElementById("locationChart"), {' +
-    '        type: "doughnut",' +
-    '        data: { labels: locLabels, datasets: [{ data: locData, backgroundColor: ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"] }] },' +
-    '        options: { responsive: true, plugins: { legend: { position: "right", labels: { color: "#cbd5e1", font: { size: 10 } } } } }' +
-    '      });' +
-    '      // Grievances by Article' +
-    '      var artLabels = Object.keys(stats.grievancesByArticle).slice(0, 6);' +
-    '      var artData = artLabels.map(function(a) { return stats.grievancesByArticle[a]; });' +
-    '      new Chart(document.getElementById("articleChart"), {' +
-    '        type: "bar",' +
-    '        data: { labels: artLabels.length > 0 ? artLabels : ["Art 5", "Art 7", "Art 12"], datasets: [{ label: "Cases", data: artData.length > 0 ? artData : [3, 5, 2], backgroundColor: "#f59e0b" }] },' +
-    '        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: "#94a3b8" } }, x: { ticks: { color: "#94a3b8" } } } }' +
-    '      });' +
-    '    }' +
-    '  </script>' +
-    '</body>' +
-    '</html>';
+    '    });' +
+    '    html += "</div>";' +
+    '    html += "<div class=\\"sat-overall-chart chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Score Comparison</div><canvas id=\\"satChart\\"></canvas></div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '    renderSatisfactionChart();' +
+    '  }' +
+    '}' +
+    'function renderOverviewCharts() {' +
+    '  var d = dashData;' +
+    '  new Chart(document.getElementById("statusChart"),{type:"doughnut",data:{labels:["Open","Pending","Won","Denied","Settled"],datasets:[{data:[d.statusDistribution.open,d.statusDistribution.pending,d.statusDistribution.won,d.statusDistribution.denied,d.statusDistribution.settled],backgroundColor:["#3b82f6","#f59e0b","#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
+    '  var trendLabels = d.sentimentTrend.length > 0 ? d.sentimentTrend.map(function(t){return t.month;}) : ["Jan","Feb","Mar","Apr","May","Jun"];' +
+    '  var trendData = d.sentimentTrend.length > 0 ? d.sentimentTrend.map(function(t){return t.score;}) : [7.2,7.4,7.5,7.6,7.8,7.9];' +
+    '  new Chart(document.getElementById("trendChart"),{type:"line",data:{labels:trendLabels,datasets:[{label:"Trust Score",data:trendData,borderColor:"#a78bfa",backgroundColor:"rgba(167,139,250,0.2)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:0,max:10,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '  var locLabels = Object.keys(d.locationBreakdown).slice(0,6);' +
+    '  var locData = locLabels.map(function(l){return d.locationBreakdown[l];});' +
+    '  new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
+    '  var artLabels = Object.keys(d.articleViolations).slice(0,6);' +
+    '  var artData = artLabels.map(function(a){return d.articleViolations[a];});' +
+    '  new Chart(document.getElementById("articleChart"),{type:"bar",data:{labels:artLabels.length>0?artLabels:["Art 5","Art 7","Art 12"],datasets:[{label:"Cases",data:artData.length>0?artData:[3,5,2],backgroundColor:"#f59e0b"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '}' +
+    'function renderAnalyticsCharts() {' +
+    '  var d = dashData;' +
+    '  var unitLabels = Object.keys(d.unitBreakdown).slice(0,8);' +
+    '  var unitData = unitLabels.map(function(u){return d.unitBreakdown[u];});' +
+    '  new Chart(document.getElementById("unitChart"),{type:"doughnut",data:{labels:unitLabels,datasets:[{data:unitData,backgroundColor:["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
+    '  new Chart(document.getElementById("outcomeChart"),{type:"bar",data:{labels:["Won","Denied","Settled"],datasets:[{label:"Cases",data:[d.wins,d.losses,d.settled],backgroundColor:["#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '}' +
+    'function renderBargainChart() {' +
+    '  var d = dashData;' +
+    '  var artLabels = Object.keys(d.articleViolations).slice(0,8);' +
+    '  var artData = artLabels.map(function(a){return d.articleViolations[a];});' +
+    '  new Chart(document.getElementById("bargainChart"),{type:"bar",data:{labels:artLabels.length>0?artLabels:["Art 5","Art 7","Art 12"],datasets:[{label:"Violations",data:artData.length>0?artData:[3,5,2],backgroundColor:"#fbbf24"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '}' +
+    'function renderSatisfactionChart() {' +
+    '  var d = dashData;' +
+    '  var labels = d.satisfactionData.sections.map(function(s){return s.name;});' +
+    '  var scores = d.satisfactionData.sections.map(function(s){return s.score;});' +
+    '  var colors = scores.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444";});' +
+    '  new Chart(document.getElementById("satChart"),{type:"bar",data:{labels:labels,datasets:[{label:"Score",data:scores,backgroundColor:colors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}});' +
+    '}' +
+    '</script></body></html>';
 }
 
 // ============================================================================
@@ -5634,9 +5813,15 @@ function checkDashboardAlerts() {
 }
 
 /**
- * Renders strategic bargaining data cheat sheet (Modal Dialog)
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * All analytics are now in the unified Steward Dashboard (Bargaining tab).
  */
 function renderBargainingCheatSheet() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function renderBargainingCheatSheet_LEGACY() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   var step1Denials = 0;
@@ -5709,9 +5894,15 @@ function renderBargainingCheatSheet() {
 }
 
 /**
- * Generates unit hot zones report showing problem areas (Modal Dialog)
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Hot Zones are now in the unified Steward Dashboard (Hot Spots tab).
  */
 function renderHotZones() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function renderHotZones_LEGACY() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -5763,9 +5954,15 @@ function renderHotZones() {
 }
 
 /**
- * Identifies rising star stewards based on performance (Modal Dialog)
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Steward metrics are now in the unified Steward Dashboard (Workload tab).
  */
 function identifyRisingStars() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function identifyRisingStars_LEGACY() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
 
@@ -5826,9 +6023,15 @@ function identifyRisingStars() {
 }
 
 /**
- * Generates management hostility funnel report (Modal Dialog)
+ * @deprecated v4.3.2 - Use showStewardDashboard() instead.
+ * Hostility metrics are now in the unified Steward Dashboard (Bargaining tab).
  */
 function renderHostilityFunnel() {
+  showStewardDashboard();
+}
+
+/** @deprecated - Legacy function body for reference only */
+function renderHostilityFunnel_LEGACY() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -6688,78 +6891,33 @@ function demoteSelectedSteward() {
 }
 
 // ============================================================================
-// 9. GLOBAL UI STYLING ENGINE
+// 9. GLOBAL UI STYLING ENGINE (Status Colors)
 // ============================================================================
 
 /**
- * Applies global Roboto theme styling to all data sheets
- * Includes zebra striping and status-based coloring
+ * Applies status-based coloring to the Grievance Log
+ * Called separately to update colors when statuses change
  */
-function applyGlobalStyling() {
+function applyStatusColors() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetsToStyle = [SHEETS.GRIEVANCE_LOG, SHEETS.MEMBER_DIR];
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
-  sheetsToStyle.forEach(function(sheetName) {
-    var sheet = ss.getSheetByName(sheetName);
-    if (!sheet) return;
+  if (!sheet) return;
 
-    var lastRow = sheet.getLastRow();
-    var lastCol = sheet.getLastColumn();
+  var lastDataRow = sheet.getLastRow();
+  if (lastDataRow < 2) return;
 
-    if (lastRow < 2 || lastCol < 1) return;
+  for (var row = 2; row <= lastDataRow; row++) {
+    var statusCell = sheet.getRange(row, GRIEVANCE_COLS.STATUS);
+    var status = statusCell.getValue();
 
-    // Apply header styling
-    var headerRange = sheet.getRange(1, 1, 1, lastCol);
-    headerRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
-               .setFontSize(11)
-               .setFontWeight('bold')
-               .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
-               .setFontColor(COMMAND_CONFIG.THEME.HEADER_TEXT)
-               .setHorizontalAlignment('center');
-
-    // Apply data styling with zebra stripes
-    for (var row = 2; row <= lastRow; row++) {
-      var rowRange = sheet.getRange(row, 1, 1, lastCol);
-      rowRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
-              .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
-              .setVerticalAlignment('middle');
-
-      // Zebra striping
-      if (row % 2 === 0) {
-        rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
-      } else {
-        rowRange.setBackground(null);
-      }
-
-      // Status coloring for Grievance Log
-      if (sheetName === SHEETS.GRIEVANCE_LOG) {
-        var statusCell = sheet.getRange(row, GRIEVANCE_COLS.STATUS);
-        var status = statusCell.getValue();
-
-        if (COMMAND_CONFIG.STATUS_COLORS[status]) {
-          var colors = COMMAND_CONFIG.STATUS_COLORS[status];
-          statusCell.setBackground(colors.bg)
-                    .setFontColor(colors.text)
-                    .setFontWeight('bold');
-        }
-      }
+    if (status && COMMAND_CONFIG.STATUS_COLORS[status]) {
+      var colors = COMMAND_CONFIG.STATUS_COLORS[status];
+      statusCell.setBackground(colors.bg)
+                .setFontColor(colors.text)
+                .setFontWeight('bold');
     }
-  });
-
-  ss.toast('Global styling applied to all data sheets.', 'Style Engine', 3);
-}
-
-/**
- * Resets all custom formatting and applies default theme
- */
-function resetToDefaultTheme() {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.alert('Reset Theme',
-    'This will reset all custom formatting. Continue?',
-    ui.ButtonSet.YES_NO);
-
-  if (response === ui.Button.YES) {
-    applyGlobalStyling();
-    ui.alert('Theme has been reset to defaults.');
   }
+
+  ss.toast('Status colors applied to Grievance Log.', 'Style Engine', 3);
 }

@@ -105,10 +105,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 1,
-  BUILD: 'v4.3.1',
-  CURRENT: '4.3.1',
-  CODENAME: 'Menu Restructure + Checklist Tracking'
+  PATCH: 7,
+  BUILD: 'v4.3.7',
+  CURRENT: '4.3.7',
+  CODENAME: 'Dynamic Row Styling'
 };
 
 // ============================================================================
@@ -124,6 +124,8 @@ var SHEETS = {
   MEMBER_DIR: 'Member Directory',
   GRIEVANCE_LOG: 'Grievance Log',
   // Dashboard sheets
+  // @deprecated v4.3.2 - Dashboard sheet is deprecated. Use modal dashboards instead.
+  // Access via: Union Hub > Dashboards menu. Use removeDeprecatedTabs() to remove.
   DASHBOARD: '💼 Dashboard',
   // Hidden calculation sheets (self-healing formulas)
   GRIEVANCE_CALC: '_Grievance_Calc',
@@ -276,6 +278,18 @@ var UI_THEME = {
   // Gradients
   GRADIENT_START: '#7C3AED',
   GRADIENT_END: '#5B21B6'
+};
+
+/**
+ * Standard dialog sizes for modals and sidebars
+ * @const {Object}
+ */
+var DIALOG_SIZES = {
+  SMALL: { width: 400, height: 300 },
+  MEDIUM: { width: 600, height: 500 },
+  LARGE: { width: 800, height: 650 },
+  FULLSCREEN: { width: 1000, height: 750 },
+  SIDEBAR: { width: 300 }
 };
 
 /**

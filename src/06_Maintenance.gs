@@ -3029,17 +3029,18 @@ function cleanupTestData() {
 }
 
 /**
- * Removes deprecated tabs from the spreadsheet (v4.0.3 cleanup)
+ * Removes deprecated tabs from the spreadsheet (v4.3.2 cleanup)
  * Run this once to remove tabs that are no longer used:
  * - 🎯 Custom View
  * - Member Analytics
  * - Executive Command
+ * - 💼 Dashboard (now modal-based - use showInteractiveDashboardTab())
  */
 function removeDeprecatedTabs() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var tabsToRemove = ['🎯 Custom View', 'Member Analytics', 'Executive Command'];
+  var tabsToRemove = ['🎯 Custom View', 'Member Analytics', 'Executive Command', '💼 Dashboard'];
   var removed = [];
   var notFound = [];
 

@@ -1,4 +1,4 @@
-# 509 Strategic Command Center - v4.2.1 Complete Menu System
+# 509 Strategic Command Center - v4.3.7 Complete Menu System
 
 A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements an **11-file modular architecture** following the Separation of Concerns principle.
 
@@ -57,7 +57,18 @@ src/
 - **Email Dashboard Link**: One-click email sending of dashboard URL to selected members
 - **Zero PII Exposure**: All member-facing views show only aggregate statistics
 
-## v4.2.0 Features (CURRENT)
+## v4.3.x Features (CURRENT)
+
+- **Two-Dashboard Architecture**: Unified Steward Dashboard (internal, with PII) and Member Dashboard (public, no PII)
+- **Steward Dashboard**: 6 tabs - Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction
+- **Member Satisfaction Analysis**: 8 survey sections with scores, progress bars, and question breakdowns
+- **Production Mode Polish**: Demo Data menu properly hides after NUKE in all menus
+- **NUKE Enhancements**: 3-5 minute warnings, cleans documentation tabs, adds repo link to FAQ, applies tab colors
+- **Professional Tab Colors**: Blue (data sheets), Green (documentation), Red (satisfaction), Orange (config)
+- **Dynamic Row Styling**: `applyZebraStripes()` and `applyThemeToSheet_()` use `getMaxRows()` to style ALL rows
+- **DIALOG_SIZES Constant**: Standard modal dimensions (SMALL, MEDIUM, LARGE, FULLSCREEN, SIDEBAR)
+
+## v4.2.0 Features
 
 - **Modal SPA Architecture**: All dashboards converted from sheet-based to responsive modal dialogs
 - **Executive Dashboard Modal**: Chart.js visualizations with win rate donut, status pie, and trends line chart
@@ -380,6 +391,12 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
+- **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
+- **4.3.6** - Full Row Styling: Zebra stripes and themes apply to all rows in data sheets
+- **4.3.5** - Production Polish: Demo menu fix, NUKE cleans docs and applies tab colors
+- **4.3.4** - Satisfaction Analytics: 8-section survey analysis in both dashboards
+- **4.3.3** - Unified Two-Dashboard Architecture: Steward Dashboard + Member Dashboard
+- **4.3.2** - Modal Dashboard Consolidation: Deprecated sheet-based dashboards
 - **4.2.0** - Modal Command Center: All dashboards converted to modal SPA architecture, Web App entry point with member portal, removed orphaned code
 - **4.1.0** - Multi-Key Smart Match for duplicate prevention, Analytics wiring, Search Precedents feature
 - **4.0.3** - Material Design Integration with Google Charts, Safety Valve PII scrubbing, Weingarten Rights utility (11-file architecture)
