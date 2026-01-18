@@ -3529,9 +3529,7 @@ function createFeaturesReferenceSheet(ss) {
   var categoryBg = '#DBEAFE';     // Light blue for categories
   var featureBg = '#FFFFFF';      // White for features
   var menuPathBg = '#F3F4F6';     // Light gray for menu paths
-  var textColor = '#1F2937';
   var white = '#FFFFFF';
-  var linkColor = '#2563EB';
 
   var row = 1;
 
