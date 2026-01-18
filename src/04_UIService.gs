@@ -34,6 +34,7 @@ function createDashboardMenu() {
   // Main Menu: Union Hub
   ui.createMenu('📊 Union Hub')
     .addItem('📊 Dashboard Home', 'showDashboardSidebar')
+    .addItem('📱 Toggle Mobile View', 'toggleMobileView')
     .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
     .addSeparator()
 
@@ -144,7 +145,10 @@ function createDashboardMenu() {
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults'));
+      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
+      .addSeparator()
+      .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+      .addItem('🎨 Apply Tab Colors', 'applyTabColors'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
