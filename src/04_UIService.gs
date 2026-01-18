@@ -150,7 +150,9 @@ function createDashboardMenu() {
       .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
-      .addItem('🎨 Apply Tab Colors', 'applyTabColors'));
+      .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('📱 Add Mobile Dashboard Link to Config', 'addMobileDashboardLinkToConfig')
+      .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
