@@ -1,7 +1,7 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.2.0 (Modal Command Center, 11-File Architecture)
-**Last Updated:** 2026-01-16
+**Version:** 4.3.7 (Dynamic Row Styling, Two-Dashboard Architecture)
+**Last Updated:** 2026-01-18
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
 ---
@@ -1383,6 +1383,144 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.3.7 (2026-01-18) - Dynamic Row Styling
+
+**Styling Enhancement:**
+- Changed `applyZebraStripes()` to use `sheet.getMaxRows()` instead of fixed 1000
+- Changed `applyThemeToSheet_()` to use `sheet.getMaxRows()` for data sheets
+- Ensures styling applies to ALL existing and future rows in the sheet
+- Covers any number of rows the sheet may have now or later
+
+**Files Changed:**
+- `src/04_UIService.gs` - Updated applyZebraStripes() and applyThemeToSheet_()
+- `src/01_Constants.gs` - Version 4.3.7
+
+---
+
+### Version 4.3.6 (2026-01-18) - Full Row Styling
+
+**Appearance Functions Update:**
+- Updated `applyZebraStripes()` to apply to 1000 rows for data sheets
+- Updated `applyThemeToSheet_()` to style 1000 rows for Member Directory and Grievance Log
+- Uses efficient row banding instead of row-by-row styling
+- Added `applyStatusColors()` function for Grievance Log status coloring
+- Removed duplicate `applyGlobalStyling_Full()` and `resetToDefaultTheme()` functions
+
+**Files Changed:**
+- `src/04_UIService.gs` - Styling functions updated
+- `src/01_Constants.gs` - Version 4.3.6
+
+---
+
+### Version 4.3.5 (2026-01-18) - Production Polish
+
+**Demo Data Menu Fix:**
+- Fixed Demo Data menu showing after NUKE in Admin menu (UIService.gs)
+- Added `isProductionMode()` check to Admin menu before showing Demo Data submenu
+- Both 509 Command menu and Admin menu now respect production mode
+
+**NUKE Enhancements:**
+- NUKE now cleans up seed/nuke/demo references from documentation tabs (FAQ, Config Guide, Getting Started)
+- Uses regex patterns to identify demo-related content
+- Adds GitHub repo link to FAQ sheet for users wanting fresh copy with demo features
+- Added `cleanupDocumentationTabs_()` helper function
+- Added `addRepoLinkToFAQ_()` helper function
+
+**Tab Colors:**
+- Added professional tab colors applied during NUKE:
+  - Blue (#1a73e8): Grievance Log, Member Directory
+  - Green (#34a853): Getting Started, FAQ, Config Guide
+  - Red (#ea4335): Satisfaction Survey
+  - Orange (#ff9800): Config
+- Added `applyTabColors_()` private function
+- Added `applyTabColors()` public function for manual use
+
+**Files Changed:**
+- `src/04_UIService.gs` - Admin menu production mode check
+- `src/10_CommandCenter.gs` - NUKE helper functions, tab colors
+- `src/01_Constants.gs` - Version 4.3.5
+
+---
+
+### Version 4.3.4 (2026-01-18) - Satisfaction Analytics
+
+**Member Satisfaction Analysis:**
+- Added "Satisfaction" tab to Steward Dashboard with 8 survey sections
+- Each section shows name, score (0-10), progress bar, and question breakdown
+- Added horizontal bar chart comparing all section scores
+- Added satisfaction section to Member Dashboard (aggregate scores only, no PII)
+- Enhanced `getSecureSatisfactionStats_()` to include section-level scores
+
+**Survey Sections Analyzed:**
+1. Overall Satisfaction - Satisfied with Rep, Trust Union, Feel Protected, Recommend
+2. Steward Ratings - Timely Response, Respect, Explained Options, Followed Through, Advocated, Safe Concerns, Confidentiality
+3. Chapter Effectiveness - Understand Issues, Chapter Comm, Organizes, Reach Chapter, Fair Rep
+4. Local Leadership - Decisions Clear, Understand Process, Transparent Finance, Accountable, Fair Processes, Welcomes Opinions
+5. Contract Enforcement - Enforces Contract, Realistic Timelines, Clear Updates, Frontline Priority
+6. Communication Quality - Clear Actionable, Enough Info, Find Easily, All Shifts, Meetings Worth
+7. Member Voice - Voice Matters, Seeks Input, Dignity, Newer Supported, Conflict Respect
+8. Value & Action - Good Value, Priorities Needs, Prepared Mobilize, Win Together
+
+**NUKE Fixes:**
+- Added 3-5 minute warning messages to NUKE confirmation dialogs
+- Added toast notification with timing warning
+- Added Function Checklist and _Audit_Log tabs to NUKE deletion
+
+**Files Changed:**
+- `src/04_UIService.gs` - Satisfaction tab in Steward Dashboard
+- `src/11_SecureMemberDashboard.gs` - Satisfaction section in Member Dashboard
+- `src/07_DevTools.gs` - NUKE timing warnings
+- `src/10_CommandCenter.gs` - NUKE timing warnings, tab deletions
+- `src/01_Constants.gs` - Version 4.3.4
+
+---
+
+### Version 4.3.3 (2026-01-18) - Unified Two-Dashboard Architecture
+
+**Dashboard Consolidation:**
+- Created unified Steward Dashboard with 5 tabs (Overview, Workload, Analytics, Hot Spots, Bargaining)
+- Kept Member Dashboard (showPublicMemberDashboard) for members without PII
+- Deprecated individual chart functions to redirect to showStewardDashboard():
+  - renderHotZones(), identifyRisingStars(), renderHostilityFunnel()
+  - renderBargainingCheatSheet(), showUnitDensityTreemap()
+  - showSentimentTrendChart(), showStewardWorkloadReport()
+
+**Bug Fixes:**
+- Added DIALOG_SIZES constant to fix "DIALOG_SIZES is not defined" errors
+- Removed Pomodoro timer and Quick Capture Notepad
+- Consolidated appearance features into Visual Control Panel
+
+**Menu Updates:**
+- Updated Union Hub, Strategic Ops, and Command Center menus to use two dashboards
+- Simplified menu structure by removing deprecated chart modals
+
+**Files Changed:**
+- `src/04_UIService.gs` - Steward Dashboard, menu consolidation
+- `src/01_Constants.gs` - DIALOG_SIZES constant, version 4.3.3
+- `src/11_SecureMemberDashboard.gs` - Deprecated chart functions
+
+---
+
+### Version 4.3.2 (2026-01-18) - Modal Dashboard Consolidation
+
+**Dashboard Architecture Changes:**
+- Consolidated dashboards to modal-based architecture
+- Deprecated Dashboard sheet tab in favor of modal dashboards
+- Updated `navToDash()` and `showExecutiveDashboard()` to launch modal dashboards
+- Added Dashboard sheet to `removeDeprecatedTabs()` for cleanup
+- Deprecated `createDashboard()` function
+
+**Member Analytics Removal:**
+- Removed 'Member Analytics' deprecated tab
+- Cleaned up associated menu items and functions
+
+**Files Changed:**
+- `src/04_UIService.gs` - Dashboard modal functions, deprecations
+- `src/08_Code.gs` - Removed Member Analytics references
+- `src/01_Constants.gs` - Version 4.3.2
+
+---
 
 ### Version 4.2.3 (2026-01-17) - Custom View Deprecation Cleanup
 

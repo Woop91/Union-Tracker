@@ -2,9 +2,46 @@
 
 ## Overview
 
-The **Interactive Dashboard** provides a comprehensive view of your union's grievance management data through a mobile-friendly modal popup interface.
+The **Interactive Dashboard** system provides comprehensive views of your union's grievance management data through mobile-friendly modal popup interfaces. Version 4.3.x introduces a **Two-Dashboard Architecture**.
 
-### 📊 Dashboard Modal Popup (⚠️ PROTECTED)
+---
+
+## 🏗️ Two-Dashboard Architecture (v4.3.3+)
+
+The system now provides **two primary dashboards** to serve different user groups:
+
+### 🛡️ Steward Dashboard (Internal Use)
+**Menu:** `🎯 Strategic Ops > 🛡️ Steward Dashboard`
+
+A comprehensive dashboard for stewards and leadership with **6 tabs**:
+
+| Tab | Features |
+|-----|----------|
+| **Overview** | KPIs, response rates, aging cases, resolution stats |
+| **Workload** | Steward performance, case distribution, capacity |
+| **Analytics** | Status breakdown, trends, category analysis |
+| **Hot Spots** | Problem locations with 3+ active grievances |
+| **Bargaining** | Contract violation tracking, cheat sheet data |
+| **Satisfaction** | 8-section member satisfaction survey analysis with scores and question breakdowns |
+
+> **Contains PII:** This dashboard shows member names and steward details. For internal use only.
+
+### 👥 Member Dashboard (Public/Member Use)
+**Menu:** `🎯 Strategic Ops > 👥 Member Dashboard`
+
+A PII-safe dashboard for sharing with members:
+
+| Section | Features |
+|---------|----------|
+| **Union Snapshot** | Aggregate stats (total members, grievances, win rate) |
+| **Steward Directory** | Live searchable steward list with contact info |
+| **Member Satisfaction** | 8-section survey scores (aggregate only, no individual responses) |
+
+> **No PII:** Uses Safety Valve scrubbing for phone numbers and SSNs.
+
+---
+
+### 📊 Legacy Dashboard Modal (⚠️ PROTECTED)
 
 **Menu:** `📊 509 Dashboard > 📊 Dashboard`
 
@@ -24,17 +61,14 @@ A **popup modal dialog** with a tabbed interface featuring:
 
 ## 📊 Dashboard Features
 
-Access via: `📊 509 Dashboard > 📊 Dashboard`
+### Steward Dashboard Access
+`🎯 Strategic Ops > 🛡️ Steward Dashboard`
 
-This opens a popup with 5 tabs:
+### Member Dashboard Access
+`🎯 Strategic Ops > 👥 Member Dashboard`
 
-| Tab | Features |
-|-----|----------|
-| **Overview** | Total members, stewards, grievance counts, win rate, quick navigation |
-| **My Cases** | Steward's assigned grievances with stats and status filtering |
-| **Grievances** | Status filter buttons, search, expandable details, quick actions |
-| **Members** | Searchable list with filters (location, unit, office days), click to view/edit |
-| **Analytics** | Bar charts, location/unit breakdowns, resolution stats, Sankey diagram |
+### Legacy Dashboard Access
+`📊 509 Dashboard > 📊 Dashboard` (5 tabs: Overview, My Cases, Grievances, Members, Analytics)
 
 ---
 
@@ -549,7 +583,7 @@ Potential additions (from Future Features sheet):
 ---
 
 **Created for SEIU Local 509 (Units 8 & 10)**
-**Version:** 4.0.3
+**Version:** 4.3.7
 **Last Updated:** January 2026
 
 *Empowering union representatives with data-driven insights* 📊✊
