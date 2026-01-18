@@ -106,10 +106,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 8,
-  BUILD: 'v4.3.8',
-  CURRENT: '4.3.8',
-CODENAME: 'Searchable Help Guide'
+  PATCH: 9,
+  BUILD: 'v4.3.9',
+  CURRENT: '4.3.9',
+  CODENAME: 'Code Audit & Cleanup'
 };
 
 // ============================================================================

@@ -1056,6 +1056,11 @@ function showClearCalendarConfirm() {
  * Consolidated to handle both mobile dashboard pages and member portal requests
  * @param {Object} e - Event object with query parameters
  * @returns {HtmlOutput} The HTML page to display
+ *
+ * URL Parameters:
+ * - id=<memberId> - Returns personalized member portal
+ * - page=search|grievances|members|links|dashboard|portal - Returns specific page
+ * - (no params) - Returns default dashboard
  */
 function doGet(e) {
   // Check for member ID parameter (member portal mode)

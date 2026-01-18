@@ -1413,11 +1413,9 @@ function doGet_MemberPortal_(e) {
   var memberId = e && e.parameter && e.parameter.id;
 
   if (memberId) {
-    // Return personalized member portal
     return buildMemberPortal(memberId);
   }
 
-  // Return public dashboard (no PII)
   return buildPublicPortal();
 }
 

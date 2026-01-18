@@ -3714,8 +3714,10 @@ function createFeaturesReferenceSheet(ss) {
 /**
  * Show desktop search modal - comprehensive search for members and grievances
  * Enhanced version of mobile search with more fields and filtering options
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:124
+ * Note: This was a wrapper for UI, the primary does actual searching with query param
  */
-function searchMembers() {
+function searchMembers_Code_DEPRECATED() {
   showDesktopSearch();
 }
 
@@ -5405,8 +5407,9 @@ function rejectFlaggedSubmission(rowNum) {
  * High-performance modal with interactive Google Charts, Satisfaction data,
  * Material Icons, Trend Stats, Progress Tracking, and Live Steward Search.
  * No PII is exposed - only aggregate statistics.
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 11_SecureMemberDashboard.gs:501
  */
-function showPublicMemberDashboard() {
+function showPublicMemberDashboard_Code_DEPRECATED() {
   var stats = getGrievanceStats();
   var stewards = getAllStewards();
   var satisfaction = getAggregateSatisfactionStats();
@@ -12180,8 +12183,9 @@ function getCalcValue(sheetName, cellRef) {
  * Gets dashboard statistics from the calc sheet
  * Used by the sidebar
  * @return {Object} Statistics object
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 04_UIService.gs:5078
  */
-function getDashboardStats() {
+function getDashboardStats_Code_DEPRECATED() {
   const statsSheet = SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(HIDDEN_SHEETS.CALC_STATS);
 
@@ -12270,8 +12274,9 @@ function getMemberList() {
  * Gets member by ID
  * @param {string} memberId - The member ID
  * @return {Object|null} Member object or null
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:97
  */
-function getMemberById(memberId) {
+function getMemberById_Code_DEPRECATED(memberId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
