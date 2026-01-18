@@ -535,7 +535,11 @@ function NUKE_DATABASE() {
     '• DELETE ALL members from Member Directory\n' +
     '• DELETE ALL grievances from Grievance Log\n' +
     '• CLEAR Config dropdown values\n' +
+    '• DELETE Function Checklist sheet\n' +
+    '• DELETE _Audit_Log hidden sheet\n' +
     '• ENABLE Production Mode (hide Demo menu)\n\n' +
+    '⏱️ IMPORTANT: This process takes approximately 3-5 MINUTES.\n' +
+    '⚠️ WAIT until the "Running script" dialog disappears!\n\n' +
     'This action CANNOT be undone!\n\n' +
     'Are you absolutely sure?',
     ui.ButtonSet.YES_NO
@@ -550,6 +554,8 @@ function NUKE_DATABASE() {
   var confirm2 = ui.alert(
     '⚠️ FINAL WARNING',
     'You are about to permanently delete ALL data.\n\n' +
+    '⏱️ This will take 3-5 MINUTES. DO NOT close the tab!\n' +
+    'Wait for the "Running script" dialog to disappear.\n\n' +
     'Type YES to confirm this is intentional.',
     ui.ButtonSet.YES_NO
   );
@@ -560,6 +566,7 @@ function NUKE_DATABASE() {
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast('Nuking database... This will take 3-5 minutes. Please wait!', '☢️ NUKE', 10);
 
   try {
     // Clear Member Directory (preserve header row)
@@ -585,6 +592,18 @@ function NUKE_DATABASE() {
     if (configSheet && configSheet.getLastRow() > 2) {
       configSheet.getRange(3, 1, Math.max(1, configSheet.getLastRow() - 2), 5)
         .clearContent();
+    }
+
+    // Delete Function Checklist sheet
+    var functionChecklistSheet = ss.getSheetByName(SHEETS.FUNCTION_CHECKLIST);
+    if (functionChecklistSheet) {
+      try { ss.deleteSheet(functionChecklistSheet); } catch (e) { Logger.log('Could not delete Function Checklist: ' + e.message); }
+    }
+
+    // Delete _Audit_Log hidden sheet
+    var auditLogSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
+    if (auditLogSheet) {
+      try { ss.deleteSheet(auditLogSheet); } catch (e) { Logger.log('Could not delete _Audit_Log: ' + e.message); }
     }
 
     // Enable Production Mode

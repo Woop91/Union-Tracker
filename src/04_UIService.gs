@@ -5333,7 +5333,22 @@ function getStewardDashboardData() {
     // Chart Data
     statusDistribution: { open: 0, pending: 0, won: 0, denied: 0, settled: 0 },
     monthlyTrend: [],
-    sentimentTrend: []
+    sentimentTrend: [],
+
+    // Satisfaction Survey Data (Section Averages)
+    satisfactionData: {
+      responseCount: 0,
+      sections: [
+        { name: 'Overall Satisfaction', key: 'overall', score: 0, questions: ['Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Recommend'] },
+        { name: 'Steward Ratings', key: 'steward', score: 0, questions: ['Timely Response', 'Treated Respect', 'Explained Options', 'Followed Through', 'Advocated', 'Safe Concerns', 'Confidentiality'] },
+        { name: 'Chapter Effectiveness', key: 'chapter', score: 0, questions: ['Understand Issues', 'Chapter Comm', 'Organizes', 'Reach Chapter', 'Fair Rep'] },
+        { name: 'Local Leadership', key: 'leadership', score: 0, questions: ['Decisions Clear', 'Understand Process', 'Transparent Finance', 'Accountable', 'Fair Processes', 'Welcomes Opinions'] },
+        { name: 'Contract Enforcement', key: 'contract', score: 0, questions: ['Enforces Contract', 'Realistic Timelines', 'Clear Updates', 'Frontline Priority'] },
+        { name: 'Communication Quality', key: 'communication', score: 0, questions: ['Clear Actionable', 'Enough Info', 'Find Easily', 'All Shifts', 'Meetings Worth'] },
+        { name: 'Member Voice', key: 'voice', score: 0, questions: ['Voice Matters', 'Seeks Input', 'Dignity', 'Newer Supported', 'Conflict Respect'] },
+        { name: 'Value & Action', key: 'value', score: 0, questions: ['Good Value', 'Priorities Needs', 'Prepared Mobilize', 'Win Together'] }
+      ]
+    }
   };
 
   // Process Members
@@ -5452,14 +5467,23 @@ function getStewardDashboardData() {
     }
   }
 
-  // Process Satisfaction Survey for morale and sentiment
+  // Process Satisfaction Survey for morale, sentiment, and section scores
   if (satSheet && satSheet.getLastRow() > 1) {
     var satData = satSheet.getDataRange().getValues();
     var trustScores = [];
     var monthlyTrust = {};
 
+    // Section score accumulators (using summary columns BT-CD if available, else calculate)
+    var sectionScores = {
+      overall: [], steward: [], chapter: [], leadership: [],
+      contract: [], communication: [], voice: [], value: []
+    };
+
     for (var i = 1; i < satData.length; i++) {
-      var trustVal = parseFloat(satData[i][7]); // Q7_TRUST_UNION
+      if (!satData[i][0]) continue; // Skip empty rows
+      data.satisfactionData.responseCount++;
+
+      var trustVal = parseFloat(satData[i][7]); // Q7_TRUST_UNION (col H, index 7)
       var timestamp = satData[i][0];
 
       if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
@@ -5472,7 +5496,45 @@ function getStewardDashboardData() {
           monthlyTrust[monthKey].count++;
         }
       }
+
+      // Calculate section averages from summary columns (BT onwards = index 71+)
+      // Or calculate from raw question columns if summaries not available
+      var avgOverall = parseFloat(satData[i][71]) || 0; // BT
+      var avgSteward = parseFloat(satData[i][72]) || 0; // BU
+      var avgChapter = parseFloat(satData[i][74]) || 0; // BW
+      var avgLeadership = parseFloat(satData[i][75]) || 0; // BX
+      var avgContract = parseFloat(satData[i][76]) || 0; // BY
+      var avgComm = parseFloat(satData[i][78]) || 0; // CA
+      var avgVoice = parseFloat(satData[i][79]) || 0; // CB
+      var avgValue = parseFloat(satData[i][80]) || 0; // CC
+
+      // If summary columns empty, calculate from raw questions
+      if (avgOverall === 0) {
+        var q6 = parseFloat(satData[i][6]) || 0, q7 = parseFloat(satData[i][7]) || 0;
+        var q8 = parseFloat(satData[i][8]) || 0, q9 = parseFloat(satData[i][9]) || 0;
+        avgOverall = (q6 + q7 + q8 + q9) / 4;
+      }
+
+      if (avgOverall > 0) sectionScores.overall.push(avgOverall);
+      if (avgSteward > 0) sectionScores.steward.push(avgSteward);
+      if (avgChapter > 0) sectionScores.chapter.push(avgChapter);
+      if (avgLeadership > 0) sectionScores.leadership.push(avgLeadership);
+      if (avgContract > 0) sectionScores.contract.push(avgContract);
+      if (avgComm > 0) sectionScores.communication.push(avgComm);
+      if (avgVoice > 0) sectionScores.voice.push(avgVoice);
+      if (avgValue > 0) sectionScores.value.push(avgValue);
     }
+
+    // Calculate final section averages
+    function avg(arr) { return arr.length > 0 ? Math.round((arr.reduce(function(a,b){return a+b;},0) / arr.length) * 10) / 10 : 0; }
+    data.satisfactionData.sections[0].score = avg(sectionScores.overall);
+    data.satisfactionData.sections[1].score = avg(sectionScores.steward);
+    data.satisfactionData.sections[2].score = avg(sectionScores.chapter);
+    data.satisfactionData.sections[3].score = avg(sectionScores.leadership);
+    data.satisfactionData.sections[4].score = avg(sectionScores.contract);
+    data.satisfactionData.sections[5].score = avg(sectionScores.communication);
+    data.satisfactionData.sections[6].score = avg(sectionScores.voice);
+    data.satisfactionData.sections[7].score = avg(sectionScores.value);
 
     if (trustScores.length > 0) {
       data.moraleScore = Math.round((trustScores.reduce(function(a,b){return a+b;},0) / trustScores.length) * 10) / 10;
@@ -5539,6 +5601,19 @@ function getStewardDashboardHtml_() {
     '.btn { padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }' +
     '.btn-primary { background: #3b82f6; color: white; } .btn-primary:hover { background: #2563eb; }' +
     '.loading { text-align: center; padding: 60px; color: #94a3b8; }' +
+    '.sat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }' +
+    '.sat-response-count { background: rgba(96,165,250,0.2); color: #60a5fa; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; }' +
+    '.sat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }' +
+    '.sat-section { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; }' +
+    '.sat-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
+    '.sat-section-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }' +
+    '.sat-section-score { font-size: 20px; font-weight: 900; }' +
+    '.sat-score-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 12px; }' +
+    '.sat-score-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }' +
+    '.sat-questions { font-size: 11px; color: #94a3b8; line-height: 1.6; }' +
+    '.sat-question-item { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }' +
+    '.sat-question-item:last-child { border-bottom: none; }' +
+    '.sat-overall-chart { margin-top: 20px; }' +
     '</style></head><body>' +
     '<div class="header"><h1><i class="material-icons">analytics</i>STEWARD COMMAND CENTER</h1><span class="pii-badge">INTERNAL USE ONLY</span></div>' +
     '<div class="tabs">' +
@@ -5547,6 +5622,7 @@ function getStewardDashboardHtml_() {
     '<div class="tab" onclick="showTab(\'analytics\')">Analytics</div>' +
     '<div class="tab" onclick="showTab(\'hotspots\')">Hot Spots</div>' +
     '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
+    '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
     '</div>' +
     '<div class="content"><div id="main-content"><div class="loading">Loading dashboard data...</div></div></div>' +
     '<div class="footer"><span style="font-size:11px;color:#64748b">Data refreshes on open</span><button class="btn btn-primary" onclick="google.script.host.close()">Close</button></div>' +
@@ -5616,6 +5692,24 @@ function getStewardDashboardHtml_() {
     '    "<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">article</i>Violations by Contract Article</div><canvas id=\\"bargainChart\\"></canvas></div>";' +
     '    document.getElementById("main-content").innerHTML = html;' +
     '    renderBargainChart();' +
+    '  } else if (tab === "satisfaction") {' +
+    '    var sat = d.satisfactionData;' +
+    '    html = "<div class=\\"sat-header\\"><h2 style=\\"color:#e2e8f0;font-size:16px\\"><i class=\\"material-icons\\" style=\\"vertical-align:middle;margin-right:8px;color:#22c55e\\">sentiment_satisfied</i>Member Satisfaction Survey Analysis</h2><span class=\\"sat-response-count\\">" + sat.responseCount + " Responses</span></div>";' +
+    '    html += "<div class=\\"sat-grid\\">";' +
+    '    sat.sections.forEach(function(section) {' +
+    '      var scoreColor = section.score >= 7 ? "#22c55e" : section.score >= 5 ? "#f59e0b" : "#ef4444";' +
+    '      var pct = (section.score / 10) * 100;' +
+    '      html += "<div class=\\"sat-section\\">";' +
+    '      html += "<div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">" + section.name + "</span><span class=\\"sat-section-score\\" style=\\"color:" + scoreColor + "\\">" + section.score + "/10</span></div>";' +
+    '      html += "<div class=\\"sat-score-bar\\"><div class=\\"sat-score-fill\\" style=\\"width:" + pct + "%;background:" + scoreColor + "\\"></div></div>";' +
+    '      html += "<div class=\\"sat-questions\\">";' +
+    '      section.questions.forEach(function(q) { html += "<div class=\\"sat-question-item\\">" + q + "</div>"; });' +
+    '      html += "</div></div>";' +
+    '    });' +
+    '    html += "</div>";' +
+    '    html += "<div class=\\"sat-overall-chart chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Score Comparison</div><canvas id=\\"satChart\\"></canvas></div>";' +
+    '    document.getElementById("main-content").innerHTML = html;' +
+    '    renderSatisfactionChart();' +
     '  }' +
     '}' +
     'function renderOverviewCharts() {' +
@@ -5643,6 +5737,13 @@ function getStewardDashboardHtml_() {
     '  var artLabels = Object.keys(d.articleViolations).slice(0,8);' +
     '  var artData = artLabels.map(function(a){return d.articleViolations[a];});' +
     '  new Chart(document.getElementById("bargainChart"),{type:"bar",data:{labels:artLabels.length>0?artLabels:["Art 5","Art 7","Art 12"],datasets:[{label:"Violations",data:artData.length>0?artData:[3,5,2],backgroundColor:"#fbbf24"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    '}' +
+    'function renderSatisfactionChart() {' +
+    '  var d = dashData;' +
+    '  var labels = d.satisfactionData.sections.map(function(s){return s.name;});' +
+    '  var scores = d.satisfactionData.sections.map(function(s){return s.score;});' +
+    '  var colors = scores.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444";});' +
+    '  new Chart(document.getElementById("satChart"),{type:"bar",data:{labels:labels,datasets:[{label:"Score",data:scores,backgroundColor:colors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}});' +
     '}' +
     '</script></body></html>';
 }

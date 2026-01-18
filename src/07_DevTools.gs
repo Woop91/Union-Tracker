@@ -1396,10 +1396,12 @@ function NUKE_SEEDED_DATA() {
     '• Config dropdown values\n' +
     '• Survey responses (Member Satisfaction data cleared)\n' +
     '• Feedback & Development sheet (entire sheet deleted)\n' +
-    '• Function Checklist sheet (entire sheet deleted)\n\n' +
+    '• Function Checklist sheet (entire sheet deleted)\n' +
+    '• _Audit_Log hidden sheet (entire sheet deleted)\n\n' +
     '✅ Manually entered data with different ID formats will be PRESERVED.\n\n' +
-    '⚠️ After nuke, the Demo menu will be permanently disabled.\n' +
-    '⚠️ To fully remove demo tools, delete DeveloperTools.gs from the script editor.\n\n' +
+    '⏱️ IMPORTANT: This process takes approximately 3-5 MINUTES.\n' +
+    '⚠️ WAIT until the "Running script" dialog disappears!\n' +
+    '⚠️ After nuke, the Demo menu will be permanently disabled.\n\n' +
     'Continue?',
     ui.ButtonSet.YES_NO
   );
@@ -1417,7 +1419,10 @@ function NUKE_SEEDED_DATA() {
     '3. Clear survey responses from Member Satisfaction\n' +
     '4. Delete Feedback & Development sheet\n' +
     '5. Delete Function Checklist sheet\n' +
-    '6. Permanently disable the Demo menu\n\n' +
+    '6. Delete _Audit_Log hidden sheet\n' +
+    '7. Permanently disable the Demo menu\n\n' +
+    '⏱️ This will take 3-5 MINUTES. DO NOT close the tab!\n' +
+    'Wait for the "Running script" dialog to disappear.\n\n' +
     'Are you sure?',
     ui.ButtonSet.YES_NO
   );
@@ -1426,7 +1431,7 @@ function NUKE_SEEDED_DATA() {
     return;
   }
 
-  ss.toast('Nuking seeded data...', '☢️ NUKE', 3);
+  ss.toast('Nuking seeded data... This will take 3-5 minutes. Please wait!', '☢️ NUKE', 10);
 
   try {
     var deletedMembers = 0;
@@ -1499,6 +1504,19 @@ function NUKE_SEEDED_DATA() {
       }
     }
 
+    // Delete _Audit_Log hidden sheet entirely
+    var auditLogToDelete = ss.getSheetByName(SHEETS.AUDIT_LOG);
+    var auditLogDeleted = false;
+    if (auditLogToDelete) {
+      try {
+        ss.deleteSheet(auditLogToDelete);
+        auditLogDeleted = true;
+        Logger.log('_Audit_Log sheet deleted');
+      } catch (e) {
+        Logger.log('Could not delete _Audit_Log sheet: ' + e.message);
+      }
+    }
+
     // Clear tracked IDs from Script Properties
     var props = PropertiesService.getScriptProperties();
     props.deleteProperty('SEEDED_MEMBER_IDS');
@@ -1515,6 +1533,7 @@ function NUKE_SEEDED_DATA() {
       (surveyCleared ? '• Survey responses cleared from Member Satisfaction\n' : '') +
       (feedbackDeleted ? '• Feedback & Development sheet deleted\n' : '') +
       (functionChecklistDeleted ? '• Function Checklist sheet deleted\n' : '') +
+      (auditLogDeleted ? '• _Audit_Log sheet deleted\n' : '') +
       '\nDemo mode has been permanently disabled.\n' +
       'Refresh the page to remove the Demo menu.\n\n' +
       '📌 NEXT STEP: Delete the "DeveloperTools.gs" file from the script editor.',
