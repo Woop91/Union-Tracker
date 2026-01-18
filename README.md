@@ -393,7 +393,7 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-- **4.3.8** - Searchable Help Guide: Modal help system with menu reference, FAQ, and real-time search
+- **4.3.8** - Searchable Help Guide & Modal Consolidation: Help modal with menu reference/FAQ, Member Satisfaction sheet hidden
 - **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
 - **4.3.6** - Full Row Styling: Zebra stripes and themes apply to all rows in data sheets
 - **4.3.5** - Production Polish: Demo menu fix, NUKE cleans docs and applies tab colors

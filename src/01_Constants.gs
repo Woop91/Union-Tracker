@@ -108,7 +108,7 @@ var VERSION_INFO = {
   PATCH: 8,
   BUILD: 'v4.3.8',
   CURRENT: '4.3.8',
-  CODENAME: 'Searchable Help Guide'
+CODENAME: 'Searchable Help Guide'
 };
 
 // ============================================================================
@@ -146,6 +146,8 @@ var SHEETS = {
   // Case Checklist
   CASE_CHECKLIST: 'Case Checklist',
   // Satisfaction & Feedback sheets
+  // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
+  // Data is preserved for modal access. Use removeDeprecatedTabs() to hide.
   SATISFACTION: '📊 Member Satisfaction',
   FEEDBACK: '💡 Feedback & Development',
   // Help & Documentation sheets
