@@ -821,8 +821,8 @@ function applyTabColors_(ss) {
     }
   });
 
-  // Purple tabs - Member Directory, Grievance Log
-  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG];
+  // Purple tabs - Member Directory, Grievance Log, Case Checklist
+  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG, SHEETS.CASE_CHECKLIST];
   purpleSheets.forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
@@ -864,6 +864,88 @@ function applyTabColors() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   applyTabColors_(ss);
   ss.toast('Tab colors applied!', 'Success', 3);
+}
+
+/**
+ * Applies different background colors to Config sheet sections for easy identification
+ * Each section gets a distinct color to make navigation easier
+ */
+function applyConfigSectionColors() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) {
+    SpreadsheetApp.getUi().alert('Config sheet not found!');
+    return;
+  }
+
+  // Section definitions with colors (column ranges are 1-indexed)
+  var sections = [
+    { name: 'Employment Info', startCol: 1, endCol: 5, color: '#e3f2fd' },      // Light Blue
+    { name: 'Supervision', startCol: 6, endCol: 7, color: '#fff3e0' },          // Light Orange
+    { name: 'Steward Info', startCol: 8, endCol: 9, color: '#e8f5e9' },         // Light Green
+    { name: 'Grievance Settings', startCol: 10, endCol: 13, color: '#fce4ec' }, // Light Pink
+    { name: 'Links & Coordinators', startCol: 14, endCol: 17, color: '#f3e5f5' }, // Light Purple
+    { name: 'Notifications', startCol: 18, endCol: 20, color: '#fff8e1' },      // Light Amber
+    { name: 'Organization', startCol: 21, endCol: 24, color: '#e0f7fa' },       // Light Cyan
+    { name: 'Integration', startCol: 25, endCol: 26, color: '#fbe9e7' },        // Light Deep Orange
+    { name: 'Deadlines', startCol: 27, endCol: 30, color: '#ffebee' },          // Light Red
+    { name: 'Multi-Select Options', startCol: 31, endCol: 32, color: '#e8eaf6' }, // Light Indigo
+    { name: 'Contract & Legal', startCol: 33, endCol: 36, color: '#f1f8e9' },   // Light Light Green
+    { name: 'Org Identity', startCol: 37, endCol: 39, color: '#eceff1' },       // Light Blue Grey
+    { name: 'Extended Contact', startCol: 40, endCol: 43, color: '#ede7f6' },   // Light Deep Purple
+    { name: 'Form Links', startCol: 44, endCol: 44, color: '#e1f5fe' },         // Light Light Blue
+    { name: 'Strategic Command Center', startCol: 45, endCol: 51, color: '#f9fbe7' } // Light Lime
+  ];
+
+  var lastRow = Math.max(configSheet.getLastRow(), 50); // At least 50 rows for visibility
+
+  // Apply colors to each section (all rows)
+  sections.forEach(function(section) {
+    var numCols = section.endCol - section.startCol + 1;
+    var range = configSheet.getRange(1, section.startCol, lastRow, numCols);
+    range.setBackground(section.color);
+  });
+
+  // Make header row (row 1) bold with darker background
+  sections.forEach(function(section) {
+    var numCols = section.endCol - section.startCol + 1;
+    var headerRange = configSheet.getRange(1, section.startCol, 1, numCols);
+    headerRange.setFontWeight('bold');
+    // Darken the header slightly
+    var darkerColor = darkenColor_(section.color, 15);
+    headerRange.setBackground(darkerColor);
+  });
+
+  // Make column header row (row 2) slightly different
+  sections.forEach(function(section) {
+    var numCols = section.endCol - section.startCol + 1;
+    var colHeaderRange = configSheet.getRange(2, section.startCol, 1, numCols);
+    colHeaderRange.setFontWeight('bold');
+    colHeaderRange.setFontStyle('italic');
+  });
+
+  ss.toast('Config section colors applied!', 'Success', 3);
+  Logger.log('Config section colors applied successfully');
+}
+
+/**
+ * Darkens a hex color by a percentage
+ * @param {string} color - Hex color (e.g., '#e3f2fd')
+ * @param {number} percent - Percentage to darken (0-100)
+ * @returns {string} Darkened hex color
+ * @private
+ */
+function darkenColor_(color, percent) {
+  var num = parseInt(color.replace('#', ''), 16);
+  var amt = Math.round(2.55 * percent);
+  var R = (num >> 16) - amt;
+  var G = (num >> 8 & 0x00FF) - amt;
+  var B = (num & 0x0000FF) - amt;
+  R = Math.max(0, R);
+  G = Math.max(0, G);
+  B = Math.max(0, B);
+  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
 }
 
 // ============================================================================
