@@ -8277,23 +8277,24 @@ function getUnifiedDashboardHtml(isPII) {
 
     // Satisfaction Tab (Enhanced)
     'else if(tab==="satisfaction"){' +
-    'var sat=d.satisfactionData;' +
-    'html="<div class=\\"sat-header\\"><h2 style=\\"color:#e2e8f0;font-size:16px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">sentiment_satisfied</i>Member Satisfaction Analysis</h2><span class=\\"sat-response-count\\">"+sat.responseCount+" Responses ("+d.engagement.surveyResponseRate+"% response rate)</span></div>";' +
-    'html+="<div class=\\"sat-grid\\">";' +
+    'var sat=d.satisfactionData||{responseCount:0,sections:[]};' +
+    'var surveyRate=d.engagement?d.engagement.surveyResponseRate:0;' +
+    'html="<div class=\\"sat-header\\"><h2 style=\\"color:#e2e8f0;font-size:16px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">sentiment_satisfied</i>Member Satisfaction Analysis</h2><span class=\\"sat-response-count\\">"+sat.responseCount+" Responses ("+surveyRate+"% response rate)</span></div>";' +
+    'if(!sat.sections||sat.sections.length===0){html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#64748b\\">poll</i><p style=\\"color:#94a3b8;margin-top:16px\\">No satisfaction survey data available yet.</p></div>"}' +
+    'else{html+="<div class=\\"sat-grid\\">";' +
     'sat.sections.forEach(function(section){' +
     'var scoreColor=section.score>=7?"#22c55e":section.score>=5?"#f59e0b":"#ef4444";' +
     'var pct=(section.score/10)*100;' +
-    'html+="<div class=\\"sat-section\\"><div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">"+section.name+"</span><span class=\\"sat-section-score\\" style=\\"color:"+scoreColor+"\\">"+section.score+"/10</span></div>";' +
+    'html+="<div class=\\"sat-section\\"><div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">"+section.name+"</span><span class=\\"sat-section-score\\" style=\\"color:"+scoreColor+"\\">"+(section.score||0)+"/10</span></div>";' +
     'html+="<div class=\\"sat-score-bar\\"><div class=\\"sat-score-fill\\" style=\\"width:"+pct+"%;background:"+scoreColor+"\\"></div></div>";' +
-    'html+="<div class=\\"sat-questions\\">";' +
-    'section.questions.forEach(function(q){html+=q+", "});' +
-    'html=html.slice(0,-2)+"</div></div>"});' +
+    'if(section.questions&&section.questions.length>0){html+="<div class=\\"sat-questions\\">"+section.questions.join(", ")+"</div>"}' +
+    'html+="</div>"});' +
     'html+="</div>";' +
-    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Scores Comparison</div><canvas id=\\"satChart\\"></canvas></div>";' +
-    'document.getElementById("main-content").innerHTML=html;renderSatisfactionChart()' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Scores Comparison</div><canvas id=\\"satChart\\"></canvas></div>"}' +
+    'document.getElementById("main-content").innerHTML=html;if(sat.sections&&sat.sections.length>0)renderSatisfactionChart()' +
     '}' +
 
-    // Resources Tab (NEW)
+    // Resources Tab (Enhanced with Steward Directory)
     'else if(tab==="resources"){' +
     'var dr=d.driveResources;' +
     'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">folder</i>Union Resources</h2>";' +
@@ -8301,9 +8302,20 @@ function getUnifiedDashboardHtml(isPII) {
     'if(dr.folderUrl){html+="<a href=\\""+dr.folderUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}' +
     'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contract PDF\\x27)\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
     'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Forms\\x27)\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contact Directory\\x27)\\"><div class=\\"resource-icon\\">📞</div><div class=\\"resource-title\\">Contacts</div><div class=\\"resource-desc\\">Steward and rep contact info</div></div>";' +
     'html+="</div>";' +
-    'if(dr.recentFiles.length>0){' +
+    // Steward Contact Directory
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">contacts</i>Steward Contact Directory</div>";' +
+    'html+="<input type=\\"text\\" id=\\"stewardSearch\\" placeholder=\\"Search by name or location...\\" oninput=\\"filterStewards()\\" style=\\"width:100%;padding:10px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\">";' +
+    'html+="<div id=\\"stewardList\\" class=\\"list-container\\" style=\\"max-height:300px\\">";' +
+    'if(d.stewardList&&d.stewardList.length>0){d.stewardList.forEach(function(s){' +
+    'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase()+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+s.name+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" onclick=\\"saveStewardContact(\\x27"+s.name+"\\x27,\\x27"+(s.email||"")+"\\x27,\\x27"+(s.phone||"")+"\\x27)\\">Save Contact</button></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+s.location+" | "+s.unit+"</div>";' +
+    'if(s.email){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#60a5fa\\">email</i> <a href=\\"mailto:"+s.email+"\\" style=\\"color:#60a5fa\\">"+s.email+"</a></div>"}' +
+    'if(s.phone){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#22c55e\\">phone</i> <a href=\\"tel:"+s.phone+"\\" style=\\"color:#22c55e\\">"+s.phone+"</a></div>"}' +
+    'html+="</div>"})}' +
+    'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">No steward contacts available</p>"}' +
+    'html+="</div></div>";' +
+    'if(dr.recentFiles&&dr.recentFiles.length>0){' +
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">description</i>Recent Files</div><div class=\\"list-container\\">";' +
     'dr.recentFiles.forEach(function(f){html+="<a href=\\""+f.url+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+f.name+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"});' +
     'html+="</div></div>"}' +
@@ -8413,6 +8425,28 @@ function getUnifiedDashboardHtml(isPII) {
     'else if(status==="Overdue"){el.style.display=el.getAttribute("data-overdue")==="yes"?"flex":"none"}' +
     'else{el.style.display=el.getAttribute("data-status").toLowerCase().indexOf(status.toLowerCase())>=0?"flex":"none"}' +
     '})' +
+    '}' +
+
+    // Filter Stewards by search (v4.4.0)
+    'function filterStewards(){' +
+    'var q=document.getElementById("stewardSearch").value.toLowerCase();' +
+    'document.querySelectorAll(".steward-contact").forEach(function(el){' +
+    'el.style.display=el.getAttribute("data-search").indexOf(q)>=0?"flex":"none"' +
+    '})' +
+    '}' +
+
+    // Save steward contact (v4.4.0)
+    'function saveStewardContact(name,email,phone){' +
+    'var vcard="BEGIN:VCARD\\nVERSION:3.0\\nFN:"+name+"\\nORG:SEIU Local 509\\nTITLE:Union Steward\\n";' +
+    'if(email)vcard+="EMAIL:"+email+"\\n";' +
+    'if(phone)vcard+="TEL:"+phone+"\\n";' +
+    'vcard+="END:VCARD";' +
+    'var blob=new Blob([vcard],{type:"text/vcard"});' +
+    'var url=URL.createObjectURL(blob);' +
+    'var a=document.createElement("a");' +
+    'a.href=url;a.download=name.replace(/\\s+/g,"_")+".vcf";' +
+    'document.body.appendChild(a);a.click();document.body.removeChild(a);' +
+    'URL.revokeObjectURL(url)' +
     '}' +
 
     '</script></body></html>';
