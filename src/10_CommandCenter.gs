@@ -783,8 +783,8 @@ function applyTabColors_(ss) {
     }
   });
 
-  // Purple tabs - Member Directory, Grievance Log
-  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG];
+  // Purple tabs - Member Directory, Grievance Log, Case Checklist
+  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG, SHEETS.CASE_CHECKLIST];
   purpleSheets.forEach(function(name) {
     var sheet = ss.getSheetByName(name);
     if (sheet) {
