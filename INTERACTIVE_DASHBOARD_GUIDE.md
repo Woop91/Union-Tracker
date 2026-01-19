@@ -14,24 +14,28 @@ The system now provides **two unified web app dashboards** with the same profess
 **Menu:** `509 Union Hub > Steward Dashboard`
 **Web App URL:** `?mode=steward`
 
-A comprehensive dashboard for stewards and leadership with **9 tabs**:
+A comprehensive dashboard for stewards and leadership with **11 tabs**:
 
 | Tab | Features |
 |-----|----------|
-| **Overview** | Clickable KPIs (members, stewards, open cases, win rate, overdue, morale), Filed vs Resolved chart |
+| **Overview** | Clickable KPIs (members, stewards, open cases, win rate, overdue, morale), Quick Insights panel (grievance status, hot spot alerts, engagement summary, bargaining position), secondary metrics row, Filed vs Resolved chart |
 | **My Cases** | Your assigned grievances with KPIs (active, urgent, avg days), status filtering |
 | **Workload** | Steward caseload distribution, Member:Steward ratio, Top Performers section |
 | **Analytics** | Grievance outcomes, engagement metrics (email open rate, meeting attendance, volunteer hours, union interest) |
 | **Directory** | Member contact trends, recent updates, stale contacts, missing email/phone, recent meeting attendees |
-| **Hot Spots** | Locations with 3+ active grievances |
-| **Bargaining** | Step 1 denial rate, settlement time, article violations, step progression |
-| **Satisfaction** | 8-section member satisfaction survey analysis with scores |
-| **Resources** | Google Drive folder access, forms, contracts, contact info |
+| **Hot Spots** | 4 types of hot spots with explanations: Grievance (3+ active cases), Dissatisfaction (score < 5), Low Engagement (< 30%), Overdue Concentration (2+ overdue) |
+| **Bargaining** | Step 1 & Step 2 denial rates, detailed step progression table with outcomes (won/denied/settled/pending/withdrawn), success rates, cases at Step 1/2 lists, recent grievances |
+| **Satisfaction** | 8-section analysis with individual question scores, expandable section details, complete question breakdown table |
+| **Resources** | Google Drive folder access, forms, contracts, steward directory with search |
+| **Compare** | Period comparison (current vs previous 30 days), step-by-step grievance comparison table, satisfaction section comparison, denial rate analysis, CSV export |
+| **Help** | Comprehensive FAQ with 4 categories and 12+ questions |
 
 **Additional Features:**
 - **Help/FAQ Button** - Comprehensive help modal with 4 categories and 12+ questions
 - **Searchable Modals** - Click-through lists include search functionality
 - **Filed vs Resolved Chart** - Monthly trend showing both filed and resolved grievances
+- **Individual Question Scores** - All 40+ survey questions scored and displayed
+- **Hot Spot Explanations** - Clear descriptions of what each hot spot type means
 
 > **Contains PII:** This dashboard shows member names and steward details. For internal use only.
 
@@ -39,17 +43,17 @@ A comprehensive dashboard for stewards and leadership with **9 tabs**:
 **Menu:** `509 Union Hub > Member Dashboard`
 **Web App URL:** `?mode=member`
 
-A PII-safe dashboard for sharing with members - **8 tabs** with anonymized data:
+A PII-safe dashboard for sharing with members - **9 tabs** with anonymized data:
 
 | Feature | Description |
 |---------|-------------|
 | **Same Dark Theme** | Identical professional dark gradient interface |
-| **8 Tabs** | Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources |
-| **No My Cases** | My Cases tab is steward-only (requires PII) |
+| **9 Tabs** | Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare |
+| **No My Cases or Help** | My Cases and Help tabs are steward-only (requires PII) |
 | **Anonymized Data** | Member names replaced with "Member 1", "Member 2", etc. |
 | **Aggregate Stats** | Individual data rolled up to percentages and totals |
 | **PII Masking** | Phone numbers and SSNs automatically scrubbed |
-| **Help/FAQ Button** | Same comprehensive help available |
+| **All Enhanced Features** | Same Quick Insights, Hot Spot types, Bargaining details, Satisfaction question breakdown, and Compare tab as steward version |
 
 > **No PII:** Uses Safety Valve scrubbing for phone numbers and SSNs.
 
@@ -601,7 +605,7 @@ Potential additions (from Future Features sheet):
 ---
 
 **Created for SEIU Local 509 (Units 8 & 10)**
-**Version:** 4.4.0
+**Version:** 4.4.1
 **Last Updated:** January 2026
 
 *Empowering union representatives with data-driven insights* 📊✊

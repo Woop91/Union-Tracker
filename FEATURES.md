@@ -1,6 +1,6 @@
 # 509 Strategic Command Center - Complete Features Reference
 
-**Version:** 4.3.8 | **Codename:** Strategic Command Center
+**Version:** 4.4.1 | **Codename:** Strategic Command Center
 **Last Updated:** January 2026
 
 This document provides a comprehensive, searchable reference of all features in the 509 Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
@@ -44,12 +44,17 @@ This document provides a comprehensive, searchable reference of all features in 
 
 | Tab | Description | Key Metrics |
 |-----|-------------|-------------|
-| **Overview** | High-level union health metrics | Active grievances, win rate, member count, satisfaction score |
-| **Workload** | Steward case distribution and capacity | Cases per steward, overload warnings (8+ cases) |
-| **Analytics** | Grievance trends and patterns | Status breakdown, step distribution, resolution times |
-| **Hot Spots** | Problem areas requiring attention | Units with 3+ active grievances, repeat offenders |
-| **Bargaining** | Contract negotiation intelligence | Denial patterns, common violations, leverage points |
-| **Satisfaction** | 8-section member satisfaction analysis | Survey scores, trends, question breakdowns |
+| **Overview** | High-level union health metrics with Quick Insights panel | Active grievances, win rate, member count, morale score, engagement summary, bargaining position |
+| **My Cases** | Steward's assigned grievances (PII mode only) | Active cases, urgent count, avg days open, filtering by status |
+| **Workload** | Steward case distribution and capacity | Cases per steward, overload warnings (8+ cases), top performers |
+| **Analytics** | Grievance trends and patterns | Status breakdown, engagement metrics, volunteer hours |
+| **Directory** | Member contact trends and data quality | Recent updates, stale contacts, missing email/phone |
+| **Hot Spots** | Problem areas with 4 hot spot types | Grievance clusters, dissatisfaction areas, low engagement zones, overdue concentrations |
+| **Bargaining** | Comprehensive bargaining intelligence | Step 1/2 denial rates, step outcomes, case details at each step, recent grievances |
+| **Satisfaction** | 8-section member satisfaction with individual question scores | Section scores, question breakdowns, expandable details |
+| **Resources** | Union documents and steward contacts | Google Drive folder, steward directory with search |
+| **Compare** | Dashboard comparison and export tool | Period comparison, step-by-step breakdown, satisfaction comparison, denial rate analysis, CSV export |
+| **Help** | FAQ and documentation (PII mode only) | Searchable help with 4 categories and 12+ questions |
 
 ---
 

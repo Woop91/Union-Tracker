@@ -7393,6 +7393,13 @@ function getUnifiedDashboardData(includePII) {
     officeDaysBreakdown: {},
     stewardWorkload: [],
     hotZones: [],
+    // Enhanced Hot Spots (multiple types)
+    hotSpots: {
+      grievance: [],        // Locations with 3+ active grievances
+      dissatisfaction: [],  // Locations/units with satisfaction < 5
+      lowEngagement: [],    // Locations/units with engagement < 30%
+      overdueConcentration: [] // Locations with multiple overdue cases
+    },
 
     // Participation/Engagement by dimensions (for heatmaps)
     participationByUnit: {},      // { unitName: { emailRate, meetingRate, count } }
@@ -7426,17 +7433,27 @@ function getUnifiedDashboardData(includePII) {
       recentMeetingAttendees: []  // Members who attended recently
     },
 
-    // Bargaining Data
+    // Bargaining Data (Enhanced)
     step1DenialRate: 0,
+    step2DenialRate: 0,
     avgSettlementDays: 0,
     topViolatedArticle: 'N/A',
     articleViolations: {},
     stepProgression: { step1: 0, step2: 0, step3: 0, arb: 0 },
     resolutionByStep: { step1Resolved: 0, step2Resolved: 0, step3Resolved: 0, arbResolved: 0 },
+    stepOutcomes: {
+      step1: { won: 0, denied: 0, settled: 0, withdrawn: 0, pending: 0 },
+      step2: { won: 0, denied: 0, settled: 0, withdrawn: 0, pending: 0 },
+      step3: { won: 0, denied: 0, settled: 0, withdrawn: 0, pending: 0 },
+      arb: { won: 0, denied: 0, settled: 0, withdrawn: 0, pending: 0 }
+    },
+    avgDaysAtStep: { step1: 0, step2: 0, step3: 0, arb: 0 },
     managementResponseTime: 0,
     grievancesByCategory: {},
     monthlyFilings: [],
     monthlyResolved: [],  // v4.4.0 - For Filed vs Resolved chart
+    recentGrievances: [],  // Last 10 grievances for display
+    stepCaseDetails: { step1: [], step2: [], step3: [], arb: [] },  // Cases at each step
 
     // Chart Data
     statusDistribution: { open: 0, pending: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 },
@@ -7452,21 +7469,70 @@ function getUnifiedDashboardData(includePII) {
       stewardByCase: {}        // { steward: [cases] }
     },
 
-    // Satisfaction Survey Data (Enhanced)
+    // Satisfaction Survey Data (Enhanced with individual question scores)
     satisfactionData: {
       responseCount: 0,
       sections: [
-        { name: 'Overall Satisfaction', key: 'overall', score: 0, questions: ['Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Recommend'] },
-        { name: 'Steward Ratings', key: 'steward', score: 0, questions: ['Timely Response', 'Treated Respect', 'Explained Options', 'Followed Through', 'Advocated', 'Safe Concerns', 'Confidentiality'] },
-        { name: 'Chapter Effectiveness', key: 'chapter', score: 0, questions: ['Understand Issues', 'Chapter Comm', 'Organizes', 'Reach Chapter', 'Fair Rep'] },
-        { name: 'Local Leadership', key: 'leadership', score: 0, questions: ['Decisions Clear', 'Understand Process', 'Transparent Finance', 'Accountable', 'Fair Processes', 'Welcomes Opinions'] },
-        { name: 'Contract Enforcement', key: 'contract', score: 0, questions: ['Enforces Contract', 'Realistic Timelines', 'Clear Updates', 'Frontline Priority'] },
-        { name: 'Communication Quality', key: 'communication', score: 0, questions: ['Clear Actionable', 'Enough Info', 'Find Easily', 'All Shifts', 'Meetings Worth'] },
-        { name: 'Member Voice', key: 'voice', score: 0, questions: ['Voice Matters', 'Seeks Input', 'Dignity', 'Newer Supported', 'Conflict Respect'] },
-        { name: 'Value & Action', key: 'value', score: 0, questions: ['Good Value', 'Priorities Needs', 'Prepared Mobilize', 'Win Together'] }
+        { name: 'Overall Satisfaction', key: 'overall', score: 0, questions: [
+          { label: 'Satisfied with Rep', key: 'q6', score: 0 },
+          { label: 'Trust Union', key: 'q7', score: 0 },
+          { label: 'Feel Protected', key: 'q8', score: 0 },
+          { label: 'Recommend to Colleague', key: 'q9', score: 0 }
+        ]},
+        { name: 'Steward Ratings', key: 'steward', score: 0, questions: [
+          { label: 'Timely Response', key: 'q10', score: 0 },
+          { label: 'Treated with Respect', key: 'q11', score: 0 },
+          { label: 'Explained Options', key: 'q12', score: 0 },
+          { label: 'Followed Through', key: 'q13', score: 0 },
+          { label: 'Advocated Effectively', key: 'q14', score: 0 },
+          { label: 'Safe to Raise Concerns', key: 'q15', score: 0 },
+          { label: 'Maintained Confidentiality', key: 'q16', score: 0 }
+        ]},
+        { name: 'Chapter Effectiveness', key: 'chapter', score: 0, questions: [
+          { label: 'Understands Workplace Issues', key: 'q21', score: 0 },
+          { label: 'Communicates Effectively', key: 'q22', score: 0 },
+          { label: 'Organizes Events/Actions', key: 'q23', score: 0 },
+          { label: 'Easy to Reach', key: 'q24', score: 0 },
+          { label: 'Fair Representation', key: 'q25', score: 0 }
+        ]},
+        { name: 'Local Leadership', key: 'leadership', score: 0, questions: [
+          { label: 'Decisions Explained Clearly', key: 'q26', score: 0 },
+          { label: 'Understand Decision Process', key: 'q27', score: 0 },
+          { label: 'Financial Transparency', key: 'q28', score: 0 },
+          { label: 'Leadership Accountable', key: 'q29', score: 0 },
+          { label: 'Fair Internal Processes', key: 'q30', score: 0 },
+          { label: 'Welcomes Member Opinions', key: 'q31', score: 0 }
+        ]},
+        { name: 'Contract Enforcement', key: 'contract', score: 0, questions: [
+          { label: 'Actively Enforces Contract', key: 'q32', score: 0 },
+          { label: 'Realistic Timelines', key: 'q33', score: 0 },
+          { label: 'Clear Updates on Cases', key: 'q34', score: 0 },
+          { label: 'Frontline Workers Priority', key: 'q35', score: 0 }
+        ]},
+        { name: 'Communication Quality', key: 'communication', score: 0, questions: [
+          { label: 'Clear & Actionable', key: 'q41', score: 0 },
+          { label: 'Enough Information', key: 'q42', score: 0 },
+          { label: 'Easy to Find Info', key: 'q43', score: 0 },
+          { label: 'Reaches All Shifts', key: 'q44', score: 0 },
+          { label: 'Meetings Worth Attending', key: 'q45', score: 0 }
+        ]},
+        { name: 'Member Voice', key: 'voice', score: 0, questions: [
+          { label: 'Voice Matters', key: 'q46', score: 0 },
+          { label: 'Seeks Member Input', key: 'q47', score: 0 },
+          { label: 'Treated with Dignity', key: 'q48', score: 0 },
+          { label: 'Newer Members Supported', key: 'q49', score: 0 },
+          { label: 'Conflicts Handled Respectfully', key: 'q50', score: 0 }
+        ]},
+        { name: 'Value & Action', key: 'value', score: 0, questions: [
+          { label: 'Good Value for Dues', key: 'q51', score: 0 },
+          { label: 'Priorities Match Needs', key: 'q52', score: 0 },
+          { label: 'Prepared to Mobilize', key: 'q53', score: 0 },
+          { label: 'Believe We Can Win', key: 'q55', score: 0 }
+        ]}
       ],
       trendByMonth: [],
-      questionBreakdown: {}
+      questionBreakdown: {},
+      allQuestionScores: {}  // Individual question scores
     },
 
     // Google Drive Resources
@@ -7685,8 +7751,11 @@ function getUnifiedDashboardData(includePII) {
   // Process Grievances
   var stewardCases = {};
   var locationCases = {};
+  var locationOverdue = {};  // Track overdue by location
   var step1Total = 0, step1Denials = 0;
+  var step2Total = 0, step2Denials = 0;
   var settlementDays = [];
+  var stepDays = { step1: [], step2: [], step3: [], arb: [] };  // Days at each step
   var mgmtResponseDays = [];
   var monthlyFilingsMap = {};
   var monthlyResolvedMap = {};  // v4.4.0 - Track resolved by month
@@ -7776,11 +7845,41 @@ function getUnifiedDashboardData(includePII) {
       if (!data.chartDrillDown.categoryByCase[category]) data.chartDrillDown.categoryByCase[category] = [];
       data.chartDrillDown.categoryByCase[category].push(caseSummary);
 
-      // Step progression
-      if (currentStep.toLowerCase().includes('step 1')) data.stepProgression.step1++;
-      else if (currentStep.toLowerCase().includes('step 2')) data.stepProgression.step2++;
-      else if (currentStep.toLowerCase().includes('step 3')) data.stepProgression.step3++;
-      else if (currentStep.toLowerCase().includes('arb')) data.stepProgression.arb++;
+      // Step progression with detailed tracking
+      var statusLower = status.toLowerCase();
+      var currentStepKey = null;
+      if (currentStep.toLowerCase().includes('step 1')) {
+        data.stepProgression.step1++;
+        currentStepKey = 'step1';
+      } else if (currentStep.toLowerCase().includes('step 2')) {
+        data.stepProgression.step2++;
+        currentStepKey = 'step2';
+      } else if (currentStep.toLowerCase().includes('step 3')) {
+        data.stepProgression.step3++;
+        currentStepKey = 'step3';
+      } else if (currentStep.toLowerCase().includes('arb')) {
+        data.stepProgression.arb++;
+        currentStepKey = 'arb';
+      }
+
+      // Track outcomes at each step
+      if (currentStepKey) {
+        var displayMemberStep = includePII ? memberName : 'Member';
+        var caseDetail = { id: grievanceId, member: displayMemberStep, category: category, location: gLocation, status: status, daysOpen: grievanceData[g][GRIEVANCE_COLS.DAYS_OPEN - 1] || 0 };
+        data.stepCaseDetails[currentStepKey].push(caseDetail);
+
+        if (statusLower === 'won') data.stepOutcomes[currentStepKey].won++;
+        else if (statusLower === 'denied') data.stepOutcomes[currentStepKey].denied++;
+        else if (statusLower === 'settled') data.stepOutcomes[currentStepKey].settled++;
+        else if (statusLower === 'withdrawn') data.stepOutcomes[currentStepKey].withdrawn++;
+        else data.stepOutcomes[currentStepKey].pending++;
+      }
+
+      // Track Step 2 denial rate
+      if (grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) {
+        step2Total++;
+        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_3_DATE - 1]) step2Denials++;
+      }
 
       // Open cases list for drill-down (member hidden in non-PII, steward always shown)
       if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info' || status.toLowerCase() === 'pending') {
@@ -7869,6 +7968,15 @@ function getUnifiedDashboardData(includePII) {
         data.overdueCount++;
         var displayMemberOverdue = includePII ? memberName : 'Member';
         data.overdueList.push({ id: grievanceId, member: displayMemberOverdue, steward: steward, step: currentStep, dueDate: step1Due });
+        // Track overdue by location for hot spots
+        if (!locationOverdue[gLocation]) locationOverdue[gLocation] = 0;
+        locationOverdue[gLocation]++;
+      }
+
+      // Track recent grievances for display (last 10)
+      if (data.recentGrievances.length < 10) {
+        var displayMemberRecent = includePII ? memberName : 'Member';
+        data.recentGrievances.push({ id: grievanceId, member: displayMemberRecent, category: category, status: status, step: currentStep, location: gLocation, dateFiled: dateFiled });
       }
     }
   }
@@ -7877,6 +7985,7 @@ function getUnifiedDashboardData(includePII) {
   var totalClosed = data.wins + data.losses + data.settled;
   data.winRate = totalClosed > 0 ? Math.round((data.wins / totalClosed) * 100) : 0;
   data.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
+  data.step2DenialRate = step2Total > 0 ? Math.round((step2Denials / step2Total) * 100) : 0;
   data.avgSettlementDays = settlementDays.length > 0 ? Math.round(settlementDays.reduce(function(a,b){return a+b;},0) / settlementDays.length) : 0;
 
   // Calculate previous period comparison metrics
@@ -7900,9 +8009,18 @@ function getUnifiedDashboardData(includePII) {
   for (var loc in locationCases) {
     if (locationCases[loc] >= 3) {
       data.hotZones.push({ location: loc, count: locationCases[loc] });
+      data.hotSpots.grievance.push({ name: loc, type: 'location', count: locationCases[loc], reason: 'High grievance activity' });
     }
   }
   data.hotZones.sort(function(a,b){return b.count - a.count;});
+
+  // Build overdue concentration hot spots (locations with 2+ overdue)
+  for (var overdLoc in locationOverdue) {
+    if (locationOverdue[overdLoc] >= 2) {
+      data.hotSpots.overdueConcentration.push({ name: overdLoc, type: 'location', count: locationOverdue[overdLoc], reason: 'Multiple overdue cases' });
+    }
+  }
+  data.hotSpots.overdueConcentration.sort(function(a,b){return b.count - a.count;});
 
   // Top violated article
   var maxViolations = 0;
@@ -7959,6 +8077,18 @@ function getUnifiedDashboardData(includePII) {
     var satByWorksite = {};  // { worksite: { scores: [], count: 0 } }
     var satByRole = {};      // { role: { scores: [], count: 0 } }
 
+    // Individual question score accumulators
+    var questionScores = {
+      q6: [], q7: [], q8: [], q9: [],  // Overall
+      q10: [], q11: [], q12: [], q13: [], q14: [], q15: [], q16: [],  // Steward
+      q21: [], q22: [], q23: [], q24: [], q25: [],  // Chapter
+      q26: [], q27: [], q28: [], q29: [], q30: [], q31: [],  // Leadership
+      q32: [], q33: [], q34: [], q35: [],  // Contract
+      q41: [], q42: [], q43: [], q44: [], q45: [],  // Communication
+      q46: [], q47: [], q48: [], q49: [], q50: [],  // Voice
+      q51: [], q52: [], q53: [], q55: []  // Value
+    };
+
     for (var i = 1; i < satData.length; i++) {
       if (!satData[i][0]) continue;
       data.satisfactionData.responseCount++;
@@ -7980,6 +8110,57 @@ function getUnifiedDashboardData(includePII) {
           monthlyTrust[monthKey].count++;
         }
       }
+
+      // Collect individual question scores (columns are 0-indexed, so Q6 is column 6)
+      var qVal;
+      // Overall Satisfaction questions
+      qVal = parseFloat(satData[i][6]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q6.push(qVal);
+      qVal = parseFloat(satData[i][7]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q7.push(qVal);
+      qVal = parseFloat(satData[i][8]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q8.push(qVal);
+      qVal = parseFloat(satData[i][9]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q9.push(qVal);
+      // Steward questions
+      qVal = parseFloat(satData[i][10]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q10.push(qVal);
+      qVal = parseFloat(satData[i][11]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q11.push(qVal);
+      qVal = parseFloat(satData[i][12]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q12.push(qVal);
+      qVal = parseFloat(satData[i][13]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q13.push(qVal);
+      qVal = parseFloat(satData[i][14]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q14.push(qVal);
+      qVal = parseFloat(satData[i][15]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q15.push(qVal);
+      qVal = parseFloat(satData[i][16]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q16.push(qVal);
+      // Chapter questions
+      qVal = parseFloat(satData[i][21]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q21.push(qVal);
+      qVal = parseFloat(satData[i][22]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q22.push(qVal);
+      qVal = parseFloat(satData[i][23]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q23.push(qVal);
+      qVal = parseFloat(satData[i][24]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q24.push(qVal);
+      qVal = parseFloat(satData[i][25]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q25.push(qVal);
+      // Leadership questions
+      qVal = parseFloat(satData[i][26]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q26.push(qVal);
+      qVal = parseFloat(satData[i][27]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q27.push(qVal);
+      qVal = parseFloat(satData[i][28]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q28.push(qVal);
+      qVal = parseFloat(satData[i][29]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q29.push(qVal);
+      qVal = parseFloat(satData[i][30]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q30.push(qVal);
+      qVal = parseFloat(satData[i][31]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q31.push(qVal);
+      // Contract questions
+      qVal = parseFloat(satData[i][32]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q32.push(qVal);
+      qVal = parseFloat(satData[i][33]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q33.push(qVal);
+      qVal = parseFloat(satData[i][34]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q34.push(qVal);
+      qVal = parseFloat(satData[i][35]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q35.push(qVal);
+      // Communication questions
+      qVal = parseFloat(satData[i][41]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q41.push(qVal);
+      qVal = parseFloat(satData[i][42]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q42.push(qVal);
+      qVal = parseFloat(satData[i][43]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q43.push(qVal);
+      qVal = parseFloat(satData[i][44]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q44.push(qVal);
+      qVal = parseFloat(satData[i][45]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q45.push(qVal);
+      // Voice questions
+      qVal = parseFloat(satData[i][46]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q46.push(qVal);
+      qVal = parseFloat(satData[i][47]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q47.push(qVal);
+      qVal = parseFloat(satData[i][48]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q48.push(qVal);
+      qVal = parseFloat(satData[i][49]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q49.push(qVal);
+      qVal = parseFloat(satData[i][50]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q50.push(qVal);
+      // Value questions
+      qVal = parseFloat(satData[i][51]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q51.push(qVal);
+      qVal = parseFloat(satData[i][52]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q52.push(qVal);
+      qVal = parseFloat(satData[i][53]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q53.push(qVal);
+      qVal = parseFloat(satData[i][55]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q55.push(qVal);
 
       // Section averages
       var avgOverall = parseFloat(satData[i][71]) || 0;
@@ -8031,6 +8212,53 @@ function getUnifiedDashboardData(includePII) {
     data.satisfactionData.sections[6].score = avg(sectionScores.voice);
     data.satisfactionData.sections[7].score = avg(sectionScores.value);
 
+    // Calculate individual question scores and populate section questions
+    data.satisfactionData.allQuestionScores = {};
+    for (var qKey in questionScores) {
+      data.satisfactionData.allQuestionScores[qKey] = avg(questionScores[qKey]);
+    }
+    // Populate scores in sections
+    data.satisfactionData.sections[0].questions[0].score = avg(questionScores.q6);
+    data.satisfactionData.sections[0].questions[1].score = avg(questionScores.q7);
+    data.satisfactionData.sections[0].questions[2].score = avg(questionScores.q8);
+    data.satisfactionData.sections[0].questions[3].score = avg(questionScores.q9);
+    data.satisfactionData.sections[1].questions[0].score = avg(questionScores.q10);
+    data.satisfactionData.sections[1].questions[1].score = avg(questionScores.q11);
+    data.satisfactionData.sections[1].questions[2].score = avg(questionScores.q12);
+    data.satisfactionData.sections[1].questions[3].score = avg(questionScores.q13);
+    data.satisfactionData.sections[1].questions[4].score = avg(questionScores.q14);
+    data.satisfactionData.sections[1].questions[5].score = avg(questionScores.q15);
+    data.satisfactionData.sections[1].questions[6].score = avg(questionScores.q16);
+    data.satisfactionData.sections[2].questions[0].score = avg(questionScores.q21);
+    data.satisfactionData.sections[2].questions[1].score = avg(questionScores.q22);
+    data.satisfactionData.sections[2].questions[2].score = avg(questionScores.q23);
+    data.satisfactionData.sections[2].questions[3].score = avg(questionScores.q24);
+    data.satisfactionData.sections[2].questions[4].score = avg(questionScores.q25);
+    data.satisfactionData.sections[3].questions[0].score = avg(questionScores.q26);
+    data.satisfactionData.sections[3].questions[1].score = avg(questionScores.q27);
+    data.satisfactionData.sections[3].questions[2].score = avg(questionScores.q28);
+    data.satisfactionData.sections[3].questions[3].score = avg(questionScores.q29);
+    data.satisfactionData.sections[3].questions[4].score = avg(questionScores.q30);
+    data.satisfactionData.sections[3].questions[5].score = avg(questionScores.q31);
+    data.satisfactionData.sections[4].questions[0].score = avg(questionScores.q32);
+    data.satisfactionData.sections[4].questions[1].score = avg(questionScores.q33);
+    data.satisfactionData.sections[4].questions[2].score = avg(questionScores.q34);
+    data.satisfactionData.sections[4].questions[3].score = avg(questionScores.q35);
+    data.satisfactionData.sections[5].questions[0].score = avg(questionScores.q41);
+    data.satisfactionData.sections[5].questions[1].score = avg(questionScores.q42);
+    data.satisfactionData.sections[5].questions[2].score = avg(questionScores.q43);
+    data.satisfactionData.sections[5].questions[3].score = avg(questionScores.q44);
+    data.satisfactionData.sections[5].questions[4].score = avg(questionScores.q45);
+    data.satisfactionData.sections[6].questions[0].score = avg(questionScores.q46);
+    data.satisfactionData.sections[6].questions[1].score = avg(questionScores.q47);
+    data.satisfactionData.sections[6].questions[2].score = avg(questionScores.q48);
+    data.satisfactionData.sections[6].questions[3].score = avg(questionScores.q49);
+    data.satisfactionData.sections[6].questions[4].score = avg(questionScores.q50);
+    data.satisfactionData.sections[7].questions[0].score = avg(questionScores.q51);
+    data.satisfactionData.sections[7].questions[1].score = avg(questionScores.q52);
+    data.satisfactionData.sections[7].questions[2].score = avg(questionScores.q53);
+    data.satisfactionData.sections[7].questions[3].score = avg(questionScores.q55);
+
     if (trustScores.length > 0) {
       data.moraleScore = Math.round((trustScores.reduce(function(a,b){return a+b;},0) / trustScores.length) * 10) / 10;
     }
@@ -8047,11 +8275,17 @@ function getUnifiedDashboardData(includePII) {
 
     // Calculate satisfaction by worksite (maps to location)
     for (var ws in satByWorksite) {
+      var wsScore = avg(satByWorksite[ws].scores);
       data.satisfactionByLocation[ws] = {
-        score: avg(satByWorksite[ws].scores),
+        score: wsScore,
         count: satByWorksite[ws].count
       };
+      // Track dissatisfaction hot spots (score < 5)
+      if (wsScore > 0 && wsScore < 5) {
+        data.hotSpots.dissatisfaction.push({ name: ws, type: 'location', score: wsScore, count: satByWorksite[ws].count, reason: 'Low satisfaction score' });
+      }
     }
+    data.hotSpots.dissatisfaction.sort(function(a,b){return a.score - b.score;});
 
     // Calculate satisfaction by role (maps to unit)
     for (var rl in satByRole) {
@@ -8061,6 +8295,23 @@ function getUnifiedDashboardData(includePII) {
       };
     }
   }
+
+  // Build low engagement hot spots from participation data
+  for (var engLoc in data.participationByLocation) {
+    var engData = data.participationByLocation[engLoc];
+    var avgEngagement = (engData.emailRate + engData.meetingRate) / 2;
+    if (avgEngagement < 30 && engData.count >= 5) {  // Less than 30% engagement, at least 5 members
+      data.hotSpots.lowEngagement.push({ name: engLoc, type: 'location', engagement: Math.round(avgEngagement), count: engData.count, reason: 'Low member engagement' });
+    }
+  }
+  for (var engUnit in data.participationByUnit) {
+    var engUnitData = data.participationByUnit[engUnit];
+    var avgUnitEngagement = (engUnitData.emailRate + engUnitData.meetingRate) / 2;
+    if (avgUnitEngagement < 30 && engUnitData.count >= 5) {
+      data.hotSpots.lowEngagement.push({ name: engUnit, type: 'unit', engagement: Math.round(avgUnitEngagement), count: engUnitData.count, reason: 'Low member engagement' });
+    }
+  }
+  data.hotSpots.lowEngagement.sort(function(a,b){return a.engagement - b.engagement;});
 
   // Get Google Drive resources folder from Config tab (column AU / 47)
   try {
@@ -8592,11 +8843,12 @@ function getUnifiedDashboardHtml(isPII) {
     'function renderTab(tab){' +
     'var d=dashData,html="";' +
 
-    // Overview Tab with trend arrows, goal progress, and pin buttons
+    // Overview Tab with trend arrows, goal progress, pin buttons, and enhanced insights
     'if(tab==="overview"){' +
     'var goals=JSON.parse(localStorage.getItem("509_goals")||"{}");' +
     'var winTarget=goals.winRate||75,moraleTarget=goals.morale||8,responseTarget=goals.response||50;' +
     'var isPinned=function(k){return pinnedMetrics.some(function(p){return p.key===k})};' +
+    // Primary KPIs
     'html="<div class=\\"kpi-grid\\">";' +
     'html+="<div class=\\"kpi-card clickable "+(isPinned("members")?"pinned":"")+"\\" onclick=\\"showList(\\x27members\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27members\\x27,\\x27Members\\x27,"+d.totalMembers+",\\x27#3b82f6\\x27)\\"><i class=\\"material-icons\\">"+(isPinned("members")?"push_pin":"push_pin")+"</i></button><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
     'html+="<div class=\\"kpi-card clickable "+(isPinned("stewards")?"pinned":"")+"\\" onclick=\\"showList(\\x27stewards\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27stewards\\x27,\\x27Stewards\\x27,"+d.stewardCount+",\\x27#a855f7\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
@@ -8605,6 +8857,33 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+" "+(isPinned("overdue")?"pinned":"")+"\\" onclick=\\"showList(\\x27overdue\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27overdue\\x27,\\x27Overdue\\x27,"+d.overdueCount+",\\x27#ef4444\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+(d.prevOverdueCount!==undefined?getTrendArrow(d.prevOverdueCount,d.overdueCount):"")+"</div></div>";' +
     'html+="<div class=\\"kpi-card "+(isPinned("morale")?"pinned":"")+"\\"><button class=\\"pin-btn\\" onclick=\\"togglePin(\\x27morale\\x27,\\x27Morale\\x27,"+d.moraleScore+",\\x27#22c55e\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Morale <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+moraleTarget+")</span></div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+(d.prevMoraleScore!==undefined?getTrendArrow(d.moraleScore,d.prevMoraleScore):"")+"</div>"+getGoalBar(d.moraleScore*10,moraleTarget*10)+"</div>";' +
     'html+="</div>";' +
+    // Quick Insights Panel
+    'html+="<div class=\\"chart-card\\" style=\\"margin-bottom:16px;background:linear-gradient(135deg,rgba(96,165,250,0.08),rgba(139,92,246,0.08))\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">lightbulb</i>Quick Insights</div><div style=\\"display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px\\">";' +
+    // Insight 1: Grievance Status
+    'var totalActive=d.openGrievances+(d.pendingCases||0);' +
+    'html+="<div style=\\"padding:12px;background:rgba(96,165,250,0.1);border-radius:8px;border-left:3px solid #60a5fa\\"><div style=\\"font-size:11px;color:#60a5fa;font-weight:600\\">GRIEVANCE STATUS</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+totalActive+" active cases | "+d.totalGrievances+" total all-time</div><div style=\\"font-size:10px;color:#94a3b8;margin-top:2px\\">Won: "+d.wins+" | Denied: "+d.losses+" | Settled: "+d.settled+"</div></div>";' +
+    // Insight 2: Hot Spot Alert
+    'var hsCount=d.hotSpots?(d.hotSpots.grievance?d.hotSpots.grievance.length:0)+(d.hotSpots.dissatisfaction?d.hotSpots.dissatisfaction.length:0):d.hotZones.length;' +
+    'var hsColor=hsCount>0?"#ef4444":"#22c55e";' +
+    'html+="<div style=\\"padding:12px;background:rgba("+(hsCount>0?"239,68,68":"34,197,94")+",0.1);border-radius:8px;border-left:3px solid "+hsColor+"\\"><div style=\\"font-size:11px;color:"+hsColor+";font-weight:600\\">HOT SPOTS</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+(hsCount>0?hsCount+" areas need attention":"No hot spots - All clear!")+"</div><div style=\\"font-size:10px;color:#94a3b8;margin-top:2px\\">Grievance clusters, dissatisfaction, low engagement</div></div>";' +
+    // Insight 3: Engagement Summary
+    'var avgEngagement=Math.round((d.engagement.emailOpenRate+d.engagement.virtualMeetingRate+d.engagement.inPersonMeetingRate)/3);' +
+    'var engColor=avgEngagement>=40?"#22c55e":avgEngagement>=25?"#f59e0b":"#ef4444";' +
+    'html+="<div style=\\"padding:12px;background:rgba("+(avgEngagement>=40?"34,197,94":avgEngagement>=25?"245,158,11":"239,68,68")+",0.1);border-radius:8px;border-left:3px solid "+engColor+"\\"><div style=\\"font-size:11px;color:"+engColor+";font-weight:600\\">ENGAGEMENT</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+avgEngagement+"% average engagement</div><div style=\\"font-size:10px;color:#94a3b8;margin-top:2px\\">Email: "+d.engagement.emailOpenRate+"% | Meetings: "+(d.engagement.virtualMeetingRate+d.engagement.inPersonMeetingRate)+"%</div></div>";' +
+    // Insight 4: Bargaining Position
+    'var bargainColor=d.step1DenialRate>60?"#ef4444":d.step1DenialRate>40?"#f59e0b":"#22c55e";' +
+    'html+="<div style=\\"padding:12px;background:rgba("+(d.step1DenialRate>60?"239,68,68":d.step1DenialRate>40?"245,158,11":"34,197,94")+",0.1);border-radius:8px;border-left:3px solid "+bargainColor+"\\"><div style=\\"font-size:11px;color:"+bargainColor+";font-weight:600\\">BARGAINING POSITION</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">Step 1 Denial: "+d.step1DenialRate+"% | Avg "+d.avgSettlementDays+" days</div><div style=\\"font-size:10px;color:#94a3b8;margin-top:2px\\">"+(d.step1DenialRate>60?"High management hostility":"Normal bargaining environment")+"</div></div>";' +
+    'html+="</div></div>";' +
+    // Secondary Metrics Row
+    'html+="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(auto-fit,minmax(100px,1fr));margin-bottom:16px\\">";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Grievances</div><div class=\\"kpi-value blue\\">"+d.totalGrievances+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Member:Steward</div><div class=\\"kpi-value purple\\">"+d.stewardRatio+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Survey Response</div><div class=\\"kpi-value yellow\\">"+d.engagement.surveyResponseRate+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Email Open Rate</div><div class=\\"kpi-value "+(d.engagement.emailOpenRate>=50?"green":"yellow")+"\\">"+d.engagement.emailOpenRate+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Step 1 Denial</div><div class=\\"kpi-value "+(d.step1DenialRate>60?"red":"yellow")+"\\">"+d.step1DenialRate+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg Settlement</div><div class=\\"kpi-value blue\\">"+d.avgSettlementDays+" days</div></div>";' +
+    'html+="</div>";' +
+    // Charts
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status <span style=\\"font-size:10px;color:#64748b\\">(click segment)</span></div><canvas id=\\"statusChart\\"></canvas></div>";' +
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div></div>";' +
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Members by Location <span style=\\"font-size:10px;color:#64748b\\">(click bar)</span></div><canvas id=\\"locationChart\\"></canvas></div>";' +
@@ -8743,32 +9022,83 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("main-content").innerHTML=html;renderDirectoryCharts()' +
     '}' +
 
-    // Hot Spots Tab with Heatmap Colors
+    // Hot Spots Tab - Multi-Type with Explanations
     'else if(tab==="hotspots"){' +
+    'var hs=d.hotSpots||{grievance:[],dissatisfaction:[],lowEngagement:[],overdueConcentration:[]};' +
     'var maxCases=d.hotZones.length>0?Math.max.apply(null,d.hotZones.map(function(h){return h.count})):0;' +
     'var minCases=d.hotZones.length>0?Math.min.apply(null,d.hotZones.map(function(h){return h.count})):0;' +
     'function getHeatColor(count){if(maxCases===minCases)return"#FEF3C7";var pct=(count-minCases)/(maxCases-minCases);if(pct<=0.5){var r=Math.round(209+(254-209)*pct*2);var g=Math.round(250+(243-250)*pct*2);var b=Math.round(229+(199-229)*pct*2);return"rgb("+r+","+g+","+b+")"}else{var p=(pct-0.5)*2;var r=Math.round(254+(252-254)*p);var g=Math.round(243+(165-243)*p);var b=Math.round(199+(165-199)*p);return"rgb("+r+","+g+","+b+")"}}' +
-    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">local_fire_department</i>Hot Zones (3+ Active Cases)</div>";' +
-    'html+="<div style=\\"display:flex;gap:4px;margin:12px 0;font-size:10px;align-items:center\\"><span style=\\"color:#94a3b8\\">Low</span><div style=\\"display:flex;height:12px\\"><div style=\\"width:20px;background:#D1FAE5\\"></div><div style=\\"width:20px;background:#E5F7E5\\"></div><div style=\\"width:20px;background:#FEF3C7\\"></div><div style=\\"width:20px;background:#FDE5B0\\"></div><div style=\\"width:20px;background:#FCA5A5\\"></div></div><span style=\\"color:#94a3b8\\">High</span></div>";' +
-    'if(d.hotZones.length===0){html+="<div style=\\"text-align:center;padding:40px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:48px\\">check_circle</i><p style=\\"margin-top:12px\\">No hot zones detected - All clear!</p></div>"}' +
+    // Explanation header
+    'html="<div class=\\"chart-card\\" style=\\"margin-bottom:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">info</i>What are Hot Spots?</div>";' +
+    'html+="<p style=\\"color:#94a3b8;margin:0 0 12px;font-size:12px;line-height:1.5\\">Hot Spots identify areas requiring immediate attention. These are locations or units with concentrated issues that may indicate systemic problems, management hostility, or member concerns that need focused resources.</p>";' +
+    'html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px\\">";' +
+    'html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid #ef4444\\"><div style=\\"font-weight:600;color:#ef4444;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">local_fire_department</i> Grievance Hot Spots</div><div style=\\"color:#94a3b8;font-size:11px;margin-top:4px\\">Locations with 3+ active grievance cases - indicates potential management issues</div></div>";' +
+    'html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid #f59e0b\\"><div style=\\"font-weight:600;color:#f59e0b;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">sentiment_dissatisfied</i> Dissatisfaction Hot Spots</div><div style=\\"color:#94a3b8;font-size:11px;margin-top:4px\\">Areas with satisfaction scores below 5/10 - members unhappy with representation</div></div>";' +
+    'html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid #a78bfa\\"><div style=\\"font-weight:600;color:#a78bfa;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">trending_down</i> Low Engagement Hot Spots</div><div style=\\"color:#94a3b8;font-size:11px;margin-top:4px\\">Areas with less than 30% email/meeting engagement - outreach needed</div></div>";' +
+    'html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid #60a5fa\\"><div style=\\"font-weight:600;color:#60a5fa;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">schedule</i> Overdue Hot Spots</div><div style=\\"color:#94a3b8;font-size:11px;margin-top:4px\\">Locations with 2+ overdue cases - deadline management needed</div></div>";' +
+    'html+="</div></div>";' +
+    // Summary KPIs
+    'var totalHotSpots=(hs.grievance?hs.grievance.length:0)+(hs.dissatisfaction?hs.dissatisfaction.length:0)+(hs.lowEngagement?hs.lowEngagement.length:0)+(hs.overdueConcentration?hs.overdueConcentration.length:0);' +
+    'html+="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(4,1fr);margin-bottom:16px\\">";' +
+    'html+="<div class=\\"kpi-card "+(hs.grievance&&hs.grievance.length>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Grievance Hot Spots</div><div class=\\"kpi-value "+(hs.grievance&&hs.grievance.length>0?"red":"green")+"\\">"+(hs.grievance?hs.grievance.length:0)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(hs.dissatisfaction&&hs.dissatisfaction.length>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Dissatisfaction</div><div class=\\"kpi-value "+(hs.dissatisfaction&&hs.dissatisfaction.length>0?"yellow":"green")+"\\">"+(hs.dissatisfaction?hs.dissatisfaction.length:0)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(hs.lowEngagement&&hs.lowEngagement.length>0?"":"")+"\\"><div class=\\"kpi-label\\">Low Engagement</div><div class=\\"kpi-value "+(hs.lowEngagement&&hs.lowEngagement.length>0?"purple":"green")+"\\">"+(hs.lowEngagement?hs.lowEngagement.length:0)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(hs.overdueConcentration&&hs.overdueConcentration.length>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Overdue Concentration</div><div class=\\"kpi-value "+(hs.overdueConcentration&&hs.overdueConcentration.length>0?"blue":"green")+"\\">"+(hs.overdueConcentration?hs.overdueConcentration.length:0)+"</div></div>";' +
+    'html+="</div>";' +
+    // Grievance Hot Zones (original)
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#ef4444\\">local_fire_department</i>Grievance Hot Zones (3+ Active Cases)</div>";' +
+    'html+="<div style=\\"display:flex;gap:4px;margin:12px 0;font-size:10px;align-items:center\\"><span style=\\"color:#94a3b8\\">Low</span><div style=\\"display:flex;height:12px\\"><div style=\\"width:20px;background:#D1FAE5\\"></div><div style=\\"width:20px;background:#FEF3C7\\"></div><div style=\\"width:20px;background:#FCA5A5\\"></div></div><span style=\\"color:#94a3b8\\">High</span></div>";' +
+    'if(d.hotZones.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">check_circle</i><p style=\\"margin-top:8px;font-size:13px\\">No grievance hot zones - All clear!</p></div>"}' +
     'else{d.hotZones.sort(function(a,b){return b.count-a.count}).forEach(function(h){var bgColor=getHeatColor(h.count);var textColor=(h.count-minCases)/(maxCases-minCases||1)>0.6?"#fff":"#1e293b";html+="<div class=\\"hot-zone\\" style=\\"background:"+bgColor+";border-left-color:"+bgColor+"\\"><span style=\\"color:"+textColor+"\\">"+h.location+"</span><span class=\\"badge\\" style=\\"background:rgba(0,0,0,0.2);color:"+textColor+"\\">"+h.count+" cases</span></div>"})}' +
     'html+="</div>";' +
+    // Dissatisfaction Hot Spots
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">sentiment_dissatisfied</i>Dissatisfaction Hot Spots (Score < 5)</div>";' +
+    'if(!hs.dissatisfaction||hs.dissatisfaction.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">sentiment_satisfied</i><p style=\\"margin-top:8px;font-size:13px\\">No dissatisfaction hot spots - Members are satisfied!</p></div>"}' +
+    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.dissatisfaction.forEach(function(h){var scoreColor=h.score<3?"#ef4444":"#f59e0b";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+scoreColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+h.name+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" responses</span><span style=\\"color:"+scoreColor+";font-weight:700\\">"+h.score+"/10</span></div></div>"});html+="</div>"}' +
+    'html+="</div>";' +
+    // Low Engagement Hot Spots
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">trending_down</i>Low Engagement Hot Spots (< 30%)</div>";' +
+    'if(!hs.lowEngagement||hs.lowEngagement.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">groups</i><p style=\\"margin-top:8px;font-size:13px\\">No low engagement areas - Good outreach!</p></div>"}' +
+    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.lowEngagement.forEach(function(h){var engColor=h.engagement<15?"#ef4444":"#a78bfa";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+engColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+h.name+"</div><div style=\\"color:#64748b;font-size:10px\\">"+h.type+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" members</span><span style=\\"color:"+engColor+";font-weight:700\\">"+h.engagement+"%</span></div></div>"});html+="</div>"}' +
+    'html+="</div>";' +
+    // Cases by Location chart
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Cases by Location</div><canvas id=\\"hotspotChart\\"></canvas></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderHotspotChart()' +
     '}' +
 
-    // Bargaining Tab (Enhanced)
+    // Bargaining Tab (Comprehensive)
     'else if(tab==="bargaining"){' +
-    'html="<div class=\\"bargain-grid\\">";' +
-    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Step 1 Denial Rate</div><div class=\\"bargain-value\\">"+d.step1DenialRate+"%</div><div class=\\"bargain-status\\">"+(d.step1DenialRate>60?"High Hostility":"Normal Range")+"</div></div>";' +
-    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Avg Settlement Time</div><div class=\\"bargain-value\\">"+d.avgSettlementDays+"</div><div class=\\"bargain-status\\">Days</div></div>";' +
-    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Most Violated Article</div><div class=\\"bargain-value\\">"+d.topViolatedArticle+"</div><div class=\\"bargain-status\\">Focus Area</div></div>";' +
-    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">At Step 1</div><div class=\\"bargain-value\\">"+d.stepProgression.step1+"</div><div class=\\"bargain-status\\">Cases</div></div>";' +
-    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">At Step 2</div><div class=\\"bargain-value\\">"+d.stepProgression.step2+"</div><div class=\\"bargain-status\\">Cases</div></div>";' +
-    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">At Arbitration</div><div class=\\"bargain-value\\">"+d.stepProgression.arb+"</div><div class=\\"bargain-status\\">Cases</div></div>";' +
+    // KPI Grid - Key Metrics
+    'html="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(6,1fr);margin-bottom:16px\\">";' +
+    'html+="<div class=\\"kpi-card "+(d.step1DenialRate>60?"alert":"")+"\\"><div class=\\"kpi-label\\">Step 1 Denial Rate</div><div class=\\"kpi-value "+(d.step1DenialRate>60?"red":"yellow")+"\\">"+d.step1DenialRate+"%</div><div style=\\"font-size:9px;color:#64748b\\">"+(d.step1DenialRate>60?"High Hostility":"Normal Range")+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(d.step2DenialRate>50?"alert":"")+"\\"><div class=\\"kpi-label\\">Step 2 Denial Rate</div><div class=\\"kpi-value "+(d.step2DenialRate>50?"red":"yellow")+"\\">"+(d.step2DenialRate||0)+"%</div><div style=\\"font-size:9px;color:#64748b\\">"+(d.step2DenialRate>50?"Escalation Pattern":"Expected Range")+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg Settlement Time</div><div class=\\"kpi-value blue\\">"+d.avgSettlementDays+"</div><div style=\\"font-size:9px;color:#64748b\\">Days to Resolution</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Most Violated Article</div><div class=\\"kpi-value purple\\" style=\\"font-size:16px\\">"+d.topViolatedArticle+"</div><div style=\\"font-size:9px;color:#64748b\\">Focus Area</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Grievances</div><div class=\\"kpi-value blue\\">"+d.totalGrievances+"</div><div style=\\"font-size:9px;color:#64748b\\">All Time</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate</div><div class=\\"kpi-value green\\">"+d.winRate+"%</div><div style=\\"font-size:9px;color:#64748b\\">Won + Settled</div></div>";' +
     'html+="</div>";' +
+    // Step Progression Detail
+    'html+="<div class=\\"chart-card\\" style=\\"margin-bottom:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">stairs</i>Grievance Step Progression - Detailed View</div>";' +
+    'html+="<p style=\\"color:#94a3b8;font-size:11px;margin:0 0 12px\\">Track cases through each step of the grievance process with outcome breakdown.</p>";' +
+    'html+="<div style=\\"overflow-x:auto\\"><table style=\\"width:100%;border-collapse:collapse;font-size:12px\\"><thead><tr style=\\"background:#1e293b\\"><th style=\\"padding:10px;text-align:left;color:#94a3b8\\">Step</th><th style=\\"padding:10px;text-align:center;color:#60a5fa\\">Active Cases</th><th style=\\"padding:10px;text-align:center;color:#22c55e\\">Won</th><th style=\\"padding:10px;text-align:center;color:#ef4444\\">Denied</th><th style=\\"padding:10px;text-align:center;color:#a78bfa\\">Settled</th><th style=\\"padding:10px;text-align:center;color:#f59e0b\\">Pending</th><th style=\\"padding:10px;text-align:center;color:#64748b\\">Withdrawn</th><th style=\\"padding:10px;text-align:center;color:#22c55e\\">Success Rate</th></tr></thead><tbody>";' +
+    'var steps=[{name:"Step 1 - Informal",key:"step1",desc:"Initial meeting with supervisor"},{name:"Step 2 - Formal",key:"step2",desc:"Written grievance to management"},{name:"Step 3 - Review",key:"step3",desc:"Higher-level management review"},{name:"Arbitration",key:"arb",desc:"Third-party arbitrator decision"}];' +
+    'steps.forEach(function(s){var count=d.stepProgression[s.key]||0;var outcomes=d.stepOutcomes?d.stepOutcomes[s.key]:{won:0,denied:0,settled:0,pending:0,withdrawn:0};var total=(outcomes.won||0)+(outcomes.denied||0)+(outcomes.settled||0);var successRate=total>0?Math.round(((outcomes.won||0)+(outcomes.settled||0))/total*100):0;html+="<tr style=\\"border-bottom:1px solid #1e293b\\"><td style=\\"padding:10px\\"><div style=\\"color:#e2e8f0;font-weight:600\\">"+s.name+"</div><div style=\\"color:#64748b;font-size:10px\\">"+s.desc+"</div></td><td style=\\"padding:10px;text-align:center;color:#60a5fa;font-weight:700;font-size:16px\\">"+count+"</td><td style=\\"padding:10px;text-align:center;color:#22c55e\\">"+(outcomes.won||0)+"</td><td style=\\"padding:10px;text-align:center;color:#ef4444\\">"+(outcomes.denied||0)+"</td><td style=\\"padding:10px;text-align:center;color:#a78bfa\\">"+(outcomes.settled||0)+"</td><td style=\\"padding:10px;text-align:center;color:#f59e0b\\">"+(outcomes.pending||0)+"</td><td style=\\"padding:10px;text-align:center;color:#64748b\\">"+(outcomes.withdrawn||0)+"</td><td style=\\"padding:10px;text-align:center\\"><span style=\\"background:"+(successRate>=50?"rgba(34,197,94,0.2)":"rgba(239,68,68,0.2)")+";color:"+(successRate>=50?"#22c55e":"#ef4444")+";padding:4px 8px;border-radius:4px;font-weight:600\\">"+successRate+"%</span></td></tr>"});' +
+    'html+="</tbody></table></div></div>";' +
+    // Cases at Each Step - Detail lists
+    'html+="<div class=\\"charts-row\\">";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">folder_open</i>Cases at Step 1 ("+d.stepProgression.step1+")</div><div class=\\"list-container\\" style=\\"max-height:200px\\">";' +
+    'if(d.stepCaseDetails&&d.stepCaseDetails.step1&&d.stepCaseDetails.step1.length>0){d.stepCaseDetails.step1.slice(0,8).forEach(function(c){html+="<div class=\\"list-item\\"><span style=\\"font-weight:600\\">"+c.id+"</span><span style=\\"color:#94a3b8;font-size:11px\\">"+c.category+" | "+c.location+"</span></div>"})}else{html+="<p style=\\"color:#64748b;text-align:center;padding:20px;font-size:12px\\">No cases at Step 1</p>"}' +
+    'html+="</div></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#ef4444\\">folder_open</i>Cases at Step 2 ("+d.stepProgression.step2+")</div><div class=\\"list-container\\" style=\\"max-height:200px\\">";' +
+    'if(d.stepCaseDetails&&d.stepCaseDetails.step2&&d.stepCaseDetails.step2.length>0){d.stepCaseDetails.step2.slice(0,8).forEach(function(c){html+="<div class=\\"list-item\\"><span style=\\"font-weight:600\\">"+c.id+"</span><span style=\\"color:#94a3b8;font-size:11px\\">"+c.category+" | "+c.location+"</span></div>"})}else{html+="<p style=\\"color:#64748b;text-align:center;padding:20px;font-size:12px\\">No cases at Step 2</p>"}' +
+    'html+="</div></div></div>";' +
+    // Charts row
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">article</i>Violations by Article</div><canvas id=\\"bargainChart\\"></canvas></div>";' +
-    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">stairs</i>Step Distribution</div><canvas id=\\"stepDistChart\\"></canvas></div></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">donut_large</i>Step Distribution</div><canvas id=\\"stepDistChart\\"></canvas></div></div>";' +
+    // Recent Grievances
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">history</i>Recent Grievances</div><div class=\\"list-container\\" style=\\"max-height:250px\\">";' +
+    'if(d.recentGrievances&&d.recentGrievances.length>0){d.recentGrievances.forEach(function(g){var statusColor=g.status.toLowerCase()==="won"?"#22c55e":g.status.toLowerCase()==="denied"?"#ef4444":g.status.toLowerCase()==="settled"?"#a78bfa":"#f59e0b";html+="<div class=\\"list-item\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+g.id+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+g.status+"</span></div><div style=\\"width:100%;margin-top:4px;font-size:11px;color:#94a3b8\\">"+g.member+" | "+g.category+" | "+g.location+"</div></div>"})}else{html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent grievances</p>"}' +
+    'html+="</div></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderBargainCharts()' +
     '}' +
 
@@ -8797,18 +9127,35 @@ function getUnifiedDashboardHtml(isPII) {
     'var highCount=sat.sections.filter(function(s){return s.score>=7}).length;var lowCount=sat.sections.filter(function(s){return s.score<5}).length;' +
     'html+="<div style=\\"padding:12px;background:rgba(96,165,250,0.1);border-radius:8px;border-left:3px solid #60a5fa\\"><div style=\\"font-size:11px;color:#60a5fa;font-weight:600\\">SUMMARY</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+highCount+" of 8 areas rated Good (7+)</div></div>";' +
     'html+="<div style=\\"padding:12px;background:rgba(139,92,246,0.1);border-radius:8px;border-left:3px solid #8b5cf6\\"><div style=\\"font-size:11px;color:#8b5cf6;font-weight:600\\">ACTION ITEMS</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+(lowCount>0?lowCount+" areas need immediate improvement":"All areas above minimum threshold")+"</div></div></div></div>";' +
-    // Section details grid
-    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:16px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">assessment</i>Section Breakdown</h3>";' +
+    // Section details grid with individual question breakdown
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:16px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">assessment</i>Section Breakdown with Question Scores</h3>";' +
     'html+="<div class=\\"sat-grid\\">";' +
-    'sat.sections.forEach(function(section){' +
+    'sat.sections.forEach(function(section,sIdx){' +
     'var scoreColor=section.score>=7?"#22c55e":section.score>=5?"#f59e0b":"#ef4444";' +
     'var pct=(section.score/10)*100;' +
     'var rank=sorted.indexOf(section)+1;' +
-    'html+="<div class=\\"sat-section\\"><div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">"+section.name+"<span style=\\"font-size:10px;color:#64748b;margin-left:6px\\">#"+rank+"</span></span><span class=\\"sat-section-score\\" style=\\"color:"+scoreColor+"\\">"+(section.score||0)+"/10</span></div>";' +
+    'html+="<div class=\\"sat-section\\" style=\\"cursor:pointer\\" onclick=\\"toggleSectionDetail("+sIdx+")\\"><div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">"+section.name+"<span style=\\"font-size:10px;color:#64748b;margin-left:6px\\">#"+rank+"</span></span><span class=\\"sat-section-score\\" style=\\"color:"+scoreColor+"\\">"+(section.score||0)+"/10 <i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">expand_more</i></span></div>";' +
     'html+="<div class=\\"sat-score-bar\\"><div class=\\"sat-score-fill\\" style=\\"width:"+pct+"%;background:"+scoreColor+"\\"></div></div>";' +
-    'if(section.questions&&section.questions.length>0){html+="<div class=\\"sat-questions\\">"+section.questions.join(", ")+"</div>"}' +
-    'html+="</div>"});' +
+    // Individual question breakdown
+    'html+="<div id=\\"section-detail-"+sIdx+"\\" class=\\"sat-questions-detail\\" style=\\"display:none;margin-top:12px;border-top:1px solid #334155;padding-top:12px\\">";' +
+    'if(section.questions&&section.questions.length>0){' +
+    'section.questions.forEach(function(q){' +
+    'var qScore=q.score||0;var qColor=qScore>=7?"#22c55e":qScore>=5?"#f59e0b":"#ef4444";var qPct=(qScore/10)*100;' +
+    'html+="<div style=\\"margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;align-items:center;margin-bottom:4px\\"><span style=\\"font-size:11px;color:#cbd5e1\\">"+q.label+"</span><span style=\\"font-size:12px;font-weight:600;color:"+qColor+"\\">"+qScore.toFixed(1)+"</span></div><div style=\\"height:4px;background:rgba(255,255,255,0.1);border-radius:2px\\"><div style=\\"height:100%;width:"+qPct+"%;background:"+qColor+";border-radius:2px\\"></div></div></div>"' +
+    '})}' +
+    'html+="</div></div>"});' +
     'html+="</div>";' +
+    // Full Question Breakdown Table
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">list_alt</i>Complete Survey Question Breakdown</div>";' +
+    'html+="<p style=\\"color:#94a3b8;font-size:11px;margin:0 0 12px\\">All "+sat.responseCount+" survey responses analyzed. Click a section above to expand individual questions.</p>";' +
+    'html+="<div style=\\"overflow-x:auto;max-height:400px;overflow-y:auto\\"><table style=\\"width:100%;border-collapse:collapse;font-size:11px\\"><thead style=\\"position:sticky;top:0;background:#0f172a\\"><tr><th style=\\"padding:10px;text-align:left;color:#94a3b8;border-bottom:1px solid #334155\\">Section</th><th style=\\"padding:10px;text-align:left;color:#94a3b8;border-bottom:1px solid #334155\\">Question</th><th style=\\"padding:10px;text-align:center;color:#94a3b8;border-bottom:1px solid #334155;width:80px\\">Score</th><th style=\\"padding:10px;text-align:left;color:#94a3b8;border-bottom:1px solid #334155;width:120px\\">Rating</th></tr></thead><tbody>";' +
+    'sat.sections.forEach(function(section){' +
+    'if(section.questions&&section.questions.length>0){' +
+    'section.questions.forEach(function(q,qIdx){' +
+    'var qScore=q.score||0;var qColor=qScore>=7?"#22c55e":qScore>=5?"#f59e0b":"#ef4444";var qPct=(qScore/10)*100;' +
+    'html+="<tr style=\\"border-bottom:1px solid #1e293b\\"><td style=\\"padding:8px;color:#64748b\\">"+(qIdx===0?section.name:"")+"</td><td style=\\"padding:8px;color:#e2e8f0\\">"+q.label+"</td><td style=\\"padding:8px;text-align:center;font-weight:600;color:"+qColor+"\\">"+qScore.toFixed(1)+"</td><td style=\\"padding:8px\\"><div style=\\"height:6px;background:rgba(255,255,255,0.1);border-radius:3px;min-width:80px\\"><div style=\\"height:100%;width:"+qPct+"%;background:"+qColor+";border-radius:3px\\"></div></div></td></tr>"' +
+    '})}});' +
+    'html+="</tbody></table></div></div>";' +
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Scores Comparison</div><canvas id=\\"satChart\\"></canvas></div>"}' +
     'document.getElementById("main-content").innerHTML=html;if(sat.sections&&sat.sections.length>0)renderSatisfactionChart()' +
     '}' +
@@ -8845,40 +9192,58 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
 
-    // Compare Tab - Metrics Comparison Tool
+    // Compare Tab - Comprehensive Dashboard Comparison Tool
     'else if(tab==="compare"){' +
     'function fmt(n){return typeof n==="number"?(n>=1000?n.toLocaleString():n):n}' +
+    'function getChangeIndicator(curr,prev,inverse){if(!prev||prev===0)return"";var pct=Math.round(((curr-prev)/Math.abs(prev))*100);var isUp=pct>0;var color=inverse?(isUp?"#ef4444":"#22c55e"):(isUp?"#22c55e":"#ef4444");if(pct===0)color="#64748b";return" <span style=\\"font-size:10px;color:"+color+"\\">"+(isUp?"+":"")+pct+"%</span>"}' +
+    // Header with explanation
+    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">compare_arrows</i>Dashboard Comparison</div>";' +
+    'html+="<div style=\\"background:#1e293b;padding:16px;border-radius:8px;margin-bottom:16px\\"><h3 style=\\"color:#e2e8f0;margin:0 0 8px 0;font-size:14px\\">What is this?</h3><p style=\\"color:#94a3b8;margin:0;font-size:12px;line-height:1.5\\">The Compare tab analyzes key metrics across different dimensions: <strong>current vs previous period</strong>, <strong>step-by-step grievance progression</strong>, <strong>satisfaction breakdowns</strong>, and <strong>denial rates</strong>. Use this to identify patterns, track improvements, and prepare for bargaining.</p></div>";' +
+    // Section 1: Current vs Previous Period
+    'html+="<h3 style=\\"color:#e2e8f0;margin:20px 0 12px;font-size:14px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">trending_up</i>Current Period vs Previous 30 Days</h3>";' +
+    'html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px\\">";' +
+    'var compareMetrics=[{label:"Open Cases",curr:d.openGrievances,prev:d.prevOpenCases,inverse:true},{label:"Win Rate",curr:d.winRate,prev:d.prevWinRate,suffix:"%"},{label:"Overdue Cases",curr:d.overdueCount,prev:d.prevOverdueCount,inverse:true},{label:"Morale Score",curr:d.moraleScore,prev:d.prevMoraleScore}];' +
+    'compareMetrics.forEach(function(m){var suffix=m.suffix||"";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;text-align:center\\"><div style=\\"color:#94a3b8;font-size:11px;margin-bottom:4px\\">"+m.label+"</div><div style=\\"display:flex;justify-content:center;align-items:baseline;gap:8px\\"><span style=\\"font-size:24px;font-weight:700;color:#e2e8f0\\">"+m.curr+suffix+"</span>"+getChangeIndicator(m.curr,m.prev,m.inverse)+"</div><div style=\\"color:#64748b;font-size:10px;margin-top:4px\\">Previous: "+(m.prev||0)+suffix+"</div></div>"});' +
+    'html+="</div>";' +
+    // Section 2: Grievance Step Comparison
+    'html+="<h3 style=\\"color:#e2e8f0;margin:20px 0 12px;font-size:14px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">stairs</i>Grievance Step-by-Step Comparison</h3>";' +
+    'html+="<div style=\\"overflow-x:auto\\"><table style=\\"width:100%;border-collapse:collapse;font-size:12px\\"><thead><tr style=\\"background:#1e293b\\"><th style=\\"padding:12px;text-align:left;color:#94a3b8;border-bottom:1px solid #334155\\">Step</th><th style=\\"padding:12px;text-align:center;color:#94a3b8;border-bottom:1px solid #334155\\">Active</th><th style=\\"padding:12px;text-align:center;color:#22c55e;border-bottom:1px solid #334155\\">Won</th><th style=\\"padding:12px;text-align:center;color:#ef4444;border-bottom:1px solid #334155\\">Denied</th><th style=\\"padding:12px;text-align:center;color:#a78bfa;border-bottom:1px solid #334155\\">Settled</th><th style=\\"padding:12px;text-align:center;color:#f59e0b;border-bottom:1px solid #334155\\">Pending</th></tr></thead><tbody>";' +
+    'var steps=[{name:"Step 1",key:"step1",count:d.stepProgression.step1},{name:"Step 2",key:"step2",count:d.stepProgression.step2},{name:"Step 3",key:"step3",count:d.stepProgression.step3},{name:"Arbitration",key:"arb",count:d.stepProgression.arb}];' +
+    'steps.forEach(function(s){var outcomes=d.stepOutcomes?d.stepOutcomes[s.key]:{won:0,denied:0,settled:0,pending:0};html+="<tr style=\\"border-bottom:1px solid #1e293b\\"><td style=\\"padding:12px;color:#e2e8f0;font-weight:600\\">"+s.name+"</td><td style=\\"padding:12px;text-align:center;color:#60a5fa;font-weight:700\\">"+s.count+"</td><td style=\\"padding:12px;text-align:center;color:#22c55e\\">"+(outcomes.won||0)+"</td><td style=\\"padding:12px;text-align:center;color:#ef4444\\">"+(outcomes.denied||0)+"</td><td style=\\"padding:12px;text-align:center;color:#a78bfa\\">"+(outcomes.settled||0)+"</td><td style=\\"padding:12px;text-align:center;color:#f59e0b\\">"+(outcomes.pending||0)+"</td></tr>"});' +
+    'html+="</tbody></table></div>";' +
+    // Section 3: Satisfaction Section Comparison
+    'html+="<h3 style=\\"color:#e2e8f0;margin:24px 0 12px;font-size:14px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">sentiment_satisfied</i>Satisfaction Section Comparison</h3>";' +
+    'var sat=d.satisfactionData;' +
+    'if(sat&&sat.sections&&sat.sections.length>0){' +
+    'html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:20px\\">";' +
+    'sat.sections.forEach(function(sec){var scoreColor=sec.score>=7?"#22c55e":sec.score>=5?"#f59e0b":"#ef4444";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+scoreColor+"\\"><div style=\\"color:#94a3b8;font-size:10px;margin-bottom:4px\\">"+sec.name+"</div><div style=\\"font-size:20px;font-weight:700;color:"+scoreColor+"\\">"+sec.score+"<span style=\\"font-size:11px;color:#64748b\\">/10</span></div></div>"});' +
+    'html+="</div>"}' +
+    'else{html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No satisfaction data available</p>"}' +
+    // Section 4: Denial Rate Analysis
+    'html+="<h3 style=\\"color:#e2e8f0;margin:24px 0 12px;font-size:14px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#ef4444\\">block</i>Denial Rate Analysis</h3>";' +
+    'html+="<div style=\\"display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px\\">";' +
+    'html+="<div style=\\"background:linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.05));padding:16px;border-radius:8px;text-align:center\\"><div style=\\"color:#94a3b8;font-size:11px\\">Step 1 Denial Rate</div><div style=\\"font-size:28px;font-weight:700;color:"+(d.step1DenialRate>60?"#ef4444":"#f59e0b")+"\\">"+d.step1DenialRate+"%</div><div style=\\"color:#64748b;font-size:10px\\">"+(d.step1DenialRate>60?"High Hostility":"Normal Range")+"</div></div>";' +
+    'html+="<div style=\\"background:linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.05));padding:16px;border-radius:8px;text-align:center\\"><div style=\\"color:#94a3b8;font-size:11px\\">Step 2 Denial Rate</div><div style=\\"font-size:28px;font-weight:700;color:"+(d.step2DenialRate>50?"#ef4444":"#f59e0b")+"\\">"+(d.step2DenialRate||0)+"%</div><div style=\\"color:#64748b;font-size:10px\\">"+(d.step2DenialRate>50?"Escalation Pattern":"Expected Range")+"</div></div>";' +
+    'html+="<div style=\\"background:linear-gradient(135deg,rgba(96,165,250,0.15),rgba(96,165,250,0.05));padding:16px;border-radius:8px;text-align:center\\"><div style=\\"color:#94a3b8;font-size:11px\\">Avg Settlement Days</div><div style=\\"font-size:28px;font-weight:700;color:#60a5fa\\">"+d.avgSettlementDays+"</div><div style=\\"color:#64748b;font-size:10px\\">days to resolution</div></div>";' +
+    'html+="</div>";' +
+    // Section 5: Export metrics
+    'html+="<h3 style=\\"color:#e2e8f0;margin:24px 0 12px;font-size:14px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">download</i>Export Metrics</h3>";' +
     'var metrics=[' +
     '{id:"totalMembers",label:"Total Members",value:d.totalMembers,category:"Membership"},' +
     '{id:"stewardCount",label:"Steward Count",value:d.stewardCount,category:"Membership"},' +
-    '{id:"stewardRatio",label:"Steward:Member Ratio",value:d.stewardRatio,category:"Membership"},' +
-    '{id:"totalCases",label:"Total Grievances",value:d.totalCases,category:"Grievances"},' +
-    '{id:"openCases",label:"Open Cases",value:d.openCases,category:"Grievances"},' +
-    '{id:"pendingCases",label:"Pending Cases",value:d.pendingCases,category:"Grievances"},' +
+    '{id:"totalCases",label:"Total Grievances",value:d.totalGrievances,category:"Grievances"},' +
+    '{id:"openCases",label:"Open Cases",value:d.openGrievances,category:"Grievances"},' +
     '{id:"winRate",label:"Win Rate",value:d.winRate+"%",category:"Grievances"},' +
-    '{id:"wins",label:"Cases Won",value:d.wins,category:"Grievances"},' +
-    '{id:"losses",label:"Cases Denied",value:d.losses,category:"Grievances"},' +
-    '{id:"settled",label:"Cases Settled",value:d.settled,category:"Grievances"},' +
-    '{id:"avgDaysToResolve",label:"Avg Days to Resolve",value:d.avgDaysToResolve,category:"Performance"},' +
+    '{id:"step1Denial",label:"Step 1 Denial Rate",value:d.step1DenialRate+"%",category:"Bargaining"},' +
+    '{id:"step2Denial",label:"Step 2 Denial Rate",value:(d.step2DenialRate||0)+"%",category:"Bargaining"},' +
+    '{id:"avgSettlement",label:"Avg Settlement Days",value:d.avgSettlementDays,category:"Bargaining"},' +
     '{id:"moraleScore",label:"Morale Score",value:d.moraleScore+"/10",category:"Satisfaction"},' +
-    '{id:"emailOpenRate",label:"Email Open Rate",value:d.engagement.emailOpenRate+"%",category:"Engagement"},' +
-    '{id:"virtualMeetingRate",label:"Virtual Meeting Attendance",value:d.engagement.virtualMeetingRate+"%",category:"Engagement"},' +
-    '{id:"inPersonMeetingRate",label:"In-Person Meeting Attendance",value:d.engagement.inPersonMeetingRate+"%",category:"Engagement"},' +
-    '{id:"surveyResponseRate",label:"Survey Response Rate",value:d.engagement.surveyResponseRate+"%",category:"Engagement"},' +
-    '{id:"overdueCount",label:"Overdue Cases",value:d.overdueCount,category:"Alerts"}' +
+    '{id:"surveyResponseRate",label:"Survey Response Rate",value:d.engagement.surveyResponseRate+"%",category:"Engagement"}' +
     '];' +
-    'var categories=["Membership","Grievances","Performance","Satisfaction","Engagement","Alerts"];' +
-    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">compare_arrows</i>Metrics Comparison Tool</div>";' +
-    'html+="<p style=\\"color:#94a3b8;margin-bottom:16px;font-size:13px\\">Select metrics to compare and export. Choose multiple metrics to generate a comparison report.</p>";' +
-    'html+="<div style=\\"display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap\\"><button class=\\"btn btn-sm\\" onclick=\\"selectAllMetrics()\\">Select All</button><button class=\\"btn btn-sm\\" onclick=\\"clearAllMetrics()\\">Clear All</button><button class=\\"btn\\" style=\\"background:#22c55e\\" onclick=\\"exportComparison()\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:4px\\">download</i>Export Selected</button></div>";' +
-    'categories.forEach(function(cat){' +
-    'html+="<div style=\\"margin-bottom:16px\\"><div style=\\"font-weight:600;color:#e2e8f0;margin-bottom:8px;font-size:13px\\"><i class=\\"material-icons\\" style=\\"font-size:16px;vertical-align:middle;margin-right:4px;color:#60a5fa\\">folder</i>"+cat+"</div>";' +
-    'html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px\\">";' +
-    'metrics.filter(function(m){return m.category===cat}).forEach(function(m){' +
-    'html+="<label style=\\"display:flex;align-items:center;gap:8px;background:#1e293b;padding:10px;border-radius:8px;cursor:pointer;border:1px solid #334155\\"><input type=\\"checkbox\\" class=\\"metric-check\\" data-id=\\""+m.id+"\\" data-label=\\""+m.label+"\\" data-value=\\""+m.value+"\\" data-category=\\""+m.category+"\\"><span style=\\"flex:1;font-size:12px\\">"+m.label+"</span><span style=\\"font-weight:600;color:#60a5fa\\">"+fmt(m.value)+"</span></label>"});' +
-    'html+="</div></div>"});' +
-    'html+="</div>";' +
-    'html+="<div id=\\"comparison-preview\\" class=\\"chart-card\\" style=\\"margin-top:16px;display:none\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">preview</i>Comparison Preview</div><div id=\\"preview-content\\"></div></div>";' +
+    'html+="<div style=\\"display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap\\"><button class=\\"btn btn-sm\\" onclick=\\"selectAllMetrics()\\">Select All</button><button class=\\"btn btn-sm\\" onclick=\\"clearAllMetrics()\\">Clear All</button><button class=\\"btn\\" style=\\"background:#22c55e\\" onclick=\\"exportComparison()\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:4px\\">download</i>Export CSV</button></div>";' +
+    'html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px\\">";' +
+    'metrics.forEach(function(m){html+="<label style=\\"display:flex;align-items:center;gap:8px;background:#1e293b;padding:8px 10px;border-radius:6px;cursor:pointer;font-size:11px\\"><input type=\\"checkbox\\" class=\\"metric-check\\" data-id=\\""+m.id+"\\" data-label=\\""+m.label+"\\" data-value=\\""+m.value+"\\" data-category=\\""+m.category+"\\"><span style=\\"flex:1\\">"+m.label+"</span><span style=\\"font-weight:600;color:#60a5fa\\">"+fmt(m.value)+"</span></label>"});' +
+    'html+="</div></div>";' +
     'document.getElementById("main-content").innerHTML=html;' +
     'document.querySelectorAll(".metric-check").forEach(function(cb){cb.addEventListener("change",updateComparisonPreview)})' +
     '}' +
@@ -9153,6 +9518,12 @@ function getUnifiedDashboardHtml(isPII) {
     'a.href=url;a.download="509_metrics_comparison_"+new Date().toISOString().split("T")[0]+".csv";' +
     'document.body.appendChild(a);a.click();document.body.removeChild(a);' +
     'URL.revokeObjectURL(url)' +
+    '}' +
+
+    // Satisfaction Tab Functions - Toggle section details
+    'function toggleSectionDetail(sIdx){' +
+    'var detail=document.getElementById("section-detail-"+sIdx);' +
+    'if(detail){detail.style.display=detail.style.display==="none"?"block":"none"}' +
     '}' +
 
     // Help Tab Functions (FAQ search and filter)
