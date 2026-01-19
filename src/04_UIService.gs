@@ -8411,6 +8411,54 @@ function getUnifiedDashboardHtml(isPII) {
 
     // Responsive
     '@media(max-width:768px){.header h1{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.bargain-grid{grid-template-columns:repeat(2,1fr)}.settings-panel,.alert-center{width:100%}}' +
+
+    // View Mode Toggle Pill
+    '.view-toggle{display:flex;background:rgba(255,255,255,0.1);border-radius:20px;padding:3px;gap:2px}' +
+    '.view-toggle button{padding:6px 12px;border:none;border-radius:17px;font-size:11px;cursor:pointer;transition:all 0.2s;background:transparent;color:#94a3b8;display:flex;align-items:center;gap:4px}' +
+    '.view-toggle button.active{background:#3b82f6;color:white}' +
+    '.view-toggle button .material-icons{font-size:14px}' +
+
+    // Mobile Mode (forced mobile layout)
+    'body.mobile-mode .header{flex-direction:column;gap:12px;padding:12px 16px}' +
+    'body.mobile-mode .header h1{font-size:16px}' +
+    'body.mobile-mode .header>div{width:100%;justify-content:space-between}' +
+    'body.mobile-mode .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 8px}' +
+    'body.mobile-mode .tabs::-webkit-scrollbar{display:none}' +
+    'body.mobile-mode .tab{flex-shrink:0;padding:12px 16px;font-size:12px}' +
+    'body.mobile-mode .kpi-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px}' +
+    'body.mobile-mode .kpi-card{padding:14px}' +
+    'body.mobile-mode .kpi-value{font-size:28px}' +
+    'body.mobile-mode .kpi-label{font-size:10px}' +
+    'body.mobile-mode .charts-row{grid-template-columns:1fr!important;gap:12px}' +
+    'body.mobile-mode .chart-card{padding:14px}' +
+    'body.mobile-mode .chart-title{font-size:12px}' +
+    'body.mobile-mode .list-item{padding:14px;font-size:13px}' +
+    'body.mobile-mode .date-filter{flex-wrap:wrap;gap:6px;padding:10px 12px}' +
+    'body.mobile-mode .date-btn{padding:8px 14px;font-size:12px}' +
+    'body.mobile-mode .date-input{width:100px}' +
+    'body.mobile-mode .pinned-section{padding:12px}' +
+    'body.mobile-mode .pinned-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .modal{width:95%;max-height:85vh;margin:10px}' +
+    'body.mobile-mode .settings-panel,body.mobile-mode .alert-center{width:100%}' +
+    'body.mobile-mode .btn{padding:12px 20px;font-size:13px}' +
+    'body.mobile-mode .content{padding:12px}' +
+    'body.mobile-mode .trend-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .bargain-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .heatmap-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .satisfaction-grid{grid-template-columns:1fr}' +
+    'body.mobile-mode .faq-container{padding:12px}' +
+    'body.mobile-mode .faq-item{padding:12px}' +
+    'body.mobile-mode .compare-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .last-updated{display:none}' +
+
+    // Desktop Mode (forced desktop layout)
+    'body.desktop-mode .kpi-grid{grid-template-columns:repeat(6,1fr)!important}' +
+    'body.desktop-mode .charts-row{grid-template-columns:repeat(2,1fr)!important}' +
+    'body.desktop-mode .tab{padding:14px 24px}' +
+    'body.desktop-mode .tabs{flex-wrap:nowrap}' +
+
+    // Auto-detect small screens
+    '@media(max-width:600px){body:not(.desktop-mode) .header{flex-direction:column;gap:10px}body:not(.desktop-mode) .tabs{overflow-x:auto}body:not(.desktop-mode) .tab{flex-shrink:0;font-size:11px;padding:10px 14px}body:not(.desktop-mode) .kpi-grid{grid-template-columns:repeat(2,1fr)}body:not(.desktop-mode) .charts-row{grid-template-columns:1fr}body:not(.desktop-mode) .date-filter{flex-wrap:wrap}body:not(.desktop-mode) .last-updated{display:none}}' +
     '</style></head><body>' +
 
     // Settings Overlay
@@ -8458,8 +8506,14 @@ function getUnifiedDashboardHtml(isPII) {
     // Shortcut Hint
     '<div class="shortcut-hint" id="shortcutHint"></div>' +
 
-    // Header with new buttons
+    // Header with view toggle and buttons
     '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1><div style="display:flex;align-items:center;gap:12px">' +
+    // View Mode Toggle Pill
+    '<div class="view-toggle" id="viewToggle">' +
+    '<button id="autoViewBtn" class="active" onclick="setViewMode(\\x27auto\\x27)"><i class="material-icons">auto_fix_high</i>Auto</button>' +
+    '<button id="desktopViewBtn" onclick="setViewMode(\\x27desktop\\x27)"><i class="material-icons">computer</i>Desktop</button>' +
+    '<button id="mobileViewBtn" onclick="setViewMode(\\x27mobile\\x27)"><i class="material-icons">smartphone</i>Mobile</button>' +
+    '</div>' +
     '<div class="last-updated" id="lastUpdated"><i class="material-icons">schedule</i><span>Loading...</span></div>' +
     badge +
     '<button onclick="toggleAlerts()" style="background:none;border:none;color:#94a3b8;cursor:pointer;position:relative"><i class="material-icons">notifications</i><span class="alert-badge" id="alertBadge" style="display:none">0</span></button>' +
@@ -9133,6 +9187,17 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("settingsPanel").classList.toggle("open");' +
     'document.querySelector(".settings-overlay").classList.toggle("open")' +
     '}' +
+    // View Mode Toggle
+    'function setViewMode(mode){' +
+    'document.body.classList.remove("mobile-mode","desktop-mode");' +
+    'document.querySelectorAll(".view-toggle button").forEach(function(b){b.classList.remove("active")});' +
+    'if(mode==="mobile"){document.body.classList.add("mobile-mode");document.getElementById("mobileViewBtn").classList.add("active")}' +
+    'else if(mode==="desktop"){document.body.classList.add("desktop-mode");document.getElementById("desktopViewBtn").classList.add("active")}' +
+    'else{document.getElementById("autoViewBtn").classList.add("active")}' +
+    'localStorage.setItem("509_viewMode",mode);' +
+    'showHint(mode.charAt(0).toUpperCase()+mode.slice(1)+" view")' +
+    '}' +
+
     'function toggleHighContrast(){' +
     'document.body.classList.toggle("high-contrast");' +
     'document.getElementById("highContrastToggle").classList.toggle("on");' +
@@ -9341,6 +9406,9 @@ function getUnifiedDashboardHtml(isPII) {
     'window.addEventListener("load",function(){' +
     'updateLastUpdated();' +
     'loadGoals();' +
+    // Load saved view mode
+    'var savedView=localStorage.getItem("509_viewMode");' +
+    'if(savedView&&savedView!=="auto"){setViewMode(savedView)}' +
     'if(localStorage.getItem("509_highContrast")==="true"){document.body.classList.add("high-contrast");document.getElementById("highContrastToggle").classList.add("on")}' +
     'if(localStorage.getItem("509_largeText")==="true"){document.body.classList.add("large-text");document.getElementById("largeTextToggle").classList.add("on")}' +
     'if(localStorage.getItem("509_autoRefresh")==="true"){document.getElementById("autoRefreshToggle").classList.add("on");startAutoRefresh()}' +
