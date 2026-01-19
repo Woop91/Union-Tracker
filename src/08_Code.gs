@@ -302,6 +302,83 @@ function createConfigSheet(ss) {
       sheet.setColumnWidth(i, 100);
     }
   }
+
+  // Add theme columns
+  setupThemeConfigColumns(sheet);
+}
+
+/**
+ * Sets up theme configuration columns in the Config sheet (BA-BF)
+ * Can be called separately to add theme columns to existing Config sheets
+ * @param {Sheet} sheet - The Config sheet (optional, defaults to active Config sheet)
+ */
+function setupThemeConfigColumns(sheet) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  sheet = sheet || ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!sheet) {
+    Logger.log('Config sheet not found');
+    return;
+  }
+
+  // Theme section headers (Row 1)
+  sheet.getRange(1, CONFIG_COLS.THEME_ENABLED, 1, 6)
+    .setValues([['── THEME SETTINGS ──', '', '', '', '', '']])
+    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontColor(COLORS.TEXT_DARK)
+    .setFontWeight('bold')
+    .setFontStyle('italic')
+    .setHorizontalAlignment('center');
+
+  // Theme column headers (Row 2)
+  var themeHeaders = ['Enable Theme', 'Header BG Color', 'Header Text Color', 'Alt Row Color', 'Font Family', 'Font Size'];
+  sheet.getRange(2, CONFIG_COLS.THEME_ENABLED, 1, 6)
+    .setValues([themeHeaders])
+    .setBackground(COLORS.PRIMARY_PURPLE)
+    .setFontColor(COLORS.WHITE)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center');
+
+  // Default theme values (Row 3)
+  sheet.getRange(3, CONFIG_COLS.THEME_ENABLED).setValue('Yes');
+  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_BG).setValue('#1e293b');
+  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_TEXT).setValue('#ffffff');
+  sheet.getRange(3, CONFIG_COLS.THEME_ALT_ROW).setValue('#f8fafc');
+  sheet.getRange(3, CONFIG_COLS.THEME_FONT).setValue('Roboto');
+  sheet.getRange(3, CONFIG_COLS.THEME_FONT_SIZE).setValue(10);
+
+  // Add Yes/No dropdown for Enable Theme
+  var yesNoRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Yes', 'No'], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(3, CONFIG_COLS.THEME_ENABLED).setDataValidation(yesNoRule);
+
+  // Add font dropdown
+  var fontRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Roboto', 'Arial', 'Verdana', 'Open Sans', 'Lato', 'Montserrat', 'Source Sans Pro'], true)
+    .setAllowInvalid(true)
+    .build();
+  sheet.getRange(3, CONFIG_COLS.THEME_FONT).setDataValidation(fontRule);
+
+  // Format color cells with sample colors
+  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_BG).setBackground('#1e293b').setFontColor('#ffffff');
+  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_TEXT).setBackground('#ffffff').setFontColor('#1e293b');
+  sheet.getRange(3, CONFIG_COLS.THEME_ALT_ROW).setBackground('#f8fafc').setFontColor('#1e293b');
+
+  // Auto-resize theme columns
+  sheet.autoResizeColumns(CONFIG_COLS.THEME_ENABLED, 6);
+
+  Logger.log('Theme configuration columns added to Config sheet');
+  ss.toast('Theme settings columns added to Config tab!', 'Theme Setup', 3);
+}
+
+/**
+ * Menu function to set up theme columns in Config sheet
+ * Call this from Admin > Setup menu to add theme configuration
+ */
+function setupThemeColumns() {
+  setupThemeConfigColumns();
 }
 
 /**

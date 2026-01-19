@@ -725,7 +725,15 @@ var CONFIG_COLS = {
   PDF_FOLDER_ID: 51,          // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
 
   // ── CONTRACT & RESOURCES ── (AZ)
-  CONTRACT_PDF_URL: 52        // AZ - URL to union contract PDF (Google Drive or external link)
+  CONTRACT_PDF_URL: 52,       // AZ - URL to union contract PDF (Google Drive or external link)
+
+  // ── THEME SETTINGS ── (BA-BF)
+  THEME_ENABLED: 53,          // BA - Enable custom theme (Yes/No)
+  THEME_HEADER_BG: 54,        // BB - Header background color (hex, e.g., #1e293b)
+  THEME_HEADER_TEXT: 55,      // BC - Header text color (hex, e.g., #ffffff)
+  THEME_ALT_ROW: 56,          // BD - Alternating row color (hex, e.g., #f8fafc)
+  THEME_FONT: 57,             // BE - Font family (e.g., Roboto, Arial)
+  THEME_FONT_SIZE: 58         // BF - Font size (number, e.g., 10)
 };
 
 // ============================================================================

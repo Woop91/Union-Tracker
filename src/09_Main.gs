@@ -30,15 +30,33 @@
 
 /**
  * Runs when the spreadsheet is opened
- * Sets up the custom menu and initializes the dashboard
+ * Sets up the custom menu, applies tab colors, and initializes the dashboard
  */
 function onOpen() {
   try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
     // Create the dashboard menu
     createDashboardMenu();
 
+    // Apply tab colors automatically on open
+    try {
+      if (typeof applyTabColors_ === 'function') {
+        applyTabColors_(ss);
+      }
+    } catch (tabError) {
+      console.log('Tab colors not applied: ' + tabError.message);
+    }
+
+    // Apply system theme to sheets if enabled
+    try {
+      applyThemeFromConfig_(ss);
+    } catch (themeError) {
+      console.log('Theme not applied: ' + themeError.message);
+    }
+
     // Show welcome toast
-    SpreadsheetApp.getActiveSpreadsheet().toast(
+    ss.toast(
       'Dashboard loaded successfully',
       '🏛️ Union Dashboard',
       3
@@ -51,6 +69,50 @@ function onOpen() {
       .createMenu('Union Dashboard')
       .addItem('Initialize Dashboard', 'initializeDashboard')
       .addToUi();
+  }
+}
+
+/**
+ * Applies theme settings from Config sheet if available
+ * Reads theme configuration from columns BA-BF (53-58)
+ * @param {Spreadsheet} ss - The spreadsheet
+ * @private
+ */
+function applyThemeFromConfig_(ss) {
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) return;
+
+  // Check if theme settings exist in Config (row 2 header, row 3 values)
+  // Theme columns start at BA (column 53)
+  try {
+    // First check if theme columns exist by looking at the header
+    var themeHeader = configSheet.getRange(2, CONFIG_COLS.THEME_ENABLED).getValue();
+    if (!themeHeader || themeHeader === '') {
+      // Theme columns don't exist yet - skip
+      return;
+    }
+
+    var themeEnabled = configSheet.getRange(3, CONFIG_COLS.THEME_ENABLED).getValue();
+    if (themeEnabled === 'Yes' || themeEnabled === true) {
+      // Read theme values from config
+      var headerBg = configSheet.getRange(3, CONFIG_COLS.THEME_HEADER_BG).getValue();
+      var headerText = configSheet.getRange(3, CONFIG_COLS.THEME_HEADER_TEXT).getValue();
+      var altRow = configSheet.getRange(3, CONFIG_COLS.THEME_ALT_ROW).getValue();
+      var font = configSheet.getRange(3, CONFIG_COLS.THEME_FONT).getValue();
+      var fontSize = configSheet.getRange(3, CONFIG_COLS.THEME_FONT_SIZE).getValue();
+
+      // Update COMMAND_CONFIG.THEME with values from Config sheet (only if set)
+      if (headerBg && headerBg !== '') COMMAND_CONFIG.THEME.HEADER_BG = headerBg;
+      if (headerText && headerText !== '') COMMAND_CONFIG.THEME.HEADER_TEXT = headerText;
+      if (altRow && altRow !== '') COMMAND_CONFIG.THEME.ALT_ROW = altRow;
+      if (font && font !== '') COMMAND_CONFIG.THEME.FONT = font;
+      if (fontSize && fontSize > 0) COMMAND_CONFIG.THEME.FONT_SIZE = fontSize;
+
+      Logger.log('Theme loaded from Config: ' + JSON.stringify(COMMAND_CONFIG.THEME));
+    }
+  } catch (e) {
+    // Theme columns may not exist yet - use defaults
+    Logger.log('Theme config not found, using defaults: ' + e.message);
   }
 }
 

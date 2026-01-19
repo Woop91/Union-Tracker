@@ -30,7 +30,7 @@
  */
 
 // ============================================================================
-// SOURCE: 01_Constants.gs (1672 lines)
+// SOURCE: 01_Constants.gs (1680 lines)
 // ============================================================================
 
 /**
@@ -760,7 +760,15 @@ var CONFIG_COLS = {
   PDF_FOLDER_ID: 51,          // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
 
   // ── CONTRACT & RESOURCES ── (AZ)
-  CONTRACT_PDF_URL: 52        // AZ - URL to union contract PDF (Google Drive or external link)
+  CONTRACT_PDF_URL: 52,       // AZ - URL to union contract PDF (Google Drive or external link)
+
+  // ── THEME SETTINGS ── (BA-BF)
+  THEME_ENABLED: 53,          // BA - Enable custom theme (Yes/No)
+  THEME_HEADER_BG: 54,        // BB - Header background color (hex, e.g., #1e293b)
+  THEME_HEADER_TEXT: 55,      // BC - Header text color (hex, e.g., #ffffff)
+  THEME_ALT_ROW: 56,          // BD - Alternating row color (hex, e.g., #f8fafc)
+  THEME_FONT: 57,             // BE - Font family (e.g., Roboto, Arial)
+  THEME_FONT_SIZE: 58         // BF - Font size (number, e.g., 10)
 };
 
 // ============================================================================
@@ -4187,7 +4195,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (7694 lines)
+// SOURCE: 04_UIService.gs (7695 lines)
 // ============================================================================
 
 /**
@@ -4343,6 +4351,7 @@ function createDashboardMenu() {
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
       .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('🖌️ Setup Theme Columns in Config', 'setupThemeColumns')
       .addItem('📱 Add Mobile Dashboard Link to Config', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
 
@@ -19810,7 +19819,7 @@ function onEditValidation(e) {
 
 
 // ============================================================================
-// SOURCE: 08_Code.gs (12629 lines)
+// SOURCE: 08_Code.gs (12706 lines)
 // ============================================================================
 
 /**
@@ -20117,6 +20126,83 @@ function createConfigSheet(ss) {
       sheet.setColumnWidth(i, 100);
     }
   }
+
+  // Add theme columns
+  setupThemeConfigColumns(sheet);
+}
+
+/**
+ * Sets up theme configuration columns in the Config sheet (BA-BF)
+ * Can be called separately to add theme columns to existing Config sheets
+ * @param {Sheet} sheet - The Config sheet (optional, defaults to active Config sheet)
+ */
+function setupThemeConfigColumns(sheet) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  sheet = sheet || ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!sheet) {
+    Logger.log('Config sheet not found');
+    return;
+  }
+
+  // Theme section headers (Row 1)
+  sheet.getRange(1, CONFIG_COLS.THEME_ENABLED, 1, 6)
+    .setValues([['── THEME SETTINGS ──', '', '', '', '', '']])
+    .setBackground(COLORS.LIGHT_GRAY)
+    .setFontColor(COLORS.TEXT_DARK)
+    .setFontWeight('bold')
+    .setFontStyle('italic')
+    .setHorizontalAlignment('center');
+
+  // Theme column headers (Row 2)
+  var themeHeaders = ['Enable Theme', 'Header BG Color', 'Header Text Color', 'Alt Row Color', 'Font Family', 'Font Size'];
+  sheet.getRange(2, CONFIG_COLS.THEME_ENABLED, 1, 6)
+    .setValues([themeHeaders])
+    .setBackground(COLORS.PRIMARY_PURPLE)
+    .setFontColor(COLORS.WHITE)
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center');
+
+  // Default theme values (Row 3)
+  sheet.getRange(3, CONFIG_COLS.THEME_ENABLED).setValue('Yes');
+  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_BG).setValue('#1e293b');
+  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_TEXT).setValue('#ffffff');
+  sheet.getRange(3, CONFIG_COLS.THEME_ALT_ROW).setValue('#f8fafc');
+  sheet.getRange(3, CONFIG_COLS.THEME_FONT).setValue('Roboto');
+  sheet.getRange(3, CONFIG_COLS.THEME_FONT_SIZE).setValue(10);
+
+  // Add Yes/No dropdown for Enable Theme
+  var yesNoRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Yes', 'No'], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(3, CONFIG_COLS.THEME_ENABLED).setDataValidation(yesNoRule);
+
+  // Add font dropdown
+  var fontRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Roboto', 'Arial', 'Verdana', 'Open Sans', 'Lato', 'Montserrat', 'Source Sans Pro'], true)
+    .setAllowInvalid(true)
+    .build();
+  sheet.getRange(3, CONFIG_COLS.THEME_FONT).setDataValidation(fontRule);
+
+  // Format color cells with sample colors
+  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_BG).setBackground('#1e293b').setFontColor('#ffffff');
+  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_TEXT).setBackground('#ffffff').setFontColor('#1e293b');
+  sheet.getRange(3, CONFIG_COLS.THEME_ALT_ROW).setBackground('#f8fafc').setFontColor('#1e293b');
+
+  // Auto-resize theme columns
+  sheet.autoResizeColumns(CONFIG_COLS.THEME_ENABLED, 6);
+
+  Logger.log('Theme configuration columns added to Config sheet');
+  ss.toast('Theme settings columns added to Config tab!', 'Theme Setup', 3);
+}
+
+/**
+ * Menu function to set up theme columns in Config sheet
+ * Call this from Admin > Setup menu to add theme configuration
+ */
+function setupThemeColumns() {
+  setupThemeConfigColumns();
 }
 
 /**
@@ -32444,7 +32530,7 @@ function advancedSearch(filters) {
 
 
 // ============================================================================
-// SOURCE: 09_Main.gs (1852 lines)
+// SOURCE: 09_Main.gs (1914 lines)
 // ============================================================================
 
 /**
@@ -32479,15 +32565,33 @@ function advancedSearch(filters) {
 
 /**
  * Runs when the spreadsheet is opened
- * Sets up the custom menu and initializes the dashboard
+ * Sets up the custom menu, applies tab colors, and initializes the dashboard
  */
 function onOpen() {
   try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
     // Create the dashboard menu
     createDashboardMenu();
 
+    // Apply tab colors automatically on open
+    try {
+      if (typeof applyTabColors_ === 'function') {
+        applyTabColors_(ss);
+      }
+    } catch (tabError) {
+      console.log('Tab colors not applied: ' + tabError.message);
+    }
+
+    // Apply system theme to sheets if enabled
+    try {
+      applyThemeFromConfig_(ss);
+    } catch (themeError) {
+      console.log('Theme not applied: ' + themeError.message);
+    }
+
     // Show welcome toast
-    SpreadsheetApp.getActiveSpreadsheet().toast(
+    ss.toast(
       'Dashboard loaded successfully',
       '🏛️ Union Dashboard',
       3
@@ -32500,6 +32604,50 @@ function onOpen() {
       .createMenu('Union Dashboard')
       .addItem('Initialize Dashboard', 'initializeDashboard')
       .addToUi();
+  }
+}
+
+/**
+ * Applies theme settings from Config sheet if available
+ * Reads theme configuration from columns BA-BF (53-58)
+ * @param {Spreadsheet} ss - The spreadsheet
+ * @private
+ */
+function applyThemeFromConfig_(ss) {
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) return;
+
+  // Check if theme settings exist in Config (row 2 header, row 3 values)
+  // Theme columns start at BA (column 53)
+  try {
+    // First check if theme columns exist by looking at the header
+    var themeHeader = configSheet.getRange(2, CONFIG_COLS.THEME_ENABLED).getValue();
+    if (!themeHeader || themeHeader === '') {
+      // Theme columns don't exist yet - skip
+      return;
+    }
+
+    var themeEnabled = configSheet.getRange(3, CONFIG_COLS.THEME_ENABLED).getValue();
+    if (themeEnabled === 'Yes' || themeEnabled === true) {
+      // Read theme values from config
+      var headerBg = configSheet.getRange(3, CONFIG_COLS.THEME_HEADER_BG).getValue();
+      var headerText = configSheet.getRange(3, CONFIG_COLS.THEME_HEADER_TEXT).getValue();
+      var altRow = configSheet.getRange(3, CONFIG_COLS.THEME_ALT_ROW).getValue();
+      var font = configSheet.getRange(3, CONFIG_COLS.THEME_FONT).getValue();
+      var fontSize = configSheet.getRange(3, CONFIG_COLS.THEME_FONT_SIZE).getValue();
+
+      // Update COMMAND_CONFIG.THEME with values from Config sheet (only if set)
+      if (headerBg && headerBg !== '') COMMAND_CONFIG.THEME.HEADER_BG = headerBg;
+      if (headerText && headerText !== '') COMMAND_CONFIG.THEME.HEADER_TEXT = headerText;
+      if (altRow && altRow !== '') COMMAND_CONFIG.THEME.ALT_ROW = altRow;
+      if (font && font !== '') COMMAND_CONFIG.THEME.FONT = font;
+      if (fontSize && fontSize > 0) COMMAND_CONFIG.THEME.FONT_SIZE = fontSize;
+
+      Logger.log('Theme loaded from Config: ' + JSON.stringify(COMMAND_CONFIG.THEME));
+    }
+  } catch (e) {
+    // Theme columns may not exist yet - use defaults
+    Logger.log('Theme config not found, using defaults: ' + e.message);
   }
 }
 

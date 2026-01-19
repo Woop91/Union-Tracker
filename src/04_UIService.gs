@@ -151,6 +151,7 @@ function createDashboardMenu() {
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
       .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('🖌️ Setup Theme Columns in Config', 'setupThemeColumns')
       .addItem('📱 Add Mobile Dashboard Link to Config', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
 
