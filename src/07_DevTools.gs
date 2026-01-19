@@ -197,6 +197,9 @@ function seedConfigData() {
     return;
   }
 
+  // Ensure Config sheet has enough columns (AZ = column 52 is the last column)
+  ensureMinimumColumns(sheet, CONFIG_COLS.MOBILE_DASHBOARD_URL);
+
   // Data row start (after section headers row 1 and column headers row 2)
   var dataStartRow = 3;
 
@@ -1034,8 +1037,8 @@ function SEED_GRIEVANCES(count) {
     return;
   }
 
-  // Ensure Grievance Log has enough columns (AI = column 35)
-  ensureMinimumColumns(grievanceSheet, GRIEVANCE_COLS.QUICK_ACTIONS);
+  // Ensure Grievance Log has enough columns (AK = column 37, CHECKLIST_PROGRESS is the last column)
+  ensureMinimumColumns(grievanceSheet, GRIEVANCE_COLS.CHECKLIST_PROGRESS);
 
   // Get members
   var memberData = memberSheet.getDataRange().getValues();
