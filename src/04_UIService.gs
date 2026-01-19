@@ -8118,7 +8118,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+e.message+"</div>"}' +
-    'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=' + "'" + '"+tab+"' + "'" + ']").classList.add("active");renderTab(tab)}' +
+    'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=\\x27"+tab+"\\x27]").classList.add("active");renderTab(tab)}' +
     'function render(json){dashData=JSON.parse(json);renderTab("overview")}' +
 
     // Modal functions
