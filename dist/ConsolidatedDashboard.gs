@@ -17709,7 +17709,7 @@ function onEditValidation(e) {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2100 lines)
+// SOURCE: 07_DevTools.gs (2135 lines)
 // ============================================================================
 
 /**
@@ -17900,6 +17900,7 @@ function SEED_SAMPLE_DATA() {
 /**
  * Seed Config sheet with dropdown values
  * Note: Data starts at row 3 (row 1 = section headers, row 2 = column headers)
+ * Seeds both preset values (Office Days, Grievance Status, etc.) and user-configurable values
  */
 function seedConfigData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -17925,6 +17926,40 @@ function seedConfigData() {
   }
 
   var seededAny = false;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRESET VALUES (Standard dropdowns that rarely change)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Office Days (Column D) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS)) seededAny = true;
+
+  // Yes/No (Column E) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO)) seededAny = true;
+
+  // Grievance Status (Column J) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS)) seededAny = true;
+
+  // Grievance Step (Column K) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP)) seededAny = true;
+
+  // Issue Category (Column L) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY)) seededAny = true;
+
+  // Articles Violated (Column M) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES)) seededAny = true;
+
+  // Communication Methods (Column N) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.COMM_METHODS, DEFAULT_CONFIG.COMM_METHODS)) seededAny = true;
+
+  // Best Times to Contact (Column AE) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.BEST_TIMES, [
+    'Morning (8am-12pm)', 'Afternoon (12pm-5pm)', 'Evening (5pm-8pm)', 'Weekends', 'Flexible'
+  ])) seededAny = true;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // USER-CONFIGURABLE VALUES (Organization-specific dropdowns)
+  // ═══════════════════════════════════════════════════════════════════════════
 
   // Job Titles (Column A)
   if (seedIfEmpty(CONFIG_COLS.JOB_TITLES, [
@@ -34470,7 +34505,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 10_CommandCenter.gs (2830 lines)
+// SOURCE: 10_CommandCenter.gs (2928 lines)
 // ============================================================================
 
 /**
@@ -35287,47 +35322,63 @@ function applyTabColors_(ss) {
     HIDDEN: '#9e9e9e'       // Gray - for hidden/calc sheets
   };
 
-  // Red tabs - Getting Started, FAQ
-  var redSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ];
-  redSheets.forEach(function(name) {
+  // Helper function to find sheet by name (tries exact match and variations)
+  function findSheet(name) {
     var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.RED); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-    }
-  });
+    if (sheet) return sheet;
 
-  // Purple tabs - Member Directory, Grievance Log
-  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG];
-  purpleSheets.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.PURPLE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    // Try without emoji prefix (if name starts with emoji)
+    if (name && name.length > 2) {
+      var noEmoji = name.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\s*/u, '');
+      if (noEmoji !== name) {
+        sheet = ss.getSheetByName(noEmoji);
+        if (sheet) return sheet;
+      }
     }
-  });
+    return null;
+  }
+
+  // Helper to apply color safely
+  function applyColor(sheetName, color) {
+    var sheet = findSheet(sheetName);
+    if (sheet) {
+      try {
+        sheet.setTabColor(color);
+        Logger.log('Tab color applied to: ' + sheet.getName());
+      } catch (e) {
+        Logger.log('Tab color error for ' + sheetName + ': ' + e.message);
+      }
+    } else {
+      Logger.log('Sheet not found for tab color: ' + sheetName);
+    }
+  }
+
+  // Red tabs - Getting Started, FAQ
+  applyColor(SHEETS.GETTING_STARTED, TAB_COLORS.RED);
+  applyColor(SHEETS.FAQ, TAB_COLORS.RED);
+
+  // Purple tabs - Member Directory, Grievance Log, Case Checklist
+  applyColor(SHEETS.MEMBER_DIR, TAB_COLORS.PURPLE);
+  applyColor('Member Directory', TAB_COLORS.PURPLE);  // Fallback without constant
+  applyColor(SHEETS.GRIEVANCE_LOG, TAB_COLORS.PURPLE);
+  applyColor('Grievance Log', TAB_COLORS.PURPLE);  // Fallback without constant
+  applyColor(SHEETS.CASE_CHECKLIST, TAB_COLORS.PURPLE);
+  applyColor('Case Checklist', TAB_COLORS.PURPLE);  // Fallback without constant
 
   // Yellow tabs - Feedback and Development, Function Checklist
-  var yellowSheets = [SHEETS.FEEDBACK, SHEETS.FUNCTION_CHECKLIST];
-  yellowSheets.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.YELLOW); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-    }
-  });
+  applyColor(SHEETS.FEEDBACK, TAB_COLORS.YELLOW);
+  applyColor('Feedback & Development', TAB_COLORS.YELLOW);  // Without emoji
+  applyColor('Feedback and Development', TAB_COLORS.YELLOW);  // Alternate spelling
+  applyColor(SHEETS.FUNCTION_CHECKLIST, TAB_COLORS.YELLOW);
 
   // Orange tabs - Config, Config Guide
-  var orangeSheets = [SHEETS.CONFIG, SHEETS.CONFIG_GUIDE];
-  orangeSheets.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.ORANGE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-    }
-  });
+  applyColor(SHEETS.CONFIG, TAB_COLORS.ORANGE);
+  applyColor('Config', TAB_COLORS.ORANGE);  // Fallback
+  applyColor(SHEETS.CONFIG_GUIDE, TAB_COLORS.ORANGE);
 
   // Blue tabs - Member Satisfaction
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
-  if (satSheet) {
-    try { satSheet.setTabColor(TAB_COLORS.BLUE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-  }
+  applyColor(SHEETS.SATISFACTION, TAB_COLORS.BLUE);
+  applyColor('Member Satisfaction', TAB_COLORS.BLUE);  // Without emoji
 
   Logger.log('Tab colors applied successfully');
 }
@@ -35339,6 +35390,88 @@ function applyTabColors() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   applyTabColors_(ss);
   ss.toast('Tab colors applied!', 'Success', 3);
+}
+
+/**
+ * Applies different background colors to Config sheet sections for easy identification
+ * Each section gets a distinct color to make navigation easier
+ */
+function applyConfigSectionColors() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) {
+    SpreadsheetApp.getUi().alert('Config sheet not found!');
+    return;
+  }
+
+  // Section definitions with colors (column ranges are 1-indexed)
+  var sections = [
+    { name: 'Employment Info', startCol: 1, endCol: 5, color: '#e3f2fd' },      // Light Blue
+    { name: 'Supervision', startCol: 6, endCol: 7, color: '#fff3e0' },          // Light Orange
+    { name: 'Steward Info', startCol: 8, endCol: 9, color: '#e8f5e9' },         // Light Green
+    { name: 'Grievance Settings', startCol: 10, endCol: 13, color: '#fce4ec' }, // Light Pink
+    { name: 'Links & Coordinators', startCol: 14, endCol: 17, color: '#f3e5f5' }, // Light Purple
+    { name: 'Notifications', startCol: 18, endCol: 20, color: '#fff8e1' },      // Light Amber
+    { name: 'Organization', startCol: 21, endCol: 24, color: '#e0f7fa' },       // Light Cyan
+    { name: 'Integration', startCol: 25, endCol: 26, color: '#fbe9e7' },        // Light Deep Orange
+    { name: 'Deadlines', startCol: 27, endCol: 30, color: '#ffebee' },          // Light Red
+    { name: 'Multi-Select Options', startCol: 31, endCol: 32, color: '#e8eaf6' }, // Light Indigo
+    { name: 'Contract & Legal', startCol: 33, endCol: 36, color: '#f1f8e9' },   // Light Light Green
+    { name: 'Org Identity', startCol: 37, endCol: 39, color: '#eceff1' },       // Light Blue Grey
+    { name: 'Extended Contact', startCol: 40, endCol: 43, color: '#ede7f6' },   // Light Deep Purple
+    { name: 'Form Links', startCol: 44, endCol: 44, color: '#e1f5fe' },         // Light Light Blue
+    { name: 'Strategic Command Center', startCol: 45, endCol: 51, color: '#f9fbe7' } // Light Lime
+  ];
+
+  var lastRow = Math.max(configSheet.getLastRow(), 50); // At least 50 rows for visibility
+
+  // Apply colors to each section (all rows)
+  sections.forEach(function(section) {
+    var numCols = section.endCol - section.startCol + 1;
+    var range = configSheet.getRange(1, section.startCol, lastRow, numCols);
+    range.setBackground(section.color);
+  });
+
+  // Make header row (row 1) bold with darker background
+  sections.forEach(function(section) {
+    var numCols = section.endCol - section.startCol + 1;
+    var headerRange = configSheet.getRange(1, section.startCol, 1, numCols);
+    headerRange.setFontWeight('bold');
+    // Darken the header slightly
+    var darkerColor = darkenColor_(section.color, 15);
+    headerRange.setBackground(darkerColor);
+  });
+
+  // Make column header row (row 2) slightly different
+  sections.forEach(function(section) {
+    var numCols = section.endCol - section.startCol + 1;
+    var colHeaderRange = configSheet.getRange(2, section.startCol, 1, numCols);
+    colHeaderRange.setFontWeight('bold');
+    colHeaderRange.setFontStyle('italic');
+  });
+
+  ss.toast('Config section colors applied!', 'Success', 3);
+  Logger.log('Config section colors applied successfully');
+}
+
+/**
+ * Darkens a hex color by a percentage
+ * @param {string} color - Hex color (e.g., '#e3f2fd')
+ * @param {number} percent - Percentage to darken (0-100)
+ * @returns {string} Darkened hex color
+ * @private
+ */
+function darkenColor_(color, percent) {
+  var num = parseInt(color.replace('#', ''), 16);
+  var amt = Math.round(2.55 * percent);
+  var R = (num >> 16) - amt;
+  var G = (num >> 8 & 0x00FF) - amt;
+  var B = (num & 0x0000FF) - amt;
+  R = Math.max(0, R);
+  G = Math.max(0, G);
+  B = Math.max(0, B);
+  return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
 }
 
 // ============================================================================
