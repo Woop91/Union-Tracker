@@ -8171,6 +8171,7 @@ function getUnifiedDashboardHtml(isPII) {
     // Goal Progress
     '.goal-bar{height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:8px;overflow:hidden}' +
     '.goal-fill{height:100%;border-radius:3px;transition:width 0.5s}' +
+    '.goal-label{display:flex;justify-content:space-between;font-size:9px;color:#64748b;margin-top:4px}' +
     '.goal-label{font-size:9px;color:#64748b;margin-top:4px;display:flex;justify-content:space-between}' +
 
     // Settings Panel
@@ -8372,15 +8373,17 @@ function getUnifiedDashboardHtml(isPII) {
     'function renderTab(tab){' +
     'var d=dashData,html="";' +
 
-    // Overview Tab
+    // Overview Tab with trend arrows and goal progress
     'if(tab==="overview"){' +
+    'var goals=JSON.parse(localStorage.getItem("509_goals")||"{}");' +
+    'var winTarget=goals.winRate||75,moraleTarget=goals.morale||8,responseTarget=goals.response||50;' +
     'html="<div class=\\"kpi-grid\\">";' +
     'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27members\\x27)\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
     'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27stewards\\x27)\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27open\\x27)\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate</div><div class=\\"kpi-value green\\">"+d.winRate+"%</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+"\\" onclick=\\"showList(\\x27overdue\\x27)\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale Score</div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27open\\x27)\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+(d.prevOpenCases!==undefined?getTrendArrow(d.openGrievances,d.prevOpenCases):"")+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+winTarget+"%)</span></div><div class=\\"kpi-value green\\">"+d.winRate+"%"+(d.prevWinRate!==undefined?getTrendArrow(d.winRate,d.prevWinRate):"")+"</div>"+getGoalBar(d.winRate,winTarget)+"</div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+"\\" onclick=\\"showList(\\x27overdue\\x27)\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+(d.prevOverdueCount!==undefined?getTrendArrow(d.prevOverdueCount,d.overdueCount):"")+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+moraleTarget+")</span></div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+(d.prevMoraleScore!==undefined?getTrendArrow(d.moraleScore,d.prevMoraleScore):"")+"</div>"+getGoalBar(d.moraleScore*10,moraleTarget*10)+"</div>";' +
     'html+="</div>";' +
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status</div><canvas id=\\"statusChart\\"></canvas></div>";' +
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div></div>";' +
@@ -8435,7 +8438,8 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Won</div><div class=\\"kpi-value green\\">"+d.wins+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Denied</div><div class=\\"kpi-value red\\">"+d.losses+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Settled</div><div class=\\"kpi-value purple\\">"+d.settled+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Survey Response</div><div class=\\"kpi-value yellow\\">"+d.engagement.surveyResponseRate+"%</div></div></div>";' +
+    'var responseTarget=(JSON.parse(localStorage.getItem("509_goals")||"{}").response)||50;' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Survey Response <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+responseTarget+"%)</span></div><div class=\\"kpi-value yellow\\">"+d.engagement.surveyResponseRate+"%</div>"+getGoalBar(d.engagement.surveyResponseRate,responseTarget)+"</div></div>";' +
     // Engagement Metrics Section
     'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:20px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">trending_up</i>Member Engagement Metrics</h3>";' +
     'html+="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(auto-fit,minmax(120px,1fr))\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Email Open Rate</div><div class=\\"kpi-value "+(d.engagement.emailOpenRate>=50?"green":d.engagement.emailOpenRate>=30?"yellow":"red")+"\\">"+d.engagement.emailOpenRate+"%</div></div>";' +
