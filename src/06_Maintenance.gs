@@ -41,7 +41,6 @@ function DIAGNOSE_SETUP() {
 
   // Check 1: Required sheets exist
   results.checks.push('Checking required sheets...');
-  const allSheetNames = getAllSheetNames();
   const existingSheets = ss.getSheets().map(s => s.getName());
 
   for (const sheetName of Object.values(SHEET_NAMES)) {

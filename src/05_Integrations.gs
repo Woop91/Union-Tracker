@@ -1112,6 +1112,18 @@ function showClearCalendarConfirm() {
  * - (no params) - Returns default dashboard
  */
 function doGet(e) {
+  // v4.4.0: Check for unified dashboard mode parameter
+  var mode = e && e.parameter && e.parameter.mode;
+  if (mode === 'steward' || mode === 'member') {
+    var isPII = (mode === 'steward');
+    var title = isPII ? '509 STEWARD COMMAND CENTER' : '509 MEMBER DASHBOARD';
+    var html = getUnifiedDashboardHtml(isPII);
+    return HtmlService.createHtmlOutput(html)
+      .setTitle(title)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+  }
+
   // Check for member ID parameter (member portal mode)
   var memberId = e && e.parameter && e.parameter.id;
   if (memberId) {
@@ -1125,7 +1137,7 @@ function doGet(e) {
     }
   }
 
-  // Standard page routing for mobile dashboard
+  // Standard page routing for mobile dashboard (legacy support)
   var page = e && e.parameter && e.parameter.page ? e.parameter.page : 'dashboard';
 
   var html;
@@ -1150,7 +1162,8 @@ function doGet(e) {
       // Fall through to dashboard
     case 'dashboard':
     default:
-      html = getWebAppDashboardHtml();
+      // v4.4.0: Default to unified member dashboard
+      html = getUnifiedDashboardHtml(false);
       break;
   }
 
