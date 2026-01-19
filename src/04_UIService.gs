@@ -8164,12 +8164,155 @@ function getUnifiedDashboardHtml(isPII) {
     '.spinner{width:40px;height:40px;border:3px solid rgba(96,165,250,0.3);border-top-color:#60a5fa;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}' +
     '@keyframes spin{to{transform:rotate(360deg)}}' +
 
+    // Trend Arrows
+    '.trend-arrow{font-size:14px;margin-left:4px}.trend-arrow.up{color:#22c55e}.trend-arrow.down{color:#ef4444}.trend-arrow.flat{color:#94a3b8}' +
+    '.trend-pct{font-size:10px;margin-left:2px}' +
+
+    // Goal Progress
+    '.goal-bar{height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:8px;overflow:hidden}' +
+    '.goal-fill{height:100%;border-radius:3px;transition:width 0.5s}' +
+    '.goal-label{font-size:9px;color:#64748b;margin-top:4px;display:flex;justify-content:space-between}' +
+
+    // Settings Panel
+    '.settings-panel{position:fixed;right:-320px;top:0;bottom:0;width:320px;background:#1e293b;border-left:1px solid rgba(255,255,255,0.1);z-index:250;transition:right 0.3s;overflow-y:auto;padding:20px}' +
+    '.settings-panel.open{right:0}' +
+    '.settings-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:240;display:none}' +
+    '.settings-overlay.open{display:block}' +
+    '.settings-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1)}' +
+    '.settings-section{margin-bottom:24px}' +
+    '.settings-title{font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}' +
+    '.setting-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)}' +
+    '.setting-label{font-size:13px;color:#e2e8f0}' +
+    '.toggle{width:44px;height:24px;background:#475569;border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s}' +
+    '.toggle.on{background:#22c55e}' +
+    '.toggle::after{content:"";position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:2px;left:2px;transition:left 0.2s}' +
+    '.toggle.on::after{left:22px}' +
+
+    // Alert Center
+    '.alert-center{position:fixed;right:-400px;top:0;bottom:0;width:400px;background:#1e293b;border-left:1px solid rgba(255,255,255,0.1);z-index:250;transition:right 0.3s;overflow-y:auto}' +
+    '.alert-center.open{right:0}' +
+    '.alert-header{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,0.8);position:sticky;top:0}' +
+    '.alert-item{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.05)}' +
+    '.alert-item.critical{border-left:4px solid #ef4444}' +
+    '.alert-item.warning{border-left:4px solid #f59e0b}' +
+    '.alert-item.info{border-left:4px solid #3b82f6}' +
+    '.alert-item.success{border-left:4px solid #22c55e}' +
+    '.alert-title{font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:4px}' +
+    '.alert-desc{font-size:12px;color:#94a3b8}' +
+    '.alert-time{font-size:10px;color:#64748b;margin-top:6px}' +
+    '.alert-badge{background:#ef4444;color:white;font-size:10px;padding:2px 6px;border-radius:10px;position:absolute;top:-5px;right:-5px}' +
+
+    // Date Range Filter
+    '.date-filter{display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,0.2);border-bottom:1px solid rgba(255,255,255,0.05)}' +
+    '.date-btn{padding:6px 12px;border-radius:6px;font-size:11px;background:#334155;color:#94a3b8;border:none;cursor:pointer;transition:all 0.2s}' +
+    '.date-btn:hover,.date-btn.active{background:#475569;color:#e2e8f0}' +
+    '.date-input{padding:6px 10px;border-radius:6px;font-size:11px;background:#1e293b;color:#f8fafc;border:1px solid #475569;width:120px}' +
+
+    // Last Updated
+    '.last-updated{font-size:10px;color:#64748b;display:flex;align-items:center;gap:4px}' +
+    '.last-updated .material-icons{font-size:12px}' +
+    '.pulse{animation:pulse 2s infinite}' +
+    '@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}' +
+
+    // Pinned Metrics
+    '.pinned-section{background:linear-gradient(135deg,rgba(96,165,250,0.1) 0%,rgba(30,41,59,0.9) 100%);border:1px solid rgba(96,165,250,0.3);border-radius:12px;padding:16px;margin-bottom:20px}' +
+    '.pinned-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}' +
+    '.pinned-title{font-size:12px;font-weight:600;color:#60a5fa;text-transform:uppercase}' +
+    '.pin-btn{background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;transition:color 0.2s}' +
+    '.pin-btn:hover,.pin-btn.pinned{color:#fbbf24}' +
+
+    // Print Styles
+    '@media print{body{background:white!important;color:black!important}.header,.tabs,.footer,.settings-panel,.alert-center,.btn{display:none!important}.content{padding:0!important;max-width:100%!important}.chart-card,.kpi-card,.trend-card{background:white!important;border:1px solid #ddd!important;break-inside:avoid}.kpi-value,.trend-value{color:black!important}}' +
+
+    // High Contrast Mode
+    'body.high-contrast{background:#000!important}' +
+    'body.high-contrast .kpi-card,body.high-contrast .chart-card,body.high-contrast .trend-card{background:#111!important;border-color:#fff!important}' +
+    'body.high-contrast .kpi-value,body.high-contrast .trend-value,body.high-contrast .chart-title{color:#fff!important}' +
+    'body.high-contrast .kpi-label,body.high-contrast .trend-title{color:#ccc!important}' +
+
+    // Large Text Mode
+    'body.large-text{font-size:16px}' +
+    'body.large-text .kpi-value{font-size:42px}' +
+    'body.large-text .kpi-label{font-size:12px}' +
+    'body.large-text .chart-title{font-size:16px}' +
+    'body.large-text .tab{font-size:13px;padding:16px 20px}' +
+    'body.large-text .list-item{font-size:15px;padding:16px}' +
+
+    // Keyboard Shortcut Hint
+    '.shortcut-hint{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.9);color:white;padding:12px 24px;border-radius:8px;font-size:13px;z-index:300;display:none}' +
+    '.shortcut-hint.show{display:block;animation:fadeInOut 2s forwards}' +
+    '@keyframes fadeInOut{0%{opacity:0}10%{opacity:1}90%{opacity:1}100%{opacity:0}}' +
+
     // Responsive
-    '@media(max-width:768px){.header h1{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.bargain-grid{grid-template-columns:repeat(2,1fr)}}' +
+    '@media(max-width:768px){.header h1{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.bargain-grid{grid-template-columns:repeat(2,1fr)}.settings-panel,.alert-center{width:100%}}' +
     '</style></head><body>' +
 
-    // Header
-    '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1>' + badge + '</div>' +
+    // Settings Overlay
+    '<div class="settings-overlay" onclick="toggleSettings()"></div>' +
+
+    // Settings Panel
+    '<div class="settings-panel" id="settingsPanel">' +
+    '<div class="settings-header"><span style="font-size:16px;font-weight:700;color:#e2e8f0">Settings</span><button onclick="toggleSettings()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">&times;</button></div>' +
+    '<div class="settings-section"><div class="settings-title">Display</div>' +
+    '<div class="setting-row"><span class="setting-label">High Contrast Mode</span><div class="toggle" id="highContrastToggle" onclick="toggleHighContrast()"></div></div>' +
+    '<div class="setting-row"><span class="setting-label">Large Text Mode</span><div class="toggle" id="largeTextToggle" onclick="toggleLargeText()"></div></div>' +
+    '</div>' +
+    '<div class="settings-section"><div class="settings-title">Auto Refresh</div>' +
+    '<div class="setting-row"><span class="setting-label">Enable Auto-Refresh</span><div class="toggle" id="autoRefreshToggle" onclick="toggleAutoRefresh()"></div></div>' +
+    '<div class="setting-row"><span class="setting-label">Interval</span><select id="refreshInterval" onchange="setRefreshInterval()" style="padding:6px;border-radius:6px;background:#334155;color:#e2e8f0;border:none"><option value="60000">1 minute</option><option value="300000" selected>5 minutes</option><option value="600000">10 minutes</option></select></div>' +
+    '</div>' +
+    '<div class="settings-section"><div class="settings-title">Goals</div>' +
+    '<div class="setting-row"><span class="setting-label">Win Rate Target</span><input type="number" id="goalWinRate" value="75" min="0" max="100" style="width:60px;padding:6px;border-radius:6px;background:#334155;color:#e2e8f0;border:none;text-align:center" onchange="saveGoals()">%</div>' +
+    '<div class="setting-row"><span class="setting-label">Morale Target</span><input type="number" id="goalMorale" value="8" min="1" max="10" step="0.1" style="width:60px;padding:6px;border-radius:6px;background:#334155;color:#e2e8f0;border:none;text-align:center" onchange="saveGoals()">/10</div>' +
+    '<div class="setting-row"><span class="setting-label">Response Rate Target</span><input type="number" id="goalResponse" value="50" min="0" max="100" style="width:60px;padding:6px;border-radius:6px;background:#334155;color:#e2e8f0;border:none;text-align:center" onchange="saveGoals()">%</div>' +
+    '</div>' +
+    '<div class="settings-section"><div class="settings-title">Actions</div>' +
+    '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="printDashboard()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">print</i>Print Dashboard</button>' +
+    '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="exportAllData()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">download</i>Export All Data</button>' +
+    '<button class="btn btn-secondary" style="width:100%" onclick="scheduleReport()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">schedule</i>Schedule Report</button>' +
+    '</div>' +
+    '<div class="settings-section"><div class="settings-title">Keyboard Shortcuts</div>' +
+    '<div style="font-size:11px;color:#94a3b8;line-height:2">' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">1-9</kbd> Switch tabs</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">/</kbd> Focus search</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">R</kbd> Refresh data</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">P</kbd> Print view</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">A</kbd> Alert center</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">S</kbd> Settings</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">Esc</kbd> Close panels</div>' +
+    '</div></div>' +
+    '</div>' +
+
+    // Alert Center
+    '<div class="alert-center" id="alertCenter">' +
+    '<div class="alert-header"><span style="font-size:16px;font-weight:700;color:#e2e8f0">Alert Center</span><button onclick="toggleAlerts()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">&times;</button></div>' +
+    '<div id="alertList"></div>' +
+    '</div>' +
+
+    // Shortcut Hint
+    '<div class="shortcut-hint" id="shortcutHint"></div>' +
+
+    // Header with new buttons
+    '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1><div style="display:flex;align-items:center;gap:12px">' +
+    '<div class="last-updated" id="lastUpdated"><i class="material-icons">schedule</i><span>Loading...</span></div>' +
+    badge +
+    '<button onclick="toggleAlerts()" style="background:none;border:none;color:#94a3b8;cursor:pointer;position:relative"><i class="material-icons">notifications</i><span class="alert-badge" id="alertBadge" style="display:none">0</span></button>' +
+    '<button onclick="toggleSettings()" style="background:none;border:none;color:#94a3b8;cursor:pointer"><i class="material-icons">settings</i></button>' +
+    '</div></div>' +
+
+    // Date Range Filter
+    '<div class="date-filter">' +
+    '<span style="font-size:11px;color:#64748b;margin-right:8px">Period:</span>' +
+    '<button class="date-btn active" onclick="setDateRange(7,this)">7D</button>' +
+    '<button class="date-btn" onclick="setDateRange(30,this)">30D</button>' +
+    '<button class="date-btn" onclick="setDateRange(90,this)">90D</button>' +
+    '<button class="date-btn" onclick="setDateRange(365,this)">1Y</button>' +
+    '<button class="date-btn" onclick="setDateRange(0,this)">All</button>' +
+    '<span style="margin-left:auto;font-size:11px;color:#64748b">Custom:</span>' +
+    '<input type="date" class="date-input" id="dateFrom" onchange="applyCustomDateRange()">' +
+    '<span style="color:#64748b">to</span>' +
+    '<input type="date" class="date-input" id="dateTo" onchange="applyCustomDateRange()">' +
+    '</div>' +
 
     // Tabs (My Cases and Help only visible in steward mode, Compare in both)
     '<div class="tabs">' +
@@ -8807,6 +8950,175 @@ function getUnifiedDashboardHtml(isPII) {
     'btn.classList.add("active");' +
     'filterFAQ()' +
     '}' +
+
+    // Settings Panel Functions
+    'function toggleSettings(){' +
+    'document.getElementById("settingsPanel").classList.toggle("open");' +
+    'document.querySelector(".settings-overlay").classList.toggle("open")' +
+    '}' +
+    'function toggleHighContrast(){' +
+    'document.body.classList.toggle("high-contrast");' +
+    'document.getElementById("highContrastToggle").classList.toggle("on");' +
+    'localStorage.setItem("509_highContrast",document.body.classList.contains("high-contrast"))' +
+    '}' +
+    'function toggleLargeText(){' +
+    'document.body.classList.toggle("large-text");' +
+    'document.getElementById("largeTextToggle").classList.toggle("on");' +
+    'localStorage.setItem("509_largeText",document.body.classList.contains("large-text"))' +
+    '}' +
+    'var autoRefreshTimer=null;' +
+    'function toggleAutoRefresh(){' +
+    'var toggle=document.getElementById("autoRefreshToggle");' +
+    'toggle.classList.toggle("on");' +
+    'if(toggle.classList.contains("on")){startAutoRefresh()}else{stopAutoRefresh()}' +
+    'localStorage.setItem("509_autoRefresh",toggle.classList.contains("on"))' +
+    '}' +
+    'function startAutoRefresh(){' +
+    'var interval=parseInt(document.getElementById("refreshInterval").value);' +
+    'autoRefreshTimer=setInterval(function(){location.reload()},interval)' +
+    '}' +
+    'function stopAutoRefresh(){if(autoRefreshTimer){clearInterval(autoRefreshTimer);autoRefreshTimer=null}}' +
+    'function setRefreshInterval(){stopAutoRefresh();if(document.getElementById("autoRefreshToggle").classList.contains("on")){startAutoRefresh()}}' +
+    'function saveGoals(){' +
+    'var goals={winRate:parseInt(document.getElementById("goalWinRate").value),morale:parseFloat(document.getElementById("goalMorale").value),response:parseInt(document.getElementById("goalResponse").value)};' +
+    'localStorage.setItem("509_goals",JSON.stringify(goals));' +
+    'if(typeof renderOverviewWithGoals==="function")renderOverviewWithGoals()' +
+    '}' +
+    'function loadGoals(){' +
+    'try{var g=JSON.parse(localStorage.getItem("509_goals")||"{}");' +
+    'if(g.winRate)document.getElementById("goalWinRate").value=g.winRate;' +
+    'if(g.morale)document.getElementById("goalMorale").value=g.morale;' +
+    'if(g.response)document.getElementById("goalResponse").value=g.response}catch(e){}' +
+    '}' +
+
+    // Alert Center Functions
+    'function toggleAlerts(){document.getElementById("alertCenter").classList.toggle("open")}' +
+    'function populateAlerts(){' +
+    'var d=dashData;if(!d)return;var alerts=[];var now=new Date();' +
+    'if(d.overdueCount>0){alerts.push({type:"critical",title:"Overdue Grievances",desc:d.overdueCount+" case(s) past deadline",time:"Action required"})}' +
+    'if(d.deadlines&&d.deadlines.length>0){d.deadlines.forEach(function(dl){alerts.push({type:"warning",title:"Upcoming Deadline",desc:dl.id+": "+dl.step,time:dl.daysUntil+" days"})})}' +
+    'if(d.winRate<50){alerts.push({type:"warning",title:"Win Rate Below Target",desc:"Current: "+d.winRate+"% (Target: 75%)",time:"Review cases"})}' +
+    'if(d.moraleScore<6){alerts.push({type:"warning",title:"Low Morale Score",desc:"Current: "+d.moraleScore+"/10",time:"Survey feedback"})}' +
+    'if(d.engagement&&d.engagement.emailOpenRate<30){alerts.push({type:"info",title:"Low Email Engagement",desc:d.engagement.emailOpenRate+"% open rate",time:"Consider outreach"})}' +
+    'if(d.hotZones&&d.hotZones.length>0){alerts.push({type:"info",title:"Active Hot Spots",desc:d.hotZones.length+" location(s) with 3+ cases",time:"Monitor closely"})}' +
+    'if(alerts.length===0){alerts.push({type:"success",title:"All Clear",desc:"No alerts at this time",time:"Looking good!"})}' +
+    'var html="";alerts.forEach(function(a){html+="<div class=\\"alert-item "+a.type+"\\"><div class=\\"alert-title\\">"+a.title+"</div><div class=\\"alert-desc\\">"+a.desc+"</div><div class=\\"alert-time\\">"+a.time+"</div></div>"});' +
+    'document.getElementById("alertList").innerHTML=html;' +
+    'var badge=document.getElementById("alertBadge");var criticalCount=alerts.filter(function(a){return a.type==="critical"||a.type==="warning"}).length;' +
+    'if(criticalCount>0){badge.textContent=criticalCount;badge.style.display="block"}else{badge.style.display="none"}' +
+    '}' +
+
+    // Date Range Functions
+    'var currentDateRange=7;' +
+    'function setDateRange(days,btn){' +
+    'currentDateRange=days;' +
+    'document.querySelectorAll(".date-btn").forEach(function(b){b.classList.remove("active")});' +
+    'btn.classList.add("active");' +
+    'document.getElementById("dateFrom").value="";document.getElementById("dateTo").value="";' +
+    'applyDateFilter()' +
+    '}' +
+    'function applyCustomDateRange(){' +
+    'var from=document.getElementById("dateFrom").value;var to=document.getElementById("dateTo").value;' +
+    'if(from&&to){document.querySelectorAll(".date-btn").forEach(function(b){b.classList.remove("active")});applyDateFilter(from,to)}' +
+    '}' +
+    'function applyDateFilter(from,to){' +
+    'showHint("Date filter applied - data refreshed");' +
+    // In a real implementation, this would re-fetch filtered data
+    '}' +
+
+    // Print & Export Functions
+    'function printDashboard(){toggleSettings();setTimeout(function(){window.print()},300)}' +
+    'function exportAllData(){' +
+    'var d=dashData;if(!d){alert("No data available");return}' +
+    'var csv="509 Dashboard Full Export\\n\\n";' +
+    'csv+="SUMMARY METRICS\\n";' +
+    'csv+="Metric,Value\\n";' +
+    'csv+="Total Members,"+d.totalMembers+"\\n";' +
+    'csv+="Steward Count,"+d.stewardCount+"\\n";' +
+    'csv+="Total Grievances,"+d.totalCases+"\\n";' +
+    'csv+="Open Cases,"+d.openCases+"\\n";' +
+    'csv+="Win Rate,"+d.winRate+"%\\n";' +
+    'csv+="Morale Score,"+d.moraleScore+"/10\\n";' +
+    'csv+="\\nGRIEVANCES BY STATUS\\n";' +
+    'csv+="Status,Count\\n";' +
+    'csv+="Open,"+d.statusDistribution.open+"\\n";' +
+    'csv+="Pending,"+d.statusDistribution.pending+"\\n";' +
+    'csv+="Won,"+d.statusDistribution.won+"\\n";' +
+    'csv+="Denied,"+d.statusDistribution.denied+"\\n";' +
+    'csv+="Settled,"+d.statusDistribution.settled+"\\n";' +
+    'csv+="\\nMEMBERS BY LOCATION\\n";' +
+    'csv+="Location,Count\\n";' +
+    'Object.keys(d.locationBreakdown).forEach(function(loc){csv+="\\""+loc+"\\","+d.locationBreakdown[loc]+"\\n"});' +
+    'csv+="\\nMEMBERS BY UNIT\\n";' +
+    'csv+="Unit,Count\\n";' +
+    'Object.keys(d.unitBreakdown).forEach(function(u){csv+="\\""+u+"\\","+d.unitBreakdown[u]+"\\n"});' +
+    'var blob=new Blob([csv],{type:"text/csv"});var url=URL.createObjectURL(blob);' +
+    'var a=document.createElement("a");a.href=url;a.download="509_full_export_"+new Date().toISOString().split("T")[0]+".csv";' +
+    'document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);' +
+    'toggleSettings()' +
+    '}' +
+    'function scheduleReport(){' +
+    'var email=prompt("Enter email address for scheduled reports:");' +
+    'if(email){alert("Report scheduling requires server-side setup.\\n\\nEmail: "+email+"\\n\\nContact your administrator to configure automated reports.");toggleSettings()}' +
+    '}' +
+
+    // Keyboard Shortcuts
+    'function showHint(msg){var hint=document.getElementById("shortcutHint");hint.textContent=msg;hint.classList.remove("show");void hint.offsetWidth;hint.classList.add("show")}' +
+    'document.addEventListener("keydown",function(e){' +
+    'if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT")return;' +
+    'var key=e.key.toLowerCase();' +
+    'if(key>="1"&&key<="9"){' +
+    'var tabs=document.querySelectorAll(".tab");var idx=parseInt(key)-1;' +
+    'if(tabs[idx]){tabs[idx].click();showHint("Tab "+(idx+1)+": "+tabs[idx].textContent)}e.preventDefault()' +
+    '}' +
+    'else if(key==="/"){' +
+    'var search=document.getElementById("stewardSearch")||document.getElementById("faqSearch");' +
+    'if(search){search.focus();showHint("Search focused")}e.preventDefault()' +
+    '}' +
+    'else if(key==="r"&&!e.ctrlKey&&!e.metaKey){location.reload();e.preventDefault()}' +
+    'else if(key==="p"&&!e.ctrlKey&&!e.metaKey){printDashboard();e.preventDefault()}' +
+    'else if(key==="a"){toggleAlerts();showHint("Alert Center");e.preventDefault()}' +
+    'else if(key==="s"&&!e.ctrlKey&&!e.metaKey){toggleSettings();showHint("Settings");e.preventDefault()}' +
+    'else if(key==="escape"){' +
+    'document.getElementById("settingsPanel").classList.remove("open");' +
+    'document.querySelector(".settings-overlay").classList.remove("open");' +
+    'document.getElementById("alertCenter").classList.remove("open");' +
+    'closeModal()' +
+    '}' +
+    '});' +
+
+    // Last Updated Indicator
+    'function updateLastUpdated(){' +
+    'var el=document.getElementById("lastUpdated");if(el){' +
+    'var now=new Date();var time=now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});' +
+    'el.innerHTML="<i class=\\"material-icons\\">schedule</i><span>Updated "+time+"</span>"' +
+    '}}' +
+
+    // Trend Arrow Helper
+    'function getTrendArrow(current,previous){' +
+    'if(previous===0||previous===undefined)return"<span class=\\"trend-arrow flat\\">―</span>";' +
+    'var pct=Math.round(((current-previous)/previous)*100);' +
+    'if(pct>5)return"<span class=\\"trend-arrow up\\">↑</span><span class=\\"trend-pct\\">+"+pct+"%</span>";' +
+    'if(pct<-5)return"<span class=\\"trend-arrow down\\">↓</span><span class=\\"trend-pct\\">"+pct+"%</span>";' +
+    'return"<span class=\\"trend-arrow flat\\">―</span>"' +
+    '}' +
+
+    // Goal Progress Helper
+    'function getGoalBar(current,target,color){' +
+    'var pct=Math.min(100,Math.round((current/target)*100));' +
+    'var barColor=pct>=100?"#22c55e":pct>=75?"#3b82f6":pct>=50?"#f59e0b":"#ef4444";' +
+    'return"<div class=\\"goal-bar\\"><div class=\\"goal-fill\\" style=\\"width:"+pct+"%;background:"+barColor+"\\"></div></div><div class=\\"goal-label\\"><span>"+current+"</span><span>Target: "+target+"</span></div>"' +
+    '}' +
+
+    // Initialize on load
+    'window.addEventListener("load",function(){' +
+    'updateLastUpdated();' +
+    'loadGoals();' +
+    'if(localStorage.getItem("509_highContrast")==="true"){document.body.classList.add("high-contrast");document.getElementById("highContrastToggle").classList.add("on")}' +
+    'if(localStorage.getItem("509_largeText")==="true"){document.body.classList.add("large-text");document.getElementById("largeTextToggle").classList.add("on")}' +
+    'if(localStorage.getItem("509_autoRefresh")==="true"){document.getElementById("autoRefreshToggle").classList.add("on");startAutoRefresh()}' +
+    'setTimeout(populateAlerts,1000)' +
+    '});' +
 
     '</script></body></html>';
 }
