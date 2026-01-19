@@ -7373,6 +7373,12 @@ function getUnifiedDashboardData(includePII) {
     memberList: [],
     overdueList: [],
     openCasesList: [],
+    myCases: [],           // Current user's assigned cases (v4.4.0)
+    currentUserEmail: '',  // For My Cases identification
+
+    // Performance metrics
+    stewardRatio: 'N/A',   // Member:Steward ratio
+    topPerformers: [],     // Top performing stewards
 
     // Breakdowns
     unitBreakdown: {},
@@ -7413,6 +7419,7 @@ function getUnifiedDashboardData(includePII) {
     managementResponseTime: 0,
     grievancesByCategory: {},
     monthlyFilings: [],
+    monthlyResolved: [],  // v4.4.0 - For Filed vs Resolved chart
 
     // Chart Data
     statusDistribution: { open: 0, pending: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 },
@@ -7577,7 +7584,20 @@ function getUnifiedDashboardData(includePII) {
       data.engagement.unionInterestLocal = Math.round((interestLocalCount / data.totalMembers) * 100);
       data.engagement.unionInterestChapter = Math.round((interestChapterCount / data.totalMembers) * 100);
       data.engagement.unionInterestAllied = Math.round((interestAlliedCount / data.totalMembers) * 100);
+
+      // Calculate Steward:Member ratio
+      if (data.stewardCount > 0) {
+        var ratio = Math.round(data.totalMembers / data.stewardCount);
+        data.stewardRatio = ratio + ':1';
+      }
     }
+  }
+
+  // Get current user email for My Cases
+  try {
+    data.currentUserEmail = Session.getActiveUser().getEmail();
+  } catch (e) {
+    data.currentUserEmail = '';
   }
 
   // Process Grievances
@@ -7587,6 +7607,7 @@ function getUnifiedDashboardData(includePII) {
   var settlementDays = [];
   var mgmtResponseDays = [];
   var monthlyFilingsMap = {};
+  var monthlyResolvedMap = {};  // v4.4.0 - Track resolved by month
 
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
     var grievanceData = grievanceSheet.getDataRange().getValues();
@@ -7632,6 +7653,27 @@ function getUnifiedDashboardData(includePII) {
         } else {
           data.openCasesList.push({ id: grievanceId, member: 'Member', steward: 'Steward', step: currentStep, location: gLocation, category: category });
         }
+
+        // My Cases - check if current user is the assigned steward (v4.4.0)
+        if (includePII && data.currentUserEmail && steward) {
+          var stewardLower = steward.toLowerCase();
+          var emailLower = data.currentUserEmail.toLowerCase();
+          var emailName = emailLower.split('@')[0].replace(/[._]/g, ' ');
+          // Match by full steward name, email prefix, or partial match
+          if (stewardLower.indexOf(emailName) >= 0 || emailLower.indexOf(stewardLower.replace(/\s+/g, '.')) >= 0 ||
+              stewardLower.split(' ').some(function(part) { return emailName.indexOf(part) >= 0 && part.length > 2; })) {
+            data.myCases.push({
+              id: grievanceId,
+              member: memberName,
+              step: currentStep,
+              location: gLocation,
+              category: category,
+              status: status,
+              daysOpen: grievanceData[g][GRIEVANCE_COLS.DAYS_OPEN - 1] || 0,
+              nextDue: grievanceData[g][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] || ''
+            });
+          }
+        }
       }
 
       // Steward workload
@@ -7675,6 +7717,13 @@ function getUnifiedDashboardData(includePII) {
         var monthKey = dateFiled.toLocaleString('default', { month: 'short', year: 'numeric' });
         if (!monthlyFilingsMap[monthKey]) monthlyFilingsMap[monthKey] = 0;
         monthlyFilingsMap[monthKey]++;
+      }
+
+      // Monthly resolved (v4.4.0)
+      if (dateClosed instanceof Date) {
+        var resolvedMonthKey = dateClosed.toLocaleString('default', { month: 'short', year: 'numeric' });
+        if (!monthlyResolvedMap[resolvedMonthKey]) monthlyResolvedMap[resolvedMonthKey] = 0;
+        monthlyResolvedMap[resolvedMonthKey]++;
       }
 
       // Check overdue
@@ -7730,12 +7779,41 @@ function getUnifiedDashboardData(includePII) {
     }
   }
 
+  // Get Top Performers from hidden steward performance sheet (v4.4.0)
+  var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
+  if (perfSheet && perfSheet.getLastRow() > 1) {
+    try {
+      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), 10).getValues();
+      data.topPerformers = perfData
+        .filter(function(row) { return row[0] && row[9]; })
+        .map(function(row) {
+          return {
+            name: includePII ? row[0] : 'Steward',
+            totalCases: row[1] || 0,
+            active: row[2] || 0,
+            closed: row[3] || 0,
+            won: row[4] || 0,
+            winRate: row[5] || 0,
+            avgDays: row[6] || 0,
+            score: row[9] || 0
+          };
+        })
+        .sort(function(a, b) { return b.score - a.score; })
+        .slice(0, 5);
+    } catch (e) {
+      Logger.log('Error reading steward performance: ' + e.message);
+    }
+  }
+
   // Monthly filings for trend
-  var sortedMonths = Object.keys(monthlyFilingsMap).sort(function(a, b) {
+  var allMonths = Object.keys(monthlyFilingsMap).concat(Object.keys(monthlyResolvedMap));
+  var uniqueMonths = allMonths.filter(function(item, pos) { return allMonths.indexOf(item) === pos; });
+  var sortedMonths = uniqueMonths.sort(function(a, b) {
     return new Date(a) - new Date(b);
   }).slice(-12);
   sortedMonths.forEach(function(month) {
-    data.monthlyFilings.push({ month: month, count: monthlyFilingsMap[month] });
+    data.monthlyFilings.push({ month: month, count: monthlyFilingsMap[month] || 0 });
+    data.monthlyResolved.push({ month: month, count: monthlyResolvedMap[month] || 0 });  // v4.4.0
   });
 
   // Process Satisfaction Survey
@@ -8008,9 +8086,10 @@ function getUnifiedDashboardHtml(isPII) {
     // Header
     '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1>' + badge + '</div>' +
 
-    // Tabs
+    // Tabs (My Cases only visible in steward mode)
     '<div class="tabs">' +
     '<div class="tab active" onclick="showTab(\'overview\')">Overview</div>' +
+    (isPII ? '<div class="tab" onclick="showTab(\'mycases\')">My Cases</div>' : '') +
     '<div class="tab" onclick="showTab(\'workload\')">Workload</div>' +
     '<div class="tab" onclick="showTab(\'analytics\')">Analytics</div>' +
     '<div class="tab" onclick="showTab(\'directory\')">Directory</div>' +
@@ -8030,8 +8109,8 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="modal-body" id="modal-body"></div>' +
     '</div></div>' +
 
-    // Footer
-    '<div class="footer"><span>Data refreshes on load | v4.4.0</span><button class="btn btn-secondary" onclick="location.reload()">Refresh</button></div>' +
+    // Footer with Help/FAQ button
+    '<div class="footer"><span>Data refreshes on load | v4.4.0</span><div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="showFAQ()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">help</i>Help</button><button class="btn btn-secondary" onclick="location.reload()">Refresh</button></div></div>' +
 
     // JavaScript
     '<script>' +
@@ -8045,14 +8124,19 @@ function getUnifiedDashboardHtml(isPII) {
     'function openModal(title,content){document.getElementById("modal-title").textContent=title;document.getElementById("modal-body").innerHTML=content;document.getElementById("modal").classList.add("active")}' +
     'function closeModal(){document.getElementById("modal").classList.remove("active")}' +
 
-    // Show list in modal
+    // Show list in modal with search (v4.4.0)
     'function showList(type){' +
-    'var d=dashData,html="",title="";' +
-    'if(type==="members"){title="All Members ("+d.totalMembers+")";if(d.memberList.length===0){html="<p style=\\"color:#94a3b8\\">Member details not available in this view.</p>"}else{d.memberList.forEach(function(m){html+="<div class=\\"modal-list-item\\"><span class=\\"modal-list-id\\">"+m.id+"</span><span class=\\"modal-list-name\\">"+m.name+(m.isSteward?" <span style=\\"color:#a78bfa\\">(Steward)</span>":"")+"</span><span class=\\"modal-list-meta\\">"+m.location+" | "+m.unit+"</span></div>"})}}' +
-    'else if(type==="stewards"){title="Stewards ("+d.stewardCount+")";d.stewardList.forEach(function(s){html+="<div class=\\"modal-list-item\\"><span class=\\"modal-list-id\\">"+s.id+"</span><span class=\\"modal-list-name\\">"+s.name+"</span><span class=\\"modal-list-meta\\">"+s.location+" | "+s.unit+"</span></div>"})}' +
-    'else if(type==="open"){title="Open Cases ("+d.openGrievances+")";d.openCasesList.forEach(function(c){html+="<div class=\\"modal-list-item\\"><span class=\\"modal-list-id\\">"+c.id+"</span><span class=\\"modal-list-name\\">"+c.member+" - "+c.category+"</span><span class=\\"modal-list-meta\\">"+c.step+" | "+c.steward+"</span></div>"})}' +
-    'else if(type==="overdue"){title="Overdue Cases ("+d.overdueCount+")";d.overdueList.forEach(function(c){html+="<div class=\\"modal-list-item\\"><span class=\\"modal-list-id\\">"+c.id+"</span><span class=\\"modal-list-name\\">"+c.member+"</span><span class=\\"modal-list-meta\\">"+c.step+" | "+c.steward+"</span></div>"})}' +
-    'openModal(title,html||"<p style=\\"color:#94a3b8\\">No data available.</p>")}' +
+    'var d=dashData,items=[],title="",listHtml="";' +
+    'if(type==="members"){title="All Members ("+d.totalMembers+")";items=d.memberList.map(function(m){return{id:m.id,name:m.name+(m.isSteward?" (Steward)":""),meta:m.location+" | "+m.unit}})}' +
+    'else if(type==="stewards"){title="Stewards ("+d.stewardCount+")";items=d.stewardList.map(function(s){return{id:s.id,name:s.name,meta:s.location+" | "+s.unit}})}' +
+    'else if(type==="open"){title="Open Cases ("+d.openGrievances+")";items=d.openCasesList.map(function(c){return{id:c.id,name:c.member+" - "+c.category,meta:c.step+" | "+c.steward}})}' +
+    'else if(type==="overdue"){title="Overdue Cases ("+d.overdueCount+")";items=d.overdueList.map(function(c){return{id:c.id,name:c.member,meta:c.step+" | "+c.steward}})}' +
+    'if(items.length===0){listHtml="<p style=\\"color:#94a3b8\\">No data available in this view.</p>"}' +
+    'else{listHtml="<input type=\\"text\\" id=\\"modalSearch\\" placeholder=\\"Search...\\" oninput=\\"filterModalList()\\" style=\\"width:100%;padding:10px;margin-bottom:12px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><div id=\\"modalListItems\\" style=\\"max-height:350px;overflow-y:auto\\">";' +
+    'items.forEach(function(item){listHtml+="<div class=\\"modal-list-item\\" data-search=\\""+((item.id||"")+" "+(item.name||"")+" "+(item.meta||"")).toLowerCase()+"\\"><span class=\\"modal-list-id\\">"+item.id+"</span><span class=\\"modal-list-name\\">"+item.name+"</span><span class=\\"modal-list-meta\\">"+item.meta+"</span></div>"});' +
+    'listHtml+="</div>"}' +
+    'openModal(title,listHtml)}' +
+    'function filterModalList(){var q=document.getElementById("modalSearch").value.toLowerCase();document.querySelectorAll("#modalListItems .modal-list-item").forEach(function(el){el.style.display=el.getAttribute("data-search").indexOf(q)>=0?"flex":"none"})}' +
 
     // Render tab content
     'function renderTab(tab){' +
@@ -8071,22 +8155,45 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status</div><canvas id=\\"statusChart\\"></canvas></div>";' +
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div></div>";' +
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Members by Location</div><canvas id=\\"locationChart\\"></canvas></div>";' +
-    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">show_chart</i>Monthly Filings</div><canvas id=\\"filingChart\\"></canvas></div></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">show_chart</i>Filed vs Resolved</div><canvas id=\\"filingChart\\"></canvas></div></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderOverviewCharts()' +
     '}' +
 
-    // Workload Tab
+    // My Cases Tab (Steward mode only) - v4.4.0
+    'else if(tab==="mycases"){' +
+    'html="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(3,1fr)\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">My Active Cases</div><div class=\\"kpi-value blue\\">"+d.myCases.length+"</div></div>";' +
+    'var urgentCount=d.myCases.filter(function(c){return c.daysOpen>30||c.status.toLowerCase().indexOf("pending")>=0}).length;' +
+    'html+="<div class=\\"kpi-card "+(urgentCount>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Needs Attention</div><div class=\\"kpi-value "+(urgentCount>0?"red":"green")+"\\">"+urgentCount+"</div></div>";' +
+    'var avgDays=d.myCases.length>0?Math.round(d.myCases.reduce(function(s,c){return s+(c.daysOpen||0)},0)/d.myCases.length):0;' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg Days Open</div><div class=\\"kpi-value "+(avgDays>45?"red":avgDays>30?"yellow":"green")+"\\">"+avgDays+"</div></div></div>";' +
+    'if(d.myCases.length===0){html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#22c55e\\">check_circle</i><p style=\\"color:#94a3b8;margin-top:16px\\">No active cases assigned to you. Great job!</p></div>"}' +
+    'else{html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">folder_open</i>My Assigned Cases</div><div class=\\"list-container\\" style=\\"max-height:400px\\">";' +
+    'd.myCases.forEach(function(c){var statusColor=c.status.toLowerCase()==="open"?"#f59e0b":c.status.toLowerCase().indexOf("pending")>=0?"#ef4444":"#64748b";' +
+    'html+="<div class=\\"list-item\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+c.id+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+c.status+"</span></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#cbd5e1\\">"+c.member+" | "+c.category+"</div>";' +
+    'html+="<div style=\\"width:100%;display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#94a3b8\\"><span>"+c.step+" | "+c.location+"</span><span>"+c.daysOpen+" days</span></div></div>"});' +
+    'html+="</div></div>"}' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+
+    // Workload Tab (Enhanced with ratio and top performers)
     'else if(tab==="workload"){' +
     'var totalCases=d.stewardWorkload.reduce(function(s,w){return s+w.count},0);' +
     'var avgCases=d.stewardWorkload.length>0?(totalCases/d.stewardWorkload.length).toFixed(1):0;' +
     'var overloaded=d.stewardWorkload.filter(function(w){return w.status==="OVERLOAD"}).length;' +
-    'html="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(4,1fr)\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Stewards</div><div class=\\"kpi-value blue\\">"+d.stewardCount+"</div></div>";' +
+    'html="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(5,1fr)\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Stewards</div><div class=\\"kpi-value blue\\">"+d.stewardCount+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Member:Steward</div><div class=\\"kpi-value purple\\">"+d.stewardRatio+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Active Cases</div><div class=\\"kpi-value yellow\\">"+totalCases+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg per Steward</div><div class=\\"kpi-value green\\">"+avgCases+"</div></div>";' +
     'html+="<div class=\\"kpi-card "+(overloaded>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Overloaded</div><div class=\\"kpi-value red\\">"+overloaded+"</div></div></div>";' +
-    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">assignment_ind</i>Steward Caseload</div><div class=\\"list-container\\">";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">assignment_ind</i>Steward Caseload</div><div class=\\"list-container\\">";' +
     'd.stewardWorkload.forEach(function(w){html+="<div class=\\"list-item\\"><span>"+w.name+"</span><span class=\\"badge\\" style=\\"background:"+w.color+";color:white\\">"+w.count+" cases - "+w.status+"</span></div>"});' +
     'html+="</div></div>";' +
+    // Top Performers section
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">emoji_events</i>Top Performers</div><div class=\\"list-container\\">";' +
+    'if(d.topPerformers&&d.topPerformers.length>0){d.topPerformers.forEach(function(p,i){html+="<div class=\\"list-item\\"><span>"+(i+1)+". "+p.name+"</span><span class=\\"badge\\" style=\\"background:#22c55e;color:white\\">Score: "+p.score+" | Win: "+p.winRate+"%</span></div>"})}' +
+    'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">Performance data not yet calculated</p>"}' +
+    'html+="</div></div></div>";' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
 
@@ -8213,7 +8320,8 @@ function getUnifiedDashboardHtml(isPII) {
     'new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
     'var filingLabels=d.monthlyFilings.map(function(f){return f.month});' +
     'var filingData=d.monthlyFilings.map(function(f){return f.count});' +
-    'new Chart(document.getElementById("filingChart"),{type:"line",data:{labels:filingLabels.length>0?filingLabels:["Jan","Feb","Mar"],datasets:[{label:"Filings",data:filingData.length>0?filingData:[2,3,1],borderColor:"#f59e0b",backgroundColor:"rgba(245,158,11,0.2)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}})' +
+    'var resolvedData=d.monthlyResolved?d.monthlyResolved.map(function(f){return f.count}):[];' +
+    'new Chart(document.getElementById("filingChart"),{type:"line",data:{labels:filingLabels.length>0?filingLabels:["Jan","Feb","Mar"],datasets:[{label:"Filed",data:filingData.length>0?filingData:[2,3,1],borderColor:"#f59e0b",backgroundColor:"rgba(245,158,11,0.1)",fill:true,tension:0.4},{label:"Resolved",data:resolvedData.length>0?resolvedData:[1,2,2],borderColor:"#22c55e",backgroundColor:"rgba(34,197,94,0.1)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:"#cbd5e1"}}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}})' +
     '}' +
 
     'function renderAnalyticsCharts(){' +
@@ -8256,6 +8364,43 @@ function getUnifiedDashboardHtml(isPII) {
     'var scores=d.satisfactionData.sections.map(function(s){return s.score});' +
     'var colors=scores.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444"});' +
     'new Chart(document.getElementById("satChart"),{type:"bar",data:{labels:labels,datasets:[{label:"Score",data:scores,backgroundColor:colors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}})' +
+    '}' +
+
+    // FAQ/Help Modal function (v4.4.0)
+    'function showFAQ(){' +
+    'var faq=[' +
+    '{cat:"Getting Started",items:[' +
+    '{q:"What is this dashboard?",a:"This is the Union Dashboard providing real-time analytics on grievances, members, and steward workload."},' +
+    '{q:"How is data updated?",a:"Data refreshes each time you open the dashboard. Click Refresh to reload."},' +
+    '{q:"What\\'s the difference between Steward and Member dashboards?",a:"Steward dashboard shows full PII (names, IDs). Member dashboard anonymizes data for public sharing."}' +
+    ']},' +
+    '{cat:"Dashboard Tabs",items:[' +
+    '{q:"What is the My Cases tab?",a:"Shows your personally assigned grievances as a steward. Only visible in Steward mode."},' +
+    '{q:"What are Hot Spots?",a:"Locations with 3 or more active grievances that need management attention."},' +
+    '{q:"What are Engagement Metrics?",a:"Email open rates, meeting attendance, volunteer hours, and union interest levels from Member Directory."},' +
+    '{q:"What is the Morale Score?",a:"Average trust/satisfaction score from the Member Satisfaction survey (1-10 scale)."}' +
+    ']},' +
+    '{cat:"Understanding Metrics",items:[' +
+    '{q:"How is Win Rate calculated?",a:"(Won Cases / Total Closed Cases) × 100. Settled cases count as closed but not won."},' +
+    '{q:"What does OVERLOAD mean?",a:"A steward with more than 8 active cases. Heavy = 5-8 cases."},' +
+    '{q:"What is Step 1 Denial Rate?",a:"Percentage of grievances denied at Step 1 that had to escalate to Step 2."},' +
+    '{q:"What is Avg Settlement Time?",a:"Average number of days from filing to closure for resolved grievances."}' +
+    ']},' +
+    '{cat:"Taking Action",items:[' +
+    '{q:"How do I file a new grievance?",a:"Go to Member Directory in the spreadsheet > check the Start Grievance box for a member."},' +
+    '{q:"How do I get help?",a:"Use the Help menu in the spreadsheet or contact your chapter leadership."},' +
+    '{q:"Can I export this data?",a:"Use your browser\\'s print function or screenshot the dashboard."}' +
+    ']}' +
+    '];' +
+    'var html="<div style=\\"max-height:400px;overflow-y:auto;padding:8px\\">";' +
+    'faq.forEach(function(section){' +
+    'html+="<div style=\\"font-size:12px;font-weight:600;color:#22c55e;margin:16px 0 8px;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px\\">"+section.cat+"</div>";' +
+    'section.items.forEach(function(item){' +
+    'html+="<div style=\\"border-left:3px solid #3b82f6;padding-left:12px;margin-bottom:12px\\">";' +
+    'html+="<div style=\\"font-weight:500;color:#e2e8f0;margin-bottom:4px;font-size:13px\\">"+item.q+"</div>";' +
+    'html+="<div style=\\"color:#94a3b8;font-size:12px;line-height:1.5\\">"+item.a+"</div></div>"})});' +
+    'html+="</div>";' +
+    'openModal("Help & FAQ",html)' +
     '}' +
 
     '</script></body></html>';

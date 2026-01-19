@@ -350,13 +350,20 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
 - Unified Web App Dashboards **(NEW v4.4.0)**:
   - `getUnifiedDashboardData(includePII)` - Comprehensive dashboard data with engagement metrics
   - `getUnifiedDashboardDataAPI(isPII)` - API wrapper for web app data requests
-  - `getUnifiedDashboardHtml(isPII)` - Complete HTML/CSS/JS for 8-tab web app dashboard
+  - `getUnifiedDashboardHtml(isPII)` - Complete HTML/CSS/JS for 9-tab web app dashboard (steward mode)
   - `showStewardDashboard()` - Opens steward dashboard web app URL (was modal, now web app)
   - `showPublicMemberDashboard()` - Opens member dashboard web app URL
-  - **8 Tabs:** Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources
+  - `showFAQ()` - Opens comprehensive FAQ/Help modal with 4 categories and 12+ questions
+  - `filterModalList()` - Search functionality for modal dialog lists
+  - **9 Tabs (Steward):** Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources
+  - **8 Tabs (Member):** Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources (no My Cases)
+  - **My Cases Tab:** Steward's assigned grievances with KPIs (active, urgent, avg days), filtering by status
   - **Engagement Metrics:** Email open rate, virtual/in-person meeting attendance, volunteer hours, union interest (local/chapter/allied)
+  - **Workload Enhancements:** Member:Steward ratio display, Top Performers section with scores and win rates
+  - **Filed vs Resolved Chart:** Monthly trend chart showing both filed and resolved grievances
   - **Directory Trends:** Recent updates, stale contacts, missing email/phone counts
   - **Drive Resources:** Google Drive folder integration from Config tab (ARCHIVE_FOLDER_ID)
+  - **Searchable Modals:** Click-through lists now include search functionality
   - **Deprecated:** `getStewardDashboardData()`, `getStewardDashboardHtml_()` - replaced by unified system
 
 - Menu Consolidation **(v4.4.0)**:

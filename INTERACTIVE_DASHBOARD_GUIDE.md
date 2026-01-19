@@ -14,12 +14,13 @@ The system now provides **two unified web app dashboards** with the same profess
 **Menu:** `509 Union Hub > Steward Dashboard`
 **Web App URL:** `?mode=steward`
 
-A comprehensive dashboard for stewards and leadership with **8 tabs**:
+A comprehensive dashboard for stewards and leadership with **9 tabs**:
 
 | Tab | Features |
 |-----|----------|
-| **Overview** | Clickable KPIs (members, stewards, open cases, win rate, overdue, morale), charts |
-| **Workload** | Steward caseload distribution, overload alerts, capacity tracking |
+| **Overview** | Clickable KPIs (members, stewards, open cases, win rate, overdue, morale), Filed vs Resolved chart |
+| **My Cases** | Your assigned grievances with KPIs (active, urgent, avg days), status filtering |
+| **Workload** | Steward caseload distribution, Member:Steward ratio, Top Performers section |
 | **Analytics** | Grievance outcomes, engagement metrics (email open rate, meeting attendance, volunteer hours, union interest) |
 | **Directory** | Member contact trends, recent updates, stale contacts, missing email/phone, recent meeting attendees |
 | **Hot Spots** | Locations with 3+ active grievances |
@@ -27,21 +28,28 @@ A comprehensive dashboard for stewards and leadership with **8 tabs**:
 | **Satisfaction** | 8-section member satisfaction survey analysis with scores |
 | **Resources** | Google Drive folder access, forms, contracts, contact info |
 
+**Additional Features:**
+- **Help/FAQ Button** - Comprehensive help modal with 4 categories and 12+ questions
+- **Searchable Modals** - Click-through lists include search functionality
+- **Filed vs Resolved Chart** - Monthly trend showing both filed and resolved grievances
+
 > **Contains PII:** This dashboard shows member names and steward details. For internal use only.
 
 ### 👥 Member Dashboard (Public/Member Use - No PII)
 **Menu:** `509 Union Hub > Member Dashboard`
 **Web App URL:** `?mode=member`
 
-A PII-safe dashboard for sharing with members - **same 8 tabs** but with anonymized data:
+A PII-safe dashboard for sharing with members - **8 tabs** with anonymized data:
 
 | Feature | Description |
 |---------|-------------|
 | **Same Dark Theme** | Identical professional dark gradient interface |
-| **Same 8 Tabs** | All tabs available with same layout |
+| **8 Tabs** | Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources |
+| **No My Cases** | My Cases tab is steward-only (requires PII) |
 | **Anonymized Data** | Member names replaced with "Member 1", "Member 2", etc. |
 | **Aggregate Stats** | Individual data rolled up to percentages and totals |
 | **PII Masking** | Phone numbers and SSNs automatically scrubbed |
+| **Help/FAQ Button** | Same comprehensive help available |
 
 > **No PII:** Uses Safety Valve scrubbing for phone numbers and SSNs.
 
