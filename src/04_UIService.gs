@@ -8073,6 +8073,7 @@ function getUnifiedDashboardHtml(isPII) {
     '.btn{padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s}' +
     '.btn-primary{background:#3b82f6;color:white}.btn-primary:hover{background:#2563eb}' +
     '.btn-secondary{background:#475569;color:white}.btn-secondary:hover{background:#64748b}' +
+    '.btn-sm{padding:6px 12px;font-size:11px}' +
 
     // Loading
     '.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;color:#94a3b8}' +
@@ -8166,10 +8167,12 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"kpi-card "+(urgentCount>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Needs Attention</div><div class=\\"kpi-value "+(urgentCount>0?"red":"green")+"\\">"+urgentCount+"</div></div>";' +
     'var avgDays=d.myCases.length>0?Math.round(d.myCases.reduce(function(s,c){return s+(c.daysOpen||0)},0)/d.myCases.length):0;' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg Days Open</div><div class=\\"kpi-value "+(avgDays>45?"red":avgDays>30?"yellow":"green")+"\\">"+avgDays+"</div></div></div>";' +
+    // Status filter buttons
+    'html+="<div style=\\"display:flex;gap:8px;margin:12px 0\\"><button class=\\"btn btn-primary btn-sm\\" onclick=\\"filterMyCases(\\'all\\')\\">All</button><button class=\\"btn btn-secondary btn-sm\\" onclick=\\"filterMyCases(\\'Open\\')\\">Open</button><button class=\\"btn btn-secondary btn-sm\\" onclick=\\"filterMyCases(\\'Pending\\')\\">Pending</button><button class=\\"btn btn-secondary btn-sm\\" style=\\"background:#ef4444\\" onclick=\\"filterMyCases(\\'Overdue\\')\\">Overdue</button></div>";' +
     'if(d.myCases.length===0){html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#22c55e\\">check_circle</i><p style=\\"color:#94a3b8;margin-top:16px\\">No active cases assigned to you. Great job!</p></div>"}' +
-    'else{html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">folder_open</i>My Assigned Cases</div><div class=\\"list-container\\" style=\\"max-height:400px\\">";' +
-    'd.myCases.forEach(function(c){var statusColor=c.status.toLowerCase()==="open"?"#f59e0b":c.status.toLowerCase().indexOf("pending")>=0?"#ef4444":"#64748b";' +
-    'html+="<div class=\\"list-item\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+c.id+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+c.status+"</span></div>";' +
+    'else{html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">folder_open</i>My Assigned Cases</div><div id=\\"myCasesList\\" class=\\"list-container\\" style=\\"max-height:400px\\">";' +
+    'd.myCases.forEach(function(c){var statusColor=c.status.toLowerCase()==="open"?"#f59e0b":c.status.toLowerCase().indexOf("pending")>=0?"#ef4444":"#64748b";var isOverdue=c.daysOpen>30||c.status.toLowerCase().indexOf("pending")>=0;' +
+    'html+="<div class=\\"my-case-item list-item\\" data-status=\\""+c.status+"\\" data-overdue=\\""+(isOverdue?"yes":"no")+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+c.id+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+c.status+(isOverdue?" ⚠":"")+"</span></div>";' +
     'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#cbd5e1\\">"+c.member+" | "+c.category+"</div>";' +
     'html+="<div style=\\"width:100%;display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#94a3b8\\"><span>"+c.step+" | "+c.location+"</span><span>"+c.daysOpen+" days</span></div></div>"});' +
     'html+="</div></div>"}' +
@@ -8401,6 +8404,15 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div style=\\"color:#94a3b8;font-size:12px;line-height:1.5\\">"+item.a+"</div></div>"})});' +
     'html+="</div>";' +
     'openModal("Help & FAQ",html)' +
+    '}' +
+
+    // Filter My Cases by status (v4.4.0)
+    'function filterMyCases(status){' +
+    'document.querySelectorAll(".my-case-item").forEach(function(el){' +
+    'if(status==="all"){el.style.display="flex"}' +
+    'else if(status==="Overdue"){el.style.display=el.getAttribute("data-overdue")==="yes"?"flex":"none"}' +
+    'else{el.style.display=el.getAttribute("data-status").toLowerCase().indexOf(status.toLowerCase())>=0?"flex":"none"}' +
+    '})' +
     '}' +
 
     '</script></body></html>';
