@@ -1,6 +1,6 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.4.0 (Unified Web App Dashboards, Engagement Metrics, Menu Consolidation)
+**Version:** 4.4.1 (Compare Tab Redesign, Hot Spots Enhancement, Satisfaction Question Breakdown)
 **Last Updated:** 2026-01-19
 **Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
 
@@ -355,8 +355,8 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - `showPublicMemberDashboard()` - Opens member dashboard web app URL
   - `showFAQ()` - Opens comprehensive FAQ/Help modal with 4 categories and 12+ questions
   - `filterModalList()` - Search functionality for modal dialog lists
-  - **9 Tabs (Steward):** Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources
-  - **8 Tabs (Member):** Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources (no My Cases)
+  - **11 Tabs (Steward):** Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Help
+  - **9 Tabs (Member):** Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare (no My Cases or Help)
   - **My Cases Tab:** Steward's assigned grievances with KPIs (active, urgent, avg days), filtering by status
   - **Engagement Metrics:** Email open rate, virtual/in-person meeting attendance, volunteer hours, union interest (local/chapter/allied)
   - **Workload Enhancements:** Member:Steward ratio display, Top Performers section with scores and win rates
@@ -364,6 +364,12 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - **Directory Trends:** Recent updates, stale contacts, missing email/phone counts
   - **Drive Resources:** Google Drive folder integration from Config tab (ARCHIVE_FOLDER_ID)
   - **Searchable Modals:** Click-through lists now include search functionality
+  - **Overview Tab Enhancements (v4.4.1):** Quick Insights panel with grievance status, hot spot alerts, engagement summary, and bargaining position; secondary metrics row showing total grievances, member:steward ratio, survey response rate, email open rate, step 1 denial rate, avg settlement days
+  - **Compare Tab (v4.4.1):** Comprehensive dashboard comparison tool with period comparison (current vs previous 30 days), step-by-step grievance comparison table with outcomes (won/denied/settled/pending), satisfaction section comparison grid, denial rate analysis (Step 1 & Step 2), and CSV export functionality
+  - **Hot Spots Tab Enhancements (v4.4.1):** Explanations of what hot spots mean; 4 types of hot spots: Grievance (3+ active cases), Dissatisfaction (satisfaction < 5/10), Low Engagement (< 30% engagement), Overdue Concentration (2+ overdue cases)
+  - **Bargaining Tab Enhancements (v4.4.1):** Step 2 denial rate; detailed step progression table with descriptions and success rates; step outcomes tracking (won/denied/settled/pending/withdrawn at each step); cases at Step 1/Step 2 detail lists; recent grievances list
+  - **Satisfaction Tab Enhancements (v4.4.1):** Individual question scores for all 40+ survey questions; expandable sections with question-level breakdowns; complete survey question breakdown table with scores and visual rating bars; `toggleSectionDetail()` function for collapsible sections
+  - **New Data Fields (v4.4.1):** `stepOutcomes`, `step2DenialRate`, `stepCaseDetails`, `recentGrievances`, `hotSpots` (grievance/dissatisfaction/lowEngagement/overdueConcentration), `allQuestionScores`, individual question scores in satisfaction sections
   - **Deprecated:** `getStewardDashboardData()`, `getStewardDashboardHtml_()` - replaced by unified system
 
 - Menu Consolidation **(v4.4.0)**:
@@ -1519,6 +1525,73 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.4.1 (2026-01-19) - Compare Tab Redesign, Hot Spots Enhancement, Satisfaction Question Breakdown
+
+**Compare Tab - Complete Redesign:**
+- Added explanatory header describing what the Compare tab is for
+- **Current vs Previous Period** comparison with trend indicators (+/- percentages)
+- **Step-by-Step Grievance Comparison** table showing outcomes at each step (Won/Denied/Settled/Pending)
+- **Satisfaction Section Comparison** grid showing all 8 section scores
+- **Denial Rate Analysis** with Step 1 and Step 2 denial rates, plus avg settlement days
+- Streamlined CSV export functionality
+
+**Hot Spots Tab - Comprehensive Overhaul:**
+- Added explanation panel describing what each hot spot type means
+- **4 Types of Hot Spots:**
+  - Grievance Hot Spots: Locations with 3+ active grievance cases
+  - Dissatisfaction Hot Spots: Areas with satisfaction scores below 5/10
+  - Low Engagement Hot Spots: Areas with less than 30% email/meeting engagement
+  - Overdue Concentration: Locations with 2+ overdue cases
+- KPI cards showing count of each hot spot type
+- Detailed grids for each hot spot category with color coding
+
+**Bargaining Tab - Enhanced Detail:**
+- Added Step 2 Denial Rate metric
+- **Detailed Step Progression Table** with descriptions for each step:
+  - Step 1 - Informal (initial meeting with supervisor)
+  - Step 2 - Formal (written grievance to management)
+  - Step 3 - Review (higher-level management review)
+  - Arbitration (third-party arbitrator decision)
+- Shows outcomes at each step: Won, Denied, Settled, Pending, Withdrawn, Success Rate
+- **Cases at Step 1 and Step 2 lists** showing actual case details
+- Recent Grievances list with status badges
+
+**Satisfaction Tab - Individual Question Breakdown:**
+- Individual question scores now calculated for all 40+ survey questions
+- **Expandable sections** - click any section to see individual question scores with progress bars
+- **Complete Survey Question Breakdown table** showing every question, section, score, and visual rating bar
+- Added `toggleSectionDetail()` function for collapsible sections
+- Questions properly mapped to survey columns (Q6-Q55)
+
+**Overview Tab - Quick Insights Panel:**
+- Added **Quick Insights panel** with 4 insight cards:
+  - Grievance Status summary (active cases, total all-time, won/denied/settled)
+  - Hot Spot Alert (count of areas needing attention)
+  - Engagement Summary (average engagement percentage)
+  - Bargaining Position (Step 1 denial rate interpretation)
+- **Secondary Metrics Row** showing: total grievances, member:steward ratio, survey response rate, email open rate, step 1 denial rate, avg settlement days
+
+**New Data Structures:**
+- `stepOutcomes`: Track outcomes (won/denied/settled/withdrawn/pending) at each grievance step
+- `step2DenialRate`: Calculate Step 2 denial rate
+- `stepCaseDetails`: Store case details for each step
+- `recentGrievances`: Last 10 grievances for display
+- `hotSpots`: Object with 4 arrays (grievance, dissatisfaction, lowEngagement, overdueConcentration)
+- `allQuestionScores`: Individual question scores for satisfaction survey
+- Individual question scores populated in satisfaction sections
+
+**Tab Count Update:**
+- Steward Dashboard: 11 tabs (was 9) - added Compare and Help
+- Member Dashboard: 9 tabs (was 8) - added Compare (no My Cases or Help)
+
+**Files Changed:**
+- `src/04_UIService.gs` - All tab enhancements, new data structures, new functions
+- `AIR.md` - Documentation updates
+- `FEATURES.md` - Tab descriptions updated
+- `INTERACTIVE_DASHBOARD_GUIDE.md` - Dashboard feature documentation
+
+---
 
 ### Version 4.3.8 (2026-01-18) - Searchable Help Guide & Modal Consolidation
 
