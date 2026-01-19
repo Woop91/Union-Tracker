@@ -812,47 +812,63 @@ function applyTabColors_(ss) {
     HIDDEN: '#9e9e9e'       // Gray - for hidden/calc sheets
   };
 
-  // Red tabs - Getting Started, FAQ
-  var redSheets = [SHEETS.GETTING_STARTED, SHEETS.FAQ];
-  redSheets.forEach(function(name) {
+  // Helper function to find sheet by name (tries exact match and variations)
+  function findSheet(name) {
     var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.RED); } catch (e) { Logger.log('Tab color error: ' + e.message); }
+    if (sheet) return sheet;
+
+    // Try without emoji prefix (if name starts with emoji)
+    if (name && name.length > 2) {
+      var noEmoji = name.replace(/^[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]\s*/u, '');
+      if (noEmoji !== name) {
+        sheet = ss.getSheetByName(noEmoji);
+        if (sheet) return sheet;
+      }
     }
-  });
+    return null;
+  }
+
+  // Helper to apply color safely
+  function applyColor(sheetName, color) {
+    var sheet = findSheet(sheetName);
+    if (sheet) {
+      try {
+        sheet.setTabColor(color);
+        Logger.log('Tab color applied to: ' + sheet.getName());
+      } catch (e) {
+        Logger.log('Tab color error for ' + sheetName + ': ' + e.message);
+      }
+    } else {
+      Logger.log('Sheet not found for tab color: ' + sheetName);
+    }
+  }
+
+  // Red tabs - Getting Started, FAQ
+  applyColor(SHEETS.GETTING_STARTED, TAB_COLORS.RED);
+  applyColor(SHEETS.FAQ, TAB_COLORS.RED);
 
   // Purple tabs - Member Directory, Grievance Log, Case Checklist
-  var purpleSheets = [SHEETS.MEMBER_DIR, SHEETS.GRIEVANCE_LOG, SHEETS.CASE_CHECKLIST];
-  purpleSheets.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.PURPLE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-    }
-  });
+  applyColor(SHEETS.MEMBER_DIR, TAB_COLORS.PURPLE);
+  applyColor('Member Directory', TAB_COLORS.PURPLE);  // Fallback without constant
+  applyColor(SHEETS.GRIEVANCE_LOG, TAB_COLORS.PURPLE);
+  applyColor('Grievance Log', TAB_COLORS.PURPLE);  // Fallback without constant
+  applyColor(SHEETS.CASE_CHECKLIST, TAB_COLORS.PURPLE);
+  applyColor('Case Checklist', TAB_COLORS.PURPLE);  // Fallback without constant
 
   // Yellow tabs - Feedback and Development, Function Checklist
-  var yellowSheets = [SHEETS.FEEDBACK, SHEETS.FUNCTION_CHECKLIST];
-  yellowSheets.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.YELLOW); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-    }
-  });
+  applyColor(SHEETS.FEEDBACK, TAB_COLORS.YELLOW);
+  applyColor('Feedback & Development', TAB_COLORS.YELLOW);  // Without emoji
+  applyColor('Feedback and Development', TAB_COLORS.YELLOW);  // Alternate spelling
+  applyColor(SHEETS.FUNCTION_CHECKLIST, TAB_COLORS.YELLOW);
 
   // Orange tabs - Config, Config Guide
-  var orangeSheets = [SHEETS.CONFIG, SHEETS.CONFIG_GUIDE];
-  orangeSheets.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      try { sheet.setTabColor(TAB_COLORS.ORANGE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-    }
-  });
+  applyColor(SHEETS.CONFIG, TAB_COLORS.ORANGE);
+  applyColor('Config', TAB_COLORS.ORANGE);  // Fallback
+  applyColor(SHEETS.CONFIG_GUIDE, TAB_COLORS.ORANGE);
 
   // Blue tabs - Member Satisfaction
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
-  if (satSheet) {
-    try { satSheet.setTabColor(TAB_COLORS.BLUE); } catch (e) { Logger.log('Tab color error: ' + e.message); }
-  }
+  applyColor(SHEETS.SATISFACTION, TAB_COLORS.BLUE);
+  applyColor('Member Satisfaction', TAB_COLORS.BLUE);  // Without emoji
 
   Logger.log('Tab colors applied successfully');
 }
