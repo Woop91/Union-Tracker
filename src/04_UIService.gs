@@ -118,6 +118,9 @@ function createDashboardMenu() {
     .addItem('🔧 Repair Dashboard', 'showRepairDialog')
     .addItem('⚙️ Settings', 'showSettingsDialog')
     .addSeparator()
+    .addItem('🎨 Apply Config Sheet Styling', 'applyConfigStyling')
+    .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+    .addSeparator()
     .addSubMenu(ui.createMenu('⚙️ Automation')
       .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
       .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
@@ -151,6 +154,7 @@ function createDashboardMenu() {
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
       .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('🖌️ Setup Theme Columns in Config', 'setupThemeColumns')
       .addItem('📱 Add Mobile Dashboard Link to Config', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
 
