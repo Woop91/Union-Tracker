@@ -2,40 +2,54 @@
 
 ## Overview
 
-The **Interactive Dashboard** system provides comprehensive views of your union's grievance management data through mobile-friendly modal popup interfaces. Version 4.3.x introduces a **Two-Dashboard Architecture**.
+The **Interactive Dashboard** system provides comprehensive views of your union's grievance management data through mobile-friendly **web app interfaces**. Version 4.4.0 introduces the **Unified Web App Dashboard Architecture**.
 
 ---
 
-## 🏗️ Two-Dashboard Architecture (v4.3.3+)
+## 🏗️ Unified Web App Dashboard Architecture (v4.4.0)
 
-The system now provides **two primary dashboards** to serve different user groups:
+The system now provides **two unified web app dashboards** with the same professional dark theme, accessed via URL parameters:
 
-### 🛡️ Steward Dashboard (Internal Use)
-**Menu:** `🎯 Strategic Ops > 🛡️ Steward Dashboard`
+### 🛡️ Steward Dashboard (Internal Use - Contains PII)
+**Menu:** `509 Union Hub > Steward Dashboard`
+**Web App URL:** `?mode=steward`
 
-A comprehensive dashboard for stewards and leadership with **6 tabs**:
+A comprehensive dashboard for stewards and leadership with **9 tabs**:
 
 | Tab | Features |
 |-----|----------|
-| **Overview** | KPIs, response rates, aging cases, resolution stats |
-| **Workload** | Steward performance, case distribution, capacity |
-| **Analytics** | Status breakdown, trends, category analysis |
-| **Hot Spots** | Problem locations with 3+ active grievances |
-| **Bargaining** | Contract violation tracking, cheat sheet data |
-| **Satisfaction** | 8-section member satisfaction survey analysis with scores and question breakdowns |
+| **Overview** | Clickable KPIs (members, stewards, open cases, win rate, overdue, morale), Filed vs Resolved chart |
+| **My Cases** | Your assigned grievances with KPIs (active, urgent, avg days), status filtering |
+| **Workload** | Steward caseload distribution, Member:Steward ratio, Top Performers section |
+| **Analytics** | Grievance outcomes, engagement metrics (email open rate, meeting attendance, volunteer hours, union interest) |
+| **Directory** | Member contact trends, recent updates, stale contacts, missing email/phone, recent meeting attendees |
+| **Hot Spots** | Locations with 3+ active grievances |
+| **Bargaining** | Step 1 denial rate, settlement time, article violations, step progression |
+| **Satisfaction** | 8-section member satisfaction survey analysis with scores |
+| **Resources** | Google Drive folder access, forms, contracts, contact info |
+
+**Additional Features:**
+- **Help/FAQ Button** - Comprehensive help modal with 4 categories and 12+ questions
+- **Searchable Modals** - Click-through lists include search functionality
+- **Filed vs Resolved Chart** - Monthly trend showing both filed and resolved grievances
 
 > **Contains PII:** This dashboard shows member names and steward details. For internal use only.
 
-### 👥 Member Dashboard (Public/Member Use)
-**Menu:** `🎯 Strategic Ops > 👥 Member Dashboard`
+### 👥 Member Dashboard (Public/Member Use - No PII)
+**Menu:** `509 Union Hub > Member Dashboard`
+**Web App URL:** `?mode=member`
 
-A PII-safe dashboard for sharing with members:
+A PII-safe dashboard for sharing with members - **8 tabs** with anonymized data:
 
-| Section | Features |
-|---------|----------|
-| **Union Snapshot** | Aggregate stats (total members, grievances, win rate) |
-| **Steward Directory** | Live searchable steward list with contact info |
-| **Member Satisfaction** | 8-section survey scores (aggregate only, no individual responses) |
+| Feature | Description |
+|---------|-------------|
+| **Same Dark Theme** | Identical professional dark gradient interface |
+| **8 Tabs** | Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources |
+| **No My Cases** | My Cases tab is steward-only (requires PII) |
+| **Anonymized Data** | Member names replaced with "Member 1", "Member 2", etc. |
+| **Aggregate Stats** | Individual data rolled up to percentages and totals |
+| **PII Masking** | Phone numbers and SSNs automatically scrubbed |
+| **Help/FAQ Button** | Same comprehensive help available |
 
 > **No PII:** Uses Safety Valve scrubbing for phone numbers and SSNs.
 
@@ -61,14 +75,18 @@ A **popup modal dialog** with a tabbed interface featuring:
 
 ## 📊 Dashboard Features
 
-### Steward Dashboard Access
-`🎯 Strategic Ops > 🛡️ Steward Dashboard`
+### Steward Dashboard Access (v4.4.0)
+`509 Union Hub > Steward Dashboard` - Opens web app URL dialog with link to copy/bookmark
 
-### Member Dashboard Access
-`🎯 Strategic Ops > 👥 Member Dashboard`
+### Member Dashboard Access (v4.4.0)
+`509 Union Hub > Member Dashboard` - Opens web app URL dialog with link to share with members
+
+### Web App Direct URLs
+- **Steward:** `[YOUR_WEB_APP_URL]?mode=steward`
+- **Member:** `[YOUR_WEB_APP_URL]?mode=member`
 
 ### Legacy Dashboard Access
-`📊 509 Dashboard > 📊 Dashboard` (5 tabs: Overview, My Cases, Grievances, Members, Analytics)
+`509 Union Hub > Legacy Dashboard` (5 tabs: Overview, My Cases, Grievances, Members, Analytics)
 
 ---
 
@@ -583,7 +601,7 @@ Potential additions (from Future Features sheet):
 ---
 
 **Created for SEIU Local 509 (Units 8 & 10)**
-**Version:** 4.3.8
+**Version:** 4.4.0
 **Last Updated:** January 2026
 
 *Empowering union representatives with data-driven insights* 📊✊

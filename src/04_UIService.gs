@@ -25,108 +25,148 @@
 
 /**
  * Creates the custom menu when the spreadsheet opens
- * Uses consistent iconography: 📊 for views, ➕ for actions
+ * Consolidated menu structure (v4.4.0):
+ * - 📊 509 Union Hub: Primary operations (dashboards, search, members, cases)
+ * - 🔧 Tools: Supporting features (calendar, drive, notifications, etc.)
+ * - 🛠️ Admin: System administration
  * Called automatically by onOpen trigger
  */
 function createDashboardMenu() {
   const ui = SpreadsheetApp.getUi();
 
-  // Main Menu: Union Hub
-  ui.createMenu('📊 Union Hub')
-    .addItem('📊 Dashboard Home', 'showDashboardSidebar')
-    .addItem('📱 Toggle Mobile View', 'toggleMobileView')
-    .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
+  // ============================================================================
+  // MENU 1: 509 Union Hub - Primary Operations
+  // ============================================================================
+  ui.createMenu('📊 509 Union Hub')
+    // Dashboards at the top - most important
+    .addItem('👥 Member Dashboard', 'showPublicMemberDashboard')
+    .addItem('🛡️ Steward Dashboard', 'showStewardDashboard')
     .addSeparator()
 
-    // Search submenu - Action icons
+    // Search - second most used
     .addSubMenu(ui.createMenu('🔍 Search')
       .addItem('🔍 Desktop Search', 'showDesktopSearch')
       .addItem('⚡ Quick Search', 'showQuickSearch')
       .addItem('🔎 Advanced Search', 'showAdvancedSearch'))
 
-    // Grievances submenu - Mixed icons
+    // Members management
+    .addSubMenu(ui.createMenu('👥 Members')
+      .addItem('➕ Add New Member', 'showNewMemberDialog')
+      .addItem('🔍 Find Member', 'showSearchDialog')
+      .addItem('🛡️ Steward Directory', 'showStewardDirectory')
+      .addSeparator()
+      .addItem('📥 Import Members', 'showImportMembersDialog')
+      .addItem('📤 Export Directory', 'showExportMembersDialog')
+      .addSeparator()
+      .addItem('🆔 Generate Missing IDs', 'generateMissingMemberIDs')
+      .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
+      .addSeparator()
+      .addItem('⬆️ Promote to Steward', 'promoteSelectedMemberToSteward')
+      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward'))
+
+    // Cases & Grievances
     .addSubMenu(ui.createMenu('📋 Cases & Grievances')
       .addItem('➕ New Case/Grievance', 'showNewGrievanceDialog')
       .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
       .addItem('✅ View Checklist', 'showChecklistDialog')
       .addSeparator()
       .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
-      .addItem('📈 Case Analytics', 'showInteractiveDashboardTab'))
-
-    // Members submenu - Mixed icons
-    .addSubMenu(ui.createMenu('👥 Members')
-      .addItem('➕ Add New Member', 'showNewMemberDialog')
-      .addItem('🔍 Find Existing Member', 'showSearchDialog')
-      .addItem('📥 Import Members', 'showImportMembersDialog')
-      .addItem('📤 Export Directory', 'showExportMembersDialog')
+      .addItem('📄 Create PDF', 'createPDFForSelectedGrievance')
       .addSeparator()
-      .addItem('🛡️ Steward Directory', 'showStewardDirectory')
-      .addItem('🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas')
-      .addSeparator()
-      .addItem('📧 Send Contact Form', 'sendContactInfoForm')
-      .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink')
-      .addSeparator()
-      .addSubMenu(ui.createMenu('🆔 ID & Data Management')
-        .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
-        .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')))
+      .addItem('🚦 Apply Traffic Lights', 'applyTrafficLightIndicators')
+      .addItem('🔄 Clear Traffic Lights', 'clearTrafficLightIndicators'))
 
-    // Calendar submenu - Action icons
-    .addSubMenu(ui.createMenu('📅 Calendar')
-      .addItem('🔗 Sync Deadlines to Calendar', 'syncDeadlinesToCalendar')
-      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar')
-      .addItem('🗑️ Clear All Calendar Events', 'clearAllCalendarEvents'))
-
-    // Drive submenu - Folder icons
-    .addSubMenu(ui.createMenu('📁 Google Drive')
-      .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
-      .addItem('📁 View Grievance Files', 'showGrievanceFiles')
-      .addItem('📁 Batch Create Folders', 'batchCreateAllMissingFolders'))
-
-    // Notifications submenu
-    .addSubMenu(ui.createMenu('🔔 Notifications')
-      .addItem('⚙️ Notification Settings', 'showNotificationSettings')
-      .addItem('🧪 Test Notifications', 'testDeadlineNotifications'))
-
-    // Dashboards - Two unified dashboards (v4.3.2)
-    .addSubMenu(ui.createMenu('📊 Dashboards')
-      .addItem('👥 Member Dashboard (No PII)', 'showPublicMemberDashboard')
-      .addItem('🛡️ Steward Dashboard (PII)', 'showStewardDashboard')
-      .addSeparator()
-      .addItem('📱 Mobile Dashboard', 'showMobileDashboard'))
-    .addSubMenu(ui.createMenu('🔄 Maintenance')
-      .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
-      .addItem('📱 Get Mobile App URL', 'showWebAppUrl'))
-
-    // Appearance & Comfort View consolidated into Visual Control Panel
-    .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
-
-    // Multi-Select Tools submenu
-    .addSubMenu(ui.createMenu('📝 Multi-Select')
-      .addItem('📝 Open Editor', 'openCellMultiSelectEditor')
-      .addItem('⚡ Enable Auto-Open', 'installMultiSelectTrigger')
-      .addItem('🚫 Disable Auto-Open', 'removeMultiSelectTrigger'))
+    // Analytics & Reports
+    .addSubMenu(ui.createMenu('📈 Analytics & Reports')
+      .addItem('📈 Case Analytics', 'showInteractiveDashboardTab')
+      .addItem('📊 Grievance Trends', 'showGrievanceTrends')
+      .addItem('🏥 Unit Health Report', 'showUnitHealthReport')
+      .addItem('📚 Search Precedents', 'showSearchPrecedents'))
 
     .addSeparator()
     .addItem('⚡ Quick Actions', 'showQuickActionsMenu')
     .addItem('📖 Help & Documentation', 'showHelpDialog')
     .addToUi();
 
-  // Admin Menu (Separate top-level menu)
+  // ============================================================================
+  // MENU 2: Tools - Supporting Features
+  // ============================================================================
+  ui.createMenu('🔧 Tools')
+    // Communication
+    .addSubMenu(ui.createMenu('📧 Communication')
+      .addItem('📧 Send Contact Form', 'sendContactInfoForm')
+      .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink')
+      .addItem('📧 Send Portal Email', 'sendPortalEmailToSelectedMember'))
+
+    // Calendar
+    .addSubMenu(ui.createMenu('📅 Calendar')
+      .addItem('🔗 Sync Deadlines', 'syncDeadlinesToCalendar')
+      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar')
+      .addItem('🗑️ Clear Calendar Events', 'clearAllCalendarEvents'))
+
+    // Google Drive
+    .addSubMenu(ui.createMenu('📁 Google Drive')
+      .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
+      .addItem('📁 View Grievance Files', 'showGrievanceFiles')
+      .addItem('📁 Batch Create Folders', 'batchCreateAllMissingFolders'))
+
+    // Notifications
+    .addSubMenu(ui.createMenu('🔔 Notifications')
+      .addItem('⚙️ Notification Settings', 'showNotificationSettings')
+      .addItem('🧪 Test Notifications', 'testDeadlineNotifications'))
+
+    .addSeparator()
+
+    // View & Display
+    .addSubMenu(ui.createMenu('🎛️ View & Display')
+      .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
+      .addItem('📱 Toggle Mobile View', 'toggleMobileView')
+      .addItem('📱 Pocket View', 'navToMobile')
+      .addItem('🖥️ Restore Desktop View', 'showAllMemberColumns')
+      .addSeparator()
+      .addItem('🎨 Apply Theme', 'APPLY_SYSTEM_THEME')
+      .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
+      .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'))
+
+    // Multi-Select Tools
+    .addSubMenu(ui.createMenu('📝 Multi-Select')
+      .addItem('📝 Open Editor', 'openCellMultiSelectEditor')
+      .addItem('⚡ Enable Auto-Open', 'installMultiSelectTrigger')
+      .addItem('🚫 Disable Auto-Open', 'removeMultiSelectTrigger'))
+
+    // OCR Tools
+    .addSubMenu(ui.createMenu('📝 OCR Tools')
+      .addItem('📝 OCR Transcribe Form', 'showOCRDialog')
+      .addItem('🔧 OCR Setup', 'setupOCRApiKey'))
+
+    .addSeparator()
+
+    // Web App & Portal
+    .addSubMenu(ui.createMenu('🌐 Web App & Portal')
+      .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
+      .addItem('👤 Build Member Portal', 'buildPortalForSelectedMember')
+      .addItem('📊 Build Public Portal', 'buildPublicPortal'))
+
+    // Maintenance
+    .addSubMenu(ui.createMenu('🔄 Maintenance')
+      .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
+      .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
+      .addItem('🔄 Refresh View', 'refreshMemberView'))
+
+    .addToUi();
+
+  // ============================================================================
+  // MENU 3: Admin - System Administration
+  // ============================================================================
   var adminMenu = ui.createMenu('🛠️ Admin')
+    // Diagnostics & Repair at top
     .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
     .addItem('🔍 Modal Diagnostics', 'showModalDiagnostics')
     .addItem('🔧 Repair Dashboard', 'showRepairDialog')
     .addItem('⚙️ Settings', 'showSettingsDialog')
     .addSeparator()
-    .addItem('🎨 Apply Config Sheet Styling', 'applyConfigStyling')
-    .addItem('🎨 Apply Tab Colors', 'applyTabColors')
-    .addSeparator()
-    .addSubMenu(ui.createMenu('⚙️ Automation')
-      .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
-      .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
-      .addItem('❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger')
-      .addItem('🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers')
-      .addItem('📑 Email Weekly PDF Snapshot', 'emailExecutivePDF'))
+
+    // Data Sync
     .addSubMenu(ui.createMenu('🔄 Data Sync')
       .addItem('🔄 Sync All Data Now', 'syncAllData')
       .addItem('🔄 Sync Grievance → Members', 'syncGrievanceToMemberDirectory')
@@ -134,15 +174,44 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
       .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
+
+    // Validation
     .addSubMenu(ui.createMenu('✅ Validation')
       .addItem('🔍 Run Bulk Validation', 'runBulkValidation')
       .addItem('⚙️ Validation Settings', 'showValidationSettings')
       .addItem('🧹 Clear Indicators', 'clearValidationIndicators')
       .addItem('⚡ Install Validation Trigger', 'installValidationTrigger'))
+
+    // Automation
+    .addSubMenu(ui.createMenu('⚙️ Automation')
+      .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
+      .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
+      .addItem('❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger')
+      .addItem('🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers')
+      .addItem('📑 Email Weekly PDF Snapshot', 'emailExecutivePDF'))
+
+    // Cache & Performance
     .addSubMenu(ui.createMenu('🗄️ Cache & Performance')
       .addItem('🗄️ Cache Status', 'showCacheStatusDashboard')
       .addItem('🔥 Warm Up Caches', 'warmUpCaches')
       .addItem('🗑️ Clear All Caches', 'invalidateAllCaches'))
+
+    // Security & Backup
+    .addSubMenu(ui.createMenu('🛡️ Security & Backup')
+      .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
+      .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
+      .addItem('📜 View Audit Log', 'navigateToAuditLog')
+      .addItem('📊 v4.0 Status Report', 'showV4StatusReport'))
+
+    .addSeparator()
+
+    // Styling
+    .addSubMenu(ui.createMenu('🎨 Styling')
+      .addItem('🎨 Apply Config Sheet Styling', 'applyConfigStyling')
+      .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('🖌️ Setup Theme Columns', 'setupThemeColumns'))
+
+    // Setup
     .addSubMenu(ui.createMenu('🏗️ Setup')
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
@@ -153,9 +222,7 @@ function createDashboardMenu() {
       .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
-      .addItem('🎨 Apply Tab Colors', 'applyTabColors')
-      .addItem('🖌️ Setup Theme Columns in Config', 'setupThemeColumns')
-      .addItem('📱 Add Mobile Dashboard Link to Config', 'addMobileDashboardLinkToConfig')
+      .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
 
   // Only show Demo Data menu if NOT in production mode
@@ -172,31 +239,6 @@ function createDashboardMenu() {
   }
 
   adminMenu.addToUi();
-
-  // Strategic Operations Menu (Simplified v4.3.2)
-  ui.createMenu('🎯 Strategic Ops')
-    .addItem('👥 Member Dashboard', 'showPublicMemberDashboard')
-    .addItem('🛡️ Steward Dashboard', 'showStewardDashboard')
-    .addSeparator()
-    .addItem('🔍 Desktop Search', 'showDesktopSearch')
-    .addSubMenu(ui.createMenu('📋 Cases & Grievances')
-      .addItem('➕ New Case/Grievance', 'showNewGrievanceDialog')
-      .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
-      .addItem('✅ View Checklist', 'showChecklistDialog'))
-    .addSeparator()
-    .addSubMenu(ui.createMenu('🆔 ID & Data Engines')
-      .addItem('🆔 Generate Missing Member IDs', 'generateMissingMemberIDs')
-      .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
-      .addItem('📄 Create PDF for Selected Grievance', 'createPDFForSelectedGrievance'))
-    .addSubMenu(ui.createMenu('👤 Steward Management')
-      .addItem('⬆️ Promote to Steward', 'promoteSelectedMemberToSteward')
-      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward')
-      .addItem('📧 Send Contact Form', 'sendContactInfoForm')
-      .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink'))
-    .addToUi();
-
-  // Create the Field Portal menu (from CommandCenter.gs)
-  createCommandCenterMenu();
 }
 
 /**
@@ -6009,469 +6051,41 @@ function getExecutiveMetrics_() {
 // ============================================================================
 
 /**
- * Shows the unified Steward Dashboard with all analytics
- * Contains all charts and statistical data for stewards
+ * Shows the unified Steward Dashboard (web app URL)
+ * Opens the unified dashboard in steward mode (with PII)
+ * v4.4.0: Now opens as web app instead of modal for better experience
  */
 function showStewardDashboard() {
-  var html = HtmlService.createHtmlOutput(getStewardDashboardHtml_())
-    .setWidth(DIALOG_SIZES.FULLSCREEN.width)
-    .setHeight(DIALOG_SIZES.FULLSCREEN.height);
-  SpreadsheetApp.getUi().showModalDialog(html, '509 STEWARD COMMAND CENTER');
+  var url = ScriptApp.getService().getUrl() + '?mode=steward';
+  var html = HtmlService.createHtmlOutput(
+    '<html><head><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0}' +
+    '.icon{font-size:48px;margin-bottom:16px}h1{margin:0 0 8px}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5}' +
+    'a{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600}a:hover{background:#2563eb}' +
+    '.copy-btn{background:#475569;margin-left:8px;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:12px}' +
+    '.url{background:#1e293b;padding:12px;border-radius:8px;font-family:monospace;font-size:11px;word-break:break-all;max-width:90%;margin-bottom:16px;border:1px solid #334155}' +
+    '.warning{background:rgba(239,68,68,0.2);color:#fca5a5;padding:8px 16px;border-radius:8px;font-size:11px;margin-bottom:16px}' +
+    '</style></head><body><div class="icon">🛡️</div><h1>Steward Command Center</h1>' +
+    '<div class="warning">INTERNAL USE ONLY - Contains PII</div>' +
+    '<p>Open the Steward Dashboard web app. This version includes full member details and sensitive information.</p>' +
+    '<div class="url" id="url">' + url + '</div>' +
+    '<div><a href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
+    '</body></html>'
+  ).setWidth(500).setHeight(400);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Steward Command Center');
 }
 
 /**
- * Gets comprehensive steward analytics data (Bridge Pattern)
- * @returns {string} JSON with all dashboard data
+ * @deprecated v4.4.0 - Replaced by getUnifiedDashboardData() and getUnifiedDashboardDataAPI()
+ * Legacy getStewardDashboardData function has been removed.
+ * Use the unified dashboard system via doGet() web app with ?mode=steward or ?mode=member
  */
-function getStewardDashboardData() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
-
-  var data = {
-    // KPIs
-    totalMembers: 0,
-    stewardCount: 0,
-    totalGrievances: 0,
-    openGrievances: 0,
-    wins: 0,
-    losses: 0,
-    settled: 0,
-    winRate: 0,
-    overdueCount: 0,
-    moraleScore: 7.5,
-
-    // Breakdowns
-    unitBreakdown: {},
-    locationBreakdown: {},
-    stewardWorkload: [],
-    hotZones: [],
-    risingStars: [],
-
-    // Bargaining Data
-    step1DenialRate: 0,
-    avgSettlementDays: 0,
-    topViolatedArticle: 'N/A',
-    articleViolations: {},
-
-    // Chart Data
-    statusDistribution: { open: 0, pending: 0, won: 0, denied: 0, settled: 0 },
-    monthlyTrend: [],
-    sentimentTrend: [],
-
-    // Satisfaction Survey Data (Section Averages)
-    satisfactionData: {
-      responseCount: 0,
-      sections: [
-        { name: 'Overall Satisfaction', key: 'overall', score: 0, questions: ['Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Recommend'] },
-        { name: 'Steward Ratings', key: 'steward', score: 0, questions: ['Timely Response', 'Treated Respect', 'Explained Options', 'Followed Through', 'Advocated', 'Safe Concerns', 'Confidentiality'] },
-        { name: 'Chapter Effectiveness', key: 'chapter', score: 0, questions: ['Understand Issues', 'Chapter Comm', 'Organizes', 'Reach Chapter', 'Fair Rep'] },
-        { name: 'Local Leadership', key: 'leadership', score: 0, questions: ['Decisions Clear', 'Understand Process', 'Transparent Finance', 'Accountable', 'Fair Processes', 'Welcomes Opinions'] },
-        { name: 'Contract Enforcement', key: 'contract', score: 0, questions: ['Enforces Contract', 'Realistic Timelines', 'Clear Updates', 'Frontline Priority'] },
-        { name: 'Communication Quality', key: 'communication', score: 0, questions: ['Clear Actionable', 'Enough Info', 'Find Easily', 'All Shifts', 'Meetings Worth'] },
-        { name: 'Member Voice', key: 'voice', score: 0, questions: ['Voice Matters', 'Seeks Input', 'Dignity', 'Newer Supported', 'Conflict Respect'] },
-        { name: 'Value & Action', key: 'value', score: 0, questions: ['Good Value', 'Priorities Needs', 'Prepared Mobilize', 'Win Together'] }
-      ]
-    }
-  };
-
-  // Process Members
-  if (memberSheet && memberSheet.getLastRow() > 1) {
-    var memberData = memberSheet.getDataRange().getValues();
-    for (var m = 1; m < memberData.length; m++) {
-      if (memberData[m][MEMBER_COLS.MEMBER_ID - 1]) {
-        data.totalMembers++;
-        if (memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.stewardCount++;
-
-        var location = memberData[m][MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
-        var unit = memberData[m][MEMBER_COLS.UNIT - 1] || 'Unknown';
-        if (!data.locationBreakdown[location]) data.locationBreakdown[location] = 0;
-        data.locationBreakdown[location]++;
-        if (!data.unitBreakdown[unit]) data.unitBreakdown[unit] = 0;
-        data.unitBreakdown[unit]++;
-      }
-    }
-  }
-
-  // Process Grievances
-  var stewardCases = {};
-  var locationCases = {};
-  var step1Total = 0, step1Denials = 0;
-  var settlementDays = [];
-
-  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-    var grievanceData = grievanceSheet.getDataRange().getValues();
-    for (var g = 1; g < grievanceData.length; g++) {
-      var status = (grievanceData[g][GRIEVANCE_COLS.STATUS - 1] || '').toString();
-      var steward = grievanceData[g][GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
-      var location = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
-      var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
-
-      if (!grievanceData[g][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) continue;
-      data.totalGrievances++;
-
-      // Status distribution
-      switch(status.toLowerCase()) {
-        case 'open': data.statusDistribution.open++; data.openGrievances++; break;
-        case 'pending info': data.statusDistribution.pending++; data.openGrievances++; break;
-        case 'won': case 'sustained': data.statusDistribution.won++; data.wins++; break;
-        case 'denied': case 'lost': data.statusDistribution.denied++; data.losses++; break;
-        case 'settled': data.statusDistribution.settled++; data.settled++; break;
-      }
-
-      // Steward workload
-      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info') {
-        if (!stewardCases[steward]) stewardCases[steward] = 0;
-        stewardCases[steward]++;
-      }
-
-      // Hot zones (locations with active cases)
-      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info') {
-        if (!locationCases[location]) locationCases[location] = 0;
-        locationCases[location]++;
-      }
-
-      // Article violations
-      if (article) {
-        if (!data.articleViolations[article]) data.articleViolations[article] = 0;
-        data.articleViolations[article]++;
-      }
-
-      // Step 1 denial rate
-      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
-        step1Total++;
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) step1Denials++;
-      }
-
-      // Settlement time
-      var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
-      var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
-      if (dateFiled instanceof Date && dateClosed instanceof Date) {
-        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
-        if (days > 0) settlementDays.push(days);
-      }
-
-      // Check overdue
-      var step1Due = grievanceData[g][GRIEVANCE_COLS.STEP1_DUE - 1];
-      if (step1Due && new Date(step1Due) < new Date() && (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info')) {
-        data.overdueCount++;
-      }
-    }
-  }
-
-  // Calculate derived metrics
-  var totalClosed = data.wins + data.losses + data.settled;
-  data.winRate = totalClosed > 0 ? Math.round((data.wins / totalClosed) * 100) : 0;
-  data.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
-  data.avgSettlementDays = settlementDays.length > 0 ? Math.round(settlementDays.reduce(function(a,b){return a+b;},0) / settlementDays.length) : 0;
-
-  // Build steward workload array
-  for (var s in stewardCases) {
-    var count = stewardCases[s];
-    var statusLabel = count > 8 ? 'OVERLOAD' : count > 5 ? 'Heavy' : 'Available';
-    var color = count > 8 ? '#ef4444' : count > 5 ? '#f59e0b' : '#22c55e';
-    data.stewardWorkload.push({ name: s, count: count, status: statusLabel, color: color });
-  }
-  data.stewardWorkload.sort(function(a,b){return b.count - a.count;});
-
-  // Build hot zones (locations with 3+ active cases)
-  for (var loc in locationCases) {
-    if (locationCases[loc] >= 3) {
-      data.hotZones.push({ location: loc, count: locationCases[loc] });
-    }
-  }
-  data.hotZones.sort(function(a,b){return b.count - a.count;});
-
-  // Top violated article
-  var maxViolations = 0;
-  for (var art in data.articleViolations) {
-    if (data.articleViolations[art] > maxViolations) {
-      maxViolations = data.articleViolations[art];
-      data.topViolatedArticle = art;
-    }
-  }
-
-  // Process Satisfaction Survey for morale, sentiment, and section scores
-  if (satSheet && satSheet.getLastRow() > 1) {
-    var satData = satSheet.getDataRange().getValues();
-    var trustScores = [];
-    var monthlyTrust = {};
-
-    // Section score accumulators (using summary columns BT-CD if available, else calculate)
-    var sectionScores = {
-      overall: [], steward: [], chapter: [], leadership: [],
-      contract: [], communication: [], voice: [], value: []
-    };
-
-    for (var i = 1; i < satData.length; i++) {
-      if (!satData[i][0]) continue; // Skip empty rows
-      data.satisfactionData.responseCount++;
-
-      var trustVal = parseFloat(satData[i][7]); // Q7_TRUST_UNION (col H, index 7)
-      var timestamp = satData[i][0];
-
-      if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
-        trustScores.push(trustVal);
-        if (timestamp) {
-          var date = new Date(timestamp);
-          var monthKey = date.toLocaleString('default', { month: 'short' });
-          if (!monthlyTrust[monthKey]) monthlyTrust[monthKey] = { sum: 0, count: 0 };
-          monthlyTrust[monthKey].sum += trustVal;
-          monthlyTrust[monthKey].count++;
-        }
-      }
-
-      // Calculate section averages from summary columns (BT onwards = index 71+)
-      // Or calculate from raw question columns if summaries not available
-      var avgOverall = parseFloat(satData[i][71]) || 0; // BT
-      var avgSteward = parseFloat(satData[i][72]) || 0; // BU
-      var avgChapter = parseFloat(satData[i][74]) || 0; // BW
-      var avgLeadership = parseFloat(satData[i][75]) || 0; // BX
-      var avgContract = parseFloat(satData[i][76]) || 0; // BY
-      var avgComm = parseFloat(satData[i][78]) || 0; // CA
-      var avgVoice = parseFloat(satData[i][79]) || 0; // CB
-      var avgValue = parseFloat(satData[i][80]) || 0; // CC
-
-      // If summary columns empty, calculate from raw questions
-      if (avgOverall === 0) {
-        var q6 = parseFloat(satData[i][6]) || 0, q7 = parseFloat(satData[i][7]) || 0;
-        var q8 = parseFloat(satData[i][8]) || 0, q9 = parseFloat(satData[i][9]) || 0;
-        avgOverall = (q6 + q7 + q8 + q9) / 4;
-      }
-
-      if (avgOverall > 0) sectionScores.overall.push(avgOverall);
-      if (avgSteward > 0) sectionScores.steward.push(avgSteward);
-      if (avgChapter > 0) sectionScores.chapter.push(avgChapter);
-      if (avgLeadership > 0) sectionScores.leadership.push(avgLeadership);
-      if (avgContract > 0) sectionScores.contract.push(avgContract);
-      if (avgComm > 0) sectionScores.communication.push(avgComm);
-      if (avgVoice > 0) sectionScores.voice.push(avgVoice);
-      if (avgValue > 0) sectionScores.value.push(avgValue);
-    }
-
-    // Calculate final section averages
-    function avg(arr) { return arr.length > 0 ? Math.round((arr.reduce(function(a,b){return a+b;},0) / arr.length) * 10) / 10 : 0; }
-    data.satisfactionData.sections[0].score = avg(sectionScores.overall);
-    data.satisfactionData.sections[1].score = avg(sectionScores.steward);
-    data.satisfactionData.sections[2].score = avg(sectionScores.chapter);
-    data.satisfactionData.sections[3].score = avg(sectionScores.leadership);
-    data.satisfactionData.sections[4].score = avg(sectionScores.contract);
-    data.satisfactionData.sections[5].score = avg(sectionScores.communication);
-    data.satisfactionData.sections[6].score = avg(sectionScores.voice);
-    data.satisfactionData.sections[7].score = avg(sectionScores.value);
-
-    if (trustScores.length > 0) {
-      data.moraleScore = Math.round((trustScores.reduce(function(a,b){return a+b;},0) / trustScores.length) * 10) / 10;
-    }
-
-    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    months.forEach(function(month) {
-      if (monthlyTrust[month]) {
-        data.sentimentTrend.push({ month: month, score: Math.round((monthlyTrust[month].sum / monthlyTrust[month].count) * 10) / 10 });
-      }
-    });
-  }
-
-  return JSON.stringify(data);
-}
 
 /**
- * Generates the Steward Dashboard HTML with tabbed interface
- * @returns {string} Complete HTML for the modal
- * @private
+ * @deprecated v4.4.0 - Replaced by getUnifiedDashboardHtml()
+ * Legacy getStewardDashboardHtml_ function has been removed.
+ * Use the unified dashboard system via doGet() web app with ?mode=steward or ?mode=member
  */
-function getStewardDashboardHtml_() {
-  return '<!DOCTYPE html>' +
-    '<html><head><base target="_top">' +
-    '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">' +
-    '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
-    '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>' +
-    '<style>' +
-    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
-    'body { font-family: "Roboto", sans-serif; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #f8fafc; min-height: 100vh; }' +
-    '.header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }' +
-    '.header h1 { font-size: 20px; font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 10px; }' +
-    '.header .material-icons { font-size: 28px; }' +
-    '.pii-badge { background: rgba(239,68,68,0.2); color: #fca5a5; padding: 6px 12px; border-radius: 20px; font-size: 10px; font-weight: 700; text-transform: uppercase; }' +
-    '.tabs { display: flex; gap: 4px; padding: 0 24px; background: rgba(0,0,0,0.2); }' +
-    '.tab { padding: 12px 20px; cursor: pointer; font-size: 12px; font-weight: 500; color: #94a3b8; border-bottom: 2px solid transparent; transition: all 0.2s; }' +
-    '.tab:hover { color: #e2e8f0; }' +
-    '.tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }' +
-    '.content { padding: 20px 24px; overflow-y: auto; max-height: calc(100vh - 140px); }' +
-    '.tab-content { display: none; }' +
-    '.tab-content.active { display: block; }' +
-    '.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }' +
-    '.kpi-card { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; text-align: center; }' +
-    '.kpi-card.alert { border-color: #ef4444; }' +
-    '.kpi-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }' +
-    '.kpi-value { font-size: 28px; font-weight: 900; }' +
-    '.kpi-value.green { color: #34d399; } .kpi-value.red { color: #f87171; } .kpi-value.blue { color: #60a5fa; } .kpi-value.yellow { color: #fbbf24; } .kpi-value.purple { color: #a78bfa; }' +
-    '.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }' +
-    '.chart-card { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 16px; }' +
-    '.chart-title { font-size: 12px; font-weight: 600; color: #e2e8f0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px; }' +
-    '.chart-title .material-icons { font-size: 18px; color: #60a5fa; }' +
-    'canvas { max-height: 200px !important; }' +
-    '.list-container { max-height: 200px; overflow-y: auto; }' +
-    '.list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }' +
-    '.list-item:last-child { border-bottom: none; }' +
-    '.badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }' +
-    '.bargain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }' +
-    '.bargain-card { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); border-radius: 10px; padding: 16px; text-align: center; }' +
-    '.bargain-label { font-size: 10px; color: #fbbf24; text-transform: uppercase; letter-spacing: 1px; }' +
-    '.bargain-value { font-size: 24px; font-weight: 700; color: #fcd34d; margin-top: 6px; }' +
-    '.bargain-status { font-size: 10px; color: #94a3b8; margin-top: 4px; }' +
-    '.hot-zone { display: flex; justify-content: space-between; padding: 12px; background: rgba(239,68,68,0.1); border-radius: 8px; margin-bottom: 8px; border-left: 4px solid #ef4444; }' +
-    '.footer { display: flex; justify-content: space-between; padding: 12px 24px; border-top: 1px solid rgba(255,255,255,0.1); }' +
-    '.btn { padding: 10px 20px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; }' +
-    '.btn-primary { background: #3b82f6; color: white; } .btn-primary:hover { background: #2563eb; }' +
-    '.loading { text-align: center; padding: 60px; color: #94a3b8; }' +
-    '.sat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }' +
-    '.sat-response-count { background: rgba(96,165,250,0.2); color: #60a5fa; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; }' +
-    '.sat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }' +
-    '.sat-section { background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px; }' +
-    '.sat-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
-    '.sat-section-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }' +
-    '.sat-section-score { font-size: 20px; font-weight: 900; }' +
-    '.sat-score-bar { height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-bottom: 12px; }' +
-    '.sat-score-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }' +
-    '.sat-questions { font-size: 11px; color: #94a3b8; line-height: 1.6; }' +
-    '.sat-question-item { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }' +
-    '.sat-question-item:last-child { border-bottom: none; }' +
-    '.sat-overall-chart { margin-top: 20px; }' +
-    '</style></head><body>' +
-    '<div class="header"><h1><i class="material-icons">analytics</i>STEWARD COMMAND CENTER</h1><span class="pii-badge">INTERNAL USE ONLY</span></div>' +
-    '<div class="tabs">' +
-    '<div class="tab active" onclick="showTab(\'overview\')">Overview</div>' +
-    '<div class="tab" onclick="showTab(\'workload\')">Workload</div>' +
-    '<div class="tab" onclick="showTab(\'analytics\')">Analytics</div>' +
-    '<div class="tab" onclick="showTab(\'hotspots\')">Hot Spots</div>' +
-    '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
-    '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
-    '</div>' +
-    '<div class="content"><div id="main-content"><div class="loading">Loading dashboard data...</div></div></div>' +
-    '<div class="footer"><span style="font-size:11px;color:#64748b">Data refreshes on open</span><button class="btn btn-primary" onclick="google.script.host.close()">Close</button></div>' +
-    '<script>' +
-    'var dashData = null;' +
-    'window.onload = function() { google.script.run.withSuccessHandler(render).withFailureHandler(showError).getStewardDashboardData(); };' +
-    'function showError(e) { document.getElementById("main-content").innerHTML = "<div class=\\"loading\\">Error: " + e.message + "</div>"; }' +
-    'function showTab(tab) { document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")}); document.querySelector(".tab[onclick*=\\\""+tab+"\\\"]").classList.add("active"); renderTab(tab); }' +
-    'function render(json) { dashData = JSON.parse(json); renderTab("overview"); }' +
-    'function renderTab(tab) {' +
-    '  var d = dashData; var html = "";' +
-    '  if (tab === "overview") {' +
-    '    html = "<div class=\\"kpi-grid\\">" +' +
-    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">" + d.totalMembers + "</div></div>" +' +
-    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">" + d.stewardCount + "</div></div>" +' +
-    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">" + d.openGrievances + "</div></div>" +' +
-    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate</div><div class=\\"kpi-value green\\">" + d.winRate + "%</div></div>" +' +
-    '      "<div class=\\"kpi-card " + (d.overdueCount > 0 ? "alert" : "") + "\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">" + d.overdueCount + "</div></div>" +' +
-    '    "</div>" +' +
-    '    "<div class=\\"charts-row\\">" +' +
-    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status Distribution</div><canvas id=\\"statusChart\\"></canvas></div>" +' +
-    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div>" +' +
-    '    "</div>" +' +
-    '    "<div class=\\"charts-row\\">" +' +
-    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Cases by Location</div><canvas id=\\"locationChart\\"></canvas></div>" +' +
-    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">gavel</i>Article Violations</div><canvas id=\\"articleChart\\"></canvas></div>" +' +
-    '    "</div>";' +
-    '    document.getElementById("main-content").innerHTML = html;' +
-    '    renderOverviewCharts();' +
-    '  } else if (tab === "workload") {' +
-    '    var totalCases = d.stewardWorkload.reduce(function(s,w){return s+w.count;},0);' +
-    '    var avgCases = d.stewardWorkload.length > 0 ? (totalCases/d.stewardWorkload.length).toFixed(1) : 0;' +
-    '    var overloaded = d.stewardWorkload.filter(function(w){return w.status==="OVERLOAD";}).length;' +
-    '    html = "<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(4,1fr)\\">" +' +
-    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Stewards</div><div class=\\"kpi-value blue\\">" + d.stewardCount + "</div></div>" +' +
-    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Active Cases</div><div class=\\"kpi-value yellow\\">" + totalCases + "</div></div>" +' +
-    '      "<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg per Steward</div><div class=\\"kpi-value green\\">" + avgCases + "</div></div>" +' +
-    '      "<div class=\\"kpi-card " + (overloaded>0?"alert":"") + "\\"><div class=\\"kpi-label\\">Overloaded</div><div class=\\"kpi-value red\\">" + overloaded + "</div></div>" +' +
-    '    "</div>" +' +
-    '    "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">assignment_ind</i>Steward Caseload</div><div class=\\"list-container\\">";' +
-    '    d.stewardWorkload.forEach(function(w) {' +
-    '      html += "<div class=\\"list-item\\"><span>" + w.name + "</span><span class=\\"badge\\" style=\\"background:" + w.color + ";color:white\\">" + w.count + " cases - " + w.status + "</span></div>";' +
-    '    });' +
-    '    html += "</div></div>";' +
-    '    document.getElementById("main-content").innerHTML = html;' +
-    '  } else if (tab === "analytics") {' +
-    '    html = "<div class=\\"charts-row\\">" +' +
-    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">donut_large</i>Unit Distribution</div><canvas id=\\"unitChart\\"></canvas></div>" +' +
-    '      "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Outcomes</div><canvas id=\\"outcomeChart\\"></canvas></div>" +' +
-    '    "</div>" +' +
-    '    "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">mood</i>Member Satisfaction Score: " + d.moraleScore + "/10</div>" +' +
-    '    "<div style=\\"height:20px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin-top:12px\\"><div style=\\"height:100%;width:" + (d.moraleScore*10) + "%;background:linear-gradient(90deg,#22c55e,#3b82f6)\\"></div></div></div>";' +
-    '    document.getElementById("main-content").innerHTML = html;' +
-    '    renderAnalyticsCharts();' +
-    '  } else if (tab === "hotspots") {' +
-    '    html = "<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">local_fire_department</i>Hot Zones (3+ Active Cases)</div>";' +
-    '    if (d.hotZones.length === 0) { html += "<div style=\\"text-align:center;padding:40px;color:#94a3b8\\">No hot zones detected - All clear!</div>"; }' +
-    '    else { d.hotZones.forEach(function(h) { html += "<div class=\\"hot-zone\\"><span>" + h.location + "</span><span class=\\"badge\\" style=\\"background:#ef4444;color:white\\">" + h.count + " cases</span></div>"; }); }' +
-    '    html += "</div>";' +
-    '    document.getElementById("main-content").innerHTML = html;' +
-    '  } else if (tab === "bargaining") {' +
-    '    html = "<div class=\\"bargain-grid\\">" +' +
-    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Step 1 Denial Rate</div><div class=\\"bargain-value\\">" + d.step1DenialRate + "%</div><div class=\\"bargain-status\\">" + (d.step1DenialRate > 60 ? "High Hostility" : "Normal Range") + "</div></div>" +' +
-    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Avg Settlement Time</div><div class=\\"bargain-value\\">" + d.avgSettlementDays + " Days</div><div class=\\"bargain-status\\">" + (d.avgSettlementDays > 45 ? "Slower than normal" : "Within range") + "</div></div>" +' +
-    '      "<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Most Violated Article</div><div class=\\"bargain-value\\">" + d.topViolatedArticle + "</div><div class=\\"bargain-status\\">Focus area</div></div>" +' +
-    '    "</div>" +' +
-    '    "<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">article</i>Violations by Contract Article</div><canvas id=\\"bargainChart\\"></canvas></div>";' +
-    '    document.getElementById("main-content").innerHTML = html;' +
-    '    renderBargainChart();' +
-    '  } else if (tab === "satisfaction") {' +
-    '    var sat = d.satisfactionData;' +
-    '    html = "<div class=\\"sat-header\\"><h2 style=\\"color:#e2e8f0;font-size:16px\\"><i class=\\"material-icons\\" style=\\"vertical-align:middle;margin-right:8px;color:#22c55e\\">sentiment_satisfied</i>Member Satisfaction Survey Analysis</h2><span class=\\"sat-response-count\\">" + sat.responseCount + " Responses</span></div>";' +
-    '    html += "<div class=\\"sat-grid\\">";' +
-    '    sat.sections.forEach(function(section) {' +
-    '      var scoreColor = section.score >= 7 ? "#22c55e" : section.score >= 5 ? "#f59e0b" : "#ef4444";' +
-    '      var pct = (section.score / 10) * 100;' +
-    '      html += "<div class=\\"sat-section\\">";' +
-    '      html += "<div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">" + section.name + "</span><span class=\\"sat-section-score\\" style=\\"color:" + scoreColor + "\\">" + section.score + "/10</span></div>";' +
-    '      html += "<div class=\\"sat-score-bar\\"><div class=\\"sat-score-fill\\" style=\\"width:" + pct + "%;background:" + scoreColor + "\\"></div></div>";' +
-    '      html += "<div class=\\"sat-questions\\">";' +
-    '      section.questions.forEach(function(q) { html += "<div class=\\"sat-question-item\\">" + q + "</div>"; });' +
-    '      html += "</div></div>";' +
-    '    });' +
-    '    html += "</div>";' +
-    '    html += "<div class=\\"sat-overall-chart chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Score Comparison</div><canvas id=\\"satChart\\"></canvas></div>";' +
-    '    document.getElementById("main-content").innerHTML = html;' +
-    '    renderSatisfactionChart();' +
-    '  }' +
-    '}' +
-    'function renderOverviewCharts() {' +
-    '  var d = dashData;' +
-    '  new Chart(document.getElementById("statusChart"),{type:"doughnut",data:{labels:["Open","Pending","Won","Denied","Settled"],datasets:[{data:[d.statusDistribution.open,d.statusDistribution.pending,d.statusDistribution.won,d.statusDistribution.denied,d.statusDistribution.settled],backgroundColor:["#3b82f6","#f59e0b","#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
-    '  var trendLabels = d.sentimentTrend.length > 0 ? d.sentimentTrend.map(function(t){return t.month;}) : ["Jan","Feb","Mar","Apr","May","Jun"];' +
-    '  var trendData = d.sentimentTrend.length > 0 ? d.sentimentTrend.map(function(t){return t.score;}) : [7.2,7.4,7.5,7.6,7.8,7.9];' +
-    '  new Chart(document.getElementById("trendChart"),{type:"line",data:{labels:trendLabels,datasets:[{label:"Trust Score",data:trendData,borderColor:"#a78bfa",backgroundColor:"rgba(167,139,250,0.2)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:0,max:10,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
-    '  var locLabels = Object.keys(d.locationBreakdown).slice(0,6);' +
-    '  var locData = locLabels.map(function(l){return d.locationBreakdown[l];});' +
-    '  new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
-    '  var artLabels = Object.keys(d.articleViolations).slice(0,6);' +
-    '  var artData = artLabels.map(function(a){return d.articleViolations[a];});' +
-    '  new Chart(document.getElementById("articleChart"),{type:"bar",data:{labels:artLabels.length>0?artLabels:["Art 5","Art 7","Art 12"],datasets:[{label:"Cases",data:artData.length>0?artData:[3,5,2],backgroundColor:"#f59e0b"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
-    '}' +
-    'function renderAnalyticsCharts() {' +
-    '  var d = dashData;' +
-    '  var unitLabels = Object.keys(d.unitBreakdown).slice(0,8);' +
-    '  var unitData = unitLabels.map(function(u){return d.unitBreakdown[u];});' +
-    '  new Chart(document.getElementById("unitChart"),{type:"doughnut",data:{labels:unitLabels,datasets:[{data:unitData,backgroundColor:["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
-    '  new Chart(document.getElementById("outcomeChart"),{type:"bar",data:{labels:["Won","Denied","Settled"],datasets:[{label:"Cases",data:[d.wins,d.losses,d.settled],backgroundColor:["#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
-    '}' +
-    'function renderBargainChart() {' +
-    '  var d = dashData;' +
-    '  var artLabels = Object.keys(d.articleViolations).slice(0,8);' +
-    '  var artData = artLabels.map(function(a){return d.articleViolations[a];});' +
-    '  new Chart(document.getElementById("bargainChart"),{type:"bar",data:{labels:artLabels.length>0?artLabels:["Art 5","Art 7","Art 12"],datasets:[{label:"Violations",data:artData.length>0?artData:[3,5,2],backgroundColor:"#fbbf24"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
-    '}' +
-    'function renderSatisfactionChart() {' +
-    '  var d = dashData;' +
-    '  var labels = d.satisfactionData.sections.map(function(s){return s.name;});' +
-    '  var scores = d.satisfactionData.sections.map(function(s){return s.score;});' +
-    '  var colors = scores.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444";});' +
-    '  new Chart(document.getElementById("satChart"),{type:"bar",data:{labels:labels,datasets:[{label:"Score",data:scores,backgroundColor:colors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}});' +
-    '}' +
-    '</script></body></html>';
-}
 
 // ============================================================================
 // 4. STRATEGIC PRO MOVES & ALERTS
@@ -7694,4 +7308,1112 @@ function applyStatusColors() {
   }
 
   ss.toast('Status colors applied to Grievance Log.', 'Style Engine', 3);
+}
+
+// ============================================================================
+// 10. UNIFIED WEB APP DASHBOARDS (v4.4.0)
+// ============================================================================
+// Both Steward and Member dashboards are web apps with identical dark theme.
+// Only difference: Member dashboard hides PII (names, contact info).
+// Features: Clickable pill boxes, enhanced analytics, directory trends,
+// engagement metrics, Google Drive resources tab.
+// ============================================================================
+
+/**
+ * Shows the Member Dashboard (web app URL)
+ * Opens the unified dashboard in member mode (no PII)
+ */
+function showPublicMemberDashboard() {
+  var url = ScriptApp.getService().getUrl() + '?mode=member';
+  var html = HtmlService.createHtmlOutput(
+    '<html><head><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0}' +
+    '.icon{font-size:48px;margin-bottom:16px}h1{margin:0 0 8px}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5}' +
+    'a{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600}a:hover{background:#2563eb}' +
+    '.copy-btn{background:#475569;margin-left:8px;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:12px}' +
+    '.url{background:#1e293b;padding:12px;border-radius:8px;font-family:monospace;font-size:11px;word-break:break-all;max-width:90%;margin-bottom:16px;border:1px solid #334155}' +
+    '</style></head><body><div class="icon">👥</div><h1>Member Dashboard</h1>' +
+    '<p>Open the Member Dashboard web app. This version hides sensitive personal information while showing full analytics.</p>' +
+    '<div class="url" id="url">' + url + '</div>' +
+    '<div><a href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
+    '</body></html>'
+  ).setWidth(500).setHeight(350);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Member Dashboard');
+}
+
+/**
+ * Gets comprehensive dashboard data for unified dashboard (v4.4.0)
+ * @param {boolean} includePII - Whether to include personally identifiable information
+ * @returns {string} JSON with all dashboard data
+ */
+function getUnifiedDashboardData(includePII) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+
+  var data = {
+    mode: includePII ? 'steward' : 'member',
+    timestamp: new Date().toISOString(),
+
+    // KPIs
+    totalMembers: 0,
+    stewardCount: 0,
+    totalGrievances: 0,
+    openGrievances: 0,
+    wins: 0,
+    losses: 0,
+    settled: 0,
+    winRate: 0,
+    overdueCount: 0,
+    moraleScore: 7.5,
+
+    // Lists for drill-down (steward mode only)
+    stewardList: [],
+    memberList: [],
+    overdueList: [],
+    openCasesList: [],
+    myCases: [],           // Current user's assigned cases (v4.4.0)
+    currentUserEmail: '',  // For My Cases identification
+
+    // Performance metrics
+    stewardRatio: 'N/A',   // Member:Steward ratio
+    topPerformers: [],     // Top performing stewards
+
+    // Breakdowns
+    unitBreakdown: {},
+    locationBreakdown: {},
+    stewardWorkload: [],
+    hotZones: [],
+
+    // Member Directory Trends (NEW)
+    directoryTrends: {
+      recentUpdates: [],      // Members who updated contact info recently
+      staleContacts: [],      // Members who haven't updated in 90+ days
+      missingEmail: 0,
+      missingPhone: 0,
+      totalWithEmail: 0,
+      totalWithPhone: 0
+    },
+
+    // Engagement Metrics (from Member Directory columns Q-W)
+    engagement: {
+      emailOpenRate: 0,           // Average from OPEN_RATE column (S)
+      virtualMeetingRate: 0,      // % with recent virtual meeting (Q)
+      inPersonMeetingRate: 0,     // % with recent in-person meeting (R)
+      totalVolunteerHours: 0,     // Sum from VOLUNTEER_HOURS column (T)
+      unionInterestLocal: 0,      // % interested in local issues (U)
+      unionInterestChapter: 0,    // % interested in chapter activities (V)
+      unionInterestAllied: 0,     // % interested in allied movements (W)
+      surveyResponseRate: 0,
+      recentMeetingAttendees: []  // Members who attended recently
+    },
+
+    // Bargaining Data
+    step1DenialRate: 0,
+    avgSettlementDays: 0,
+    topViolatedArticle: 'N/A',
+    articleViolations: {},
+    stepProgression: { step1: 0, step2: 0, step3: 0, arb: 0 },
+    resolutionByStep: { step1Resolved: 0, step2Resolved: 0, step3Resolved: 0, arbResolved: 0 },
+    managementResponseTime: 0,
+    grievancesByCategory: {},
+    monthlyFilings: [],
+    monthlyResolved: [],  // v4.4.0 - For Filed vs Resolved chart
+
+    // Chart Data
+    statusDistribution: { open: 0, pending: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 },
+    monthlyTrend: [],
+    sentimentTrend: [],
+
+    // Satisfaction Survey Data (Enhanced)
+    satisfactionData: {
+      responseCount: 0,
+      sections: [
+        { name: 'Overall Satisfaction', key: 'overall', score: 0, questions: ['Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Recommend'] },
+        { name: 'Steward Ratings', key: 'steward', score: 0, questions: ['Timely Response', 'Treated Respect', 'Explained Options', 'Followed Through', 'Advocated', 'Safe Concerns', 'Confidentiality'] },
+        { name: 'Chapter Effectiveness', key: 'chapter', score: 0, questions: ['Understand Issues', 'Chapter Comm', 'Organizes', 'Reach Chapter', 'Fair Rep'] },
+        { name: 'Local Leadership', key: 'leadership', score: 0, questions: ['Decisions Clear', 'Understand Process', 'Transparent Finance', 'Accountable', 'Fair Processes', 'Welcomes Opinions'] },
+        { name: 'Contract Enforcement', key: 'contract', score: 0, questions: ['Enforces Contract', 'Realistic Timelines', 'Clear Updates', 'Frontline Priority'] },
+        { name: 'Communication Quality', key: 'communication', score: 0, questions: ['Clear Actionable', 'Enough Info', 'Find Easily', 'All Shifts', 'Meetings Worth'] },
+        { name: 'Member Voice', key: 'voice', score: 0, questions: ['Voice Matters', 'Seeks Input', 'Dignity', 'Newer Supported', 'Conflict Respect'] },
+        { name: 'Value & Action', key: 'value', score: 0, questions: ['Good Value', 'Priorities Needs', 'Prepared Mobilize', 'Win Together'] }
+      ],
+      trendByMonth: [],
+      questionBreakdown: {}
+    },
+
+    // Google Drive Resources
+    driveResources: {
+      folderId: '',
+      folderUrl: '',
+      recentFiles: []
+    }
+  };
+
+  var now = new Date();
+  var ninetyDaysAgo = new Date(now.getTime() - (90 * 24 * 60 * 60 * 1000));
+  var thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+  var sixMonthsAgo = new Date(now.getTime() - (180 * 24 * 60 * 60 * 1000));
+
+  // Engagement metric accumulators
+  var openRates = [];
+  var virtualMeetingCount = 0;
+  var inPersonMeetingCount = 0;
+  var totalVolunteerHours = 0;
+  var interestLocalCount = 0;
+  var interestChapterCount = 0;
+  var interestAlliedCount = 0;
+
+  // Process Members
+  if (memberSheet && memberSheet.getLastRow() > 1) {
+    var memberData = memberSheet.getDataRange().getValues();
+    var headers = memberData[0];
+
+    for (var m = 1; m < memberData.length; m++) {
+      var memberId = memberData[m][MEMBER_COLS.MEMBER_ID - 1];
+      if (!memberId) continue;
+
+      data.totalMembers++;
+      var name = memberData[m][MEMBER_COLS.FULL_NAME - 1] || 'Unknown';
+      var email = memberData[m][MEMBER_COLS.EMAIL - 1] || '';
+      var phone = memberData[m][MEMBER_COLS.PHONE - 1] || '';
+      var location = memberData[m][MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
+      var unit = memberData[m][MEMBER_COLS.UNIT - 1] || 'Unknown';
+      var isSteward = memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes';
+      var lastUpdated = memberData[m][MEMBER_COLS.LAST_UPDATED - 1];
+
+      // Engagement metrics from columns Q-W
+      var lastVirtualMtg = memberData[m][MEMBER_COLS.LAST_VIRTUAL_MTG - 1];
+      var lastInPersonMtg = memberData[m][MEMBER_COLS.LAST_INPERSON_MTG - 1];
+      var openRate = memberData[m][MEMBER_COLS.OPEN_RATE - 1];
+      var volunteerHours = memberData[m][MEMBER_COLS.VOLUNTEER_HOURS - 1];
+      var interestLocal = memberData[m][MEMBER_COLS.INTEREST_LOCAL - 1];
+      var interestChapter = memberData[m][MEMBER_COLS.INTEREST_CHAPTER - 1];
+      var interestAllied = memberData[m][MEMBER_COLS.INTEREST_ALLIED - 1];
+
+      // Track email open rates (if numeric)
+      if (openRate && !isNaN(parseFloat(openRate))) {
+        openRates.push(parseFloat(openRate));
+      }
+
+      // Track volunteer hours
+      if (volunteerHours && !isNaN(parseFloat(volunteerHours))) {
+        totalVolunteerHours += parseFloat(volunteerHours);
+      }
+
+      // Track meeting attendance (within last 6 months)
+      if (lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) {
+        virtualMeetingCount++;
+        if (includePII) {
+          data.engagement.recentMeetingAttendees.push({ id: memberId, name: name, type: 'Virtual', date: lastVirtualMtg });
+        }
+      }
+      if (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo) {
+        inPersonMeetingCount++;
+        if (includePII) {
+          data.engagement.recentMeetingAttendees.push({ id: memberId, name: name, type: 'In-Person', date: lastInPersonMtg });
+        }
+      }
+
+      // Track union interest (Yes/True values)
+      if (interestLocal && (interestLocal === 'Yes' || interestLocal === true || interestLocal === 'TRUE')) {
+        interestLocalCount++;
+      }
+      if (interestChapter && (interestChapter === 'Yes' || interestChapter === true || interestChapter === 'TRUE')) {
+        interestChapterCount++;
+      }
+      if (interestAllied && (interestAllied === 'Yes' || interestAllied === true || interestAllied === 'TRUE')) {
+        interestAlliedCount++;
+      }
+
+      // Count stewards
+      if (isSteward) {
+        data.stewardCount++;
+        if (includePII) {
+          data.stewardList.push({ id: memberId, name: name, location: location, unit: unit, email: email, phone: phone });
+        } else {
+          data.stewardList.push({ id: memberId.substring(0, 4) + '***', name: 'Steward', location: location, unit: unit });
+        }
+      }
+
+      // Member list for drill-down
+      if (includePII) {
+        data.memberList.push({ id: memberId, name: name, location: location, unit: unit, isSteward: isSteward });
+      }
+
+      // Location and unit breakdowns
+      if (!data.locationBreakdown[location]) data.locationBreakdown[location] = 0;
+      data.locationBreakdown[location]++;
+      if (!data.unitBreakdown[unit]) data.unitBreakdown[unit] = 0;
+      data.unitBreakdown[unit]++;
+
+      // Contact info tracking
+      if (email) data.directoryTrends.totalWithEmail++;
+      else data.directoryTrends.missingEmail++;
+      if (phone) data.directoryTrends.totalWithPhone++;
+      else data.directoryTrends.missingPhone++;
+
+      // Recent updates vs stale contacts
+      if (lastUpdated instanceof Date) {
+        if (lastUpdated > thirtyDaysAgo) {
+          if (includePII) {
+            data.directoryTrends.recentUpdates.push({ id: memberId, name: name, date: lastUpdated });
+          } else {
+            data.directoryTrends.recentUpdates.push({ id: memberId.substring(0, 4) + '***', name: 'Member', date: lastUpdated });
+          }
+        }
+        if (lastUpdated < ninetyDaysAgo) {
+          if (includePII) {
+            data.directoryTrends.staleContacts.push({ id: memberId, name: name, lastUpdate: lastUpdated });
+          } else {
+            data.directoryTrends.staleContacts.push({ id: memberId.substring(0, 4) + '***', name: 'Member', lastUpdate: lastUpdated });
+          }
+        }
+      }
+    }
+
+    // Calculate engagement metrics after processing all members
+    if (data.totalMembers > 0) {
+      data.engagement.emailOpenRate = openRates.length > 0
+        ? Math.round((openRates.reduce(function(a,b){return a+b;},0) / openRates.length) * 10) / 10
+        : 0;
+      data.engagement.virtualMeetingRate = Math.round((virtualMeetingCount / data.totalMembers) * 100);
+      data.engagement.inPersonMeetingRate = Math.round((inPersonMeetingCount / data.totalMembers) * 100);
+      data.engagement.totalVolunteerHours = Math.round(totalVolunteerHours);
+      data.engagement.unionInterestLocal = Math.round((interestLocalCount / data.totalMembers) * 100);
+      data.engagement.unionInterestChapter = Math.round((interestChapterCount / data.totalMembers) * 100);
+      data.engagement.unionInterestAllied = Math.round((interestAlliedCount / data.totalMembers) * 100);
+
+      // Calculate Steward:Member ratio
+      if (data.stewardCount > 0) {
+        var ratio = Math.round(data.totalMembers / data.stewardCount);
+        data.stewardRatio = ratio + ':1';
+      }
+    }
+  }
+
+  // Get current user email for My Cases
+  try {
+    data.currentUserEmail = Session.getActiveUser().getEmail();
+  } catch (e) {
+    data.currentUserEmail = '';
+  }
+
+  // Process Grievances
+  var stewardCases = {};
+  var locationCases = {};
+  var step1Total = 0, step1Denials = 0;
+  var settlementDays = [];
+  var mgmtResponseDays = [];
+  var monthlyFilingsMap = {};
+  var monthlyResolvedMap = {};  // v4.4.0 - Track resolved by month
+
+  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+    var grievanceData = grievanceSheet.getDataRange().getValues();
+    for (var g = 1; g < grievanceData.length; g++) {
+      var grievanceId = grievanceData[g][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+      if (!grievanceId) continue;
+
+      data.totalGrievances++;
+      var status = (grievanceData[g][GRIEVANCE_COLS.STATUS - 1] || '').toString();
+      var steward = grievanceData[g][GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
+      var gLocation = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
+      var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
+      var category = grievanceData[g][GRIEVANCE_COLS.CATEGORY - 1] || 'Other';
+      var memberName = grievanceData[g][GRIEVANCE_COLS.MEMBER_NAME - 1] || 'Unknown';
+      var currentStep = grievanceData[g][GRIEVANCE_COLS.CURRENT_STEP - 1] || 'Step 1';
+      var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
+      var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
+
+      // Status distribution
+      switch(status.toLowerCase()) {
+        case 'open': data.statusDistribution.open++; data.openGrievances++; break;
+        case 'pending info': case 'pending': data.statusDistribution.pending++; data.openGrievances++; break;
+        case 'won': case 'sustained': case 'favorable': data.statusDistribution.won++; data.wins++; break;
+        case 'denied': case 'lost': data.statusDistribution.denied++; data.losses++; break;
+        case 'settled': data.statusDistribution.settled++; data.settled++; break;
+        case 'withdrawn': data.statusDistribution.withdrawn++; break;
+      }
+
+      // Category breakdown
+      if (!data.grievancesByCategory[category]) data.grievancesByCategory[category] = 0;
+      data.grievancesByCategory[category]++;
+
+      // Step progression
+      if (currentStep.toLowerCase().includes('step 1')) data.stepProgression.step1++;
+      else if (currentStep.toLowerCase().includes('step 2')) data.stepProgression.step2++;
+      else if (currentStep.toLowerCase().includes('step 3')) data.stepProgression.step3++;
+      else if (currentStep.toLowerCase().includes('arb')) data.stepProgression.arb++;
+
+      // Open cases list for drill-down
+      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info' || status.toLowerCase() === 'pending') {
+        if (includePII) {
+          data.openCasesList.push({ id: grievanceId, member: memberName, steward: steward, step: currentStep, location: gLocation, category: category });
+        } else {
+          data.openCasesList.push({ id: grievanceId, member: 'Member', steward: 'Steward', step: currentStep, location: gLocation, category: category });
+        }
+
+        // My Cases - check if current user is the assigned steward (v4.4.0)
+        if (includePII && data.currentUserEmail && steward) {
+          var stewardLower = steward.toLowerCase();
+          var emailLower = data.currentUserEmail.toLowerCase();
+          var emailName = emailLower.split('@')[0].replace(/[._]/g, ' ');
+          // Match by full steward name, email prefix, or partial match
+          if (stewardLower.indexOf(emailName) >= 0 || emailLower.indexOf(stewardLower.replace(/\s+/g, '.')) >= 0 ||
+              stewardLower.split(' ').some(function(part) { return emailName.indexOf(part) >= 0 && part.length > 2; })) {
+            data.myCases.push({
+              id: grievanceId,
+              member: memberName,
+              step: currentStep,
+              location: gLocation,
+              category: category,
+              status: status,
+              daysOpen: grievanceData[g][GRIEVANCE_COLS.DAYS_OPEN - 1] || 0,
+              nextDue: grievanceData[g][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] || ''
+            });
+          }
+        }
+      }
+
+      // Steward workload
+      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info' || status.toLowerCase() === 'pending') {
+        if (!stewardCases[steward]) stewardCases[steward] = 0;
+        stewardCases[steward]++;
+      }
+
+      // Hot zones (locations with active cases)
+      if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info' || status.toLowerCase() === 'pending') {
+        if (!locationCases[gLocation]) locationCases[gLocation] = 0;
+        locationCases[gLocation]++;
+      }
+
+      // Article violations
+      if (article) {
+        var articles = article.toString().split(',');
+        articles.forEach(function(art) {
+          art = art.trim();
+          if (art) {
+            if (!data.articleViolations[art]) data.articleViolations[art] = 0;
+            data.articleViolations[art]++;
+          }
+        });
+      }
+
+      // Step 1 denial rate
+      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
+        step1Total++;
+        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) step1Denials++;
+      }
+
+      // Settlement time
+      if (dateFiled instanceof Date && dateClosed instanceof Date) {
+        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
+        if (days > 0) settlementDays.push(days);
+      }
+
+      // Monthly filings
+      if (dateFiled instanceof Date) {
+        var monthKey = dateFiled.toLocaleString('default', { month: 'short', year: 'numeric' });
+        if (!monthlyFilingsMap[monthKey]) monthlyFilingsMap[monthKey] = 0;
+        monthlyFilingsMap[monthKey]++;
+      }
+
+      // Monthly resolved (v4.4.0)
+      if (dateClosed instanceof Date) {
+        var resolvedMonthKey = dateClosed.toLocaleString('default', { month: 'short', year: 'numeric' });
+        if (!monthlyResolvedMap[resolvedMonthKey]) monthlyResolvedMap[resolvedMonthKey] = 0;
+        monthlyResolvedMap[resolvedMonthKey]++;
+      }
+
+      // Check overdue
+      var step1Due = grievanceData[g][GRIEVANCE_COLS.STEP1_DUE - 1];
+      var daysToDeadline = grievanceData[g][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+      var isOverdue = (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0)) ||
+                      (step1Due && new Date(step1Due) < now && (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info'));
+
+      if (isOverdue && (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info' || status.toLowerCase() === 'pending')) {
+        data.overdueCount++;
+        if (includePII) {
+          data.overdueList.push({ id: grievanceId, member: memberName, steward: steward, step: currentStep, dueDate: step1Due });
+        } else {
+          data.overdueList.push({ id: grievanceId, member: 'Member', steward: 'Steward', step: currentStep, dueDate: step1Due });
+        }
+      }
+    }
+  }
+
+  // Calculate derived metrics
+  var totalClosed = data.wins + data.losses + data.settled;
+  data.winRate = totalClosed > 0 ? Math.round((data.wins / totalClosed) * 100) : 0;
+  data.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
+  data.avgSettlementDays = settlementDays.length > 0 ? Math.round(settlementDays.reduce(function(a,b){return a+b;},0) / settlementDays.length) : 0;
+
+  // Build steward workload array
+  for (var s in stewardCases) {
+    var count = stewardCases[s];
+    var statusLabel = count > 8 ? 'OVERLOAD' : count > 5 ? 'Heavy' : 'Available';
+    var color = count > 8 ? '#ef4444' : count > 5 ? '#f59e0b' : '#22c55e';
+    if (includePII) {
+      data.stewardWorkload.push({ name: s, count: count, status: statusLabel, color: color });
+    } else {
+      data.stewardWorkload.push({ name: 'Steward ' + (data.stewardWorkload.length + 1), count: count, status: statusLabel, color: color });
+    }
+  }
+  data.stewardWorkload.sort(function(a,b){return b.count - a.count;});
+
+  // Build hot zones (locations with 3+ active cases)
+  for (var loc in locationCases) {
+    if (locationCases[loc] >= 3) {
+      data.hotZones.push({ location: loc, count: locationCases[loc] });
+    }
+  }
+  data.hotZones.sort(function(a,b){return b.count - a.count;});
+
+  // Top violated article
+  var maxViolations = 0;
+  for (var art in data.articleViolations) {
+    if (data.articleViolations[art] > maxViolations) {
+      maxViolations = data.articleViolations[art];
+      data.topViolatedArticle = art;
+    }
+  }
+
+  // Get Top Performers from hidden steward performance sheet (v4.4.0)
+  var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
+  if (perfSheet && perfSheet.getLastRow() > 1) {
+    try {
+      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), 10).getValues();
+      data.topPerformers = perfData
+        .filter(function(row) { return row[0] && row[9]; })
+        .map(function(row) {
+          return {
+            name: includePII ? row[0] : 'Steward',
+            totalCases: row[1] || 0,
+            active: row[2] || 0,
+            closed: row[3] || 0,
+            won: row[4] || 0,
+            winRate: row[5] || 0,
+            avgDays: row[6] || 0,
+            score: row[9] || 0
+          };
+        })
+        .sort(function(a, b) { return b.score - a.score; })
+        .slice(0, 5);
+    } catch (e) {
+      Logger.log('Error reading steward performance: ' + e.message);
+    }
+  }
+
+  // Monthly filings for trend
+  var allMonths = Object.keys(monthlyFilingsMap).concat(Object.keys(monthlyResolvedMap));
+  var uniqueMonths = allMonths.filter(function(item, pos) { return allMonths.indexOf(item) === pos; });
+  var sortedMonths = uniqueMonths.sort(function(a, b) {
+    return new Date(a) - new Date(b);
+  }).slice(-12);
+  sortedMonths.forEach(function(month) {
+    data.monthlyFilings.push({ month: month, count: monthlyFilingsMap[month] || 0 });
+    data.monthlyResolved.push({ month: month, count: monthlyResolvedMap[month] || 0 });  // v4.4.0
+  });
+
+  // Process Satisfaction Survey
+  if (satSheet && satSheet.getLastRow() > 1) {
+    var satData = satSheet.getDataRange().getValues();
+    var trustScores = [];
+    var monthlyTrust = {};
+    var sectionScores = { overall: [], steward: [], chapter: [], leadership: [], contract: [], communication: [], voice: [], value: [] };
+
+    for (var i = 1; i < satData.length; i++) {
+      if (!satData[i][0]) continue;
+      data.satisfactionData.responseCount++;
+
+      var trustVal = parseFloat(satData[i][7]);
+      var timestamp = satData[i][0];
+
+      if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
+        trustScores.push(trustVal);
+        if (timestamp) {
+          var date = new Date(timestamp);
+          var monthKey = date.toLocaleString('default', { month: 'short' });
+          if (!monthlyTrust[monthKey]) monthlyTrust[monthKey] = { sum: 0, count: 0 };
+          monthlyTrust[monthKey].sum += trustVal;
+          monthlyTrust[monthKey].count++;
+        }
+      }
+
+      // Section averages
+      var avgOverall = parseFloat(satData[i][71]) || 0;
+      var avgSteward = parseFloat(satData[i][72]) || 0;
+      var avgChapter = parseFloat(satData[i][74]) || 0;
+      var avgLeadership = parseFloat(satData[i][75]) || 0;
+      var avgContract = parseFloat(satData[i][76]) || 0;
+      var avgComm = parseFloat(satData[i][78]) || 0;
+      var avgVoice = parseFloat(satData[i][79]) || 0;
+      var avgValue = parseFloat(satData[i][80]) || 0;
+
+      if (avgOverall === 0) {
+        var q6 = parseFloat(satData[i][6]) || 0, q7 = parseFloat(satData[i][7]) || 0;
+        var q8 = parseFloat(satData[i][8]) || 0, q9 = parseFloat(satData[i][9]) || 0;
+        avgOverall = (q6 + q7 + q8 + q9) / 4;
+      }
+
+      if (avgOverall > 0) sectionScores.overall.push(avgOverall);
+      if (avgSteward > 0) sectionScores.steward.push(avgSteward);
+      if (avgChapter > 0) sectionScores.chapter.push(avgChapter);
+      if (avgLeadership > 0) sectionScores.leadership.push(avgLeadership);
+      if (avgContract > 0) sectionScores.contract.push(avgContract);
+      if (avgComm > 0) sectionScores.communication.push(avgComm);
+      if (avgVoice > 0) sectionScores.voice.push(avgVoice);
+      if (avgValue > 0) sectionScores.value.push(avgValue);
+    }
+
+    function avg(arr) { return arr.length > 0 ? Math.round((arr.reduce(function(a,b){return a+b;},0) / arr.length) * 10) / 10 : 0; }
+    data.satisfactionData.sections[0].score = avg(sectionScores.overall);
+    data.satisfactionData.sections[1].score = avg(sectionScores.steward);
+    data.satisfactionData.sections[2].score = avg(sectionScores.chapter);
+    data.satisfactionData.sections[3].score = avg(sectionScores.leadership);
+    data.satisfactionData.sections[4].score = avg(sectionScores.contract);
+    data.satisfactionData.sections[5].score = avg(sectionScores.communication);
+    data.satisfactionData.sections[6].score = avg(sectionScores.voice);
+    data.satisfactionData.sections[7].score = avg(sectionScores.value);
+
+    if (trustScores.length > 0) {
+      data.moraleScore = Math.round((trustScores.reduce(function(a,b){return a+b;},0) / trustScores.length) * 10) / 10;
+    }
+
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    months.forEach(function(month) {
+      if (monthlyTrust[month]) {
+        data.sentimentTrend.push({ month: month, score: Math.round((monthlyTrust[month].sum / monthlyTrust[month].count) * 10) / 10 });
+      }
+    });
+
+    // Engagement: Survey response rate
+    data.engagement.surveyResponseRate = data.totalMembers > 0 ? Math.round((data.satisfactionData.responseCount / data.totalMembers) * 100) : 0;
+  }
+
+  // Get Google Drive resources folder from Config tab (column AU / 47)
+  try {
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    var archiveFolderId = '';
+
+    // Try to read from Config tab first
+    if (configSheet) {
+      archiveFolderId = configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).getValue();
+      if (archiveFolderId) {
+        archiveFolderId = String(archiveFolderId).trim();
+      }
+    }
+
+    // Fallback to COMMAND_CONFIG if not in Config sheet
+    if (!archiveFolderId && COMMAND_CONFIG && COMMAND_CONFIG.ARCHIVE_FOLDER_ID) {
+      archiveFolderId = COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
+    }
+
+    if (archiveFolderId) {
+      data.driveResources.folderId = archiveFolderId;
+      data.driveResources.folderUrl = 'https://drive.google.com/drive/folders/' + archiveFolderId;
+
+      var folder = DriveApp.getFolderById(archiveFolderId);
+      var files = folder.getFiles();
+      var fileCount = 0;
+      while (files.hasNext() && fileCount < 10) {
+        var file = files.next();
+        data.driveResources.recentFiles.push({
+          name: file.getName(),
+          url: file.getUrl(),
+          type: file.getMimeType(),
+          updated: file.getLastUpdated()
+        });
+        fileCount++;
+      }
+    }
+  } catch (e) {
+    Logger.log('Error accessing Drive resources: ' + e.message);
+  }
+
+  return JSON.stringify(data);
+}
+
+/**
+ * API function for web app to get dashboard data
+ * @param {boolean} isPII - Include PII (steward mode)
+ * @returns {string} JSON dashboard data
+ */
+function getUnifiedDashboardDataAPI(isPII) {
+  return getUnifiedDashboardData(isPII === true || isPII === 'true');
+}
+
+/**
+ * Generates the unified dashboard HTML for web app (v4.4.0)
+ * @param {boolean} isPII - Whether to include PII (steward mode)
+ * @returns {string} Complete HTML for the web app
+ */
+function getUnifiedDashboardHtml(isPII) {
+  var mode = isPII ? 'steward' : 'member';
+  var title = isPII ? '509 STEWARD COMMAND CENTER' : '509 MEMBER DASHBOARD';
+  var badge = isPII ? '<span class="pii-badge">INTERNAL USE - CONTAINS PII</span>' : '<span class="member-badge">MEMBER VIEW</span>';
+
+  return '<!DOCTYPE html>' +
+    '<html lang="en"><head><meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="apple-mobile-web-app-capable" content="yes">' +
+    '<title>' + title + '</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">' +
+    '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>' +
+    '<style>' +
+    // CSS Reset & Base
+    '*{box-sizing:border-box;margin:0;padding:0}' +
+    'body{font-family:"Inter",sans-serif;background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);color:#f8fafc;min-height:100vh;overflow-x:hidden}' +
+
+    // Header
+    '.header{background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}' +
+    '.header h1{font-size:18px;font-weight:700;color:#60a5fa;display:flex;align-items:center;gap:10px}' +
+    '.header .material-icons{font-size:24px}' +
+    '.pii-badge{background:rgba(239,68,68,0.2);color:#fca5a5;padding:6px 12px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}' +
+    '.member-badge{background:rgba(34,197,94,0.2);color:#86efac;padding:6px 12px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px}' +
+
+    // Tabs
+    '.tabs{display:flex;gap:2px;padding:0 16px;background:rgba(0,0,0,0.3);overflow-x:auto;-webkit-overflow-scrolling:touch}' +
+    '.tabs::-webkit-scrollbar{display:none}' +
+    '.tab{padding:14px 16px;cursor:pointer;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:3px solid transparent;transition:all 0.2s;white-space:nowrap;text-transform:uppercase;letter-spacing:0.5px}' +
+    '.tab:hover{color:#e2e8f0;background:rgba(255,255,255,0.05)}' +
+    '.tab.active{color:#60a5fa;border-bottom-color:#60a5fa;background:rgba(96,165,250,0.1)}' +
+
+    // Main content
+    '.content{padding:16px;max-width:1200px;margin:0 auto;min-height:calc(100vh - 140px)}' +
+    '.tab-content{display:none;animation:fadeIn 0.3s}' +
+    '.tab-content.active{display:block}' +
+    '@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}' +
+
+    // KPI Cards - Clickable
+    '.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}' +
+    '.kpi-card{background:linear-gradient(135deg,rgba(30,41,59,0.9) 0%,rgba(51,65,85,0.9) 100%);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all 0.2s}' +
+    '.kpi-card:hover{transform:translateY(-2px);border-color:rgba(96,165,250,0.5);box-shadow:0 8px 25px rgba(0,0,0,0.3)}' +
+    '.kpi-card:active{transform:scale(0.98)}' +
+    '.kpi-card.alert{border-color:#ef4444;background:linear-gradient(135deg,rgba(127,29,29,0.3) 0%,rgba(30,41,59,0.9) 100%)}' +
+    '.kpi-card.clickable::after{content:"Click for details";display:block;font-size:9px;color:#64748b;margin-top:6px;opacity:0;transition:opacity 0.2s}' +
+    '.kpi-card.clickable:hover::after{opacity:1}' +
+    '.kpi-label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}' +
+    '.kpi-value{font-size:32px;font-weight:900;line-height:1}' +
+    '.kpi-value.green{color:#34d399}.kpi-value.red{color:#f87171}.kpi-value.blue{color:#60a5fa}.kpi-value.yellow{color:#fbbf24}.kpi-value.purple{color:#a78bfa}' +
+
+    // Charts
+    '.charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:16px}' +
+    '.chart-card{background:rgba(30,41,59,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px}' +
+    '.chart-title{font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:14px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:0.5px}' +
+    '.chart-title .material-icons{font-size:20px;color:#60a5fa}' +
+    'canvas{max-height:220px!important}' +
+
+    // Lists
+    '.list-container{max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#475569 transparent}' +
+    '.list-container::-webkit-scrollbar{width:6px}' +
+    '.list-container::-webkit-scrollbar-thumb{background:#475569;border-radius:3px}' +
+    '.list-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.2s}' +
+    '.list-item:hover{background:rgba(255,255,255,0.03)}' +
+    '.list-item:last-child{border-bottom:none}' +
+    '.badge{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600}' +
+
+    // Bargaining Cards
+    '.bargain-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}' +
+    '.bargain-card{background:linear-gradient(135deg,rgba(251,191,36,0.1) 0%,rgba(30,41,59,0.9) 100%);border:1px solid rgba(251,191,36,0.3);border-radius:12px;padding:16px;text-align:center}' +
+    '.bargain-label{font-size:10px;color:#fbbf24;text-transform:uppercase;letter-spacing:1px}' +
+    '.bargain-value{font-size:28px;font-weight:800;color:#fcd34d;margin-top:8px}' +
+    '.bargain-status{font-size:11px;color:#94a3b8;margin-top:6px}' +
+
+    // Hot Zones
+    '.hot-zone{display:flex;justify-content:space-between;align-items:center;padding:14px;background:linear-gradient(90deg,rgba(239,68,68,0.15) 0%,rgba(30,41,59,0.8) 100%);border-radius:10px;margin-bottom:10px;border-left:4px solid #ef4444}' +
+
+    // Satisfaction
+    '.sat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px}' +
+    '.sat-response-count{background:rgba(96,165,250,0.2);color:#60a5fa;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600}' +
+    '.sat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}' +
+    '.sat-section{background:rgba(30,41,59,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px}' +
+    '.sat-section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}' +
+    '.sat-section-name{font-size:13px;font-weight:600;color:#e2e8f0}' +
+    '.sat-section-score{font-size:22px;font-weight:900}' +
+    '.sat-score-bar{height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;margin-bottom:12px}' +
+    '.sat-score-fill{height:100%;border-radius:4px;transition:width 0.5s}' +
+    '.sat-questions{font-size:11px;color:#94a3b8;line-height:1.7}' +
+
+    // Directory Trends
+    '.trend-card{background:rgba(30,41,59,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin-bottom:16px}' +
+    '.trend-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}' +
+    '.trend-title{font-size:14px;font-weight:600;color:#e2e8f0;display:flex;align-items:center;gap:8px}' +
+    '.trend-value{font-size:20px;font-weight:800}' +
+    '.trend-list{max-height:150px;overflow-y:auto}' +
+    '.trend-item{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px;display:flex;justify-content:space-between}' +
+
+    // Resources
+    '.resource-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}' +
+    '.resource-card{background:rgba(30,41,59,0.8);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;text-decoration:none;color:inherit}' +
+    '.resource-card:hover{transform:translateY(-2px);border-color:rgba(96,165,250,0.5);box-shadow:0 8px 25px rgba(0,0,0,0.3)}' +
+    '.resource-icon{font-size:40px;margin-bottom:12px}' +
+    '.resource-title{font-size:14px;font-weight:600;color:#e2e8f0;margin-bottom:4px}' +
+    '.resource-desc{font-size:11px;color:#94a3b8}' +
+
+    // Modal
+    '.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:200;align-items:center;justify-content:center;padding:20px}' +
+    '.modal-overlay.active{display:flex}' +
+    '.modal{background:#1e293b;border-radius:16px;max-width:600px;width:100%;max-height:80vh;overflow:hidden;border:1px solid rgba(255,255,255,0.1);animation:modalIn 0.2s}' +
+    '@keyframes modalIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}' +
+    '.modal-header{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}' +
+    '.modal-title{font-size:16px;font-weight:700;color:#60a5fa}' +
+    '.modal-close{background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer;padding:4px}' +
+    '.modal-close:hover{color:#f8fafc}' +
+    '.modal-body{padding:20px;max-height:calc(80vh - 60px);overflow-y:auto}' +
+    '.modal-list-item{padding:12px;background:rgba(15,23,42,0.5);border-radius:8px;margin-bottom:8px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}' +
+    '.modal-list-id{font-weight:700;color:#60a5fa;font-size:12px}' +
+    '.modal-list-name{font-size:13px;color:#e2e8f0}' +
+    '.modal-list-meta{font-size:11px;color:#94a3b8}' +
+
+    // Footer
+    '.footer{padding:12px 20px;border-top:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#64748b;background:rgba(15,23,42,0.8)}' +
+    '.btn{padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.2s}' +
+    '.btn-primary{background:#3b82f6;color:white}.btn-primary:hover{background:#2563eb}' +
+    '.btn-secondary{background:#475569;color:white}.btn-secondary:hover{background:#64748b}' +
+    '.btn-sm{padding:6px 12px;font-size:11px}' +
+
+    // Loading
+    '.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;color:#94a3b8}' +
+    '.spinner{width:40px;height:40px;border:3px solid rgba(96,165,250,0.3);border-top-color:#60a5fa;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+
+    // Responsive
+    '@media(max-width:768px){.header h1{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.bargain-grid{grid-template-columns:repeat(2,1fr)}}' +
+    '</style></head><body>' +
+
+    // Header
+    '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1>' + badge + '</div>' +
+
+    // Tabs (My Cases only visible in steward mode)
+    '<div class="tabs">' +
+    '<div class="tab active" onclick="showTab(\'overview\')">Overview</div>' +
+    (isPII ? '<div class="tab" onclick="showTab(\'mycases\')">My Cases</div>' : '') +
+    '<div class="tab" onclick="showTab(\'workload\')">Workload</div>' +
+    '<div class="tab" onclick="showTab(\'analytics\')">Analytics</div>' +
+    '<div class="tab" onclick="showTab(\'directory\')">Directory</div>' +
+    '<div class="tab" onclick="showTab(\'hotspots\')">Hot Spots</div>' +
+    '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
+    '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
+    '<div class="tab" onclick="showTab(\'resources\')">Resources</div>' +
+    '</div>' +
+
+    // Content
+    '<div class="content"><div id="main-content"><div class="loading"><div class="spinner"></div>Loading dashboard data...</div></div></div>' +
+
+    // Modal
+    '<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">' +
+    '<div class="modal">' +
+    '<div class="modal-header"><span class="modal-title" id="modal-title">Details</span><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+    '<div class="modal-body" id="modal-body"></div>' +
+    '</div></div>' +
+
+    // Footer with Help/FAQ button
+    '<div class="footer"><span>Data refreshes on load | v4.4.0</span><div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="showFAQ()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">help</i>Help</button><button class="btn btn-secondary" onclick="location.reload()">Refresh</button></div></div>' +
+
+    // JavaScript
+    '<script>' +
+    'var dashData=null;var isPII=' + isPII + ';' +
+    'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
+    'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+e.message+"</div>"}' +
+    'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=\\'"+tab+"\\']").classList.add("active");renderTab(tab)}' +
+    'function render(json){dashData=JSON.parse(json);renderTab("overview")}' +
+
+    // Modal functions
+    'function openModal(title,content){document.getElementById("modal-title").textContent=title;document.getElementById("modal-body").innerHTML=content;document.getElementById("modal").classList.add("active")}' +
+    'function closeModal(){document.getElementById("modal").classList.remove("active")}' +
+
+    // Show list in modal with search (v4.4.0)
+    'function showList(type){' +
+    'var d=dashData,items=[],title="",listHtml="";' +
+    'if(type==="members"){title="All Members ("+d.totalMembers+")";items=d.memberList.map(function(m){return{id:m.id,name:m.name+(m.isSteward?" (Steward)":""),meta:m.location+" | "+m.unit}})}' +
+    'else if(type==="stewards"){title="Stewards ("+d.stewardCount+")";items=d.stewardList.map(function(s){return{id:s.id,name:s.name,meta:s.location+" | "+s.unit}})}' +
+    'else if(type==="open"){title="Open Cases ("+d.openGrievances+")";items=d.openCasesList.map(function(c){return{id:c.id,name:c.member+" - "+c.category,meta:c.step+" | "+c.steward}})}' +
+    'else if(type==="overdue"){title="Overdue Cases ("+d.overdueCount+")";items=d.overdueList.map(function(c){return{id:c.id,name:c.member,meta:c.step+" | "+c.steward}})}' +
+    'if(items.length===0){listHtml="<p style=\\"color:#94a3b8\\">No data available in this view.</p>"}' +
+    'else{listHtml="<input type=\\"text\\" id=\\"modalSearch\\" placeholder=\\"Search...\\" oninput=\\"filterModalList()\\" style=\\"width:100%;padding:10px;margin-bottom:12px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><div id=\\"modalListItems\\" style=\\"max-height:350px;overflow-y:auto\\">";' +
+    'items.forEach(function(item){listHtml+="<div class=\\"modal-list-item\\" data-search=\\""+((item.id||"")+" "+(item.name||"")+" "+(item.meta||"")).toLowerCase()+"\\"><span class=\\"modal-list-id\\">"+item.id+"</span><span class=\\"modal-list-name\\">"+item.name+"</span><span class=\\"modal-list-meta\\">"+item.meta+"</span></div>"});' +
+    'listHtml+="</div>"}' +
+    'openModal(title,listHtml)}' +
+    'function filterModalList(){var q=document.getElementById("modalSearch").value.toLowerCase();document.querySelectorAll("#modalListItems .modal-list-item").forEach(function(el){el.style.display=el.getAttribute("data-search").indexOf(q)>=0?"flex":"none"})}' +
+
+    // Render tab content
+    'function renderTab(tab){' +
+    'var d=dashData,html="";' +
+
+    // Overview Tab
+    'if(tab==="overview"){' +
+    'html="<div class=\\"kpi-grid\\">";' +
+    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\'members\\')\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\'stewards\\')\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\'open\\')\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate</div><div class=\\"kpi-value green\\">"+d.winRate+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+"\\" onclick=\\"showList(\\'overdue\\')\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale Score</div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+"</div></div>";' +
+    'html+="</div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status</div><canvas id=\\"statusChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div></div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Members by Location</div><canvas id=\\"locationChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">show_chart</i>Filed vs Resolved</div><canvas id=\\"filingChart\\"></canvas></div></div>";' +
+    'document.getElementById("main-content").innerHTML=html;renderOverviewCharts()' +
+    '}' +
+
+    // My Cases Tab (Steward mode only) - v4.4.0
+    'else if(tab==="mycases"){' +
+    'html="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(3,1fr)\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">My Active Cases</div><div class=\\"kpi-value blue\\">"+d.myCases.length+"</div></div>";' +
+    'var urgentCount=d.myCases.filter(function(c){return c.daysOpen>30||c.status.toLowerCase().indexOf("pending")>=0}).length;' +
+    'html+="<div class=\\"kpi-card "+(urgentCount>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Needs Attention</div><div class=\\"kpi-value "+(urgentCount>0?"red":"green")+"\\">"+urgentCount+"</div></div>";' +
+    'var avgDays=d.myCases.length>0?Math.round(d.myCases.reduce(function(s,c){return s+(c.daysOpen||0)},0)/d.myCases.length):0;' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg Days Open</div><div class=\\"kpi-value "+(avgDays>45?"red":avgDays>30?"yellow":"green")+"\\">"+avgDays+"</div></div></div>";' +
+    // Status filter buttons
+    'html+="<div style=\\"display:flex;gap:8px;margin:12px 0\\"><button class=\\"btn btn-primary btn-sm\\" onclick=\\"filterMyCases(\\'all\\')\\">All</button><button class=\\"btn btn-secondary btn-sm\\" onclick=\\"filterMyCases(\\'Open\\')\\">Open</button><button class=\\"btn btn-secondary btn-sm\\" onclick=\\"filterMyCases(\\'Pending\\')\\">Pending</button><button class=\\"btn btn-secondary btn-sm\\" style=\\"background:#ef4444\\" onclick=\\"filterMyCases(\\'Overdue\\')\\">Overdue</button></div>";' +
+    'if(d.myCases.length===0){html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#22c55e\\">check_circle</i><p style=\\"color:#94a3b8;margin-top:16px\\">No active cases assigned to you. Great job!</p></div>"}' +
+    'else{html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">folder_open</i>My Assigned Cases</div><div id=\\"myCasesList\\" class=\\"list-container\\" style=\\"max-height:400px\\">";' +
+    'd.myCases.forEach(function(c){var statusColor=c.status.toLowerCase()==="open"?"#f59e0b":c.status.toLowerCase().indexOf("pending")>=0?"#ef4444":"#64748b";var isOverdue=c.daysOpen>30||c.status.toLowerCase().indexOf("pending")>=0;' +
+    'html+="<div class=\\"my-case-item list-item\\" data-status=\\""+c.status+"\\" data-overdue=\\""+(isOverdue?"yes":"no")+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+c.id+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+c.status+(isOverdue?" ⚠":"")+"</span></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#cbd5e1\\">"+c.member+" | "+c.category+"</div>";' +
+    'html+="<div style=\\"width:100%;display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#94a3b8\\"><span>"+c.step+" | "+c.location+"</span><span>"+c.daysOpen+" days</span></div></div>"});' +
+    'html+="</div></div>"}' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+
+    // Workload Tab (Enhanced with ratio and top performers)
+    'else if(tab==="workload"){' +
+    'var totalCases=d.stewardWorkload.reduce(function(s,w){return s+w.count},0);' +
+    'var avgCases=d.stewardWorkload.length>0?(totalCases/d.stewardWorkload.length).toFixed(1):0;' +
+    'var overloaded=d.stewardWorkload.filter(function(w){return w.status==="OVERLOAD"}).length;' +
+    'html="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(5,1fr)\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Stewards</div><div class=\\"kpi-value blue\\">"+d.stewardCount+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Member:Steward</div><div class=\\"kpi-value purple\\">"+d.stewardRatio+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Active Cases</div><div class=\\"kpi-value yellow\\">"+totalCases+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg per Steward</div><div class=\\"kpi-value green\\">"+avgCases+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(overloaded>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Overloaded</div><div class=\\"kpi-value red\\">"+overloaded+"</div></div></div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">assignment_ind</i>Steward Caseload</div><div class=\\"list-container\\">";' +
+    'd.stewardWorkload.forEach(function(w){html+="<div class=\\"list-item\\"><span>"+w.name+"</span><span class=\\"badge\\" style=\\"background:"+w.color+";color:white\\">"+w.count+" cases - "+w.status+"</span></div>"});' +
+    'html+="</div></div>";' +
+    // Top Performers section
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">emoji_events</i>Top Performers</div><div class=\\"list-container\\">";' +
+    'if(d.topPerformers&&d.topPerformers.length>0){d.topPerformers.forEach(function(p,i){html+="<div class=\\"list-item\\"><span>"+(i+1)+". "+p.name+"</span><span class=\\"badge\\" style=\\"background:#22c55e;color:white\\">Score: "+p.score+" | Win: "+p.winRate+"%</span></div>"})}' +
+    'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">Performance data not yet calculated</p>"}' +
+    'html+="</div></div></div>";' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+
+    // Analytics Tab (Enhanced with Engagement Metrics)
+    'else if(tab==="analytics"){' +
+    'html="<div class=\\"kpi-grid\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Grievances</div><div class=\\"kpi-value blue\\">"+d.totalGrievances+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Won</div><div class=\\"kpi-value green\\">"+d.wins+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Denied</div><div class=\\"kpi-value red\\">"+d.losses+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Settled</div><div class=\\"kpi-value purple\\">"+d.settled+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Survey Response</div><div class=\\"kpi-value yellow\\">"+d.engagement.surveyResponseRate+"%</div></div></div>";' +
+    // Engagement Metrics Section
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:20px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">trending_up</i>Member Engagement Metrics</h3>";' +
+    'html+="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(auto-fit,minmax(120px,1fr))\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Email Open Rate</div><div class=\\"kpi-value "+(d.engagement.emailOpenRate>=50?"green":d.engagement.emailOpenRate>=30?"yellow":"red")+"\\">"+d.engagement.emailOpenRate+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Virtual Mtg Att.</div><div class=\\"kpi-value "+(d.engagement.virtualMeetingRate>=40?"green":d.engagement.virtualMeetingRate>=20?"yellow":"red")+"\\">"+d.engagement.virtualMeetingRate+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">In-Person Mtg Att.</div><div class=\\"kpi-value "+(d.engagement.inPersonMeetingRate>=30?"green":d.engagement.inPersonMeetingRate>=15?"yellow":"red")+"\\">"+d.engagement.inPersonMeetingRate+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Vol. Hours</div><div class=\\"kpi-value purple\\">"+d.engagement.totalVolunteerHours+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Local Interest</div><div class=\\"kpi-value blue\\">"+d.engagement.unionInterestLocal+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Chapter Interest</div><div class=\\"kpi-value blue\\">"+d.engagement.unionInterestChapter+"%</div></div></div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">donut_large</i>Unit Distribution</div><canvas id=\\"unitChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Outcomes</div><canvas id=\\"outcomeChart\\"></canvas></div></div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">category</i>Cases by Category</div><canvas id=\\"categoryChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">stairs</i>Step Progression</div><canvas id=\\"stepChart\\"></canvas></div></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">mood</i>Member Satisfaction: "+d.moraleScore+"/10</div><div style=\\"height:20px;background:rgba(255,255,255,0.1);border-radius:10px;overflow:hidden;margin-top:12px\\"><div style=\\"height:100%;width:"+(d.moraleScore*10)+"%;background:linear-gradient(90deg,#22c55e,#3b82f6)\\"></div></div></div>";' +
+    'document.getElementById("main-content").innerHTML=html;renderAnalyticsCharts()' +
+    '}' +
+
+    // Directory Trends Tab (Enhanced with Engagement)
+    'else if(tab==="directory"){' +
+    'var dt=d.directoryTrends;var eng=d.engagement;' +
+    'html="<div class=\\"kpi-grid\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">With Email</div><div class=\\"kpi-value green\\">"+dt.totalWithEmail+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Email</div><div class=\\"kpi-value "+(dt.missingEmail>0?"red":"green")+"\\">"+dt.missingEmail+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Phone</div><div class=\\"kpi-value "+(dt.missingPhone>0?"yellow":"green")+"\\">"+dt.missingPhone+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Email Open Rate</div><div class=\\"kpi-value "+(eng.emailOpenRate>=50?"green":eng.emailOpenRate>=30?"yellow":"red")+"\\">"+eng.emailOpenRate+"%</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Meeting Attendance</div><div class=\\"kpi-value purple\\">"+(eng.virtualMeetingRate+eng.inPersonMeetingRate)+"%</div></div></div>";' +
+    'html+="<div class=\\"charts-row\\">";' +
+    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">update</i>Recent Updates (30 days)</span><span class=\\"trend-value green\\">"+dt.recentUpdates.length+"</span></div><div class=\\"trend-list\\">";' +
+    'dt.recentUpdates.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.date).toLocaleDateString()+"</span></div>"});' +
+    'if(dt.recentUpdates.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent updates</p>";' +
+    'html+="</div></div>";' +
+    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">warning</i>Stale Contacts (90+ days)</span><span class=\\"trend-value yellow\\">"+dt.staleContacts.length+"</span></div><div class=\\"trend-list\\">";' +
+    'dt.staleContacts.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.lastUpdate).toLocaleDateString()+"</span></div>"});' +
+    'if(dt.staleContacts.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">All contacts up to date!</p>";' +
+    'html+="</div></div></div>";' +
+    // Recent Meeting Attendees section
+    'html+="<div class=\\"charts-row\\"><div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">groups</i>Recent Meeting Attendees</span><span class=\\"trend-value purple\\">"+eng.recentMeetingAttendees.length+"</span></div><div class=\\"trend-list\\">";' +
+    'eng.recentMeetingAttendees.slice(0,8).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+"</span><span style=\\"color:"+(m.type==="Virtual"?"#60a5fa":"#22c55e")+"\\">"+m.type+"</span></div>"});' +
+    'if(eng.recentMeetingAttendees.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent meeting attendance data</p>";' +
+    'html+="</div></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">groups</i>Members by Unit</div><canvas id=\\"unitDistChart\\"></canvas></div></div>";' +
+    'document.getElementById("main-content").innerHTML=html;renderDirectoryCharts()' +
+    '}' +
+
+    // Hot Spots Tab
+    'else if(tab==="hotspots"){' +
+    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">local_fire_department</i>Hot Zones (3+ Active Cases)</div>";' +
+    'if(d.hotZones.length===0){html+="<div style=\\"text-align:center;padding:40px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:48px\\">check_circle</i><p style=\\"margin-top:12px\\">No hot zones detected - All clear!</p></div>"}' +
+    'else{d.hotZones.forEach(function(h){html+="<div class=\\"hot-zone\\"><span>"+h.location+"</span><span class=\\"badge\\" style=\\"background:#ef4444;color:white\\">"+h.count+" cases</span></div>"})}' +
+    'html+="</div>";' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Cases by Location</div><canvas id=\\"hotspotChart\\"></canvas></div>";' +
+    'document.getElementById("main-content").innerHTML=html;renderHotspotChart()' +
+    '}' +
+
+    // Bargaining Tab (Enhanced)
+    'else if(tab==="bargaining"){' +
+    'html="<div class=\\"bargain-grid\\">";' +
+    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Step 1 Denial Rate</div><div class=\\"bargain-value\\">"+d.step1DenialRate+"%</div><div class=\\"bargain-status\\">"+(d.step1DenialRate>60?"High Hostility":"Normal Range")+"</div></div>";' +
+    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Avg Settlement Time</div><div class=\\"bargain-value\\">"+d.avgSettlementDays+"</div><div class=\\"bargain-status\\">Days</div></div>";' +
+    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">Most Violated Article</div><div class=\\"bargain-value\\">"+d.topViolatedArticle+"</div><div class=\\"bargain-status\\">Focus Area</div></div>";' +
+    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">At Step 1</div><div class=\\"bargain-value\\">"+d.stepProgression.step1+"</div><div class=\\"bargain-status\\">Cases</div></div>";' +
+    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">At Step 2</div><div class=\\"bargain-value\\">"+d.stepProgression.step2+"</div><div class=\\"bargain-status\\">Cases</div></div>";' +
+    'html+="<div class=\\"bargain-card\\"><div class=\\"bargain-label\\">At Arbitration</div><div class=\\"bargain-value\\">"+d.stepProgression.arb+"</div><div class=\\"bargain-status\\">Cases</div></div>";' +
+    'html+="</div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">article</i>Violations by Article</div><canvas id=\\"bargainChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">stairs</i>Step Distribution</div><canvas id=\\"stepDistChart\\"></canvas></div></div>";' +
+    'document.getElementById("main-content").innerHTML=html;renderBargainCharts()' +
+    '}' +
+
+    // Satisfaction Tab (Enhanced)
+    'else if(tab==="satisfaction"){' +
+    'var sat=d.satisfactionData;' +
+    'html="<div class=\\"sat-header\\"><h2 style=\\"color:#e2e8f0;font-size:16px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">sentiment_satisfied</i>Member Satisfaction Analysis</h2><span class=\\"sat-response-count\\">"+sat.responseCount+" Responses ("+d.engagement.surveyResponseRate+"% response rate)</span></div>";' +
+    'html+="<div class=\\"sat-grid\\">";' +
+    'sat.sections.forEach(function(section){' +
+    'var scoreColor=section.score>=7?"#22c55e":section.score>=5?"#f59e0b":"#ef4444";' +
+    'var pct=(section.score/10)*100;' +
+    'html+="<div class=\\"sat-section\\"><div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">"+section.name+"</span><span class=\\"sat-section-score\\" style=\\"color:"+scoreColor+"\\">"+section.score+"/10</span></div>";' +
+    'html+="<div class=\\"sat-score-bar\\"><div class=\\"sat-score-fill\\" style=\\"width:"+pct+"%;background:"+scoreColor+"\\"></div></div>";' +
+    'html+="<div class=\\"sat-questions\\">";' +
+    'section.questions.forEach(function(q){html+=q+", "});' +
+    'html=html.slice(0,-2)+"</div></div>"});' +
+    'html+="</div>";' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Scores Comparison</div><canvas id=\\"satChart\\"></canvas></div>";' +
+    'document.getElementById("main-content").innerHTML=html;renderSatisfactionChart()' +
+    '}' +
+
+    // Resources Tab (NEW)
+    'else if(tab==="resources"){' +
+    'var dr=d.driveResources;' +
+    'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">folder</i>Union Resources</h2>";' +
+    'html+="<div class=\\"resource-grid\\">";' +
+    'if(dr.folderUrl){html+="<a href=\\""+dr.folderUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}' +
+    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\'Coming soon: Contract PDF\\')\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
+    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\'Coming soon: Forms\\')\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
+    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\'Coming soon: Contact Directory\\')\\"><div class=\\"resource-icon\\">📞</div><div class=\\"resource-title\\">Contacts</div><div class=\\"resource-desc\\">Steward and rep contact info</div></div>";' +
+    'html+="</div>";' +
+    'if(dr.recentFiles.length>0){' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">description</i>Recent Files</div><div class=\\"list-container\\">";' +
+    'dr.recentFiles.forEach(function(f){html+="<a href=\\""+f.url+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+f.name+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"});' +
+    'html+="</div></div>"}' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+    '}' +
+
+    // Chart rendering functions
+    'function renderOverviewCharts(){' +
+    'var d=dashData;' +
+    'new Chart(document.getElementById("statusChart"),{type:"doughnut",data:{labels:["Open","Pending","Won","Denied","Settled","Withdrawn"],datasets:[{data:[d.statusDistribution.open,d.statusDistribution.pending,d.statusDistribution.won,d.statusDistribution.denied,d.statusDistribution.settled,d.statusDistribution.withdrawn],backgroundColor:["#3b82f6","#f59e0b","#22c55e","#ef4444","#8b5cf6","#64748b"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:11}}}}}});' +
+    'var trendLabels=d.sentimentTrend.length>0?d.sentimentTrend.map(function(t){return t.month}):["Jan","Feb","Mar"];' +
+    'var trendData=d.sentimentTrend.length>0?d.sentimentTrend.map(function(t){return t.score}):[7,7.2,7.5];' +
+    'new Chart(document.getElementById("trendChart"),{type:"line",data:{labels:trendLabels,datasets:[{label:"Trust Score",data:trendData,borderColor:"#a78bfa",backgroundColor:"rgba(167,139,250,0.2)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:0,max:10,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    'var locLabels=Object.keys(d.locationBreakdown).slice(0,8);' +
+    'var locData=locLabels.map(function(l){return d.locationBreakdown[l]});' +
+    'new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
+    'var filingLabels=d.monthlyFilings.map(function(f){return f.month});' +
+    'var filingData=d.monthlyFilings.map(function(f){return f.count});' +
+    'var resolvedData=d.monthlyResolved?d.monthlyResolved.map(function(f){return f.count}):[];' +
+    'new Chart(document.getElementById("filingChart"),{type:"line",data:{labels:filingLabels.length>0?filingLabels:["Jan","Feb","Mar"],datasets:[{label:"Filed",data:filingData.length>0?filingData:[2,3,1],borderColor:"#f59e0b",backgroundColor:"rgba(245,158,11,0.1)",fill:true,tension:0.4},{label:"Resolved",data:resolvedData.length>0?resolvedData:[1,2,2],borderColor:"#22c55e",backgroundColor:"rgba(34,197,94,0.1)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:true,labels:{color:"#cbd5e1"}}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}})' +
+    '}' +
+
+    'function renderAnalyticsCharts(){' +
+    'var d=dashData;' +
+    'var unitLabels=Object.keys(d.unitBreakdown).slice(0,8);' +
+    'var unitData=unitLabels.map(function(u){return d.unitBreakdown[u]});' +
+    'new Chart(document.getElementById("unitChart"),{type:"doughnut",data:{labels:unitLabels,datasets:[{data:unitData,backgroundColor:["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
+    'new Chart(document.getElementById("outcomeChart"),{type:"bar",data:{labels:["Won","Denied","Settled"],datasets:[{label:"Cases",data:[d.wins,d.losses,d.settled],backgroundColor:["#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    'var catLabels=Object.keys(d.grievancesByCategory).slice(0,6);' +
+    'var catData=catLabels.map(function(c){return d.grievancesByCategory[c]});' +
+    'new Chart(document.getElementById("categoryChart"),{type:"bar",data:{labels:catLabels.length>0?catLabels:["Discipline","Contract","Safety"],datasets:[{label:"Cases",data:catData.length>0?catData:[3,5,2],backgroundColor:"#06b6d4"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8",maxRotation:45}}}}});' +
+    'new Chart(document.getElementById("stepChart"),{type:"bar",data:{labels:["Step 1","Step 2","Step 3","Arbitration"],datasets:[{label:"Cases",data:[d.stepProgression.step1,d.stepProgression.step2,d.stepProgression.step3,d.stepProgression.arb],backgroundColor:["#3b82f6","#f59e0b","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}})' +
+    '}' +
+
+    'function renderDirectoryCharts(){' +
+    'var d=dashData;' +
+    'var unitLabels=Object.keys(d.unitBreakdown).slice(0,10);' +
+    'var unitData=unitLabels.map(function(u){return d.unitBreakdown[u]});' +
+    'new Chart(document.getElementById("unitDistChart"),{type:"bar",data:{labels:unitLabels,datasets:[{label:"Members",data:unitData,backgroundColor:"#60a5fa"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8",maxRotation:45}}}}})' +
+    '}' +
+
+    'function renderHotspotChart(){' +
+    'var d=dashData;' +
+    'var locLabels=Object.keys(d.locationBreakdown).slice(0,10);' +
+    'var locData=locLabels.map(function(l){return d.locationBreakdown[l]});' +
+    'new Chart(document.getElementById("hotspotChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:locData.map(function(v){return v>=3?"#ef4444":"#3b82f6"})}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}})' +
+    '}' +
+
+    'function renderBargainCharts(){' +
+    'var d=dashData;' +
+    'var artLabels=Object.keys(d.articleViolations).slice(0,8);' +
+    'var artData=artLabels.map(function(a){return d.articleViolations[a]});' +
+    'new Chart(document.getElementById("bargainChart"),{type:"bar",data:{labels:artLabels.length>0?artLabels:["Art 5","Art 7","Art 12"],datasets:[{label:"Violations",data:artData.length>0?artData:[3,5,2],backgroundColor:"#fbbf24"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    'new Chart(document.getElementById("stepDistChart"),{type:"doughnut",data:{labels:["Step 1","Step 2","Step 3","Arbitration"],datasets:[{data:[d.stepProgression.step1,d.stepProgression.step2,d.stepProgression.step3,d.stepProgression.arb],backgroundColor:["#3b82f6","#f59e0b","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1"}}}}})' +
+    '}' +
+
+    'function renderSatisfactionChart(){' +
+    'var d=dashData;' +
+    'var labels=d.satisfactionData.sections.map(function(s){return s.name});' +
+    'var scores=d.satisfactionData.sections.map(function(s){return s.score});' +
+    'var colors=scores.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444"});' +
+    'new Chart(document.getElementById("satChart"),{type:"bar",data:{labels:labels,datasets:[{label:"Score",data:scores,backgroundColor:colors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}})' +
+    '}' +
+
+    // FAQ/Help Modal function (v4.4.0)
+    'function showFAQ(){' +
+    'var faq=[' +
+    '{cat:"Getting Started",items:[' +
+    '{q:"What is this dashboard?",a:"This is the Union Dashboard providing real-time analytics on grievances, members, and steward workload."},' +
+    '{q:"How is data updated?",a:"Data refreshes each time you open the dashboard. Click Refresh to reload."},' +
+    '{q:"What\\'s the difference between Steward and Member dashboards?",a:"Steward dashboard shows full PII (names, IDs). Member dashboard anonymizes data for public sharing."}' +
+    ']},' +
+    '{cat:"Dashboard Tabs",items:[' +
+    '{q:"What is the My Cases tab?",a:"Shows your personally assigned grievances as a steward. Only visible in Steward mode."},' +
+    '{q:"What are Hot Spots?",a:"Locations with 3 or more active grievances that need management attention."},' +
+    '{q:"What are Engagement Metrics?",a:"Email open rates, meeting attendance, volunteer hours, and union interest levels from Member Directory."},' +
+    '{q:"What is the Morale Score?",a:"Average trust/satisfaction score from the Member Satisfaction survey (1-10 scale)."}' +
+    ']},' +
+    '{cat:"Understanding Metrics",items:[' +
+    '{q:"How is Win Rate calculated?",a:"(Won Cases / Total Closed Cases) × 100. Settled cases count as closed but not won."},' +
+    '{q:"What does OVERLOAD mean?",a:"A steward with more than 8 active cases. Heavy = 5-8 cases."},' +
+    '{q:"What is Step 1 Denial Rate?",a:"Percentage of grievances denied at Step 1 that had to escalate to Step 2."},' +
+    '{q:"What is Avg Settlement Time?",a:"Average number of days from filing to closure for resolved grievances."}' +
+    ']},' +
+    '{cat:"Taking Action",items:[' +
+    '{q:"How do I file a new grievance?",a:"Go to Member Directory in the spreadsheet > check the Start Grievance box for a member."},' +
+    '{q:"How do I get help?",a:"Use the Help menu in the spreadsheet or contact your chapter leadership."},' +
+    '{q:"Can I export this data?",a:"Use your browser\\'s print function or screenshot the dashboard."}' +
+    ']}' +
+    '];' +
+    'var html="<div style=\\"max-height:400px;overflow-y:auto;padding:8px\\">";' +
+    'faq.forEach(function(section){' +
+    'html+="<div style=\\"font-size:12px;font-weight:600;color:#22c55e;margin:16px 0 8px;padding:6px 10px;background:rgba(34,197,94,0.1);border-radius:6px\\">"+section.cat+"</div>";' +
+    'section.items.forEach(function(item){' +
+    'html+="<div style=\\"border-left:3px solid #3b82f6;padding-left:12px;margin-bottom:12px\\">";' +
+    'html+="<div style=\\"font-weight:500;color:#e2e8f0;margin-bottom:4px;font-size:13px\\">"+item.q+"</div>";' +
+    'html+="<div style=\\"color:#94a3b8;font-size:12px;line-height:1.5\\">"+item.a+"</div></div>"})});' +
+    'html+="</div>";' +
+    'openModal("Help & FAQ",html)' +
+    '}' +
+
+    // Filter My Cases by status (v4.4.0)
+    'function filterMyCases(status){' +
+    'document.querySelectorAll(".my-case-item").forEach(function(el){' +
+    'if(status==="all"){el.style.display="flex"}' +
+    'else if(status==="Overdue"){el.style.display=el.getAttribute("data-overdue")==="yes"?"flex":"none"}' +
+    'else{el.style.display=el.getAttribute("data-status").toLowerCase().indexOf(status.toLowerCase())>=0?"flex":"none"}' +
+    '})' +
+    '}' +
+
+    '</script></body></html>';
 }

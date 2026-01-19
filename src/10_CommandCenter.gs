@@ -71,19 +71,26 @@ var COMMAND_CENTER_CONFIG = {
 };
 
 // ============================================================================
-// COMMAND CENTER MENU
+// COMMAND CENTER MENU (DEPRECATED - v4.4.0)
 // ============================================================================
 
 /**
- * Creates the 509 Command Center menu (v4.0 Harmonized Structure)
- * Called by createDashboardMenu() in UIService.gs
+ * @deprecated v4.4.0 - Menu consolidated into createDashboardMenu() in UIService.gs
+ * The Field Portal menu has been merged into:
+ * - 📊 509 Union Hub (primary operations)
+ * - 🔧 Tools (supporting features)
+ * - 🛠️ Admin (system administration)
  *
- * v4.0 Features:
- * - Quick access to Search and Mobile View at top level
- * - Production Mode: Demo Data menu disappears after NUKE
- * - Organized submenus for Personnel, Grievance, Security, and Styling
+ * This function is kept for backward compatibility but is no longer called.
+ * All menu items have been reorganized into the new consolidated structure.
  */
 function createCommandCenterMenu() {
+  // v4.4.0: This function is deprecated - menu consolidated into UIService.gs
+  // Keeping the function stub to prevent errors if called from legacy code
+  console.log('createCommandCenterMenu() is deprecated in v4.4.0 - menus consolidated');
+  return;
+
+  /* ORIGINAL CODE (preserved for reference):
   var ui = SpreadsheetApp.getUi();
   var menu = ui.createMenu('📱 Field Portal');
 
@@ -175,6 +182,7 @@ function createCommandCenterMenu() {
   }
 
   menu.addToUi();
+  END OF DEPRECATED CODE */
 }
 
 // ============================================================================
