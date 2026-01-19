@@ -8171,7 +8171,7 @@ function getUnifiedDashboardHtml(isPII) {
     // Header
     '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1>' + badge + '</div>' +
 
-    // Tabs (My Cases only visible in steward mode)
+    // Tabs (My Cases and Help only visible in steward mode, Compare in both)
     '<div class="tabs">' +
     '<div class="tab active" onclick="showTab(\'overview\')">Overview</div>' +
     (isPII ? '<div class="tab" onclick="showTab(\'mycases\')">My Cases</div>' : '') +
@@ -8182,6 +8182,8 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
     '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
     '<div class="tab" onclick="showTab(\'resources\')">Resources</div>' +
+    '<div class="tab" onclick="showTab(\'compare\')">Compare</div>' +
+    (isPII ? '<div class="tab" onclick="showTab(\'help\')">Help</div>' : '') +
     '</div>' +
 
     // Content
@@ -8453,9 +8455,13 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contract PDF\\x27)\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
     'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Forms\\x27)\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
     'html+="</div>";' +
-    // Steward Contact Directory
+    // Steward Contact Directory with Smart Search
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">contacts</i>Steward Contact Directory</div>";' +
-    'html+="<input type=\\"text\\" id=\\"stewardSearch\\" placeholder=\\"Search by name or location...\\" oninput=\\"filterStewards()\\" style=\\"width:100%;padding:10px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\">";' +
+    'html+="<div style=\\"position:relative\\"><input type=\\"text\\" id=\\"stewardSearch\\" placeholder=\\"Start typing to search stewards...\\" oninput=\\"smartFilterStewards()\\" onfocus=\\"showSearchSuggestions()\\" autocomplete=\\"off\\" style=\\"width:100%;padding:10px 10px 10px 36px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><i class=\\"material-icons\\" style=\\"position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#64748b;font-size:18px\\">search</i><div id=\\"searchSuggestions\\" style=\\"display:none;position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #475569;border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.3)\\"></div></div>";' +
+    'html+="<div style=\\"display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap\\"><span style=\\"color:#64748b;font-size:11px\\">Quick filters:</span>";' +
+    'var locations=[...new Set(d.stewardList.map(function(s){return s.location}))].filter(Boolean).slice(0,5);' +
+    'locations.forEach(function(loc){html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px\\" onclick=\\"quickFilterSteward(\\x27"+loc+"\\x27)\\">"+loc+"</button>"});' +
+    'html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px;background:#475569\\" onclick=\\"clearStewardFilter()\\">Clear</button></div>";' +
     'html+="<div id=\\"stewardList\\" class=\\"list-container\\" style=\\"max-height:300px\\">";' +
     'if(d.stewardList&&d.stewardList.length>0){d.stewardList.forEach(function(s){' +
     'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase()+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+s.name+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" onclick=\\"saveStewardContact(\\x27"+s.name+"\\x27,\\x27"+(s.email||"")+"\\x27,\\x27"+(s.phone||"")+"\\x27)\\">Save Contact</button></div>";' +
@@ -8469,6 +8475,96 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">description</i>Recent Files</div><div class=\\"list-container\\">";' +
     'dr.recentFiles.forEach(function(f){html+="<a href=\\""+f.url+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+f.name+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"});' +
     'html+="</div></div>"}' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+
+    // Compare Tab - Metrics Comparison Tool
+    'else if(tab==="compare"){' +
+    'function fmt(n){return typeof n==="number"?(n>=1000?n.toLocaleString():n):n}' +
+    'var metrics=[' +
+    '{id:"totalMembers",label:"Total Members",value:d.totalMembers,category:"Membership"},' +
+    '{id:"stewardCount",label:"Steward Count",value:d.stewardCount,category:"Membership"},' +
+    '{id:"stewardRatio",label:"Steward:Member Ratio",value:d.stewardRatio,category:"Membership"},' +
+    '{id:"totalCases",label:"Total Grievances",value:d.totalCases,category:"Grievances"},' +
+    '{id:"openCases",label:"Open Cases",value:d.openCases,category:"Grievances"},' +
+    '{id:"pendingCases",label:"Pending Cases",value:d.pendingCases,category:"Grievances"},' +
+    '{id:"winRate",label:"Win Rate",value:d.winRate+"%",category:"Grievances"},' +
+    '{id:"wins",label:"Cases Won",value:d.wins,category:"Grievances"},' +
+    '{id:"losses",label:"Cases Denied",value:d.losses,category:"Grievances"},' +
+    '{id:"settled",label:"Cases Settled",value:d.settled,category:"Grievances"},' +
+    '{id:"avgDaysToResolve",label:"Avg Days to Resolve",value:d.avgDaysToResolve,category:"Performance"},' +
+    '{id:"moraleScore",label:"Morale Score",value:d.moraleScore+"/10",category:"Satisfaction"},' +
+    '{id:"emailOpenRate",label:"Email Open Rate",value:d.engagement.emailOpenRate+"%",category:"Engagement"},' +
+    '{id:"virtualMeetingRate",label:"Virtual Meeting Attendance",value:d.engagement.virtualMeetingRate+"%",category:"Engagement"},' +
+    '{id:"inPersonMeetingRate",label:"In-Person Meeting Attendance",value:d.engagement.inPersonMeetingRate+"%",category:"Engagement"},' +
+    '{id:"surveyResponseRate",label:"Survey Response Rate",value:d.engagement.surveyResponseRate+"%",category:"Engagement"},' +
+    '{id:"overdueCount",label:"Overdue Cases",value:d.overdueCount,category:"Alerts"}' +
+    '];' +
+    'var categories=["Membership","Grievances","Performance","Satisfaction","Engagement","Alerts"];' +
+    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">compare_arrows</i>Metrics Comparison Tool</div>";' +
+    'html+="<p style=\\"color:#94a3b8;margin-bottom:16px;font-size:13px\\">Select metrics to compare and export. Choose multiple metrics to generate a comparison report.</p>";' +
+    'html+="<div style=\\"display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap\\"><button class=\\"btn btn-sm\\" onclick=\\"selectAllMetrics()\\">Select All</button><button class=\\"btn btn-sm\\" onclick=\\"clearAllMetrics()\\">Clear All</button><button class=\\"btn\\" style=\\"background:#22c55e\\" onclick=\\"exportComparison()\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:4px\\">download</i>Export Selected</button></div>";' +
+    'categories.forEach(function(cat){' +
+    'html+="<div style=\\"margin-bottom:16px\\"><div style=\\"font-weight:600;color:#e2e8f0;margin-bottom:8px;font-size:13px\\"><i class=\\"material-icons\\" style=\\"font-size:16px;vertical-align:middle;margin-right:4px;color:#60a5fa\\">folder</i>"+cat+"</div>";' +
+    'html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px\\">";' +
+    'metrics.filter(function(m){return m.category===cat}).forEach(function(m){' +
+    'html+="<label style=\\"display:flex;align-items:center;gap:8px;background:#1e293b;padding:10px;border-radius:8px;cursor:pointer;border:1px solid #334155\\"><input type=\\"checkbox\\" class=\\"metric-check\\" data-id=\\""+m.id+"\\" data-label=\\""+m.label+"\\" data-value=\\""+m.value+"\\" data-category=\\""+m.category+"\\"><span style=\\"flex:1;font-size:12px\\">"+m.label+"</span><span style=\\"font-weight:600;color:#60a5fa\\">"+fmt(m.value)+"</span></label>"});' +
+    'html+="</div></div>"});' +
+    'html+="</div>";' +
+    'html+="<div id=\\"comparison-preview\\" class=\\"chart-card\\" style=\\"margin-top:16px;display:none\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">preview</i>Comparison Preview</div><div id=\\"preview-content\\"></div></div>";' +
+    'document.getElementById("main-content").innerHTML=html;' +
+    'document.querySelectorAll(".metric-check").forEach(function(cb){cb.addEventListener("change",updateComparisonPreview)})' +
+    '}' +
+
+    // Help Tab - Comprehensive FAQ & Tutorials (Steward only)
+    'else if(tab==="help"&&isPII){' +
+    'var faqData=[' +
+    '{cat:"Getting Started",q:"How do I navigate the dashboard?",a:"Use the tabs at the top to switch between views. Overview shows key metrics, Workload shows steward assignments, Analytics shows trends and charts, and other tabs provide detailed breakdowns.",tutorial:true},' +
+    '{cat:"Getting Started",q:"What is the difference between Steward and Member dashboards?",a:"The Steward Dashboard shows full PII (names, contact info) and has the Help tab. The Member Dashboard anonymizes data for public sharing but shows the same analytics.",tutorial:true},' +
+    '{cat:"Getting Started",q:"How often does the data refresh?",a:"Data refreshes each time you load the dashboard. Click the Refresh button in the footer to reload the latest data.",tutorial:false},' +
+    '{cat:"Grievance Management",q:"How do I track my assigned cases?",a:"Go to the My Cases tab to see all grievances assigned to you. Filter by status using the buttons at the top.",tutorial:true},' +
+    '{cat:"Grievance Management",q:"What do the grievance statuses mean?",a:"Open = Active case, Pending = Awaiting response, Won = Resolved in member favor, Denied = Management decision upheld, Settled = Negotiated resolution, Withdrawn = Case dropped.",tutorial:false},' +
+    '{cat:"Grievance Management",q:"How is the win rate calculated?",a:"Win Rate = (Won + Settled) / Total Resolved cases. Only closed cases are counted.",tutorial:false},' +
+    '{cat:"Analytics",q:"What does the Morale Score represent?",a:"The Morale Score is the average Trust Score (Q7) from member satisfaction surveys, on a scale of 1-10.",tutorial:false},' +
+    '{cat:"Analytics",q:"How do I interpret the Hot Spots?",a:"Hot Spots show locations with 3+ active cases. Red/orange colors indicate higher case counts. Focus resources on these areas.",tutorial:true},' +
+    '{cat:"Analytics",q:"What are the engagement metrics?",a:"Email Open Rate = % who opened union emails. Meeting Attendance = % who attended meetings in last 6 months. Survey Response = % who completed satisfaction survey.",tutorial:false},' +
+    '{cat:"Member Directory",q:"How do I find a specific member?",a:"Use the search field in the steward contact section or the filter in list views. Search works on names, locations, and units.",tutorial:false},' +
+    '{cat:"Member Directory",q:"What do the participation heatmaps show?",a:"Heatmaps show engagement levels by unit or location. Green = high engagement (60%+), Yellow = moderate (40-60%), Red = low (<40%).",tutorial:true},' +
+    '{cat:"Satisfaction",q:"How are satisfaction scores calculated?",a:"Each section score is the average of related survey questions (1-10 scale). Overall Score combines all sections weighted equally.",tutorial:false},' +
+    '{cat:"Satisfaction",q:"What is the Key Insights section?",a:"Key Insights automatically identifies your strongest area, biggest opportunity, and suggests action items based on survey data.",tutorial:true},' +
+    '{cat:"Comparison Tool",q:"How do I use the Compare tab?",a:"Select metrics you want to compare using checkboxes, then click Export to download a CSV file with your selected data.",tutorial:true},' +
+    '{cat:"Comparison Tool",q:"Can I export data for reports?",a:"Yes! Use the Compare tab to select metrics, then Export. The CSV can be opened in Excel or Google Sheets for further analysis.",tutorial:false},' +
+    '{cat:"Troubleshooting",q:"Data is not loading",a:"Try clicking Refresh in the footer. If that fails, close and reopen the dashboard. Check your network connection.",tutorial:false},' +
+    '{cat:"Troubleshooting",q:"Charts are not displaying",a:"Ensure JavaScript is enabled in your browser. Try a different browser (Chrome recommended). Clear browser cache if issues persist.",tutorial:false}' +
+    '];' +
+    'var features=[' +
+    '{name:"Overview Tab",desc:"At-a-glance KPIs including total members, open cases, win rate, morale score. Quick status cards and trend charts.",icon:"dashboard"},' +
+    '{name:"My Cases Tab",desc:"View and filter grievances assigned to you. See case details, timelines, and status updates.",icon:"assignment_ind"},' +
+    '{name:"Workload Tab",desc:"Steward workload distribution and top performers. Identify imbalances and reassignment opportunities.",icon:"work"},' +
+    '{name:"Analytics Tab",desc:"Deep-dive charts: cases by category, step progression, outcomes, and member satisfaction trends.",icon:"analytics"},' +
+    '{name:"Directory Tab",desc:"Member distribution by location, unit, and office days. Participation heatmaps and satisfaction breakdowns.",icon:"people"},' +
+    '{name:"Hot Spots Tab",desc:"Locations with high case concentrations. Heatmap colors show severity. Prioritize these areas.",icon:"whatshot"},' +
+    '{name:"Bargaining Tab",desc:"Contract-related metrics for bargaining preparation. Category breakdowns and resolution patterns.",icon:"handshake"},' +
+    '{name:"Satisfaction Tab",desc:"Member survey results with section scores, key insights, and actionable recommendations.",icon:"sentiment_satisfied"},' +
+    '{name:"Resources Tab",desc:"Quick links to contract, forms, and resources. Searchable steward contact directory.",icon:"folder"},' +
+    '{name:"Compare Tab",desc:"Select multiple metrics to compare side-by-side. Export data as CSV for reporting.",icon:"compare"}' +
+    '];' +
+    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">search</i>Search Help</div>";' +
+    'html+="<input type=\\"text\\" id=\\"faqSearch\\" placeholder=\\"Search FAQs, tutorials, and features...\\" oninput=\\"filterFAQ()\\" style=\\"width:100%;padding:12px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:14px;margin-bottom:8px\\">";' +
+    'html+="<div style=\\"display:flex;gap:8px;flex-wrap:wrap\\"><button class=\\"btn btn-sm faq-filter active\\" onclick=\\"setFAQFilter(\\x27all\\x27,this)\\">All</button><button class=\\"btn btn-sm faq-filter\\" onclick=\\"setFAQFilter(\\x27tutorial\\x27,this)\\">Tutorials Only</button><button class=\\"btn btn-sm faq-filter\\" onclick=\\"setFAQFilter(\\x27features\\x27,this)\\">Features</button></div></div>";' +
+    // Feature Breakdown
+    'html+="<div id=\\"features-section\\" class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">apps</i>Feature Breakdown</div><div class=\\"feature-grid\\" style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px\\">";' +
+    'features.forEach(function(f){html+="<div class=\\"feature-item\\" style=\\"background:#1e293b;padding:12px;border-radius:8px;border:1px solid #334155\\"><div style=\\"display:flex;align-items:center;gap:8px;margin-bottom:6px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">"+f.icon+"</i><span style=\\"font-weight:600;color:#e2e8f0\\">"+f.name+"</span></div><p style=\\"color:#94a3b8;font-size:12px;margin:0;line-height:1.4\\">"+f.desc+"</p></div>"});' +
+    'html+="</div></div>";' +
+    // FAQ Section
+    'html+="<div id=\\"faq-section\\" class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">help_outline</i>Frequently Asked Questions</div><div id=\\"faq-list\\">";' +
+    'var cats=["Getting Started","Grievance Management","Analytics","Member Directory","Satisfaction","Comparison Tool","Troubleshooting"];' +
+    'cats.forEach(function(cat){' +
+    'var catFaqs=faqData.filter(function(f){return f.cat===cat});' +
+    'if(catFaqs.length>0){html+="<div class=\\"faq-category\\" style=\\"margin-bottom:16px\\"><div style=\\"font-weight:600;color:#a78bfa;margin-bottom:8px;font-size:13px\\">"+cat+"</div>";' +
+    'catFaqs.forEach(function(f){html+="<div class=\\"faq-item\\" data-searchable=\\""+f.q.toLowerCase()+" "+f.a.toLowerCase()+"\\" data-tutorial=\\""+(f.tutorial?"yes":"no")+"\\" style=\\"background:#1e293b;padding:12px;border-radius:8px;margin-bottom:8px;border-left:3px solid "+(f.tutorial?"#22c55e":"#475569")+"\\"><div style=\\"font-weight:500;color:#e2e8f0;margin-bottom:6px;display:flex;align-items:center;gap:6px\\">"+(f.tutorial?"<span style=\\"background:#22c55e;color:white;font-size:9px;padding:2px 6px;border-radius:4px\\">TUTORIAL</span>":"")+""+f.q+"</div><p style=\\"color:#94a3b8;font-size:12px;margin:0;line-height:1.5\\">"+f.a+"</p></div>"});' +
+    'html+="</div>"}});' +
+    'html+="</div></div>";' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
     '}' +
@@ -8607,6 +8703,43 @@ function getUnifiedDashboardHtml(isPII) {
     'el.style.display=el.getAttribute("data-search").indexOf(q)>=0?"flex":"none"' +
     '})' +
     '}' +
+    // Smart steward search with autocomplete
+    'function smartFilterStewards(){' +
+    'var q=document.getElementById("stewardSearch").value.toLowerCase();' +
+    'var suggestions=document.getElementById("searchSuggestions");' +
+    'filterStewards();' +
+    'if(q.length<2){suggestions.style.display="none";return}' +
+    'var matches=[];' +
+    'document.querySelectorAll(".steward-contact").forEach(function(el){' +
+    'var searchable=el.getAttribute("data-search")||"";' +
+    'if(searchable.indexOf(q)>=0){' +
+    'var name=el.querySelector("span[style*=\\"font-weight\\"]");' +
+    'if(name)matches.push(name.textContent)}' +
+    '});' +
+    'if(matches.length>0&&matches.length<10){' +
+    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+m+"</div>"}).join("");' +
+    'suggestions.style.display="block"}else{suggestions.style.display="none"}' +
+    '}' +
+    'function selectStewardSuggestion(name){' +
+    'document.getElementById("stewardSearch").value=name;' +
+    'document.getElementById("searchSuggestions").style.display="none";' +
+    'filterStewards()' +
+    '}' +
+    'function showSearchSuggestions(){' +
+    'var q=document.getElementById("stewardSearch").value;' +
+    'if(q.length>=2)smartFilterStewards()' +
+    '}' +
+    'function quickFilterSteward(loc){' +
+    'document.getElementById("stewardSearch").value=loc;' +
+    'filterStewards();' +
+    'document.getElementById("searchSuggestions").style.display="none"' +
+    '}' +
+    'function clearStewardFilter(){' +
+    'document.getElementById("stewardSearch").value="";' +
+    'filterStewards();' +
+    'var s=document.getElementById("searchSuggestions");if(s)s.style.display="none"' +
+    '}' +
+    'document.addEventListener("click",function(e){var s=document.getElementById("searchSuggestions");if(s&&!e.target.closest("#stewardSearch")&&!e.target.closest("#searchSuggestions"))s.style.display="none"});' +
 
     // Save steward contact (v4.4.0)
     'function saveStewardContact(name,email,phone){' +
@@ -8620,6 +8753,59 @@ function getUnifiedDashboardHtml(isPII) {
     'a.href=url;a.download=name.replace(/\\s+/g,"_")+".vcf";' +
     'document.body.appendChild(a);a.click();document.body.removeChild(a);' +
     'URL.revokeObjectURL(url)' +
+    '}' +
+
+    // Compare Tab Functions
+    'function selectAllMetrics(){document.querySelectorAll(".metric-check").forEach(function(cb){cb.checked=true});updateComparisonPreview()}' +
+    'function clearAllMetrics(){document.querySelectorAll(".metric-check").forEach(function(cb){cb.checked=false});updateComparisonPreview()}' +
+    'function updateComparisonPreview(){' +
+    'var selected=[];document.querySelectorAll(".metric-check:checked").forEach(function(cb){selected.push({id:cb.dataset.id,label:cb.dataset.label,value:cb.dataset.value,category:cb.dataset.category})});' +
+    'var preview=document.getElementById("comparison-preview");var content=document.getElementById("preview-content");' +
+    'if(selected.length===0){preview.style.display="none";return}' +
+    'preview.style.display="block";' +
+    'var html="<p style=\\"color:#94a3b8;margin-bottom:12px\\">"+selected.length+" metrics selected</p>";' +
+    'html+="<table style=\\"width:100%;border-collapse:collapse;font-size:12px\\"><tr style=\\"background:#1e293b\\"><th style=\\"padding:8px;text-align:left;color:#94a3b8\\">Category</th><th style=\\"padding:8px;text-align:left;color:#94a3b8\\">Metric</th><th style=\\"padding:8px;text-align:right;color:#94a3b8\\">Value</th></tr>";' +
+    'selected.forEach(function(m,i){html+="<tr style=\\"background:"+(i%2===0?"#0f172a":"#1e293b")+"\\"><td style=\\"padding:8px;color:#60a5fa\\">"+m.category+"</td><td style=\\"padding:8px;color:#e2e8f0\\">"+m.label+"</td><td style=\\"padding:8px;text-align:right;font-weight:600;color:#22c55e\\">"+m.value+"</td></tr>"});' +
+    'html+="</table>";content.innerHTML=html' +
+    '}' +
+    'function exportComparison(){' +
+    'var selected=[];document.querySelectorAll(".metric-check:checked").forEach(function(cb){selected.push({label:cb.dataset.label,value:cb.dataset.value,category:cb.dataset.category})});' +
+    'if(selected.length===0){alert("Please select at least one metric to export");return}' +
+    'var csv="Category,Metric,Value\\n";' +
+    'selected.forEach(function(m){csv+="\\""+m.category+"\\",\\""+m.label+"\\",\\""+m.value+"\\"\\n"});' +
+    'var blob=new Blob([csv],{type:"text/csv"});' +
+    'var url=URL.createObjectURL(blob);' +
+    'var a=document.createElement("a");' +
+    'a.href=url;a.download="509_metrics_comparison_"+new Date().toISOString().split("T")[0]+".csv";' +
+    'document.body.appendChild(a);a.click();document.body.removeChild(a);' +
+    'URL.revokeObjectURL(url)' +
+    '}' +
+
+    // Help Tab Functions (FAQ search and filter)
+    'var currentFAQFilter="all";' +
+    'function filterFAQ(){' +
+    'var query=document.getElementById("faqSearch").value.toLowerCase();' +
+    'document.querySelectorAll(".faq-item").forEach(function(item){' +
+    'var searchable=item.dataset.searchable;' +
+    'var isTutorial=item.dataset.tutorial==="yes";' +
+    'var matchesQuery=!query||searchable.indexOf(query)>=0;' +
+    'var matchesFilter=currentFAQFilter==="all"||(currentFAQFilter==="tutorial"&&isTutorial);' +
+    'item.style.display=(matchesQuery&&matchesFilter)?"block":"none"' +
+    '});' +
+    'document.querySelectorAll(".feature-item").forEach(function(item){' +
+    'var text=(item.textContent||"").toLowerCase();' +
+    'var matchesQuery=!query||text.indexOf(query)>=0;' +
+    'var matchesFilter=currentFAQFilter==="all"||currentFAQFilter==="features";' +
+    'item.style.display=(matchesQuery&&matchesFilter)?"block":"none"' +
+    '});' +
+    'document.getElementById("features-section").style.display=(currentFAQFilter==="tutorial")?"none":"block";' +
+    'document.getElementById("faq-section").style.display=(currentFAQFilter==="features")?"none":"block"' +
+    '}' +
+    'function setFAQFilter(filter,btn){' +
+    'currentFAQFilter=filter;' +
+    'document.querySelectorAll(".faq-filter").forEach(function(b){b.classList.remove("active")});' +
+    'btn.classList.add("active");' +
+    'filterFAQ()' +
     '}' +
 
     '</script></body></html>';
