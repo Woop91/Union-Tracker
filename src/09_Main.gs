@@ -74,7 +74,7 @@ function onOpen() {
 
 /**
  * Applies theme settings from Config sheet if available
- * Reads theme configuration from columns BA-BF (53-58)
+ * Reads theme configuration from columns BB-BG (54-59)
  * @param {Spreadsheet} ss - The spreadsheet
  * @private
  */
@@ -83,7 +83,7 @@ function applyThemeFromConfig_(ss) {
   if (!configSheet) return;
 
   // Check if theme settings exist in Config (row 2 header, row 3 values)
-  // Theme columns start at BA (column 53)
+  // Theme columns start at BB (column 54)
   try {
     // First check if theme columns exist by looking at the header
     var themeHeader = configSheet.getRange(2, CONFIG_COLS.THEME_ENABLED).getValue();
