@@ -305,6 +305,157 @@ function createConfigSheet(ss) {
 
   // Add theme columns
   setupThemeConfigColumns(sheet);
+
+  // Apply full Config sheet styling
+  applyConfigSheetStyling(sheet);
+}
+
+/**
+ * Applies consistent styling to the entire Config sheet
+ * - Row 1 (Section Headers): Dark slate background
+ * - Row 2 (Column Headers): Purple background
+ * - Row 3+ (Data Entry): Light background for easy editing
+ * Can be called from menu to restyle existing Config sheets
+ * @param {Sheet} sheet - The Config sheet (optional)
+ */
+function applyConfigSheetStyling(sheet) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  sheet = sheet || ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!sheet) {
+    ss.toast('Config sheet not found', 'Error', 3);
+    return;
+  }
+
+  var lastCol = sheet.getLastColumn();
+  var lastRow = sheet.getLastRow();
+
+  if (lastCol < 1) {
+    ss.toast('Config sheet is empty', 'Error', 3);
+    return;
+  }
+
+  // Ensure we have at least 50 rows for data entry
+  var maxRows = Math.max(lastRow, 50);
+
+  // ═══ ROW 1: Section Headers - Dark Slate ═══
+  sheet.getRange(1, 1, 1, lastCol)
+    .setBackground('#1e293b')  // Dark slate
+    .setFontColor('#f8fafc')   // Light text
+    .setFontWeight('bold')
+    .setFontStyle('italic')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(1, 28);
+
+  // ═══ ROW 2: Column Headers - Purple ═══
+  sheet.getRange(2, 1, 1, lastCol)
+    .setBackground('#7C3AED')  // Primary purple
+    .setFontColor('#ffffff')   // White text
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(2, 30);
+
+  // ═══ ROWS 3+: Data Entry Area - Light Background ═══
+  if (maxRows >= 3) {
+    var dataRange = sheet.getRange(3, 1, maxRows - 2, lastCol);
+    dataRange
+      .setBackground('#f8fafc')  // Very light gray/white
+      .setFontColor('#1e293b')   // Dark text
+      .setFontWeight('normal')
+      .setVerticalAlignment('middle');
+
+    // Apply alternating row colors (zebra stripes) for readability
+    for (var row = 3; row <= maxRows; row++) {
+      var rowRange = sheet.getRange(row, 1, 1, lastCol);
+      if (row % 2 === 0) {
+        rowRange.setBackground('#f1f5f9');  // Slightly darker for even rows
+      } else {
+        rowRange.setBackground('#ffffff');  // White for odd rows
+      }
+    }
+  }
+
+  // Apply section-specific column colors to headers
+  applySectionColors_(sheet, lastCol);
+
+  ss.toast('Config sheet styling applied!', 'Theme Applied', 3);
+  Logger.log('Config sheet styling applied to ' + lastCol + ' columns');
+}
+
+/**
+ * Applies section-specific colors to column headers in Config sheet
+ * Each section gets a distinct color for easy identification
+ * @param {Sheet} sheet - The Config sheet
+ * @param {number} lastCol - Last column number
+ * @private
+ */
+function applySectionColors_(sheet, lastCol) {
+  // Section color definitions
+  var SECTION_COLORS = {
+    EMPLOYMENT: { bg: '#3b82f6', text: '#ffffff' },      // Blue - A-E
+    SUPERVISION: { bg: '#8b5cf6', text: '#ffffff' },     // Violet - F-G
+    STEWARD: { bg: '#06b6d4', text: '#ffffff' },         // Cyan - H-I
+    GRIEVANCE: { bg: '#ef4444', text: '#ffffff' },       // Red - J-M
+    LINKS: { bg: '#f97316', text: '#ffffff' },           // Orange - N-Q
+    NOTIFICATIONS: { bg: '#eab308', text: '#1e293b' },   // Yellow - R-T
+    ORGANIZATION: { bg: '#22c55e', text: '#ffffff' },    // Green - U-X
+    INTEGRATION: { bg: '#14b8a6', text: '#ffffff' },     // Teal - Y-Z
+    DEADLINES: { bg: '#ec4899', text: '#ffffff' },       // Pink - AA-AD
+    MULTISELECT: { bg: '#a855f7', text: '#ffffff' },     // Purple - AE-AF
+    CONTRACT: { bg: '#6366f1', text: '#ffffff' },        // Indigo - AG-AJ
+    IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AK-AM
+    EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AN-AR
+    COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AS-AY
+    RESOURCES: { bg: '#10b981', text: '#ffffff' },       // Emerald - AZ
+    THEME: { bg: '#7c3aed', text: '#ffffff' }            // Purple - BA-BF
+  };
+
+  // Apply colors by column ranges (both row 1 section header and row 2 column header)
+  var sections = [
+    { start: 1, end: 5, color: SECTION_COLORS.EMPLOYMENT },      // A-E
+    { start: 6, end: 7, color: SECTION_COLORS.SUPERVISION },     // F-G
+    { start: 8, end: 9, color: SECTION_COLORS.STEWARD },         // H-I
+    { start: 10, end: 13, color: SECTION_COLORS.GRIEVANCE },     // J-M
+    { start: 14, end: 17, color: SECTION_COLORS.LINKS },         // N-Q
+    { start: 18, end: 20, color: SECTION_COLORS.NOTIFICATIONS }, // R-T
+    { start: 21, end: 24, color: SECTION_COLORS.ORGANIZATION },  // U-X
+    { start: 25, end: 26, color: SECTION_COLORS.INTEGRATION },   // Y-Z
+    { start: 27, end: 30, color: SECTION_COLORS.DEADLINES },     // AA-AD
+    { start: 31, end: 32, color: SECTION_COLORS.MULTISELECT },   // AE-AF
+    { start: 33, end: 36, color: SECTION_COLORS.CONTRACT },      // AG-AJ
+    { start: 37, end: 39, color: SECTION_COLORS.IDENTITY },      // AK-AM
+    { start: 40, end: 44, color: SECTION_COLORS.EXTENDED },      // AN-AR
+    { start: 45, end: 51, color: SECTION_COLORS.COMMAND },       // AS-AY
+    { start: 52, end: 52, color: SECTION_COLORS.RESOURCES },     // AZ
+    { start: 53, end: 58, color: SECTION_COLORS.THEME }          // BA-BF
+  ];
+
+  sections.forEach(function(section) {
+    if (section.start <= lastCol) {
+      var endCol = Math.min(section.end, lastCol);
+      var colCount = endCol - section.start + 1;
+
+      // Row 1 - Section header
+      sheet.getRange(1, section.start, 1, colCount)
+        .setBackground(section.color.bg)
+        .setFontColor(section.color.text);
+
+      // Row 2 - Column header (slightly lighter version)
+      sheet.getRange(2, section.start, 1, colCount)
+        .setBackground(section.color.bg)
+        .setFontColor(section.color.text);
+    }
+  });
+}
+
+/**
+ * Menu function to apply Config sheet styling
+ * Call this from menu to restyle the Config sheet
+ */
+function applyConfigStyling() {
+  applyConfigSheetStyling();
 }
 
 /**
