@@ -186,6 +186,7 @@ function SEED_SAMPLE_DATA() {
 /**
  * Seed Config sheet with dropdown values
  * Note: Data starts at row 3 (row 1 = section headers, row 2 = column headers)
+ * Seeds both preset values (Office Days, Grievance Status, etc.) and user-configurable values
  */
 function seedConfigData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -211,6 +212,40 @@ function seedConfigData() {
   }
 
   var seededAny = false;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRESET VALUES (Standard dropdowns that rarely change)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Office Days (Column D) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS)) seededAny = true;
+
+  // Yes/No (Column E) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO)) seededAny = true;
+
+  // Grievance Status (Column J) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS)) seededAny = true;
+
+  // Grievance Step (Column K) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP)) seededAny = true;
+
+  // Issue Category (Column L) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY)) seededAny = true;
+
+  // Articles Violated (Column M) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES)) seededAny = true;
+
+  // Communication Methods (Column N) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.COMM_METHODS, DEFAULT_CONFIG.COMM_METHODS)) seededAny = true;
+
+  // Best Times to Contact (Column AE) - PRESET
+  if (seedIfEmpty(CONFIG_COLS.BEST_TIMES, [
+    'Morning (8am-12pm)', 'Afternoon (12pm-5pm)', 'Evening (5pm-8pm)', 'Weekends', 'Flexible'
+  ])) seededAny = true;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // USER-CONFIGURABLE VALUES (Organization-specific dropdowns)
+  // ═══════════════════════════════════════════════════════════════════════════
 
   // Job Titles (Column A)
   if (seedIfEmpty(CONFIG_COLS.JOB_TITLES, [
