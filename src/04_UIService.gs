@@ -7368,6 +7368,13 @@ function getUnifiedDashboardData(includePII) {
     overdueCount: 0,
     moraleScore: 7.5,
 
+    // Trend comparison data (previous 30-day period)
+    prevOpenCases: 0,
+    prevWinRate: 0,
+    prevOverdueCount: 0,
+    prevMoraleScore: 0,
+    prevTotalGrievances: 0,
+
     // Lists for drill-down (steward mode only)
     stewardList: [],
     memberList: [],
@@ -7435,6 +7442,15 @@ function getUnifiedDashboardData(includePII) {
     statusDistribution: { open: 0, pending: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 },
     monthlyTrend: [],
     sentimentTrend: [],
+
+    // Chart drill-down data (details for each chart segment)
+    chartDrillDown: {
+      statusByCase: { open: [], pending: [], won: [], denied: [], settled: [], withdrawn: [] },
+      locationByCase: {},      // { location: [cases] }
+      categoryByCase: {},      // { category: [cases] }
+      unitByMember: {},        // { unit: [members] }
+      stewardByCase: {}        // { steward: [cases] }
+    },
 
     // Satisfaction Survey Data (Enhanced)
     satisfactionData: {
@@ -7589,6 +7605,15 @@ function getUnifiedDashboardData(includePII) {
       if (!data.unitBreakdown[unit]) data.unitBreakdown[unit] = 0;
       data.unitBreakdown[unit]++;
 
+      // Unit drill-down by member
+      if (!data.chartDrillDown.unitByMember[unit]) data.chartDrillDown.unitByMember[unit] = [];
+      data.chartDrillDown.unitByMember[unit].push({
+        id: includePII ? memberId : memberId.substring(0, 4) + '***',
+        name: includePII ? name : 'Member',
+        location: location,
+        isSteward: isSteward
+      });
+
       // Contact info tracking
       if (email) data.directoryTrends.totalWithEmail++;
       else data.directoryTrends.missingEmail++;
@@ -7666,6 +7691,11 @@ function getUnifiedDashboardData(includePII) {
   var monthlyFilingsMap = {};
   var monthlyResolvedMap = {};  // v4.4.0 - Track resolved by month
 
+  // Previous period tracking (30-60 days ago vs current 30 days)
+  var prevPeriodStart = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
+  var prevPeriodEnd = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+  var prevOpenCases = 0, prevWins = 0, prevLosses = 0, prevSettled = 0, prevOverdue = 0;
+
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
     var grievanceData = grievanceSheet.getDataRange().getValues();
     for (var g = 1; g < grievanceData.length; g++) {
@@ -7683,19 +7713,68 @@ function getUnifiedDashboardData(includePII) {
       var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
       var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
 
-      // Status distribution
+      // Create case summary for drill-down
+      var caseSummary = {
+        id: grievanceId,
+        member: includePII ? memberName : 'Member',
+        steward: steward,
+        location: gLocation,
+        category: category,
+        step: currentStep,
+        dateFiled: dateFiled instanceof Date ? dateFiled.toLocaleDateString() : '',
+        dateClosed: dateClosed instanceof Date ? dateClosed.toLocaleDateString() : ''
+      };
+
+      // Track previous period metrics (cases active 30-60 days ago)
+      var wasOpenInPrevPeriod = dateFiled instanceof Date && dateFiled <= prevPeriodEnd &&
+        (!dateClosed || (dateClosed instanceof Date && dateClosed > prevPeriodEnd));
+      var closedInPrevPeriod = dateClosed instanceof Date && dateClosed >= prevPeriodStart && dateClosed <= prevPeriodEnd;
+
+      // Status distribution with drill-down data
+      var statusKey = '';
       switch(status.toLowerCase()) {
-        case 'open': data.statusDistribution.open++; data.openGrievances++; break;
-        case 'pending info': case 'pending': data.statusDistribution.pending++; data.openGrievances++; break;
-        case 'won': case 'sustained': case 'favorable': data.statusDistribution.won++; data.wins++; break;
-        case 'denied': case 'lost': data.statusDistribution.denied++; data.losses++; break;
-        case 'settled': data.statusDistribution.settled++; data.settled++; break;
-        case 'withdrawn': data.statusDistribution.withdrawn++; break;
+        case 'open':
+          data.statusDistribution.open++; data.openGrievances++; statusKey = 'open';
+          if (wasOpenInPrevPeriod) prevOpenCases++;
+          break;
+        case 'pending info': case 'pending':
+          data.statusDistribution.pending++; data.openGrievances++; statusKey = 'pending';
+          if (wasOpenInPrevPeriod) prevOpenCases++;
+          break;
+        case 'won': case 'sustained': case 'favorable':
+          data.statusDistribution.won++; data.wins++; statusKey = 'won';
+          if (closedInPrevPeriod) prevWins++;
+          break;
+        case 'denied': case 'lost':
+          data.statusDistribution.denied++; data.losses++; statusKey = 'denied';
+          if (closedInPrevPeriod) prevLosses++;
+          break;
+        case 'settled':
+          data.statusDistribution.settled++; data.settled++; statusKey = 'settled';
+          if (closedInPrevPeriod) prevSettled++;
+          break;
+        case 'withdrawn':
+          data.statusDistribution.withdrawn++; statusKey = 'withdrawn'; break;
       }
 
-      // Category breakdown
+      // Add to drill-down arrays
+      if (statusKey && data.chartDrillDown.statusByCase[statusKey]) {
+        data.chartDrillDown.statusByCase[statusKey].push(caseSummary);
+      }
+
+      // Location drill-down
+      if (!data.chartDrillDown.locationByCase[gLocation]) data.chartDrillDown.locationByCase[gLocation] = [];
+      data.chartDrillDown.locationByCase[gLocation].push(caseSummary);
+
+      // Steward drill-down
+      if (!data.chartDrillDown.stewardByCase[steward]) data.chartDrillDown.stewardByCase[steward] = [];
+      data.chartDrillDown.stewardByCase[steward].push(caseSummary);
+
+      // Category breakdown and drill-down
       if (!data.grievancesByCategory[category]) data.grievancesByCategory[category] = 0;
       data.grievancesByCategory[category]++;
+      if (!data.chartDrillDown.categoryByCase[category]) data.chartDrillDown.categoryByCase[category] = [];
+      data.chartDrillDown.categoryByCase[category].push(caseSummary);
 
       // Step progression
       if (currentStep.toLowerCase().includes('step 1')) data.stepProgression.step1++;
@@ -7799,6 +7878,13 @@ function getUnifiedDashboardData(includePII) {
   data.winRate = totalClosed > 0 ? Math.round((data.wins / totalClosed) * 100) : 0;
   data.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
   data.avgSettlementDays = settlementDays.length > 0 ? Math.round(settlementDays.reduce(function(a,b){return a+b;},0) / settlementDays.length) : 0;
+
+  // Calculate previous period comparison metrics
+  data.prevOpenCases = prevOpenCases;
+  var prevTotalClosed = prevWins + prevLosses + prevSettled;
+  data.prevWinRate = prevTotalClosed > 0 ? Math.round((prevWins / prevTotalClosed) * 100) : data.winRate;
+  data.prevOverdueCount = prevOverdue;
+  data.prevTotalGrievances = data.totalGrievances; // Approximation - would need historical data for accurate count
 
   // Build steward workload array
   for (var s in stewardCases) {
@@ -8029,6 +8115,70 @@ function getUnifiedDashboardDataAPI(isPII) {
 }
 
 /**
+ * API function with date range filtering support
+ * @param {boolean} isPII - Include PII (steward mode)
+ * @param {number} days - Number of days to filter (0 = all data)
+ * @param {string} fromDate - Custom start date (ISO string)
+ * @param {string} toDate - Custom end date (ISO string)
+ * @returns {string} JSON dashboard data filtered by date range
+ */
+function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
+  var fullData = JSON.parse(getUnifiedDashboardData(isPII === true || isPII === 'true'));
+
+  // If no filtering requested, return full data
+  if (!days && !fromDate) {
+    return JSON.stringify(fullData);
+  }
+
+  var now = new Date();
+  var startDate, endDate;
+
+  if (fromDate && toDate) {
+    startDate = new Date(fromDate);
+    endDate = new Date(toDate);
+  } else if (days > 0) {
+    startDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+    endDate = now;
+  } else {
+    return JSON.stringify(fullData);
+  }
+
+  // Filter monthly filings to date range
+  fullData.monthlyFilings = fullData.monthlyFilings.filter(function(m) {
+    var monthDate = new Date(m.month + ' 1');
+    return monthDate >= startDate && monthDate <= endDate;
+  });
+
+  fullData.monthlyResolved = fullData.monthlyResolved.filter(function(m) {
+    var monthDate = new Date(m.month + ' 1');
+    return monthDate >= startDate && monthDate <= endDate;
+  });
+
+  // Filter drill-down data by date
+  for (var statusKey in fullData.chartDrillDown.statusByCase) {
+    fullData.chartDrillDown.statusByCase[statusKey] = fullData.chartDrillDown.statusByCase[statusKey].filter(function(c) {
+      if (!c.dateFiled) return true;
+      var filedDate = new Date(c.dateFiled);
+      return filedDate >= startDate && filedDate <= endDate;
+    });
+  }
+
+  // Recalculate counts based on filtered data
+  fullData.statusDistribution = { open: 0, pending: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 };
+  for (var sk in fullData.chartDrillDown.statusByCase) {
+    fullData.statusDistribution[sk] = fullData.chartDrillDown.statusByCase[sk].length;
+  }
+
+  fullData.dateRangeApplied = {
+    days: days,
+    from: startDate.toISOString(),
+    to: endDate.toISOString()
+  };
+
+  return JSON.stringify(fullData);
+}
+
+/**
  * Generates the unified dashboard HTML for web app (v4.4.0)
  * @param {boolean} isPII - Whether to include PII (steward mode)
  * @returns {string} Complete HTML for the web app
@@ -8172,7 +8322,22 @@ function getUnifiedDashboardHtml(isPII) {
     '.goal-bar{height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:8px;overflow:hidden}' +
     '.goal-fill{height:100%;border-radius:3px;transition:width 0.5s}' +
     '.goal-label{display:flex;justify-content:space-between;font-size:9px;color:#64748b;margin-top:4px}' +
-    '.goal-label{font-size:9px;color:#64748b;margin-top:4px;display:flex;justify-content:space-between}' +
+    // Pinned Metrics
+    '.pinned-section{margin-bottom:16px;padding:16px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:12px}' +
+    '.pinned-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}' +
+    '.pinned-title{font-size:12px;font-weight:600;color:#60a5fa;display:flex;align-items:center;gap:6px}' +
+    '.pinned-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}' +
+    '.pinned-metric{background:#1e293b;padding:12px;border-radius:8px;text-align:center;position:relative}' +
+    '.pinned-metric .unpin-btn{position:absolute;top:4px;right:4px;background:none;border:none;color:#64748b;cursor:pointer;font-size:14px;opacity:0;transition:opacity 0.2s}' +
+    '.pinned-metric:hover .unpin-btn{opacity:1}' +
+    '.pin-btn{position:absolute;top:4px;right:4px;background:none;border:none;color:#64748b;cursor:pointer;font-size:14px;opacity:0;transition:opacity 0.2s}' +
+    '.kpi-card:hover .pin-btn{opacity:1}' +
+    '.kpi-card.pinned .pin-btn{opacity:1;color:#3b82f6}' +
+    // Chart Drill-down
+    '.chart-card canvas{cursor:pointer}' +
+    '.drill-down-list{max-height:300px;overflow-y:auto}' +
+    '.drill-down-item{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px}' +
+    '.drill-down-item:hover{background:rgba(255,255,255,0.05)}' +
 
     // Settings Panel
     '.settings-panel{position:fixed;right:-320px;top:0;bottom:0;width:320px;background:#1e293b;border-left:1px solid rgba(255,255,255,0.1);z-index:250;transition:right 0.3s;overflow-y:auto;padding:20px}' +
@@ -8349,7 +8514,7 @@ function getUnifiedDashboardHtml(isPII) {
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+e.message+"</div>"}' +
     'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=\\x27"+tab+"\\x27]").classList.add("active");renderTab(tab)}' +
-    'function render(json){dashData=JSON.parse(json);renderTab("overview")}' +
+    'function render(json){dashData=JSON.parse(json);renderTab("overview");setTimeout(renderPinnedSection,100)}' +
 
     // Modal functions
     'function openModal(title,content){document.getElementById("modal-title").textContent=title;document.getElementById("modal-body").innerHTML=content;document.getElementById("modal").classList.add("active")}' +
@@ -8373,21 +8538,22 @@ function getUnifiedDashboardHtml(isPII) {
     'function renderTab(tab){' +
     'var d=dashData,html="";' +
 
-    // Overview Tab with trend arrows and goal progress
+    // Overview Tab with trend arrows, goal progress, and pin buttons
     'if(tab==="overview"){' +
     'var goals=JSON.parse(localStorage.getItem("509_goals")||"{}");' +
     'var winTarget=goals.winRate||75,moraleTarget=goals.morale||8,responseTarget=goals.response||50;' +
+    'var isPinned=function(k){return pinnedMetrics.some(function(p){return p.key===k})};' +
     'html="<div class=\\"kpi-grid\\">";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27members\\x27)\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27stewards\\x27)\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27open\\x27)\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+(d.prevOpenCases!==undefined?getTrendArrow(d.openGrievances,d.prevOpenCases):"")+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+winTarget+"%)</span></div><div class=\\"kpi-value green\\">"+d.winRate+"%"+(d.prevWinRate!==undefined?getTrendArrow(d.winRate,d.prevWinRate):"")+"</div>"+getGoalBar(d.winRate,winTarget)+"</div>";' +
-    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+"\\" onclick=\\"showList(\\x27overdue\\x27)\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+(d.prevOverdueCount!==undefined?getTrendArrow(d.prevOverdueCount,d.overdueCount):"")+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+moraleTarget+")</span></div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+(d.prevMoraleScore!==undefined?getTrendArrow(d.moraleScore,d.prevMoraleScore):"")+"</div>"+getGoalBar(d.moraleScore*10,moraleTarget*10)+"</div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(isPinned("members")?"pinned":"")+"\\" onclick=\\"showList(\\x27members\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27members\\x27,\\x27Members\\x27,"+d.totalMembers+",\\x27#3b82f6\\x27)\\"><i class=\\"material-icons\\">"+(isPinned("members")?"push_pin":"push_pin")+"</i></button><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(isPinned("stewards")?"pinned":"")+"\\" onclick=\\"showList(\\x27stewards\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27stewards\\x27,\\x27Stewards\\x27,"+d.stewardCount+",\\x27#a855f7\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(isPinned("openCases")?"pinned":"")+"\\" onclick=\\"showList(\\x27open\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27openCases\\x27,\\x27Open Cases\\x27,"+d.openGrievances+",\\x27#f59e0b\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+(d.prevOpenCases!==undefined?getTrendArrow(d.openGrievances,d.prevOpenCases):"")+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(isPinned("winRate")?"pinned":"")+"\\"><button class=\\"pin-btn\\" onclick=\\"togglePin(\\x27winRate\\x27,\\x27Win Rate\\x27,\\x27"+d.winRate+"%\\x27,\\x27#22c55e\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Win Rate <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+winTarget+"%)</span></div><div class=\\"kpi-value green\\">"+d.winRate+"%"+(d.prevWinRate!==undefined?getTrendArrow(d.winRate,d.prevWinRate):"")+"</div>"+getGoalBar(d.winRate,winTarget)+"</div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+" "+(isPinned("overdue")?"pinned":"")+"\\" onclick=\\"showList(\\x27overdue\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27overdue\\x27,\\x27Overdue\\x27,"+d.overdueCount+",\\x27#ef4444\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+(d.prevOverdueCount!==undefined?getTrendArrow(d.prevOverdueCount,d.overdueCount):"")+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(isPinned("morale")?"pinned":"")+"\\"><button class=\\"pin-btn\\" onclick=\\"togglePin(\\x27morale\\x27,\\x27Morale\\x27,"+d.moraleScore+",\\x27#22c55e\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Morale <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+moraleTarget+")</span></div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+(d.prevMoraleScore!==undefined?getTrendArrow(d.moraleScore,d.prevMoraleScore):"")+"</div>"+getGoalBar(d.moraleScore*10,moraleTarget*10)+"</div>";' +
     'html+="</div>";' +
-    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status</div><canvas id=\\"statusChart\\"></canvas></div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status <span style=\\"font-size:10px;color:#64748b\\">(click segment)</span></div><canvas id=\\"statusChart\\"></canvas></div>";' +
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div></div>";' +
-    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Members by Location</div><canvas id=\\"locationChart\\"></canvas></div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Members by Location <span style=\\"font-size:10px;color:#64748b\\">(click bar)</span></div><canvas id=\\"locationChart\\"></canvas></div>";' +
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">show_chart</i>Filed vs Resolved</div><canvas id=\\"filingChart\\"></canvas></div></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderOverviewCharts()' +
     '}' +
@@ -8719,13 +8885,16 @@ function getUnifiedDashboardHtml(isPII) {
     // Chart rendering functions
     'function renderOverviewCharts(){' +
     'var d=dashData;' +
-    'new Chart(document.getElementById("statusChart"),{type:"doughnut",data:{labels:["Open","Pending","Won","Denied","Settled","Withdrawn"],datasets:[{data:[d.statusDistribution.open,d.statusDistribution.pending,d.statusDistribution.won,d.statusDistribution.denied,d.statusDistribution.settled,d.statusDistribution.withdrawn],backgroundColor:["#3b82f6","#f59e0b","#22c55e","#ef4444","#8b5cf6","#64748b"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:11}}}}}});' +
+    // Status chart with drill-down
+    'var statusKeys=["open","pending","won","denied","settled","withdrawn"];' +
+    'var statusChart=new Chart(document.getElementById("statusChart"),{type:"doughnut",data:{labels:["Open","Pending","Won","Denied","Settled","Withdrawn"],datasets:[{data:[d.statusDistribution.open,d.statusDistribution.pending,d.statusDistribution.won,d.statusDistribution.denied,d.statusDistribution.settled,d.statusDistribution.withdrawn],backgroundColor:["#3b82f6","#f59e0b","#22c55e","#ef4444","#8b5cf6","#64748b"]}]},options:{responsive:true,onClick:function(e,el){if(el.length>0){var idx=el[0].index;showChartDrillDown("status",statusKeys[idx],statusChart.data.labels[idx]+" Cases")}},plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:11}}}}}});' +
     'var trendLabels=d.sentimentTrend.length>0?d.sentimentTrend.map(function(t){return t.month}):["Jan","Feb","Mar"];' +
     'var trendData=d.sentimentTrend.length>0?d.sentimentTrend.map(function(t){return t.score}):[7,7.2,7.5];' +
     'new Chart(document.getElementById("trendChart"),{type:"line",data:{labels:trendLabels,datasets:[{label:"Trust Score",data:trendData,borderColor:"#a78bfa",backgroundColor:"rgba(167,139,250,0.2)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:0,max:10,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
     'var locLabels=Object.keys(d.locationBreakdown).slice(0,8);' +
     'var locData=locLabels.map(function(l){return d.locationBreakdown[l]});' +
-    'new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
+    // Location chart with drill-down
+    'var locChart=new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",onClick:function(e,el){if(el.length>0){var idx=el[0].index;showChartDrillDown("unit",locLabels[idx],"Members in "+locLabels[idx])}},plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
     'var filingLabels=d.monthlyFilings.map(function(f){return f.month});' +
     'var filingData=d.monthlyFilings.map(function(f){return f.count});' +
     'var resolvedData=d.monthlyResolved?d.monthlyResolved.map(function(f){return f.count}):[];' +
@@ -8736,11 +8905,15 @@ function getUnifiedDashboardHtml(isPII) {
     'var d=dashData;' +
     'var unitLabels=Object.keys(d.unitBreakdown).slice(0,8);' +
     'var unitData=unitLabels.map(function(u){return d.unitBreakdown[u]});' +
-    'new Chart(document.getElementById("unitChart"),{type:"doughnut",data:{labels:unitLabels,datasets:[{data:unitData,backgroundColor:["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
-    'new Chart(document.getElementById("outcomeChart"),{type:"bar",data:{labels:["Won","Denied","Settled"],datasets:[{label:"Cases",data:[d.wins,d.losses,d.settled],backgroundColor:["#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    // Unit chart with drill-down
+    'var unitChart=new Chart(document.getElementById("unitChart"),{type:"doughnut",data:{labels:unitLabels,datasets:[{data:unitData,backgroundColor:["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"]}]},options:{responsive:true,onClick:function(e,el){if(el.length>0){var idx=el[0].index;showChartDrillDown("unit",unitLabels[idx],"Members in "+unitLabels[idx])}},plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
+    // Outcomes chart with drill-down
+    'var outcomeKeys=["won","denied","settled"];' +
+    'new Chart(document.getElementById("outcomeChart"),{type:"bar",data:{labels:["Won","Denied","Settled"],datasets:[{label:"Cases",data:[d.wins,d.losses,d.settled],backgroundColor:["#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,onClick:function(e,el){if(el.length>0){var idx=el[0].index;showChartDrillDown("status",outcomeKeys[idx],["Won","Denied","Settled"][idx]+" Cases")}},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
     'var catLabels=Object.keys(d.grievancesByCategory).slice(0,6);' +
     'var catData=catLabels.map(function(c){return d.grievancesByCategory[c]});' +
-    'new Chart(document.getElementById("categoryChart"),{type:"bar",data:{labels:catLabels.length>0?catLabels:["Discipline","Contract","Safety"],datasets:[{label:"Cases",data:catData.length>0?catData:[3,5,2],backgroundColor:"#06b6d4"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8",maxRotation:45}}}}});' +
+    // Category chart with drill-down
+    'new Chart(document.getElementById("categoryChart"),{type:"bar",data:{labels:catLabels.length>0?catLabels:["Discipline","Contract","Safety"],datasets:[{label:"Cases",data:catData.length>0?catData:[3,5,2],backgroundColor:"#06b6d4"}]},options:{responsive:true,onClick:function(e,el){if(el.length>0&&catLabels.length>0){var idx=el[0].index;showChartDrillDown("category",catLabels[idx],catLabels[idx]+" Cases")}},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8",maxRotation:45}}}}});' +
     'new Chart(document.getElementById("stepChart"),{type:"bar",data:{labels:["Step 1","Step 2","Step 3","Arbitration"],datasets:[{label:"Cases",data:[d.stepProgression.step1,d.stepProgression.step2,d.stepProgression.step3,d.stepProgression.arb],backgroundColor:["#3b82f6","#f59e0b","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}})' +
     '}' +
 
@@ -9026,8 +9199,58 @@ function getUnifiedDashboardHtml(isPII) {
     'if(from&&to){document.querySelectorAll(".date-btn").forEach(function(b){b.classList.remove("active")});applyDateFilter(from,to)}' +
     '}' +
     'function applyDateFilter(from,to){' +
-    'showHint("Date filter applied - data refreshed");' +
-    // In a real implementation, this would re-fetch filtered data
+    'showHint("Loading filtered data...");' +
+    'google.script.run.withSuccessHandler(function(json){' +
+    'dashData=JSON.parse(json);renderTab(document.querySelector(".tab.active").textContent.toLowerCase().replace(/\\s+/g,""));showHint("Date filter applied")' +
+    '}).withFailureHandler(function(e){showHint("Filter error: "+e.message)}).getUnifiedDashboardDataWithDateRange(isPII,currentDateRange,from,to)' +
+    '}' +
+
+    // Pinned Metrics Functions
+    'var pinnedMetrics=JSON.parse(localStorage.getItem("509_pinned")||"[]");' +
+    'function togglePin(metricKey,label,value,color){' +
+    'var idx=pinnedMetrics.findIndex(function(p){return p.key===metricKey});' +
+    'if(idx>=0){pinnedMetrics.splice(idx,1);showHint("Unpinned: "+label)}' +
+    'else{pinnedMetrics.push({key:metricKey,label:label,value:value,color:color});showHint("Pinned: "+label)}' +
+    'localStorage.setItem("509_pinned",JSON.stringify(pinnedMetrics));' +
+    'renderPinnedSection()' +
+    '}' +
+    'function renderPinnedSection(){' +
+    'var existing=document.getElementById("pinnedSection");if(existing)existing.remove();' +
+    'if(pinnedMetrics.length===0)return;' +
+    'var html="<div id=\\"pinnedSection\\" class=\\"pinned-section\\"><div class=\\"pinned-header\\"><span class=\\"pinned-title\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">push_pin</i>Pinned Metrics</span><button onclick=\\"clearAllPinned()\\" class=\\"btn btn-secondary btn-sm\\">Clear All</button></div><div class=\\"pinned-grid\\">";' +
+    'pinnedMetrics.forEach(function(p){' +
+    'var val=p.value;if(dashData){' +
+    'if(p.key==="members")val=dashData.totalMembers;' +
+    'else if(p.key==="stewards")val=dashData.stewardCount;' +
+    'else if(p.key==="openCases")val=dashData.openGrievances;' +
+    'else if(p.key==="winRate")val=dashData.winRate+"%";' +
+    'else if(p.key==="overdue")val=dashData.overdueCount;' +
+    'else if(p.key==="morale")val=dashData.moraleScore;' +
+    '}' +
+    'html+="<div class=\\"pinned-metric\\"><button class=\\"unpin-btn\\" onclick=\\"togglePin(\\x27"+p.key+"\\x27,\\x27"+p.label+"\\x27)\\"><i class=\\"material-icons\\">close</i></button><div style=\\"font-size:10px;color:#94a3b8\\">"+p.label+"</div><div style=\\"font-size:24px;font-weight:700;color:"+p.color+"\\">"+val+"</div></div>"});' +
+    'html+="</div></div>";' +
+    'var content=document.getElementById("main-content");' +
+    'if(content)content.insertAdjacentHTML("afterbegin",html)' +
+    '}' +
+    'function clearAllPinned(){pinnedMetrics=[];localStorage.removeItem("509_pinned");renderPinnedSection();showHint("All pins cleared")}' +
+
+    // Chart Drill-Down Functions
+    'function showChartDrillDown(type,key,title){' +
+    'var d=dashData;if(!d||!d.chartDrillDown)return;' +
+    'var items=[];' +
+    'if(type==="status"&&d.chartDrillDown.statusByCase[key])items=d.chartDrillDown.statusByCase[key];' +
+    'else if(type==="location"&&d.chartDrillDown.locationByCase[key])items=d.chartDrillDown.locationByCase[key];' +
+    'else if(type==="category"&&d.chartDrillDown.categoryByCase[key])items=d.chartDrillDown.categoryByCase[key];' +
+    'else if(type==="unit"&&d.chartDrillDown.unitByMember[key])items=d.chartDrillDown.unitByMember[key];' +
+    'else if(type==="steward"&&d.chartDrillDown.stewardByCase[key])items=d.chartDrillDown.stewardByCase[key];' +
+    'if(items.length===0){openModal(title,"<p style=\\"color:#94a3b8\\">No data available</p>");return}' +
+    'var html="<div class=\\"drill-down-list\\">";' +
+    'items.forEach(function(item){' +
+    'if(item.id&&item.member){html+="<div class=\\"drill-down-item\\"><span><strong>"+item.id+"</strong> - "+item.member+"</span><span style=\\"color:#94a3b8\\">"+item.steward+" | "+item.location+"</span></div>"}' +
+    'else if(item.id&&item.name){html+="<div class=\\"drill-down-item\\"><span>"+item.name+"</span><span style=\\"color:#94a3b8\\">"+item.location+(item.isSteward?" (Steward)":"")+"</span></div>"}' +
+    '});' +
+    'html+="</div>";' +
+    'openModal(title+" ("+items.length+")",html)' +
     '}' +
 
     // Print & Export Functions
