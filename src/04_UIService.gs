@@ -7368,6 +7368,13 @@ function getUnifiedDashboardData(includePII) {
     overdueCount: 0,
     moraleScore: 7.5,
 
+    // Trend comparison data (previous 30-day period)
+    prevOpenCases: 0,
+    prevWinRate: 0,
+    prevOverdueCount: 0,
+    prevMoraleScore: 0,
+    prevTotalGrievances: 0,
+
     // Lists for drill-down (steward mode only)
     stewardList: [],
     memberList: [],
@@ -7383,8 +7390,18 @@ function getUnifiedDashboardData(includePII) {
     // Breakdowns
     unitBreakdown: {},
     locationBreakdown: {},
+    officeDaysBreakdown: {},
     stewardWorkload: [],
     hotZones: [],
+
+    // Participation/Engagement by dimensions (for heatmaps)
+    participationByUnit: {},      // { unitName: { emailRate, meetingRate, count } }
+    participationByLocation: {},  // { location: { emailRate, meetingRate, count } }
+
+    // Satisfaction by dimensions
+    satisfactionByUnit: {},       // { unitName: { score, count } }
+    satisfactionByLocation: {},   // { location: { score, count } }
+    satisfactionByOfficeDays: {}, // { day: { score, count } }
 
     // Member Directory Trends (NEW)
     directoryTrends: {
@@ -7426,6 +7443,15 @@ function getUnifiedDashboardData(includePII) {
     monthlyTrend: [],
     sentimentTrend: [],
 
+    // Chart drill-down data (details for each chart segment)
+    chartDrillDown: {
+      statusByCase: { open: [], pending: [], won: [], denied: [], settled: [], withdrawn: [] },
+      locationByCase: {},      // { location: [cases] }
+      categoryByCase: {},      // { category: [cases] }
+      unitByMember: {},        // { unit: [members] }
+      stewardByCase: {}        // { steward: [cases] }
+    },
+
     // Satisfaction Survey Data (Enhanced)
     satisfactionData: {
       responseCount: 0,
@@ -7464,6 +7490,10 @@ function getUnifiedDashboardData(includePII) {
   var interestLocalCount = 0;
   var interestChapterCount = 0;
   var interestAlliedCount = 0;
+
+  // Engagement by unit/location accumulators
+  var engagementByUnit = {};    // { unit: { openRates: [], meetings: 0, count: 0 } }
+  var engagementByLocation = {}; // { location: { openRates: [], meetings: 0, count: 0 } }
 
   // Process Members
   if (memberSheet && memberSheet.getLastRow() > 1) {
@@ -7527,17 +7557,44 @@ function getUnifiedDashboardData(includePII) {
         interestAlliedCount++;
       }
 
-      // Count stewards
-      if (isSteward) {
-        data.stewardCount++;
-        if (includePII) {
-          data.stewardList.push({ id: memberId, name: name, location: location, unit: unit, email: email, phone: phone });
-        } else {
-          data.stewardList.push({ id: memberId.substring(0, 4) + '***', name: 'Steward', location: location, unit: unit });
+      // Track office days breakdown
+      var officeDays = memberData[m][MEMBER_COLS.OFFICE_DAYS - 1] || '';
+      if (officeDays && officeDays !== 'N/A') {
+        var days = officeDays.split(',');
+        for (var di = 0; di < days.length; di++) {
+          var day = days[di].trim();
+          if (day) {
+            if (!data.officeDaysBreakdown[day]) data.officeDaysBreakdown[day] = 0;
+            data.officeDaysBreakdown[day]++;
+          }
         }
       }
 
-      // Member list for drill-down
+      // Track engagement by unit
+      if (!engagementByUnit[unit]) engagementByUnit[unit] = { openRates: [], meetings: 0, count: 0 };
+      engagementByUnit[unit].count++;
+      if (openRate && !isNaN(parseFloat(openRate))) engagementByUnit[unit].openRates.push(parseFloat(openRate));
+      if ((lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) ||
+          (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo)) {
+        engagementByUnit[unit].meetings++;
+      }
+
+      // Track engagement by location
+      if (!engagementByLocation[location]) engagementByLocation[location] = { openRates: [], meetings: 0, count: 0 };
+      engagementByLocation[location].count++;
+      if (openRate && !isNaN(parseFloat(openRate))) engagementByLocation[location].openRates.push(parseFloat(openRate));
+      if ((lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) ||
+          (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo)) {
+        engagementByLocation[location].meetings++;
+      }
+
+      // Count stewards (steward PII is always shown - they're public union reps)
+      if (isSteward) {
+        data.stewardCount++;
+        data.stewardList.push({ id: memberId, name: name, location: location, unit: unit, email: email, phone: phone });
+      }
+
+      // Member list for drill-down (members hidden in non-PII mode)
       if (includePII) {
         data.memberList.push({ id: memberId, name: name, location: location, unit: unit, isSteward: isSteward });
       }
@@ -7547,6 +7604,15 @@ function getUnifiedDashboardData(includePII) {
       data.locationBreakdown[location]++;
       if (!data.unitBreakdown[unit]) data.unitBreakdown[unit] = 0;
       data.unitBreakdown[unit]++;
+
+      // Unit drill-down by member
+      if (!data.chartDrillDown.unitByMember[unit]) data.chartDrillDown.unitByMember[unit] = [];
+      data.chartDrillDown.unitByMember[unit].push({
+        id: includePII ? memberId : memberId.substring(0, 4) + '***',
+        name: includePII ? name : 'Member',
+        location: location,
+        isSteward: isSteward
+      });
 
       // Contact info tracking
       if (email) data.directoryTrends.totalWithEmail++;
@@ -7590,6 +7656,22 @@ function getUnifiedDashboardData(includePII) {
         var ratio = Math.round(data.totalMembers / data.stewardCount);
         data.stewardRatio = ratio + ':1';
       }
+
+      // Calculate participation rates by unit
+      for (var unitKey in engagementByUnit) {
+        var u = engagementByUnit[unitKey];
+        var avgRate = u.openRates.length > 0 ? Math.round(u.openRates.reduce(function(a,b){return a+b;},0) / u.openRates.length) : 0;
+        var meetingPct = u.count > 0 ? Math.round((u.meetings / u.count) * 100) : 0;
+        data.participationByUnit[unitKey] = { emailRate: avgRate, meetingRate: meetingPct, count: u.count };
+      }
+
+      // Calculate participation rates by location
+      for (var locKey in engagementByLocation) {
+        var loc = engagementByLocation[locKey];
+        var avgLocRate = loc.openRates.length > 0 ? Math.round(loc.openRates.reduce(function(a,b){return a+b;},0) / loc.openRates.length) : 0;
+        var locMeetingPct = loc.count > 0 ? Math.round((loc.meetings / loc.count) * 100) : 0;
+        data.participationByLocation[locKey] = { emailRate: avgLocRate, meetingRate: locMeetingPct, count: loc.count };
+      }
     }
   }
 
@@ -7609,6 +7691,11 @@ function getUnifiedDashboardData(includePII) {
   var monthlyFilingsMap = {};
   var monthlyResolvedMap = {};  // v4.4.0 - Track resolved by month
 
+  // Previous period tracking (30-60 days ago vs current 30 days)
+  var prevPeriodStart = new Date(now.getTime() - (60 * 24 * 60 * 60 * 1000));
+  var prevPeriodEnd = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+  var prevOpenCases = 0, prevWins = 0, prevLosses = 0, prevSettled = 0, prevOverdue = 0;
+
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
     var grievanceData = grievanceSheet.getDataRange().getValues();
     for (var g = 1; g < grievanceData.length; g++) {
@@ -7626,19 +7713,68 @@ function getUnifiedDashboardData(includePII) {
       var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
       var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
 
-      // Status distribution
+      // Create case summary for drill-down
+      var caseSummary = {
+        id: grievanceId,
+        member: includePII ? memberName : 'Member',
+        steward: steward,
+        location: gLocation,
+        category: category,
+        step: currentStep,
+        dateFiled: dateFiled instanceof Date ? dateFiled.toLocaleDateString() : '',
+        dateClosed: dateClosed instanceof Date ? dateClosed.toLocaleDateString() : ''
+      };
+
+      // Track previous period metrics (cases active 30-60 days ago)
+      var wasOpenInPrevPeriod = dateFiled instanceof Date && dateFiled <= prevPeriodEnd &&
+        (!dateClosed || (dateClosed instanceof Date && dateClosed > prevPeriodEnd));
+      var closedInPrevPeriod = dateClosed instanceof Date && dateClosed >= prevPeriodStart && dateClosed <= prevPeriodEnd;
+
+      // Status distribution with drill-down data
+      var statusKey = '';
       switch(status.toLowerCase()) {
-        case 'open': data.statusDistribution.open++; data.openGrievances++; break;
-        case 'pending info': case 'pending': data.statusDistribution.pending++; data.openGrievances++; break;
-        case 'won': case 'sustained': case 'favorable': data.statusDistribution.won++; data.wins++; break;
-        case 'denied': case 'lost': data.statusDistribution.denied++; data.losses++; break;
-        case 'settled': data.statusDistribution.settled++; data.settled++; break;
-        case 'withdrawn': data.statusDistribution.withdrawn++; break;
+        case 'open':
+          data.statusDistribution.open++; data.openGrievances++; statusKey = 'open';
+          if (wasOpenInPrevPeriod) prevOpenCases++;
+          break;
+        case 'pending info': case 'pending':
+          data.statusDistribution.pending++; data.openGrievances++; statusKey = 'pending';
+          if (wasOpenInPrevPeriod) prevOpenCases++;
+          break;
+        case 'won': case 'sustained': case 'favorable':
+          data.statusDistribution.won++; data.wins++; statusKey = 'won';
+          if (closedInPrevPeriod) prevWins++;
+          break;
+        case 'denied': case 'lost':
+          data.statusDistribution.denied++; data.losses++; statusKey = 'denied';
+          if (closedInPrevPeriod) prevLosses++;
+          break;
+        case 'settled':
+          data.statusDistribution.settled++; data.settled++; statusKey = 'settled';
+          if (closedInPrevPeriod) prevSettled++;
+          break;
+        case 'withdrawn':
+          data.statusDistribution.withdrawn++; statusKey = 'withdrawn'; break;
       }
 
-      // Category breakdown
+      // Add to drill-down arrays
+      if (statusKey && data.chartDrillDown.statusByCase[statusKey]) {
+        data.chartDrillDown.statusByCase[statusKey].push(caseSummary);
+      }
+
+      // Location drill-down
+      if (!data.chartDrillDown.locationByCase[gLocation]) data.chartDrillDown.locationByCase[gLocation] = [];
+      data.chartDrillDown.locationByCase[gLocation].push(caseSummary);
+
+      // Steward drill-down
+      if (!data.chartDrillDown.stewardByCase[steward]) data.chartDrillDown.stewardByCase[steward] = [];
+      data.chartDrillDown.stewardByCase[steward].push(caseSummary);
+
+      // Category breakdown and drill-down
       if (!data.grievancesByCategory[category]) data.grievancesByCategory[category] = 0;
       data.grievancesByCategory[category]++;
+      if (!data.chartDrillDown.categoryByCase[category]) data.chartDrillDown.categoryByCase[category] = [];
+      data.chartDrillDown.categoryByCase[category].push(caseSummary);
 
       // Step progression
       if (currentStep.toLowerCase().includes('step 1')) data.stepProgression.step1++;
@@ -7646,13 +7782,10 @@ function getUnifiedDashboardData(includePII) {
       else if (currentStep.toLowerCase().includes('step 3')) data.stepProgression.step3++;
       else if (currentStep.toLowerCase().includes('arb')) data.stepProgression.arb++;
 
-      // Open cases list for drill-down
+      // Open cases list for drill-down (member hidden in non-PII, steward always shown)
       if (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info' || status.toLowerCase() === 'pending') {
-        if (includePII) {
-          data.openCasesList.push({ id: grievanceId, member: memberName, steward: steward, step: currentStep, location: gLocation, category: category });
-        } else {
-          data.openCasesList.push({ id: grievanceId, member: 'Member', steward: 'Steward', step: currentStep, location: gLocation, category: category });
-        }
+        var displayMember = includePII ? memberName : 'Member';
+        data.openCasesList.push({ id: grievanceId, member: displayMember, steward: steward, step: currentStep, location: gLocation, category: category });
 
         // My Cases - check if current user is the assigned steward (v4.4.0)
         if (includePII && data.currentUserEmail && steward) {
@@ -7734,11 +7867,8 @@ function getUnifiedDashboardData(includePII) {
 
       if (isOverdue && (status.toLowerCase() === 'open' || status.toLowerCase() === 'pending info' || status.toLowerCase() === 'pending')) {
         data.overdueCount++;
-        if (includePII) {
-          data.overdueList.push({ id: grievanceId, member: memberName, steward: steward, step: currentStep, dueDate: step1Due });
-        } else {
-          data.overdueList.push({ id: grievanceId, member: 'Member', steward: 'Steward', step: currentStep, dueDate: step1Due });
-        }
+        var displayMemberOverdue = includePII ? memberName : 'Member';
+        data.overdueList.push({ id: grievanceId, member: displayMemberOverdue, steward: steward, step: currentStep, dueDate: step1Due });
       }
     }
   }
@@ -7749,16 +7879,20 @@ function getUnifiedDashboardData(includePII) {
   data.step1DenialRate = step1Total > 0 ? Math.round((step1Denials / step1Total) * 100) : 0;
   data.avgSettlementDays = settlementDays.length > 0 ? Math.round(settlementDays.reduce(function(a,b){return a+b;},0) / settlementDays.length) : 0;
 
+  // Calculate previous period comparison metrics
+  data.prevOpenCases = prevOpenCases;
+  var prevTotalClosed = prevWins + prevLosses + prevSettled;
+  data.prevWinRate = prevTotalClosed > 0 ? Math.round((prevWins / prevTotalClosed) * 100) : data.winRate;
+  data.prevOverdueCount = prevOverdue;
+  data.prevTotalGrievances = data.totalGrievances; // Approximation - would need historical data for accurate count
+
   // Build steward workload array
   for (var s in stewardCases) {
     var count = stewardCases[s];
     var statusLabel = count > 8 ? 'OVERLOAD' : count > 5 ? 'Heavy' : 'Available';
     var color = count > 8 ? '#ef4444' : count > 5 ? '#f59e0b' : '#22c55e';
-    if (includePII) {
-      data.stewardWorkload.push({ name: s, count: count, status: statusLabel, color: color });
-    } else {
-      data.stewardWorkload.push({ name: 'Steward ' + (data.stewardWorkload.length + 1), count: count, status: statusLabel, color: color });
-    }
+    // Steward names always shown (they're public union reps)
+    data.stewardWorkload.push({ name: s, count: count, status: statusLabel, color: color });
   }
   data.stewardWorkload.sort(function(a,b){return b.count - a.count;});
 
@@ -7788,7 +7922,7 @@ function getUnifiedDashboardData(includePII) {
         .filter(function(row) { return row[0] && row[9]; })
         .map(function(row) {
           return {
-            name: includePII ? row[0] : 'Steward',
+            name: row[0],  // Steward names always shown (public union reps)
             totalCases: row[1] || 0,
             active: row[2] || 0,
             closed: row[3] || 0,
@@ -7822,10 +7956,16 @@ function getUnifiedDashboardData(includePII) {
     var trustScores = [];
     var monthlyTrust = {};
     var sectionScores = { overall: [], steward: [], chapter: [], leadership: [], contract: [], communication: [], voice: [], value: [] };
+    var satByWorksite = {};  // { worksite: { scores: [], count: 0 } }
+    var satByRole = {};      // { role: { scores: [], count: 0 } }
 
     for (var i = 1; i < satData.length; i++) {
       if (!satData[i][0]) continue;
       data.satisfactionData.responseCount++;
+
+      // Get worksite and role for breakdown
+      var worksite = (satData[i][SATISFACTION_COLS.Q1_WORKSITE - 1] || 'Unknown').toString().trim();
+      var role = (satData[i][SATISFACTION_COLS.Q2_ROLE - 1] || 'Unknown').toString().trim();
 
       var trustVal = parseFloat(satData[i][7]);
       var timestamp = satData[i][0];
@@ -7865,6 +8005,20 @@ function getUnifiedDashboardData(includePII) {
       if (avgComm > 0) sectionScores.communication.push(avgComm);
       if (avgVoice > 0) sectionScores.voice.push(avgVoice);
       if (avgValue > 0) sectionScores.value.push(avgValue);
+
+      // Track satisfaction by worksite (location)
+      if (worksite && avgOverall > 0) {
+        if (!satByWorksite[worksite]) satByWorksite[worksite] = { scores: [], count: 0 };
+        satByWorksite[worksite].scores.push(avgOverall);
+        satByWorksite[worksite].count++;
+      }
+
+      // Track satisfaction by role (similar to unit)
+      if (role && avgOverall > 0) {
+        if (!satByRole[role]) satByRole[role] = { scores: [], count: 0 };
+        satByRole[role].scores.push(avgOverall);
+        satByRole[role].count++;
+      }
     }
 
     function avg(arr) { return arr.length > 0 ? Math.round((arr.reduce(function(a,b){return a+b;},0) / arr.length) * 10) / 10 : 0; }
@@ -7890,6 +8044,22 @@ function getUnifiedDashboardData(includePII) {
 
     // Engagement: Survey response rate
     data.engagement.surveyResponseRate = data.totalMembers > 0 ? Math.round((data.satisfactionData.responseCount / data.totalMembers) * 100) : 0;
+
+    // Calculate satisfaction by worksite (maps to location)
+    for (var ws in satByWorksite) {
+      data.satisfactionByLocation[ws] = {
+        score: avg(satByWorksite[ws].scores),
+        count: satByWorksite[ws].count
+      };
+    }
+
+    // Calculate satisfaction by role (maps to unit)
+    for (var rl in satByRole) {
+      data.satisfactionByUnit[rl] = {
+        score: avg(satByRole[rl].scores),
+        count: satByRole[rl].count
+      };
+    }
   }
 
   // Get Google Drive resources folder from Config tab (column AU / 47)
@@ -7942,6 +8112,70 @@ function getUnifiedDashboardData(includePII) {
  */
 function getUnifiedDashboardDataAPI(isPII) {
   return getUnifiedDashboardData(isPII === true || isPII === 'true');
+}
+
+/**
+ * API function with date range filtering support
+ * @param {boolean} isPII - Include PII (steward mode)
+ * @param {number} days - Number of days to filter (0 = all data)
+ * @param {string} fromDate - Custom start date (ISO string)
+ * @param {string} toDate - Custom end date (ISO string)
+ * @returns {string} JSON dashboard data filtered by date range
+ */
+function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
+  var fullData = JSON.parse(getUnifiedDashboardData(isPII === true || isPII === 'true'));
+
+  // If no filtering requested, return full data
+  if (!days && !fromDate) {
+    return JSON.stringify(fullData);
+  }
+
+  var now = new Date();
+  var startDate, endDate;
+
+  if (fromDate && toDate) {
+    startDate = new Date(fromDate);
+    endDate = new Date(toDate);
+  } else if (days > 0) {
+    startDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+    endDate = now;
+  } else {
+    return JSON.stringify(fullData);
+  }
+
+  // Filter monthly filings to date range
+  fullData.monthlyFilings = fullData.monthlyFilings.filter(function(m) {
+    var monthDate = new Date(m.month + ' 1');
+    return monthDate >= startDate && monthDate <= endDate;
+  });
+
+  fullData.monthlyResolved = fullData.monthlyResolved.filter(function(m) {
+    var monthDate = new Date(m.month + ' 1');
+    return monthDate >= startDate && monthDate <= endDate;
+  });
+
+  // Filter drill-down data by date
+  for (var statusKey in fullData.chartDrillDown.statusByCase) {
+    fullData.chartDrillDown.statusByCase[statusKey] = fullData.chartDrillDown.statusByCase[statusKey].filter(function(c) {
+      if (!c.dateFiled) return true;
+      var filedDate = new Date(c.dateFiled);
+      return filedDate >= startDate && filedDate <= endDate;
+    });
+  }
+
+  // Recalculate counts based on filtered data
+  fullData.statusDistribution = { open: 0, pending: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 };
+  for (var sk in fullData.chartDrillDown.statusByCase) {
+    fullData.statusDistribution[sk] = fullData.chartDrillDown.statusByCase[sk].length;
+  }
+
+  fullData.dateRangeApplied = {
+    days: days,
+    from: startDate.toISOString(),
+    to: endDate.toISOString()
+  };
+
+  return JSON.stringify(fullData);
 }
 
 /**
@@ -8080,14 +8314,227 @@ function getUnifiedDashboardHtml(isPII) {
     '.spinner{width:40px;height:40px;border:3px solid rgba(96,165,250,0.3);border-top-color:#60a5fa;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px}' +
     '@keyframes spin{to{transform:rotate(360deg)}}' +
 
+    // Trend Arrows
+    '.trend-arrow{font-size:14px;margin-left:4px}.trend-arrow.up{color:#22c55e}.trend-arrow.down{color:#ef4444}.trend-arrow.flat{color:#94a3b8}' +
+    '.trend-pct{font-size:10px;margin-left:2px}' +
+
+    // Goal Progress
+    '.goal-bar{height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin-top:8px;overflow:hidden}' +
+    '.goal-fill{height:100%;border-radius:3px;transition:width 0.5s}' +
+    '.goal-label{display:flex;justify-content:space-between;font-size:9px;color:#64748b;margin-top:4px}' +
+    // Pinned Metrics
+    '.pinned-section{margin-bottom:16px;padding:16px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:12px}' +
+    '.pinned-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}' +
+    '.pinned-title{font-size:12px;font-weight:600;color:#60a5fa;display:flex;align-items:center;gap:6px}' +
+    '.pinned-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}' +
+    '.pinned-metric{background:#1e293b;padding:12px;border-radius:8px;text-align:center;position:relative}' +
+    '.pinned-metric .unpin-btn{position:absolute;top:4px;right:4px;background:none;border:none;color:#64748b;cursor:pointer;font-size:14px;opacity:0;transition:opacity 0.2s}' +
+    '.pinned-metric:hover .unpin-btn{opacity:1}' +
+    '.pin-btn{position:absolute;top:4px;right:4px;background:none;border:none;color:#64748b;cursor:pointer;font-size:14px;opacity:0;transition:opacity 0.2s}' +
+    '.kpi-card:hover .pin-btn{opacity:1}' +
+    '.kpi-card.pinned .pin-btn{opacity:1;color:#3b82f6}' +
+    // Chart Drill-down
+    '.chart-card canvas{cursor:pointer}' +
+    '.drill-down-list{max-height:300px;overflow-y:auto}' +
+    '.drill-down-item{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.05);font-size:12px}' +
+    '.drill-down-item:hover{background:rgba(255,255,255,0.05)}' +
+
+    // Settings Panel
+    '.settings-panel{position:fixed;right:-320px;top:0;bottom:0;width:320px;background:#1e293b;border-left:1px solid rgba(255,255,255,0.1);z-index:250;transition:right 0.3s;overflow-y:auto;padding:20px}' +
+    '.settings-panel.open{right:0}' +
+    '.settings-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:240;display:none}' +
+    '.settings-overlay.open{display:block}' +
+    '.settings-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1)}' +
+    '.settings-section{margin-bottom:24px}' +
+    '.settings-title{font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}' +
+    '.setting-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05)}' +
+    '.setting-label{font-size:13px;color:#e2e8f0}' +
+    '.toggle{width:44px;height:24px;background:#475569;border-radius:12px;position:relative;cursor:pointer;transition:background 0.2s}' +
+    '.toggle.on{background:#22c55e}' +
+    '.toggle::after{content:"";position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:2px;left:2px;transition:left 0.2s}' +
+    '.toggle.on::after{left:22px}' +
+
+    // Alert Center
+    '.alert-center{position:fixed;right:-400px;top:0;bottom:0;width:400px;background:#1e293b;border-left:1px solid rgba(255,255,255,0.1);z-index:250;transition:right 0.3s;overflow-y:auto}' +
+    '.alert-center.open{right:0}' +
+    '.alert-header{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,0.8);position:sticky;top:0}' +
+    '.alert-item{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.05)}' +
+    '.alert-item.critical{border-left:4px solid #ef4444}' +
+    '.alert-item.warning{border-left:4px solid #f59e0b}' +
+    '.alert-item.info{border-left:4px solid #3b82f6}' +
+    '.alert-item.success{border-left:4px solid #22c55e}' +
+    '.alert-title{font-size:13px;font-weight:600;color:#e2e8f0;margin-bottom:4px}' +
+    '.alert-desc{font-size:12px;color:#94a3b8}' +
+    '.alert-time{font-size:10px;color:#64748b;margin-top:6px}' +
+    '.alert-badge{background:#ef4444;color:white;font-size:10px;padding:2px 6px;border-radius:10px;position:absolute;top:-5px;right:-5px}' +
+
+    // Date Range Filter
+    '.date-filter{display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,0.2);border-bottom:1px solid rgba(255,255,255,0.05)}' +
+    '.date-btn{padding:6px 12px;border-radius:6px;font-size:11px;background:#334155;color:#94a3b8;border:none;cursor:pointer;transition:all 0.2s}' +
+    '.date-btn:hover,.date-btn.active{background:#475569;color:#e2e8f0}' +
+    '.date-input{padding:6px 10px;border-radius:6px;font-size:11px;background:#1e293b;color:#f8fafc;border:1px solid #475569;width:120px}' +
+
+    // Last Updated
+    '.last-updated{font-size:10px;color:#64748b;display:flex;align-items:center;gap:4px}' +
+    '.last-updated .material-icons{font-size:12px}' +
+    '.pulse{animation:pulse 2s infinite}' +
+    '@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}' +
+
+    // Pinned Metrics
+    '.pinned-section{background:linear-gradient(135deg,rgba(96,165,250,0.1) 0%,rgba(30,41,59,0.9) 100%);border:1px solid rgba(96,165,250,0.3);border-radius:12px;padding:16px;margin-bottom:20px}' +
+    '.pinned-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}' +
+    '.pinned-title{font-size:12px;font-weight:600;color:#60a5fa;text-transform:uppercase}' +
+    '.pin-btn{background:none;border:none;color:#64748b;cursor:pointer;font-size:18px;transition:color 0.2s}' +
+    '.pin-btn:hover,.pin-btn.pinned{color:#fbbf24}' +
+
+    // Print Styles
+    '@media print{body{background:white!important;color:black!important}.header,.tabs,.footer,.settings-panel,.alert-center,.btn{display:none!important}.content{padding:0!important;max-width:100%!important}.chart-card,.kpi-card,.trend-card{background:white!important;border:1px solid #ddd!important;break-inside:avoid}.kpi-value,.trend-value{color:black!important}}' +
+
+    // High Contrast Mode
+    'body.high-contrast{background:#000!important}' +
+    'body.high-contrast .kpi-card,body.high-contrast .chart-card,body.high-contrast .trend-card{background:#111!important;border-color:#fff!important}' +
+    'body.high-contrast .kpi-value,body.high-contrast .trend-value,body.high-contrast .chart-title{color:#fff!important}' +
+    'body.high-contrast .kpi-label,body.high-contrast .trend-title{color:#ccc!important}' +
+
+    // Large Text Mode
+    'body.large-text{font-size:16px}' +
+    'body.large-text .kpi-value{font-size:42px}' +
+    'body.large-text .kpi-label{font-size:12px}' +
+    'body.large-text .chart-title{font-size:16px}' +
+    'body.large-text .tab{font-size:13px;padding:16px 20px}' +
+    'body.large-text .list-item{font-size:15px;padding:16px}' +
+
+    // Keyboard Shortcut Hint
+    '.shortcut-hint{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.9);color:white;padding:12px 24px;border-radius:8px;font-size:13px;z-index:300;display:none}' +
+    '.shortcut-hint.show{display:block;animation:fadeInOut 2s forwards}' +
+    '@keyframes fadeInOut{0%{opacity:0}10%{opacity:1}90%{opacity:1}100%{opacity:0}}' +
+
     // Responsive
-    '@media(max-width:768px){.header h1{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.bargain-grid{grid-template-columns:repeat(2,1fr)}}' +
+    '@media(max-width:768px){.header h1{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.bargain-grid{grid-template-columns:repeat(2,1fr)}.settings-panel,.alert-center{width:100%}}' +
+
+    // View Mode Toggle Pill
+    '.view-toggle{display:flex;background:rgba(255,255,255,0.1);border-radius:20px;padding:3px;gap:2px}' +
+    '.view-toggle button{padding:6px 12px;border:none;border-radius:17px;font-size:11px;cursor:pointer;transition:all 0.2s;background:transparent;color:#94a3b8;display:flex;align-items:center;gap:4px}' +
+    '.view-toggle button.active{background:#3b82f6;color:white}' +
+    '.view-toggle button .material-icons{font-size:14px}' +
+
+    // Mobile Mode (forced mobile layout)
+    'body.mobile-mode .header{flex-direction:column;gap:12px;padding:12px 16px}' +
+    'body.mobile-mode .header h1{font-size:16px}' +
+    'body.mobile-mode .header>div{width:100%;justify-content:space-between}' +
+    'body.mobile-mode .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 8px}' +
+    'body.mobile-mode .tabs::-webkit-scrollbar{display:none}' +
+    'body.mobile-mode .tab{flex-shrink:0;padding:12px 16px;font-size:12px}' +
+    'body.mobile-mode .kpi-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px}' +
+    'body.mobile-mode .kpi-card{padding:14px}' +
+    'body.mobile-mode .kpi-value{font-size:28px}' +
+    'body.mobile-mode .kpi-label{font-size:10px}' +
+    'body.mobile-mode .charts-row{grid-template-columns:1fr!important;gap:12px}' +
+    'body.mobile-mode .chart-card{padding:14px}' +
+    'body.mobile-mode .chart-title{font-size:12px}' +
+    'body.mobile-mode .list-item{padding:14px;font-size:13px}' +
+    'body.mobile-mode .date-filter{flex-wrap:wrap;gap:6px;padding:10px 12px}' +
+    'body.mobile-mode .date-btn{padding:8px 14px;font-size:12px}' +
+    'body.mobile-mode .date-input{width:100px}' +
+    'body.mobile-mode .pinned-section{padding:12px}' +
+    'body.mobile-mode .pinned-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .modal{width:95%;max-height:85vh;margin:10px}' +
+    'body.mobile-mode .settings-panel,body.mobile-mode .alert-center{width:100%}' +
+    'body.mobile-mode .btn{padding:12px 20px;font-size:13px}' +
+    'body.mobile-mode .content{padding:12px}' +
+    'body.mobile-mode .trend-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .bargain-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .heatmap-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .satisfaction-grid{grid-template-columns:1fr}' +
+    'body.mobile-mode .faq-container{padding:12px}' +
+    'body.mobile-mode .faq-item{padding:12px}' +
+    'body.mobile-mode .compare-grid{grid-template-columns:repeat(2,1fr)}' +
+    'body.mobile-mode .last-updated{display:none}' +
+
+    // Desktop Mode (forced desktop layout)
+    'body.desktop-mode .kpi-grid{grid-template-columns:repeat(6,1fr)!important}' +
+    'body.desktop-mode .charts-row{grid-template-columns:repeat(2,1fr)!important}' +
+    'body.desktop-mode .tab{padding:14px 24px}' +
+    'body.desktop-mode .tabs{flex-wrap:nowrap}' +
+
+    // Auto-detect small screens
+    '@media(max-width:600px){body:not(.desktop-mode) .header{flex-direction:column;gap:10px}body:not(.desktop-mode) .tabs{overflow-x:auto}body:not(.desktop-mode) .tab{flex-shrink:0;font-size:11px;padding:10px 14px}body:not(.desktop-mode) .kpi-grid{grid-template-columns:repeat(2,1fr)}body:not(.desktop-mode) .charts-row{grid-template-columns:1fr}body:not(.desktop-mode) .date-filter{flex-wrap:wrap}body:not(.desktop-mode) .last-updated{display:none}}' +
     '</style></head><body>' +
 
-    // Header
-    '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1>' + badge + '</div>' +
+    // Settings Overlay
+    '<div class="settings-overlay" onclick="toggleSettings()"></div>' +
 
-    // Tabs (My Cases only visible in steward mode)
+    // Settings Panel
+    '<div class="settings-panel" id="settingsPanel">' +
+    '<div class="settings-header"><span style="font-size:16px;font-weight:700;color:#e2e8f0">Settings</span><button onclick="toggleSettings()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">&times;</button></div>' +
+    '<div class="settings-section"><div class="settings-title">Display</div>' +
+    '<div class="setting-row"><span class="setting-label">High Contrast Mode</span><div class="toggle" id="highContrastToggle" onclick="toggleHighContrast()"></div></div>' +
+    '<div class="setting-row"><span class="setting-label">Large Text Mode</span><div class="toggle" id="largeTextToggle" onclick="toggleLargeText()"></div></div>' +
+    '</div>' +
+    '<div class="settings-section"><div class="settings-title">Auto Refresh</div>' +
+    '<div class="setting-row"><span class="setting-label">Enable Auto-Refresh</span><div class="toggle" id="autoRefreshToggle" onclick="toggleAutoRefresh()"></div></div>' +
+    '<div class="setting-row"><span class="setting-label">Interval</span><select id="refreshInterval" onchange="setRefreshInterval()" style="padding:6px;border-radius:6px;background:#334155;color:#e2e8f0;border:none"><option value="60000">1 minute</option><option value="300000" selected>5 minutes</option><option value="600000">10 minutes</option></select></div>' +
+    '</div>' +
+    '<div class="settings-section"><div class="settings-title">Goals</div>' +
+    '<div class="setting-row"><span class="setting-label">Win Rate Target</span><input type="number" id="goalWinRate" value="75" min="0" max="100" style="width:60px;padding:6px;border-radius:6px;background:#334155;color:#e2e8f0;border:none;text-align:center" onchange="saveGoals()">%</div>' +
+    '<div class="setting-row"><span class="setting-label">Morale Target</span><input type="number" id="goalMorale" value="8" min="1" max="10" step="0.1" style="width:60px;padding:6px;border-radius:6px;background:#334155;color:#e2e8f0;border:none;text-align:center" onchange="saveGoals()">/10</div>' +
+    '<div class="setting-row"><span class="setting-label">Response Rate Target</span><input type="number" id="goalResponse" value="50" min="0" max="100" style="width:60px;padding:6px;border-radius:6px;background:#334155;color:#e2e8f0;border:none;text-align:center" onchange="saveGoals()">%</div>' +
+    '</div>' +
+    '<div class="settings-section"><div class="settings-title">Actions</div>' +
+    '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="printDashboard()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">print</i>Print Dashboard</button>' +
+    '<button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="exportAllData()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">download</i>Export All Data</button>' +
+    '<button class="btn btn-secondary" style="width:100%" onclick="scheduleReport()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">schedule</i>Schedule Report</button>' +
+    '</div>' +
+    '<div class="settings-section"><div class="settings-title">Keyboard Shortcuts</div>' +
+    '<div style="font-size:11px;color:#94a3b8;line-height:2">' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">1-9</kbd> Switch tabs</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">/</kbd> Focus search</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">R</kbd> Refresh data</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">P</kbd> Print view</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">A</kbd> Alert center</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">S</kbd> Settings</div>' +
+    '<div><kbd style="background:#334155;padding:2px 6px;border-radius:4px">Esc</kbd> Close panels</div>' +
+    '</div></div>' +
+    '</div>' +
+
+    // Alert Center
+    '<div class="alert-center" id="alertCenter">' +
+    '<div class="alert-header"><span style="font-size:16px;font-weight:700;color:#e2e8f0">Alert Center</span><button onclick="toggleAlerts()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">&times;</button></div>' +
+    '<div id="alertList"></div>' +
+    '</div>' +
+
+    // Shortcut Hint
+    '<div class="shortcut-hint" id="shortcutHint"></div>' +
+
+    // Header with view toggle and buttons
+    '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1><div style="display:flex;align-items:center;gap:12px">' +
+    // View Mode Toggle Pill
+    '<div class="view-toggle" id="viewToggle">' +
+    '<button id="autoViewBtn" class="active" onclick="setViewMode(\\x27auto\\x27)"><i class="material-icons">auto_fix_high</i>Auto</button>' +
+    '<button id="desktopViewBtn" onclick="setViewMode(\\x27desktop\\x27)"><i class="material-icons">computer</i>Desktop</button>' +
+    '<button id="mobileViewBtn" onclick="setViewMode(\\x27mobile\\x27)"><i class="material-icons">smartphone</i>Mobile</button>' +
+    '</div>' +
+    '<div class="last-updated" id="lastUpdated"><i class="material-icons">schedule</i><span>Loading...</span></div>' +
+    badge +
+    '<button onclick="toggleAlerts()" style="background:none;border:none;color:#94a3b8;cursor:pointer;position:relative"><i class="material-icons">notifications</i><span class="alert-badge" id="alertBadge" style="display:none">0</span></button>' +
+    '<button onclick="toggleSettings()" style="background:none;border:none;color:#94a3b8;cursor:pointer"><i class="material-icons">settings</i></button>' +
+    '</div></div>' +
+
+    // Date Range Filter
+    '<div class="date-filter">' +
+    '<span style="font-size:11px;color:#64748b;margin-right:8px">Period:</span>' +
+    '<button class="date-btn active" onclick="setDateRange(7,this)">7D</button>' +
+    '<button class="date-btn" onclick="setDateRange(30,this)">30D</button>' +
+    '<button class="date-btn" onclick="setDateRange(90,this)">90D</button>' +
+    '<button class="date-btn" onclick="setDateRange(365,this)">1Y</button>' +
+    '<button class="date-btn" onclick="setDateRange(0,this)">All</button>' +
+    '<span style="margin-left:auto;font-size:11px;color:#64748b">Custom:</span>' +
+    '<input type="date" class="date-input" id="dateFrom" onchange="applyCustomDateRange()">' +
+    '<span style="color:#64748b">to</span>' +
+    '<input type="date" class="date-input" id="dateTo" onchange="applyCustomDateRange()">' +
+    '</div>' +
+
+    // Tabs (My Cases and Help only visible in steward mode, Compare in both)
     '<div class="tabs">' +
     '<div class="tab active" onclick="showTab(\'overview\')">Overview</div>' +
     (isPII ? '<div class="tab" onclick="showTab(\'mycases\')">My Cases</div>' : '') +
@@ -8098,6 +8545,8 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
     '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
     '<div class="tab" onclick="showTab(\'resources\')">Resources</div>' +
+    '<div class="tab" onclick="showTab(\'compare\')">Compare</div>' +
+    (isPII ? '<div class="tab" onclick="showTab(\'help\')">Help</div>' : '') +
     '</div>' +
 
     // Content
@@ -8119,7 +8568,7 @@ function getUnifiedDashboardHtml(isPII) {
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+e.message+"</div>"}' +
     'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=\\x27"+tab+"\\x27]").classList.add("active");renderTab(tab)}' +
-    'function render(json){dashData=JSON.parse(json);renderTab("overview")}' +
+    'function render(json){dashData=JSON.parse(json);renderTab("overview");setTimeout(renderPinnedSection,100)}' +
 
     // Modal functions
     'function openModal(title,content){document.getElementById("modal-title").textContent=title;document.getElementById("modal-body").innerHTML=content;document.getElementById("modal").classList.add("active")}' +
@@ -8143,19 +8592,22 @@ function getUnifiedDashboardHtml(isPII) {
     'function renderTab(tab){' +
     'var d=dashData,html="";' +
 
-    // Overview Tab
+    // Overview Tab with trend arrows, goal progress, and pin buttons
     'if(tab==="overview"){' +
+    'var goals=JSON.parse(localStorage.getItem("509_goals")||"{}");' +
+    'var winTarget=goals.winRate||75,moraleTarget=goals.morale||8,responseTarget=goals.response||50;' +
+    'var isPinned=function(k){return pinnedMetrics.some(function(p){return p.key===k})};' +
     'html="<div class=\\"kpi-grid\\">";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27members\\x27)\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27stewards\\x27)\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27open\\x27)\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate</div><div class=\\"kpi-value green\\">"+d.winRate+"%</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+"\\" onclick=\\"showList(\\x27overdue\\x27)\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale Score</div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(isPinned("members")?"pinned":"")+"\\" onclick=\\"showList(\\x27members\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27members\\x27,\\x27Members\\x27,"+d.totalMembers+",\\x27#3b82f6\\x27)\\"><i class=\\"material-icons\\">"+(isPinned("members")?"push_pin":"push_pin")+"</i></button><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(isPinned("stewards")?"pinned":"")+"\\" onclick=\\"showList(\\x27stewards\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27stewards\\x27,\\x27Stewards\\x27,"+d.stewardCount+",\\x27#a855f7\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(isPinned("openCases")?"pinned":"")+"\\" onclick=\\"showList(\\x27open\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27openCases\\x27,\\x27Open Cases\\x27,"+d.openGrievances+",\\x27#f59e0b\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+(d.prevOpenCases!==undefined?getTrendArrow(d.openGrievances,d.prevOpenCases):"")+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(isPinned("winRate")?"pinned":"")+"\\"><button class=\\"pin-btn\\" onclick=\\"togglePin(\\x27winRate\\x27,\\x27Win Rate\\x27,\\x27"+d.winRate+"%\\x27,\\x27#22c55e\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Win Rate <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+winTarget+"%)</span></div><div class=\\"kpi-value green\\">"+d.winRate+"%"+(d.prevWinRate!==undefined?getTrendArrow(d.winRate,d.prevWinRate):"")+"</div>"+getGoalBar(d.winRate,winTarget)+"</div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+" "+(isPinned("overdue")?"pinned":"")+"\\" onclick=\\"showList(\\x27overdue\\x27)\\"><button class=\\"pin-btn\\" onclick=\\"event.stopPropagation();togglePin(\\x27overdue\\x27,\\x27Overdue\\x27,"+d.overdueCount+",\\x27#ef4444\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+(d.prevOverdueCount!==undefined?getTrendArrow(d.prevOverdueCount,d.overdueCount):"")+"</div></div>";' +
+    'html+="<div class=\\"kpi-card "+(isPinned("morale")?"pinned":"")+"\\"><button class=\\"pin-btn\\" onclick=\\"togglePin(\\x27morale\\x27,\\x27Morale\\x27,"+d.moraleScore+",\\x27#22c55e\\x27)\\"><i class=\\"material-icons\\">push_pin</i></button><div class=\\"kpi-label\\">Morale <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+moraleTarget+")</span></div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+(d.prevMoraleScore!==undefined?getTrendArrow(d.moraleScore,d.prevMoraleScore):"")+"</div>"+getGoalBar(d.moraleScore*10,moraleTarget*10)+"</div>";' +
     'html+="</div>";' +
-    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status</div><canvas id=\\"statusChart\\"></canvas></div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status <span style=\\"font-size:10px;color:#64748b\\">(click segment)</span></div><canvas id=\\"statusChart\\"></canvas></div>";' +
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">trending_up</i>Morale Trend</div><canvas id=\\"trendChart\\"></canvas></div></div>";' +
-    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Members by Location</div><canvas id=\\"locationChart\\"></canvas></div>";' +
+    'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Members by Location <span style=\\"font-size:10px;color:#64748b\\">(click bar)</span></div><canvas id=\\"locationChart\\"></canvas></div>";' +
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">show_chart</i>Filed vs Resolved</div><canvas id=\\"filingChart\\"></canvas></div></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderOverviewCharts()' +
     '}' +
@@ -8206,7 +8658,8 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Won</div><div class=\\"kpi-value green\\">"+d.wins+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Denied</div><div class=\\"kpi-value red\\">"+d.losses+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Settled</div><div class=\\"kpi-value purple\\">"+d.settled+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Survey Response</div><div class=\\"kpi-value yellow\\">"+d.engagement.surveyResponseRate+"%</div></div></div>";' +
+    'var responseTarget=(JSON.parse(localStorage.getItem("509_goals")||"{}").response)||50;' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Survey Response <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+responseTarget+"%)</span></div><div class=\\"kpi-value yellow\\">"+d.engagement.surveyResponseRate+"%</div>"+getGoalBar(d.engagement.surveyResponseRate,responseTarget)+"</div></div>";' +
     // Engagement Metrics Section
     'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:20px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">trending_up</i>Member Engagement Metrics</h3>";' +
     'html+="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(auto-fit,minmax(120px,1fr))\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Email Open Rate</div><div class=\\"kpi-value "+(d.engagement.emailOpenRate>=50?"green":d.engagement.emailOpenRate>=30?"yellow":"red")+"\\">"+d.engagement.emailOpenRate+"%</div></div>";' +
@@ -8223,38 +8676,82 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("main-content").innerHTML=html;renderAnalyticsCharts()' +
     '}' +
 
-    // Directory Trends Tab (Enhanced with Engagement)
+    // Directory Trends Tab (Enhanced with Full Analytics)
     'else if(tab==="directory"){' +
     'var dt=d.directoryTrends;var eng=d.engagement;' +
-    'html="<div class=\\"kpi-grid\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">With Email</div><div class=\\"kpi-value green\\">"+dt.totalWithEmail+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Email</div><div class=\\"kpi-value "+(dt.missingEmail>0?"red":"green")+"\\">"+dt.missingEmail+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Phone</div><div class=\\"kpi-value "+(dt.missingPhone>0?"yellow":"green")+"\\">"+dt.missingPhone+"</div></div>";' +
+    // Number formatting function
+    'function fmt(n){return n>=1000?n.toLocaleString():n}' +
+    'html="<div class=\\"kpi-grid\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Members</div><div class=\\"kpi-value blue\\">"+fmt(d.totalMembers)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">With Email</div><div class=\\"kpi-value green\\">"+fmt(dt.totalWithEmail)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Email</div><div class=\\"kpi-value "+(dt.missingEmail>0?"red":"green")+"\\">"+fmt(dt.missingEmail)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Phone</div><div class=\\"kpi-value "+(dt.missingPhone>0?"yellow":"green")+"\\">"+fmt(dt.missingPhone)+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Email Open Rate</div><div class=\\"kpi-value "+(eng.emailOpenRate>=50?"green":eng.emailOpenRate>=30?"yellow":"red")+"\\">"+eng.emailOpenRate+"%</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Meeting Attendance</div><div class=\\"kpi-value purple\\">"+(eng.virtualMeetingRate+eng.inPersonMeetingRate)+"%</div></div></div>";' +
+    // Section: Employee Distribution
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">people</i>Employee Distribution</h3>";' +
     'html+="<div class=\\"charts-row\\">";' +
-    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">update</i>Recent Updates (30 days)</span><span class=\\"trend-value green\\">"+dt.recentUpdates.length+"</span></div><div class=\\"trend-list\\">";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Employees by Office Location</div><canvas id=\\"empByLocationChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">business</i>Employees by Unit</div><canvas id=\\"empByUnitChart\\"></canvas></div></div>";' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">event</i>Employees by Office Days</div><canvas id=\\"empByOfficeDaysChart\\"></canvas></div>";' +
+    // Section: Participation Heatmap
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">insights</i>Participation Rate Heatmap</h3>";' +
+    'html+="<div style=\\"display:flex;gap:4px;margin-bottom:12px;font-size:10px;align-items:center\\"><span style=\\"color:#94a3b8\\">Low</span><div style=\\"display:flex;height:12px\\"><div style=\\"width:20px;background:#fee2e2\\"></div><div style=\\"width:20px;background:#fef3c7\\"></div><div style=\\"width:20px;background:#d9f99d\\"></div><div style=\\"width:20px;background:#bbf7d0\\"></div><div style=\\"width:20px;background:#86efac\\"></div></div><span style=\\"color:#94a3b8\\">High</span></div>";' +
+    // Participation by Unit heatmap
+    'html+="<div class=\\"chart-card\\" style=\\"margin-bottom:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">grid_view</i>Email/Meeting Participation by Unit</div><div class=\\"heatmap-grid\\" style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:12px\\">";' +
+    'var partUnits=Object.keys(d.participationByUnit).slice(0,12);' +
+    'partUnits.forEach(function(u){var p=d.participationByUnit[u];var avgPart=(p.emailRate+p.meetingRate)/2;var heatBg=avgPart>=60?"#86efac":avgPart>=40?"#d9f99d":avgPart>=20?"#fef3c7":"#fee2e2";var textCol=avgPart>=40?"#166534":"#991b1b";html+="<div style=\\"background:"+heatBg+";padding:10px;border-radius:8px\\"><div style=\\"font-weight:600;color:"+textCol+";font-size:12px;margin-bottom:4px\\">"+u+"</div><div style=\\"display:flex;justify-content:space-between;font-size:11px;color:"+textCol+"\\"><span>Email: "+p.emailRate+"%</span><span>Mtg: "+p.meetingRate+"%</span></div><div style=\\"font-size:10px;color:"+textCol+";opacity:0.7;margin-top:2px\\">"+fmt(p.count)+" members</div></div>"});' +
+    'if(partUnits.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px;grid-column:1/-1\\">No participation data available</p>";' +
+    'html+="</div></div>";' +
+    // Participation by Location heatmap
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">place</i>Email/Meeting Participation by Location</div><div class=\\"heatmap-grid\\" style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:12px\\">";' +
+    'var partLocs=Object.keys(d.participationByLocation).slice(0,12);' +
+    'partLocs.forEach(function(l){var p=d.participationByLocation[l];var avgPart=(p.emailRate+p.meetingRate)/2;var heatBg=avgPart>=60?"#86efac":avgPart>=40?"#d9f99d":avgPart>=20?"#fef3c7":"#fee2e2";var textCol=avgPart>=40?"#166534":"#991b1b";html+="<div style=\\"background:"+heatBg+";padding:10px;border-radius:8px\\"><div style=\\"font-weight:600;color:"+textCol+";font-size:12px;margin-bottom:4px\\">"+l+"</div><div style=\\"display:flex;justify-content:space-between;font-size:11px;color:"+textCol+"\\"><span>Email: "+p.emailRate+"%</span><span>Mtg: "+p.meetingRate+"%</span></div><div style=\\"font-size:10px;color:"+textCol+";opacity:0.7;margin-top:2px\\">"+fmt(p.count)+" members</div></div>"});' +
+    'if(partLocs.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px;grid-column:1/-1\\">No participation data available</p>";' +
+    'html+="</div></div>";' +
+    // Section: Member Satisfaction Analysis
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">sentiment_satisfied</i>Member Satisfaction Analysis</h3>";' +
+    'html+="<div class=\\"charts-row\\">";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">work</i>Satisfaction by Unit/Role</div><canvas id=\\"satByUnitChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_city</i>Satisfaction by Work Location</div><canvas id=\\"satByLocationChart\\"></canvas></div></div>";' +
+    // Satisfaction matrix (unit x location)
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">table_chart</i>Satisfaction by Unit & Location Matrix</div>";' +
+    'var satUnits=Object.keys(d.satisfactionByUnit).slice(0,8);var satLocs=Object.keys(d.satisfactionByLocation).slice(0,8);' +
+    'if(satUnits.length>0&&satLocs.length>0){' +
+    'html+="<div style=\\"overflow-x:auto;margin-top:12px\\"><table style=\\"width:100%;border-collapse:collapse;font-size:11px\\"><tr><th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:left\\">Unit / Location</th>";' +
+    'satLocs.forEach(function(l){html+="<th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:center;min-width:80px\\">"+l.substring(0,12)+"</th>"});' +
+    'html+="</tr>";' +
+    'satUnits.forEach(function(u){html+="<tr><td style=\\"padding:8px;background:#0f172a;color:#e2e8f0;font-weight:500\\">"+u+"</td>";satLocs.forEach(function(l){var uScore=d.satisfactionByUnit[u]?d.satisfactionByUnit[u].score:0;var lScore=d.satisfactionByLocation[l]?d.satisfactionByLocation[l].score:0;var avgS=(uScore+lScore)/2;var cellBg=avgS>=7?"rgba(34,197,94,0.3)":avgS>=5?"rgba(245,158,11,0.3)":"rgba(239,68,68,0.3)";var cellCol=avgS>=7?"#22c55e":avgS>=5?"#f59e0b":"#ef4444";html+="<td style=\\"padding:8px;background:"+cellBg+";color:"+cellCol+";text-align:center;font-weight:600\\">"+avgS.toFixed(1)+"</td>"});html+="</tr>"});' +
+    'html+="</table></div>"}' +
+    'else{html+="<p style=\\"color:#64748b;text-align:center;padding:30px\\">Not enough satisfaction data for matrix view</p>"}' +
+    'html+="</div>";' +
+    // Contact Updates Section
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">contact_phone</i>Contact Updates</h3>";' +
+    'html+="<div class=\\"charts-row\\">";' +
+    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">update</i>Recent Updates (30 days)</span><span class=\\"trend-value green\\">"+fmt(dt.recentUpdates.length)+"</span></div><div class=\\"trend-list\\">";' +
     'dt.recentUpdates.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.date).toLocaleDateString()+"</span></div>"});' +
     'if(dt.recentUpdates.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent updates</p>";' +
     'html+="</div></div>";' +
-    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">warning</i>Stale Contacts (90+ days)</span><span class=\\"trend-value yellow\\">"+dt.staleContacts.length+"</span></div><div class=\\"trend-list\\">";' +
+    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">warning</i>Stale Contacts (90+ days)</span><span class=\\"trend-value yellow\\">"+fmt(dt.staleContacts.length)+"</span></div><div class=\\"trend-list\\">";' +
     'dt.staleContacts.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.lastUpdate).toLocaleDateString()+"</span></div>"});' +
     'if(dt.staleContacts.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">All contacts up to date!</p>";' +
     'html+="</div></div></div>";' +
-    // Recent Meeting Attendees section
-    'html+="<div class=\\"charts-row\\"><div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">groups</i>Recent Meeting Attendees</span><span class=\\"trend-value purple\\">"+eng.recentMeetingAttendees.length+"</span></div><div class=\\"trend-list\\">";' +
+    // Meeting Attendees
+    'html+="<div class=\\"charts-row\\"><div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">groups</i>Recent Meeting Attendees</span><span class=\\"trend-value purple\\">"+fmt(eng.recentMeetingAttendees.length)+"</span></div><div class=\\"trend-list\\">";' +
     'eng.recentMeetingAttendees.slice(0,8).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+"</span><span style=\\"color:"+(m.type==="Virtual"?"#60a5fa":"#22c55e")+"\\">"+m.type+"</span></div>"});' +
     'if(eng.recentMeetingAttendees.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent meeting attendance data</p>";' +
-    'html+="</div></div>";' +
-    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">groups</i>Members by Unit</div><canvas id=\\"unitDistChart\\"></canvas></div></div>";' +
+    'html+="</div></div><div class=\\"chart-card\\"></div></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderDirectoryCharts()' +
     '}' +
 
-    // Hot Spots Tab
+    // Hot Spots Tab with Heatmap Colors
     'else if(tab==="hotspots"){' +
+    'var maxCases=d.hotZones.length>0?Math.max.apply(null,d.hotZones.map(function(h){return h.count})):0;' +
+    'var minCases=d.hotZones.length>0?Math.min.apply(null,d.hotZones.map(function(h){return h.count})):0;' +
+    'function getHeatColor(count){if(maxCases===minCases)return"#FEF3C7";var pct=(count-minCases)/(maxCases-minCases);if(pct<=0.5){var r=Math.round(209+(254-209)*pct*2);var g=Math.round(250+(243-250)*pct*2);var b=Math.round(229+(199-229)*pct*2);return"rgb("+r+","+g+","+b+")"}else{var p=(pct-0.5)*2;var r=Math.round(254+(252-254)*p);var g=Math.round(243+(165-243)*p);var b=Math.round(199+(165-199)*p);return"rgb("+r+","+g+","+b+")"}}' +
     'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">local_fire_department</i>Hot Zones (3+ Active Cases)</div>";' +
+    'html+="<div style=\\"display:flex;gap:4px;margin:12px 0;font-size:10px;align-items:center\\"><span style=\\"color:#94a3b8\\">Low</span><div style=\\"display:flex;height:12px\\"><div style=\\"width:20px;background:#D1FAE5\\"></div><div style=\\"width:20px;background:#E5F7E5\\"></div><div style=\\"width:20px;background:#FEF3C7\\"></div><div style=\\"width:20px;background:#FDE5B0\\"></div><div style=\\"width:20px;background:#FCA5A5\\"></div></div><span style=\\"color:#94a3b8\\">High</span></div>";' +
     'if(d.hotZones.length===0){html+="<div style=\\"text-align:center;padding:40px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:48px\\">check_circle</i><p style=\\"margin-top:12px\\">No hot zones detected - All clear!</p></div>"}' +
-    'else{d.hotZones.forEach(function(h){html+="<div class=\\"hot-zone\\"><span>"+h.location+"</span><span class=\\"badge\\" style=\\"background:#ef4444;color:white\\">"+h.count+" cases</span></div>"})}' +
+    'else{d.hotZones.sort(function(a,b){return b.count-a.count}).forEach(function(h){var bgColor=getHeatColor(h.count);var textColor=(h.count-minCases)/(maxCases-minCases||1)>0.6?"#fff":"#1e293b";html+="<div class=\\"hot-zone\\" style=\\"background:"+bgColor+";border-left-color:"+bgColor+"\\"><span style=\\"color:"+textColor+"\\">"+h.location+"</span><span class=\\"badge\\" style=\\"background:rgba(0,0,0,0.2);color:"+textColor+"\\">"+h.count+" cases</span></div>"})}' +
     'html+="</div>";' +
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Cases by Location</div><canvas id=\\"hotspotChart\\"></canvas></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderHotspotChart()' +
@@ -8275,25 +8772,48 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("main-content").innerHTML=html;renderBargainCharts()' +
     '}' +
 
-    // Satisfaction Tab (Enhanced)
+    // Satisfaction Tab (Enhanced with Insights)
     'else if(tab==="satisfaction"){' +
-    'var sat=d.satisfactionData;' +
-    'html="<div class=\\"sat-header\\"><h2 style=\\"color:#e2e8f0;font-size:16px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">sentiment_satisfied</i>Member Satisfaction Analysis</h2><span class=\\"sat-response-count\\">"+sat.responseCount+" Responses ("+d.engagement.surveyResponseRate+"% response rate)</span></div>";' +
+    'var sat=d.satisfactionData||{responseCount:0,sections:[]};' +
+    'var surveyRate=d.engagement?d.engagement.surveyResponseRate:0;' +
+    'html="<div class=\\"sat-header\\"><h2 style=\\"color:#e2e8f0;font-size:16px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">sentiment_satisfied</i>Member Satisfaction Analysis</h2><span class=\\"sat-response-count\\">"+sat.responseCount+" Responses ("+surveyRate+"% response rate)</span></div>";' +
+    'if(!sat.sections||sat.sections.length===0){html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#64748b\\">poll</i><p style=\\"color:#94a3b8;margin-top:16px\\">No satisfaction survey data available yet.</p></div>"}' +
+    'else{' +
+    // Calculate insights
+    'var avgScore=sat.sections.reduce(function(s,sec){return s+sec.score},0)/sat.sections.length;' +
+    'var sorted=sat.sections.slice().sort(function(a,b){return b.score-a.score});' +
+    'var best=sorted[0];var worst=sorted[sorted.length-1];' +
+    'var avgColor=avgScore>=7?"#22c55e":avgScore>=5?"#f59e0b":"#ef4444";' +
+    // KPI row with overall score and insights
+    'html+="<div class=\\"kpi-grid\\" style=\\"grid-template-columns:repeat(4,1fr);margin-bottom:20px\\">";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Overall Score</div><div class=\\"kpi-value\\" style=\\"color:"+avgColor+"\\">"+avgScore.toFixed(1)+"</div><div style=\\"font-size:10px;color:#64748b\\">out of 10</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Best Area</div><div style=\\"font-size:14px;font-weight:700;color:#22c55e\\">"+best.name+"</div><div style=\\"font-size:10px;color:#64748b\\">"+best.score+"/10</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Needs Focus</div><div style=\\"font-size:14px;font-weight:700;color:"+(worst.score<5?"#ef4444":"#f59e0b")+"\\">"+worst.name+"</div><div style=\\"font-size:10px;color:#64748b\\">"+worst.score+"/10</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale Score</div><div class=\\"kpi-value\\" style=\\"color:"+(d.moraleScore>=7?"#22c55e":d.moraleScore>=5?"#f59e0b":"#ef4444")+"\\">"+d.moraleScore+"</div><div style=\\"font-size:10px;color:#64748b\\">Trust Index</div></div></div>";' +
+    // Insights box
+    'html+="<div class=\\"chart-card\\" style=\\"margin-bottom:16px;background:linear-gradient(135deg,rgba(96,165,250,0.1),rgba(139,92,246,0.1))\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">lightbulb</i>Key Insights</div><div style=\\"display:grid;grid-template-columns:1fr 1fr;gap:12px\\">";' +
+    'html+="<div style=\\"padding:12px;background:rgba(34,197,94,0.1);border-radius:8px;border-left:3px solid #22c55e\\"><div style=\\"font-size:11px;color:#22c55e;font-weight:600\\">STRENGTH</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+best.name+" rated highest at "+best.score+"/10</div></div>";' +
+    'html+="<div style=\\"padding:12px;background:rgba("+(worst.score<5?"239,68,68":"245,158,11")+",0.1);border-radius:8px;border-left:3px solid "+(worst.score<5?"#ef4444":"#f59e0b")+"\\"><div style=\\"font-size:11px;color:"+(worst.score<5?"#ef4444":"#f59e0b")+";font-weight:600\\">OPPORTUNITY</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+worst.name+" at "+worst.score+"/10 needs attention</div></div>";' +
+    'var highCount=sat.sections.filter(function(s){return s.score>=7}).length;var lowCount=sat.sections.filter(function(s){return s.score<5}).length;' +
+    'html+="<div style=\\"padding:12px;background:rgba(96,165,250,0.1);border-radius:8px;border-left:3px solid #60a5fa\\"><div style=\\"font-size:11px;color:#60a5fa;font-weight:600\\">SUMMARY</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+highCount+" of 8 areas rated Good (7+)</div></div>";' +
+    'html+="<div style=\\"padding:12px;background:rgba(139,92,246,0.1);border-radius:8px;border-left:3px solid #8b5cf6\\"><div style=\\"font-size:11px;color:#8b5cf6;font-weight:600\\">ACTION ITEMS</div><div style=\\"font-size:13px;color:#e2e8f0;margin-top:4px\\">"+(lowCount>0?lowCount+" areas need immediate improvement":"All areas above minimum threshold")+"</div></div></div></div>";' +
+    // Section details grid
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:16px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">assessment</i>Section Breakdown</h3>";' +
     'html+="<div class=\\"sat-grid\\">";' +
     'sat.sections.forEach(function(section){' +
     'var scoreColor=section.score>=7?"#22c55e":section.score>=5?"#f59e0b":"#ef4444";' +
     'var pct=(section.score/10)*100;' +
-    'html+="<div class=\\"sat-section\\"><div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">"+section.name+"</span><span class=\\"sat-section-score\\" style=\\"color:"+scoreColor+"\\">"+section.score+"/10</span></div>";' +
+    'var rank=sorted.indexOf(section)+1;' +
+    'html+="<div class=\\"sat-section\\"><div class=\\"sat-section-header\\"><span class=\\"sat-section-name\\">"+section.name+"<span style=\\"font-size:10px;color:#64748b;margin-left:6px\\">#"+rank+"</span></span><span class=\\"sat-section-score\\" style=\\"color:"+scoreColor+"\\">"+(section.score||0)+"/10</span></div>";' +
     'html+="<div class=\\"sat-score-bar\\"><div class=\\"sat-score-fill\\" style=\\"width:"+pct+"%;background:"+scoreColor+"\\"></div></div>";' +
-    'html+="<div class=\\"sat-questions\\">";' +
-    'section.questions.forEach(function(q){html+=q+", "});' +
-    'html=html.slice(0,-2)+"</div></div>"});' +
+    'if(section.questions&&section.questions.length>0){html+="<div class=\\"sat-questions\\">"+section.questions.join(", ")+"</div>"}' +
+    'html+="</div>"});' +
     'html+="</div>";' +
-    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Scores Comparison</div><canvas id=\\"satChart\\"></canvas></div>";' +
-    'document.getElementById("main-content").innerHTML=html;renderSatisfactionChart()' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">bar_chart</i>Section Scores Comparison</div><canvas id=\\"satChart\\"></canvas></div>"}' +
+    'document.getElementById("main-content").innerHTML=html;if(sat.sections&&sat.sections.length>0)renderSatisfactionChart()' +
     '}' +
 
-    // Resources Tab (NEW)
+    // Resources Tab (Enhanced with Steward Directory)
     'else if(tab==="resources"){' +
     'var dr=d.driveResources;' +
     'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">folder</i>Union Resources</h2>";' +
@@ -8301,12 +8821,117 @@ function getUnifiedDashboardHtml(isPII) {
     'if(dr.folderUrl){html+="<a href=\\""+dr.folderUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}' +
     'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contract PDF\\x27)\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
     'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Forms\\x27)\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contact Directory\\x27)\\"><div class=\\"resource-icon\\">📞</div><div class=\\"resource-title\\">Contacts</div><div class=\\"resource-desc\\">Steward and rep contact info</div></div>";' +
     'html+="</div>";' +
-    'if(dr.recentFiles.length>0){' +
+    // Steward Contact Directory with Smart Search
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">contacts</i>Steward Contact Directory</div>";' +
+    'html+="<div style=\\"position:relative\\"><input type=\\"text\\" id=\\"stewardSearch\\" placeholder=\\"Start typing to search stewards...\\" oninput=\\"smartFilterStewards()\\" onfocus=\\"showSearchSuggestions()\\" autocomplete=\\"off\\" style=\\"width:100%;padding:10px 10px 10px 36px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><i class=\\"material-icons\\" style=\\"position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#64748b;font-size:18px\\">search</i><div id=\\"searchSuggestions\\" style=\\"display:none;position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #475569;border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.3)\\"></div></div>";' +
+    'html+="<div style=\\"display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap\\"><span style=\\"color:#64748b;font-size:11px\\">Quick filters:</span>";' +
+    'var locations=[...new Set(d.stewardList.map(function(s){return s.location}))].filter(Boolean).slice(0,5);' +
+    'locations.forEach(function(loc){html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px\\" onclick=\\"quickFilterSteward(\\x27"+loc+"\\x27)\\">"+loc+"</button>"});' +
+    'html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px;background:#475569\\" onclick=\\"clearStewardFilter()\\">Clear</button></div>";' +
+    'html+="<div id=\\"stewardList\\" class=\\"list-container\\" style=\\"max-height:300px\\">";' +
+    'if(d.stewardList&&d.stewardList.length>0){d.stewardList.forEach(function(s){' +
+    'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase()+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+s.name+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" onclick=\\"saveStewardContact(\\x27"+s.name+"\\x27,\\x27"+(s.email||"")+"\\x27,\\x27"+(s.phone||"")+"\\x27)\\">Save Contact</button></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+s.location+" | "+s.unit+"</div>";' +
+    'if(s.email){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#60a5fa\\">email</i> <a href=\\"mailto:"+s.email+"\\" style=\\"color:#60a5fa\\">"+s.email+"</a></div>"}' +
+    'if(s.phone){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#22c55e\\">phone</i> <a href=\\"tel:"+s.phone+"\\" style=\\"color:#22c55e\\">"+s.phone+"</a></div>"}' +
+    'html+="</div>"})}' +
+    'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">No steward contacts available</p>"}' +
+    'html+="</div></div>";' +
+    'if(dr.recentFiles&&dr.recentFiles.length>0){' +
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">description</i>Recent Files</div><div class=\\"list-container\\">";' +
     'dr.recentFiles.forEach(function(f){html+="<a href=\\""+f.url+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+f.name+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"});' +
     'html+="</div></div>"}' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+
+    // Compare Tab - Metrics Comparison Tool
+    'else if(tab==="compare"){' +
+    'function fmt(n){return typeof n==="number"?(n>=1000?n.toLocaleString():n):n}' +
+    'var metrics=[' +
+    '{id:"totalMembers",label:"Total Members",value:d.totalMembers,category:"Membership"},' +
+    '{id:"stewardCount",label:"Steward Count",value:d.stewardCount,category:"Membership"},' +
+    '{id:"stewardRatio",label:"Steward:Member Ratio",value:d.stewardRatio,category:"Membership"},' +
+    '{id:"totalCases",label:"Total Grievances",value:d.totalCases,category:"Grievances"},' +
+    '{id:"openCases",label:"Open Cases",value:d.openCases,category:"Grievances"},' +
+    '{id:"pendingCases",label:"Pending Cases",value:d.pendingCases,category:"Grievances"},' +
+    '{id:"winRate",label:"Win Rate",value:d.winRate+"%",category:"Grievances"},' +
+    '{id:"wins",label:"Cases Won",value:d.wins,category:"Grievances"},' +
+    '{id:"losses",label:"Cases Denied",value:d.losses,category:"Grievances"},' +
+    '{id:"settled",label:"Cases Settled",value:d.settled,category:"Grievances"},' +
+    '{id:"avgDaysToResolve",label:"Avg Days to Resolve",value:d.avgDaysToResolve,category:"Performance"},' +
+    '{id:"moraleScore",label:"Morale Score",value:d.moraleScore+"/10",category:"Satisfaction"},' +
+    '{id:"emailOpenRate",label:"Email Open Rate",value:d.engagement.emailOpenRate+"%",category:"Engagement"},' +
+    '{id:"virtualMeetingRate",label:"Virtual Meeting Attendance",value:d.engagement.virtualMeetingRate+"%",category:"Engagement"},' +
+    '{id:"inPersonMeetingRate",label:"In-Person Meeting Attendance",value:d.engagement.inPersonMeetingRate+"%",category:"Engagement"},' +
+    '{id:"surveyResponseRate",label:"Survey Response Rate",value:d.engagement.surveyResponseRate+"%",category:"Engagement"},' +
+    '{id:"overdueCount",label:"Overdue Cases",value:d.overdueCount,category:"Alerts"}' +
+    '];' +
+    'var categories=["Membership","Grievances","Performance","Satisfaction","Engagement","Alerts"];' +
+    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">compare_arrows</i>Metrics Comparison Tool</div>";' +
+    'html+="<p style=\\"color:#94a3b8;margin-bottom:16px;font-size:13px\\">Select metrics to compare and export. Choose multiple metrics to generate a comparison report.</p>";' +
+    'html+="<div style=\\"display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap\\"><button class=\\"btn btn-sm\\" onclick=\\"selectAllMetrics()\\">Select All</button><button class=\\"btn btn-sm\\" onclick=\\"clearAllMetrics()\\">Clear All</button><button class=\\"btn\\" style=\\"background:#22c55e\\" onclick=\\"exportComparison()\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:4px\\">download</i>Export Selected</button></div>";' +
+    'categories.forEach(function(cat){' +
+    'html+="<div style=\\"margin-bottom:16px\\"><div style=\\"font-weight:600;color:#e2e8f0;margin-bottom:8px;font-size:13px\\"><i class=\\"material-icons\\" style=\\"font-size:16px;vertical-align:middle;margin-right:4px;color:#60a5fa\\">folder</i>"+cat+"</div>";' +
+    'html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px\\">";' +
+    'metrics.filter(function(m){return m.category===cat}).forEach(function(m){' +
+    'html+="<label style=\\"display:flex;align-items:center;gap:8px;background:#1e293b;padding:10px;border-radius:8px;cursor:pointer;border:1px solid #334155\\"><input type=\\"checkbox\\" class=\\"metric-check\\" data-id=\\""+m.id+"\\" data-label=\\""+m.label+"\\" data-value=\\""+m.value+"\\" data-category=\\""+m.category+"\\"><span style=\\"flex:1;font-size:12px\\">"+m.label+"</span><span style=\\"font-weight:600;color:#60a5fa\\">"+fmt(m.value)+"</span></label>"});' +
+    'html+="</div></div>"});' +
+    'html+="</div>";' +
+    'html+="<div id=\\"comparison-preview\\" class=\\"chart-card\\" style=\\"margin-top:16px;display:none\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">preview</i>Comparison Preview</div><div id=\\"preview-content\\"></div></div>";' +
+    'document.getElementById("main-content").innerHTML=html;' +
+    'document.querySelectorAll(".metric-check").forEach(function(cb){cb.addEventListener("change",updateComparisonPreview)})' +
+    '}' +
+
+    // Help Tab - Comprehensive FAQ & Tutorials (Steward only)
+    'else if(tab==="help"&&isPII){' +
+    'var faqData=[' +
+    '{cat:"Getting Started",q:"How do I navigate the dashboard?",a:"Use the tabs at the top to switch between views. Overview shows key metrics, Workload shows steward assignments, Analytics shows trends and charts, and other tabs provide detailed breakdowns.",tutorial:true},' +
+    '{cat:"Getting Started",q:"What is the difference between Steward and Member dashboards?",a:"The Steward Dashboard shows full PII (names, contact info) and has the Help tab. The Member Dashboard anonymizes data for public sharing but shows the same analytics.",tutorial:true},' +
+    '{cat:"Getting Started",q:"How often does the data refresh?",a:"Data refreshes each time you load the dashboard. Click the Refresh button in the footer to reload the latest data.",tutorial:false},' +
+    '{cat:"Grievance Management",q:"How do I track my assigned cases?",a:"Go to the My Cases tab to see all grievances assigned to you. Filter by status using the buttons at the top.",tutorial:true},' +
+    '{cat:"Grievance Management",q:"What do the grievance statuses mean?",a:"Open = Active case, Pending = Awaiting response, Won = Resolved in member favor, Denied = Management decision upheld, Settled = Negotiated resolution, Withdrawn = Case dropped.",tutorial:false},' +
+    '{cat:"Grievance Management",q:"How is the win rate calculated?",a:"Win Rate = (Won + Settled) / Total Resolved cases. Only closed cases are counted.",tutorial:false},' +
+    '{cat:"Analytics",q:"What does the Morale Score represent?",a:"The Morale Score is the average Trust Score (Q7) from member satisfaction surveys, on a scale of 1-10.",tutorial:false},' +
+    '{cat:"Analytics",q:"How do I interpret the Hot Spots?",a:"Hot Spots show locations with 3+ active cases. Red/orange colors indicate higher case counts. Focus resources on these areas.",tutorial:true},' +
+    '{cat:"Analytics",q:"What are the engagement metrics?",a:"Email Open Rate = % who opened union emails. Meeting Attendance = % who attended meetings in last 6 months. Survey Response = % who completed satisfaction survey.",tutorial:false},' +
+    '{cat:"Member Directory",q:"How do I find a specific member?",a:"Use the search field in the steward contact section or the filter in list views. Search works on names, locations, and units.",tutorial:false},' +
+    '{cat:"Member Directory",q:"What do the participation heatmaps show?",a:"Heatmaps show engagement levels by unit or location. Green = high engagement (60%+), Yellow = moderate (40-60%), Red = low (<40%).",tutorial:true},' +
+    '{cat:"Satisfaction",q:"How are satisfaction scores calculated?",a:"Each section score is the average of related survey questions (1-10 scale). Overall Score combines all sections weighted equally.",tutorial:false},' +
+    '{cat:"Satisfaction",q:"What is the Key Insights section?",a:"Key Insights automatically identifies your strongest area, biggest opportunity, and suggests action items based on survey data.",tutorial:true},' +
+    '{cat:"Comparison Tool",q:"How do I use the Compare tab?",a:"Select metrics you want to compare using checkboxes, then click Export to download a CSV file with your selected data.",tutorial:true},' +
+    '{cat:"Comparison Tool",q:"Can I export data for reports?",a:"Yes! Use the Compare tab to select metrics, then Export. The CSV can be opened in Excel or Google Sheets for further analysis.",tutorial:false},' +
+    '{cat:"Troubleshooting",q:"Data is not loading",a:"Try clicking Refresh in the footer. If that fails, close and reopen the dashboard. Check your network connection.",tutorial:false},' +
+    '{cat:"Troubleshooting",q:"Charts are not displaying",a:"Ensure JavaScript is enabled in your browser. Try a different browser (Chrome recommended). Clear browser cache if issues persist.",tutorial:false}' +
+    '];' +
+    'var features=[' +
+    '{name:"Overview Tab",desc:"At-a-glance KPIs including total members, open cases, win rate, morale score. Quick status cards and trend charts.",icon:"dashboard"},' +
+    '{name:"My Cases Tab",desc:"View and filter grievances assigned to you. See case details, timelines, and status updates.",icon:"assignment_ind"},' +
+    '{name:"Workload Tab",desc:"Steward workload distribution and top performers. Identify imbalances and reassignment opportunities.",icon:"work"},' +
+    '{name:"Analytics Tab",desc:"Deep-dive charts: cases by category, step progression, outcomes, and member satisfaction trends.",icon:"analytics"},' +
+    '{name:"Directory Tab",desc:"Member distribution by location, unit, and office days. Participation heatmaps and satisfaction breakdowns.",icon:"people"},' +
+    '{name:"Hot Spots Tab",desc:"Locations with high case concentrations. Heatmap colors show severity. Prioritize these areas.",icon:"whatshot"},' +
+    '{name:"Bargaining Tab",desc:"Contract-related metrics for bargaining preparation. Category breakdowns and resolution patterns.",icon:"handshake"},' +
+    '{name:"Satisfaction Tab",desc:"Member survey results with section scores, key insights, and actionable recommendations.",icon:"sentiment_satisfied"},' +
+    '{name:"Resources Tab",desc:"Quick links to contract, forms, and resources. Searchable steward contact directory.",icon:"folder"},' +
+    '{name:"Compare Tab",desc:"Select multiple metrics to compare side-by-side. Export data as CSV for reporting.",icon:"compare"}' +
+    '];' +
+    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">search</i>Search Help</div>";' +
+    'html+="<input type=\\"text\\" id=\\"faqSearch\\" placeholder=\\"Search FAQs, tutorials, and features...\\" oninput=\\"filterFAQ()\\" style=\\"width:100%;padding:12px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:14px;margin-bottom:8px\\">";' +
+    'html+="<div style=\\"display:flex;gap:8px;flex-wrap:wrap\\"><button class=\\"btn btn-sm faq-filter active\\" onclick=\\"setFAQFilter(\\x27all\\x27,this)\\">All</button><button class=\\"btn btn-sm faq-filter\\" onclick=\\"setFAQFilter(\\x27tutorial\\x27,this)\\">Tutorials Only</button><button class=\\"btn btn-sm faq-filter\\" onclick=\\"setFAQFilter(\\x27features\\x27,this)\\">Features</button></div></div>";' +
+    // Feature Breakdown
+    'html+="<div id=\\"features-section\\" class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">apps</i>Feature Breakdown</div><div class=\\"feature-grid\\" style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px\\">";' +
+    'features.forEach(function(f){html+="<div class=\\"feature-item\\" style=\\"background:#1e293b;padding:12px;border-radius:8px;border:1px solid #334155\\"><div style=\\"display:flex;align-items:center;gap:8px;margin-bottom:6px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">"+f.icon+"</i><span style=\\"font-weight:600;color:#e2e8f0\\">"+f.name+"</span></div><p style=\\"color:#94a3b8;font-size:12px;margin:0;line-height:1.4\\">"+f.desc+"</p></div>"});' +
+    'html+="</div></div>";' +
+    // FAQ Section
+    'html+="<div id=\\"faq-section\\" class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">help_outline</i>Frequently Asked Questions</div><div id=\\"faq-list\\">";' +
+    'var cats=["Getting Started","Grievance Management","Analytics","Member Directory","Satisfaction","Comparison Tool","Troubleshooting"];' +
+    'cats.forEach(function(cat){' +
+    'var catFaqs=faqData.filter(function(f){return f.cat===cat});' +
+    'if(catFaqs.length>0){html+="<div class=\\"faq-category\\" style=\\"margin-bottom:16px\\"><div style=\\"font-weight:600;color:#a78bfa;margin-bottom:8px;font-size:13px\\">"+cat+"</div>";' +
+    'catFaqs.forEach(function(f){html+="<div class=\\"faq-item\\" data-searchable=\\""+f.q.toLowerCase()+" "+f.a.toLowerCase()+"\\" data-tutorial=\\""+(f.tutorial?"yes":"no")+"\\" style=\\"background:#1e293b;padding:12px;border-radius:8px;margin-bottom:8px;border-left:3px solid "+(f.tutorial?"#22c55e":"#475569")+"\\"><div style=\\"font-weight:500;color:#e2e8f0;margin-bottom:6px;display:flex;align-items:center;gap:6px\\">"+(f.tutorial?"<span style=\\"background:#22c55e;color:white;font-size:9px;padding:2px 6px;border-radius:4px\\">TUTORIAL</span>":"")+""+f.q+"</div><p style=\\"color:#94a3b8;font-size:12px;margin:0;line-height:1.5\\">"+f.a+"</p></div>"});' +
+    'html+="</div>"}});' +
+    'html+="</div></div>";' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
     '}' +
@@ -8314,13 +8939,16 @@ function getUnifiedDashboardHtml(isPII) {
     // Chart rendering functions
     'function renderOverviewCharts(){' +
     'var d=dashData;' +
-    'new Chart(document.getElementById("statusChart"),{type:"doughnut",data:{labels:["Open","Pending","Won","Denied","Settled","Withdrawn"],datasets:[{data:[d.statusDistribution.open,d.statusDistribution.pending,d.statusDistribution.won,d.statusDistribution.denied,d.statusDistribution.settled,d.statusDistribution.withdrawn],backgroundColor:["#3b82f6","#f59e0b","#22c55e","#ef4444","#8b5cf6","#64748b"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:11}}}}}});' +
+    // Status chart with drill-down
+    'var statusKeys=["open","pending","won","denied","settled","withdrawn"];' +
+    'var statusChart=new Chart(document.getElementById("statusChart"),{type:"doughnut",data:{labels:["Open","Pending","Won","Denied","Settled","Withdrawn"],datasets:[{data:[d.statusDistribution.open,d.statusDistribution.pending,d.statusDistribution.won,d.statusDistribution.denied,d.statusDistribution.settled,d.statusDistribution.withdrawn],backgroundColor:["#3b82f6","#f59e0b","#22c55e","#ef4444","#8b5cf6","#64748b"]}]},options:{responsive:true,onClick:function(e,el){if(el.length>0){var idx=el[0].index;showChartDrillDown("status",statusKeys[idx],statusChart.data.labels[idx]+" Cases")}},plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:11}}}}}});' +
     'var trendLabels=d.sentimentTrend.length>0?d.sentimentTrend.map(function(t){return t.month}):["Jan","Feb","Mar"];' +
     'var trendData=d.sentimentTrend.length>0?d.sentimentTrend.map(function(t){return t.score}):[7,7.2,7.5];' +
     'new Chart(document.getElementById("trendChart"),{type:"line",data:{labels:trendLabels,datasets:[{label:"Trust Score",data:trendData,borderColor:"#a78bfa",backgroundColor:"rgba(167,139,250,0.2)",fill:true,tension:0.4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:0,max:10,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
     'var locLabels=Object.keys(d.locationBreakdown).slice(0,8);' +
     'var locData=locLabels.map(function(l){return d.locationBreakdown[l]});' +
-    'new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
+    // Location chart with drill-down
+    'var locChart=new Chart(document.getElementById("locationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",onClick:function(e,el){if(el.length>0){var idx=el[0].index;showChartDrillDown("unit",locLabels[idx],"Members in "+locLabels[idx])}},plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}});' +
     'var filingLabels=d.monthlyFilings.map(function(f){return f.month});' +
     'var filingData=d.monthlyFilings.map(function(f){return f.count});' +
     'var resolvedData=d.monthlyResolved?d.monthlyResolved.map(function(f){return f.count}):[];' +
@@ -8331,26 +8959,53 @@ function getUnifiedDashboardHtml(isPII) {
     'var d=dashData;' +
     'var unitLabels=Object.keys(d.unitBreakdown).slice(0,8);' +
     'var unitData=unitLabels.map(function(u){return d.unitBreakdown[u]});' +
-    'new Chart(document.getElementById("unitChart"),{type:"doughnut",data:{labels:unitLabels,datasets:[{data:unitData,backgroundColor:["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"]}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
-    'new Chart(document.getElementById("outcomeChart"),{type:"bar",data:{labels:["Won","Denied","Settled"],datasets:[{label:"Cases",data:[d.wins,d.losses,d.settled],backgroundColor:["#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
+    // Unit chart with drill-down
+    'var unitChart=new Chart(document.getElementById("unitChart"),{type:"doughnut",data:{labels:unitLabels,datasets:[{data:unitData,backgroundColor:["#3b82f6","#22c55e","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"]}]},options:{responsive:true,onClick:function(e,el){if(el.length>0){var idx=el[0].index;showChartDrillDown("unit",unitLabels[idx],"Members in "+unitLabels[idx])}},plugins:{legend:{position:"right",labels:{color:"#cbd5e1",font:{size:10}}}}}});' +
+    // Outcomes chart with drill-down
+    'var outcomeKeys=["won","denied","settled"];' +
+    'new Chart(document.getElementById("outcomeChart"),{type:"bar",data:{labels:["Won","Denied","Settled"],datasets:[{label:"Cases",data:[d.wins,d.losses,d.settled],backgroundColor:["#22c55e","#ef4444","#8b5cf6"]}]},options:{responsive:true,onClick:function(e,el){if(el.length>0){var idx=el[0].index;showChartDrillDown("status",outcomeKeys[idx],["Won","Denied","Settled"][idx]+" Cases")}},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}});' +
     'var catLabels=Object.keys(d.grievancesByCategory).slice(0,6);' +
     'var catData=catLabels.map(function(c){return d.grievancesByCategory[c]});' +
-    'new Chart(document.getElementById("categoryChart"),{type:"bar",data:{labels:catLabels.length>0?catLabels:["Discipline","Contract","Safety"],datasets:[{label:"Cases",data:catData.length>0?catData:[3,5,2],backgroundColor:"#06b6d4"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8",maxRotation:45}}}}});' +
+    // Category chart with drill-down
+    'new Chart(document.getElementById("categoryChart"),{type:"bar",data:{labels:catLabels.length>0?catLabels:["Discipline","Contract","Safety"],datasets:[{label:"Cases",data:catData.length>0?catData:[3,5,2],backgroundColor:"#06b6d4"}]},options:{responsive:true,onClick:function(e,el){if(el.length>0&&catLabels.length>0){var idx=el[0].index;showChartDrillDown("category",catLabels[idx],catLabels[idx]+" Cases")}},plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8",maxRotation:45}}}}});' +
     'new Chart(document.getElementById("stepChart"),{type:"bar",data:{labels:["Step 1","Step 2","Step 3","Arbitration"],datasets:[{label:"Cases",data:[d.stepProgression.step1,d.stepProgression.step2,d.stepProgression.step3,d.stepProgression.arb],backgroundColor:["#3b82f6","#f59e0b","#ef4444","#8b5cf6"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8"}}}}})' +
     '}' +
 
     'function renderDirectoryCharts(){' +
     'var d=dashData;' +
+    // Employees by Location chart
+    'var locLabels=Object.keys(d.locationBreakdown).slice(0,10);' +
+    'var locData=locLabels.map(function(l){return d.locationBreakdown[l]});' +
+    'if(document.getElementById("empByLocationChart")){new Chart(document.getElementById("empByLocationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Employees",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{color:"#94a3b8",callback:function(v){return v>=1000?v.toLocaleString():v}}},y:{ticks:{color:"#cbd5e1"}}}}})}' +
+    // Employees by Unit chart
     'var unitLabels=Object.keys(d.unitBreakdown).slice(0,10);' +
     'var unitData=unitLabels.map(function(u){return d.unitBreakdown[u]});' +
-    'new Chart(document.getElementById("unitDistChart"),{type:"bar",data:{labels:unitLabels,datasets:[{label:"Members",data:unitData,backgroundColor:"#60a5fa"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8",maxRotation:45}}}}})' +
+    'if(document.getElementById("empByUnitChart")){new Chart(document.getElementById("empByUnitChart"),{type:"bar",data:{labels:unitLabels,datasets:[{label:"Employees",data:unitData,backgroundColor:"#8b5cf6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{color:"#94a3b8",callback:function(v){return v>=1000?v.toLocaleString():v}}},y:{ticks:{color:"#cbd5e1"}}}}})}' +
+    // Employees by Office Days chart
+    'var dayOrder=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];' +
+    'var dayLabels=Object.keys(d.officeDaysBreakdown).sort(function(a,b){return dayOrder.indexOf(a)-dayOrder.indexOf(b)});' +
+    'var dayData=dayLabels.map(function(day){return d.officeDaysBreakdown[day]});' +
+    'if(document.getElementById("empByOfficeDaysChart")&&dayLabels.length>0){new Chart(document.getElementById("empByOfficeDaysChart"),{type:"bar",data:{labels:dayLabels,datasets:[{label:"Employees",data:dayData,backgroundColor:["#ef4444","#f59e0b","#22c55e","#3b82f6","#8b5cf6","#ec4899","#06b6d4"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8",callback:function(v){return v>=1000?v.toLocaleString():v}}},x:{ticks:{color:"#cbd5e1"}}}}})}' +
+    // Satisfaction by Unit/Role chart
+    'var satUnitLabels=Object.keys(d.satisfactionByUnit).slice(0,8);' +
+    'var satUnitData=satUnitLabels.map(function(u){return d.satisfactionByUnit[u].score});' +
+    'var satUnitColors=satUnitData.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444"});' +
+    'if(document.getElementById("satByUnitChart")&&satUnitLabels.length>0){new Chart(document.getElementById("satByUnitChart"),{type:"bar",data:{labels:satUnitLabels,datasets:[{label:"Score",data:satUnitData,backgroundColor:satUnitColors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}})}' +
+    // Satisfaction by Location chart
+    'var satLocLabels=Object.keys(d.satisfactionByLocation).slice(0,8);' +
+    'var satLocData=satLocLabels.map(function(l){return d.satisfactionByLocation[l].score});' +
+    'var satLocColors=satLocData.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444"});' +
+    'if(document.getElementById("satByLocationChart")&&satLocLabels.length>0){new Chart(document.getElementById("satByLocationChart"),{type:"bar",data:{labels:satLocLabels,datasets:[{label:"Score",data:satLocData,backgroundColor:satLocColors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}})}' +
     '}' +
 
     'function renderHotspotChart(){' +
     'var d=dashData;' +
     'var locLabels=Object.keys(d.locationBreakdown).slice(0,10);' +
     'var locData=locLabels.map(function(l){return d.locationBreakdown[l]});' +
-    'new Chart(document.getElementById("hotspotChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Members",data:locData,backgroundColor:locData.map(function(v){return v>=3?"#ef4444":"#3b82f6"})}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}})' +
+    'var maxVal=Math.max.apply(null,locData)||1;var minVal=Math.min.apply(null,locData)||0;' +
+    'function heatColor(v){var pct=(v-minVal)/(maxVal-minVal||1);if(pct<=0.5){return"rgba("+(209+Math.round((254-209)*pct*2))+","+(250+Math.round((243-250)*pct*2))+","+(229+Math.round((199-229)*pct*2))+",0.9)"}else{var p=(pct-0.5)*2;return"rgba("+(254+Math.round((252-254)*p))+","+(243+Math.round((165-243)*p))+","+(199+Math.round((165-199)*p))+",0.9)"}}' +
+    'var barColors=locData.map(function(v){return heatColor(v)});' +
+    'new Chart(document.getElementById("hotspotChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Cases",data:locData,backgroundColor:barColors,borderColor:barColors.map(function(c){return c.replace("0.9","1")}),borderWidth:1}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1"}}}}})' +
     '}' +
 
     'function renderBargainCharts(){' +
@@ -8414,6 +9069,351 @@ function getUnifiedDashboardHtml(isPII) {
     'else{el.style.display=el.getAttribute("data-status").toLowerCase().indexOf(status.toLowerCase())>=0?"flex":"none"}' +
     '})' +
     '}' +
+
+    // Filter Stewards by search (v4.4.0)
+    'function filterStewards(){' +
+    'var q=document.getElementById("stewardSearch").value.toLowerCase();' +
+    'document.querySelectorAll(".steward-contact").forEach(function(el){' +
+    'el.style.display=el.getAttribute("data-search").indexOf(q)>=0?"flex":"none"' +
+    '})' +
+    '}' +
+    // Smart steward search with autocomplete
+    'function smartFilterStewards(){' +
+    'var q=document.getElementById("stewardSearch").value.toLowerCase();' +
+    'var suggestions=document.getElementById("searchSuggestions");' +
+    'filterStewards();' +
+    'if(q.length<2){suggestions.style.display="none";return}' +
+    'var matches=[];' +
+    'document.querySelectorAll(".steward-contact").forEach(function(el){' +
+    'var searchable=el.getAttribute("data-search")||"";' +
+    'if(searchable.indexOf(q)>=0){' +
+    'var name=el.querySelector("span[style*=\\"font-weight\\"]");' +
+    'if(name)matches.push(name.textContent)}' +
+    '});' +
+    'if(matches.length>0&&matches.length<10){' +
+    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+m+"</div>"}).join("");' +
+    'suggestions.style.display="block"}else{suggestions.style.display="none"}' +
+    '}' +
+    'function selectStewardSuggestion(name){' +
+    'document.getElementById("stewardSearch").value=name;' +
+    'document.getElementById("searchSuggestions").style.display="none";' +
+    'filterStewards()' +
+    '}' +
+    'function showSearchSuggestions(){' +
+    'var q=document.getElementById("stewardSearch").value;' +
+    'if(q.length>=2)smartFilterStewards()' +
+    '}' +
+    'function quickFilterSteward(loc){' +
+    'document.getElementById("stewardSearch").value=loc;' +
+    'filterStewards();' +
+    'document.getElementById("searchSuggestions").style.display="none"' +
+    '}' +
+    'function clearStewardFilter(){' +
+    'document.getElementById("stewardSearch").value="";' +
+    'filterStewards();' +
+    'var s=document.getElementById("searchSuggestions");if(s)s.style.display="none"' +
+    '}' +
+    'document.addEventListener("click",function(e){var s=document.getElementById("searchSuggestions");if(s&&!e.target.closest("#stewardSearch")&&!e.target.closest("#searchSuggestions"))s.style.display="none"});' +
+
+    // Save steward contact (v4.4.0)
+    'function saveStewardContact(name,email,phone){' +
+    'var vcard="BEGIN:VCARD\\nVERSION:3.0\\nFN:"+name+"\\nORG:SEIU Local 509\\nTITLE:Union Steward\\n";' +
+    'if(email)vcard+="EMAIL:"+email+"\\n";' +
+    'if(phone)vcard+="TEL:"+phone+"\\n";' +
+    'vcard+="END:VCARD";' +
+    'var blob=new Blob([vcard],{type:"text/vcard"});' +
+    'var url=URL.createObjectURL(blob);' +
+    'var a=document.createElement("a");' +
+    'a.href=url;a.download=name.replace(/\\s+/g,"_")+".vcf";' +
+    'document.body.appendChild(a);a.click();document.body.removeChild(a);' +
+    'URL.revokeObjectURL(url)' +
+    '}' +
+
+    // Compare Tab Functions
+    'function selectAllMetrics(){document.querySelectorAll(".metric-check").forEach(function(cb){cb.checked=true});updateComparisonPreview()}' +
+    'function clearAllMetrics(){document.querySelectorAll(".metric-check").forEach(function(cb){cb.checked=false});updateComparisonPreview()}' +
+    'function updateComparisonPreview(){' +
+    'var selected=[];document.querySelectorAll(".metric-check:checked").forEach(function(cb){selected.push({id:cb.dataset.id,label:cb.dataset.label,value:cb.dataset.value,category:cb.dataset.category})});' +
+    'var preview=document.getElementById("comparison-preview");var content=document.getElementById("preview-content");' +
+    'if(selected.length===0){preview.style.display="none";return}' +
+    'preview.style.display="block";' +
+    'var html="<p style=\\"color:#94a3b8;margin-bottom:12px\\">"+selected.length+" metrics selected</p>";' +
+    'html+="<table style=\\"width:100%;border-collapse:collapse;font-size:12px\\"><tr style=\\"background:#1e293b\\"><th style=\\"padding:8px;text-align:left;color:#94a3b8\\">Category</th><th style=\\"padding:8px;text-align:left;color:#94a3b8\\">Metric</th><th style=\\"padding:8px;text-align:right;color:#94a3b8\\">Value</th></tr>";' +
+    'selected.forEach(function(m,i){html+="<tr style=\\"background:"+(i%2===0?"#0f172a":"#1e293b")+"\\"><td style=\\"padding:8px;color:#60a5fa\\">"+m.category+"</td><td style=\\"padding:8px;color:#e2e8f0\\">"+m.label+"</td><td style=\\"padding:8px;text-align:right;font-weight:600;color:#22c55e\\">"+m.value+"</td></tr>"});' +
+    'html+="</table>";content.innerHTML=html' +
+    '}' +
+    'function exportComparison(){' +
+    'var selected=[];document.querySelectorAll(".metric-check:checked").forEach(function(cb){selected.push({label:cb.dataset.label,value:cb.dataset.value,category:cb.dataset.category})});' +
+    'if(selected.length===0){alert("Please select at least one metric to export");return}' +
+    'var csv="Category,Metric,Value\\n";' +
+    'selected.forEach(function(m){csv+="\\""+m.category+"\\",\\""+m.label+"\\",\\""+m.value+"\\"\\n"});' +
+    'var blob=new Blob([csv],{type:"text/csv"});' +
+    'var url=URL.createObjectURL(blob);' +
+    'var a=document.createElement("a");' +
+    'a.href=url;a.download="509_metrics_comparison_"+new Date().toISOString().split("T")[0]+".csv";' +
+    'document.body.appendChild(a);a.click();document.body.removeChild(a);' +
+    'URL.revokeObjectURL(url)' +
+    '}' +
+
+    // Help Tab Functions (FAQ search and filter)
+    'var currentFAQFilter="all";' +
+    'function filterFAQ(){' +
+    'var query=document.getElementById("faqSearch").value.toLowerCase();' +
+    'document.querySelectorAll(".faq-item").forEach(function(item){' +
+    'var searchable=item.dataset.searchable;' +
+    'var isTutorial=item.dataset.tutorial==="yes";' +
+    'var matchesQuery=!query||searchable.indexOf(query)>=0;' +
+    'var matchesFilter=currentFAQFilter==="all"||(currentFAQFilter==="tutorial"&&isTutorial);' +
+    'item.style.display=(matchesQuery&&matchesFilter)?"block":"none"' +
+    '});' +
+    'document.querySelectorAll(".feature-item").forEach(function(item){' +
+    'var text=(item.textContent||"").toLowerCase();' +
+    'var matchesQuery=!query||text.indexOf(query)>=0;' +
+    'var matchesFilter=currentFAQFilter==="all"||currentFAQFilter==="features";' +
+    'item.style.display=(matchesQuery&&matchesFilter)?"block":"none"' +
+    '});' +
+    'document.getElementById("features-section").style.display=(currentFAQFilter==="tutorial")?"none":"block";' +
+    'document.getElementById("faq-section").style.display=(currentFAQFilter==="features")?"none":"block"' +
+    '}' +
+    'function setFAQFilter(filter,btn){' +
+    'currentFAQFilter=filter;' +
+    'document.querySelectorAll(".faq-filter").forEach(function(b){b.classList.remove("active")});' +
+    'btn.classList.add("active");' +
+    'filterFAQ()' +
+    '}' +
+
+    // Settings Panel Functions
+    'function toggleSettings(){' +
+    'document.getElementById("settingsPanel").classList.toggle("open");' +
+    'document.querySelector(".settings-overlay").classList.toggle("open")' +
+    '}' +
+    // View Mode Toggle
+    'function setViewMode(mode){' +
+    'document.body.classList.remove("mobile-mode","desktop-mode");' +
+    'document.querySelectorAll(".view-toggle button").forEach(function(b){b.classList.remove("active")});' +
+    'if(mode==="mobile"){document.body.classList.add("mobile-mode");document.getElementById("mobileViewBtn").classList.add("active")}' +
+    'else if(mode==="desktop"){document.body.classList.add("desktop-mode");document.getElementById("desktopViewBtn").classList.add("active")}' +
+    'else{document.getElementById("autoViewBtn").classList.add("active")}' +
+    'localStorage.setItem("509_viewMode",mode);' +
+    'showHint(mode.charAt(0).toUpperCase()+mode.slice(1)+" view")' +
+    '}' +
+
+    'function toggleHighContrast(){' +
+    'document.body.classList.toggle("high-contrast");' +
+    'document.getElementById("highContrastToggle").classList.toggle("on");' +
+    'localStorage.setItem("509_highContrast",document.body.classList.contains("high-contrast"))' +
+    '}' +
+    'function toggleLargeText(){' +
+    'document.body.classList.toggle("large-text");' +
+    'document.getElementById("largeTextToggle").classList.toggle("on");' +
+    'localStorage.setItem("509_largeText",document.body.classList.contains("large-text"))' +
+    '}' +
+    'var autoRefreshTimer=null;' +
+    'function toggleAutoRefresh(){' +
+    'var toggle=document.getElementById("autoRefreshToggle");' +
+    'toggle.classList.toggle("on");' +
+    'if(toggle.classList.contains("on")){startAutoRefresh()}else{stopAutoRefresh()}' +
+    'localStorage.setItem("509_autoRefresh",toggle.classList.contains("on"))' +
+    '}' +
+    'function startAutoRefresh(){' +
+    'var interval=parseInt(document.getElementById("refreshInterval").value);' +
+    'autoRefreshTimer=setInterval(function(){location.reload()},interval)' +
+    '}' +
+    'function stopAutoRefresh(){if(autoRefreshTimer){clearInterval(autoRefreshTimer);autoRefreshTimer=null}}' +
+    'function setRefreshInterval(){stopAutoRefresh();if(document.getElementById("autoRefreshToggle").classList.contains("on")){startAutoRefresh()}}' +
+    'function saveGoals(){' +
+    'var goals={winRate:parseInt(document.getElementById("goalWinRate").value),morale:parseFloat(document.getElementById("goalMorale").value),response:parseInt(document.getElementById("goalResponse").value)};' +
+    'localStorage.setItem("509_goals",JSON.stringify(goals));' +
+    'if(typeof renderOverviewWithGoals==="function")renderOverviewWithGoals()' +
+    '}' +
+    'function loadGoals(){' +
+    'try{var g=JSON.parse(localStorage.getItem("509_goals")||"{}");' +
+    'if(g.winRate)document.getElementById("goalWinRate").value=g.winRate;' +
+    'if(g.morale)document.getElementById("goalMorale").value=g.morale;' +
+    'if(g.response)document.getElementById("goalResponse").value=g.response}catch(e){}' +
+    '}' +
+
+    // Alert Center Functions
+    'function toggleAlerts(){document.getElementById("alertCenter").classList.toggle("open")}' +
+    'function populateAlerts(){' +
+    'var d=dashData;if(!d)return;var alerts=[];var now=new Date();' +
+    'if(d.overdueCount>0){alerts.push({type:"critical",title:"Overdue Grievances",desc:d.overdueCount+" case(s) past deadline",time:"Action required"})}' +
+    'if(d.deadlines&&d.deadlines.length>0){d.deadlines.forEach(function(dl){alerts.push({type:"warning",title:"Upcoming Deadline",desc:dl.id+": "+dl.step,time:dl.daysUntil+" days"})})}' +
+    'if(d.winRate<50){alerts.push({type:"warning",title:"Win Rate Below Target",desc:"Current: "+d.winRate+"% (Target: 75%)",time:"Review cases"})}' +
+    'if(d.moraleScore<6){alerts.push({type:"warning",title:"Low Morale Score",desc:"Current: "+d.moraleScore+"/10",time:"Survey feedback"})}' +
+    'if(d.engagement&&d.engagement.emailOpenRate<30){alerts.push({type:"info",title:"Low Email Engagement",desc:d.engagement.emailOpenRate+"% open rate",time:"Consider outreach"})}' +
+    'if(d.hotZones&&d.hotZones.length>0){alerts.push({type:"info",title:"Active Hot Spots",desc:d.hotZones.length+" location(s) with 3+ cases",time:"Monitor closely"})}' +
+    'if(alerts.length===0){alerts.push({type:"success",title:"All Clear",desc:"No alerts at this time",time:"Looking good!"})}' +
+    'var html="";alerts.forEach(function(a){html+="<div class=\\"alert-item "+a.type+"\\"><div class=\\"alert-title\\">"+a.title+"</div><div class=\\"alert-desc\\">"+a.desc+"</div><div class=\\"alert-time\\">"+a.time+"</div></div>"});' +
+    'document.getElementById("alertList").innerHTML=html;' +
+    'var badge=document.getElementById("alertBadge");var criticalCount=alerts.filter(function(a){return a.type==="critical"||a.type==="warning"}).length;' +
+    'if(criticalCount>0){badge.textContent=criticalCount;badge.style.display="block"}else{badge.style.display="none"}' +
+    '}' +
+
+    // Date Range Functions
+    'var currentDateRange=7;' +
+    'function setDateRange(days,btn){' +
+    'currentDateRange=days;' +
+    'document.querySelectorAll(".date-btn").forEach(function(b){b.classList.remove("active")});' +
+    'btn.classList.add("active");' +
+    'document.getElementById("dateFrom").value="";document.getElementById("dateTo").value="";' +
+    'applyDateFilter()' +
+    '}' +
+    'function applyCustomDateRange(){' +
+    'var from=document.getElementById("dateFrom").value;var to=document.getElementById("dateTo").value;' +
+    'if(from&&to){document.querySelectorAll(".date-btn").forEach(function(b){b.classList.remove("active")});applyDateFilter(from,to)}' +
+    '}' +
+    'function applyDateFilter(from,to){' +
+    'showHint("Loading filtered data...");' +
+    'google.script.run.withSuccessHandler(function(json){' +
+    'dashData=JSON.parse(json);renderTab(document.querySelector(".tab.active").textContent.toLowerCase().replace(/\\s+/g,""));showHint("Date filter applied")' +
+    '}).withFailureHandler(function(e){showHint("Filter error: "+e.message)}).getUnifiedDashboardDataWithDateRange(isPII,currentDateRange,from,to)' +
+    '}' +
+
+    // Pinned Metrics Functions
+    'var pinnedMetrics=JSON.parse(localStorage.getItem("509_pinned")||"[]");' +
+    'function togglePin(metricKey,label,value,color){' +
+    'var idx=pinnedMetrics.findIndex(function(p){return p.key===metricKey});' +
+    'if(idx>=0){pinnedMetrics.splice(idx,1);showHint("Unpinned: "+label)}' +
+    'else{pinnedMetrics.push({key:metricKey,label:label,value:value,color:color});showHint("Pinned: "+label)}' +
+    'localStorage.setItem("509_pinned",JSON.stringify(pinnedMetrics));' +
+    'renderPinnedSection()' +
+    '}' +
+    'function renderPinnedSection(){' +
+    'var existing=document.getElementById("pinnedSection");if(existing)existing.remove();' +
+    'if(pinnedMetrics.length===0)return;' +
+    'var html="<div id=\\"pinnedSection\\" class=\\"pinned-section\\"><div class=\\"pinned-header\\"><span class=\\"pinned-title\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">push_pin</i>Pinned Metrics</span><button onclick=\\"clearAllPinned()\\" class=\\"btn btn-secondary btn-sm\\">Clear All</button></div><div class=\\"pinned-grid\\">";' +
+    'pinnedMetrics.forEach(function(p){' +
+    'var val=p.value;if(dashData){' +
+    'if(p.key==="members")val=dashData.totalMembers;' +
+    'else if(p.key==="stewards")val=dashData.stewardCount;' +
+    'else if(p.key==="openCases")val=dashData.openGrievances;' +
+    'else if(p.key==="winRate")val=dashData.winRate+"%";' +
+    'else if(p.key==="overdue")val=dashData.overdueCount;' +
+    'else if(p.key==="morale")val=dashData.moraleScore;' +
+    '}' +
+    'html+="<div class=\\"pinned-metric\\"><button class=\\"unpin-btn\\" onclick=\\"togglePin(\\x27"+p.key+"\\x27,\\x27"+p.label+"\\x27)\\"><i class=\\"material-icons\\">close</i></button><div style=\\"font-size:10px;color:#94a3b8\\">"+p.label+"</div><div style=\\"font-size:24px;font-weight:700;color:"+p.color+"\\">"+val+"</div></div>"});' +
+    'html+="</div></div>";' +
+    'var content=document.getElementById("main-content");' +
+    'if(content)content.insertAdjacentHTML("afterbegin",html)' +
+    '}' +
+    'function clearAllPinned(){pinnedMetrics=[];localStorage.removeItem("509_pinned");renderPinnedSection();showHint("All pins cleared")}' +
+
+    // Chart Drill-Down Functions
+    'function showChartDrillDown(type,key,title){' +
+    'var d=dashData;if(!d||!d.chartDrillDown)return;' +
+    'var items=[];' +
+    'if(type==="status"&&d.chartDrillDown.statusByCase[key])items=d.chartDrillDown.statusByCase[key];' +
+    'else if(type==="location"&&d.chartDrillDown.locationByCase[key])items=d.chartDrillDown.locationByCase[key];' +
+    'else if(type==="category"&&d.chartDrillDown.categoryByCase[key])items=d.chartDrillDown.categoryByCase[key];' +
+    'else if(type==="unit"&&d.chartDrillDown.unitByMember[key])items=d.chartDrillDown.unitByMember[key];' +
+    'else if(type==="steward"&&d.chartDrillDown.stewardByCase[key])items=d.chartDrillDown.stewardByCase[key];' +
+    'if(items.length===0){openModal(title,"<p style=\\"color:#94a3b8\\">No data available</p>");return}' +
+    'var html="<div class=\\"drill-down-list\\">";' +
+    'items.forEach(function(item){' +
+    'if(item.id&&item.member){html+="<div class=\\"drill-down-item\\"><span><strong>"+item.id+"</strong> - "+item.member+"</span><span style=\\"color:#94a3b8\\">"+item.steward+" | "+item.location+"</span></div>"}' +
+    'else if(item.id&&item.name){html+="<div class=\\"drill-down-item\\"><span>"+item.name+"</span><span style=\\"color:#94a3b8\\">"+item.location+(item.isSteward?" (Steward)":"")+"</span></div>"}' +
+    '});' +
+    'html+="</div>";' +
+    'openModal(title+" ("+items.length+")",html)' +
+    '}' +
+
+    // Print & Export Functions
+    'function printDashboard(){toggleSettings();setTimeout(function(){window.print()},300)}' +
+    'function exportAllData(){' +
+    'var d=dashData;if(!d){alert("No data available");return}' +
+    'var csv="509 Dashboard Full Export\\n\\n";' +
+    'csv+="SUMMARY METRICS\\n";' +
+    'csv+="Metric,Value\\n";' +
+    'csv+="Total Members,"+d.totalMembers+"\\n";' +
+    'csv+="Steward Count,"+d.stewardCount+"\\n";' +
+    'csv+="Total Grievances,"+d.totalCases+"\\n";' +
+    'csv+="Open Cases,"+d.openCases+"\\n";' +
+    'csv+="Win Rate,"+d.winRate+"%\\n";' +
+    'csv+="Morale Score,"+d.moraleScore+"/10\\n";' +
+    'csv+="\\nGRIEVANCES BY STATUS\\n";' +
+    'csv+="Status,Count\\n";' +
+    'csv+="Open,"+d.statusDistribution.open+"\\n";' +
+    'csv+="Pending,"+d.statusDistribution.pending+"\\n";' +
+    'csv+="Won,"+d.statusDistribution.won+"\\n";' +
+    'csv+="Denied,"+d.statusDistribution.denied+"\\n";' +
+    'csv+="Settled,"+d.statusDistribution.settled+"\\n";' +
+    'csv+="\\nMEMBERS BY LOCATION\\n";' +
+    'csv+="Location,Count\\n";' +
+    'Object.keys(d.locationBreakdown).forEach(function(loc){csv+="\\""+loc+"\\","+d.locationBreakdown[loc]+"\\n"});' +
+    'csv+="\\nMEMBERS BY UNIT\\n";' +
+    'csv+="Unit,Count\\n";' +
+    'Object.keys(d.unitBreakdown).forEach(function(u){csv+="\\""+u+"\\","+d.unitBreakdown[u]+"\\n"});' +
+    'var blob=new Blob([csv],{type:"text/csv"});var url=URL.createObjectURL(blob);' +
+    'var a=document.createElement("a");a.href=url;a.download="509_full_export_"+new Date().toISOString().split("T")[0]+".csv";' +
+    'document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);' +
+    'toggleSettings()' +
+    '}' +
+    'function scheduleReport(){' +
+    'var email=prompt("Enter email address for scheduled reports:");' +
+    'if(email){alert("Report scheduling requires server-side setup.\\n\\nEmail: "+email+"\\n\\nContact your administrator to configure automated reports.");toggleSettings()}' +
+    '}' +
+
+    // Keyboard Shortcuts
+    'function showHint(msg){var hint=document.getElementById("shortcutHint");hint.textContent=msg;hint.classList.remove("show");void hint.offsetWidth;hint.classList.add("show")}' +
+    'document.addEventListener("keydown",function(e){' +
+    'if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT")return;' +
+    'var key=e.key.toLowerCase();' +
+    'if(key>="1"&&key<="9"){' +
+    'var tabs=document.querySelectorAll(".tab");var idx=parseInt(key)-1;' +
+    'if(tabs[idx]){tabs[idx].click();showHint("Tab "+(idx+1)+": "+tabs[idx].textContent)}e.preventDefault()' +
+    '}' +
+    'else if(key==="/"){' +
+    'var search=document.getElementById("stewardSearch")||document.getElementById("faqSearch");' +
+    'if(search){search.focus();showHint("Search focused")}e.preventDefault()' +
+    '}' +
+    'else if(key==="r"&&!e.ctrlKey&&!e.metaKey){location.reload();e.preventDefault()}' +
+    'else if(key==="p"&&!e.ctrlKey&&!e.metaKey){printDashboard();e.preventDefault()}' +
+    'else if(key==="a"){toggleAlerts();showHint("Alert Center");e.preventDefault()}' +
+    'else if(key==="s"&&!e.ctrlKey&&!e.metaKey){toggleSettings();showHint("Settings");e.preventDefault()}' +
+    'else if(key==="escape"){' +
+    'document.getElementById("settingsPanel").classList.remove("open");' +
+    'document.querySelector(".settings-overlay").classList.remove("open");' +
+    'document.getElementById("alertCenter").classList.remove("open");' +
+    'closeModal()' +
+    '}' +
+    '});' +
+
+    // Last Updated Indicator
+    'function updateLastUpdated(){' +
+    'var el=document.getElementById("lastUpdated");if(el){' +
+    'var now=new Date();var time=now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});' +
+    'el.innerHTML="<i class=\\"material-icons\\">schedule</i><span>Updated "+time+"</span>"' +
+    '}}' +
+
+    // Trend Arrow Helper
+    'function getTrendArrow(current,previous){' +
+    'if(previous===0||previous===undefined)return"<span class=\\"trend-arrow flat\\">―</span>";' +
+    'var pct=Math.round(((current-previous)/previous)*100);' +
+    'if(pct>5)return"<span class=\\"trend-arrow up\\">↑</span><span class=\\"trend-pct\\">+"+pct+"%</span>";' +
+    'if(pct<-5)return"<span class=\\"trend-arrow down\\">↓</span><span class=\\"trend-pct\\">"+pct+"%</span>";' +
+    'return"<span class=\\"trend-arrow flat\\">―</span>"' +
+    '}' +
+
+    // Goal Progress Helper
+    'function getGoalBar(current,target,color){' +
+    'var pct=Math.min(100,Math.round((current/target)*100));' +
+    'var barColor=pct>=100?"#22c55e":pct>=75?"#3b82f6":pct>=50?"#f59e0b":"#ef4444";' +
+    'return"<div class=\\"goal-bar\\"><div class=\\"goal-fill\\" style=\\"width:"+pct+"%;background:"+barColor+"\\"></div></div><div class=\\"goal-label\\"><span>"+current+"</span><span>Target: "+target+"</span></div>"' +
+    '}' +
+
+    // Initialize on load
+    'window.addEventListener("load",function(){' +
+    'updateLastUpdated();' +
+    'loadGoals();' +
+    // Load saved view mode
+    'var savedView=localStorage.getItem("509_viewMode");' +
+    'if(savedView&&savedView!=="auto"){setViewMode(savedView)}' +
+    'if(localStorage.getItem("509_highContrast")==="true"){document.body.classList.add("high-contrast");document.getElementById("highContrastToggle").classList.add("on")}' +
+    'if(localStorage.getItem("509_largeText")==="true"){document.body.classList.add("large-text");document.getElementById("largeTextToggle").classList.add("on")}' +
+    'if(localStorage.getItem("509_autoRefresh")==="true"){document.getElementById("autoRefreshToggle").classList.add("on");startAutoRefresh()}' +
+    'setTimeout(populateAlerts,1000)' +
+    '});' +
 
     '</script></body></html>';
 }
