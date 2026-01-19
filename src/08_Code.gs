@@ -184,7 +184,10 @@ function createConfigSheet(ss) {
     '── MULTI-SELECT OPTIONS ──', '',                   // AE-AF (2 cols)
     '── CONTRACT & LEGAL ──', '', '', '',               // AG-AJ (4 cols)
     '── ORG IDENTITY ──', '', '',                       // AK-AM (3 cols)
-    '── EXTENDED CONTACT ──', '', '', ''                // AN-AQ (4 cols)
+    '── EXTENDED CONTACT ──', '', '', '', '',           // AN-AR (5 cols)
+    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AS-AY (7 cols)
+    '── RESOURCES ──',                                  // AZ (1 col)
+    '── THEME SETTINGS ──', '', '', '', '', ''          // BA-BF (6 cols)
   ];
 
   // Row 2: Column Headers
@@ -201,7 +204,10 @@ function createConfigSheet(ss) {
     'Best Times to Contact', 'Home Towns',
     'Contract Article (Grievance)', 'Contract Article (Discipline)', 'Contract Article (Workload)', 'Contract Name',
     'Union Parent', 'State/Region', 'Organization Website',
-    'Office Addresses', 'Main Fax', 'Main Contact Name', 'Main Contact Email'
+    'Office Addresses', 'Main Fax', 'Main Contact Name', 'Main Contact Email', 'Satisfaction Survey URL',
+    'Chief Steward Email', 'Unit Codes', 'Archive Folder ID', 'Escalation Statuses', 'Escalation Steps', 'Template ID', 'PDF Folder ID',
+    'Contract PDF URL',
+    'Enable Theme', 'Header BG Color', 'Header Text Color', 'Alt Row Color', 'Font Family', 'Font Size'
   ];
 
   // Apply section headers (Row 1)
