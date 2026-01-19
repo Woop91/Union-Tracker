@@ -30,7 +30,7 @@
  */
 
 // ============================================================================
-// SOURCE: 01_Constants.gs (1655 lines)
+// SOURCE: 01_Constants.gs (1669 lines)
 // ============================================================================
 
 /**
@@ -141,10 +141,10 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 3,
-  PATCH: 8,
-  BUILD: 'v4.3.8',
-  CURRENT: '4.3.8',
-CODENAME: 'Searchable Help Guide'
+  PATCH: 9,
+  BUILD: 'v4.3.9',
+  CURRENT: '4.3.9',
+  CODENAME: 'Code Audit & Cleanup'
 };
 
 // ============================================================================
@@ -190,6 +190,7 @@ var SHEETS = {
   GETTING_STARTED: '📚 Getting Started',
   FAQ: '❓ FAQ',
   CONFIG_GUIDE: '📖 Config Guide',
+  FEATURES_REFERENCE: '📋 Features Reference',
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
@@ -1189,6 +1190,19 @@ var GRIEVANCE_STATUS = {
 };
 
 /**
+ * Deadline rules for grievance step calculations
+ * Defines the number of days for responses and appeals at each step
+ * Used by deadline calculation functions throughout the system
+ * @const {Object}
+ */
+var DEADLINE_RULES = {
+  STEP_1: { DAYS_FOR_RESPONSE: 7 },
+  STEP_2: { DAYS_TO_APPEAL: 7, DAYS_FOR_RESPONSE: 14 },
+  STEP_3: { DAYS_TO_APPEAL: 10, DAYS_FOR_RESPONSE: 21 },
+  ARBITRATION: { DAYS_TO_DEMAND: 30 }
+};
+
+/**
  * Audit event types for logging
  * @const {Object}
  */
@@ -1693,7 +1707,7 @@ function generateSequentialId(prefix, sheet, idColumn) {
 
 
 // ============================================================================
-// SOURCE: 02_MemberManager.gs (1158 lines)
+// SOURCE: 02_MemberManager.gs (1160 lines)
 // ============================================================================
 
 /**
@@ -1929,10 +1943,12 @@ function getAllStewards() {
 }
 
 /**
- * Gets steward workload statistics
- * @returns {Array} Array of steward workload objects
+ * Gets detailed steward workload statistics including win rates
+ * NOTE: A simpler getStewardWorkload() exists in 11_SecureMemberDashboard.gs for dashboard use
+ * This version provides detailed metrics: activeCases, totalCases, wonCases, winRate
+ * @returns {Array} Array of steward workload objects with detailed metrics
  */
-function getStewardWorkload() {
+function getStewardWorkloadDetailed() {
   var stewards = getAllStewards();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
@@ -4171,7 +4187,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (7249 lines)
+// SOURCE: 04_UIService.gs (7694 lines)
 // ============================================================================
 
 /**
@@ -4323,8 +4339,12 @@ function createDashboardMenu() {
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
       .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
       .addSeparator()
+      .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
+      .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
-      .addItem('🎨 Apply Tab Colors', 'applyTabColors'));
+      .addItem('🎨 Apply Tab Colors', 'applyTabColors')
+      .addItem('📱 Add Mobile Dashboard Link to Config', 'addMobileDashboardLinkToConfig')
+      .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
@@ -4333,6 +4353,8 @@ function createDashboardMenu() {
         .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
         .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
         .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
+        .addSeparator()
+        .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
         .addSeparator()
         .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
   }
@@ -4719,8 +4741,9 @@ function navToDash() {
 
 /**
  * Navigate to Mobile View (if exists)
+ * NOTE: Duplicate exists in 10_CommandCenter.gs - this version kept for compatibility
  */
-function navToMobile() {
+function navToMobile_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var mobileSheet = ss.getSheetByName('📱 Mobile View');
 
@@ -4909,7 +4932,16 @@ function resetToDefaultTheme() {
 function refreshVisualsSimple_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  ss.toast('Refreshing all visuals...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+  ss.toast('Refreshing visuals and data...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  // Refresh hidden calculation sheets if available
+  try {
+    if (typeof rebuildAllHiddenSheets === 'function') {
+      rebuildAllHiddenSheets();
+    }
+  } catch (e) {
+    Logger.log('Hidden sheets refresh error: ' + e.message);
+  }
 
   // Apply traffic light indicators
   try {
@@ -4925,7 +4957,71 @@ function refreshVisualsSimple_() {
     Logger.log('Theme error: ' + e.message);
   }
 
-  ss.toast('Visual refresh complete', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  // Check for alerts
+  try {
+    checkDashboardAlerts();
+  } catch (e) {
+    Logger.log('Alert check error: ' + e.message);
+  }
+
+  ss.toast('Refresh complete', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Refreshes all visual elements, data calculations, and alerts
+ * Main entry point for Force Global Refresh menu item
+ */
+function refreshAllVisuals() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  ss.toast('Refreshing all visuals and data...', COMMAND_CONFIG.SYSTEM_NAME, 10);
+
+  // Refresh hidden calculation sheets if available
+  try {
+    if (typeof rebuildAllHiddenSheets === 'function') {
+      rebuildAllHiddenSheets();
+    }
+  } catch (e) {
+    Logger.log('Hidden sheets refresh error: ' + e.message);
+  }
+
+  // Apply traffic light indicators
+  try {
+    if (typeof applyTrafficLightIndicators === 'function') {
+      applyTrafficLightIndicators();
+    }
+  } catch (e) {
+    Logger.log('Traffic lights error: ' + e.message);
+  }
+
+  // Apply global theme
+  try {
+    if (typeof APPLY_SYSTEM_THEME === 'function') {
+      APPLY_SYSTEM_THEME();
+    }
+  } catch (e) {
+    Logger.log('Theme error: ' + e.message);
+  }
+
+  // Check for alerts
+  try {
+    if (typeof checkDashboardAlerts === 'function') {
+      checkDashboardAlerts();
+    }
+  } catch (e) {
+    Logger.log('Alert check error: ' + e.message);
+  }
+
+  // Sync checklist progress if available
+  try {
+    if (typeof syncChecklistCalcToGrievanceLog === 'function') {
+      syncChecklistCalcToGrievanceLog();
+    }
+  } catch (e) {
+    Logger.log('Checklist sync error: ' + e.message);
+  }
+
+  ss.toast('All visuals refreshed!', COMMAND_CONFIG.SYSTEM_NAME, 5);
 }
 
 // ============================================================================
@@ -6159,17 +6255,7 @@ function showAlert(message, title) {
   SpreadsheetApp.getUi().alert(title || 'Alert', message, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
-/**
- * Navigates to a specific sheet
- * @param {string} sheetName - Name of sheet to navigate to
- */
-function navigateToSheet(sheetName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (sheet) {
-    ss.setActiveSheet(sheet);
-  }
-}
+// navigateToSheet() - REMOVED DUPLICATE - see line 565 for main definition
 
 /**
  * Navigates to a specific record (row) in the appropriate sheet
@@ -6390,6 +6476,61 @@ function deactivateFocusMode() {
   ss.toast('✅ Focus mode deactivated', 'Focus Mode', 3);
 }
 
+// ==================== POMODORO TIMER ====================
+
+/**
+ * Starts a simple Pomodoro timer using Google Sheets toast notifications
+ * Shows a 25-minute work session reminder
+ */
+function startPomodoroTimer() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Show starting message
+  ss.toast('🍅 Pomodoro started! Focus for 25 minutes.\n\nYou\'ll get a notification when the session ends.', 'Pomodoro Timer', 10);
+
+  // Create a time-driven trigger for 25 minutes from now
+  var triggerTime = new Date(new Date().getTime() + 25 * 60 * 1000);
+
+  // Store the start time
+  PropertiesService.getUserProperties().setProperty('pomodoroStart', new Date().toISOString());
+
+  // For immediate feedback, show a modal with timer info
+  var html = HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><html><head><base target="_top"><style>' +
+    'body{font-family:Arial,sans-serif;padding:30px;text-align:center;background:linear-gradient(135deg,#ff6b6b,#ee5a24)}' +
+    '.timer{font-size:72px;color:white;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}' +
+    '.label{color:white;font-size:18px;margin-top:10px;opacity:0.9}' +
+    '.tip{background:rgba(255,255,255,0.2);padding:15px;border-radius:8px;margin-top:20px;color:white}' +
+    'button{background:white;color:#ee5a24;border:none;padding:12px 24px;border-radius:25px;font-size:16px;cursor:pointer;margin-top:20px}' +
+    '</style></head><body>' +
+    '<div class="timer" id="time">25:00</div>' +
+    '<div class="label">🍅 Focus Time Remaining</div>' +
+    '<div class="tip">💡 Tip: Close this window and focus on your task.<br>A toast notification will remind you when time is up.</div>' +
+    '<button onclick="google.script.host.close()">Start Focusing</button>' +
+    '<script>' +
+    'var seconds = 25 * 60;' +
+    'var timer = setInterval(function(){' +
+    '  seconds--;' +
+    '  if(seconds <= 0){clearInterval(timer);document.getElementById("time").innerHTML="Done!";return;}' +
+    '  var m = Math.floor(seconds/60);' +
+    '  var s = seconds % 60;' +
+    '  document.getElementById("time").innerHTML = m + ":" + (s < 10 ? "0" : "") + s;' +
+    '},1000);' +
+    '</script></body></html>'
+  ).setWidth(350).setHeight(350);
+
+  ui.showModelessDialog(html, '🍅 Pomodoro Timer');
+}
+
+/**
+ * Called when Pomodoro timer ends (placeholder for trigger-based implementation)
+ */
+function onPomodoroEnd_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast('🍅 Pomodoro complete! Take a 5-minute break.', 'Break Time!', 30);
+}
+
 // ==================== QUICK CAPTURE NOTEPAD ====================
 
 /**
@@ -6549,6 +6690,317 @@ function showQuickCaptureNotepad() {
   .setHeight(450);
 
   SpreadsheetApp.getUi().showModalDialog(html, '📝 Quick Capture Notepad');
+}
+
+/**
+ * Shows import dialog for bulk member import from CSV
+ * Provides paste area for CSV data with preview and validation
+ * NOTE: Duplicate exists in 09_Main.gs - keeping both for compatibility
+ */
+function showImportDialog_UIService_() {
+  var html = HtmlService.createHtmlOutput(getImportDialogHtml_())
+    .setWidth(700)
+    .setHeight(600);
+  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members from CSV');
+}
+
+/**
+ * Generates HTML for import dialog
+ * @private
+ */
+function getImportDialogHtml_() {
+  return '<!DOCTYPE html>' +
+    '<html><head><base target="_top">' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Roboto", Arial, sans-serif; padding: 20px; background: #f5f5f5; }' +
+    '.container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }' +
+    'h2 { color: #1a73e8; margin-bottom: 15px; font-size: 18px; }' +
+    '.section { margin-bottom: 20px; }' +
+    '.section-title { font-weight: bold; color: #333; margin-bottom: 8px; font-size: 14px; }' +
+    'textarea { width: 100%; height: 200px; border: 2px solid #e0e0e0; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; resize: vertical; }' +
+    'textarea:focus { border-color: #1a73e8; outline: none; }' +
+    '.format-hint { background: #e8f0fe; padding: 12px; border-radius: 6px; font-size: 12px; color: #1967d2; margin-bottom: 15px; }' +
+    '.format-hint code { background: #fff; padding: 2px 6px; border-radius: 3px; }' +
+    '.preview { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; max-height: 150px; overflow-y: auto; font-size: 12px; display: none; }' +
+    '.preview-row { padding: 4px 0; border-bottom: 1px solid #eee; }' +
+    '.preview-row:last-child { border-bottom: none; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 15px; }' +
+    'button { padding: 10px 20px; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; font-weight: 500; }' +
+    '.btn-primary { background: #1a73e8; color: white; }' +
+    '.btn-primary:hover { background: #1557b0; }' +
+    '.btn-secondary { background: #f1f3f4; color: #5f6368; }' +
+    '.btn-secondary:hover { background: #e8eaed; }' +
+    '.status { padding: 10px; border-radius: 6px; margin-top: 10px; display: none; }' +
+    '.status.success { background: #e6f4ea; color: #137333; }' +
+    '.status.error { background: #fce8e6; color: #c5221f; }' +
+    '.count { font-weight: bold; color: #1a73e8; }' +
+    '</style></head><body>' +
+    '<div class="container">' +
+    '<h2>📥 Import Members from CSV</h2>' +
+    '<div class="format-hint">' +
+    '<strong>Required columns:</strong> First Name, Last Name<br>' +
+    '<strong>Optional:</strong> Email, Phone, Job Title, Unit, Work Location, Supervisor, Is Steward, Dues Paying<br>' +
+    '<strong>Format:</strong> Paste CSV with headers in first row. Use comma separator.' +
+    '</div>' +
+    '<div class="section">' +
+    '<div class="section-title">Paste CSV Data:</div>' +
+    '<textarea id="csvData" placeholder="First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Clerk,Admin&#10;Jane,Smith,jane@example.com,555-5678,Manager,Operations"></textarea>' +
+    '</div>' +
+    '<div class="section">' +
+    '<div class="section-title">Preview (<span id="rowCount" class="count">0</span> rows):</div>' +
+    '<div id="preview" class="preview"></div>' +
+    '</div>' +
+    '<div id="status" class="status"></div>' +
+    '<div class="btn-row">' +
+    '<button class="btn-secondary" onclick="previewData()">👁️ Preview</button>' +
+    '<button class="btn-primary" onclick="importData()">📥 Import</button>' +
+    '<button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
+    '</div></div>' +
+    '<script>' +
+    'function previewData() {' +
+    '  var csv = document.getElementById("csvData").value.trim();' +
+    '  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }' +
+    '  var rows = parseCSV(csv);' +
+    '  if (rows.length < 2) { showStatus("Need at least a header row and one data row", "error"); return; }' +
+    '  document.getElementById("rowCount").textContent = rows.length - 1;' +
+    '  var previewHtml = "<div class=\\"preview-row\\"><strong>" + rows[0].join(" | ") + "</strong></div>";' +
+    '  for (var i = 1; i < Math.min(rows.length, 6); i++) {' +
+    '    previewHtml += "<div class=\\"preview-row\\">" + rows[i].join(" | ") + "</div>";' +
+    '  }' +
+    '  if (rows.length > 6) previewHtml += "<div class=\\"preview-row\\">... and " + (rows.length - 6) + " more rows</div>";' +
+    '  document.getElementById("preview").innerHTML = previewHtml;' +
+    '  document.getElementById("preview").style.display = "block";' +
+    '  showStatus("Preview ready. Click Import to add " + (rows.length - 1) + " members.", "success");' +
+    '}' +
+    'function parseCSV(csv) {' +
+    '  var lines = csv.split(/\\r?\\n/);' +
+    '  return lines.filter(function(line) { return line.trim(); }).map(function(line) {' +
+    '    var result = []; var cell = ""; var inQuotes = false;' +
+    '    for (var i = 0; i < line.length; i++) {' +
+    '      var c = line[i];' +
+    '      if (c === "\\"") { inQuotes = !inQuotes; }' +
+    '      else if (c === "," && !inQuotes) { result.push(cell.trim()); cell = ""; }' +
+    '      else { cell += c; }' +
+    '    }' +
+    '    result.push(cell.trim());' +
+    '    return result;' +
+    '  });' +
+    '}' +
+    'function importData() {' +
+    '  var csv = document.getElementById("csvData").value.trim();' +
+    '  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }' +
+    '  showStatus("Importing...", "success");' +
+    '  google.script.run.withSuccessHandler(function(result) {' +
+    '    if (result.success) {' +
+    '      showStatus("✅ Successfully imported " + result.count + " members!", "success");' +
+    '      setTimeout(function() { google.script.host.close(); }, 2000);' +
+    '    } else {' +
+    '      showStatus("❌ " + result.error, "error");' +
+    '    }' +
+    '  }).withFailureHandler(function(err) {' +
+    '    showStatus("❌ Error: " + err.message, "error");' +
+    '  }).processMemberImport(csv);' +
+    '}' +
+    'function showStatus(msg, type) {' +
+    '  var el = document.getElementById("status");' +
+    '  el.textContent = msg;' +
+    '  el.className = "status " + type;' +
+    '  el.style.display = "block";' +
+    '}' +
+    '</script></body></html>';
+}
+
+/**
+ * Processes member import from CSV data
+ * @param {string} csvData - Raw CSV data
+ * @returns {Object} Result with success status and count/error
+ */
+function processMemberImport(csvData) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+    if (!sheet) {
+      return { success: false, error: 'Member Directory sheet not found' };
+    }
+
+    // Parse CSV
+    var lines = csvData.split(/\r?\n/).filter(function(l) { return l.trim(); });
+    if (lines.length < 2) {
+      return { success: false, error: 'Need at least header and one data row' };
+    }
+
+    // Parse header and map columns
+    var headers = parseCSVLine_(lines[0]);
+    var columnMap = mapImportColumns_(headers);
+
+    if (!columnMap.firstName || !columnMap.lastName) {
+      return { success: false, error: 'Required columns missing: First Name, Last Name' };
+    }
+
+    // Get existing data to find last row
+    var lastRow = sheet.getLastRow();
+
+    // Process data rows
+    var importedCount = 0;
+    for (var i = 1; i < lines.length; i++) {
+      var values = parseCSVLine_(lines[i]);
+      if (!values || values.length === 0) continue;
+
+      // Build row data
+      var rowData = [];
+      rowData[MEMBER_COLS.FIRST_NAME - 1] = values[columnMap.firstName] || '';
+      rowData[MEMBER_COLS.LAST_NAME - 1] = values[columnMap.lastName] || '';
+      rowData[MEMBER_COLS.EMAIL - 1] = columnMap.email !== undefined ? values[columnMap.email] || '' : '';
+      rowData[MEMBER_COLS.PHONE - 1] = columnMap.phone !== undefined ? values[columnMap.phone] || '' : '';
+      rowData[MEMBER_COLS.JOB_TITLE - 1] = columnMap.jobTitle !== undefined ? values[columnMap.jobTitle] || '' : '';
+      rowData[MEMBER_COLS.UNIT - 1] = columnMap.unit !== undefined ? values[columnMap.unit] || '' : '';
+      rowData[MEMBER_COLS.WORK_LOCATION - 1] = columnMap.workLocation !== undefined ? values[columnMap.workLocation] || '' : '';
+      rowData[MEMBER_COLS.SUPERVISOR - 1] = columnMap.supervisor !== undefined ? values[columnMap.supervisor] || '' : '';
+      rowData[MEMBER_COLS.IS_STEWARD - 1] = columnMap.isSteward !== undefined ? (values[columnMap.isSteward] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'No';
+      rowData[MEMBER_COLS.DUES_PAYING - 1] = columnMap.duesPaying !== undefined ? (values[columnMap.duesPaying] || '').toLowerCase() === 'yes' ? 'Yes' : 'No' : 'Yes';
+
+      // Fill empty cells
+      while (rowData.length < sheet.getLastColumn()) {
+        rowData.push('');
+      }
+
+      // Append row
+      sheet.appendRow(rowData);
+      importedCount++;
+    }
+
+    // Generate Member IDs for imported rows
+    if (typeof generateMissingMemberIDs === 'function') {
+      generateMissingMemberIDs();
+    }
+
+    return { success: true, count: importedCount };
+
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Parses a single CSV line handling quoted values
+ * @private
+ */
+function parseCSVLine_(line) {
+  var result = [];
+  var cell = '';
+  var inQuotes = false;
+
+  for (var i = 0; i < line.length; i++) {
+    var c = line.charAt(i);
+    if (c === '"') {
+      inQuotes = !inQuotes;
+    } else if (c === ',' && !inQuotes) {
+      result.push(cell.trim());
+      cell = '';
+    } else {
+      cell += c;
+    }
+  }
+  result.push(cell.trim());
+  return result;
+}
+
+/**
+ * Maps CSV headers to member column indices
+ * @private
+ */
+function mapImportColumns_(headers) {
+  var map = {};
+  var headerLower = headers.map(function(h) { return (h || '').toLowerCase().replace(/[^a-z]/g, ''); });
+
+  for (var i = 0; i < headerLower.length; i++) {
+    var h = headerLower[i];
+    if (h === 'firstname' || h === 'first') map.firstName = i;
+    else if (h === 'lastname' || h === 'last') map.lastName = i;
+    else if (h === 'email' || h === 'emailaddress') map.email = i;
+    else if (h === 'phone' || h === 'phonenumber') map.phone = i;
+    else if (h === 'jobtitle' || h === 'title' || h === 'position') map.jobTitle = i;
+    else if (h === 'unit' || h === 'department' || h === 'dept') map.unit = i;
+    else if (h === 'worklocation' || h === 'location' || h === 'worksite') map.workLocation = i;
+    else if (h === 'supervisor' || h === 'manager') map.supervisor = i;
+    else if (h === 'issteward' || h === 'steward') map.isSteward = i;
+    else if (h === 'duespaying' || h === 'dues') map.duesPaying = i;
+  }
+
+  return map;
+}
+
+/**
+ * Shows export dialog for member directory export
+ * Creates downloadable CSV file
+ * NOTE: Duplicate exists in 09_Main.gs - keeping both for compatibility
+ */
+function showExportDialog_UIService_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    SpreadsheetApp.getUi().alert('No member data to export.');
+    return;
+  }
+
+  // Get data
+  var data = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+
+  // Convert to CSV
+  var csv = data.map(function(row) {
+    return row.map(function(cell) {
+      var str = String(cell === null || cell === undefined ? '' : cell);
+      // Escape quotes and wrap in quotes if contains comma, quote, or newline
+      if (str.indexOf(',') >= 0 || str.indexOf('"') >= 0 || str.indexOf('\n') >= 0) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }).join(',');
+  }).join('\n');
+
+  // Create temporary file in Drive
+  var fileName = 'MemberDirectory_Export_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmm') + '.csv';
+  var blob = Utilities.newBlob(csv, 'text/csv', fileName);
+  var file = DriveApp.createFile(blob);
+
+  // Make file accessible
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  // Show download link
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    'body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }' +
+    '.success { color: #137333; font-size: 48px; margin-bottom: 10px; }' +
+    'h2 { color: #333; margin-bottom: 20px; }' +
+    '.info { background: #e8f0fe; padding: 15px; border-radius: 8px; margin: 20px 0; }' +
+    '.btn { display: inline-block; background: #1a73e8; color: white; padding: 12px 24px; ' +
+    'text-decoration: none; border-radius: 6px; font-weight: bold; margin: 10px; }' +
+    '.btn:hover { background: #1557b0; }' +
+    '.btn-secondary { background: #5f6368; }' +
+    '.note { color: #666; font-size: 12px; margin-top: 20px; }' +
+    '</style>' +
+    '<div class="success">✅</div>' +
+    '<h2>Export Ready!</h2>' +
+    '<div class="info">' +
+    '<strong>' + (lastRow - 1) + ' members</strong> exported to CSV<br>' +
+    'File: ' + fileName +
+    '</div>' +
+    '<a href="' + file.getDownloadUrl() + '" target="_blank" class="btn">📥 Download CSV</a>' +
+    '<a href="' + file.getUrl() + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
+    '<p class="note">File will be available in your Google Drive.<br>Link expires when you close this dialog.</p>' +
+    '<script>setTimeout(function() { google.script.host.setHeight(350); }, 100);</script>'
+  ).setWidth(450).setHeight(350);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '📤 Export Complete');
 }
 
 function setBreakReminders(minutes) {
@@ -7499,18 +7951,24 @@ function emailDashboardLinkToMember(memberId) {
     return;
   }
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var dashboardUrl = ss.getUrl();
+  // Use the deployed web app URL with personalized member ID parameter
+  var webAppUrl = ScriptApp.getService().getUrl();
+  if (!webAppUrl) {
+    SpreadsheetApp.getUi().alert('Web app is not deployed. Please deploy the web app first via Extensions > Apps Script > Deploy.');
+    return;
+  }
+  var portalUrl = webAppUrl + '?id=' + memberId;
   var orgName = getOrgNameFromConfig_();
 
   var subject = orgName + ' - Member Dashboard Access';
   var body = 'Dear ' + memberData.firstName + ',\n\n' +
-    'You can access your union member dashboard and track your information at:\n\n' +
-    'Dashboard Link: ' + dashboardUrl + '\n\n' +
+    'You can access your personalized union member dashboard at:\n\n' +
+    'Dashboard Link: ' + portalUrl + '\n\n' +
     'From the dashboard you can:\n' +
     '- View your member profile\n' +
     '- Track grievance status (if applicable)\n' +
     '- Stay updated on union activities\n\n' +
+    'Keep this link private - it is personalized for you.\n\n' +
     'If you have any questions, please contact your steward.\n\n' +
     'In Solidarity,\n' +
     orgName;
@@ -9417,15 +9875,7 @@ function saveInteractiveMember(memberData, mode) {
 // 1. NAVIGATION HELPERS
 // ============================================================================
 
-/**
- * Jump to a specific sheet via code
- * @param {string} sheetName - Name of the sheet to navigate to
- */
-function navigateToSheet(sheetName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (sheet) ss.setActiveSheet(sheet);
-}
+// navigateToSheet() - REMOVED DUPLICATE - see line 565 for main definition
 
 // ============================================================================
 // 2. EXECUTIVE COMMAND MODAL (SPA Architecture - Bridge Pattern)
@@ -10719,10 +11169,12 @@ function checkOverdueGrievances_() {
 }
 
 /**
- * Refreshes all dashboard visuals and checks alerts
- * Note: Executive and Member dashboards are now modal-based and refresh on-demand
+ * @deprecated v4.3.9 - REMOVED DUPLICATE
+ * Use refreshAllVisuals() at line 729 instead.
+ * This duplicate focused on data refresh while the main one focuses on visuals.
+ * The main function now handles both.
  */
-function refreshAllVisuals() {
+function refreshAllVisuals_DataRefresh_DEPRECATED() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -10787,8 +11239,10 @@ function sendMemberDashboardLink() {
  * Sends the Member Dashboard URL to the selected member from Member Directory.
  * Uses the currently selected row to get member email and name.
  * This is a PII-protected view link.
+ * NOTE: Duplicate exists in 11_SecureMemberDashboard.gs - this version kept for compatibility
+ * @deprecated Use emailDashboardLink() in 11_SecureMemberDashboard.gs
  */
-function emailDashboardLink() {
+function emailDashboardLink_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
   var row = sheet.getActiveRange().getRow();
@@ -10856,8 +11310,10 @@ function emailDashboardLink() {
  * - Active cases, total cases, and win rates
  * - Response time averages
  * - Member satisfaction scores (if available)
+ * NOTE: Duplicate exists in 11_SecureMemberDashboard.gs - this version kept for compatibility
+ * @deprecated Use showStewardPerformanceModal() in 11_SecureMemberDashboard.gs
  */
-function showStewardPerformanceModal() {
+function showStewardPerformanceModal_UIService_() {
   var stewardData = getStewardWorkload();
 
   if (!stewardData || stewardData.length === 0) {
@@ -11071,10 +11527,11 @@ function checkDuplicateMemberIDs_UIService_() {
 /**
  * Creates a grievance PDF document with signature blocks
  * Uses Google Docs template if configured, otherwise creates from scratch
+ * NOTE: createGrievancePDF(folder, data) exists in 10_CommandCenter.gs with different signature
  * @param {Object} data - Grievance data object with name, details, etc.
  * @returns {File} The created PDF file
  */
-function createGrievancePDF(data) {
+function createGrievancePDF_UIService_(data) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Get or create archive folder
@@ -11167,9 +11624,10 @@ function createGrievancePDF(data) {
 
 /**
  * Creates PDF for the currently selected grievance row
- * @deprecated Use createPDFForSelectedGrievance() - this is a legacy version
+ * NOTE: Duplicate exists in 05_Integrations.gs - this version is kept for backwards compatibility
+ * @deprecated Use createPDFForSelectedGrievance() in 05_Integrations.gs
  */
-function createPDFForSelectedGrievance_Legacy_() {
+function createPDFForSelectedGrievance_UIService_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -11211,8 +11669,9 @@ function createPDFForSelectedGrievance_Legacy_() {
  * Promotes the selected member to Steward status
  * Sends steward toolkit email to the promoted member
  * Requires two confirmation dialogs for safety
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:559
  */
-function promoteSelectedMemberToSteward() {
+function promoteSelectedMemberToSteward_UIService_DEPRECATED() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var ui = SpreadsheetApp.getUi();
@@ -11322,8 +11781,9 @@ function sendStewardToolkit_(email, name) {
 /**
  * Demotes the selected steward back to regular member status
  * Requires two confirmation dialogs for safety
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:632
  */
-function demoteSelectedSteward() {
+function demoteSelectedSteward_UIService_DEPRECATED() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var ui = SpreadsheetApp.getUi();
@@ -11426,7 +11886,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2181 lines)
+// SOURCE: 05_Integrations.gs (2266 lines)
 // ============================================================================
 
 /**
@@ -11483,7 +11943,7 @@ function getOrCreateRootFolder() {
 
 /**
  * Sets up a Drive folder for a specific grievance
- * Folder naming format: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+ * Folder naming format: LastName, FirstName - YYYY-MM-DD
  * @param {string} grievanceId - The grievance ID
  * @return {Object} Result with folder URL or error
  */
@@ -12536,6 +12996,11 @@ function showClearCalendarConfirm() {
  * Consolidated to handle both mobile dashboard pages and member portal requests
  * @param {Object} e - Event object with query parameters
  * @returns {HtmlOutput} The HTML page to display
+ *
+ * URL Parameters:
+ * - id=<memberId> - Returns personalized member portal
+ * - page=search|grievances|members|links|dashboard|portal - Returns specific page
+ * - (no params) - Returns default dashboard
  */
 function doGet(e) {
   // Check for member ID parameter (member portal mode)
@@ -13656,6 +14121,86 @@ function showWebAppUrl() {
     'Open this URL on your mobile device:\n\n' + url + '\n\n' +
     'Tip: Add it to your home screen for quick access!',
     ui.ButtonSet.OK
+  );
+}
+
+/**
+ * Add Mobile Dashboard link to Config sheet for easy mobile access
+ * Creates a clickable hyperlink cell that works on mobile devices
+ */
+function addMobileDashboardLinkToConfig() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) {
+    SpreadsheetApp.getUi().alert('Error', 'Config sheet not found', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  var url = ScriptApp.getService().getUrl();
+  if (!url) {
+    SpreadsheetApp.getUi().alert(
+      '📱 Web App Not Deployed',
+      'To use this feature, you must first deploy the web app:\n\n' +
+      '1. Go to Extensions → Apps Script\n' +
+      '2. Click "Deploy" → "New deployment"\n' +
+      '3. Select "Web app"\n' +
+      '4. Set "Who has access" to "Anyone" or appropriate setting\n' +
+      '5. Click "Deploy"\n' +
+      '6. Then run this function again',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Find first empty row in column AZ (or create Mobile Dashboard URL section)
+  var lastRow = configSheet.getLastRow();
+  var targetRow = 2;
+  var targetCol = 52; // Column AZ
+
+  // Check if header exists
+  var headerCell = configSheet.getRange(1, targetCol);
+  if (!headerCell.getValue()) {
+    headerCell.setValue('📱 Mobile Dashboard URL');
+    headerCell.setFontWeight('bold');
+    headerCell.setBackground('#1a73e8');
+    headerCell.setFontColor('#ffffff');
+  }
+
+  // Add the hyperlink
+  var linkCell = configSheet.getRange(targetRow, targetCol);
+  linkCell.setFormula('=HYPERLINK("' + url + '", "📱 Tap to Open Dashboard")');
+  linkCell.setFontSize(14);
+  linkCell.setFontWeight('bold');
+  linkCell.setFontColor('#1a73e8');
+  linkCell.setBackground('#e8f0fe');
+
+  // Also add plain URL below for copying
+  var urlCell = configSheet.getRange(targetRow + 1, targetCol);
+  urlCell.setValue(url);
+  urlCell.setFontSize(10);
+  urlCell.setWrap(true);
+
+  // Add instructions
+  var instructionCell = configSheet.getRange(targetRow + 2, targetCol);
+  instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
+  instructionCell.setFontSize(9);
+  instructionCell.setFontColor('#666666');
+  instructionCell.setWrap(true);
+
+  // Set column width
+  configSheet.setColumnWidth(targetCol, 300);
+
+  SpreadsheetApp.getUi().alert(
+    '📱 Mobile Dashboard Link Added!',
+    'A clickable link has been added to column AZ of the Config sheet.\n\n' +
+    'To access on mobile:\n' +
+    '1. Open this spreadsheet in Google Sheets mobile app\n' +
+    '2. Go to the Config tab\n' +
+    '3. Scroll to column AZ\n' +
+    '4. Tap the blue "Tap to Open Dashboard" link\n\n' +
+    'URL: ' + url,
+    SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
 
@@ -19262,7 +19807,7 @@ function onEditValidation(e) {
 
 
 // ============================================================================
-// SOURCE: 08_Code.gs (12275 lines)
+// SOURCE: 08_Code.gs (12629 lines)
 // ============================================================================
 
 /**
@@ -19991,9 +20536,13 @@ function createGrievanceLog(ss) {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
-    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
-    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    // Group Coordinator columns AC-AF (Message Alert, Coordinator Message, Acknowledged By, Acknowledged Date)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
+    // Collapse all groups by default (including coordinator columns AC-AF)
+    sheet.collapseAllColumnGroups();
+    // Hide Drive Folder ID column (AG) - internal use only
+    sheet.hideColumns(GRIEVANCE_COLS.DRIVE_FOLDER_ID, 1);
   } catch (e) {
     Logger.log('Column group setup skipped: ' + e.toString());
   }
@@ -20653,27 +21202,32 @@ function createDashboardCharts_(sheet) {
     ['7', '🔥 Heatmap Table', 'Color-coded data grid', 'Steward performance matrix', 'Pattern spotting', '🟩🟨🟥'],
     ['8', '📊 Stacked Bar', 'Stacked horizontal bars', 'Status by steward', 'Composition analysis', '▰▰▱'],
     ['9', '🍩 Donut Chart', 'Pie with center hole', 'Resolution outcomes', 'Outcome breakdown', '◎'],
-    ['10', '📈 Area Chart', 'Filled line chart', 'Cumulative trends', 'Volume over time', '▓▓░']
+    ['10', '📈 Area Chart', 'Filled line chart', 'Cumulative trends', 'Volume over time', '▓▓░'],
+    ['11', '📊 Combo Chart', 'Bars + line overlay', 'Volume + Rate comparison', 'Dual metrics', '▮📈'],
+    ['12', '🔵 Scatter Plot', 'X-Y point distribution', 'Response time vs outcomes', 'Correlation analysis', '⋮⋮'],
+    ['13', '📊 Histogram', 'Frequency distribution bars', 'Case duration ranges', 'Distribution shape', '▁▃▅▇▅▃'],
+    ['14', '📋 Summary Table', 'Key metrics in tabular form', 'All KPI summaries', 'Quick reference', '☰'],
+    ['15', '🎯 Steward Leaderboard', 'Ranked performance list', 'Steward metrics', 'Performance ranking', '🥇🥈🥉']
   ];
 
-  sheet.getRange('A122:F131').setValues(chartOptions)
+  sheet.getRange('A122:F136').setValues(chartOptions)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
 
   // Alternate row coloring for chart options
-  for (var r = 122; r <= 131; r++) {
+  for (var r = 122; r <= 136; r++) {
     if (r % 2 === 0) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_LIGHT);
     }
   }
 
   // Style the # column
-  sheet.getRange('A122:A131')
+  sheet.getRange('A122:A136')
     .setFontWeight('bold')
     .setFontColor(COLORS.PRIMARY_PURPLE);
 
   // Card bottom border
-  sheet.getRange('A132:G132').setBackground(COLORS.CHART_INDIGO);
+  sheet.getRange('A137:G137').setBackground(COLORS.CHART_INDIGO);
   sheet.setRowHeight(132, 4);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -20713,8 +21267,8 @@ function generateSelectedChart() {
   }
 
   var chartNum = sheet.getRange('G120').getValue();
-  if (!chartNum || chartNum < 1 || chartNum > 10) {
-    ss.toast('Please enter a valid chart number (1-10) in cell G120', '⚠️ Invalid Selection', 5);
+  if (!chartNum || chartNum < 1 || chartNum > 15) {
+    ss.toast('Please enter a valid chart number (1-15) in cell G120', '⚠️ Invalid Selection', 5);
     return;
   }
 
@@ -20823,8 +21377,50 @@ function generateSelectedChart() {
       createAreaChart_(sheet);
       break;
 
+    case 11: // Combo Chart - Bars + Line overlay
+      createComboChart_(sheet);
+      break;
+
+    case 12: // Scatter Plot
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.SCATTER)
+        .addRange(sheet.getRange('A35:C39')) // X, Y data points
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Response Time vs Outcome Analysis')
+        .setOption('legend', {position: 'bottom'})
+        .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.UNION_GREEN])
+        .setOption('width', 600)
+        .setOption('height', 300)
+        .setOption('pointSize', 8);
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 13: // Histogram
+      chartBuilder = sheet.newChart()
+        .setChartType(Charts.ChartType.HISTOGRAM)
+        .addRange(sheet.getRange('B26:B30')) // Numeric values for distribution
+        .setPosition(135, 1, 0, 0)
+        .setOption('title', 'Case Duration Distribution')
+        .setOption('legend', {position: 'none'})
+        .setOption('colors', [COLORS.CHART_CYAN])
+        .setOption('width', 600)
+        .setOption('height', 300)
+        .setOption('histogram', {bucketSize: 5});
+      chart = chartBuilder.build();
+      sheet.insertChart(chart);
+      break;
+
+    case 14: // Summary Table
+      createSummaryTableChart_(sheet);
+      break;
+
+    case 15: // Steward Leaderboard
+      createStewardLeaderboardChart_(sheet);
+      break;
+
     default:
-      ss.toast('Chart type not yet implemented', 'ℹ️ Info', 3);
+      ss.toast('Enter 1-15 in cell G120 to select a chart type. See options table above.', 'ℹ️ Chart Help', 5);
   }
 
   ss.toast('Chart generated! Scroll down to "Chart Display Area" to view.', '✅ Done', 5);
@@ -20916,6 +21512,107 @@ function createAreaChart_(sheet) {
 
   var chart = chartBuilder.build();
   sheet.insertChart(chart);
+}
+
+/**
+ * Creates a combo chart (bars with line overlay)
+ * @private
+ */
+function createComboChart_(sheet) {
+  var chartBuilder = sheet.newChart()
+    .setChartType(Charts.ChartType.COMBO)
+    .addRange(sheet.getRange('A26:C30')) // Category, Count, Percentage
+    .setPosition(135, 1, 0, 0)
+    .setOption('title', 'Cases by Category with Trend Line')
+    .setOption('legend', {position: 'bottom'})
+    .setOption('seriesType', 'bars')
+    .setOption('series', {1: {type: 'line'}}) // Second series as line
+    .setOption('colors', [COLORS.CHART_BLUE, COLORS.SOLIDARITY_RED])
+    .setOption('width', 600)
+    .setOption('height', 300);
+
+  var chart = chartBuilder.build();
+  sheet.insertChart(chart);
+}
+
+/**
+ * Creates a summary table display
+ * @private
+ */
+function createSummaryTableChart_(sheet) {
+  var openCases = sheet.getRange('A16').getValue() || 0;
+  var resolvedCases = sheet.getRange('D16').getValue() || 0;
+  var winRate = sheet.getRange('D6').getValue() || '0%';
+  var avgDays = sheet.getRange('E6').getValue() || 'N/A';
+
+  var tableText = '╔═══════════════════════════════════════════════════════╗\n' +
+                  '║            📋 KPI SUMMARY TABLE                       ║\n' +
+                  '╠═══════════════════════════════════════════════════════╣\n' +
+                  '║  Metric                    │  Value                   ║\n' +
+                  '╠═══════════════════════════════════════════════════════╣\n' +
+                  '║  Open Cases                │  ' + padRight(String(openCases), 23) + '║\n' +
+                  '║  Resolved Cases            │  ' + padRight(String(resolvedCases), 23) + '║\n' +
+                  '║  Win Rate                  │  ' + padRight(String(winRate), 23) + '║\n' +
+                  '║  Avg Resolution Time       │  ' + padRight(String(avgDays), 23) + '║\n' +
+                  '╚═══════════════════════════════════════════════════════╝';
+
+  sheet.getRange('A135').setValue(tableText)
+    .setFontFamily('Courier New')
+    .setFontSize(12)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBackground('#F0F9FF');
+  sheet.getRange('A135:G145').merge();
+}
+
+/**
+ * Creates a steward leaderboard display
+ * @private
+ */
+function createStewardLeaderboardChart_(sheet) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var stewardSheet = ss.getSheetByName(SHEETS.STEWARDS);
+
+  var leaderboardText = '╔═══════════════════════════════════════════════════════╗\n' +
+                        '║       🏆 STEWARD PERFORMANCE LEADERBOARD              ║\n' +
+                        '╠═══════════════════════════════════════════════════════╣\n';
+
+  if (stewardSheet) {
+    // Get top 5 stewards by cases handled (column B has name, column C has case count)
+    var stewardData = stewardSheet.getRange('B4:C8').getValues();
+    var rank = 1;
+    var medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+
+    for (var i = 0; i < stewardData.length; i++) {
+      if (stewardData[i][0]) {
+        var name = padRight(String(stewardData[i][0]), 25);
+        var cases = stewardData[i][1] || 0;
+        leaderboardText += '║  ' + medals[rank-1] + ' ' + name + ' │  ' + padRight(String(cases) + ' cases', 15) + '║\n';
+        rank++;
+      }
+    }
+  } else {
+    leaderboardText += '║  No steward data available                            ║\n';
+  }
+
+  leaderboardText += '╚═══════════════════════════════════════════════════════╝';
+
+  sheet.getRange('A135').setValue(leaderboardText)
+    .setFontFamily('Courier New')
+    .setFontSize(12)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setBackground('#FDF4FF');
+  sheet.getRange('A135:G145').merge();
+}
+
+/**
+ * Pads a string on the right to reach a target length
+ * @private
+ */
+function padRight(str, len) {
+  while (str.length < len) str += ' ';
+  return str.substring(0, len);
 }
 
 // ============================================================================
@@ -22166,7 +22863,7 @@ function createFunctionChecklistSheet_() {
     // ═══ PHASE 16: Member Management (v4.1) ═══
     ['1️⃣6️⃣ Members', '👤 Member Tools', '➕ Add New Member', 'addMember', 'Adds a new member to the Member Directory'],
     ['1️⃣6️⃣ Members', '👤 Member Tools', '🔄 Update Member', 'updateMember', 'Updates an existing member record'],
-    ['1️⃣6️⃣ Members', '👤 Member Tools', '🔍 Find Existing Member', 'findExistingMember', 'Multi-key smart match (ID, Email, Name) for duplicate prevention'],
+    ['1️⃣6️⃣ Members', '👤 Member Tools', '🔍 Find Existing Member', 'showFindMemberDialog', 'Multi-key smart match (ID, Email, Name) for duplicate prevention'],
     ['1️⃣6️⃣ Members', '👤 Member Tools', '📧 Send Contact Form', 'sendContactInfoForm', 'Sends contact info update form to selected member'],
     ['1️⃣6️⃣ Members', '👤 Member Tools', '📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink', 'Gets link to member satisfaction survey'],
 
@@ -22195,7 +22892,7 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📋 Grievances', '📋 View Active Grievances', 'viewActiveGrievances', 'Shows filtered list of all open/pending grievances'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📋 Grievances', '🔄 Refresh Grievance Formulas', 'recalcAllGrievancesBatched', 'Recalculates deadline and status formulas'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📋 Grievances', '🔗 Setup Live Grievance Links', 'setupLiveGrievanceFormulas', 'Creates formulas linking grievances to member data'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👥 Members', '🔍 Find Existing Member', 'findExistingMember', 'Multi-key smart match for duplicate prevention'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👥 Members', '🔍 Find Existing Member', 'showFindMemberDialog', 'Multi-key smart match for duplicate prevention'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👥 Members', '🔄 Refresh Member Directory Data', 'refreshMemberDirectoryFormulas', 'Updates calculated columns in Member Directory'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📁 Google Drive', '📁 Setup Folder for Grievance', 'setupDriveFolderForGrievance', 'Creates organized folder structure for grievance documents'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📁 Google Drive', '📁 View Grievance Files', 'showGrievanceFiles', 'Shows all files associated with selected grievance'],
@@ -22776,6 +23473,204 @@ function createFAQSheet(ss) {
   return sheet;
 }
 
+/**
+ * Creates a comprehensive Features Reference sheet with searchable features list
+ * v4.3.8 - Complete features catalog with categories, descriptions, and menu paths
+ */
+function createFeaturesReferenceSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = '📋 Features Reference';
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (sheet) {
+    sheet.clear();
+  } else {
+    sheet = ss.insertSheet(sheetName);
+  }
+
+  // Define colors
+  var headerBg = '#3B82F6';       // Blue header
+  var categoryBg = '#DBEAFE';     // Light blue for categories
+  var featureBg = '#FFFFFF';      // White for features
+  var menuPathBg = '#F3F4F6';     // Light gray for menu paths
+  var white = '#FFFFFF';
+
+  var row = 1;
+
+  // ═══ MAIN HEADER ═══
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('📋 FEATURES REFERENCE - 509 Strategic Command Center v' + VERSION_INFO.CURRENT)
+    .setBackground(headerBg)
+    .setFontColor(white)
+    .setFontWeight('bold')
+    .setFontSize(18)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  sheet.setRowHeight(row, 50);
+
+  row += 2;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('Complete searchable reference of all features. Use Ctrl+F (Cmd+F on Mac) to search. See FEATURES.md for detailed documentation.')
+    .setFontSize(11)
+    .setFontColor('#6B7280')
+    .setHorizontalAlignment('center')
+    .setWrap(true);
+
+  // ═══ COLUMN HEADERS ═══
+  row += 2;
+  var headers = ['Category', 'Feature', 'Description', 'Menu Path', 'Keywords'];
+  sheet.getRange(row, 1, 1, 5).setValues([headers])
+    .setBackground('#1E40AF')
+    .setFontColor(white)
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+  sheet.setRowHeight(row, 30);
+  var headerRow = row;
+
+  // ═══ FEATURES DATA ═══
+  var features = [
+    // Dashboard & Analytics
+    ['Dashboard & Analytics', 'Steward Dashboard', 'Internal 6-tab dashboard with Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction. Contains PII.', 'Strategic Ops > Command Center > Steward Dashboard', 'internal, analytics, PII, workload'],
+    ['Dashboard & Analytics', 'Member Dashboard', 'PII-safe dashboard for sharing with members. Shows aggregate stats without personal info.', 'Strategic Ops > Command Center > Member Dashboard', 'public, aggregate, safe, sharing'],
+    ['Dashboard & Analytics', 'Executive Dashboard', 'Legacy 5-tab modal with Overview, My Cases, Grievances, Members, Analytics tabs.', 'Union Hub > Dashboards > Dashboard', 'executive, overview, legacy'],
+    ['Dashboard & Analytics', 'Steward Performance', 'View active cases, total cases, and win rates for all stewards.', 'Strategic Ops > Command Center > Steward Performance', 'performance, win rate, cases'],
+
+    // Search & Discovery
+    ['Search & Discovery', 'Desktop Search', 'Advanced search with tabs for All/Members/Grievances, filters by status/department/date.', 'Strategic Ops > Desktop Search', 'advanced, filter, desktop'],
+    ['Search & Discovery', 'Quick Search', 'Minimal interface for fast member/grievance lookup. Supports partial name matching.', 'Union Hub > Quick Search', 'fast, simple, minimal'],
+    ['Search & Discovery', 'Advanced Search', 'Fullscreen search with complex filtering and multiple criteria support.', 'Union Hub > Search > Advanced Search', 'fullscreen, complex, criteria'],
+    ['Search & Discovery', 'Mobile Search', 'Touch-optimized search for field use on phones and tablets.', 'Field Portal > Mobile Search', 'mobile, touch, field'],
+    ['Search & Discovery', 'Searchable Help Guide', '4-tab help modal with real-time search across Overview, Menu Reference, FAQ, Quick Tips.', 'Union Hub > Help & Documentation', 'help, FAQ, documentation'],
+
+    // Grievance Management
+    ['Grievance Management', 'New Case/Grievance', 'Opens pre-filled grievance form. Calculates deadlines automatically per Article 23A.', 'Strategic Ops > Cases > New Case/Grievance', 'create, file, new'],
+    ['Grievance Management', 'Edit Grievance', 'Modify details of the currently selected grievance row.', 'Strategic Ops > Cases > Edit Selected', 'edit, modify, update'],
+    ['Grievance Management', 'Advance Step', 'Move grievance to next step (Step I → Step II → Step III → Arbitration).', 'Strategic Ops > Cases > Advance Step', 'step, advance, escalate'],
+    ['Grievance Management', 'Bulk Status Update', 'Update status for multiple selected grievances at once.', 'Union Hub > Grievances > Bulk Update', 'bulk, batch, multiple'],
+    ['Grievance Management', 'Auto Deadlines', 'Article 23A: Step 1 (7d), Step 2 Appeal (7d), Step 2 (14d), Step 3 (10d/21d), Arb (30d).', 'Automatic calculation', 'deadline, calculate, Article 23A'],
+    ['Grievance Management', 'Message Alert Flag', 'Checkbox to highlight urgent cases in yellow and move to top when sorted.', 'Grievance Log column', 'urgent, flag, priority'],
+
+    // Member Management
+    ['Member Management', 'Add New Member', 'Open member registration form with all fields.', 'Union Hub > Members > Add New Member', 'add, register, new'],
+    ['Member Management', 'Find Member', 'Search for specific member by name, ID, or other criteria.', 'Union Hub > Members > Find Member', 'find, search, lookup'],
+    ['Member Management', 'Import Members', 'Bulk import member data from external sources.', 'Union Hub > Members > Import Members', 'import, bulk, external'],
+    ['Member Management', 'Export Members', 'Export member directory to CSV or other formats.', 'Union Hub > Members > Export Members', 'export, CSV, download'],
+    ['Member Management', 'Generate Member IDs', 'Creates IDs in format M + First2 + Last2 + 3 digits (e.g., MJOSM123).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
+    ['Member Management', 'Check Duplicate IDs', 'Finds and highlights duplicate Member IDs in the directory.', 'Strategic Ops > ID Engines > Check Duplicates', 'duplicate, check, validate'],
+
+    // Steward Tools
+    ['Steward Tools', 'Promote to Steward', 'Change member status to steward, sends toolkit email.', 'Strategic Ops > Steward Management > Promote', 'promote, steward, new'],
+    ['Steward Tools', 'Demote from Steward', 'Remove steward status from member.', 'Strategic Ops > Steward Management > Demote', 'demote, remove, former'],
+    ['Steward Tools', 'Steward Directory', 'View list of all stewards with contact information.', 'Union Hub > Members > Steward Directory', 'steward, directory, contact'],
+    ['Steward Tools', 'Workload Report', 'Capacity analysis with overload detection (flags 8+ active cases).', 'Strategic Ops > Analytics > Workload Report', 'workload, capacity, overload'],
+    ['Steward Tools', 'Rising Stars', 'Highlights top-performing stewards by score and win rate.', 'Strategic Ops > Strategic Intelligence > Rising Stars', 'top, performance, best'],
+
+    // Calendar & Drive
+    ['Calendar & Drive', 'Sync Deadlines', 'Creates Google Calendar events for all grievance deadlines.', 'Union Hub > Calendar > Sync Deadlines', 'sync, calendar, events'],
+    ['Calendar & Drive', 'Setup Drive Folder', 'Auto-creates Drive folder with subfolders for each step.', 'Union Hub > Google Drive > Setup Folder', 'folder, drive, create'],
+    ['Calendar & Drive', 'View Grievance Files', 'Open the Drive folder for selected grievance.', 'Union Hub > Google Drive > View Files', 'view, files, open'],
+    ['Calendar & Drive', 'Batch Create Folders', 'Create Drive folders for multiple grievances at once.', 'Union Hub > Google Drive > Batch Create', 'batch, bulk, folders'],
+
+    // Accessibility
+    ['Accessibility', 'Focus Mode', 'Distraction-free view, hides non-essential sheets.', 'Union Hub > Comfort View > Focus Mode', 'focus, distraction-free, ADHD'],
+    ['Accessibility', 'Zebra Stripes', 'Alternating row colors for easier reading.', 'Union Hub > Comfort View > Zebra Stripes', 'zebra, stripes, alternating'],
+    ['Accessibility', 'High Contrast', 'Enhanced contrast for visibility.', 'Union Hub > Comfort View > High Contrast', 'contrast, visibility, accessibility'],
+    ['Accessibility', 'Dark Mode', 'Dark gradient backgrounds across all modals.', 'Union Hub > View > Dark Mode', 'dark, theme, night'],
+    ['Accessibility', 'Global Styling', 'Applies Roboto font and zebra stripes to all rows.', '509 Dashboard > Styling > Apply Global', 'styling, font, Roboto'],
+
+    // Strategic Intelligence
+    ['Strategic Intelligence', 'Unit Hot Zones', 'Identifies locations with 3+ active grievances.', 'Strategic Ops > Strategic Intelligence > Hot Zones', 'hot zones, problem, locations'],
+    ['Strategic Intelligence', 'Hostility Report', 'Analyzes denial rates across grievance steps.', 'Strategic Ops > Strategic Intelligence > Hostility', 'denial, management, hostility'],
+    ['Strategic Intelligence', 'Bargaining Sheet', 'Strategic data for contract negotiations.', 'Strategic Ops > Strategic Intelligence > Bargaining', 'bargaining, contract, negotiation'],
+    ['Strategic Intelligence', 'Treemap', 'Visual heat map of grievance activity by unit.', 'Strategic Ops > Analytics > Treemap', 'treemap, density, heatmap'],
+    ['Strategic Intelligence', 'Sentiment Trends', 'Union morale tracking over time from survey data.', 'Strategic Ops > Analytics > Sentiment Trends', 'sentiment, morale, trends'],
+
+    // Administration
+    ['Administration', 'System Diagnostics', 'Comprehensive health check on all components.', 'Admin > System Diagnostics', 'diagnostics, health, check'],
+    ['Administration', 'Repair Dashboard', 'Auto-fix common issues (missing sheets, broken formulas).', 'Admin > Repair Dashboard', 'repair, fix, auto'],
+    ['Administration', 'Midnight Trigger', 'Daily 12AM refresh of dashboards and overdue alerts.', 'Admin > Automation > Midnight Trigger', 'midnight, daily, refresh'],
+    ['Administration', 'Bulk Validation', 'Validate all data for consistency and errors.', 'Admin > Validation > Run Bulk', 'validate, bulk, check'],
+    ['Administration', 'Setup Hidden Sheets', 'Initialize all 6 calculation sheets.', 'Admin > Setup > Hidden Sheets', 'hidden, setup, initialize'],
+
+    // Mobile & Web
+    ['Mobile & Web', 'Pocket/Mobile View', 'Hides non-essential columns for phone access.', '509 Dashboard > Field Access > Mobile View', 'mobile, pocket, phone'],
+    ['Mobile & Web', 'Web App Deploy', 'Create standalone web application from dashboard.', 'Field Portal > Web App > Deploy', 'deploy, web app, standalone'],
+    ['Mobile & Web', 'Member Portal', 'Personalized member view via URL (?member=ID).', 'Via Web App URL', 'portal, personal, member'],
+    ['Mobile & Web', 'Email Portal Links', 'Send personalized dashboard URLs to members.', 'Field Portal > Web App > Email Links', 'email, portal, personalized'],
+
+    // Security
+    ['Security & Audit', 'Audit Logging', 'Track all changes with timestamps and user info.', 'Automatic (_Audit_Log sheet)', 'audit, log, tracking'],
+    ['Security & Audit', 'Sabotage Protection', 'Detects mass deletion (>15 cells) and alerts.', 'Automatic on edit', 'sabotage, protection, deletion'],
+    ['Security & Audit', 'PII Scrubbing', 'Auto-redacts phone/SSN from public dashboards.', 'Automatic in Member Dashboard', 'PII, scrub, redact, privacy'],
+    ['Security & Audit', 'Weingarten Rights', 'Emergency rights statement with tap-to-expand.', 'Within Member Dashboard', 'Weingarten, rights, legal'],
+
+    // Documents
+    ['Documents', 'Create PDF', 'Generate signature-ready PDF with legal blocks.', 'Strategic Ops > ID Engines > Create PDF', 'PDF, generate, signature'],
+    ['Documents', 'Email PDF', 'Send generated PDFs via email.', 'After PDF generation', 'email, PDF, send'],
+
+    // Demo Tools
+    ['Demo Tools', 'Seed Sample Data', 'Generate 1,000 test members and 300 grievances.', 'Admin > Demo Data > Seed All', 'seed, demo, test'],
+    ['Demo Tools', 'NUKE Seeded Data', 'Remove all demo data (preserves real data).', 'Admin > Demo Data > NUKE', 'nuke, delete, cleanup']
+  ];
+
+  // Write all features
+  row++;
+  var startDataRow = row;
+  for (var i = 0; i < features.length; i++) {
+    sheet.getRange(row, 1, 1, 5).setValues([features[i]]);
+
+    // Alternate row colors
+    var bgColor = (i % 2 === 0) ? featureBg : menuPathBg;
+    sheet.getRange(row, 1, 1, 5).setBackground(bgColor);
+
+    // Category column styling
+    if (i === 0 || features[i][0] !== features[i-1][0]) {
+      sheet.getRange(row, 1).setFontWeight('bold').setBackground(categoryBg);
+    }
+
+    sheet.setRowHeight(row, 28);
+    row++;
+  }
+
+  // ═══ FOOTER ═══
+  row += 1;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('Total Features: ' + features.length + ' | Use Ctrl+F to search | See FEATURES.md for complete documentation')
+    .setFontColor('#6B7280')
+    .setFontStyle('italic')
+    .setHorizontalAlignment('center')
+    .setBackground('#F9FAFB');
+
+  // Set column widths
+  sheet.setColumnWidth(1, 160);  // Category
+  sheet.setColumnWidth(2, 160);  // Feature
+  sheet.setColumnWidth(3, 350);  // Description
+  sheet.setColumnWidth(4, 280);  // Menu Path
+  sheet.setColumnWidth(5, 200);  // Keywords
+
+  // Delete excess columns
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols > 5) {
+    sheet.deleteColumns(6, maxCols - 5);
+  }
+
+  // Freeze header rows
+  sheet.setFrozenRows(headerRow);
+
+  // Enable text wrapping for description column
+  sheet.getRange(startDataRow, 3, features.length, 1).setWrap(true);
+
+  // Apply filter to data
+  var dataRange = sheet.getRange(headerRow, 1, features.length + 1, 5);
+  dataRange.createFilter();
+
+  // Set tab color to blue (documentation)
+  sheet.setTabColor('#3B82F6');
+
+  return sheet;
+}
+
 // ============================================================================
 // MENU HANDLER FUNCTIONS
 // ============================================================================
@@ -22783,8 +23678,10 @@ function createFAQSheet(ss) {
 /**
  * Show desktop search modal - comprehensive search for members and grievances
  * Enhanced version of mobile search with more fields and filtering options
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:124
+ * Note: This was a wrapper for UI, the primary does actual searching with query param
  */
-function searchMembers() {
+function searchMembers_Code_DEPRECATED() {
   showDesktopSearch();
 }
 
@@ -23213,23 +24110,21 @@ function createGrievanceFolderFromData_(grievanceId, memberId, firstName, lastNa
     // Get or create root folder
     var rootFolder = getOrCreateDashboardFolder_();
 
-    // Format date as YYYY-MM (default to current date if not provided)
+    // Format date as YYYY-MM-DD (default to current date if not provided)
     var date = dateFiled ? new Date(dateFiled) : new Date();
-    var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+    var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-    // Build folder name: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
-    // Example: "2026-01 - Smith, John - Scheduling - G-2026-001"
+    // Build folder name: LastName, FirstName - YYYY-MM-DD
+    // Example: "Smith, John - 2026-01-15"
     var folderName;
     var sanitizedFirst = sanitizeFolderName_(firstName || '');
     var sanitizedLast = sanitizeFolderName_(lastName || '');
-    var sanitizedCategory = sanitizeFolderName_(issueCategory || 'General');
 
     if (sanitizedFirst && sanitizedLast) {
-      folderName = dateStr + ' - ' + sanitizedLast + ', ' + sanitizedFirst +
-                   ' - ' + sanitizedCategory + ' - ' + grievanceId;
+      folderName = sanitizedLast + ', ' + sanitizedFirst + ' - ' + dateStr;
     } else {
       // Fallback if name not available
-      folderName = dateStr + ' - ' + grievanceId + ' - ' + sanitizedCategory;
+      folderName = grievanceId + ' - ' + dateStr;
     }
 
     // Check if folder already exists
@@ -24474,8 +25369,9 @@ function rejectFlaggedSubmission(rowNum) {
  * High-performance modal with interactive Google Charts, Satisfaction data,
  * Material Icons, Trend Stats, Progress Tracking, and Live Steward Search.
  * No PII is exposed - only aggregate statistics.
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 11_SecureMemberDashboard.gs:501
  */
-function showPublicMemberDashboard() {
+function showPublicMemberDashboard_Code_DEPRECATED() {
   var stats = getGrievanceStats();
   var stewards = getAllStewards();
   var satisfaction = getAggregateSatisfactionStats();
@@ -25215,11 +26111,14 @@ function setupTimelineColumnGroups() {
     sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
-    // Group Coordinator columns (Message Alert, Coordinator Message, Acknowledged By)
-    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    // Group Coordinator columns AC-AF (Message Alert, Coordinator Message, Acknowledged By, Acknowledged Date)
+    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
 
-    // Collapse Step II and III by default (Step I usually visible)
+    // Collapse all groups by default (including coordinator columns AC-AF)
     sheet.collapseAllColumnGroups();
+
+    // Hide Drive Folder ID column (AG) - internal use only
+    sheet.hideColumns(GRIEVANCE_COLS.DRIVE_FOLDER_ID, 1);
 
     ss.toast('Column groups created! Click +/- to expand/collapse step details', '✅ Done', 5);
   } catch (e) {
@@ -28942,21 +29841,19 @@ function autoCreateMissingGrievanceFolders_() {
     }
 
     try {
-      // Format date as YYYY-MM (default to current date if not provided)
+      // Format date as YYYY-MM-DD (default to current date if not provided)
       var date = dateFiled ? new Date(dateFiled) : new Date();
-      var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM');
+      var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
-      // Create folder name: YYYY-MM - LastName, FirstName - IssueCategory - GrievanceID
+      // Create folder name: LastName, FirstName - YYYY-MM-DD
       var sanitizedFirst = sanitizeFolderName_(firstName || '');
       var sanitizedLast = sanitizeFolderName_(lastName || '');
-      var sanitizedCategory = sanitizeFolderName_(issueCategory);
 
       var folderName;
       if (sanitizedFirst && sanitizedLast) {
-        folderName = dateStr + ' - ' + sanitizedLast + ', ' + sanitizedFirst +
-                     ' - ' + sanitizedCategory + ' - ' + grievanceId;
+        folderName = sanitizedLast + ', ' + sanitizedFirst + ' - ' + dateStr;
       } else {
-        folderName = dateStr + ' - ' + grievanceId + ' - ' + sanitizedCategory;
+        folderName = grievanceId + ' - ' + dateStr;
       }
 
       // Create the folder
@@ -31249,8 +32146,9 @@ function getCalcValue(sheetName, cellRef) {
  * Gets dashboard statistics from the calc sheet
  * Used by the sidebar
  * @return {Object} Statistics object
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 04_UIService.gs:5078
  */
-function getDashboardStats() {
+function getDashboardStats_Code_DEPRECATED() {
   const statsSheet = SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(HIDDEN_SHEETS.CALC_STATS);
 
@@ -31339,8 +32237,9 @@ function getMemberList() {
  * Gets member by ID
  * @param {string} memberId - The member ID
  * @return {Object|null} Member object or null
+ * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:97
  */
-function getMemberById(memberId) {
+function getMemberById_Code_DEPRECATED(memberId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
@@ -31542,7 +32441,7 @@ function advancedSearch(filters) {
 
 
 // ============================================================================
-// SOURCE: 09_Main.gs (1684 lines)
+// SOURCE: 09_Main.gs (1852 lines)
 // ============================================================================
 
 /**
@@ -32196,8 +33095,8 @@ function showHelpDialog() {
         .search-input { width: 100%; padding: 12px 16px 12px 44px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.05); color: #e2e8f0; font-size: 14px; }
         .search-input:focus { outline: none; border-color: #3b82f6; }
         .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #64748b; }
-        .tabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
-        .tab { padding: 8px 16px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; cursor: pointer; font-size: 12px; color: #94a3b8; transition: all 0.2s; }
+        .tabs { display: flex; gap: 6px; margin: 16px 0; flex-wrap: wrap; }
+        .tab { padding: 8px 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; cursor: pointer; font-size: 11px; color: #94a3b8; transition: all 0.2s; }
         .tab:hover { background: rgba(255,255,255,0.1); }
         .tab.active { background: #3b82f6; border-color: #3b82f6; color: white; }
         .section { margin-bottom: 20px; }
@@ -32206,6 +33105,7 @@ function showHelpDialog() {
         .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
         .card-title { font-weight: 500; color: #e2e8f0; margin-bottom: 6px; font-size: 13px; }
         .card-desc { color: #94a3b8; font-size: 12px; line-height: 1.5; }
+        .card-path { color: #60a5fa; font-size: 10px; font-family: monospace; margin-top: 6px; }
         .menu-item { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 6px; }
         .menu-item:hover { background: rgba(255,255,255,0.08); }
         .menu-path { color: #60a5fa; font-size: 11px; font-family: monospace; margin-bottom: 4px; }
@@ -32214,11 +33114,18 @@ function showHelpDialog() {
         .faq-item { border-left: 3px solid #3b82f6; padding-left: 12px; margin-bottom: 12px; }
         .faq-q { font-weight: 500; color: #e2e8f0; margin-bottom: 6px; font-size: 13px; }
         .faq-a { color: #94a3b8; font-size: 12px; line-height: 1.6; }
+        .faq-category { font-size: 12px; font-weight: 600; color: #10b981; margin: 16px 0 8px 0; padding: 6px 10px; background: rgba(16,185,129,0.1); border-radius: 6px; display: inline-block; }
+        .feature-row { display: grid; grid-template-columns: 1fr 2fr; gap: 8px; padding: 8px 10px; background: rgba(255,255,255,0.03); border-radius: 6px; margin-bottom: 6px; font-size: 12px; }
+        .feature-row:hover { background: rgba(255,255,255,0.08); }
+        .feature-name { font-weight: 500; color: #e2e8f0; }
+        .feature-desc { color: #94a3b8; }
+        .feature-category { font-size: 11px; font-weight: 600; color: #f59e0b; margin: 14px 0 8px 0; padding: 4px 8px; background: rgba(245,158,11,0.1); border-radius: 4px; display: inline-block; }
         .highlight { background: #fbbf24; color: #0f172a; padding: 0 2px; border-radius: 2px; }
         .hidden { display: none; }
         .repo-link { display: inline-flex; align-items: center; gap: 6px; color: #60a5fa; text-decoration: none; font-size: 12px; margin-top: 8px; }
         .repo-link:hover { text-decoration: underline; }
         .version { color: #64748b; font-size: 11px; text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .result-count { font-size: 11px; color: #64748b; margin: 8px 0; }
       </style>
     </head>
     <body>
@@ -32226,15 +33133,17 @@ function showHelpDialog() {
         <div class="search-box">
           <div style="position: relative;">
             <span class="material-icons search-icon">search</span>
-            <input type="text" class="search-input" id="searchInput" placeholder="Search help topics, menus, or FAQ..." oninput="filterContent()">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search features, help topics, menus, or FAQ..." oninput="filterContent()">
           </div>
+          <div class="result-count" id="resultCount"></div>
         </div>
 
         <div class="tabs">
           <div class="tab active" onclick="showTab('overview')">Overview</div>
-          <div class="tab" onclick="showTab('menus')">Menu Reference</div>
+          <div class="tab" onclick="showTab('features')">Features</div>
+          <div class="tab" onclick="showTab('menus')">Menus</div>
           <div class="tab" onclick="showTab('faq')">FAQ</div>
-          <div class="tab" onclick="showTab('shortcuts')">Quick Tips</div>
+          <div class="tab" onclick="showTab('shortcuts')">Tips</div>
         </div>
 
         <div id="content">
@@ -32243,82 +33152,258 @@ function showHelpDialog() {
             <div class="section">
               <div class="section-title"><span class="material-icons">dashboard</span>Two-Dashboard Architecture</div>
               <div class="card">
-                <div class="card-title">🛡️ Steward Dashboard (Internal)</div>
-                <div class="card-desc">Comprehensive dashboard for stewards with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, and Satisfaction. Contains member names and PII - for internal use only.</div>
+                <div class="card-title">Steward Dashboard (Internal)</div>
+                <div class="card-desc">Comprehensive dashboard with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction. Contains PII - for internal use only.</div>
+                <div class="card-path">Strategic Ops > Command Center > Steward Dashboard</div>
               </div>
               <div class="card">
-                <div class="card-title">👥 Member Dashboard (Public)</div>
+                <div class="card-title">Member Dashboard (Public)</div>
                 <div class="card-desc">PII-safe dashboard for sharing with members. Shows aggregate union stats, steward directory, and satisfaction scores without personal information.</div>
+                <div class="card-path">Strategic Ops > Command Center > Member Dashboard</div>
               </div>
             </div>
 
             <div class="section">
-              <div class="section-title"><span class="material-icons">star</span>Key Features</div>
+              <div class="section-title"><span class="material-icons">star</span>Key Capabilities</div>
               <div class="card">
                 <div class="card-title">Grievance Tracking</div>
-                <div class="card-desc">Track grievances through all steps with automatic deadline calculations based on Article 23A.</div>
+                <div class="card-desc">Full lifecycle management from filing to resolution with automatic Article 23A deadline calculations.</div>
               </div>
               <div class="card">
                 <div class="card-title">Member Directory</div>
-                <div class="card-desc">Maintain member records with contact info, union status, and steward assignments.</div>
+                <div class="card-desc">31-column member records with contact info, union status, steward assignments, and auto-calculated grievance status.</div>
               </div>
               <div class="card">
-                <div class="card-title">Satisfaction Surveys</div>
-                <div class="card-desc">8-section member satisfaction analysis covering steward ratings, leadership, communication, and more.</div>
+                <div class="card-title">Strategic Intelligence</div>
+                <div class="card-desc">Unit Hot Zones, Rising Stars, Management Hostility Reports, and Bargaining Cheat Sheets for contract negotiations.</div>
               </div>
               <div class="card">
-                <div class="card-title">Calendar & Drive Integration</div>
-                <div class="card-desc">Sync deadlines to Google Calendar and auto-create Drive folders for documentation.</div>
+                <div class="card-title">Integrations</div>
+                <div class="card-desc">Google Calendar sync, Drive folder auto-creation, email notifications, PDF generation, and Web App deployment.</div>
               </div>
+            </div>
+          </div>
+
+          <!-- FEATURES TAB (NEW) -->
+          <div id="features-tab" class="tab-content hidden">
+            <div class="section">
+              <div class="section-title"><span class="material-icons">apps</span>Complete Features Reference</div>
+
+              <div class="feature-category">Dashboard & Analytics</div>
+              <div class="feature-row"><div class="feature-name">Steward Dashboard</div><div class="feature-desc">Internal 6-tab dashboard with PII (Strategic Ops > Command Center)</div></div>
+              <div class="feature-row"><div class="feature-name">Member Dashboard</div><div class="feature-desc">PII-safe public dashboard with aggregate stats</div></div>
+              <div class="feature-row"><div class="feature-name">Steward Performance</div><div class="feature-desc">View win rates, active cases, total cases for all stewards</div></div>
+              <div class="feature-row"><div class="feature-name">Satisfaction Analysis</div><div class="feature-desc">8-section survey analysis with trends and breakdowns</div></div>
+
+              <div class="feature-category">Search & Discovery</div>
+              <div class="feature-row"><div class="feature-name">Desktop Search</div><div class="feature-desc">Advanced search with filters by status/department/date</div></div>
+              <div class="feature-row"><div class="feature-name">Quick Search</div><div class="feature-desc">Fast minimal interface with partial name matching</div></div>
+              <div class="feature-row"><div class="feature-name">Mobile Search</div><div class="feature-desc">Touch-optimized search for field use</div></div>
+              <div class="feature-row"><div class="feature-name">Live Steward Search</div><div class="feature-desc">Real-time client-side filtering in Member Dashboard</div></div>
+
+              <div class="feature-category">Grievance Management</div>
+              <div class="feature-row"><div class="feature-name">New Case/Grievance</div><div class="feature-desc">Pre-filled form with auto-calculated deadlines</div></div>
+              <div class="feature-row"><div class="feature-name">Advance Step</div><div class="feature-desc">Move grievance through Step I → II → III → Arbitration</div></div>
+              <div class="feature-row"><div class="feature-name">Auto Deadlines</div><div class="feature-desc">Article 23A calculations (7/14/10/21/30 day rules)</div></div>
+              <div class="feature-row"><div class="feature-name">Message Alert Flag</div><div class="feature-desc">Highlight urgent cases in yellow, move to top</div></div>
+              <div class="feature-row"><div class="feature-name">Bulk Status Update</div><div class="feature-desc">Update multiple grievances at once</div></div>
+
+              <div class="feature-category">Member Management</div>
+              <div class="feature-row"><div class="feature-name">Add/Find Members</div><div class="feature-desc">Registration form and search functionality</div></div>
+              <div class="feature-row"><div class="feature-name">Generate Member IDs</div><div class="feature-desc">Auto-create IDs (M + First2 + Last2 + 3 digits)</div></div>
+              <div class="feature-row"><div class="feature-name">Check Duplicates</div><div class="feature-desc">Find and highlight duplicate Member IDs</div></div>
+              <div class="feature-row"><div class="feature-name">Import/Export</div><div class="feature-desc">Bulk data import and CSV export</div></div>
+
+              <div class="feature-category">Steward Tools</div>
+              <div class="feature-row"><div class="feature-name">Promote/Demote</div><div class="feature-desc">One-click steward status changes with toolkit emails</div></div>
+              <div class="feature-row"><div class="feature-name">Workload Report</div><div class="feature-desc">Capacity analysis, overload detection (8+ cases)</div></div>
+              <div class="feature-row"><div class="feature-name">Rising Stars</div><div class="feature-desc">Top performers by score and win rate</div></div>
+              <div class="feature-row"><div class="feature-name">Steward Directory</div><div class="feature-desc">Contact info for all stewards</div></div>
+
+              <div class="feature-category">Calendar & Drive</div>
+              <div class="feature-row"><div class="feature-name">Sync Deadlines</div><div class="feature-desc">Create Google Calendar events for all deadlines</div></div>
+              <div class="feature-row"><div class="feature-name">Drive Folders</div><div class="feature-desc">Auto-create folders with step subfolders</div></div>
+              <div class="feature-row"><div class="feature-name">Batch Create</div><div class="feature-desc">Create folders for multiple grievances</div></div>
+
+              <div class="feature-category">Strategic Intelligence</div>
+              <div class="feature-row"><div class="feature-name">Unit Hot Zones</div><div class="feature-desc">Locations with 3+ active grievances</div></div>
+              <div class="feature-row"><div class="feature-name">Hostility Report</div><div class="feature-desc">Management denial rate analysis</div></div>
+              <div class="feature-row"><div class="feature-name">Bargaining Sheet</div><div class="feature-desc">Strategic contract negotiation data</div></div>
+              <div class="feature-row"><div class="feature-name">Treemap</div><div class="feature-desc">Visual heat map of grievance activity</div></div>
+              <div class="feature-row"><div class="feature-name">Sentiment Trends</div><div class="feature-desc">Union morale tracking over time</div></div>
+
+              <div class="feature-category">Accessibility</div>
+              <div class="feature-row"><div class="feature-name">Focus Mode</div><div class="feature-desc">Distraction-free view, hides non-essential sheets</div></div>
+              <div class="feature-row"><div class="feature-name">Zebra Stripes</div><div class="feature-desc">Alternating row colors for readability</div></div>
+              <div class="feature-row"><div class="feature-name">Dark Mode</div><div class="feature-desc">Dark gradient backgrounds on all modals</div></div>
+              <div class="feature-row"><div class="feature-name">High Contrast</div><div class="feature-desc">Enhanced visibility for accessibility</div></div>
+
+              <div class="feature-category">Security & Audit</div>
+              <div class="feature-row"><div class="feature-name">Audit Logging</div><div class="feature-desc">Track all changes with timestamps and users</div></div>
+              <div class="feature-row"><div class="feature-name">Sabotage Protection</div><div class="feature-desc">Mass deletion detection (>15 cells) with alerts</div></div>
+              <div class="feature-row"><div class="feature-name">PII Scrubbing</div><div class="feature-desc">Auto-redact phone/SSN from public dashboards</div></div>
+              <div class="feature-row"><div class="feature-name">Weingarten Rights</div><div class="feature-desc">Emergency rights statement utility</div></div>
+
+              <div class="feature-category">Administration</div>
+              <div class="feature-row"><div class="feature-name">System Diagnostics</div><div class="feature-desc">Comprehensive health check on all components</div></div>
+              <div class="feature-row"><div class="feature-name">Repair Dashboard</div><div class="feature-desc">Auto-fix missing sheets, broken formulas</div></div>
+              <div class="feature-row"><div class="feature-name">Midnight Trigger</div><div class="feature-desc">Daily 12AM refresh and overdue alerts</div></div>
+              <div class="feature-row"><div class="feature-name">Hidden Sheets</div><div class="feature-desc">6 auto-calculating sheets for formulas</div></div>
+
+              <div class="feature-category">Mobile & Web</div>
+              <div class="feature-row"><div class="feature-name">Pocket View</div><div class="feature-desc">Hide columns for phone access</div></div>
+              <div class="feature-row"><div class="feature-name">Web App</div><div class="feature-desc">Standalone deployment with URL routing</div></div>
+              <div class="feature-row"><div class="feature-name">Member Portal</div><div class="feature-desc">Personalized view via ?member=ID URL</div></div>
+              <div class="feature-row"><div class="feature-name">Email Links</div><div class="feature-desc">Send portal URLs to members</div></div>
+
+              <div class="feature-category">Documents</div>
+              <div class="feature-row"><div class="feature-name">PDF Generation</div><div class="feature-desc">Signature-ready PDFs with legal blocks</div></div>
+              <div class="feature-row"><div class="feature-name">Email PDFs</div><div class="feature-desc">Send generated documents via email</div></div>
+            </div>
+
+            <div style="margin-top: 12px; padding: 10px; background: rgba(59,130,246,0.1); border-radius: 8px; font-size: 11px; color: #94a3b8;">
+              <strong style="color: #60a5fa;">Tip:</strong> For a printable reference, go to Admin > Setup > Create Features Reference Sheet
             </div>
           </div>
 
           <!-- MENU REFERENCE TAB -->
           <div id="menus-tab" class="tab-content hidden">
             <div class="section">
-              <div class="section-title"><span class="material-icons">menu</span>🏛️ Union Hub Menu</div>
-              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">👥 Member Dashboard</div><div class="menu-desc">Opens the public-safe member dashboard with aggregate stats</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">🛡️ Steward Dashboard</div><div class="menu-desc">Opens the internal steward dashboard with full analytics</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Union Hub > Quick Search</div><div class="menu-name">🔍 Quick Search</div><div class="menu-desc">Fast search across members and grievances</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Union Hub > Multi-Select Panel</div><div class="menu-name">📋 Multi-Select Panel</div><div class="menu-desc">Select multiple grievances for bulk operations</div></div></div>
+              <div class="section-title"><span class="material-icons">menu</span>Union Hub Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">Member Dashboard</div><div class="menu-desc">Public-safe dashboard with aggregate stats</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">Steward Dashboard</div><div class="menu-desc">Internal dashboard with full analytics</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Search</div><div class="menu-name">Quick/Desktop/Advanced Search</div><div class="menu-desc">Multiple search interfaces</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Cases</div><div class="menu-name">New Case, Edit, Checklist</div><div class="menu-desc">Grievance management</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Members</div><div class="menu-name">Add, Find, Import, Export</div><div class="menu-desc">Member directory operations</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Calendar</div><div class="menu-name">Sync, View, Clear</div><div class="menu-desc">Google Calendar integration</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Union Hub > Drive</div><div class="menu-name">Setup, View, Batch Create</div><div class="menu-desc">Google Drive folder management</div></div></div>
             </div>
 
             <div class="section">
-              <div class="section-title"><span class="material-icons">menu</span>🎯 Strategic Ops Menu</div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops</div><div class="menu-name">👥 Member Dashboard</div><div class="menu-desc">PII-safe aggregate statistics portal</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops</div><div class="menu-name">🛡️ Steward Dashboard</div><div class="menu-desc">Internal analytics with all 6 tabs</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">➕ New Case/Grievance</div><div class="menu-desc">Open the new grievance filing form</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">✏️ Edit Selected</div><div class="menu-desc">Edit the currently selected grievance</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Strategic Ops > ID Engines</div><div class="menu-name">🆔 Generate Missing Member IDs</div><div class="menu-desc">Auto-generate IDs for members without one</div></div></div>
+              <div class="section-title"><span class="material-icons">menu</span>Strategic Ops Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Command Center</div><div class="menu-name">Dashboards & Performance</div><div class="menu-desc">Both dashboards and steward performance</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Cases</div><div class="menu-name">New, Edit, Checklist</div><div class="menu-desc">Grievance operations</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > ID Engines</div><div class="menu-name">Generate IDs, Check Duplicates, PDF</div><div class="menu-desc">ID and document generation</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Strategic Ops > Steward Mgmt</div><div class="menu-name">Promote, Demote, Forms, Surveys</div><div class="menu-desc">Steward management tools</div></div></div>
             </div>
 
             <div class="section">
-              <div class="section-title"><span class="material-icons">menu</span>🛠️ Admin Menu</div>
-              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">🩺 System Diagnostics</div><div class="menu-desc">Run health check on all system components</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">🔧 Repair Dashboard</div><div class="menu-desc">Fix common issues automatically</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Admin > Data Sync</div><div class="menu-name">🔄 Sync All Data Now</div><div class="menu-desc">Synchronize member and grievance data</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Admin > Validation</div><div class="menu-name">🔍 Run Bulk Validation</div><div class="menu-desc">Validate all data for consistency</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">Admin > Setup</div><div class="menu-name">🔧 Setup All Hidden Sheets</div><div class="menu-desc">Initialize all calculation sheets</div></div></div>
+              <div class="section-title"><span class="material-icons">menu</span>Admin Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Admin</div><div class="menu-name">Diagnostics, Repair, Settings</div><div class="menu-desc">System health and fixes</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Automation</div><div class="menu-name">Refresh, Triggers, Email</div><div class="menu-desc">Automated tasks</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Data Sync</div><div class="menu-name">Sync All, Triggers</div><div class="menu-desc">Data synchronization</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Validation</div><div class="menu-name">Run, Settings, Indicators</div><div class="menu-desc">Data validation</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Setup</div><div class="menu-name">Hidden Sheets, Validations, Features</div><div class="menu-desc">System setup including Features Reference Sheet</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Admin > Demo Data</div><div class="menu-name">Seed, NUKE</div><div class="menu-desc">Test data management (dev only)</div></div></div>
             </div>
 
             <div class="section">
-              <div class="section-title"><span class="material-icons">menu</span>📊 509 Dashboard Menu</div>
-              <div class="menu-item"><div><div class="menu-path">509 Dashboard</div><div class="menu-name">📊 Dashboard</div><div class="menu-desc">Legacy 5-tab dashboard modal</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Field Access</div><div class="menu-name">📱 Pocket/Mobile View</div><div class="menu-desc">Optimize display for mobile devices</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Personnel</div><div class="menu-name">➕ Add New Member</div><div class="menu-desc">Open the member registration form</div></div></div>
-              <div class="menu-item"><div><div class="menu-path">509 Dashboard > Styling</div><div class="menu-name">🎨 Apply Global Styling</div><div class="menu-desc">Apply Roboto theme and zebra stripes</div></div></div>
+              <div class="section-title"><span class="material-icons">menu</span>Field Portal Menu</div>
+              <div class="menu-item"><div><div class="menu-path">Field Portal > Accessibility</div><div class="menu-name">Mobile View, Get URL</div><div class="menu-desc">Mobile optimization</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Field Portal > Analytics</div><div class="menu-name">Unit Health, Trends, Precedents</div><div class="menu-desc">Field analytics</div></div></div>
+              <div class="menu-item"><div><div class="menu-path">Field Portal > Web App</div><div class="menu-name">Deploy, Portals, Email Links</div><div class="menu-desc">Web app management</div></div></div>
             </div>
           </div>
 
-          <!-- FAQ TAB -->
+          <!-- FAQ TAB (ENHANCED - ALL 15+ FAQs) -->
           <div id="faq-tab" class="tab-content hidden">
             <div class="section">
               <div class="section-title"><span class="material-icons">help</span>Frequently Asked Questions</div>
 
+              <div class="faq-category">Getting Started</div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I set up the dashboard for the first time?</div>
+                <div class="faq-a">Go to <strong>Admin > System Diagnostics</strong> to check your system, then customize the <strong>Config</strong> tab with your organization's dropdown values (job titles, locations, stewards, etc.).</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Can I use this with existing member data?</div>
+                <div class="faq-a">Yes! You can paste member data into the <strong>Member Directory</strong> tab. Just make sure the columns match and Member IDs follow the format (MJOHN123).</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I test the system without real data?</div>
+                <div class="faq-a">Use <strong>Admin > Demo Data > Seed All Sample Data</strong> to generate 1,000 test members and 300 grievances. Use <strong>NUKE SEEDED DATA</strong> when done testing.</div>
+              </div>
+
+              <div class="faq-category">Member Directory</div>
+
+              <div class="faq-item">
+                <div class="faq-q">What format should Member IDs use?</div>
+                <div class="faq-a">Format is <strong>M + first 2 letters of first name + first 2 letters of last name + 3 random digits</strong>. Example: John Smith = MJOSM123</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Why are some columns not editable (AB-AD)?</div>
+                <div class="faq-a">Columns AB-AD are <strong>auto-calculated</strong> from the Grievance Log: Has Open Grievance, Grievance Status, and Days to Deadline update automatically when you edit grievances.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I assign a steward to multiple members?</div>
+                <div class="faq-a">Use the <strong>Assigned Steward</strong> dropdown in column P. You can use the multi-select editor from <strong>Union Hub > Multi-Select</strong>.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">What does the "Start Grievance" checkbox do?</div>
+                <div class="faq-a">Checking this opens a <strong>pre-filled grievance form</strong> for that member. The checkbox auto-resets after use.</div>
+              </div>
+
+              <div class="faq-category">Grievances</div>
+
               <div class="faq-item">
                 <div class="faq-q">How do I file a new grievance?</div>
-                <div class="faq-a">Go to <strong>Strategic Ops > Cases & Grievances > ➕ New Case/Grievance</strong>. Fill in the member info, select the grievance type, and provide details. Deadlines are calculated automatically.</div>
+                <div class="faq-a">Go to <strong>Strategic Ops > Cases > New Case/Grievance</strong>. Fill in the member info, select the grievance type, and provide details. Deadlines are calculated automatically.</div>
               </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How are deadlines calculated?</div>
+                <div class="faq-a">Based on <strong>Article 23A</strong>: Filing = Incident + 21 days, Step I = Filed + 30 days, Step II Appeal = Step I Decision + 10 days, Step II Decision = Appeal + 30 days. Arbitration within 30 days of Step 3.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">What does "Message Alert" do?</div>
+                <div class="faq-a">When checked, the row is <strong>highlighted yellow</strong> and moves to the top of the list when sorted. Use it to flag urgent cases.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Why does Days to Deadline show "Overdue"?</div>
+                <div class="faq-a">This means the next deadline has <strong>passed</strong>. Check the Next Action Due column to see which deadline is overdue and take action.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I create a folder for grievance documents?</div>
+                <div class="faq-a">Select the grievance row, then go to <strong>Union Hub > Drive > Setup Folder</strong>. This creates a Google Drive folder with subfolders for each step.</div>
+              </div>
+
+              <div class="faq-category">Troubleshooting</div>
+
+              <div class="faq-item">
+                <div class="faq-q">Dropdowns are empty or not working</div>
+                <div class="faq-a">Check the <strong>Config</strong> tab - the corresponding column may be empty. Run <strong>Admin > Setup > Setup Data Validations</strong> to reapply dropdowns.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Data isn't syncing between sheets</div>
+                <div class="faq-a">Run <strong>Admin > Data Sync > Install Auto-Sync Trigger</strong>. Also try <strong>Admin > Data Sync > Sync All Data Now</strong> for immediate sync.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">The dashboard shows wrong numbers</div>
+                <div class="faq-a">Try <strong>Admin > Repair Dashboard</strong>. If issues persist, run <strong>Admin > Setup > Repair All Hidden Sheets</strong> to rebuild calculation sheets.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">I accidentally deleted data - can I undo?</div>
+                <div class="faq-a">Use <strong>Ctrl+Z</strong> (or Cmd+Z on Mac) immediately. For older changes, go to <strong>File > Version history > See version history</strong>.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">Menus are not appearing</div>
+                <div class="faq-a">Close and reopen the spreadsheet. If still missing, go to <strong>Extensions > Apps Script</strong> and run the <code>onOpen</code> function manually.</div>
+              </div>
+
+              <div class="faq-category">Advanced</div>
 
               <div class="faq-item">
                 <div class="faq-q">What's the difference between the two dashboards?</div>
@@ -32326,44 +33411,19 @@ function showHelpDialog() {
               </div>
 
               <div class="faq-item">
-                <div class="faq-q">How do deadline calculations work?</div>
-                <div class="faq-a">Based on Article 23A: Step 1 has ${DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE} days for response, Step 2 has ${DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL} days to appeal, Step 3 has ${DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL} days, and Arbitration must be demanded within ${DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND} days of Step 3.</div>
+                <div class="faq-q">Can multiple people use this at the same time?</div>
+                <div class="faq-a">Yes! Google Sheets supports <strong>real-time collaboration</strong>. Changes sync automatically between users.</div>
               </div>
 
               <div class="faq-item">
-                <div class="faq-q">Why are some cells showing errors?</div>
-                <div class="faq-a">Run <strong>Admin > 🩺 System Diagnostics</strong> to check for issues. Then try <strong>Admin > 🔧 Repair Dashboard</strong> to fix common problems automatically.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">How do I search for a member or grievance?</div>
-                <div class="faq-a">Use <strong>Union Hub > 🔍 Quick Search</strong> or <strong>Strategic Ops > 🔍 Desktop Search</strong> for advanced filtering options.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">How do I sync deadlines to Google Calendar?</div>
-                <div class="faq-a">Select a grievance, then use <strong>509 Dashboard > Calendar > 📅 Create Calendar Event</strong>. This creates reminder events for all deadline dates.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">What does the Satisfaction tab show?</div>
-                <div class="faq-a">It analyzes member satisfaction surveys across 8 sections: Overall Satisfaction, Steward Ratings, Chapter Effectiveness, Local Leadership, Contract Enforcement, Communication Quality, Member Voice, and Value & Action.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">How do I apply zebra stripes to all rows?</div>
-                <div class="faq-a">Go to <strong>509 Dashboard > Styling > 🎨 Apply Global Styling</strong>. This applies Roboto font and zebra stripes to all rows in Member Directory and Grievance Log.</div>
-              </div>
-
-              <div class="faq-item">
-                <div class="faq-q">How do I start fresh with a new spreadsheet?</div>
-                <div class="faq-a">Visit our GitHub repository to get a fresh copy with seed data and demo features. See the link below.</div>
+                <div class="faq-q">How do I customize deadline days?</div>
+                <div class="faq-a">The default deadlines (21, 30, 10 days) are configured in the <strong>Config</strong> tab columns AA-AD. You can modify these values for your contract.</div>
               </div>
             </div>
 
             <a href="https://github.com/Woop91/MULTIPLE-SCRIPS-REPO" target="_blank" class="repo-link">
               <span class="material-icons" style="font-size: 16px;">open_in_new</span>
-              Get a fresh copy from GitHub (with Seed & Nuke features)
+              GitHub Repository (fresh copies, documentation, updates)
             </a>
           </div>
 
@@ -32373,33 +33433,43 @@ function showHelpDialog() {
               <div class="section-title"><span class="material-icons">bolt</span>Quick Tips</div>
 
               <div class="card">
-                <div class="card-title">🔍 Quick Search</div>
-                <div class="card-desc">Use Union Hub > Quick Search to find any member or grievance instantly. Supports partial name matching.</div>
+                <div class="card-title">Quick Search</div>
+                <div class="card-desc">Use <strong>Union Hub > Quick Search</strong> to find any member or grievance instantly. Supports partial name matching.</div>
               </div>
 
               <div class="card">
-                <div class="card-title">📊 Dashboard Views</div>
-                <div class="card-desc">Use Steward Dashboard for internal analysis, Member Dashboard for sharing with members (PII-safe).</div>
+                <div class="card-title">Dashboard Views</div>
+                <div class="card-desc">Use <strong>Steward Dashboard</strong> for internal analysis, <strong>Member Dashboard</strong> for sharing with members (PII-safe).</div>
               </div>
 
               <div class="card">
-                <div class="card-title">📱 Mobile Access</div>
-                <div class="card-desc">Enable Pocket/Mobile View to hide non-essential columns when using on phones or tablets.</div>
+                <div class="card-title">Mobile Access</div>
+                <div class="card-desc">Enable <strong>Pocket/Mobile View</strong> to hide non-essential columns when using on phones or tablets.</div>
               </div>
 
               <div class="card">
-                <div class="card-title">🔄 Data Sync</div>
-                <div class="card-desc">Run Admin > Data Sync > Sync All Data Now periodically to ensure member and grievance data stays linked.</div>
+                <div class="card-title">Data Sync</div>
+                <div class="card-desc">Run <strong>Admin > Data Sync > Sync All Data Now</strong> periodically to ensure member and grievance data stays linked.</div>
               </div>
 
               <div class="card">
-                <div class="card-title">🎨 Visual Styling</div>
-                <div class="card-desc">Apply Global Styling adds zebra stripes to ALL rows (not just data rows) for consistent appearance.</div>
+                <div class="card-title">Visual Styling</div>
+                <div class="card-desc"><strong>Visual Control Panel</strong> (Union Hub) lets you toggle dark mode, zebra stripes, and focus mode.</div>
               </div>
 
               <div class="card">
-                <div class="card-title">⚡ Auto-Triggers</div>
-                <div class="card-desc">Install auto-sync and midnight refresh triggers from Admin menu to keep data current automatically.</div>
+                <div class="card-title">Auto-Triggers</div>
+                <div class="card-desc">Install <strong>auto-sync</strong> and <strong>midnight refresh</strong> triggers from Admin menu to keep data current automatically.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">Features Reference Sheet</div>
+                <div class="card-desc">Create a printable features sheet via <strong>Admin > Setup > Create Features Reference Sheet</strong>.</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">Keyboard Shortcut</div>
+                <div class="card-desc">Use <strong>Ctrl+F</strong> (Cmd+F on Mac) in any sheet to search within the spreadsheet itself.</div>
               </div>
             </div>
           </div>
@@ -32412,54 +33482,51 @@ function showHelpDialog() {
 
       <script>
         function showTab(tabName) {
-          // Hide all tabs
           document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-
-          // Show selected tab
           document.getElementById(tabName + '-tab').classList.remove('hidden');
           event.target.classList.add('active');
+          document.getElementById('resultCount').textContent = '';
         }
 
         function filterContent() {
-          const query = document.getElementById('searchInput').value.toLowerCase();
-          const items = document.querySelectorAll('.card, .menu-item, .faq-item');
+          const query = document.getElementById('searchInput').value.toLowerCase().trim();
+          const allItems = document.querySelectorAll('.card, .menu-item, .faq-item, .feature-row');
+          let visibleCount = 0;
 
-          items.forEach(item => {
-            const text = item.textContent.toLowerCase();
-            if (query === '' || text.includes(query)) {
+          if (query === '') {
+            allItems.forEach(item => {
               item.classList.remove('hidden');
-              // Highlight matches
-              if (query !== '') {
-                highlightText(item, query);
-              } else {
-                removeHighlight(item);
-              }
+              item.style.borderLeft = '';
+            });
+            document.getElementById('resultCount').textContent = '';
+            return;
+          }
+
+          // Show all tabs when searching
+          document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('hidden'));
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+          allItems.forEach(item => {
+            const text = item.textContent.toLowerCase();
+            if (text.includes(query)) {
+              item.classList.remove('hidden');
+              item.style.borderLeft = '3px solid #fbbf24';
+              visibleCount++;
             } else {
               item.classList.add('hidden');
+              item.style.borderLeft = '';
             }
           });
 
-          // Show all tabs when searching
-          if (query !== '') {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('hidden'));
-          }
-        }
-
-        function highlightText(element, query) {
-          // Simple highlight - just mark parent as searched
-          element.style.borderLeft = '3px solid #fbbf24';
-        }
-
-        function removeHighlight(element) {
-          element.style.borderLeft = '';
+          document.getElementById('resultCount').textContent = visibleCount + ' results found';
         }
       </script>
     </body>
     </html>
-  `).setWidth(650).setHeight(700);
+  `).setWidth(700).setHeight(750);
 
-  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help Guide - 509 Dashboard');
+  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - 509 Dashboard v' + VERSION_INFO.CURRENT);
 }
 
 // ============================================================================
@@ -33091,10 +34158,10 @@ function exportMemberDirectory(format) {
 }
 
 /**
- * Wrapper function for findExistingMember that can be called from menu
  * Shows a search dialog to find existing members
+ * Menu wrapper - calls the backend findExistingMember() with user input
  */
-function findExistingMember() {
+function showFindMemberDialog() {
   const html = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
@@ -33231,7 +34298,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 10_CommandCenter.gs (2515 lines)
+// SOURCE: 10_CommandCenter.gs (2740 lines)
 // ============================================================================
 
 /**
@@ -33385,7 +34452,8 @@ function createCommandCenterMenu() {
       .addItem('📊 Grievance Trends', 'showGrievanceTrends')
       .addItem('📚 Search Precedents', 'showSearchPrecedents')
       .addSeparator()
-      .addItem('📝 OCR Transcribe Form', 'showOCRDialog'));
+      .addItem('📝 OCR Transcribe Form', 'showOCRDialog')
+      .addItem('🔧 OCR Setup', 'setupOCRApiKey'));
 
   menu.addSeparator();
 
@@ -35543,6 +36611,230 @@ function showOCRDialog() {
   ui.showModalDialog(html, '📝 WGER OCR Transcription');
 }
 
+/**
+ * OCR Setup Helper - Guides users through Cloud Vision API configuration
+ * Checks current status, provides instructions, and allows API key entry
+ */
+function setupOCRApiKey() {
+  var ui = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var currentKey = props.getProperty('CLOUD_VISION_API_KEY');
+
+  // Check current status
+  var statusMessage = currentKey
+    ? '✅ API Key Configured (ends with: ...' + currentKey.slice(-6) + ')'
+    : '❌ API Key Not Configured';
+
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    '* { box-sizing: border-box; }' +
+    'body { font-family: "Google Sans", Roboto, Arial, sans-serif; padding: 24px; margin: 0; background: #F8FAFC; color: #1E293B; }' +
+    'h2 { margin: 0 0 8px 0; color: #1E293B; }' +
+    '.status { padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; }' +
+    '.status.configured { background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }' +
+    '.status.not-configured { background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; }' +
+    '.section { background: white; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }' +
+    '.section h3 { margin: 0 0 12px 0; font-size: 16px; color: #334155; }' +
+    '.step { display: flex; gap: 12px; margin-bottom: 12px; }' +
+    '.step-num { width: 28px; height: 28px; background: #7C3AED; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; flex-shrink: 0; }' +
+    '.step-text { font-size: 14px; line-height: 1.5; color: #475569; }' +
+    '.step-text a { color: #7C3AED; }' +
+    '.input-group { margin-top: 16px; }' +
+    '.input-group label { display: block; font-size: 13px; font-weight: 500; color: #64748B; margin-bottom: 6px; }' +
+    'input[type="text"] { width: 100%; padding: 12px; border: 2px solid #E2E8F0; border-radius: 8px; font-size: 14px; font-family: monospace; }' +
+    'input[type="text"]:focus { outline: none; border-color: #7C3AED; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 20px; }' +
+    'button { flex: 1; padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
+    '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }' +
+    '.btn-secondary { background: #E2E8F0; color: #475569; }' +
+    '.btn-secondary:hover { background: #CBD5E1; }' +
+    '.btn-test { background: #0EA5E9; color: white; }' +
+    '.btn-test:hover { background: #0284C7; }' +
+    '.result { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; display: none; }' +
+    '.result.success { display: block; background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }' +
+    '.result.error { display: block; background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }' +
+    '.result.info { display: block; background: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD; }' +
+    '.free-tier { background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 8px; padding: 12px; margin-top: 12px; font-size: 13px; color: #166534; }' +
+    '</style>' +
+    '<h2>🔧 OCR Setup</h2>' +
+    '<div class="status ' + (currentKey ? 'configured' : 'not-configured') + '">' + statusMessage + '</div>' +
+
+    '<div class="section">' +
+    '<h3>📋 Setup Instructions</h3>' +
+    '<div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://console.cloud.google.com/apis/library/vision.googleapis.com" target="_blank">Google Cloud Console → Vision API</a></div></div>' +
+    '<div class="step"><div class="step-num">2</div><div class="step-text">Click <strong>"Enable"</strong> to activate Cloud Vision API for your project</div></div>' +
+    '<div class="step"><div class="step-num">3</div><div class="step-text">Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank">APIs & Services → Credentials</a></div></div>' +
+    '<div class="step"><div class="step-num">4</div><div class="step-text">Click <strong>"+ CREATE CREDENTIALS"</strong> → <strong>"API key"</strong></div></div>' +
+    '<div class="step"><div class="step-num">5</div><div class="step-text">Copy the API key and paste it below</div></div>' +
+    '<div class="free-tier">💰 <strong>Free Tier:</strong> 1,000 OCR requests/month at no cost. Most unions will never exceed this.</div>' +
+    '</div>' +
+
+    '<div class="section">' +
+    '<h3>🔑 Enter API Key</h3>' +
+    '<div class="input-group">' +
+    '<label>Cloud Vision API Key</label>' +
+    '<input type="text" id="apiKey" placeholder="AIzaSy..." value="' + (currentKey || '') + '">' +
+    '</div>' +
+    '<div class="btn-row">' +
+    '<button class="btn-primary" onclick="saveKey()">💾 Save Key</button>' +
+    '<button class="btn-test" onclick="testKey()">🧪 Test OCR</button>' +
+    '</div>' +
+    '<div id="result" class="result"></div>' +
+    '</div>' +
+
+    '<div class="btn-row">' +
+    '<button class="btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '</div>' +
+
+    '<script>' +
+    'function saveKey() {' +
+    '  var key = document.getElementById("apiKey").value.trim();' +
+    '  if (!key) {' +
+    '    showResult("error", "Please enter an API key");' +
+    '    return;' +
+    '  }' +
+    '  showResult("info", "Saving...");' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(result) {' +
+    '      if (result.success) {' +
+    '        showResult("success", "✅ " + result.message);' +
+    '      } else {' +
+    '        showResult("error", "❌ " + result.message);' +
+    '      }' +
+    '    })' +
+    '    .withFailureHandler(function(e) {' +
+    '      showResult("error", "❌ Error: " + e.message);' +
+    '    })' +
+    '    .saveOCRApiKey(key);' +
+    '}' +
+    'function testKey() {' +
+    '  showResult("info", "🔄 Testing OCR... (this may take a few seconds)");' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(result) {' +
+    '      if (result.success) {' +
+    '        showResult("success", "✅ " + result.message);' +
+    '      } else {' +
+    '        showResult("error", "❌ " + result.message);' +
+    '      }' +
+    '    })' +
+    '    .withFailureHandler(function(e) {' +
+    '      showResult("error", "❌ Error: " + e.message);' +
+    '    })' +
+    '    .testOCRConnection();' +
+    '}' +
+    'function showResult(type, message) {' +
+    '  var el = document.getElementById("result");' +
+    '  el.className = "result " + type;' +
+    '  el.textContent = message;' +
+    '}' +
+    '</script>'
+  )
+  .setWidth(520)
+  .setHeight(620);
+
+  ui.showModalDialog(html, '🔧 OCR Setup - Cloud Vision API');
+}
+
+/**
+ * Saves the Cloud Vision API key to Script Properties
+ * @param {string} apiKey - The API key to save
+ * @returns {Object} Result with success status
+ */
+function saveOCRApiKey(apiKey) {
+  try {
+    if (!apiKey || apiKey.trim().length < 10) {
+      return { success: false, message: 'Invalid API key format' };
+    }
+
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty('CLOUD_VISION_API_KEY', apiKey.trim());
+
+    // Log the configuration for audit
+    logAuditEvent('OCR_API_KEY_CONFIGURED', {
+      configuredBy: Session.getActiveUser().getEmail(),
+      keyPreview: '...' + apiKey.slice(-6)
+    });
+
+    return { success: true, message: 'API key saved successfully! You can now use OCR features.' };
+  } catch (e) {
+    return { success: false, message: 'Failed to save: ' + e.message };
+  }
+}
+
+/**
+ * Tests the OCR connection by making a simple API validation call
+ * @returns {Object} Result with success status
+ */
+function testOCRConnection() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var apiKey = props.getProperty('CLOUD_VISION_API_KEY');
+
+    if (!apiKey) {
+      return { success: false, message: 'No API key configured. Please save an API key first.' };
+    }
+
+    // Make a minimal test request to validate the API key
+    var testRequest = {
+      requests: [{
+        image: {
+          content: Utilities.base64Encode(Utilities.newBlob('Test').getBytes())
+        },
+        features: [{
+          type: 'TEXT_DETECTION',
+          maxResults: 1
+        }]
+      }]
+    };
+
+    var response = UrlFetchApp.fetch(
+      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      {
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify(testRequest),
+        muteHttpExceptions: true
+      }
+    );
+
+    var responseCode = response.getResponseCode();
+    var responseBody = response.getContentText();
+
+    if (responseCode === 200) {
+      return { success: true, message: 'OCR connection successful! API key is valid and working.' };
+    } else if (responseCode === 400) {
+      // 400 with valid key often means the test image was invalid, but key works
+      var errorData = JSON.parse(responseBody);
+      if (errorData.error && errorData.error.message.indexOf('image') !== -1) {
+        return { success: true, message: 'API key is valid! OCR is ready to use.' };
+      }
+      return { success: false, message: 'API Error: ' + (errorData.error ? errorData.error.message : responseBody) };
+    } else if (responseCode === 403) {
+      return { success: false, message: 'API key invalid or Cloud Vision API not enabled. Check your Google Cloud Console.' };
+    } else {
+      return { success: false, message: 'Unexpected response (' + responseCode + '): ' + responseBody.substring(0, 200) };
+    }
+
+  } catch (e) {
+    return { success: false, message: 'Connection test failed: ' + e.message };
+  }
+}
+
+/**
+ * Checks if OCR is configured and ready to use
+ * @returns {Object} Status object
+ */
+function getOCRStatus() {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = props.getProperty('CLOUD_VISION_API_KEY');
+
+  return {
+    configured: !!apiKey,
+    message: apiKey ? 'OCR is configured and ready' : 'OCR requires setup - run setupOCRApiKey()'
+  };
+}
+
 // ============================================================================
 // SEARCH PRECEDENTS (v4.1 - Historical Grievance Outcomes)
 // ============================================================================
@@ -35751,7 +37043,7 @@ function searchPrecedentsData(query, outcomeFilter) {
 
 
 // ============================================================================
-// SOURCE: 11_SecureMemberDashboard.gs (1859 lines)
+// SOURCE: 11_SecureMemberDashboard.gs (1871 lines)
 // ============================================================================
 
 /**
@@ -36819,12 +38111,20 @@ function emailDashboardLink() {
     return;
   }
 
-  var data = sheet.getRange(row, 1, 1, MEMBER_COLS.EMAIL).getValues()[0];
+  // Get member data including Member ID for personalized portal link
+  var dataRange = sheet.getRange(row, 1, 1, Math.max(MEMBER_COLS.EMAIL, MEMBER_COLS.MEMBER_ID, MEMBER_COLS.FIRST_NAME));
+  var data = dataRange.getValues()[0];
   var email = data[MEMBER_COLS.EMAIL - 1];
   var firstName = data[MEMBER_COLS.FIRST_NAME - 1];
+  var memberId = data[MEMBER_COLS.MEMBER_ID - 1];
 
   if (!email) {
     ui.alert('No email address found for this member.');
+    return;
+  }
+
+  if (!memberId) {
+    ui.alert('No Member ID found for this member. Cannot generate portal link.');
     return;
   }
 
@@ -36839,18 +38139,24 @@ function emailDashboardLink() {
   if (response !== ui.Button.YES) return;
 
   try {
-    var spreadsheetUrl = ss.getUrl();
+    // Use the deployed web app URL, not the spreadsheet URL
+    var webAppUrl = ScriptApp.getService().getUrl();
+    if (!webAppUrl) {
+      ui.alert('Error', 'Web app is not deployed. Please deploy the web app first via Extensions > Apps Script > Deploy.', ui.ButtonSet.OK);
+      return;
+    }
+    var portalUrl = webAppUrl + '?id=' + memberId;
+
     var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Your Member Dashboard Access';
     var body = 'Hello ' + firstName + ',\n\n' +
-               'You can access your Union Member Dashboard at the following link:\n\n' +
-               spreadsheetUrl + '\n\n' +
-               'From the spreadsheet, go to:\n' +
-               '509 Command > Command Center > Member Dashboard (No PII)\n\n' +
+               'You can access your personalized Union Member Dashboard at the following link:\n\n' +
+               portalUrl + '\n\n' +
                'This dashboard gives you access to:\n' +
                '- Your Weingarten Rights (emergency reference)\n' +
                '- Union contract and resources\n' +
                '- Steward contact information\n' +
                '- Grievance statistics\n\n' +
+               'Keep this link private - it is personalized for you.\n\n' +
                'If you have any questions, contact your steward.\n\n' +
                'In Solidarity,' +
                COMMAND_CONFIG.EMAIL.FOOTER;
@@ -37168,11 +38474,9 @@ function doGet_MemberPortal_(e) {
   var memberId = e && e.parameter && e.parameter.id;
 
   if (memberId) {
-    // Return personalized member portal
     return buildMemberPortal(memberId);
   }
 
-  // Return public dashboard (no PII)
   return buildPublicPortal();
 }
 
@@ -37614,7 +38918,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_ChecklistManager.gs (1281 lines)
+// SOURCE: 12_ChecklistManager.gs (1374 lines)
 // ============================================================================
 
 /**
@@ -38712,6 +40016,99 @@ function getCasesByActionType() {
   }
 
   return summary;
+}
+
+// ============================================================================
+// CHECKLIST SHEET PROTECTION MANAGEMENT
+// ============================================================================
+
+/**
+ * Unlock the Checklist sheet by removing all protections
+ * Call this from Admin > Setup > Unlock Checklist Sheet menu
+ */
+function unlockChecklistSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CHECKLIST_SHEET_NAME);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert(
+      'Checklist Sheet Not Found',
+      'The Case Checklist sheet does not exist. It will be created when you first use a checklist feature.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Get all protections on the sheet
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+
+  if (protections.length === 0) {
+    SpreadsheetApp.getUi().alert(
+      'Already Unlocked',
+      'The Checklist sheet has no protections. It is already fully editable.',
+      SpreadsheetApp.getUi().ButtonSet.OK
+    );
+    return;
+  }
+
+  // Remove all protections
+  var removed = 0;
+  protections.forEach(function(protection) {
+    if (protection.canEdit()) {
+      protection.remove();
+      removed++;
+    }
+  });
+
+  // Also check for range protections
+  var rangeProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+  rangeProtections.forEach(function(protection) {
+    if (protection.canEdit()) {
+      protection.remove();
+      removed++;
+    }
+  });
+
+  SpreadsheetApp.getUi().alert(
+    'Checklist Sheet Unlocked',
+    'Removed ' + removed + ' protection(s) from the Checklist sheet.\n\n' +
+    'The sheet is now fully editable. Note: The protection was originally added to prevent ' +
+    'accidental modification of the sheet structure (headers, formulas).\n\n' +
+    'If you want to re-protect the sheet later, run the sheet setup function.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Re-protect the Checklist sheet (keeps data rows editable)
+ * Only protects the header row
+ */
+function reprotectChecklistSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CHECKLIST_SHEET_NAME);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error', 'Checklist sheet not found', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  // First remove any existing protections
+  var existingProtections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  existingProtections.forEach(function(p) { if (p.canEdit()) p.remove(); });
+
+  // Add protection that only protects header row
+  var protection = sheet.protect().setDescription('Checklist Sheet Structure');
+  var lastCol = sheet.getLastColumn() || 12;
+  var lastRow = Math.max(sheet.getLastRow(), 1000);
+
+  // Allow editing everything except row 1 (header)
+  protection.setUnprotectedRanges([sheet.getRange(2, 1, lastRow - 1, lastCol)]);
+
+  SpreadsheetApp.getUi().alert(
+    'Checklist Sheet Protected',
+    'The header row is now protected. All data rows remain editable.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
 }
 
 // ============================================================================
