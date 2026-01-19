@@ -7383,8 +7383,18 @@ function getUnifiedDashboardData(includePII) {
     // Breakdowns
     unitBreakdown: {},
     locationBreakdown: {},
+    officeDaysBreakdown: {},
     stewardWorkload: [],
     hotZones: [],
+
+    // Participation/Engagement by dimensions (for heatmaps)
+    participationByUnit: {},      // { unitName: { emailRate, meetingRate, count } }
+    participationByLocation: {},  // { location: { emailRate, meetingRate, count } }
+
+    // Satisfaction by dimensions
+    satisfactionByUnit: {},       // { unitName: { score, count } }
+    satisfactionByLocation: {},   // { location: { score, count } }
+    satisfactionByOfficeDays: {}, // { day: { score, count } }
 
     // Member Directory Trends (NEW)
     directoryTrends: {
@@ -7465,6 +7475,10 @@ function getUnifiedDashboardData(includePII) {
   var interestChapterCount = 0;
   var interestAlliedCount = 0;
 
+  // Engagement by unit/location accumulators
+  var engagementByUnit = {};    // { unit: { openRates: [], meetings: 0, count: 0 } }
+  var engagementByLocation = {}; // { location: { openRates: [], meetings: 0, count: 0 } }
+
   // Process Members
   if (memberSheet && memberSheet.getLastRow() > 1) {
     var memberData = memberSheet.getDataRange().getValues();
@@ -7527,6 +7541,37 @@ function getUnifiedDashboardData(includePII) {
         interestAlliedCount++;
       }
 
+      // Track office days breakdown
+      var officeDays = memberData[m][MEMBER_COLS.OFFICE_DAYS - 1] || '';
+      if (officeDays && officeDays !== 'N/A') {
+        var days = officeDays.split(',');
+        for (var di = 0; di < days.length; di++) {
+          var day = days[di].trim();
+          if (day) {
+            if (!data.officeDaysBreakdown[day]) data.officeDaysBreakdown[day] = 0;
+            data.officeDaysBreakdown[day]++;
+          }
+        }
+      }
+
+      // Track engagement by unit
+      if (!engagementByUnit[unit]) engagementByUnit[unit] = { openRates: [], meetings: 0, count: 0 };
+      engagementByUnit[unit].count++;
+      if (openRate && !isNaN(parseFloat(openRate))) engagementByUnit[unit].openRates.push(parseFloat(openRate));
+      if ((lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) ||
+          (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo)) {
+        engagementByUnit[unit].meetings++;
+      }
+
+      // Track engagement by location
+      if (!engagementByLocation[location]) engagementByLocation[location] = { openRates: [], meetings: 0, count: 0 };
+      engagementByLocation[location].count++;
+      if (openRate && !isNaN(parseFloat(openRate))) engagementByLocation[location].openRates.push(parseFloat(openRate));
+      if ((lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) ||
+          (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo)) {
+        engagementByLocation[location].meetings++;
+      }
+
       // Count stewards (steward PII is always shown - they're public union reps)
       if (isSteward) {
         data.stewardCount++;
@@ -7585,6 +7630,22 @@ function getUnifiedDashboardData(includePII) {
       if (data.stewardCount > 0) {
         var ratio = Math.round(data.totalMembers / data.stewardCount);
         data.stewardRatio = ratio + ':1';
+      }
+
+      // Calculate participation rates by unit
+      for (var unitKey in engagementByUnit) {
+        var u = engagementByUnit[unitKey];
+        var avgRate = u.openRates.length > 0 ? Math.round(u.openRates.reduce(function(a,b){return a+b;},0) / u.openRates.length) : 0;
+        var meetingPct = u.count > 0 ? Math.round((u.meetings / u.count) * 100) : 0;
+        data.participationByUnit[unitKey] = { emailRate: avgRate, meetingRate: meetingPct, count: u.count };
+      }
+
+      // Calculate participation rates by location
+      for (var locKey in engagementByLocation) {
+        var loc = engagementByLocation[locKey];
+        var avgLocRate = loc.openRates.length > 0 ? Math.round(loc.openRates.reduce(function(a,b){return a+b;},0) / loc.openRates.length) : 0;
+        var locMeetingPct = loc.count > 0 ? Math.round((loc.meetings / loc.count) * 100) : 0;
+        data.participationByLocation[locKey] = { emailRate: avgLocRate, meetingRate: locMeetingPct, count: loc.count };
       }
     }
   }
@@ -7809,10 +7870,16 @@ function getUnifiedDashboardData(includePII) {
     var trustScores = [];
     var monthlyTrust = {};
     var sectionScores = { overall: [], steward: [], chapter: [], leadership: [], contract: [], communication: [], voice: [], value: [] };
+    var satByWorksite = {};  // { worksite: { scores: [], count: 0 } }
+    var satByRole = {};      // { role: { scores: [], count: 0 } }
 
     for (var i = 1; i < satData.length; i++) {
       if (!satData[i][0]) continue;
       data.satisfactionData.responseCount++;
+
+      // Get worksite and role for breakdown
+      var worksite = (satData[i][SATISFACTION_COLS.Q1_WORKSITE - 1] || 'Unknown').toString().trim();
+      var role = (satData[i][SATISFACTION_COLS.Q2_ROLE - 1] || 'Unknown').toString().trim();
 
       var trustVal = parseFloat(satData[i][7]);
       var timestamp = satData[i][0];
@@ -7852,6 +7919,20 @@ function getUnifiedDashboardData(includePII) {
       if (avgComm > 0) sectionScores.communication.push(avgComm);
       if (avgVoice > 0) sectionScores.voice.push(avgVoice);
       if (avgValue > 0) sectionScores.value.push(avgValue);
+
+      // Track satisfaction by worksite (location)
+      if (worksite && avgOverall > 0) {
+        if (!satByWorksite[worksite]) satByWorksite[worksite] = { scores: [], count: 0 };
+        satByWorksite[worksite].scores.push(avgOverall);
+        satByWorksite[worksite].count++;
+      }
+
+      // Track satisfaction by role (similar to unit)
+      if (role && avgOverall > 0) {
+        if (!satByRole[role]) satByRole[role] = { scores: [], count: 0 };
+        satByRole[role].scores.push(avgOverall);
+        satByRole[role].count++;
+      }
     }
 
     function avg(arr) { return arr.length > 0 ? Math.round((arr.reduce(function(a,b){return a+b;},0) / arr.length) * 10) / 10 : 0; }
@@ -7877,6 +7958,22 @@ function getUnifiedDashboardData(includePII) {
 
     // Engagement: Survey response rate
     data.engagement.surveyResponseRate = data.totalMembers > 0 ? Math.round((data.satisfactionData.responseCount / data.totalMembers) * 100) : 0;
+
+    // Calculate satisfaction by worksite (maps to location)
+    for (var ws in satByWorksite) {
+      data.satisfactionByLocation[ws] = {
+        score: avg(satByWorksite[ws].scores),
+        count: satByWorksite[ws].count
+      };
+    }
+
+    // Calculate satisfaction by role (maps to unit)
+    for (var rl in satByRole) {
+      data.satisfactionByUnit[rl] = {
+        score: avg(satByRole[rl].scores),
+        count: satByRole[rl].count
+      };
+    }
   }
 
   // Get Google Drive resources folder from Config tab (column AU / 47)
@@ -8210,30 +8307,70 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("main-content").innerHTML=html;renderAnalyticsCharts()' +
     '}' +
 
-    // Directory Trends Tab (Enhanced with Engagement)
+    // Directory Trends Tab (Enhanced with Full Analytics)
     'else if(tab==="directory"){' +
     'var dt=d.directoryTrends;var eng=d.engagement;' +
-    'html="<div class=\\"kpi-grid\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">With Email</div><div class=\\"kpi-value green\\">"+dt.totalWithEmail+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Email</div><div class=\\"kpi-value "+(dt.missingEmail>0?"red":"green")+"\\">"+dt.missingEmail+"</div></div>";' +
-    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Phone</div><div class=\\"kpi-value "+(dt.missingPhone>0?"yellow":"green")+"\\">"+dt.missingPhone+"</div></div>";' +
+    // Number formatting function
+    'function fmt(n){return n>=1000?n.toLocaleString():n}' +
+    'html="<div class=\\"kpi-grid\\"><div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Total Members</div><div class=\\"kpi-value blue\\">"+fmt(d.totalMembers)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">With Email</div><div class=\\"kpi-value green\\">"+fmt(dt.totalWithEmail)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Email</div><div class=\\"kpi-value "+(dt.missingEmail>0?"red":"green")+"\\">"+fmt(dt.missingEmail)+"</div></div>";' +
+    'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Missing Phone</div><div class=\\"kpi-value "+(dt.missingPhone>0?"yellow":"green")+"\\">"+fmt(dt.missingPhone)+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Email Open Rate</div><div class=\\"kpi-value "+(eng.emailOpenRate>=50?"green":eng.emailOpenRate>=30?"yellow":"red")+"\\">"+eng.emailOpenRate+"%</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Meeting Attendance</div><div class=\\"kpi-value purple\\">"+(eng.virtualMeetingRate+eng.inPersonMeetingRate)+"%</div></div></div>";' +
+    // Section: Employee Distribution
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">people</i>Employee Distribution</h3>";' +
     'html+="<div class=\\"charts-row\\">";' +
-    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">update</i>Recent Updates (30 days)</span><span class=\\"trend-value green\\">"+dt.recentUpdates.length+"</span></div><div class=\\"trend-list\\">";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Employees by Office Location</div><canvas id=\\"empByLocationChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">business</i>Employees by Unit</div><canvas id=\\"empByUnitChart\\"></canvas></div></div>";' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">event</i>Employees by Office Days</div><canvas id=\\"empByOfficeDaysChart\\"></canvas></div>";' +
+    // Section: Participation Heatmap
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">insights</i>Participation Rate Heatmap</h3>";' +
+    'html+="<div style=\\"display:flex;gap:4px;margin-bottom:12px;font-size:10px;align-items:center\\"><span style=\\"color:#94a3b8\\">Low</span><div style=\\"display:flex;height:12px\\"><div style=\\"width:20px;background:#fee2e2\\"></div><div style=\\"width:20px;background:#fef3c7\\"></div><div style=\\"width:20px;background:#d9f99d\\"></div><div style=\\"width:20px;background:#bbf7d0\\"></div><div style=\\"width:20px;background:#86efac\\"></div></div><span style=\\"color:#94a3b8\\">High</span></div>";' +
+    // Participation by Unit heatmap
+    'html+="<div class=\\"chart-card\\" style=\\"margin-bottom:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">grid_view</i>Email/Meeting Participation by Unit</div><div class=\\"heatmap-grid\\" style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:12px\\">";' +
+    'var partUnits=Object.keys(d.participationByUnit).slice(0,12);' +
+    'partUnits.forEach(function(u){var p=d.participationByUnit[u];var avgPart=(p.emailRate+p.meetingRate)/2;var heatBg=avgPart>=60?"#86efac":avgPart>=40?"#d9f99d":avgPart>=20?"#fef3c7":"#fee2e2";var textCol=avgPart>=40?"#166534":"#991b1b";html+="<div style=\\"background:"+heatBg+";padding:10px;border-radius:8px\\"><div style=\\"font-weight:600;color:"+textCol+";font-size:12px;margin-bottom:4px\\">"+u+"</div><div style=\\"display:flex;justify-content:space-between;font-size:11px;color:"+textCol+"\\"><span>Email: "+p.emailRate+"%</span><span>Mtg: "+p.meetingRate+"%</span></div><div style=\\"font-size:10px;color:"+textCol+";opacity:0.7;margin-top:2px\\">"+fmt(p.count)+" members</div></div>"});' +
+    'if(partUnits.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px;grid-column:1/-1\\">No participation data available</p>";' +
+    'html+="</div></div>";' +
+    // Participation by Location heatmap
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">place</i>Email/Meeting Participation by Location</div><div class=\\"heatmap-grid\\" style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:12px\\">";' +
+    'var partLocs=Object.keys(d.participationByLocation).slice(0,12);' +
+    'partLocs.forEach(function(l){var p=d.participationByLocation[l];var avgPart=(p.emailRate+p.meetingRate)/2;var heatBg=avgPart>=60?"#86efac":avgPart>=40?"#d9f99d":avgPart>=20?"#fef3c7":"#fee2e2";var textCol=avgPart>=40?"#166534":"#991b1b";html+="<div style=\\"background:"+heatBg+";padding:10px;border-radius:8px\\"><div style=\\"font-weight:600;color:"+textCol+";font-size:12px;margin-bottom:4px\\">"+l+"</div><div style=\\"display:flex;justify-content:space-between;font-size:11px;color:"+textCol+"\\"><span>Email: "+p.emailRate+"%</span><span>Mtg: "+p.meetingRate+"%</span></div><div style=\\"font-size:10px;color:"+textCol+";opacity:0.7;margin-top:2px\\">"+fmt(p.count)+" members</div></div>"});' +
+    'if(partLocs.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px;grid-column:1/-1\\">No participation data available</p>";' +
+    'html+="</div></div>";' +
+    // Section: Member Satisfaction Analysis
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">sentiment_satisfied</i>Member Satisfaction Analysis</h3>";' +
+    'html+="<div class=\\"charts-row\\">";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">work</i>Satisfaction by Unit/Role</div><canvas id=\\"satByUnitChart\\"></canvas></div>";' +
+    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_city</i>Satisfaction by Work Location</div><canvas id=\\"satByLocationChart\\"></canvas></div></div>";' +
+    // Satisfaction matrix (unit x location)
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">table_chart</i>Satisfaction by Unit & Location Matrix</div>";' +
+    'var satUnits=Object.keys(d.satisfactionByUnit).slice(0,8);var satLocs=Object.keys(d.satisfactionByLocation).slice(0,8);' +
+    'if(satUnits.length>0&&satLocs.length>0){' +
+    'html+="<div style=\\"overflow-x:auto;margin-top:12px\\"><table style=\\"width:100%;border-collapse:collapse;font-size:11px\\"><tr><th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:left\\">Unit / Location</th>";' +
+    'satLocs.forEach(function(l){html+="<th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:center;min-width:80px\\">"+l.substring(0,12)+"</th>"});' +
+    'html+="</tr>";' +
+    'satUnits.forEach(function(u){html+="<tr><td style=\\"padding:8px;background:#0f172a;color:#e2e8f0;font-weight:500\\">"+u+"</td>";satLocs.forEach(function(l){var uScore=d.satisfactionByUnit[u]?d.satisfactionByUnit[u].score:0;var lScore=d.satisfactionByLocation[l]?d.satisfactionByLocation[l].score:0;var avgS=(uScore+lScore)/2;var cellBg=avgS>=7?"rgba(34,197,94,0.3)":avgS>=5?"rgba(245,158,11,0.3)":"rgba(239,68,68,0.3)";var cellCol=avgS>=7?"#22c55e":avgS>=5?"#f59e0b":"#ef4444";html+="<td style=\\"padding:8px;background:"+cellBg+";color:"+cellCol+";text-align:center;font-weight:600\\">"+avgS.toFixed(1)+"</td>"});html+="</tr>"});' +
+    'html+="</table></div>"}' +
+    'else{html+="<p style=\\"color:#64748b;text-align:center;padding:30px\\">Not enough satisfaction data for matrix view</p>"}' +
+    'html+="</div>";' +
+    // Contact Updates Section
+    'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">contact_phone</i>Contact Updates</h3>";' +
+    'html+="<div class=\\"charts-row\\">";' +
+    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">update</i>Recent Updates (30 days)</span><span class=\\"trend-value green\\">"+fmt(dt.recentUpdates.length)+"</span></div><div class=\\"trend-list\\">";' +
     'dt.recentUpdates.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.date).toLocaleDateString()+"</span></div>"});' +
     'if(dt.recentUpdates.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent updates</p>";' +
     'html+="</div></div>";' +
-    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">warning</i>Stale Contacts (90+ days)</span><span class=\\"trend-value yellow\\">"+dt.staleContacts.length+"</span></div><div class=\\"trend-list\\">";' +
+    'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">warning</i>Stale Contacts (90+ days)</span><span class=\\"trend-value yellow\\">"+fmt(dt.staleContacts.length)+"</span></div><div class=\\"trend-list\\">";' +
     'dt.staleContacts.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.lastUpdate).toLocaleDateString()+"</span></div>"});' +
     'if(dt.staleContacts.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">All contacts up to date!</p>";' +
     'html+="</div></div></div>";' +
-    // Recent Meeting Attendees section
-    'html+="<div class=\\"charts-row\\"><div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">groups</i>Recent Meeting Attendees</span><span class=\\"trend-value purple\\">"+eng.recentMeetingAttendees.length+"</span></div><div class=\\"trend-list\\">";' +
+    // Meeting Attendees
+    'html+="<div class=\\"charts-row\\"><div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">groups</i>Recent Meeting Attendees</span><span class=\\"trend-value purple\\">"+fmt(eng.recentMeetingAttendees.length)+"</span></div><div class=\\"trend-list\\">";' +
     'eng.recentMeetingAttendees.slice(0,8).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+"</span><span style=\\"color:"+(m.type==="Virtual"?"#60a5fa":"#22c55e")+"\\">"+m.type+"</span></div>"});' +
     'if(eng.recentMeetingAttendees.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent meeting attendance data</p>";' +
-    'html+="</div></div>";' +
-    'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">groups</i>Members by Unit</div><canvas id=\\"unitDistChart\\"></canvas></div></div>";' +
+    'html+="</div></div><div class=\\"chart-card\\"></div></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderDirectoryCharts()' +
     '}' +
 
@@ -8366,9 +8503,29 @@ function getUnifiedDashboardHtml(isPII) {
 
     'function renderDirectoryCharts(){' +
     'var d=dashData;' +
+    // Employees by Location chart
+    'var locLabels=Object.keys(d.locationBreakdown).slice(0,10);' +
+    'var locData=locLabels.map(function(l){return d.locationBreakdown[l]});' +
+    'if(document.getElementById("empByLocationChart")){new Chart(document.getElementById("empByLocationChart"),{type:"bar",data:{labels:locLabels,datasets:[{label:"Employees",data:locData,backgroundColor:"#3b82f6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{color:"#94a3b8",callback:function(v){return v>=1000?v.toLocaleString():v}}},y:{ticks:{color:"#cbd5e1"}}}}})}' +
+    // Employees by Unit chart
     'var unitLabels=Object.keys(d.unitBreakdown).slice(0,10);' +
     'var unitData=unitLabels.map(function(u){return d.unitBreakdown[u]});' +
-    'new Chart(document.getElementById("unitDistChart"),{type:"bar",data:{labels:unitLabels,datasets:[{label:"Members",data:unitData,backgroundColor:"#60a5fa"}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8"}},x:{ticks:{color:"#94a3b8",maxRotation:45}}}}})' +
+    'if(document.getElementById("empByUnitChart")){new Chart(document.getElementById("empByUnitChart"),{type:"bar",data:{labels:unitLabels,datasets:[{label:"Employees",data:unitData,backgroundColor:"#8b5cf6"}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{color:"#94a3b8",callback:function(v){return v>=1000?v.toLocaleString():v}}},y:{ticks:{color:"#cbd5e1"}}}}})}' +
+    // Employees by Office Days chart
+    'var dayOrder=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];' +
+    'var dayLabels=Object.keys(d.officeDaysBreakdown).sort(function(a,b){return dayOrder.indexOf(a)-dayOrder.indexOf(b)});' +
+    'var dayData=dayLabels.map(function(day){return d.officeDaysBreakdown[day]});' +
+    'if(document.getElementById("empByOfficeDaysChart")&&dayLabels.length>0){new Chart(document.getElementById("empByOfficeDaysChart"),{type:"bar",data:{labels:dayLabels,datasets:[{label:"Employees",data:dayData,backgroundColor:["#ef4444","#f59e0b","#22c55e","#3b82f6","#8b5cf6","#ec4899","#06b6d4"]}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:"#94a3b8",callback:function(v){return v>=1000?v.toLocaleString():v}}},x:{ticks:{color:"#cbd5e1"}}}}})}' +
+    // Satisfaction by Unit/Role chart
+    'var satUnitLabels=Object.keys(d.satisfactionByUnit).slice(0,8);' +
+    'var satUnitData=satUnitLabels.map(function(u){return d.satisfactionByUnit[u].score});' +
+    'var satUnitColors=satUnitData.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444"});' +
+    'if(document.getElementById("satByUnitChart")&&satUnitLabels.length>0){new Chart(document.getElementById("satByUnitChart"),{type:"bar",data:{labels:satUnitLabels,datasets:[{label:"Score",data:satUnitData,backgroundColor:satUnitColors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}})}' +
+    // Satisfaction by Location chart
+    'var satLocLabels=Object.keys(d.satisfactionByLocation).slice(0,8);' +
+    'var satLocData=satLocLabels.map(function(l){return d.satisfactionByLocation[l].score});' +
+    'var satLocColors=satLocData.map(function(s){return s>=7?"#22c55e":s>=5?"#f59e0b":"#ef4444"});' +
+    'if(document.getElementById("satByLocationChart")&&satLocLabels.length>0){new Chart(document.getElementById("satByLocationChart"),{type:"bar",data:{labels:satLocLabels,datasets:[{label:"Score",data:satLocData,backgroundColor:satLocColors}]},options:{responsive:true,indexAxis:"y",plugins:{legend:{display:false}},scales:{x:{min:0,max:10,ticks:{color:"#94a3b8"}},y:{ticks:{color:"#cbd5e1",font:{size:10}}}}}})}' +
     '}' +
 
     'function renderHotspotChart(){' +
