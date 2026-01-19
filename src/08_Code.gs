@@ -186,28 +186,26 @@ function createConfigSheet(ss) {
     '── ORG IDENTITY ──', '', '',                       // AK-AM (3 cols)
     '── EXTENDED CONTACT ──', '', '', '', '',           // AN-AR (5 cols)
     '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AS-AY (7 cols)
-    '── MOBILE & RESOURCES ──', '',                     // AZ-BA (2 cols)
-    '── THEME SETTINGS ──', '', '', '', '', ''          // BB-BG (6 cols)
+    '── MOBILE DASHBOARD ──'                            // AZ (1 col) - LAST COLUMN
   ];
 
-  // Row 2: Column Headers
+  // Row 2: Column Headers (A-AZ = 52 columns total)
   var columnHeaders = [
-    'Job Titles', 'Office Locations', 'Units', 'Office Days', 'Yes/No (Dropdowns)',
-    'Supervisors', 'Managers',
-    'Stewards', 'Steward Committees',
-    'Grievance Status', 'Grievance Step', 'Issue Category', 'Articles Violated',
-    'Communication Methods', 'Grievance Coordinators', 'Grievance Form URL', 'Contact Form URL',
-    'Admin Emails', 'Alert Days Before Deadline', 'Notification Recipients',
-    'Organization Name', 'Local Number', 'Main Office Address', 'Main Phone',
-    'Google Drive Folder ID', 'Google Calendar ID',
-    'Filing Deadline Days', 'Step I Response Days', 'Step II Appeal Days', 'Step II Response Days',
-    'Best Times to Contact', 'Home Towns',
-    'Contract Article (Grievance)', 'Contract Article (Discipline)', 'Contract Article (Workload)', 'Contract Name',
-    'Union Parent', 'State/Region', 'Organization Website',
-    'Office Addresses', 'Main Fax', 'Main Contact Name', 'Main Contact Email', 'Satisfaction Survey URL',
-    'Chief Steward Email', 'Unit Codes', 'Archive Folder ID', 'Escalation Statuses', 'Escalation Steps', 'Template ID', 'PDF Folder ID',
-    '📱 Mobile Dashboard URL', 'Contract PDF URL',
-    'Enable Theme', 'Header BG Color', 'Header Text Color', 'Alt Row Color', 'Font Family', 'Font Size'
+    'Job Titles', 'Office Locations', 'Units', 'Office Days', 'Yes/No (Dropdowns)',       // A-E
+    'Supervisors', 'Managers',                                                             // F-G
+    'Stewards', 'Steward Committees',                                                      // H-I
+    'Grievance Status', 'Grievance Step', 'Issue Category', 'Articles Violated',          // J-M
+    'Communication Methods', 'Grievance Coordinators', 'Grievance Form URL', 'Contact Form URL', // N-Q
+    'Admin Emails', 'Alert Days Before Deadline', 'Notification Recipients',              // R-T
+    'Organization Name', 'Local Number', 'Main Office Address', 'Main Phone',             // U-X
+    'Google Drive Folder ID', 'Google Calendar ID',                                       // Y-Z
+    'Filing Deadline Days', 'Step I Response Days', 'Step II Appeal Days', 'Step II Response Days', // AA-AD
+    'Best Times to Contact', 'Home Towns',                                                // AE-AF
+    'Contract Article (Grievance)', 'Contract Article (Discipline)', 'Contract Article (Workload)', 'Contract Name', // AG-AJ
+    'Union Parent', 'State/Region', 'Organization Website',                               // AK-AM
+    'Office Addresses', 'Main Fax', 'Main Contact Name', 'Main Contact Email', 'Satisfaction Survey URL', // AN-AR
+    'Chief Steward Email', 'Unit Codes', 'Archive Folder ID', 'Escalation Statuses', 'Escalation Steps', 'Template ID', 'PDF Folder ID', // AS-AY
+    '📱 Mobile Dashboard URL'                                                              // AZ - LAST COLUMN
   ];
 
   // Apply section headers (Row 1)
@@ -309,9 +307,6 @@ function createConfigSheet(ss) {
     }
   }
 
-  // Add theme columns
-  setupThemeConfigColumns(sheet);
-
   // Apply full Config sheet styling
   applyConfigSheetStyling(sheet);
 }
@@ -398,7 +393,7 @@ function applyConfigSheetStyling(sheet) {
  * @private
  */
 function applySectionColors_(sheet, lastCol) {
-  // Section color definitions
+  // Section color definitions (15 sections, columns A-AZ)
   var SECTION_COLORS = {
     EMPLOYMENT: { bg: '#3b82f6', text: '#ffffff' },      // Blue - A-E
     SUPERVISION: { bg: '#8b5cf6', text: '#ffffff' },     // Violet - F-G
@@ -414,11 +409,11 @@ function applySectionColors_(sheet, lastCol) {
     IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AK-AM
     EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AN-AR
     COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AS-AY
-    RESOURCES: { bg: '#10b981', text: '#ffffff' },       // Emerald - AZ
-    THEME: { bg: '#7c3aed', text: '#ffffff' }            // Purple - BA-BF
+    MOBILE: { bg: '#10b981', text: '#ffffff' }           // Emerald - AZ (LAST COLUMN)
   };
 
   // Apply colors by column ranges (both row 1 section header and row 2 column header)
+  // Total: 52 columns (A-AZ)
   var sections = [
     { start: 1, end: 5, color: SECTION_COLORS.EMPLOYMENT },      // A-E
     { start: 6, end: 7, color: SECTION_COLORS.SUPERVISION },     // F-G
@@ -433,9 +428,8 @@ function applySectionColors_(sheet, lastCol) {
     { start: 33, end: 36, color: SECTION_COLORS.CONTRACT },      // AG-AJ
     { start: 37, end: 39, color: SECTION_COLORS.IDENTITY },      // AK-AM
     { start: 40, end: 44, color: SECTION_COLORS.EXTENDED },      // AN-AR
-    { start: 45, end: 51, color: SECTION_COLORS.COMMAND },       // AS-AY
-    { start: 52, end: 53, color: SECTION_COLORS.RESOURCES },     // AZ-BA (Mobile & Resources)
-    { start: 54, end: 59, color: SECTION_COLORS.THEME }          // BB-BG
+    { start: 45, end: 51, color: SECTION_COLORS.COMMAND },       // AS-AY (Strategic Command Center)
+    { start: 52, end: 52, color: SECTION_COLORS.MOBILE }         // AZ (Mobile Dashboard - LAST COLUMN)
   ];
 
   sections.forEach(function(section) {
@@ -462,80 +456,6 @@ function applySectionColors_(sheet, lastCol) {
  */
 function applyConfigStyling() {
   applyConfigSheetStyling();
-}
-
-/**
- * Sets up theme configuration columns in the Config sheet (BA-BF)
- * Can be called separately to add theme columns to existing Config sheets
- * @param {Sheet} sheet - The Config sheet (optional, defaults to active Config sheet)
- */
-function setupThemeConfigColumns(sheet) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  sheet = sheet || ss.getSheetByName(SHEETS.CONFIG);
-
-  if (!sheet) {
-    Logger.log('Config sheet not found');
-    return;
-  }
-
-  // Theme section headers (Row 1)
-  sheet.getRange(1, CONFIG_COLS.THEME_ENABLED, 1, 6)
-    .setValues([['── THEME SETTINGS ──', '', '', '', '', '']])
-    .setBackground(COLORS.LIGHT_GRAY)
-    .setFontColor(COLORS.TEXT_DARK)
-    .setFontWeight('bold')
-    .setFontStyle('italic')
-    .setHorizontalAlignment('center');
-
-  // Theme column headers (Row 2)
-  var themeHeaders = ['Enable Theme', 'Header BG Color', 'Header Text Color', 'Alt Row Color', 'Font Family', 'Font Size'];
-  sheet.getRange(2, CONFIG_COLS.THEME_ENABLED, 1, 6)
-    .setValues([themeHeaders])
-    .setBackground(COLORS.PRIMARY_PURPLE)
-    .setFontColor(COLORS.WHITE)
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center');
-
-  // Default theme values (Row 3)
-  sheet.getRange(3, CONFIG_COLS.THEME_ENABLED).setValue('Yes');
-  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_BG).setValue('#1e293b');
-  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_TEXT).setValue('#ffffff');
-  sheet.getRange(3, CONFIG_COLS.THEME_ALT_ROW).setValue('#f8fafc');
-  sheet.getRange(3, CONFIG_COLS.THEME_FONT).setValue('Roboto');
-  sheet.getRange(3, CONFIG_COLS.THEME_FONT_SIZE).setValue(10);
-
-  // Add Yes/No dropdown for Enable Theme
-  var yesNoRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['Yes', 'No'], true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange(3, CONFIG_COLS.THEME_ENABLED).setDataValidation(yesNoRule);
-
-  // Add font dropdown
-  var fontRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['Roboto', 'Arial', 'Verdana', 'Open Sans', 'Lato', 'Montserrat', 'Source Sans Pro'], true)
-    .setAllowInvalid(true)
-    .build();
-  sheet.getRange(3, CONFIG_COLS.THEME_FONT).setDataValidation(fontRule);
-
-  // Format color cells with sample colors
-  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_BG).setBackground('#1e293b').setFontColor('#ffffff');
-  sheet.getRange(3, CONFIG_COLS.THEME_HEADER_TEXT).setBackground('#ffffff').setFontColor('#1e293b');
-  sheet.getRange(3, CONFIG_COLS.THEME_ALT_ROW).setBackground('#f8fafc').setFontColor('#1e293b');
-
-  // Auto-resize theme columns
-  sheet.autoResizeColumns(CONFIG_COLS.THEME_ENABLED, 6);
-
-  Logger.log('Theme configuration columns added to Config sheet');
-  ss.toast('Theme settings columns added to Config tab!', 'Theme Setup', 3);
-}
-
-/**
- * Menu function to set up theme columns in Config sheet
- * Call this from Admin > Setup menu to add theme configuration
- */
-function setupThemeColumns() {
-  setupThemeConfigColumns();
 }
 
 /**

@@ -449,24 +449,19 @@ function getStewardWorkload() {
 // ============================================================================
 
 /**
- * Gets contract PDF URL from Config sheet
- * Uses CONFIG_COLS.CONTRACT_PDF_URL (column AZ) for the contract link
+ * Gets contract PDF URL
+ * Note: Contract PDF URL column was removed from Config sheet.
+ * Users can configure this by modifying this function or adding a custom column.
  * @returns {string} Contract PDF URL or '#' if not configured
  */
 function getContractPdfUrl_() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-    if (configSheet) {
-      var url = configSheet.getRange(2, CONFIG_COLS.CONTRACT_PDF_URL).getValue();
-      if (url && url.toString().trim() !== '') {
-        return url.toString().trim();
-      }
-    }
-  } catch (e) {
-    Logger.log('Contract URL error: ' + e.message);
-  }
-  return '#'; // Not configured
+  // Contract PDF URL column has been removed from Config sheet.
+  // To enable contract links in dashboards, either:
+  // 1. Hardcode your contract URL below, or
+  // 2. Add a custom column to Config and update this function
+  //
+  // Example: return 'https://drive.google.com/file/d/YOUR_FILE_ID/view';
+  return '#'; // Not configured - update this function to add your contract URL
 }
 
 /**
