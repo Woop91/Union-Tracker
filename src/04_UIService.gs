@@ -8118,7 +8118,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+e.message+"</div>"}' +
-    'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=\\'"+tab+"\\']").classList.add("active");renderTab(tab)}' +
+    'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=' + "'" + '"+tab+"' + "'" + ']").classList.add("active");renderTab(tab)}' +
     'function render(json){dashData=JSON.parse(json);renderTab("overview")}' +
 
     // Modal functions
@@ -8146,11 +8146,11 @@ function getUnifiedDashboardHtml(isPII) {
     // Overview Tab
     'if(tab==="overview"){' +
     'html="<div class=\\"kpi-grid\\">";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\'members\\')\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\'stewards\\')\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\'open\\')\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27members\\x27)\\"><div class=\\"kpi-label\\">Members</div><div class=\\"kpi-value blue\\">"+d.totalMembers+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27stewards\\x27)\\"><div class=\\"kpi-label\\">Stewards</div><div class=\\"kpi-value purple\\">"+d.stewardCount+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable\\" onclick=\\"showList(\\x27open\\x27)\\"><div class=\\"kpi-label\\">Open Cases</div><div class=\\"kpi-value yellow\\">"+d.openGrievances+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Win Rate</div><div class=\\"kpi-value green\\">"+d.winRate+"%</div></div>";' +
-    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+"\\" onclick=\\"showList(\\'overdue\\')\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+"</div></div>";' +
+    'html+="<div class=\\"kpi-card clickable "+(d.overdueCount>0?"alert":"")+"\\" onclick=\\"showList(\\x27overdue\\x27)\\"><div class=\\"kpi-label\\">Overdue</div><div class=\\"kpi-value red\\">"+d.overdueCount+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Morale Score</div><div class=\\"kpi-value "+(d.moraleScore>=7?"green":d.moraleScore>=5?"yellow":"red")+"\\">"+d.moraleScore+"</div></div>";' +
     'html+="</div>";' +
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">pie_chart</i>Case Status</div><canvas id=\\"statusChart\\"></canvas></div>";' +
@@ -8168,7 +8168,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var avgDays=d.myCases.length>0?Math.round(d.myCases.reduce(function(s,c){return s+(c.daysOpen||0)},0)/d.myCases.length):0;' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg Days Open</div><div class=\\"kpi-value "+(avgDays>45?"red":avgDays>30?"yellow":"green")+"\\">"+avgDays+"</div></div></div>";' +
     // Status filter buttons
-    'html+="<div style=\\"display:flex;gap:8px;margin:12px 0\\"><button class=\\"btn btn-primary btn-sm\\" onclick=\\"filterMyCases(\\'all\\')\\">All</button><button class=\\"btn btn-secondary btn-sm\\" onclick=\\"filterMyCases(\\'Open\\')\\">Open</button><button class=\\"btn btn-secondary btn-sm\\" onclick=\\"filterMyCases(\\'Pending\\')\\">Pending</button><button class=\\"btn btn-secondary btn-sm\\" style=\\"background:#ef4444\\" onclick=\\"filterMyCases(\\'Overdue\\')\\">Overdue</button></div>";' +
+    'html+="<div style=\\"display:flex;gap:8px;margin:12px 0\\"><button class=\\"btn btn-primary btn-sm\\" onclick=\\"filterMyCases(\\x27all\\x27)\\">All</button><button class=\\"btn btn-secondary btn-sm\\" onclick=\\"filterMyCases(\\x27Open\\x27)\\">Open</button><button class=\\"btn btn-secondary btn-sm\\" onclick=\\"filterMyCases(\\x27Pending\\x27)\\">Pending</button><button class=\\"btn btn-secondary btn-sm\\" style=\\"background:#ef4444\\" onclick=\\"filterMyCases(\\x27Overdue\\x27)\\">Overdue</button></div>";' +
     'if(d.myCases.length===0){html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#22c55e\\">check_circle</i><p style=\\"color:#94a3b8;margin-top:16px\\">No active cases assigned to you. Great job!</p></div>"}' +
     'else{html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">folder_open</i>My Assigned Cases</div><div id=\\"myCasesList\\" class=\\"list-container\\" style=\\"max-height:400px\\">";' +
     'd.myCases.forEach(function(c){var statusColor=c.status.toLowerCase()==="open"?"#f59e0b":c.status.toLowerCase().indexOf("pending")>=0?"#ef4444":"#64748b";var isOverdue=c.daysOpen>30||c.status.toLowerCase().indexOf("pending")>=0;' +
@@ -8299,9 +8299,9 @@ function getUnifiedDashboardHtml(isPII) {
     'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">folder</i>Union Resources</h2>";' +
     'html+="<div class=\\"resource-grid\\">";' +
     'if(dr.folderUrl){html+="<a href=\\""+dr.folderUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\'Coming soon: Contract PDF\\')\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\'Coming soon: Forms\\')\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\'Coming soon: Contact Directory\\')\\"><div class=\\"resource-icon\\">📞</div><div class=\\"resource-title\\">Contacts</div><div class=\\"resource-desc\\">Steward and rep contact info</div></div>";' +
+    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contract PDF\\x27)\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
+    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Forms\\x27)\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
+    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contact Directory\\x27)\\"><div class=\\"resource-icon\\">📞</div><div class=\\"resource-title\\">Contacts</div><div class=\\"resource-desc\\">Steward and rep contact info</div></div>";' +
     'html+="</div>";' +
     'if(dr.recentFiles.length>0){' +
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">description</i>Recent Files</div><div class=\\"list-container\\">";' +
@@ -8375,7 +8375,7 @@ function getUnifiedDashboardHtml(isPII) {
     '{cat:"Getting Started",items:[' +
     '{q:"What is this dashboard?",a:"This is the Union Dashboard providing real-time analytics on grievances, members, and steward workload."},' +
     '{q:"How is data updated?",a:"Data refreshes each time you open the dashboard. Click Refresh to reload."},' +
-    '{q:"What\\'s the difference between Steward and Member dashboards?",a:"Steward dashboard shows full PII (names, IDs). Member dashboard anonymizes data for public sharing."}' +
+    '{q:"What\\x27s the difference between Steward and Member dashboards?",a:"Steward dashboard shows full PII (names, IDs). Member dashboard anonymizes data for public sharing."}' +
     ']},' +
     '{cat:"Dashboard Tabs",items:[' +
     '{q:"What is the My Cases tab?",a:"Shows your personally assigned grievances as a steward. Only visible in Steward mode."},' +
@@ -8392,7 +8392,7 @@ function getUnifiedDashboardHtml(isPII) {
     '{cat:"Taking Action",items:[' +
     '{q:"How do I file a new grievance?",a:"Go to Member Directory in the spreadsheet > check the Start Grievance box for a member."},' +
     '{q:"How do I get help?",a:"Use the Help menu in the spreadsheet or contact your chapter leadership."},' +
-    '{q:"Can I export this data?",a:"Use your browser\\'s print function or screenshot the dashboard."}' +
+    '{q:"Can I export this data?",a:"Use your browser\\x27s print function or screenshot the dashboard."}' +
     ']}' +
     '];' +
     'var html="<div style=\\"max-height:400px;overflow-y:auto;padding:8px\\">";' +
