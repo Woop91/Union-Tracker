@@ -95,7 +95,7 @@ function createCommandCenterMenu() {
 
   // v4.0 Field Accessibility submenu (Mobile/Pocket View)
   menu.addSubMenu(ui.createMenu('📱 Field Accessibility')
-      .addItem('📱 Mobile / Pocket View', 'navToMobile')
+      .addItem('📱 Pocket View', 'navToMobile')
       .addItem('🖥️ Restore Full Desktop View', 'showAllMemberColumns')
       .addItem('🔄 Refresh View', 'refreshMemberView')
       .addSeparator()
@@ -1490,6 +1490,7 @@ function sendGeminiEscalationAlert(member, caseID, status) {
  * @param {string} fileId - Google Drive file ID of the image/document to transcribe
  * @param {Object} options - Optional configuration object
  * @param {string} options.mode - OCR mode: 'TEXT' (default), 'DOCUMENT', 'HANDWRITING'
+ * @param {string} options.language - Language hint for OCR: 'en' (default), 'es', 'fr', etc.
  * @param {boolean} options.autoPopulate - If true, attempts to auto-populate grievance fields
  * @param {string} options.targetGrievanceId - Grievance ID to populate (if autoPopulate is true)
  * @returns {Object} Result object with extracted text and metadata
@@ -1497,6 +1498,7 @@ function sendGeminiEscalationAlert(member, caseID, status) {
 function wger(fileId, options) {
   options = options || {};
   var mode = options.mode || 'TEXT';
+  var language = options.language || 'en';
   var autoPopulate = options.autoPopulate || false;
   var targetGrievanceId = options.targetGrievanceId || null;
 
@@ -1542,7 +1544,7 @@ function wger(fileId, options) {
     });
 
     // Perform OCR using Google Cloud Vision API
-    var ocrResult = performCloudVisionOCR_(imageBlob, mode);
+    var ocrResult = performCloudVisionOCR_(imageBlob, mode, { language: language });
 
     if (!ocrResult.success) {
       return {
@@ -1605,10 +1607,15 @@ function wger(fileId, options) {
  * Performs OCR using Google Cloud Vision API
  * @param {Blob} imageBlob - Image blob to process
  * @param {string} mode - OCR mode (TEXT, DOCUMENT, HANDWRITING)
+ * @param {Object} options - Optional configuration
+ * @param {string} options.language - Language hint for OCR (default: 'en')
  * @returns {Object} Result with success status and extracted text
  * @private
  */
-function performCloudVisionOCR_(imageBlob, mode) {
+function performCloudVisionOCR_(imageBlob, mode, options) {
+  options = options || {};
+  var language = options.language || 'en';
+
   try {
     // Get API key from script properties (set via Script Properties or Config)
     var apiKey = PropertiesService.getScriptProperties().getProperty('CLOUD_VISION_API_KEY');
@@ -1618,8 +1625,18 @@ function performCloudVisionOCR_(imageBlob, mode) {
       return performBuiltInOCR_(imageBlob, mode);
     }
 
+    // Validate file size (Cloud Vision limit is 10MB for base64 encoded images)
+    var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    var imageBytes = imageBlob.getBytes();
+    if (imageBytes.length > MAX_FILE_SIZE) {
+      return {
+        success: false,
+        message: 'File too large (' + Math.round(imageBytes.length / 1024 / 1024 * 10) / 10 + 'MB). Maximum size is 10MB.'
+      };
+    }
+
     // Prepare Cloud Vision API request
-    var base64Image = Utilities.base64Encode(imageBlob.getBytes());
+    var base64Image = Utilities.base64Encode(imageBytes);
 
     // Select feature type based on mode
     var featureType = 'TEXT_DETECTION';
@@ -1637,17 +1654,22 @@ function performCloudVisionOCR_(imageBlob, mode) {
         features: [{
           type: featureType,
           maxResults: 1
-        }]
+        }],
+        imageContext: {
+          languageHints: [language]
+        }
       }]
     };
 
+    // API request with explicit timeout (30 seconds)
     var response = UrlFetchApp.fetch(
       'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
       {
         method: 'POST',
         contentType: 'application/json',
         payload: JSON.stringify(requestBody),
-        muteHttpExceptions: true
+        muteHttpExceptions: true,
+        timeout: 30000
       }
     );
 
@@ -1792,17 +1814,46 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
       issueCategory: /(?:discipline|workload|scheduling|pay|benefits|safety|harassment|discrimination)/i
     };
 
-    // Try to extract incident date
+    // Try to extract incident date with explicit format handling
     var dateMatch = text.match(patterns.incidentDate);
     if (dateMatch) {
       try {
-        var parsedDate = new Date(dateMatch[1]);
-        if (!isNaN(parsedDate.getTime())) {
+        var dateStr = dateMatch[1];
+        var parts = dateStr.split(/[\/\-]/);
+        var parsedDate = null;
+
+        if (parts.length === 3) {
+          var p0 = parseInt(parts[0], 10);
+          var p1 = parseInt(parts[1], 10);
+          var p2 = parseInt(parts[2], 10);
+
+          // Handle 2-digit years
+          if (p2 < 100) {
+            p2 = p2 + (p2 < 50 ? 2000 : 1900);
+          }
+
+          if (parts[0].length === 4) {
+            // YYYY-MM-DD format
+            parsedDate = new Date(p0, p1 - 1, p2);
+          } else if (p0 > 12) {
+            // DD-MM-YYYY format (day > 12 indicates day-first)
+            parsedDate = new Date(p2, p1 - 1, p0);
+          } else if (p1 > 12) {
+            // MM-DD-YYYY format (second part > 12 indicates month-first)
+            parsedDate = new Date(p2, p0 - 1, p1);
+          } else {
+            // Ambiguous - default to MM-DD-YYYY (US format)
+            parsedDate = new Date(p2, p0 - 1, p1);
+          }
+        }
+
+        if (parsedDate && !isNaN(parsedDate.getTime()) && parsedDate.getFullYear() > 1900) {
           sheet.getRange(grievanceRow, GRIEVANCE_COLS.INCIDENT_DATE).setValue(parsedDate);
           fieldsPopulated.push('Incident Date');
         }
       } catch (e) {
         // Date parsing failed, skip
+        console.log('Date parsing failed for: ' + dateMatch[1] + ' - ' + e.message);
       }
     }
 
@@ -2253,6 +2304,19 @@ function showOCRDialog() {
     '    <option value="DOCUMENT">Document Layout Preservation</option>' +
     '  </select>' +
     '</div>' +
+    '<div class="input-group">' +
+    '  <label>Language Hint</label>' +
+    '  <select id="ocrLanguage">' +
+    '    <option value="en">English</option>' +
+    '    <option value="es">Spanish (Español)</option>' +
+    '    <option value="fr">French (Français)</option>' +
+    '    <option value="de">German (Deutsch)</option>' +
+    '    <option value="pt">Portuguese (Português)</option>' +
+    '    <option value="zh">Chinese (中文)</option>' +
+    '    <option value="ja">Japanese (日本語)</option>' +
+    '    <option value="ko">Korean (한국어)</option>' +
+    '  </select>' +
+    '</div>' +
     '<div class="btn-row">' +
     '  <button class="btn-primary" onclick="runOCR()">🔍 Extract Text</button>' +
     '  <button class="btn-secondary" onclick="google.script.host.close()">Close</button>' +
@@ -2261,13 +2325,29 @@ function showOCRDialog() {
     '<script>' +
     'function extractFileId(input) {' +
     '  input = input.trim();' +
-    '  var driveMatch = input.match(/[-\\w]{25,}/);' +
-    '  return driveMatch ? driveMatch[0] : input;' +
+    '  // Handle various Google Drive URL formats' +
+    '  var patterns = [' +
+    '    /\\/d\\/([a-zA-Z0-9_-]{25,})/,           ' + // /d/{fileId}/ format
+    '    /[?&]id=([a-zA-Z0-9_-]{25,})/,          ' + // ?id={fileId} format
+    '    /\\/file\\/d\\/([a-zA-Z0-9_-]{25,})/,   ' + // /file/d/{fileId}/ format
+    '    /\\/open\\?id=([a-zA-Z0-9_-]{25,})/,    ' + // /open?id={fileId} format
+    '    /^([a-zA-Z0-9_-]{25,})$/                ' + // Plain file ID
+    '  ];' +
+    '  for (var i = 0; i < patterns.length; i++) {' +
+    '    var match = input.match(patterns[i]);' +
+    '    if (match && match[1]) {' +
+    '      return match[1];' +
+    '    }' +
+    '  }' +
+    '  // Fallback: try to find any 25+ char alphanumeric string' +
+    '  var fallbackMatch = input.match(/[a-zA-Z0-9_-]{25,}/);' +
+    '  return fallbackMatch ? fallbackMatch[0] : input;' +
     '}' +
     'function runOCR() {' +
     '  var rawInput = document.getElementById("fileId").value;' +
     '  var fileId = extractFileId(rawInput);' +
     '  var mode = document.getElementById("ocrMode").value;' +
+    '  var language = document.getElementById("ocrLanguage").value;' +
     '  if (!fileId) {' +
     '    showResult({ success: false, message: "Please enter a valid file ID or URL" });' +
     '    return;' +
@@ -2275,7 +2355,7 @@ function showOCRDialog() {
     '  document.getElementById("resultContainer").innerHTML = "<div class=\\"loading\\"><div class=\\"spinner\\"></div><div style=\\"margin-top:12px\\">Processing OCR...</div></div>";' +
     '  google.script.run.withSuccessHandler(showResult).withFailureHandler(function(e) {' +
     '    showResult({ success: false, message: e.message });' +
-    '  }).wger(fileId, { mode: mode });' +
+    '  }).wger(fileId, { mode: mode, language: language });' +
     '}' +
     'function showResult(result) {' +
     '  var container = document.getElementById("resultContainer");' +
@@ -2303,7 +2383,7 @@ function showOCRDialog() {
     '</script>'
   )
   .setWidth(500)
-  .setHeight(480);
+  .setHeight(540);
 
   ui.showModalDialog(html, '📝 WGER OCR Transcription');
 }
@@ -2370,8 +2450,13 @@ function setupOCRApiKey() {
     '<div class="section">' +
     '<h3>🔑 Enter API Key</h3>' +
     '<div class="input-group">' +
-    '<label>Cloud Vision API Key</label>' +
-    '<input type="text" id="apiKey" placeholder="AIzaSy..." value="' + (currentKey || '') + '">' +
+    '<label>Cloud Vision API Key' + (currentKey ? ' <span style="color:#10B981;font-weight:normal;">(currently configured)</span>' : '') + '</label>' +
+    '<input type="password" id="apiKey" placeholder="AIzaSy..." autocomplete="off">' +
+    '<div style="margin-top:8px;font-size:12px;color:#64748B;">' +
+    '<label style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;">' +
+    '<input type="checkbox" id="showKey" onchange="toggleKeyVisibility()"> Show API key' +
+    '</label>' +
+    '</div>' +
     '</div>' +
     '<div class="btn-row">' +
     '<button class="btn-primary" onclick="saveKey()">💾 Save Key</button>' +
@@ -2385,6 +2470,11 @@ function setupOCRApiKey() {
     '</div>' +
 
     '<script>' +
+    'function toggleKeyVisibility() {' +
+    '  var input = document.getElementById("apiKey");' +
+    '  var checkbox = document.getElementById("showKey");' +
+    '  input.type = checkbox.checked ? "text" : "password";' +
+    '}' +
     'function saveKey() {' +
     '  var key = document.getElementById("apiKey").value.trim();' +
     '  if (!key) {' +

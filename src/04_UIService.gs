@@ -3294,7 +3294,7 @@ function getMobileDashboardStats() {
     var daysTo = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
     if (status && status !== 'Resolved' && status !== 'Withdrawn') stats.activeGrievances++;
     if (status === 'Pending Info') stats.pendingGrievances++;
-    if (daysTo !== null && daysTo !== '' && daysTo < 0 && status === 'Open') stats.overdueGrievances++;
+    if ((daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0)) && status === 'Open') stats.overdueGrievances++;
   });
   return stats;
 }
@@ -3617,7 +3617,7 @@ function showGrievanceQuickActions(row) {
     '<div class="gstatus">' +
     '<span class="badge">' + status + '</span>' +
     '<span class="badge">' + step + '</span>' +
-    (daysTo !== null && daysTo !== '' ? '<span class="badge" style="background:' + (daysTo < 0 ? '#ffebee;color:#c62828' : '#e3f2fd;color:#1565c0') + '">' + (daysTo < 0 ? '⚠️ Overdue' : '📅 ' + daysTo + ' days') + '</span>' : '') +
+    (daysTo !== null && daysTo !== '' ? '<span class="badge" style="background:' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '#ffebee;color:#c62828' : '#e3f2fd;color:#1565c0') + '">' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '⚠️ Overdue' : '📅 ' + daysTo + ' days') + '</span>' : '') +
     '</div></div>' +
     '<div class="actions">' +
     '<div class="section-header">📋 Case Management</div>' +
@@ -3857,7 +3857,7 @@ function emailGrievanceStatusToMember(grievanceId) {
     'Date Filed: ' + (grievance.dateFiled ? new Date(grievance.dateFiled).toLocaleDateString() : 'N/A') + '\n';
 
   if (grievance.daysToDeadline !== null && grievance.daysToDeadline !== '') {
-    if (grievance.daysToDeadline < 0) {
+    if (grievance.daysToDeadline === 'Overdue' || (typeof grievance.daysToDeadline === 'number' && grievance.daysToDeadline < 0)) {
       body += 'Next Deadline: OVERDUE\n';
     } else {
       body += 'Days Until Next Deadline: ' + grievance.daysToDeadline + '\n';
