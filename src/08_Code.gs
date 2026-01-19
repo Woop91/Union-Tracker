@@ -186,8 +186,8 @@ function createConfigSheet(ss) {
     '── ORG IDENTITY ──', '', '',                       // AK-AM (3 cols)
     '── EXTENDED CONTACT ──', '', '', '', '',           // AN-AR (5 cols)
     '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AS-AY (7 cols)
-    '── RESOURCES ──',                                  // AZ (1 col)
-    '── THEME SETTINGS ──', '', '', '', '', ''          // BA-BF (6 cols)
+    '── MOBILE & RESOURCES ──', '',                     // AZ-BA (2 cols)
+    '── THEME SETTINGS ──', '', '', '', '', ''          // BB-BG (6 cols)
   ];
 
   // Row 2: Column Headers
@@ -206,7 +206,7 @@ function createConfigSheet(ss) {
     'Union Parent', 'State/Region', 'Organization Website',
     'Office Addresses', 'Main Fax', 'Main Contact Name', 'Main Contact Email', 'Satisfaction Survey URL',
     'Chief Steward Email', 'Unit Codes', 'Archive Folder ID', 'Escalation Statuses', 'Escalation Steps', 'Template ID', 'PDF Folder ID',
-    'Contract PDF URL',
+    '📱 Mobile Dashboard URL', 'Contract PDF URL',
     'Enable Theme', 'Header BG Color', 'Header Text Color', 'Alt Row Color', 'Font Family', 'Font Size'
   ];
 
@@ -434,8 +434,8 @@ function applySectionColors_(sheet, lastCol) {
     { start: 37, end: 39, color: SECTION_COLORS.IDENTITY },      // AK-AM
     { start: 40, end: 44, color: SECTION_COLORS.EXTENDED },      // AN-AR
     { start: 45, end: 51, color: SECTION_COLORS.COMMAND },       // AS-AY
-    { start: 52, end: 52, color: SECTION_COLORS.RESOURCES },     // AZ
-    { start: 53, end: 58, color: SECTION_COLORS.THEME }          // BA-BF
+    { start: 52, end: 53, color: SECTION_COLORS.RESOURCES },     // AZ-BA (Mobile & Resources)
+    { start: 54, end: 59, color: SECTION_COLORS.THEME }          // BB-BG
   ];
 
   sections.forEach(function(section) {
