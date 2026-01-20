@@ -2,17 +2,18 @@
 
 **Version:** 4.4.1 (Compare Tab Redesign, Hot Spots Enhancement, Satisfaction Question Breakdown)
 **Last Updated:** 2026-01-19
-**Purpose:** Union grievance tracking and member engagement system for SEIU Local 509
+**Purpose:** A personal project for grievance tracking and member engagement
+
+> **Disclaimer:** This is a personal project and is not affiliated with or endorsed by any union or labor organization. It is shared freely for others to use and customize.
 
 ---
 
 ## Creator & License
 
-**Creator & Owner:** Wardis N. Vizcaino
-**Role:** Steward at SEIU Local 509
+**Creator:** Wardis N. Vizcaino
 **Contact:** wardis@pm.me
 
-**License:** Free for use by non-profit collective bargaining groups and unions. No license required.
+**License:** Free for personal use. Feel free to copy and customize for your own needs.
 
 ---
 

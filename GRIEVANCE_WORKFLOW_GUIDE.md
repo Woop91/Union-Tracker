@@ -38,7 +38,7 @@ To enable the full workflow with automatic form submissions:
 1. **Create a new Google Form:**
    - Go to [Google Forms](https://forms.google.com)
    - Click **+ Blank** or use a template
-   - Name it "SEIU Local 509 - Grievance Form"
+   - Name it "[Your Organization] - Grievance Form"
 
 2. **Add the following fields** (adjust as needed):
    - Member ID (Short answer)

@@ -1,5 +1,5 @@
 # 🌟 Steward Excellence Guide
-**You Are the Backbone of Our Union! 💪**
+**A Guide for Representatives Using This System 💪**
 
 ---
 
@@ -112,7 +112,7 @@ The new **My Cases** tab lets you view all grievances assigned to YOU in one pla
 
 ## 👏 Thank You for Being a Steward!
 
-Every time you update member information, you're **strengthening our union family**. Every blank field you fill in represents a member who's now better connected, better represented, and better protected. **You're making a real difference!**
+Every time you update member information, you're **strengthening your organization**. Every blank field you fill in represents a member who's now better connected, better represented, and better protected. **You're making a real difference!**
 
 This dashboard is only as powerful as the care you put into it. And you? You're crushing it! 🎉
 
@@ -170,9 +170,9 @@ When you fill in member details, you're not just entering data—you're:
 These members are **not lost**—they're just waiting for someone to remind them they matter. **That someone is YOU!** 🌟
 
 When you update information for a less-active member, you're:
-- 🔥 **Reigniting their connection** to the union
+- 🔥 **Reigniting their connection** to the group
 - 💡 **Opening doors** for future conversations
-- 🛡️ **Ensuring they're protected** when they need us
+- 🛡️ **Ensuring they're protected** when they need support
 - 🌍 **Showing them they belong** to something bigger
 
 **Every less-active member you update is a potential future leader!**
@@ -196,7 +196,7 @@ When you update information for a less-active member, you're:
 **Goal**: Contact 3 of those members to update their info
 
 **Sample Script (Warm & Welcoming):**
-> *"Hi [Name]! This is [Your Name] from Local 509. I'm updating our member directory to make sure we can reach everyone. Do you have a few minutes to confirm your contact info? We want to make sure you're getting all the updates and support you deserve!"*
+> *"Hi [Name]! This is [Your Name] from [Your Organization]. I'm updating our member directory to make sure we can reach everyone. Do you have a few minutes to confirm your contact info? We want to make sure you're getting all the updates and support you deserve!"*
 
 **Celebrate**: Every call you make = **one member feeling valued!** 🎊
 
@@ -261,7 +261,7 @@ Run these reports weekly to **celebrate your progress**:
 ### Daily Affirmations for Stewards
 
 **When you're about to update data, remember:**
-- 💙 "Every field I complete strengthens our union"
+- 💙 "Every field I complete strengthens our organization"
 - 💪 "I'm building bridges, not just updating records"
 - 🌟 "This member matters, and I'm proving it"
 - 🎯 "Small actions create massive solidarity"
@@ -270,7 +270,7 @@ Run these reports weekly to **celebrate your progress**:
 - 🔥 "I'm reigniting connections, not chasing ghosts"
 - 💡 "This member has value, and I see it"
 - 🛡️ "I'm ensuring everyone is protected"
-- 🌍 "I'm bringing our union family back together"
+- 🌍 "I'm bringing our members back together"
 
 ---
 
@@ -391,7 +391,7 @@ Run these reports weekly to **celebrate your progress**:
 
 > **"I commit to seeing every member as a person, not just a record.
 > I will update data with care, knowing each field represents a real human being.
-> I will celebrate every small win, because small wins build powerful unions.
+> I will celebrate every small win, because small wins build powerful organizations.
 > I will reach out to less-active members with warmth, not judgment.
 > I will remember: I'm not just maintaining a database—I'm strengthening solidarity.
 > I am a steward. I am a connector. I am essential."** 💪✊
@@ -496,7 +496,7 @@ Run these reports weekly to **celebrate your progress**:
 
 ### Remember These Truths:
 
-✨ **You are making a difference** – Every update strengthens our union
+✨ **You are making a difference** – Every update strengthens your organization
 ✨ **Progress over perfection** – Small steps lead to big impact
 ✨ **Members appreciate you** – Even if they don't say it directly
 ✨ **Your work matters** – Data quality = better member support
@@ -545,7 +545,7 @@ Run these reports weekly to **celebrate your progress**:
 
 ### Template for Steward Meetings:
 
-> *"This week, I updated contact information for [number] members, including [number] less-active members. I reached out to [name one member if comfortable], and they were so happy to hear from us! I'm proud that our union can now reach [number] more members in emergencies. Next week, I'm focusing on [your next goal]. Together, we're building a stronger Local 509!"*
+> *"This week, I updated contact information for [number] members, including [number] less-active members. I reached out to [name one member if comfortable], and they were so happy to hear from us! I'm proud that we can now reach [number] more members in emergencies. Next week, I'm focusing on [your next goal]. Together, we're building a stronger organization!"*
 
 **Why Share:**
 - 🌟 Inspires fellow stewards
@@ -566,7 +566,7 @@ Every time you sit down to update member records, you're doing sacred union work
 **Every engagement note** = One more story in our collective history
 **Every less-active member** = One more potential leader waiting to emerge
 
-**You are the connection between our union and our members.**
+**You are the connection between the organization and its members.**
 
 **You are the reason our data is a living, breathing reflection of our community.**
 
@@ -580,18 +580,18 @@ Remember: **Progress, not perfection.**
 Celebrate: **Every single update.**
 Believe: **You're making a difference.**
 
-**Thank you for being an incredible steward. Our union is stronger because of YOU!** 💪✊
+**Thank you for being an incredible steward. Your organization is stronger because of YOU!** 💪✊
 
 ---
 
 **Questions? Feeling stuck? Need encouragement?**
-Reach out to your fellow stewards or union leadership. We're all in this together! 🤝
+Reach out to your fellow stewards or leadership. We're all in this together! 🤝
 
 ---
 
 **Last Updated**: January 2026
 **Version**: 4.0.3
 **Created with**: Deep appreciation for steward dedication
-**Purpose**: Celebrating and supporting the backbone of Local 509 💙
+**Purpose**: Celebrating and supporting stewards everywhere 💙
 
 *"Alone we can do so little; together we can do so much." – Helen Keller*

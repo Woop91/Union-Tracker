@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Interactive Dashboard** system provides comprehensive views of your union's grievance management data through mobile-friendly **web app interfaces**. Version 4.4.0 introduces the **Unified Web App Dashboard Architecture**.
+The **Interactive Dashboard** system provides comprehensive views of your organization's grievance management data through mobile-friendly **web app interfaces**. Version 4.4.0 introduces the **Unified Web App Dashboard Architecture**.
 
 ---
 
@@ -205,13 +205,13 @@ Choose from 20+ metrics:
 
 Choose from 6 professional themes:
 
-1. **Union Blue** 🔵
-   - Primary: Union Blue (#2563EB)
+1. **Professional Blue** 🔵
+   - Primary: Blue (#2563EB)
    - Accent: Teal (#0891B2)
    - Professional and trustworthy
 
-2. **Solidarity Red** 🔴
-   - Primary: Solidarity Red (#DC2626)
+2. **Action Red** 🔴
+   - Primary: Red (#DC2626)
    - Accent: Orange (#EA580C)
    - Bold and action-oriented
 
@@ -297,8 +297,8 @@ A sortable table showing:
 
 ### Professional Color Scheme
 
-Based on reference dashboards and union branding:
-- Primary: Union Blue (#2563EB)
+Based on reference dashboards:
+- Primary: Blue (#2563EB)
 - Success: Green (#059669)
 - Warning: Orange (#EA580C)
 - Critical: Red (#DC2626)
@@ -329,7 +329,7 @@ Based on reference dashboards and union branding:
 **Settings:**
 - Metric 1: Total Members → Donut Chart
 - Metric 2: Win Rate % → Pie Chart
-- Theme: Union Blue
+- Theme: Professional Blue
 - Comparison: Yes
 
 **Result:** Two clear pie charts showing member distribution and win/loss breakdown
@@ -355,7 +355,7 @@ Based on reference dashboards and union branding:
 **Settings:**
 - Metric 1: Grievances by Location → Bar Chart
 - Metric 2: Steward Workload → Column Chart
-- Theme: Solidarity Red
+- Theme: Action Red
 - Comparison: Yes
 
 **Result:** Side-by-side comparison of location issues and steward capacity
@@ -437,8 +437,8 @@ Quickly change the entire dashboard appearance:
 3. All headers and accents update automatically
 
 **When to Use Each Theme:**
-- **Union Blue**: Default, professional presentations
-- **Solidarity Red**: Highlighting urgent issues
+- **Professional Blue**: Default, professional presentations
+- **Action Red**: Highlighting urgent issues
 - **Success Green**: Celebrating wins, positive metrics
 - **Professional Purple**: Modern executive reports
 - **Modern Dark**: Reducing eye strain, presentations
@@ -539,7 +539,7 @@ The Interactive Dashboard is mobile-friendly:
 **Monthly Reporting:**
 1. Select "Win Rate %" + "Monthly Trends"
 2. Choose Pie + Line charts
-3. Apply "Union Blue" theme
+3. Apply "Professional Blue" theme
 4. Export to PDF for distribution
 
 **Executive Presentation:**
@@ -604,8 +604,7 @@ Potential additions (from Future Features sheet):
 
 ---
 
-**Created for SEIU Local 509 (Units 8 & 10)**
 **Version:** 4.4.1
 **Last Updated:** January 2026
 
-*Empowering union representatives with data-driven insights* 📊✊
+*A personal project providing data-driven insights for representatives* 📊
