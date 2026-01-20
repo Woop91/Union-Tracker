@@ -12,7 +12,13 @@
 
 Hi there,
 
-Thanks for checking out this project! I created this system as a personal side project to help with member engagement, grievance tracking, and data organization. It's designed to streamline communication, protect member information, and provide useful tools for stewards—but again, this is just something I built independently and decided to share.
+Thanks for checking out this project! I created this system as a personal side project to help chapters, groups, or organizations keep track of:
+
+- **Membership contact information** – A centralized directory for managing member details
+- **Grievance status tracking** – Monitor cases, deadlines, and outcomes in one place
+- **Survey data presentation** – Collect and visualize member feedback and satisfaction metrics
+
+The system is designed to be **customized to fit different chapters, groups, or organizations**—you can adapt the terminology, deadlines, workflows, and structure to match your specific needs. This is just something I built independently and decided to share.
 
 **Important Note:** All member data currently shown in the forms and sheets has been **randomly generated** for demonstration purposes and is NOT based on real members or work locations.
 
