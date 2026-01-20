@@ -1,16 +1,18 @@
 # Welcome to the 509 Strategic Command Center
 
-**Your Union's Digital Hub for Member Engagement, Grievance Tracking & Strategic Analytics**
+**A Personal Project for Member Engagement, Grievance Tracking & Strategic Analytics**
 
 ---
 
-> **Development Notice:** This system is currently in the **review and feedback phase** (approximately one month). We welcome all feedback, bug reports, and feature suggestions. Feel free to copy the sheet, forms, and core repository at any time to explore and customize for your own union's needs.
+> **Disclaimer:** This is a **personal project** I built on my own time—it is **not** an official union tool or endorsed by any labor organization. I'm sharing it freely with fellow stewards and union members who might find it useful.
+
+> **Development Notice:** This system is currently in the **review and feedback phase** (approximately one month). I welcome all feedback, bug reports, and feature suggestions. Feel free to copy the sheet, forms, and core repository at any time to explore and customize for your own needs.
 
 ---
 
-Dear Fellow Union Members and Stewards,
+Hi there,
 
-Welcome to our new digital union management system! This comprehensive platform is designed to streamline communication, protect member information, and empower stewards with the tools they need to effectively represent our membership.
+Thanks for checking out this project! I created this system as a personal side project to help with member engagement, grievance tracking, and data organization. It's designed to streamline communication, protect member information, and provide useful tools for stewards—but again, this is just something I built independently and decided to share.
 
 **Important Note:** All member data currently shown in the forms and sheets has been **randomly generated** for demonstration purposes and is NOT based on real members or work locations.
 
@@ -32,7 +34,7 @@ Welcome to our new digital union management system! This comprehensive platform 
 
 ## How Information Flows Through the System
 
-Understanding how your information moves through our system helps you know exactly what to expect:
+Understanding how information moves through the system helps you know exactly what to expect:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -92,7 +94,7 @@ Understanding how your information moves through our system helps you know exact
 
 ## Member Directory Features
 
-The Member Directory is your central hub for all member information, organized into logical sections:
+The Member Directory serves as a central hub for member information, organized into logical sections:
 
 ### Identity & Core Information
 - **Member ID**: Auto-generated unique identifier (format: M + initials + 3 digits)
@@ -377,36 +379,38 @@ The sheet includes a **Function Checklist** tab that documents:
 
 ---
 
-## Want to Copy This for Your Union?
+## Want to Copy This for Your Own Use?
 
-This system is **free for use by non-profit collective bargaining groups and unions**. You can:
+This is a personal project that I'm sharing freely. You're welcome to:
 
 1. **Copy the Google Sheet**: File → Make a copy
 2. **Copy the Google Forms**: Each form can be copied from the form editor
 3. **Clone the GitHub Repository**: Contains all the Apps Script code
 
-Feel free to customize everything to match your union's contract deadlines, terminology, and workflows.
+Feel free to customize everything to match your contract deadlines, terminology, and workflows. No affiliation with any official union organization is implied.
 
 ---
 
 ## Feedback & Development Phase
 
-We are currently in a **month-long review and feedback phase**. During this time:
+I'm currently in a **month-long review and feedback phase**. During this time:
 
 - Test all features thoroughly
 - Report any bugs or issues in the **Feedback & Development tab**
 - Suggest new features or improvements
-- Share your experience with other stewards
+- Share your experience with others who might find it useful
 
-Your feedback directly shapes the development of this tool!
+Your feedback directly shapes how I continue developing this project!
 
 ---
 
-**Welcome aboard, and thank you for your commitment to our union!**
+**Thanks for checking this out!**
 
-*In Solidarity,*
-*The 509 Strategic Command Center Team*
+*Best,*
+*Wardis*
 
 ---
 
 *Version 4.3.8 | Questions or Feedback? Contact wardis@pm.me*
+
+*This is a personal project and is not affiliated with or endorsed by any union or labor organization.*
