@@ -36,7 +36,7 @@ This document provides a comprehensive, searchable reference of all features in 
 | Feature | Description | Menu Path | Keywords |
 |---------|-------------|-----------|----------|
 | **Steward Dashboard** | Internal dashboard with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction. Contains member names and PII - for steward use only. | Strategic Ops > Command Center > Steward Dashboard | internal, analytics, PII, workload |
-| **Member Dashboard** | PII-safe dashboard for sharing with members. Shows aggregate union stats, steward directory, and satisfaction scores without personal information. | Strategic Ops > Command Center > Member Dashboard | public, aggregate, safe, sharing |
+| **Member Dashboard** | PII-safe dashboard for sharing with members. Shows aggregate stats, steward directory, and satisfaction scores without personal information. | Strategic Ops > Command Center > Member Dashboard | public, aggregate, safe, sharing |
 | **Executive Command Dashboard** | Legacy 5-tab modal with Overview, My Cases, Grievances, Members, and Analytics tabs. | Union Hub > Dashboards > Dashboard | executive, overview, legacy |
 | **Interactive Dashboard** | Customizable dashboard with 20+ metrics and 7 chart types. | See INTERACTIVE_DASHBOARD_GUIDE.md | charts, metrics, customizable |
 
@@ -44,7 +44,7 @@ This document provides a comprehensive, searchable reference of all features in 
 
 | Tab | Description | Key Metrics |
 |-----|-------------|-------------|
-| **Overview** | High-level union health metrics with Quick Insights panel | Active grievances, win rate, member count, morale score, engagement summary, bargaining position |
+| **Overview** | High-level organization health metrics with Quick Insights panel | Active grievances, win rate, member count, morale score, engagement summary, bargaining position |
 | **My Cases** | Steward's assigned grievances (PII mode only) | Active cases, urgent count, avg days open, filtering by status |
 | **Workload** | Steward case distribution and capacity | Cases per steward, overload warnings (8+ cases), top performers |
 | **Analytics** | Grievance trends and patterns | Status breakdown, engagement metrics, volunteer hours |
@@ -52,7 +52,7 @@ This document provides a comprehensive, searchable reference of all features in 
 | **Hot Spots** | Problem areas with 4 hot spot types | Grievance clusters, dissatisfaction areas, low engagement zones, overdue concentrations |
 | **Bargaining** | Comprehensive bargaining intelligence | Step 1/2 denial rates, step outcomes, case details at each step, recent grievances |
 | **Satisfaction** | 8-section member satisfaction with individual question scores | Section scores, question breakdowns, expandable details |
-| **Resources** | Union documents and steward contacts | Google Drive folder, steward directory with search |
+| **Resources** | Organization documents and steward contacts | Google Drive folder, steward directory with search |
 | **Compare** | Dashboard comparison and export tool | Period comparison, step-by-step breakdown, satisfaction comparison, denial rate analysis, CSV export |
 | **Help** | FAQ and documentation (PII mode only) | Searchable help with 4 categories and 12+ questions |
 
@@ -216,7 +216,7 @@ This document provides a comprehensive, searchable reference of all features in 
 | **Management Hostility Report** | Analyzes denial rates across grievance steps. | Strategic Ops > Strategic Intelligence > Hostility Report | denial, management, hostility |
 | **Bargaining Cheat Sheet** | Strategic data for contract negotiations (common violations, leverage points). | Strategic Ops > Strategic Intelligence > Bargaining | bargaining, contract, negotiation |
 | **Unit Density Treemap** | Visual heat map of grievance activity by unit (green → yellow → red). | Strategic Ops > Analytics > Treemap | treemap, density, heatmap |
-| **Sentiment Trend Analysis** | Union morale tracking over time from survey data. | Strategic Ops > Analytics > Sentiment Trends | sentiment, morale, trends |
+| **Sentiment Trend Analysis** | Organization morale tracking over time from survey data. | Strategic Ops > Analytics > Sentiment Trends | sentiment, morale, trends |
 | **Unit Health Report** | Comprehensive health check for specific units. | Field Portal > Analytics > Unit Health | health, unit, report |
 
 ---
@@ -287,7 +287,7 @@ This document provides a comprehensive, searchable reference of all features in 
 |---------|-------------|-----------|----------|
 | **Deploy Web App** | Create standalone web application from the dashboard. | Field Portal > Web App > Deploy | deploy, web app, standalone |
 | **Member Portal** | Personalized member view via URL parameter (?member=ID). | Via Web App URL | portal, personal, member |
-| **Public Statistics Portal** | Aggregate union statistics for public deployment. | Field Portal > Web App > Public Portal | public, statistics, aggregate |
+| **Public Statistics Portal** | Aggregate statistics for public deployment. | Field Portal > Web App > Public Portal | public, statistics, aggregate |
 | **Email Portal Links** | Send personalized dashboard URLs to members. | Field Portal > Web App > Email Links | email, portal, personalized |
 | **JSON API Endpoints** | REST API for external integrations. | Via doGet/doPost handlers | API, JSON, REST |
 
@@ -395,4 +395,4 @@ This document provides a comprehensive, searchable reference of all features in 
 
 ---
 
-*509 Strategic Command Center v4.3.8 - Empowering union representatives with comprehensive tools*
+*509 Strategic Command Center v4.3.8 - A personal project providing comprehensive tools for representatives*
