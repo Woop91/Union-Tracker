@@ -8661,13 +8661,14 @@ function getUnifiedDashboardHtml(isPII) {
     '@keyframes fadeInOut{0%{opacity:0}10%{opacity:1}90%{opacity:1}100%{opacity:0}}' +
 
     // Responsive
-    '@media(max-width:768px){.header h1{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.bargain-grid{grid-template-columns:repeat(2,1fr)}.settings-panel,.alert-center{width:100%}}' +
+    '@media(max-width:768px){.header h1{font-size:14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row{grid-template-columns:1fr}.bargain-grid{grid-template-columns:repeat(2,1fr)}.settings-panel,.alert-center{width:100%;right:-100%}.settings-panel.open,.alert-center.open{right:0}}' +
 
     // View Mode Toggle Pill
     '.view-toggle{display:flex;background:rgba(255,255,255,0.1);border-radius:20px;padding:3px;gap:2px}' +
-    '.view-toggle button{padding:6px 12px;border:none;border-radius:17px;font-size:11px;cursor:pointer;transition:all 0.2s;background:transparent;color:#94a3b8;display:flex;align-items:center;gap:4px}' +
+    '.view-toggle button{padding:6px 12px;border:none;border-radius:17px;font-size:11px;cursor:pointer;transition:all 0.2s;background:transparent;color:#94a3b8;display:flex;align-items:center;gap:4px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}' +
     '.view-toggle button.active{background:#3b82f6;color:white}' +
     '.view-toggle button .material-icons{font-size:14px}' +
+    '@media(max-width:768px){.view-toggle button{padding:8px 14px;min-height:44px}}' +
 
     // Mobile Mode (forced mobile layout)
     'body.mobile-mode .header{flex-direction:column;gap:12px;padding:12px 16px}' +
@@ -8713,11 +8714,11 @@ function getUnifiedDashboardHtml(isPII) {
     '</style></head><body>' +
 
     // Settings Overlay
-    '<div class="settings-overlay" onclick="toggleSettings()"></div>' +
+    '<div class="settings-overlay" onclick="toggleSettings()" ontouchend="event.preventDefault();toggleSettings()"></div>' +
 
     // Settings Panel
     '<div class="settings-panel" id="settingsPanel">' +
-    '<div class="settings-header"><span style="font-size:16px;font-weight:700;color:#e2e8f0">Settings</span><button onclick="toggleSettings()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">&times;</button></div>' +
+    '<div class="settings-header"><span style="font-size:16px;font-weight:700;color:#e2e8f0">Settings</span><button onclick="toggleSettings()" ontouchend="event.preventDefault();toggleSettings()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer;min-width:44px;min-height:44px;touch-action:manipulation">&times;</button></div>' +
     '<div class="settings-section"><div class="settings-title">Display</div>' +
     '<div class="setting-row"><span class="setting-label">High Contrast Mode</span><div class="toggle" id="highContrastToggle" onclick="toggleHighContrast()"></div></div>' +
     '<div class="setting-row"><span class="setting-label">Large Text Mode</span><div class="toggle" id="largeTextToggle" onclick="toggleLargeText()"></div></div>' +
@@ -8750,7 +8751,7 @@ function getUnifiedDashboardHtml(isPII) {
 
     // Alert Center
     '<div class="alert-center" id="alertCenter">' +
-    '<div class="alert-header"><span style="font-size:16px;font-weight:700;color:#e2e8f0">Alert Center</span><button onclick="toggleAlerts()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer">&times;</button></div>' +
+    '<div class="alert-header"><span style="font-size:16px;font-weight:700;color:#e2e8f0">Alert Center</span><button onclick="toggleAlerts()" ontouchend="event.preventDefault();toggleAlerts()" style="background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer;min-width:44px;min-height:44px;touch-action:manipulation">&times;</button></div>' +
     '<div id="alertList"></div>' +
     '</div>' +
 
@@ -8761,9 +8762,9 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="header"><h1><i class="material-icons">analytics</i>' + title + '</h1><div style="display:flex;align-items:center;gap:12px">' +
     // View Mode Toggle Pill
     '<div class="view-toggle" id="viewToggle">' +
-    '<button id="autoViewBtn" class="active" onclick="setViewMode(\\x27auto\\x27)"><i class="material-icons">auto_fix_high</i>Auto</button>' +
-    '<button id="desktopViewBtn" onclick="setViewMode(\\x27desktop\\x27)"><i class="material-icons">computer</i>Desktop</button>' +
-    '<button id="mobileViewBtn" onclick="setViewMode(\\x27mobile\\x27)"><i class="material-icons">smartphone</i>Mobile</button>' +
+    '<button id="autoViewBtn" class="active" onclick="setViewMode(\\x27auto\\x27)" ontouchend="event.preventDefault();setViewMode(\\x27auto\\x27)"><i class="material-icons">auto_fix_high</i>Auto</button>' +
+    '<button id="desktopViewBtn" onclick="setViewMode(\\x27desktop\\x27)" ontouchend="event.preventDefault();setViewMode(\\x27desktop\\x27)"><i class="material-icons">computer</i>Desktop</button>' +
+    '<button id="mobileViewBtn" onclick="setViewMode(\\x27mobile\\x27)" ontouchend="event.preventDefault();setViewMode(\\x27mobile\\x27)"><i class="material-icons">smartphone</i>Mobile</button>' +
     '</div>' +
     '<div class="last-updated" id="lastUpdated"><i class="material-icons">schedule</i><span>Loading...</span></div>' +
     badge +
