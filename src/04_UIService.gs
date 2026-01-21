@@ -8462,7 +8462,7 @@ function getUnifiedDashboardHtml(isPII) {
     // Tabs
     '.tabs{display:flex;gap:2px;padding:0 16px;background:rgba(0,0,0,0.3);overflow-x:auto;-webkit-overflow-scrolling:touch}' +
     '.tabs::-webkit-scrollbar{display:none}' +
-    '.tab{padding:14px 16px;cursor:pointer;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:3px solid transparent;transition:all 0.2s;white-space:nowrap;text-transform:uppercase;letter-spacing:0.5px}' +
+    '.tab{padding:14px 16px;cursor:pointer;font-size:11px;font-weight:600;color:#94a3b8;border-bottom:3px solid transparent;transition:all 0.2s;white-space:nowrap;text-transform:uppercase;letter-spacing:0.5px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}' +
     '.tab:hover{color:#e2e8f0;background:rgba(255,255,255,0.05)}' +
     '.tab.active{color:#60a5fa;border-bottom-color:#60a5fa;background:rgba(96,165,250,0.1)}' +
 
@@ -8545,7 +8545,7 @@ function getUnifiedDashboardHtml(isPII) {
     '@keyframes modalIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}' +
     '.modal-header{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;justify-content:space-between;align-items:center}' +
     '.modal-title{font-size:16px;font-weight:700;color:#60a5fa}' +
-    '.modal-close{background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer;padding:4px}' +
+    '.modal-close{background:none;border:none;color:#94a3b8;font-size:24px;cursor:pointer;padding:4px;min-width:44px;min-height:44px;touch-action:manipulation}' +
     '.modal-close:hover{color:#f8fafc}' +
     '.modal-body{padding:20px;max-height:calc(80vh - 60px);overflow-y:auto}' +
     '.modal-list-item{padding:12px;background:rgba(15,23,42,0.5);border-radius:8px;margin-bottom:8px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}' +
@@ -8621,7 +8621,7 @@ function getUnifiedDashboardHtml(isPII) {
 
     // Date Range Filter
     '.date-filter{display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(0,0,0,0.2);border-bottom:1px solid rgba(255,255,255,0.05)}' +
-    '.date-btn{padding:6px 12px;border-radius:6px;font-size:11px;background:#334155;color:#94a3b8;border:none;cursor:pointer;transition:all 0.2s}' +
+    '.date-btn{padding:6px 12px;border-radius:6px;font-size:11px;background:#334155;color:#94a3b8;border:none;cursor:pointer;transition:all 0.2s;touch-action:manipulation;-webkit-tap-highlight-color:transparent}' +
     '.date-btn:hover,.date-btn.active{background:#475569;color:#e2e8f0}' +
     '.date-input{padding:6px 10px;border-radius:6px;font-size:11px;background:#1e293b;color:#f8fafc;border:1px solid #475569;width:120px}' +
 
@@ -8691,7 +8691,8 @@ function getUnifiedDashboardHtml(isPII) {
     'body.mobile-mode .pinned-section{padding:12px}' +
     'body.mobile-mode .pinned-grid{grid-template-columns:repeat(2,1fr)}' +
     'body.mobile-mode .modal{width:95%;max-height:85vh;margin:10px}' +
-    'body.mobile-mode .settings-panel,body.mobile-mode .alert-center{width:100%}' +
+    'body.mobile-mode .settings-panel,body.mobile-mode .alert-center{width:100%;right:-100%}' +
+    'body.mobile-mode .settings-panel.open,body.mobile-mode .alert-center.open{right:0}' +
     'body.mobile-mode .btn{padding:12px 20px;font-size:13px}' +
     'body.mobile-mode .content{padding:12px}' +
     'body.mobile-mode .trend-grid{grid-template-columns:repeat(2,1fr)}' +
@@ -8805,9 +8806,9 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="content"><div id="main-content"><div class="loading"><div class="spinner"></div>Loading dashboard data...</div></div></div>' +
 
     // Modal
-    '<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">' +
+    '<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()" ontouchend="if(event.target===this){event.preventDefault();closeModal()}">' +
     '<div class="modal">' +
-    '<div class="modal-header"><span class="modal-title" id="modal-title">Details</span><button class="modal-close" onclick="closeModal()">&times;</button></div>' +
+    '<div class="modal-header"><span class="modal-title" id="modal-title">Details</span><button class="modal-close" onclick="closeModal()" ontouchend="event.preventDefault();closeModal()">&times;</button></div>' +
     '<div class="modal-body" id="modal-body"></div>' +
     '</div></div>' +
 
