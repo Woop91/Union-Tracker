@@ -474,7 +474,13 @@ var GRIEVANCE_COLS = {
 
   // Section 14: Action Type & Checklist (AJ-AK)
   ACTION_TYPE: 36,        // AJ - Action Type (Grievance, Records Request, etc.)
-  CHECKLIST_PROGRESS: 37  // AK - Checklist Progress (e.g., "5/8" or "62%")
+  CHECKLIST_PROGRESS: 37, // AK - Checklist Progress (e.g., "5/8" or "62%")
+
+  // Section 15: Reminders (AL-AO) - For scheduling meetings/follow-ups
+  REMINDER_1_DATE: 38,    // AL - First reminder date
+  REMINDER_1_NOTE: 39,    // AM - First reminder note (e.g., "Schedule Step II meeting")
+  REMINDER_2_DATE: 40,    // AN - Second reminder date
+  REMINDER_2_NOTE: 41     // AO - Second reminder note
 };
 
 // ============================================================================
@@ -568,7 +574,13 @@ var GRIEVANCE_COLUMNS = {
 
   // Action Type & Checklist (0-indexed)
   ACTION_TYPE: 35,         // AJ - Action Type
-  CHECKLIST_PROGRESS: 36   // AK - Checklist Progress
+  CHECKLIST_PROGRESS: 36,  // AK - Checklist Progress
+
+  // Reminders (0-indexed)
+  REMINDER_1_DATE: 37,     // AL - First reminder date
+  REMINDER_1_NOTE: 38,     // AM - First reminder note
+  REMINDER_2_DATE: 39,     // AN - Second reminder date
+  REMINDER_2_NOTE: 40      // AO - Second reminder note
 };
 
 /**
@@ -1026,7 +1038,11 @@ function mapGrievanceRow(row) {
     driveFolderId: row[GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1] || '',
     driveFolderUrl: row[GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1] || '',
     actionType: row[GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance',
-    checklistProgress: row[GRIEVANCE_COLS.CHECKLIST_PROGRESS - 1] || ''
+    checklistProgress: row[GRIEVANCE_COLS.CHECKLIST_PROGRESS - 1] || '',
+    reminder1Date: row[GRIEVANCE_COLS.REMINDER_1_DATE - 1] || '',
+    reminder1Note: row[GRIEVANCE_COLS.REMINDER_1_NOTE - 1] || '',
+    reminder2Date: row[GRIEVANCE_COLS.REMINDER_2_DATE - 1] || '',
+    reminder2Note: row[GRIEVANCE_COLS.REMINDER_2_NOTE - 1] || ''
   };
 }
 
@@ -1067,7 +1083,8 @@ function getGrievanceHeaders() {
     'Message Alert', 'Coordinator Message', 'Acknowledged By', 'Acknowledged Date',
     'Drive Folder ID', 'Drive Folder URL',
     '⚡ Actions',
-    'Action Type', 'Checklist Progress'
+    'Action Type', 'Checklist Progress',
+    'Reminder 1 Date', 'Reminder 1 Note', 'Reminder 2 Date', 'Reminder 2 Note'
   ];
 }
 

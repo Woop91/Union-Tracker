@@ -569,3 +569,507 @@ function getDynamicEngineStatus() {
     }
   };
 }
+
+// ============================================================================
+// GRIEVANCE REMINDERS FEATURE
+// ============================================================================
+// Allows users to set two reminder dates with notes for meetings/follow-ups
+
+/**
+ * Sets a reminder for a grievance.
+ * @param {string} grievanceId - The grievance ID
+ * @param {number} reminderNum - Which reminder (1 or 2)
+ * @param {Date|string} reminderDate - The reminder date
+ * @param {string} reminderNote - Brief note about the reminder
+ * @returns {Object} Result with success status
+ */
+function setGrievanceReminder(grievanceId, reminderNum, reminderDate, reminderNote) {
+  if (!grievanceId || (reminderNum !== 1 && reminderNum !== 2)) {
+    return { success: false, error: 'Invalid grievance ID or reminder number' };
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG || 'Grievance Log');
+
+  if (!sheet) {
+    return { success: false, error: 'Grievance Log sheet not found' };
+  }
+
+  // Find the grievance row
+  const data = sheet.getDataRange().getValues();
+  let rowIndex = -1;
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+      rowIndex = i + 1;
+      break;
+    }
+  }
+
+  if (rowIndex === -1) {
+    return { success: false, error: 'Grievance not found: ' + grievanceId };
+  }
+
+  // Determine which columns to update
+  const dateCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_DATE : GRIEVANCE_COLS.REMINDER_2_DATE;
+  const noteCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_NOTE : GRIEVANCE_COLS.REMINDER_2_NOTE;
+
+  // Parse date if string
+  let parsedDate = reminderDate;
+  if (typeof reminderDate === 'string' && reminderDate) {
+    parsedDate = new Date(reminderDate);
+    if (isNaN(parsedDate.getTime())) {
+      return { success: false, error: 'Invalid date format' };
+    }
+  }
+
+  // Batch update both columns
+  const updates = [[parsedDate || '', reminderNote || '']];
+  sheet.getRange(rowIndex, dateCol, 1, 2).setValues(updates);
+
+  // Log the action
+  if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
+    logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
+      grievanceId: grievanceId,
+      action: 'REMINDER_SET',
+      reminderNum: reminderNum,
+      reminderDate: parsedDate ? parsedDate.toISOString() : null,
+      performedBy: Session.getActiveUser().getEmail()
+    });
+  }
+
+  return { success: true, grievanceId: grievanceId, reminderNum: reminderNum };
+}
+
+/**
+ * Gets reminders for a grievance.
+ * @param {string} grievanceId - The grievance ID
+ * @returns {Object} Reminder data or null if not found
+ */
+function getGrievanceReminders(grievanceId) {
+  if (!grievanceId) return null;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG || 'Grievance Log');
+
+  if (!sheet) return null;
+
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+      return {
+        grievanceId: grievanceId,
+        memberName: (data[i][GRIEVANCE_COLS.FIRST_NAME - 1] || '') + ' ' +
+                    (data[i][GRIEVANCE_COLS.LAST_NAME - 1] || ''),
+        status: data[i][GRIEVANCE_COLS.STATUS - 1] || '',
+        reminder1: {
+          date: data[i][GRIEVANCE_COLS.REMINDER_1_DATE - 1] || null,
+          note: data[i][GRIEVANCE_COLS.REMINDER_1_NOTE - 1] || ''
+        },
+        reminder2: {
+          date: data[i][GRIEVANCE_COLS.REMINDER_2_DATE - 1] || null,
+          note: data[i][GRIEVANCE_COLS.REMINDER_2_NOTE - 1] || ''
+        }
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Clears a reminder for a grievance.
+ * @param {string} grievanceId - The grievance ID
+ * @param {number} reminderNum - Which reminder to clear (1 or 2)
+ * @returns {Object} Result with success status
+ */
+function clearGrievanceReminder(grievanceId, reminderNum) {
+  return setGrievanceReminder(grievanceId, reminderNum, '', '');
+}
+
+/**
+ * Gets all grievances with reminders due within specified days.
+ * Optimized single-pass through grievance data.
+ * @param {number} daysAhead - Number of days to look ahead (default 3)
+ * @returns {Array} Array of grievances with due reminders
+ */
+function getDueReminders(daysAhead) {
+  daysAhead = daysAhead || 3;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG || 'Grievance Log');
+
+  if (!sheet) return [];
+
+  const data = sheet.getDataRange().getValues();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const cutoffDate = new Date(today);
+  cutoffDate.setDate(cutoffDate.getDate() + daysAhead);
+
+  const dueReminders = [];
+
+  // Pre-compute column indices
+  const colGrievanceId = GRIEVANCE_COLS.GRIEVANCE_ID - 1;
+  const colFirstName = GRIEVANCE_COLS.FIRST_NAME - 1;
+  const colLastName = GRIEVANCE_COLS.LAST_NAME - 1;
+  const colStatus = GRIEVANCE_COLS.STATUS - 1;
+  const colSteward = GRIEVANCE_COLS.STEWARD - 1;
+  const colR1Date = GRIEVANCE_COLS.REMINDER_1_DATE - 1;
+  const colR1Note = GRIEVANCE_COLS.REMINDER_1_NOTE - 1;
+  const colR2Date = GRIEVANCE_COLS.REMINDER_2_DATE - 1;
+  const colR2Note = GRIEVANCE_COLS.REMINDER_2_NOTE - 1;
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const grievanceId = row[colGrievanceId];
+    const status = row[colStatus];
+
+    // Skip closed/resolved grievances
+    if (!grievanceId || status === 'Closed' || status === 'Won' ||
+        status === 'Denied' || status === 'Withdrawn' || status === 'Settled') {
+      continue;
+    }
+
+    const memberName = ((row[colFirstName] || '') + ' ' + (row[colLastName] || '')).trim();
+    const steward = row[colSteward] || '';
+
+    // Check reminder 1
+    const r1Date = row[colR1Date];
+    if (r1Date instanceof Date) {
+      const r1DateNorm = new Date(r1Date);
+      r1DateNorm.setHours(0, 0, 0, 0);
+
+      if (r1DateNorm >= today && r1DateNorm <= cutoffDate) {
+        const daysUntil = Math.ceil((r1DateNorm - today) / (1000 * 60 * 60 * 24));
+        dueReminders.push({
+          grievanceId: grievanceId,
+          memberName: memberName,
+          status: status,
+          steward: steward,
+          reminderNum: 1,
+          date: r1Date,
+          dateFormatted: Utilities.formatDate(r1Date, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
+          note: row[colR1Note] || '',
+          daysUntil: daysUntil,
+          isToday: daysUntil === 0,
+          isOverdue: daysUntil < 0,
+          rowNumber: i + 1
+        });
+      }
+    }
+
+    // Check reminder 2
+    const r2Date = row[colR2Date];
+    if (r2Date instanceof Date) {
+      const r2DateNorm = new Date(r2Date);
+      r2DateNorm.setHours(0, 0, 0, 0);
+
+      if (r2DateNorm >= today && r2DateNorm <= cutoffDate) {
+        const daysUntil = Math.ceil((r2DateNorm - today) / (1000 * 60 * 60 * 24));
+        dueReminders.push({
+          grievanceId: grievanceId,
+          memberName: memberName,
+          status: status,
+          steward: steward,
+          reminderNum: 2,
+          date: r2Date,
+          dateFormatted: Utilities.formatDate(r2Date, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
+          note: row[colR2Note] || '',
+          daysUntil: daysUntil,
+          isToday: daysUntil === 0,
+          isOverdue: daysUntil < 0,
+          rowNumber: i + 1
+        });
+      }
+    }
+  }
+
+  // Sort by date (soonest first)
+  dueReminders.sort(function(a, b) { return a.date - b.date; });
+
+  return dueReminders;
+}
+
+/**
+ * Shows the reminder management dialog for a grievance.
+ * Can be called from Quick Actions or menu.
+ * @param {string} grievanceId - Optional grievance ID (uses selected row if not provided)
+ */
+function showReminderDialog(grievanceId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+
+  // If no grievanceId provided, try to get from selected row
+  if (!grievanceId) {
+    const sheet = ss.getActiveSheet();
+    if (sheet.getName() !== (SHEETS.GRIEVANCE_LOG || 'Grievance Log')) {
+      ui.alert('Please select a grievance in the Grievance Log sheet, or provide a Grievance ID.');
+      return;
+    }
+
+    const row = sheet.getActiveRange().getRow();
+    if (row <= 1) {
+      ui.alert('Please select a grievance row (not the header).');
+      return;
+    }
+
+    grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+  }
+
+  if (!grievanceId) {
+    ui.alert('No grievance selected.');
+    return;
+  }
+
+  // Get current reminders
+  const reminders = getGrievanceReminders(grievanceId);
+  if (!reminders) {
+    ui.alert('Grievance not found: ' + grievanceId);
+    return;
+  }
+
+  // Build the HTML dialog
+  const html = buildReminderDialogHtml_(grievanceId, reminders);
+  const dialog = HtmlService.createHtmlOutput(html)
+    .setWidth(500)
+    .setHeight(450);
+
+  ui.showModalDialog(dialog, '⏰ Reminders: ' + grievanceId);
+}
+
+/**
+ * Builds the HTML for the reminder dialog.
+ * @private
+ */
+function buildReminderDialogHtml_(grievanceId, reminders) {
+  const r1Date = reminders.reminder1.date instanceof Date
+    ? Utilities.formatDate(reminders.reminder1.date, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+    : '';
+  const r2Date = reminders.reminder2.date instanceof Date
+    ? Utilities.formatDate(reminders.reminder2.date, Session.getScriptTimeZone(), 'yyyy-MM-dd')
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Google Sans', Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 20px; color: #F8FAFC; }
+    .header { margin-bottom: 20px; }
+    .header h2 { font-size: 18px; color: #A78BFA; margin-bottom: 4px; }
+    .header .member { font-size: 14px; color: #94A3B8; }
+    .reminder-card { background: rgba(255,255,255,0.05); border: 1px solid #334155; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .reminder-card h3 { font-size: 14px; color: #7C3AED; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .reminder-card h3::before { content: '⏰'; }
+    .form-group { margin-bottom: 12px; }
+    .form-label { display: block; font-size: 12px; color: #94A3B8; margin-bottom: 4px; }
+    .form-input { width: 100%; padding: 10px 12px; border: 1px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-size: 14px; }
+    .form-input:focus { border-color: #7C3AED; outline: none; }
+    .form-input::placeholder { color: #64748B; }
+    .btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+    .btn-clear { background: #334155; color: #F8FAFC; }
+    .btn-clear:hover { background: #475569; }
+    .actions { display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end; }
+    .btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; padding: 12px 24px; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }
+    .btn-secondary { background: #334155; color: #F8FAFC; padding: 12px 24px; }
+    .status { padding: 8px 12px; border-radius: 6px; margin-top: 12px; font-size: 13px; display: none; }
+    .status.success { display: block; background: rgba(16,185,129,0.2); border: 1px solid #10B981; }
+    .status.error { display: block; background: rgba(239,68,68,0.2); border: 1px solid #EF4444; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>Grievance ${grievanceId}</h2>
+    <div class="member">${reminders.memberName} • ${reminders.status}</div>
+  </div>
+
+  <div class="reminder-card">
+    <h3>Reminder 1</h3>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input type="date" class="form-input" id="r1Date" value="${r1Date}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Note (e.g., "Schedule Step II meeting")</label>
+      <input type="text" class="form-input" id="r1Note" value="${reminders.reminder1.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-clear" onclick="clearReminder(1)">Clear</button>
+    </div>
+  </div>
+
+  <div class="reminder-card">
+    <h3>Reminder 2</h3>
+    <div class="form-group">
+      <label class="form-label">Date</label>
+      <input type="date" class="form-input" id="r2Date" value="${r2Date}">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Note</label>
+      <input type="text" class="form-input" id="r2Note" value="${reminders.reminder2.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-clear" onclick="clearReminder(2)">Clear</button>
+    </div>
+  </div>
+
+  <div id="statusArea"></div>
+
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>
+    <button class="btn btn-primary" onclick="saveReminders()">Save Reminders</button>
+  </div>
+
+  <script>
+    var grievanceId = '${grievanceId}';
+
+    function saveReminders() {
+      var r1Date = document.getElementById('r1Date').value;
+      var r1Note = document.getElementById('r1Note').value;
+      var r2Date = document.getElementById('r2Date').value;
+      var r2Note = document.getElementById('r2Note').value;
+
+      showStatus('Saving...', false);
+
+      // Save reminder 1
+      google.script.run
+        .withSuccessHandler(function() {
+          // Save reminder 2
+          google.script.run
+            .withSuccessHandler(function() {
+              showStatus('Reminders saved!', false);
+              setTimeout(function() { google.script.host.close(); }, 1000);
+            })
+            .withFailureHandler(function(e) { showStatus('Error: ' + e.message, true); })
+            .setGrievanceReminder(grievanceId, 2, r2Date, r2Note);
+        })
+        .withFailureHandler(function(e) { showStatus('Error: ' + e.message, true); })
+        .setGrievanceReminder(grievanceId, 1, r1Date, r1Note);
+    }
+
+    function clearReminder(num) {
+      if (num === 1) {
+        document.getElementById('r1Date').value = '';
+        document.getElementById('r1Note').value = '';
+      } else {
+        document.getElementById('r2Date').value = '';
+        document.getElementById('r2Note').value = '';
+      }
+    }
+
+    function showStatus(msg, isError) {
+      var area = document.getElementById('statusArea');
+      area.className = 'status ' + (isError ? 'error' : 'success');
+      area.textContent = msg;
+    }
+  </script>
+</body>
+</html>`;
+}
+
+/**
+ * Checks for due reminders and sends notifications.
+ * Call this from a daily time-driven trigger.
+ * @param {number} daysAhead - Days to look ahead (default 1 = today only)
+ * @returns {Object} Result with notification count
+ */
+function checkAndNotifyReminders(daysAhead) {
+  daysAhead = daysAhead || 1;
+
+  const dueReminders = getDueReminders(daysAhead);
+
+  if (dueReminders.length === 0) {
+    return { success: true, notified: 0, message: 'No reminders due' };
+  }
+
+  // Group reminders by steward for consolidated notifications
+  const bysteward = {};
+  for (let i = 0; i < dueReminders.length; i++) {
+    const reminder = dueReminders[i];
+    const steward = reminder.steward || 'Unassigned';
+    if (!bysteward[steward]) {
+      bysteward[steward] = [];
+    }
+    bysteward[steward].push(reminder);
+  }
+
+  // Show toast summary
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const todayCount = dueReminders.filter(function(r) { return r.isToday; }).length;
+  const upcomingCount = dueReminders.length - todayCount;
+
+  let message = '';
+  if (todayCount > 0) {
+    message += todayCount + ' reminder(s) due TODAY';
+  }
+  if (upcomingCount > 0) {
+    message += (message ? ', ' : '') + upcomingCount + ' upcoming';
+  }
+
+  ss.toast(message, '⏰ Grievance Reminders', 10);
+
+  return {
+    success: true,
+    notified: dueReminders.length,
+    todayCount: todayCount,
+    upcomingCount: upcomingCount,
+    reminders: dueReminders
+  };
+}
+
+/**
+ * Installs the daily reminder check trigger.
+ * Call once during setup to enable automatic reminder notifications.
+ */
+function installReminderTrigger() {
+  // Remove existing reminder triggers first
+  const triggers = ScriptApp.getProjectTriggers();
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'checkAndNotifyReminders') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  // Install new daily trigger at 8 AM
+  ScriptApp.newTrigger('checkAndNotifyReminders')
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .create();
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Daily reminder check installed (8 AM)',
+    'Trigger Installed',
+    5
+  );
+
+  if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
+    logAuditEvent(AUDIT_EVENTS.TRIGGER_INSTALLED, {
+      triggerName: 'checkAndNotifyReminders',
+      schedule: 'Daily at 8 AM',
+      installedBy: Session.getActiveUser().getEmail()
+    });
+  }
+
+  return { success: true };
+}
+
+/**
+ * Gets reminder summary for dashboard display.
+ * @returns {Object} Summary with counts and upcoming reminders
+ */
+function getReminderSummary() {
+  const todayReminders = getDueReminders(0); // Due today
+  const weekReminders = getDueReminders(7);  // Due within a week
+
+  return {
+    dueToday: todayReminders.length,
+    dueThisWeek: weekReminders.length,
+    upcoming: weekReminders.slice(0, 5) // Top 5 for dashboard
+  };
+}
