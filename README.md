@@ -1,10 +1,10 @@
-# 509 Strategic Command Center - v4.3.8 Complete Menu System
+# 509 Strategic Command Center - v4.4.1 Complete Menu System
 
-A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements an **11-file modular architecture** following the Separation of Concerns principle.
+A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **13-file modular architecture** following the Separation of Concerns principle.
 
 ## Architecture Overview
 
-The dashboard uses a streamlined 11-file architecture for clarity and maintainability:
+The dashboard uses a streamlined 13-file architecture for clarity and maintainability:
 
 ```
 src/
@@ -18,7 +18,9 @@ src/
 ├── 08_Code.gs                   # Core setup, hidden sheets, dashboard creation
 ├── 09_Main.gs                   # Entry point and triggers
 ├── 10_CommandCenter.gs          # 509 Strategic Command Center Unified Master Engine (v4.0)
-└── 11_SecureMemberDashboard.gs  # Material Design member portal, Web App & secure portal (v4.2.0)
+├── 11_SecureMemberDashboard.gs  # Material Design member portal, Web App & secure portal (v4.2.0)
+├── 13_DynamicEngine.gs          # Dynamic Engine: Member Leaders, Column Expansion, Reminders (v4.4.1)
+└── 14_LookerIntegration.gs      # Google Looker Studio integration (Standard & PII-Free) (v4.4.1)
 ```
 
 ### Module Descriptions
@@ -35,6 +37,8 @@ src/
 | **08_Code.gs** | Core setup, hidden sheet management, dashboard creation | `CREATE_509_DASHBOARD`, `setupAllHiddenSheets`, `createConfigSheet` |
 | **10_CommandCenter.gs** | v4.0 Unified Master Engine - PDF engine, analytics, scaling hooks | `navToMobile`, `createGrievancePDF`, `showUnitHealthReport`, `calculateUnitHealth` |
 | **11_SecureMemberDashboard.gs** | Material Design member portal with Google Charts, PII protection | `showPublicMemberDashboard`, `showStewardPerformanceModal`, `safetyValveScrub`, `getAdvancedAnalytics` |
+| **13_DynamicEngine.gs** | Dynamic Engine: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders | `getMemberLeaders`, `getStewardsForGrievance`, `getHeaderMap`, `setGrievanceReminder`, `getDueReminders`, `showReminderDialog` |
+| **14_LookerIntegration.gs** | Google Looker Studio integration with Standard (PII) and PII-Free sheets | `setupLookerIntegration`, `refreshLookerData`, `setupLookerAnonIntegration`, `refreshLookerAnonData`, `showLookerConnectionHelp` |
 | **09_Main.gs** | Entry point, triggers, edit handlers | `onOpen`, `onEdit`, `initializeDashboard` |
 
 ## v4.0 Features
@@ -57,7 +61,21 @@ src/
 - **Email Dashboard Link**: One-click email sending of dashboard URL to selected members
 - **Zero PII Exposure**: All member-facing views show only aggregate statistics
 
-## v4.3.x Features (CURRENT)
+## v4.4.x Features (CURRENT)
+
+- **Dynamic Engine**: Extensible feature framework with caching, unified data loading, and batch operations
+- **Member Leaders**: Organizational layer tracking stewards and member leaders with role/unit info
+- **Column Expansion**: No-code custom columns with form generation and batch saves
+- **Self-Healing Architecture**: Automated formula repair in hidden calculation sheets
+- **Grievance Reminders**: Two reminder dates with notes for scheduling meetings (columns AL-AO)
+- **Reminder Dialog**: Dark-themed modal for managing grievance reminders
+- **Automated Reminder Notifications**: Daily 8 AM trigger with toast notifications for due reminders
+- **Looker Studio Integration (Standard)**: Hidden `_Looker_*` sheets for internal dashboards
+- **Looker Studio Integration (PII-Free)**: Anonymized `_Looker_Anon_*` sheets for external/compliance use
+- **Anonymization Features**: Non-reversible hashes, bucketed values, categorized roles, engagement levels
+- **Restricted Data Sources**: Looker limited to Member Directory, Grievance Log, and Member Satisfaction only
+
+## v4.3.x Features
 
 - **Searchable Help Guide**: Modal help system with 4 tabs (Overview, Menu Reference, FAQ, Quick Tips), real-time search filtering
 - **Two-Dashboard Architecture**: Unified Steward Dashboard (internal, with PII) and Member Dashboard (public, no PII)
@@ -94,14 +112,16 @@ src/
 - **Standalone Analytics Charts**: Dedicated modals for Treemap, Sentiment Trend, and Workload Report
 - **High-Contrast Dark Theme**: Professional dark gradient backgrounds optimized for readability
 
-## Benefits of 11-File Architecture
+## Benefits of 13-File Architecture
 
 1. **Clear Separation**: Each file has one clear purpose
 2. **Easy Navigation**: Numbered prefixes show dependency order on GitHub
-3. **Production Ready**: Delete `07_DevTools.gs` before go-live (10 files in production)
+3. **Production Ready**: Delete `07_DevTools.gs` before go-live (12 files in production)
 4. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
 5. **Easier Maintenance**: Update union rules in one place (`01_Constants.gs`)
 6. **Scalability**: Handles 5,000+ members without performance issues
+7. **Extensibility**: Dynamic Engine enables no-code custom columns and features
+8. **Analytics Ready**: Looker Studio integration with both internal and PII-free options
 
 ## Installation
 
@@ -150,6 +170,8 @@ src/
 | `09_Main.gs` | Entry point and triggers |
 | `10_CommandCenter.gs` | Strategic Command Center features |
 | `11_SecureMemberDashboard.gs` | Material Design member portal with analytics |
+| `13_DynamicEngine.gs` | Dynamic Engine, Member Leaders, Column Expansion, Reminders |
+| `14_LookerIntegration.gs` | Looker Studio integration (Standard & PII-Free) |
 
 ## Going Live (Production)
 
@@ -172,10 +194,12 @@ src/
 ├── 08_Code.gs                   # Core setup
 ├── 09_Main.gs                   # Entry point
 ├── 10_CommandCenter.gs          # Strategic Command Center
-└── 11_SecureMemberDashboard.gs  # Material Design member portal
+├── 11_SecureMemberDashboard.gs  # Material Design member portal
+├── 13_DynamicEngine.gs          # Dynamic Engine & Reminders
+└── 14_LookerIntegration.gs      # Looker Studio integration
 ```
 
-**10 files in production** (DevTools removed)
+**12 files in production** (DevTools removed)
 
 ## Key Features
 
@@ -393,6 +417,7 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
+- **4.4.1** - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
 - **4.3.8** - Searchable Help Guide & Modal Consolidation: Help modal with menu reference/FAQ, Member Satisfaction sheet hidden
 - **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
 - **4.3.6** - Full Row Styling: Zebra stripes and themes apply to all rows in data sheets

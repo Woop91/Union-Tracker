@@ -3,6 +3,8 @@
 **Version:** 4.4.1 | **Codename:** Strategic Command Center
 **Last Updated:** January 2026
 
+> **New in v4.4.1:** Dynamic Engine (Member Leaders, Column Expansion, Self-Healing), Grievance Reminders, and Google Looker Studio Integration (Standard & PII-Free)
+
 This document provides a comprehensive, searchable reference of all features in the 509 Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
 ---
@@ -26,6 +28,9 @@ This document provides a comprehensive, searchable reference of all features in 
 15. [Security & Audit](#15-security--audit)
 16. [Document Generation](#16-document-generation)
 17. [Demo & Development Tools](#17-demo--development-tools)
+18. [Dynamic Engine & Extensions](#18-dynamic-engine--extensions)
+19. [Grievance Reminders](#19-grievance-reminders)
+20. [Looker Studio Integration](#20-looker-studio-integration)
 
 ---
 
@@ -368,10 +373,160 @@ This document provides a comprehensive, searchable reference of all features in 
 
 ---
 
+## 18. Dynamic Engine & Extensions
+
+> **File:** `13_DynamicEngine.gs`
+
+The Dynamic Engine provides extensible features for organizational structure tracking, custom columns, and self-healing formulas.
+
+### Member Leaders (Organizational Layer)
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Get Member Leaders** | Retrieves all members marked as stewards or member leaders with role/unit info | `getMemberLeaders()` | leaders, stewards, organizational |
+| **Stewards for Grievance** | Returns dropdown-ready list of stewards for grievance assignment | `getStewardsForGrievance()` | dropdown, assignment, steward |
+| **Check Member Leader Status** | Determines if a specific member is a steward or member leader | `isMemberLeader(memberId)` | check, status, role |
+
+### Column Expansion (No-Code Custom Columns)
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Get Header Map** | Retrieves column headers with 5-minute caching for performance | `getHeaderMap(sheetName)` | headers, cache, columns |
+| **Expansion Column Data** | Gets data from custom/expansion columns by header name | `getExpansionColumnData(sheetName, columnHeader)` | custom, data, expansion |
+| **Generate Expansion HTML** | Creates HTML form fields for custom column editing | `generateExpansionFieldsHtml(sheetName, rowIndex)` | form, HTML, custom fields |
+| **Save Expansion Data** | Batch-saves data to expansion columns with smart contiguous detection | `saveExpansionData(sheetName, rowIndex, columnData)` | save, batch, custom |
+| **Invalidate Header Cache** | Clears cached header maps when columns change | `invalidateHeaderCache(sheetName)` | cache, clear, refresh |
+
+### Self-Healing Hidden Architecture
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Repair Dynamic Formulas** | Injects/repairs formulas in hidden `_Dashboard_Calc` sheet (row 50+) | `repairDynamicFormulas()` | repair, formulas, self-healing |
+| **Setup Dynamic Engine** | Initializes all Dynamic Engine features and returns status | `setupDynamicEngine()` | setup, initialize, status |
+| **Get Dynamic Engine Status** | Returns current status of all engine components | `getDynamicEngineStatus()` | status, health, diagnostics |
+
+### Performance Optimizations
+
+| Feature | Description |
+|---------|-------------|
+| **CacheService Layer** | 5-minute TTL caching for header maps |
+| **Unified Data Loader** | Single-pass data reading via `loadMemberData_(options)` |
+| **Pre-computed Column Indices** | `COL_IDX` object for fast array access |
+| **Batch Writes** | Uses `setValues()` for efficient multi-cell updates |
+| **Smart Contiguous Detection** | Optimizes saves for adjacent columns |
+
+---
+
+## 19. Grievance Reminders
+
+> **File:** `13_DynamicEngine.gs` (Reminders section)
+
+Allows users to set two reminder dates with notes for scheduling meetings and follow-ups on grievances.
+
+### Reminder Management
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Set Reminder** | Sets a reminder (1 or 2) with date and note for a grievance | `setGrievanceReminder(grievanceId, reminderNum, date, note)` | set, schedule, meeting |
+| **Get Reminders** | Retrieves both reminders for a specific grievance | `getGrievanceReminders(grievanceId)` | get, view, reminders |
+| **Clear Reminder** | Clears a specific reminder for a grievance | `clearGrievanceReminder(grievanceId, reminderNum)` | clear, remove, cancel |
+| **Get Due Reminders** | Finds all grievances with reminders due within specified days | `getDueReminders(daysAhead)` | due, upcoming, alerts |
+| **Reminder Summary** | Dashboard-ready summary with today/week counts | `getReminderSummary()` | summary, dashboard, counts |
+
+### Reminder Dialog
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Show Reminder Dialog** | Opens dark-themed modal to manage reminders for selected grievance | `showReminderDialog(grievanceId)` | dialog, modal, UI |
+
+### Automated Notifications
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Check & Notify** | Checks for due reminders and shows toast notifications | `checkAndNotifyReminders(daysAhead)` | notify, alert, check |
+| **Install Trigger** | Sets up daily 8 AM trigger for automatic reminder checks | `installReminderTrigger()` | trigger, automation, daily |
+
+### Grievance Log Columns (AL-AO)
+
+| Column | Letter | Description |
+|--------|--------|-------------|
+| **Reminder 1 Date** | AL | First reminder date |
+| **Reminder 1 Note** | AM | First reminder note (e.g., "Schedule Step II meeting") |
+| **Reminder 2 Date** | AN | Second reminder date |
+| **Reminder 2 Note** | AO | Second reminder note |
+
+---
+
+## 20. Looker Studio Integration
+
+> **File:** `14_LookerIntegration.gs`
+
+Provides read-only data layers for Google Looker Studio without modifying existing sheets or modal dashboards.
+
+### Standard Integration (With PII)
+
+Creates hidden sheets for internal Looker reports with full member data.
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Setup Integration** | Creates hidden `_Looker_*` sheets for Looker data sources | `setupLookerIntegration()` | setup, create, initialize |
+| **Refresh Data** | Updates all Looker data sheets from source data | `refreshLookerData()` | refresh, update, sync |
+| **Connection Help** | Shows dialog with Looker Studio connection instructions | `showLookerConnectionHelp()` | help, connect, instructions |
+| **Get Status** | Returns status of all Looker sheets and record counts | `getLookerStatus()` | status, health, counts |
+| **Install Trigger** | Sets up daily 6 AM auto-refresh trigger | `installLookerRefreshTrigger()` | trigger, automation, daily |
+
+#### Standard Looker Sheets (Restricted Sources)
+
+| Sheet Name | Source | Data Included |
+|------------|--------|---------------|
+| `_Looker_Members` | Member Directory | Full member data with names, contact info, grievance stats |
+| `_Looker_Grievances` | Grievance Log | Full grievance data with member names, dates, outcomes |
+| `_Looker_Satisfaction` | Member Satisfaction | Survey responses with section averages and scores |
+
+### PII-Free Integration (Anonymized)
+
+Creates anonymized sheets for external stakeholders, public dashboards, or compliance reporting.
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Setup Anon Integration** | Creates hidden `_Looker_Anon_*` sheets with no PII | `setupLookerAnonIntegration()` | setup, anonymous, PII-free |
+| **Refresh Anon Data** | Updates all anonymized Looker sheets | `refreshLookerAnonData()` | refresh, anonymous, sync |
+| **Anon Connection Help** | Shows connection help for PII-free sheets | `showLookerAnonConnectionHelp()` | help, anonymous, connect |
+| **Get Anon Status** | Returns status of anonymized Looker sheets | `getLookerAnonStatus()` | status, anonymous, health |
+| **Install All Triggers** | Sets up combined refresh for both standard and PII-free | `installLookerAllRefreshTrigger()` | trigger, both, combined |
+
+#### PII-Free Looker Sheets
+
+| Sheet Name | Source | Data Excluded |
+|------------|--------|---------------|
+| `_Looker_Anon_Members` | Member Directory | Names, emails, phones, member IDs (uses hashes) |
+| `_Looker_Anon_Grievances` | Grievance Log | Member names, member IDs, steward names |
+| `_Looker_Anon_Satisfaction` | Member Satisfaction | Any potential PII linkages |
+
+### Anonymization Features
+
+| Feature | Description |
+|---------|-------------|
+| **Anonymous Hashes** | Non-reversible hash generation for IDs (e.g., `A7F3K2M9`) |
+| **Bucketed Values** | Days since contact → "Within Week", "1-3 Months", etc. |
+| **Categorized Roles** | Specific job titles → "Nursing", "Technical/Support", etc. |
+| **Engagement Levels** | Calculated from aggregated factors, not individual data |
+| **Score Buckets** | 1-10 ratings → "Low (1-4)", "Medium (5-7)", "High (8-10)" |
+
+### Use Cases
+
+| Integration Type | Best For |
+|-----------------|----------|
+| **Standard** | Internal steward dashboards, executive reports, detailed analytics |
+| **PII-Free** | External stakeholders, public dashboards, compliance reporting, board presentations |
+
+---
+
 ## Version History
 
 | Version | Features Added |
 |---------|----------------|
+| **4.4.1** | Dynamic Engine, Grievance Reminders, Looker Studio Integration (Standard & PII-Free) |
 | **4.3.8** | Searchable Help Guide, Features Reference Sheet, Enhanced FAQ |
 | **4.3.7** | Dynamic row styling with getMaxRows() |
 | **4.3.6** | Full row styling for zebra stripes |
