@@ -5696,23 +5696,7 @@ function rejectFlaggedSubmission(rowNum) {
 // PUBLIC MEMBER DASHBOARD - Stats without PII
 // ============================================================================
 
-/**
- * COMMAND CENTER: PROFESSIONAL MEMBER PORTAL (FULLY LOADED)
- * High-performance modal with interactive Google Charts, Satisfaction data,
- * Material Icons, Trend Stats, Progress Tracking, and Live Steward Search.
- * No PII is exposed - only aggregate statistics.
- * @deprecated v4.3.9 - DUPLICATE: Primary function is in 11_SecureMemberDashboard.gs:501
- */
-function showPublicMemberDashboard_Code_DEPRECATED() {
-  var stats = getGrievanceStats();
-  var stewards = getAllStewards();
-  var satisfaction = getAggregateSatisfactionStats();
-  var coverage = getStewardCoverageStats();
-
-  var html = getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage);
-  var output = HtmlService.createHtmlOutput(html).setWidth(520).setHeight(720);
-  SpreadsheetApp.getUi().showModalDialog(output, '509 Member Command Center');
-}
+// REMOVED: showPublicMemberDashboard_Code_DEPRECATED - Use showPublicMemberDashboard() in 11_SecureMemberDashboard.gs instead
 
 /**
  * Generates HTML for the secure member dashboard

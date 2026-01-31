@@ -12,7 +12,8 @@
     "clean": "node build.js --clean",
     "manifest": "node build.js --manifest",
     "deploy": "npm run test && npm run manifest && clasp push",
-    "open": "clasp open"
+    "open": "clasp open",
+    "prepare": "husky"
   },
   "keywords": [
     "google-apps-script",
@@ -26,7 +27,8 @@
   "devDependencies": {
     "@google/clasp": "^2.4.2",
     "@types/google-apps-script": "^1.0.83",
-    "eslint": "8.57.0"
+    "eslint": "8.57.0",
+    "husky": "^9.1.7"
   },
   "engines": {
     "node": ">=14.0.0"
