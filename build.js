@@ -13,19 +13,48 @@ const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
 // Files in build order (constants first, then modules, main last)
+// REFACTORED: Split large monolithic files into smaller modules for maintainability
 const BUILD_ORDER = [
+  // Core constants - must be first
   '01_Constants.gs',
+
+  // Data managers
   '02_MemberManager.gs',
   '03_GrievanceManager.gs',
-  '04_UIService.gs',
+
+  // UI modules (split from 04_UIService.gs)
+  '04a_MenuBuilder.gs',
+  '04b_ThemeService.gs',
+  '04_UIService.gs',           // Remaining UI functions
+
+  // Integrations
   '05_Integrations.gs',
-  '06_Maintenance.gs',
+
+  // Maintenance modules (split from 06_Maintenance.gs)
+  '06a_Diagnostics.gs',
+  '06_Maintenance.gs',         // Remaining maintenance functions
+
+  // Development tools
   '07_DevTools.gs',
-  '08_Code.gs',
+
+  // Core code modules (split from 08_Code.gs)
+  '08a_SheetCreation.gs',
+  '08b_DataValidation.gs',
+  '08c_SearchEngine.gs',
+  '08_Code.gs',                // Remaining code functions
+
+  // Main entry point
   '09_Main.gs',
+
+  // Feature modules
   '10_CommandCenter.gs',
   '11_SecureMemberDashboard.gs',
-  '12_ChecklistManager.gs'
+  '12_ChecklistManager.gs',
+  '13_DynamicEngine.gs',
+  '14_LookerIntegration.gs',
+
+  // Testing framework (last)
+  '15_TestFramework.gs'
 ];
 
 const HTML_FILES = [
