@@ -6585,29 +6585,7 @@ function checkOverdueGrievances_() {
   }
 }
 
-/**
- * @deprecated v4.3.9 - REMOVED DUPLICATE
- * Use refreshAllVisuals() at line 729 instead.
- * This duplicate focused on data refresh while the main one focuses on visuals.
- * The main function now handles both.
- */
-function refreshAllVisuals_DataRefresh_DEPRECATED() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    // Refresh hidden calculation sheets if available
-    if (typeof rebuildAllHiddenSheets === 'function') {
-      rebuildAllHiddenSheets();
-    }
-
-    // Check for alerts
-    checkDashboardAlerts();
-
-    ss.toast("Data Refresh Complete - Open dashboards from 509 Command menu", COMMAND_CONFIG.SYSTEM_NAME);
-  } catch (e) {
-    Logger.log("Refresh Error: " + e.message);
-  }
-}
+// REMOVED: refreshAllVisuals_DataRefresh_DEPRECATED - Use refreshAllVisuals() instead
 
 /**
  * Sends Member Analytics dashboard access link to specified email
@@ -7113,79 +7091,7 @@ function sendStewardToolkit_(email, name) {
   }
 }
 
-/**
- * Demotes the selected steward back to regular member status
- * Requires two confirmation dialogs for safety
- * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:632
- */
-function demoteSelectedSteward_UIService_DEPRECATED() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var ui = SpreadsheetApp.getUi();
-
-  if (!sheet) {
-    ui.alert('Member Directory sheet not found.');
-    return;
-  }
-
-  var row = sheet.getActiveRange().getRow();
-  if (row < 2) {
-    ui.alert('Please select a member row (not the header).');
-    return;
-  }
-
-  // Get member details early for confirmation dialogs
-  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
-  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
-  var name = firstName + ' ' + lastName;
-
-  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
-  if (currentStatus !== 'Yes') {
-    ui.alert('This member is not currently a Steward.');
-    return;
-  }
-
-  // WARNING 1: Initial confirmation
-  var response1 = ui.alert(
-    '⬇️ Demote Steward - Step 1 of 2',
-    'You are about to remove Steward status from ' + name + '.\n\n' +
-    'This will:\n' +
-    '• Set "Is Steward" to No\n' +
-    '• Clear committee assignments\n' +
-    '• Remove steward-level access\n\n' +
-    'Do you want to proceed?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response1 !== ui.Button.YES) {
-    ui.alert('Demotion cancelled.');
-    return;
-  }
-
-  // WARNING 2: Final confirmation
-  var response2 = ui.alert(
-    '⚠️ Final Confirmation - Step 2 of 2',
-    'PLEASE CONFIRM: You are removing Steward status from ' + name + '.\n\n' +
-    'This is a significant action that:\n' +
-    '• Removes their authority to represent members\n' +
-    '• Should be documented appropriately\n' +
-    '• May require notification to the member\n\n' +
-    'Are you absolutely sure you want to proceed?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response2 !== ui.Button.YES) {
-    ui.alert('Demotion cancelled.');
-    return;
-  }
-
-  // Demote steward
-  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('No');
-  sheet.getRange(row, MEMBER_COLS.COMMITTEES).setValue('');  // Clear committee assignments
-
-  ui.alert('✅ ' + name + ' has been removed from Steward status.\n\n' +
-    'Committee assignments have been cleared.');
-}
+// REMOVED: demoteSelectedSteward_UIService_DEPRECATED - Use demoteSelectedSteward() in 02_MemberManager.gs instead
 
 // ============================================================================
 // 9. GLOBAL UI STYLING ENGINE (Status Colors)

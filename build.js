@@ -48,6 +48,7 @@ const BUILD_ORDER = [
   '08a_SheetCreation.gs',
   '08b_DataValidation.gs',
   '08c_SearchEngine.gs',
+  '08d_ChartBuilder.gs',
   '08_Code.gs',                // Remaining code functions
 
   // Main entry point
