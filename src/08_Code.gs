@@ -4018,16 +4018,6 @@ function createFeaturesReferenceSheet(ss) {
 // ============================================================================
 
 /**
- * Show desktop search modal - comprehensive search for members and grievances
- * Enhanced version of mobile search with more fields and filtering options
- * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:124
- * Note: This was a wrapper for UI, the primary does actual searching with query param
- */
-function searchMembers_Code_DEPRECATED() {
-  showDesktopSearch();
-}
-
-/**
  * Show the desktop unified search dialog
  * Optimized for larger screens with advanced filtering
  */
@@ -12485,40 +12475,6 @@ function getCalcValue(sheetName, cellRef) {
 }
 
 /**
- * Gets dashboard statistics from the calc sheet
- * Used by the sidebar
- * @return {Object} Statistics object
- * @deprecated v4.3.9 - DUPLICATE: Primary function is in 04_UIService.gs:5078
- */
-function getDashboardStats_Code_DEPRECATED() {
-  const statsSheet = SpreadsheetApp.getActiveSpreadsheet()
-    .getSheetByName(HIDDEN_SHEETS.CALC_STATS);
-
-  if (!statsSheet) {
-    // Fallback to direct calculation
-    return {
-      open: getOpenGrievances().length,
-      pending: 0,
-      members: 0,
-      resolved: 0
-    };
-  }
-
-  // Read from pre-calculated values
-  const data = statsSheet.getRange('A4:B7').getValues();
-  const stats = {};
-
-  data.forEach(row => {
-    if (row[0] === 'open_grievances') stats.open = row[1];
-    if (row[0] === 'pending_response') stats.pending = row[1];
-    if (row[0] === 'total_members') stats.members = row[1];
-    if (row[0] === 'resolved_ytd') stats.resolved = row[1];
-  });
-
-  return stats;
-}
-
-/**
  * Gets department list from calc sheet
  * @return {string[]} Array of department names
  */
@@ -12573,34 +12529,6 @@ function getMemberList() {
   }
 
   return members;
-}
-
-/**
- * Gets member by ID
- * @param {string} memberId - The member ID
- * @return {Object|null} Member object or null
- * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:97
- */
-function getMemberById_Code_DEPRECATED(memberId) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
-
-  if (!sheet) return null;
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLUMNS.ID] === memberId) {
-      const member = {};
-      headers.forEach((header, index) => {
-        member[header] = data[i][index];
-      });
-      return member;
-    }
-  }
-
-  return null;
 }
 
 // ============================================================================

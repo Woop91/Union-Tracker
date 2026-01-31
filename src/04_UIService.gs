@@ -557,15 +557,6 @@ function showExecutiveDashboard() {
   showInteractiveDashboardTab();
 }
 
-/**
- * @deprecated v4.3.8 - Sheet is now hidden. Modal version in 08_Code.gs is used instead.
- * Keeping for backward compatibility - redirects to modal.
- */
-function showSatisfactionDashboard_DEPRECATED() {
-  // The modal version showSatisfactionDashboard() in 08_Code.gs handles this now
-  // This function is deprecated - the sheet is hidden
-}
-
 function showStewardDirectory() {
   // Navigate to Member Directory filtered by stewards
   navigateToSheet(SHEETS.MEMBER_DIR);
@@ -7088,91 +7079,9 @@ function createPDFForSelectedGrievance_UIService_() {
 }
 
 // ============================================================================
-// 8. STEWARD PROMOTION ENGINE
+// 8. STEWARD PROMOTION ENGINE (Helper Functions)
 // ============================================================================
-
-/**
- * Promotes the selected member to Steward status
- * Sends steward toolkit email to the promoted member
- * Requires two confirmation dialogs for safety
- * @deprecated v4.3.9 - DUPLICATE: Primary function is in 02_MemberManager.gs:559
- */
-function promoteSelectedMemberToSteward_UIService_DEPRECATED() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var ui = SpreadsheetApp.getUi();
-
-  if (!sheet) {
-    ui.alert('Member Directory sheet not found.');
-    return;
-  }
-
-  var row = sheet.getActiveRange().getRow();
-  if (row < 2) {
-    ui.alert('Please select a member row (not the header).');
-    return;
-  }
-
-  // Get member details early for confirmation dialogs
-  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
-  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
-  var name = firstName + ' ' + lastName;
-
-  // Check if already a steward
-  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
-  if (currentStatus === 'Yes') {
-    ui.alert('This member is already a Steward.');
-    return;
-  }
-
-  // WARNING 1: Initial confirmation
-  var response1 = ui.alert(
-    '⬆️ Promote to Steward - Step 1 of 2',
-    'You are about to promote ' + name + ' to Steward status.\n\n' +
-    'This will:\n' +
-    '• Set "Is Steward" to Yes\n' +
-    '• Send steward toolkit email (if email on file)\n' +
-    '• Grant access to steward-level functions\n\n' +
-    'Do you want to proceed?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response1 !== ui.Button.YES) {
-    ui.alert('Promotion cancelled.');
-    return;
-  }
-
-  // WARNING 2: Final confirmation
-  var response2 = ui.alert(
-    '⚠️ Final Confirmation - Step 2 of 2',
-    'PLEASE CONFIRM: You are promoting ' + name + ' to Steward.\n\n' +
-    'This action grants significant responsibilities including:\n' +
-    '• Representing members in grievances\n' +
-    '• Access to sensitive member information\n' +
-    '• Authority to act on behalf of the union\n\n' +
-    'Are you absolutely sure you want to proceed?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response2 !== ui.Button.YES) {
-    ui.alert('Promotion cancelled.');
-    return;
-  }
-
-  // Promote to steward
-  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
-
-  // Get email for toolkit
-  var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
-
-  // Send toolkit email if email is available
-  if (email) {
-    sendStewardToolkit_(email, name);
-  }
-
-  ui.alert('✅ ' + name + ' has been promoted to Steward!' +
-    (email ? '\n\nToolkit email sent to: ' + email : '\n\nNo email on file - please send toolkit manually.'));
-}
+// Note: Main promote/demote functions moved to 02_MemberManager.gs
 
 /**
  * Sends steward toolkit email to newly promoted steward

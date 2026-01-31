@@ -2,30 +2,66 @@
  * Build Script for 509 Dashboard
  * Concatenates all source files into a single consolidated .gs file
  *
- * Usage: node build.js
+ * Usage:
+ *   node build.js           - Build only
+ *   node build.js --lint    - Lint before building
+ *   node build.js --clean   - Clean dist directory
+ *   node build.js --watch   - Watch for changes (not implemented)
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
 // Files in build order (constants first, then modules, main last)
+// REFACTORED: Split large monolithic files into smaller modules for maintainability
 const BUILD_ORDER = [
+  // Core constants - must be first
   '01_Constants.gs',
+
+  // Data managers
   '02_MemberManager.gs',
   '03_GrievanceManager.gs',
-  '04_UIService.gs',
+
+  // UI modules (split from 04_UIService.gs)
+  '04a_MenuBuilder.gs',
+  '04b_ThemeService.gs',
+  '04_UIService.gs',           // Remaining UI functions
+
+  // Integrations
   '05_Integrations.gs',
-  '06_Maintenance.gs',
+
+  // Maintenance modules (split from 06_Maintenance.gs)
+  '06a_Diagnostics.gs',
+  '06b_CacheManager.gs',
+  '06c_UndoManager.gs',
+  '06_Maintenance.gs',         // Remaining maintenance functions
+
+  // Development tools
   '07_DevTools.gs',
-  '08_Code.gs',
+
+  // Core code modules (split from 08_Code.gs)
+  '08a_SheetCreation.gs',
+  '08b_DataValidation.gs',
+  '08c_SearchEngine.gs',
+  '08_Code.gs',                // Remaining code functions
+
+  // Main entry point
   '09_Main.gs',
+
+  // Feature modules
   '10_CommandCenter.gs',
   '11_SecureMemberDashboard.gs',
-  '12_ChecklistManager.gs'
+  '12_ChecklistManager.gs',
+  '13_DynamicEngine.gs',
+  '14_LookerIntegration.gs',
+
+  // Testing framework (last)
+  '15_TestFramework.gs'
 ];
 
 const HTML_FILES = [
@@ -129,5 +165,53 @@ function build() {
   console.log(`  File size: ${(output.length / 1024).toFixed(1)} KB`);
 }
 
-// Run build
-build();
+/**
+ * Runs ESLint on source files
+ * @returns {boolean} True if linting passed
+ */
+function lint() {
+  console.log('Running ESLint on source files...\n');
+
+  try {
+    execSync('npx eslint src/**/*.gs --ext .gs', {
+      stdio: 'inherit',
+      cwd: __dirname
+    });
+    console.log('\nLinting passed!\n');
+    return true;
+  } catch (error) {
+    console.error('\nLinting failed. Please fix the errors above.\n');
+    return false;
+  }
+}
+
+/**
+ * Cleans the dist directory
+ */
+function clean() {
+  console.log('Cleaning dist directory...');
+  if (fs.existsSync(DIST_DIR)) {
+    fs.rmSync(DIST_DIR, { recursive: true });
+    console.log('Dist directory cleaned.\n');
+  } else {
+    console.log('Dist directory does not exist.\n');
+  }
+}
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const shouldLint = args.includes('--lint');
+const shouldClean = args.includes('--clean');
+
+// Execute based on arguments
+if (shouldClean) {
+  clean();
+} else {
+  if (shouldLint) {
+    const lintPassed = lint();
+    if (!lintPassed) {
+      process.exit(1);
+    }
+  }
+  build();
+}

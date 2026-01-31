@@ -1,0 +1,103 @@
+name: Build and Lint
+
+on:
+  push:
+    branches: [ main, master, develop, 'claude/**' ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  lint-and-build:
+    name: Lint and Build Dashboard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: false
+
+      - name: Build consolidated file
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          if [ ! -f "dist/ConsolidatedDashboard.gs" ]; then
+            echo "ERROR: Build output not found!"
+            exit 1
+          fi
+          echo "Build output verified: dist/ConsolidatedDashboard.gs"
+          ls -la dist/
+
+      - name: Report build size
+        run: |
+          SIZE=$(stat -f%z "dist/ConsolidatedDashboard.gs" 2>/dev/null || stat -c%s "dist/ConsolidatedDashboard.gs")
+          LINES=$(wc -l < "dist/ConsolidatedDashboard.gs")
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **File**: dist/ConsolidatedDashboard.gs" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size**: $(echo "scale=1; $SIZE/1024" | bc) KB" >> $GITHUB_STEP_SUMMARY
+          echo "- **Lines**: $LINES" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolidated-dashboard
+          path: dist/ConsolidatedDashboard.gs
+          retention-days: 30
+
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Count source files and functions
+        run: |
+          echo "## Code Quality Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Count .gs files
+          GS_COUNT=$(find src -name "*.gs" | wc -l)
+          echo "- **Source Files**: $GS_COUNT .gs files" >> $GITHUB_STEP_SUMMARY
+
+          # Count functions
+          FUNC_COUNT=$(grep -r "^function " src/*.gs | wc -l)
+          echo "- **Functions**: $FUNC_COUNT total functions" >> $GITHUB_STEP_SUMMARY
+
+          # Count lines per major module
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Lines per Module" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for f in src/*.gs; do
+            if [ -f "$f" ]; then
+              LINES=$(wc -l < "$f")
+              NAME=$(basename "$f")
+              echo "- $NAME: $LINES lines" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: Check for TODO/FIXME comments
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Technical Debt" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          TODO_COUNT=$(grep -r "TODO\|FIXME\|HACK\|XXX" src/*.gs | wc -l || echo "0")
+          echo "- **TODO/FIXME/HACK/XXX comments**: $TODO_COUNT" >> $GITHUB_STEP_SUMMARY
+
+          DEPRECATED_COUNT=$(grep -r "DEPRECATED" src/*.gs | wc -l || echo "0")
+          echo "- **DEPRECATED markers**: $DEPRECATED_COUNT" >> $GITHUB_STEP_SUMMARY
