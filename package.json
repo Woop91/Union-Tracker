@@ -5,8 +5,8 @@
   "main": "build.js",
   "scripts": {
     "build": "node build.js",
-    "lint": "eslint src/**/*.gs --ext .gs",
-    "lint:fix": "eslint src/**/*.gs --ext .gs --fix",
+    "lint": "eslint \"src/**/*.gs\"",
+    "lint:fix": "eslint \"src/**/*.gs\" --fix",
     "test": "npm run lint && npm run build",
     "watch": "node build.js --watch",
     "clean": "node build.js --clean",
@@ -26,8 +26,7 @@
   "devDependencies": {
     "@google/clasp": "^2.4.2",
     "@types/google-apps-script": "^1.0.83",
-    "eslint": "^8.57.0",
-    "eslint-plugin-googleappsscript": "^1.0.5"
+    "eslint": "8.57.0"
   },
   "engines": {
     "node": ">=14.0.0"

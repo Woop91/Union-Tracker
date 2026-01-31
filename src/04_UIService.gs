@@ -7084,40 +7084,6 @@ function createPDFForSelectedGrievance_UIService_() {
 // Note: Main promote/demote functions moved to 02_MemberManager.gs
 
 /**
- * Placeholder for steward confirmation - redirects to manager
- * Final confirmation step 2 placeholder
- * @private
- */
-var _stewardPromotionPlaceholder = 'PLEASE CONFIRM: You are promoting member to Steward.\n\n' +
-    'This action grants significant responsibilities including:\n' +
-    '• Representing members in grievances\n' +
-    '• Access to sensitive member information\n' +
-    '• Authority to act on behalf of the union\n\n' +
-    'Are you absolutely sure you want to proceed?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response2 !== ui.Button.YES) {
-    ui.alert('Promotion cancelled.');
-    return;
-  }
-
-  // Promote to steward
-  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
-
-  // Get email for toolkit
-  var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
-
-  // Send toolkit email if email is available
-  if (email) {
-    sendStewardToolkit_(email, name);
-  }
-
-  ui.alert('✅ ' + name + ' has been promoted to Steward!' +
-    (email ? '\n\nToolkit email sent to: ' + email : '\n\nNo email on file - please send toolkit manually.'));
-}
-
-/**
  * Sends steward toolkit email to newly promoted steward
  * @param {string} email - Steward's email address
  * @param {string} name - Steward's name
