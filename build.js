@@ -35,6 +35,7 @@ const BUILD_ORDER = [
   '04b_ThemeService.gs',
   '04c_MobileInterface.gs',
   '04d_QuickActions.gs',
+  '04e_SearchDialogs.gs',
   '04_UIService.gs',           // Remaining UI functions
 
   // Integrations
@@ -57,6 +58,10 @@ const BUILD_ORDER = [
   '08e_FormHandlers.gs',
   '08f_SatisfactionEngine.gs',
   '08g_SyncEngine.gs',
+  '08h_NotificationEngine.gs',
+  '08i_AuditLog.gs',
+  '08j_CalcSheets.gs',
+  '08k_PublicDashboard.gs',
   '08_Code.gs',                // Remaining code functions
 
   // Main entry point
