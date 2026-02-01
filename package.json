@@ -1,6 +1,6 @@
 {
   "name": "union-steward-dashboard",
-  "version": "4.4.1",
+  "version": "4.5.0",
   "description": "Modular Union Steward Dashboard for Google Sheets",
   "main": "build.js",
   "scripts": {
@@ -27,7 +27,7 @@
   "devDependencies": {
     "@google/clasp": "^2.4.2",
     "@types/google-apps-script": "^1.0.83",
-    "eslint": "8.57.0",
+    "eslint": "^9.39.0",
     "husky": "^9.1.7"
   },
   "engines": {
