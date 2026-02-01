@@ -2007,14 +2007,6 @@ function showInteractiveDashboardTab() {
   showStewardDashboard();
 }
 
-/** @deprecated - Legacy function kept for reference */
-function showInteractiveDashboardTab_LEGACY() {
-  var html = HtmlService.createHtmlOutput(getInteractiveDashboardHtml())
-    .setWidth(900)
-    .setHeight(750);
-  SpreadsheetApp.getUi().showModalDialog(html, '📊 Dashboard');
-}
-
 /**
  * Returns the HTML for the interactive dashboard with tabs
  */
@@ -4028,137 +4020,12 @@ function renderBargainingCheatSheet() {
   showStewardDashboard();
 }
 
-/** @deprecated - Legacy function body for reference only */
-function renderBargainingCheatSheet_LEGACY() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  var step1Denials = 0;
-  var totalStep1 = 0;
-  var settlementDays = [];
-  var articleViolations = {};
-
-  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-    var grievanceData = grievanceSheet.getDataRange().getValues();
-
-    for (var g = 1; g < grievanceData.length; g++) {
-      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
-        totalStep1++;
-        if (grievanceData[g][GRIEVANCE_COLS.STATUS - 1] !== 'Won' &&
-            grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) {
-          step1Denials++;
-        }
-      }
-
-      var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
-      var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
-      if (dateFiled instanceof Date && dateClosed instanceof Date) {
-        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
-        if (days > 0) settlementDays.push(days);
-      }
-
-      var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
-      if (article) {
-        articleViolations[article] = (articleViolations[article] || 0) + 1;
-      }
-    }
-  }
-
-  var denialRate = totalStep1 > 0 ? Math.round((step1Denials / totalStep1) * 100) : 0;
-  var avgSettlement = settlementDays.length > 0 ?
-    Math.round(settlementDays.reduce(function(a, b) { return a + b; }, 0) / settlementDays.length) : 0;
-
-  var topArticle = "N/A";
-  var topCount = 0;
-  for (var art in articleViolations) {
-    if (articleViolations[art] > topCount) {
-      topArticle = art;
-      topCount = articleViolations[art];
-    }
-  }
-
-  // Build modal HTML
-  var html = '<!DOCTYPE html><html><head>' +
-    '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">' +
-    '<style>body{font-family:"Roboto",sans-serif;background:#0f172a;color:#f8fafc;padding:20px;margin:0}' +
-    '.header{color:#fbbf24;font-size:18px;font-weight:700;margin-bottom:16px}' +
-    '.card{background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:16px;margin-bottom:12px}' +
-    '.metric-row{display:flex;justify-content:space-between;align-items:center}' +
-    '.label{font-size:13px;color:#fcd34d}.value{font-size:24px;font-weight:700;color:#fbbf24}' +
-    '.status{font-size:11px;padding:4px 8px;border-radius:4px;margin-top:8px;display:inline-block}' +
-    '.status.danger{background:rgba(239,68,68,0.2);color:#f87171}' +
-    '.status.warning{background:rgba(251,191,36,0.2);color:#fcd34d}' +
-    '.status.ok{background:rgba(16,185,129,0.2);color:#34d399}</style></head><body>' +
-    '<div class="header">📊 STRATEGIC BARGAINING DATA</div>' +
-    '<div class="card"><div class="metric-row"><div class="label">Step 1 Denial Rate</div><div class="value">' + denialRate + '%</div></div>' +
-    '<div class="status ' + (denialRate > 60 ? 'danger' : 'ok') + '">' + (denialRate > 60 ? 'High Hostility - Management aggressive' : 'Normal Range') + '</div></div>' +
-    '<div class="card"><div class="metric-row"><div class="label">Average Settlement Time</div><div class="value">' + avgSettlement + ' Days</div></div>' +
-    '<div class="status ' + (avgSettlement > 45 ? 'warning' : 'ok') + '">' + (avgSettlement > 45 ? 'Slower than normal' : 'Within expected range') + '</div></div>' +
-    '<div class="card"><div class="metric-row"><div class="label">Most Violated Article</div><div class="value">' + topArticle + '</div></div>' +
-    '<div class="status ' + (topCount > 5 ? 'danger' : 'warning') + '">' + topCount + ' violations - ' + (topCount > 5 ? 'High Risk Area' : 'Monitor closely') + '</div></div>' +
-    '</body></html>';
-
-  var output = HtmlService.createHtmlOutput(html).setWidth(400).setHeight(350);
-  SpreadsheetApp.getUi().showModalDialog(output, 'Bargaining Intelligence');
-}
-
 /**
  * @deprecated v4.3.2 - Use showStewardDashboard() instead.
  * Hot Zones are now in the unified Steward Dashboard (Hot Spots tab).
  */
 function renderHotZones() {
   showStewardDashboard();
-}
-
-/** @deprecated - Legacy function body for reference only */
-function renderHotZones_LEGACY() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!grievanceSheet) {
-    SpreadsheetApp.getUi().alert('No Grievance Log found.');
-    return;
-  }
-
-  var grievanceData = grievanceSheet.getDataRange().getValues();
-
-  // Count grievances by location
-  var locationIssues = {};
-  for (var g = 1; g < grievanceData.length; g++) {
-    var location = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1];
-    var status = grievanceData[g][GRIEVANCE_COLS.STATUS - 1];
-
-    if (location && (status === 'Open' || status === 'Pending Info')) {
-      locationIssues[location] = (locationIssues[location] || 0) + 1;
-    }
-  }
-
-  // Sort and identify hot zones (locations with 3+ active issues)
-  var hotZones = Object.entries(locationIssues)
-    .filter(function(entry) { return entry[1] >= 3; })
-    .sort(function(a, b) { return b[1] - a[1]; });
-
-  // Build modal HTML
-  var html = '<!DOCTYPE html><html><head>' +
-    '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">' +
-    '<style>body{font-family:"Roboto",sans-serif;background:#0f172a;color:#f8fafc;padding:20px;margin:0}' +
-    '.header{color:#ef4444;font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}' +
-    '.zone{display:flex;justify-content:space-between;padding:12px;background:rgba(239,68,68,0.1);border-radius:8px;margin-bottom:8px;border-left:4px solid #ef4444}' +
-    '.location{font-weight:500}.count{background:#ef4444;color:white;padding:4px 12px;border-radius:12px;font-weight:700}' +
-    '.empty{color:#94a3b8;font-style:italic;text-align:center;padding:40px}</style></head><body>' +
-    '<div class="header">🔥 HOT ZONES (3+ Active Issues)</div>';
-
-  if (hotZones.length === 0) {
-    html += '<div class="empty">No hot zones detected - All clear!</div>';
-  } else {
-    hotZones.forEach(function(zone) {
-      html += '<div class="zone"><span class="location">' + zone[0] + '</span><span class="count">' + zone[1] + ' cases</span></div>';
-    });
-  }
-
-  html += '</body></html>';
-
-  var output = HtmlService.createHtmlOutput(html).setWidth(400).setHeight(300);
-  SpreadsheetApp.getUi().showModalDialog(output, 'Hot Zones Analysis');
 }
 
 /**
@@ -4169,150 +4036,12 @@ function identifyRisingStars() {
   showStewardDashboard();
 }
 
-/** @deprecated - Legacy function body for reference only */
-function identifyRisingStars_LEGACY() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
-
-  if (!perfSheet || perfSheet.getLastRow() < 2) {
-    SpreadsheetApp.getUi().alert("Steward performance data not available. Run system diagnostics first.");
-    return;
-  }
-
-  var perfData = perfSheet.getDataRange().getValues();
-
-  // Find top performers by score
-  var performers = [];
-  for (var p = 1; p < perfData.length; p++) {
-    if (perfData[p][0] && perfData[p][9]) {  // Name and Score
-      performers.push({
-        name: perfData[p][0],
-        score: perfData[p][9],
-        winRate: perfData[p][5] || 0,
-        avgDays: perfData[p][6] || 0
-      });
-    }
-  }
-
-  performers.sort(function(a, b) { return b.score - a.score; });
-  var risingStars = performers.slice(0, 5);
-
-  // Build modal HTML
-  var html = '<!DOCTYPE html><html><head>' +
-    '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">' +
-    '<style>body{font-family:"Roboto",sans-serif;background:#0f172a;color:#f8fafc;padding:20px;margin:0}' +
-    '.header{color:#10b981;font-size:18px;font-weight:700;margin-bottom:16px}' +
-    '.star{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;padding:12px;background:rgba(16,185,129,0.1);border-radius:8px;margin-bottom:8px;align-items:center}' +
-    '.star.top{border-left:4px solid #fbbf24;background:rgba(251,191,36,0.1)}' +
-    '.name{font-weight:600}.metric{text-align:center;font-size:13px}' +
-    '.label{font-size:10px;color:#94a3b8;text-transform:uppercase}' +
-    '.value{font-weight:700;color:#34d399}' +
-    '.empty{color:#94a3b8;font-style:italic;text-align:center;padding:40px}</style></head><body>' +
-    '<div class="header">⭐ RISING STARS (Top Performers)</div>';
-
-  if (risingStars.length === 0) {
-    html += '<div class="empty">No performance data available</div>';
-  } else {
-    risingStars.forEach(function(star, index) {
-      var isTop = index === 0;
-      html += '<div class="star' + (isTop ? ' top' : '') + '">' +
-        '<div class="name">' + (isTop ? '🏆 ' : '') + star.name + '</div>' +
-        '<div class="metric"><div class="label">Score</div><div class="value">' + star.score + '</div></div>' +
-        '<div class="metric"><div class="label">Win Rate</div><div class="value">' + (typeof star.winRate === 'number' ? star.winRate + '%' : star.winRate) + '</div></div>' +
-        '<div class="metric"><div class="label">Avg Days</div><div class="value">' + star.avgDays + '</div></div>' +
-        '</div>';
-    });
-  }
-
-  html += '</body></html>';
-
-  var output = HtmlService.createHtmlOutput(html).setWidth(500).setHeight(350);
-  SpreadsheetApp.getUi().showModalDialog(output, 'Rising Stars');
-}
-
 /**
  * @deprecated v4.3.2 - Use showStewardDashboard() instead.
  * Hostility metrics are now in the unified Steward Dashboard (Bargaining tab).
  */
 function renderHostilityFunnel() {
   showStewardDashboard();
-}
-
-/** @deprecated - Legacy function body for reference only */
-function renderHostilityFunnel_LEGACY() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!grievanceSheet) {
-    SpreadsheetApp.getUi().alert('No Grievance Log found.');
-    return;
-  }
-
-  var grievanceData = grievanceSheet.getDataRange().getValues();
-
-  // Analyze management response patterns
-  var step1Count = 0, step1Denied = 0;
-  var step2Count = 0, step2Denied = 0;
-  var step3Count = 0;
-  var arbitrationCount = 0;
-
-  for (var g = 1; g < grievanceData.length; g++) {
-    if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) step1Count++;
-    if (grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) {
-      step2Count++;
-      step1Denied++;
-    }
-    if (grievanceData[g][GRIEVANCE_COLS.STEP_3_DATE - 1]) {
-      step3Count++;
-      step2Denied++;
-    }
-    var status = grievanceData[g][GRIEVANCE_COLS.STATUS - 1];
-    if (status === 'In Arbitration') arbitrationCount++;
-  }
-
-  var step1Rate = 100;
-  var step2Rate = step1Count > 0 ? Math.round((step1Denied/step1Count)*100) : 0;
-  var step3Rate = step2Count > 0 ? Math.round((step2Denied/step2Count)*100) : 0;
-  var arbRate = step3Count > 0 ? Math.round((arbitrationCount/step3Count)*100) : 0;
-
-  // Helper to get color class
-  function getRateClass(rate) {
-    if (rate >= 60) return 'danger';
-    if (rate >= 40) return 'warning';
-    return 'ok';
-  }
-
-  // Build modal HTML
-  var html = '<!DOCTYPE html><html><head>' +
-    '<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">' +
-    '<style>body{font-family:"Roboto",sans-serif;background:#0f172a;color:#f8fafc;padding:20px;margin:0}' +
-    '.header{color:#ef4444;font-size:18px;font-weight:700;margin-bottom:16px}' +
-    '.funnel{margin-bottom:8px}.step{display:flex;align-items:center;padding:12px;border-radius:8px;margin-bottom:6px}' +
-    '.step-label{flex:2;font-weight:500}.step-count{flex:1;text-align:center;font-size:20px;font-weight:700}' +
-    '.step-rate{flex:1;text-align:right;padding:4px 12px;border-radius:16px;font-weight:600;font-size:13px}' +
-    '.danger{background:rgba(239,68,68,0.2);color:#f87171}' +
-    '.warning{background:rgba(251,191,36,0.2);color:#fcd34d}' +
-    '.ok{background:rgba(16,185,129,0.2);color:#34d399}' +
-    '.step1{background:rgba(59,130,246,0.15);border-left:4px solid #3b82f6}' +
-    '.step2{background:rgba(251,191,36,0.15);border-left:4px solid #f59e0b}' +
-    '.step3{background:rgba(239,68,68,0.15);border-left:4px solid #ef4444}' +
-    '.arb{background:rgba(139,92,246,0.15);border-left:4px solid #8b5cf6}' +
-    '.insight{margin-top:16px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:12px;color:#94a3b8}</style></head><body>' +
-    '<div class="header">⚡ MANAGEMENT HOSTILITY FUNNEL</div>' +
-    '<div class="funnel">' +
-    '<div class="step step1"><span class="step-label">Step 1 Filed</span><span class="step-count">' + step1Count + '</span><span class="step-rate ok">' + step1Rate + '%</span></div>' +
-    '<div class="step step2"><span class="step-label">Denied → Step 2</span><span class="step-count">' + step1Denied + '</span><span class="step-rate ' + getRateClass(step2Rate) + '">' + step2Rate + '%</span></div>' +
-    '<div class="step step3"><span class="step-label">Denied → Step 3</span><span class="step-count">' + step2Denied + '</span><span class="step-rate ' + getRateClass(step3Rate) + '">' + step3Rate + '%</span></div>' +
-    '<div class="step arb"><span class="step-label">To Arbitration</span><span class="step-count">' + arbitrationCount + '</span><span class="step-rate ' + getRateClass(arbRate) + '">' + arbRate + '%</span></div>' +
-    '</div>' +
-    '<div class="insight">' +
-    (step2Rate > 60 ? '⚠️ High Step 1 denial rate indicates aggressive management posture. Document everything carefully.' :
-     step2Rate > 40 ? '📊 Moderate denial rate. Some management pushback but within normal range.' :
-     '✅ Lower denial rate suggests more cooperative management environment.') +
-    '</div></body></html>';
-
-  var output = HtmlService.createHtmlOutput(html).setWidth(450).setHeight(380);
-  SpreadsheetApp.getUi().showModalDialog(output, 'Hostility Funnel');
 }
 
 // ============================================================================
