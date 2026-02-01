@@ -1311,7 +1311,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2170 lines)
+// SOURCE: 01_Core.gs (2183 lines)
 // ============================================================================
 
 /**
@@ -2046,6 +2046,19 @@ var COLORS = {
   ROW_ALT_GREEN: '#ECFDF5',     // Light green tint
   ROW_ALT_RED: '#FEF2F2',       // Light red tint
   ROW_ALT_BLUE: '#EFF6FF'       // Light blue tint
+};
+
+/**
+ * Mobile interface configuration settings
+ * Shared constants for responsive design across all UI modules
+ * @const {Object}
+ */
+var MOBILE_CONFIG = {
+  MAX_COLUMNS_MOBILE: 8,
+  CARD_LAYOUT_ENABLED: true,
+  TOUCH_TARGET_SIZE: '44px',
+  MOBILE_BREAKPOINT: 768,   // Width in pixels below which is considered mobile
+  TABLET_BREAKPOINT: 1024   // Width in pixels below which is considered tablet
 };
 
 /**
@@ -5963,7 +5976,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2538 lines)
+// SOURCE: 03_UIComponents.gs (2522 lines)
 // ============================================================================
 
 /**
@@ -6855,25 +6868,9 @@ function refreshAllVisuals() {
  */
 
 // ============================================================================
-// MOBILE CONFIGURATION
-// ============================================================================
-
-/**
- * Mobile interface configuration settings
- * Note: This duplicates the config from 04_UIService.gs for module independence
- * TODO: Consider moving to a shared constants file after full extraction
- */
-var MOBILE_CONFIG = {
-  MAX_COLUMNS_MOBILE: 8,
-  CARD_LAYOUT_ENABLED: true,
-  TOUCH_TARGET_SIZE: '44px',
-  MOBILE_BREAKPOINT: 768,  // Width in pixels below which is considered mobile
-  TABLET_BREAKPOINT: 1024  // Width in pixels below which is considered tablet
-};
-
-// ============================================================================
 // MOBILE CONTEXT DETECTION
 // ============================================================================
+// Note: MOBILE_CONFIG is now defined in 01_Core.gs as a shared constant
 
 /**
  * Checks if the current context is a mobile device
@@ -8506,7 +8503,7 @@ function getAdvancedSearchHtml() {
 
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (7128 lines)
+// SOURCE: 04_UIService.gs (7119 lines)
 // ============================================================================
 
 /**
@@ -10222,17 +10219,8 @@ function showThemeManager() {
  * Includes automatic device detection for responsive experience
  */
 
-// ==================== MOBILE CONFIGURATION ====================
-
-var MOBILE_CONFIG = {
-  MAX_COLUMNS_MOBILE: 8,
-  CARD_LAYOUT_ENABLED: true,
-  TOUCH_TARGET_SIZE: '44px',
-  MOBILE_BREAKPOINT: 768,  // Width in pixels below which is considered mobile
-  TABLET_BREAKPOINT: 1024  // Width in pixels below which is considered tablet
-};
-
 // ==================== DEVICE DETECTION ====================
+// Note: MOBILE_CONFIG is now defined in 01_Core.gs as a shared constant
 
 /**
  * Shows a smart dashboard that automatically detects the device type
