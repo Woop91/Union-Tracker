@@ -90,6 +90,21 @@ jobs:
             fi
           done
 
+      - name: Check for duplicate functions
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Duplicate Function Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          DUPES=$(grep -hE "^function [a-zA-Z_][a-zA-Z0-9_]*\(" src/*.gs | sort | uniq -d | wc -l)
+          if [ "$DUPES" -gt 0 ]; then
+            echo "- **WARNING**: $DUPES duplicate function definitions found!" >> $GITHUB_STEP_SUMMARY
+            grep -hE "^function [a-zA-Z_][a-zA-Z0-9_]*\(" src/*.gs | sort | uniq -d >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "- **Status**: No duplicate functions found" >> $GITHUB_STEP_SUMMARY
+          fi
+
       - name: Check for TODO/FIXME comments
         run: |
           echo "" >> $GITHUB_STEP_SUMMARY
