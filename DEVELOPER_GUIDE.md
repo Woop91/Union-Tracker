@@ -7,11 +7,13 @@ This guide provides an overview of the codebase architecture, development workfl
 1. [Project Overview](#project-overview)
 2. [Architecture](#architecture)
 3. [Module Structure](#module-structure)
-4. [Build System](#build-system)
-5. [Testing](#testing)
-6. [Code Style Guidelines](#code-style-guidelines)
-7. [Common Patterns](#common-patterns)
-8. [Debugging](#debugging)
+4. [Security](#security)
+5. [Data Access Layer](#data-access-layer)
+6. [Build System](#build-system)
+7. [Testing](#testing)
+8. [Code Style Guidelines](#code-style-guidelines)
+9. [Common Patterns](#common-patterns)
+10. [Debugging](#debugging)
 
 ---
 
@@ -23,9 +25,9 @@ The 509 Dashboard is a Google Apps Script (GAS) application for managing union s
 - Google Apps Script (ES5-compatible JavaScript)
 - Google Sheets API
 - Node.js build system
-- ESLint for code quality
+- ESLint for code quality (v9.x flat config)
 
-**Version:** 4.4.1
+**Version:** 4.5.0
 
 ---
 
@@ -44,28 +46,40 @@ MULTIPLE-SCRIPS-REPO/
 └── DEVELOPER_GUIDE.md     # This file
 ```
 
-### Modular Design
+### Modular Design (v4.5.0)
 
-The codebase follows a modular architecture where each file handles a specific domain:
+The codebase follows a layered architecture with 15 modules:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      09_Main.gs                              │
-│                   (Entry Point / onOpen)                     │
+│                      10_Main.gs                              │
+│               (Entry Point / onOpen / onEdit)                │
 └─────────────────────────────────────────────────────────────┘
                               │
         ┌─────────────────────┼─────────────────────┐
         ▼                     ▼                     ▼
 ┌───────────────┐   ┌───────────────┐   ┌───────────────┐
 │  UI Layer     │   │  Data Layer   │   │  Services     │
-│  04a/04b/04   │   │  02/03/08     │   │  05/06/14     │
+│  03/04        │   │  02/08        │   │  05/06/09     │
 └───────────────┘   └───────────────┘   └───────────────┘
         │                     │                     │
         └─────────────────────┼─────────────────────┘
                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│               00_DataAccess.gs (Data Access Layer)           │
+│            Cached sheet access, batch operations             │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                00_Security.gs (Security Layer)               │
+│     XSS prevention, access control, PII masking, validation  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
                     ┌───────────────┐
-                    │ 01_Constants  │
-                    │   (Globals)   │
+                    │  01_Core.gs   │
+                    │ (Error + Config)│
                     └───────────────┘
 ```
 
@@ -121,32 +135,154 @@ The codebase follows a modular architecture where each file handles a specific d
 
 ## Module Structure
 
-### Core Modules
+### Foundation Modules (Load First)
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `01_Constants.gs` | Global constants and configuration | `SHEETS`, `COLORS`, column indices |
-| `02_MemberManager.gs` | Member CRUD operations | `getMemberById`, `updateMember`, `addMember` |
-| `03_GrievanceManager.gs` | Grievance handling | `createGrievance`, `updateGrievance`, `getGrievanceStats` |
+| `00_Security.gs` | Security utilities | `escapeHtml`, `checkWebAppAuthorization`, `maskEmail`, `validateWebAppRequest` |
+| `00_DataAccess.gs` | Data Access Layer | `DataAccess.getSheet`, `DataAccess.getMemberById`, `TIME_CONSTANTS` |
+| `01_Core.gs` | Error handling + Constants | `handleError`, `SHEETS`, `MEMBER_COLS`, `GRIEVANCE_COLS` |
+
+### Data Modules
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `02_DataManagers.gs` | Member + Grievance CRUD | `addMember`, `updateMember`, `createGrievance` |
+| `08_SheetUtils.gs` | Sheet creation, validation | `getOrCreateSheet`, `setupDataValidation`, `onEditMultiSelect` |
 
 ### UI Modules
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `04a_MenuBuilder.gs` | Menu creation | `createDashboardMenu`, `navigateToSheet` |
-| `04b_ThemeService.gs` | Theme management | `APPLY_SYSTEM_THEME`, `toggleDarkMode`, `applyZebraStripes` |
-| `04_UIService.gs` | Dialogs and panels | `showMemberDialog`, `showGrievanceForm` |
+| `03_UIComponents.gs` | Menu, Theme, Mobile | `createDashboardMenu`, `applyTheme`, `showQuickActions` |
+| `04_UIService.gs` | Dialogs and panels | `showMemberDialog`, `showGrievanceForm`, `getUnifiedDashboardHtml` |
 
-### Maintenance Modules
+### Service Modules
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `06a_Diagnostics.gs` | System diagnostics | `DIAGNOSE_SETUP`, `REPAIR_DASHBOARD` |
-| `06b_CacheManager.gs` | Caching layer | `getCachedData`, `invalidateCache`, `warmUpCaches` |
-| `06c_UndoManager.gs` | Undo/redo system | `recordAction`, `undoLastAction`, `redoLastAction` |
-| `06_Maintenance.gs` | General maintenance | `cleanupOldData`, `optimizeSheets` |
+| `05_Integrations.gs` | Drive, Calendar, WebApp | `doGet`, `syncToCalendar`, `setupDriveFolder` |
+| `06_Maintenance.gs` | Diagnostics, Cache, Undo | `DIAGNOSE_SETUP`, `getCachedData`, `undoLastAction` |
+| `09_Dashboards.gs` | Satisfaction, Sync, Public | `getSatisfactionData`, `onEditAutoSync`, `buildPublicPortal` |
 
-### Data Modules
+### Feature Modules
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `10_Code.gs` | Core business logic | `calculateDeadlines`, `processGrievanceStep` |
+| `10_Main.gs` | Entry point + Triggers | `onOpen`, `onEdit` (consolidated dispatcher) |
+| `11_CommandHub.gs` | Command center | `showCommandCenter`, `buildSecureDashboard` |
+| `12_Features.gs` | Checklist, Dynamic, Looker | `handleChecklistEdit`, `buildSafeQuery` |
+
+### Development Module (Remove in Production)
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `07_DevTools.gs` | Test data generation | `SEED_TEST_DATA`, `NUKE_SEEDED_DATA` |
+
+---
+
+## Security
+
+### Overview
+
+The `00_Security.gs` module provides centralized security functions:
+
+### XSS Prevention
+
+```javascript
+// Server-side HTML escaping
+var safeName = escapeHtml(userData.name);
+
+// For client-side templates, include the security script
+var html = getClientSecurityScript() + '<body>...</body>';
+
+// Pre-sanitize data arrays before passing to client
+var safeData = sanitizeDataForClient(members, ['firstName', 'lastName', 'email']);
+```
+
+### Access Control
+
+```javascript
+// In doGet() - validate request and check authorization
+var validation = validateWebAppRequest(e);
+if (!validation.isValid) {
+  return getAccessDeniedPage('Invalid request');
+}
+
+var authResult = checkWebAppAuthorization('steward');
+if (!authResult.isAuthorized) {
+  return getAccessDeniedPage(authResult.message);
+}
+```
+
+### PII Masking for Logs
+
+```javascript
+// Use secure logging to mask PII
+secureLog('processGrievance', 'Processing grievance', {
+  email: member.email,     // Will be masked as "j***@example.com"
+  phone: member.phone,     // Will be masked as "***-***-1234"
+  firstName: member.firstName  // Will be masked as "J."
+});
+```
+
+### Formula Injection Prevention
+
+```javascript
+// Use safe formula builders
+var formula = buildSafeQuery(sheetName, 'SELECT A, B WHERE C > 0', 1);
+
+// Escape sheet names for formula use
+var safeSheet = safeSheetNameForFormula(userProvidedName);
+```
+
+---
+
+## Data Access Layer
+
+### Overview
+
+The `00_DataAccess.gs` module provides a centralized data access layer with caching:
+
+### Basic Usage
+
+```javascript
+// Get a cached sheet reference
+var sheet = DataAccess.getSheet(SHEETS.MEMBER_DIR);
+
+// Get all data (cached)
+var members = DataAccess.getAllMembers();
+
+// Get specific member
+var member = DataAccess.getMemberById('MEM-001');
+
+// Find with predicate
+var overdueGrievances = DataAccess.findAllRows(SHEETS.GRIEVANCE_LOG, function(row) {
+  return row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE] < 0;
+});
+```
+
+### Time Constants
+
+```javascript
+// Use TIME_CONSTANTS instead of magic numbers
+var filingDeadline = calculateDeadline(incidentDate, TIME_CONSTANTS.DEADLINE_DAYS.FILING);
+
+// Get urgency level
+var urgency = getDeadlineUrgency(daysToDeadline);  // 'critical', 'warning', 'normal', 'overdue'
+```
+
+### Cache Invalidation
+
+```javascript
+// After structural changes (adding/removing sheets)
+DataAccess.invalidateCache();
+```
+
+---
+
+### Legacy Data Modules
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|

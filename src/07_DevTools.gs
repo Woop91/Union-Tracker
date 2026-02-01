@@ -1822,7 +1822,9 @@ function testValidateGrievanceId() {
 
 function testOpenRateRange() {
   Assert.assertTrue(85 >= 0 && 85 <= 100, 'Open rate 85 should be in range');
+  // eslint-disable-next-line no-self-compare -- Testing boundary conditions explicitly
   Assert.assertTrue(0 >= 0 && 0 <= 100, 'Open rate 0 should be in range');
+  // eslint-disable-next-line no-self-compare -- Testing boundary conditions explicitly
   Assert.assertTrue(100 >= 0 && 100 <= 100, 'Open rate 100 should be in range');
 }
 
