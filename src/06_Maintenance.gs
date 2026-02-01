@@ -1,5 +1,1333 @@
 /**
  * ============================================================================
+ * Diagnostics.gs - System Diagnostics and Repair
+ * ============================================================================
+ *
+ * This module handles all diagnostic and repair functions including:
+ * - System diagnostics (DIAGNOSE_SETUP)
+ * - Dashboard repair (REPAIR_DASHBOARD)
+ * - Modal diagnostics
+ * - Sheet verification
+ *
+ * REFACTORED: Split from 06_Maintenance.gs for better maintainability
+ *
+ * @fileoverview System diagnostics and repair functions
+ * @version 1.0.0
+ * @requires 01_Constants.gs
+ */
+
+// ============================================================================
+// SYSTEM DIAGNOSTICS
+// ============================================================================
+
+/**
+ * Runs a complete diagnostic check on the dashboard setup
+ * Checks all required sheets, columns, formulas, and configurations
+ * @returns {Object} Diagnostic results with status, checks, warnings, and errors
+ */
+function DIAGNOSE_SETUP() {
+  var results = {
+    timestamp: new Date().toISOString(),
+    status: 'OK',
+    checks: [],
+    warnings: [],
+    errors: []
+  };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Check 1: Required sheets exist
+  results.checks.push('Checking required sheets...');
+  var existingSheets = ss.getSheets().map(function(s) { return s.getName(); });
+
+  for (var key in SHEET_NAMES) {
+    var sheetName = SHEET_NAMES[key];
+    if (existingSheets.indexOf(sheetName) === -1) {
+      results.errors.push('Missing required sheet: ' + sheetName);
+      results.status = 'ERROR';
+    }
+  }
+
+  // Check 2: Hidden sheets exist
+  results.checks.push('Checking hidden calculation sheets...');
+  for (var hiddenKey in HIDDEN_SHEETS) {
+    var hiddenName = HIDDEN_SHEETS[hiddenKey];
+    if (existingSheets.indexOf(hiddenName) === -1) {
+      results.warnings.push('Missing hidden sheet: ' + hiddenName + ' (will be auto-created on repair)');
+      if (results.status === 'OK') results.status = 'WARNING';
+    }
+  }
+
+  // Check 3: Member Directory structure
+  results.checks.push('Verifying Member Directory structure...');
+  var memberSheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
+  if (memberSheet) {
+    var headers = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
+    var requiredHeaders = [
+      'ID', 'First Name', 'Last Name', 'Employee ID', 'Department',
+      'Job Title', 'Hire Date', 'Email', 'Phone', 'Status'
+    ];
+
+    requiredHeaders.forEach(function(header) {
+      var found = headers.some(function(h) {
+        return h.toString().toLowerCase().indexOf(header.toLowerCase()) !== -1;
+      });
+      if (!found) {
+        results.warnings.push('Member Directory may be missing column: ' + header);
+      }
+    });
+  }
+
+  // Check 4: Grievance Tracker structure
+  results.checks.push('Verifying Grievance Tracker structure...');
+  var grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  if (grievanceSheet) {
+    var gHeaders = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
+    var requiredGHeaders = [
+      'Grievance ID', 'Member', 'Filing Date', 'Type', 'Current Step',
+      'Status', 'Last Updated'
+    ];
+
+    requiredGHeaders.forEach(function(header) {
+      var found = gHeaders.some(function(h) {
+        return h.toString().toLowerCase().indexOf(header.toLowerCase()) !== -1;
+      });
+      if (!found) {
+        results.warnings.push('Grievance Tracker may be missing column: ' + header);
+      }
+    });
+  }
+
+  // Check 5: Data integrity
+  results.checks.push('Checking data integrity...');
+  if (grievanceSheet) {
+    var data = grievanceSheet.getDataRange().getValues();
+    var orphanedGrievances = 0;
+    var invalidDates = 0;
+
+    for (var i = 1; i < data.length; i++) {
+      var memberId = data[i][GRIEVANCE_COLUMNS.MEMBER_ID];
+      var filingDate = data[i][GRIEVANCE_COLUMNS.FILING_DATE];
+
+      if (!memberId && data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID]) {
+        orphanedGrievances++;
+      }
+
+      if (filingDate && !(filingDate instanceof Date)) {
+        invalidDates++;
+      }
+    }
+
+    if (orphanedGrievances > 0) {
+      results.warnings.push('Found ' + orphanedGrievances + ' grievances without member ID');
+    }
+    if (invalidDates > 0) {
+      results.warnings.push('Found ' + invalidDates + ' grievances with invalid filing dates');
+    }
+  }
+
+  // Check 6: Calendar permissions
+  results.checks.push('Checking Calendar permissions...');
+  try {
+    CalendarApp.getAllCalendars();
+    results.checks.push('Calendar access: OK');
+  } catch (e) {
+    results.warnings.push('Cannot access Calendar - sync features may not work');
+  }
+
+  // Check 7: Drive permissions
+  results.checks.push('Checking Drive permissions...');
+  try {
+    DriveApp.getRootFolder();
+    results.checks.push('Drive access: OK');
+  } catch (e) {
+    results.warnings.push('Cannot access Drive - folder features may not work');
+  }
+
+  // Finalize status
+  if (results.errors.length > 0) {
+    results.status = 'ERROR';
+  } else if (results.warnings.length > 0) {
+    results.status = 'WARNING';
+  }
+
+  results.summary = 'Completed ' + results.checks.length + ' checks: ' +
+                    results.errors.length + ' errors, ' + results.warnings.length + ' warnings';
+
+  // Log the diagnostic run
+  logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
+    action: 'DIAGNOSTICS',
+    status: results.status,
+    errors: results.errors.length,
+    warnings: results.warnings.length,
+    runBy: Session.getActiveUser().getEmail()
+  });
+
+  return results;
+}
+
+// ============================================================================
+// REPAIR FUNCTIONS
+// ============================================================================
+
+/**
+ * Repairs the dashboard by recreating missing sheets and fixing issues
+ * @returns {void}
+ */
+function REPAIR_DASHBOARD() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+
+  var response = ui.alert(
+    '🔧 Repair Dashboard',
+    'This will:\n' +
+    '• Recreate missing hidden sheets\n' +
+    '• Reapply formulas and validations\n' +
+    '• Fix broken references\n' +
+    '• Install required triggers\n\n' +
+    'Your data will NOT be deleted.\n\n' +
+    'Continue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) {
+    ui.alert('Repair cancelled.');
+    return;
+  }
+
+  ss.toast('Starting repair...', '🔧 Repair', 5);
+
+  try {
+    // Recreate hidden sheets
+    ss.toast('Recreating hidden sheets...', '🔧 Progress', 3);
+    setupHiddenSheets(ss);
+
+    // Reapply data validations
+    ss.toast('Reapplying data validations...', '🔧 Progress', 3);
+    setupDataValidations();
+
+    // Install triggers
+    ss.toast('Installing triggers...', '🔧 Progress', 3);
+    installAutoSyncTrigger();
+
+    // Sync data
+    ss.toast('Syncing data...', '🔧 Progress', 3);
+    syncAllData();
+
+    ss.toast('Repair complete!', '✅ Success', 5);
+    ui.alert('✅ Repair Complete',
+      'Dashboard has been repaired successfully!\n\n' +
+      '• Hidden sheets recreated\n' +
+      '• Validations reapplied\n' +
+      '• Triggers installed\n' +
+      '• Data synced',
+      ui.ButtonSet.OK);
+
+    // Log the repair
+    logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
+      action: 'REPAIR_DASHBOARD',
+      runBy: Session.getActiveUser().getEmail()
+    });
+
+  } catch (error) {
+    Logger.log('Error in REPAIR_DASHBOARD: ' + error.message);
+    ui.alert('❌ Error', 'Repair failed: ' + error.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Removes deprecated tabs from the spreadsheet
+ * @returns {void}
+ */
+function removeDeprecatedTabs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var deprecatedSheets = [
+    'Dashboard_OLD',
+    'Member List_OLD',
+    'BACKUP_',
+    'TEST_'
+  ];
+
+  var removed = [];
+  ss.getSheets().forEach(function(sheet) {
+    var name = sheet.getName();
+    deprecatedSheets.forEach(function(prefix) {
+      if (name.indexOf(prefix) === 0 || name.indexOf(prefix) !== -1) {
+        try {
+          ss.deleteSheet(sheet);
+          removed.push(name);
+        } catch (e) {
+          Logger.log('Could not delete sheet: ' + name);
+        }
+      }
+    });
+  });
+
+  if (removed.length > 0) {
+    SpreadsheetApp.getUi().alert(
+      'Removed ' + removed.length + ' deprecated sheets:\n' + removed.join('\n')
+    );
+  } else {
+    SpreadsheetApp.getUi().alert('No deprecated sheets found.');
+  }
+}
+
+/**
+ * Sets up sheet structure for a given sheet type
+ * @param {Sheet} sheet - The sheet to set up
+ * @param {string} sheetType - Type of sheet ('member', 'grievance', 'config')
+ * @returns {void}
+ */
+function setupSheetStructure(sheet, sheetType) {
+  // This is a placeholder that delegates to specific setup functions
+  switch (sheetType) {
+    case 'member':
+      // Setup member directory structure
+      break;
+    case 'grievance':
+      // Setup grievance log structure
+      break;
+    case 'config':
+      // Setup config structure
+      break;
+    default:
+      Logger.log('Unknown sheet type: ' + sheetType);
+  }
+}
+
+/**
+ * Shows the repair dialog
+ * @returns {void}
+ */
+function showRepairDialog() {
+  var diagnostics = DIAGNOSE_SETUP();
+
+  var html = HtmlService.createHtmlOutput(getRepairDialogHtml_(diagnostics))
+    .setWidth(500)
+    .setHeight(400);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '🔧 Repair Dashboard');
+}
+
+/**
+ * Generates HTML for repair dialog
+ * @param {Object} diagnostics - Diagnostic results
+ * @returns {string} HTML content
+ * @private
+ */
+function getRepairDialogHtml_(diagnostics) {
+  var statusColor = diagnostics.status === 'OK' ? '#10b981' :
+                    diagnostics.status === 'WARNING' ? '#f59e0b' : '#ef4444';
+
+  return '<!DOCTYPE html><html><head><base target="_top">' +
+    '<style>' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;margin:0}' +
+    '.status{padding:10px;border-radius:8px;text-align:center;margin-bottom:20px;color:white;background:' + statusColor + '}' +
+    '.section{margin-bottom:15px}' +
+    '.section-title{font-weight:600;margin-bottom:8px}' +
+    '.item{padding:4px 0;font-size:13px}' +
+    '.error{color:#ef4444}' +
+    '.warning{color:#f59e0b}' +
+    '.btn{padding:10px 20px;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin-right:10px}' +
+    '.btn-primary{background:#7c3aed;color:white}' +
+    '.btn-secondary{background:#e5e7eb;color:#374151}' +
+    '</style></head><body>' +
+    '<div class="status">' + diagnostics.status + '</div>' +
+    '<p>' + diagnostics.summary + '</p>' +
+    (diagnostics.errors.length > 0 ?
+      '<div class="section"><div class="section-title error">Errors</div>' +
+      diagnostics.errors.map(function(e) { return '<div class="item error">' + e + '</div>'; }).join('') +
+      '</div>' : '') +
+    (diagnostics.warnings.length > 0 ?
+      '<div class="section"><div class="section-title warning">Warnings</div>' +
+      diagnostics.warnings.map(function(w) { return '<div class="item warning">' + w + '</div>'; }).join('') +
+      '</div>' : '') +
+    '<div style="margin-top:20px;text-align:right">' +
+    '<button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="runRepair()">Run Repair</button>' +
+    '</div>' +
+    '<script>' +
+    'function runRepair(){google.script.run.withSuccessHandler(function(){google.script.host.close()}).REPAIR_DASHBOARD()}' +
+    '</script></body></html>';
+}
+
+// ============================================================================
+// MODAL DIAGNOSTICS
+// ============================================================================
+
+/**
+ * Diagnoses why modals might not be loading data
+ * @returns {Object} Diagnostic results
+ */
+function diagnoseModalIssues() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var results = {
+    status: 'OK',
+    sheetChecks: [],
+    dataChecks: [],
+    modalTests: [],
+    errors: [],
+    warnings: []
+  };
+
+  var actualSheets = ss.getSheets().map(function(s) { return s.getName(); });
+
+  // Check required sheets
+  var requiredSheets = {
+    'Member Directory': SHEETS.MEMBER_DIR,
+    'Grievance Log': SHEETS.GRIEVANCE_LOG,
+    'Member Satisfaction': SHEETS.SATISFACTION,
+    'Config': SHEETS.CONFIG
+  };
+
+  for (var displayName in requiredSheets) {
+    var expectedName = requiredSheets[displayName];
+    var found = actualSheets.indexOf(expectedName) !== -1;
+    results.sheetChecks.push({
+      name: expectedName,
+      expected: expectedName,
+      found: found,
+      status: found ? 'OK' : 'MISSING'
+    });
+    if (!found) {
+      results.errors.push('Sheet "' + expectedName + '" not found.');
+      results.status = 'ERROR';
+    }
+  }
+
+  // Check data structure
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (memberSheet) {
+    var memberCols = memberSheet.getLastColumn();
+    var memberRows = memberSheet.getLastRow();
+    results.dataChecks.push({
+      sheet: 'Member Directory',
+      columns: memberCols,
+      rows: memberRows,
+      dataRows: Math.max(0, memberRows - 1),
+      status: memberCols >= 20 ? 'OK' : 'WARNING'
+    });
+  }
+
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (grievanceSheet) {
+    var grievCols = grievanceSheet.getLastColumn();
+    var grievRows = grievanceSheet.getLastRow();
+    results.dataChecks.push({
+      sheet: 'Grievance Log',
+      columns: grievCols,
+      rows: grievRows,
+      dataRows: Math.max(0, grievRows - 1),
+      status: grievCols >= 20 ? 'OK' : 'WARNING'
+    });
+  }
+
+  results.summary = results.status === 'OK'
+    ? 'All modal checks passed.'
+    : results.status === 'WARNING'
+    ? 'Some warnings detected.'
+    : 'Errors detected.';
+
+  return results;
+}
+
+/**
+ * Shows modal diagnostic results in a dialog
+ * @returns {void}
+ */
+function showModalDiagnostics() {
+  var results = diagnoseModalIssues();
+
+  var html = '<!DOCTYPE html><html><head><base target="_top">' +
+    '<style>' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px}' +
+    '.card{background:#f9fafb;border-radius:8px;padding:15px;margin-bottom:15px}' +
+    '.title{font-size:18px;font-weight:600;margin-bottom:15px}' +
+    '.status-ok{color:#059669;background:#d1fae5;padding:4px 12px;border-radius:20px}' +
+    '.status-error{color:#dc2626;background:#fee2e2;padding:4px 12px;border-radius:20px}' +
+    'table{width:100%;border-collapse:collapse;font-size:13px}' +
+    'th,td{padding:8px;text-align:left;border-bottom:1px solid #e5e7eb}' +
+    '.btn{padding:10px 20px;border:none;border-radius:6px;cursor:pointer;background:#7c3aed;color:white}' +
+    '</style></head><body>' +
+    '<div class="title">Modal Diagnostics</div>' +
+    '<span class="status-' + (results.status === 'OK' ? 'ok' : 'error') + '">' + results.status + '</span>' +
+    '<p>' + results.summary + '</p>' +
+    '<div class="card"><strong>Sheet Checks</strong><table>' +
+    '<tr><th>Sheet</th><th>Status</th></tr>' +
+    results.sheetChecks.map(function(c) {
+      return '<tr><td>' + c.name + '</td><td>' + (c.found ? '✅' : '❌') + '</td></tr>';
+    }).join('') +
+    '</table></div>' +
+    '<button class="btn" onclick="google.script.host.close()">Close</button>' +
+    '</body></html>';
+
+  var output = HtmlService.createHtmlOutput(html).setWidth(500).setHeight(400);
+  SpreadsheetApp.getUi().showModalDialog(output, '🔍 Modal Diagnostics');
+}
+
+/**
+ * Shows the diagnostics dialog
+ * @returns {void}
+ */
+function showDiagnosticsDialog() {
+  var results = DIAGNOSE_SETUP();
+
+  var html = HtmlService.createHtmlOutput(getDiagnosticsDialogHtml_(results))
+    .setWidth(550)
+    .setHeight(450);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '🩺 System Diagnostics');
+}
+
+/**
+ * Generates HTML for diagnostics dialog
+ * @param {Object} results - Diagnostic results
+ * @returns {string} HTML content
+ * @private
+ */
+function getDiagnosticsDialogHtml_(results) {
+  var statusClass = results.status === 'OK' ? 'ok' :
+                    results.status === 'WARNING' ? 'warning' : 'error';
+
+  return '<!DOCTYPE html><html><head><base target="_top">' +
+    '<style>' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;margin:0}' +
+    '.status{display:inline-block;padding:8px 16px;border-radius:20px;font-weight:600;margin-bottom:15px}' +
+    '.ok{background:#d1fae5;color:#065f46}' +
+    '.warning{background:#fef3c7;color:#92400e}' +
+    '.error{background:#fee2e2;color:#991b1b}' +
+    '.section{margin:15px 0}' +
+    '.section-title{font-weight:600;margin-bottom:8px}' +
+    '.list{background:#f9fafb;padding:10px;border-radius:6px;max-height:120px;overflow-y:auto}' +
+    '.item{padding:3px 0;font-size:13px}' +
+    '.btn{padding:10px 20px;border:none;border-radius:6px;cursor:pointer;font-weight:600}' +
+    '.btn-primary{background:#7c3aed;color:white}' +
+    '.btn-secondary{background:#e5e7eb;color:#374151;margin-right:10px}' +
+    '</style></head><body>' +
+    '<div class="status ' + statusClass + '">' + results.status + '</div>' +
+    '<p>' + results.summary + '</p>' +
+    '<div class="section">' +
+    '<div class="section-title">Checks Performed (' + results.checks.length + ')</div>' +
+    '<div class="list">' +
+    results.checks.map(function(c) { return '<div class="item">✓ ' + c + '</div>'; }).join('') +
+    '</div></div>' +
+    (results.errors.length > 0 ?
+      '<div class="section"><div class="section-title error">Errors (' + results.errors.length + ')</div>' +
+      '<div class="list">' + results.errors.map(function(e) { return '<div class="item" style="color:#991b1b">❌ ' + e + '</div>'; }).join('') + '</div></div>' : '') +
+    (results.warnings.length > 0 ?
+      '<div class="section"><div class="section-title warning">Warnings (' + results.warnings.length + ')</div>' +
+      '<div class="list">' + results.warnings.map(function(w) { return '<div class="item" style="color:#92400e">⚠ ' + w + '</div>'; }).join('') + '</div></div>' : '') +
+    '<div style="margin-top:20px;text-align:right">' +
+    '<button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '<button class="btn btn-primary" onclick="runRepair()">Run Repair</button>' +
+    '</div>' +
+    '<script>function runRepair(){google.script.run.REPAIR_DASHBOARD();google.script.host.close()}</script>' +
+    '</body></html>';
+}
+
+
+
+/**
+ * ============================================================================
+ * CacheManager.gs - Caching and Performance
+ * ============================================================================
+ *
+ * This module handles all caching-related functions including:
+ * - Multi-layer caching (memory + properties)
+ * - Cache warming and invalidation
+ * - Cached data loaders for common queries
+ * - Cache status dashboard
+ *
+ * REFACTORED: Split from 06_Maintenance.gs for better maintainability
+ *
+ * @fileoverview Caching and performance optimization functions
+ * @version 1.0.0
+ * @requires 01_Constants.gs
+ */
+
+// ============================================================================
+// CACHE CONFIGURATION
+// ============================================================================
+
+/**
+ * Cache configuration constants
+ * @const {Object}
+ */
+var CACHE_CONFIG = {
+  /** Memory cache TTL in seconds */
+  MEMORY_TTL: 300,
+  /** Properties cache TTL in seconds */
+  PROPS_TTL: 3600,
+  /** Enable debug logging */
+  ENABLE_LOGGING: false
+};
+
+/**
+ * Cache key constants
+ * @const {Object}
+ */
+var CACHE_KEYS = {
+  ALL_GRIEVANCES: 'cache_grievances',
+  ALL_MEMBERS: 'cache_members',
+  ALL_STEWARDS: 'cache_stewards',
+  DASHBOARD_METRICS: 'cache_metrics',
+  CONFIG_VALUES: 'cache_config'
+};
+
+// ============================================================================
+// CORE CACHING FUNCTIONS
+// ============================================================================
+
+/**
+ * Gets data from cache or loads it using the provided loader function
+ * Implements two-layer caching: memory (fast) -> properties (persistent)
+ * @param {string} key - Cache key
+ * @param {Function} loader - Function to load data if not cached
+ * @param {number} [ttl=CACHE_CONFIG.MEMORY_TTL] - Time to live in seconds
+ * @returns {*} The cached or loaded data
+ */
+function getCachedData(key, loader, ttl) {
+  ttl = ttl || CACHE_CONFIG.MEMORY_TTL;
+
+  try {
+    // Check memory cache first (fastest)
+    var memCache = CacheService.getScriptCache();
+    var cached = memCache.get(key);
+    if (cached) {
+      if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Memory] ' + key);
+      return JSON.parse(cached);
+    }
+
+    // Check properties cache (persistent)
+    var propsCache = PropertiesService.getScriptProperties();
+    var propsCached = propsCache.getProperty(key);
+    if (propsCached) {
+      var obj = JSON.parse(propsCached);
+      if (obj.timestamp && (Date.now() - obj.timestamp) < (ttl * 1000)) {
+        // Refresh memory cache from properties
+        memCache.put(key, JSON.stringify(obj.data), ttl);
+        if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Props] ' + key);
+        return obj.data;
+      }
+    }
+
+    // Cache miss - load fresh data
+    if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE MISS] ' + key);
+    var data = loader();
+    setCachedData(key, data, ttl);
+    return data;
+
+  } catch (e) {
+    Logger.log('Cache error for ' + key + ': ' + e.message);
+    // Fallback to direct load on error
+    return loader();
+  }
+}
+
+/**
+ * Sets data in both memory and properties cache
+ * @param {string} key - Cache key
+ * @param {*} data - Data to cache
+ * @param {number} [ttl=CACHE_CONFIG.MEMORY_TTL] - Time to live in seconds
+ * @returns {void}
+ */
+function setCachedData(key, data, ttl) {
+  ttl = ttl || CACHE_CONFIG.MEMORY_TTL;
+
+  try {
+    var str = JSON.stringify(data);
+
+    // Store in memory cache (max 6 hours)
+    var memCache = CacheService.getScriptCache();
+    memCache.put(key, str, Math.min(ttl, 21600));
+
+    // Store in properties if under size limit (100KB)
+    if (str.length < 100000) {
+      var propsCache = PropertiesService.getScriptProperties();
+      propsCache.setProperty(key, JSON.stringify({
+        data: data,
+        timestamp: Date.now()
+      }));
+    }
+  } catch (e) {
+    Logger.log('Set cache error for ' + key + ': ' + e.message);
+  }
+}
+
+/**
+ * Invalidates a specific cache key
+ * @param {string} key - Cache key to invalidate
+ * @returns {void}
+ */
+function invalidateCache(key) {
+  try {
+    CacheService.getScriptCache().remove(key);
+    PropertiesService.getScriptProperties().deleteProperty(key);
+    if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('Cache invalidated: ' + key);
+  } catch (e) {
+    Logger.log('Invalidate error for ' + key + ': ' + e.message);
+  }
+}
+
+/**
+ * Invalidates all caches
+ * @returns {void}
+ */
+function invalidateAllCaches() {
+  try {
+    var keys = Object.keys(CACHE_KEYS).map(function(k) { return CACHE_KEYS[k]; });
+    CacheService.getScriptCache().removeAll(keys);
+
+    var props = PropertiesService.getScriptProperties();
+    keys.forEach(function(k) { props.deleteProperty(k); });
+
+    SpreadsheetApp.getActiveSpreadsheet().toast('All caches cleared', 'Cache', 3);
+  } catch (e) {
+    Logger.log('Clear all caches error: ' + e.message);
+  }
+}
+
+/**
+ * Warms up all caches by pre-loading common data
+ * @returns {void}
+ */
+function warmUpCaches() {
+  SpreadsheetApp.getActiveSpreadsheet().toast('Warming caches...', 'Cache', -1);
+
+  try {
+    getCachedGrievances();
+    getCachedMembers();
+    getCachedStewards();
+    getCachedDashboardMetrics();
+    SpreadsheetApp.getActiveSpreadsheet().toast('Caches warmed successfully', 'Cache', 3);
+  } catch (e) {
+    Logger.log('Cache warmup error: ' + e.message);
+    SpreadsheetApp.getActiveSpreadsheet().toast('Cache warmup failed: ' + e.message, 'Error', 5);
+  }
+}
+
+// ============================================================================
+// CACHED DATA LOADERS
+// ============================================================================
+
+/**
+ * Gets all grievances with caching
+ * @returns {Array<Array>} 2D array of grievance data
+ */
+function getCachedGrievances() {
+  return getCachedData(CACHE_KEYS.ALL_GRIEVANCES, function() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (!sheet) return [];
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+
+    return sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+  }, 300);
+}
+
+/**
+ * Gets all members with caching
+ * @returns {Array<Array>} 2D array of member data
+ */
+function getCachedMembers() {
+  return getCachedData(CACHE_KEYS.ALL_MEMBERS, function() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet) return [];
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+
+    return sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+  }, 600);
+}
+
+/**
+ * Gets all stewards with caching
+ * @returns {Array<Array>} 2D array of steward data
+ */
+function getCachedStewards() {
+  return getCachedData(CACHE_KEYS.ALL_STEWARDS, function() {
+    var members = getCachedMembers();
+    return members.filter(function(row) {
+      return row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes';
+    });
+  }, 600);
+}
+
+/**
+ * Gets dashboard metrics with caching
+ * @returns {Object} Dashboard metrics object
+ */
+function getCachedDashboardMetrics() {
+  return getCachedData(CACHE_KEYS.DASHBOARD_METRICS, function() {
+    var grievances = getCachedGrievances();
+
+    var metrics = {
+      total: grievances.length,
+      open: 0,
+      closed: 0,
+      overdue: 0,
+      byStatus: {},
+      byIssueType: {},
+      bySteward: {}
+    };
+
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    grievances.forEach(function(row) {
+      var status = row[GRIEVANCE_COLS.STATUS - 1];
+      var issue = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1];
+      var steward = row[GRIEVANCE_COLS.STEWARD - 1];
+      var deadline = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
+
+      // Calculate days to deadline
+      var daysTo = null;
+      if (deadline) {
+        daysTo = Math.floor((new Date(deadline) - today) / (1000 * 60 * 60 * 24));
+      }
+
+      // Update counts
+      if (status === 'Open') metrics.open++;
+      if (status === 'Closed' || status === 'Resolved') metrics.closed++;
+      if (daysTo !== null && daysTo < 0) metrics.overdue++;
+
+      // Update breakdowns
+      metrics.byStatus[status] = (metrics.byStatus[status] || 0) + 1;
+      if (issue) metrics.byIssueType[issue] = (metrics.byIssueType[issue] || 0) + 1;
+      if (steward) metrics.bySteward[steward] = (metrics.bySteward[steward] || 0) + 1;
+    });
+
+    return metrics;
+  }, 180);
+}
+
+// ============================================================================
+// CACHE STATUS DASHBOARD
+// ============================================================================
+
+/**
+ * Shows the cache status dashboard
+ * @returns {void}
+ */
+function showCacheStatusDashboard() {
+  var memCache = CacheService.getScriptCache();
+  var propsCache = PropertiesService.getScriptProperties();
+
+  var rows = Object.keys(CACHE_KEYS).map(function(name) {
+    var key = CACHE_KEYS[name];
+    var inMem = memCache.get(key) !== null;
+    var inProps = propsCache.getProperty(key) !== null;
+    var age = 'N/A';
+
+    if (inProps) {
+      try {
+        var obj = JSON.parse(propsCache.getProperty(key));
+        if (obj.timestamp) {
+          age = Math.floor((Date.now() - obj.timestamp) / 1000) + 's';
+        }
+      } catch (e) {}
+    }
+
+    return '<tr>' +
+      '<td>' + name + '</td>' +
+      '<td>' + (inMem ? '✅' : '❌') + '</td>' +
+      '<td>' + (inProps ? '✅' : '❌') + '</td>' +
+      '<td>' + age + '</td>' +
+      '</tr>';
+  }).join('');
+
+  var html = HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><html><head><base target="_top">' +
+    '<style>' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#f5f5f5}' +
+    '.container{background:white;padding:25px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}' +
+    'h2{color:#7c3aed;margin-bottom:20px}' +
+    'table{width:100%;border-collapse:collapse;margin:20px 0}' +
+    'th{background:#7c3aed;color:white;padding:12px;text-align:left}' +
+    'td{padding:10px;border-bottom:1px solid #e0e0e0}' +
+    '.btn{padding:12px 24px;border:none;border-radius:6px;cursor:pointer;font-weight:600;margin:5px}' +
+    '.btn-primary{background:#7c3aed;color:white}' +
+    '.btn-danger{background:#ef4444;color:white}' +
+    '</style></head><body>' +
+    '<div class="container">' +
+    '<h2>🗄️ Cache Status Dashboard</h2>' +
+    '<table>' +
+    '<tr><th>Cache</th><th>Memory</th><th>Props</th><th>Age</th></tr>' +
+    rows +
+    '</table>' +
+    '<button class="btn btn-primary" onclick="warmUp()">🔥 Warm Up Caches</button>' +
+    '<button class="btn btn-danger" onclick="clearAll()">🗑️ Clear All Caches</button>' +
+    '</div>' +
+    '<script>' +
+    'function warmUp(){google.script.run.withSuccessHandler(function(){location.reload()}).warmUpCaches()}' +
+    'function clearAll(){google.script.run.withSuccessHandler(function(){location.reload()}).invalidateAllCaches()}' +
+    '</script></body></html>'
+  ).setWidth(600).setHeight(450);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '🗄️ Cache Status');
+}
+
+
+
+/**
+ * ============================================================================
+ * UndoManager.gs - Undo/Redo System
+ * ============================================================================
+ *
+ * This module handles the undo/redo functionality including:
+ * - Action recording
+ * - State management
+ * - History navigation
+ * - Snapshot management
+ *
+ * REFACTORED: Split from 06_Maintenance.gs for better maintainability
+ *
+ * @fileoverview Undo/redo system functions
+ * @version 1.0.0
+ * @requires 01_Constants.gs
+ */
+
+// ============================================================================
+// UNDO CONFIGURATION
+// ============================================================================
+
+/**
+ * Undo system configuration
+ * @const {Object}
+ */
+var UNDO_CONFIG = {
+  /** Maximum number of actions to store */
+  MAX_HISTORY: 50,
+  /** Storage key for undo history */
+  STORAGE_KEY: 'undoRedoHistory'
+};
+
+// ============================================================================
+// HISTORY MANAGEMENT
+// ============================================================================
+
+/**
+ * Gets the undo history from storage
+ * @returns {Object} History object with actions array and currentIndex
+ */
+function getUndoHistory() {
+  var props = PropertiesService.getScriptProperties();
+  var json = props.getProperty(UNDO_CONFIG.STORAGE_KEY);
+
+  if (json) {
+    return JSON.parse(json);
+  }
+
+  return { actions: [], currentIndex: 0 };
+}
+
+/**
+ * Saves the undo history to storage
+ * @param {Object} history - History object to save
+ * @returns {void}
+ */
+function saveUndoHistory(history) {
+  var props = PropertiesService.getScriptProperties();
+
+  // Trim history if over limit
+  if (history.actions.length > UNDO_CONFIG.MAX_HISTORY) {
+    history.actions = history.actions.slice(-UNDO_CONFIG.MAX_HISTORY);
+    history.currentIndex = Math.min(history.currentIndex, history.actions.length);
+  }
+
+  props.setProperty(UNDO_CONFIG.STORAGE_KEY, JSON.stringify(history));
+}
+
+/**
+ * Clears all undo history
+ * @returns {void}
+ */
+function clearUndoHistory() {
+  PropertiesService.getScriptProperties().deleteProperty(UNDO_CONFIG.STORAGE_KEY);
+  SpreadsheetApp.getActiveSpreadsheet().toast('History cleared', 'Undo/Redo', 3);
+}
+
+// ============================================================================
+// ACTION RECORDING
+// ============================================================================
+
+/**
+ * Records an action for undo/redo
+ * @param {string} type - Action type (EDIT_CELL, ADD_ROW, DELETE_ROW, etc.)
+ * @param {string} description - Human-readable description
+ * @param {Object} beforeState - State before the action
+ * @param {Object} afterState - State after the action
+ * @returns {void}
+ */
+function recordAction(type, description, beforeState, afterState) {
+  var history = getUndoHistory();
+
+  // Clear any redo history when new action is recorded
+  if (history.currentIndex < history.actions.length) {
+    history.actions = history.actions.slice(0, history.currentIndex);
+  }
+
+  history.actions.push({
+    type: type,
+    description: description,
+    timestamp: new Date().toISOString(),
+    beforeState: beforeState,
+    afterState: afterState
+  });
+
+  history.currentIndex = history.actions.length;
+  saveUndoHistory(history);
+}
+
+/**
+ * Records a cell edit action
+ * @param {number} row - Row number
+ * @param {number} col - Column number
+ * @param {*} oldValue - Value before edit
+ * @param {*} newValue - Value after edit
+ * @returns {void}
+ */
+function recordCellEdit(row, col, oldValue, newValue) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var colName = sheet.getRange(1, col).getValue();
+
+  recordAction(
+    'EDIT_CELL',
+    'Edited ' + colName + ' in row ' + row,
+    { row: row, col: col, value: oldValue, sheet: sheet.getName() },
+    { row: row, col: col, value: newValue, sheet: sheet.getName() }
+  );
+}
+
+/**
+ * Records a row addition action
+ * @param {number} row - Row number
+ * @param {Array} rowData - Data in the new row
+ * @returns {void}
+ */
+function recordRowAddition(row, rowData) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+
+  recordAction(
+    'ADD_ROW',
+    'Added row ' + row,
+    null,
+    { row: row, data: rowData, sheet: sheet.getName() }
+  );
+}
+
+/**
+ * Records a row deletion action
+ * @param {number} row - Row number
+ * @param {Array} rowData - Data that was in the row
+ * @returns {void}
+ */
+function recordRowDeletion(row, rowData) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+
+  recordAction(
+    'DELETE_ROW',
+    'Deleted row ' + row,
+    { row: row, data: rowData, sheet: sheet.getName() },
+    null
+  );
+}
+
+// ============================================================================
+// UNDO/REDO OPERATIONS
+// ============================================================================
+
+/**
+ * Undoes the last action
+ * @returns {void}
+ * @throws {Error} If nothing to undo
+ */
+function undoLastAction() {
+  var history = getUndoHistory();
+
+  if (history.currentIndex === 0) {
+    throw new Error('Nothing to undo');
+  }
+
+  var action = history.actions[history.currentIndex - 1];
+  applyState(action.beforeState, action.type);
+
+  history.currentIndex--;
+  saveUndoHistory(history);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('Undone: ' + action.description, 'Undo', 3);
+}
+
+/**
+ * Redoes the last undone action
+ * @returns {void}
+ * @throws {Error} If nothing to redo
+ */
+function redoLastAction() {
+  var history = getUndoHistory();
+
+  if (history.currentIndex >= history.actions.length) {
+    throw new Error('Nothing to redo');
+  }
+
+  var action = history.actions[history.currentIndex];
+  applyState(action.afterState, action.type);
+
+  history.currentIndex++;
+  saveUndoHistory(history);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('Redone: ' + action.description, 'Redo', 3);
+}
+
+/**
+ * Undoes all actions up to a specific index
+ * @param {number} targetIndex - Target index to undo to
+ * @returns {void}
+ */
+function undoToIndex(targetIndex) {
+  var history = getUndoHistory();
+  while (history.currentIndex > targetIndex) {
+    undoLastAction();
+    history = getUndoHistory();
+  }
+}
+
+/**
+ * Redoes all actions up to a specific index
+ * @param {number} targetIndex - Target index to redo to
+ * @returns {void}
+ */
+function redoToIndex(targetIndex) {
+  var history = getUndoHistory();
+  while (history.currentIndex <= targetIndex && history.currentIndex < history.actions.length) {
+    redoLastAction();
+    history = getUndoHistory();
+  }
+}
+
+/**
+ * Applies a saved state to the spreadsheet
+ * @param {Object} state - State to apply
+ * @param {string} actionType - Type of action being applied
+ * @returns {void}
+ */
+function applyState(state, actionType) {
+  if (!state) return;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(state.sheet);
+
+  if (!sheet) {
+    throw new Error('Sheet ' + state.sheet + ' not found');
+  }
+
+  switch (actionType) {
+    case 'EDIT_CELL':
+      sheet.getRange(state.row, state.col).setValue(state.value);
+      break;
+
+    case 'ADD_ROW':
+      if (state.row) {
+        sheet.deleteRow(state.row);
+      }
+      break;
+
+    case 'DELETE_ROW':
+      if (state.row && state.data) {
+        sheet.insertRowAfter(state.row - 1);
+        sheet.getRange(state.row, 1, 1, state.data.length).setValues([state.data]);
+      }
+      break;
+
+    case 'BATCH_UPDATE':
+      if (state.changes) {
+        state.changes.forEach(function(c) {
+          sheet.getRange(c.row, c.col).setValue(c.oldValue);
+        });
+      }
+      break;
+  }
+}
+
+// ============================================================================
+// SNAPSHOT MANAGEMENT
+// ============================================================================
+
+/**
+ * Creates a snapshot of the grievance log
+ * @returns {Object} Snapshot object
+ */
+function createGrievanceSnapshot() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    throw new Error('Grievance Log not found');
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    data: sheet.getDataRange().getValues(),
+    lastRow: sheet.getLastRow(),
+    lastColumn: sheet.getLastColumn()
+  };
+}
+
+/**
+ * Restores the grievance log from a snapshot
+ * @param {Object} snapshot - Snapshot to restore
+ * @returns {void}
+ */
+function restoreFromSnapshot(snapshot) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    throw new Error('Grievance Log not found');
+  }
+
+  // Clear existing data (keep header)
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
+  }
+
+  // Restore data
+  if (snapshot.data.length > 1) {
+    sheet.getRange(2, 1, snapshot.data.length - 1, snapshot.data[0].length)
+      .setValues(snapshot.data.slice(1));
+  }
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('Snapshot restored', 'Undo/Redo', 3);
+}
+
+// ============================================================================
+// EXPORT AND UI
+// ============================================================================
+
+/**
+ * Exports undo history to a new sheet
+ * @returns {string} URL of the exported sheet
+ */
+function exportUndoHistoryToSheet() {
+  var history = getUndoHistory();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var sheet = ss.getSheetByName('Undo_History_Export');
+  if (sheet) {
+    sheet.clear();
+  } else {
+    sheet = ss.insertSheet('Undo_History_Export');
+  }
+
+  var headers = ['#', 'Action Type', 'Description', 'Timestamp', 'Status'];
+  sheet.getRange(1, 1, 1, headers.length)
+    .setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#7c3aed')
+    .setFontColor('#fff');
+
+  if (history.actions.length > 0) {
+    var rows = history.actions.map(function(a, i) {
+      return [
+        i + 1,
+        a.type,
+        a.description,
+        new Date(a.timestamp).toLocaleString(),
+        i < history.currentIndex ? 'Applied' : 'Undone'
+      ];
+    });
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  }
+
+  for (var c = 1; c <= headers.length; c++) {
+    sheet.autoResizeColumn(c);
+  }
+
+  return ss.getUrl() + '#gid=' + sheet.getSheetId();
+}
+
+/**
+ * Shows the undo/redo panel
+ * @returns {void}
+ */
+function showUndoRedoPanel() {
+  var history = getUndoHistory();
+
+  var rows = history.actions.length === 0
+    ? '<tr><td colspan="5" style="text-align:center;padding:40px;color:#999">No actions recorded</td></tr>'
+    : history.actions.slice().reverse().map(function(a, i) {
+        var idx = history.actions.length - i;
+        var time = new Date(a.timestamp).toLocaleString();
+        var canUndo = idx <= history.currentIndex;
+
+        return '<tr>' +
+          '<td>' + idx + '</td>' +
+          '<td><span class="badge ' + a.type.toLowerCase() + '">' + a.type + '</span></td>' +
+          '<td>' + a.description + '</td>' +
+          '<td style="font-size:12px;color:#666">' + time + '</td>' +
+          '<td>' + (canUndo ? '<button onclick="undo(' + (idx - 1) + ')">↩️</button>' : '') + '</td>' +
+          '</tr>';
+      }).join('');
+
+  var html = HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><html><head><base target="_top">' +
+    '<style>' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#f5f5f5}' +
+    '.container{background:white;padding:25px;border-radius:12px}' +
+    'h2{color:#7c3aed}' +
+    '.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0}' +
+    '.stat{background:#f8f9fa;padding:15px;border-radius:8px;text-align:center;border-left:4px solid #7c3aed}' +
+    '.num{font-size:32px;font-weight:bold;color:#7c3aed}' +
+    'table{width:100%;border-collapse:collapse;margin:20px 0}' +
+    'th{background:#7c3aed;color:white;padding:12px;text-align:left}' +
+    'td{padding:12px;border-bottom:1px solid #e0e0e0}' +
+    'button{background:#7c3aed;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;margin:2px}' +
+    '.badge{display:inline-block;padding:4px 12px;border-radius:12px;font-size:11px;font-weight:bold}' +
+    '.edit_cell{background:#e3f2fd;color:#1976d2}' +
+    '.add_row{background:#e8f5e9;color:#388e3c}' +
+    '.delete_row{background:#ffebee;color:#d32f2f}' +
+    '.actions{margin:20px 0;padding:20px;background:#f8f9fa;border-radius:8px}' +
+    '.btn-danger{background:#ef4444}' +
+    '.btn-success{background:#10b981}' +
+    '</style></head><body>' +
+    '<div class="container">' +
+    '<h2>↩️ Undo/Redo History</h2>' +
+    '<div class="stats">' +
+    '<div class="stat"><div class="num">' + history.actions.length + '</div><div>Total Actions</div></div>' +
+    '<div class="stat"><div class="num">' + history.currentIndex + '</div><div>Current Position</div></div>' +
+    '<div class="stat"><div class="num">' + (history.actions.length - history.currentIndex) + '</div><div>Can Redo</div></div>' +
+    '</div>' +
+    '<div class="actions">' +
+    '<button onclick="performUndo()">↩️ Undo Last</button>' +
+    '<button onclick="performRedo()">↪️ Redo</button>' +
+    '<button class="btn-danger" onclick="clearHistory()">🗑️ Clear All</button>' +
+    '<button class="btn-success" onclick="exportHistory()">📥 Export</button>' +
+    '</div>' +
+    '<table>' +
+    '<tr><th>#</th><th>Type</th><th>Description</th><th>Time</th><th></th></tr>' +
+    rows +
+    '</table>' +
+    '</div>' +
+    '<script>' +
+    'function performUndo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).undoLastAction()}' +
+    'function performRedo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).redoLastAction()}' +
+    'function undo(i){google.script.run.withSuccessHandler(function(){location.reload()}).undoToIndex(i)}' +
+    'function clearHistory(){if(confirm("Clear all history?")){google.script.run.withSuccessHandler(function(){location.reload()}).clearUndoHistory()}}' +
+    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");window.open(url,"_blank")}).exportUndoHistoryToSheet()}' +
+    '</script></body></html>'
+  ).setWidth(800).setHeight(600);
+
+  SpreadsheetApp.getUi().showModalDialog(html, '↩️ Undo/Redo History');
+}
+
+
+
+/**
+ * ============================================================================
  * Maintenance.gs - Admin & Diagnostic Tools
  * ============================================================================
  *
