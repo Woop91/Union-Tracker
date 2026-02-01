@@ -20,7 +20,10 @@ const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 // Files in build order (constants first, then modules, main last)
 // REFACTORED: Split large monolithic files into smaller modules for maintainability
 const BUILD_ORDER = [
-  // Core constants - must be first
+  // Error handling and utilities - must be first
+  '00_ErrorHandler.gs',
+
+  // Core constants
   '01_Constants.gs',
 
   // Data managers
@@ -30,6 +33,8 @@ const BUILD_ORDER = [
   // UI modules (split from 04_UIService.gs)
   '04a_MenuBuilder.gs',
   '04b_ThemeService.gs',
+  '04c_MobileInterface.gs',
+  '04d_QuickActions.gs',
   '04_UIService.gs',           // Remaining UI functions
 
   // Integrations
@@ -49,6 +54,9 @@ const BUILD_ORDER = [
   '08b_DataValidation.gs',
   '08c_SearchEngine.gs',
   '08d_ChartBuilder.gs',
+  '08e_FormHandlers.gs',
+  '08f_SatisfactionEngine.gs',
+  '08g_SyncEngine.gs',
   '08_Code.gs',                // Remaining code functions
 
   // Main entry point
