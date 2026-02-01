@@ -1711,17 +1711,8 @@ function showThemeManager() {
  * Includes automatic device detection for responsive experience
  */
 
-// ==================== MOBILE CONFIGURATION ====================
-
-var MOBILE_CONFIG = {
-  MAX_COLUMNS_MOBILE: 8,
-  CARD_LAYOUT_ENABLED: true,
-  TOUCH_TARGET_SIZE: '44px',
-  MOBILE_BREAKPOINT: 768,  // Width in pixels below which is considered mobile
-  TABLET_BREAKPOINT: 1024  // Width in pixels below which is considered tablet
-};
-
 // ==================== DEVICE DETECTION ====================
+// Note: MOBILE_CONFIG is now defined in 01_Core.gs as a shared constant
 
 /**
  * Shows a smart dashboard that automatically detects the device type

@@ -733,6 +733,19 @@ var COLORS = {
 };
 
 /**
+ * Mobile interface configuration settings
+ * Shared constants for responsive design across all UI modules
+ * @const {Object}
+ */
+var MOBILE_CONFIG = {
+  MAX_COLUMNS_MOBILE: 8,
+  CARD_LAYOUT_ENABLED: true,
+  TOUCH_TARGET_SIZE: '44px',
+  MOBILE_BREAKPOINT: 768,   // Width in pixels below which is considered mobile
+  TABLET_BREAKPOINT: 1024   // Width in pixels below which is considered tablet
+};
+
+/**
  * UI Theme constants for dialogs and sidebars
  * Used in HTML templates for consistent styling
  * @const {Object}
