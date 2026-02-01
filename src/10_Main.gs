@@ -67,40 +67,90 @@ function onOpen() {
 
 /**
  * Runs when a cell is edited
- * Handles auto-calculations, validations, security audit, and auto-styling
+ * This is the SINGLE entry point for all edit triggers.
+ * Dispatches to specialized handlers based on sheet and context.
+ *
+ * Consolidated handlers (v4.5.0):
+ * - handleSecurityAudit_: Security audit and change tracking
+ * - handleGrievanceEdit: Grievance-specific edits
+ * - handleMemberEdit: Member directory edits
+ * - handleChecklistEdit: Case checklist updates
+ * - onEditMultiSelect: Multi-select dropdown handling (08_SheetUtils.gs)
+ * - onEditAutoSync: Auto-sync to external services (09_Dashboards.gs)
+ *
  * @param {Object} e - The edit event object
  */
 function onEdit(e) {
   if (!e || !e.range) return;
 
   try {
-    const sheet = e.range.getSheet();
-    const sheetName = sheet.getName();
-    const row = e.range.getRow();
+    var sheet = e.range.getSheet();
+    var sheetName = sheet.getName();
+    var row = e.range.getRow();
 
     // Skip header rows
     if (row <= 1) return;
 
-    // 1. Security Audit & Change Tracking (runs for all tracked sheets)
+    // ========================================
+    // 1. Security Audit & Change Tracking
+    // ========================================
     handleSecurityAudit_(e);
 
-    // 2. Handle edits in Grievance Log
+    // ========================================
+    // 2. Multi-Select Dropdown Handler
+    // ========================================
+    // Call the consolidated multi-select handler (defined in 08_SheetUtils.gs)
+    if (typeof onEditMultiSelect === 'function') {
+      try {
+        onEditMultiSelect(e);
+      } catch (multiSelectError) {
+        console.log('MultiSelect handler error: ' + multiSelectError.message);
+      }
+    }
+
+    // ========================================
+    // 3. Sheet-Specific Handlers
+    // ========================================
+
+    // Grievance Log edits
     if (sheetName === SHEETS.GRIEVANCE_LOG) {
       handleGrievanceEdit(e);
       applyAutoStyleToRow_(sheet, row);  // Auto-styling
       handleStageGateWorkflow_(e);        // Escalation alerts
+
+      // Auto-sync after grievance edits
+      if (typeof onEditAutoSync === 'function') {
+        try {
+          onEditAutoSync(e);
+        } catch (syncError) {
+          console.log('AutoSync handler error: ' + syncError.message);
+        }
+      }
     }
 
-    // 3. Handle edits in Member Directory
+    // Member Directory edits
     if (sheetName === SHEETS.MEMBER_DIR) {
       handleMemberEdit(e);
       applyAutoStyleToRow_(sheet, row);  // Auto-styling
     }
 
-    // 4. Handle edits in Case Checklist (auto-update progress)
+    // Case Checklist edits
     if (sheetName === 'Case Checklist' || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
       if (typeof handleChecklistEdit === 'function') {
         handleChecklistEdit(e);
+      }
+    }
+
+    // ========================================
+    // 4. Additional Audit Logging (optional)
+    // ========================================
+    // Only run detailed audit for specific sheets to avoid performance impact
+    if (typeof onEditAudit === 'function' &&
+        (sheetName === SHEETS.GRIEVANCE_LOG || sheetName === SHEETS.MEMBER_DIR)) {
+      try {
+        onEditAudit(e);
+      } catch (auditError) {
+        console.log('Audit handler error: ' + auditError.message);
       }
     }
 

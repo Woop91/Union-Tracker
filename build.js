@@ -17,8 +17,10 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order - CONSOLIDATED to 13 files
+// Files in build order - CONSOLIDATED to 15 files
 const BUILD_ORDER = [
+  '00_Security.gs',       // Security utilities, XSS prevention, access control
+  '00_DataAccess.gs',     // Data Access Layer, time constants
   '01_Core.gs',           // Error handling + Constants (2,169 lines)
   '02_DataManagers.gs',   // Member + Grievance managers (2,471 lines)
   '03_UIComponents.gs',   // Menu, Theme, Mobile, QuickActions, Search (2,537 lines)

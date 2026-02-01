@@ -1,0 +1,615 @@
+/**
+ * ============================================================================
+ * 00_DataAccess.gs - Data Access Layer (DAL)
+ * ============================================================================
+ *
+ * This module provides a centralized data access layer for all spreadsheet
+ * operations. It implements:
+ * - Cached spreadsheet/sheet references
+ * - Batch read/write operations for performance
+ * - Consistent error handling
+ * - Single point of access for all data operations
+ *
+ * Benefits:
+ * - Reduces API calls by caching references
+ * - Provides consistent error handling
+ * - Makes testing easier (can mock this layer)
+ * - Centralizes all data access patterns
+ *
+ * @fileoverview Data Access Layer for the dashboard
+ * @version 1.0.0
+ */
+
+// ============================================================================
+// SPREADSHEET CACHE
+// ============================================================================
+
+/**
+ * Cached spreadsheet and sheet references
+ * @private
+ */
+var _spreadsheetCache = {
+  ss: null,
+  sheets: {},
+  lastAccess: null,
+  cacheTimeout: 300000  // 5 minutes
+};
+
+/**
+ * Data Access Layer - singleton pattern
+ * @namespace
+ */
+var DataAccess = {
+
+  // ==========================================================================
+  // SPREADSHEET ACCESS
+  // ==========================================================================
+
+  /**
+   * Gets the active spreadsheet (cached)
+   * @returns {Spreadsheet} The active spreadsheet
+   */
+  getSpreadsheet: function() {
+    var now = new Date().getTime();
+
+    // Check if cache is valid
+    if (_spreadsheetCache.ss &&
+        _spreadsheetCache.lastAccess &&
+        (now - _spreadsheetCache.lastAccess) < _spreadsheetCache.cacheTimeout) {
+      return _spreadsheetCache.ss;
+    }
+
+    // Refresh cache
+    _spreadsheetCache.ss = SpreadsheetApp.getActiveSpreadsheet();
+    _spreadsheetCache.lastAccess = now;
+    _spreadsheetCache.sheets = {};  // Clear sheet cache too
+
+    return _spreadsheetCache.ss;
+  },
+
+  /**
+   * Gets a sheet by name (cached)
+   * @param {string} sheetName - Name of the sheet
+   * @returns {Sheet|null} The sheet or null if not found
+   */
+  getSheet: function(sheetName) {
+    if (!sheetName) return null;
+
+    // Check sheet cache
+    if (_spreadsheetCache.sheets[sheetName]) {
+      return _spreadsheetCache.sheets[sheetName];
+    }
+
+    // Get from spreadsheet
+    var ss = this.getSpreadsheet();
+    var sheet = ss.getSheetByName(sheetName);
+
+    if (sheet) {
+      _spreadsheetCache.sheets[sheetName] = sheet;
+    }
+
+    return sheet;
+  },
+
+  /**
+   * Gets or creates a sheet
+   * @param {string} sheetName - Name of the sheet
+   * @param {Object} [options] - Options for sheet creation
+   * @param {Array} [options.headers] - Header row values
+   * @param {boolean} [options.hidden] - Whether to hide the sheet
+   * @returns {Sheet} The existing or new sheet
+   */
+  getOrCreateSheet: function(sheetName, options) {
+    var sheet = this.getSheet(sheetName);
+
+    if (!sheet) {
+      var ss = this.getSpreadsheet();
+      sheet = ss.insertSheet(sheetName);
+      _spreadsheetCache.sheets[sheetName] = sheet;
+
+      if (options) {
+        if (options.headers && Array.isArray(options.headers)) {
+          sheet.getRange(1, 1, 1, options.headers.length).setValues([options.headers]);
+          sheet.getRange(1, 1, 1, options.headers.length).setFontWeight('bold');
+        }
+        if (options.hidden) {
+          sheet.hideSheet();
+        }
+      }
+    }
+
+    return sheet;
+  },
+
+  /**
+   * Invalidates the cache (call after structural changes)
+   */
+  invalidateCache: function() {
+    _spreadsheetCache.ss = null;
+    _spreadsheetCache.sheets = {};
+    _spreadsheetCache.lastAccess = null;
+  },
+
+  // ==========================================================================
+  // DATA READING - BATCH OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Gets all data from a sheet
+   * @param {string} sheetName - Name of the sheet
+   * @param {Object} [options] - Options
+   * @param {boolean} [options.includeHeaders=true] - Include header row
+   * @returns {Array<Array>} 2D array of values
+   */
+  getAllData: function(sheetName, options) {
+    options = options || {};
+    var includeHeaders = options.includeHeaders !== false;
+
+    var sheet = this.getSheet(sheetName);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+
+    if (!includeHeaders && data.length > 0) {
+      return data.slice(1);
+    }
+
+    return data;
+  },
+
+  /**
+   * Gets a single row by row number
+   * @param {string} sheetName - Name of the sheet
+   * @param {number} rowNumber - Row number (1-indexed)
+   * @returns {Array} Row values
+   */
+  getRow: function(sheetName, rowNumber) {
+    var sheet = this.getSheet(sheetName);
+    if (!sheet) return [];
+
+    var lastCol = sheet.getLastColumn();
+    if (lastCol === 0) return [];
+
+    return sheet.getRange(rowNumber, 1, 1, lastCol).getValues()[0];
+  },
+
+  /**
+   * Gets multiple rows efficiently (batch operation)
+   * @param {string} sheetName - Name of the sheet
+   * @param {Array<number>} rowNumbers - Array of row numbers (1-indexed)
+   * @returns {Object} Map of rowNumber -> row values
+   */
+  getRows: function(sheetName, rowNumbers) {
+    var result = {};
+    if (!rowNumbers || rowNumbers.length === 0) return result;
+
+    var sheet = this.getSheet(sheetName);
+    if (!sheet) return result;
+
+    // For efficiency, get all data and filter
+    var allData = sheet.getDataRange().getValues();
+
+    for (var i = 0; i < rowNumbers.length; i++) {
+      var rowNum = rowNumbers[i];
+      if (rowNum > 0 && rowNum <= allData.length) {
+        result[rowNum] = allData[rowNum - 1];
+      }
+    }
+
+    return result;
+  },
+
+  /**
+   * Finds a row by a column value
+   * @param {string} sheetName - Name of the sheet
+   * @param {number} columnIndex - Column index (0-indexed)
+   * @param {*} searchValue - Value to search for
+   * @returns {Object|null} Object with {rowNumber, data} or null
+   */
+  findRow: function(sheetName, columnIndex, searchValue) {
+    var data = this.getAllData(sheetName, { includeHeaders: true });
+
+    for (var i = 1; i < data.length; i++) {  // Skip header
+      if (data[i][columnIndex] == searchValue) {  // Loose equality for type coercion
+        return {
+          rowNumber: i + 1,  // 1-indexed
+          data: data[i]
+        };
+      }
+    }
+
+    return null;
+  },
+
+  /**
+   * Finds all rows matching a condition
+   * @param {string} sheetName - Name of the sheet
+   * @param {Function} predicate - Function(row, rowIndex) returning boolean
+   * @returns {Array<Object>} Array of {rowNumber, data} objects
+   */
+  findAllRows: function(sheetName, predicate) {
+    var results = [];
+    var data = this.getAllData(sheetName, { includeHeaders: true });
+
+    for (var i = 1; i < data.length; i++) {  // Skip header
+      if (predicate(data[i], i)) {
+        results.push({
+          rowNumber: i + 1,  // 1-indexed
+          data: data[i]
+        });
+      }
+    }
+
+    return results;
+  },
+
+  // ==========================================================================
+  // DATA WRITING - BATCH OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Sets a single cell value
+   * @param {string} sheetName - Name of the sheet
+   * @param {number} row - Row number (1-indexed)
+   * @param {number} col - Column number (1-indexed)
+   * @param {*} value - Value to set
+   */
+  setCell: function(sheetName, row, col, value) {
+    var sheet = this.getSheet(sheetName);
+    if (!sheet) return;
+
+    sheet.getRange(row, col).setValue(value);
+  },
+
+  /**
+   * Sets multiple cells efficiently (batch operation)
+   * @param {string} sheetName - Name of the sheet
+   * @param {Array<Object>} cells - Array of {row, col, value}
+   */
+  setCells: function(sheetName, cells) {
+    if (!cells || cells.length === 0) return;
+
+    var sheet = this.getSheet(sheetName);
+    if (!sheet) return;
+
+    // Group cells by row for efficiency
+    var rowUpdates = {};
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      if (!rowUpdates[cell.row]) {
+        rowUpdates[cell.row] = {};
+      }
+      rowUpdates[cell.row][cell.col] = cell.value;
+    }
+
+    // Apply updates
+    for (var row in rowUpdates) {
+      var updates = rowUpdates[row];
+      for (var col in updates) {
+        sheet.getRange(parseInt(row), parseInt(col)).setValue(updates[col]);
+      }
+    }
+  },
+
+  /**
+   * Updates an entire row
+   * @param {string} sheetName - Name of the sheet
+   * @param {number} rowNumber - Row number (1-indexed)
+   * @param {Array} values - Values for the row
+   * @param {number} [startCol=1] - Starting column (1-indexed)
+   */
+  setRow: function(sheetName, rowNumber, values, startCol) {
+    var sheet = this.getSheet(sheetName);
+    if (!sheet || !values || values.length === 0) return;
+
+    startCol = startCol || 1;
+    sheet.getRange(rowNumber, startCol, 1, values.length).setValues([values]);
+  },
+
+  /**
+   * Appends a new row to the sheet
+   * @param {string} sheetName - Name of the sheet
+   * @param {Array} values - Values for the new row
+   * @returns {number} The row number of the new row
+   */
+  appendRow: function(sheetName, values) {
+    var sheet = this.getSheet(sheetName);
+    if (!sheet || !values || values.length === 0) return -1;
+
+    sheet.appendRow(values);
+    return sheet.getLastRow();
+  },
+
+  /**
+   * Deletes a row
+   * @param {string} sheetName - Name of the sheet
+   * @param {number} rowNumber - Row number (1-indexed)
+   */
+  deleteRow: function(sheetName, rowNumber) {
+    var sheet = this.getSheet(sheetName);
+    if (!sheet) return;
+
+    sheet.deleteRow(rowNumber);
+  },
+
+  // ==========================================================================
+  // MEMBER-SPECIFIC OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Gets a member by ID
+   * @param {string} memberId - The member ID
+   * @returns {Object|null} Member data object or null
+   */
+  getMemberById: function(memberId) {
+    if (!memberId) return null;
+
+    var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
+                    SHEETS.MEMBER_DIR : 'Member Directory';
+
+    var result = this.findRow(sheetName, 0, memberId);  // Column A (0-indexed)
+
+    if (!result) return null;
+
+    // Map to object using MEMBER_COLUMNS
+    var row = result.data;
+    return {
+      rowNumber: result.rowNumber,
+      memberId: row[MEMBER_COLUMNS.MEMBER_ID],
+      firstName: row[MEMBER_COLUMNS.FIRST_NAME],
+      lastName: row[MEMBER_COLUMNS.LAST_NAME],
+      jobTitle: row[MEMBER_COLUMNS.JOB_TITLE],
+      workLocation: row[MEMBER_COLUMNS.WORK_LOCATION],
+      unit: row[MEMBER_COLUMNS.UNIT],
+      email: row[MEMBER_COLUMNS.EMAIL],
+      phone: row[MEMBER_COLUMNS.PHONE],
+      isSteward: row[MEMBER_COLUMNS.IS_STEWARD],
+      assignedSteward: row[MEMBER_COLUMNS.ASSIGNED_STEWARD],
+      hasOpenGrievance: row[MEMBER_COLUMNS.HAS_OPEN_GRIEVANCE],
+      grievanceStatus: row[MEMBER_COLUMNS.GRIEVANCE_STATUS]
+    };
+  },
+
+  /**
+   * Gets all members
+   * @param {Object} [options] - Filter options
+   * @param {string} [options.unit] - Filter by unit
+   * @param {string} [options.location] - Filter by location
+   * @param {boolean} [options.stewardsOnly] - Only return stewards
+   * @returns {Array<Object>} Array of member objects
+   */
+  getAllMembers: function(options) {
+    options = options || {};
+
+    var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
+                    SHEETS.MEMBER_DIR : 'Member Directory';
+
+    var data = this.getAllData(sheetName, { includeHeaders: false });
+    var members = [];
+
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+
+      // Skip empty rows
+      if (!row[MEMBER_COLUMNS.MEMBER_ID]) continue;
+
+      // Apply filters
+      if (options.unit && row[MEMBER_COLUMNS.UNIT] !== options.unit) continue;
+      if (options.location && row[MEMBER_COLUMNS.WORK_LOCATION] !== options.location) continue;
+      if (options.stewardsOnly) {
+        var isSteward = row[MEMBER_COLUMNS.IS_STEWARD];
+        if (isSteward !== true && isSteward !== 'Yes' && isSteward !== 'TRUE') continue;
+      }
+
+      members.push({
+        rowNumber: i + 2,  // Account for header and 0-index
+        memberId: row[MEMBER_COLUMNS.MEMBER_ID],
+        firstName: row[MEMBER_COLUMNS.FIRST_NAME],
+        lastName: row[MEMBER_COLUMNS.LAST_NAME],
+        jobTitle: row[MEMBER_COLUMNS.JOB_TITLE],
+        workLocation: row[MEMBER_COLUMNS.WORK_LOCATION],
+        unit: row[MEMBER_COLUMNS.UNIT],
+        email: row[MEMBER_COLUMNS.EMAIL],
+        phone: row[MEMBER_COLUMNS.PHONE],
+        isSteward: row[MEMBER_COLUMNS.IS_STEWARD],
+        assignedSteward: row[MEMBER_COLUMNS.ASSIGNED_STEWARD]
+      });
+    }
+
+    return members;
+  },
+
+  // ==========================================================================
+  // GRIEVANCE-SPECIFIC OPERATIONS
+  // ==========================================================================
+
+  /**
+   * Gets a grievance by ID
+   * @param {string} grievanceId - The grievance ID
+   * @returns {Object|null} Grievance data object or null
+   */
+  getGrievanceById: function(grievanceId) {
+    if (!grievanceId) return null;
+
+    var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
+                    SHEETS.GRIEVANCE_LOG : 'Grievance Log';
+
+    var result = this.findRow(sheetName, 0, grievanceId);  // Column A (0-indexed)
+
+    if (!result) return null;
+
+    var row = result.data;
+    return {
+      rowNumber: result.rowNumber,
+      grievanceId: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
+      memberId: row[GRIEVANCE_COLUMNS.MEMBER_ID],
+      firstName: row[GRIEVANCE_COLUMNS.FIRST_NAME],
+      lastName: row[GRIEVANCE_COLUMNS.LAST_NAME],
+      status: row[GRIEVANCE_COLUMNS.STATUS],
+      currentStep: row[GRIEVANCE_COLUMNS.CURRENT_STEP],
+      incidentDate: row[GRIEVANCE_COLUMNS.INCIDENT_DATE],
+      filingDeadline: row[GRIEVANCE_COLUMNS.FILING_DEADLINE],
+      dateFiled: row[GRIEVANCE_COLUMNS.DATE_FILED],
+      daysOpen: row[GRIEVANCE_COLUMNS.DAYS_OPEN],
+      nextActionDue: row[GRIEVANCE_COLUMNS.NEXT_ACTION_DUE],
+      daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
+      articles: row[GRIEVANCE_COLUMNS.ARTICLES],
+      issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
+      unit: row[GRIEVANCE_COLUMNS.UNIT],
+      location: row[GRIEVANCE_COLUMNS.LOCATION],
+      steward: row[GRIEVANCE_COLUMNS.STEWARD],
+      resolution: row[GRIEVANCE_COLUMNS.RESOLUTION]
+    };
+  },
+
+  /**
+   * Gets all grievances with optional filters
+   * @param {Object} [options] - Filter options
+   * @param {string} [options.status] - Filter by status
+   * @param {string} [options.steward] - Filter by steward name
+   * @param {boolean} [options.overdueOnly] - Only return overdue grievances
+   * @returns {Array<Object>} Array of grievance objects
+   */
+  getAllGrievances: function(options) {
+    options = options || {};
+
+    var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
+                    SHEETS.GRIEVANCE_LOG : 'Grievance Log';
+
+    var data = this.getAllData(sheetName, { includeHeaders: false });
+    var grievances = [];
+
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+
+      // Skip empty rows
+      if (!row[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) continue;
+
+      // Apply filters
+      if (options.status && row[GRIEVANCE_COLUMNS.STATUS] !== options.status) continue;
+      if (options.steward && row[GRIEVANCE_COLUMNS.STEWARD] !== options.steward) continue;
+      if (options.overdueOnly) {
+        var daysToDeadline = row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE];
+        if (typeof daysToDeadline !== 'number' || daysToDeadline >= 0) continue;
+      }
+
+      grievances.push({
+        rowNumber: i + 2,
+        grievanceId: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
+        memberId: row[GRIEVANCE_COLUMNS.MEMBER_ID],
+        firstName: row[GRIEVANCE_COLUMNS.FIRST_NAME],
+        lastName: row[GRIEVANCE_COLUMNS.LAST_NAME],
+        status: row[GRIEVANCE_COLUMNS.STATUS],
+        currentStep: row[GRIEVANCE_COLUMNS.CURRENT_STEP],
+        incidentDate: row[GRIEVANCE_COLUMNS.INCIDENT_DATE],
+        daysOpen: row[GRIEVANCE_COLUMNS.DAYS_OPEN],
+        daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
+        issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
+        steward: row[GRIEVANCE_COLUMNS.STEWARD]
+      });
+    }
+
+    return grievances;
+  }
+};
+
+// ============================================================================
+// TIME CONSTANTS
+// ============================================================================
+
+/**
+ * Time-related constants for deadline calculations
+ * @const {Object}
+ */
+var TIME_CONSTANTS = {
+  /** Milliseconds per second */
+  MS_PER_SECOND: 1000,
+
+  /** Milliseconds per minute */
+  MS_PER_MINUTE: 60 * 1000,
+
+  /** Milliseconds per hour */
+  MS_PER_HOUR: 60 * 60 * 1000,
+
+  /** Milliseconds per day */
+  MS_PER_DAY: 24 * 60 * 60 * 1000,
+
+  /** Milliseconds per week */
+  MS_PER_WEEK: 7 * 24 * 60 * 60 * 1000,
+
+  /** Deadline days configuration */
+  DEADLINE_DAYS: {
+    /** Days to file grievance after incident */
+    FILING: 21,
+
+    /** Days for Step I response */
+    STEP1_RESPONSE: 30,
+
+    /** Days to appeal to Step II */
+    STEP2_APPEAL: 10,
+
+    /** Days for Step II response */
+    STEP2_RESPONSE: 30,
+
+    /** Days to appeal to Step III */
+    STEP3_APPEAL: 30,
+
+    /** Days before deadline to show warning */
+    WARNING_THRESHOLD: 5,
+
+    /** Days before deadline to show critical alert */
+    CRITICAL_THRESHOLD: 2
+  },
+
+  /** Reminder intervals */
+  REMINDER_DAYS: {
+    /** First reminder before deadline */
+    FIRST: 7,
+
+    /** Second reminder before deadline */
+    SECOND: 3,
+
+    /** Final reminder before deadline */
+    FINAL: 1
+  }
+};
+
+/**
+ * Calculates a deadline date from a start date
+ * @param {Date} startDate - The start date
+ * @param {number} days - Number of days to add
+ * @returns {Date} The deadline date
+ */
+function calculateDeadline(startDate, days) {
+  if (!startDate || !(startDate instanceof Date)) {
+    startDate = new Date();
+  }
+  return new Date(startDate.getTime() + (days * TIME_CONSTANTS.MS_PER_DAY));
+}
+
+/**
+ * Calculates days between two dates
+ * @param {Date} startDate - Start date
+ * @param {Date} endDate - End date
+ * @returns {number} Number of days (can be negative)
+ */
+function daysBetween(startDate, endDate) {
+  if (!startDate || !endDate) return 0;
+
+  var start = startDate instanceof Date ? startDate : new Date(startDate);
+  var end = endDate instanceof Date ? endDate : new Date(endDate);
+
+  return Math.floor((end.getTime() - start.getTime()) / TIME_CONSTANTS.MS_PER_DAY);
+}
+
+/**
+ * Gets the urgency level based on days to deadline
+ * @param {number} daysToDeadline - Days until deadline
+ * @returns {string} Urgency level ('critical', 'warning', 'normal', 'overdue')
+ */
+function getDeadlineUrgency(daysToDeadline) {
+  if (daysToDeadline < 0) return 'overdue';
+  if (daysToDeadline <= TIME_CONSTANTS.DEADLINE_DAYS.CRITICAL_THRESHOLD) return 'critical';
+  if (daysToDeadline <= TIME_CONSTANTS.DEADLINE_DAYS.WARNING_THRESHOLD) return 'warning';
+  return 'normal';
+}

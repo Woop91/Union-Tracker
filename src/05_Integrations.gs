@@ -1112,10 +1112,33 @@ function showClearCalendarConfirm() {
  * - (no params) - Returns default dashboard
  */
 function doGet(e) {
-  // v4.4.0: Check for unified dashboard mode parameter
-  var mode = e && e.parameter && e.parameter.mode;
+  // v4.5.0: Add access control and input validation
+
+  // Step 1: Validate request parameters (prevents injection attacks)
+  var validation = validateWebAppRequest(e);
+  if (!validation.isValid) {
+    secureLog('doGet', 'Invalid request parameters', { errors: validation.errors });
+    return getAccessDeniedPage('Invalid request: ' + validation.errors.join(', '));
+  }
+
+  // Step 2: Check for unified dashboard mode parameter
+  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode);
   if (mode === 'steward' || mode === 'member') {
     var isPII = (mode === 'steward');
+
+    // Steward mode requires authorization (contains PII)
+    if (isPII) {
+      var authResult = checkWebAppAuthorization('steward');
+      if (!authResult.isAuthorized) {
+        secureLog('doGet', 'Unauthorized steward access attempt', {
+          email: authResult.email,
+          role: authResult.role
+        });
+        return getAccessDeniedPage(authResult.message || 'Steward access required');
+      }
+      secureLog('doGet', 'Steward access granted', { email: authResult.email });
+    }
+
     var title = isPII ? '509 STEWARD COMMAND CENTER' : '509 MEMBER DASHBOARD';
     var html = getUnifiedDashboardHtml(isPII);
     return HtmlService.createHtmlOutput(html)
@@ -1124,9 +1147,15 @@ function doGet(e) {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
   }
 
-  // Check for member ID parameter (member portal mode)
-  var memberId = e && e.parameter && e.parameter.id;
+  // Step 3: Check for member ID parameter (member portal mode)
+  var memberId = validation.params.id || (e && e.parameter && e.parameter.id);
   if (memberId) {
+    // Validate member ID format
+    if (!isValidMemberId(memberId)) {
+      secureLog('doGet', 'Invalid member ID format', { id: memberId });
+      return getAccessDeniedPage('Invalid member ID format');
+    }
+
     // Delegate to member portal (defined in 11_SecureMemberDashboard.gs)
     if (typeof buildMemberPortal === 'function') {
       return buildMemberPortal(memberId);
@@ -1137,8 +1166,8 @@ function doGet(e) {
     }
   }
 
-  // Standard page routing for mobile dashboard (legacy support)
-  var page = e && e.parameter && e.parameter.page ? e.parameter.page : 'dashboard';
+  // Step 4: Standard page routing for mobile dashboard (legacy support)
+  var page = validation.params.page || (e && e.parameter && e.parameter.page) || 'dashboard';
 
   var html;
   switch (page) {

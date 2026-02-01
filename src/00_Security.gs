@@ -1,0 +1,651 @@
+/**
+ * ============================================================================
+ * 00_Security.gs - Security Utilities and Access Control
+ * ============================================================================
+ *
+ * This module provides centralized security functions including:
+ * - XSS prevention (HTML sanitization)
+ * - Formula injection prevention
+ * - Access control for web apps
+ * - Input validation and sanitization
+ * - PII masking for logs
+ *
+ * MUST be loaded first in build order (00_ prefix).
+ *
+ * @fileoverview Security utilities for the dashboard
+ * @version 1.0.0
+ */
+
+// ============================================================================
+// ACCESS CONTROL CONFIGURATION
+// ============================================================================
+
+/**
+ * Access control configuration
+ * @const {Object}
+ */
+var ACCESS_CONTROL = {
+  /** Whether to enforce access control (set to true in production) */
+  ENABLED: true,
+
+  /** Allowed modes for web app */
+  ALLOWED_MODES: ['steward', 'member', 'dashboard', 'search', 'grievances', 'members', 'links', 'portal'],
+
+  /** Allowed page values */
+  ALLOWED_PAGES: ['dashboard', 'search', 'grievances', 'members', 'links', 'portal'],
+
+  /** Cache duration for authorization check (5 minutes) */
+  AUTH_CACHE_DURATION: 300
+};
+
+// ============================================================================
+// XSS PREVENTION - HTML SANITIZATION
+// ============================================================================
+
+/**
+ * Sanitizes a string for safe insertion into HTML content.
+ * Prevents XSS attacks by escaping HTML special characters.
+ *
+ * @param {*} input - The input to sanitize (will be converted to string)
+ * @returns {string} HTML-safe string
+ *
+ * @example
+ * // Returns: "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;"
+ * escapeHtml("<script>alert('xss')</script>");
+ */
+function escapeHtml(input) {
+  if (input === null || input === undefined) {
+    return '';
+  }
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .replace(/`/g, '&#x60;')
+    .replace(/=/g, '&#x3D;');
+}
+
+/**
+ * Alias for escapeHtml - use in innerHTML contexts
+ * @param {*} input - The input to sanitize
+ * @returns {string} HTML-safe string
+ */
+function sanitizeForHtml(input) {
+  return escapeHtml(input);
+}
+
+/**
+ * Sanitizes an object's string values for HTML output
+ * @param {Object} obj - Object with string values to sanitize
+ * @returns {Object} New object with sanitized values
+ */
+function sanitizeObjectForHtml(obj) {
+  if (!obj || typeof obj !== 'object') {
+    return obj;
+  }
+
+  var result = {};
+  for (var key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      var value = obj[key];
+      if (typeof value === 'string') {
+        result[key] = escapeHtml(value);
+      } else if (typeof value === 'object' && value !== null) {
+        result[key] = sanitizeObjectForHtml(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+}
+
+// ============================================================================
+// FORMULA INJECTION PREVENTION
+// ============================================================================
+
+/**
+ * Sanitizes input for use in Google Sheets formulas.
+ * Prevents formula injection attacks.
+ *
+ * @param {*} input - The input to sanitize
+ * @returns {string} Formula-safe string
+ *
+ * @example
+ * // Returns: "'Member Directory'"
+ * escapeForFormula("Member Directory");
+ */
+function escapeForFormula(input) {
+  if (input === null || input === undefined) {
+    return '';
+  }
+  var str = String(input);
+
+  // Remove or escape characters that could be used in formula injection
+  return str
+    .replace(/'/g, "''")       // Escape single quotes
+    .replace(/"/g, '""')       // Escape double quotes
+    .replace(/\\/g, '\\\\')    // Escape backslashes
+    .replace(/[\r\n]/g, ' ')   // Replace newlines with spaces
+    .replace(/[=+\-@]/g, function(match) {
+      // Prefix formula-starting characters with a space if at start
+      return "'" + match;
+    });
+}
+
+/**
+ * Safely creates a sheet name reference for use in formulas
+ * @param {string} sheetName - The sheet name to escape
+ * @returns {string} Safe sheet name for formula use
+ */
+function safeSheetNameForFormula(sheetName) {
+  if (!sheetName) return '';
+
+  var escaped = String(sheetName)
+    .replace(/'/g, "''");  // Escape single quotes
+
+  // Wrap in quotes if contains special characters
+  if (/[^a-zA-Z0-9_]/.test(escaped)) {
+    return "'" + escaped + "'";
+  }
+  return escaped;
+}
+
+/**
+ * Safely creates a QUERY formula with sanitized parameters
+ * @param {string} sheetName - The sheet name
+ * @param {string} query - The query string
+ * @param {number} headers - Number of header rows
+ * @returns {string} Safe QUERY formula
+ */
+function buildSafeQuery(sheetName, query, headers) {
+  var safeSheet = safeSheetNameForFormula(sheetName);
+  var safeHeaders = parseInt(headers, 10) || 1;
+
+  // Sanitize the query - remove potentially dangerous characters
+  var safeQuery = String(query)
+    .replace(/'/g, "''")
+    .replace(/"/g, '\\"');
+
+  return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
+}
+
+// ============================================================================
+// ACCESS CONTROL FOR WEB APP
+// ============================================================================
+
+/**
+ * Checks if a user is authorized to access the web app
+ * @param {string} [requiredRole] - Optional role requirement ('steward', 'admin')
+ * @returns {Object} Authorization result with isAuthorized and user info
+ */
+function checkWebAppAuthorization(requiredRole) {
+  var result = {
+    isAuthorized: false,
+    user: null,
+    email: null,
+    role: 'anonymous',
+    message: ''
+  };
+
+  try {
+    // Get the effective user (the user accessing the web app)
+    var user = Session.getEffectiveUser();
+    var email = user ? user.getEmail() : null;
+
+    if (!email) {
+      result.message = 'Authentication required';
+      return result;
+    }
+
+    result.user = user;
+    result.email = email;
+
+    // Check if access control is enabled
+    if (!ACCESS_CONTROL.ENABLED) {
+      result.isAuthorized = true;
+      result.role = 'user';
+      return result;
+    }
+
+    // Determine user role
+    var role = getUserRole_(email);
+    result.role = role;
+
+    // Check role requirement
+    if (requiredRole) {
+      if (requiredRole === 'admin' && role !== 'admin') {
+        result.message = 'Administrator access required';
+        return result;
+      }
+      if (requiredRole === 'steward' && role !== 'steward' && role !== 'admin') {
+        result.message = 'Steward access required';
+        return result;
+      }
+    }
+
+    result.isAuthorized = true;
+    return result;
+
+  } catch (e) {
+    result.message = 'Authorization check failed: ' + e.message;
+    Logger.log('Authorization error: ' + e.message);
+    return result;
+  }
+}
+
+/**
+ * Gets the role of a user based on their email
+ * @param {string} email - User email
+ * @returns {string} Role ('admin', 'steward', 'member', 'anonymous')
+ * @private
+ */
+function getUserRole_(email) {
+  if (!email) return 'anonymous';
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // Check if user is the spreadsheet owner (admin)
+    var owner = ss.getOwner();
+    if (owner && owner.getEmail() === email) {
+      return 'admin';
+    }
+
+    // Check if user is in the stewards list
+    if (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) {
+      var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+      if (memberSheet) {
+        var data = memberSheet.getDataRange().getValues();
+        for (var i = 1; i < data.length; i++) {
+          var memberEmail = data[i][MEMBER_COLUMNS.EMAIL] || '';
+          if (memberEmail.toLowerCase() === email.toLowerCase()) {
+            var isSteward = data[i][MEMBER_COLUMNS.IS_STEWARD];
+            if (isSteward === true || isSteward === 'Yes' || isSteward === 'TRUE') {
+              return 'steward';
+            }
+            return 'member';
+          }
+        }
+      }
+    }
+
+    return 'anonymous';
+  } catch (e) {
+    Logger.log('Error getting user role: ' + e.message);
+    return 'anonymous';
+  }
+}
+
+/**
+ * Validates web app request parameters
+ * @param {Object} e - The event object from doGet
+ * @returns {Object} Validation result with isValid and sanitized parameters
+ */
+function validateWebAppRequest(e) {
+  var result = {
+    isValid: true,
+    params: {},
+    errors: []
+  };
+
+  if (!e || !e.parameter) {
+    return result;  // No parameters is valid
+  }
+
+  // Validate and sanitize 'mode' parameter
+  if (e.parameter.mode) {
+    var mode = String(e.parameter.mode).toLowerCase();
+    if (ACCESS_CONTROL.ALLOWED_MODES.indexOf(mode) === -1) {
+      result.isValid = false;
+      result.errors.push('Invalid mode parameter');
+    } else {
+      result.params.mode = mode;
+    }
+  }
+
+  // Validate and sanitize 'page' parameter
+  if (e.parameter.page) {
+    var page = String(e.parameter.page).toLowerCase();
+    if (ACCESS_CONTROL.ALLOWED_PAGES.indexOf(page) === -1) {
+      result.isValid = false;
+      result.errors.push('Invalid page parameter');
+    } else {
+      result.params.page = page;
+    }
+  }
+
+  // Validate and sanitize 'id' parameter (member ID)
+  if (e.parameter.id) {
+    var id = String(e.parameter.id);
+    // Only allow alphanumeric and hyphen for IDs
+    if (!/^[a-zA-Z0-9\-_]+$/.test(id)) {
+      result.isValid = false;
+      result.errors.push('Invalid ID format');
+    } else {
+      result.params.id = id;
+    }
+  }
+
+  // Validate and sanitize 'filter' parameter
+  if (e.parameter.filter) {
+    var filter = String(e.parameter.filter).toLowerCase();
+    var allowedFilters = ['open', 'closed', 'overdue', 'pending', 'all'];
+    if (allowedFilters.indexOf(filter) === -1) {
+      result.isValid = false;
+      result.errors.push('Invalid filter parameter');
+    } else {
+      result.params.filter = filter;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Returns an access denied HTML page
+ * @param {string} [message] - Custom message to display
+ * @returns {HtmlOutput} Access denied page
+ */
+function getAccessDeniedPage(message) {
+  var html = '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">' +
+    '<title>Access Denied</title>' +
+    '<style>' +
+    'body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}' +
+    '.container{background:white;padding:40px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);text-align:center;max-width:400px}' +
+    '.icon{font-size:64px;margin-bottom:20px}' +
+    'h1{color:#DC2626;margin:0 0 15px}' +
+    'p{color:#666;margin:0}' +
+    '</style></head><body>' +
+    '<div class="container">' +
+    '<div class="icon">🔒</div>' +
+    '<h1>Access Denied</h1>' +
+    '<p>' + escapeHtml(message || 'You do not have permission to access this resource.') + '</p>' +
+    '</div></body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Access Denied')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+}
+
+// ============================================================================
+// PII MASKING FOR LOGS
+// ============================================================================
+
+/**
+ * Masks an email address for logging
+ * @param {string} email - Email to mask
+ * @returns {string} Masked email (e.g., "j***@example.com")
+ */
+function maskEmail(email) {
+  if (!email || typeof email !== 'string') return '[no email]';
+
+  var atIndex = email.indexOf('@');
+  if (atIndex <= 1) return '***@***';
+
+  var localPart = email.substring(0, atIndex);
+  var domain = email.substring(atIndex);
+
+  if (localPart.length <= 2) {
+    return localPart.charAt(0) + '***' + domain;
+  }
+
+  return localPart.charAt(0) + '***' + localPart.charAt(localPart.length - 1) + domain;
+}
+
+/**
+ * Masks a phone number for logging
+ * @param {string} phone - Phone number to mask
+ * @returns {string} Masked phone (e.g., "***-***-1234")
+ */
+function maskPhone(phone) {
+  if (!phone || typeof phone !== 'string') return '[no phone]';
+
+  var digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return '***';
+
+  return '***-***-' + digits.slice(-4);
+}
+
+/**
+ * Masks a name for logging
+ * @param {string} firstName - First name
+ * @param {string} lastName - Last name
+ * @returns {string} Masked name (e.g., "J. S.")
+ */
+function maskName(firstName, lastName) {
+  var first = firstName ? String(firstName).charAt(0) + '.' : '';
+  var last = lastName ? String(lastName).charAt(0) + '.' : '';
+  return (first + ' ' + last).trim() || '[anonymous]';
+}
+
+/**
+ * Creates a log-safe version of a member object (masks PII)
+ * @param {Object} member - Member object with PII
+ * @returns {Object} Member object with masked PII
+ */
+function maskMemberForLog(member) {
+  if (!member) return null;
+
+  return {
+    id: member.memberId || member.id || '[no id]',
+    name: maskName(member.firstName, member.lastName),
+    email: maskEmail(member.email),
+    phone: maskPhone(member.phone),
+    unit: member.unit || '[no unit]',
+    location: member.location || member.workLocation || '[no location]'
+  };
+}
+
+/**
+ * Creates a log-safe version of a grievance object (masks PII)
+ * @param {Object} grievance - Grievance object with PII
+ * @returns {Object} Grievance object with masked PII
+ */
+function maskGrievanceForLog(grievance) {
+  if (!grievance) return null;
+
+  return {
+    id: grievance.grievanceId || grievance.id || '[no id]',
+    memberName: maskName(grievance.firstName, grievance.lastName),
+    status: grievance.status || '[no status]',
+    step: grievance.currentStep || grievance.step || '[no step]',
+    category: grievance.issueCategory || grievance.category || '[no category]'
+  };
+}
+
+// ============================================================================
+// SECURE LOGGING
+// ============================================================================
+
+/**
+ * Logs a message without exposing PII
+ * @param {string} context - The context/function name
+ * @param {string} message - The log message
+ * @param {Object} [data] - Optional data (will be masked)
+ */
+function secureLog(context, message, data) {
+  var logMessage = '[' + context + '] ' + message;
+
+  if (data) {
+    // Create a masked version of data for logging
+    var maskedData = {};
+    for (var key in data) {
+      if (data.hasOwnProperty(key)) {
+        var value = data[key];
+        // Check for PII fields and mask them
+        if (key.toLowerCase().indexOf('email') !== -1) {
+          maskedData[key] = maskEmail(value);
+        } else if (key.toLowerCase().indexOf('phone') !== -1) {
+          maskedData[key] = maskPhone(value);
+        } else if (key === 'firstName' || key === 'lastName' || key === 'name') {
+          maskedData[key] = value ? String(value).charAt(0) + '.' : '';
+        } else {
+          maskedData[key] = value;
+        }
+      }
+    }
+    logMessage += ' | Data: ' + JSON.stringify(maskedData);
+  }
+
+  Logger.log(logMessage);
+}
+
+// ============================================================================
+// INPUT VALIDATION
+// ============================================================================
+
+/**
+ * Validates that a value is a safe string (no script tags, etc.)
+ * @param {*} input - Input to validate
+ * @param {number} [maxLength=1000] - Maximum allowed length
+ * @returns {boolean} True if valid
+ */
+function isValidSafeString(input, maxLength) {
+  if (input === null || input === undefined) return true;
+  if (typeof input !== 'string') return false;
+
+  maxLength = maxLength || 1000;
+  if (input.length > maxLength) return false;
+
+  // Check for dangerous patterns
+  var dangerousPatterns = [
+    /<script/i,
+    /javascript:/i,
+    /on\w+\s*=/i,  // onclick=, onerror=, etc.
+    /data:/i,
+    /vbscript:/i
+  ];
+
+  for (var i = 0; i < dangerousPatterns.length; i++) {
+    if (dangerousPatterns[i].test(input)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Validates a member ID format
+ * @param {string} memberId - Member ID to validate
+ * @returns {boolean} True if valid format
+ */
+function isValidMemberId(memberId) {
+  if (!memberId) return false;
+  // Allow alphanumeric, hyphen, underscore, max 50 chars
+  return /^[a-zA-Z0-9\-_]{1,50}$/.test(String(memberId));
+}
+
+/**
+ * Validates a grievance ID format
+ * @param {string} grievanceId - Grievance ID to validate
+ * @returns {boolean} True if valid format
+ */
+function isValidGrievanceId(grievanceId) {
+  if (!grievanceId) return false;
+  // Allow alphanumeric, hyphen, underscore, max 50 chars
+  return /^[a-zA-Z0-9\-_]{1,50}$/.test(String(grievanceId));
+}
+
+// ============================================================================
+// CLIENT-SIDE SECURITY HELPERS
+// ============================================================================
+
+/**
+ * Returns JavaScript code for client-side HTML escaping.
+ * Include this in your HTML templates inside a <script> tag.
+ *
+ * @returns {string} JavaScript code defining escapeHtml function
+ *
+ * @example
+ * var html = '<script>' + getClientSideEscapeHtml() + '</script>';
+ */
+function getClientSideEscapeHtml() {
+  return 'function escapeHtml(t){' +
+    'if(t==null)return"";' +
+    'return String(t)' +
+    '.replace(/&/g,"&amp;")' +
+    '.replace(/</g,"&lt;")' +
+    '.replace(/>/g,"&gt;")' +
+    '.replace(/"/g,"&quot;")' +
+    '.replace(/\'/g,"&#x27;")' +
+    '.replace(/\\//g,"&#x2F;")' +
+    '.replace(/`/g,"&#x60;")' +
+    '.replace(/=/g,"&#x3D;");' +
+    '}' +
+    'function safeText(t){return escapeHtml(t);}';
+}
+
+/**
+ * Returns the full client-side security script as a <script> tag.
+ * Include this at the start of your HTML body.
+ *
+ * @returns {string} Full script tag with security functions
+ */
+function getClientSecurityScript() {
+  return '<script>' +
+    getClientSideEscapeHtml() +
+    "function safeAttr(t){return escapeHtml(t).replace(/&#x27;/g,\"'\");}" +
+    '</script>';
+}
+
+/**
+ * Sanitizes data for embedding in JSON within HTML.
+ * Use this when passing server data to client-side JavaScript.
+ *
+ * @param {Object} data - Data to sanitize
+ * @returns {string} JSON string safe for HTML embedding
+ */
+function safeJsonForHtml(data) {
+  if (!data) return '{}';
+
+  // Convert to JSON and escape HTML entities in strings
+  var json = JSON.stringify(data, function(key, value) {
+    if (typeof value === 'string') {
+      return escapeHtml(value);
+    }
+    return value;
+  });
+
+  // Escape </script> tags that could break out of script context
+  return json.replace(/<\/script>/gi, '<\\/script>');
+}
+
+/**
+ * Pre-sanitizes an array of objects for safe client-side rendering.
+ * Call this on the server before passing data to client.
+ *
+ * @param {Array<Object>} dataArray - Array of data objects
+ * @param {Array<string>} fieldsToSanitize - Field names to sanitize
+ * @returns {Array<Object>} Array with sanitized string fields
+ */
+function sanitizeDataForClient(dataArray, fieldsToSanitize) {
+  if (!Array.isArray(dataArray)) return [];
+  if (!Array.isArray(fieldsToSanitize) || fieldsToSanitize.length === 0) {
+    // Sanitize all string fields
+    return dataArray.map(function(item) {
+      return sanitizeObjectForHtml(item);
+    });
+  }
+
+  return dataArray.map(function(item) {
+    var sanitized = {};
+    for (var key in item) {
+      if (item.hasOwnProperty(key)) {
+        if (fieldsToSanitize.indexOf(key) !== -1 && typeof item[key] === 'string') {
+          sanitized[key] = escapeHtml(item[key]);
+        } else {
+          sanitized[key] = item[key];
+        }
+      }
+    }
+    return sanitized;
+  });
+}
