@@ -1,5 +1,1167 @@
 /**
  * ============================================================================
+ * 02_MemberManager.gs - Member Directory Operations
+ * ============================================================================
+ *
+ * This module handles all member-related operations including:
+ * - Member directory management
+ * - Steward promotion/demotion
+ * - Member ID generation and validation
+ * - Member data sync
+ *
+ * @fileoverview Member directory operations and steward management
+ * @version 3.6.0
+ * @requires 01_Constants.gs
+ */
+
+// ============================================================================
+// MEMBER DIRECTORY OPERATIONS
+// ============================================================================
+
+/**
+ * Adds a new member to the Member Directory
+ * @param {Object} memberData - Member information object
+ * @returns {string} The generated Member ID
+ */
+function addMember(memberData) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  // Generate Member ID if not provided
+  var memberId = memberData.memberId || generateMemberID_(memberData.firstName, memberData.lastName);
+
+  // Find next empty row
+  var lastRow = sheet.getLastRow();
+  var newRow = lastRow + 1;
+
+  // Set member data
+  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(memberId);
+  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(memberData.firstName || '');
+  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(memberData.lastName || '');
+  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(memberData.email || '');
+  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(memberData.phone || '');
+  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(memberData.jobTitle || '');
+  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(memberData.workLocation || '');
+  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(memberData.unit || '');
+
+  return memberId;
+}
+
+/**
+ * Updates an existing member's information
+ * @param {string} memberId - The member ID to update
+ * @param {Object} updateData - Fields to update
+ */
+function updateMember(memberId, updateData) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  // Find the member row
+  var data = sheet.getDataRange().getValues();
+  var memberRow = -1;
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+      memberRow = i + 1;
+      break;
+    }
+  }
+
+  if (memberRow === -1) {
+    throw new Error('Member not found: ' + memberId);
+  }
+
+  // Update fields
+  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(updateData.firstName);
+  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(updateData.lastName);
+  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(updateData.email);
+  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(updateData.phone);
+  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(updateData.jobTitle);
+  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(updateData.workLocation);
+  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(updateData.unit);
+}
+
+/**
+ * Gets a member by their ID
+ * @param {string} memberId - The member ID to find
+ * @returns {Object|null} Member data object or null if not found
+ */
+function getMemberById(memberId) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) return null;
+
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+      var member = {};
+      for (var j = 0; j < headers.length; j++) {
+        member[headers[j]] = data[i][j];
+      }
+      return member;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Searches members by name, email, or other fields
+ * @param {string} query - Search query
+ * @returns {Array} Array of matching member objects
+ */
+function searchMembers(query) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) return [];
+
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var results = [];
+  var queryLower = query.toLowerCase();
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var firstName = String(row[MEMBER_COLS.FIRST_NAME - 1] || '').toLowerCase();
+    var lastName = String(row[MEMBER_COLS.LAST_NAME - 1] || '').toLowerCase();
+    var email = String(row[MEMBER_COLS.EMAIL - 1] || '').toLowerCase();
+    var memberId = String(row[MEMBER_COLS.MEMBER_ID - 1] || '').toLowerCase();
+
+    if (firstName.indexOf(queryLower) !== -1 ||
+        lastName.indexOf(queryLower) !== -1 ||
+        email.indexOf(queryLower) !== -1 ||
+        memberId.indexOf(queryLower) !== -1) {
+      var member = {};
+      for (var j = 0; j < headers.length; j++) {
+        member[headers[j]] = row[j];
+      }
+      results.push(member);
+    }
+  }
+
+  return results;
+}
+
+// ============================================================================
+// MEMBER ID GENERATION
+// ============================================================================
+
+/**
+ * Generates a unique Member ID based on name
+ * Format: M + First 2 letters of first name + First 2 letters of last name + 3 digits
+ * Example: MJOSM123
+ * @param {string} firstName - Member's first name
+ * @param {string} lastName - Member's last name
+ * @returns {string} Generated Member ID
+ * @private
+ */
+function generateMemberID_(firstName, lastName) {
+  var prefix = 'M';
+  var firstPart = (firstName || 'XX').substring(0, 2).toUpperCase();
+  var lastPart = (lastName || 'XX').substring(0, 2).toUpperCase();
+  var namePrefix = prefix + firstPart + lastPart;
+
+  // Get existing IDs to avoid duplicates
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var existingIds = {};
+
+  if (sheet && sheet.getLastRow() > 1) {
+    var ids = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1).getValues();
+    ids.forEach(function(row) {
+      if (row[0]) existingIds[row[0]] = true;
+    });
+  }
+
+  // Find next available number
+  for (var num = 100; num < 1000; num++) {
+    var newId = namePrefix + num;
+    if (!existingIds[newId]) {
+      return newId;
+    }
+  }
+
+  // Fallback with timestamp
+  return namePrefix + String(Date.now()).slice(-3);
+}
+
+// ============================================================================
+// STEWARD MANAGEMENT
+// ============================================================================
+
+/**
+ * Gets all active stewards from the Member Directory
+ * @returns {Array} Array of steward objects
+ */
+function getAllStewards() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) return [];
+
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0];
+  var stewards = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+    if (isSteward === 'Yes' || isSteward === true) {
+      var steward = {};
+      for (var j = 0; j < headers.length; j++) {
+        steward[headers[j]] = data[i][j];
+      }
+      steward.rowNumber = i + 1;
+      stewards.push(steward);
+    }
+  }
+
+  return stewards;
+}
+
+/**
+ * Gets detailed steward workload statistics including win rates
+ * NOTE: A simpler getStewardWorkload() exists in 11_SecureMemberDashboard.gs for dashboard use
+ * This version provides detailed metrics: activeCases, totalCases, wonCases, winRate
+ * @returns {Array} Array of steward workload objects with detailed metrics
+ */
+function getStewardWorkloadDetailed() {
+  var stewards = getAllStewards();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!grievanceSheet) return stewards;
+
+  var grievances = grievanceSheet.getDataRange().getValues();
+
+  stewards.forEach(function(steward) {
+    var fullName = steward[Object.keys(steward).find(function(k) { return k.toLowerCase().indexOf('first') !== -1; })] + ' ' +
+                   steward[Object.keys(steward).find(function(k) { return k.toLowerCase().indexOf('last') !== -1; })];
+
+    var activeCases = 0;
+    var totalCases = 0;
+    var wonCases = 0;
+
+    for (var i = 1; i < grievances.length; i++) {
+      var assignedSteward = grievances[i][GRIEVANCE_COLS.STEWARD - 1];
+      if (assignedSteward === fullName) {
+        totalCases++;
+        var status = grievances[i][GRIEVANCE_COLS.STATUS - 1];
+        if (status === 'Open' || status === 'Pending Info') {
+          activeCases++;
+        }
+        if (status === 'Won') {
+          wonCases++;
+        }
+      }
+    }
+
+    steward.activeCases = activeCases;
+    steward.totalCases = totalCases;
+    steward.wonCases = wonCases;
+    steward.winRate = totalCases > 0 ? Math.round((wonCases / totalCases) * 100) : 0;
+  });
+
+  return stewards;
+}
+
+// ============================================================================
+// MEMBER DATA SYNC
+// ============================================================================
+
+/**
+ * Syncs member data with grievance records
+ * Updates grievance counts and status in Member Directory
+ */
+function syncMemberGrievanceData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!memberSheet || !grievanceSheet) {
+    Logger.log('Required sheets not found for sync');
+    return;
+  }
+
+  var members = memberSheet.getDataRange().getValues();
+  var grievances = grievanceSheet.getDataRange().getValues();
+
+  // Build grievance count map
+  var grievanceCounts = {};
+  for (var i = 1; i < grievances.length; i++) {
+    var memberId = grievances[i][GRIEVANCE_COLS.MEMBER_ID - 1];
+    if (memberId) {
+      if (!grievanceCounts[memberId]) {
+        grievanceCounts[memberId] = { total: 0, active: 0 };
+      }
+      grievanceCounts[memberId].total++;
+      var status = grievances[i][GRIEVANCE_COLS.STATUS - 1];
+      if (status === 'Open' || status === 'Pending Info') {
+        grievanceCounts[memberId].active++;
+      }
+    }
+  }
+
+  // Update member rows (if grievance count columns exist)
+  if (MEMBER_COLS.TOTAL_GRIEVANCES && MEMBER_COLS.ACTIVE_GRIEVANCES) {
+    for (var j = 1; j < members.length; j++) {
+      var memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
+      var counts = grievanceCounts[memberId] || { total: 0, active: 0 };
+      memberSheet.getRange(j + 1, MEMBER_COLS.TOTAL_GRIEVANCES).setValue(counts.total);
+      memberSheet.getRange(j + 1, MEMBER_COLS.ACTIVE_GRIEVANCES).setValue(counts.active);
+    }
+  }
+
+  Logger.log('Member grievance data synced');
+}
+
+// ============================================================================
+// UNIT-BASED ID GENERATION (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Generates missing Member IDs for all members without one
+ * Uses unit-based prefixes from COMMAND_CONFIG or Config sheet
+ * Format: UNIT_CODE-SEQUENCE-H (e.g., MS-101-H)
+ */
+function generateMissingMemberIDs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory sheet not found');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var unitCodes = getUnitCodes_();
+  var countAdded = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var currentId = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    var unit = data[i][MEMBER_COLS.UNIT - 1];
+
+    // If ID is blank but member has data
+    if (!currentId && (unit || data[i][MEMBER_COLS.FIRST_NAME - 1])) {
+      var prefix = unitCodes[unit] || 'GEN';
+      var nextNum = getNextSequence_(prefix, sheet);
+      var newId = prefix + '-' + nextNum + '-H';
+
+      sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
+      countAdded++;
+    }
+  }
+
+  ss.toast('Generated ' + countAdded + ' new Member IDs', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  return countAdded;
+}
+
+/**
+ * Gets the next available sequence number for a given prefix
+ * Scans existing IDs to find the highest number and increments
+ * @param {string} prefix - The unit code prefix (e.g., "MS")
+ * @param {Sheet} sheet - The Member Directory sheet
+ * @returns {number} Next available sequence number
+ * @private
+ */
+function getNextSequence_(prefix, sheet) {
+  var ids = sheet.getRange(1, MEMBER_COLS.MEMBER_ID, sheet.getLastRow(), 1).getValues().flat();
+  var max = 100;
+
+  ids.forEach(function(id) {
+    if (typeof id === 'string' && id.startsWith(prefix + '-')) {
+      var parts = id.split('-');
+      if (parts.length >= 2) {
+        var n = parseInt(parts[1], 10);
+        if (!isNaN(n) && n > max) {
+          max = n;
+        }
+      }
+    }
+  });
+
+  return max + 1;
+}
+
+/**
+ * Checks for duplicate Member IDs and reports them
+ */
+function checkDuplicateMemberIDs() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory sheet not found');
+    return;
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var idCounts = {};
+  var duplicates = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var id = data[i][MEMBER_COLS.MEMBER_ID - 1];
+    if (id) {
+      if (idCounts[id]) {
+        idCounts[id].count++;
+        idCounts[id].rows.push(i + 1);
+      } else {
+        idCounts[id] = { count: 1, rows: [i + 1] };
+      }
+    }
+  }
+
+  for (var memberId in idCounts) {
+    if (idCounts[memberId].count > 1) {
+      duplicates.push({
+        id: memberId,
+        count: idCounts[memberId].count,
+        rows: idCounts[memberId].rows
+      });
+    }
+  }
+
+  if (duplicates.length === 0) {
+    SpreadsheetApp.getUi().alert('No duplicate Member IDs found.');
+  } else {
+    var message = 'Found ' + duplicates.length + ' duplicate ID(s):\n\n';
+    duplicates.forEach(function(dup) {
+      message += 'ID: ' + dup.id + ' (rows: ' + dup.rows.join(', ') + ')\n';
+    });
+    SpreadsheetApp.getUi().alert(message);
+  }
+
+  return duplicates;
+}
+
+/**
+ * Multi-Key Smart Match (v4.1)
+ * Hierarchical matching across Member ID, Email, and Name.
+ * Used during form submissions and bulk imports to prevent duplicate records.
+ *
+ * Match Priority:
+ *   1. Exact Member ID match (highest confidence)
+ *   2. Exact Email match (high confidence)
+ *   3. Exact First + Last Name match (fallback)
+ *
+ * @param {Object} searchParams - Search parameters object
+ * @param {string} [searchParams.memberId] - Member ID to search for
+ * @param {string} [searchParams.email] - Email address to search for
+ * @param {string} [searchParams.firstName] - First name to search for
+ * @param {string} [searchParams.lastName] - Last name to search for
+ * @param {Array<Array>} dataArray - 2D array of Member Directory data (batch processed)
+ * @returns {Object|null} Match result with row number and match type, or null if no match
+ *
+ * @example
+ * var data = sheet.getDataRange().getValues();
+ * var match = findExistingMember({
+ *   memberId: 'MS-101-H',
+ *   email: 'john.doe@email.com',
+ *   firstName: 'John',
+ *   lastName: 'Doe'
+ * }, data);
+ *
+ * if (match) {
+ *   // Update existing record at match.row
+ *   Logger.log('Found via ' + match.matchType + ' at row ' + match.row);
+ * } else {
+ *   // Create new record
+ * }
+ */
+function findExistingMember(searchParams, dataArray) {
+  var searchId = searchParams.memberId || '';
+  var searchEmail = searchParams.email || '';
+  var searchFirstName = searchParams.firstName || '';
+  var searchLastName = searchParams.lastName || '';
+
+  // Column indices (0-based for array access)
+  var COL_ID = MEMBER_COLS.MEMBER_ID - 1;        // 0
+  var COL_FIRST = MEMBER_COLS.FIRST_NAME - 1;    // 1
+  var COL_LAST = MEMBER_COLS.LAST_NAME - 1;      // 2
+  var COL_EMAIL = MEMBER_COLS.EMAIL - 1;         // 7
+
+  // Normalize search values
+  var normId = searchId.toString().trim();
+  var normEmail = searchEmail.toString().trim().toLowerCase();
+  var normFirst = searchFirstName.toString().trim().toLowerCase();
+  var normLast = searchLastName.toString().trim().toLowerCase();
+
+  // Track potential name match (lower priority)
+  var nameMatch = null;
+
+  for (var i = 1; i < dataArray.length; i++) {
+    var row = dataArray[i];
+
+    // Extract and normalize row values
+    var rowId = row[COL_ID] ? row[COL_ID].toString().trim() : '';
+    var rowEmail = row[COL_EMAIL] ? row[COL_EMAIL].toString().trim().toLowerCase() : '';
+    var rowFirst = row[COL_FIRST] ? row[COL_FIRST].toString().trim().toLowerCase() : '';
+    var rowLast = row[COL_LAST] ? row[COL_LAST].toString().trim().toLowerCase() : '';
+
+    // Priority 1: Exact Member ID match (immediate return)
+    if (normId && rowId && rowId === normId) {
+      return {
+        row: i + 1,  // Convert to 1-indexed sheet row
+        matchType: 'MEMBER_ID',
+        confidence: 'HIGH'
+      };
+    }
+
+    // Priority 2: Exact Email match (immediate return)
+    if (normEmail && rowEmail && rowEmail === normEmail) {
+      return {
+        row: i + 1,
+        matchType: 'EMAIL',
+        confidence: 'HIGH'
+      };
+    }
+
+    // Priority 3: Name match (store but continue searching for higher-priority match)
+    if (!nameMatch && normFirst && normLast && rowFirst && rowLast) {
+      if (rowFirst === normFirst && rowLast === normLast) {
+        nameMatch = {
+          row: i + 1,
+          matchType: 'NAME',
+          confidence: 'MEDIUM'
+        };
+        // Don't return yet - keep searching for ID/Email match
+      }
+    }
+  }
+
+  // Return name match if found (no higher-priority match existed)
+  if (nameMatch) {
+    return nameMatch;
+  }
+
+  // No match found - safe to create new record
+  return null;
+}
+
+// ============================================================================
+// STEWARD PROMOTION/DEMOTION (Strategic Command Center)
+// ============================================================================
+
+/**
+ * Promotes the currently selected member to Steward status
+ * Updates IS_STEWARD column and adds to Config steward list
+ * Requires two confirmation dialogs for safety
+ */
+function promoteSelectedMemberToSteward() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('Please select a member row in the Member Directory sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a member row (not the header)');
+    return;
+  }
+
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var fullName = firstName + ' ' + lastName;
+  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
+
+  if (currentStatus === 'Yes' || currentStatus === true) {
+    ui.alert(fullName + ' is already a Steward');
+    return;
+  }
+
+  // WARNING 1: Initial confirmation
+  var response1 = ui.alert(
+    '⬆️ Promote to Steward - Step 1 of 2',
+    'You are about to promote ' + fullName + ' to Steward status.\n\n' +
+    'This will:\n' +
+    '• Set "Is Steward" to Yes\n' +
+    '• Add to the Steward dropdown list\n' +
+    '• Grant access to steward-level functions\n\n' +
+    'Do you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response1 !== ui.Button.YES) {
+    ui.alert('Promotion cancelled.');
+    return;
+  }
+
+  // WARNING 2: Final confirmation
+  var response2 = ui.alert(
+    '⚠️ Final Confirmation - Step 2 of 2',
+    'PLEASE CONFIRM: You are promoting ' + fullName + ' to Steward.\n\n' +
+    'This action grants significant responsibilities including:\n' +
+    '• Representing members in grievances\n' +
+    '• Access to sensitive member information\n' +
+    '• Authority to act on behalf of the union\n\n' +
+    'Are you absolutely sure you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response2 !== ui.Button.YES) {
+    ui.alert('Promotion cancelled.');
+    return;
+  }
+
+  // Update member record
+  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
+
+  // Add to Config steward list
+  addToConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
+
+  ss.toast('✅ ' + fullName + ' has been promoted to Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Demotes the currently selected steward back to regular member
+ * Requires two confirmation dialogs for safety
+ */
+function demoteSelectedSteward() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getActiveSheet();
+  var ui = SpreadsheetApp.getUi();
+
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+    ui.alert('Please select a steward row in the Member Directory sheet');
+    return;
+  }
+
+  var row = sheet.getActiveRange().getRow();
+  if (row <= 1) {
+    ui.alert('Please select a member row (not the header)');
+    return;
+  }
+
+  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var fullName = firstName + ' ' + lastName;
+  var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
+
+  if (currentStatus !== 'Yes' && currentStatus !== true) {
+    ui.alert(fullName + ' is not currently a Steward');
+    return;
+  }
+
+  // WARNING 1: Initial confirmation
+  var response1 = ui.alert(
+    '⬇️ Demote Steward - Step 1 of 2',
+    'You are about to remove Steward status from ' + fullName + '.\n\n' +
+    'This will:\n' +
+    '• Set "Is Steward" to No\n' +
+    '• Remove from the Steward dropdown list\n' +
+    '• Remove steward-level access\n\n' +
+    'Do you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response1 !== ui.Button.YES) {
+    ui.alert('Demotion cancelled.');
+    return;
+  }
+
+  // WARNING 2: Final confirmation
+  var response2 = ui.alert(
+    '⚠️ Final Confirmation - Step 2 of 2',
+    'PLEASE CONFIRM: You are removing Steward status from ' + fullName + '.\n\n' +
+    'This is a significant action that:\n' +
+    '• Removes their authority to represent members\n' +
+    '• Should be documented appropriately\n' +
+    '• May require notification to the member\n\n' +
+    'Are you absolutely sure you want to proceed?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response2 !== ui.Button.YES) {
+    ui.alert('Demotion cancelled.');
+    return;
+  }
+
+  // Update member record
+  sheet.getRange(row, MEMBER_COLS.IS_STEWARD).setValue('No');
+
+  // Remove from Config steward list
+  removeFromConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
+
+  ss.toast('✅ ' + fullName + ' has been demoted from Steward', COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Adds a value to a Config column dropdown list
+ * @param {number} configCol - The Config column number
+ * @param {string} value - The value to add
+ * @private
+ */
+function addToConfigDropdown_(configCol, value) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) return;
+
+  // Find first empty row in the column
+  var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
+  var emptyRow = 3;
+
+  for (var i = 0; i < colData.length; i++) {
+    if (!colData[i][0]) {
+      emptyRow = i + 3;
+      break;
+    }
+    emptyRow = i + 4;
+  }
+
+  configSheet.getRange(emptyRow, configCol).setValue(value);
+}
+
+/**
+ * Removes a value from a Config column dropdown list
+ * @param {number} configCol - The Config column number
+ * @param {string} value - The value to remove
+ * @private
+ */
+function removeFromConfigDropdown_(configCol, value) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!configSheet) return;
+
+  var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
+
+  for (var i = 0; i < colData.length; i++) {
+    if (colData[i][0] === value) {
+      configSheet.getRange(i + 3, configCol).clearContent();
+      break;
+    }
+  }
+}
+
+// ============================================================================
+// BATCH PROCESSING (Performance Optimization)
+// ============================================================================
+
+/**
+ * Updates member data in batch mode for better performance
+ * Reads all data once, modifies in memory, writes back in one operation
+ * @param {string} memberId - The member ID to update
+ * @param {Object} newValuesObj - Object with field values to update
+ */
+function updateMemberDataBatch(memberId, newValuesObj) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    throw new Error('Member Directory sheet not found');
+  }
+
+  var range = sheet.getDataRange();
+  var data = range.getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+      // Modify array in memory
+      if (newValuesObj.email !== undefined) {
+        data[i][MEMBER_COLS.EMAIL - 1] = newValuesObj.email;
+      }
+      if (newValuesObj.phone !== undefined) {
+        data[i][MEMBER_COLS.PHONE - 1] = newValuesObj.phone;
+      }
+      if (newValuesObj.firstName !== undefined) {
+        data[i][MEMBER_COLS.FIRST_NAME - 1] = newValuesObj.firstName;
+      }
+      if (newValuesObj.lastName !== undefined) {
+        data[i][MEMBER_COLS.LAST_NAME - 1] = newValuesObj.lastName;
+      }
+      if (newValuesObj.unit !== undefined) {
+        data[i][MEMBER_COLS.UNIT - 1] = newValuesObj.unit;
+      }
+      if (newValuesObj.workLocation !== undefined) {
+        data[i][MEMBER_COLS.WORK_LOCATION - 1] = newValuesObj.workLocation;
+      }
+      if (newValuesObj.isSteward !== undefined) {
+        data[i][MEMBER_COLS.IS_STEWARD - 1] = newValuesObj.isSteward;
+      }
+
+      // Write the specific row back in one shot
+      sheet.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
+
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Member ' + memberId + ' updated via batch process',
+        COMMAND_CONFIG.SYSTEM_NAME,
+        3
+      );
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// ============================================================================
+// IMPORT/EXPORT DIALOGS
+// ============================================================================
+
+/**
+ * Shows the import members dialog
+ * Allows importing members from CSV data with column mapping
+ */
+function showImportMembersDialog() {
+  var html = HtmlService.createHtmlOutput(getImportMembersHtml_())
+    .setWidth(700)
+    .setHeight(600);
+  SpreadsheetApp.getUi().showModalDialog(html, '📥 Import Members');
+}
+
+/**
+ * Generates HTML for the import members dialog
+ * @returns {string} HTML content
+ * @private
+ */
+function getImportMembersHtml_() {
+  return '<!DOCTYPE html>' +
+    '<html><head>' +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 20px; color: #F8FAFC; }' +
+    'h3 { margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }' +
+    '.step { margin-bottom: 20px; padding: 16px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid #334155; }' +
+    '.step-title { font-weight: 600; margin-bottom: 12px; color: #A78BFA; }' +
+    'textarea { width: 100%; height: 120px; padding: 12px; border: 2px solid #334155; border-radius: 8px; background: #1E293B; color: #F8FAFC; font-family: monospace; font-size: 12px; resize: vertical; }' +
+    'textarea:focus { border-color: #7C3AED; outline: none; }' +
+    '.mapping-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 200px; overflow-y: auto; }' +
+    '.mapping-row { display: flex; align-items: center; gap: 8px; padding: 6px; background: rgba(255,255,255,0.03); border-radius: 4px; }' +
+    '.mapping-row label { flex: 1; font-size: 13px; color: #94A3B8; }' +
+    'select { padding: 6px 10px; border: 1px solid #334155; border-radius: 4px; background: #1E293B; color: #F8FAFC; font-size: 12px; min-width: 140px; }' +
+    '.btn-row { display: flex; gap: 10px; margin-top: 16px; }' +
+    'button { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.2s; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; flex: 1; }' +
+    '.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(124,58,237,0.3); }' +
+    '.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }' +
+    '.btn-secondary { background: #334155; color: #F8FAFC; }' +
+    '.preview { margin-top: 12px; font-size: 12px; color: #64748B; }' +
+    '.preview-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 11px; }' +
+    '.preview-table th, .preview-table td { padding: 6px 8px; border: 1px solid #334155; text-align: left; }' +
+    '.preview-table th { background: #334155; color: #F8FAFC; }' +
+    '.preview-table td { background: rgba(255,255,255,0.02); }' +
+    '.status { padding: 12px; border-radius: 6px; margin-top: 12px; font-size: 13px; }' +
+    '.status.success { background: rgba(16,185,129,0.2); border: 1px solid #10B981; }' +
+    '.status.error { background: rgba(239,68,68,0.2); border: 1px solid #EF4444; }' +
+    '.help { font-size: 12px; color: #64748B; margin-top: 8px; }' +
+    '</style>' +
+    '</head><body>' +
+    '<h3>📥 Import Members from CSV</h3>' +
+    '' +
+    '<div class="step">' +
+    '  <div class="step-title">Step 1: Paste CSV Data</div>' +
+    '  <textarea id="csvData" placeholder="Paste your CSV data here...&#10;&#10;Example:&#10;First Name,Last Name,Email,Phone,Job Title,Unit&#10;John,Doe,john@example.com,555-1234,Analyst,Main Station&#10;Jane,Smith,jane@example.com,555-5678,Manager,Field Ops"></textarea>' +
+    '  <div class="help">Paste data from Excel, Google Sheets, or a CSV file. First row should be headers.</div>' +
+    '</div>' +
+    '' +
+    '<div class="step" id="mappingStep" style="display:none;">' +
+    '  <div class="step-title">Step 2: Map Columns</div>' +
+    '  <div class="mapping-grid" id="mappingGrid"></div>' +
+    '  <div class="preview" id="preview"></div>' +
+    '</div>' +
+    '' +
+    '<div class="btn-row">' +
+    '  <button class="btn-secondary" id="parseBtn" onclick="parseCSV()">Parse CSV</button>' +
+    '  <button class="btn-primary" id="importBtn" onclick="importMembers()" disabled>Import Members</button>' +
+    '  <button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
+    '</div>' +
+    '' +
+    '<div id="statusArea"></div>' +
+    '' +
+    '<script>' +
+    'var parsedData = [];' +
+    'var csvHeaders = [];' +
+    'var targetFields = [' +
+    '  {key: "firstName", label: "First Name", required: true},' +
+    '  {key: "lastName", label: "Last Name", required: true},' +
+    '  {key: "email", label: "Email", required: false},' +
+    '  {key: "phone", label: "Phone", required: false},' +
+    '  {key: "jobTitle", label: "Job Title", required: false},' +
+    '  {key: "workLocation", label: "Work Location", required: false},' +
+    '  {key: "unit", label: "Unit", required: false},' +
+    '  {key: "supervisor", label: "Supervisor", required: false},' +
+    '  {key: "manager", label: "Manager", required: false}' +
+    '];' +
+    '' +
+    'function parseCSV() {' +
+    '  var csvText = document.getElementById("csvData").value.trim();' +
+    '  if (!csvText) { showStatus("Please paste CSV data first", true); return; }' +
+    '  ' +
+    '  var lines = csvText.split(/\\r?\\n/);' +
+    '  if (lines.length < 2) { showStatus("CSV must have header row and at least one data row", true); return; }' +
+    '  ' +
+    '  csvHeaders = parseCSVLine(lines[0]);' +
+    '  parsedData = [];' +
+    '  for (var i = 1; i < lines.length; i++) {' +
+    '    if (lines[i].trim()) parsedData.push(parseCSVLine(lines[i]));' +
+    '  }' +
+    '  ' +
+    '  buildMappingUI();' +
+    '  showPreview();' +
+    '  document.getElementById("mappingStep").style.display = "block";' +
+    '  document.getElementById("importBtn").disabled = false;' +
+    '  showStatus("Parsed " + parsedData.length + " rows. Map columns and click Import.", false);' +
+    '}' +
+    '' +
+    'function parseCSVLine(line) {' +
+    '  var result = [];' +
+    '  var current = "";' +
+    '  var inQuotes = false;' +
+    '  for (var i = 0; i < line.length; i++) {' +
+    '    var c = line[i];' +
+    '    if (c === \'"\' && (i === 0 || line[i-1] !== \'\\\\\')) { inQuotes = !inQuotes; }' +
+    '    else if ((c === "," || c === "\\t") && !inQuotes) { result.push(current.trim()); current = ""; }' +
+    '    else { current += c; }' +
+    '  }' +
+    '  result.push(current.trim());' +
+    '  return result;' +
+    '}' +
+    '' +
+    'function buildMappingUI() {' +
+    '  var grid = document.getElementById("mappingGrid");' +
+    '  grid.innerHTML = "";' +
+    '  targetFields.forEach(function(field) {' +
+    '    var row = document.createElement("div");' +
+    '    row.className = "mapping-row";' +
+    '    var label = document.createElement("label");' +
+    '    label.textContent = field.label + (field.required ? " *" : "");' +
+    '    var select = document.createElement("select");' +
+    '    select.id = "map_" + field.key;' +
+    '    select.innerHTML = "<option value=\\"\\">-- Skip --</option>";' +
+    '    csvHeaders.forEach(function(h, idx) {' +
+    '      var opt = document.createElement("option");' +
+    '      opt.value = idx;' +
+    '      opt.textContent = h;' +
+    '      if (h.toLowerCase().replace(/[^a-z]/g, "").indexOf(field.key.toLowerCase()) !== -1 ||' +
+    '          field.key.toLowerCase().indexOf(h.toLowerCase().replace(/[^a-z]/g, "")) !== -1) {' +
+    '        opt.selected = true;' +
+    '      }' +
+    '      select.appendChild(opt);' +
+    '    });' +
+    '    row.appendChild(label);' +
+    '    row.appendChild(select);' +
+    '    grid.appendChild(row);' +
+    '  });' +
+    '}' +
+    '' +
+    'function showPreview() {' +
+    '  var preview = document.getElementById("preview");' +
+    '  var rows = parsedData.slice(0, 3);' +
+    '  if (rows.length === 0) { preview.innerHTML = ""; return; }' +
+    '  var html = "<strong>Preview (first " + rows.length + " rows):</strong><table class=\\"preview-table\\"><tr>";' +
+    '  csvHeaders.forEach(function(h) { html += "<th>" + h + "</th>"; });' +
+    '  html += "</tr>";' +
+    '  rows.forEach(function(row) {' +
+    '    html += "<tr>";' +
+    '    row.forEach(function(cell) { html += "<td>" + (cell || "-") + "</td>"; });' +
+    '    html += "</tr>";' +
+    '  });' +
+    '  html += "</table>";' +
+    '  preview.innerHTML = html;' +
+    '}' +
+    '' +
+    'function importMembers() {' +
+    '  var mapping = {};' +
+    '  targetFields.forEach(function(field) {' +
+    '    var sel = document.getElementById("map_" + field.key);' +
+    '    if (sel.value !== "") mapping[field.key] = parseInt(sel.value);' +
+    '  });' +
+    '  ' +
+    '  if (mapping.firstName === undefined || mapping.lastName === undefined) {' +
+    '    showStatus("First Name and Last Name are required mappings", true);' +
+    '    return;' +
+    '  }' +
+    '  ' +
+    '  document.getElementById("importBtn").disabled = true;' +
+    '  document.getElementById("importBtn").textContent = "Importing...";' +
+    '  ' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(result) {' +
+    '      if (result.success) {' +
+    '        showStatus("Successfully imported " + result.imported + " members! " + (result.skipped > 0 ? "(" + result.skipped + " skipped as duplicates)" : ""), false);' +
+    '        document.getElementById("importBtn").textContent = "Done!";' +
+    '      } else {' +
+    '        showStatus("Import failed: " + result.message, true);' +
+    '        document.getElementById("importBtn").disabled = false;' +
+    '        document.getElementById("importBtn").textContent = "Import Members";' +
+    '      }' +
+    '    })' +
+    '    .withFailureHandler(function(e) {' +
+    '      showStatus("Error: " + e.message, true);' +
+    '      document.getElementById("importBtn").disabled = false;' +
+    '      document.getElementById("importBtn").textContent = "Import Members";' +
+    '    })' +
+    '    .importMembersFromData(parsedData, mapping);' +
+    '}' +
+    '' +
+    'function showStatus(msg, isError) {' +
+    '  var area = document.getElementById("statusArea");' +
+    '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + msg + "</div>";' +
+    '}' +
+    '</script>' +
+    '</body></html>';
+}
+
+/**
+ * Imports members from parsed CSV data
+ * @param {Array<Array>} data - 2D array of CSV data (without headers)
+ * @param {Object} mapping - Column mapping object {fieldName: columnIndex}
+ * @returns {Object} Result with imported count and any errors
+ */
+function importMembersFromData(data, mapping) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+    if (!sheet) {
+      return { success: false, message: 'Member Directory sheet not found' };
+    }
+
+    // Get existing data for duplicate checking
+    var existingData = sheet.getDataRange().getValues();
+    var existingEmails = {};
+    var existingNames = {};
+
+    for (var i = 1; i < existingData.length; i++) {
+      var email = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+      var name = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
+      if (email) existingEmails[email] = true;
+      if (name) existingNames[name] = true;
+    }
+
+    var imported = 0;
+    var skipped = 0;
+    var newRows = [];
+
+    for (var j = 0; j < data.length; j++) {
+      var row = data[j];
+
+      var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
+      var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
+      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+
+      // Skip if no name
+      if (!firstName && !lastName) {
+        skipped++;
+        continue;
+      }
+
+      // Check for duplicates
+      var emailLower = email.toLowerCase();
+      var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
+
+      if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
+        skipped++;
+        continue;
+      }
+
+      // Mark as existing to prevent duplicates within import batch
+      if (emailLower) existingEmails[emailLower] = true;
+      existingNames[nameLower] = true;
+
+      // Generate Member ID
+      var memberId = generateMemberID_(firstName, lastName);
+
+      // Build new row with empty values for all columns
+      var newRow = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
+      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+
+      if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
+      if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
+      if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
+      if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
+      if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
+      if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
+      if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
+
+      // Default Is Steward to No
+      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+
+      newRows.push(newRow);
+      imported++;
+    }
+
+    // Batch write all new rows
+    if (newRows.length > 0) {
+      var lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+    }
+
+    // Log the import
+    logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
+      action: 'BULK_IMPORT',
+      importedCount: imported,
+      skippedCount: skipped,
+      importedBy: Session.getActiveUser().getEmail()
+    });
+
+    return {
+      success: true,
+      imported: imported,
+      skipped: skipped,
+      message: 'Import completed'
+    };
+
+  } catch (e) {
+    console.error('Import error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Shows the export members dialog
+ * Allows exporting members to CSV or Google Sheets
+ */
+function showExportMembersDialog() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    ui.alert('Error', 'Member Directory not found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var memberCount = lastRow > 1 ? lastRow - 1 : 0;
+
+  var response = ui.alert('📤 Export Members',
+    'Export ' + memberCount + ' members?\n\n' +
+    'Options:\n' +
+    '• Download as CSV: File > Download > Comma-separated values (.csv)\n' +
+    '• Download as Excel: File > Download > Microsoft Excel (.xlsx)\n' +
+    '• Copy to another sheet: Right-click the Member Directory tab > Copy to\n\n' +
+    'Would you like to navigate to the Member Directory sheet now?',
+    ui.ButtonSet.YES_NO);
+
+  if (response === ui.Button.YES) {
+    ss.setActiveSheet(sheet);
+    sheet.getRange('A1').activate();
+  }
+}
+
+
+
+/**
+ * ============================================================================
  * GrievanceManager.gs - Grievance Lifecycle Management
  * ============================================================================
  *

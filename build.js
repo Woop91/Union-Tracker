@@ -17,65 +17,21 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order (constants first, then modules, main last)
-// REFACTORED: Split large monolithic files into smaller modules for maintainability
+// Files in build order - CONSOLIDATED to 13 files
 const BUILD_ORDER = [
-  // Error handling and utilities - must be first
-  '00_ErrorHandler.gs',
-
-  // Core constants
-  '01_Constants.gs',
-
-  // Data managers
-  '02_MemberManager.gs',
-  '03_GrievanceManager.gs',
-
-  // UI modules (split from 04_UIService.gs)
-  '04a_MenuBuilder.gs',
-  '04b_ThemeService.gs',
-  '04c_MobileInterface.gs',
-  '04d_QuickActions.gs',
-  '04e_SearchDialogs.gs',
-  '04_UIService.gs',           // Remaining UI functions
-
-  // Integrations
-  '05_Integrations.gs',
-
-  // Maintenance modules (split from 06_Maintenance.gs)
-  '06a_Diagnostics.gs',
-  '06b_CacheManager.gs',
-  '06c_UndoManager.gs',
-  '06_Maintenance.gs',         // Remaining maintenance functions
-
-  // Development tools
-  '07_DevTools.gs',
-
-  // Core code modules (split from 08_Code.gs)
-  '08a_SheetCreation.gs',
-  '08b_DataValidation.gs',
-  '08c_SearchEngine.gs',
-  '08d_ChartBuilder.gs',
-  '08e_FormHandlers.gs',
-  '08f_SatisfactionEngine.gs',
-  '08g_SyncEngine.gs',
-  '08h_NotificationEngine.gs',
-  '08i_AuditLog.gs',
-  '08j_CalcSheets.gs',
-  '08k_PublicDashboard.gs',
-  '08_Code.gs',                // Remaining code functions
-
-  // Main entry point
-  '09_Main.gs',
-
-  // Feature modules
-  '10_CommandCenter.gs',
-  '11_SecureMemberDashboard.gs',
-  '12_ChecklistManager.gs',
-  '13_DynamicEngine.gs',
-  '14_LookerIntegration.gs',
-
-  // Testing framework (last)
-  '15_TestFramework.gs'
+  '01_Core.gs',           // Error handling + Constants (2,169 lines)
+  '02_DataManagers.gs',   // Member + Grievance managers (2,471 lines)
+  '03_UIComponents.gs',   // Menu, Theme, Mobile, QuickActions, Search (2,537 lines)
+  '04_UIService.gs',      // Main UI service (7,398 lines)
+  '05_Integrations.gs',   // External integrations (2,330 lines)
+  '06_Maintenance.gs',    // Diagnostics, Cache, Undo, Maintenance (3,437 lines)
+  '07_DevTools.gs',       // Dev tools + Test framework (2,807 lines)
+  '08_SheetUtils.gs',     // Sheet creation, validation, forms, notifications (4,442 lines)
+  '09_Dashboards.gs',     // Satisfaction, Sync, Public dashboards (4,007 lines)
+  '10_Code.gs',           // Core business logic (5,406 lines)
+  '10_Main.gs',           // Main entry point (1,862 lines)
+  '11_CommandHub.gs',     // Command center + Secure dashboard (3,627 lines)
+  '12_Features.gs'        // Checklist, Dynamic, Looker (3,970 lines)
 ];
 
 const HTML_FILES = [
