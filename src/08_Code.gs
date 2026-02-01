@@ -29,134 +29,6 @@
  * Main setup function - creates the complete 509 Dashboard
  * Creates the core sheets with proper structure and formatting
  */
-function CREATE_509_DASHBOARD() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = null;
-
-  // Try to get UI context - may not be available if called from trigger/API
-  try {
-    ui = SpreadsheetApp.getUi();
-  } catch (e) {
-    // UI not available - will proceed without confirmation dialog
-    Logger.log('UI not available, proceeding without confirmation: ' + e.message);
-  }
-
-  // Confirm with user if UI is available
-  if (ui) {
-    var response = ui.alert(
-      '🏗️ Create 509 Dashboard',
-      'This will create the 509 Dashboard with:\n\n' +
-      '• Config (dropdown sources)\n' +
-      '• Member Directory\n' +
-      '• Grievance Log (with Action Type dropdown)\n' +
-      '• ✅ Case Checklist (track grievance tasks)\n' +
-      '• 📊 Member Satisfaction (Survey tracking)\n' +
-      '• 💡 Feedback & Development (Bug/feature tracking)\n' +
-      '• ✅ Function Checklist (function reference)\n' +
-      '• 📚 Getting Started (setup instructions)\n' +
-      '• ❓ FAQ (common questions)\n' +
-      '• 📖 Config Guide (how to use Config tab)\n\n' +
-      'Note: All dashboards are now modal-based (popup windows).\n' +
-      'Access them via: Union Hub > Dashboards menu.\n\n' +
-      'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
-      'Existing sheets with matching names will be recreated.\n\n' +
-      'Continue?',
-      ui.ButtonSet.YES_NO
-    );
-
-    if (response !== ui.Button.YES) {
-      ui.alert('Setup cancelled.');
-      return;
-    }
-  }
-
-  ss.toast('Starting dashboard creation...', '🏗️ Setup', 5);
-
-  try {
-    // Create core data sheets
-    createConfigSheet(ss);
-    ss.toast('Created Config sheet', '🏗️ Progress', 2);
-
-    createMemberDirectory(ss);
-    ss.toast('Created Member Directory', '🏗️ Progress', 2);
-
-    createGrievanceLog(ss);
-    ss.toast('Created Grievance Log', '🏗️ Progress', 2);
-
-    // Setup Action Type dropdown and Case Checklist sheet
-    setupActionTypeColumn();
-    ss.toast('Setup Action Type dropdown', '🏗️ Progress', 2);
-
-    getOrCreateChecklistSheet();
-    ss.toast('Created Case Checklist sheet', '🏗️ Progress', 2);
-
-    // Setup hidden calculation sheets (needed before dashboards for formula references)
-    ss.toast('Setting up hidden sheets...', '🏗️ Progress', 3);
-    setupHiddenSheets(ss);
-
-    // Note: Dashboard sheet creation removed in v4.3.2
-    // All dashboards are now modal-based for better UX
-    // Access via: 📊 Union Hub > 📊 Dashboards menu
-
-    createSatisfactionSheet(ss);
-    ss.toast('Created Member Satisfaction', '🏗️ Progress', 2);
-
-    createFeedbackSheet(ss);
-    ss.toast('Created Feedback & Development', '🏗️ Progress', 2);
-
-    // Create Function Checklist (function reference guide with 13 phases)
-    createFunctionChecklistSheet_();
-    ss.toast('Created Function Checklist', '🏗️ Progress', 2);
-
-    // Create Getting Started guide
-    createGettingStartedSheet(ss);
-    ss.toast('Created Getting Started', '🏗️ Progress', 2);
-
-    // Create FAQ sheet
-    createFAQSheet(ss);
-    ss.toast('Created FAQ', '🏗️ Progress', 2);
-
-    // Create Config Guide sheet
-    createConfigGuideSheet(ss);
-    ss.toast('Created Config Guide', '🏗️ Progress', 2);
-
-    // Save form URLs to Config sheet
-    saveFormUrlsToConfig_silent(ss);
-    ss.toast('Saved form URLs to Config', '🏗️ Progress', 2);
-
-    // Setup data validations
-    ss.toast('Setting up validations...', '🏗️ Progress', 3);
-    setupDataValidations();
-
-    // Reorder sheets to standard layout
-    reorderSheetsToStandard(ss);
-    ss.toast('Sheets reordered', '🏗️ Progress', 2);
-
-    ss.toast('Dashboard creation complete!', '✅ Success', 5);
-    if (ui) {
-      ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
-        '10 sheets created:\n' +
-        '• Config, Member Directory, Grievance Log (data)\n' +
-        '• ✅ Case Checklist (track grievance tasks)\n' +
-        '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
-        '• ✅ Function Checklist (function reference)\n' +
-        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
-        '📋 Action Type dropdown configured with 8 case types.\n' +
-        '📊 Dashboards are now modal-based (popup windows).\n' +
-        'Access via: Union Hub > Dashboards menu.\n\n' +
-        'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
-        '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
-        'update automatically when you edit the sheets.\n\n' +
-        'Use the Demo menu to seed sample data.', ui.ButtonSet.OK);
-    }
-
-  } catch (error) {
-    Logger.log('Error in CREATE_509_DASHBOARD: ' + error.message);
-    if (ui) {
-      ui.alert('❌ Error', 'An error occurred: ' + error.message, ui.ButtonSet.OK);
-    }
-  }
-}
 
 // ============================================================================
 // SHEET CREATION FUNCTIONS
@@ -985,7 +857,6 @@ function createGrievanceLog(ss) {
   );
   sheet.setConditionalFormatRules(rules);
 }
-
 
 /**
  * @deprecated v4.3.2 - Dashboard sheet is deprecated. Use modal dashboards instead.
@@ -2314,26 +2185,11 @@ function populateRoadmapItems(sheet) {
  * @param {string} name - Sheet name
  * @returns {Sheet} Sheet object
  */
-function getOrCreateSheet(ss, name) {
-  var sheet = ss.getSheetByName(name);
-  if (sheet) {
-    ss.deleteSheet(sheet);
-  }
-  return ss.insertSheet(name);
-}
 
 /**
  * Setup hidden calculation sheets for cross-sheet data sync
  * Calls the full implementation in HiddenSheets.gs
  */
-function setupHiddenSheets(ss) {
-  // Call the full hidden sheet setup from HiddenSheets.gs
-  setupAllHiddenSheets();
-
-  // Install the auto-sync trigger using quick mode (no UI required)
-  // This allows it to work when called from triggers or API contexts
-  installAutoSyncTriggerQuick();
-}
 
 // ============================================================================
 // SHEET ORDERING
@@ -2348,47 +2204,6 @@ function setupHiddenSheets(ss) {
  *
  * @param {Spreadsheet} ss - Optional spreadsheet object (defaults to active)
  */
-function reorderSheetsToStandard(ss) {
-  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
-
-  // Define the desired order of visible sheets
-  var desiredOrder = [
-    SHEETS.GETTING_STARTED,       // 📚 Getting Started
-    SHEETS.FAQ,                   // ❓ FAQ
-    SHEETS.MEMBER_DIR,            // Member Directory
-    SHEETS.GRIEVANCE_LOG,         // Grievance Log
-    SHEETS.FEEDBACK,              // 💡 Feedback & Development
-    SHEETS.FUNCTION_CHECKLIST,    // Function Checklist
-    SHEETS.CONFIG_GUIDE,          // 📖 Config Guide
-    'Config',                     // Config
-    SHEETS.DASHBOARD,             // 💼 Dashboard
-    SHEETS.INTERACTIVE,           // 🎯 Custom View
-    SHEETS.SATISFACTION           // 📊 Member Satisfaction
-  ];
-
-  var position = 1;
-
-  for (var i = 0; i < desiredOrder.length; i++) {
-    var sheetName = desiredOrder[i];
-    var sheet = ss.getSheetByName(sheetName);
-
-    if (sheet) {
-      ss.setActiveSheet(sheet);
-      ss.moveActiveSheet(position);
-      position++;
-    }
-  }
-
-  // Move the first sheet to active after reordering
-  var firstSheet = ss.getSheetByName(SHEETS.GETTING_STARTED) ||
-                   ss.getSheetByName(SHEETS.MEMBER_DIR) ||
-                   ss.getSheets()[0];
-  if (firstSheet) {
-    ss.setActiveSheet(firstSheet);
-  }
-
-  Logger.log('Sheets reordered to standard layout');
-}
 
 // ============================================================================
 // DATA VALIDATION
@@ -2397,71 +2212,12 @@ function reorderSheetsToStandard(ss) {
 /**
  * Setup all data validations for Member Directory and Grievance Log
  */
-function setupDataValidations() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-
-  if (!configSheet || !memberSheet || !grievanceSheet) {
-    SpreadsheetApp.getUi().alert('Error: Required sheets not found. Please run CREATE_509_DASHBOARD first.');
-    return;
-  }
-
-  // Member Directory Validations
-  // Single-select dropdowns (strict validation)
-  setDropdownValidation(memberSheet, MEMBER_COLS.JOB_TITLE, configSheet, CONFIG_COLS.JOB_TITLES);
-  setDropdownValidation(memberSheet, MEMBER_COLS.WORK_LOCATION, configSheet, CONFIG_COLS.OFFICE_LOCATIONS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.UNIT, configSheet, CONFIG_COLS.UNITS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.IS_STEWARD, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.SUPERVISOR, configSheet, CONFIG_COLS.SUPERVISORS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.MANAGER, configSheet, CONFIG_COLS.MANAGERS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_LOCAL, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_CHAPTER, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_ALLIED, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.HOME_TOWN, configSheet, CONFIG_COLS.HOME_TOWNS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.CONTACT_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
-
-  // Multi-select dropdowns (allow comma-separated values)
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.OFFICE_DAYS, configSheet, CONFIG_COLS.OFFICE_DAYS);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.PREFERRED_COMM, configSheet, CONFIG_COLS.COMM_METHODS);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.BEST_TIME, configSheet, CONFIG_COLS.BEST_TIMES);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.COMMITTEES, configSheet, CONFIG_COLS.STEWARD_COMMITTEES);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.ASSIGNED_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
-
-  // Grievance Log Validations
-  // Note: Member ID does NOT have dropdown - allows free text entry for flexibility
-  // setMemberIdValidation(grievanceSheet, memberSheet);  // REMOVED: Member ID should not have dropdown
-
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.STATUS, configSheet, CONFIG_COLS.GRIEVANCE_STATUS);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.CURRENT_STEP, configSheet, CONFIG_COLS.GRIEVANCE_STEP);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.ISSUE_CATEGORY, configSheet, CONFIG_COLS.ISSUE_CATEGORY);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.ARTICLES, configSheet, CONFIG_COLS.ARTICLES);
-
-  // Note: Unit, Location, Steward columns now use formulas for auto-lookup
-  // No need for manual dropdown validation on those columns
-
-  SpreadsheetApp.getActiveSpreadsheet().toast('Data validations applied successfully!', '✅ Success', 3);
-}
 
 /**
  * Set Member ID validation dropdown from Member Directory
  * @param {Sheet} grievanceSheet - Grievance Log sheet
  * @param {Sheet} memberSheet - Member Directory sheet
  */
-function setMemberIdValidation(grievanceSheet, memberSheet) {
-  // Get the Member ID column from Member Directory
-  var memberIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + '1000');
-
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(false)
-    .build();
-
-  var targetRange = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_ID, 998, 1);
-  targetRange.setDataValidation(rule);
-}
 
 /**
  * Set dropdown validation from Config sheet
@@ -2470,31 +2226,6 @@ function setMemberIdValidation(grievanceSheet, memberSheet) {
  * @param {Sheet} configSheet - Config sheet with source values
  * @param {number} sourceCol - Column number in Config sheet
  */
-function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  // Config data starts at row 3 (row 1 = section headers, row 2 = column headers)
-  // Use dynamic row count instead of fixed 100 to handle large Config lists
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  // Use at least 10 rows, or actual count + buffer for growth
-  var rowCount = Math.max(10, actualRows + 10);
-
-  var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(false)
-    .build();
-
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
-  targetRange.setDataValidation(rule);
-}
 
 /**
  * Set multi-select validation (allows comma-separated values)
@@ -2504,31 +2235,6 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
  * @param {Sheet} configSheet - Config sheet with source values
  * @param {number} sourceCol - Column number in Config sheet
  */
-function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  // Config data starts at row 3
-  // Use dynamic row count instead of fixed 100 to handle large Config lists
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  // Use at least 10 rows, or actual count + buffer for growth
-  var rowCount = Math.max(10, actualRows + 10);
-
-  var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(true)  // Allow comma-separated values
-    .build();
-
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
-  targetRange.setDataValidation(rule);
-}
 
 // ============================================================================
 // MULTI-SELECT FUNCTIONALITY
@@ -2550,166 +2256,31 @@ var multiSelectTarget_ = null;
  * @param {number} col - Column number
  * @returns {Array} Array of non-empty values
  */
-function getConfigValues(configSheet, col) {
-  var lastRow = configSheet.getLastRow();
-  if (lastRow < 3) return [];
-
-  var data = configSheet.getRange(3, col, lastRow - 2, 1).getValues();
-  var values = [];
-  for (var i = 0; i < data.length; i++) {
-    if (data[i][0] && data[i][0].toString().trim() !== '') {
-      values.push(data[i][0].toString());
-    }
-  }
-  return values;
-}
 
 /**
  * Apply the multi-select value to the stored cell
  * Called from the dialog
  * @param {string} value - Comma-separated selected values
  */
-function applyMultiSelectValue(value) {
-  var props = PropertiesService.getDocumentProperties();
-  var row = parseInt(props.getProperty('multiSelectRow'), 10);
-  var col = parseInt(props.getProperty('multiSelectCol'), 10);
-
-  if (!row || !col) {
-    throw new Error('Target cell not found. Please try again.');
-  }
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  sheet.getRange(row, col).setValue(value);
-
-  // Clear stored properties
-  props.deleteProperty('multiSelectRow');
-  props.deleteProperty('multiSelectCol');
-}
 
 /**
  * Handle edit events to trigger multi-select dialog
  * This is installed as an onEdit trigger
  */
-function onEditMultiSelect(e) {
-  // Only process single cell edits
-  if (!e || !e.range) return;
-
-  var sheet = e.range.getSheet();
-  var sheetName = sheet.getName();
-
-  // Only Member Directory
-  if (sheetName !== SHEETS.MEMBER_DIR) return;
-
-  var col = e.range.getColumn();
-  var row = e.range.getRow();
-
-  // Skip header row
-  if (row < 2) return;
-
-  // Check if this is a multi-select column
-  var config = getMultiSelectConfig(col);
-  if (!config) return;
-
-  // If user typed something, show the dialog to help them select properly
-  // Only trigger if the new value isn't already comma-separated (user might be pasting)
-  var newValue = e.value || '';
-  var oldValue = e.oldValue || '';
-
-  // If user cleared the cell or pasted valid data, don't interrupt
-  if (newValue === '' || newValue.indexOf(',') !== -1) return;
-
-  // Show helpful toast
-  SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Tip: Use Dashboard menu > "Multi-Select Editor" for easier selection of multiple values.',
-    config.label,
-    5
-  );
-}
 
 /**
  * Handle selection change to auto-open multi-select dialog
  * This is installed as an onSelectionChange trigger
  */
-function onSelectionChangeMultiSelect(e) {
-  // Only process if we have a valid range
-  if (!e || !e.range) return;
-
-  var sheet = e.range.getSheet();
-  var sheetName = sheet.getName();
-
-  // Only Member Directory
-  if (sheetName !== SHEETS.MEMBER_DIR) return;
-
-  var col = e.range.getColumn();
-  var row = e.range.getRow();
-
-  // Skip header row and multi-cell selections
-  if (row < 2) return;
-  if (e.range.getNumRows() > 1 || e.range.getNumColumns() > 1) return;
-
-  // Check if this is a multi-select column
-  var config = getMultiSelectConfig(col);
-  if (!config) return;
-
-  // Check if we already showed dialog for this cell (avoid repeated opens)
-  var props = PropertiesService.getDocumentProperties();
-  var lastCell = props.getProperty('lastMultiSelectCell');
-  var currentCell = row + ',' + col;
-
-  if (lastCell === currentCell) return;
-
-  // Store current cell
-  props.setProperty('lastMultiSelectCell', currentCell);
-
-  // Auto-open the multi-select dialog
-  openCellMultiSelectEditor();
-}
 
 /**
  * Install the multi-select auto-open trigger
  * Run this once to enable auto-open on cell selection
  */
-function installMultiSelectTrigger() {
-  var ui = SpreadsheetApp.getUi();
-
-  // Note: onSelectionChange triggers cannot be created programmatically
-  // User must set this up manually in Apps Script editor
-  ui.alert('☑️ Multi-Select Auto-Open Setup',
-    'To enable auto-open for multi-select cells:\n\n' +
-    '1. Go to Extensions → Apps Script\n' +
-    '2. Click the clock icon (Triggers) in the left sidebar\n' +
-    '3. Click "+ Add Trigger"\n' +
-    '4. Choose function: onSelectionChangeMultiSelect\n' +
-    '5. Select event type: "On change" or "On edit"\n' +
-    '6. Click Save\n\n' +
-    'Alternatively, use the manual method:\n' +
-    '• Select a multi-select cell\n' +
-    '• Go to Tools → Multi-Select → Open Editor',
-    ui.ButtonSet.OK);
-}
 
 /**
  * Remove the multi-select auto-open trigger
  */
-function removeMultiSelectTrigger() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var triggers = ScriptApp.getUserTriggers(ss);
-  var removed = false;
-
-  triggers.forEach(function(trigger) {
-    if (trigger.getHandlerFunction() === 'onSelectionChangeMultiSelect') {
-      ScriptApp.deleteTrigger(trigger);
-      removed = true;
-    }
-  });
-
-  if (removed) {
-    SpreadsheetApp.getUi().alert('Multi-Select auto-open has been disabled.');
-  } else {
-    SpreadsheetApp.getUi().alert('No multi-select trigger was found.');
-  }
-}
 
 // ============================================================================
 // DIAGNOSE FUNCTION
@@ -3680,24 +3251,6 @@ function createFeaturesReferenceSheet(ss) {
  * Get locations for desktop search filter dropdown
  * @returns {Array} Array of unique locations
  */
-function getDesktopSearchLocations() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var locations = [];
-
-  // Get locations from Member Directory
-  var mSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (mSheet && mSheet.getLastRow() > 1) {
-    var mData = mSheet.getRange(2, MEMBER_COLS.WORK_LOCATION, mSheet.getLastRow() - 1, 1).getValues();
-    mData.forEach(function(row) {
-      var loc = row[0];
-      if (loc && locations.indexOf(loc) === -1) {
-        locations.push(loc);
-      }
-    });
-  }
-
-  return locations.sort();
-}
 
 /**
  * Get search data for desktop search
@@ -3707,111 +3260,6 @@ function getDesktopSearchLocations() {
  * @param {Object} filters - Additional filters: status, location, isSteward
  * @returns {Array} Array of search results
  */
-function getDesktopSearchData(query, tab, filters) {
-  var results = [];
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var q = (query || '').toLowerCase();
-  filters = filters || {};
-
-  // Search Members
-  if (tab === 'all' || tab === 'members') {
-    var mSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-    if (mSheet && mSheet.getLastRow() > 1) {
-      var lastCol = Math.max(MEMBER_COLS.IS_STEWARD, MEMBER_COLS.WORK_LOCATION, MEMBER_COLS.JOB_TITLE, MEMBER_COLS.EMAIL);
-      var mData = mSheet.getRange(2, 1, mSheet.getLastRow() - 1, lastCol).getValues();
-
-      mData.forEach(function(row, index) {
-        var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
-        var firstName = row[MEMBER_COLS.FIRST_NAME - 1] || '';
-        var lastName = row[MEMBER_COLS.LAST_NAME - 1] || '';
-        var fullName = firstName + ' ' + lastName;
-        var email = row[MEMBER_COLS.EMAIL - 1] || '';
-        var jobTitle = row[MEMBER_COLS.JOB_TITLE - 1] || '';
-        var location = row[MEMBER_COLS.WORK_LOCATION - 1] || '';
-        var isSteward = row[MEMBER_COLS.IS_STEWARD - 1] || '';
-
-        // Apply filters
-        if (filters.location && location !== filters.location) return;
-        if (filters.isSteward && isSteward !== filters.isSteward) return;
-
-        // Search across fields
-        var searchable = (memberId + ' ' + fullName + ' ' + email + ' ' + jobTitle + ' ' + location).toLowerCase();
-        if (q.length >= 2 && searchable.indexOf(q) === -1) return;
-
-        // Skip if no query and no filters
-        if (q.length < 2 && !filters.location && !filters.isSteward) return;
-
-        results.push({
-          type: 'member',
-          id: memberId,
-          title: fullName.trim() || 'Unnamed Member',
-          email: email,
-          jobTitle: jobTitle,
-          location: location,
-          isSteward: isSteward,
-          row: index + 2 // 1-indexed + header row
-        });
-      });
-    }
-  }
-
-  // Search Grievances
-  if (tab === 'all' || tab === 'grievances') {
-    var gSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-    if (gSheet && gSheet.getLastRow() > 1) {
-      var lastGCol = Math.max(GRIEVANCE_COLS.STATUS, GRIEVANCE_COLS.ISSUE_CATEGORY, GRIEVANCE_COLS.LOCATION, GRIEVANCE_COLS.STEWARD, GRIEVANCE_COLS.DATE_FILED);
-      var gData = gSheet.getRange(2, 1, gSheet.getLastRow() - 1, lastGCol).getValues();
-
-      gData.forEach(function(row, index) {
-        var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '';
-        var firstName = row[GRIEVANCE_COLS.FIRST_NAME - 1] || '';
-        var lastName = row[GRIEVANCE_COLS.LAST_NAME - 1] || '';
-        var fullName = firstName + ' ' + lastName;
-        var status = row[GRIEVANCE_COLS.STATUS - 1] || '';
-        var issueType = row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
-        var location = row[GRIEVANCE_COLS.LOCATION - 1] || '';
-        var steward = row[GRIEVANCE_COLS.STEWARD - 1] || '';
-        var dateFiled = row[GRIEVANCE_COLS.DATE_FILED - 1] || '';
-
-        // Apply filters
-        if (filters.status && status !== filters.status) return;
-        if (filters.location && location !== filters.location) return;
-
-        // Search across fields
-        var searchable = (grievanceId + ' ' + fullName + ' ' + status + ' ' + issueType + ' ' + location + ' ' + steward).toLowerCase();
-        if (q.length >= 2 && searchable.indexOf(q) === -1) return;
-
-        // Skip if no query and no filters
-        if (q.length < 2 && !filters.status && !filters.location) return;
-
-        // Format date
-        var filedDateStr = '';
-        if (dateFiled) {
-          try {
-            filedDateStr = Utilities.formatDate(new Date(dateFiled), Session.getScriptTimeZone(), 'MM/dd/yyyy');
-          } catch(e) {
-            filedDateStr = dateFiled.toString();
-          }
-        }
-
-        results.push({
-          type: 'grievance',
-          id: grievanceId,
-          title: fullName.trim() || 'Unknown Member',
-          status: status,
-          issueType: issueType,
-          location: location,
-          steward: steward,
-          filedDate: filedDateStr,
-          row: index + 2
-        });
-      });
-    }
-  }
-
-  // Limit results
-  return results.slice(0, 50);
-}
 
 /**
  * Navigate to a search result in the spreadsheet
@@ -3819,25 +3267,6 @@ function getDesktopSearchData(query, tab, filters) {
  * @param {string} id - The record ID
  * @param {number} row - The row number
  */
-function navigateToSearchResult(type, id, row) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetName = type === 'member' ? SHEETS.MEMBER_DIR : SHEETS.GRIEVANCE_LOG;
-  var sheet = ss.getSheetByName(sheetName);
-
-  if (sheet && row) {
-    ss.setActiveSheet(sheet);
-    sheet.setActiveRange(sheet.getRange(row, 1));
-    SpreadsheetApp.flush();
-  }
-}
-
-function viewActiveGrievances() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (sheet) {
-    ss.setActiveSheet(sheet);
-  }
-}
 
 /**
  * Grievance Form Configuration
@@ -12099,74 +11528,16 @@ function setupCalcFormulasSheet(sheet) {
  * @param {string} cellRef - The cell reference (e.g., 'B4')
  * @return {*} The cell value
  */
-function getCalcValue(sheetName, cellRef) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-
-  if (!sheet) {
-    console.error(`Hidden sheet ${sheetName} not found`);
-    return null;
-  }
-
-  return sheet.getRange(cellRef).getValue();
-}
 
 /**
  * Gets department list from calc sheet
  * @return {string[]} Array of department names
  */
-function getDepartmentList() {
-  const formulaSheet = SpreadsheetApp.getActiveSpreadsheet()
-    .getSheetByName(HIDDEN_SHEETS.CALC_FORMULAS);
-
-  if (!formulaSheet) {
-    // Fallback to direct query
-    const memberSheet = SpreadsheetApp.getActiveSpreadsheet()
-      .getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
-
-    if (!memberSheet) return [];
-
-    const data = memberSheet.getRange(2, MEMBER_COLUMNS.DEPARTMENT + 1,
-      memberSheet.getLastRow() - 1, 1).getValues();
-
-    const depts = new Set();
-    data.forEach(row => {
-      if (row[0]) depts.add(row[0]);
-    });
-
-    return Array.from(depts).sort();
-  }
-
-  // Read from pre-calculated list
-  const deptData = formulaSheet.getRange('B4:B').getValues();
-  return deptData.filter(row => row[0]).map(row => row[0]);
-}
 
 /**
  * Gets member list for dropdowns
  * @return {Array} Array of member objects with id, name, department
  */
-function getMemberList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
-
-  if (!sheet) return [];
-
-  const data = sheet.getDataRange().getValues();
-  const members = [];
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLUMNS.ID]) {
-      members.push({
-        id: data[i][MEMBER_COLUMNS.ID],
-        name: `${data[i][MEMBER_COLUMNS.FIRST_NAME]} ${data[i][MEMBER_COLUMNS.LAST_NAME]}`,
-        department: data[i][MEMBER_COLUMNS.DEPARTMENT]
-      });
-    }
-  }
-
-  return members;
-}
 
 // ============================================================================
 // SEARCH FUNCTIONS (Used by UIService)
@@ -12179,169 +11550,15 @@ function getMemberList() {
  * @param {Object} filters - Additional filters
  * @return {Array} Search results
  */
-function searchDashboard(query, searchType, filters) {
-  const results = [];
-  const queryLower = query.toLowerCase();
-
-  // Search members
-  if (searchType === 'all' || searchType === 'members') {
-    const members = getMemberList();
-    members.forEach(m => {
-      if (m.name.toLowerCase().includes(queryLower) ||
-          m.id.toLowerCase().includes(queryLower) ||
-          m.department.toLowerCase().includes(queryLower)) {
-        results.push({
-          id: m.id,
-          type: 'member',
-          title: m.name,
-          subtitle: `${m.department} - ID: ${m.id}`
-        });
-      }
-    });
-  }
-
-  // Search grievances
-  if (searchType === 'all' || searchType === 'grievances') {
-    const grievances = getOpenGrievances();
-    grievances.forEach(g => {
-      const grievanceId = g['Grievance ID'] || '';
-      const memberName = g['Member Name'] || '';
-      const description = g['Description'] || '';
-      const status = g['Status'] || '';
-
-      if (grievanceId.toLowerCase().includes(queryLower) ||
-          memberName.toLowerCase().includes(queryLower) ||
-          description.toLowerCase().includes(queryLower)) {
-
-        // Apply status filter
-        if (filters.status && status.toLowerCase() !== filters.status.toLowerCase()) {
-          return;
-        }
-
-        results.push({
-          id: grievanceId,
-          type: 'grievance',
-          title: `${grievanceId} - ${memberName}`,
-          subtitle: `${status} - Step ${g['Current Step'] || 1}`
-        });
-      }
-    });
-  }
-
-  return results.slice(0, 50); // Limit results
-}
 
 /**
  * Quick search for instant results
  * @param {string} query - Search query
  * @return {Array} Quick search results
  */
-function quickSearchDashboard(query) {
-  if (!query || query.length < 2) return [];
-
-  const results = searchDashboard(query, 'all', {});
-  return results.slice(0, 10);
-}
 
 /**
  * Advanced search with complex filters
  * @param {Object} filters - Search filters
  * @return {Array} Search results
  */
-function advancedSearch(filters) {
-  const results = [];
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // Search members if included
-  if (filters.includeMembers) {
-    const memberSheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
-    if (memberSheet) {
-      const data = memberSheet.getDataRange().getValues();
-
-      for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        let matches = true;
-
-        // Keyword filter
-        if (filters.keywords) {
-          const keywords = filters.keywords.toLowerCase();
-          const rowText = row.join(' ').toLowerCase();
-          if (!rowText.includes(keywords)) matches = false;
-        }
-
-        // Department filter
-        if (filters.department && row[MEMBER_COLUMNS.DEPARTMENT] !== filters.department) {
-          matches = false;
-        }
-
-        if (matches && row[MEMBER_COLUMNS.ID]) {
-          results.push({
-            id: row[MEMBER_COLUMNS.ID],
-            type: 'Member',
-            name: `${row[MEMBER_COLUMNS.FIRST_NAME]} ${row[MEMBER_COLUMNS.LAST_NAME]}`,
-            details: row[MEMBER_COLUMNS.DEPARTMENT],
-            status: row[MEMBER_COLUMNS.STATUS] || 'Active',
-            date: row[MEMBER_COLUMNS.LAST_UPDATED] ?
-                  Utilities.formatDate(new Date(row[MEMBER_COLUMNS.LAST_UPDATED]),
-                    Session.getScriptTimeZone(), 'MM/dd/yyyy') : ''
-          });
-        }
-      }
-    }
-  }
-
-  // Search grievances if included
-  if (filters.includeGrievances) {
-    const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
-    if (grievanceSheet) {
-      const data = grievanceSheet.getDataRange().getValues();
-
-      for (let i = 1; i < data.length; i++) {
-        const row = data[i];
-        let matches = true;
-
-        // Keyword filter
-        if (filters.keywords) {
-          const keywords = filters.keywords.toLowerCase();
-          const rowText = row.join(' ').toLowerCase();
-          if (!rowText.includes(keywords)) matches = false;
-        }
-
-        // Status filter
-        if (filters.statuses && filters.statuses.length > 0) {
-          if (!filters.statuses.includes(row[GRIEVANCE_COLUMNS.STATUS])) {
-            matches = false;
-          }
-        }
-
-        // Date range filter
-        if (filters.dateFrom) {
-          const filingDate = new Date(row[GRIEVANCE_COLUMNS.FILING_DATE]);
-          const fromDate = new Date(filters.dateFrom);
-          if (filingDate < fromDate) matches = false;
-        }
-
-        if (filters.dateTo) {
-          const filingDate = new Date(row[GRIEVANCE_COLUMNS.FILING_DATE]);
-          const toDate = new Date(filters.dateTo);
-          if (filingDate > toDate) matches = false;
-        }
-
-        if (matches && row[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) {
-          results.push({
-            id: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-            type: 'Grievance',
-            name: `${row[GRIEVANCE_COLUMNS.GRIEVANCE_ID]} - ${row[GRIEVANCE_COLUMNS.MEMBER_NAME]}`,
-            details: row[GRIEVANCE_COLUMNS.GRIEVANCE_TYPE],
-            status: row[GRIEVANCE_COLUMNS.STATUS],
-            date: row[GRIEVANCE_COLUMNS.FILING_DATE] ?
-                  Utilities.formatDate(new Date(row[GRIEVANCE_COLUMNS.FILING_DATE]),
-                    Session.getScriptTimeZone(), 'MM/dd/yyyy') : ''
-          });
-        }
-      }
-    }
-  }
-
-  return results;
-}

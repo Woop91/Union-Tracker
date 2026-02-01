@@ -31,215 +31,6 @@
  * - 🛠️ Admin: System administration
  * Called automatically by onOpen trigger
  */
-function createDashboardMenu() {
-  const ui = SpreadsheetApp.getUi();
-
-  // ============================================================================
-  // MENU 1: 509 Union Hub - Primary Operations
-  // ============================================================================
-  ui.createMenu('📊 509 Union Hub')
-    // Dashboards at the top - most important
-    .addItem('👥 Member Dashboard', 'showPublicMemberDashboard')
-    .addItem('🛡️ Steward Dashboard', 'showStewardDashboard')
-    .addSeparator()
-
-    // Search - second most used
-    .addSubMenu(ui.createMenu('🔍 Search')
-      .addItem('🔍 Desktop Search', 'showDesktopSearch')
-      .addItem('⚡ Quick Search', 'showQuickSearch')
-      .addItem('🔎 Advanced Search', 'showAdvancedSearch'))
-
-    // Members management
-    .addSubMenu(ui.createMenu('👥 Members')
-      .addItem('➕ Add New Member', 'showNewMemberDialog')
-      .addItem('🔍 Find Member', 'showSearchDialog')
-      .addItem('🛡️ Steward Directory', 'showStewardDirectory')
-      .addSeparator()
-      .addItem('📥 Import Members', 'showImportMembersDialog')
-      .addItem('📤 Export Directory', 'showExportMembersDialog')
-      .addSeparator()
-      .addItem('🆔 Generate Missing IDs', 'generateMissingMemberIDs')
-      .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
-      .addSeparator()
-      .addItem('⬆️ Promote to Steward', 'promoteSelectedMemberToSteward')
-      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward'))
-
-    // Cases & Grievances
-    .addSubMenu(ui.createMenu('📋 Cases & Grievances')
-      .addItem('➕ New Case/Grievance', 'showNewGrievanceDialog')
-      .addItem('✏️ Edit Selected', 'showEditGrievanceDialog')
-      .addItem('✅ View Checklist', 'showChecklistDialog')
-      .addSeparator()
-      .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
-      .addItem('📄 Create PDF', 'createPDFForSelectedGrievance')
-      .addSeparator()
-      .addItem('🚦 Apply Traffic Lights', 'applyTrafficLightIndicators')
-      .addItem('🔄 Clear Traffic Lights', 'clearTrafficLightIndicators'))
-
-    // Analytics & Reports
-    .addSubMenu(ui.createMenu('📈 Analytics & Reports')
-      .addItem('📈 Case Analytics', 'showInteractiveDashboardTab')
-      .addItem('📊 Grievance Trends', 'showGrievanceTrends')
-      .addItem('🏥 Unit Health Report', 'showUnitHealthReport')
-      .addItem('📚 Search Precedents', 'showSearchPrecedents'))
-
-    .addSeparator()
-    .addItem('⚡ Quick Actions', 'showQuickActionsMenu')
-    .addItem('📖 Help & Documentation', 'showHelpDialog')
-    .addToUi();
-
-  // ============================================================================
-  // MENU 2: Tools - Supporting Features
-  // ============================================================================
-  ui.createMenu('🔧 Tools')
-    // Communication
-    .addSubMenu(ui.createMenu('📧 Communication')
-      .addItem('📧 Send Contact Form', 'sendContactInfoForm')
-      .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink')
-      .addItem('📧 Send Portal Email', 'sendPortalEmailToSelectedMember'))
-
-    // Calendar
-    .addSubMenu(ui.createMenu('📅 Calendar')
-      .addItem('🔗 Sync Deadlines', 'syncDeadlinesToCalendar')
-      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar')
-      .addItem('🗑️ Clear Calendar Events', 'clearAllCalendarEvents'))
-
-    // Google Drive
-    .addSubMenu(ui.createMenu('📁 Google Drive')
-      .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
-      .addItem('📁 View Grievance Files', 'showGrievanceFiles')
-      .addItem('📁 Batch Create Folders', 'batchCreateAllMissingFolders'))
-
-    // Notifications
-    .addSubMenu(ui.createMenu('🔔 Notifications')
-      .addItem('⚙️ Notification Settings', 'showNotificationSettings')
-      .addItem('🧪 Test Notifications', 'testDeadlineNotifications'))
-
-    .addSeparator()
-
-    // View & Display
-    .addSubMenu(ui.createMenu('🎛️ View & Display')
-      .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
-      .addItem('📱 Toggle Mobile View', 'toggleMobileView')
-      .addItem('📱 Pocket View', 'navToMobile')
-      .addItem('🖥️ Restore Desktop View', 'showAllMemberColumns')
-      .addSeparator()
-      .addItem('🎨 Apply Theme', 'APPLY_SYSTEM_THEME')
-      .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
-      .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'))
-
-    // Multi-Select Tools
-    .addSubMenu(ui.createMenu('📝 Multi-Select')
-      .addItem('📝 Open Editor', 'openCellMultiSelectEditor')
-      .addItem('⚡ Enable Auto-Open', 'installMultiSelectTrigger')
-      .addItem('🚫 Disable Auto-Open', 'removeMultiSelectTrigger'))
-
-    // OCR Tools
-    .addSubMenu(ui.createMenu('📝 OCR Tools')
-      .addItem('📝 OCR Transcribe Form', 'showOCRDialog')
-      .addItem('🔧 OCR Setup', 'setupOCRApiKey'))
-
-    .addSeparator()
-
-    // Web App & Portal
-    .addSubMenu(ui.createMenu('🌐 Web App & Portal')
-      .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
-      .addItem('👤 Build Member Portal', 'buildPortalForSelectedMember')
-      .addItem('📊 Build Public Portal', 'buildPublicPortal'))
-
-    // Maintenance
-    .addSubMenu(ui.createMenu('🔄 Maintenance')
-      .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
-      .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
-      .addItem('🔄 Refresh View', 'refreshMemberView'))
-
-    .addToUi();
-
-  // ============================================================================
-  // MENU 3: Admin - System Administration
-  // ============================================================================
-  var adminMenu = ui.createMenu('🛠️ Admin')
-    // Diagnostics & Repair at top
-    .addItem('🩺 System Diagnostics', 'showDiagnosticsDialog')
-    .addItem('🔍 Modal Diagnostics', 'showModalDiagnostics')
-    .addItem('🔧 Repair Dashboard', 'showRepairDialog')
-    .addItem('⚙️ Settings', 'showSettingsDialog')
-    .addSeparator()
-
-    // Data Sync
-    .addSubMenu(ui.createMenu('🔄 Data Sync')
-      .addItem('🔄 Sync All Data Now', 'syncAllData')
-      .addItem('🔄 Sync Grievance → Members', 'syncGrievanceToMemberDirectory')
-      .addItem('🔄 Sync Members → Grievances', 'syncMemberToGrievanceLog')
-      .addSeparator()
-      .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
-      .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
-
-    // Validation
-    .addSubMenu(ui.createMenu('✅ Validation')
-      .addItem('🔍 Run Bulk Validation', 'runBulkValidation')
-      .addItem('⚙️ Validation Settings', 'showValidationSettings')
-      .addItem('🧹 Clear Indicators', 'clearValidationIndicators')
-      .addItem('⚡ Install Validation Trigger', 'installValidationTrigger'))
-
-    // Automation
-    .addSubMenu(ui.createMenu('⚙️ Automation')
-      .addItem('🔄 Force Global Refresh', 'refreshAllVisuals')
-      .addItem('🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger')
-      .addItem('❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger')
-      .addItem('🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers')
-      .addItem('📑 Email Weekly PDF Snapshot', 'emailExecutivePDF'))
-
-    // Cache & Performance
-    .addSubMenu(ui.createMenu('🗄️ Cache & Performance')
-      .addItem('🗄️ Cache Status', 'showCacheStatusDashboard')
-      .addItem('🔥 Warm Up Caches', 'warmUpCaches')
-      .addItem('🗑️ Clear All Caches', 'invalidateAllCaches'))
-
-    // Security & Backup
-    .addSubMenu(ui.createMenu('🛡️ Security & Backup')
-      .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
-      .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
-      .addItem('📜 View Audit Log', 'navigateToAuditLog')
-      .addItem('📊 v4.0 Status Report', 'showV4StatusReport'))
-
-    .addSeparator()
-
-    // Styling
-    .addSubMenu(ui.createMenu('🎨 Styling')
-      .addItem('🎨 Apply Config Sheet Styling', 'applyConfigStyling')
-      .addItem('🎨 Apply Tab Colors', 'applyTabColors')
-      .addItem('🖌️ Setup Theme Columns', 'setupThemeColumns'))
-
-    // Setup
-    .addSubMenu(ui.createMenu('🏗️ Setup')
-      .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
-      .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
-      .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
-      .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
-      .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
-      .addSeparator()
-      .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
-      .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
-      .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
-      .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
-      .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
-
-  // Only show Demo Data menu if NOT in production mode
-  if (!isProductionMode()) {
-    adminMenu.addSeparator()
-      .addSubMenu(ui.createMenu('🎭 Demo Data')
-        .addItem('🚀 Seed All Sample Data', 'SEED_SAMPLE_DATA')
-        .addItem('👥 Seed Members Only...', 'SEED_MEMBERS_DIALOG')
-        .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
-        .addSeparator()
-        .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
-        .addSeparator()
-        .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
-  }
-
-  adminMenu.addToUi();
-}
 
 /**
  * Shows the Visual Control Panel sidebar
@@ -531,22 +322,11 @@ function getVisualControlPanelHtml() {
  * @param {string} setting - Setting name
  * @param {boolean} value - Setting value
  */
-function saveVisualSetting(setting, value) {
-  var userProps = PropertiesService.getUserProperties();
-  userProps.setProperty('visual_' + setting, value.toString());
-  return 'Setting saved';
-}
 
 /**
  * Applies a dashboard theme
  * @param {string} theme - Theme name (default, dark, light, contrast)
  */
-function applyDashboardTheme(theme) {
-  var userProps = PropertiesService.getUserProperties();
-  userProps.setProperty('dashboard_theme', theme);
-  // Theme application would be done on next dashboard refresh
-  return 'Theme set to ' + theme;
-}
 
 /**
  * Helper functions for navigation
@@ -563,15 +343,6 @@ function showStewardDirectory() {
   SpreadsheetApp.getActive().toast('Filter by "Is Steward = Yes" to see steward directory', 'Steward Directory', 5);
 }
 
-function toggleDarkMode() {
-  SpreadsheetApp.getActive().toast('Dark Mode toggle - use Visual Control Panel for full options', 'Theme', 3);
-  showVisualControlPanel();
-}
-
-function showThemeSettings() {
-  showVisualControlPanel();
-}
-
 // ============================================================================
 // NAVIGATION HELPERS (Strategic Command Center)
 // ============================================================================
@@ -579,49 +350,16 @@ function showThemeSettings() {
 /**
  * Navigate to Executive Dashboard (now launches modal)
  */
-function navToDash() {
-  // Launches Interactive Dashboard modal (was: sheet navigation)
-  showInteractiveDashboardTab();
-}
 
 /**
  * Navigate to Mobile View (if exists)
  * NOTE: Duplicate exists in 10_CommandCenter.gs - this version kept for compatibility
  */
-function navToMobile_UIService_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var mobileSheet = ss.getSheetByName('📱 Mobile View');
-
-  if (mobileSheet) {
-    mobileSheet.activate();
-  } else {
-    // Fall back to showing the mobile-optimized sidebar
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Mobile View sheet not found. Use the web app for best mobile experience.',
-      COMMAND_CONFIG.SYSTEM_NAME,
-      5
-    );
-  }
-}
 
 /**
  * Navigate to a specific sheet by name
  * @param {string} sheetName - The sheet name to navigate to
  */
-function navigateToSheet(sheetName) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName);
-
-  if (sheet) {
-    sheet.activate();
-  } else {
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Sheet "' + sheetName + '" not found',
-      'Navigation Error',
-      3
-    );
-  }
-}
 
 // ============================================================================
 // GLOBAL STYLING (Strategic Command Center)
@@ -631,32 +369,6 @@ function navigateToSheet(sheetName) {
  * Applies the system theme to all visible sheets
  * Includes header styling, zebra striping, and font standardization
  */
-function APPLY_SYSTEM_THEME() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheets();
-  var sheetsStyled = 0;
-
-  ss.toast('Applying theme to all sheets...', COMMAND_CONFIG.SYSTEM_NAME, 10);
-
-  sheets.forEach(function(sheet) {
-    var sheetName = sheet.getName();
-
-    // Skip hidden sheets
-    if (sheet.isSheetHidden()) return;
-
-    // Skip sheets starting with underscore (calculation sheets)
-    if (sheetName.startsWith('_')) return;
-
-    try {
-      applyThemeToSheet_(sheet);
-      sheetsStyled++;
-    } catch (e) {
-      Logger.log('Failed to style sheet ' + sheetName + ': ' + e.message);
-    }
-  });
-
-  ss.toast('Theme applied to ' + sheetsStyled + ' sheets', COMMAND_CONFIG.SYSTEM_NAME, 5);
-}
 
 /**
  * Applies theme styling to a single sheet
@@ -664,110 +376,14 @@ function APPLY_SYSTEM_THEME() {
  * @param {Sheet} sheet - The sheet to style
  * @private
  */
-function applyThemeToSheet_(sheet) {
-  var sheetName = sheet.getName();
-  var lastCol = sheet.getLastColumn();
-
-  if (lastCol < 1) lastCol = 26; // Default columns for empty sheets
-
-  // For data sheets, style ALL rows using getMaxRows() for consistent appearance
-  var isDataSheet = (sheetName === SHEETS.MEMBER_DIR || sheetName === SHEETS.GRIEVANCE_LOG);
-  var rowsToStyle = isDataSheet ? sheet.getMaxRows() : sheet.getLastRow();
-
-  if (rowsToStyle < 1) return;
-
-  // Style header row
-  var headerRange = sheet.getRange(1, 1, 1, lastCol);
-  headerRange.setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
-             .setFontColor(COMMAND_CONFIG.THEME.HEADER_TEXT)
-             .setFontWeight('bold')
-             .setFontFamily(COMMAND_CONFIG.THEME.FONT)
-             .setFontSize(11)
-             .setVerticalAlignment('middle');
-
-  // Apply font to all data rows
-  if (rowsToStyle > 1) {
-    var dataRange = sheet.getRange(2, 1, rowsToStyle - 1, lastCol);
-    dataRange.setFontFamily(COMMAND_CONFIG.THEME.FONT)
-             .setFontSize(COMMAND_CONFIG.THEME.FONT_SIZE)
-             .setVerticalAlignment('middle');
-
-    // Use banding for efficient zebra striping on data sheets
-    if (isDataSheet) {
-      var bandings = dataRange.getBandings();
-      if (bandings.length > 0) bandings[0].remove();
-      dataRange.applyRowBanding()
-        .setHeaderRowColor(null)
-        .setFirstRowColor('#ffffff')
-        .setSecondRowColor(COMMAND_CONFIG.THEME.ALT_ROW || '#f8f9fa');
-    } else {
-      // Row-by-row for other sheets (smaller data sets)
-      var actualLastRow = sheet.getLastRow();
-      for (var row = 2; row <= actualLastRow; row++) {
-        var rowRange = sheet.getRange(row, 1, 1, lastCol);
-        if (row % 2 === 0) {
-          rowRange.setBackground(COMMAND_CONFIG.THEME.ALT_ROW);
-        } else {
-          rowRange.setBackground(null);
-        }
-      }
-    }
-  }
-
-  // Freeze header row
-  sheet.setFrozenRows(1);
-}
 
 /**
  * Applies global styling to all visible sheets (alias for APPLY_SYSTEM_THEME)
  */
-function applyGlobalStyling() {
-  APPLY_SYSTEM_THEME();
-}
 
 /**
  * Resets all visible sheets to default styling
  */
-function resetToDefaultTheme() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
-
-  var response = ui.alert(
-    'Reset Theme',
-    'This will reset all sheets to default styling (white background, black text).\n\nContinue?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response !== ui.Button.YES) return;
-
-  var sheets = ss.getSheets();
-
-  sheets.forEach(function(sheet) {
-    if (sheet.isSheetHidden()) return;
-    if (sheet.getName().startsWith('_')) return;
-
-    var lastRow = sheet.getLastRow();
-    var lastCol = sheet.getLastColumn();
-
-    if (lastRow < 1 || lastCol < 1) return;
-
-    try {
-      var allRange = sheet.getRange(1, 1, lastRow, lastCol);
-      allRange.setBackground(null)
-              .setFontColor(null)
-              .setFontWeight('normal')
-              .setFontFamily('Arial')
-              .setFontSize(10);
-
-      // Keep headers bold
-      sheet.getRange(1, 1, 1, lastCol).setFontWeight('bold');
-    } catch (e) {
-      Logger.log('Failed to reset sheet ' + sheet.getName() + ': ' + e.message);
-    }
-  });
-
-  ss.toast('Theme reset to defaults', COMMAND_CONFIG.SYSTEM_NAME, 5);
-}
 
 /**
  * Refreshes visual elements - simple version
@@ -816,58 +432,6 @@ function refreshVisualsSimple_() {
  * Refreshes all visual elements, data calculations, and alerts
  * Main entry point for Force Global Refresh menu item
  */
-function refreshAllVisuals() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  ss.toast('Refreshing all visuals and data...', COMMAND_CONFIG.SYSTEM_NAME, 10);
-
-  // Refresh hidden calculation sheets if available
-  try {
-    if (typeof rebuildAllHiddenSheets === 'function') {
-      rebuildAllHiddenSheets();
-    }
-  } catch (e) {
-    Logger.log('Hidden sheets refresh error: ' + e.message);
-  }
-
-  // Apply traffic light indicators
-  try {
-    if (typeof applyTrafficLightIndicators === 'function') {
-      applyTrafficLightIndicators();
-    }
-  } catch (e) {
-    Logger.log('Traffic lights error: ' + e.message);
-  }
-
-  // Apply global theme
-  try {
-    if (typeof APPLY_SYSTEM_THEME === 'function') {
-      APPLY_SYSTEM_THEME();
-    }
-  } catch (e) {
-    Logger.log('Theme error: ' + e.message);
-  }
-
-  // Check for alerts
-  try {
-    if (typeof checkDashboardAlerts === 'function') {
-      checkDashboardAlerts();
-    }
-  } catch (e) {
-    Logger.log('Alert check error: ' + e.message);
-  }
-
-  // Sync checklist progress if available
-  try {
-    if (typeof syncChecklistCalcToGrievanceLog === 'function') {
-      syncChecklistCalcToGrievanceLog();
-    }
-  } catch (e) {
-    Logger.log('Checklist sync error: ' + e.message);
-  }
-
-  ss.toast('All visuals refreshed!', COMMAND_CONFIG.SYSTEM_NAME, 5);
-}
 
 // ============================================================================
 // SEARCH DIALOGS
@@ -2075,9 +1639,6 @@ function getCommonStyles() {
  * @param {string} message - Message to display
  * @param {string} title - Optional title
  */
-function showToast(message, title) {
-  SpreadsheetApp.getActiveSpreadsheet().toast(message, title || 'Dashboard', 5);
-}
 
 /**
  * Shows a confirmation dialog
@@ -2085,20 +1646,12 @@ function showToast(message, title) {
  * @param {string} title - Dialog title
  * @return {boolean} True if user confirmed
  */
-function showConfirmation(message, title) {
-  const ui = SpreadsheetApp.getUi();
-  const response = ui.alert(title || 'Confirm', message, ui.ButtonSet.YES_NO);
-  return response === ui.Button.YES;
-}
 
 /**
  * Shows an alert dialog
  * @param {string} message - Alert message
  * @param {string} title - Dialog title
  */
-function showAlert(message, title) {
-  SpreadsheetApp.getUi().alert(title || 'Alert', message, SpreadsheetApp.getUi().ButtonSet.OK);
-}
 
 // navigateToSheet() - REMOVED DUPLICATE - see line 565 for main definition
 
@@ -2107,31 +1660,6 @@ function showAlert(message, title) {
  * @param {string} id - Record ID
  * @param {string} type - Record type ('member' or 'grievance')
  */
-function navigateToRecord(id, type) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet, idColumn;
-
-  if (type === 'member') {
-    sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
-    idColumn = MEMBER_COLUMNS.ID + 1;
-  } else if (type === 'grievance') {
-    sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
-    idColumn = GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1;
-  }
-
-  if (!sheet) return;
-
-  ss.setActiveSheet(sheet);
-
-  // Find the row with matching ID
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][idColumn - 1] === id) {
-      sheet.setActiveRange(sheet.getRange(i + 1, 1));
-      break;
-    }
-  }
-}
 /**
  * ============================================================================
  * COMFORT VIEW ACCESSIBILITY & THEMING
@@ -2159,103 +1687,7 @@ var THEME_CONFIG = {
 
 // ==================== COMFORT VIEW SETTINGS ====================
 
-function getADHDSettings() {
-  var props = PropertiesService.getUserProperties();
-  var settingsJSON = props.getProperty('adhdSettings');
-  if (settingsJSON) return JSON.parse(settingsJSON);
-  return { theme: 'default', fontSize: 10, zebraStripes: false, gridlines: true, reducedMotion: false, breakInterval: 0 };
-}
-
-function saveADHDSettings(settings) {
-  var props = PropertiesService.getUserProperties();
-  var current = getADHDSettings();
-  var newSettings = Object.assign({}, current, settings);
-  props.setProperty('adhdSettings', JSON.stringify(newSettings));
-  applyADHDSettings(newSettings);
-}
-
-function applyADHDSettings(settings) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheets();
-  sheets.forEach(function(sheet) {
-    if (settings.fontSize) sheet.getDataRange().setFontSize(parseInt(settings.fontSize));
-    if (settings.zebraStripes) applyZebraStripes(sheet);
-    if (settings.gridlines !== undefined) sheet.setHiddenGridlines(!settings.gridlines);
-  });
-}
-
-function resetADHDSettings() {
-  PropertiesService.getUserProperties().deleteProperty('adhdSettings');
-  SpreadsheetApp.getActiveSpreadsheet().toast('✅ Comfort View settings reset', 'Settings', 3);
-}
-
 // ==================== VISUAL HELPERS ====================
-
-function hideAllGridlines() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.getSheets().forEach(function(sheet) {
-    var name = sheet.getName();
-    if (name !== SHEETS.CONFIG && name !== SHEETS.MEMBER_DIR && name !== SHEETS.GRIEVANCE_LOG) {
-      sheet.setHiddenGridlines(true);
-    }
-  });
-  SpreadsheetApp.getUi().alert('✅ Gridlines hidden on dashboards!');
-}
-
-function showAllGridlines() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.getSheets().forEach(function(sheet) { sheet.showGridlines(); });
-  SpreadsheetApp.getUi().alert('✅ Gridlines shown on all sheets.');
-}
-
-function toggleGridlinesADHD() {
-  var settings = getADHDSettings();
-  settings.gridlines = !settings.gridlines;
-  saveADHDSettings(settings);
-}
-
-function applyZebraStripes(sheet) {
-  var sheetName = sheet.getName();
-
-  // For data sheets (Member Directory, Grievance Log), apply to ALL rows in the sheet
-  // Uses getMaxRows() to cover all existing and future rows
-  var isDataSheet = (sheetName === SHEETS.MEMBER_DIR || sheetName === SHEETS.GRIEVANCE_LOG);
-  var totalRows = isDataSheet ? sheet.getMaxRows() : sheet.getLastRow();
-
-  if (totalRows < 2) return;
-
-  var lastCol = sheet.getLastColumn() || 26; // Default to 26 columns if sheet is empty
-  var range = sheet.getRange(2, 1, totalRows - 1, lastCol);
-
-  // Remove existing bandings first
-  var bandings = range.getBandings();
-  if (bandings.length > 0) bandings[0].remove();
-
-  // Apply fresh banding
-  range.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, true, false);
-}
-
-function removeZebraStripes(sheet) {
-  sheet.getBandings().forEach(function(b) { b.remove(); });
-}
-
-function toggleZebraStripes() {
-  var settings = getADHDSettings();
-  settings.zebraStripes = !settings.zebraStripes;
-  saveADHDSettings(settings);
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.getSheets().forEach(function(sheet) {
-    if (settings.zebraStripes) applyZebraStripes(sheet);
-    else removeZebraStripes(sheet);
-  });
-  ss.toast(settings.zebraStripes ? '✅ Zebra stripes enabled' : '🔕 Zebra stripes disabled', 'Visual', 3);
-}
-
-function toggleReducedMotion() {
-  var settings = getADHDSettings();
-  settings.reducedMotion = !settings.reducedMotion;
-  saveADHDSettings(settings);
-}
 
 // ==================== FOCUS MODE ====================
 
@@ -2276,50 +1708,6 @@ function toggleReducedMotion() {
  * - Reducing cognitive load
  * - Preventing tab-switching distractions
  */
-function activateFocusMode() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var ui = SpreadsheetApp.getUi();
-  var active = ss.getActiveSheet();
-
-  // Count visible sheets to warn user
-  var visibleSheets = ss.getSheets().filter(function(s) { return !s.isSheetHidden(); });
-
-  if (visibleSheets.length === 1) {
-    ui.alert('🎯 Focus Mode',
-      'Focus mode is already active (only one sheet visible).\n\n' +
-      'To exit focus mode, use:\n' +
-      'Comfort View Menu > Exit Focus Mode',
-      ui.ButtonSet.OK);
-    return;
-  }
-
-  // Hide all sheets except active
-  ss.getSheets().forEach(function(sheet) {
-    if (sheet.getName() !== active.getName()) sheet.hideSheet();
-  });
-  active.setHiddenGridlines(true);
-
-  ui.alert('🎯 Focus Mode Activated',
-    'You are now in Focus Mode on: "' + active.getName() + '"\n\n' +
-    'WHAT THIS DOES:\n' +
-    '• Hides all other sheets to reduce distractions\n' +
-    '• Removes gridlines for a cleaner view\n\n' +
-    'TO EXIT:\n' +
-    '• Use menu: ♿ Comfort View > Exit Focus Mode\n' +
-    '• Or run: deactivateFocusMode()\n\n' +
-    '💡 Tip: Focus mode helps with deep work and reduces cognitive load.',
-    ui.ButtonSet.OK);
-}
-
-function deactivateFocusMode() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.getSheets().forEach(function(sheet) {
-    if (sheet.isSheetHidden()) sheet.showSheet();
-  });
-  var settings = getADHDSettings();
-  ss.getActiveSheet().setHiddenGridlines(!settings.gridlines);
-  ss.toast('✅ Focus mode deactivated', 'Focus Mode', 3);
-}
 
 // ==================== POMODORO TIMER ====================
 
@@ -2867,57 +2255,11 @@ function showBreakReminder() {
 
 // ==================== THEME MANAGEMENT ====================
 
-function getCurrentTheme() {
-  return PropertiesService.getUserProperties().getProperty('currentTheme') || THEME_CONFIG.DEFAULT_THEME;
-}
-
-function applyTheme(themeKey, scope) {
-  scope = scope || 'all';
-  var theme = THEME_CONFIG.THEMES[themeKey];
-  if (!theme) throw new Error('Invalid theme');
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = scope === 'all' ? ss.getSheets() : [ss.getActiveSheet()];
-  sheets.forEach(function(sheet) { applyThemeToSheet(sheet, theme); });
-  PropertiesService.getUserProperties().setProperty('currentTheme', themeKey);
-  ss.toast(theme.icon + ' ' + theme.name + ' theme applied!', 'Theme', 3);
-}
-
-function applyThemeToSheet(sheet, theme) {
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  if (lastRow === 0 || lastCol === 0) return;
-  var headerRange = sheet.getRange(1, 1, 1, lastCol);
-  headerRange.setBackground(theme.headerBackground).setFontColor(theme.headerText).setFontWeight('bold');
-  if (lastRow > 1) {
-    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
-    sheet.getBandings().forEach(function(b) { b.remove(); });
-    var banding = dataRange.applyRowBanding();
-    banding.setFirstRowColor(theme.oddRow).setSecondRowColor(theme.evenRow);
-    dataRange.setFontColor(theme.text);
-  }
-  sheet.setTabColor(theme.accent);
-}
-
-function previewTheme(themeKey) {
-  var theme = THEME_CONFIG.THEMES[themeKey];
-  if (!theme) throw new Error('Invalid theme');
-  applyThemeToSheet(SpreadsheetApp.getActiveSpreadsheet().getActiveSheet(), theme);
-  SpreadsheetApp.getActiveSpreadsheet().toast('👁️ Previewing ' + theme.name, 'Preview', 5);
-}
-
 /**
  * Resets to default theme using theme system
  * NOTE: Renamed to avoid duplicate. Use resetToDefaultTheme() for hard reset to defaults.
  * This version uses the theme system; resetToDefaultTheme() clears all styling.
  */
-function resetToDefaultThemeViaSystem_() {
-  applyTheme(THEME_CONFIG.DEFAULT_THEME, 'all');
-}
-
-function quickToggleDarkMode() {
-  var current = getCurrentTheme();
-  applyTheme(current === 'LIGHT' ? 'DARK' : 'LIGHT', 'all');
-}
 
 // ==================== COMFORT VIEW CONTROL PANEL ====================
 
@@ -2950,157 +2292,15 @@ function showThemeManager() {
  * Setup Comfort View defaults with options dialog
  * User can choose which settings to apply and settings can be undone
  */
-function setupADHDDefaults() {
-  var ui = SpreadsheetApp.getUi();
-  var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>' +
-    'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
-    '.container{background:white;padding:25px;border-radius:8px;max-width:500px}' +
-    'h2{color:#1a73e8;margin-top:0}' +
-    '.option{display:flex;align-items:center;padding:12px;margin:8px 0;background:#f8f9fa;border-radius:8px;cursor:pointer}' +
-    '.option:hover{background:#e8f0fe}' +
-    '.option input{margin-right:12px;width:18px;height:18px}' +
-    '.option-text{flex:1}' +
-    '.option-label{font-weight:bold;font-size:14px}' +
-    '.option-desc{font-size:12px;color:#666;margin-top:2px}' +
-    '.buttons{display:flex;gap:10px;margin-top:20px}' +
-    'button{padding:12px 24px;border:none;border-radius:4px;cursor:pointer;font-size:14px;flex:1}' +
-    '.primary{background:#1a73e8;color:white}' +
-    '.secondary{background:#e0e0e0;color:#333}' +
-    '.info{background:#e8f4fd;padding:15px;border-radius:8px;margin-bottom:15px;font-size:13px}' +
-    '</style></head><body><div class="container">' +
-    '<h2>🎨 Comfort View Setup</h2>' +
-    '<div class="info">💡 These settings can be undone anytime via the Comfort View Panel or by running "Undo Comfort View"</div>' +
-    '<div class="option" onclick="toggle(\'gridlines\')"><input type="checkbox" id="gridlines" checked><div class="option-text"><div class="option-label">Hide Gridlines</div><div class="option-desc">Reduce visual clutter by hiding sheet gridlines</div></div></div>' +
-    '<div class="option" onclick="toggle(\'zebra\')"><input type="checkbox" id="zebra"><div class="option-text"><div class="option-label">Zebra Stripes</div><div class="option-desc">Alternating row colors for easier reading</div></div></div>' +
-    '<div class="option" onclick="toggle(\'fontSize\')"><input type="checkbox" id="fontSize"><div class="option-text"><div class="option-label">Larger Font (12pt)</div><div class="option-desc">Increase default font size for better readability</div></div></div>' +
-    '<div class="option" onclick="toggle(\'focus\')"><input type="checkbox" id="focus"><div class="option-text"><div class="option-label">Focus Mode</div><div class="option-desc">Hide all sheets except the active one</div></div></div>' +
-    '<div class="buttons">' +
-    '<button class="secondary" onclick="google.script.host.close()">Cancel</button>' +
-    '<button class="primary" onclick="apply()">Apply Settings</button>' +
-    '</div></div>' +
-    '<script>' +
-    'function toggle(id){var cb=document.getElementById(id);cb.checked=!cb.checked}' +
-    'function apply(){' +
-    'var opts={gridlines:document.getElementById("gridlines").checked,zebra:document.getElementById("zebra").checked,fontSize:document.getElementById("fontSize").checked,focus:document.getElementById("focus").checked};' +
-    'google.script.run.withSuccessHandler(function(){google.script.host.close()}).applyADHDDefaultsWithOptions(opts)}' +
-    '</script></body></html>'
-  ).setWidth(500).setHeight(450);
-  ui.showModalDialog(html, '🎨 Comfort View Setup');
-}
 
 /**
  * Apply Comfort View defaults with selected options
  * @param {Object} options - Selected options
  */
-function applyADHDDefaultsWithOptions(options) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var applied = [];
-
-  try {
-    // Store previous settings for undo
-    var prevSettings = {
-      gridlinesWereHidden: [],
-      zebraWasApplied: false,
-      previousFontSize: 10
-    };
-
-    var sheets = ss.getSheets();
-
-    if (options.gridlines) {
-      sheets.forEach(function(sheet) {
-        var name = sheet.getName();
-        if (name !== SHEETS.CONFIG && name !== SHEETS.MEMBER_DIR && name !== SHEETS.GRIEVANCE_LOG) {
-          sheet.setHiddenGridlines(true);
-        }
-      });
-      applied.push('✅ Gridlines hidden on dashboard sheets');
-    }
-
-    if (options.zebra) {
-      sheets.forEach(function(sheet) {
-        applyZebraStripes(sheet);
-      });
-      saveADHDSettings({zebraStripes: true});
-      applied.push('✅ Zebra stripes applied');
-    }
-
-    if (options.fontSize) {
-      sheets.forEach(function(sheet) {
-        if (sheet.getLastRow() > 0) {
-          sheet.getDataRange().setFontSize(12);
-        }
-      });
-      saveADHDSettings({fontSize: 12});
-      applied.push('✅ Font size increased to 12pt');
-    }
-
-    if (options.focus) {
-      activateFocusMode();
-      applied.push('✅ Focus mode activated');
-    }
-
-    ss.toast(applied.join('\n'), '🎨 Setup Complete', 5);
-
-  } catch (e) {
-    SpreadsheetApp.getUi().alert('⚠️ Error: ' + e.message);
-  }
-}
 
 /**
  * Undo Comfort View defaults - restore original settings
  */
-function undoADHDDefaults() {
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.alert('↩️ Undo Comfort View',
-    'This will:\n\n' +
-    '• Show all gridlines\n' +
-    '• Remove zebra stripes\n' +
-    '• Reset font size to 10pt\n' +
-    '• Exit focus mode (show all sheets)\n\n' +
-    'Continue?',
-    ui.ButtonSet.YES_NO);
-
-  if (response !== ui.Button.YES) return;
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  try {
-    // Show all gridlines
-    ss.getSheets().forEach(function(sheet) {
-      sheet.setHiddenGridlines(false);
-    });
-
-    // Remove zebra stripes
-    ss.getSheets().forEach(function(sheet) {
-      removeZebraStripes(sheet);
-    });
-
-    // Reset font size
-    ss.getSheets().forEach(function(sheet) {
-      if (sheet.getLastRow() > 0) {
-        sheet.getDataRange().setFontSize(10);
-      }
-    });
-
-    // Exit focus mode
-    deactivateFocusMode();
-
-    // Reset stored settings
-    resetADHDSettings();
-
-    ui.alert('↩️ Undo Complete',
-      'Comfort View defaults have been reset:\n\n' +
-      '✅ Gridlines restored\n' +
-      '✅ Zebra stripes removed\n' +
-      '✅ Font size reset to 10pt\n' +
-      '✅ Focus mode deactivated',
-      ui.ButtonSet.OK);
-
-  } catch (e) {
-    ui.alert('⚠️ Error: ' + e.message);
-  }
-}
 /**
  * ============================================================================
  * MOBILE INTERFACE & QUICK ACTIONS
@@ -5533,79 +4733,22 @@ function getInteractiveMemberFilters() {
 /**
  * Navigate to a specific member in the Member Directory sheet
  */
-function navigateToMemberInSheet(memberId) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (!sheet) return;
-
-  // Find the member row
-  var data = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1).getValues();
-  for (var i = 0; i < data.length; i++) {
-    if (data[i][0] === memberId) {
-      sheet.activate();
-      var row = i + 2; // Row 1 is header
-      sheet.setActiveRange(sheet.getRange(row, 1));
-      ss.toast('Navigated to ' + memberId, 'Member Found', 3);
-      return;
-    }
-  }
-  ss.toast('Member not found: ' + memberId, 'Not Found', 3);
-}
 
 /**
  * Navigate to a specific grievance in the Grievance Log sheet
  */
-function navigateToGrievanceInSheet(grievanceId) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (!sheet) return;
-
-  // Find the grievance row
-  var data = sheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, sheet.getLastRow() - 1, 1).getValues();
-  for (var i = 0; i < data.length; i++) {
-    if (data[i][0] === grievanceId) {
-      sheet.activate();
-      var row = i + 2; // Row 1 is header
-      sheet.setActiveRange(sheet.getRange(row, 1));
-      ss.toast('Navigated to ' + grievanceId, 'Grievance Found', 3);
-      return;
-    }
-  }
-  ss.toast('Grievance not found: ' + grievanceId, 'Not Found', 3);
-}
 
 /**
  * Show the Member Directory sheet
  */
-function showMemberDirectory() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (sheet) {
-    sheet.activate();
-  }
-}
 
 /**
  * Show the Grievance Log sheet
  */
-function showGrievanceLog() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-  if (sheet) {
-    sheet.activate();
-  }
-}
 
 /**
  * Show the Config sheet
  */
-function showConfigSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (sheet) {
-    sheet.activate();
-  }
-}
 
 /**
  * Save a member from the interactive dashboard (add or edit)
