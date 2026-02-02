@@ -1816,6 +1816,7 @@ function showFindMemberDialog() {
         <div id="results" class="results"></div>
       </div>
       <script>
+        function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\\//g,"&#x2F;");}
         document.getElementById('searchTerm').addEventListener('keypress', function(e) {
           if (e.key === 'Enter') searchMembers();
         });
@@ -1830,15 +1831,15 @@ function showFindMemberDialog() {
               } else {
                 results.forEach(function(m) {
                   html += '<div class="result-item" onclick="goToMember(' + m.row + ')">' +
-                    '<strong>' + m.name + '</strong><br>' +
-                    '<small>' + (m.id || 'No ID') + ' • ' + (m.email || 'No email') + '</small>' +
+                    '<strong>' + escapeHtml(m.name) + '</strong><br>' +
+                    '<small>' + escapeHtml(m.id || 'No ID') + ' • ' + escapeHtml(m.email || 'No email') + '</small>' +
                     '</div>';
                 });
               }
               document.getElementById('results').innerHTML = html;
             })
             .withFailureHandler(function(e) {
-              document.getElementById('results').innerHTML = '<div class="result-item">Error: ' + e.message + '</div>';
+              document.getElementById('results').innerHTML = '<div class="result-item">Error: ' + escapeHtml(e.message) + '</div>';
             })
             .searchMembersForDialog(term);
         }

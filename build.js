@@ -3,10 +3,15 @@
  * Concatenates all source files into a single consolidated .gs file
  *
  * Usage:
- *   node build.js           - Build only
+ *   node build.js           - Build only (includes all files)
+ *   node build.js --prod    - Production build (excludes DevTools.gs for security)
  *   node build.js --lint    - Lint before building
  *   node build.js --clean   - Clean dist directory
  *   node build.js --watch   - Watch for changes (not implemented)
+ *
+ * Production builds (--prod or --production):
+ *   Excludes development/test files that should not be deployed:
+ *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
  */
 
 const fs = require('fs');
@@ -174,6 +179,10 @@ function clean() {
 const args = process.argv.slice(2);
 const shouldLint = args.includes('--lint');
 const shouldClean = args.includes('--clean');
+const isProd = args.includes('--prod') || args.includes('--production');
+
+// Files to exclude in production builds (security: removes dev/test tools)
+const PROD_EXCLUDE = ['07_DevTools.gs'];
 
 // Execute based on arguments
 if (shouldClean) {
@@ -185,5 +194,14 @@ if (shouldClean) {
       process.exit(1);
     }
   }
+
+  // Filter out excluded files for production builds
+  if (isProd) {
+    console.log('Production build: Excluding DevTools...\n');
+    const filteredOrder = BUILD_ORDER.filter(f => !PROD_EXCLUDE.includes(f));
+    BUILD_ORDER.length = 0;
+    BUILD_ORDER.push(...filteredOrder);
+  }
+
   build();
 }
