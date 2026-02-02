@@ -48700,7 +48700,7 @@ function updateMemberContact(sessionToken, updates) {
       var value = String(updates[field] || '').trim();
 
       // Basic validation
-      if (field === 'email' && value && !isValidEmail_(value)) {
+      if (field === 'email' && value && !isValidEmailMSS_(value)) {
         return { success: false, error: 'Invalid email format' };
       }
       if (field === 'phone' && value) {
@@ -48732,10 +48732,10 @@ function updateMemberContact(sessionToken, updates) {
 }
 
 /**
- * Simple email validation
+ * Simple email validation (Member Self Service module)
  * @private
  */
-function isValidEmail_(email) {
+function isValidEmailMSS_(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
@@ -48781,10 +48781,10 @@ function getMemberGrievances(sessionToken) {
         status: data[i][GRIEVANCE_COLS.STATUS - 1] || '',
         currentStep: data[i][GRIEVANCE_COLS.CURRENT_STEP - 1] || '',
         issueCategory: data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
-        incidentDate: formatDate_(data[i][GRIEVANCE_COLS.INCIDENT_DATE - 1]),
-        filedDate: formatDate_(data[i][GRIEVANCE_COLS.DATE_FILED - 1]),
+        incidentDate: formatDateMSS_(data[i][GRIEVANCE_COLS.INCIDENT_DATE - 1]),
+        filedDate: formatDateMSS_(data[i][GRIEVANCE_COLS.DATE_FILED - 1]),
         steward: data[i][GRIEVANCE_COLS.STEWARD - 1] || '',
-        nextDeadline: formatDate_(data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1]),
+        nextDeadline: formatDateMSS_(data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1]),
         resolution: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '',
         outcome: data[i][GRIEVANCE_COLS.OUTCOME - 1] || ''
       });
@@ -48804,10 +48804,10 @@ function getMemberGrievances(sessionToken) {
 }
 
 /**
- * Format date for display
+ * Format date for display (Member Self Service module)
  * @private
  */
-function formatDate_(date) {
+function formatDateMSS_(date) {
   if (!date) return '';
   try {
     var d = new Date(date);
