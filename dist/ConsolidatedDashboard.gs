@@ -48602,11 +48602,11 @@ function showBulkGeneratePINDialog() {
 // ============================================================================
 
 /**
- * Get member's own profile data
+ * Get member's own profile data via session token (Member Self Service)
  * @param {string} sessionToken - Valid session token
  * @returns {Object} Member profile data
  */
-function getMemberProfile(sessionToken) {
+function getMemberProfileBySession(sessionToken) {
   var session = validateMemberSession(sessionToken);
   if (!session.valid) {
     return { success: false, error: 'Session expired. Please log in again.' };
@@ -49167,7 +49167,7 @@ function getMemberSelfServicePortalHtml() {
     '  google.script.run' +
     '    .withSuccessHandler(renderProfile)' +
     '    .withFailureHandler(function(e){document.getElementById("profileContent").innerHTML="<div class=\\"error\\">Failed to load profile</div>"})' +
-    '    .getMemberProfile(sessionToken);' +
+    '    .getMemberProfileBySession(sessionToken);' +
     '}' +
 
     'function renderProfile(result){' +
