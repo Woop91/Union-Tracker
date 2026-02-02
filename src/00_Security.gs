@@ -29,10 +29,10 @@ var ACCESS_CONTROL = {
   ENABLED: true,
 
   /** Allowed modes for web app */
-  ALLOWED_MODES: ['steward', 'member', 'dashboard', 'search', 'grievances', 'members', 'links', 'portal'],
+  ALLOWED_MODES: ['steward', 'member', 'dashboard', 'search', 'grievances', 'members', 'links', 'portal', 'selfservice'],
 
   /** Allowed page values */
-  ALLOWED_PAGES: ['dashboard', 'search', 'grievances', 'members', 'links', 'portal'],
+  ALLOWED_PAGES: ['dashboard', 'search', 'grievances', 'members', 'links', 'portal', 'selfservice'],
 
   /** Cache duration for authorization check (5 minutes) */
   AUTH_CACHE_DURATION: 300

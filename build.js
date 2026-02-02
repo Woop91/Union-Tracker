@@ -22,7 +22,7 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order - CONSOLIDATED to 15 files
+// Files in build order - CONSOLIDATED to 16 files
 const BUILD_ORDER = [
   '00_Security.gs',       // Security utilities, XSS prevention, access control
   '00_DataAccess.gs',     // Data Access Layer, time constants
@@ -38,7 +38,8 @@ const BUILD_ORDER = [
   '10_Code.gs',           // Core business logic (5,406 lines)
   '10_Main.gs',           // Main entry point (1,862 lines)
   '11_CommandHub.gs',     // Command center + Secure dashboard (3,627 lines)
-  '12_Features.gs'        // Checklist, Dynamic, Looker (3,970 lines)
+  '12_Features.gs',       // Checklist, Dynamic, Looker (3,970 lines)
+  '13_MemberSelfService.gs' // Member self-service portal with PIN auth
 ];
 
 const HTML_FILES = [

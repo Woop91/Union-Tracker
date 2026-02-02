@@ -1209,6 +1209,14 @@ function doGet(e) {
     case 'links':
       html = getWebAppLinksHtml();
       break;
+    case 'selfservice':
+      // v4.5.1: Member self-service portal with PIN authentication
+      if (typeof getMemberSelfServicePortalHtml === 'function') {
+        html = getMemberSelfServicePortalHtml();
+      } else {
+        return getAccessDeniedPage('Member self-service portal not available');
+      }
+      break;
     case 'portal':
       // Public portal without member ID
       if (typeof buildPublicPortal === 'function') {

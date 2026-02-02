@@ -128,7 +128,11 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('🌐 Web App & Portal')
       .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
       .addItem('👤 Build Member Portal', 'buildPortalForSelectedMember')
-      .addItem('📊 Build Public Portal', 'buildPublicPortal'))
+      .addItem('📊 Build Public Portal', 'buildPublicPortal')
+      .addSeparator()
+      .addItem('🔑 Generate Member PIN', 'showGeneratePINDialog')
+      .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
+      .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'))
 
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')

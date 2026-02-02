@@ -890,6 +890,9 @@ var MEMBER_COLS = {
   // Section 9: Quick Actions (AF)
   QUICK_ACTIONS: 32,               // AF - Checkbox to open Quick Actions dialog
 
+  // Section 10: Member Authentication (AG)
+  PIN_HASH: 33,                    // AG - Hashed PIN for member self-service portal
+
   // ALIASES - For backward compatibility
   LOCATION: 5,                     // Alias for WORK_LOCATION
   DAYS_TO_DEADLINE: 30             // Alias for NEXT_DEADLINE
