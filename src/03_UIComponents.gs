@@ -181,7 +181,11 @@ function createDashboardMenu() {
       .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
       .addItem('📜 View Audit Log', 'navigateToAuditLog')
-      .addItem('📊 v4.0 Status Report', 'showV4StatusReport'))
+      .addItem('📊 v4.0 Status Report', 'showV4StatusReport')
+      .addSeparator()
+      .addItem('🔐 Dashboard Auth Status', 'showDashboardAuthStatus')
+      .addItem('✅ Enable Dashboard Member Auth', 'enableDashboardMemberAuth')
+      .addItem('❌ Disable Dashboard Member Auth', 'disableDashboardMemberAuth'))
 
     .addSeparator()
 

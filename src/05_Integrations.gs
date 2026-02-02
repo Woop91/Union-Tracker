@@ -1181,6 +1181,23 @@ function doGet(e) {
   // Step 4: Standard page routing for mobile dashboard (legacy support)
   var page = validation.params.page || (e && e.parameter && e.parameter.page) || 'dashboard';
 
+  // v4.5.2: Check if dashboard member authentication is required (toggled via Admin menu)
+  // When enabled, redirect to selfservice portal for public dashboard pages
+  if (typeof isDashboardMemberAuthRequired === 'function' && isDashboardMemberAuthRequired()) {
+    var publicPages = ['dashboard', 'portal'];
+    if (publicPages.indexOf(page) >= 0 || !page) {
+      // Redirect to self-service portal for authentication
+      secureLog('doGet', 'Dashboard auth required - redirecting to selfservice', { requestedPage: page });
+      if (typeof getMemberSelfServicePortalHtml === 'function') {
+        var authHtml = getMemberSelfServicePortalHtml();
+        return HtmlService.createHtmlOutput(authHtml)
+          .setTitle('509 Member Login')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+    }
+  }
+
   // v4.5.1: Add authorization for sensitive pages (search, grievances, members)
   var sensitivePages = ['search', 'grievances', 'members'];
   if (sensitivePages.indexOf(page) >= 0) {

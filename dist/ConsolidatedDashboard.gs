@@ -33,7 +33,7 @@
  */
 
 // ============================================================================
-// SOURCE: 00_Security.gs (652 lines)
+// SOURCE: 00_Security.gs (726 lines)
 // ============================================================================
 
 /**
@@ -73,8 +73,82 @@ var ACCESS_CONTROL = {
   ALLOWED_PAGES: ['dashboard', 'search', 'grievances', 'members', 'links', 'portal', 'selfservice'],
 
   /** Cache duration for authorization check (5 minutes) */
-  AUTH_CACHE_DURATION: 300
+  AUTH_CACHE_DURATION: 300,
+
+  /** Property key for dashboard member auth toggle */
+  DASHBOARD_AUTH_PROPERTY: 'REQUIRE_MEMBER_AUTH_FOR_DASHBOARDS'
 };
+
+// ============================================================================
+// DASHBOARD ACCESS CONTROL TOGGLE
+// ============================================================================
+
+/**
+ * Check if member authentication is required for dashboard access
+ * Default: OFF (dashboards accessible without member login)
+ * @returns {boolean} True if member auth is required
+ */
+function isDashboardMemberAuthRequired() {
+  var props = PropertiesService.getScriptProperties();
+  var setting = props.getProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY);
+  return setting === 'true';
+}
+
+/**
+ * Enable member authentication requirement for dashboard access
+ * When enabled, all dashboard pages require member PIN login
+ */
+function enableDashboardMemberAuth() {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'true');
+  Logger.log('Dashboard member authentication ENABLED');
+
+  if (typeof secureLog === 'function') {
+    secureLog('DashboardAuthEnabled', 'Member auth required for dashboards', {});
+  }
+
+  SpreadsheetApp.getUi().alert(
+    'Dashboard Authentication Enabled',
+    'Members will now need to log in with their PIN to access dashboards.\n\n' +
+    'Make sure all members have PINs generated before enabling this.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Disable member authentication requirement for dashboard access
+ * When disabled, dashboards are accessible without member login (default)
+ */
+function disableDashboardMemberAuth() {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'false');
+  Logger.log('Dashboard member authentication DISABLED');
+
+  if (typeof secureLog === 'function') {
+    secureLog('DashboardAuthDisabled', 'Member auth not required for dashboards', {});
+  }
+
+  SpreadsheetApp.getUi().alert(
+    'Dashboard Authentication Disabled',
+    'Dashboards are now accessible without member PIN login.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Show current dashboard auth status
+ */
+function showDashboardAuthStatus() {
+  var isEnabled = isDashboardMemberAuthRequired();
+  SpreadsheetApp.getUi().alert(
+    'Dashboard Authentication Status',
+    'Member authentication for dashboards is currently: ' + (isEnabled ? 'ENABLED' : 'DISABLED') + '\n\n' +
+    (isEnabled
+      ? 'Members must log in with their PIN to access dashboards.'
+      : 'Dashboards are accessible without member login.'),
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
 
 // ============================================================================
 // XSS PREVENTION - HTML SANITIZATION
@@ -5979,7 +6053,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2526 lines)
+// SOURCE: 03_UIComponents.gs (2530 lines)
 // ============================================================================
 
 /**
@@ -6165,7 +6239,11 @@ function createDashboardMenu() {
       .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
       .addItem('📜 View Audit Log', 'navigateToAuditLog')
-      .addItem('📊 v4.0 Status Report', 'showV4StatusReport'))
+      .addItem('📊 v4.0 Status Report', 'showV4StatusReport')
+      .addSeparator()
+      .addItem('🔐 Dashboard Auth Status', 'showDashboardAuthStatus')
+      .addItem('✅ Enable Dashboard Member Auth', 'enableDashboardMemberAuth')
+      .addItem('❌ Disable Dashboard Member Auth', 'disableDashboardMemberAuth'))
 
     .addSeparator()
 
@@ -15637,7 +15715,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2395 lines)
+// SOURCE: 05_Integrations.gs (2412 lines)
 // ============================================================================
 
 /**
@@ -16822,6 +16900,23 @@ function doGet(e) {
 
   // Step 4: Standard page routing for mobile dashboard (legacy support)
   var page = validation.params.page || (e && e.parameter && e.parameter.page) || 'dashboard';
+
+  // v4.5.2: Check if dashboard member authentication is required (toggled via Admin menu)
+  // When enabled, redirect to selfservice portal for public dashboard pages
+  if (typeof isDashboardMemberAuthRequired === 'function' && isDashboardMemberAuthRequired()) {
+    var publicPages = ['dashboard', 'portal'];
+    if (publicPages.indexOf(page) >= 0 || !page) {
+      // Redirect to self-service portal for authentication
+      secureLog('doGet', 'Dashboard auth required - redirecting to selfservice', { requestedPage: page });
+      if (typeof getMemberSelfServicePortalHtml === 'function') {
+        var authHtml = getMemberSelfServicePortalHtml();
+        return HtmlService.createHtmlOutput(authHtml)
+          .setTitle('509 Member Login')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+    }
+  }
 
   // v4.5.1: Add authorization for sensitive pages (search, grievances, members)
   var sensitivePages = ['search', 'grievances', 'members'];
@@ -44792,7 +44887,7 @@ function getLookerStatus() {
 
 
 // ============================================================================
-// SOURCE: 13_MemberSelfService.gs (1232 lines)
+// SOURCE: 13_MemberSelfService.gs (1573 lines)
 // ============================================================================
 
 /**
@@ -44827,7 +44922,9 @@ var PIN_CONFIG = {
   LOCKOUT_MINUTES: 15,              // Lockout duration in minutes
   SESSION_DURATION_MINUTES: 30,     // Session duration before re-auth required
   PIN_COLUMN: 33,                   // AG column for PIN hash storage
-  SALT_PROPERTY: 'MEMBER_PIN_SALT'  // Property key for salt storage
+  SALT_PROPERTY: 'MEMBER_PIN_SALT', // Property key for salt storage
+  RESET_TOKEN_EXPIRY_MINUTES: 30,   // Reset token expiration time
+  RESET_TOKEN_PREFIX: 'pin_reset_'  // Cache key prefix for reset tokens
 };
 
 /**
@@ -44909,6 +45006,211 @@ function verifyPIN(pin, memberId, storedHash) {
 
   var computedHash = hashPIN(pin, memberId);
   return computedHash === storedHash;
+}
+
+// ============================================================================
+// EMAIL-BASED PIN RESET
+// ============================================================================
+
+/**
+ * Generate a secure reset token
+ * @returns {string} Random token string
+ * @private
+ */
+function generateResetToken_() {
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous characters
+  var token = '';
+  for (var i = 0; i < 8; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+/**
+ * Request a PIN reset - sends reset token via email
+ * @param {string} memberId - The member ID
+ * @returns {Object} Result with success status
+ */
+function requestPINReset(memberId) {
+  if (!memberId) {
+    return { success: false, error: 'Member ID is required' };
+  }
+
+  memberId = String(memberId).trim().toUpperCase();
+
+  // Find member and get their email
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    return { success: false, error: 'System error' };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var memberRow = null;
+  var memberEmail = null;
+  var memberName = null;
+
+  for (var i = 1; i < data.length; i++) {
+    var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    if (rowMemberId === memberId) {
+      memberRow = i + 1;
+      memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
+      memberName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '');
+      break;
+    }
+  }
+
+  if (!memberRow) {
+    // Don't reveal if member exists or not for security
+    return { success: true, message: 'If your Member ID is valid, a reset email has been sent.' };
+  }
+
+  if (!memberEmail) {
+    // Log but don't reveal to user
+    if (typeof secureLog === 'function') {
+      secureLog('PINResetRequest', 'Reset requested but no email on file', { memberId: memberId });
+    }
+    return { success: true, message: 'If your Member ID is valid, a reset email has been sent.' };
+  }
+
+  // Check if member even has a PIN set
+  var currentPinHash = data[memberRow - 1][PIN_CONFIG.PIN_COLUMN - 1];
+  if (!currentPinHash) {
+    // No PIN set - they need to contact a steward
+    return { success: true, message: 'If your Member ID is valid, a reset email has been sent.' };
+  }
+
+  // Generate reset token and store it
+  var resetToken = generateResetToken_();
+  var cache = CacheService.getScriptCache();
+  var cacheKey = PIN_CONFIG.RESET_TOKEN_PREFIX + memberId;
+
+  // Store token with member ID verification (expires in 30 minutes)
+  var tokenData = JSON.stringify({
+    token: resetToken,
+    memberId: memberId,
+    created: Date.now()
+  });
+  cache.put(cacheKey, tokenData, PIN_CONFIG.RESET_TOKEN_EXPIRY_MINUTES * 60);
+
+  // Send reset email
+  try {
+    var subject = '509 Union - PIN Reset Request';
+    var body = 'Hello ' + memberName.trim() + ',\n\n' +
+      'You requested a PIN reset for the Member Self-Service Portal.\n\n' +
+      'Your reset code is: ' + resetToken + '\n\n' +
+      'This code will expire in ' + PIN_CONFIG.RESET_TOKEN_EXPIRY_MINUTES + ' minutes.\n\n' +
+      'If you did not request this reset, please ignore this email or contact your union steward.\n\n' +
+      'Best regards,\n' +
+      'WFSE Local 509';
+
+    MailApp.sendEmail({
+      to: memberEmail,
+      subject: subject,
+      body: body
+    });
+
+    if (typeof secureLog === 'function') {
+      secureLog('PINResetSent', 'Reset token sent via email', { memberId: memberId });
+    }
+
+  } catch (e) {
+    Logger.log('Failed to send PIN reset email: ' + e.message);
+    if (typeof secureLog === 'function') {
+      secureLog('PINResetError', 'Failed to send reset email', { memberId: memberId, error: e.message });
+    }
+    return { success: false, error: 'Failed to send email. Please try again or contact your steward.' };
+  }
+
+  return { success: true, message: 'If your Member ID is valid, a reset email has been sent.' };
+}
+
+/**
+ * Complete PIN reset with token
+ * @param {string} memberId - The member ID
+ * @param {string} token - The reset token from email
+ * @param {string} newPin - The new PIN to set
+ * @returns {Object} Result with success status
+ */
+function completePINReset(memberId, token, newPin) {
+  if (!memberId || !token || !newPin) {
+    return { success: false, error: 'All fields are required' };
+  }
+
+  memberId = String(memberId).trim().toUpperCase();
+  token = String(token).trim().toUpperCase();
+  newPin = String(newPin).trim();
+
+  // Validate new PIN format
+  if (!/^\d{6}$/.test(newPin)) {
+    return { success: false, error: 'PIN must be exactly 6 digits' };
+  }
+
+  // Retrieve and verify token
+  var cache = CacheService.getScriptCache();
+  var cacheKey = PIN_CONFIG.RESET_TOKEN_PREFIX + memberId;
+  var storedData = cache.get(cacheKey);
+
+  if (!storedData) {
+    return { success: false, error: 'Reset code has expired or is invalid. Please request a new one.' };
+  }
+
+  var tokenData;
+  try {
+    tokenData = JSON.parse(storedData);
+  } catch (e) {
+    return { success: false, error: 'Invalid reset data. Please request a new code.' };
+  }
+
+  // Verify token matches
+  if (tokenData.token !== token || tokenData.memberId !== memberId) {
+    // Log failed attempt
+    if (typeof secureLog === 'function') {
+      secureLog('PINResetFailed', 'Invalid reset token', { memberId: memberId });
+    }
+    return { success: false, error: 'Invalid reset code. Please check and try again.' };
+  }
+
+  // Token is valid - update the PIN
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    return { success: false, error: 'System error' };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var memberRow = null;
+
+  for (var i = 1; i < data.length; i++) {
+    var rowMemberId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    if (rowMemberId === memberId) {
+      memberRow = i + 1;
+      break;
+    }
+  }
+
+  if (!memberRow) {
+    return { success: false, error: 'Member not found' };
+  }
+
+  // Hash and store new PIN
+  var newHash = hashPIN(newPin, memberId);
+  sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(newHash);
+
+  // Invalidate the reset token
+  cache.remove(cacheKey);
+
+  // Clear any lockouts for this member
+  cache.remove('pin_lockout_' + memberId);
+  cache.remove('pin_attempts_' + memberId);
+
+  if (typeof secureLog === 'function') {
+    secureLog('PINResetComplete', 'PIN successfully reset via email token', { memberId: memberId });
+  }
+
+  return { success: true, message: 'Your PIN has been reset successfully. You can now log in with your new PIN.' };
 }
 
 // ============================================================================
@@ -45789,6 +46091,54 @@ function getMemberSelfServicePortalHtml() {
     '<p style="text-align:center;margin-top:20px;font-size:13px;color:#666">' +
     'Don\\'t have a PIN? Contact your union steward.' +
     '</p>' +
+    '<p style="text-align:center;margin-top:10px">' +
+    '<a href="#" onclick="showResetRequest();return false" style="color:#059669;font-size:13px">Forgot your PIN?</a>' +
+    '</p>' +
+    '</div>' +
+    '</div>' +
+
+    // PIN Reset Request view
+    '<div id="resetRequestView" style="display:none">' +
+    '<div class="login-card">' +
+    '<h2>🔑 Reset PIN</h2>' +
+    '<p style="text-align:center;color:#666;margin-bottom:20px;font-size:14px">Enter your Member ID and we\\'ll send a reset code to your registered email.</p>' +
+    '<div class="field">' +
+    '<label for="resetMemberId">Member ID</label>' +
+    '<input type="text" id="resetMemberId" placeholder="Enter your Member ID" autocomplete="username">' +
+    '</div>' +
+    '<button class="btn btn-primary" id="requestResetBtn" onclick="requestReset()">Send Reset Code</button>' +
+    '<div id="resetRequestError" class="error" style="display:none"></div>' +
+    '<div id="resetRequestSuccess" class="success" style="display:none"></div>' +
+    '<p style="text-align:center;margin-top:20px">' +
+    '<a href="#" onclick="showLogin();return false" style="color:#059669;font-size:13px">← Back to Login</a>' +
+    '</p>' +
+    '</div>' +
+    '</div>' +
+
+    // PIN Reset Complete view (enter token + new PIN)
+    '<div id="resetCompleteView" style="display:none">' +
+    '<div class="login-card">' +
+    '<h2>🔐 Enter New PIN</h2>' +
+    '<p style="text-align:center;color:#666;margin-bottom:20px;font-size:14px">Enter the reset code from your email and choose a new PIN.</p>' +
+    '<div class="field">' +
+    '<label for="resetToken">Reset Code</label>' +
+    '<input type="text" id="resetToken" placeholder="8-character code from email" maxlength="8" style="text-transform:uppercase">' +
+    '</div>' +
+    '<div class="field">' +
+    '<label for="newPin">New PIN</label>' +
+    '<input type="password" id="newPin" placeholder="Enter new 6-digit PIN" maxlength="6" pattern="[0-9]*" inputmode="numeric">' +
+    '</div>' +
+    '<div class="field">' +
+    '<label for="confirmPin">Confirm PIN</label>' +
+    '<input type="password" id="confirmPin" placeholder="Confirm new PIN" maxlength="6" pattern="[0-9]*" inputmode="numeric">' +
+    '</div>' +
+    '<button class="btn btn-primary" id="completeResetBtn" onclick="completeReset()">Set New PIN</button>' +
+    '<div id="resetCompleteError" class="error" style="display:none"></div>' +
+    '<div id="resetCompleteSuccess" class="success" style="display:none"></div>' +
+    '<p style="text-align:center;margin-top:20px">' +
+    '<a href="#" onclick="showResetRequest();return false" style="color:#059669;font-size:13px">← Request New Code</a> | ' +
+    '<a href="#" onclick="showLogin();return false" style="color:#059669;font-size:13px">Back to Login</a>' +
+    '</p>' +
     '</div>' +
     '</div>' +
 
@@ -45872,6 +46222,92 @@ function getMemberSelfServicePortalHtml() {
     '  document.getElementById("loginError").style.display="none";' +
     '  document.getElementById("memberId").value="";' +
     '  document.getElementById("pin").value="";' +
+    '}' +
+
+    // PIN Reset - View switching
+    'var resetMemberIdStored="";' +
+    'function showLogin(){' +
+    '  document.getElementById("loginView").style.display="block";' +
+    '  document.getElementById("resetRequestView").style.display="none";' +
+    '  document.getElementById("resetCompleteView").style.display="none";' +
+    '  document.getElementById("loginError").style.display="none";' +
+    '}' +
+    'function showResetRequest(){' +
+    '  document.getElementById("loginView").style.display="none";' +
+    '  document.getElementById("resetRequestView").style.display="block";' +
+    '  document.getElementById("resetCompleteView").style.display="none";' +
+    '  document.getElementById("resetRequestError").style.display="none";' +
+    '  document.getElementById("resetRequestSuccess").style.display="none";' +
+    '}' +
+    'function showResetComplete(){' +
+    '  document.getElementById("loginView").style.display="none";' +
+    '  document.getElementById("resetRequestView").style.display="none";' +
+    '  document.getElementById("resetCompleteView").style.display="block";' +
+    '  document.getElementById("resetCompleteError").style.display="none";' +
+    '  document.getElementById("resetCompleteSuccess").style.display="none";' +
+    '}' +
+
+    // Request reset code
+    'function requestReset(){' +
+    '  var memberId=document.getElementById("resetMemberId").value.trim();' +
+    '  if(!memberId){document.getElementById("resetRequestError").textContent="Please enter your Member ID";document.getElementById("resetRequestError").style.display="block";return}' +
+    '  resetMemberIdStored=memberId;' +
+    '  document.getElementById("requestResetBtn").disabled=true;' +
+    '  document.getElementById("requestResetBtn").textContent="Sending...";' +
+    '  document.getElementById("resetRequestError").style.display="none";' +
+    '  document.getElementById("resetRequestSuccess").style.display="none";' +
+    '  google.script.run' +
+    '    .withSuccessHandler(handleResetRequest)' +
+    '    .withFailureHandler(function(e){document.getElementById("resetRequestError").textContent="Error: "+e.message;document.getElementById("resetRequestError").style.display="block";resetRequestBtn()})' +
+    '    .requestPINReset(memberId);' +
+    '}' +
+    'function handleResetRequest(result){' +
+    '  resetRequestBtn();' +
+    '  if(result.success){' +
+    '    document.getElementById("resetRequestSuccess").textContent=result.message+" Check your email for the reset code.";' +
+    '    document.getElementById("resetRequestSuccess").style.display="block";' +
+    '    setTimeout(function(){showResetComplete()},2000);' +
+    '  }else{' +
+    '    document.getElementById("resetRequestError").textContent=result.error;' +
+    '    document.getElementById("resetRequestError").style.display="block";' +
+    '  }' +
+    '}' +
+    'function resetRequestBtn(){' +
+    '  document.getElementById("requestResetBtn").disabled=false;' +
+    '  document.getElementById("requestResetBtn").textContent="Send Reset Code";' +
+    '}' +
+
+    // Complete reset with token
+    'function completeReset(){' +
+    '  var token=document.getElementById("resetToken").value.trim().toUpperCase();' +
+    '  var newPin=document.getElementById("newPin").value.trim();' +
+    '  var confirmPin=document.getElementById("confirmPin").value.trim();' +
+    '  var errEl=document.getElementById("resetCompleteError");' +
+    '  if(!token||!newPin||!confirmPin){errEl.textContent="All fields are required";errEl.style.display="block";return}' +
+    '  if(newPin!==confirmPin){errEl.textContent="PINs do not match";errEl.style.display="block";return}' +
+    '  if(!/^\\d{6}$/.test(newPin)){errEl.textContent="PIN must be exactly 6 digits";errEl.style.display="block";return}' +
+    '  document.getElementById("completeResetBtn").disabled=true;' +
+    '  document.getElementById("completeResetBtn").textContent="Setting PIN...";' +
+    '  errEl.style.display="none";' +
+    '  google.script.run' +
+    '    .withSuccessHandler(handleResetComplete)' +
+    '    .withFailureHandler(function(e){errEl.textContent="Error: "+e.message;errEl.style.display="block";resetCompleteBtn()})' +
+    '    .completePINReset(resetMemberIdStored,token,newPin);' +
+    '}' +
+    'function handleResetComplete(result){' +
+    '  resetCompleteBtn();' +
+    '  if(result.success){' +
+    '    document.getElementById("resetCompleteSuccess").textContent=result.message;' +
+    '    document.getElementById("resetCompleteSuccess").style.display="block";' +
+    '    setTimeout(function(){showLogin();document.getElementById("memberId").value=resetMemberIdStored},2000);' +
+    '  }else{' +
+    '    document.getElementById("resetCompleteError").textContent=result.error;' +
+    '    document.getElementById("resetCompleteError").style.display="block";' +
+    '  }' +
+    '}' +
+    'function resetCompleteBtn(){' +
+    '  document.getElementById("completeResetBtn").disabled=false;' +
+    '  document.getElementById("completeResetBtn").textContent="Set New PIN";' +
     '}' +
 
     // Tab switching
