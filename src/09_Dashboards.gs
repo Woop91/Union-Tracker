@@ -233,6 +233,8 @@ function getSatisfactionDashboardHtml() {
 
     // JavaScript
     '<script>' +
+    // XSS Prevention - escape HTML special characters
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'var allResponses=[];var currentFilter="all";var analyticsLoaded=false;var sectionsLoaded=false;' +
 
     // Tab switching
@@ -317,7 +319,7 @@ function getSatisfactionDashboardHtml() {
     '    var scoreClass=getScoreClass(r.avgScore);' +
     '    var scoreColor=getScoreColor(r.avgScore);' +
     '    return"<div class=\\"list-item\\" onclick=\\"toggleResponse(this)\\">' +
-    '      <div class=\\"list-item-header\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+r.worksite+" - "+r.role+"</div><div class=\\"list-item-subtitle\\">"+r.shift+" • "+r.timeInRole+" • "+r.date+"</div></div><div><span class=\\"score-indicator score-"+scoreClass+"\\" style=\\"color:"+scoreColor+"\\">"+r.avgScore.toFixed(1)+"/10</span></div></div>' +
+    '      <div class=\\"list-item-header\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+escapeHtml(r.worksite)+" - "+escapeHtml(r.role)+"</div><div class=\\"list-item-subtitle\\">"+escapeHtml(r.shift)+" • "+escapeHtml(r.timeInRole)+" • "+escapeHtml(r.date)+"</div></div><div><span class=\\"score-indicator score-"+scoreClass+"\\" style=\\"color:"+scoreColor+"\\">"+r.avgScore.toFixed(1)+"/10</span></div></div>' +
     '      <div class=\\"list-item-details\\">' +
     '        <div class=\\"detail-grid\\">' +
     '          <div class=\\"detail-item\\"><div class=\\"detail-item-label\\">Satisfaction</div><div class=\\"detail-item-value\\" style=\\"color:"+getScoreColor(r.satisfaction)+"\\">"+r.satisfaction+"/10</div></div>' +
@@ -392,7 +394,7 @@ function getSatisfactionDashboardHtml() {
     '    if(s.responseCount===0)return;' +  // Skip sections with no data
     '    var pct=Math.max(0,Math.min(100,(s.avg/maxScore)*100));' +  // Clamp to 0-100%
     '    var color=getScoreColor(s.avg);' +
-    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+s.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"><span class=\\"bar-inner-value\\">"+s.avg.toFixed(1)+"</span></div></div><div class=\\"bar-value\\">"+s.responseCount+" responses</div></div>";' +
+    '    html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+escapeHtml(s.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"><span class=\\"bar-inner-value\\">"+s.avg.toFixed(1)+"</span></div></div><div class=\\"bar-value\\">"+s.responseCount+" responses</div></div>";' +
     '  });' +
     '  }' +
     '  html+="</div></div>";' +
@@ -403,12 +405,12 @@ function getSatisfactionDashboardHtml() {
     '    html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">💡 Section Insights</div>";' +
     '    if(lowScoring.length>0){' +
     '      html+="<div class=\\"insight-card warning\\" style=\\"margin-bottom:10px\\"><div class=\\"insight-title\\">⚠️ Areas Needing Attention</div><div class=\\"insight-text\\">";' +
-    '      lowScoring.forEach(function(s,i){html+=(i>0?", ":"")+s.name+" ("+s.avg.toFixed(1)+")"});' +
+    '      lowScoring.forEach(function(s,i){html+=(i>0?", ":"")+escapeHtml(s.name)+" ("+s.avg.toFixed(1)+")"});' +
     '      html+="</div></div>";' +
     '    }' +
     '    if(highScoring.length>0){' +
     '      html+="<div class=\\"insight-card success\\" style=\\"margin-bottom:10px\\"><div class=\\"insight-title\\">✅ Strong Performance</div><div class=\\"insight-text\\">";' +
-    '      highScoring.forEach(function(s,i){html+=(i>0?", ":"")+s.name+" ("+s.avg.toFixed(1)+")"});' +
+    '      highScoring.forEach(function(s,i){html+=(i>0?", ":"")+escapeHtml(s.name)+" ("+s.avg.toFixed(1)+")"});' +
     '      html+="</div></div>";' +
     '    }' +
     '    html+="</div>";' +
@@ -430,7 +432,7 @@ function getSatisfactionDashboardHtml() {
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">💡 Key Insights</div>";' +
     '  if(data.insights&&data.insights.length>0){' +
     '    data.insights.forEach(function(i){' +
-    '      html+="<div class=\\"insight-card "+i.type+"\\" style=\\"margin-bottom:10px\\"><div class=\\"insight-title\\">"+i.icon+" "+i.title+"</div><div class=\\"insight-text\\">"+i.text+"</div></div>";' +
+    '      html+="<div class=\\"insight-card "+escapeHtml(i.type)+"\\" style=\\"margin-bottom:10px\\"><div class=\\"insight-title\\">"+escapeHtml(i.icon)+" "+escapeHtml(i.title)+"</div><div class=\\"insight-text\\">"+escapeHtml(i.text)+"</div></div>";' +
     '    });' +
     '  }else{html+="<div class=\\"empty-state\\">No insights available</div>";}' +
     '  html+="</div>";' +
@@ -440,7 +442,7 @@ function getSatisfactionDashboardHtml() {
     '    data.byWorksite.forEach(function(w){' +
     '      var pct=(w.avg/10)*100;' +
     '      var color=getScoreColor(w.avg);' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+w.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"><span class=\\"bar-inner-value\\">"+w.avg.toFixed(1)+"</span></div></div><div class=\\"bar-value\\">"+w.count+" responses</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+escapeHtml(w.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"><span class=\\"bar-inner-value\\">"+w.avg.toFixed(1)+"</span></div></div><div class=\\"bar-value\\">"+w.count+" responses</div></div>";' +
     '    });' +
     '    html+="</div></div>";' +
     '  }' +
@@ -450,7 +452,7 @@ function getSatisfactionDashboardHtml() {
     '    data.byRole.forEach(function(r){' +
     '      var pct=(r.avg/10)*100;' +
     '      var color=getScoreColor(r.avg);' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+r.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"><span class=\\"bar-inner-value\\">"+r.avg.toFixed(1)+"</span></div></div><div class=\\"bar-value\\">"+r.count+" responses</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+escapeHtml(r.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+color+"\\"><span class=\\"bar-inner-value\\">"+r.avg.toFixed(1)+"</span></div></div><div class=\\"bar-value\\">"+r.count+" responses</div></div>";' +
     '    });' +
     '    html+="</div></div>";' +
     '  }' +
@@ -473,7 +475,7 @@ function getSatisfactionDashboardHtml() {
     '    var maxP=Math.max.apply(null,data.topPriorities.map(function(p){return p.count}))||1;' +
     '    data.topPriorities.forEach(function(p){' +
     '      var pct=(p.count/maxP)*100;' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+p.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:#7C3AED\\"></div></div><div class=\\"bar-value\\">"+p.count+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\">"+escapeHtml(p.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:#7C3AED\\"></div></div><div class=\\"bar-value\\">"+p.count+"</div></div>";' +
     '    });' +
     '    html+="</div></div>";' +
     '  }' +
@@ -3392,6 +3394,7 @@ function getFlaggedSubmissionsHtml() {
     '<div id="content"><div class="empty-state">Loading...</div></div>' +
     '</div>' +
     '<script>' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'function load(){google.script.run.withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
@@ -3406,8 +3409,8 @@ function getFlaggedSubmissionsHtml() {
     '    h+="<div class=\\"email-list\\">";' +
     '    d.pendingEmails.forEach(function(e){' +
     '      h+="<div class=\\"email-item\\"><div class=\\"email-info\\">";' +
-    '      h+="<span class=\\"email-text\\">"+e.email+"</span>";' +
-    '      h+="<span class=\\"email-date\\">"+e.date+" | "+e.quarter+"</span></div>";' +
+    '      h+="<span class=\\"email-text\\">"+escapeHtml(e.email)+"</span>";' +
+    '      h+="<span class=\\"email-date\\">"+escapeHtml(e.date)+" | "+escapeHtml(e.quarter)+"</span></div>";' +
     '      h+="<div class=\\"actions\\">";' +
     '      h+="<button class=\\"btn btn-approve\\" onclick=\\"approve("+e.row+\")\\">✓ Approve</button>";' +
     '      h+="<button class=\\"btn btn-reject\\" onclick=\\"reject("+e.row+\")\\">✗ Reject</button>";' +
@@ -3584,6 +3587,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '.trend-area { margin-top: 10px; }' +
     '</style>' +
     '<script type="text/javascript">' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'google.charts.load("current", {"packages":["corechart", "gauge"]});' +
     'google.charts.setOnLoadCallback(drawCharts);' +
     'function drawCharts() {' +
@@ -3611,10 +3615,10 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '    var searchText = (fullName + " " + s.unit + " " + s.location).toLowerCase();' +
     '    if (!q || searchText.indexOf(q) !== -1) {' +
     '      html += "<div class=\\"steward-row\\">";' +
-    '      html += "<div><span class=\\"steward-name\\">" + s.firstName + " " + s.lastName + "</span></div>";' +
+    '      html += "<div><span class=\\"steward-name\\">" + escapeHtml(s.firstName) + " " + escapeHtml(s.lastName) + "</span></div>";' +
     '      html += "<div class=\\"steward-actions\\">";' +
-    '      html += "<span class=\\"steward-unit\\">" + s.unit + "</span>";' +
-    '      if (s.email) { html += " <a href=\\"mailto:" + s.email + "\\" title=\\"Email\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">email</i></a>"; }' +
+    '      html += "<span class=\\"steward-unit\\">" + escapeHtml(s.unit) + "</span>";' +
+    '      if (s.email) { html += " <a href=\\"mailto:" + escapeHtml(s.email) + "\\" title=\\"Email\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">email</i></a>"; }' +
     '      html += "</div></div>";' +
     '    }' +
     '  });' +

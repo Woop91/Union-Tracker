@@ -1143,7 +1143,7 @@ function doGet(e) {
     var html = getUnifiedDashboardHtml(isPII);
     return HtmlService.createHtmlOutput(html)
       .setTitle(title)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
   }
 
@@ -1155,6 +1155,18 @@ function doGet(e) {
       secureLog('doGet', 'Invalid member ID format', { id: memberId });
       return getAccessDeniedPage('Invalid member ID format');
     }
+
+    // v4.5.1: Require authentication to access member portals (IDOR protection)
+    var portalAuthResult = checkWebAppAuthorization('member');
+    if (!portalAuthResult.isAuthorized) {
+      secureLog('doGet', 'Unauthorized member portal access attempt', {
+        requestedMemberId: memberId,
+        email: portalAuthResult.email,
+        role: portalAuthResult.role
+      });
+      return getAccessDeniedPage(portalAuthResult.message || 'Authentication required to view member portal');
+    }
+    secureLog('doGet', 'Member portal access granted', { memberId: memberId, email: portalAuthResult.email });
 
     // Delegate to member portal (defined in 11_SecureMemberDashboard.gs)
     if (typeof buildMemberPortal === 'function') {
@@ -1169,6 +1181,37 @@ function doGet(e) {
   // Step 4: Standard page routing for mobile dashboard (legacy support)
   var page = validation.params.page || (e && e.parameter && e.parameter.page) || 'dashboard';
 
+  // v4.5.2: Check if dashboard member authentication is required (toggled via Admin menu)
+  // When enabled, redirect to selfservice portal for public dashboard pages
+  if (typeof isDashboardMemberAuthRequired === 'function' && isDashboardMemberAuthRequired()) {
+    var publicPages = ['dashboard', 'portal'];
+    if (publicPages.indexOf(page) >= 0 || !page) {
+      // Redirect to self-service portal for authentication
+      secureLog('doGet', 'Dashboard auth required - redirecting to selfservice', { requestedPage: page });
+      if (typeof getMemberSelfServicePortalHtml === 'function') {
+        var authHtml = getMemberSelfServicePortalHtml();
+        return HtmlService.createHtmlOutput(authHtml)
+          .setTitle('509 Member Login')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+    }
+  }
+
+  // v4.5.1: Add authorization for sensitive pages (search, grievances, members)
+  var sensitivePages = ['search', 'grievances', 'members'];
+  if (sensitivePages.indexOf(page) >= 0) {
+    var pageAuthResult = checkWebAppAuthorization('steward');
+    if (!pageAuthResult.isAuthorized) {
+      secureLog('doGet', 'Unauthorized access to ' + page + ' page', {
+        email: pageAuthResult.email,
+        role: pageAuthResult.role
+      });
+      return getAccessDeniedPage(pageAuthResult.message || 'Steward authorization required to view ' + page);
+    }
+    secureLog('doGet', 'Authorized access to ' + page + ' page', { email: pageAuthResult.email });
+  }
+
   var html;
   switch (page) {
     case 'search':
@@ -1182,6 +1225,14 @@ function doGet(e) {
       break;
     case 'links':
       html = getWebAppLinksHtml();
+      break;
+    case 'selfservice':
+      // v4.5.1: Member self-service portal with PIN authentication
+      if (typeof getMemberSelfServicePortalHtml === 'function') {
+        html = getMemberSelfServicePortalHtml();
+      } else {
+        return getAccessDeniedPage('Member self-service portal not available');
+      }
       break;
     case 'portal':
       // Public portal without member ID
@@ -1198,7 +1249,7 @@ function doGet(e) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('509 Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
 }
 
@@ -1464,6 +1515,7 @@ function getWebAppSearchHtml() {
     '</nav>' +
 
     '<script>' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'var currentTab="all";' +
     'var searchTimeout=null;' +
     'var lastQuery="";' +
@@ -1507,7 +1559,7 @@ function getWebAppSearchHtml() {
     '}' +
 
     'function showError(err){' +
-    '  document.getElementById("results").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">⚠️</div><div class=\\"empty-text\\">Error: "+(err.message||"Unknown error")+"</div></div>";' +
+    '  document.getElementById("results").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">⚠️</div><div class=\\"empty-text\\">Error: "+escapeHtml(err.message||"Unknown error")+"</div></div>";' +
     '}' +
 
     'function getBadgeClass(status){' +
@@ -1526,8 +1578,8 @@ function getWebAppSearchHtml() {
     '    return;' +
     '  }' +
     '  c.innerHTML=data.map(function(r){' +
-    '    var badge=r.status?"<span class=\\"result-badge "+getBadgeClass(r.status)+"\\">"+r.status+"</span>":"";' +
-    '    return"<div class=\\"result-card\\">"+"<div class=\\"result-type\\">"+(r.type==="member"?"👤 Member":"📋 Grievance")+"</div>"+"<div class=\\"result-title\\">"+r.title+"</div>"+"<div class=\\"result-detail\\">"+r.subtitle+"</div>"+(r.detail?"<div class=\\"result-detail\\">"+r.detail+"</div>":"")+badge+"</div>";' +
+    '    var badge=r.status?"<span class=\\"result-badge "+getBadgeClass(r.status)+"\\">"+escapeHtml(r.status)+"</span>":"";' +
+    '    return"<div class=\\"result-card\\">"+"<div class=\\"result-type\\">"+(r.type==="member"?"👤 Member":"📋 Grievance")+"</div>"+"<div class=\\"result-title\\">"+escapeHtml(r.title)+"</div>"+"<div class=\\"result-detail\\">"+escapeHtml(r.subtitle)+"</div>"+(r.detail?"<div class=\\"result-detail\\">"+escapeHtml(r.detail)+"</div>":"")+badge+"</div>";' +
     '  }).join("");' +
     '}' +
 

@@ -3,10 +3,15 @@
  * Concatenates all source files into a single consolidated .gs file
  *
  * Usage:
- *   node build.js           - Build only
+ *   node build.js           - Build only (includes all files)
+ *   node build.js --prod    - Production build (excludes DevTools.gs for security)
  *   node build.js --lint    - Lint before building
  *   node build.js --clean   - Clean dist directory
  *   node build.js --watch   - Watch for changes (not implemented)
+ *
+ * Production builds (--prod or --production):
+ *   Excludes development/test files that should not be deployed:
+ *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
  */
 
 const fs = require('fs');
@@ -17,7 +22,7 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order - CONSOLIDATED to 15 files
+// Files in build order - CONSOLIDATED to 16 files
 const BUILD_ORDER = [
   '00_Security.gs',       // Security utilities, XSS prevention, access control
   '00_DataAccess.gs',     // Data Access Layer, time constants
@@ -33,7 +38,8 @@ const BUILD_ORDER = [
   '10_Code.gs',           // Core business logic (5,406 lines)
   '10_Main.gs',           // Main entry point (1,862 lines)
   '11_CommandHub.gs',     // Command center + Secure dashboard (3,627 lines)
-  '12_Features.gs'        // Checklist, Dynamic, Looker (3,970 lines)
+  '12_Features.gs',       // Checklist, Dynamic, Looker (3,970 lines)
+  '13_MemberSelfService.gs' // Member self-service portal with PIN auth
 ];
 
 const HTML_FILES = [
@@ -174,6 +180,10 @@ function clean() {
 const args = process.argv.slice(2);
 const shouldLint = args.includes('--lint');
 const shouldClean = args.includes('--clean');
+const isProd = args.includes('--prod') || args.includes('--production');
+
+// Files to exclude in production builds (security: removes dev/test tools)
+const PROD_EXCLUDE = ['07_DevTools.gs'];
 
 // Execute based on arguments
 if (shouldClean) {
@@ -185,5 +195,14 @@ if (shouldClean) {
       process.exit(1);
     }
   }
+
+  // Filter out excluded files for production builds
+  if (isProd) {
+    console.log('Production build: Excluding DevTools...\n');
+    const filteredOrder = BUILD_ORDER.filter(f => !PROD_EXCLUDE.includes(f));
+    BUILD_ORDER.length = 0;
+    BUILD_ORDER.push(...filteredOrder);
+  }
+
   build();
 }

@@ -2666,9 +2666,9 @@ function sendStewardDeadlineAlerts() {
         name: 'SEIU Local 509 Dashboard'
       });
       emailsSent++;
-      Logger.log('Sent alert to ' + stewardName + ' (' + email + '): ' + grievances.length + ' grievances');
+      Logger.log('Sent alert to ' + stewardName + ': ' + grievances.length + ' grievances');
     } catch (e) {
-      Logger.log('Failed to send to ' + email + ': ' + e.message);
+      Logger.log('Failed to send steward alert: ' + e.message);
     }
   }
 
