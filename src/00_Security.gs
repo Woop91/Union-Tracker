@@ -29,14 +29,88 @@ var ACCESS_CONTROL = {
   ENABLED: true,
 
   /** Allowed modes for web app */
-  ALLOWED_MODES: ['steward', 'member', 'dashboard', 'search', 'grievances', 'members', 'links', 'portal'],
+  ALLOWED_MODES: ['steward', 'member', 'dashboard', 'search', 'grievances', 'members', 'links', 'portal', 'selfservice'],
 
   /** Allowed page values */
-  ALLOWED_PAGES: ['dashboard', 'search', 'grievances', 'members', 'links', 'portal'],
+  ALLOWED_PAGES: ['dashboard', 'search', 'grievances', 'members', 'links', 'portal', 'selfservice'],
 
   /** Cache duration for authorization check (5 minutes) */
-  AUTH_CACHE_DURATION: 300
+  AUTH_CACHE_DURATION: 300,
+
+  /** Property key for dashboard member auth toggle */
+  DASHBOARD_AUTH_PROPERTY: 'REQUIRE_MEMBER_AUTH_FOR_DASHBOARDS'
 };
+
+// ============================================================================
+// DASHBOARD ACCESS CONTROL TOGGLE
+// ============================================================================
+
+/**
+ * Check if member authentication is required for dashboard access
+ * Default: OFF (dashboards accessible without member login)
+ * @returns {boolean} True if member auth is required
+ */
+function isDashboardMemberAuthRequired() {
+  var props = PropertiesService.getScriptProperties();
+  var setting = props.getProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY);
+  return setting === 'true';
+}
+
+/**
+ * Enable member authentication requirement for dashboard access
+ * When enabled, all dashboard pages require member PIN login
+ */
+function enableDashboardMemberAuth() {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'true');
+  Logger.log('Dashboard member authentication ENABLED');
+
+  if (typeof secureLog === 'function') {
+    secureLog('DashboardAuthEnabled', 'Member auth required for dashboards', {});
+  }
+
+  SpreadsheetApp.getUi().alert(
+    'Dashboard Authentication Enabled',
+    'Members will now need to log in with their PIN to access dashboards.\n\n' +
+    'Make sure all members have PINs generated before enabling this.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Disable member authentication requirement for dashboard access
+ * When disabled, dashboards are accessible without member login (default)
+ */
+function disableDashboardMemberAuth() {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY, 'false');
+  Logger.log('Dashboard member authentication DISABLED');
+
+  if (typeof secureLog === 'function') {
+    secureLog('DashboardAuthDisabled', 'Member auth not required for dashboards', {});
+  }
+
+  SpreadsheetApp.getUi().alert(
+    'Dashboard Authentication Disabled',
+    'Dashboards are now accessible without member PIN login.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
+ * Show current dashboard auth status
+ */
+function showDashboardAuthStatus() {
+  var isEnabled = isDashboardMemberAuthRequired();
+  SpreadsheetApp.getUi().alert(
+    'Dashboard Authentication Status',
+    'Member authentication for dashboards is currently: ' + (isEnabled ? 'ENABLED' : 'DISABLED') + '\n\n' +
+    (isEnabled
+      ? 'Members must log in with their PIN to access dashboards.'
+      : 'Dashboards are accessible without member login.'),
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
 
 // ============================================================================
 // XSS PREVENTION - HTML SANITIZATION

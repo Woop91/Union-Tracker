@@ -1196,6 +1196,7 @@ function getSearchDialogHtml_() {
       </div>
 
       <script>
+        function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\\//g,"&#x2F;");}
         document.getElementById('searchQuery').addEventListener('keypress', function(e) {
           if (e.key === 'Enter') doSearch();
         });
@@ -1214,7 +1215,7 @@ function getSearchDialogHtml_() {
               displayResults(results);
             })
             .withFailureHandler(function(e) {
-              document.getElementById('results').innerHTML = '<div class="no-results">Error: ' + e.message + '</div>';
+              document.getElementById('results').innerHTML = '<div class="no-results">Error: ' + escapeHtml(e.message) + '</div>';
             })
             .searchMembers(query);
         }
@@ -1229,10 +1230,10 @@ function getSearchDialogHtml_() {
 
           var html = '';
           results.forEach(function(member) {
-            var name = (member['First Name'] || '') + ' ' + (member['Last Name'] || '');
-            var id = member['Member ID'] || 'N/A';
-            var email = member['Email'] || '';
-            html += '<div class="result-item" onclick="selectMember(\\'' + id + '\\')">';
+            var name = escapeHtml((member['First Name'] || '') + ' ' + (member['Last Name'] || ''));
+            var id = escapeHtml(member['Member ID'] || 'N/A');
+            var email = escapeHtml(member['Email'] || '');
+            html += '<div class="result-item" onclick="selectMember(\\'' + id.replace(/'/g,"") + '\\')">';
             html += '<strong>' + name + '</strong> (' + id + ')';
             if (email) html += '<br><small>' + email + '</small>';
             html += '</div>';
@@ -1673,11 +1674,16 @@ function performCloudVisionOCR_(imageBlob, mode, options) {
     };
 
     // API request with explicit timeout (30 seconds)
+    // Use X-Goog-Api-Key header instead of URL query string for security
+    // (prevents API key exposure in logs, browser history, and referrer headers)
     var response = UrlFetchApp.fetch(
-      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      'https://vision.googleapis.com/v1/images:annotate',
       {
         method: 'POST',
         contentType: 'application/json',
+        headers: {
+          'X-Goog-Api-Key': apiKey
+        },
         payload: JSON.stringify(requestBody),
         muteHttpExceptions: true,
         timeout: 30000
@@ -2689,6 +2695,7 @@ function showSearchPrecedents() {
     '  <div class="empty">Enter search terms to find historical grievances</div>' +
     '</div>' +
     '<script>' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'function searchPrecedents() {' +
     '  var query = document.getElementById("searchQuery").value;' +
     '  var outcomeFilter = document.getElementById("filterOutcome").value;' +
@@ -2703,15 +2710,15 @@ function showSearchPrecedents() {
     '  }' +
     '  var html = "";' +
     '  data.forEach(function(item) {' +
-    '    var statusClass = "status-" + item.outcomeClass;' +
+    '    var statusClass = "status-" + escapeHtml(item.outcomeClass);' +
     '    html += "<div class=\\"result-item\\">" +' +
     '      "<div class=\\"result-header\\">" +' +
-    '        "<span class=\\"result-id\\">" + item.id + "</span>" +' +
-    '        "<span class=\\"result-status " + statusClass + "\\">" + item.outcome + "</span>" +' +
+    '        "<span class=\\"result-id\\">" + escapeHtml(item.id) + "</span>" +' +
+    '        "<span class=\\"result-status " + statusClass + "\\">" + escapeHtml(item.outcome) + "</span>" +' +
     '      "</div>" +' +
-    '      "<div class=\\"result-meta\\"><strong>" + item.issueCategory + "</strong> | " + item.article + "</div>" +' +
-    '      "<div class=\\"result-meta\\">" + item.memberName + " • " + item.location + " • " + item.dateResolved + "</div>" +' +
-    '      (item.resolution ? "<div class=\\"result-outcome\\"><strong>Resolution:</strong> " + item.resolution + "<button class=\\"copy-btn\\" onclick=\\"copyText(\'" + item.id + ": " + item.resolution.replace(/\'/g, "") + "\')\\">Copy</button></div>" : "") +' +
+    '      "<div class=\\"result-meta\\"><strong>" + escapeHtml(item.issueCategory) + "</strong> | " + escapeHtml(item.article) + "</div>" +' +
+    '      "<div class=\\"result-meta\\">" + escapeHtml(item.memberName) + " • " + escapeHtml(item.location) + " • " + escapeHtml(item.dateResolved) + "</div>" +' +
+    '      (item.resolution ? "<div class=\\"result-outcome\\"><strong>Resolution:</strong> " + escapeHtml(item.resolution) + "<button class=\\"copy-btn\\" onclick=\\"copyText(\'" + escapeHtml(item.id).replace(/\'/g,"") + ": " + escapeHtml(item.resolution).replace(/\'/g, "") + "\')\\">Copy</button></div>" : "") +' +
     '    "</div>";' +
     '  });' +
     '  container.innerHTML = html;' +
@@ -3218,7 +3225,7 @@ function buildMemberPortal(memberId) {
   var html = getMemberPortalHtml_(profile);
   return HtmlService.createHtmlOutput(html)
     .setTitle('509 Member Portal - ' + profile.firstName)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
 }
 
 /**
@@ -3233,7 +3240,7 @@ function buildPublicPortal() {
   var html = getPublicPortalHtml_(stats, stewards, satisfaction);
   return HtmlService.createHtmlOutput(html)
     .setTitle('509 Union Member Portal')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
 }
 
 /**

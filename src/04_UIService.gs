@@ -660,6 +660,7 @@ function getMultiSelectHtml(items, callback) {
       </div>
 
       <script>
+        function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\\//g,"&#x2F;");}
         const items = ${itemsJson};
         const callbackFn = '${callback}';
         let filteredItems = [...items];
@@ -668,9 +669,9 @@ function getMultiSelectHtml(items, callback) {
           const container = document.getElementById('itemsList');
           container.innerHTML = filteredItems.map(function(item) {
             return '<div class="item-row">' +
-                   '<input type="checkbox" class="item-checkbox" data-id="' + item.id + '"' +
+                   '<input type="checkbox" class="item-checkbox" data-id="' + escapeHtml(item.id) + '"' +
                    (item.selected ? ' checked' : '') + ' onchange="updateCount()">' +
-                   '<span class="item-label">' + item.label + '</span>' +
+                   '<span class="item-label">' + escapeHtml(item.label) + '</span>' +
                    '</div>';
           }).join('');
           updateCount();
@@ -2247,14 +2248,16 @@ function getInteractiveDashboardHtml() {
 
     // JavaScript
     '<script>' +
+    // XSS Prevention - escape HTML special characters
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
     // Debug mode and error handler wrapper
     'var DEBUG_MODE=true;' +
     'function log(msg,data){if(DEBUG_MODE){console.log("[Dashboard] "+msg,data||"")}}' +
-    'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+e.message)}' +
+    'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+escapeHtml(e.message))}' +
     'function safeRun(fn,fallback){try{fn()}catch(e){console.error("[Dashboard]",e);if(fallback)fallback(e)}}' +
-    'function showLoading(elementId,msg){var el=document.getElementById(elementId);if(el)el.innerHTML="<div class=\\"loading-state\\"><div class=\\"loading-spinner\\"></div><div>"+(msg||"Loading...")+"</div></div>"}' +
+    'function showLoading(elementId,msg){var el=document.getElementById(elementId);if(el)el.innerHTML="<div class=\\"loading-state\\"><div class=\\"loading-spinner\\"></div><div>"+escapeHtml(msg||"Loading...")+"</div></div>"}' +
 
     // Tab switching with error handling
     'function switchTab(tabName,btn){' +
@@ -2279,12 +2282,12 @@ function getInteractiveDashboardHtml() {
     '    .withSuccessHandler(function(data){' +
     '      log("Overview data received:",data);' +
     '      safeRun(function(){renderOverview(data)},function(e){' +
-    '        document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Error rendering stats<div class=\\"debug-info\\">"+e.message+"</div></div>"' +
+    '        document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Error rendering stats<div class=\\"debug-info\\">"+escapeHtml(e.message)+"</div></div>"' +
     '      })' +
     '    })'  +
     '    .withFailureHandler(function(e){' +
     '      logError("Failed to load overview",e);' +
-    '      document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Failed to load stats<div class=\\"debug-info\\">"+e.message+"<br>Check: Admin → Modal Diagnostics</div></div>"' +
+    '      document.getElementById("overview-stats").innerHTML="<div class=\\"error-state\\">Failed to load stats<div class=\\"debug-info\\">"+escapeHtml(e.message)+"<br>Check: Admin → Modal Diagnostics</div></div>"' +
     '    })' +
     '    .getInteractiveOverviewData();' +
     '}' +
@@ -2347,7 +2350,7 @@ function getInteractiveDashboardHtml() {
     '  showLoading("mycases-list","Loading your assigned cases...");' +
     '  google.script.run' +
     '    .withSuccessHandler(function(data){log("My cases received:",data?data.length:0);myCases=data||[];renderMyCases(myCases);renderMyCasesStats(data)})'  +
-    '    .withFailureHandler(function(e){logError("Failed to load my cases",e);document.getElementById("mycases-list").innerHTML="<div class=\\"error-state\\">Failed to load your cases<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
+    '    .withFailureHandler(function(e){logError("Failed to load my cases",e);document.getElementById("mycases-list").innerHTML="<div class=\\"error-state\\">Failed to load your cases<div class=\\"debug-info\\">"+escapeHtml(e.message)+"</div></div>"})' +
     '    .getMyStewardCases();' +
     '}' +
 
@@ -2375,16 +2378,16 @@ function getInteractiveDashboardHtml() {
     '    var statusText=g.isOverdue?"Overdue":g.status;' +
     '    var priorityBorder=g.isOverdue?"border-left:4px solid #dc2626;":"";' +
     '    return "<div class=\\"list-item\\" style=\\""+priorityBorder+"\\" onclick=\\"toggleMyCaseDetail(this)\\">' +
-    '      <div class=\\"list-item-header\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+g.id+" - "+g.memberName+"</div><div class=\\"list-item-subtitle\\">"+g.issueType+" • "+g.currentStep+"</div></div><div><span class=\\"badge "+badgeClass+"\\">"+statusText+"</span></div></div>' +
+    '      <div class=\\"list-item-header\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+escapeHtml(g.id)+" - "+escapeHtml(g.memberName)+"</div><div class=\\"list-item-subtitle\\">"+escapeHtml(g.issueType)+" • "+escapeHtml(g.currentStep)+"</div></div><div><span class=\\"badge "+badgeClass+"\\">"+escapeHtml(statusText)+"</span></div></div>' +
     '      <div class=\\"list-item-details\\">' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Filed:</span><span class=\\"detail-value\\">"+g.filedDate+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">⏰ Next Due:</span><span class=\\"detail-value\\">"+g.nextActionDue+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">⏱️ Days Open:</span><span class=\\"detail-value\\">"+g.daysOpen+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+g.location+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+g.articles+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Filed:</span><span class=\\"detail-value\\">"+escapeHtml(g.filedDate)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">⏰ Next Due:</span><span class=\\"detail-value\\">"+escapeHtml(g.nextActionDue)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">⏱️ Days Open:</span><span class=\\"detail-value\\">"+escapeHtml(g.daysOpen)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+escapeHtml(g.location)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+escapeHtml(g.articles)+"</span></div>' +
     '        <div class=\\"detail-actions\\">' +
-    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+g.id+"\')\\">⚡ Quick Actions</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+g.id+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">⚡ Quick Actions</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +
@@ -2414,7 +2417,7 @@ function getInteractiveDashboardHtml() {
     '  showLoading("members-list","Loading member directory...");' +
     '  google.script.run' +
     '    .withSuccessHandler(function(data){log("Members received:",data?data.length:0);allMembers=data||[];renderMembers(allMembers);loadMemberFilters()})'  +
-    '    .withFailureHandler(function(e){logError("Failed to load members",e);document.getElementById("members-list").innerHTML="<div class=\\"error-state\\">Failed to load members<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
+    '    .withFailureHandler(function(e){logError("Failed to load members",e);document.getElementById("members-list").innerHTML="<div class=\\"error-state\\">Failed to load members<div class=\\"debug-info\\">"+escapeHtml(e.message)+"</div></div>"})' +
     '    .getInteractiveMemberData();' +
     '}' +
 
@@ -2450,18 +2453,18 @@ function getInteractiveDashboardHtml() {
     '    var badge=m.isSteward?"<span class=\\"badge badge-steward\\">Steward</span>":"";' +
     '    if(m.hasOpenGrievance)badge+="<span class=\\"badge badge-open\\" style=\\"margin-left:4px\\">Has Case</span>";' +
     '    return "<div class=\\"list-item\\" onclick=\\"toggleMemberDetail(this,"+i+")\\">' +
-    '      <div class=\\"list-item-header\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+m.name+"</div><div class=\\"list-item-subtitle\\">"+m.id+" • "+m.title+"</div></div><div>"+badge+"</div></div>' +
+    '      <div class=\\"list-item-header\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+escapeHtml(m.name)+"</div><div class=\\"list-item-subtitle\\">"+escapeHtml(m.id)+" • "+escapeHtml(m.title)+"</div></div><div>"+badge+"</div></div>' +
     '      <div class=\\"list-item-details\\">' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+m.location+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🏢 Unit:</span><span class=\\"detail-value\\">"+m.unit+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📧 Email:</span><span class=\\"detail-value\\">"+(m.email||"N/A")+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📱 Phone:</span><span class=\\"detail-value\\">"+(m.phone||"N/A")+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Office Days:</span><span class=\\"detail-value\\">"+m.officeDays+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">👤 Supervisor:</span><span class=\\"detail-value\\">"+m.supervisor+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+m.assignedSteward+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+escapeHtml(m.location)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🏢 Unit:</span><span class=\\"detail-value\\">"+escapeHtml(m.unit)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📧 Email:</span><span class=\\"detail-value\\">"+escapeHtml(m.email||"N/A")+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📱 Phone:</span><span class=\\"detail-value\\">"+escapeHtml(m.phone||"N/A")+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Office Days:</span><span class=\\"detail-value\\">"+escapeHtml(m.officeDays)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">👤 Supervisor:</span><span class=\\"detail-value\\">"+escapeHtml(m.supervisor)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+escapeHtml(m.assignedSteward)+"</span></div>' +
     '        <div class=\\"detail-actions\\">' +
     '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();showEditMemberForm("+i+")\\">✏️ Edit Member</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToMemberInSheet(\'"+m.id+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToMemberInSheet(\'"+escapeHtml(m.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +
@@ -2497,8 +2500,8 @@ function getInteractiveDashboardHtml() {
     '  var unitSelect=document.getElementById("form-unit");' +
     '  locSelect.innerHTML="<option value=\\"\\">Select location...</option>";' +
     '  unitSelect.innerHTML="<option value=\\"\\">Select unit...</option>";' +
-    '  Object.keys(locations).sort().forEach(function(l){locSelect.innerHTML+="<option value=\\""+l+"\\">"+l+"</option>"});' +
-    '  Object.keys(units).sort().forEach(function(u){unitSelect.innerHTML+="<option value=\\""+u+"\\">"+u+"</option>"});' +
+    '  Object.keys(locations).sort().forEach(function(l){locSelect.innerHTML+="<option value=\\""+escapeHtml(l)+"\\">"+escapeHtml(l)+"</option>"});' +
+    '  Object.keys(units).sort().forEach(function(u){unitSelect.innerHTML+="<option value=\\""+escapeHtml(u)+"\\">"+escapeHtml(u)+"</option>"});' +
     '}' +
 
     // Show add member form
@@ -2591,7 +2594,7 @@ function getInteractiveDashboardHtml() {
     '  showLoading("grievances-list","Loading grievance log...");' +
     '  google.script.run' +
     '    .withSuccessHandler(function(data){log("Grievances received:",data?data.length:0);allGrievances=data||[];renderGrievances(allGrievances)})'  +
-    '    .withFailureHandler(function(e){logError("Failed to load grievances",e);document.getElementById("grievances-list").innerHTML="<div class=\\"error-state\\">Failed to load grievances<div class=\\"debug-info\\">"+e.message+"</div></div>"})' +
+    '    .withFailureHandler(function(e){logError("Failed to load grievances",e);document.getElementById("grievances-list").innerHTML="<div class=\\"error-state\\">Failed to load grievances<div class=\\"debug-info\\">"+escapeHtml(e.message)+"</div></div>"})' +
     '    .getInteractiveGrievanceData();' +
     '}' +
 
@@ -2604,19 +2607,19 @@ function getInteractiveDashboardHtml() {
     '    var statusText=g.isOverdue?"Overdue":g.status;' +
     '    var daysInfo=g.isOverdue?"<span style=\\"color:#dc2626;font-weight:bold\\">⚠️ PAST DUE</span>":(typeof g.daysToDeadline==="number"?""+g.daysToDeadline+" days left":"");' +
     '    return "<div class=\\"list-item\\" onclick=\\"toggleGrievanceDetail(this,"+i+")\\">' +
-    '      <div class=\\"list-item-header\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+g.id+" - "+g.memberName+"</div><div class=\\"list-item-subtitle\\">"+g.issueType+" • "+g.currentStep+"</div></div><div><span class=\\"badge "+badgeClass+"\\">"+statusText+"</span></div></div>' +
+    '      <div class=\\"list-item-header\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+escapeHtml(g.id)+" - "+escapeHtml(g.memberName)+"</div><div class=\\"list-item-subtitle\\">"+escapeHtml(g.issueType)+" • "+escapeHtml(g.currentStep)+"</div></div><div><span class=\\"badge "+badgeClass+"\\">"+escapeHtml(statusText)+"</span></div></div>' +
     '      <div class=\\"list-item-details\\">' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Filed:</span><span class=\\"detail-value\\">"+g.filedDate+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🔔 Incident:</span><span class=\\"detail-value\\">"+g.incidentDate+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">⏰ Next Due:</span><span class=\\"detail-value\\">"+g.nextActionDue+" "+daysInfo+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">⏱️ Days Open:</span><span class=\\"detail-value\\">"+g.daysOpen+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+g.location+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+g.articles+"</span></div>' +
-    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+g.steward+"</span></div>' +
-    '        "+(g.resolution?"<div class=\\"detail-row\\"><span class=\\"detail-label\\">✅ Resolution:</span><span class=\\"detail-value\\">"+g.resolution+"</span></div>":"")+"' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Filed:</span><span class=\\"detail-value\\">"+escapeHtml(g.filedDate)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🔔 Incident:</span><span class=\\"detail-value\\">"+escapeHtml(g.incidentDate)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">⏰ Next Due:</span><span class=\\"detail-value\\">"+escapeHtml(g.nextActionDue)+" "+daysInfo+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">⏱️ Days Open:</span><span class=\\"detail-value\\">"+escapeHtml(g.daysOpen)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+escapeHtml(g.location)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+escapeHtml(g.articles)+"</span></div>' +
+    '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+escapeHtml(g.steward)+"</span></div>' +
+    '        "+(g.resolution?"<div class=\\"detail-row\\"><span class=\\"detail-label\\">✅ Resolution:</span><span class=\\"detail-value\\">"+escapeHtml(g.resolution)+"</span></div>":"")+"' +
     '        <div class=\\"detail-actions\\">' +
-    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+g.id+"\')\\">⚡ Quick Actions</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+g.id+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">⚡ Quick Actions</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +

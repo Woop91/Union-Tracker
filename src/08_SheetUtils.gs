@@ -1761,7 +1761,9 @@ function onContactFormSubmit(e) {
 
     if (memberRow === -1) {
       // Member not found - create new member
-      Logger.log('Creating new member: ' + firstName + ' ' + lastName);
+      // Mask name in logs for privacy
+      var maskedName = typeof maskName === 'function' ? maskName(firstName + ' ' + lastName) : '[REDACTED]';
+      Logger.log('Creating new member: ' + maskedName);
 
       // Generate Member ID
       var existingIds = {};
@@ -1793,7 +1795,8 @@ function onContactFormSubmit(e) {
 
       // Append new member row
       memberSheet.appendRow(newRow);
-      Logger.log('Created new member ' + memberId + ': ' + firstName + ' ' + lastName);
+      // Log with masked name for privacy
+      Logger.log('Created new member ' + memberId + ': ' + maskedName);
 
     } else {
       // Update existing member record with form data
@@ -1819,7 +1822,9 @@ function onContactFormSubmit(e) {
         memberSheet.getRange(memberRow, updates[j].col).setValue(updates[j].value);
       }
 
-      Logger.log('Updated contact info for ' + firstName + ' ' + lastName + ' (row ' + memberRow + ')');
+      // Mask name in logs for privacy
+      var maskedUpdateName = typeof maskName === 'function' ? maskName(firstName + ' ' + lastName) : '[REDACTED]';
+      Logger.log('Updated contact info for ' + maskedUpdateName + ' (row ' + memberRow + ')');
     }
 
   } catch (error) {
@@ -2666,9 +2671,11 @@ function sendStewardDeadlineAlerts() {
         name: 'SEIU Local 509 Dashboard'
       });
       emailsSent++;
-      Logger.log('Sent alert to ' + stewardName + ' (' + email + '): ' + grievances.length + ' grievances');
+      // Mask name in logs for privacy
+      var maskedSteward = typeof maskName === 'function' ? maskName(stewardName) : '[REDACTED]';
+      Logger.log('Sent alert to ' + maskedSteward + ': ' + grievances.length + ' grievances');
     } catch (e) {
-      Logger.log('Failed to send to ' + email + ': ' + e.message);
+      Logger.log('Failed to send steward alert: ' + e.message);
     }
   }
 

@@ -128,7 +128,11 @@ function createDashboardMenu() {
     .addSubMenu(ui.createMenu('🌐 Web App & Portal')
       .addItem('📱 Get Mobile App URL', 'showWebAppUrl')
       .addItem('👤 Build Member Portal', 'buildPortalForSelectedMember')
-      .addItem('📊 Build Public Portal', 'buildPublicPortal'))
+      .addItem('📊 Build Public Portal', 'buildPublicPortal')
+      .addSeparator()
+      .addItem('🔑 Generate Member PIN', 'showGeneratePINDialog')
+      .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
+      .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'))
 
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
@@ -177,7 +181,11 @@ function createDashboardMenu() {
       .addItem('📸 Create Manual Snapshot', 'createWeeklySnapshot')
       .addItem('📅 Setup Weekly Backup', 'setupWeeklySnapshotTrigger')
       .addItem('📜 View Audit Log', 'navigateToAuditLog')
-      .addItem('📊 v4.0 Status Report', 'showV4StatusReport'))
+      .addItem('📊 v4.0 Status Report', 'showV4StatusReport')
+      .addSeparator()
+      .addItem('🔐 Dashboard Auth Status', 'showDashboardAuthStatus')
+      .addItem('✅ Enable Dashboard Member Auth', 'enableDashboardMemberAuth')
+      .addItem('❌ Disable Dashboard Member Auth', 'disableDashboardMemberAuth'))
 
     .addSeparator()
 

