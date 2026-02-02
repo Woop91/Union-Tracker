@@ -1197,7 +1197,7 @@ function getMemberSelfServicePortalHtml() {
     '<button class="btn btn-primary" id="loginBtn" onclick="login()">Login</button>' +
     '<div id="loginError" class="error" style="display:none"></div>' +
     '<p style="text-align:center;margin-top:20px;font-size:13px;color:#666">' +
-    'Don\\'t have a PIN? Contact your union steward.' +
+    'Don\'t have a PIN? Contact your union steward.' +
     '</p>' +
     '<p style="text-align:center;margin-top:10px">' +
     '<a href="#" onclick="showResetRequest();return false" style="color:#059669;font-size:13px">Forgot your PIN?</a>' +
@@ -1209,7 +1209,7 @@ function getMemberSelfServicePortalHtml() {
     '<div id="resetRequestView" style="display:none">' +
     '<div class="login-card">' +
     '<h2>🔑 Reset PIN</h2>' +
-    '<p style="text-align:center;color:#666;margin-bottom:20px;font-size:14px">Enter your Member ID and we\\'ll send a reset code to your registered email.</p>' +
+    '<p style="text-align:center;color:#666;margin-bottom:20px;font-size:14px">Enter your Member ID and we\'ll send a reset code to your registered email.</p>' +
     '<div class="field">' +
     '<label for="resetMemberId">Member ID</label>' +
     '<input type="text" id="resetMemberId" placeholder="Enter your Member ID" autocomplete="username">' +
@@ -1253,9 +1253,9 @@ function getMemberSelfServicePortalHtml() {
     // Authenticated view
     '<div id="authView" style="display:none">' +
     '<div class="tabs">' +
-    '<button class="tab active" onclick="switchTab(\\'profile\\',this)">👤 My Profile</button>' +
-    '<button class="tab" onclick="switchTab(\\'grievances\\',this)">📋 My Cases</button>' +
-    '<button class="tab" onclick="switchTab(\\'edit\\',this)">✏️ Update Info</button>' +
+    '<button class="tab active" onclick="switchTab(&apos;profile&apos;,this)">👤 My Profile</button>' +
+    '<button class="tab" onclick="switchTab(&apos;grievances&apos;,this)">📋 My Cases</button>' +
+    '<button class="tab" onclick="switchTab(&apos;edit&apos;,this)">✏️ Update Info</button>' +
     '</div>' +
     '<div class="content">' +
 
