@@ -3515,7 +3515,9 @@ function shareWithCoordinators_(folder) {
         try {
           folder.addEditor(email.toString().trim());
         } catch (shareError) {
-          Logger.log('Could not share with ' + email + ': ' + shareError.message);
+          // Mask email in log for privacy
+          var maskedEmail = typeof maskEmail === 'function' ? maskEmail(email) : '[REDACTED]';
+          Logger.log('Could not share with ' + maskedEmail + ': ' + shareError.message);
         }
       }
     }

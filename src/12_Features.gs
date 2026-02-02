@@ -1641,15 +1641,21 @@ function repairDynamicFormulas() {
   const colLetter = typeof getColumnLetter === 'function' ? getColumnLetter(isStewardCol) : 'N';
 
   // Build all values and formulas for batch write
+  // Use safeSheetNameForFormula to prevent formula injection attacks
+  const safeSheetName = typeof safeSheetNameForFormula === 'function'
+    ? safeSheetNameForFormula(EXTENSION_CONFIG.MEMBER_SHEET)
+    : "'" + String(EXTENSION_CONFIG.MEMBER_SHEET).replace(/'/g, "''") + "'";
+  const safeLeaderRole = String(EXTENSION_CONFIG.LEADER_ROLE_NAME || '').replace(/"/g, '""');
+
   const batchData = [
     ['=== DYNAMIC ENGINE FORMULAS ===', ''],
     ['Role Distribution:', ''],
-    [`=QUERY('${EXTENSION_CONFIG.MEMBER_SHEET}'!A:ZZ, "SELECT Col${isStewardCol}, count(Col1) WHERE Col1 IS NOT NULL GROUP BY Col${isStewardCol} LABEL count(Col1) 'Total'", 1)`, ''],
+    [`=QUERY(${safeSheetName}!A:ZZ, "SELECT Col${isStewardCol}, count(Col1) WHERE Col1 IS NOT NULL GROUP BY Col${isStewardCol} LABEL count(Col1) 'Total'", 1)`, ''],
     ['', ''],
     ['', ''],
     ['', ''],
-    ['Member Leaders:', `=COUNTIF('${EXTENSION_CONFIG.MEMBER_SHEET}'!${colLetter}:${colLetter},"${EXTENSION_CONFIG.LEADER_ROLE_NAME}")`],
-    ['Active Stewards:', `=COUNTIF('${EXTENSION_CONFIG.MEMBER_SHEET}'!${colLetter}:${colLetter},"Yes")`]
+    ['Member Leaders:', `=COUNTIF(${safeSheetName}!${colLetter}:${colLetter},"${safeLeaderRole}")`],
+    ['Active Stewards:', `=COUNTIF(${safeSheetName}!${colLetter}:${colLetter},"Yes")`]
   ];
 
   // Single batch write

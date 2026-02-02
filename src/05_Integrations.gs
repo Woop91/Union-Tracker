@@ -894,7 +894,10 @@ function sendGrievancePdfEmail_(data, pdf) {
     name: COMMAND_CONFIG.SYSTEM_NAME || 'Union Grievance System'
   });
 
-  Logger.log('Grievance PDF emailed to: ' + data.memberEmail);
+  // Use secureLog to mask PII in logs
+  if (typeof secureLog === 'function') {
+    secureLog('EmailPDF', 'Grievance PDF emailed', { recipientMasked: typeof maskEmail === 'function' ? maskEmail(data.memberEmail) : '[REDACTED]' });
+  }
 }
 
 /**
@@ -929,7 +932,10 @@ function onGrievanceFormSubmit(e) {
       }
     }
 
-    Logger.log('Form submission processed: ' + data.name + ' - PDF created');
+    // Use secureLog to avoid logging PII
+    if (typeof secureLog === 'function') {
+      secureLog('FormSubmission', 'Form submission processed - PDF created', {});
+    }
 
   } catch (e) {
     Logger.log('Error processing form submission: ' + e.message);

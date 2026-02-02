@@ -1674,11 +1674,16 @@ function performCloudVisionOCR_(imageBlob, mode, options) {
     };
 
     // API request with explicit timeout (30 seconds)
+    // Use X-Goog-Api-Key header instead of URL query string for security
+    // (prevents API key exposure in logs, browser history, and referrer headers)
     var response = UrlFetchApp.fetch(
-      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      'https://vision.googleapis.com/v1/images:annotate',
       {
         method: 'POST',
         contentType: 'application/json',
+        headers: {
+          'X-Goog-Api-Key': apiKey
+        },
         payload: JSON.stringify(requestBody),
         muteHttpExceptions: true,
         timeout: 30000

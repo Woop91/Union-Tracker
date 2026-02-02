@@ -15716,7 +15716,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2412 lines)
+// SOURCE: 05_Integrations.gs (2418 lines)
 // ============================================================================
 
 /**
@@ -16615,7 +16615,10 @@ function sendGrievancePdfEmail_(data, pdf) {
     name: COMMAND_CONFIG.SYSTEM_NAME || 'Union Grievance System'
   });
 
-  Logger.log('Grievance PDF emailed to: ' + data.memberEmail);
+  // Use secureLog to mask PII in logs
+  if (typeof secureLog === 'function') {
+    secureLog('EmailPDF', 'Grievance PDF emailed', { recipientMasked: typeof maskEmail === 'function' ? maskEmail(data.memberEmail) : '[REDACTED]' });
+  }
 }
 
 /**
@@ -16650,7 +16653,10 @@ function onGrievanceFormSubmit(e) {
       }
     }
 
-    Logger.log('Form submission processed: ' + data.name + ' - PDF created');
+    // Use secureLog to avoid logging PII
+    if (typeof secureLog === 'function') {
+      secureLog('FormSubmission', 'Form submission processed - PDF created', {});
+    }
 
   } catch (e) {
     Logger.log('Error processing form submission: ' + e.message);
@@ -24391,7 +24397,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08_SheetUtils.gs (4443 lines)
+// SOURCE: 08_SheetUtils.gs (4450 lines)
 // ============================================================================
 
 /**
@@ -26157,7 +26163,9 @@ function onContactFormSubmit(e) {
 
     if (memberRow === -1) {
       // Member not found - create new member
-      Logger.log('Creating new member: ' + firstName + ' ' + lastName);
+      // Mask name in logs for privacy
+      var maskedName = typeof maskName === 'function' ? maskName(firstName + ' ' + lastName) : '[REDACTED]';
+      Logger.log('Creating new member: ' + maskedName);
 
       // Generate Member ID
       var existingIds = {};
@@ -26189,7 +26197,8 @@ function onContactFormSubmit(e) {
 
       // Append new member row
       memberSheet.appendRow(newRow);
-      Logger.log('Created new member ' + memberId + ': ' + firstName + ' ' + lastName);
+      // Log with masked name for privacy
+      Logger.log('Created new member ' + memberId + ': ' + maskedName);
 
     } else {
       // Update existing member record with form data
@@ -26215,7 +26224,9 @@ function onContactFormSubmit(e) {
         memberSheet.getRange(memberRow, updates[j].col).setValue(updates[j].value);
       }
 
-      Logger.log('Updated contact info for ' + firstName + ' ' + lastName + ' (row ' + memberRow + ')');
+      // Mask name in logs for privacy
+      var maskedUpdateName = typeof maskName === 'function' ? maskName(firstName + ' ' + lastName) : '[REDACTED]';
+      Logger.log('Updated contact info for ' + maskedUpdateName + ' (row ' + memberRow + ')');
     }
 
   } catch (error) {
@@ -27062,7 +27073,9 @@ function sendStewardDeadlineAlerts() {
         name: 'SEIU Local 509 Dashboard'
       });
       emailsSent++;
-      Logger.log('Sent alert to ' + stewardName + ': ' + grievances.length + ' grievances');
+      // Mask name in logs for privacy
+      var maskedSteward = typeof maskName === 'function' ? maskName(stewardName) : '[REDACTED]';
+      Logger.log('Sent alert to ' + maskedSteward + ': ' + grievances.length + ' grievances');
     } catch (e) {
       Logger.log('Failed to send steward alert: ' + e.message);
     }
@@ -32856,7 +32869,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10_Code.gs (5407 lines)
+// SOURCE: 10_Code.gs (5409 lines)
 // ============================================================================
 
 /**
@@ -36376,7 +36389,9 @@ function shareWithCoordinators_(folder) {
         try {
           folder.addEditor(email.toString().trim());
         } catch (shareError) {
-          Logger.log('Could not share with ' + email + ': ' + shareError.message);
+          // Mask email in log for privacy
+          var maskedEmail = typeof maskEmail === 'function' ? maskEmail(email) : '[REDACTED]';
+          Logger.log('Could not share with ' + maskedEmail + ': ' + shareError.message);
         }
       }
     }
@@ -40187,7 +40202,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3535 lines)
+// SOURCE: 11_CommandHub.gs (3540 lines)
 // ============================================================================
 
 /**
@@ -41866,11 +41881,16 @@ function performCloudVisionOCR_(imageBlob, mode, options) {
     };
 
     // API request with explicit timeout (30 seconds)
+    // Use X-Goog-Api-Key header instead of URL query string for security
+    // (prevents API key exposure in logs, browser history, and referrer headers)
     var response = UrlFetchApp.fetch(
-      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      'https://vision.googleapis.com/v1/images:annotate',
       {
         method: 'POST',
         contentType: 'application/json',
+        headers: {
+          'X-Goog-Api-Key': apiKey
+        },
         payload: JSON.stringify(requestBody),
         muteHttpExceptions: true,
         timeout: 30000
@@ -43727,7 +43747,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (3971 lines)
+// SOURCE: 12_Features.gs (3977 lines)
 // ============================================================================
 
 /**
@@ -45373,15 +45393,21 @@ function repairDynamicFormulas() {
   const colLetter = typeof getColumnLetter === 'function' ? getColumnLetter(isStewardCol) : 'N';
 
   // Build all values and formulas for batch write
+  // Use safeSheetNameForFormula to prevent formula injection attacks
+  const safeSheetName = typeof safeSheetNameForFormula === 'function'
+    ? safeSheetNameForFormula(EXTENSION_CONFIG.MEMBER_SHEET)
+    : "'" + String(EXTENSION_CONFIG.MEMBER_SHEET).replace(/'/g, "''") + "'";
+  const safeLeaderRole = String(EXTENSION_CONFIG.LEADER_ROLE_NAME || '').replace(/"/g, '""');
+
   const batchData = [
     ['=== DYNAMIC ENGINE FORMULAS ===', ''],
     ['Role Distribution:', ''],
-    [`=QUERY('${EXTENSION_CONFIG.MEMBER_SHEET}'!A:ZZ, "SELECT Col${isStewardCol}, count(Col1) WHERE Col1 IS NOT NULL GROUP BY Col${isStewardCol} LABEL count(Col1) 'Total'", 1)`, ''],
+    [`=QUERY(${safeSheetName}!A:ZZ, "SELECT Col${isStewardCol}, count(Col1) WHERE Col1 IS NOT NULL GROUP BY Col${isStewardCol} LABEL count(Col1) 'Total'", 1)`, ''],
     ['', ''],
     ['', ''],
     ['', ''],
-    ['Member Leaders:', `=COUNTIF('${EXTENSION_CONFIG.MEMBER_SHEET}'!${colLetter}:${colLetter},"${EXTENSION_CONFIG.LEADER_ROLE_NAME}")`],
-    ['Active Stewards:', `=COUNTIF('${EXTENSION_CONFIG.MEMBER_SHEET}'!${colLetter}:${colLetter},"Yes")`]
+    ['Member Leaders:', `=COUNTIF(${safeSheetName}!${colLetter}:${colLetter},"${safeLeaderRole}")`],
+    ['Active Stewards:', `=COUNTIF(${safeSheetName}!${colLetter}:${colLetter},"Yes")`]
   ];
 
   // Single batch write
