@@ -2207,7 +2207,8 @@ function getMobileResponsiveStyles() {
   return '<style id="mobile-responsive-styles">' +
     '/* Mobile-first responsive base */' +
     'html{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}' +
-    'body{overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}' +
+    'body{overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;' +
+    'padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);}' +
 
     '/* Touch-friendly interactive elements */' +
     'button,select,.btn,.action-btn,.tab,.filter,.quick-item,.option-item,.result-item,.search-tab,.filter-select{' +
@@ -2251,7 +2252,7 @@ function getMobileResponsiveStyles() {
       '.btn-row,.button-row{' +
         'flex-direction:column !important;gap:8px !important;' +
       '}' +
-      'table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;font-size:12px;}' +
+      'table,.data-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;font-size:12px;}' +
       'th,td{padding:8px 6px !important;font-size:clamp(11px,2.8vw,13px) !important;}' +
       '.stats-row,[class*="stat"]{' +
         'display:grid !important;grid-template-columns:repeat(2,1fr) !important;gap:8px !important;' +
@@ -2263,6 +2264,15 @@ function getMobileResponsiveStyles() {
       '.filter-toggle{display:block !important;}' +
       '.filter-panel.show{display:block !important;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:#fff;padding:16px;overflow-y:auto;}' +
       'select,input[type="text"],input[type="search"],input[type="email"],textarea{width:100% !important;}' +
+      '.filter-group{flex-direction:column !important;}' +
+      '.filter-group .action-btn,.filter-group button{width:100% !important;}' +
+      '.chart-container{padding:10px !important;}' +
+      '.bar-label{width:80px !important;font-size:11px !important;}' +
+      '.bar-value{width:40px !important;font-size:11px !important;}' +
+      '.gauge-container{flex-direction:column !important;align-items:center !important;}' +
+      '.detail-grid{grid-template-columns:repeat(2,1fr) !important;}' +
+      '.heatmap-grid{grid-template-columns:repeat(auto-fit,minmax(60px,1fr)) !important;gap:6px !important;}' +
+      '.fab{bottom:calc(20px + env(safe-area-inset-bottom,0px)) !important;right:calc(20px + env(safe-area-inset-right,0px)) !important;}' +
     '}' +
 
     '/* Tablet breakpoint */' +
