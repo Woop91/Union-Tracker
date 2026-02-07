@@ -176,13 +176,36 @@ function getSatisfactionDashboardHtml() {
     '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e5e7eb;border-top-color:#059669;border-radius:50%;animation:spin 1s linear infinite}' +
     '@keyframes spin{to{transform:rotate(360deg)}}' +
 
-    // Responsive
-    '@media (max-width:600px){' +
-    '  .stats-grid{grid-template-columns:repeat(2,1fr)}' +
+    // Responsive - Mobile
+    '@media (max-width:768px){' +
+    '  .header{padding:15px 12px}' +
+    '  .tab-content{padding:10px}' +
+    '  .stats-grid{grid-template-columns:repeat(2,1fr);gap:8px}' +
+    '  .stat-card{padding:14px 10px}' +
     '  .list-item{flex-direction:column;align-items:flex-start}' +
+    '  .list-item-header{flex-direction:column;gap:6px}' +
+    '  .list-item-main{min-width:0;width:100%}' +
     '  .tab-icon{font-size:16px}' +
-    '  .bar-label{width:100px}' +
+    '  .tab{padding:10px 6px;font-size:clamp(11px,2.5vw,13px)}' +
+    '  .bar-label{width:80px;font-size:11px}' +
+    '  .bar-value{width:40px;font-size:11px}' +
     '  .gauge-container{flex-direction:column;align-items:center}' +
+    '  .gauge-ring{width:80px;height:80px}' +
+    '  .gauge-ring span{font-size:20px}' +
+    '  .filter-group{flex-direction:column}' +
+    '  .filter-group .action-btn{width:100%}' +
+    '  .data-table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}' +
+    '  .detail-grid{grid-template-columns:repeat(2,1fr)}' +
+    '  .chart-container{padding:12px}' +
+    '  .search-input{font-size:16px}' +
+    '  .section-card{padding:12px}' +
+    '  .heatmap-grid{grid-template-columns:repeat(auto-fit,minmax(60px,1fr));gap:6px}' +
+    '}' +
+    // Responsive - Tablet
+    '@media (min-width:769px) and (max-width:1024px){' +
+    '  .stats-grid{grid-template-columns:repeat(3,1fr)}' +
+    '  .detail-grid{grid-template-columns:repeat(3,1fr)}' +
+    '  .gauge-container{gap:15px}' +
     '}' +
 
     '</style>' +

@@ -3967,17 +3967,19 @@ function getExecutiveMetrics_() {
 function showStewardDashboard() {
   var url = ScriptApp.getService().getUrl() + '?mode=steward';
   var html = HtmlService.createHtmlOutput(
-    '<html><head>' + getMobileOptimizedHead() + '<style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0}' +
-    '.icon{font-size:48px;margin-bottom:16px}h1{margin:0 0 8px}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5}' +
-    'a{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600}a:hover{background:#2563eb}' +
-    '.copy-btn{background:#475569;margin-left:8px;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:12px}' +
-    '.url{background:#1e293b;padding:12px;border-radius:8px;font-family:monospace;font-size:11px;word-break:break-all;max-width:90%;margin-bottom:16px;border:1px solid #334155}' +
-    '.warning{background:rgba(239,68,68,0.2);color:#fca5a5;padding:8px 16px;border-radius:8px;font-size:11px;margin-bottom:16px}' +
+    '<html><head>' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0;padding:16px}' +
+    '.icon{font-size:clamp(36px,10vw,48px);margin-bottom:16px}h1{margin:0 0 8px;font-size:clamp(18px,5vw,24px);text-align:center}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5;font-size:clamp(13px,3.5vw,15px);padding:0 8px}' +
+    'a.open-link{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;min-height:44px;line-height:20px;text-align:center}a.open-link:hover{background:#2563eb}' +
+    '.copy-btn{background:#475569;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:clamp(11px,3vw,13px);min-height:44px}' +
+    '.url{background:#1e293b;padding:12px;border-radius:8px;font-family:monospace;font-size:clamp(10px,2.5vw,12px);word-break:break-all;max-width:90%;margin-bottom:16px;border:1px solid #334155;width:100%}' +
+    '.warning{background:rgba(239,68,68,0.2);color:#fca5a5;padding:8px 16px;border-radius:8px;font-size:clamp(10px,2.5vw,12px);margin-bottom:16px}' +
+    '.btn-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}' +
+    '@media(max-width:480px){.btn-row{flex-direction:column;width:100%}a.open-link,.copy-btn{width:100%;text-align:center}}' +
     '</style></head><body><div class="icon">🛡️</div><h1>Steward Command Center</h1>' +
     '<div class="warning">INTERNAL USE ONLY - Contains PII</div>' +
     '<p>Open the Steward Dashboard web app. This version includes full member details and sensitive information.</p>' +
     '<div class="url" id="url">' + url + '</div>' +
-    '<div><a href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<div class="btn-row"><a class="open-link" href="' + url + '" target="_blank">Open Dashboard</a>' +
     '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
     '</body></html>'
   ).setWidth(500).setHeight(400);
@@ -4674,15 +4676,17 @@ function applyStatusColors() {
 function showPublicMemberDashboard() {
   var url = ScriptApp.getService().getUrl() + '?mode=member';
   var html = HtmlService.createHtmlOutput(
-    '<html><head>' + getMobileOptimizedHead() + '<style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0}' +
-    '.icon{font-size:48px;margin-bottom:16px}h1{margin:0 0 8px}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5}' +
-    'a{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600}a:hover{background:#2563eb}' +
-    '.copy-btn{background:#475569;margin-left:8px;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:12px}' +
-    '.url{background:#1e293b;padding:12px;border-radius:8px;font-family:monospace;font-size:11px;word-break:break-all;max-width:90%;margin-bottom:16px;border:1px solid #334155}' +
+    '<html><head>' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0;padding:16px}' +
+    '.icon{font-size:clamp(36px,10vw,48px);margin-bottom:16px}h1{margin:0 0 8px;font-size:clamp(18px,5vw,24px);text-align:center}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5;font-size:clamp(13px,3.5vw,15px);padding:0 8px}' +
+    'a.open-link{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;min-height:44px;line-height:20px;text-align:center}a.open-link:hover{background:#2563eb}' +
+    '.copy-btn{background:#475569;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:clamp(11px,3vw,13px);min-height:44px}' +
+    '.url{background:#1e293b;padding:12px;border-radius:8px;font-family:monospace;font-size:clamp(10px,2.5vw,12px);word-break:break-all;max-width:90%;margin-bottom:16px;border:1px solid #334155;width:100%}' +
+    '.btn-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}' +
+    '@media(max-width:480px){.btn-row{flex-direction:column;width:100%}a.open-link,.copy-btn{width:100%;text-align:center}}' +
     '</style></head><body><div class="icon">👥</div><h1>Member Dashboard</h1>' +
     '<p>Open the Member Dashboard web app. This version hides sensitive personal information while showing full analytics.</p>' +
     '<div class="url" id="url">' + url + '</div>' +
-    '<div><a href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<div class="btn-row"><a class="open-link" href="' + url + '" target="_blank">Open Dashboard</a>' +
     '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
     '</body></html>'
   ).setWidth(500).setHeight(350);
