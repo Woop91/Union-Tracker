@@ -2183,3 +2183,248 @@ function generateSequentialId(prefix, sheet, idColumn) {
 
   return prefix + String(maxNum + 1).padStart(5, '0');
 }
+
+// ============================================================================
+// MOBILE OPTIMIZATION UTILITIES
+// ============================================================================
+
+/**
+ * Returns the viewport meta tag for mobile-optimized modals.
+ * Should be included in the <head> of every modal dialog HTML.
+ * @returns {string} HTML meta tag string
+ */
+function getMobileMetaTag() {
+  return '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">';
+}
+
+/**
+ * Returns responsive CSS that should be injected into every modal dialog.
+ * Handles common mobile patterns: touch targets, responsive grids,
+ * fluid typography, overflow scrolling, and safe-area insets.
+ * @returns {string} CSS style block string
+ */
+function getMobileResponsiveStyles() {
+  return '<style id="mobile-responsive-styles">' +
+    '/* Mobile-first responsive base */' +
+    'html{-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}' +
+    'body{overflow-x:hidden;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}' +
+
+    '/* Touch-friendly interactive elements */' +
+    'button,select,.btn,.action-btn,.tab,.filter,.quick-item,.option-item,.result-item,.search-tab,.filter-select{' +
+      'min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + ';' +
+      'touch-action:manipulation;' +
+      '-webkit-tap-highlight-color:transparent;' +
+    '}' +
+    'input[type="text"],input[type="search"],input[type="email"],input[type="number"],input[type="date"],input[type="password"],textarea,select{' +
+      'font-size:16px;' +  /* Prevents iOS zoom on focus */
+      'min-height:' + MOBILE_CONFIG.TOUCH_TARGET_SIZE + ';' +
+      'touch-action:manipulation;' +
+    '}' +
+    'input[type="checkbox"],input[type="radio"]{' +
+      'width:22px;height:22px;' +
+      'touch-action:manipulation;' +
+    '}' +
+
+    '/* Smooth scrolling for overflow containers */' +
+    '[style*="overflow-y:auto"],[style*="overflow-y: auto"],.options-container,.results-container,.quick-results,.items-list,.preview,.steward-list,.filter-panel,.results-panel{' +
+      '-webkit-overflow-scrolling:touch;' +
+      'overscroll-behavior:contain;' +
+      'scroll-behavior:smooth;' +
+    '}' +
+
+    '/* Active state feedback for touch */' +
+    'button:active,.btn:active,.action-btn:active,.tab:active,.option-item:active{' +
+      'transform:scale(0.97);' +
+      'opacity:0.85;' +
+      'transition:transform 0.1s,opacity 0.1s;' +
+    '}' +
+
+    '/* Mobile breakpoint: phones */' +
+    '@media(max-width:' + MOBILE_CONFIG.MOBILE_BREAKPOINT + 'px){' +
+      'body{padding:12px !important;font-size:clamp(13px,3.5vw,15px) !important;}' +
+      'h1,h2,.modal-title{font-size:clamp(18px,5vw,24px) !important;}' +
+      'h3{font-size:clamp(15px,4vw,18px) !important;}' +
+      '.btn,.action-btn,button{' +
+        'width:100%;margin-bottom:8px;padding:12px 16px !important;' +
+        'font-size:clamp(13px,3.5vw,15px) !important;' +
+      '}' +
+      '.btn-row,.button-row{' +
+        'flex-direction:column !important;gap:8px !important;' +
+      '}' +
+      'table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;font-size:12px;}' +
+      'th,td{padding:8px 6px !important;font-size:clamp(11px,2.8vw,13px) !important;}' +
+      '.stats-row,[class*="stat"]{' +
+        'display:grid !important;grid-template-columns:repeat(2,1fr) !important;gap:8px !important;' +
+      '}' +
+      '[class*="kpi-grid"],[class*="charts-grid"]{' +
+        'grid-template-columns:1fr !important;' +
+      '}' +
+      '.filter-panel{display:none;}' +
+      '.filter-toggle{display:block !important;}' +
+      '.filter-panel.show{display:block !important;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:#fff;padding:16px;overflow-y:auto;}' +
+      'select,input[type="text"],input[type="search"],input[type="email"],textarea{width:100% !important;}' +
+    '}' +
+
+    '/* Tablet breakpoint */' +
+    '@media(min-width:' + MOBILE_CONFIG.MOBILE_BREAKPOINT + 'px) and (max-width:' + MOBILE_CONFIG.TABLET_BREAKPOINT + 'px){' +
+      '.stats-row,[class*="stat"]{' +
+        'grid-template-columns:repeat(2,1fr) !important;' +
+      '}' +
+      '[class*="kpi-grid"]{grid-template-columns:repeat(2,1fr) !important;}' +
+      'table{font-size:13px;}' +
+    '}' +
+
+    '/* Desktop: restore inline button layout */' +
+    '@media(min-width:' + MOBILE_CONFIG.MOBILE_BREAKPOINT + 'px){' +
+      '.btn-row,.button-row{' +
+        'flex-direction:row !important;' +
+      '}' +
+      '.btn,.action-btn,button{' +
+        'width:auto;margin-bottom:0;' +
+      '}' +
+    '}' +
+  '</style>';
+}
+
+/**
+ * Returns JavaScript for Android haptic feedback using the Vibration API.
+ * Detects Android devices and provides haptic feedback on user interactions.
+ * Automatically attaches to buttons, inputs, toggles, and interactive elements.
+ * @returns {string} Script block string
+ */
+function getHapticFeedbackScript() {
+  return '<script id="haptic-feedback">' +
+    '(function(){' +
+      '/* Detect Android device */' +
+      'var isAndroid=/android/i.test(navigator.userAgent||"");' +
+      'var canVibrate=!!navigator.vibrate;' +
+      'if(!isAndroid||!canVibrate)return;' +
+
+      '/* Haptic feedback patterns (duration in ms) */' +
+      'var HapticPatterns={' +
+        'light:10,' +      /* Light tap - toggles, checkboxes, minor selections */
+        'medium:18,' +     /* Medium tap - button presses, tab switches */
+        'heavy:30,' +      /* Heavy tap - important actions (submit, delete) */
+        'success:[10,60,10],' +  /* Double pulse - success confirmation */
+        'error:[40,30,40,30,40],' +  /* Triple pulse - error feedback */
+        'warning:[20,40,20]' +  /* Double pulse - warning actions */
+      '};' +
+
+      '/* Main haptic trigger function */' +
+      'window.hapticFeedback=function(pattern){' +
+        'if(!canVibrate)return;' +
+        'try{' +
+          'var p=HapticPatterns[pattern]||HapticPatterns.light;' +
+          'navigator.vibrate(p);' +
+        '}catch(e){}' +
+      '};' +
+
+      '/* Auto-attach haptic feedback to interactive elements */' +
+      'function attachHaptics(){' +
+        '/* Buttons get medium feedback */' +
+        'var buttons=document.querySelectorAll("button,.btn,.action-btn,.fab");' +
+        'for(var i=0;i<buttons.length;i++){' +
+          'if(!buttons[i].dataset.haptic){' +
+            'buttons[i].dataset.haptic="1";' +
+            '(function(btn){' +
+              'var origClick=btn.onclick;' +
+              'btn.addEventListener("touchstart",function(){' +
+                '/* Determine feedback type from button context */' +
+                'var cls=btn.className||"";' +
+                'var txt=(btn.textContent||"").toLowerCase();' +
+                'if(cls.indexOf("danger")>-1||cls.indexOf("delete")>-1||txt.indexOf("delete")>-1||txt.indexOf("remove")>-1){' +
+                  'hapticFeedback("warning");' +
+                '}else if(cls.indexOf("success")>-1||txt.indexOf("save")>-1||txt.indexOf("submit")>-1||txt.indexOf("confirm")>-1){' +
+                  'hapticFeedback("medium");' +
+                '}else if(cls.indexOf("primary")>-1){' +
+                  'hapticFeedback("medium");' +
+                '}else{' +
+                  'hapticFeedback("light");' +
+                '}' +
+              '},{passive:true});' +
+            '})(buttons[i]);' +
+          '}' +
+        '}' +
+
+        '/* Checkboxes and radio buttons get light feedback */' +
+        'var checks=document.querySelectorAll("input[type=checkbox],input[type=radio],.option-item");' +
+        'for(var j=0;j<checks.length;j++){' +
+          'if(!checks[j].dataset.haptic){' +
+            'checks[j].dataset.haptic="1";' +
+            'checks[j].addEventListener("touchstart",function(){hapticFeedback("light");},{passive:true});' +
+          '}' +
+        '}' +
+
+        '/* Tabs and filters get light feedback */' +
+        'var tabs=document.querySelectorAll(".tab,.filter,.search-tab,.nav-tab,.toggle-btn");' +
+        'for(var k=0;k<tabs.length;k++){' +
+          'if(!tabs[k].dataset.haptic){' +
+            'tabs[k].dataset.haptic="1";' +
+            'tabs[k].addEventListener("touchstart",function(){hapticFeedback("light");},{passive:true});' +
+          '}' +
+        '}' +
+
+        '/* Select dropdowns get light feedback */' +
+        'var selects=document.querySelectorAll("select");' +
+        'for(var m=0;m<selects.length;m++){' +
+          'if(!selects[m].dataset.haptic){' +
+            'selects[m].dataset.haptic="1";' +
+            'selects[m].addEventListener("touchstart",function(){hapticFeedback("light");},{passive:true});' +
+          '}' +
+        '}' +
+      '}' +
+
+      '/* Run on DOM ready and observe for dynamic content */' +
+      'if(document.readyState==="loading"){' +
+        'document.addEventListener("DOMContentLoaded",attachHaptics);' +
+      '}else{' +
+        'attachHaptics();' +
+      '}' +
+
+      '/* MutationObserver to handle dynamically added elements */' +
+      'if(typeof MutationObserver!=="undefined"){' +
+        'var observer=new MutationObserver(function(mutations){' +
+          'var shouldReattach=false;' +
+          'for(var i=0;i<mutations.length;i++){' +
+            'if(mutations[i].addedNodes.length>0){shouldReattach=true;break;}' +
+          '}' +
+          'if(shouldReattach)attachHaptics();' +
+        '});' +
+        'observer.observe(document.body,{childList:true,subtree:true});' +
+      '}' +
+
+      '/* Provide success/error feedback for google.script.run callbacks */' +
+      'var origRun=google.script&&google.script.run;' +
+      'if(origRun){' +
+        'var origSuccess=origRun.withSuccessHandler;' +
+        'var origFailure=origRun.withFailureHandler;' +
+        'if(origSuccess){' +
+          'google.script.run.withSuccessHandler=function(fn){' +
+            'return origSuccess.call(this,function(){' +
+              'hapticFeedback("success");' +
+              'if(fn)fn.apply(this,arguments);' +
+            '});' +
+          '};' +
+        '}' +
+        'if(origFailure){' +
+          'google.script.run.withFailureHandler=function(fn){' +
+            'return origFailure.call(this,function(){' +
+              'hapticFeedback("error");' +
+              'if(fn)fn.apply(this,arguments);' +
+            '});' +
+          '};' +
+        '}' +
+      '}' +
+    '})();' +
+  '</script>';
+}
+
+/**
+ * Returns a complete mobile-optimized <head> section for modal dialogs.
+ * Combines viewport meta tag, responsive styles, and haptic feedback.
+ * Usage: Include the return value right after <head> in any modal HTML.
+ * @returns {string} Combined HTML string for mobile optimization
+ */
+function getMobileOptimizedHead() {
+  return getMobileMetaTag() + getMobileResponsiveStyles() + getHapticFeedbackScript();
+}

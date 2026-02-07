@@ -840,7 +840,7 @@ function showBulkGeneratePINDialog() {
 
   // Use a scrollable HTML dialog for large results
   if (generated.length > 10) {
-    var htmlContent = '<html><body style="font-family:sans-serif;padding:10px;">';
+    var htmlContent = '<html><head>' + getMobileOptimizedHead() + '</head><body style="font-family:sans-serif;padding:10px;">';
     htmlContent += '<h3>Bulk PIN Generation Complete</h3>';
     htmlContent += '<p><strong>Generated:</strong> ' + generated.length + ' new PINs<br>';
     htmlContent += '<strong>Skipped:</strong> ' + skipped + ' (already had PINs)</p>';

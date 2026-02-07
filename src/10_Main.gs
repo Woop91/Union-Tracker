@@ -700,6 +700,7 @@ function showHelpDialog() {
     <!DOCTYPE html>
     <html>
     <head>
+      ${getMobileOptimizedHead()}
       <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
       <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600&display=swap" rel="stylesheet">
       <style>
@@ -1526,6 +1527,7 @@ function showImportDialog() {
     <html>
     <head>
       <base target="_top">
+      ${getMobileOptimizedHead()}
       <style>
         body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
         .container { background: white; padding: 25px; border-radius: 8px; max-width: 500px; margin: 0 auto; }
@@ -1644,6 +1646,7 @@ function showExportDialog() {
     <html>
     <head>
       <base target="_top">
+      ${getMobileOptimizedHead()}
       <style>
         body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
         .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
@@ -1782,6 +1785,7 @@ function showFindMemberDialog() {
     <html>
     <head>
       <base target="_top">
+      ${getMobileOptimizedHead()}
       <style>
         body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
         .container { background: white; padding: 25px; border-radius: 8px; max-width: 450px; margin: 0 auto; }
