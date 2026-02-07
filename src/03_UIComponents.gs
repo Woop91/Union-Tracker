@@ -1264,24 +1264,24 @@ function showMemberQuickActions(row) {
 
   var html = HtmlService.createHtmlOutput(
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
-    'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
-    '.container{background:white;padding:25px;border-radius:8px}' +
-    'h2{color:#1a73e8;display:flex;align-items:center;gap:10px}' +
-    '.info{background:#e8f4fd;padding:15px;border-radius:8px;margin-bottom:20px}' +
-    '.name{font-size:18px;font-weight:bold}' +
-    '.id{color:#666;font-size:14px}' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}' +
+    '.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}' +
+    'h2{color:#1a73e8;display:flex;align-items:center;gap:10px;font-size:clamp(16px,4.5vw,20px)}' +
+    '.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px}' +
+    '.name{font-size:clamp(15px,4vw,18px);font-weight:bold}' +
+    '.id{color:#666;font-size:clamp(12px,3vw,14px)}' +
     '.status{margin-top:10px}' +
-    '.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:bold}' +
+    '.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:clamp(10px,2.8vw,12px);font-weight:bold}' +
     '.open{background:#ffebee;color:#c62828}' +
     '.none{background:#e8f5e9;color:#2e7d32}' +
     '.actions{display:flex;flex-direction:column;gap:10px}' +
-    '.action-btn{display:flex;align-items:center;gap:12px;padding:15px;border:none;border-radius:8px;cursor:pointer;font-size:14px;text-align:left;background:#f8f9fa}' +
+    '.action-btn{display:flex;align-items:center;gap:12px;padding:clamp(12px,3vw,15px);border:none;border-radius:8px;cursor:pointer;font-size:clamp(13px,3.5vw,14px);text-align:left;background:#f8f9fa;min-height:44px}' +
     '.action-btn:hover{background:#e8f4fd}' +
-    '.icon{font-size:24px}' +
+    '.icon{font-size:clamp(20px,5vw,24px)}' +
     '.title{font-weight:bold}' +
-    '.desc{font-size:12px;color:#666;margin-top:2px}' +
-    '.section-header{font-weight:bold;color:#1a73e8;margin:15px 0 10px;padding-top:10px;border-top:1px solid #e0e0e0}' +
-    '.close{width:100%;margin-top:15px;padding:12px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer}' +
+    '.desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}' +
+    '.section-header{font-weight:bold;color:#1a73e8;margin:15px 0 10px;padding-top:10px;border-top:1px solid #e0e0e0;font-size:clamp(12px,3vw,14px)}' +
+    '.close{width:100%;margin-top:15px;padding:12px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer;min-height:44px;font-size:clamp(13px,3.5vw,14px)}' +
     '</style></head><body><div class="container">' +
     '<h2>⚡ Quick Actions</h2>' +
     '<div class="info">' +
@@ -1335,26 +1335,26 @@ function showGrievanceQuickActions(row) {
 
   var html = HtmlService.createHtmlOutput(
     '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
-    'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
-    '.container{background:white;padding:25px;border-radius:8px}' +
-    'h2{color:#DC2626}' +
-    '.info{background:#fff5f5;padding:15px;border-radius:8px;margin-bottom:20px;border-left:4px solid #DC2626}' +
-    '.gid{font-size:18px;font-weight:bold}' +
-    '.gmem{color:#666;font-size:14px}' +
-    '.gstatus{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}' +
-    '.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:bold}' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}' +
+    '.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}' +
+    'h2{color:#DC2626;font-size:clamp(16px,4.5vw,20px)}' +
+    '.info{background:#fff5f5;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;border-left:4px solid #DC2626}' +
+    '.gid{font-size:clamp(15px,4vw,18px);font-weight:bold}' +
+    '.gmem{color:#666;font-size:clamp(12px,3vw,14px)}' +
+    '.gstatus{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}' +
+    '.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:clamp(10px,2.8vw,12px);font-weight:bold}' +
     '.actions{display:flex;flex-direction:column;gap:10px}' +
-    '.action-btn{display:flex;align-items:center;gap:12px;padding:15px;border:none;border-radius:8px;cursor:pointer;font-size:14px;text-align:left;background:#f8f9fa}' +
+    '.action-btn{display:flex;align-items:center;gap:12px;padding:clamp(12px,3vw,15px);border:none;border-radius:8px;cursor:pointer;font-size:clamp(13px,3.5vw,14px);text-align:left;background:#f8f9fa;min-height:44px}' +
     '.action-btn:hover{background:#fff5f5}' +
-    '.icon{font-size:24px}' +
+    '.icon{font-size:clamp(20px,5vw,24px)}' +
     '.title{font-weight:bold}' +
-    '.desc{font-size:12px;color:#666;margin-top:2px}' +
-    '.section-header{font-weight:bold;color:#DC2626;margin:15px 0 10px;padding-top:10px;border-top:1px solid #e0e0e0}' +
+    '.desc{font-size:clamp(10px,2.8vw,12px);color:#666;margin-top:2px}' +
+    '.section-header{font-weight:bold;color:#DC2626;margin:15px 0 10px;padding-top:10px;border-top:1px solid #e0e0e0;font-size:clamp(12px,3vw,14px)}' +
     '.divider{height:1px;background:#e0e0e0;margin:10px 0}' +
-    '.status-section{margin-top:15px;padding:15px;background:#f8f9fa;border-radius:8px}' +
-    '.status-section h4{margin:0 0 10px}' +
-    'select{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:14px}' +
-    '.close{width:100%;margin-top:15px;padding:12px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer}' +
+    '.status-section{margin-top:15px;padding:clamp(10px,3vw,15px);background:#f8f9fa;border-radius:8px}' +
+    '.status-section h4{margin:0 0 10px;font-size:clamp(13px,3.5vw,15px)}' +
+    'select{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;min-height:44px}' +
+    '.close{width:100%;margin-top:15px;padding:12px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer;min-height:44px;font-size:clamp(13px,3.5vw,14px)}' +
     '</style></head><body><div class="container">' +
     '<h2>⚡ Grievance Actions</h2>' +
     '<div class="info">' +
@@ -1415,7 +1415,7 @@ function composeEmailForMember(memberId) {
       var name = data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1];
       if (!email) { SpreadsheetApp.getUi().alert('No email on file.'); return; }
       var html = HtmlService.createHtmlOutput(
-        '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8}.info{background:#e8f4fd;padding:15px;border-radius:8px;margin-bottom:20px}.form-group{margin:15px 0}label{display:block;font-weight:bold;margin-bottom:5px}input,textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:14px;box-sizing:border-box}textarea{min-height:200px}input:focus,textarea:focus{outline:none;border-color:#1a73e8}.buttons{display:flex;gap:10px;margin-top:20px}button{padding:12px 24px;font-size:14px;border:none;border-radius:4px;cursor:pointer;flex:1}.primary{background:#1a73e8;color:white}.secondary{background:#6c757d;color:white}</style></head><body><div class="container"><h2>📧 Email to Member</h2><div class="info"><strong>' + name + '</strong> (' + memberId + ')<br>' + email + '</div><div class="form-group"><label>Subject:</label><input type="text" id="subject" placeholder="Email subject"></div><div class="form-group"><label>Message:</label><textarea id="message" placeholder="Type your message..."></textarea></div><div class="buttons"><button class="primary" onclick="send()">📤 Send</button><button class="secondary" onclick="google.script.host.close()">Cancel</button></div></div><script>function send(){var s=document.getElementById("subject").value.trim();var m=document.getElementById("message").value.trim();if(!s||!m){alert("Fill in subject and message");return}google.script.run.withSuccessHandler(function(){alert("Email sent!");google.script.host.close()}).withFailureHandler(function(e){alert("Error: "+e.message)}).sendQuickEmail("' + email + '",s,m,"' + memberId + '")}</script></body></html>'
+        '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}.form-group{margin:15px 0}label{display:block;font-weight:bold;margin-bottom:5px;font-size:clamp(12px,3vw,14px)}input,textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;min-height:44px}textarea{min-height:180px}input:focus,textarea:focus{outline:none;border-color:#1a73e8}.buttons{display:flex;gap:10px;margin-top:20px}button{padding:12px 24px;font-size:clamp(13px,3.5vw,14px);border:none;border-radius:4px;cursor:pointer;flex:1;min-height:44px}.primary{background:#1a73e8;color:white}.secondary{background:#6c757d;color:white}@media(max-width:480px){.buttons{flex-direction:column}}</style></head><body><div class="container"><h2>📧 Email to Member</h2><div class="info"><strong>' + name + '</strong> (' + memberId + ')<br>' + email + '</div><div class="form-group"><label>Subject:</label><input type="text" id="subject" placeholder="Email subject"></div><div class="form-group"><label>Message:</label><textarea id="message" placeholder="Type your message..."></textarea></div><div class="buttons"><button class="primary" onclick="send()">📤 Send</button><button class="secondary" onclick="google.script.host.close()">Cancel</button></div></div><script>function send(){var s=document.getElementById("subject").value.trim();var m=document.getElementById("message").value.trim();if(!s||!m){alert("Fill in subject and message");return}google.script.run.withSuccessHandler(function(){alert("Email sent!");google.script.host.close()}).withFailureHandler(function(e){alert("Error: "+e.message)}).sendQuickEmail("' + email + '",s,m,"' + memberId + '")}</script></body></html>'
       ).setWidth(600).setHeight(500);
       SpreadsheetApp.getUi().showModalDialog(html, '📧 Compose Email');
       return;
@@ -1722,7 +1722,7 @@ function showMemberGrievanceHistory(memberId) {
     return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === 'Open' ? '#f44336' : '#4caf50') + '"><strong>' + g.id + '</strong><br><span style="color:#666">Status: ' + g.status + ' | Step: ' + g.step + '</span><br><span style="color:#888;font-size:12px">' + g.issue + ' | Filed: ' + (g.filed ? new Date(g.filed).toLocaleDateString() : 'N/A') + '</span></div>';
   }).join('');
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px}h2{color:#1a73e8}.summary{background:#e8f4fd;padding:15px;border-radius:8px;margin-bottom:20px}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + memberId + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === 'Open'; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== 'Open'; }).length + '</div>' + list + '</body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + memberId + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === 'Open'; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== 'Open'; }).length + '</div>' + list + '</body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, 'Grievance History - ' + memberId);
 }
