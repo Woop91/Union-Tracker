@@ -1123,6 +1123,7 @@ function getSearchDialogHtml_() {
     <html>
     <head>
       <base target="_top">
+      ${getMobileOptimizedHead()}
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -2281,6 +2282,7 @@ function showOCRDialog() {
   var ui = SpreadsheetApp.getUi();
 
   var html = HtmlService.createHtmlOutput(
+    '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
     '<style>' +
     '* { box-sizing: border-box; }' +
     'body { font-family: "Google Sans", Roboto, Arial, sans-serif; padding: 20px; margin: 0; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; color: #F8FAFC; }' +
@@ -2420,6 +2422,7 @@ function setupOCRApiKey() {
     : '❌ API Key Not Configured';
 
   var html = HtmlService.createHtmlOutput(
+    '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
     '<style>' +
     '* { box-sizing: border-box; }' +
     'body { font-family: "Google Sans", Roboto, Arial, sans-serif; padding: 24px; margin: 0; background: #F8FAFC; color: #1E293B; }' +
@@ -2651,6 +2654,7 @@ function showSearchPrecedents() {
   var ui = SpreadsheetApp.getUi();
 
   var html = HtmlService.createHtmlOutput(
+    '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
     '<style>' +
     'body { font-family: Roboto, Arial, sans-serif; padding: 16px; margin: 0; }' +
     'h3 { color: #1e293b; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; }' +

@@ -865,6 +865,7 @@ function getChecklistDialogHtml(caseId) {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<base target="_top">' +
+    getMobileOptimizedHead() +
     '<style>' +
     '* { box-sizing: border-box; margin: 0; padding: 0; }' +
     'body { font-family: "Google Sans", -apple-system, BlinkMacSystemFont, sans-serif; background: #F9FAFB; color: #1F2937; }' +
@@ -2237,6 +2238,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
   return `<!DOCTYPE html>
 <html>
 <head>
+  ${getMobileOptimizedHead()}
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Google Sans', Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 20px; color: #F8FAFC; }
@@ -3631,6 +3633,7 @@ function showLookerAnonConnectionHelp() {
   const html = `<!DOCTYPE html>
 <html>
 <head>
+  ${getMobileOptimizedHead()}
   <style>
     body { font-family: 'Google Sans', Roboto, sans-serif; padding: 20px; color: #1F2937; }
     h2 { color: #059669; margin-bottom: 16px; }
@@ -3865,6 +3868,7 @@ function showLookerConnectionHelp() {
   const html = `<!DOCTYPE html>
 <html>
 <head>
+  ${getMobileOptimizedHead()}
   <style>
     body { font-family: 'Google Sans', Roboto, sans-serif; padding: 20px; color: #1F2937; }
     h2 { color: #7C3AED; margin-bottom: 16px; }

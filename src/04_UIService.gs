@@ -52,6 +52,7 @@ function getVisualControlPanelHtml() {
     <html>
     <head>
       <base target="_top">
+      ${getMobileOptimizedHead()}
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -1033,7 +1034,25 @@ function getCommonStyles() {
         background: #e6f4ea;
         color: #137333;
       }
+
+      /* Mobile-responsive enhancements for common styles */
+      @media (max-width: ${MOBILE_CONFIG.MOBILE_BREAKPOINT}px) {
+        .btn {
+          min-height: ${MOBILE_CONFIG.TOUCH_TARGET_SIZE};
+          padding: 12px 16px;
+          font-size: clamp(13px, 3.5vw, 15px);
+        }
+        .form-input, .form-select, .form-textarea {
+          min-height: ${MOBILE_CONFIG.TOUCH_TARGET_SIZE};
+          font-size: 16px; /* Prevents iOS zoom */
+        }
+        .alert {
+          padding: 10px 12px;
+          font-size: clamp(12px, 3vw, 14px);
+        }
+      }
     </style>
+    ${getMobileOptimizedHead()}
   `;
 }
 
@@ -1133,7 +1152,7 @@ function startPomodoroTimer() {
 
   // For immediate feedback, show a modal with timer info
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>' +
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
     'body{font-family:Arial,sans-serif;padding:30px;text-align:center;background:linear-gradient(135deg,#ff6b6b,#ee5a24)}' +
     '.timer{font-size:72px;color:white;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}' +
     '.label{color:white;font-size:18px;margin-top:10px;opacity:0.9}' +
@@ -1235,7 +1254,7 @@ function getQuickCaptureMetadata() {
  */
 function showQuickCaptureNotepad() {
   var html = HtmlService.createHtmlOutput(
-    '<style>' +
+    '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
     '* { box-sizing: border-box; margin: 0; padding: 0; }' +
     'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 16px; color: #F8FAFC; }' +
     '.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }' +
@@ -1346,7 +1365,7 @@ function showImportDialog_UIService_() {
  */
 function getImportDialogHtml_() {
   return '<!DOCTYPE html>' +
-    '<html><head><base target="_top">' +
+    '<html><head><base target="_top">' + getMobileOptimizedHead() +
     '<style>' +
     '* { box-sizing: border-box; margin: 0; padding: 0; }' +
     'body { font-family: "Roboto", Arial, sans-serif; padding: 20px; background: #f5f5f5; }' +
@@ -1613,7 +1632,7 @@ function showExportDialog_UIService_() {
 
   // Show download link
   var html = HtmlService.createHtmlOutput(
-    '<style>' +
+    '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
     'body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }' +
     '.success { color: #137333; font-size: 48px; margin-bottom: 10px; }' +
     'h2 { color: #333; margin-bottom: 20px; }' +
@@ -1669,7 +1688,7 @@ function showBreakReminder() {
 function showADHDControlPanel() {
   var settings = getADHDSettings();
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8;border-bottom:3px solid #1a73e8;padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid #1a73e8}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:#1a73e8;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:#1557b0}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.toggleZebraStripes();setTimeout(function(){location.reload()},1000)">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.toggleGridlinesADHD();setTimeout(function(){location.reload()},1000)">' + (settings.gridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetADHDSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8;border-bottom:3px solid #1a73e8;padding-bottom:10px}.section{background:#f8f9fa;padding:15px;margin:15px 0;border-radius:8px;border-left:4px solid #1a73e8}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #e0e0e0}button{background:#1a73e8;color:white;border:none;padding:10px 20px;border-radius:4px;cursor:pointer;margin:5px}button:hover{background:#1557b0}button.sec{background:#6c757d}</style></head><body><div class="container"><h2>♿ Comfort View Panel</h2><div class="section"><div class="row"><span>Zebra Stripes</span><button onclick="google.script.run.toggleZebraStripes();setTimeout(function(){location.reload()},1000)">' + (settings.zebraStripes ? '✅ On' : 'Off') + '</button></div><div class="row"><span>Gridlines</span><button onclick="google.script.run.toggleGridlinesADHD();setTimeout(function(){location.reload()},1000)">' + (settings.gridlines ? '✅ Visible' : 'Hidden') + '</button></div><div class="row"><span>Focus Mode</span><button onclick="google.script.run.activateFocusMode();google.script.host.close()">🎯 Activate</button></div></div><div class="section"><div class="row"><span>Quick Capture</span><button onclick="google.script.run.showQuickCaptureNotepad()">📝 Open</button></div><div class="row"><span>Pomodoro Timer</span><button onclick="google.script.run.startPomodoroTimer();google.script.host.close()">⏱️ Start</button></div></div><button class="sec" onclick="google.script.run.resetADHDSettings();google.script.host.close()">🔄 Reset</button><button class="sec" onclick="google.script.host.close()">Close</button></div></body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, '♿ Comfort View Panel');
 }
@@ -1684,7 +1703,7 @@ function showThemeManager() {
       '<div style="height:20px;background:' + t.headerBackground + ';border-radius:4px;margin-top:10px"></div></div>';
   }).join('');
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;margin:5px}button.sec{background:#6c757d}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0}</style></head><body><div class="container"><h2>🎨 Theme Manager</h2><div class="grid">' + themeCards + '</div><button onclick="apply()">✅ Apply Theme</button><button class="sec" onclick="google.script.host.close()">Close</button></div><script>var sel="' + current + '";function select(k){sel=k;document.querySelectorAll(".grid>div").forEach(function(d){d.style.border="3px solid transparent"});event.currentTarget.style.border="3px solid #1a73e8"}function apply(){google.script.run.withSuccessHandler(function(){alert("Theme applied!");google.script.host.close()}).applyTheme(sel,"all")}</script></body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:Arial;padding:20px;background:#f5f5f5}.container{background:white;padding:25px;border-radius:8px}h2{color:#1a73e8}button{background:#1a73e8;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;margin:5px}button.sec{background:#6c757d}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px;margin:20px 0}</style></head><body><div class="container"><h2>🎨 Theme Manager</h2><div class="grid">' + themeCards + '</div><button onclick="apply()">✅ Apply Theme</button><button class="sec" onclick="google.script.host.close()">Close</button></div><script>var sel="' + current + '";function select(k){sel=k;document.querySelectorAll(".grid>div").forEach(function(d){d.style.border="3px solid transparent"});event.currentTarget.style.border="3px solid #1a73e8"}function apply(){google.script.run.withSuccessHandler(function(){alert("Theme applied!");google.script.host.close()}).applyTheme(sel,"all")}</script></body></html>'
   ).setWidth(450).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, '🎨 Theme Manager');
 }
@@ -1735,7 +1754,7 @@ function getSmartDashboardHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<base target="_top">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    getMobileOptimizedHead() +
     '<style>' +
     // CSS Reset and base styles
     '*{box-sizing:border-box;margin:0;padding:0}' +
@@ -3769,7 +3788,7 @@ function getExecutiveDashboardHtml_() {
   return '<!DOCTYPE html>' +
     '<html>' +
     '<head>' +
-    '  <base target="_top">' +
+    '  <base target="_top">' + getMobileOptimizedHead() +
     '  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">' +
     '  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>' +
     '  <style>' +
@@ -3948,7 +3967,7 @@ function getExecutiveMetrics_() {
 function showStewardDashboard() {
   var url = ScriptApp.getService().getUrl() + '?mode=steward';
   var html = HtmlService.createHtmlOutput(
-    '<html><head><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0}' +
+    '<html><head>' + getMobileOptimizedHead() + '<style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0}' +
     '.icon{font-size:48px;margin-bottom:16px}h1{margin:0 0 8px}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5}' +
     'a{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600}a:hover{background:#2563eb}' +
     '.copy-btn{background:#475569;margin-left:8px;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:12px}' +
@@ -4253,7 +4272,7 @@ function showStewardPerformanceModal_UIService_() {
     return;
   }
 
-  var html = '<!DOCTYPE html><html><head>' +
+  var html = '<!DOCTYPE html><html><head>' + getMobileOptimizedHead() +
     '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
     '<style>' +
     '* { box-sizing: border-box; margin: 0; padding: 0; }' +
@@ -4655,7 +4674,7 @@ function applyStatusColors() {
 function showPublicMemberDashboard() {
   var url = ScriptApp.getService().getUrl() + '?mode=member';
   var html = HtmlService.createHtmlOutput(
-    '<html><head><style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0}' +
+    '<html><head>' + getMobileOptimizedHead() + '<style>body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc;margin:0}' +
     '.icon{font-size:48px;margin-bottom:16px}h1{margin:0 0 8px}p{color:#94a3b8;margin:0 0 24px;text-align:center;max-width:400px;line-height:1.5}' +
     'a{background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600}a:hover{background:#2563eb}' +
     '.copy-btn{background:#475569;margin-left:8px;cursor:pointer;border:none;padding:10px 16px;border-radius:8px;color:white;font-size:12px}' +

@@ -37,7 +37,7 @@ function getSatisfactionDashboardHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<base target="_top">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    getMobileOptimizedHead() +
     '<style>' +
     // CSS Reset and base styles
     '*{box-sizing:border-box;margin:0;padding:0}' +
@@ -2322,7 +2322,7 @@ function syncAllData() {
 function installAutoSyncTrigger() {
   var ui = SpreadsheetApp.getUi();
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>' +
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
     'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:8px}' +
     'h2{color:#1a73e8;margin-top:0}' +
@@ -3364,7 +3364,7 @@ function showFlaggedSubmissionsReview() {
  * @returns {string} HTML content
  */
 function getFlaggedSubmissionsHtml() {
-  return '<!DOCTYPE html><html><head><base target="_top">' +
+  return '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
     '<style>' +
     ':root{--purple:#5B4B9E;--green:#059669;--red:#DC2626;--orange:#F97316}' +
     '*{box-sizing:border-box;margin:0;padding:0}' +

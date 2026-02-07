@@ -833,6 +833,7 @@ function showImportMembersDialog() {
 function getImportMembersHtml_() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
+    getMobileOptimizedHead() +
     '<style>' +
     '* { box-sizing: border-box; margin: 0; padding: 0; }' +
     'body { font-family: "Google Sans", Roboto, sans-serif; background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); min-height: 100vh; padding: 20px; color: #F8FAFC; }' +

@@ -319,7 +319,7 @@ function getRepairDialogHtml_(diagnostics) {
   var statusColor = diagnostics.status === 'OK' ? '#10b981' :
                     diagnostics.status === 'WARNING' ? '#f59e0b' : '#ef4444';
 
-  return '<!DOCTYPE html><html><head><base target="_top">' +
+  return '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
     '<style>' +
     'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;margin:0}' +
     '.status{padding:10px;border-radius:8px;text-align:center;margin-bottom:20px;color:white;background:' + statusColor + '}' +
@@ -438,7 +438,7 @@ function diagnoseModalIssues() {
 function showModalDiagnostics() {
   var results = diagnoseModalIssues();
 
-  var html = '<!DOCTYPE html><html><head><base target="_top">' +
+  var html = '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
     '<style>' +
     'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px}' +
     '.card{background:#f9fafb;border-radius:8px;padding:15px;margin-bottom:15px}' +
@@ -489,7 +489,7 @@ function getDiagnosticsDialogHtml_(results) {
   var statusClass = results.status === 'OK' ? 'ok' :
                     results.status === 'WARNING' ? 'warning' : 'error';
 
-  return '<!DOCTYPE html><html><head><base target="_top">' +
+  return '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
     '<style>' +
     'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;margin:0}' +
     '.status{display:inline-block;padding:8px 16px;border-radius:20px;font-weight:600;margin-bottom:15px}' +
@@ -841,7 +841,7 @@ function showCacheStatusDashboard() {
   }).join('');
 
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' +
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
     '<style>' +
     'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1)}' +
@@ -1274,7 +1274,7 @@ function showUndoRedoPanel() {
       }).join('');
 
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' +
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() +
     '<style>' +
     'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:12px}' +
@@ -2428,7 +2428,7 @@ function showStewardWorkloadDashboard() {
   var totalActive = stewards.reduce(function(sum, s) { return sum + s.activeCount; }, 0);
   var avgLoad = totalActive / stewards.length;
 
-  var html = '<style>' +
+  var html = '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
     'body { font-family: Arial, sans-serif; padding: 20px; }' +
     'h2 { color: #7C3AED; margin-bottom: 10px; }' +
     '.stats { background: #F3F4F6; padding: 15px; border-radius: 8px; margin-bottom: 20px; }' +
@@ -2608,7 +2608,7 @@ function showConfigHealthCheck() {
     return;
   }
 
-  var html = '<style>' +
+  var html = '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
     'body { font-family: Arial, sans-serif; padding: 20px; }' +
     'h2 { color: #DC2626; }' +
     '.warning { background: #FEF3C7; padding: 15px; border-radius: 8px; margin-bottom: 20px; }' +
@@ -2799,7 +2799,7 @@ function showAuditLogViewer() {
   var startRow = Math.max(2, lastRow - 49); // Last 50 entries
   var data = auditSheet.getRange(startRow, 1, lastRow - startRow + 1, 5).getValues();
 
-  var html = '<style>' +
+  var html = '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
     'body { font-family: Arial, sans-serif; padding: 20px; }' +
     'h2 { color: #7C3AED; }' +
     'table { width: 100%; border-collapse: collapse; font-size: 12px; }' +
@@ -2929,7 +2929,7 @@ function archiveClosedGrievances(daysOld) {
  * Show archive dialog with options
  */
 function showArchiveDialog() {
-  var html = '<style>' +
+  var html = '<html><head>' + getMobileOptimizedHead() + '</head><body><style>' +
     'body { font-family: Arial, sans-serif; padding: 20px; }' +
     'h2 { color: #7C3AED; }' +
     '.info { background: #EFF6FF; padding: 15px; border-radius: 8px; margin-bottom: 20px; }' +

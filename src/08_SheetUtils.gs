@@ -1680,6 +1680,7 @@ function sendContactInfoForm() {
   } else if (response === ui.Button.NO) {
     // Show link to copy
     var copyHtml = HtmlService.createHtmlOutput(
+      '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
       '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
       '<p>Copy this link and share with members:</p>' +
       '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + formUrl + '</textarea>' +
@@ -1694,7 +1695,7 @@ function sendContactInfoForm() {
       '  document.getElementById("copied").style.display = "inline";' +
       '}' +
       '</script>' +
-      '</div>'
+      '</div></body></html>'
     ).setWidth(450).setHeight(180);
     ui.showModalDialog(copyHtml, 'Contact Form Link');
   }
@@ -2045,6 +2046,7 @@ function getSatisfactionSurveyLink() {
   } else if (response === ui.Button.NO) {
     // Show link to copy
     var copyHtml = HtmlService.createHtmlOutput(
+      '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
       '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
       '<p>Copy this link and share with members:</p>' +
       '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + formUrl + '</textarea>' +
@@ -2059,7 +2061,7 @@ function getSatisfactionSurveyLink() {
       '  document.getElementById("copied").style.display = "inline";' +
       '}' +
       '</script>' +
-      '</div>'
+      '</div></body></html>'
     ).setWidth(450).setHeight(180);
     ui.showModalDialog(copyHtml, 'Survey Link');
   }
@@ -2761,7 +2763,7 @@ function sendRandomSurveyEmails() {
 
   // Show configuration dialog
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>' +
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
     'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:8px;max-width:450px}' +
     'h2{color:#5B4B9E;margin-top:0}' +

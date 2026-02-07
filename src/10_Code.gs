@@ -5147,7 +5147,7 @@ function fixDataQualityIssues() {
   }
 
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top"><style>' +
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>' +
     'body{font-family:Arial;padding:20px;background:#f5f5f5}' +
     '.container{background:white;padding:25px;border-radius:8px}' +
     'h2{color:#DC2626;margin-top:0}' +
