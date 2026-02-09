@@ -6310,7 +6310,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2547 lines)
+// SOURCE: 03_UIComponents.gs (2549 lines)
 // ============================================================================
 
 /**
@@ -6510,6 +6510,8 @@ function createDashboardMenu() {
       .addItem('🖌️ Setup Theme Columns', 'setupThemeColumns'))
 
     .addSubMenu(ui.createMenu('🏗️ Setup')
+      .addItem('🚀 Initialize Dashboard', 'initializeDashboard')
+      .addSeparator()
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
@@ -38604,7 +38606,7 @@ function repairAllCheckboxes() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (1918 lines)
+// SOURCE: 10_Main.gs (1866 lines)
 // ============================================================================
 
 /**
@@ -39209,61 +39211,9 @@ function dailyTrigger() {
  * Creates all required sheets and configurations
  */
 function initializeDashboard() {
-  const ui = SpreadsheetApp.getUi();
-
-  const response = ui.alert(
-    'Initialize Dashboard',
-    'This will set up the Union Steward Dashboard with all required sheets and configurations. ' +
-    'Existing data will not be affected. Continue?',
-    ui.ButtonSet.YES_NO
-  );
-
-  if (response !== ui.Button.YES) {
-    return;
-  }
-
-  try {
-    showToast('Initializing dashboard...', 'Setup');
-
-    // Create visible sheets if missing
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    for (const [key, sheetName] of Object.entries(SHEET_NAMES)) {
-      if (!ss.getSheetByName(sheetName)) {
-        const sheet = ss.insertSheet(sheetName);
-        setupSheetStructure(sheet, key);
-        showToast(`Created sheet: ${sheetName}`, 'Setup');
-      }
-    }
-
-    // Setup hidden calculation sheets
-    const hiddenResult = setupAllHiddenSheets();
-    showToast(`Set up ${hiddenResult.created} hidden sheets`, 'Setup');
-
-    // Setup triggers
-    setupTriggers();
-
-    // Create menu
-    createDashboardMenu();
-
-    // Log initialization
-    logAuditEvent('DASHBOARD_INITIALIZED', {
-      sheetsCreated: Object.keys(SHEET_NAMES).length,
-      hiddenSheetsCreated: hiddenResult.created,
-      initializedBy: Session.getActiveUser().getEmail()
-    });
-
-    ui.alert(
-      'Setup Complete',
-      'The Union Steward Dashboard has been initialized successfully!\n\n' +
-      'Use the "Union Dashboard" menu to access all features.',
-      ui.ButtonSet.OK
-    );
-
-  } catch (error) {
-    console.error('Error initializing dashboard:', error);
-    ui.alert('Error', 'Failed to initialize: ' + error.message, ui.ButtonSet.OK);
-  }
+  // Delegate to CREATE_509_DASHBOARD which properly creates all sheets
+  // with headers, formatting, validations, and hidden calculation sheets
+  CREATE_509_DASHBOARD();
 }
 
 /**
