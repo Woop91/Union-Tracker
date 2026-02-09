@@ -625,11 +625,11 @@ function sendDeadlineReminders(daysAhead) {
     deadlines.forEach(d => {
       const urgent = d.daysLeft <= 3 ? 'style="background: #fee2e2;"' : '';
       body += `<tr ${urgent}>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.grievanceId}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.memberName}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.step}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.date}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.daysLeft}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.grievanceId)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.memberName)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.step)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.date)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(String(d.daysLeft))}</td>
                </tr>`;
     });
 

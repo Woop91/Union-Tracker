@@ -16642,11 +16642,11 @@ function sendDeadlineReminders(daysAhead) {
     deadlines.forEach(d => {
       const urgent = d.daysLeft <= 3 ? 'style="background: #fee2e2;"' : '';
       body += `<tr ${urgent}>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.grievanceId}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.memberName}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.step}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.date}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.daysLeft}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.grievanceId)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.memberName)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.step)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.date)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(String(d.daysLeft))}</td>
                </tr>`;
     });
 
@@ -18766,15 +18766,15 @@ function getRepairDialogHtml_(diagnostics) {
     '.btn-primary{background:#7c3aed;color:white}' +
     '.btn-secondary{background:#e5e7eb;color:#374151}' +
     '</style></head><body>' +
-    '<div class="status">' + diagnostics.status + '</div>' +
-    '<p>' + diagnostics.summary + '</p>' +
+    '<div class="status">' + escapeHtml(diagnostics.status) + '</div>' +
+    '<p>' + escapeHtml(diagnostics.summary) + '</p>' +
     (diagnostics.errors.length > 0 ?
       '<div class="section"><div class="section-title error">Errors</div>' +
-      diagnostics.errors.map(function(e) { return '<div class="item error">' + e + '</div>'; }).join('') +
+      diagnostics.errors.map(function(e) { return '<div class="item error">' + escapeHtml(e) + '</div>'; }).join('') +
       '</div>' : '') +
     (diagnostics.warnings.length > 0 ?
       '<div class="section"><div class="section-title warning">Warnings</div>' +
-      diagnostics.warnings.map(function(w) { return '<div class="item warning">' + w + '</div>'; }).join('') +
+      diagnostics.warnings.map(function(w) { return '<div class="item warning">' + escapeHtml(w) + '</div>'; }).join('') +
       '</div>' : '') +
     '<div style="margin-top:20px;text-align:right">' +
     '<button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
@@ -18938,19 +18938,19 @@ function getDiagnosticsDialogHtml_(results) {
     '.btn-primary{background:#7c3aed;color:white}' +
     '.btn-secondary{background:#e5e7eb;color:#374151;margin-right:10px}' +
     '</style></head><body>' +
-    '<div class="status ' + statusClass + '">' + results.status + '</div>' +
-    '<p>' + results.summary + '</p>' +
+    '<div class="status ' + statusClass + '">' + escapeHtml(results.status) + '</div>' +
+    '<p>' + escapeHtml(results.summary) + '</p>' +
     '<div class="section">' +
     '<div class="section-title">Checks Performed (' + results.checks.length + ')</div>' +
     '<div class="list">' +
-    results.checks.map(function(c) { return '<div class="item">✓ ' + c + '</div>'; }).join('') +
+    results.checks.map(function(c) { return '<div class="item">✓ ' + escapeHtml(c) + '</div>'; }).join('') +
     '</div></div>' +
     (results.errors.length > 0 ?
       '<div class="section"><div class="section-title error">Errors (' + results.errors.length + ')</div>' +
-      '<div class="list">' + results.errors.map(function(e) { return '<div class="item" style="color:#991b1b">❌ ' + e + '</div>'; }).join('') + '</div></div>' : '') +
+      '<div class="list">' + results.errors.map(function(e) { return '<div class="item" style="color:#991b1b">❌ ' + escapeHtml(e) + '</div>'; }).join('') + '</div></div>' : '') +
     (results.warnings.length > 0 ?
       '<div class="section"><div class="section-title warning">Warnings (' + results.warnings.length + ')</div>' +
-      '<div class="list">' + results.warnings.map(function(w) { return '<div class="item" style="color:#92400e">⚠ ' + w + '</div>'; }).join('') + '</div></div>' : '') +
+      '<div class="list">' + results.warnings.map(function(w) { return '<div class="item" style="color:#92400e">⚠ ' + escapeHtml(w) + '</div>'; }).join('') + '</div></div>' : '') +
     '<div style="margin-top:20px;text-align:right">' +
     '<button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>' +
     '<button class="btn btn-primary" onclick="runRepair()">Run Repair</button>' +
@@ -24688,7 +24688,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08_SheetUtils.gs (4451 lines)
+// SOURCE: 08_SheetUtils.gs (4480 lines)
 // ============================================================================
 
 /**
@@ -26074,15 +26074,35 @@ function createStewardLeaderboardChart_(sheet) {
   }
 
   var data = memberSheet.getDataRange().getValues();
+
+  // Build case counts from Grievance Log since MEMBER_COLS doesn't have TOTAL_CASES/WINS
+  var caseCounts = {};
+  var winCounts = {};
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+    var gData = grievanceSheet.getDataRange().getValues();
+    for (var g = 1; g < gData.length; g++) {
+      var stewardName = gData[g][GRIEVANCE_COLS.STEWARD - 1] || '';
+      if (stewardName) {
+        caseCounts[stewardName] = (caseCounts[stewardName] || 0) + 1;
+        var gStatus = gData[g][GRIEVANCE_COLS.STATUS - 1] || '';
+        if (gStatus === 'Won' || gStatus === 'Settled') {
+          winCounts[stewardName] = (winCounts[stewardName] || 0) + 1;
+        }
+      }
+    }
+  }
+
   var stewards = [];
 
-  // Find stewards and their case counts
+  // Find stewards and look up their case counts
   for (var i = 1; i < data.length; i++) {
     if (data[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+      var fullName = data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1];
       stewards.push({
-        name: data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1],
-        cases: data[i][MEMBER_COLS.TOTAL_CASES - 1] || 0,
-        wins: data[i][MEMBER_COLS.WINS - 1] || 0
+        name: fullName,
+        cases: caseCounts[fullName] || 0,
+        wins: winCounts[fullName] || 0
       });
     }
   }
@@ -26269,20 +26289,21 @@ function saveFormUrlsToConfig_silent(ss) {
     return;
   }
 
-  // Set headers in row 1
-  configSheet.getRange(1, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue('Grievance Form URL');
-  configSheet.getRange(1, CONFIG_COLS.CONTACT_FORM_URL).setValue('Contact Form URL');
-  configSheet.getRange(1, CONFIG_COLS.SATISFACTION_FORM_URL).setValue('Satisfaction Survey URL');
+  // Config layout: Row 1 = section headers, Row 2 = column headers, Row 3+ = data
+  // Set column headers in row 2
+  configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue('Grievance Form URL');
+  configSheet.getRange(2, CONFIG_COLS.CONTACT_FORM_URL).setValue('Contact Form URL');
+  configSheet.getRange(2, CONFIG_COLS.SATISFACTION_FORM_URL).setValue('Satisfaction Survey URL');
 
-  // Set form URLs in row 2
-  configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue(GRIEVANCE_FORM_CONFIG.FORM_URL);
-  configSheet.getRange(2, CONFIG_COLS.CONTACT_FORM_URL).setValue(CONTACT_FORM_CONFIG.FORM_URL);
-  configSheet.getRange(2, CONFIG_COLS.SATISFACTION_FORM_URL).setValue(SATISFACTION_FORM_CONFIG.FORM_URL);
+  // Set form URLs in row 3 (data row)
+  configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue(GRIEVANCE_FORM_CONFIG.FORM_URL);
+  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setValue(CONTACT_FORM_CONFIG.FORM_URL);
+  configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).setValue(SATISFACTION_FORM_CONFIG.FORM_URL);
 
   // Format as links
-  configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
-  configSheet.getRange(2, CONFIG_COLS.CONTACT_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
-  configSheet.getRange(2, CONFIG_COLS.SATISFACTION_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
 }
 
 // ============================================================================
@@ -27794,7 +27815,15 @@ function onEditAudit(e) {
     actionType = 'Delete';
   }
 
-  logAuditEvent(sheetName, row, col, fieldName, oldValue, newValue, recordId, actionType);
+  logAuditEvent(actionType + '_' + sheetName.toUpperCase().replace(/\s+/g, '_'), {
+    sheet: sheetName,
+    row: row,
+    col: col,
+    field: fieldName,
+    oldValue: oldValue,
+    newValue: newValue,
+    recordId: recordId
+  });
 }
 
 /**
@@ -38598,7 +38627,7 @@ function repairAllCheckboxes() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (1889 lines)
+// SOURCE: 10_Main.gs (1884 lines)
 // ============================================================================
 
 /**
@@ -40007,23 +40036,18 @@ function addNewMember(memberData) {
     const timestamp = Date.now().toString(36).toUpperCase();
     const newId = `MEM-${timestamp}`;
 
-    // Prepare row data
-    const rowData = [
-      newId,
-      memberData.firstName,
-      memberData.lastName,
-      memberData.employeeId,
-      memberData.department,
-      memberData.jobTitle,
-      memberData.hireDate ? new Date(memberData.hireDate) : '',
-      memberData.hireDate ? new Date(memberData.hireDate) : '', // Seniority same as hire
-      memberData.email,
-      memberData.phone,
-      memberData.status || 'Active',
-      memberData.unionStatus || 'Full Member',
-      '',  // Notes
-      new Date()  // Last Updated
-    ];
+    // Prepare row data using MEMBER_COLS constants (1-indexed)
+    var rowData = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+    rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
+    rowData[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName || '';
+    rowData[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName || '';
+    rowData[MEMBER_COLS.JOB_TITLE - 1] = memberData.jobTitle || '';
+    rowData[MEMBER_COLS.WORK_LOCATION - 1] = memberData.workLocation || '';
+    rowData[MEMBER_COLS.UNIT - 1] = memberData.unit || '';
+    rowData[MEMBER_COLS.EMAIL - 1] = memberData.email || '';
+    rowData[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
+    rowData[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+    rowData[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = new Date();
 
     sheet.appendRow(rowData);
 
@@ -44046,7 +44070,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (3985 lines)
+// SOURCE: 12_Features.gs (4015 lines)
 // ============================================================================
 
 /**
@@ -45002,7 +45026,7 @@ function getChecklistDialogHtml(caseId) {
     '  </div>' +
     '</div>' +
     '<script>' +
-    'var caseId = "' + caseId + '";' +
+    'var caseId = "' + String(caseId || '').replace(/['"\\<>&]/g, '') + '";' +
     'function toggleItem(checklistId, completed) {' +
     '  google.script.run' +
     '    .withSuccessHandler(function() { location.reload(); })' +
@@ -45032,15 +45056,48 @@ function getChecklistDialogHtml(caseId) {
     '      else { alert("Error: " + result.error); }' +
     '    })' +
     '    .withFailureHandler(function(e) { alert("Error: " + e.message); })' +
-    '    .createChecklistForSelectedCase();' +
+    '    .createChecklistForCaseId(caseId);' +
     '}' +
     '</script>' +
     '</body></html>';
 }
 
 /**
+ * Create checklist for a specific case by ID
+ * Called from the checklist dialog with the known caseId
+ * @param {string} caseId - The grievance/case ID
+ * @returns {Object} Result with success status
+ */
+function createChecklistForCaseId(caseId) {
+  if (!caseId) {
+    return { success: false, error: 'No case ID provided' };
+  }
+
+  // Look up the grievance to get action type and category
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) {
+    return { success: false, error: 'Grievance Log not found' };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var actionType = 'Grievance';
+  var issueCategory = '';
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) === String(caseId)) {
+      actionType = data[i][GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance';
+      issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
+      break;
+    }
+  }
+
+  return createChecklistFromTemplate(caseId, actionType, issueCategory);
+}
+
+/**
  * Create checklist for the currently selected case
- * Called from the checklist dialog
+ * Called from the checklist dialog (legacy - prefer createChecklistForCaseId)
  */
 function createChecklistForSelectedCase() {
   var sheet = SpreadsheetApp.getActiveSheet();
@@ -45051,10 +45108,7 @@ function createChecklistForSelectedCase() {
   }
 
   var caseId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
-  var actionType = sheet.getRange(row, GRIEVANCE_COLS.ACTION_TYPE).getValue() || 'Grievance';
-  var issueCategory = sheet.getRange(row, GRIEVANCE_COLS.ISSUE_CATEGORY).getValue();
-
-  return createChecklistFromTemplate(caseId, actionType, issueCategory);
+  return createChecklistForCaseId(caseId);
 }
 
 // ============================================================================

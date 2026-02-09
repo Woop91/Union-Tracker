@@ -1404,23 +1404,18 @@ function addNewMember(memberData) {
     const timestamp = Date.now().toString(36).toUpperCase();
     const newId = `MEM-${timestamp}`;
 
-    // Prepare row data
-    const rowData = [
-      newId,
-      memberData.firstName,
-      memberData.lastName,
-      memberData.employeeId,
-      memberData.department,
-      memberData.jobTitle,
-      memberData.hireDate ? new Date(memberData.hireDate) : '',
-      memberData.hireDate ? new Date(memberData.hireDate) : '', // Seniority same as hire
-      memberData.email,
-      memberData.phone,
-      memberData.status || 'Active',
-      memberData.unionStatus || 'Full Member',
-      '',  // Notes
-      new Date()  // Last Updated
-    ];
+    // Prepare row data using MEMBER_COLS constants (1-indexed)
+    var rowData = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+    rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
+    rowData[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName || '';
+    rowData[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName || '';
+    rowData[MEMBER_COLS.JOB_TITLE - 1] = memberData.jobTitle || '';
+    rowData[MEMBER_COLS.WORK_LOCATION - 1] = memberData.workLocation || '';
+    rowData[MEMBER_COLS.UNIT - 1] = memberData.unit || '';
+    rowData[MEMBER_COLS.EMAIL - 1] = memberData.email || '';
+    rowData[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
+    rowData[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+    rowData[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = new Date();
 
     sheet.appendRow(rowData);
 
