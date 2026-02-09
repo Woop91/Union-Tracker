@@ -195,6 +195,8 @@ function createDashboardMenu() {
       .addItem('🖌️ Setup Theme Columns', 'setupThemeColumns'))
 
     .addSubMenu(ui.createMenu('🏗️ Setup')
+      .addItem('🚀 Initialize Dashboard', 'initializeDashboard')
+      .addSeparator()
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
