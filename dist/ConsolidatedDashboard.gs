@@ -243,8 +243,8 @@ function escapeForFormula(input) {
     .replace(/"/g, '""')       // Escape double quotes
     .replace(/\\/g, '\\\\')    // Escape backslashes
     .replace(/[\r\n]/g, ' ')   // Replace newlines with spaces
-    .replace(/[=+\-@]/g, function(match) {
-      // Prefix formula-starting characters with a space if at start
+    .replace(/^[=+\-@]/, function(match) {
+      // Prefix formula-starting characters with a single quote only at start of string
       return "'" + match;
     });
 }
@@ -705,7 +705,7 @@ function getClientSideEscapeHtml() {
 function getClientSecurityScript() {
   return '<script>' +
     getClientSideEscapeHtml() +
-    "function safeAttr(t){return escapeHtml(t).replace(/&#x27;/g,\"'\");}" +
+    "function safeAttr(t){return escapeHtml(t);}" +
     '</script>';
 }
 
@@ -1312,17 +1312,17 @@ var TIME_CONSTANTS = {
     /** Days to file grievance after incident */
     FILING: 21,
 
-    /** Days for Step I response */
-    STEP1_RESPONSE: 30,
+    /** Days for Step I response (matches DEADLINE_RULES.STEP_1) */
+    STEP1_RESPONSE: 7,
 
-    /** Days to appeal to Step II */
-    STEP2_APPEAL: 10,
+    /** Days to appeal to Step II (matches DEADLINE_RULES.STEP_2) */
+    STEP2_APPEAL: 7,
 
-    /** Days for Step II response */
-    STEP2_RESPONSE: 30,
+    /** Days for Step II response (matches DEADLINE_RULES.STEP_2) */
+    STEP2_RESPONSE: 14,
 
-    /** Days to appeal to Step III */
-    STEP3_APPEAL: 30,
+    /** Days to appeal to Step III (matches DEADLINE_RULES.STEP_3) */
+    STEP3_APPEAL: 10,
 
     /** Days before deadline to show warning */
     WARNING_THRESHOLD: 5,
@@ -1386,7 +1386,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2441 lines)
+// SOURCE: 01_Core.gs (2439 lines)
 // ============================================================================
 
 /**
@@ -1589,14 +1589,8 @@ function sendCriticalErrorNotification_(errorInfo) {
  * @returns {string} Sanitized string
  */
 function sanitizeHtml(input) {
-  if (!input) return '';
-  return String(input)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
+  // Delegate to escapeHtml in 00_Security.gs for consistent escaping
+  return escapeHtml(input);
 }
 
 /**
@@ -1900,7 +1894,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.1.0",
+  VERSION: "4.5.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -1977,10 +1971,10 @@ var DRIVE_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 3,
-  PATCH: 9,
-  BUILD: 'v4.3.9',
-  CURRENT: '4.3.9',
+  MINOR: 5,
+  PATCH: 0,
+  BUILD: 'v4.5.0',
+  CURRENT: '4.5.0',
   CODENAME: 'Code Audit & Cleanup'
 };
 
@@ -2531,7 +2525,10 @@ var MEMBER_COLUMNS = {
   START_GRIEVANCE: 30,     // AE - Start Grievance
 
   // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 31        // AF - Quick Actions
+  QUICK_ACTIONS: 31,       // AF - Quick Actions
+
+  // Member Authentication (0-indexed)
+  PIN_HASH: 32             // AG - PIN Hash
 };
 
 // ============================================================================
@@ -2948,7 +2945,8 @@ function getMemberHeaders() {
     'Interest: Local', 'Interest: Chapter', 'Interest: Allied', 'Home Town',
     'Recent Contact Date', 'Contact Steward', 'Contact Notes',
     'Has Open Grievance?', 'Grievance Status', 'Days to Deadline', 'Start Grievance',
-    '⚡ Actions'
+    '⚡ Actions',
+    'PIN Hash'
   ];
 }
 
@@ -11141,7 +11139,7 @@ function getInteractiveDashboardHtml() {
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
     // Debug mode and error handler wrapper
-    'var DEBUG_MODE=true;' +
+    'var DEBUG_MODE=false;' +
     'function log(msg,data){if(DEBUG_MODE){console.log("[Dashboard] "+msg,data||"")}}' +
     'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+escapeHtml(e.message))}' +
     'function safeRun(fn,fallback){try{fn()}catch(e){console.error("[Dashboard]",e);if(fallback)fallback(e)}}' +
@@ -16014,7 +16012,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2418 lines)
+// SOURCE: 05_Integrations.gs (2433 lines)
 // ============================================================================
 
 /**
@@ -16036,6 +16034,19 @@ function getUnifiedDashboardHtml(isPII) {
  * @version 2.0.0
  * @requires Constants.gs
  */
+
+// ============================================================================
+// CALENDAR CONFIGURATION
+// ============================================================================
+
+/**
+ * Calendar configuration for deadline tracking
+ * @const {Object}
+ */
+var CALENDAR_CONFIG = {
+  CALENDAR_NAME: '509 Grievance Deadlines',
+  REMINDER_DAYS: [7, 3, 1]
+};
 
 // ============================================================================
 // GOOGLE DRIVE INTEGRATION
@@ -16496,15 +16507,17 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
   // Get the deadline for current step
   let deadline;
   switch (currentStep) {
-    case 1:
+    case 'Step I':
+    case 'Informal':
       deadline = grievance['Step 1 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
       break;
-    case 2:
+    case 'Step II':
       deadline = grievance['Step 2 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
       break;
-    case 3:
+    case 'Step III':
+    case 'Arbitration':
       deadline = grievance['Step 3 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
       break;
@@ -18437,7 +18450,7 @@ function addMobileDashboardLinkToConfig() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3438 lines)
+// SOURCE: 06_Maintenance.gs (3418 lines)
 // ============================================================================
 
 /**
@@ -18694,7 +18707,7 @@ function removeDeprecatedTabs() {
   ss.getSheets().forEach(function(sheet) {
     var name = sheet.getName();
     deprecatedSheets.forEach(function(prefix) {
-      if (name.indexOf(prefix) === 0 || name.indexOf(prefix) !== -1) {
+      if (name.indexOf(prefix) === 0) {
         try {
           ss.deleteSheet(sheet);
           removed.push(name);
@@ -18714,28 +18727,7 @@ function removeDeprecatedTabs() {
   }
 }
 
-/**
- * Sets up sheet structure for a given sheet type
- * @param {Sheet} sheet - The sheet to set up
- * @param {string} sheetType - Type of sheet ('member', 'grievance', 'config')
- * @returns {void}
- */
-function setupSheetStructure(sheet, sheetType) {
-  // This is a placeholder that delegates to specific setup functions
-  switch (sheetType) {
-    case 'member':
-      // Setup member directory structure
-      break;
-    case 'grievance':
-      // Setup grievance log structure
-      break;
-    case 'config':
-      // Setup config structure
-      break;
-    default:
-      Logger.log('Unknown sheet type: ' + sheetType);
-  }
-}
+// setupSheetStructure stub removed - initializeDashboard now delegates to CREATE_509_DASHBOARD()
 
 /**
  * Shows the repair dialog
@@ -19588,7 +19580,7 @@ function applyState(state, actionType) {
     case 'BATCH_UPDATE':
       if (state.changes) {
         state.changes.forEach(function(c) {
-          sheet.getRange(c.row, c.col).setValue(c.oldValue);
+          sheet.getRange(c.row, c.col).setValue(c.value);
         });
       }
       break;
@@ -19947,11 +19939,11 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
 
   const response2 = ui.alert(
     '⚠️ FINAL WARNING',
-    'Type "CONFIRM" to proceed with the nuclear reset.',
-    ui.ButtonSet.OK_CANCEL
+    'This action CANNOT be undone. Click YES to proceed with the nuclear reset.',
+    ui.ButtonSet.YES_NO
   );
 
-  if (response2 !== ui.Button.OK) {
+  if (response2 !== ui.Button.YES) {
     return { success: false, message: 'Cancelled by user' };
   }
 
@@ -20350,7 +20342,8 @@ var CACHE_KEYS = {
   ALL_GRIEVANCES: 'cache_grievances',
   ALL_MEMBERS: 'cache_members',
   ALL_STEWARDS: 'cache_stewards',
-  DASHBOARD_METRICS: 'cache_metrics'
+  DASHBOARD_METRICS: 'cache_metrics',
+  CONFIG_VALUES: 'cache_config_values'
 };
 
 // ==================== CACHING FUNCTIONS ====================
@@ -24695,7 +24688,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08_SheetUtils.gs (4452 lines)
+// SOURCE: 08_SheetUtils.gs (4451 lines)
 // ============================================================================
 
 /**
@@ -24873,7 +24866,6 @@ function reorderSheetsToStandard(ss) {
     SHEETS.CONFIG_GUIDE,
     'Config',
     SHEETS.DASHBOARD,
-    SHEETS.INTERACTIVE,
     SHEETS.SATISFACTION
   ];
 
@@ -26803,7 +26795,7 @@ function onSatisfactionFormSubmit(e) {
     newRow[SATISFACTION_COLS.Q6_SATISFIED_REP - 1] = getFormValue_(responses, 'Satisfied with union representation');
     newRow[SATISFACTION_COLS.Q7_TRUST_UNION - 1] = getFormValue_(responses, 'Trust union to act in best interests');
     newRow[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1] = getFormValue_(responses, 'Feel more protected at work');
-    newRow[SATISFACTION_COLS.Q9_RECOMMEND - 1] = getFormValue_(responses, 'Voted during the last election');
+    newRow[SATISFACTION_COLS.Q9_RECOMMEND - 1] = getFormValue_(responses, 'Would recommend membership');
 
     // Steward Ratings 3A (Q10-17)
     newRow[SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1] = getFormValue_(responses, 'Responded in timely manner');
@@ -27154,7 +27146,7 @@ function checkDeadlinesAndNotify_() {
     var closedStatuses = ['Closed', 'Settled', 'Won', 'Denied', 'Withdrawn'];
     if (closedStatuses.indexOf(status) !== -1) continue;
 
-    if (daysToDeadline !== '' && daysToDeadline <= 3) {
+    if (daysToDeadline === 'Overdue' || (daysToDeadline !== '' && typeof daysToDeadline === 'number' && daysToDeadline <= 3)) {
       urgent.push({
         id: grievanceId,
         step: currentStep,
@@ -35129,10 +35121,10 @@ function createSatisfactionSheet(ss) {
   sheet.setColumnWidth(dashStart + 3, 80);   // Type
   sheet.setColumnWidth(dashStart + 4, 200);  // Options
 
-  // Delete excess columns after CJ (column 88)
+  // Delete excess columns after CK (column 89) - preserve all verification columns including REVIEWER_NOTES
   var maxCols = sheet.getMaxColumns();
-  if (maxCols > 88) {
-    sheet.deleteColumns(89, maxCols - 88);
+  if (maxCols > 89) {
+    sheet.deleteColumns(90, maxCols - 89);
   }
 
   // Populate computed values (no formulas in visible sheet)
@@ -38606,7 +38598,7 @@ function repairAllCheckboxes() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (1866 lines)
+// SOURCE: 10_Main.gs (1889 lines)
 // ============================================================================
 
 /**
@@ -38786,8 +38778,8 @@ function handleSecurityAudit_(e) {
     if (!auditSheet) {
       // Create audit log sheet if it doesn't exist
       auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-      auditSheet.getRange('A1:F1').setValues([['Timestamp', 'User', 'Cell', 'Old Value', 'New Value', 'Alert']]);
-      auditSheet.getRange('A1:F1').setFontWeight('bold').setBackground(COLORS.CARD_DARK_BG).setFontColor(COLORS.CARD_DARK_TEXT);
+      auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
+      auditSheet.setFrozenRows(1);
       auditSheet.hideSheet();
     }
 
@@ -38803,7 +38795,7 @@ function handleSecurityAudit_(e) {
     var alertMessage = '';
 
     // SABOTAGE PROTECTION: Detect mass deletions (>15 cells cleared)
-    if (e.oldValue && !e.value && numCells > 15) {
+    if (numCells > 15 && !e.value) {
       alertMessage = 'MASS_DELETION_ALERT';
 
       // Send alert to Chief Steward
@@ -38843,13 +38835,20 @@ function handleSecurityAudit_(e) {
       alertMessage = alertMessage || 'LARGE_CHANGE';
     }
 
+    var details = JSON.stringify({
+      cell: range.getA1Notation(),
+      sheet: range.getSheet().getName(),
+      oldValue: e.oldValue || '(empty)',
+      newValue: e.value || '(deleted)',
+      alert: alertMessage || ''
+    });
+
     auditSheet.appendRow([
       new Date(),
+      alertMessage || 'CELL_EDIT',
       userEmail,
-      range.getA1Notation() + ' (' + range.getSheet().getName() + ')',
-      e.oldValue || '(empty)',
-      e.value || '(deleted)',
-      alertMessage
+      details,
+      ''
     ]);
 
   } catch (auditError) {
@@ -39089,8 +39088,14 @@ function handleGrievanceEdit(e) {
 
   const sheet = e.range.getSheet();
 
-  // Auto-update Next Action Due timestamp when any field changes
-  if (col !== GRIEVANCE_COLS.NEXT_ACTION_DUE) {
+  // Only update Next Action Due when status or step date changes, not on every edit
+  var statusAndDateCols = [
+    GRIEVANCE_COLS.STATUS, GRIEVANCE_COLS.CURRENT_STEP,
+    GRIEVANCE_COLS.DATE_FILED, GRIEVANCE_COLS.STEP1_RCVD,
+    GRIEVANCE_COLS.STEP2_APPEAL_FILED, GRIEVANCE_COLS.STEP2_RCVD,
+    GRIEVANCE_COLS.STEP3_APPEAL_FILED, GRIEVANCE_COLS.DATE_CLOSED
+  ];
+  if (statusAndDateCols.indexOf(col) !== -1) {
     sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(new Date());
   }
 
@@ -39124,7 +39129,7 @@ function handleGrievanceEdit(e) {
       const deadline = calculateResponseDeadline(step, new Date(stepDate));
       if (deadline) {
         // Update the corresponding due column
-        const dueColumns = [GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_DUE, GRIEVANCE_COLS.DATE_CLOSED];
+        const dueColumns = [GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_DUE, GRIEVANCE_COLS.STEP3_APPEAL_DUE];
         sheet.getRange(row, dueColumns[step - 1]).setValue(deadline);
       }
     }
@@ -39237,12 +39242,14 @@ function setupTriggers() {
 }
 
 /**
- * Removes all triggers (for cleanup)
+ * Removes dashboard-specific triggers (dailyTrigger only)
  */
 function removeTriggers() {
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(trigger => {
-    ScriptApp.deleteTrigger(trigger);
+    if (trigger.getHandlerFunction() === 'dailyTrigger') {
+      ScriptApp.deleteTrigger(trigger);
+    }
   });
 }
 
@@ -39996,9 +40003,9 @@ function addNewMember(memberData) {
       return { success: false, error: 'Member Directory sheet not found' };
     }
 
-    // Generate new member ID
-    const lastRow = sheet.getLastRow();
-    const newId = `MEM-${String(lastRow).padStart(5, '0')}`;
+    // Generate unique member ID using timestamp to avoid collisions from row deletions
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const newId = `MEM-${timestamp}`;
 
     // Prepare row data
     const rowData = [
@@ -40059,15 +40066,17 @@ function startGrievanceForMember() {
   const memberName = `${data[MEMBER_COLUMNS.FIRST_NAME]} ${data[MEMBER_COLUMNS.LAST_NAME]}`;
 
   // Open new grievance dialog pre-populated with member info
-  const html = HtmlService.createHtmlOutput(`
-    <script>
-      // Store member info for the form
-      sessionStorage.setItem('prefillMemberId', '${memberId}');
-      sessionStorage.setItem('prefillMemberName', '${memberName}');
-      google.script.host.close();
-      google.script.run.showNewGrievanceDialog();
-    </script>
-  `).setWidth(100).setHeight(50);
+  // Sanitize values before embedding in script context
+  const safeMemberId = String(memberId || '').replace(/['"\\<>&]/g, '');
+  const safeMemberName = String(memberName || '').replace(/['"\\<>&]/g, '');
+  const html = HtmlService.createHtmlOutput(
+    '<script>' +
+      'sessionStorage.setItem("prefillMemberId", "' + safeMemberId + '");' +
+      'sessionStorage.setItem("prefillMemberName", "' + safeMemberName + '");' +
+      'google.script.host.close();' +
+      'google.script.run.showNewGrievanceDialog();' +
+    '</script>'
+  ).setWidth(100).setHeight(50);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Loading...');
 }
@@ -40302,7 +40311,13 @@ function exportMemberDirectory(format) {
   switch (format) {
     case 'csv':
       // Create CSV content
-      const csv = data.map(row => row.join(',')).join('\\n');
+      const csv = data.map(row => row.map(cell => {
+        var val = String(cell === null || cell === undefined ? '' : cell);
+        if (val.indexOf(',') !== -1 || val.indexOf('"') !== -1 || val.indexOf('\n') !== -1) {
+          return '"' + val.replace(/"/g, '""') + '"';
+        }
+        return val;
+      }).join(',')).join('\n');
       const blob = Utilities.newBlob(csv, 'text/csv', 'MemberDirectory.csv');
       const file = DriveApp.createFile(blob);
       return {
@@ -40477,7 +40492,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3544 lines)
+// SOURCE: 11_CommandHub.gs (3549 lines)
 // ============================================================================
 
 /**
@@ -40580,7 +40595,13 @@ function createCommandCenterMenu() {
  * Quick navigation to Executive Dashboard
  */
 function navigateToDashboard() {
-  navToDash();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.DASHBOARD);
+  if (sheet) {
+    ss.setActiveSheet(sheet);
+  } else {
+    SpreadsheetApp.getUi().alert('Dashboard sheet not found. Use the Dashboards menu for modal dashboards.');
+  }
 }
 
 /**
@@ -41035,6 +41056,12 @@ function NUKE_DATABASE() {
       try { ss.deleteSheet(functionChecklistSheet); } catch (e) { Logger.log('Could not delete Function Checklist: ' + e.message); }
     }
 
+    // Log the action BEFORE deleting audit sheet so it's recorded
+    logAuditEvent('NUCLEAR_WIPE', {
+      performedBy: Session.getActiveUser().getEmail(),
+      timestamp: new Date().toISOString()
+    });
+
     // Delete _Audit_Log hidden sheet
     var auditLogSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
     if (auditLogSheet) {
@@ -41053,12 +41080,6 @@ function NUKE_DATABASE() {
     // Clear demo tracking
     PropertiesService.getScriptProperties().deleteProperty('SEEDED_MEMBER_IDS');
     PropertiesService.getScriptProperties().deleteProperty('SEEDED_GRIEVANCE_IDS');
-
-    // Log the action
-    logAuditEvent('NUCLEAR_WIPE', {
-      performedBy: Session.getActiveUser().getEmail(),
-      timestamp: new Date().toISOString()
-    });
 
     ui.alert(
       '✅ Nuclear Operation Complete',
@@ -41380,8 +41401,7 @@ function showDiagnosticReport() {
     SHEETS.CONFIG,
     SHEETS.MEMBER_DIR,
     SHEETS.GRIEVANCE_LOG,
-    SHEETS.DASHBOARD,
-    SHEETS.INTERACTIVE
+    SHEETS.DASHBOARD
   ];
 
   report += '📋 SHEET STATUS:\n';
@@ -44026,7 +44046,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (3983 lines)
+// SOURCE: 12_Features.gs (3985 lines)
 // ============================================================================
 
 /**
@@ -44147,14 +44167,16 @@ function createChecklistSheet_(ss) {
 
 /**
  * Generate a unique checklist item ID
+ * @param {number} [offset=0] - Offset to add for batch creation (prevents duplicate IDs)
  * @returns {string} Unique checklist ID (e.g., CL-00001)
  */
-function generateChecklistId_() {
+function generateChecklistId_(offset) {
+  offset = offset || 0;
   var sheet = getOrCreateChecklistSheet();
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return 'CL-00001';
+    return 'CL-' + String(1 + offset).padStart(5, '0');
   }
 
   var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
@@ -44170,7 +44192,7 @@ function generateChecklistId_() {
     }
   }
 
-  return 'CL-' + String(maxNum + 1).padStart(5, '0');
+  return 'CL-' + String(maxNum + 1 + offset).padStart(5, '0');
 }
 
 /**
@@ -44202,7 +44224,7 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   var rows = [];
   for (var i = 0; i < templateItems.length; i++) {
     var item = templateItems[i];
-    var checklistId = generateChecklistId_();
+    var checklistId = generateChecklistId_(i);
 
     var row = [];
     row[CHECKLIST_COLS.CHECKLIST_ID - 1] = checklistId;
@@ -48014,7 +48036,7 @@ function getLookerStatus() {
 
 
 // ============================================================================
-// SOURCE: 13_MemberSelfService.gs (1573 lines)
+// SOURCE: 13_MemberSelfService.gs (1570 lines)
 // ============================================================================
 
 /**
@@ -48072,11 +48094,9 @@ var MEMBER_PIN_COLS = {
  * @returns {string} 6-digit PIN
  */
 function generateMemberPIN() {
-  var pin = '';
-  for (var i = 0; i < PIN_CONFIG.PIN_LENGTH; i++) {
-    pin += Math.floor(Math.random() * 10).toString();
-  }
-  return pin;
+  // Use Utilities.getUuid() for better randomness than Math.random()
+  var uuid = Utilities.getUuid().replace(/[^0-9]/g, '');
+  return uuid.substring(0, PIN_CONFIG.PIN_LENGTH).padEnd(PIN_CONFIG.PIN_LENGTH, '0');
 }
 
 /**
@@ -48145,12 +48165,9 @@ function verifyPIN(pin, memberId, storedHash) {
  * @private
  */
 function generateResetToken_() {
-  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous characters
-  var token = '';
-  for (var i = 0; i < 8; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  // Use Utilities.getUuid() for better randomness than Math.random()
+  var uuid = Utilities.getUuid().replace(/-/g, '').toUpperCase();
+  return uuid.substring(0, 8);
 }
 
 /**
@@ -49071,7 +49088,7 @@ function getMemberGrievances(sessionToken) {
         steward: data[i][GRIEVANCE_COLS.STEWARD - 1] || '',
         nextDeadline: formatDateMSS_(data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1]),
         resolution: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '',
-        outcome: data[i][GRIEVANCE_COLS.OUTCOME - 1] || ''
+        outcome: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || ''
       });
     }
   }
@@ -49512,8 +49529,10 @@ function getMemberSelfServicePortalHtml() {
     '}' +
 
     // Edit form
+    'var editFormRetries=0;' +
     'function loadEditForm(){' +
-    '  if(!profileData){loadProfile();setTimeout(loadEditForm,500);return}' +
+    '  if(!profileData){if(editFormRetries++>10){alert("Could not load profile data");return}loadProfile();setTimeout(loadEditForm,500);return}' +
+    '  editFormRetries=0;' +
     '  var p=profileData;' +
     '  var html="<div class=\\"section-title\\">Update Contact Information</div>";' +
     '  html+="<div id=\\"updateSuccess\\" class=\\"success\\" style=\\"display:none\\">Contact information updated!</div>";' +

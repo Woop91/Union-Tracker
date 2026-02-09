@@ -252,7 +252,7 @@ function removeDeprecatedTabs() {
   ss.getSheets().forEach(function(sheet) {
     var name = sheet.getName();
     deprecatedSheets.forEach(function(prefix) {
-      if (name.indexOf(prefix) === 0 || name.indexOf(prefix) !== -1) {
+      if (name.indexOf(prefix) === 0) {
         try {
           ss.deleteSheet(sheet);
           removed.push(name);
@@ -272,28 +272,7 @@ function removeDeprecatedTabs() {
   }
 }
 
-/**
- * Sets up sheet structure for a given sheet type
- * @param {Sheet} sheet - The sheet to set up
- * @param {string} sheetType - Type of sheet ('member', 'grievance', 'config')
- * @returns {void}
- */
-function setupSheetStructure(sheet, sheetType) {
-  // This is a placeholder that delegates to specific setup functions
-  switch (sheetType) {
-    case 'member':
-      // Setup member directory structure
-      break;
-    case 'grievance':
-      // Setup grievance log structure
-      break;
-    case 'config':
-      // Setup config structure
-      break;
-    default:
-      Logger.log('Unknown sheet type: ' + sheetType);
-  }
-}
+// setupSheetStructure stub removed - initializeDashboard now delegates to CREATE_509_DASHBOARD()
 
 /**
  * Shows the repair dialog
@@ -1146,7 +1125,7 @@ function applyState(state, actionType) {
     case 'BATCH_UPDATE':
       if (state.changes) {
         state.changes.forEach(function(c) {
-          sheet.getRange(c.row, c.col).setValue(c.oldValue);
+          sheet.getRange(c.row, c.col).setValue(c.value);
         });
       }
       break;
@@ -1505,11 +1484,11 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
 
   const response2 = ui.alert(
     '⚠️ FINAL WARNING',
-    'Type "CONFIRM" to proceed with the nuclear reset.',
-    ui.ButtonSet.OK_CANCEL
+    'This action CANNOT be undone. Click YES to proceed with the nuclear reset.',
+    ui.ButtonSet.YES_NO
   );
 
-  if (response2 !== ui.Button.OK) {
+  if (response2 !== ui.Button.YES) {
     return { success: false, message: 'Cancelled by user' };
   }
 
@@ -1908,7 +1887,8 @@ var CACHE_KEYS = {
   ALL_GRIEVANCES: 'cache_grievances',
   ALL_MEMBERS: 'cache_members',
   ALL_STEWARDS: 'cache_stewards',
-  DASHBOARD_METRICS: 'cache_metrics'
+  DASHBOARD_METRICS: 'cache_metrics',
+  CONFIG_VALUES: 'cache_config_values'
 };
 
 // ==================== CACHING FUNCTIONS ====================

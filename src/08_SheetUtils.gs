@@ -173,7 +173,6 @@ function reorderSheetsToStandard(ss) {
     SHEETS.CONFIG_GUIDE,
     'Config',
     SHEETS.DASHBOARD,
-    SHEETS.INTERACTIVE,
     SHEETS.SATISFACTION
   ];
 
@@ -2103,7 +2102,7 @@ function onSatisfactionFormSubmit(e) {
     newRow[SATISFACTION_COLS.Q6_SATISFIED_REP - 1] = getFormValue_(responses, 'Satisfied with union representation');
     newRow[SATISFACTION_COLS.Q7_TRUST_UNION - 1] = getFormValue_(responses, 'Trust union to act in best interests');
     newRow[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1] = getFormValue_(responses, 'Feel more protected at work');
-    newRow[SATISFACTION_COLS.Q9_RECOMMEND - 1] = getFormValue_(responses, 'Voted during the last election');
+    newRow[SATISFACTION_COLS.Q9_RECOMMEND - 1] = getFormValue_(responses, 'Would recommend membership');
 
     // Steward Ratings 3A (Q10-17)
     newRow[SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1] = getFormValue_(responses, 'Responded in timely manner');
@@ -2454,7 +2453,7 @@ function checkDeadlinesAndNotify_() {
     var closedStatuses = ['Closed', 'Settled', 'Won', 'Denied', 'Withdrawn'];
     if (closedStatuses.indexOf(status) !== -1) continue;
 
-    if (daysToDeadline !== '' && daysToDeadline <= 3) {
+    if (daysToDeadline === 'Overdue' || (daysToDeadline !== '' && typeof daysToDeadline === 'number' && daysToDeadline <= 3)) {
       urgent.push({
         id: grievanceId,
         step: currentStep,
