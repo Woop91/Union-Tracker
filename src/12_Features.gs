@@ -116,14 +116,16 @@ function createChecklistSheet_(ss) {
 
 /**
  * Generate a unique checklist item ID
+ * @param {number} [offset=0] - Offset to add for batch creation (prevents duplicate IDs)
  * @returns {string} Unique checklist ID (e.g., CL-00001)
  */
-function generateChecklistId_() {
+function generateChecklistId_(offset) {
+  offset = offset || 0;
   var sheet = getOrCreateChecklistSheet();
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return 'CL-00001';
+    return 'CL-' + String(1 + offset).padStart(5, '0');
   }
 
   var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
@@ -139,7 +141,7 @@ function generateChecklistId_() {
     }
   }
 
-  return 'CL-' + String(maxNum + 1).padStart(5, '0');
+  return 'CL-' + String(maxNum + 1 + offset).padStart(5, '0');
 }
 
 /**
@@ -171,7 +173,7 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   var rows = [];
   for (var i = 0; i < templateItems.length; i++) {
     var item = templateItems[i];
-    var checklistId = generateChecklistId_();
+    var checklistId = generateChecklistId_(i);
 
     var row = [];
     row[CHECKLIST_COLS.CHECKLIST_ID - 1] = checklistId;

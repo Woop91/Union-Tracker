@@ -204,8 +204,8 @@ function escapeForFormula(input) {
     .replace(/"/g, '""')       // Escape double quotes
     .replace(/\\/g, '\\\\')    // Escape backslashes
     .replace(/[\r\n]/g, ' ')   // Replace newlines with spaces
-    .replace(/[=+\-@]/g, function(match) {
-      // Prefix formula-starting characters with a space if at start
+    .replace(/^[=+\-@]/, function(match) {
+      // Prefix formula-starting characters with a single quote only at start of string
       return "'" + match;
     });
 }
@@ -666,7 +666,7 @@ function getClientSideEscapeHtml() {
 function getClientSecurityScript() {
   return '<script>' +
     getClientSideEscapeHtml() +
-    "function safeAttr(t){return escapeHtml(t).replace(/&#x27;/g,\"'\");}" +
+    "function safeAttr(t){return escapeHtml(t);}" +
     '</script>';
 }
 

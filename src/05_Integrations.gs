@@ -19,6 +19,19 @@
  */
 
 // ============================================================================
+// CALENDAR CONFIGURATION
+// ============================================================================
+
+/**
+ * Calendar configuration for deadline tracking
+ * @const {Object}
+ */
+var CALENDAR_CONFIG = {
+  CALENDAR_NAME: '509 Grievance Deadlines',
+  REMINDER_DAYS: [7, 3, 1]
+};
+
+// ============================================================================
 // GOOGLE DRIVE INTEGRATION
 // ============================================================================
 
@@ -477,15 +490,17 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
   // Get the deadline for current step
   let deadline;
   switch (currentStep) {
-    case 1:
+    case 'Step I':
+    case 'Informal':
       deadline = grievance['Step 1 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
       break;
-    case 2:
+    case 'Step II':
       deadline = grievance['Step 2 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
       break;
-    case 3:
+    case 'Step III':
+    case 'Arbitration':
       deadline = grievance['Step 3 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
       break;
