@@ -311,15 +311,15 @@ function getRepairDialogHtml_(diagnostics) {
     '.btn-primary{background:#7c3aed;color:white}' +
     '.btn-secondary{background:#e5e7eb;color:#374151}' +
     '</style></head><body>' +
-    '<div class="status">' + diagnostics.status + '</div>' +
-    '<p>' + diagnostics.summary + '</p>' +
+    '<div class="status">' + escapeHtml(diagnostics.status) + '</div>' +
+    '<p>' + escapeHtml(diagnostics.summary) + '</p>' +
     (diagnostics.errors.length > 0 ?
       '<div class="section"><div class="section-title error">Errors</div>' +
-      diagnostics.errors.map(function(e) { return '<div class="item error">' + e + '</div>'; }).join('') +
+      diagnostics.errors.map(function(e) { return '<div class="item error">' + escapeHtml(e) + '</div>'; }).join('') +
       '</div>' : '') +
     (diagnostics.warnings.length > 0 ?
       '<div class="section"><div class="section-title warning">Warnings</div>' +
-      diagnostics.warnings.map(function(w) { return '<div class="item warning">' + w + '</div>'; }).join('') +
+      diagnostics.warnings.map(function(w) { return '<div class="item warning">' + escapeHtml(w) + '</div>'; }).join('') +
       '</div>' : '') +
     '<div style="margin-top:20px;text-align:right">' +
     '<button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
@@ -483,19 +483,19 @@ function getDiagnosticsDialogHtml_(results) {
     '.btn-primary{background:#7c3aed;color:white}' +
     '.btn-secondary{background:#e5e7eb;color:#374151;margin-right:10px}' +
     '</style></head><body>' +
-    '<div class="status ' + statusClass + '">' + results.status + '</div>' +
-    '<p>' + results.summary + '</p>' +
+    '<div class="status ' + statusClass + '">' + escapeHtml(results.status) + '</div>' +
+    '<p>' + escapeHtml(results.summary) + '</p>' +
     '<div class="section">' +
     '<div class="section-title">Checks Performed (' + results.checks.length + ')</div>' +
     '<div class="list">' +
-    results.checks.map(function(c) { return '<div class="item">✓ ' + c + '</div>'; }).join('') +
+    results.checks.map(function(c) { return '<div class="item">✓ ' + escapeHtml(c) + '</div>'; }).join('') +
     '</div></div>' +
     (results.errors.length > 0 ?
       '<div class="section"><div class="section-title error">Errors (' + results.errors.length + ')</div>' +
-      '<div class="list">' + results.errors.map(function(e) { return '<div class="item" style="color:#991b1b">❌ ' + e + '</div>'; }).join('') + '</div></div>' : '') +
+      '<div class="list">' + results.errors.map(function(e) { return '<div class="item" style="color:#991b1b">❌ ' + escapeHtml(e) + '</div>'; }).join('') + '</div></div>' : '') +
     (results.warnings.length > 0 ?
       '<div class="section"><div class="section-title warning">Warnings (' + results.warnings.length + ')</div>' +
-      '<div class="list">' + results.warnings.map(function(w) { return '<div class="item" style="color:#92400e">⚠ ' + w + '</div>'; }).join('') + '</div></div>' : '') +
+      '<div class="list">' + results.warnings.map(function(w) { return '<div class="item" style="color:#92400e">⚠ ' + escapeHtml(w) + '</div>'; }).join('') + '</div></div>' : '') +
     '<div style="margin-top:20px;text-align:right">' +
     '<button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>' +
     '<button class="btn btn-primary" onclick="runRepair()">Run Repair</button>' +

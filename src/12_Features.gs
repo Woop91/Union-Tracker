@@ -951,7 +951,7 @@ function getChecklistDialogHtml(caseId) {
     '  </div>' +
     '</div>' +
     '<script>' +
-    'var caseId = "' + caseId + '";' +
+    'var caseId = "' + String(caseId || '').replace(/['"\\<>&]/g, '') + '";' +
     'function toggleItem(checklistId, completed) {' +
     '  google.script.run' +
     '    .withSuccessHandler(function() { location.reload(); })' +
@@ -981,15 +981,48 @@ function getChecklistDialogHtml(caseId) {
     '      else { alert("Error: " + result.error); }' +
     '    })' +
     '    .withFailureHandler(function(e) { alert("Error: " + e.message); })' +
-    '    .createChecklistForSelectedCase();' +
+    '    .createChecklistForCaseId(caseId);' +
     '}' +
     '</script>' +
     '</body></html>';
 }
 
 /**
+ * Create checklist for a specific case by ID
+ * Called from the checklist dialog with the known caseId
+ * @param {string} caseId - The grievance/case ID
+ * @returns {Object} Result with success status
+ */
+function createChecklistForCaseId(caseId) {
+  if (!caseId) {
+    return { success: false, error: 'No case ID provided' };
+  }
+
+  // Look up the grievance to get action type and category
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) {
+    return { success: false, error: 'Grievance Log not found' };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var actionType = 'Grievance';
+  var issueCategory = '';
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) === String(caseId)) {
+      actionType = data[i][GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance';
+      issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
+      break;
+    }
+  }
+
+  return createChecklistFromTemplate(caseId, actionType, issueCategory);
+}
+
+/**
  * Create checklist for the currently selected case
- * Called from the checklist dialog
+ * Called from the checklist dialog (legacy - prefer createChecklistForCaseId)
  */
 function createChecklistForSelectedCase() {
   var sheet = SpreadsheetApp.getActiveSheet();
@@ -1000,10 +1033,7 @@ function createChecklistForSelectedCase() {
   }
 
   var caseId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
-  var actionType = sheet.getRange(row, GRIEVANCE_COLS.ACTION_TYPE).getValue() || 'Grievance';
-  var issueCategory = sheet.getRange(row, GRIEVANCE_COLS.ISSUE_CATEGORY).getValue();
-
-  return createChecklistFromTemplate(caseId, actionType, issueCategory);
+  return createChecklistForCaseId(caseId);
 }
 
 // ============================================================================
