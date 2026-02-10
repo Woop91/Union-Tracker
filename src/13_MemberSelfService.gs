@@ -53,11 +53,11 @@ var MEMBER_PIN_COLS = {
  * @returns {string} 6-digit PIN
  */
 function generateMemberPIN() {
-  var pin = '';
-  for (var i = 0; i < PIN_CONFIG.PIN_LENGTH; i++) {
-    pin += Math.floor(Math.random() * 10).toString();
+  var digits = Utilities.getUuid().replace(/[^0-9]/g, '');
+  while (digits.length < PIN_CONFIG.PIN_LENGTH) {
+    digits += Utilities.getUuid().replace(/[^0-9]/g, '');
   }
-  return pin;
+  return digits.substring(0, PIN_CONFIG.PIN_LENGTH);
 }
 
 /**

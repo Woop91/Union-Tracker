@@ -414,8 +414,8 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 5,
-  patch: 0,
+  minor: 3,
+  patch: 9,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -509,7 +509,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.1.0",
+  VERSION: "4.3.9",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -1140,7 +1140,10 @@ var MEMBER_COLUMNS = {
   START_GRIEVANCE: 30,     // AE - Start Grievance
 
   // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 31        // AF - Quick Actions
+  QUICK_ACTIONS: 31,       // AF - Quick Actions
+
+  // PIN Hash (0-indexed)
+  PIN_HASH: 32             // AG - PIN Hash
 };
 
 // ============================================================================
@@ -1557,7 +1560,8 @@ function getMemberHeaders() {
     'Interest: Local', 'Interest: Chapter', 'Interest: Allied', 'Home Town',
     'Recent Contact Date', 'Contact Steward', 'Contact Notes',
     'Has Open Grievance?', 'Grievance Status', 'Days to Deadline', 'Start Grievance',
-    '⚡ Actions'
+    '⚡ Actions',
+    'PIN Hash'
   ];
 }
 

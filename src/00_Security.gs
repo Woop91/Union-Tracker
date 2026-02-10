@@ -199,15 +199,18 @@ function escapeForFormula(input) {
   var str = String(input);
 
   // Remove or escape characters that could be used in formula injection
-  return str
+  str = str
     .replace(/'/g, "''")       // Escape single quotes
     .replace(/"/g, '""')       // Escape double quotes
     .replace(/\\/g, '\\\\')    // Escape backslashes
-    .replace(/[\r\n]/g, ' ')   // Replace newlines with spaces
-    .replace(/[=+\-@]/g, function(match) {
-      // Prefix formula-starting characters with a space if at start
-      return "'" + match;
-    });
+    .replace(/[\r\n]/g, ' ');  // Replace newlines with spaces
+
+  // Only prefix formula-starting characters if they appear at the START of the string
+  if (/^[=+\-@]/.test(str)) {
+    str = "'" + str;
+  }
+
+  return str;
 }
 
 /**

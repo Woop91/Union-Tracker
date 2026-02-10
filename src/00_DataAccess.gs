@@ -543,16 +543,16 @@ var TIME_CONSTANTS = {
     FILING: 21,
 
     /** Days for Step I response */
-    STEP1_RESPONSE: 30,
+    STEP1_RESPONSE: 7,
 
     /** Days to appeal to Step II */
-    STEP2_APPEAL: 10,
+    STEP2_APPEAL: 7,
 
     /** Days for Step II response */
-    STEP2_RESPONSE: 30,
+    STEP2_RESPONSE: 14,
 
     /** Days to appeal to Step III */
-    STEP3_APPEAL: 30,
+    STEP3_APPEAL: 10,
 
     /** Days before deadline to show warning */
     WARNING_THRESHOLD: 5,
