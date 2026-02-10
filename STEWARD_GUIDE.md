@@ -3,7 +3,7 @@
 
 ---
 
-## 🆕 NEW in v3.50: Steward Workload Dashboard & Mobile Portal!
+## Steward Workload Dashboard & Mobile Portal
 
 ### 📊 Steward Workload Dashboard
 

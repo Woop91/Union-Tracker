@@ -351,6 +351,7 @@ function createChainableMockSheet(name) {
     showSheet: jest.fn(),
     setFrozenRows: jest.fn(),
     setColumnWidth: jest.fn(),
+    setTabColor: jest.fn(),
     clear: jest.fn(),
     autoResizeColumns: jest.fn(),
     getColumnWidth: jest.fn(() => 80),

@@ -3,7 +3,7 @@
 **Version:** 4.5.0 | **Codename:** Strategic Command Center
 **Last Updated:** February 2026
 
-> **New in v4.5.0:** Security module, Data Access Layer, Member Self-Service PIN authentication, 276 Jest tests, consolidated architecture (16 source files)
+> **New in v4.5.1:** Fixed tab population bugs, added sheet tab colors, 871 Jest tests, consolidated architecture (16 source files)
 
 This document provides a comprehensive, searchable reference of all features in the 509 Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -550,7 +550,8 @@ Provides PIN-based member authentication for self-service access to the dashboar
 
 | Version | Features Added |
 |---------|----------------|
-| **4.5.0** | Security module, Data Access Layer, Member Self-Service PIN, 276 Jest tests, consolidated architecture |
+| **4.5.1** | Fixed GRIEVANCE_OUTCOMES/generateGrievanceId bugs, sheet tab colors, 871 Jest tests |
+| **4.5.0** | Security module, Data Access Layer, Member Self-Service PIN, consolidated architecture |
 | **4.4.1** | Dynamic Engine, Grievance Reminders, Looker Studio Integration (Standard & PII-Free) |
 | **4.3.8** | Searchable Help Guide, Features Reference Sheet, Enhanced FAQ |
 | **4.3.7** | Dynamic row styling with getMaxRows() |

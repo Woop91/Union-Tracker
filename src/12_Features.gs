@@ -107,6 +107,9 @@ function createChecklistSheet_(ss) {
   // No protection - sheet is fully dynamic like all other tabs
   // Self-healing formulas in _Checklist_Calc handle calculations
 
+  // Set tab color
+  sheet.setTabColor(COLORS.CHART_YELLOW);
+
   return sheet;
 }
 
