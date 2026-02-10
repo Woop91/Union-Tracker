@@ -48,7 +48,7 @@ MULTIPLE-SCRIPS-REPO/
 
 ### Modular Design (v4.5.0)
 
-The codebase follows a layered architecture with 15 modules:
+The codebase follows a layered architecture with 16 modules:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -56,14 +56,14 @@ The codebase follows a layered architecture with 15 modules:
 │               (Entry Point / onOpen / onEdit)                │
 └─────────────────────────────────────────────────────────────┘
                               │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-┌───────────────┐   ┌───────────────┐   ┌───────────────┐
-│  UI Layer     │   │  Data Layer   │   │  Services     │
-│  03/04        │   │  02/08        │   │  05/06/09     │
-└───────────────┘   └───────────────┘   └───────────────┘
-        │                     │                     │
-        └─────────────────────┼─────────────────────┘
+        ┌─────────────────────┼──────────────────────┐
+        ▼                     ▼                      ▼
+┌───────────────┐   ┌────────────────┐   ┌────────────────────┐
+│  UI Layer     │   │  Data Layer    │   │  Services/Features  │
+│  03/04        │   │  02/08/10_Code │   │  05/06/09/11/12/13  │
+└───────────────┘   └────────────────┘   └────────────────────┘
+        │                     │                      │
+        └─────────────────────┼──────────────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │               00_DataAccess.gs (Data Access Layer)           │
@@ -92,7 +92,7 @@ The codebase follows a layered architecture with 15 modules:
                     └────────────────────┬────────────────────┘
                                          │
                     ┌────────────────────▼────────────────────┐
-                    │              09_Main.gs                  │
+                    │              10_Main.gs                  │
                     │         onOpen(), onEdit()               │
                     └────────────────────┬────────────────────┘
                                          │
@@ -102,13 +102,9 @@ The codebase follows a layered architecture with 15 modules:
 ┌─────────────────┐           ┌─────────────────┐           ┌─────────────────┐
 │   UI LAYER      │           │   DATA LAYER    │           │  FEATURE LAYER  │
 ├─────────────────┤           ├─────────────────┤           ├─────────────────┤
-│ 04a_MenuBuilder │           │ 02_MemberMgr    │           │ 10_CommandCtr   │
-│ 04b_ThemeService│           │ 03_GrievanceMgr │           │ 11_SecureDash   │
-│ 04_UIService    │           │ 08a_SheetCreate │           │ 12_ChecklistMgr │
-│                 │           │ 08b_DataValid   │           │ 13_DynamicEng   │
-│                 │           │ 08c_SearchEng   │           │ 14_LookerInteg  │
-│                 │           │ 08d_ChartBuild  │           │ 15_TestFramewrk │
-│                 │           │ 08_Code         │           │                 │
+│ 03_UIComponents │           │ 02_DataManagers │           │ 11_CommandHub   │
+│ 04_UIService    │           │ 08_SheetUtils   │           │ 12_Features     │
+│                 │           │ 10_Code         │           │ 13_MemberSelf.. │
 └────────┬────────┘           └────────┬────────┘           └────────┬────────┘
          │                             │                             │
          │     ┌───────────────────────┼───────────────────────┐     │
@@ -117,16 +113,14 @@ The codebase follows a layered architecture with 15 modules:
          │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
          │  │ MAINTENANCE     │  │ INTEGRATION     │  │  DEV TOOLS      │
          │  ├─────────────────┤  ├─────────────────┤  ├─────────────────┤
-         │  │ 06a_Diagnostics │  │ 05_Integrations │  │ 07_DevTools     │
-         │  │ 06b_CacheManager│  │                 │  │                 │
-         │  │ 06c_UndoManager │  │                 │  │                 │
-         │  │ 06_Maintenance  │  │                 │  │                 │
+         │  │ 06_Maintenance  │  │ 05_Integrations │  │ 07_DevTools     │
+         │  │                 │  │ 09_Dashboards   │  │                 │
          │  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘
          │           │                    │                    │
          └───────────┴────────────────────┴────────────────────┘
                                          │
                     ┌────────────────────▼────────────────────┐
-                    │           01_Constants.gs                │
+                    │             01_Core.gs                   │
                     │   SHEETS, COLORS, COLS, CONFIG           │
                     └──────────────────────────────────────────┘
 ```
@@ -171,8 +165,9 @@ The codebase follows a layered architecture with 15 modules:
 |------|---------|---------------|
 | `10_Code.gs` | Core business logic | `calculateDeadlines`, `processGrievanceStep` |
 | `10_Main.gs` | Entry point + Triggers | `onOpen`, `onEdit` (consolidated dispatcher) |
-| `11_CommandHub.gs` | Command center | `showCommandCenter`, `buildSecureDashboard` |
+| `11_CommandHub.gs` | Command center + Secure dashboard | `showCommandCenter`, `buildSecureDashboard` |
 | `12_Features.gs` | Checklist, Dynamic, Looker | `handleChecklistEdit`, `buildSafeQuery` |
+| `13_MemberSelfService.gs` | Member self-service portal | PIN authentication, member-facing portal |
 
 ### Development Module (Remove in Production)
 
@@ -282,29 +277,6 @@ DataAccess.invalidateCache();
 
 ---
 
-### Legacy Data Modules
-
-| File | Purpose | Key Functions |
-|------|---------|---------------|
-| `08a_SheetCreation.gs` | Sheet setup | `CREATE_509_DASHBOARD`, `createGrievanceLogSheet` |
-| `08b_DataValidation.gs` | Validation rules | `setupDataValidations`, `setDropdownValidation` |
-| `08c_SearchEngine.gs` | Search functionality | `searchDashboard`, `advancedSearch`, `navigateToSearchResult` |
-| `08d_ChartBuilder.gs` | Dashboard charts | `generateSelectedChart`, `createGaugeStyleChart_` |
-| `08_Code.gs` | Core utilities | Various helper functions |
-
-### Feature Modules
-
-| File | Purpose |
-|------|---------|
-| `10_CommandCenter.gs` | Admin command center |
-| `11_SecureMemberDashboard.gs` | Member-facing dashboard |
-| `12_ChecklistManager.gs` | Task checklists |
-| `13_DynamicEngine.gs` | Dynamic content generation |
-| `14_LookerIntegration.gs` | Looker Studio integration |
-| `15_TestFramework.gs` | Unit testing framework |
-
----
-
 ## Build System
 
 ### Commands
@@ -322,8 +294,11 @@ npm run lint:fix
 # Build consolidated file
 npm run build
 
-# Lint + Build (test command)
+# Lint + Build + Jest tests
 npm run test
+
+# Run Jest unit tests only
+npm run test:unit
 
 # Build with linting
 node build.js --lint
@@ -344,33 +319,26 @@ npm run deploy
 
 ### Build Order
 
-Files must be concatenated in dependency order:
+Files must be concatenated in dependency order (16 files):
 
 ```javascript
 const BUILD_ORDER = [
-  '01_Constants.gs',        // Must be first - defines globals
-  '02_MemberManager.gs',
-  '03_GrievanceManager.gs',
-  '04a_MenuBuilder.gs',
-  '04b_ThemeService.gs',
-  '04_UIService.gs',
-  '05_Integrations.gs',
-  '06a_Diagnostics.gs',
-  '06b_CacheManager.gs',
-  '06c_UndoManager.gs',
-  '06_Maintenance.gs',
-  '07_DevTools.gs',
-  '08a_SheetCreation.gs',
-  '08b_DataValidation.gs',
-  '08c_SearchEngine.gs',
-  '08_Code.gs',
-  '09_Main.gs',
-  '10_CommandCenter.gs',
-  '11_SecureMemberDashboard.gs',
-  '12_ChecklistManager.gs',
-  '13_DynamicEngine.gs',
-  '14_LookerIntegration.gs',
-  '15_TestFramework.gs'     // Must be last - tests other modules
+  '00_Security.gs',           // Security utilities, XSS prevention, access control
+  '00_DataAccess.gs',         // Data Access Layer, time constants
+  '01_Core.gs',               // Error handling + Constants (SHEETS, MEMBER_COLS, etc.)
+  '02_DataManagers.gs',       // Member + Grievance CRUD managers
+  '03_UIComponents.gs',       // Menu, Theme, Mobile, QuickActions, Search
+  '04_UIService.gs',          // Main UI service (dialogs, panels, forms)
+  '05_Integrations.gs',       // Drive, Calendar, WebApp integration
+  '06_Maintenance.gs',        // Diagnostics, Cache, Undo/Redo
+  '07_DevTools.gs',           // Dev tools + Test framework (remove before prod)
+  '08_SheetUtils.gs',         // Sheet creation, validation, search, charts, forms
+  '09_Dashboards.gs',         // Satisfaction, Sync, Public dashboards
+  '10_Code.gs',               // Core business logic
+  '10_Main.gs',               // Main entry point, onOpen, onEdit, triggers
+  '11_CommandHub.gs',         // Command center + Secure member dashboard
+  '12_Features.gs',           // Checklist, Dynamic Engine, Looker Studio
+  '13_MemberSelfService.gs'   // Member self-service portal with PIN auth
 ];
 ```
 
@@ -378,41 +346,69 @@ const BUILD_ORDER = [
 
 ## Testing
 
-### Test Framework
+### Jest Test Suite (Primary)
 
-The project includes a custom test framework in `15_TestFramework.gs`:
+The project uses **Jest v29.7.0** as its primary test framework, with 276 tests across 7 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
+
+#### Running Tests
+
+```bash
+# Run Jest unit tests only
+npm run test:unit
+
+# Run full pipeline: lint + build + Jest tests
+npm test
+```
+
+#### Test Directory Structure
+
+```
+test/
+├── gas-mock.js                    # GAS global mocks (SpreadsheetApp, Logger, etc.)
+├── load-source.js                 # Loads .gs source files into Node.js global scope
+├── 00_Security.test.js            # Security module tests
+├── 00_DataAccess.test.js          # Data Access Layer tests
+├── 01_Core.test.js                # Core constants and error handling tests
+├── 05_Integrations.test.js        # Integrations tests
+├── 10_Main.test.js                # Main entry point tests
+├── 13_MemberSelfService.test.js   # Member self-service portal tests
+└── modules.test.js                # Cross-module integration tests
+```
+
+#### Writing Tests
 
 ```javascript
-// Run all tests
+// test/example.test.js
+require('./gas-mock');                     // Set up GAS environment mocks
+const { loadSource } = require('./load-source');
+
+beforeAll(() => {
+  loadSource('01_Core.gs');                // Load source file into global scope
+});
+
+describe('myFunction', () => {
+  it('should return expected value', () => {
+    var result = global.myFunction(42);
+    expect(result).toBe(42);
+  });
+});
+```
+
+The `gas-mock.js` file provides mock implementations for GAS globals (`SpreadsheetApp`, `Logger`, `Utilities`, `DriveApp`, etc.) so that source files can be loaded and tested outside of the Apps Script runtime.
+
+The `load-source.js` helper rewrites top-level `var` and `function` declarations to `global.*` assignments so they become accessible in Jest's sandbox.
+
+### Custom GAS Test Framework (Legacy/In-Editor)
+
+The `07_DevTools.gs` module also includes a custom in-editor test framework for running tests directly within the Apps Script environment:
+
+```javascript
+// Run all tests in Apps Script editor
 runAllTests();
 
 // Show test dashboard UI
 showTestDashboard();
 ```
-
-### Writing Tests
-
-```javascript
-function test_exampleFunction() {
-  var result = exampleFunction(42);
-
-  assert.equals(result, 42, 'Should return input value');
-  assert.isTrue(result > 0, 'Should be positive');
-  assert.isDefined(result, 'Should not be undefined');
-}
-```
-
-### Assert Methods
-
-| Method | Description |
-|--------|-------------|
-| `assert.isTrue(val, msg)` | Value is truthy |
-| `assert.isFalse(val, msg)` | Value is falsy |
-| `assert.equals(a, b, msg)` | Strict equality |
-| `assert.isDefined(val, msg)` | Not undefined |
-| `assert.isArray(val, msg)` | Is an array |
-| `assert.contains(arr, val, msg)` | Array contains value |
-| `assert.throws(fn, msg)` | Function throws error |
 
 ---
 
@@ -560,7 +556,7 @@ showCacheStatusDashboard();
 
 | Issue | Solution |
 |-------|----------|
-| "Sheet not found" | Check `SHEETS` constant in `01_Constants.gs` |
+| "Sheet not found" | Check `SHEETS` constant in `01_Core.gs` |
 | Stale data | Call `invalidateAllCaches()` |
 | Trigger not firing | Run `DIAGNOSE_SETUP()` to check triggers |
 | UI not updating | Call `SpreadsheetApp.flush()` |

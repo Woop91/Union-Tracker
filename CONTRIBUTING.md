@@ -53,23 +53,34 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 ```
 .
-├── src/                    # Source files
-│   ├── 00_ErrorHandler.gs  # Error handling utilities
-│   ├── 01_Constants.gs     # Global constants
-│   ├── 02_MemberManager.gs # Member management
-│   ├── 03_GrievanceManager.gs # Grievance management
-│   ├── 04_*.gs            # UI modules
-│   ├── 05_Integrations.gs # External integrations
-│   ├── 06_*.gs            # Maintenance modules
-│   ├── 07_DevTools.gs     # Development tools
-│   ├── 08_*.gs            # Core code modules
-│   ├── 09_Main.gs         # Main entry point
-│   └── ...
+├── src/                    # Source files (16 .gs + 1 .html)
+│   ├── 00_Security.gs      # Security utilities, XSS prevention
+│   ├── 00_DataAccess.gs    # Data Access Layer
+│   ├── 01_Core.gs          # Error handling + Constants
+│   ├── 02_DataManagers.gs  # Member + Grievance managers
+│   ├── 03_UIComponents.gs  # Menu, Theme, Mobile
+│   ├── 04_UIService.gs     # UI dialogs and panels
+│   ├── 05_Integrations.gs  # External integrations
+│   ├── 06_Maintenance.gs   # Diagnostics, cache, undo
+│   ├── 07_DevTools.gs      # Development tools
+│   ├── 08_SheetUtils.gs    # Sheet creation, validation
+│   ├── 09_Dashboards.gs    # Dashboards and sync
+│   ├── 10_Code.gs          # Core business logic
+│   ├── 10_Main.gs          # Main entry point
+│   ├── 11_CommandHub.gs    # Command center
+│   ├── 12_Features.gs      # Checklist, Dynamic, Looker
+│   ├── 13_MemberSelfService.gs  # PIN authentication
+│   └── MultiSelectDialog.html
+├── test/                   # Jest unit tests
+│   ├── gas-mock.js         # GAS environment mocks
+│   ├── load-source.js      # Source file loader
+│   └── *.test.js           # Test files (276 tests)
 ├── dist/                   # Built output (auto-generated)
 ├── .github/workflows/      # CI/CD configuration
 ├── build.js               # Build script
+├── jest.config.js         # Jest configuration
 ├── package.json           # Node.js configuration
-└── .eslintrc.js          # ESLint configuration
+└── eslint.config.mjs      # ESLint configuration
 ```
 
 ### Module Naming Convention
@@ -180,38 +191,43 @@ docs(readme): update installation instructions
 ### Running Tests
 
 ```bash
-# Run all tests (in Google Apps Script)
-runAllTests();
+# Run unit tests only
+npm run test:unit
 
-# Run quick tests
-runQuickTests();
+# Run full test pipeline (lint + build + tests)
+npm test
+```
+
+### Test Structure
+
+Tests use Jest v29.7.0 with custom GAS environment mocking:
+
+```
+test/
+├── gas-mock.js           # Mocks for SpreadsheetApp, Session, Utilities, etc.
+├── load-source.js        # Preprocessor to load .gs files in Node.js
+├── 00_Security.test.js   # Security function tests
+├── 00_DataAccess.test.js # Data access and time constant tests
+├── 01_Core.test.js       # Column constants, version, headers
+├── 05_Integrations.test.js # Config and integration tests
+├── 10_Main.test.js       # Row construction, CSV escaping
+├── 13_MemberSelfService.test.js # PIN generation/hashing
+└── modules.test.js       # Cross-module tests
 ```
 
 ### Writing Tests
 
-Add tests to `15_TestFramework.gs`:
-
 ```javascript
-function testYourFeature() {
-  var result = yourFunction('input');
+const { loadSources } = require('./load-source');
 
-  if (result !== 'expected') {
-    throw new Error('Test failed: expected "expected", got "' + result + '"');
-  }
+beforeAll(() => {
+  require('./gas-mock');
+  loadSources(['00_Security.gs', '01_Core.gs']);
+});
 
-  Logger.log('testYourFeature: PASSED');
-}
-```
-
-Register in the test registry:
-
-```javascript
-function getTestFunctionRegistry() {
-  return [
-    // ... existing tests
-    'testYourFeature'
-  ];
-}
+test('escapeHtml escapes angle brackets', () => {
+  expect(escapeHtml('<script>')).toBe('&lt;script&gt;');
+});
 ```
 
 ## Submitting Changes
@@ -233,6 +249,7 @@ function getTestFunctionRegistry() {
    ```bash
    npm run lint
    npm run build
+   npm run test:unit
    ```
 
 4. **Push and create PR**

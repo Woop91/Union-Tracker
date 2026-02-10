@@ -1,9 +1,9 @@
 # 509 Strategic Command Center - Complete Features Reference
 
-**Version:** 4.4.1 | **Codename:** Strategic Command Center
-**Last Updated:** January 2026
+**Version:** 4.5.0 | **Codename:** Strategic Command Center
+**Last Updated:** February 2026
 
-> **New in v4.4.1:** Dynamic Engine (Member Leaders, Column Expansion, Self-Healing), Grievance Reminders, and Google Looker Studio Integration (Standard & PII-Free)
+> **New in v4.5.0:** Security module, Data Access Layer, Member Self-Service PIN authentication, 276 Jest tests, consolidated architecture (16 source files)
 
 This document provides a comprehensive, searchable reference of all features in the 509 Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -31,6 +31,7 @@ This document provides a comprehensive, searchable reference of all features in 
 18. [Dynamic Engine & Extensions](#18-dynamic-engine--extensions)
 19. [Grievance Reminders](#19-grievance-reminders)
 20. [Looker Studio Integration](#20-looker-studio-integration)
+21. [Member Self-Service & PIN Authentication](#21-member-self-service--pin-authentication)
 
 ---
 
@@ -375,7 +376,7 @@ This document provides a comprehensive, searchable reference of all features in 
 
 ## 18. Dynamic Engine & Extensions
 
-> **File:** `13_DynamicEngine.gs`
+> **File:** `12_Features.gs`
 
 The Dynamic Engine provides extensible features for organizational structure tracking, custom columns, and self-healing formulas.
 
@@ -419,7 +420,7 @@ The Dynamic Engine provides extensible features for organizational structure tra
 
 ## 19. Grievance Reminders
 
-> **File:** `13_DynamicEngine.gs` (Reminders section)
+> **File:** `12_Features.gs` (Reminders section)
 
 Allows users to set two reminder dates with notes for scheduling meetings and follow-ups on grievances.
 
@@ -459,7 +460,7 @@ Allows users to set two reminder dates with notes for scheduling meetings and fo
 
 ## 20. Looker Studio Integration
 
-> **File:** `14_LookerIntegration.gs`
+> **File:** `12_Features.gs` (Looker section)
 
 Provides read-only data layers for Google Looker Studio without modifying existing sheets or modal dashboards.
 
@@ -522,10 +523,34 @@ Creates anonymized sheets for external stakeholders, public dashboards, or compl
 
 ---
 
+## 21. Member Self-Service & PIN Authentication
+
+> **File:** `13_MemberSelfService.gs`
+
+Provides PIN-based member authentication for self-service access to the dashboard system.
+
+### PIN Management
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Generate Member PIN** | Creates secure UUID-based PIN using Utilities.getUuid() with hashed storage | `generateMemberPIN(memberId)` | PIN, generate, secure, UUID |
+| **Authenticate Member** | Validates member-provided PIN against stored hash | `authenticateMember(memberId, pin)` | authenticate, login, verify |
+| **Reset Member PIN** | Generates a new PIN and invalidates the previous one | `resetMemberPIN(memberId)` | reset, regenerate, new PIN |
+
+### Self-Service Portal
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Member Self-Service View** | PIN-authenticated portal for members to view their own data | `showMemberSelfService()` | portal, self-service, view |
+| **PIN Entry Dialog** | Secure PIN entry interface for member authentication | `showPINEntryDialog()` | dialog, PIN, entry |
+
+---
+
 ## Version History
 
 | Version | Features Added |
 |---------|----------------|
+| **4.5.0** | Security module, Data Access Layer, Member Self-Service PIN, 276 Jest tests, consolidated architecture |
 | **4.4.1** | Dynamic Engine, Grievance Reminders, Looker Studio Integration (Standard & PII-Free) |
 | **4.3.8** | Searchable Help Guide, Features Reference Sheet, Enhanced FAQ |
 | **4.3.7** | Dynamic row styling with getMaxRows() |
@@ -550,4 +575,4 @@ Creates anonymized sheets for external stakeholders, public dashboards, or compl
 
 ---
 
-*509 Strategic Command Center v4.3.8 - A personal project providing comprehensive tools for representatives*
+*509 Strategic Command Center v4.5.0 - A personal project providing comprehensive tools for representatives*

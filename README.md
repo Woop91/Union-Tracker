@@ -1,45 +1,53 @@
-# 509 Strategic Command Center - v4.4.1 Complete Menu System
+# 509 Strategic Command Center - v4.5.0
 
-A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **13-file modular architecture** following the Separation of Concerns principle.
+A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **16-file modular architecture** following the Separation of Concerns principle.
 
 ## Architecture Overview
 
-The dashboard uses a streamlined 13-file architecture for clarity and maintainability:
+The dashboard uses a streamlined 16-file architecture for clarity and maintainability:
 
 ```
 src/
-├── 01_Constants.gs              # Single source of truth for configuration
-├── 02_MemberManager.gs          # Member operations and directory management
-├── 03_GrievanceManager.gs       # Grievance lifecycle and deadline tracking
-├── 04_UIService.gs              # UI, Comfort View, mobile, Strategic Command Center
+├── 00_Security.gs               # Security utilities, XSS prevention, access control
+├── 00_DataAccess.gs             # Data Access Layer, time constants, cached sheet access
+├── 01_Core.gs                   # Error handling + Constants (SHEETS, MEMBER_COLS, etc.)
+├── 02_DataManagers.gs           # Member + Grievance managers
+├── 03_UIComponents.gs           # Menu, Theme, Mobile, QuickActions, Search
+├── 04_UIService.gs              # Main UI service (dialogs, panels)
 ├── 05_Integrations.gs           # Drive, Calendar, WebApp integration
-├── 06_Maintenance.gs            # Diagnostics, caching, performance
-├── 07_DevTools.gs               # Test data generation (DELETE BEFORE PROD)
-├── 08_Code.gs                   # Core setup, hidden sheets, dashboard creation
-├── 09_Main.gs                   # Entry point and triggers
-├── 10_CommandCenter.gs          # 509 Strategic Command Center Unified Master Engine (v4.0)
-├── 11_SecureMemberDashboard.gs  # Material Design member portal, Web App & secure portal (v4.2.0)
-├── 13_DynamicEngine.gs          # Dynamic Engine: Member Leaders, Column Expansion, Reminders (v4.4.1)
-└── 14_LookerIntegration.gs      # Google Looker Studio integration (Standard & PII-Free) (v4.4.1)
+├── 06_Maintenance.gs            # Diagnostics, Cache, Undo
+├── 07_DevTools.gs               # Dev tools + Test framework (remove before prod)
+├── 08_SheetUtils.gs             # Sheet creation, validation, forms
+├── 09_Dashboards.gs             # Satisfaction, Sync, Public dashboards
+├── 10_Code.gs                   # Core business logic
+├── 10_Main.gs                   # Main entry point, triggers, edit handlers
+├── 11_CommandHub.gs             # Command center + Secure dashboard
+├── 12_Features.gs               # Checklist, Dynamic Engine, Looker
+├── 13_MemberSelfService.gs      # Member self-service portal with PIN authentication
+└── MultiSelectDialog.html
 ```
 
 ### Module Descriptions
 
-| Module | Purpose | Key Functions |
-|--------|---------|---------------|
-| **01_Constants.gs** | Configuration constants, sheet names, column mappings, deadline rules | `SHEETS`, `MEMBER_COLS`, `GRIEVANCE_COLS`, `CONFIG_COLS`, `COMMAND_CONFIG`, `VERSION_INFO` |
-| **02_MemberManager.gs** | Member directory operations, steward management, ID generation | `addMember`, `promoteToSteward`, `generateMissingMemberIDs`, `checkDuplicateMemberIDs` |
-| **03_GrievanceManager.gs** | Grievance creation, step advancement, deadline calculations | `startNewGrievance`, `advanceGrievanceStep`, `recalcAllGrievancesBatched` |
-| **04_UIService.gs** | Dialogs, Comfort View, mobile UI, Strategic Command Center dashboards | `showDesktopSearch`, `rebuildExecutiveDashboard`, `rebuildMemberAnalytics`, `setupMidnightTrigger` |
-| **05_Integrations.gs** | External service connections (Drive, Calendar, WebApp) | `setupDriveFolderForGrievance`, `syncDeadlinesToCalendar`, `doGet`, `doPost` |
-| **06_Maintenance.gs** | Admin tools, diagnostics, caching, performance optimization | `DIAGNOSE_SETUP`, `REPAIR_DASHBOARD`, `getCachedData`, `warmUpCaches` |
-| **07_DevTools.gs** | Test data generation and demo utilities (remove before production) | `seedAllSampleData`, `nukeDemoData`, `showDeveloperPanel` |
-| **08_Code.gs** | Core setup, hidden sheet management, dashboard creation | `CREATE_509_DASHBOARD`, `setupAllHiddenSheets`, `createConfigSheet` |
-| **10_CommandCenter.gs** | v4.0 Unified Master Engine - PDF engine, analytics, scaling hooks | `navToMobile`, `createGrievancePDF`, `showUnitHealthReport`, `calculateUnitHealth` |
-| **11_SecureMemberDashboard.gs** | Material Design member portal with Google Charts, PII protection | `showPublicMemberDashboard`, `showStewardPerformanceModal`, `safetyValveScrub`, `getAdvancedAnalytics` |
-| **13_DynamicEngine.gs** | Dynamic Engine: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders | `getMemberLeaders`, `getStewardsForGrievance`, `getHeaderMap`, `setGrievanceReminder`, `getDueReminders`, `showReminderDialog` |
-| **14_LookerIntegration.gs** | Google Looker Studio integration with Standard (PII) and PII-Free sheets | `setupLookerIntegration`, `refreshLookerData`, `setupLookerAnonIntegration`, `refreshLookerAnonData`, `showLookerConnectionHelp` |
-| **09_Main.gs** | Entry point, triggers, edit handlers | `onOpen`, `onEdit`, `initializeDashboard` |
+| Module | Purpose |
+|--------|---------|
+| **00_Security.gs** | Security utilities, XSS prevention, access control |
+| **00_DataAccess.gs** | Data Access Layer, time constants, cached sheet access |
+| **01_Core.gs** | Error handling + Constants (SHEETS, MEMBER_COLS, etc.) |
+| **02_DataManagers.gs** | Member + Grievance managers |
+| **03_UIComponents.gs** | Menu, Theme, Mobile, QuickActions, Search |
+| **04_UIService.gs** | Main UI service (dialogs, panels) |
+| **05_Integrations.gs** | Drive, Calendar, WebApp integration |
+| **06_Maintenance.gs** | Diagnostics, Cache, Undo |
+| **07_DevTools.gs** | Dev tools + Test framework (remove before prod) |
+| **08_SheetUtils.gs** | Sheet creation, validation, forms |
+| **09_Dashboards.gs** | Satisfaction, Sync, Public dashboards |
+| **10_Code.gs** | Core business logic |
+| **10_Main.gs** | Main entry point, triggers, edit handlers |
+| **11_CommandHub.gs** | Command center + Secure dashboard |
+| **12_Features.gs** | Checklist, Dynamic Engine, Looker |
+| **13_MemberSelfService.gs** | Member self-service portal with PIN authentication |
+| **MultiSelectDialog.html** | Multi-select dialog HTML template |
 
 ## v4.0 Features
 
@@ -61,8 +69,13 @@ src/
 - **Email Dashboard Link**: One-click email sending of dashboard URL to selected members
 - **Zero PII Exposure**: All member-facing views show only aggregate statistics
 
-## v4.4.x Features (CURRENT)
+## v4.5.0 Features (CURRENT)
 
+- **Security Module** (`00_Security.gs`): XSS prevention, input sanitization, access control utilities
+- **Data Access Layer** (`00_DataAccess.gs`): Centralized sheet access with caching, time constants
+- **Member Self-Service** (`13_MemberSelfService.gs`): Member self-service portal with PIN authentication
+- **276 Jest Unit Tests**: Comprehensive test suite (`npm run test:unit`)
+- **Comprehensive Bug Fixes**: Stability improvements across all modules
 - **Dynamic Engine**: Extensible feature framework with caching, unified data loading, and batch operations
 - **Member Leaders**: Organizational layer tracking stewards and member leaders with role/unit info
 - **Column Expansion**: No-code custom columns with form generation and batch saves
@@ -112,13 +125,13 @@ src/
 - **Standalone Analytics Charts**: Dedicated modals for Treemap, Sentiment Trend, and Workload Report
 - **High-Contrast Dark Theme**: Professional dark gradient backgrounds optimized for readability
 
-## Benefits of 13-File Architecture
+## Benefits of 16-File Architecture
 
 1. **Clear Separation**: Each file has one clear purpose
 2. **Easy Navigation**: Numbered prefixes show dependency order on GitHub
-3. **Production Ready**: Delete `07_DevTools.gs` before go-live (12 files in production)
+3. **Production Ready**: Delete `07_DevTools.gs` before go-live (15 files in production)
 4. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
-5. **Easier Maintenance**: Update union rules in one place (`01_Constants.gs`)
+5. **Easier Maintenance**: Update union rules in one place (`01_Core.gs`)
 6. **Scalability**: Handles 5,000+ members without performance issues
 7. **Extensibility**: Dynamic Engine enables no-code custom columns and features
 8. **Analytics Ready**: Looker Studio integration with both internal and PII-free options
@@ -151,27 +164,32 @@ src/
 
 ### Making Changes
 
-1. Edit files in the `src/` directory (numbered 01-11)
+1. Edit files in the `src/` directory (numbered 00-13)
 2. Copy updated files to Google Apps Script
 3. Save and refresh your Google Sheet
+4. Run `npm run test:unit` to execute 276 Jest unit tests
 
 ### Source Files
 
 | File | Purpose |
 |------|---------|
-| `01_Constants.gs` | Configuration constants, column mappings |
-| `02_MemberManager.gs` | Member operations and directory management |
-| `03_GrievanceManager.gs` | Grievance lifecycle and deadline tracking |
-| `04_UIService.gs` | UI, Comfort View, mobile, Strategic Command Center |
+| `00_Security.gs` | Security utilities, XSS prevention, access control |
+| `00_DataAccess.gs` | Data Access Layer, time constants, cached sheet access |
+| `01_Core.gs` | Error handling + Constants (SHEETS, MEMBER_COLS, etc.) |
+| `02_DataManagers.gs` | Member + Grievance managers |
+| `03_UIComponents.gs` | Menu, Theme, Mobile, QuickActions, Search |
+| `04_UIService.gs` | Main UI service (dialogs, panels) |
 | `05_Integrations.gs` | Drive, Calendar, WebApp integration |
-| `06_Maintenance.gs` | Diagnostics, caching, performance |
-| `07_DevTools.gs` | Test data generation (DELETE BEFORE PROD) |
-| `08_Code.gs` | Core setup, hidden sheets, dashboard creation |
-| `09_Main.gs` | Entry point and triggers |
-| `10_CommandCenter.gs` | Strategic Command Center features |
-| `11_SecureMemberDashboard.gs` | Material Design member portal with analytics |
-| `13_DynamicEngine.gs` | Dynamic Engine, Member Leaders, Column Expansion, Reminders |
-| `14_LookerIntegration.gs` | Looker Studio integration (Standard & PII-Free) |
+| `06_Maintenance.gs` | Diagnostics, Cache, Undo |
+| `07_DevTools.gs` | Dev tools + Test framework (remove before prod) |
+| `08_SheetUtils.gs` | Sheet creation, validation, forms |
+| `09_Dashboards.gs` | Satisfaction, Sync, Public dashboards |
+| `10_Code.gs` | Core business logic |
+| `10_Main.gs` | Main entry point, triggers, edit handlers |
+| `11_CommandHub.gs` | Command center + Secure dashboard |
+| `12_Features.gs` | Checklist, Dynamic Engine, Looker |
+| `13_MemberSelfService.gs` | Member self-service portal with PIN authentication |
+| `MultiSelectDialog.html` | Multi-select dialog HTML template |
 
 ## Going Live (Production)
 
@@ -185,21 +203,25 @@ Before deploying to production:
 
 ```
 src/
-├── 01_Constants.gs              # Configuration
-├── 02_MemberManager.gs          # Member operations
-├── 03_GrievanceManager.gs       # Grievance lifecycle
-├── 04_UIService.gs              # UI components
-├── 05_Integrations.gs           # External services
-├── 06_Maintenance.gs            # Admin tools
-├── 08_Code.gs                   # Core setup
-├── 09_Main.gs                   # Entry point
-├── 10_CommandCenter.gs          # Strategic Command Center
-├── 11_SecureMemberDashboard.gs  # Material Design member portal
-├── 13_DynamicEngine.gs          # Dynamic Engine & Reminders
-└── 14_LookerIntegration.gs      # Looker Studio integration
+├── 00_Security.gs               # Security utilities, XSS prevention, access control
+├── 00_DataAccess.gs             # Data Access Layer, time constants, cached sheet access
+├── 01_Core.gs                   # Error handling + Constants
+├── 02_DataManagers.gs           # Member + Grievance managers
+├── 03_UIComponents.gs           # Menu, Theme, Mobile, QuickActions, Search
+├── 04_UIService.gs              # Main UI service (dialogs, panels)
+├── 05_Integrations.gs           # Drive, Calendar, WebApp integration
+├── 06_Maintenance.gs            # Diagnostics, Cache, Undo
+├── 08_SheetUtils.gs             # Sheet creation, validation, forms
+├── 09_Dashboards.gs             # Satisfaction, Sync, Public dashboards
+├── 10_Code.gs                   # Core business logic
+├── 10_Main.gs                   # Main entry point, triggers, edit handlers
+├── 11_CommandHub.gs             # Command center + Secure dashboard
+├── 12_Features.gs               # Checklist, Dynamic Engine, Looker
+├── 13_MemberSelfService.gs      # Member self-service portal with PIN authentication
+└── MultiSelectDialog.html
 ```
 
-**12 files in production** (DevTools removed)
+**15 files in production** (DevTools removed)
 
 ## Key Features
 
@@ -212,7 +234,7 @@ src/
 - **Data Integrity**: Batch operations, validation, orphan detection
 - **Audit Logging**: Track all changes with timestamps
 
-## Menu System Overview (v4.2.2)
+## Menu System Overview (v4.5.0)
 
 The dashboard provides 4 comprehensive top-level menus with 100+ functions:
 
@@ -379,12 +401,14 @@ Automatic status-based coloring for Grievance Log:
 - **Audit Log**: System activity log
 
 ### Hidden Sheets (Auto-managed)
-- `_CalcMembers`: Member statistics
-- `_CalcGrievances`: Grievance aggregations
-- `_CalcDeadlines`: Deadline calculations
-- `_CalcStats`: Dashboard statistics
-- `_CalcSync`: Cross-sheet synchronization
-- `_CalcFormulas`: Named formula references
+- `_Dashboard_Calc`: Dashboard statistics
+- `_Grievance_Calc`: Grievance aggregations
+- `_Grievance_Formulas`: Named formula references
+- `_Member_Lookup`: Member lookup data
+- `_Steward_Contact_Calc`: Steward contact calculations
+- `_Steward_Performance_Calc`: Steward performance metrics
+- `_Audit_Log`: System activity log
+- `_Checklist_Calc`: Checklist calculations
 
 ## Troubleshooting
 
@@ -417,6 +441,7 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
+- **4.5.0** - Security Module, Data Access Layer, Member Self-Service with PIN authentication, 276 Jest unit tests, comprehensive bug fixes
 - **4.4.1** - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
 - **4.3.8** - Searchable Help Guide & Modal Consolidation: Help modal with menu reference/FAQ, Member Satisfaction sheet hidden
 - **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
