@@ -1358,6 +1358,16 @@ function validateGrievanceData(data) {
 }
 
 /**
+ * Generates a grievance ID from a sequence number
+ * @param {number} sequence - The sequence number
+ * @return {string} Formatted grievance ID (e.g. GRV-2026-0001)
+ */
+function generateGrievanceId(sequence) {
+  var year = new Date().getFullYear();
+  return 'GRV-' + year + '-' + String(sequence).padStart(4, '0');
+}
+
+/**
  * Gets the next available grievance ID
  * @param {Sheet} sheet - Grievance tracker sheet
  * @return {string} Next grievance ID

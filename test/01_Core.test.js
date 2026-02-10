@@ -404,3 +404,49 @@ describe('AUDIT_EVENTS', () => {
     expect(AUDIT_EVENTS.MEMBER_UPDATED).toBe('MEMBER_UPDATED');
   });
 });
+
+// ============================================================================
+// GRIEVANCE_OUTCOMES constant existence guard
+// ============================================================================
+
+describe('GRIEVANCE_OUTCOMES', () => {
+  test('is defined', () => {
+    expect(GRIEVANCE_OUTCOMES).toBeDefined();
+  });
+
+  test('has PENDING value', () => {
+    expect(GRIEVANCE_OUTCOMES.PENDING).toBe('Pending');
+  });
+
+  test('has WON value', () => {
+    expect(GRIEVANCE_OUTCOMES.WON).toBe('Won');
+  });
+
+  test('has DENIED value', () => {
+    expect(GRIEVANCE_OUTCOMES.DENIED).toBe('Denied');
+  });
+
+  test('has SETTLED value', () => {
+    expect(GRIEVANCE_OUTCOMES.SETTLED).toBe('Settled');
+  });
+
+  test('has WITHDRAWN value', () => {
+    expect(GRIEVANCE_OUTCOMES.WITHDRAWN).toBe('Withdrawn');
+  });
+
+  test('has CLOSED value', () => {
+    expect(GRIEVANCE_OUTCOMES.CLOSED).toBe('Closed');
+  });
+
+  test('all values are non-empty strings', () => {
+    Object.entries(GRIEVANCE_OUTCOMES).forEach(([key, value]) => {
+      expect(typeof value).toBe('string');
+      expect(value.length).toBeGreaterThan(0);
+    });
+  });
+
+  test('GRIEVANCE_STATUS and GRIEVANCE_OUTCOMES are both defined', () => {
+    expect(GRIEVANCE_STATUS).toBeDefined();
+    expect(GRIEVANCE_OUTCOMES).toBeDefined();
+  });
+});

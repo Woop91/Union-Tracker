@@ -6,7 +6,7 @@
  * findExistingMember, getGrievanceStats, addMember, getMemberById, searchMembers.
  */
 
-const { createMockSheet, createMockSpreadsheet } = require('./gas-mock');
+const { createMockRange, createMockSheet, createMockSpreadsheet } = require('./gas-mock');
 const { loadSources } = require('./load-source');
 
 // Load files in GAS load order
@@ -718,5 +718,369 @@ describe('searchMembers (mock spreadsheet)', () => {
 
     const results = searchMembers('John');
     expect(results).toEqual([]);
+  });
+});
+
+// ============================================================================
+// startNewGrievance (integration - exercises GRIEVANCE_OUTCOMES)
+// ============================================================================
+
+describe('startNewGrievance', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function setupGrievanceMock() {
+    const headerRow = new Array(40).fill('');
+    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
+
+    const existingRow = new Array(40).fill('');
+    existingRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'GRV-2026-0001';
+
+    const data = [headerRow, existingRow];
+
+    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, data);
+    sheet.getDataRange.mockReturnValue({
+      getValues: jest.fn(() => data),
+      getRow: jest.fn(() => 1),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => data.length),
+      getNumColumns: jest.fn(() => 40)
+    });
+    sheet.getLastRow.mockReturnValue(data.length);
+
+    const mockSS = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    // Mock logAuditEvent if not already defined
+    if (!global.logAuditEvent) {
+      global.logAuditEvent = jest.fn();
+    } else {
+      global.logAuditEvent.mockClear();
+    }
+
+    return { sheet, mockSS };
+  }
+
+  test('returns success with grievance ID for valid input', () => {
+    const { sheet } = setupGrievanceMock();
+
+    const result = startNewGrievance({
+      memberId: 'MS-101-H',
+      memberName: 'John Doe',
+      grievanceType: 'Discipline',
+      description: 'Valid description for the grievance'
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.grievanceId).toBeDefined();
+    expect(result.grievanceId).toMatch(/^GRV-/);
+    expect(sheet.appendRow).toHaveBeenCalledTimes(1);
+  });
+
+  test('row data includes GRIEVANCE_OUTCOMES.PENDING as outcome', () => {
+    const { sheet } = setupGrievanceMock();
+
+    startNewGrievance({
+      memberId: 'MS-101-H',
+      memberName: 'John Doe',
+      grievanceType: 'Discipline',
+      description: 'Valid description for the grievance'
+    });
+
+    const appendedRow = sheet.appendRow.mock.calls[0][0];
+    // The outcome should be GRIEVANCE_OUTCOMES.PENDING (not undefined)
+    expect(appendedRow).toContain(GRIEVANCE_OUTCOMES.PENDING);
+    expect(appendedRow).toContain(GRIEVANCE_STATUS.OPEN);
+  });
+
+  test('returns error for invalid grievance data', () => {
+    setupGrievanceMock();
+
+    const result = startNewGrievance({
+      // missing memberName/memberId
+      grievanceType: 'Discipline',
+      description: 'Valid description'
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  test('returns error when grievance sheet is missing', () => {
+    const mockSS = createMockSpreadsheet([]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    const result = startNewGrievance({
+      memberId: 'MS-101-H',
+      memberName: 'John Doe',
+      grievanceType: 'Discipline',
+      description: 'Valid description for the grievance'
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  test('calls logAuditEvent after creation', () => {
+    setupGrievanceMock();
+
+    startNewGrievance({
+      memberId: 'MS-101-H',
+      memberName: 'John Doe',
+      grievanceType: 'Discipline',
+      description: 'Valid description for the grievance'
+    });
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      AUDIT_EVENTS.GRIEVANCE_CREATED,
+      expect.objectContaining({
+        grievanceId: expect.stringMatching(/^GRV-/),
+        memberId: 'MS-101-H'
+      })
+    );
+  });
+});
+
+// ============================================================================
+// resolveGrievance (integration)
+// ============================================================================
+
+describe('resolveGrievance', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function setupResolveMock(grievanceId, currentStep) {
+    const headerRow = new Array(40).fill('');
+    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLUMNS.STATUS] = 'Status';
+
+    const grievanceRow = new Array(40).fill('');
+    grievanceRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = grievanceId || 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLUMNS.STATUS] = GRIEVANCE_STATUS.OPEN;
+    grievanceRow[GRIEVANCE_COLUMNS.CURRENT_STEP] = currentStep || 1;
+    grievanceRow[GRIEVANCE_COLUMNS.NOTES] = '';
+
+    const data = [headerRow, grievanceRow];
+
+    const setValueCalls = {};
+    const mockRange = {
+      setValue: jest.fn(function(val) { return val; }),
+      getValue: jest.fn(() => ''),
+      getValues: jest.fn(() => data),
+      getRow: jest.fn(() => 2),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => data.length),
+      getNumColumns: jest.fn(() => 40),
+      getA1Notation: jest.fn(() => 'A2'),
+      getSheet: jest.fn()
+    };
+
+    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, data);
+    sheet.getDataRange.mockReturnValue({
+      getValues: jest.fn(() => data),
+      getRow: jest.fn(() => 1),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => data.length),
+      getNumColumns: jest.fn(() => 40)
+    });
+    sheet.getRange.mockReturnValue(mockRange);
+
+    const mockSS = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    if (!global.logAuditEvent) {
+      global.logAuditEvent = jest.fn();
+    } else {
+      global.logAuditEvent.mockClear();
+    }
+
+    return { sheet, mockRange };
+  }
+
+  test('returns success for valid resolution', () => {
+    setupResolveMock('GRV-2026-0001');
+
+    const result = resolveGrievance('GRV-2026-0001', 'Won', 'Management conceded', 'Great outcome');
+
+    expect(result.success).toBe(true);
+    expect(result.grievanceId).toBe('GRV-2026-0001');
+    expect(result.message).toContain('Won');
+  });
+
+  test('updates resolution, outcome, and status on the sheet', () => {
+    const { mockRange } = setupResolveMock('GRV-2026-0001');
+
+    resolveGrievance('GRV-2026-0001', 'Settled', 'Partial agreement reached', '');
+
+    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
+    expect(setValueArgs).toContain('Partial agreement reached'); // resolution
+    expect(setValueArgs).toContain('Settled');                    // outcome
+    expect(setValueArgs).toContain(GRIEVANCE_STATUS.RESOLVED);   // status
+  });
+
+  test('returns error when grievance ID not found', () => {
+    setupResolveMock('GRV-2026-0001');
+
+    const result = resolveGrievance('GRV-NONEXISTENT', 'Won', 'N/A', '');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  test('logs audit event on resolution', () => {
+    setupResolveMock('GRV-2026-0001');
+
+    resolveGrievance('GRV-2026-0001', 'Denied', 'No violation found', 'Reviewed thoroughly');
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      AUDIT_EVENTS.GRIEVANCE_UPDATED,
+      expect.objectContaining({
+        grievanceId: 'GRV-2026-0001',
+        action: 'RESOLVED',
+        outcome: 'Denied'
+      })
+    );
+  });
+
+  test('appends timestamped notes when notes provided', () => {
+    const { mockRange } = setupResolveMock('GRV-2026-0001');
+
+    resolveGrievance('GRV-2026-0001', 'Won', 'Full remedy', 'Victory!');
+
+    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
+    const notesArg = setValueArgs.find(v => typeof v === 'string' && v.includes('RESOLVED'));
+    expect(notesArg).toContain('Won');
+    expect(notesArg).toContain('Victory!');
+  });
+});
+
+// ============================================================================
+// advanceGrievanceStep (integration)
+// ============================================================================
+
+describe('advanceGrievanceStep', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function setupAdvanceMock(grievanceId, currentStep) {
+    const headerRow = new Array(40).fill('');
+    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
+
+    const grievanceRow = new Array(40).fill('');
+    grievanceRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = grievanceId || 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLUMNS.CURRENT_STEP] = currentStep || 1;
+    grievanceRow[GRIEVANCE_COLUMNS.STATUS] = GRIEVANCE_STATUS.OPEN;
+    grievanceRow[GRIEVANCE_COLUMNS.NOTES] = '';
+
+    const data = [headerRow, grievanceRow];
+
+    const mockRange = {
+      setValue: jest.fn(),
+      getValue: jest.fn(() => ''),
+      getValues: jest.fn(() => data),
+      getRow: jest.fn(() => 2),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => data.length),
+      getNumColumns: jest.fn(() => 40),
+      getA1Notation: jest.fn(() => 'A2'),
+      getSheet: jest.fn()
+    };
+
+    const sheet = createMockSheet(SHEET_NAMES.GRIEVANCE_TRACKER, data);
+    sheet.getDataRange.mockReturnValue({
+      getValues: jest.fn(() => data),
+      getRow: jest.fn(() => 1),
+      getColumn: jest.fn(() => 1),
+      getNumRows: jest.fn(() => data.length),
+      getNumColumns: jest.fn(() => 40)
+    });
+    sheet.getRange.mockReturnValue(mockRange);
+
+    const mockSS = createMockSpreadsheet([sheet]);
+    SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
+
+    if (!global.logAuditEvent) {
+      global.logAuditEvent = jest.fn();
+    } else {
+      global.logAuditEvent.mockClear();
+    }
+
+    return { sheet, mockRange };
+  }
+
+  test('advances from step 1 to step 2', () => {
+    setupAdvanceMock('GRV-2026-0001', 1);
+
+    const result = advanceGrievanceStep('GRV-2026-0001', {});
+
+    expect(result.success).toBe(true);
+    expect(result.newStep).toBe(2);
+    expect(result.message).toContain('Step 2');
+  });
+
+  test('advances from step 2 to step 3', () => {
+    setupAdvanceMock('GRV-2026-0001', 2);
+
+    const result = advanceGrievanceStep('GRV-2026-0001', {});
+
+    expect(result.success).toBe(true);
+    expect(result.newStep).toBe(3);
+  });
+
+  test('advances from step 3 to arbitration (step 4)', () => {
+    setupAdvanceMock('GRV-2026-0001', 3);
+
+    const result = advanceGrievanceStep('GRV-2026-0001', {});
+
+    expect(result.success).toBe(true);
+    expect(result.newStep).toBe(4);
+  });
+
+  test('returns error when already at arbitration (step 4)', () => {
+    setupAdvanceMock('GRV-2026-0001', 4);
+
+    const result = advanceGrievanceStep('GRV-2026-0001', {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/arbitration/i);
+  });
+
+  test('returns error when grievance not found', () => {
+    setupAdvanceMock('GRV-2026-0001', 1);
+
+    const result = advanceGrievanceStep('GRV-NONEXISTENT', {});
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  test('updates status to Appealed for steps 1-2', () => {
+    const { mockRange } = setupAdvanceMock('GRV-2026-0001', 1);
+
+    advanceGrievanceStep('GRV-2026-0001', {});
+
+    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
+    expect(setValueArgs).toContain(GRIEVANCE_STATUS.APPEALED);
+  });
+
+  test('updates status to In Arbitration for step 3 advance', () => {
+    const { mockRange } = setupAdvanceMock('GRV-2026-0001', 3);
+
+    advanceGrievanceStep('GRV-2026-0001', {});
+
+    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
+    expect(setValueArgs).toContain(GRIEVANCE_STATUS.AT_ARBITRATION);
+  });
+
+  test('logs audit event with step details', () => {
+    setupAdvanceMock('GRV-2026-0001', 2);
+
+    advanceGrievanceStep('GRV-2026-0001', { notes: 'Denied at step 2' });
+
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      AUDIT_EVENTS.GRIEVANCE_STEP_ADVANCED,
+      expect.objectContaining({
+        grievanceId: 'GRV-2026-0001',
+        fromStep: 2,
+        toStep: 3
+      })
+    );
   });
 });
