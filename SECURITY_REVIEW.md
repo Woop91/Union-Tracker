@@ -372,7 +372,7 @@ All dependencies are development-only and do not run in production (Google Apps 
 - [x] Complete access control on all web endpoints (search/grievances/members require steward role)
 - [x] PII masking in all log statements (secureLog used for audit events)
 - [ ] Clickjacking protection (X-Frame-Options)
-- [x] Security testing automation (276 Jest tests covering escapeHtml, escapeForFormula, sanitization, PII masking, input validation)
+- [x] Security testing automation (838 Jest tests covering escapeHtml, escapeForFormula, sanitization, PII masking, input validation)
 - [ ] Regular dependency audits
 
 ---
@@ -387,7 +387,7 @@ All dependencies are development-only and do not run in production (Google Apps 
 | PII in logs | Medium | **Fixed** (secureLog for audit events) |
 | Access control | Missing | **Implemented** |
 | Input validation | Missing | **Implemented** |
-| Security testing | Missing | **Implemented** (276 Jest tests) |
+| Security testing | Missing | **Implemented** (838 Jest tests) |
 
 **Progress:** Version 4.5.0 resolved all critical and medium security issues from the v4.4.1 review. XSS vulnerabilities fixed with escapeHtml() on all innerHTML assignments. Access control implemented with role-based authorization on all sensitive web app pages. Formula injection fixed with start-of-string anchored regex. PII logging secured with secureLog(). 276 Jest unit tests cover security functions.
 
