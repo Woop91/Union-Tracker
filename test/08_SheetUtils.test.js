@@ -432,3 +432,74 @@ describe('Sheet utility constants', () => {
     expect(COLORS.PRIMARY_PURPLE).toBeDefined();
   });
 });
+
+// ============================================================================
+// setupCalcFormulasSheet (exercises GRIEVANCE_OUTCOMES and GRIEVANCE_STATUS)
+// ============================================================================
+
+describe('setupCalcFormulasSheet', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  function createTrackingSheet() {
+    const cells = {};
+    const mockSheet = createMockSheet('_CalcFormulas');
+
+    mockSheet.getRange.mockImplementation((a1) => {
+      const range = createMockRange();
+      range.setValue.mockImplementation((val) => { cells[a1] = val; });
+      range.setFormula = jest.fn((val) => { cells[a1 + '_formula'] = val; });
+      range.setFontWeight.mockReturnThis();
+      return range;
+    });
+
+    return { mockSheet, cells };
+  }
+
+  test('is defined as a function', () => {
+    expect(typeof setupCalcFormulasSheet).toBe('function');
+  });
+
+  test('does not throw (GRIEVANCE_OUTCOMES is defined)', () => {
+    const { mockSheet } = createTrackingSheet();
+    expect(() => setupCalcFormulasSheet(mockSheet)).not.toThrow();
+  });
+
+  test('writes STATUS_LIST from GRIEVANCE_STATUS values', () => {
+    const { mockSheet, cells } = createTrackingSheet();
+
+    setupCalcFormulasSheet(mockSheet);
+
+    expect(cells['A6']).toBe('STATUS_LIST');
+    expect(cells['B6']).toBe(Object.values(GRIEVANCE_STATUS).join(','));
+  });
+
+  test('writes OUTCOME_LIST from GRIEVANCE_OUTCOMES values', () => {
+    const { mockSheet, cells } = createTrackingSheet();
+
+    setupCalcFormulasSheet(mockSheet);
+
+    expect(cells['A8']).toBe('OUTCOME_LIST');
+    expect(cells['B8']).toBe(Object.values(GRIEVANCE_OUTCOMES).join(','));
+    expect(cells['B8']).toContain('Pending');
+    expect(cells['B8']).toContain('Won');
+    expect(cells['B8']).toContain('Denied');
+  });
+
+  test('writes GRIEVANCE_TYPES list', () => {
+    const { mockSheet, cells } = createTrackingSheet();
+
+    setupCalcFormulasSheet(mockSheet);
+
+    expect(cells['A10']).toBe('GRIEVANCE_TYPES');
+    expect(cells['B10']).toContain('Discipline');
+  });
+
+  test('writes header and department formula', () => {
+    const { mockSheet, cells } = createTrackingSheet();
+
+    setupCalcFormulasSheet(mockSheet);
+
+    expect(cells['A1']).toBe('Named Formula References');
+    expect(cells['A4']).toBe('DEPARTMENT_LIST');
+  });
+});

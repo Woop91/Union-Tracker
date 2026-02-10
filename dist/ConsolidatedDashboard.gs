@@ -3861,7 +3861,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2474 lines)
+// SOURCE: 02_DataManagers.gs (2484 lines)
 // ============================================================================
 
 /**
@@ -5221,6 +5221,16 @@ function validateGrievanceData(data) {
   }
 
   return { valid: true };
+}
+
+/**
+ * Generates a grievance ID from a sequence number
+ * @param {number} sequence - The sequence number
+ * @return {string} Formatted grievance ID (e.g. GRV-2026-0001)
+ */
+function generateGrievanceId(sequence) {
+  var year = new Date().getFullYear();
+  return 'GRV-' + year + '-' + String(sequence).padStart(4, '0');
 }
 
 /**
