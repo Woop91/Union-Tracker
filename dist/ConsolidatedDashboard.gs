@@ -34,7 +34,7 @@
  */
 
 // ============================================================================
-// SOURCE: 00_Security.gs (726 lines)
+// SOURCE: 00_Security.gs (743 lines)
 // ============================================================================
 
 /**
@@ -284,6 +284,23 @@ function buildSafeQuery(sheetName, query, headers) {
     .replace(/"/g, '\\"');
 
   return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
+}
+
+// ============================================================================
+// CENTRALIZED USER SESSION
+// ============================================================================
+
+/**
+ * Gets the current user's email with caching and error handling.
+ * Use this instead of calling Session.getActiveUser().getEmail() directly.
+ * @returns {string} The user's email or 'Unknown' if unavailable
+ */
+function getCurrentUserEmail() {
+  try {
+    return Session.getActiveUser().getEmail() || 'Unknown';
+  } catch (e) {
+    return 'Unknown';
+  }
 }
 
 // ============================================================================
@@ -3830,7 +3847,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2473 lines)
+// SOURCE: 02_DataManagers.gs (2474 lines)
 // ============================================================================
 
 /**
@@ -4846,9 +4863,10 @@ function getImportMembersHtml_() {
     '    .importMembersFromData(parsedData, mapping);' +
     '}' +
     '' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'function showStatus(msg, isError) {' +
     '  var area = document.getElementById("statusArea");' +
-    '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + msg + "</div>";' +
+    '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + escapeHtml(msg) + "</div>";' +
     '}' +
     '</script>' +
     '</body></html>';
@@ -8571,7 +8589,7 @@ function getQuickSearchHtml() {
           }
           container.innerHTML = results.map(function(r, i) {
             return '<div class="quick-item" onclick="selectQuick(' + i + ')">' +
-                   r.title + ' <small style="color:#666">(' + r.type + ')</small></div>';
+                   escapeHtml(r.title) + ' <small style="color:#666">(' + escapeHtml(r.type) + ')</small></div>';
           }).join('');
         }
 
@@ -8862,7 +8880,7 @@ function getAdvancedSearchHtml() {
 
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (7145 lines)
+// SOURCE: 04_UIService.gs (7146 lines)
 // ============================================================================
 
 /**
@@ -11413,7 +11431,7 @@ function getInteractiveDashboardHtml() {
     'function showEditMemberForm(idx){' +
     '  var m=allMembers[idx];' +
     '  if(!m)return;' +
-    '  document.getElementById("member-form-title").innerHTML="✏️ Edit Member: "+m.name;' +
+    '  document.getElementById("member-form-title").innerHTML="✏️ Edit Member: "+escapeHtml(m.name);' +
     '  document.getElementById("form-mode").value="edit";' +
     '  document.getElementById("form-memberId").value=m.id;' +
     '  document.getElementById("form-firstName").value=m.firstName||"";' +
@@ -15036,9 +15054,10 @@ function getUnifiedDashboardHtml(isPII) {
 
     // JavaScript
     '<script>' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
-    'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+e.message+"</div>"}' +
+    'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+escapeHtml(e.message)+"</div>"}' +
     'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=\\x27"+tab+"\\x27]").classList.add("active");renderTab(tab)}' +
     'function render(json){dashData=JSON.parse(json);renderTab("overview");setTimeout(renderPinnedSection,100)}' +
 
@@ -15055,7 +15074,7 @@ function getUnifiedDashboardHtml(isPII) {
     'else if(type==="overdue"){title="Overdue Cases ("+d.overdueCount+")";items=d.overdueList.map(function(c){return{id:c.id,name:c.member,meta:c.step+" | "+c.steward}})}' +
     'if(items.length===0){listHtml="<p style=\\"color:#94a3b8\\">No data available in this view.</p>"}' +
     'else{listHtml="<input type=\\"text\\" id=\\"modalSearch\\" placeholder=\\"Search...\\" oninput=\\"filterModalList()\\" style=\\"width:100%;padding:10px;margin-bottom:12px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><div id=\\"modalListItems\\" style=\\"max-height:350px;overflow-y:auto\\">";' +
-    'items.forEach(function(item){listHtml+="<div class=\\"modal-list-item\\" data-search=\\""+((item.id||"")+" "+(item.name||"")+" "+(item.meta||"")).toLowerCase()+"\\"><span class=\\"modal-list-id\\">"+item.id+"</span><span class=\\"modal-list-name\\">"+item.name+"</span><span class=\\"modal-list-meta\\">"+item.meta+"</span></div>"});' +
+    'items.forEach(function(item){listHtml+="<div class=\\"modal-list-item\\" data-search=\\""+escapeHtml(((item.id||"")+" "+(item.name||"")+" "+(item.meta||"")).toLowerCase())+"\\"><span class=\\"modal-list-id\\">"+escapeHtml(item.id)+"</span><span class=\\"modal-list-name\\">"+escapeHtml(item.name)+"</span><span class=\\"modal-list-meta\\">"+escapeHtml(item.meta)+"</span></div>"});' +
     'listHtml+="</div>"}' +
     'openModal(title,listHtml)}' +
     'function filterModalList(){var q=document.getElementById("modalSearch").value.toLowerCase();document.querySelectorAll("#modalListItems .modal-list-item").forEach(function(el){el.style.display=el.getAttribute("data-search").indexOf(q)>=0?"flex":"none"})}' +
@@ -15677,7 +15696,7 @@ function getUnifiedDashboardHtml(isPII) {
     'if(name)matches.push(name.textContent)}' +
     '});' +
     'if(matches.length>0&&matches.length<10){' +
-    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+m+"</div>"}).join("");' +
+    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+escapeHtml(m)+"</div>"}).join("");' +
     'suggestions.style.display="block"}else{suggestions.style.display="none"}' +
     '}' +
     'function selectStewardSuggestion(name){' +
@@ -16012,7 +16031,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2433 lines)
+// SOURCE: 05_Integrations.gs (2435 lines)
 // ============================================================================
 
 /**
@@ -17730,6 +17749,7 @@ function getWebAppGrievanceListHtml() {
     '</nav>' +
 
     '<script>' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -17790,7 +17810,7 @@ function getWebAppGrievanceListHtml() {
     '  var html=paged.map(function(g){' +
     '    var cardClass="grievance-card"+(g.isOverdue?" overdue":"");' +
     '    var daysInfo=g.isOverdue?"<span class=\\"detail-value danger\\">⚠️ PAST DUE</span>":(typeof g.daysToDeadline==="number"?"<span class=\\"detail-value\\">"+g.daysToDeadline+" days</span>":"<span class=\\"detail-value\\">N/A</span>");' +
-    '    return"<div class=\\""+cardClass+"\\" onclick=\\"toggleCard(this)\\">"+"<div class=\\"grievance-header\\">"+"<span class=\\"grievance-id\\">"+g.id+"</span>"+"<span class=\\"grievance-status "+getStatusClass(g)+"\\">"+getStatusText(g)+"</span>"+"</div>"+"<div class=\\"grievance-name\\">"+g.name+"</div>"+(g.category?"<div class=\\"grievance-detail\\">"+g.category+"</div>":"")+(g.step?"<span class=\\"grievance-step\\">"+g.step+"</span>":"")+"<div class=\\"grievance-details\\">"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Filed:</span><span class=\\"detail-value\\">"+g.filedDate+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🔔 Incident:</span><span class=\\"detail-value\\">"+g.incidentDate+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">⏰ Next Due:</span>"+daysInfo+"</div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">⏱️ Days Open:</span><span class=\\"detail-value\\">"+g.daysOpen+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+g.location+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+g.articles+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+g.steward+"</span></div>"+(g.resolution?"<div class=\\"detail-row\\"><span class=\\"detail-label\\">✅ Resolution:</span><span class=\\"detail-value\\">"+g.resolution+"</span></div>":"")+"</div>"+"</div>";' +
+    '    return"<div class=\\""+cardClass+"\\" onclick=\\"toggleCard(this)\\">"+"<div class=\\"grievance-header\\">"+"<span class=\\"grievance-id\\">"+escapeHtml(g.id)+"</span>"+"<span class=\\"grievance-status "+getStatusClass(g)+"\\">"+getStatusText(g)+"</span>"+"</div>"+"<div class=\\"grievance-name\\">"+escapeHtml(g.name)+"</div>"+(g.category?"<div class=\\"grievance-detail\\">"+escapeHtml(g.category)+"</div>":"")+(g.step?"<span class=\\"grievance-step\\">"+escapeHtml(g.step)+"</span>":"")+"<div class=\\"grievance-details\\">"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📅 Filed:</span><span class=\\"detail-value\\">"+escapeHtml(g.filedDate)+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🔔 Incident:</span><span class=\\"detail-value\\">"+escapeHtml(g.incidentDate)+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">⏰ Next Due:</span>"+daysInfo+"</div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">⏱️ Days Open:</span><span class=\\"detail-value\\">"+escapeHtml(g.daysOpen)+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+escapeHtml(g.location)+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+escapeHtml(g.articles)+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+escapeHtml(g.steward)+"</span></div>"+(g.resolution?"<div class=\\"detail-row\\"><span class=\\"detail-label\\">✅ Resolution:</span><span class=\\"detail-value\\">"+escapeHtml(g.resolution)+"</span></div>":"")+"</div>"+"</div>";' +
     '  }).join("");' +
     '  if(totalPages>1){html+="<div style=\\"display:flex;justify-content:center;gap:10px;padding:15px\\"><button onclick=\\"prevPage()\\" style=\\"padding:10px 20px;border:none;border-radius:8px;background:"+(currentPage>0?"#7C3AED":"#ccc")+";color:white;cursor:pointer\\" "+(currentPage===0?"disabled":"")+">← Prev</button><span style=\\"display:flex;align-items:center\\">Page "+(currentPage+1)+" of "+totalPages+"</span><button onclick=\\"nextPage()\\" style=\\"padding:10px 20px;border:none;border-radius:8px;background:"+(currentPage<totalPages-1?"#7C3AED":"#ccc")+";color:white;cursor:pointer\\" "+(currentPage>=totalPages-1?"disabled":"")+">Next →</button></div>"}' +
     '  c.innerHTML=html;' +
@@ -17929,6 +17949,7 @@ function getWebAppMemberListHtml() {
     '</nav>' +
 
     '<script>' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -17974,7 +17995,7 @@ function getWebAppMemberListHtml() {
     '    var badges="";' +
     '    if(m.isSteward)badges+="<span class=\\"badge badge-steward\\">🛡️ Steward</span>";' +
     '    if(m.hasOpenGrievance)badges+="<span class=\\"badge badge-grievance\\">⚠️ Open Grievance</span>";' +
-    '    return"<div class=\\""+cardClass+"\\" onclick=\\"toggleCard(this)\\">"+"<div class=\\"member-header\\"><span class=\\"member-name\\">"+m.name+"</span><span class=\\"member-id\\">"+m.id+"</span></div>"+"<div class=\\"member-title\\">"+m.title+"</div>"+"<div class=\\"member-location\\">📍 "+m.location+"</div>"+(badges?"<div class=\\"member-badges\\">"+badges+"</div>":"")+"<div class=\\"member-details\\">"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📧 Email:</span><span class=\\"detail-value\\">"+(m.email||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📞 Phone:</span><span class=\\"detail-value\\">"+(m.phone||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🏢 Unit:</span><span class=\\"detail-value\\">"+m.unit+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">👔 Supervisor:</span><span class=\\"detail-value\\">"+m.supervisor+"</span></div>"+"</div>"+"</div>";' +
+    '    return"<div class=\\""+cardClass+"\\" onclick=\\"toggleCard(this)\\">"+"<div class=\\"member-header\\"><span class=\\"member-name\\">"+escapeHtml(m.name)+"</span><span class=\\"member-id\\">"+escapeHtml(m.id)+"</span></div>"+"<div class=\\"member-title\\">"+escapeHtml(m.title)+"</div>"+"<div class=\\"member-location\\">📍 "+escapeHtml(m.location)+"</div>"+(badges?"<div class=\\"member-badges\\">"+badges+"</div>":"")+"<div class=\\"member-details\\">"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📧 Email:</span><span class=\\"detail-value\\">"+escapeHtml(m.email||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">📞 Phone:</span><span class=\\"detail-value\\">"+escapeHtml(m.phone||"N/A")+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">🏢 Unit:</span><span class=\\"detail-value\\">"+escapeHtml(m.unit)+"</span></div>"+"<div class=\\"detail-row\\"><span class=\\"detail-label\\">👔 Supervisor:</span><span class=\\"detail-value\\">"+escapeHtml(m.supervisor)+"</span></div>"+"</div>"+"</div>";' +
     '  }).join("");' +
     '  if(totalPages>1){html+="<div style=\\"display:flex;justify-content:center;gap:10px;padding:15px\\"><button onclick=\\"prevPage()\\" style=\\"padding:10px 20px;border:none;border-radius:8px;background:"+(currentPage>0?"#7C3AED":"#ccc")+";color:white;cursor:pointer\\" "+(currentPage===0?"disabled":"")+">← Prev</button><span style=\\"display:flex;align-items:center\\">Page "+(currentPage+1)+" of "+totalPages+"</span><button onclick=\\"nextPage()\\" style=\\"padding:10px 20px;border:none;border-radius:8px;background:"+(currentPage<totalPages-1?"#7C3AED":"#ccc")+";color:white;cursor:pointer\\" "+(currentPage>=totalPages-1?"disabled":"")+">Next →</button></div>"}' +
     '  c.innerHTML=html;' +
@@ -29494,7 +29515,7 @@ function getSatisfactionDashboardHtml() {
     '  insights+="<div class=\\"insight-card\\" style=\\"background:linear-gradient(135deg,#eff6ff,#dbeafe);border-left-color:#2563eb\\"><div class=\\"insight-title\\">ℹ️ Understanding Loyalty Score</div><div class=\\"insight-text\\">The <strong>Loyalty Score</strong> (ranging from -100 to +100) measures how likely members are to recommend the union. <strong>50+</strong> = Excellent (many advocates), <strong>0-49</strong> = Good (room for growth), <strong>Below 0</strong> = Needs work (more critics than advocates). It\'s based on the \\"Would Recommend\\" question.</div></div>";' +
     '  if(data.insights&&data.insights.length>0){' +
     '    data.insights.forEach(function(i){' +
-    '      insights+="<div class=\\"insight-card "+i.type+"\\"><div class=\\"insight-title\\">"+i.icon+" "+i.title+"</div><div class=\\"insight-text\\">"+i.text+"</div></div>";' +
+    '      insights+="<div class=\\"insight-card "+escapeHtml(i.type)+"\\"><div class=\\"insight-title\\">"+escapeHtml(i.icon)+" "+escapeHtml(i.title)+"</div><div class=\\"insight-text\\">"+escapeHtml(i.text)+"</div></div>";' +
     '    });' +
     '  }' +
     '  document.getElementById("overview-insights").innerHTML=insights;' +
@@ -38627,7 +38648,7 @@ function repairAllCheckboxes() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (1884 lines)
+// SOURCE: 10_Main.gs (1887 lines)
 // ============================================================================
 
 /**
@@ -38854,9 +38875,12 @@ function handleSecurityAudit_(e) {
         }
       }
 
-      // Log to console for visibility
-      Logger.log('SABOTAGE ALERT: Mass deletion by ' + userEmail + ' in ' +
-                 range.getSheet().getName() + ' (' + numCells + ' cells)');
+      // Log to console for visibility (PII-safe)
+      secureLog('SabotageDetection', 'Mass deletion detected', {
+        email: userEmail,
+        sheet: range.getSheet().getName(),
+        cellsAffected: numCells
+      });
     }
 
     // Detect large-scale changes (not necessarily malicious but notable)

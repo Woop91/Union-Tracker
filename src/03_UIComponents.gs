@@ -2258,7 +2258,7 @@ function getQuickSearchHtml() {
           }
           container.innerHTML = results.map(function(r, i) {
             return '<div class="quick-item" onclick="selectQuick(' + i + ')">' +
-                   r.title + ' <small style="color:#666">(' + r.type + ')</small></div>';
+                   escapeHtml(r.title) + ' <small style="color:#666">(' + escapeHtml(r.type) + ')</small></div>';
           }).join('');
         }
 
