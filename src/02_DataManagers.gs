@@ -1011,9 +1011,10 @@ function getImportMembersHtml_() {
     '    .importMembersFromData(parsedData, mapping);' +
     '}' +
     '' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'function showStatus(msg, isError) {' +
     '  var area = document.getElementById("statusArea");' +
-    '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + msg + "</div>";' +
+    '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + escapeHtml(msg) + "</div>";' +
     '}' +
     '</script>' +
     '</body></html>';

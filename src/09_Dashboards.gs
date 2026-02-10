@@ -316,7 +316,7 @@ function getSatisfactionDashboardHtml() {
     '  insights+="<div class=\\"insight-card\\" style=\\"background:linear-gradient(135deg,#eff6ff,#dbeafe);border-left-color:#2563eb\\"><div class=\\"insight-title\\">ℹ️ Understanding Loyalty Score</div><div class=\\"insight-text\\">The <strong>Loyalty Score</strong> (ranging from -100 to +100) measures how likely members are to recommend the union. <strong>50+</strong> = Excellent (many advocates), <strong>0-49</strong> = Good (room for growth), <strong>Below 0</strong> = Needs work (more critics than advocates). It\'s based on the \\"Would Recommend\\" question.</div></div>";' +
     '  if(data.insights&&data.insights.length>0){' +
     '    data.insights.forEach(function(i){' +
-    '      insights+="<div class=\\"insight-card "+i.type+"\\"><div class=\\"insight-title\\">"+i.icon+" "+i.title+"</div><div class=\\"insight-text\\">"+i.text+"</div></div>";' +
+    '      insights+="<div class=\\"insight-card "+escapeHtml(i.type)+"\\"><div class=\\"insight-title\\">"+escapeHtml(i.icon)+" "+escapeHtml(i.title)+"</div><div class=\\"insight-text\\">"+escapeHtml(i.text)+"</div></div>";' +
     '    });' +
     '  }' +
     '  document.getElementById("overview-insights").innerHTML=insights;' +

@@ -222,9 +222,12 @@ function handleSecurityAudit_(e) {
         }
       }
 
-      // Log to console for visibility
-      Logger.log('SABOTAGE ALERT: Mass deletion by ' + userEmail + ' in ' +
-                 range.getSheet().getName() + ' (' + numCells + ' cells)');
+      // Log to console for visibility (PII-safe)
+      secureLog('SabotageDetection', 'Mass deletion detected', {
+        email: userEmail,
+        sheet: range.getSheet().getName(),
+        cellsAffected: numCells
+      });
     }
 
     // Detect large-scale changes (not necessarily malicious but notable)

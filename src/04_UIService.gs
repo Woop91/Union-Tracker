@@ -2546,7 +2546,7 @@ function getInteractiveDashboardHtml() {
     'function showEditMemberForm(idx){' +
     '  var m=allMembers[idx];' +
     '  if(!m)return;' +
-    '  document.getElementById("member-form-title").innerHTML="✏️ Edit Member: "+m.name;' +
+    '  document.getElementById("member-form-title").innerHTML="✏️ Edit Member: "+escapeHtml(m.name);' +
     '  document.getElementById("form-mode").value="edit";' +
     '  document.getElementById("form-memberId").value=m.id;' +
     '  document.getElementById("form-firstName").value=m.firstName||"";' +
@@ -6169,9 +6169,10 @@ function getUnifiedDashboardHtml(isPII) {
 
     // JavaScript
     '<script>' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
-    'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+e.message+"</div>"}' +
+    'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+escapeHtml(e.message)+"</div>"}' +
     'function showTab(tab){document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});document.querySelector(".tab[onclick*=\\x27"+tab+"\\x27]").classList.add("active");renderTab(tab)}' +
     'function render(json){dashData=JSON.parse(json);renderTab("overview");setTimeout(renderPinnedSection,100)}' +
 
@@ -6188,7 +6189,7 @@ function getUnifiedDashboardHtml(isPII) {
     'else if(type==="overdue"){title="Overdue Cases ("+d.overdueCount+")";items=d.overdueList.map(function(c){return{id:c.id,name:c.member,meta:c.step+" | "+c.steward}})}' +
     'if(items.length===0){listHtml="<p style=\\"color:#94a3b8\\">No data available in this view.</p>"}' +
     'else{listHtml="<input type=\\"text\\" id=\\"modalSearch\\" placeholder=\\"Search...\\" oninput=\\"filterModalList()\\" style=\\"width:100%;padding:10px;margin-bottom:12px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><div id=\\"modalListItems\\" style=\\"max-height:350px;overflow-y:auto\\">";' +
-    'items.forEach(function(item){listHtml+="<div class=\\"modal-list-item\\" data-search=\\""+((item.id||"")+" "+(item.name||"")+" "+(item.meta||"")).toLowerCase()+"\\"><span class=\\"modal-list-id\\">"+item.id+"</span><span class=\\"modal-list-name\\">"+item.name+"</span><span class=\\"modal-list-meta\\">"+item.meta+"</span></div>"});' +
+    'items.forEach(function(item){listHtml+="<div class=\\"modal-list-item\\" data-search=\\""+escapeHtml(((item.id||"")+" "+(item.name||"")+" "+(item.meta||"")).toLowerCase())+"\\"><span class=\\"modal-list-id\\">"+escapeHtml(item.id)+"</span><span class=\\"modal-list-name\\">"+escapeHtml(item.name)+"</span><span class=\\"modal-list-meta\\">"+escapeHtml(item.meta)+"</span></div>"});' +
     'listHtml+="</div>"}' +
     'openModal(title,listHtml)}' +
     'function filterModalList(){var q=document.getElementById("modalSearch").value.toLowerCase();document.querySelectorAll("#modalListItems .modal-list-item").forEach(function(el){el.style.display=el.getAttribute("data-search").indexOf(q)>=0?"flex":"none"})}' +
@@ -6810,7 +6811,7 @@ function getUnifiedDashboardHtml(isPII) {
     'if(name)matches.push(name.textContent)}' +
     '});' +
     'if(matches.length>0&&matches.length<10){' +
-    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+m+"</div>"}).join("");' +
+    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+escapeHtml(m)+"</div>"}).join("");' +
     'suggestions.style.display="block"}else{suggestions.style.display="none"}' +
     '}' +
     'function selectStewardSuggestion(name){' +

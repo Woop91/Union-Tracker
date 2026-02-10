@@ -248,6 +248,23 @@ function buildSafeQuery(sheetName, query, headers) {
 }
 
 // ============================================================================
+// CENTRALIZED USER SESSION
+// ============================================================================
+
+/**
+ * Gets the current user's email with caching and error handling.
+ * Use this instead of calling Session.getActiveUser().getEmail() directly.
+ * @returns {string} The user's email or 'Unknown' if unavailable
+ */
+function getCurrentUserEmail() {
+  try {
+    return Session.getActiveUser().getEmail() || 'Unknown';
+  } catch (e) {
+    return 'Unknown';
+  }
+}
+
+// ============================================================================
 // ACCESS CONTROL FOR WEB APP
 // ============================================================================
 
