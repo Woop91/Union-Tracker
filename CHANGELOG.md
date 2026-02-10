@@ -8,49 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [4.5.0] - 2026-02-01
 
 ### Added
-- Centralized error handling module (`00_ErrorHandler.gs`)
-  - Error logging with severity levels
-  - User-friendly error notifications
-  - Performance monitoring utilities
-  - Input sanitization functions
-  - Constants validation on startup
-  - API versioning support
-- New modular architecture with 29 source files
-- CI/CD pipeline with GitHub Actions
-- ESLint configuration for code quality
-- Husky pre-commit hooks
-- JSDoc type checking support
+- Security module (`00_Security.gs`) - XSS prevention, HTML escaping, formula injection protection, PII masking, input validation, access control
+- Data Access Layer (`00_DataAccess.gs`) - Centralized sheet access with caching, TIME_CONSTANTS for deadline management, deadline urgency calculations
+- Member Self-Service (`13_MemberSelfService.gs`) - PIN-based member authentication with secure UUID-based PIN generation and hashed storage
+- Jest unit test suite (276 tests across 7 test files) with GAS environment mocking
+- jest.config.js and test infrastructure (gas-mock.js, load-source.js)
 
 ### Changed
-- Split `04_UIService.gs` into focused modules:
-  - `04a_MenuBuilder.gs` - Menu creation
-  - `04b_ThemeService.gs` - Theme management
-  - `04c_MobileInterface.gs` - Mobile dashboard
-  - `04d_QuickActions.gs` - Quick actions and email
-- Split `06_Maintenance.gs` into focused modules:
-  - `06a_Diagnostics.gs` - System diagnostics
-  - `06b_CacheManager.gs` - Cache management
-  - `06c_UndoManager.gs` - Undo/redo functionality
-- Split `08_Code.gs` into focused modules:
-  - `08a_SheetCreation.gs` - Sheet creation
-  - `08b_DataValidation.gs` - Data validation
-  - `08c_SearchEngine.gs` - Search functionality
-  - `08d_ChartBuilder.gs` - Chart generation
-  - `08e_FormHandlers.gs` - Form submission handlers
-  - `08f_SatisfactionEngine.gs` - Satisfaction surveys
-  - `08g_SyncEngine.gs` - Data synchronization
+- Consolidated architecture from scattered modules to 16 focused source files
+- CI/CD pipeline with GitHub Actions
+- ESLint v9 flat config for code quality
+- Husky pre-commit hooks
+- Version bumped to 4.5.0 across all files (VERSION_INFO, COMMAND_CONFIG, API_VERSION, package.json)
+
+### Fixed
+- `escapeForFormula()` - was prefixing formula chars mid-string, now only at start
+- `generateMemberPIN()` - replaced insecure Math.random with Utilities.getUuid()
+- `TIME_CONSTANTS.DEADLINE_DAYS` - corrected values to match DEADLINE_RULES (7/7/14/10)
+- `API_VERSION` - synced with VERSION_INFO (4.5.0)
+- `CALENDAR_CONFIG` - re-added missing config to Integrations module
+- `MEMBER_COLUMNS.PIN_HASH` - added missing column constant and header
+- `initializeDashboard()` - fixed dead stub, now delegates to CREATE_509_DASHBOARD()
+- `COMMAND_CONFIG.VERSION` - synced with VERSION_INFO.CURRENT
 
 ### Removed
 - 138+ duplicate function definitions
-- Deprecated functions:
-  - `showPublicMemberDashboard_Code_DEPRECATED`
-  - `refreshAllVisuals_DataRefresh_DEPRECATED`
-  - `demoteSelectedSteward_UIService_DEPRECATED`
-
-### Fixed
-- ESLint configuration compatibility with v8
-- Syntax errors in UI service module
-- Build script path handling
+- Deprecated function stubs
 
 ## [4.4.1] - 2026-01-31
 
@@ -80,6 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 4.5.0 | 2026-02-01 | Modular architecture, error handling, CI/CD |
+| 4.5.0 | 2026-02-01 | Security module, Data Access Layer, Member Self-Service, 276 Jest tests, consolidated to 16 source files |
 | 4.4.1 | 2026-01-31 | Build system |
 | 4.4.0 | 2026-01-30 | Initial release |

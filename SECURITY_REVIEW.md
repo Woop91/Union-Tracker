@@ -24,9 +24,9 @@ This comprehensive security review analyzed the Union Steward Dashboard, a Googl
 | Clickjacking | LOW | **ALLOWALL X-Frame-Options used** |
 | Dependency Security | LOW | **Dev dependencies only** |
 
-### Overall Risk Assessment: **MEDIUM-HIGH**
+### Overall Risk Assessment: **MEDIUM**
 
-The application has made significant progress in implementing security controls (version 4.5.0 added access control and input validation to the web app), but critical XSS vulnerabilities remain unresolved from previous reviews.
+The application has made significant progress in implementing security controls (version 4.5.0 added access control, input validation, formula injection fixes, and 276 unit tests). Critical XSS vulnerabilities in innerHTML assignments remain the primary concern.
 
 ---
 
@@ -138,9 +138,11 @@ case 'grievances':
 
 ### 1.3 Formula Injection - MEDIUM
 
-**Status:** PARTIALLY MITIGATED
+**Status:** FIXED in v4.5.0
 
-The codebase has `escapeForFormula()` in `00_Security.gs:121-137`, but some QUERY formulas still use unsanitized input:
+The `escapeForFormula()` function in `00_Security.gs` was fixed to only prefix formula-starting characters (`=`, `+`, `-`, `@`) at the **start** of the string, preventing mid-string corruption of emails and expressions. The function now uses `^[=+\-@]` regex anchor.
+
+Some QUERY formulas still use unsanitized sheet names:
 
 | File | Line | Issue |
 |------|------|-------|
@@ -370,7 +372,7 @@ All dependencies are development-only and do not run in production (Google Apps 
 - [ ] Complete access control on all web endpoints
 - [ ] PII masking in all log statements
 - [ ] Clickjacking protection (X-Frame-Options)
-- [ ] Security testing automation
+- [x] Security testing automation (276 Jest tests covering escapeHtml, escapeForFormula, sanitization, PII masking, input validation)
 - [ ] Regular dependency audits
 
 ---
@@ -379,14 +381,15 @@ All dependencies are development-only and do not run in production (Google Apps 
 
 | Issue | v4.4.1 Status | v4.5.0 Status |
 |-------|---------------|---------------|
-| XSS vulnerabilities | Critical | **Still Critical** |
+| XSS vulnerabilities | Critical | **Still Critical** (innerHTML) |
 | Missing web app auth | Critical | **Partially Fixed** |
-| Formula injection | Critical | **Partially Fixed** |
+| Formula injection | Critical | **Fixed** (escapeForFormula now start-only) |
 | PII in logs | Medium | **Still Medium** |
 | Access control | Missing | **Implemented** |
 | Input validation | Missing | **Implemented** |
+| Security testing | Missing | **Implemented** (276 Jest tests) |
 
-**Progress:** Version 4.5.0 added significant security improvements including access control framework, input validation, and parameter allowlists. However, the critical XSS vulnerabilities identified in v4.4.1 remain unresolved.
+**Progress:** Version 4.5.0 added significant security improvements including access control framework, input validation, parameter allowlists, formula injection fix (start-of-string only), and 276 unit tests covering security functions. The critical XSS innerHTML vulnerabilities identified in v4.4.1 remain the primary outstanding concern.
 
 ---
 
