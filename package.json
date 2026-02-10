@@ -7,7 +7,8 @@
     "build": "node build.js",
     "lint": "eslint \"src/**/*.gs\"",
     "lint:fix": "eslint \"src/**/*.gs\" --fix",
-    "test": "npm run lint && npm run build",
+    "test": "npm run lint && npm run build && jest --verbose",
+    "test:unit": "jest --verbose",
     "watch": "node build.js --watch",
     "clean": "node build.js --clean",
     "manifest": "node build.js --manifest",
@@ -28,7 +29,8 @@
     "@google/clasp": "^2.4.2",
     "@types/google-apps-script": "^1.0.83",
     "eslint": "^9.39.0",
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "jest": "^29.7.0"
   },
   "engines": {
     "node": ">=14.0.0"
