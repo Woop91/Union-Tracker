@@ -1403,7 +1403,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2439 lines)
+// SOURCE: 01_Core.gs (2453 lines)
 // ============================================================================
 
 /**
@@ -3072,6 +3072,20 @@ var GRIEVANCE_STATUS = {
   AT_ARBITRATION: 'In Arbitration',
   CLOSED: 'Closed',
   RESOLVED: 'Settled'  // Alias for backward compatibility
+};
+
+/**
+ * Grievance outcome constants for programmatic access
+ * Use these constants instead of hardcoded strings
+ * @const {Object}
+ */
+var GRIEVANCE_OUTCOMES = {
+  PENDING: 'Pending',
+  WON: 'Won',
+  DENIED: 'Denied',
+  SETTLED: 'Settled',
+  WITHDRAWN: 'Withdrawn',
+  CLOSED: 'Closed'
 };
 
 /**

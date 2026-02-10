@@ -1667,6 +1667,20 @@ var GRIEVANCE_STATUS = {
 };
 
 /**
+ * Grievance outcome constants for programmatic access
+ * Use these constants instead of hardcoded strings
+ * @const {Object}
+ */
+var GRIEVANCE_OUTCOMES = {
+  PENDING: 'Pending',
+  WON: 'Won',
+  DENIED: 'Denied',
+  SETTLED: 'Settled',
+  WITHDRAWN: 'Withdrawn',
+  CLOSED: 'Closed'
+};
+
+/**
  * Deadline rules for grievance step calculations
  * Defines the number of days for responses and appeals at each step
  * Used by deadline calculation functions throughout the system
