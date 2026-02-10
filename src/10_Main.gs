@@ -175,8 +175,8 @@ function handleSecurityAudit_(e) {
     if (!auditSheet) {
       // Create audit log sheet if it doesn't exist
       auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-      auditSheet.getRange('A1:F1').setValues([['Timestamp', 'User', 'Cell', 'Old Value', 'New Value', 'Alert']]);
-      auditSheet.getRange('A1:F1').setFontWeight('bold').setBackground(COLORS.CARD_DARK_BG).setFontColor(COLORS.CARD_DARK_TEXT);
+      auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
+      auditSheet.setFrozenRows(1);
       auditSheet.hideSheet();
     }
 
@@ -192,7 +192,7 @@ function handleSecurityAudit_(e) {
     var alertMessage = '';
 
     // SABOTAGE PROTECTION: Detect mass deletions (>15 cells cleared)
-    if (e.oldValue && !e.value && numCells > 15) {
+    if (numCells > 15 && !e.value) {
       alertMessage = 'MASS_DELETION_ALERT';
 
       // Send alert to Chief Steward
@@ -232,13 +232,20 @@ function handleSecurityAudit_(e) {
       alertMessage = alertMessage || 'LARGE_CHANGE';
     }
 
+    var details = JSON.stringify({
+      cell: range.getA1Notation(),
+      sheet: range.getSheet().getName(),
+      oldValue: e.oldValue || '(empty)',
+      newValue: e.value || '(deleted)',
+      alert: alertMessage || ''
+    });
+
     auditSheet.appendRow([
       new Date(),
+      alertMessage || 'CELL_EDIT',
       userEmail,
-      range.getA1Notation() + ' (' + range.getSheet().getName() + ')',
-      e.oldValue || '(empty)',
-      e.value || '(deleted)',
-      alertMessage
+      details,
+      ''
     ]);
 
   } catch (auditError) {
@@ -478,8 +485,14 @@ function handleGrievanceEdit(e) {
 
   const sheet = e.range.getSheet();
 
-  // Auto-update Next Action Due timestamp when any field changes
-  if (col !== GRIEVANCE_COLS.NEXT_ACTION_DUE) {
+  // Only update Next Action Due when status or step date changes, not on every edit
+  var statusAndDateCols = [
+    GRIEVANCE_COLS.STATUS, GRIEVANCE_COLS.CURRENT_STEP,
+    GRIEVANCE_COLS.DATE_FILED, GRIEVANCE_COLS.STEP1_RCVD,
+    GRIEVANCE_COLS.STEP2_APPEAL_FILED, GRIEVANCE_COLS.STEP2_RCVD,
+    GRIEVANCE_COLS.STEP3_APPEAL_FILED, GRIEVANCE_COLS.DATE_CLOSED
+  ];
+  if (statusAndDateCols.indexOf(col) !== -1) {
     sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(new Date());
   }
 
@@ -513,7 +526,7 @@ function handleGrievanceEdit(e) {
       const deadline = calculateResponseDeadline(step, new Date(stepDate));
       if (deadline) {
         // Update the corresponding due column
-        const dueColumns = [GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_DUE, GRIEVANCE_COLS.DATE_CLOSED];
+        const dueColumns = [GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_DUE, GRIEVANCE_COLS.STEP3_APPEAL_DUE];
         sheet.getRange(row, dueColumns[step - 1]).setValue(deadline);
       }
     }
@@ -626,12 +639,14 @@ function setupTriggers() {
 }
 
 /**
- * Removes all triggers (for cleanup)
+ * Removes dashboard-specific triggers (dailyTrigger only)
  */
 function removeTriggers() {
   const triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(trigger => {
-    ScriptApp.deleteTrigger(trigger);
+    if (trigger.getHandlerFunction() === 'dailyTrigger') {
+      ScriptApp.deleteTrigger(trigger);
+    }
   });
 }
 
@@ -1385,27 +1400,22 @@ function addNewMember(memberData) {
       return { success: false, error: 'Member Directory sheet not found' };
     }
 
-    // Generate new member ID
-    const lastRow = sheet.getLastRow();
-    const newId = `MEM-${String(lastRow).padStart(5, '0')}`;
+    // Generate unique member ID using timestamp to avoid collisions from row deletions
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const newId = `MEM-${timestamp}`;
 
-    // Prepare row data
-    const rowData = [
-      newId,
-      memberData.firstName,
-      memberData.lastName,
-      memberData.employeeId,
-      memberData.department,
-      memberData.jobTitle,
-      memberData.hireDate ? new Date(memberData.hireDate) : '',
-      memberData.hireDate ? new Date(memberData.hireDate) : '', // Seniority same as hire
-      memberData.email,
-      memberData.phone,
-      memberData.status || 'Active',
-      memberData.unionStatus || 'Full Member',
-      '',  // Notes
-      new Date()  // Last Updated
-    ];
+    // Prepare row data using MEMBER_COLS constants (1-indexed)
+    var rowData = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+    rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
+    rowData[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName || '';
+    rowData[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName || '';
+    rowData[MEMBER_COLS.JOB_TITLE - 1] = memberData.jobTitle || '';
+    rowData[MEMBER_COLS.WORK_LOCATION - 1] = memberData.workLocation || '';
+    rowData[MEMBER_COLS.UNIT - 1] = memberData.unit || '';
+    rowData[MEMBER_COLS.EMAIL - 1] = memberData.email || '';
+    rowData[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
+    rowData[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+    rowData[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = new Date();
 
     sheet.appendRow(rowData);
 
@@ -1448,15 +1458,17 @@ function startGrievanceForMember() {
   const memberName = `${data[MEMBER_COLUMNS.FIRST_NAME]} ${data[MEMBER_COLUMNS.LAST_NAME]}`;
 
   // Open new grievance dialog pre-populated with member info
-  const html = HtmlService.createHtmlOutput(`
-    <script>
-      // Store member info for the form
-      sessionStorage.setItem('prefillMemberId', '${memberId}');
-      sessionStorage.setItem('prefillMemberName', '${memberName}');
-      google.script.host.close();
-      google.script.run.showNewGrievanceDialog();
-    </script>
-  `).setWidth(100).setHeight(50);
+  // Sanitize values before embedding in script context
+  const safeMemberId = String(memberId || '').replace(/['"\\<>&]/g, '');
+  const safeMemberName = String(memberName || '').replace(/['"\\<>&]/g, '');
+  const html = HtmlService.createHtmlOutput(
+    '<script>' +
+      'sessionStorage.setItem("prefillMemberId", "' + safeMemberId + '");' +
+      'sessionStorage.setItem("prefillMemberName", "' + safeMemberName + '");' +
+      'google.script.host.close();' +
+      'google.script.run.showNewGrievanceDialog();' +
+    '</script>'
+  ).setWidth(100).setHeight(50);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Loading...');
 }
@@ -1691,7 +1703,13 @@ function exportMemberDirectory(format) {
   switch (format) {
     case 'csv':
       // Create CSV content
-      const csv = data.map(row => row.join(',')).join('\\n');
+      const csv = data.map(row => row.map(cell => {
+        var val = String(cell === null || cell === undefined ? '' : cell);
+        if (val.indexOf(',') !== -1 || val.indexOf('"') !== -1 || val.indexOf('\n') !== -1) {
+          return '"' + val.replace(/"/g, '""') + '"';
+        }
+        return val;
+      }).join(',')).join('\n');
       const blob = Utilities.newBlob(csv, 'text/csv', 'MemberDirectory.csv');
       const file = DriveApp.createFile(blob);
       return {

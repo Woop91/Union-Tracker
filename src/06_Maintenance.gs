@@ -252,7 +252,7 @@ function removeDeprecatedTabs() {
   ss.getSheets().forEach(function(sheet) {
     var name = sheet.getName();
     deprecatedSheets.forEach(function(prefix) {
-      if (name.indexOf(prefix) === 0 || name.indexOf(prefix) !== -1) {
+      if (name.indexOf(prefix) === 0) {
         try {
           ss.deleteSheet(sheet);
           removed.push(name);
@@ -272,28 +272,7 @@ function removeDeprecatedTabs() {
   }
 }
 
-/**
- * Sets up sheet structure for a given sheet type
- * @param {Sheet} sheet - The sheet to set up
- * @param {string} sheetType - Type of sheet ('member', 'grievance', 'config')
- * @returns {void}
- */
-function setupSheetStructure(sheet, sheetType) {
-  // This is a placeholder that delegates to specific setup functions
-  switch (sheetType) {
-    case 'member':
-      // Setup member directory structure
-      break;
-    case 'grievance':
-      // Setup grievance log structure
-      break;
-    case 'config':
-      // Setup config structure
-      break;
-    default:
-      Logger.log('Unknown sheet type: ' + sheetType);
-  }
-}
+// setupSheetStructure stub removed - initializeDashboard now delegates to CREATE_509_DASHBOARD()
 
 /**
  * Shows the repair dialog
@@ -332,15 +311,15 @@ function getRepairDialogHtml_(diagnostics) {
     '.btn-primary{background:#7c3aed;color:white}' +
     '.btn-secondary{background:#e5e7eb;color:#374151}' +
     '</style></head><body>' +
-    '<div class="status">' + diagnostics.status + '</div>' +
-    '<p>' + diagnostics.summary + '</p>' +
+    '<div class="status">' + escapeHtml(diagnostics.status) + '</div>' +
+    '<p>' + escapeHtml(diagnostics.summary) + '</p>' +
     (diagnostics.errors.length > 0 ?
       '<div class="section"><div class="section-title error">Errors</div>' +
-      diagnostics.errors.map(function(e) { return '<div class="item error">' + e + '</div>'; }).join('') +
+      diagnostics.errors.map(function(e) { return '<div class="item error">' + escapeHtml(e) + '</div>'; }).join('') +
       '</div>' : '') +
     (diagnostics.warnings.length > 0 ?
       '<div class="section"><div class="section-title warning">Warnings</div>' +
-      diagnostics.warnings.map(function(w) { return '<div class="item warning">' + w + '</div>'; }).join('') +
+      diagnostics.warnings.map(function(w) { return '<div class="item warning">' + escapeHtml(w) + '</div>'; }).join('') +
       '</div>' : '') +
     '<div style="margin-top:20px;text-align:right">' +
     '<button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
@@ -504,19 +483,19 @@ function getDiagnosticsDialogHtml_(results) {
     '.btn-primary{background:#7c3aed;color:white}' +
     '.btn-secondary{background:#e5e7eb;color:#374151;margin-right:10px}' +
     '</style></head><body>' +
-    '<div class="status ' + statusClass + '">' + results.status + '</div>' +
-    '<p>' + results.summary + '</p>' +
+    '<div class="status ' + statusClass + '">' + escapeHtml(results.status) + '</div>' +
+    '<p>' + escapeHtml(results.summary) + '</p>' +
     '<div class="section">' +
     '<div class="section-title">Checks Performed (' + results.checks.length + ')</div>' +
     '<div class="list">' +
-    results.checks.map(function(c) { return '<div class="item">✓ ' + c + '</div>'; }).join('') +
+    results.checks.map(function(c) { return '<div class="item">✓ ' + escapeHtml(c) + '</div>'; }).join('') +
     '</div></div>' +
     (results.errors.length > 0 ?
       '<div class="section"><div class="section-title error">Errors (' + results.errors.length + ')</div>' +
-      '<div class="list">' + results.errors.map(function(e) { return '<div class="item" style="color:#991b1b">❌ ' + e + '</div>'; }).join('') + '</div></div>' : '') +
+      '<div class="list">' + results.errors.map(function(e) { return '<div class="item" style="color:#991b1b">❌ ' + escapeHtml(e) + '</div>'; }).join('') + '</div></div>' : '') +
     (results.warnings.length > 0 ?
       '<div class="section"><div class="section-title warning">Warnings (' + results.warnings.length + ')</div>' +
-      '<div class="list">' + results.warnings.map(function(w) { return '<div class="item" style="color:#92400e">⚠ ' + w + '</div>'; }).join('') + '</div></div>' : '') +
+      '<div class="list">' + results.warnings.map(function(w) { return '<div class="item" style="color:#92400e">⚠ ' + escapeHtml(w) + '</div>'; }).join('') + '</div></div>' : '') +
     '<div style="margin-top:20px;text-align:right">' +
     '<button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>' +
     '<button class="btn btn-primary" onclick="runRepair()">Run Repair</button>' +
@@ -1146,7 +1125,7 @@ function applyState(state, actionType) {
     case 'BATCH_UPDATE':
       if (state.changes) {
         state.changes.forEach(function(c) {
-          sheet.getRange(c.row, c.col).setValue(c.oldValue);
+          sheet.getRange(c.row, c.col).setValue(c.value);
         });
       }
       break;
@@ -1505,11 +1484,11 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
 
   const response2 = ui.alert(
     '⚠️ FINAL WARNING',
-    'Type "CONFIRM" to proceed with the nuclear reset.',
-    ui.ButtonSet.OK_CANCEL
+    'This action CANNOT be undone. Click YES to proceed with the nuclear reset.',
+    ui.ButtonSet.YES_NO
   );
 
-  if (response2 !== ui.Button.OK) {
+  if (response2 !== ui.Button.YES) {
     return { success: false, message: 'Cancelled by user' };
   }
 
@@ -1908,7 +1887,8 @@ var CACHE_KEYS = {
   ALL_GRIEVANCES: 'cache_grievances',
   ALL_MEMBERS: 'cache_members',
   ALL_STEWARDS: 'cache_stewards',
-  DASHBOARD_METRICS: 'cache_metrics'
+  DASHBOARD_METRICS: 'cache_metrics',
+  CONFIG_VALUES: 'cache_config_values'
 };
 
 // ==================== CACHING FUNCTIONS ====================

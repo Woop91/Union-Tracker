@@ -116,14 +116,16 @@ function createChecklistSheet_(ss) {
 
 /**
  * Generate a unique checklist item ID
+ * @param {number} [offset=0] - Offset to add for batch creation (prevents duplicate IDs)
  * @returns {string} Unique checklist ID (e.g., CL-00001)
  */
-function generateChecklistId_() {
+function generateChecklistId_(offset) {
+  offset = offset || 0;
   var sheet = getOrCreateChecklistSheet();
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return 'CL-00001';
+    return 'CL-' + String(1 + offset).padStart(5, '0');
   }
 
   var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
@@ -139,7 +141,7 @@ function generateChecklistId_() {
     }
   }
 
-  return 'CL-' + String(maxNum + 1).padStart(5, '0');
+  return 'CL-' + String(maxNum + 1 + offset).padStart(5, '0');
 }
 
 /**
@@ -171,7 +173,7 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   var rows = [];
   for (var i = 0; i < templateItems.length; i++) {
     var item = templateItems[i];
-    var checklistId = generateChecklistId_();
+    var checklistId = generateChecklistId_(i);
 
     var row = [];
     row[CHECKLIST_COLS.CHECKLIST_ID - 1] = checklistId;
@@ -949,7 +951,7 @@ function getChecklistDialogHtml(caseId) {
     '  </div>' +
     '</div>' +
     '<script>' +
-    'var caseId = "' + caseId + '";' +
+    'var caseId = "' + String(caseId || '').replace(/['"\\<>&]/g, '') + '";' +
     'function toggleItem(checklistId, completed) {' +
     '  google.script.run' +
     '    .withSuccessHandler(function() { location.reload(); })' +
@@ -979,15 +981,48 @@ function getChecklistDialogHtml(caseId) {
     '      else { alert("Error: " + result.error); }' +
     '    })' +
     '    .withFailureHandler(function(e) { alert("Error: " + e.message); })' +
-    '    .createChecklistForSelectedCase();' +
+    '    .createChecklistForCaseId(caseId);' +
     '}' +
     '</script>' +
     '</body></html>';
 }
 
 /**
+ * Create checklist for a specific case by ID
+ * Called from the checklist dialog with the known caseId
+ * @param {string} caseId - The grievance/case ID
+ * @returns {Object} Result with success status
+ */
+function createChecklistForCaseId(caseId) {
+  if (!caseId) {
+    return { success: false, error: 'No case ID provided' };
+  }
+
+  // Look up the grievance to get action type and category
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) {
+    return { success: false, error: 'Grievance Log not found' };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var actionType = 'Grievance';
+  var issueCategory = '';
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) === String(caseId)) {
+      actionType = data[i][GRIEVANCE_COLS.ACTION_TYPE - 1] || 'Grievance';
+      issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '';
+      break;
+    }
+  }
+
+  return createChecklistFromTemplate(caseId, actionType, issueCategory);
+}
+
+/**
  * Create checklist for the currently selected case
- * Called from the checklist dialog
+ * Called from the checklist dialog (legacy - prefer createChecklistForCaseId)
  */
 function createChecklistForSelectedCase() {
   var sheet = SpreadsheetApp.getActiveSheet();
@@ -998,10 +1033,7 @@ function createChecklistForSelectedCase() {
   }
 
   var caseId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
-  var actionType = sheet.getRange(row, GRIEVANCE_COLS.ACTION_TYPE).getValue() || 'Grievance';
-  var issueCategory = sheet.getRange(row, GRIEVANCE_COLS.ISSUE_CATEGORY).getValue();
-
-  return createChecklistFromTemplate(caseId, actionType, issueCategory);
+  return createChecklistForCaseId(caseId);
 }
 
 // ============================================================================

@@ -2272,7 +2272,7 @@ function getInteractiveDashboardHtml() {
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
     // Debug mode and error handler wrapper
-    'var DEBUG_MODE=true;' +
+    'var DEBUG_MODE=false;' +
     'function log(msg,data){if(DEBUG_MODE){console.log("[Dashboard] "+msg,data||"")}}' +
     'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+escapeHtml(e.message))}' +
     'function safeRun(fn,fallback){try{fn()}catch(e){console.error("[Dashboard]",e);if(fallback)fallback(e)}}' +

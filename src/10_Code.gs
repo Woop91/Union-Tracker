@@ -1932,10 +1932,10 @@ function createSatisfactionSheet(ss) {
   sheet.setColumnWidth(dashStart + 3, 80);   // Type
   sheet.setColumnWidth(dashStart + 4, 200);  // Options
 
-  // Delete excess columns after CJ (column 88)
+  // Delete excess columns after CK (column 89) - preserve all verification columns including REVIEWER_NOTES
   var maxCols = sheet.getMaxColumns();
-  if (maxCols > 88) {
-    sheet.deleteColumns(89, maxCols - 88);
+  if (maxCols > 89) {
+    sheet.deleteColumns(90, maxCols - 89);
   }
 
   // Populate computed values (no formulas in visible sheet)

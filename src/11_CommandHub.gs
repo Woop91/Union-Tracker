@@ -98,7 +98,13 @@ function createCommandCenterMenu() {
  * Quick navigation to Executive Dashboard
  */
 function navigateToDashboard() {
-  navToDash();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.DASHBOARD);
+  if (sheet) {
+    ss.setActiveSheet(sheet);
+  } else {
+    SpreadsheetApp.getUi().alert('Dashboard sheet not found. Use the Dashboards menu for modal dashboards.');
+  }
 }
 
 /**
@@ -553,6 +559,12 @@ function NUKE_DATABASE() {
       try { ss.deleteSheet(functionChecklistSheet); } catch (e) { Logger.log('Could not delete Function Checklist: ' + e.message); }
     }
 
+    // Log the action BEFORE deleting audit sheet so it's recorded
+    logAuditEvent('NUCLEAR_WIPE', {
+      performedBy: Session.getActiveUser().getEmail(),
+      timestamp: new Date().toISOString()
+    });
+
     // Delete _Audit_Log hidden sheet
     var auditLogSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
     if (auditLogSheet) {
@@ -571,12 +583,6 @@ function NUKE_DATABASE() {
     // Clear demo tracking
     PropertiesService.getScriptProperties().deleteProperty('SEEDED_MEMBER_IDS');
     PropertiesService.getScriptProperties().deleteProperty('SEEDED_GRIEVANCE_IDS');
-
-    // Log the action
-    logAuditEvent('NUCLEAR_WIPE', {
-      performedBy: Session.getActiveUser().getEmail(),
-      timestamp: new Date().toISOString()
-    });
 
     ui.alert(
       '✅ Nuclear Operation Complete',
@@ -898,8 +904,7 @@ function showDiagnosticReport() {
     SHEETS.CONFIG,
     SHEETS.MEMBER_DIR,
     SHEETS.GRIEVANCE_LOG,
-    SHEETS.DASHBOARD,
-    SHEETS.INTERACTIVE
+    SHEETS.DASHBOARD
   ];
 
   report += '📋 SHEET STATUS:\n';

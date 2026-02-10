@@ -490,15 +490,17 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
   // Get the deadline for current step
   let deadline;
   switch (currentStep) {
-    case 1:
+    case 'Step I':
+    case 'Informal':
       deadline = grievance['Step 1 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
       break;
-    case 2:
+    case 'Step II':
       deadline = grievance['Step 2 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
       break;
-    case 3:
+    case 'Step III':
+    case 'Arbitration':
       deadline = grievance['Step 3 Due'] ||
                  grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
       break;
@@ -623,11 +625,11 @@ function sendDeadlineReminders(daysAhead) {
     deadlines.forEach(d => {
       const urgent = d.daysLeft <= 3 ? 'style="background: #fee2e2;"' : '';
       body += `<tr ${urgent}>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.grievanceId}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.memberName}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.step}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.date}</td>
-                 <td style="padding: 10px; border: 1px solid #ddd;">${d.daysLeft}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.grievanceId)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.memberName)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.step)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(d.date)}</td>
+                 <td style="padding: 10px; border: 1px solid #ddd;">${escapeHtml(String(d.daysLeft))}</td>
                </tr>`;
     });
 

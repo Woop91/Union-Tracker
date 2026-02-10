@@ -53,11 +53,9 @@ var MEMBER_PIN_COLS = {
  * @returns {string} 6-digit PIN
  */
 function generateMemberPIN() {
-  var digits = Utilities.getUuid().replace(/[^0-9]/g, '');
-  while (digits.length < PIN_CONFIG.PIN_LENGTH) {
-    digits += Utilities.getUuid().replace(/[^0-9]/g, '');
-  }
-  return digits.substring(0, PIN_CONFIG.PIN_LENGTH);
+  // Use Utilities.getUuid() for better randomness than Math.random()
+  var uuid = Utilities.getUuid().replace(/[^0-9]/g, '');
+  return uuid.substring(0, PIN_CONFIG.PIN_LENGTH).padEnd(PIN_CONFIG.PIN_LENGTH, '0');
 }
 
 /**
@@ -126,12 +124,9 @@ function verifyPIN(pin, memberId, storedHash) {
  * @private
  */
 function generateResetToken_() {
-  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous characters
-  var token = '';
-  for (var i = 0; i < 8; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  // Use Utilities.getUuid() for better randomness than Math.random()
+  var uuid = Utilities.getUuid().replace(/-/g, '').toUpperCase();
+  return uuid.substring(0, 8);
 }
 
 /**
@@ -1052,7 +1047,7 @@ function getMemberGrievances(sessionToken) {
         steward: data[i][GRIEVANCE_COLS.STEWARD - 1] || '',
         nextDeadline: formatDateMSS_(data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1]),
         resolution: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '',
-        outcome: data[i][GRIEVANCE_COLS.OUTCOME - 1] || ''
+        outcome: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || ''
       });
     }
   }
@@ -1493,8 +1488,10 @@ function getMemberSelfServicePortalHtml() {
     '}' +
 
     // Edit form
+    'var editFormRetries=0;' +
     'function loadEditForm(){' +
-    '  if(!profileData){loadProfile();setTimeout(loadEditForm,500);return}' +
+    '  if(!profileData){if(editFormRetries++>10){alert("Could not load profile data");return}loadProfile();setTimeout(loadEditForm,500);return}' +
+    '  editFormRetries=0;' +
     '  var p=profileData;' +
     '  var html="<div class=\\"section-title\\">Update Contact Information</div>";' +
     '  html+="<div id=\\"updateSuccess\\" class=\\"success\\" style=\\"display:none\\">Contact information updated!</div>";' +

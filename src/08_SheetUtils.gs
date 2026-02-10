@@ -173,7 +173,6 @@ function reorderSheetsToStandard(ss) {
     SHEETS.CONFIG_GUIDE,
     'Config',
     SHEETS.DASHBOARD,
-    SHEETS.INTERACTIVE,
     SHEETS.SATISFACTION
   ];
 
@@ -1382,15 +1381,35 @@ function createStewardLeaderboardChart_(sheet) {
   }
 
   var data = memberSheet.getDataRange().getValues();
+
+  // Build case counts from Grievance Log since MEMBER_COLS doesn't have TOTAL_CASES/WINS
+  var caseCounts = {};
+  var winCounts = {};
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+    var gData = grievanceSheet.getDataRange().getValues();
+    for (var g = 1; g < gData.length; g++) {
+      var stewardName = gData[g][GRIEVANCE_COLS.STEWARD - 1] || '';
+      if (stewardName) {
+        caseCounts[stewardName] = (caseCounts[stewardName] || 0) + 1;
+        var gStatus = gData[g][GRIEVANCE_COLS.STATUS - 1] || '';
+        if (gStatus === 'Won' || gStatus === 'Settled') {
+          winCounts[stewardName] = (winCounts[stewardName] || 0) + 1;
+        }
+      }
+    }
+  }
+
   var stewards = [];
 
-  // Find stewards and their case counts
+  // Find stewards and look up their case counts
   for (var i = 1; i < data.length; i++) {
     if (data[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+      var fullName = data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1];
       stewards.push({
-        name: data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1],
-        cases: data[i][MEMBER_COLS.TOTAL_CASES - 1] || 0,
-        wins: data[i][MEMBER_COLS.WINS - 1] || 0
+        name: fullName,
+        cases: caseCounts[fullName] || 0,
+        wins: winCounts[fullName] || 0
       });
     }
   }
@@ -1577,20 +1596,21 @@ function saveFormUrlsToConfig_silent(ss) {
     return;
   }
 
-  // Set headers in row 1
-  configSheet.getRange(1, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue('Grievance Form URL');
-  configSheet.getRange(1, CONFIG_COLS.CONTACT_FORM_URL).setValue('Contact Form URL');
-  configSheet.getRange(1, CONFIG_COLS.SATISFACTION_FORM_URL).setValue('Satisfaction Survey URL');
+  // Config layout: Row 1 = section headers, Row 2 = column headers, Row 3+ = data
+  // Set column headers in row 2
+  configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue('Grievance Form URL');
+  configSheet.getRange(2, CONFIG_COLS.CONTACT_FORM_URL).setValue('Contact Form URL');
+  configSheet.getRange(2, CONFIG_COLS.SATISFACTION_FORM_URL).setValue('Satisfaction Survey URL');
 
-  // Set form URLs in row 2
-  configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue(GRIEVANCE_FORM_CONFIG.FORM_URL);
-  configSheet.getRange(2, CONFIG_COLS.CONTACT_FORM_URL).setValue(CONTACT_FORM_CONFIG.FORM_URL);
-  configSheet.getRange(2, CONFIG_COLS.SATISFACTION_FORM_URL).setValue(SATISFACTION_FORM_CONFIG.FORM_URL);
+  // Set form URLs in row 3 (data row)
+  configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setValue(GRIEVANCE_FORM_CONFIG.FORM_URL);
+  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setValue(CONTACT_FORM_CONFIG.FORM_URL);
+  configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).setValue(SATISFACTION_FORM_CONFIG.FORM_URL);
 
   // Format as links
-  configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
-  configSheet.getRange(2, CONFIG_COLS.CONTACT_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
-  configSheet.getRange(2, CONFIG_COLS.SATISFACTION_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
+  configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).setFontColor('#1155cc').setFontLine('underline');
 }
 
 // ============================================================================
@@ -2103,7 +2123,7 @@ function onSatisfactionFormSubmit(e) {
     newRow[SATISFACTION_COLS.Q6_SATISFIED_REP - 1] = getFormValue_(responses, 'Satisfied with union representation');
     newRow[SATISFACTION_COLS.Q7_TRUST_UNION - 1] = getFormValue_(responses, 'Trust union to act in best interests');
     newRow[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1] = getFormValue_(responses, 'Feel more protected at work');
-    newRow[SATISFACTION_COLS.Q9_RECOMMEND - 1] = getFormValue_(responses, 'Voted during the last election');
+    newRow[SATISFACTION_COLS.Q9_RECOMMEND - 1] = getFormValue_(responses, 'Would recommend membership');
 
     // Steward Ratings 3A (Q10-17)
     newRow[SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1] = getFormValue_(responses, 'Responded in timely manner');
@@ -2454,7 +2474,7 @@ function checkDeadlinesAndNotify_() {
     var closedStatuses = ['Closed', 'Settled', 'Won', 'Denied', 'Withdrawn'];
     if (closedStatuses.indexOf(status) !== -1) continue;
 
-    if (daysToDeadline !== '' && daysToDeadline <= 3) {
+    if (daysToDeadline === 'Overdue' || (daysToDeadline !== '' && typeof daysToDeadline === 'number' && daysToDeadline <= 3)) {
       urgent.push({
         id: grievanceId,
         step: currentStep,
@@ -3102,7 +3122,15 @@ function onEditAudit(e) {
     actionType = 'Delete';
   }
 
-  logAuditEvent(sheetName, row, col, fieldName, oldValue, newValue, recordId, actionType);
+  logAuditEvent(actionType + '_' + sheetName.toUpperCase().replace(/\s+/g, '_'), {
+    sheet: sheetName,
+    row: row,
+    col: col,
+    field: fieldName,
+    oldValue: oldValue,
+    newValue: newValue,
+    recordId: recordId
+  });
 }
 
 /**

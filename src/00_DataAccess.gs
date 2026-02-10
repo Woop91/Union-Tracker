@@ -542,16 +542,16 @@ var TIME_CONSTANTS = {
     /** Days to file grievance after incident */
     FILING: 21,
 
-    /** Days for Step I response */
+    /** Days for Step I response (matches DEADLINE_RULES.STEP_1) */
     STEP1_RESPONSE: 7,
 
-    /** Days to appeal to Step II */
+    /** Days to appeal to Step II (matches DEADLINE_RULES.STEP_2) */
     STEP2_APPEAL: 7,
 
-    /** Days for Step II response */
+    /** Days for Step II response (matches DEADLINE_RULES.STEP_2) */
     STEP2_RESPONSE: 14,
 
-    /** Days to appeal to Step III */
+    /** Days to appeal to Step III (matches DEADLINE_RULES.STEP_3) */
     STEP3_APPEAL: 10,
 
     /** Days before deadline to show warning */

@@ -199,18 +199,15 @@ function escapeForFormula(input) {
   var str = String(input);
 
   // Remove or escape characters that could be used in formula injection
-  str = str
+  return str
     .replace(/'/g, "''")       // Escape single quotes
     .replace(/"/g, '""')       // Escape double quotes
     .replace(/\\/g, '\\\\')    // Escape backslashes
-    .replace(/[\r\n]/g, ' ');  // Replace newlines with spaces
-
-  // Only prefix formula-starting characters if they appear at the START of the string
-  if (/^[=+\-@]/.test(str)) {
-    str = "'" + str;
-  }
-
-  return str;
+    .replace(/[\r\n]/g, ' ')   // Replace newlines with spaces
+    .replace(/^[=+\-@]/, function(match) {
+      // Prefix formula-starting characters with a single quote only at start of string
+      return "'" + match;
+    });
 }
 
 /**
@@ -669,7 +666,7 @@ function getClientSideEscapeHtml() {
 function getClientSecurityScript() {
   return '<script>' +
     getClientSideEscapeHtml() +
-    "function safeAttr(t){return escapeHtml(t).replace(/&#x27;/g,\"'\");}" +
+    "function safeAttr(t){return escapeHtml(t);}" +
     '</script>';
 }
 

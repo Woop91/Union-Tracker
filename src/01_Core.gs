@@ -198,14 +198,8 @@ function sendCriticalErrorNotification_(errorInfo) {
  * @returns {string} Sanitized string
  */
 function sanitizeHtml(input) {
-  if (!input) return '';
-  return String(input)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
+  // Delegate to escapeHtml in 00_Security.gs for consistent escaping
+  return escapeHtml(input);
 }
 
 /**
@@ -414,8 +408,8 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 3,
-  patch: 9,
+  minor: 5,
+  patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -509,7 +503,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.3.9",
+  VERSION: "4.5.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -586,10 +580,10 @@ var DRIVE_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 3,
-  PATCH: 9,
-  BUILD: 'v4.3.9',
-  CURRENT: '4.3.9',
+  MINOR: 5,
+  PATCH: 0,
+  BUILD: 'v4.5.0',
+  CURRENT: '4.5.0',
   CODENAME: 'Code Audit & Cleanup'
 };
 
@@ -1142,7 +1136,7 @@ var MEMBER_COLUMNS = {
   // Quick Actions (0-indexed)
   QUICK_ACTIONS: 31,       // AF - Quick Actions
 
-  // PIN Hash (0-indexed)
+  // Member Authentication (0-indexed)
   PIN_HASH: 32             // AG - PIN Hash
 };
 
