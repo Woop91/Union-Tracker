@@ -1269,6 +1269,207 @@ function repairAllCheckboxes() {
  */
 
 // ============================================================================
+// ENGAGEMENT TRACKING SYNC FUNCTIONS
+// ============================================================================
+
+/**
+ * Syncs volunteer hours from Volunteer Hours sheet to Member Directory
+ * Calculates total hours for each member and updates column S (VOLUNTEER_HOURS)
+ * @returns {void}
+ */
+function syncVolunteerHoursToMemberDirectory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var volunteerSheet = ss.getSheetByName(SHEETS.VOLUNTEER_HOURS);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!volunteerSheet || !memberSheet) {
+    Logger.log('Required sheets not found for volunteer hours sync');
+    return;
+  }
+
+  // Get volunteer hours data
+  var volunteerData = volunteerSheet.getDataRange().getValues();
+  if (volunteerData.length < 3) {
+    // No data rows (only headers row 1-2)
+    Logger.log('No volunteer hours data to sync');
+    return;
+  }
+
+  // Build lookup map: memberId -> totalHours
+  var hoursLookup = {};
+
+  for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
+    var row = volunteerData[i];
+    var memberId = row[1];  // Column B - Member ID
+    var hours = row[5];     // Column F - Hours
+
+    if (!memberId) continue;
+
+    // Initialize if doesn't exist
+    if (!hoursLookup[memberId]) {
+      hoursLookup[memberId] = 0;
+    }
+
+    // Add hours (handle both number and string)
+    var hoursNum = parseFloat(hours) || 0;
+    hoursLookup[memberId] += hoursNum;
+  }
+
+  // Get member data
+  var memberData = memberSheet.getDataRange().getValues();
+  if (memberData.length < 2) return;
+
+  // Update column S (VOLUNTEER_HOURS)
+  var updates = [];
+  for (var j = 1; j < memberData.length; j++) {
+    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    var totalHours = hoursLookup[memberId] || 0;
+    updates.push([totalHours]);
+  }
+
+  if (updates.length > 0) {
+    memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, updates.length, 1).setValues(updates);
+  }
+
+  Logger.log('Synced volunteer hours to ' + updates.length + ' members');
+}
+
+/**
+ * Syncs meeting attendance from Meeting Attendance sheet to Member Directory
+ * Updates Last Virtual Mtg (column P) and Last In-Person Mtg (column Q)
+ * @returns {void}
+ */
+function syncMeetingAttendanceToMemberDirectory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var attendanceSheet = ss.getSheetByName(SHEETS.MEETING_ATTENDANCE);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!attendanceSheet || !memberSheet) {
+    Logger.log('Required sheets not found for meeting attendance sync');
+    return;
+  }
+
+  // Get attendance data
+  var attendanceData = attendanceSheet.getDataRange().getValues();
+  if (attendanceData.length < 3) {
+    // No data rows (only headers row 1-2)
+    Logger.log('No meeting attendance data to sync');
+    return;
+  }
+
+  // Build lookup map: memberId -> {lastVirtual, lastInPerson}
+  var attendanceLookup = {};
+
+  for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
+    var row = attendanceData[i];
+    var meetingDate = row[1];     // Column B - Meeting Date
+    var meetingType = row[2];     // Column C - Meeting Type
+    var memberId = row[4];        // Column E - Member ID
+    var attended = row[6];        // Column G - Attended (checkbox)
+
+    if (!memberId || !attended || !meetingDate) continue;
+
+    // Initialize if doesn't exist
+    if (!attendanceLookup[memberId]) {
+      attendanceLookup[memberId] = {
+        lastVirtual: null,
+        lastInPerson: null
+      };
+    }
+
+    // Convert to date if it's a string
+    var dateValue = meetingDate instanceof Date ? meetingDate : new Date(meetingDate);
+
+    // Update last meeting date by type
+    if (meetingType === 'Virtual' || meetingType === 'virtual') {
+      if (!attendanceLookup[memberId].lastVirtual || dateValue > attendanceLookup[memberId].lastVirtual) {
+        attendanceLookup[memberId].lastVirtual = dateValue;
+      }
+    } else if (meetingType === 'In-Person' || meetingType === 'in-person') {
+      if (!attendanceLookup[memberId].lastInPerson || dateValue > attendanceLookup[memberId].lastInPerson) {
+        attendanceLookup[memberId].lastInPerson = dateValue;
+      }
+    }
+  }
+
+  // Get member data
+  var memberData = memberSheet.getDataRange().getValues();
+  if (memberData.length < 2) return;
+
+  // Update columns P (LAST_VIRTUAL_MTG) and Q (LAST_INPERSON_MTG)
+  var updates = [];
+  for (var j = 1; j < memberData.length; j++) {
+    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    var memberAttendance = attendanceLookup[memberId] || {lastVirtual: '', lastInPerson: ''};
+    updates.push([
+      memberAttendance.lastVirtual || '',
+      memberAttendance.lastInPerson || ''
+    ]);
+  }
+
+  if (updates.length > 0) {
+    memberSheet.getRange(2, MEMBER_COLS.LAST_VIRTUAL_MTG, updates.length, 2).setValues(updates);
+  }
+
+  Logger.log('Synced meeting attendance to ' + updates.length + ' members');
+}
+
+/**
+ * Unified sync function for all engagement tracking
+ * Syncs volunteer hours and meeting attendance to Member Directory
+ * Call this function after edits to Volunteer Hours or Meeting Attendance sheets
+ * @returns {void}
+ */
+function syncEngagementToMemberDirectory() {
+  syncVolunteerHoursToMemberDirectory();
+  syncMeetingAttendanceToMemberDirectory();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Engagement data synced successfully!', '✅ Sync Complete', 3);
+}
+
+// ============================================================================
+// DEPRECATED SHEET CLEANUP
+// ============================================================================
+
+/**
+ * Removes the deprecated Dashboard sheet and provides migration info
+ * The Dashboard sheet was deprecated in v4.3.2 in favor of modal dashboards
+ * @returns {void}
+ */
+function removeDeprecatedDashboard() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var dashSheet = ss.getSheetByName(SHEETS.DASHBOARD);
+
+  if (!dashSheet) {
+    ui.alert('✅ Clean',
+      'No deprecated Dashboard sheet found.\n\n' +
+      'Your spreadsheet is already using the modern modal dashboard system.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var response = ui.alert(
+    '🗑️ Remove Deprecated Dashboard Sheet',
+    'The "💼 Dashboard" sheet is deprecated as of v4.3.2.\n\n' +
+    'Modern dashboards are now modal (popup) based:\n' +
+    '• Union Hub > Dashboards > Interactive Dashboard\n' +
+    '• Union Hub > Dashboards > Executive Command\n' +
+    '• Union Hub > Dashboards > Member Dashboard\n' +
+    '• Union Hub > Dashboards > Steward Performance\n\n' +
+    'Delete the deprecated sheet?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response === ui.Button.YES) {
+    ss.deleteSheet(dashSheet);
+    ss.toast('Deprecated Dashboard sheet removed', '✅ Cleanup Complete', 3);
+    Logger.log('Removed deprecated Dashboard sheet');
+  } else {
+    ss.toast('Deprecated sheet retained', 'ℹ️ Info', 3);
+  }
+}
+
+// ============================================================================
 // FORMULA HELPERS
 // ============================================================================
 
@@ -1288,6 +1489,7 @@ function repairAllCheckboxes() {
  * Gets member list for dropdowns
  * @return {Array} Array of member objects with id, name, department
  */
+
 
 // ============================================================================
 // SEARCH FUNCTIONS (Used by UIService)

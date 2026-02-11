@@ -141,6 +141,28 @@ function onEdit(e) {
       }
     }
 
+    // Volunteer Hours edits - auto-sync to Member Directory
+    if (sheetName === SHEETS.VOLUNTEER_HOURS) {
+      if (typeof syncVolunteerHoursToMemberDirectory === 'function') {
+        try {
+          syncVolunteerHoursToMemberDirectory();
+        } catch (syncError) {
+          Logger.log('Volunteer Hours sync error: ' + syncError.message);
+        }
+      }
+    }
+
+    // Meeting Attendance edits - auto-sync to Member Directory
+    if (sheetName === SHEETS.MEETING_ATTENDANCE) {
+      if (typeof syncMeetingAttendanceToMemberDirectory === 'function') {
+        try {
+          syncMeetingAttendanceToMemberDirectory();
+        } catch (syncError) {
+          Logger.log('Meeting Attendance sync error: ' + syncError.message);
+        }
+      }
+    }
+
     // ========================================
     // 4. Additional Audit Logging (optional)
     // ========================================
