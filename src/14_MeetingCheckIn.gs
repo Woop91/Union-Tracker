@@ -96,7 +96,7 @@ function generateMeetingId_(sheet, dateStr) {
   var maxNum = 0;
 
   for (var i = 1; i < data.length; i++) {
-    var id = String(data[i][0] || '');
+    var id = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
     if (id.indexOf(prefix) === 0) {
       var num = parseInt(id.substring(prefix.length), 10);
       if (!isNaN(num) && num > maxNum) {
@@ -396,7 +396,7 @@ function cleanupExpiredMeetings() {
     sheet.deleteRow(rowsToDelete[j]);
   }
 
-  if (rowsToDelete.length > 0) {
+  if (rowsToDelete.length > 0 && typeof logAuditEvent === 'function') {
     logAuditEvent('MEETING_CLEANUP', {
       rowsRemoved: rowsToDelete.length,
       cutoffDate: cutoff.toISOString()
