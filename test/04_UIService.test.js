@@ -1,5 +1,5 @@
 /**
- * Tests for 04_UIService.gs
+ * Tests for 04_UIService (split into 04a-04e modules)
  *
  * Covers: parseCSVLine_, mapImportColumns_, getCommonStyles,
  * getQuickCaptureNotes, saveQuickCaptureNotes, clearQuickCaptureNotes,
@@ -17,7 +17,11 @@ loadSources([
   '01_Core.gs',
   '02_DataManagers.gs',
   '03_UIComponents.gs',
-  '04_UIService.gs'
+  '04a_UIMenus.gs',
+  '04b_AccessibilityFeatures.gs',
+  '04c_InteractiveDashboard.gs',
+  '04d_ExecutiveDashboard.gs',
+  '04e_PublicDashboard.gs'
 ]);
 
 // ============================================================================

@@ -1,5 +1,5 @@
 /**
- * Tests for 10_Code.gs
+ * Tests for 10_Code (split into 10a-10d modules)
  *
  * Covers form config constants, sanitizeFolderName_, padRight,
  * getExistingGrievanceIds_, getCurrentStewardInfo_,
@@ -17,8 +17,14 @@ loadSources([
   '01_Core.gs',
   '02_DataManagers.gs',
   '03_UIComponents.gs',
-  '08_SheetUtils.gs',
-  '10_Code.gs'
+  '08a_SheetSetup.gs',
+  '08b_SearchAndCharts.gs',
+  '08c_FormsAndNotifications.gs',
+  '08d_AuditAndFormulas.gs',
+  '10a_SheetCreation.gs',
+  '10b_SurveyDocSheets.gs',
+  '10c_FormHandlers.gs',
+  '10d_SyncAndMaintenance.gs'
 ]);
 
 // ============================================================================
