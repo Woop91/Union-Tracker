@@ -33258,7 +33258,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10_Code.gs (5409 lines)
+// SOURCE: 10_Code.gs (5439 lines)
 // ============================================================================
 
 /**
@@ -33444,6 +33444,9 @@ function createConfigSheet(ss) {
 
   // Apply full Config sheet styling
   applyConfigSheetStyling(sheet);
+
+  // Set tab color
+  sheet.setTabColor(COLORS.PRIMARY_PURPLE);
 }
 
 /**
@@ -33608,7 +33611,7 @@ function createConfigGuideSheet(ss) {
   }
 
   // Define guide colors
-  var headerBg = '#4A90D9';      // Blue header
+  var headerBg = COLORS.STATUS_BLUE;       // Blue header
   var sectionBg = '#E8F4FD';     // Light blue section
   var tipBg = '#FFF9E6';         // Light yellow for tips
   var warningBg = '#FEE2E2';     // Light red for warnings
@@ -33664,7 +33667,7 @@ function createConfigGuideSheet(ss) {
 
   for (var i = 0; i < howToSteps.length; i++) {
     row++;
-    sheet.getRange(row, 1).setValue(howToSteps[i][0]).setFontWeight('bold').setFontColor('#4A90D9');
+    sheet.getRange(row, 1).setValue(howToSteps[i][0]).setFontWeight('bold').setFontColor(COLORS.STATUS_BLUE);
     sheet.getRange(row, 2, 1, 5).merge().setValue(howToSteps[i][1]).setFontColor(textColor).setWrap(true);
     sheet.setRowHeight(row, 30);
   }
@@ -33701,7 +33704,7 @@ function createConfigGuideSheet(ss) {
 
   for (var j = 0; j < columnData.length; j++) {
     row++;
-    sheet.getRange(row, 1).setValue(columnData[j][0]).setFontColor('#4A90D9').setFontWeight('bold').setHorizontalAlignment('center');
+    sheet.getRange(row, 1).setValue(columnData[j][0]).setFontColor(COLORS.STATUS_BLUE).setFontWeight('bold').setHorizontalAlignment('center');
     sheet.getRange(row, 2).setValue(columnData[j][1]).setFontColor(textColor);
     sheet.getRange(row, 3, 1, 2).merge().setValue(columnData[j][2]).setFontColor('#6B7280');
     sheet.getRange(row, 5, 1, 2).merge().setValue(columnData[j][3]).setFontColor('#6B7280').setFontStyle('italic');
@@ -33782,6 +33785,9 @@ function createConfigGuideSheet(ss) {
 
   // Freeze header
   sheet.setFrozenRows(1);
+
+  // Set tab color
+  sheet.setTabColor(COLORS.STATUS_BLUE);
 
   return sheet;
 }
@@ -33947,6 +33953,9 @@ function createMemberDirectory(ss) {
   // Contact Steward, Contact Notes, Has Open Grievance?, Grievance Status, Days to Deadline
   var filterRange = sheet.getRange(1, 1, 5000, headers.length);
   filterRange.createFilter();
+
+  // Set tab color
+  sheet.setTabColor(COLORS.UNION_GREEN);
 }
 
 /**
@@ -34119,6 +34128,9 @@ function createGrievanceLog(ss) {
     completedRule, step3ProgressRule, step2ProgressRule, step1ProgressRule, notReachedRule
   );
   sheet.setConditionalFormatRules(rules);
+
+  // Set tab color
+  sheet.setTabColor(COLORS.SOLIDARITY_RED);
 }
 
 /**
@@ -34623,6 +34635,9 @@ function createDashboard(ss) {
 
   // Populate all values using JavaScript-computed metrics (no formulas in visible sheet)
   syncDashboardValues();
+
+  // Set tab color
+  sheet.setTabColor(COLORS.SECTION_TIMELINE);
 }
 
 /**
@@ -35205,6 +35220,9 @@ function createSatisfactionSheet(ss) {
   syncSatisfactionValues();
 
   Logger.log('Member Satisfaction sheet created with 68-question survey, dashboard, and chart data');
+
+  // Set tab color
+  sheet.setTabColor(COLORS.UNION_GREEN);
 }
 
 // ============================================================================
@@ -35393,6 +35411,9 @@ function createFeedbackSheet(ss) {
   syncFeedbackValues();
 
   Logger.log('Feedback & Development sheet created');
+
+  // Set tab color
+  sheet.setTabColor(COLORS.CHART_YELLOW);
 }
 
 /**
@@ -35796,8 +35817,8 @@ function createFunctionChecklistSheet_() {
   // Format header
   sheet.getRange(1, 1, 1, 7)
     .setFontWeight('bold')
-    .setBackground(COLORS.PRIMARY_PURPLE || '#7C3AED')
-    .setFontColor(COLORS.WHITE || '#FFFFFF')
+    .setBackground(COLORS.PRIMARY_PURPLE)
+    .setFontColor(COLORS.WHITE)
     .setHorizontalAlignment('center');
 
   // Add checkboxes
@@ -35838,6 +35859,9 @@ function createFunctionChecklistSheet_() {
     sheet.deleteColumns(8, maxCols - 7);
   }
 
+  // Set tab color
+  sheet.setTabColor(COLORS.ACCENT_ORANGE);
+
   return sheet;
 }
 
@@ -35856,10 +35880,10 @@ function createGettingStartedSheet(ss) {
   }
 
   // Define colors
-  var headerBg = '#7C3AED';       // Purple header
-  var sectionBg = '#F3E8FF';      // Light purple section
-  var stepBg = '#ECFDF5';         // Light green for steps
-  var tipBg = '#FEF3C7';          // Light yellow for tips
+  var headerBg = COLORS.PRIMARY_PURPLE;    // Purple header
+  var sectionBg = '#F3E8FF';               // Light purple section
+  var stepBg = COLORS.ROW_ALT_GREEN;       // Light green for steps
+  var tipBg = COLORS.GRADIENT_MID_LOW;     // Light yellow for tips
   var textColor = '#1F2937';
   var white = '#FFFFFF';
 
@@ -35890,7 +35914,7 @@ function createGettingStartedSheet(ss) {
     .setBackground(sectionBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#7C3AED');
+    .setFontColor(COLORS.PRIMARY_PURPLE);
   sheet.setRowHeight(row, 35);
 
   var setupSteps = [
@@ -35903,7 +35927,7 @@ function createGettingStartedSheet(ss) {
 
   for (var i = 0; i < setupSteps.length; i++) {
     row++;
-    sheet.getRange(row, 1).setValue(setupSteps[i][0]).setFontWeight('bold').setFontColor('#7C3AED').setHorizontalAlignment('center');
+    sheet.getRange(row, 1).setValue(setupSteps[i][0]).setFontWeight('bold').setFontColor(COLORS.PRIMARY_PURPLE).setHorizontalAlignment('center');
     sheet.getRange(row, 2, 1, 5).merge().setValue(setupSteps[i][1]).setFontColor(textColor).setWrap(true);
     sheet.getRange(row, 1, 1, 6).setBackground(stepBg);
   }
@@ -35915,7 +35939,7 @@ function createGettingStartedSheet(ss) {
     .setBackground(sectionBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#7C3AED');
+    .setFontColor(COLORS.PRIMARY_PURPLE);
   sheet.setRowHeight(row, 35);
 
   var memberSteps = [
@@ -35929,7 +35953,7 @@ function createGettingStartedSheet(ss) {
 
   for (var j = 0; j < memberSteps.length; j++) {
     row++;
-    sheet.getRange(row, 1).setValue(memberSteps[j][0]).setFontWeight('bold').setFontColor('#7C3AED').setHorizontalAlignment('center');
+    sheet.getRange(row, 1).setValue(memberSteps[j][0]).setFontWeight('bold').setFontColor(COLORS.PRIMARY_PURPLE).setHorizontalAlignment('center');
     sheet.getRange(row, 2, 1, 5).merge().setValue(memberSteps[j][1]).setFontColor(textColor).setWrap(true);
     if (memberSteps[j][1].indexOf('TIP:') === 0) {
       sheet.getRange(row, 1, 1, 6).setBackground(tipBg);
@@ -35945,7 +35969,7 @@ function createGettingStartedSheet(ss) {
     .setBackground(sectionBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#7C3AED');
+    .setFontColor(COLORS.PRIMARY_PURPLE);
   sheet.setRowHeight(row, 35);
 
   var grievanceSteps = [
@@ -35961,7 +35985,7 @@ function createGettingStartedSheet(ss) {
 
   for (var k = 0; k < grievanceSteps.length; k++) {
     row++;
-    sheet.getRange(row, 1).setValue(grievanceSteps[k][0]).setFontWeight('bold').setFontColor('#7C3AED').setHorizontalAlignment('center');
+    sheet.getRange(row, 1).setValue(grievanceSteps[k][0]).setFontWeight('bold').setFontColor(COLORS.PRIMARY_PURPLE).setHorizontalAlignment('center');
     sheet.getRange(row, 2, 1, 5).merge().setValue(grievanceSteps[k][1]).setFontColor(textColor).setWrap(true);
     if (grievanceSteps[k][1].indexOf('TIP:') === 0) {
       sheet.getRange(row, 1, 1, 6).setBackground(tipBg);
@@ -35977,7 +36001,7 @@ function createGettingStartedSheet(ss) {
     .setBackground(sectionBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#7C3AED');
+    .setFontColor(COLORS.PRIMARY_PURPLE);
   sheet.setRowHeight(row, 35);
 
   var dashboardInfo = [
@@ -35992,7 +36016,7 @@ function createGettingStartedSheet(ss) {
 
   for (var m = 0; m < dashboardInfo.length; m++) {
     row++;
-    sheet.getRange(row, 1, 1, 2).merge().setValue(dashboardInfo[m][0]).setFontColor('#7C3AED').setFontWeight('bold');
+    sheet.getRange(row, 1, 1, 2).merge().setValue(dashboardInfo[m][0]).setFontColor(COLORS.PRIMARY_PURPLE).setFontWeight('bold');
     sheet.getRange(row, 3, 1, 4).merge().setValue(dashboardInfo[m][1]).setFontColor(textColor).setWrap(true);
   }
 
@@ -36003,7 +36027,7 @@ function createGettingStartedSheet(ss) {
     .setBackground(sectionBg)
     .setFontWeight('bold')
     .setFontSize(14)
-    .setFontColor('#7C3AED');
+    .setFontColor(COLORS.PRIMARY_PURPLE);
   sheet.setRowHeight(row, 35);
 
   var menuInfo = [
@@ -36020,7 +36044,7 @@ function createGettingStartedSheet(ss) {
 
   for (var n = 0; n < menuInfo.length; n++) {
     row++;
-    sheet.getRange(row, 1, 1, 2).merge().setValue(menuInfo[n][0]).setFontColor('#7C3AED').setFontWeight('bold');
+    sheet.getRange(row, 1, 1, 2).merge().setValue(menuInfo[n][0]).setFontColor(COLORS.PRIMARY_PURPLE).setFontWeight('bold');
     sheet.getRange(row, 3, 1, 4).merge().setValue(menuInfo[n][1]).setFontColor(textColor);
   }
 
@@ -36070,6 +36094,9 @@ function createGettingStartedSheet(ss) {
     sheet.deleteColumns(7, maxCols - 6);
   }
 
+  // Set tab color
+  sheet.setTabColor(COLORS.PRIMARY_PURPLE);
+
   return sheet;
 }
 
@@ -36088,12 +36115,12 @@ function createFAQSheet(ss) {
   }
 
   // Define colors
-  var headerBg = '#059669';       // Green header
-  var questionBg = '#ECFDF5';     // Light green for questions
+  var headerBg = COLORS.UNION_GREEN;       // Green header
+  var questionBg = COLORS.ROW_ALT_GREEN;  // Light green for questions
   var answerBg = '#FFFFFF';       // White for answers
-  var categoryBg = '#D1FAE5';     // Medium green for categories
-  var textColor = '#1F2937';
-  var white = '#FFFFFF';
+  var categoryBg = COLORS.GRADIENT_LOW;   // Medium green for categories
+  var textColor = COLORS.TEXT_DARK;
+  var white = COLORS.WHITE;
 
   var row = 1;
 
@@ -36299,6 +36326,9 @@ function createFAQSheet(ss) {
   // Freeze header
   sheet.setFrozenRows(1);
 
+  // Set tab color
+  sheet.setTabColor(COLORS.UNION_GREEN);
+
   return sheet;
 }
 
@@ -36494,8 +36524,8 @@ function createFeaturesReferenceSheet(ss) {
   var dataRange = sheet.getRange(headerRow, 1, features.length + 1, 5);
   dataRange.createFilter();
 
-  // Set tab color to blue (documentation)
-  sheet.setTabColor('#3B82F6');
+  // Set tab color
+  sheet.setTabColor(COLORS.STATUS_BLUE);
 
   return sheet;
 }
@@ -44118,7 +44148,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4015 lines)
+// SOURCE: 12_Features.gs (4018 lines)
 // ============================================================================
 
 /**
@@ -44229,6 +44259,9 @@ function createChecklistSheet_(ss) {
 
   // No protection - sheet is fully dynamic like all other tabs
   // Self-healing formulas in _Checklist_Calc handle calculations
+
+  // Set tab color
+  sheet.setTabColor(COLORS.CHART_YELLOW);
 
   return sheet;
 }

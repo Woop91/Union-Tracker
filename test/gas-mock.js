@@ -101,6 +101,7 @@ function createMockSheet(name, data) {
     showSheet: jest.fn(),
     setFrozenRows: jest.fn(),
     setColumnWidth: jest.fn(),
+    setTabColor: jest.fn(),
     clear: jest.fn()
   };
 }

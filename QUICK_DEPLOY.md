@@ -1,14 +1,14 @@
 # Quick Deploy - Union Steward Dashboard
 
-## 11-File Modular Deployment
+## 16-File Modular Deployment
 
-Deploy the **Union Steward Dashboard** using the **11 source files** in the `src/` folder.
+Deploy the **Union Steward Dashboard** using the **16 source files** in the `src/` folder.
 
 ---
 
 ## What You Get
 
-- 11 modular source files for easy maintenance
+- 16 modular source files for easy maintenance
 - 11 visible sheets + 6 hidden calculation sheets
 - Demo data seeding (members + grievances)
 - 12-section Dashboard with real-time metrics
