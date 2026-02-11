@@ -348,7 +348,7 @@ const BUILD_ORDER = [
 
 ### Jest Test Suite (Primary)
 
-The project uses **Jest v29.7.0** as its primary test framework, with 871 tests across 17 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
+The project uses **Jest v29.7.0** as its primary test framework, with 950 tests across 18 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
 
 #### Running Tests
 

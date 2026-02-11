@@ -3,7 +3,7 @@
  * 509 DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
- * Version: 4.2.0
+ * Version: 4.5.1
  * Build Date: 2026-02-11
  *
  * This file is auto-generated from the src/ directory.

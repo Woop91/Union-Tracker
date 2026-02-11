@@ -90,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 4.5.1 | 2026-02-10 | Fixed GRIEVANCE_OUTCOMES/generateGrievanceId bugs, sheet tab colors, 871 Jest tests |
+| 4.5.1 | 2026-02-11 | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |
 | 4.5.0 | 2026-02-01 | Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files |
 | 4.4.1 | 2026-01-31 | Build system |
 | 4.4.0 | 2026-01-30 | Initial release |

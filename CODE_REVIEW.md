@@ -408,7 +408,7 @@ Six source files exceed 3,500 lines and should be split into focused, single-res
 
 ## Positive Observations
 
-- **Test coverage is solid:** 871 tests across 17 suites all passing
+- **Test coverage is solid:** 950 tests across 18 suites all passing
 - **ESLint passes clean** with no warnings
 - **Security fundamentals are in place:** PIN hashing with SHA-256 + salt, rate limiting, session tokens, audit logging, IDOR protection on web app endpoints
 - **PII protection is thoughtful:** The `safetyValveScrub()` function, anonymized Looker sheets, and PII-free exports demonstrate privacy awareness
