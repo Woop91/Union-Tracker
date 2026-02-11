@@ -24802,7 +24802,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (626 lines)
+// SOURCE: 08a_SheetSetup.gs (630 lines)
 // ============================================================================
 
 /**
@@ -24854,6 +24854,7 @@ function CREATE_509_DASHBOARD() {
       '• 💡 Feedback & Development (Bug/feature tracking)\n' +
       '• 🤝 Volunteer Hours (track volunteer activities)\n' +
       '• 📅 Meeting Attendance (track meeting participation)\n' +
+      '• 📝 Meeting Check-In Log (email+PIN check-in)\n' +
       '• ✅ Function Checklist (function reference)\n' +
       '• 📋 Features Reference (complete feature list)\n' +
       '• 📚 Getting Started (setup instructions)\n' +
@@ -24921,6 +24922,9 @@ function CREATE_509_DASHBOARD() {
     createMeetingAttendanceSheet(ss);
     ss.toast('Created Meeting Attendance tracking', '🏗️ Progress', 2);
 
+    createMeetingCheckInLogSheet(ss);
+    ss.toast('Created Meeting Check-In Log', '🏗️ Progress', 2);
+
     saveFormUrlsToConfig_silent(ss);
     ss.toast('Saved form URLs to Config', '🏗️ Progress', 2);
 
@@ -24933,11 +24937,11 @@ function CREATE_509_DASHBOARD() {
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
-        '13 sheets created:\n' +
+        '14 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
-        '• 🤝 Volunteer Hours, 📅 Meeting Attendance (engagement tracking)\n' +
+        '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
@@ -39322,7 +39326,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (1909 lines)
+// SOURCE: 10_Main.gs (1918 lines)
 // ============================================================================
 
 /**
@@ -39945,10 +39949,19 @@ function dailyTrigger() {
       sendDeadlineReminders(settings.reminderDays);
     }
 
+    // Cleanup expired meeting check-in records (>90 days old)
+    var meetingRowsCleaned = 0;
+    try {
+      meetingRowsCleaned = cleanupExpiredMeetings();
+    } catch (e) {
+      console.error('Meeting cleanup error:', e);
+    }
+
     // Log the trigger run
     logAuditEvent('DAILY_TRIGGER', {
       timestamp: new Date().toISOString(),
-      remindersSent: settings.emailReminders
+      remindersSent: settings.emailReminders,
+      meetingRowsCleaned: meetingRowsCleaned
     });
 
   } catch (error) {
@@ -50388,7 +50401,7 @@ function showSelfServicePortalUrl() {
 
 
 // ============================================================================
-// SOURCE: 14_MeetingCheckIn.gs (657 lines)
+// SOURCE: 14_MeetingCheckIn.gs (702 lines)
 // ============================================================================
 
 /**
@@ -50752,6 +50765,51 @@ function getMeetingAttendees(meetingId) {
   }
 
   return { success: true, attendees: attendees, count: attendees.length };
+}
+
+// ============================================================================
+// CLEANUP
+// ============================================================================
+
+/**
+ * Archive expired meeting records (meetings older than 90 days)
+ * Called from dailyTrigger to keep the check-in log manageable.
+ * Rows are deleted (not moved) since the data is attendance-only.
+ * @returns {number} Number of rows removed
+ */
+function cleanupExpiredMeetings() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  cutoff.setHours(0, 0, 0, 0);
+
+  var data = sheet.getDataRange().getValues();
+  var rowsToDelete = [];
+
+  for (var i = data.length - 1; i >= 1; i--) {
+    var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+    if (meetingDate instanceof Date && meetingDate < cutoff) {
+      rowsToDelete.push(i + 1); // 1-indexed sheet row
+    }
+  }
+
+  // Delete bottom-up to preserve row indices
+  for (var j = 0; j < rowsToDelete.length; j++) {
+    sheet.deleteRow(rowsToDelete[j]);
+  }
+
+  if (rowsToDelete.length > 0) {
+    logAuditEvent('MEETING_CLEANUP', {
+      rowsRemoved: rowsToDelete.length,
+      cutoffDate: cutoff.toISOString()
+    });
+  }
+
+  return rowsToDelete.length;
 }
 
 // ============================================================================

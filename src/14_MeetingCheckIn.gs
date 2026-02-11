@@ -362,6 +362,51 @@ function getMeetingAttendees(meetingId) {
 }
 
 // ============================================================================
+// CLEANUP
+// ============================================================================
+
+/**
+ * Archive expired meeting records (meetings older than 90 days)
+ * Called from dailyTrigger to keep the check-in log manageable.
+ * Rows are deleted (not moved) since the data is attendance-only.
+ * @returns {number} Number of rows removed
+ */
+function cleanupExpiredMeetings() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  cutoff.setHours(0, 0, 0, 0);
+
+  var data = sheet.getDataRange().getValues();
+  var rowsToDelete = [];
+
+  for (var i = data.length - 1; i >= 1; i--) {
+    var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+    if (meetingDate instanceof Date && meetingDate < cutoff) {
+      rowsToDelete.push(i + 1); // 1-indexed sheet row
+    }
+  }
+
+  // Delete bottom-up to preserve row indices
+  for (var j = 0; j < rowsToDelete.length; j++) {
+    sheet.deleteRow(rowsToDelete[j]);
+  }
+
+  if (rowsToDelete.length > 0) {
+    logAuditEvent('MEETING_CLEANUP', {
+      rowsRemoved: rowsToDelete.length,
+      cutoffDate: cutoff.toISOString()
+    });
+  }
+
+  return rowsToDelete.length;
+}
+
+// ============================================================================
 // HTML TEMPLATES
 // ============================================================================
 
