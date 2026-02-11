@@ -3,7 +3,7 @@
  * 509 DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
- * Version: 4.2.0
+ * Version: 4.5.1
  * Build Date: 2026-02-11
  *
  * This file is auto-generated from the src/ directory.
@@ -1827,7 +1827,7 @@ function runStartupValidation() {
 var API_VERSION = {
   major: 4,
   minor: 5,
-  patch: 0,
+  patch: 1,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -1921,7 +1921,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.5.0",
+  VERSION: "4.5.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -13605,7 +13605,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 04e_PublicDashboard.gs (2484 lines)
+// SOURCE: 04e_PublicDashboard.gs (2488 lines)
 // ============================================================================
 
 // ============================================================================
@@ -13871,13 +13871,15 @@ function getUnifiedDashboardData(includePII) {
       if (!memberId) continue;
 
       data.totalMembers++;
-      var name = memberData[m][MEMBER_COLS.FULL_NAME - 1] || 'Unknown';
+      var firstName = memberData[m][MEMBER_COLS.FIRST_NAME - 1] || '';
+      var lastName = memberData[m][MEMBER_COLS.LAST_NAME - 1] || '';
+      var name = (firstName + ' ' + lastName).trim() || 'Unknown';
       var email = memberData[m][MEMBER_COLS.EMAIL - 1] || '';
       var phone = memberData[m][MEMBER_COLS.PHONE - 1] || '';
       var location = memberData[m][MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
       var unit = memberData[m][MEMBER_COLS.UNIT - 1] || 'Unknown';
       var isSteward = memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes';
-      var lastUpdated = memberData[m][MEMBER_COLS.LAST_UPDATED - 1];
+      var lastUpdated = memberData[m][MEMBER_COLS.RECENT_CONTACT_DATE - 1];
 
       // Engagement metrics from columns Q-W
       var lastVirtualMtg = memberData[m][MEMBER_COLS.LAST_VIRTUAL_MTG - 1];
@@ -13888,13 +13890,13 @@ function getUnifiedDashboardData(includePII) {
       var interestChapter = memberData[m][MEMBER_COLS.INTEREST_CHAPTER - 1];
       var interestAllied = memberData[m][MEMBER_COLS.INTEREST_ALLIED - 1];
 
-      // Track email open rates (if numeric)
-      if (openRate && !isNaN(parseFloat(openRate))) {
+      // Track email open rates (if numeric, including 0)
+      if ((openRate !== '' && openRate !== null && openRate !== undefined) && !isNaN(parseFloat(openRate))) {
         openRates.push(parseFloat(openRate));
       }
 
-      // Track volunteer hours
-      if (volunteerHours && !isNaN(parseFloat(volunteerHours))) {
+      // Track volunteer hours (if numeric, including 0)
+      if ((volunteerHours !== '' && volunteerHours !== null && volunteerHours !== undefined) && !isNaN(parseFloat(volunteerHours))) {
         totalVolunteerHours += parseFloat(volunteerHours);
       }
 
@@ -13912,14 +13914,14 @@ function getUnifiedDashboardData(includePII) {
         }
       }
 
-      // Track union interest (Yes/True values)
-      if (interestLocal && (interestLocal === 'Yes' || interestLocal === true || interestLocal === 'TRUE')) {
+      // Track union interest (Yes/True/true values)
+      if (interestLocal && (interestLocal === 'Yes' || interestLocal === true || interestLocal === 'TRUE' || interestLocal === 'true')) {
         interestLocalCount++;
       }
-      if (interestChapter && (interestChapter === 'Yes' || interestChapter === true || interestChapter === 'TRUE')) {
+      if (interestChapter && (interestChapter === 'Yes' || interestChapter === true || interestChapter === 'TRUE' || interestChapter === 'true')) {
         interestChapterCount++;
       }
-      if (interestAllied && (interestAllied === 'Yes' || interestAllied === true || interestAllied === 'TRUE')) {
+      if (interestAllied && (interestAllied === 'Yes' || interestAllied === true || interestAllied === 'TRUE' || interestAllied === 'true')) {
         interestAlliedCount++;
       }
 
@@ -13939,7 +13941,7 @@ function getUnifiedDashboardData(includePII) {
       // Track engagement by unit
       if (!engagementByUnit[unit]) engagementByUnit[unit] = { openRates: [], meetings: 0, count: 0 };
       engagementByUnit[unit].count++;
-      if (openRate && !isNaN(parseFloat(openRate))) engagementByUnit[unit].openRates.push(parseFloat(openRate));
+      if ((openRate !== '' && openRate !== null && openRate !== undefined) && !isNaN(parseFloat(openRate))) engagementByUnit[unit].openRates.push(parseFloat(openRate));
       if ((lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) ||
           (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo)) {
         engagementByUnit[unit].meetings++;
@@ -13948,7 +13950,7 @@ function getUnifiedDashboardData(includePII) {
       // Track engagement by location
       if (!engagementByLocation[location]) engagementByLocation[location] = { openRates: [], meetings: 0, count: 0 };
       engagementByLocation[location].count++;
-      if (openRate && !isNaN(parseFloat(openRate))) engagementByLocation[location].openRates.push(parseFloat(openRate));
+      if ((openRate !== '' && openRate !== null && openRate !== undefined) && !isNaN(parseFloat(openRate))) engagementByLocation[location].openRates.push(parseFloat(openRate));
       if ((lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) ||
           (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo)) {
         engagementByLocation[location].meetings++;
@@ -14076,8 +14078,10 @@ function getUnifiedDashboardData(includePII) {
       var steward = grievanceData[g][GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
       var gLocation = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
       var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
-      var category = grievanceData[g][GRIEVANCE_COLS.CATEGORY - 1] || 'Other';
-      var memberName = grievanceData[g][GRIEVANCE_COLS.MEMBER_NAME - 1] || 'Unknown';
+      var category = grievanceData[g][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
+      var gFirstName = grievanceData[g][GRIEVANCE_COLS.FIRST_NAME - 1] || '';
+      var gLastName = grievanceData[g][GRIEVANCE_COLS.LAST_NAME - 1] || '';
+      var memberName = (gFirstName + ' ' + gLastName).trim() || 'Unknown';
       var currentStep = grievanceData[g][GRIEVANCE_COLS.CURRENT_STEP - 1] || 'Step 1';
       var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
       var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
@@ -14176,9 +14180,9 @@ function getUnifiedDashboardData(includePII) {
       }
 
       // Track Step 2 denial rate
-      if (grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) {
+      if (grievanceData[g][GRIEVANCE_COLS.STEP2_RCVD - 1]) {
         step2Total++;
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_3_DATE - 1]) step2Denials++;
+        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1]) step2Denials++;
       }
 
       // Open cases list for drill-down (member hidden in non-PII, steward always shown)
@@ -14233,9 +14237,9 @@ function getUnifiedDashboardData(includePII) {
       }
 
       // Step 1 denial rate
-      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
+      if (grievanceData[g][GRIEVANCE_COLS.STEP1_RCVD - 1]) {
         step1Total++;
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) step1Denials++;
+        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1]) step1Denials++;
       }
 
       // Settlement time
@@ -34986,7 +34990,7 @@ function createMeetingAttendanceSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1819 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1857 lines)
 // ============================================================================
 
 // ============================================================================
@@ -36502,6 +36506,44 @@ function createFAQSheet(ss) {
     sheet.setRowHeight(row, 45);
   }
 
+  // ═══ CATEGORY: ENGAGEMENT TRACKING ═══
+  row += 2;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('📊 ENGAGEMENT TRACKING')
+    .setBackground(categoryBg)
+    .setFontWeight('bold')
+    .setFontSize(14)
+    .setFontColor('#065F46');
+  sheet.setRowHeight(row, 35);
+
+  var engagementFAQs = [
+    ['Q: What engagement metrics are tracked?',
+     'A: Email open rates (column S), virtual meeting attendance (Q), in-person meeting attendance (R), volunteer hours (T), and union interest in local/chapter/allied activities (U-W).'],
+    ['Q: Where do engagement metrics appear?',
+     'A: Engagement metrics appear in the Unified Web App Dashboard (both Steward and Member views), in the Engagement tab with email open rates, meeting attendance, volunteer hours, and union interest breakdowns.'],
+    ['Q: What are low engagement hot spots?',
+     'A: Locations or units where the average of email open rate and meeting attendance rate is below 30%, with at least 5 members. These are flagged in the Hot Spots tab to help stewards identify areas needing outreach.'],
+    ['Q: How is meeting attendance tracked?',
+     'A: Members who attended a virtual or in-person meeting within the last 6 months are counted. The rate is calculated as (attending members / total members) × 100.'],
+    ['Q: What values count as "interested" for union interest columns?',
+     'A: The values Yes, TRUE, true, and boolean true are all counted as expressing interest. Any other value (No, FALSE, empty) is not counted.'],
+    ['Q: Are engagement metrics columns visible by default?',
+     'A: No. Columns Q-T (Engagement Metrics) and U-X (Member Interests) are hidden by default using collapsible column groups. Stewards can expand them when needed.'],
+    ['Q: How does the survey response rate work?',
+     'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.']
+  ];
+
+  for (var eng = 0; eng < engagementFAQs.length; eng++) {
+    row++;
+    sheet.getRange(row, 1, 1, 5).merge().setValue(engagementFAQs[eng][0])
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+    sheet.setRowHeight(row, 30);
+    row++;
+    sheet.getRange(row, 1, 1, 5).merge().setValue(engagementFAQs[eng][1])
+      .setBackground(answerBg).setFontColor(textColor).setWrap(true);
+    sheet.setRowHeight(row, 45);
+  }
+
   // ═══ CATEGORY: ADVANCED ═══
   row += 2;
   sheet.getRange(row, 1, 1, 5).merge()
@@ -36555,7 +36597,7 @@ function createFAQSheet(ss) {
   sheet.setRowHeight(row, 28);
 
   var versionHistory = [
-    ['v' + VERSION_INFO.CURRENT, VERSION_INFO.CODENAME, 'Current release - comprehensive code review, 871+ tests, ESLint clean, modular source files'],
+    ['v' + VERSION_INFO.CURRENT, VERSION_INFO.CODENAME, 'Engagement tracking bug fixes, 950+ tests (79 new for engagement), comprehensive code review, ESLint clean, modular source files'],
     ['v4.4.0', 'Menu Consolidation', 'Unified 3-menu system (Union Hub, Tools, Admin), web app dashboards, deprecated command center menu'],
     ['v4.3.8', 'Features Reference', 'Satisfaction modal dashboard, Features Reference sheet, hidden satisfaction sheet'],
     ['v4.3.7', 'Help System', 'Complete rewrite of help guide with real-time search, menu reference, and FAQ tabs'],

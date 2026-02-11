@@ -409,7 +409,7 @@ function runStartupValidation() {
 var API_VERSION = {
   major: 4,
   minor: 5,
-  patch: 0,
+  patch: 1,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -503,7 +503,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.5.0",
+  VERSION: "4.5.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs

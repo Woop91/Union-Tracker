@@ -5,16 +5,27 @@ All notable changes to the 509 Union Dashboard project will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.5.1] - 2026-02-10
+## [4.5.1] - 2026-02-11
 
 ### Fixed
+- **Engagement tracking: `MEMBER_COLS.FULL_NAME` undefined** - Member names in unified dashboard always showed "Unknown". Now builds name from `FIRST_NAME` + `LAST_NAME`
+- **Engagement tracking: `MEMBER_COLS.LAST_UPDATED` undefined** - Directory trends (recent updates, stale contacts) never tracked. Now uses `RECENT_CONTACT_DATE`
+- **Engagement tracking: `GRIEVANCE_COLS.CATEGORY` undefined** - Grievance categories always showed "Other". Now uses `ISSUE_CATEGORY`
+- **Engagement tracking: `GRIEVANCE_COLS.MEMBER_NAME` undefined** - Grievance member names always showed "Unknown". Now builds from `FIRST_NAME` + `LAST_NAME`
+- **Engagement tracking: step denial rates always 0%** - `STEP_1_DATE`/`STEP_2_DATE`/`STEP_3_DATE` were undefined. Now uses `STEP1_RCVD`, `STEP2_RCVD`, `STEP2_APPEAL_FILED`, `STEP3_APPEAL_FILED`
+- **Engagement tracking: openRate=0 excluded** - Members with 0% email open rate were skipped because `0` is falsy in JS. Now uses explicit empty checks
+- **Interest field comparison** - Added lowercase `'true'` to union interest value checks
+- **Version consistency** - Synced `API_VERSION` (4.5.0→4.5.1) and `COMMAND_CONFIG.VERSION` (4.5.0→4.5.1) to match `VERSION_INFO.CURRENT`
 - `GRIEVANCE_OUTCOMES` - added missing constant that caused "GRIEVANCE_OUTCOMES is not defined" runtime error, preventing tabs from populating
 - `generateGrievanceId()` - added missing function called by `getNextGrievanceId()`, which caused `startNewGrievance()` to silently fail
-- Sheet tab colors - added `.setTabColor()` to all 11 sheet creation functions (Config, Config Guide, Member Directory, Grievance Log, Dashboard, Satisfaction, Feedback, Function Checklist, Getting Started, FAQ, Case Checklist)
+- Sheet tab colors - added `.setTabColor()` to all 11 sheet creation functions
 - Hardcoded hex colors replaced with `COLORS` constants in Getting Started, FAQ, and Config Guide sheet creation
 
 ### Added
-- 33 new tests (871 total across 17 suites) covering core grievance mutation paths:
+- 79 new engagement tracking tests (`test/04e_PublicDashboard.test.js`) covering: member counting, engagement metrics, participation rates, hot spot detection, PII handling, grievance processing, directory trends, satisfaction data, date range filtering, HTML generation, edge cases
+- Engagement Tracking FAQ category (7 questions) in FAQ sheet
+- Total: 950 tests across 18 suites (up from 871 across 17)
+- 33 new tests covering core grievance mutation paths:
   - `startNewGrievance()` - validates row data includes `GRIEVANCE_OUTCOMES.PENDING`, audit logging, error handling
   - `resolveGrievance()` - validates outcome/status updates, audit logging, timestamped notes
   - `advanceGrievanceStep()` - validates step 1→2→3→arbitration transitions, status updates, boundary errors
@@ -79,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 4.5.1 | 2026-02-10 | Fixed GRIEVANCE_OUTCOMES/generateGrievanceId bugs, sheet tab colors, 871 Jest tests |
+| 4.5.1 | 2026-02-11 | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |
 | 4.5.0 | 2026-02-01 | Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files |
 | 4.4.1 | 2026-01-31 | Build system |
 | 4.4.0 | 2026-01-30 | Initial release |

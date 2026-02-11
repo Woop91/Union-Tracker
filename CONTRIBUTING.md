@@ -74,7 +74,7 @@ Please be respectful and constructive in all interactions. We're all working tow
 ├── test/                   # Jest unit tests
 │   ├── gas-mock.js         # GAS environment mocks
 │   ├── load-source.js      # Source file loader
-│   └── *.test.js           # Test files (871 tests)
+│   └── *.test.js           # Test files (950 tests)
 ├── dist/                   # Built output (auto-generated)
 ├── .github/workflows/      # CI/CD configuration
 ├── build.js               # Build script

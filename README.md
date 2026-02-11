@@ -74,7 +74,7 @@ src/
 - **Security Module** (`00_Security.gs`): XSS prevention, input sanitization, access control utilities
 - **Data Access Layer** (`00_DataAccess.gs`): Centralized sheet access with caching, time constants
 - **Member Self-Service** (`13_MemberSelfService.gs`): Member self-service portal with PIN authentication
-- **871 Jest Unit Tests**: Comprehensive test suite (`npm run test:unit`)
+- **950 Jest Unit Tests**: Comprehensive test suite (`npm run test:unit`)
 - **Comprehensive Bug Fixes**: Stability improvements across all modules
 - **Dynamic Engine**: Extensible feature framework with caching, unified data loading, and batch operations
 - **Member Leaders**: Organizational layer tracking stewards and member leaders with role/unit info
@@ -167,7 +167,7 @@ src/
 1. Edit files in the `src/` directory (numbered 00-13)
 2. Copy updated files to Google Apps Script
 3. Save and refresh your Google Sheet
-4. Run `npm run test:unit` to execute 871 Jest unit tests
+4. Run `npm run test:unit` to execute 950 Jest unit tests
 
 ### Source Files
 
@@ -441,7 +441,7 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-- **4.5.1** - Fixed GRIEVANCE_OUTCOMES/generateGrievanceId missing definitions, added sheet tab colors, 871 Jest unit tests
+- **4.5.1** - Fixed GRIEVANCE_OUTCOMES/generateGrievanceId missing definitions, engagement tracking fixes, 950 Jest unit tests
 - **4.5.0** - Security Module, Data Access Layer, Member Self-Service with PIN authentication, comprehensive bug fixes
 - **4.4.1** - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
 - **4.3.8** - Searchable Help Guide & Modal Consolidation: Help modal with menu reference/FAQ, Member Satisfaction sheet hidden
