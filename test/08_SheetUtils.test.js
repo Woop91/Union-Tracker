@@ -1,5 +1,5 @@
 /**
- * Tests for 08_SheetUtils.gs
+ * Tests for 08_SheetUtils (split into 08a-08d modules)
  *
  * Covers: padRight, getCurrentQuarter, getQuarterFromDate, validateMemberEmail,
  * getConfigValues, setupAuditLogSheet, getAuditHistory, CREATE_509_DASHBOARD,
@@ -24,7 +24,10 @@ loadSources([
   '01_Core.gs',
   '02_DataManagers.gs',
   '03_UIComponents.gs',
-  '08_SheetUtils.gs'
+  '08a_SheetSetup.gs',
+  '08b_SearchAndCharts.gs',
+  '08c_FormsAndNotifications.gs',
+  '08d_AuditAndFormulas.gs'
 ]);
 
 // ============================================================================

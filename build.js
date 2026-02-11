@@ -22,24 +22,34 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order - CONSOLIDATED to 16 files
+// Files in build order - 26 modules
 const BUILD_ORDER = [
-  '00_Security.gs',       // Security utilities, XSS prevention, access control
-  '00_DataAccess.gs',     // Data Access Layer, time constants
-  '01_Core.gs',           // Error handling + Constants (2,169 lines)
-  '02_DataManagers.gs',   // Member + Grievance managers (2,471 lines)
-  '03_UIComponents.gs',   // Menu, Theme, Mobile, QuickActions, Search (2,537 lines)
-  '04_UIService.gs',      // Main UI service (7,398 lines)
-  '05_Integrations.gs',   // External integrations (2,330 lines)
-  '06_Maintenance.gs',    // Diagnostics, Cache, Undo, Maintenance (3,437 lines)
-  '07_DevTools.gs',       // Dev tools + Test framework (2,807 lines)
-  '08_SheetUtils.gs',     // Sheet creation, validation, forms, notifications (4,442 lines)
-  '09_Dashboards.gs',     // Satisfaction, Sync, Public dashboards (4,007 lines)
-  '10_Code.gs',           // Core business logic (5,406 lines)
-  '10_Main.gs',           // Main entry point (1,862 lines)
-  '11_CommandHub.gs',     // Command center + Secure dashboard (3,627 lines)
-  '12_Features.gs',       // Checklist, Dynamic, Looker (3,970 lines)
-  '13_MemberSelfService.gs' // Member self-service portal with PIN auth
+  '00_Security.gs',                // Security utilities, XSS prevention, access control
+  '00_DataAccess.gs',              // Data Access Layer, time constants
+  '01_Core.gs',                    // Error handling + Constants
+  '02_DataManagers.gs',            // Member + Grievance managers
+  '03_UIComponents.gs',            // Menu, Theme, Mobile, QuickActions, Search
+  '04a_UIMenus.gs',                // Menu creation, visual control panel, navigation, dialogs, sidebar
+  '04b_AccessibilityFeatures.gs',  // Common styles, comfort view, pomodoro, notepad, import/export
+  '04c_InteractiveDashboard.gs',   // Interactive dashboard, mobile views, data retrieval
+  '04d_ExecutiveDashboard.gs',     // Executive dashboard, steward dashboard, alerts, triggers
+  '04e_PublicDashboard.gs',        // Public member dashboard, unified data endpoints
+  '05_Integrations.gs',            // External integrations
+  '06_Maintenance.gs',             // Diagnostics, Cache, Undo, Maintenance
+  '07_DevTools.gs',                // Dev tools + Test framework
+  '08a_SheetSetup.gs',             // Main setup, utility functions, data validation, multi-select
+  '08b_SearchAndCharts.gs',        // Search functions, chart generation
+  '08c_FormsAndNotifications.gs',  // Form handling, notifications, deadline alerts
+  '08d_AuditAndFormulas.gs',       // Audit log, formula sync, hidden calc sheets
+  '09_Dashboards.gs',              // Satisfaction, Sync, Public dashboards
+  '10a_SheetCreation.gs',          // Config, Member Directory, Grievance Log sheet creation
+  '10b_SurveyDocSheets.gs',        // Satisfaction, Feedback, FAQ, Getting Started sheets
+  '10c_FormHandlers.gs',           // Menu handlers, form submissions, flagged reviews
+  '10d_SyncAndMaintenance.gs',     // Formatting, testing, Drive, Calendar, Email, sync, formulas
+  '10_Main.gs',                    // Main entry point
+  '11_CommandHub.gs',              // Command center + Secure dashboard
+  '12_Features.gs',                // Checklist, Dynamic, Looker
+  '13_MemberSelfService.gs'        // Member self-service portal with PIN auth
 ];
 
 const HTML_FILES = [

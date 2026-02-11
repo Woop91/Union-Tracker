@@ -15,13 +15,23 @@
  *   - 01_Core.gs
  *   - 02_DataManagers.gs
  *   - 03_UIComponents.gs
- *   - 04_UIService.gs
+ *   - 04a_UIMenus.gs
+ *   - 04b_AccessibilityFeatures.gs
+ *   - 04c_InteractiveDashboard.gs
+ *   - 04d_ExecutiveDashboard.gs
+ *   - 04e_PublicDashboard.gs
  *   - 05_Integrations.gs
  *   - 06_Maintenance.gs
  *   - 07_DevTools.gs
- *   - 08_SheetUtils.gs
+ *   - 08a_SheetSetup.gs
+ *   - 08b_SearchAndCharts.gs
+ *   - 08c_FormsAndNotifications.gs
+ *   - 08d_AuditAndFormulas.gs
  *   - 09_Dashboards.gs
- *   - 10_Code.gs
+ *   - 10a_SheetCreation.gs
+ *   - 10b_SurveyDocSheets.gs
+ *   - 10c_FormHandlers.gs
+ *   - 10d_SyncAndMaintenance.gs
  *   - 10_Main.gs
  *   - 11_CommandHub.gs
  *   - 12_Features.gs
@@ -8904,7 +8914,7 @@ function getAdvancedSearchHtml() {
 
 
 // ============================================================================
-// SOURCE: 04_UIService.gs (7146 lines)
+// SOURCE: 04a_UIMenus.gs (913 lines)
 // ============================================================================
 
 /**
@@ -9818,6 +9828,12 @@ function getDashboardSidebarHtml() {
     </html>
   `;
 }
+
+
+
+// ============================================================================
+// SOURCE: 04b_AccessibilityFeatures.gs (1029 lines)
+// ============================================================================
 
 // ============================================================================
 // COMMON UI UTILITIES
@@ -10846,6 +10862,12 @@ function getSmartDashboardHtml() {
  * 3. Run Quick Actions from the menu
  * 4. A popup will show relevant actions for that row
  */
+
+
+
+// ============================================================================
+// SOURCE: 04c_InteractiveDashboard.gs (1697 lines)
+// ============================================================================
 
 // ============================================================================
 // QUICK ACTION EMAIL FUNCTIONS - Send Forms, Surveys, and Status Updates
@@ -12543,6 +12565,12 @@ function saveInteractiveMember(memberData, mode) {
  * ============================================================================
  */
 
+
+
+// ============================================================================
+// SOURCE: 04d_ExecutiveDashboard.gs (1027 lines)
+// ============================================================================
+
 // ============================================================================
 // 1. NAVIGATION HELPERS
 // ============================================================================
@@ -13568,6 +13596,12 @@ function applyStatusColors() {
 
   ss.toast('Status colors applied to Grievance Log.', 'Style Engine', 3);
 }
+
+
+
+// ============================================================================
+// SOURCE: 04e_PublicDashboard.gs (2484 lines)
+// ============================================================================
 
 // ============================================================================
 // 10. UNIFIED WEB APP DASHBOARDS (v4.4.0)
@@ -24733,7 +24767,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08_SheetUtils.gs (4480 lines)
+// SOURCE: 08a_SheetSetup.gs (613 lines)
 // ============================================================================
 
 /**
@@ -25347,6 +25381,12 @@ function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, so
  * @version 1.0.0
  * @requires 01_Constants.gs
  */
+
+
+
+// ============================================================================
+// SOURCE: 08b_SearchAndCharts.gs (873 lines)
+// ============================================================================
 
 // ============================================================================
 // SEARCH FUNCTIONS
@@ -26220,6 +26260,12 @@ function padRight(str, len) {
  * @author SEIU Local 509 Development Team
  * @version 1.0.0
  */
+
+
+// ============================================================================
+// SOURCE: 08c_FormsAndNotifications.gs (1536 lines)
+// ============================================================================
+
 
 // ============================================================================
 // FORM URL CONFIGURATION
@@ -27754,6 +27800,12 @@ function getQuarterFromDate(date) {
  * @version 1.0.0
  * ============================================================================
  */
+
+
+
+// ============================================================================
+// SOURCE: 08d_AuditAndFormulas.gs (1461 lines)
+// ============================================================================
 
 // ============================================================================
 // AUDIT LOG SHEET SETUP
@@ -33258,7 +33310,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10_Code.gs (5439 lines)
+// SOURCE: 10a_SheetCreation.gs (1499 lines)
 // ============================================================================
 
 /**
@@ -34757,6 +34809,12 @@ function createDashboardCharts_(sheet) {
 // - createSummaryTableChart_()
 // - createStewardLeaderboardChart_()
 // - padRight()
+// ============================================================================
+
+
+
+// ============================================================================
+// SOURCE: 10b_SurveyDocSheets.gs (1819 lines)
 // ============================================================================
 
 // ============================================================================
@@ -36302,6 +36360,53 @@ function createFAQSheet(ss) {
     sheet.setRowHeight(row, 45);
   }
 
+  // ═══ CATEGORY: VERSION HISTORY ═══
+  row += 2;
+  var versionBg = '#EDE9FE';  // Light purple for version section
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('📜 VERSION HISTORY')
+    .setBackground(categoryBg)
+    .setFontWeight('bold')
+    .setFontSize(14)
+    .setFontColor('#065F46');
+  sheet.setRowHeight(row, 35);
+
+  // Version history header row
+  row++;
+  var versionHeaders = ['Version', 'Codename', 'Key Changes'];
+  sheet.getRange(row, 1).setValue(versionHeaders[0])
+    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
+  sheet.getRange(row, 2).setValue(versionHeaders[1])
+    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
+  sheet.getRange(row, 3, 1, 3).merge().setValue(versionHeaders[2])
+    .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
+  sheet.setRowHeight(row, 28);
+
+  var versionHistory = [
+    ['v' + VERSION_INFO.CURRENT, VERSION_INFO.CODENAME, 'Current release - comprehensive code review, 871+ tests, ESLint clean, modular source files'],
+    ['v4.4.0', 'Menu Consolidation', 'Unified 3-menu system (Union Hub, Tools, Admin), web app dashboards, deprecated command center menu'],
+    ['v4.3.8', 'Features Reference', 'Satisfaction modal dashboard, Features Reference sheet, hidden satisfaction sheet'],
+    ['v4.3.7', 'Help System', 'Complete rewrite of help guide with real-time search, menu reference, and FAQ tabs'],
+    ['v4.3.2', 'Modal Dashboards', 'Deprecated visible Dashboard sheet, switched to SPA-style modal dashboards'],
+    ['v4.3.0', 'Checklist & Looker', 'Case Checklist system, Looker data integration, dynamic field expansion engine'],
+    ['v4.1.0', 'Strategic Config', 'Strategic Command Center config, status color mapping, PDF/email branding'],
+    ['v4.0.0', 'Strategic Command Center', 'Unified master engine, audit logging, sabotage protection, batch processing, mobile views'],
+    ['v3.6.0', 'Data Managers', 'Member and Grievance data manager refactor, improved validation'],
+    ['v2.0.0', 'Modular Architecture', 'Split monolith into modular source files, build system, UI/business logic separation']
+  ];
+
+  for (var v = 0; v < versionHistory.length; v++) {
+    row++;
+    var vRowBg = (v % 2 === 0) ? versionBg : answerBg;
+    sheet.getRange(row, 1).setValue(versionHistory[v][0])
+      .setBackground(vRowBg).setFontWeight('bold').setFontColor('#5B21B6');
+    sheet.getRange(row, 2).setValue(versionHistory[v][1])
+      .setBackground(vRowBg).setFontColor(textColor).setFontStyle('italic');
+    sheet.getRange(row, 3, 1, 3).merge().setValue(versionHistory[v][2])
+      .setBackground(vRowBg).setFontColor(textColor).setWrap(true);
+    sheet.setRowHeight(row, 35);
+  }
+
   // ═══ FOOTER ═══
   row += 2;
   sheet.getRange(row, 1, 1, 5).merge()
@@ -36529,6 +36634,12 @@ function createFeaturesReferenceSheet(ss) {
 
   return sheet;
 }
+
+
+
+// ============================================================================
+// SOURCE: 10c_FormHandlers.gs (856 lines)
+// ============================================================================
 
 // ============================================================================
 // MENU HANDLER FUNCTIONS
@@ -37384,6 +37495,12 @@ function unfreezeAllColumns() {
 
   ss.toast('Columns unfrozen. Header row still frozen.', '🔓 Unfrozen', 3);
 }
+
+
+
+// ============================================================================
+// SOURCE: 10d_SyncAndMaintenance.gs (1315 lines)
+// ============================================================================
 
 // ============================================================================
 // ENHANCED VISUAL FORMATTING - Gradient Heatmaps
