@@ -581,9 +581,9 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 5,
-  PATCH: 0,
-  BUILD: 'v4.5.0',
-  CURRENT: '4.5.0',
+  PATCH: 1,
+  BUILD: 'v4.5.1',
+  CURRENT: '4.5.1',
   CODENAME: 'Code Audit & Cleanup'
 };
 

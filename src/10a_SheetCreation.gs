@@ -1496,3 +1496,157 @@ function createDashboardCharts_(sheet) {
 // - padRight()
 // ============================================================================
 
+
+// ============================================================================
+// VOLUNTEER HOURS & MEETING ATTENDANCE SHEETS
+// ============================================================================
+
+/**
+ * Creates the Volunteer Hours tracking sheet
+ * Records volunteer activities and auto-calculates totals for Member Directory
+ * @param {Spreadsheet} ss - The spreadsheet
+ * @returns {void}
+ */
+function createVolunteerHoursSheet(ss) {
+  var sheet = getOrCreateSheet(ss, SHEETS.VOLUNTEER_HOURS);
+
+  var headers = [
+    'Entry ID',           // A - Auto-generated
+    'Member ID',          // B - Dropdown from Member Directory
+    'Member Name',        // C - Auto-lookup from Member Directory
+    'Activity Date',      // D - Date of volunteer activity
+    'Activity Type',      // E - Type of volunteer work
+    'Hours',              // F - Number of hours volunteered
+    'Description',        // G - Brief description
+    'Verified By',        // H - Who verified the hours
+    'Notes'               // I - Additional notes
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setBackground(COLORS.UNION_GREEN)
+    .setFontColor(COLORS.WHITE)
+    .setHorizontalAlignment('center')
+    .setWrap(false);
+
+  // Add data type hints (row 2)
+  var hints = [
+    'Auto-ID', 'Dropdown', 'Auto-lookup', 'MM/DD/YYYY', 'Dropdown', 'Number', 'Text', 'Text', 'Text'
+  ];
+
+  sheet.getRange(2, 1, 1, hints.length).setValues([hints])
+    .setFontStyle('italic')
+    .setFontSize(9)
+    .setBackground('#F0F9FF')
+    .setFontColor('#6B7280')
+    .setHorizontalAlignment('center');
+
+  // Set column widths
+  sheet.setColumnWidth(1, 100);  // A - Entry ID
+  sheet.setColumnWidth(2, 100);  // B - Member ID
+  sheet.setColumnWidth(3, 150);  // C - Member Name
+  sheet.setColumnWidth(4, 110);  // D - Activity Date
+  sheet.setColumnWidth(5, 150);  // E - Activity Type
+  sheet.setColumnWidth(6, 80);   // F - Hours
+  sheet.setColumnWidth(7, 250);  // G - Description
+  sheet.setColumnWidth(8, 130);  // H - Verified By
+  sheet.setColumnWidth(9, 200);  // I - Notes
+
+  // Format columns
+  sheet.getRange(3, 4, 998, 1).setNumberFormat('MM/DD/YYYY');  // D - Activity Date
+  sheet.getRange(3, 6, 998, 1).setNumberFormat('#,##0.0');     // F - Hours
+
+  // Auto-ID formula for Entry ID (column A)
+  var idFormula = '=IF(B3<>"", "VOL-" & TEXT(ROW()-2, "0000"), "")';
+  sheet.getRange('A3').setFormula(idFormula);
+  sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+
+  // Member Name lookup formula (column C) - VLOOKUP from Member Directory
+  var nameLookupFormula = '=IF(B3<>"", IFERROR(VLOOKUP(B3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(B3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  sheet.getRange('C3').setFormula(nameLookupFormula);
+  sheet.getRange('C3').copyTo(sheet.getRange('C3:C1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+
+  // Freeze header rows
+  sheet.setFrozenRows(2);
+
+  // Set tab color
+  sheet.setTabColor('#8B5CF6');  // Purple for volunteer hours
+
+  Logger.log('Volunteer Hours sheet created');
+}
+
+/**
+ * Creates the Meeting Attendance tracking sheet
+ * Records meeting attendance and auto-updates Member Directory
+ * @param {Spreadsheet} ss - The spreadsheet
+ * @returns {void}
+ */
+function createMeetingAttendanceSheet(ss) {
+  var sheet = getOrCreateSheet(ss, SHEETS.MEETING_ATTENDANCE);
+
+  var headers = [
+    'Entry ID',           // A - Auto-generated
+    'Meeting Date',       // B - Date of meeting
+    'Meeting Type',       // C - Virtual or In-Person
+    'Meeting Name',       // D - Name/description of meeting
+    'Member ID',          // E - Dropdown from Member Directory
+    'Member Name',        // F - Auto-lookup from Member Directory
+    'Attended',           // G - Yes/No checkbox
+    'Notes'               // H - Additional notes
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setBackground(COLORS.UNION_GREEN)
+    .setFontColor(COLORS.WHITE)
+    .setHorizontalAlignment('center')
+    .setWrap(false);
+
+  // Add data type hints (row 2)
+  var hints = [
+    'Auto-ID', 'MM/DD/YYYY', 'Dropdown', 'Text', 'Dropdown', 'Auto-lookup', 'Checkbox', 'Text'
+  ];
+
+  sheet.getRange(2, 1, 1, hints.length).setValues([hints])
+    .setFontStyle('italic')
+    .setFontSize(9)
+    .setBackground('#F0F9FF')
+    .setFontColor('#6B7280')
+    .setHorizontalAlignment('center');
+
+  // Set column widths
+  sheet.setColumnWidth(1, 100);  // A - Entry ID
+  sheet.setColumnWidth(2, 110);  // B - Meeting Date
+  sheet.setColumnWidth(3, 120);  // C - Meeting Type
+  sheet.setColumnWidth(4, 200);  // D - Meeting Name
+  sheet.setColumnWidth(5, 100);  // E - Member ID
+  sheet.setColumnWidth(6, 150);  // F - Member Name
+  sheet.setColumnWidth(7, 90);   // G - Attended
+  sheet.setColumnWidth(8, 200);  // H - Notes
+
+  // Format columns
+  sheet.getRange(3, 2, 998, 1).setNumberFormat('MM/DD/YYYY');  // B - Meeting Date
+
+  // Add checkboxes for Attended column
+  sheet.getRange('G3:G1000').insertCheckboxes();
+
+  // Auto-ID formula for Entry ID (column A)
+  var idFormula = '=IF(E3<>"", "MTG-" & TEXT(ROW()-2, "0000"), "")';
+  sheet.getRange('A3').setFormula(idFormula);
+  sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+
+  // Member Name lookup formula (column F) - VLOOKUP from Member Directory
+  var nameLookupFormula = '=IF(E3<>"", IFERROR(VLOOKUP(E3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(E3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  sheet.getRange('F3').setFormula(nameLookupFormula);
+  sheet.getRange('F3').copyTo(sheet.getRange('F3:F1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+
+  // Freeze header rows
+  sheet.setFrozenRows(2);
+
+  // Set tab color
+  sheet.setTabColor('#10B981');  // Green for meeting attendance
+
+  Logger.log('Meeting Attendance sheet created');
+}
