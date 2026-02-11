@@ -312,6 +312,100 @@ These are correctly implemented and populate properly when their respective setu
 
 ---
 
+## File Splitting Recommendations
+
+Six source files exceed 3,500 lines and should be split into focused, single-responsibility modules for maintainability. The build system (`build.js`) already concatenates all modules, so splitting has no impact on the deployed output.
+
+### Current File Sizes
+
+| File | Lines | Recommended Splits |
+|------|------:|:-------------------|
+| `04_UIService.gs` | 7,145 | 8 modules |
+| `10_Code.gs` | 5,438 | 6 modules |
+| `08_SheetUtils.gs` | 4,479 | 8 modules |
+| `09_Dashboards.gs` | 4,034 | 4 modules |
+| `12_Features.gs` | 4,017 | 5 modules |
+| `11_CommandHub.gs` | 3,548 | 7 modules |
+| **Total** | **28,661** | **38 modules (~750 lines avg)** |
+
+### Proposed Split: `04_UIService.gs` (7,145 lines → 8 modules)
+
+| Module | Contents | ~Lines |
+|--------|----------|-------:|
+| `04a_UIMenus.gs` | Menu creation, navigation, visual control panel | 325 |
+| `04b_UIDialogs.gs` | Multi-select dialogs, sidebars, common styles | 575 |
+| `04c_AccessibilityFeatures.gs` | Dark mode, focus mode, pomodoro, ADHD panel, notepad | 580 |
+| `04d_ImportExportUI.gs` | Import/export dialogs, CSV processing, break reminders | 310 |
+| `04e_InteractiveDashboardUI.gs` | Interactive dashboard, mobile views, data retrieval | 1,155 |
+| `04f_ExecutiveDashboardUI.gs` | Executive dashboard modal, alert systems, midnight triggers | 510 |
+| `04g_DocumentGenerationUI.gs` | PDF generation, steward performance modal, overdue checks | 450 |
+| `04h_PublicDashboardUI.gs` | Public member dashboard, unified data endpoints, date filters | 1,115 |
+
+### Proposed Split: `10_Code.gs` (5,438 lines → 6 modules)
+
+| Module | Contents | ~Lines |
+|--------|----------|-------:|
+| `10a_ConfigSheetCreation.gs` | Config sheet structure, dropdown sources, section styling | 230 |
+| `10b_CoreSheetCreation.gs` | Member Directory, Grievance Log, Satisfaction, Feedback sheets | 1,190 |
+| `10c_DocumentationSheets.gs` | FAQ, Getting Started, Function Checklist, Features Reference | 750 |
+| `10d_HiddenSheetSetup.gs` | Audit log, hidden calculation sheets, formula setup | 1,025 |
+| `10e_FormHandlers.gs` | Form submission handling, member import processing | 350 |
+| `10f_DataQualityMaintenance.gs` | Data repair, checkbox repair, validation, integrity checks | 1,050 |
+
+### Proposed Split: `08_SheetUtils.gs` (4,479 lines → 8 modules)
+
+| Module | Contents | ~Lines |
+|--------|----------|-------:|
+| `08a_SheetCreation.gs` | `CREATE_509_DASHBOARD()`, `getOrCreateSheet()`, sheet ordering | 230 |
+| `08b_DataValidation.gs` | Dropdown and multi-select validation setup, trigger install | 285 |
+| `08c_SearchFunctionality.gs` | Desktop/mobile search, advanced search, result navigation | 240 |
+| `08d_ChartBuilder.gs` | Chart generation — gauge, scorecard, trend, area, combo, leaderboard | 400 |
+| `08e_FormManagement.gs` | Form URLs, submission handlers (contact, grievance, satisfaction) | 790 |
+| `08f_NotificationSystem.gs` | Deadline alerts, survey emails, notification settings | 440 |
+| `08g_AuditLogging.gs` | Audit log setup, `onEditAudit()`, audit history retrieval | 315 |
+| `08h_HiddenSheetFormulas.gs` | All `setupCalc*Sheet()` functions, formula management | 1,100 |
+
+### Proposed Split: `09_Dashboards.gs` (4,034 lines → 4 modules)
+
+| Module | Contents | ~Lines |
+|--------|----------|-------:|
+| `09a_SatisfactionDashboard.gs` | Satisfaction dashboard display, data retrieval, analytics, drill-down | 1,645 |
+| `09b_DataSynchronization.gs` | Cross-sheet data sync, auto-sync triggers, `syncAllData()` | 705 |
+| `09c_DashboardMetrics.gs` | Dashboard value computation, metric sync, gradient application | 675 |
+| `09d_PublicDataEndpoints.gs` | Public dashboard data, flagged submission review, secure endpoints | 450 |
+
+### Proposed Split: `12_Features.gs` (4,017 lines → 5 modules)
+
+| Module | Contents | ~Lines |
+|--------|----------|-------:|
+| `12a_ChecklistManager.gs` | Case checklist creation, CRUD operations, progress tracking, dialog | 1,032 |
+| `12b_MemberDynamicEngine.gs` | Member leaders, dynamic field expansion, steward assignment | 470 |
+| `12c_GrievanceReminders.gs` | Reminder CRUD, notification triggers, reminder dialog | 485 |
+| `12d_LookerIntegration.gs` | Standard and anonymous Looker data sync, sheet initialization | 1,115 |
+| `12e_LookerAdmin.gs` | Looker connection help, status reporting, quarter calculation | 320 |
+
+### Proposed Split: `11_CommandHub.gs` (3,548 lines → 7 modules)
+
+| Module | Contents | ~Lines |
+|--------|----------|-------:|
+| `11a_CommandCenterNav.gs` | Config, navigation shortcuts, ID generation, mobile toggles | 350 |
+| `11b_ProductionMode.gs` | Production mode controls, tab colors, documentation cleanup | 270 |
+| `11c_DiagnosticsRepair.gs` | Diagnostic reports, repair utilities, search dialog | 220 |
+| `11d_OCRProcessing.gs` | Cloud Vision, OCR processing, transcription, auto-populate | 1,125 |
+| `11e_UnitAnalytics.gs` | Unit health metrics, grievance trends, trend visualization | 290 |
+| `11f_SecurityAnalytics.gs` | PII scrubbing, precedent search, secure stats endpoints | 445 |
+| `11g_MemberPortal.gs` | Member and public portal HTML generation | 390 |
+
+### Implementation Notes
+
+1. **Build system compatible:** `build.js` already concatenates all `.gs` files from `src/` — new modules will be picked up automatically
+2. **No runtime impact:** Google Apps Script loads all files into one namespace; splitting is purely organizational
+3. **Test updates needed:** Jest test imports may need updating if they reference specific file paths
+4. **Target:** Keep modules under ~1,000 lines; prioritize splitting the largest sections first (`04e`, `10b`, `08h`, `09a`)
+5. **Naming convention:** Use letter suffixes (`04a_`, `04b_`) to maintain load order within each logical group
+
+---
+
 ## Positive Observations
 
 - **Test coverage is solid:** 871 tests across 17 suites all passing
@@ -333,3 +427,4 @@ These are correctly implemented and populate properly when their respective setu
 | High | 3 | Dual constant systems, hardcoded indices, shared undo state |
 | Medium | 4 | Hardcoded sheet names, dev tools in prod, weak anonymization hash, column adjacency assumption |
 | Low | 4 | ID sequence pollution, character stripping, trend ordering, missing CSP |
+| Maintenance | 1 | 6 files over 3,500 lines need splitting into ~38 focused modules |
