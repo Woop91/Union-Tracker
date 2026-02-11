@@ -613,6 +613,7 @@ var SHEETS = {
   STEWARD_PERFORMANCE_CALC: '_Steward_Performance_Calc',
   // Optional source sheets
   MEETING_ATTENDANCE: '📅 Meeting Attendance',
+  MEETING_CHECKIN_LOG: '📝 Meeting Check-In Log',
   VOLUNTEER_HOURS: '🤝 Volunteer Hours',
   // Test Results
   TEST_RESULTS: 'Test Results',
@@ -891,6 +892,25 @@ var MEMBER_COLS = {
   // ALIASES - For backward compatibility
   LOCATION: 5,                     // Alias for WORK_LOCATION
   DAYS_TO_DEADLINE: 30             // Alias for NEXT_DEADLINE
+};
+
+// ============================================================================
+// MEETING CHECK-IN LOG COLUMNS (8 columns: A-H)
+// ============================================================================
+
+/**
+ * Meeting Check-In Log column positions (1-indexed)
+ * @const {Object}
+ */
+var MEETING_CHECKIN_COLS = {
+  MEETING_ID: 1,         // A - Meeting ID (steward-created)
+  MEETING_NAME: 2,       // B - Meeting name/topic
+  MEETING_DATE: 3,       // C - Date of meeting
+  MEETING_TYPE: 4,       // D - Virtual or In-Person
+  MEMBER_ID: 5,          // E - Checked-in member ID
+  MEMBER_NAME: 6,        // F - Member first + last name
+  CHECKIN_TIME: 7,       // G - Timestamp of check-in
+  EMAIL: 8               // H - Member email (for lookup)
 };
 
 // ============================================================================

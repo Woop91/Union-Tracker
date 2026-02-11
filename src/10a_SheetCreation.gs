@@ -1650,3 +1650,62 @@ function createMeetingAttendanceSheet(ss) {
 
   Logger.log('Meeting Attendance sheet created');
 }
+
+/**
+ * Create the Meeting Check-In Log sheet
+ * Stewards create meetings here; members check in via modal with email + PIN
+ * @param {Spreadsheet} ss - The active spreadsheet
+ */
+function createMeetingCheckInLogSheet(ss) {
+  var sheet = getOrCreateSheet(ss, SHEETS.MEETING_CHECKIN_LOG);
+
+  var headers = [
+    'Meeting ID',     // A - Unique meeting identifier (steward sets)
+    'Meeting Name',   // B - Meeting name/topic
+    'Meeting Date',   // C - Date of meeting
+    'Meeting Type',   // D - Virtual or In-Person
+    'Member ID',      // E - Checked-in member
+    'Member Name',    // F - First + Last name
+    'Check-In Time',  // G - Timestamp when member checked in
+    'Email'           // H - Member email used for check-in
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setBackground(COLORS.UNION_GREEN)
+    .setFontColor(COLORS.WHITE)
+    .setHorizontalAlignment('center')
+    .setWrap(false);
+
+  // Set column widths
+  sheet.setColumnWidth(1, 130);  // A - Meeting ID
+  sheet.setColumnWidth(2, 220);  // B - Meeting Name
+  sheet.setColumnWidth(3, 120);  // C - Meeting Date
+  sheet.setColumnWidth(4, 120);  // D - Meeting Type
+  sheet.setColumnWidth(5, 110);  // E - Member ID
+  sheet.setColumnWidth(6, 170);  // F - Member Name
+  sheet.setColumnWidth(7, 170);  // G - Check-In Time
+  sheet.setColumnWidth(8, 200);  // H - Email
+
+  // Format date columns
+  sheet.getRange(2, 3, 999, 1).setNumberFormat('MM/DD/YYYY');   // C - Meeting Date
+  sheet.getRange(2, 7, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss'); // G - Check-In Time
+
+  // Freeze header row
+  sheet.setFrozenRows(1);
+
+  // Set tab color
+  sheet.setTabColor('#8B5CF6');  // Purple for check-in
+
+  Logger.log('Meeting Check-In Log sheet created');
+}
+
+/**
+ * Menu-callable wrapper to create the Meeting Check-In Log sheet
+ */
+function setupMeetingCheckInSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  createMeetingCheckInLogSheet(ss);
+  ss.toast('Meeting Check-In Log sheet created', '📝 Meeting Check-In', 5);
+}
