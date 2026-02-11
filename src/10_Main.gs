@@ -1080,7 +1080,7 @@ function showHelpDialog() {
         </div>
 
         <div class="version">
-          509 Dashboard v${VERSION_INFO.CURRENT} | ${VERSION_INFO.CODENAME}
+          509 Dashboard v${VERSION_INFO.CURRENT} (${VERSION_INFO.BUILD_DATE}) | ${VERSION_INFO.CODENAME}
         </div>
       </div>
 
@@ -1130,7 +1130,7 @@ function showHelpDialog() {
     </html>
   `).setWidth(700).setHeight(750);
 
-  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - 509 Dashboard v' + VERSION_INFO.CURRENT);
+  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - 509 Dashboard v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')');
 }
 
 // ============================================================================

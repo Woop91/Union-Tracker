@@ -392,7 +392,7 @@ function showV4StatusReport() {
   // System Identity
   report += '🏷️ SYSTEM IDENTITY:\n';
   report += '  Name: ' + COMMAND_CONFIG.SYSTEM_NAME + '\n';
-  report += '  Version: ' + COMMAND_CONFIG.VERSION + '\n';
+  report += '  Version: ' + COMMAND_CONFIG.VERSION + ' (' + VERSION_INFO.BUILD_DATE + ')\n';
   report += '  Codename: ' + VERSION_INFO.CODENAME + '\n';
   report += '  Architecture: Single-File Modular (10 Virtual Files)\n\n';
 
@@ -3510,7 +3510,7 @@ function getPublicPortalHtml_(stats, stewards, satisfaction) {
     }).join('') +
     '    </div>' +
     '    ' +
-    '    <div class="footer"><i class="material-icons" style="font-size:12px;vertical-align:middle">lock</i> No PII Visible | Public Portal v' + VERSION_INFO.CURRENT + '</div>' +
+    '    <div class="footer"><i class="material-icons" style="font-size:12px;vertical-align:middle">lock</i> No PII Visible | Public Portal v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')' + '</div>' +
     '  </div>' +
     '</body>' +
     '</html>';
