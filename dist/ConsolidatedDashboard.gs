@@ -1999,9 +1999,9 @@ var DRIVE_CONFIG = {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 5,
-  PATCH: 0,
-  BUILD: 'v4.5.0',
-  CURRENT: '4.5.0',
+  PATCH: 1,
+  BUILD: 'v4.5.1',
+  CURRENT: '4.5.1',
   CODENAME: 'Code Audit & Cleanup'
 };
 
@@ -6360,7 +6360,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2549 lines)
+// SOURCE: 03_UIComponents.gs (2554 lines)
 // ============================================================================
 
 /**
@@ -6520,6 +6520,9 @@ function createDashboardMenu() {
       .addItem('🔄 Sync All Data Now', 'syncAllData')
       .addItem('🔄 Sync Grievance → Members', 'syncGrievanceToMemberDirectory')
       .addItem('🔄 Sync Members → Grievances', 'syncMemberToGrievanceLog')
+      .addItem('🤝 Sync Volunteer Hours → Members', 'syncVolunteerHoursToMemberDirectory')
+      .addItem('📅 Sync Meeting Attendance → Members', 'syncMeetingAttendanceToMemberDirectory')
+      .addItem('📊 Sync All Engagement Data', 'syncEngagementToMemberDirectory')
       .addSeparator()
       .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
       .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
@@ -6572,7 +6575,9 @@ function createDashboardMenu() {
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
       .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
-      .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
+      .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet')
+      .addSeparator()
+      .addItem('🗑️ Remove Deprecated Dashboard', 'removeDeprecatedDashboard'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
@@ -24767,7 +24772,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (613 lines)
+// SOURCE: 08a_SheetSetup.gs (626 lines)
 // ============================================================================
 
 /**
@@ -24817,7 +24822,10 @@ function CREATE_509_DASHBOARD() {
       '• ✅ Case Checklist (track grievance tasks)\n' +
       '• 📊 Member Satisfaction (Survey tracking)\n' +
       '• 💡 Feedback & Development (Bug/feature tracking)\n' +
+      '• 🤝 Volunteer Hours (track volunteer activities)\n' +
+      '• 📅 Meeting Attendance (track meeting participation)\n' +
       '• ✅ Function Checklist (function reference)\n' +
+      '• 📋 Features Reference (complete feature list)\n' +
       '• 📚 Getting Started (setup instructions)\n' +
       '• ❓ FAQ (common questions)\n' +
       '• 📖 Config Guide (how to use Config tab)\n\n' +
@@ -24874,6 +24882,15 @@ function CREATE_509_DASHBOARD() {
     createConfigGuideSheet(ss);
     ss.toast('Created Config Guide', '🏗️ Progress', 2);
 
+    createFeaturesReferenceSheet(ss);
+    ss.toast('Created Features Reference', '🏗️ Progress', 2);
+
+    createVolunteerHoursSheet(ss);
+    ss.toast('Created Volunteer Hours tracking', '🏗️ Progress', 2);
+
+    createMeetingAttendanceSheet(ss);
+    ss.toast('Created Meeting Attendance tracking', '🏗️ Progress', 2);
+
     saveFormUrlsToConfig_silent(ss);
     ss.toast('Saved form URLs to Config', '🏗️ Progress', 2);
 
@@ -24886,11 +24903,12 @@ function CREATE_509_DASHBOARD() {
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
-        '10 sheets created:\n' +
+        '13 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
-        '• ✅ Function Checklist (function reference)\n' +
+        '• 🤝 Volunteer Hours, 📅 Meeting Attendance (engagement tracking)\n' +
+        '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
@@ -33310,7 +33328,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1499 lines)
+// SOURCE: 10a_SheetCreation.gs (1653 lines)
 // ============================================================================
 
 /**
@@ -34811,6 +34829,160 @@ function createDashboardCharts_(sheet) {
 // - padRight()
 // ============================================================================
 
+
+// ============================================================================
+// VOLUNTEER HOURS & MEETING ATTENDANCE SHEETS
+// ============================================================================
+
+/**
+ * Creates the Volunteer Hours tracking sheet
+ * Records volunteer activities and auto-calculates totals for Member Directory
+ * @param {Spreadsheet} ss - The spreadsheet
+ * @returns {void}
+ */
+function createVolunteerHoursSheet(ss) {
+  var sheet = getOrCreateSheet(ss, SHEETS.VOLUNTEER_HOURS);
+
+  var headers = [
+    'Entry ID',           // A - Auto-generated
+    'Member ID',          // B - Dropdown from Member Directory
+    'Member Name',        // C - Auto-lookup from Member Directory
+    'Activity Date',      // D - Date of volunteer activity
+    'Activity Type',      // E - Type of volunteer work
+    'Hours',              // F - Number of hours volunteered
+    'Description',        // G - Brief description
+    'Verified By',        // H - Who verified the hours
+    'Notes'               // I - Additional notes
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setBackground(COLORS.UNION_GREEN)
+    .setFontColor(COLORS.WHITE)
+    .setHorizontalAlignment('center')
+    .setWrap(false);
+
+  // Add data type hints (row 2)
+  var hints = [
+    'Auto-ID', 'Dropdown', 'Auto-lookup', 'MM/DD/YYYY', 'Dropdown', 'Number', 'Text', 'Text', 'Text'
+  ];
+
+  sheet.getRange(2, 1, 1, hints.length).setValues([hints])
+    .setFontStyle('italic')
+    .setFontSize(9)
+    .setBackground('#F0F9FF')
+    .setFontColor('#6B7280')
+    .setHorizontalAlignment('center');
+
+  // Set column widths
+  sheet.setColumnWidth(1, 100);  // A - Entry ID
+  sheet.setColumnWidth(2, 100);  // B - Member ID
+  sheet.setColumnWidth(3, 150);  // C - Member Name
+  sheet.setColumnWidth(4, 110);  // D - Activity Date
+  sheet.setColumnWidth(5, 150);  // E - Activity Type
+  sheet.setColumnWidth(6, 80);   // F - Hours
+  sheet.setColumnWidth(7, 250);  // G - Description
+  sheet.setColumnWidth(8, 130);  // H - Verified By
+  sheet.setColumnWidth(9, 200);  // I - Notes
+
+  // Format columns
+  sheet.getRange(3, 4, 998, 1).setNumberFormat('MM/DD/YYYY');  // D - Activity Date
+  sheet.getRange(3, 6, 998, 1).setNumberFormat('#,##0.0');     // F - Hours
+
+  // Auto-ID formula for Entry ID (column A)
+  var idFormula = '=IF(B3<>"", "VOL-" & TEXT(ROW()-2, "0000"), "")';
+  sheet.getRange('A3').setFormula(idFormula);
+  sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+
+  // Member Name lookup formula (column C) - VLOOKUP from Member Directory
+  var nameLookupFormula = '=IF(B3<>"", IFERROR(VLOOKUP(B3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(B3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  sheet.getRange('C3').setFormula(nameLookupFormula);
+  sheet.getRange('C3').copyTo(sheet.getRange('C3:C1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+
+  // Freeze header rows
+  sheet.setFrozenRows(2);
+
+  // Set tab color
+  sheet.setTabColor('#8B5CF6');  // Purple for volunteer hours
+
+  Logger.log('Volunteer Hours sheet created');
+}
+
+/**
+ * Creates the Meeting Attendance tracking sheet
+ * Records meeting attendance and auto-updates Member Directory
+ * @param {Spreadsheet} ss - The spreadsheet
+ * @returns {void}
+ */
+function createMeetingAttendanceSheet(ss) {
+  var sheet = getOrCreateSheet(ss, SHEETS.MEETING_ATTENDANCE);
+
+  var headers = [
+    'Entry ID',           // A - Auto-generated
+    'Meeting Date',       // B - Date of meeting
+    'Meeting Type',       // C - Virtual or In-Person
+    'Meeting Name',       // D - Name/description of meeting
+    'Member ID',          // E - Dropdown from Member Directory
+    'Member Name',        // F - Auto-lookup from Member Directory
+    'Attended',           // G - Yes/No checkbox
+    'Notes'               // H - Additional notes
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setBackground(COLORS.UNION_GREEN)
+    .setFontColor(COLORS.WHITE)
+    .setHorizontalAlignment('center')
+    .setWrap(false);
+
+  // Add data type hints (row 2)
+  var hints = [
+    'Auto-ID', 'MM/DD/YYYY', 'Dropdown', 'Text', 'Dropdown', 'Auto-lookup', 'Checkbox', 'Text'
+  ];
+
+  sheet.getRange(2, 1, 1, hints.length).setValues([hints])
+    .setFontStyle('italic')
+    .setFontSize(9)
+    .setBackground('#F0F9FF')
+    .setFontColor('#6B7280')
+    .setHorizontalAlignment('center');
+
+  // Set column widths
+  sheet.setColumnWidth(1, 100);  // A - Entry ID
+  sheet.setColumnWidth(2, 110);  // B - Meeting Date
+  sheet.setColumnWidth(3, 120);  // C - Meeting Type
+  sheet.setColumnWidth(4, 200);  // D - Meeting Name
+  sheet.setColumnWidth(5, 100);  // E - Member ID
+  sheet.setColumnWidth(6, 150);  // F - Member Name
+  sheet.setColumnWidth(7, 90);   // G - Attended
+  sheet.setColumnWidth(8, 200);  // H - Notes
+
+  // Format columns
+  sheet.getRange(3, 2, 998, 1).setNumberFormat('MM/DD/YYYY');  // B - Meeting Date
+
+  // Add checkboxes for Attended column
+  sheet.getRange('G3:G1000').insertCheckboxes();
+
+  // Auto-ID formula for Entry ID (column A)
+  var idFormula = '=IF(E3<>"", "MTG-" & TEXT(ROW()-2, "0000"), "")';
+  sheet.getRange('A3').setFormula(idFormula);
+  sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+
+  // Member Name lookup formula (column F) - VLOOKUP from Member Directory
+  var nameLookupFormula = '=IF(E3<>"", IFERROR(VLOOKUP(E3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(E3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  sheet.getRange('F3').setFormula(nameLookupFormula);
+  sheet.getRange('F3').copyTo(sheet.getRange('F3:F1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
+
+  // Freeze header rows
+  sheet.setFrozenRows(2);
+
+  // Set tab color
+  sheet.setTabColor('#10B981');  // Green for meeting attendance
+
+  Logger.log('Meeting Attendance sheet created');
+}
 
 
 // ============================================================================
@@ -37499,7 +37671,7 @@ function unfreezeAllColumns() {
 
 
 // ============================================================================
-// SOURCE: 10d_SyncAndMaintenance.gs (1315 lines)
+// SOURCE: 10d_SyncAndMaintenance.gs (1517 lines)
 // ============================================================================
 
 // ============================================================================
@@ -38773,6 +38945,207 @@ function repairAllCheckboxes() {
  */
 
 // ============================================================================
+// ENGAGEMENT TRACKING SYNC FUNCTIONS
+// ============================================================================
+
+/**
+ * Syncs volunteer hours from Volunteer Hours sheet to Member Directory
+ * Calculates total hours for each member and updates column S (VOLUNTEER_HOURS)
+ * @returns {void}
+ */
+function syncVolunteerHoursToMemberDirectory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var volunteerSheet = ss.getSheetByName(SHEETS.VOLUNTEER_HOURS);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!volunteerSheet || !memberSheet) {
+    Logger.log('Required sheets not found for volunteer hours sync');
+    return;
+  }
+
+  // Get volunteer hours data
+  var volunteerData = volunteerSheet.getDataRange().getValues();
+  if (volunteerData.length < 3) {
+    // No data rows (only headers row 1-2)
+    Logger.log('No volunteer hours data to sync');
+    return;
+  }
+
+  // Build lookup map: memberId -> totalHours
+  var hoursLookup = {};
+
+  for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
+    var row = volunteerData[i];
+    var memberId = row[1];  // Column B - Member ID
+    var hours = row[5];     // Column F - Hours
+
+    if (!memberId) continue;
+
+    // Initialize if doesn't exist
+    if (!hoursLookup[memberId]) {
+      hoursLookup[memberId] = 0;
+    }
+
+    // Add hours (handle both number and string)
+    var hoursNum = parseFloat(hours) || 0;
+    hoursLookup[memberId] += hoursNum;
+  }
+
+  // Get member data
+  var memberData = memberSheet.getDataRange().getValues();
+  if (memberData.length < 2) return;
+
+  // Update column S (VOLUNTEER_HOURS)
+  var updates = [];
+  for (var j = 1; j < memberData.length; j++) {
+    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    var totalHours = hoursLookup[memberId] || 0;
+    updates.push([totalHours]);
+  }
+
+  if (updates.length > 0) {
+    memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, updates.length, 1).setValues(updates);
+  }
+
+  Logger.log('Synced volunteer hours to ' + updates.length + ' members');
+}
+
+/**
+ * Syncs meeting attendance from Meeting Attendance sheet to Member Directory
+ * Updates Last Virtual Mtg (column P) and Last In-Person Mtg (column Q)
+ * @returns {void}
+ */
+function syncMeetingAttendanceToMemberDirectory() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var attendanceSheet = ss.getSheetByName(SHEETS.MEETING_ATTENDANCE);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!attendanceSheet || !memberSheet) {
+    Logger.log('Required sheets not found for meeting attendance sync');
+    return;
+  }
+
+  // Get attendance data
+  var attendanceData = attendanceSheet.getDataRange().getValues();
+  if (attendanceData.length < 3) {
+    // No data rows (only headers row 1-2)
+    Logger.log('No meeting attendance data to sync');
+    return;
+  }
+
+  // Build lookup map: memberId -> {lastVirtual, lastInPerson}
+  var attendanceLookup = {};
+
+  for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
+    var row = attendanceData[i];
+    var meetingDate = row[1];     // Column B - Meeting Date
+    var meetingType = row[2];     // Column C - Meeting Type
+    var memberId = row[4];        // Column E - Member ID
+    var attended = row[6];        // Column G - Attended (checkbox)
+
+    if (!memberId || !attended || !meetingDate) continue;
+
+    // Initialize if doesn't exist
+    if (!attendanceLookup[memberId]) {
+      attendanceLookup[memberId] = {
+        lastVirtual: null,
+        lastInPerson: null
+      };
+    }
+
+    // Convert to date if it's a string
+    var dateValue = meetingDate instanceof Date ? meetingDate : new Date(meetingDate);
+
+    // Update last meeting date by type
+    if (meetingType === 'Virtual' || meetingType === 'virtual') {
+      if (!attendanceLookup[memberId].lastVirtual || dateValue > attendanceLookup[memberId].lastVirtual) {
+        attendanceLookup[memberId].lastVirtual = dateValue;
+      }
+    } else if (meetingType === 'In-Person' || meetingType === 'in-person') {
+      if (!attendanceLookup[memberId].lastInPerson || dateValue > attendanceLookup[memberId].lastInPerson) {
+        attendanceLookup[memberId].lastInPerson = dateValue;
+      }
+    }
+  }
+
+  // Get member data
+  var memberData = memberSheet.getDataRange().getValues();
+  if (memberData.length < 2) return;
+
+  // Update columns P (LAST_VIRTUAL_MTG) and Q (LAST_INPERSON_MTG)
+  var updates = [];
+  for (var j = 1; j < memberData.length; j++) {
+    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    var memberAttendance = attendanceLookup[memberId] || {lastVirtual: '', lastInPerson: ''};
+    updates.push([
+      memberAttendance.lastVirtual || '',
+      memberAttendance.lastInPerson || ''
+    ]);
+  }
+
+  if (updates.length > 0) {
+    memberSheet.getRange(2, MEMBER_COLS.LAST_VIRTUAL_MTG, updates.length, 2).setValues(updates);
+  }
+
+  Logger.log('Synced meeting attendance to ' + updates.length + ' members');
+}
+
+/**
+ * Unified sync function for all engagement tracking
+ * Syncs volunteer hours and meeting attendance to Member Directory
+ * Call this function after edits to Volunteer Hours or Meeting Attendance sheets
+ * @returns {void}
+ */
+function syncEngagementToMemberDirectory() {
+  syncVolunteerHoursToMemberDirectory();
+  syncMeetingAttendanceToMemberDirectory();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Engagement data synced successfully!', '✅ Sync Complete', 3);
+}
+
+// ============================================================================
+// DEPRECATED SHEET CLEANUP
+// ============================================================================
+
+/**
+ * Removes the deprecated Dashboard sheet and provides migration info
+ * The Dashboard sheet was deprecated in v4.3.2 in favor of modal dashboards
+ * @returns {void}
+ */
+function removeDeprecatedDashboard() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var dashSheet = ss.getSheetByName(SHEETS.DASHBOARD);
+
+  if (!dashSheet) {
+    ui.alert('✅ Clean',
+      'No deprecated Dashboard sheet found.\n\n' +
+      'Your spreadsheet is already using the modern modal dashboard system.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  var response = ui.alert(
+    '🗑️ Remove Deprecated Dashboard Sheet',
+    'The "💼 Dashboard" sheet is deprecated as of v4.3.2.\n\n' +
+    'Modern dashboards are now modal (popup) based:\n' +
+    '• Union Hub > Dashboards > Interactive Dashboard\n' +
+    '• Union Hub > Dashboards > Executive Command\n' +
+    '• Union Hub > Dashboards > Member Dashboard\n' +
+    '• Union Hub > Dashboards > Steward Performance\n\n' +
+    'Delete the deprecated sheet?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response === ui.Button.YES) {
+    ss.deleteSheet(dashSheet);
+    ss.toast('Deprecated Dashboard sheet removed', '✅ Cleanup Complete', 3);
+    Logger.log('Removed deprecated Dashboard sheet');
+  } else {
+    ss.toast('Deprecated sheet retained', 'ℹ️ Info', 3);
+  }
+}
+
+// ============================================================================
 // FORMULA HELPERS
 // ============================================================================
 
@@ -38792,6 +39165,7 @@ function repairAllCheckboxes() {
  * Gets member list for dropdowns
  * @return {Array} Array of member objects with id, name, department
  */
+
 
 // ============================================================================
 // SEARCH FUNCTIONS (Used by UIService)
@@ -38819,7 +39193,7 @@ function repairAllCheckboxes() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (1887 lines)
+// SOURCE: 10_Main.gs (1909 lines)
 // ============================================================================
 
 /**
@@ -38962,6 +39336,28 @@ function onEdit(e) {
     if (sheetName === 'Case Checklist' || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
       if (typeof handleChecklistEdit === 'function') {
         handleChecklistEdit(e);
+      }
+    }
+
+    // Volunteer Hours edits - auto-sync to Member Directory
+    if (sheetName === SHEETS.VOLUNTEER_HOURS) {
+      if (typeof syncVolunteerHoursToMemberDirectory === 'function') {
+        try {
+          syncVolunteerHoursToMemberDirectory();
+        } catch (syncError) {
+          Logger.log('Volunteer Hours sync error: ' + syncError.message);
+        }
+      }
+    }
+
+    // Meeting Attendance edits - auto-sync to Member Directory
+    if (sheetName === SHEETS.MEETING_ATTENDANCE) {
+      if (typeof syncMeetingAttendanceToMemberDirectory === 'function') {
+        try {
+          syncMeetingAttendanceToMemberDirectory();
+        } catch (syncError) {
+          Logger.log('Meeting Attendance sync error: ' + syncError.message);
+        }
       }
     }
 

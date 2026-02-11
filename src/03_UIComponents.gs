@@ -155,6 +155,9 @@ function createDashboardMenu() {
       .addItem('🔄 Sync All Data Now', 'syncAllData')
       .addItem('🔄 Sync Grievance → Members', 'syncGrievanceToMemberDirectory')
       .addItem('🔄 Sync Members → Grievances', 'syncMemberToGrievanceLog')
+      .addItem('🤝 Sync Volunteer Hours → Members', 'syncVolunteerHoursToMemberDirectory')
+      .addItem('📅 Sync Meeting Attendance → Members', 'syncMeetingAttendanceToMemberDirectory')
+      .addItem('📊 Sync All Engagement Data', 'syncEngagementToMemberDirectory')
       .addSeparator()
       .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
       .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
@@ -207,7 +210,9 @@ function createDashboardMenu() {
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
       .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
-      .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet'));
+      .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet')
+      .addSeparator()
+      .addItem('🗑️ Remove Deprecated Dashboard', 'removeDeprecatedDashboard'));
 
   // Only show Demo Data menu if NOT in production mode
   if (!isProductionMode()) {
