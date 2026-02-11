@@ -584,6 +584,7 @@ var VERSION_INFO = {
   PATCH: 1,
   BUILD: 'v4.5.1',
   CURRENT: '4.5.1',
+  BUILD_DATE: '2026-02-11',
   CODENAME: 'Code Audit & Cleanup'
 };
 
