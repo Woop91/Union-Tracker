@@ -1,4 +1,4 @@
-# 509 Strategic Command Center - v4.5.1 (2026-02-11)
+# 509 Strategic Command Center - v4.5.1
 
 A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **16-file modular architecture** following the Separation of Concerns principle.
 
@@ -441,9 +441,10 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-- **4.5.1** - Fixed GRIEVANCE_OUTCOMES/generateGrievanceId missing definitions, engagement tracking fixes, 950 Jest unit tests
-- **4.5.0** - Security Module, Data Access Layer, Member Self-Service with PIN authentication, comprehensive bug fixes
-- **4.4.1** - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
+- **4.5.1** (2026-02-11) - Fixed GRIEVANCE_OUTCOMES/generateGrievanceId missing definitions, engagement tracking fixes, 950 Jest unit tests
+- **4.5.0** (2026-02-01) - Security Module, Data Access Layer, Member Self-Service with PIN authentication, comprehensive bug fixes
+- **4.4.1** (2026-01-31) - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
+- **4.4.0** (2026-01-30) - Grievance tracking, member dashboard, satisfaction surveys, calendar integration, email notifications
 - **4.3.8** - Searchable Help Guide & Modal Consolidation: Help modal with menu reference/FAQ, Member Satisfaction sheet hidden
 - **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
 - **4.3.6** - Full Row Styling: Zebra stripes and themes apply to all rows in data sheets
