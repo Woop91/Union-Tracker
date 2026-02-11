@@ -1,4 +1,4 @@
-# 509 Strategic Command Center - v4.5.0
+# 509 Strategic Command Center - v4.5.1 (2026-02-11)
 
 A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **16-file modular architecture** following the Separation of Concerns principle.
 
