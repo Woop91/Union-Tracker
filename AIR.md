@@ -1,7 +1,7 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.4.1 (Compare Tab Redesign, Hot Spots Enhancement, Satisfaction Question Breakdown)
-**Last Updated:** 2026-01-19
+**Version:** 4.5.1 (Engagement Tracking Fixes, 950+ Tests, Code Audit & Cleanup)
+**Last Updated:** 2026-02-11
 **Purpose:** A personal project for grievance tracking and member engagement
 
 > **Disclaimer:** This is a personal project and is not affiliated with or endorsed by any union or labor organization. It is shared freely for others to use and customize.
@@ -359,7 +359,7 @@ Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each fil
   - **11 Tabs (Steward):** Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Help
   - **9 Tabs (Member):** Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare (no My Cases or Help)
   - **My Cases Tab:** Steward's assigned grievances with KPIs (active, urgent, avg days), filtering by status
-  - **Engagement Metrics:** Email open rate, virtual/in-person meeting attendance, volunteer hours, union interest (local/chapter/allied)
+  - **Engagement Metrics (Fixed v4.5.1):** Email open rate, virtual/in-person meeting attendance, volunteer hours, union interest (local/chapter/allied). Properly reads from MEMBER_COLS columns Q-W. Handles 0% open rate as valid. Accepts Yes/TRUE/true/boolean for interest fields.
   - **Workload Enhancements:** Member:Steward ratio display, Top Performers section with scores and win rates
   - **Filed vs Resolved Chart:** Monthly trend chart showing both filed and resolved grievances
   - **Directory Trends:** Recent updates, stale contacts, missing email/phone counts
@@ -1526,6 +1526,45 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 ---
 
 ## Changelog
+
+### Version 4.5.1 (2026-02-11) - Engagement Tracking Bug Fixes & Test Coverage
+
+**Critical Bug Fixes in `04e_PublicDashboard.gs`:**
+- **Fixed `MEMBER_COLS.FULL_NAME` undefined** - Member names in unified dashboard always showed "Unknown". Now correctly builds name from `FIRST_NAME` + `LAST_NAME` columns.
+- **Fixed `MEMBER_COLS.LAST_UPDATED` undefined** - Directory trends (recent updates, stale contacts) were never tracked. Now uses `RECENT_CONTACT_DATE` (column Y).
+- **Fixed `GRIEVANCE_COLS.CATEGORY` undefined** - Grievance categories always showed "Other". Now uses `ISSUE_CATEGORY` (column W).
+- **Fixed `GRIEVANCE_COLS.MEMBER_NAME` undefined** - Grievance member names always showed "Unknown". Now builds from `FIRST_NAME` + `LAST_NAME`.
+- **Fixed `GRIEVANCE_COLS.STEP_1_DATE/STEP_2_DATE/STEP_3_DATE` undefined** - Step 1 and Step 2 denial rates always showed 0%. Now uses `STEP1_RCVD`, `STEP2_RCVD`, `STEP2_APPEAL_FILED`, `STEP3_APPEAL_FILED`.
+- **Fixed `openRate=0` treated as empty** - Members with 0% email open rate were excluded from calculations because `0` is falsy in JavaScript. Now uses explicit empty checks.
+- **Fixed interest field comparison** - Added lowercase `'true'` to union interest value checks alongside `'Yes'`, `'TRUE'`, and boolean `true`.
+
+**Version Consistency Fix:**
+- Synced `API_VERSION` and `COMMAND_CONFIG.VERSION` to `4.5.1` to match `VERSION_INFO.CURRENT`
+
+**New Test Coverage (79 tests in `test/04e_PublicDashboard.test.js`):**
+- Function existence (5 tests)
+- Empty data handling (4 tests)
+- Member counting and steward ratio (4 tests)
+- Engagement metric calculations: email open rate, volunteer hours, virtual/in-person meeting attendance, union interest (11 tests)
+- Participation by unit/location (3 tests)
+- Hot spot detection: low engagement, grievance zones (5 tests)
+- PII handling: member mode vs steward mode (6 tests)
+- Grievance processing: status, win rate, overdue, workload, steps, articles (11 tests)
+- Directory trends: email/phone tracking, recent/stale contacts (4 tests)
+- Office days breakdown (2 tests)
+- Satisfaction data: survey response rate, morale score (3 tests)
+- API wrapper tests (3 tests)
+- Date range filtering (3 tests)
+- HTML generation (4 tests)
+- Data structure integrity (4 tests)
+- Edge cases: full data, empty data, case-insensitive status, zero values (7 tests)
+
+**FAQ Sheet Update:**
+- Added new "Engagement Tracking" FAQ category with 7 questions covering metrics tracked, where they appear, hot spots, meeting attendance, interest values, visibility, and survey response rate
+
+**Total Test Count:** 950 tests across 18 test suites (up from 871 across 17)
+
+---
 
 ### Version 4.4.1 (2026-01-19) - Compare Tab Redesign, Hot Spots Enhancement, Satisfaction Question Breakdown
 

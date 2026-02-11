@@ -1511,6 +1511,44 @@ function createFAQSheet(ss) {
     sheet.setRowHeight(row, 45);
   }
 
+  // ═══ CATEGORY: ENGAGEMENT TRACKING ═══
+  row += 2;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('📊 ENGAGEMENT TRACKING')
+    .setBackground(categoryBg)
+    .setFontWeight('bold')
+    .setFontSize(14)
+    .setFontColor('#065F46');
+  sheet.setRowHeight(row, 35);
+
+  var engagementFAQs = [
+    ['Q: What engagement metrics are tracked?',
+     'A: Email open rates (column S), virtual meeting attendance (Q), in-person meeting attendance (R), volunteer hours (T), and union interest in local/chapter/allied activities (U-W).'],
+    ['Q: Where do engagement metrics appear?',
+     'A: Engagement metrics appear in the Unified Web App Dashboard (both Steward and Member views), in the Engagement tab with email open rates, meeting attendance, volunteer hours, and union interest breakdowns.'],
+    ['Q: What are low engagement hot spots?',
+     'A: Locations or units where the average of email open rate and meeting attendance rate is below 30%, with at least 5 members. These are flagged in the Hot Spots tab to help stewards identify areas needing outreach.'],
+    ['Q: How is meeting attendance tracked?',
+     'A: Members who attended a virtual or in-person meeting within the last 6 months are counted. The rate is calculated as (attending members / total members) × 100.'],
+    ['Q: What values count as "interested" for union interest columns?',
+     'A: The values Yes, TRUE, true, and boolean true are all counted as expressing interest. Any other value (No, FALSE, empty) is not counted.'],
+    ['Q: Are engagement metrics columns visible by default?',
+     'A: No. Columns Q-T (Engagement Metrics) and U-X (Member Interests) are hidden by default using collapsible column groups. Stewards can expand them when needed.'],
+    ['Q: How does the survey response rate work?',
+     'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.']
+  ];
+
+  for (var eng = 0; eng < engagementFAQs.length; eng++) {
+    row++;
+    sheet.getRange(row, 1, 1, 5).merge().setValue(engagementFAQs[eng][0])
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+    sheet.setRowHeight(row, 30);
+    row++;
+    sheet.getRange(row, 1, 1, 5).merge().setValue(engagementFAQs[eng][1])
+      .setBackground(answerBg).setFontColor(textColor).setWrap(true);
+    sheet.setRowHeight(row, 45);
+  }
+
   // ═══ CATEGORY: ADVANCED ═══
   row += 2;
   sheet.getRange(row, 1, 1, 5).merge()
@@ -1564,7 +1602,7 @@ function createFAQSheet(ss) {
   sheet.setRowHeight(row, 28);
 
   var versionHistory = [
-    ['v' + VERSION_INFO.CURRENT, VERSION_INFO.CODENAME, 'Current release - comprehensive code review, 871+ tests, ESLint clean, modular source files'],
+    ['v' + VERSION_INFO.CURRENT, VERSION_INFO.CODENAME, 'Engagement tracking bug fixes, 950+ tests (79 new for engagement), comprehensive code review, ESLint clean, modular source files'],
     ['v4.4.0', 'Menu Consolidation', 'Unified 3-menu system (Union Hub, Tools, Admin), web app dashboards, deprecated command center menu'],
     ['v4.3.8', 'Features Reference', 'Satisfaction modal dashboard, Features Reference sheet, hidden satisfaction sheet'],
     ['v4.3.7', 'Help System', 'Complete rewrite of help guide with real-time search, menu reference, and FAQ tabs'],

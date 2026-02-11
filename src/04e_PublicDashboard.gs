@@ -261,13 +261,15 @@ function getUnifiedDashboardData(includePII) {
       if (!memberId) continue;
 
       data.totalMembers++;
-      var name = memberData[m][MEMBER_COLS.FULL_NAME - 1] || 'Unknown';
+      var firstName = memberData[m][MEMBER_COLS.FIRST_NAME - 1] || '';
+      var lastName = memberData[m][MEMBER_COLS.LAST_NAME - 1] || '';
+      var name = (firstName + ' ' + lastName).trim() || 'Unknown';
       var email = memberData[m][MEMBER_COLS.EMAIL - 1] || '';
       var phone = memberData[m][MEMBER_COLS.PHONE - 1] || '';
       var location = memberData[m][MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
       var unit = memberData[m][MEMBER_COLS.UNIT - 1] || 'Unknown';
       var isSteward = memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes';
-      var lastUpdated = memberData[m][MEMBER_COLS.LAST_UPDATED - 1];
+      var lastUpdated = memberData[m][MEMBER_COLS.RECENT_CONTACT_DATE - 1];
 
       // Engagement metrics from columns Q-W
       var lastVirtualMtg = memberData[m][MEMBER_COLS.LAST_VIRTUAL_MTG - 1];
@@ -278,13 +280,13 @@ function getUnifiedDashboardData(includePII) {
       var interestChapter = memberData[m][MEMBER_COLS.INTEREST_CHAPTER - 1];
       var interestAllied = memberData[m][MEMBER_COLS.INTEREST_ALLIED - 1];
 
-      // Track email open rates (if numeric)
-      if (openRate && !isNaN(parseFloat(openRate))) {
+      // Track email open rates (if numeric, including 0)
+      if ((openRate !== '' && openRate !== null && openRate !== undefined) && !isNaN(parseFloat(openRate))) {
         openRates.push(parseFloat(openRate));
       }
 
-      // Track volunteer hours
-      if (volunteerHours && !isNaN(parseFloat(volunteerHours))) {
+      // Track volunteer hours (if numeric, including 0)
+      if ((volunteerHours !== '' && volunteerHours !== null && volunteerHours !== undefined) && !isNaN(parseFloat(volunteerHours))) {
         totalVolunteerHours += parseFloat(volunteerHours);
       }
 
@@ -302,14 +304,14 @@ function getUnifiedDashboardData(includePII) {
         }
       }
 
-      // Track union interest (Yes/True values)
-      if (interestLocal && (interestLocal === 'Yes' || interestLocal === true || interestLocal === 'TRUE')) {
+      // Track union interest (Yes/True/true values)
+      if (interestLocal && (interestLocal === 'Yes' || interestLocal === true || interestLocal === 'TRUE' || interestLocal === 'true')) {
         interestLocalCount++;
       }
-      if (interestChapter && (interestChapter === 'Yes' || interestChapter === true || interestChapter === 'TRUE')) {
+      if (interestChapter && (interestChapter === 'Yes' || interestChapter === true || interestChapter === 'TRUE' || interestChapter === 'true')) {
         interestChapterCount++;
       }
-      if (interestAllied && (interestAllied === 'Yes' || interestAllied === true || interestAllied === 'TRUE')) {
+      if (interestAllied && (interestAllied === 'Yes' || interestAllied === true || interestAllied === 'TRUE' || interestAllied === 'true')) {
         interestAlliedCount++;
       }
 
@@ -329,7 +331,7 @@ function getUnifiedDashboardData(includePII) {
       // Track engagement by unit
       if (!engagementByUnit[unit]) engagementByUnit[unit] = { openRates: [], meetings: 0, count: 0 };
       engagementByUnit[unit].count++;
-      if (openRate && !isNaN(parseFloat(openRate))) engagementByUnit[unit].openRates.push(parseFloat(openRate));
+      if ((openRate !== '' && openRate !== null && openRate !== undefined) && !isNaN(parseFloat(openRate))) engagementByUnit[unit].openRates.push(parseFloat(openRate));
       if ((lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) ||
           (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo)) {
         engagementByUnit[unit].meetings++;
@@ -338,7 +340,7 @@ function getUnifiedDashboardData(includePII) {
       // Track engagement by location
       if (!engagementByLocation[location]) engagementByLocation[location] = { openRates: [], meetings: 0, count: 0 };
       engagementByLocation[location].count++;
-      if (openRate && !isNaN(parseFloat(openRate))) engagementByLocation[location].openRates.push(parseFloat(openRate));
+      if ((openRate !== '' && openRate !== null && openRate !== undefined) && !isNaN(parseFloat(openRate))) engagementByLocation[location].openRates.push(parseFloat(openRate));
       if ((lastVirtualMtg instanceof Date && lastVirtualMtg > sixMonthsAgo) ||
           (lastInPersonMtg instanceof Date && lastInPersonMtg > sixMonthsAgo)) {
         engagementByLocation[location].meetings++;
@@ -466,8 +468,10 @@ function getUnifiedDashboardData(includePII) {
       var steward = grievanceData[g][GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
       var gLocation = grievanceData[g][GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
       var article = grievanceData[g][GRIEVANCE_COLS.ARTICLES - 1];
-      var category = grievanceData[g][GRIEVANCE_COLS.CATEGORY - 1] || 'Other';
-      var memberName = grievanceData[g][GRIEVANCE_COLS.MEMBER_NAME - 1] || 'Unknown';
+      var category = grievanceData[g][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
+      var gFirstName = grievanceData[g][GRIEVANCE_COLS.FIRST_NAME - 1] || '';
+      var gLastName = grievanceData[g][GRIEVANCE_COLS.LAST_NAME - 1] || '';
+      var memberName = (gFirstName + ' ' + gLastName).trim() || 'Unknown';
       var currentStep = grievanceData[g][GRIEVANCE_COLS.CURRENT_STEP - 1] || 'Step 1';
       var dateFiled = grievanceData[g][GRIEVANCE_COLS.DATE_FILED - 1];
       var dateClosed = grievanceData[g][GRIEVANCE_COLS.DATE_CLOSED - 1];
@@ -566,9 +570,9 @@ function getUnifiedDashboardData(includePII) {
       }
 
       // Track Step 2 denial rate
-      if (grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) {
+      if (grievanceData[g][GRIEVANCE_COLS.STEP2_RCVD - 1]) {
         step2Total++;
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_3_DATE - 1]) step2Denials++;
+        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1]) step2Denials++;
       }
 
       // Open cases list for drill-down (member hidden in non-PII, steward always shown)
@@ -623,9 +627,9 @@ function getUnifiedDashboardData(includePII) {
       }
 
       // Step 1 denial rate
-      if (grievanceData[g][GRIEVANCE_COLS.STEP_1_DATE - 1]) {
+      if (grievanceData[g][GRIEVANCE_COLS.STEP1_RCVD - 1]) {
         step1Total++;
-        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP_2_DATE - 1]) step1Denials++;
+        if (status !== 'Won' && grievanceData[g][GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1]) step1Denials++;
       }
 
       // Settlement time
