@@ -22,7 +22,7 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order - 26 modules
+// Files in build order - 27 modules
 const BUILD_ORDER = [
   '00_Security.gs',                // Security utilities, XSS prevention, access control
   '00_DataAccess.gs',              // Data Access Layer, time constants
@@ -49,7 +49,8 @@ const BUILD_ORDER = [
   '10_Main.gs',                    // Main entry point
   '11_CommandHub.gs',              // Command center + Secure dashboard
   '12_Features.gs',                // Checklist, Dynamic, Looker
-  '13_MemberSelfService.gs'        // Member self-service portal with PIN auth
+  '13_MemberSelfService.gs',        // Member self-service portal with PIN auth
+  '14_MeetingCheckIn.gs'            // Meeting check-in system with email + PIN
 ];
 
 const HTML_FILES = [

@@ -1,10 +1,10 @@
 # 509 Strategic Command Center - v4.5.1
 
-A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **16-file modular architecture** following the Separation of Concerns principle.
+A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **17-file modular architecture** following the Separation of Concerns principle.
 
 ## Architecture Overview
 
-The dashboard uses a streamlined 16-file architecture for clarity and maintainability:
+The dashboard uses a streamlined 17-file architecture for clarity and maintainability:
 
 ```
 src/
@@ -24,6 +24,7 @@ src/
 ├── 11_CommandHub.gs             # Command center + Secure dashboard
 ├── 12_Features.gs               # Checklist, Dynamic Engine, Looker
 ├── 13_MemberSelfService.gs      # Member self-service portal with PIN authentication
+├── 14_MeetingCheckIn.gs         # Meeting check-in system with email + PIN auth
 └── MultiSelectDialog.html
 ```
 
@@ -47,6 +48,7 @@ src/
 | **11_CommandHub.gs** | Command center + Secure dashboard |
 | **12_Features.gs** | Checklist, Dynamic Engine, Looker |
 | **13_MemberSelfService.gs** | Member self-service portal with PIN authentication |
+| **14_MeetingCheckIn.gs** | Meeting check-in system with email + PIN authentication |
 | **MultiSelectDialog.html** | Multi-select dialog HTML template |
 
 ## v4.0 Features
@@ -125,11 +127,11 @@ src/
 - **Standalone Analytics Charts**: Dedicated modals for Treemap, Sentiment Trend, and Workload Report
 - **High-Contrast Dark Theme**: Professional dark gradient backgrounds optimized for readability
 
-## Benefits of 16-File Architecture
+## Benefits of 17-File Architecture
 
 1. **Clear Separation**: Each file has one clear purpose
 2. **Easy Navigation**: Numbered prefixes show dependency order on GitHub
-3. **Production Ready**: Delete `07_DevTools.gs` before go-live (15 files in production)
+3. **Production Ready**: Delete `07_DevTools.gs` before go-live (16 files in production)
 4. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
 5. **Easier Maintenance**: Update union rules in one place (`01_Core.gs`)
 6. **Scalability**: Handles 5,000+ members without performance issues
@@ -189,6 +191,7 @@ src/
 | `11_CommandHub.gs` | Command center + Secure dashboard |
 | `12_Features.gs` | Checklist, Dynamic Engine, Looker |
 | `13_MemberSelfService.gs` | Member self-service portal with PIN authentication |
+| `14_MeetingCheckIn.gs` | Meeting check-in system with email + PIN authentication |
 | `MultiSelectDialog.html` | Multi-select dialog HTML template |
 
 ## Going Live (Production)
@@ -218,10 +221,11 @@ src/
 ├── 11_CommandHub.gs             # Command center + Secure dashboard
 ├── 12_Features.gs               # Checklist, Dynamic Engine, Looker
 ├── 13_MemberSelfService.gs      # Member self-service portal with PIN authentication
+├── 14_MeetingCheckIn.gs         # Meeting check-in system with email + PIN auth
 └── MultiSelectDialog.html
 ```
 
-**15 files in production** (DevTools removed)
+**16 files in production** (DevTools removed)
 
 ## Key Features
 
