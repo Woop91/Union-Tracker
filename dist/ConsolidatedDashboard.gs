@@ -1827,8 +1827,8 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 5,
-  patch: 1,
+  minor: 6,
+  patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -1922,7 +1922,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.5.1",
+  VERSION: "4.6.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -1999,12 +1999,12 @@ var DRIVE_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 5,
-  PATCH: 1,
-  BUILD: 'v4.5.1',
-  CURRENT: '4.5.1',
-  BUILD_DATE: '2026-02-11',
-  CODENAME: 'Code Audit & Cleanup'
+  MINOR: 6,
+  PATCH: 0,
+  BUILD: 'v4.6.0',
+  CURRENT: '4.6.0',
+  BUILD_DATE: '2026-02-12',
+  CODENAME: 'Meeting Intelligence & Document Automation'
 };
 
 // ============================================================================
@@ -13651,7 +13651,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 04e_PublicDashboard.gs (2559 lines)
+// SOURCE: 04e_PublicDashboard.gs (2564 lines)
 // ============================================================================
 
 // ============================================================================
@@ -15683,7 +15683,12 @@ function getUnifiedDashboardHtml(isPII) {
     '{cat:"Comparison Tool",q:"How do I use the Compare tab?",a:"Select metrics you want to compare using checkboxes, then click Export to download a CSV file with your selected data.",tutorial:true},' +
     '{cat:"Comparison Tool",q:"Can I export data for reports?",a:"Yes! Use the Compare tab to select metrics, then Export. The CSV can be opened in Excel or Google Sheets for further analysis.",tutorial:false},' +
     '{cat:"Troubleshooting",q:"Data is not loading",a:"Try clicking Refresh in the footer. If that fails, close and reopen the dashboard. Check your network connection.",tutorial:false},' +
-    '{cat:"Troubleshooting",q:"Charts are not displaying",a:"Ensure JavaScript is enabled in your browser. Try a different browser (Chrome recommended). Clear browser cache if issues persist.",tutorial:false}' +
+    '{cat:"Troubleshooting",q:"Charts are not displaying",a:"Ensure JavaScript is enabled in your browser. Try a different browser (Chrome recommended). Clear browser cache if issues persist.",tutorial:false},' +
+    '{cat:"Meeting Notes",q:"How do I set up a meeting with notes and agenda?",a:"Go to Strategic Ops > Meeting Check-In > Setup Meeting. Fill in the details and the system auto-creates Google Docs for Meeting Notes and Meeting Agenda in dedicated Drive folders.",tutorial:true},' +
+    '{cat:"Meeting Notes",q:"How does the agenda sharing work?",a:"When setting up a meeting, select which stewards get the agenda early (3 days before). All stewards automatically receive it at least 1 day before. The agenda is never shared with members.",tutorial:true},' +
+    '{cat:"Meeting Notes",q:"Where can I view meeting notes?",a:"Click the Meeting Notes tab in this dashboard. It shows completed meetings chronologically with search. Click View Notes to open the read-only Google Doc.",tutorial:true},' +
+    '{cat:"Meeting Notes",q:"When do meeting notes become available?",a:"Meeting notes are published as view-only 1 day after the meeting date. Before that, only stewards with the link can edit them.",tutorial:false},' +
+    '{cat:"Meeting Notes",q:"How do I create a member Drive folder?",a:"Select a member in the Member Directory, open Quick Actions (Strategic Ops > Cases > Member Quick Actions), and click Create Member Folder. If the member has an existing grievance folder, it will be reused.",tutorial:true}' +
     '];' +
     'var features=[' +
     '{name:"Overview Tab",desc:"At-a-glance KPIs including total members, open cases, win rate, morale score. Quick status cards and trend charts.",icon:"dashboard"},' +
@@ -15706,7 +15711,7 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="</div></div>";' +
     // FAQ Section
     'html+="<div id=\\"faq-section\\" class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">help_outline</i>Frequently Asked Questions</div><div id=\\"faq-list\\">";' +
-    'var cats=["Getting Started","Grievance Management","Analytics","Member Directory","Satisfaction","Comparison Tool","Troubleshooting"];' +
+    'var cats=["Getting Started","Grievance Management","Analytics","Member Directory","Satisfaction","Comparison Tool","Meeting Notes","Troubleshooting"];' +
     'cats.forEach(function(cat){' +
     'var catFaqs=faqData.filter(function(f){return f.cat===cat});' +
     'if(catFaqs.length>0){html+="<div class=\\"faq-category\\" style=\\"margin-bottom:16px\\"><div style=\\"font-weight:600;color:#a78bfa;margin-bottom:8px;font-size:13px\\">"+cat+"</div>";' +
@@ -45592,7 +45597,7 @@ function getErrorPageHtml_(message) {
  * Manages case checklists for grievances and other action types.
  * Provides functions for creating, updating, and tracking checklist items.
  *
- * @version 4.3.0
+ * @version 4.6.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 

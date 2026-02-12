@@ -5,6 +5,34 @@ All notable changes to the 509 Union Dashboard project will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.0] - 2026-02-12
+
+### Added
+- **Meeting Notes & Agenda Document Automation** - When a meeting is created, Google Docs for Meeting Notes and Meeting Agenda are auto-generated in dedicated Drive folders (`Meeting Notes/`, `Meeting Agenda/`). URLs stored in Meeting Check-In Log columns N-O
+- **Two-Tier Agenda Steward Selection** - Meeting setup dialog lets the organizer select which stewards receive the agenda 3 days before the meeting; ALL stewards receive it at least 1 day before. Agenda is never shared with members
+- **Meeting Notes Dashboard Tab** - New "Meeting Notes" tab in Member Dashboard shows completed meetings chronologically with search and view-only Google Doc links. Notes auto-publish (view-only) 1 day after each meeting
+- **Scheduled Meeting Document Notifications** - `processMeetingDocNotifications()` runs in `dailyTrigger()`: agenda 3 days before (selected stewards), agenda 1 day before (all stewards), notes 1 day before (notification stewards), view-only publish 1 day after
+- **Member Drive Folder Quick Action** - "Create Member Folder" button in Member Quick Actions dialog creates/reuses a Google Drive folder for the member, checking for existing grievance folders first
+- **Meeting Event Scheduling** - Full calendar lifecycle for meetings: creates Google Calendar events, activates/deactivates check-in based on event status
+- **Grievance Date Override** - Stewards can overwrite grievance dates with downstream deadline recalculation
+- **Steward Checkboxes in Meeting Setup** - Dynamic steward list loaded from Member Directory with Select All / Clear All, separate "Email Attendance Report To" and "Send Agenda Early To" sections
+- Meeting Check-In Log expanded from 13 columns (A-M) to 16 columns (A-P): `NOTES_DOC_URL` (N), `AGENDA_DOC_URL` (O), `AGENDA_STEWARDS` (P)
+
+### Changed
+- Version bumped to 4.6.0 across all files (VERSION_INFO, COMMAND_CONFIG, API_VERSION)
+- Meeting setup dialog height increased from 580px to 720px to accommodate steward selection
+- `dailyTrigger()` now includes `processMeetingDocNotifications()` with audit logging for agenda sent, notes sent, and notes published counts
+
+### New Functions
+- `createMeetingDocs(meetingData)` - Creates Meeting Notes and Agenda Google Docs in dedicated folders
+- `getOrCreateMeetingNotesFolder()` / `getOrCreateMeetingAgendaFolder()` - Gets or creates Drive folders for meeting documents
+- `emailMeetingDocLink()` - Sends HTML email with meeting document link to stewards
+- `setDocViewOnlyByLink(docUrl)` - Sets a Google Doc to view-only sharing via link
+- `getAllStewardEmails_()` - Retrieves all steward emails from Member Directory
+- `processMeetingDocNotifications()` - Two-tier notification scheduler for meeting documents
+- `setupDriveFolderForMember(memberId)` - Creates/reuses Google Drive folder for a member
+- `getStewardEmailsForMeetingSetup()` - Returns steward names/emails for the meeting setup dialog
+
 ## [4.5.1] - 2026-02-11
 
 ### Fixed
@@ -90,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 4.6.0 | 2026-02-12 | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling |
 | 4.5.1 | 2026-02-11 | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |
 | 4.5.0 | 2026-02-01 | Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files |
 | 4.4.1 | 2026-01-31 | Build system |

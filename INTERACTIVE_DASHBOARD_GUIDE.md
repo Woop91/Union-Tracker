@@ -14,7 +14,7 @@ The system now provides **two unified web app dashboards** with the same profess
 **Menu:** `509 Union Hub > Steward Dashboard`
 **Web App URL:** `?mode=steward`
 
-A comprehensive dashboard for stewards and leadership with **11 tabs**:
+A comprehensive dashboard for stewards and leadership with **12 tabs**:
 
 | Tab | Features |
 |-----|----------|
@@ -28,14 +28,16 @@ A comprehensive dashboard for stewards and leadership with **11 tabs**:
 | **Satisfaction** | 8-section analysis with individual question scores, expandable section details, complete question breakdown table |
 | **Resources** | Google Drive folder access, forms, contracts, steward directory with search |
 | **Compare** | Period comparison (current vs previous 30 days), step-by-step grievance comparison table, satisfaction section comparison, denial rate analysis, CSV export |
+| **Meeting Notes** | Chronological list of completed meetings with search and view-only Google Doc links (v4.6.0) |
 | **Help** | Comprehensive FAQ with 4 categories and 12+ questions |
 
 **Additional Features:**
-- **Help/FAQ Button** - Comprehensive help modal with 4 categories and 12+ questions
+- **Help/FAQ Button** - Comprehensive help modal with 4+ categories and 17+ questions
 - **Searchable Modals** - Click-through lists include search functionality
 - **Filed vs Resolved Chart** - Monthly trend showing both filed and resolved grievances
 - **Individual Question Scores** - All 40+ survey questions scored and displayed
 - **Hot Spot Explanations** - Clear descriptions of what each hot spot type means
+- **Meeting Notes Tab (v4.6.0)** - Chronological meeting notes with search and view-only Google Doc links
 
 > **Contains PII:** This dashboard shows member names and steward details. For internal use only.
 
@@ -43,12 +45,12 @@ A comprehensive dashboard for stewards and leadership with **11 tabs**:
 **Menu:** `509 Union Hub > Member Dashboard`
 **Web App URL:** `?mode=member`
 
-A PII-safe dashboard for sharing with members - **9 tabs** with anonymized data:
+A PII-safe dashboard for sharing with members - **10 tabs** with anonymized data:
 
 | Feature | Description |
 |---------|-------------|
 | **Same Dark Theme** | Identical professional dark gradient interface |
-| **9 Tabs** | Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare |
+| **10 Tabs** | Overview, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Meeting Notes, Compare |
 | **No My Cases or Help** | My Cases and Help tabs are steward-only (requires PII) |
 | **Anonymized Data** | Member names replaced with "Member 1", "Member 2", etc. |
 | **Aggregate Stats** | Individual data rolled up to percentages and totals |
@@ -604,7 +606,7 @@ Potential additions (from Future Features sheet):
 
 ---
 
-**Version:** 4.4.1
-**Last Updated:** January 2026
+**Version:** 4.6.0
+**Last Updated:** February 2026
 
 *A personal project providing data-driven insights for representatives* 📊

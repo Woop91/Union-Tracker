@@ -408,8 +408,8 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 5,
-  patch: 1,
+  minor: 6,
+  patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -503,7 +503,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.5.1",
+  VERSION: "4.6.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -580,12 +580,12 @@ var DRIVE_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 5,
-  PATCH: 1,
-  BUILD: 'v4.5.1',
-  CURRENT: '4.5.1',
-  BUILD_DATE: '2026-02-11',
-  CODENAME: 'Code Audit & Cleanup'
+  MINOR: 6,
+  PATCH: 0,
+  BUILD: 'v4.6.0',
+  CURRENT: '4.6.0',
+  BUILD_DATE: '2026-02-12',
+  CODENAME: 'Meeting Intelligence & Document Automation'
 };
 
 // ============================================================================

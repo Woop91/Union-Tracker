@@ -1,4 +1,4 @@
-# 509 Strategic Command Center - v4.5.1
+# 509 Strategic Command Center - v4.6.0
 
 A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **27-file modular architecture** following the Separation of Concerns principle.
 
@@ -91,7 +91,18 @@ src/
 - **Email Dashboard Link**: One-click email sending of dashboard URL to selected members
 - **Zero PII Exposure**: All member-facing views show only aggregate statistics
 
-## v4.5.0 Features (CURRENT)
+## v4.6.0 Features (CURRENT)
+
+- **Meeting Notes & Agenda Document Automation**: Auto-creates Google Docs for Meeting Notes and Meeting Agenda when a meeting is set up, stored in dedicated Drive folders
+- **Two-Tier Steward Agenda Sharing**: Meeting organizer selects which stewards get agenda early (3 days before); ALL stewards receive it at least 1 day before. Agenda never shared with members
+- **Meeting Notes Dashboard Tab**: New tab in Member Dashboard showing completed meetings chronologically with search and view-only Google Doc links
+- **Scheduled Meeting Document Notifications**: Daily trigger sends agenda/notes emails at the right time and auto-publishes notes as view-only after the meeting
+- **Member Drive Folder Quick Action**: "Create Member Folder" button in Quick Actions creates/reuses a Google Drive folder per member
+- **Meeting Event Scheduling**: Full Google Calendar lifecycle for meetings with event creation, check-in activation/deactivation
+- **Grievance Date Override**: Stewards can overwrite grievance dates with downstream deadline recalculation
+- **Meeting Check-In Log Expansion**: 16 columns (A-P) with Notes Doc URL, Agenda Doc URL, and Agenda Stewards columns
+
+## v4.5.0 Features
 
 - **Security Module** (`00_Security.gs`): XSS prevention, input sanitization, access control utilities
 - **Data Access Layer** (`00_DataAccess.gs`): Centralized sheet access with caching, time constants
@@ -272,13 +283,15 @@ src/
 - **Grievance Tracking**: Full lifecycle from filing to resolution
 - **Member Directory**: Contact info, job metadata, steward assignments
 - **Deadline Management**: Auto-calculated deadlines with Calendar sync
-- **Drive Integration**: Auto-created folders for each grievance
+- **Drive Integration**: Auto-created folders for each grievance and per member
+- **Meeting Management**: Check-in system with auto-generated Notes & Agenda docs, scheduled steward notifications
+- **Meeting Notes Dashboard**: Chronological view of completed meeting notes with search and view-only links
 - **Comfort View**: ADHD-friendly themes, focus mode, reduced motion
 - **Mobile UI**: Quick actions optimized for phone access
 - **Data Integrity**: Batch operations, validation, orphan detection
 - **Audit Logging**: Track all changes with timestamps
 
-## Menu System Overview (v4.5.0)
+## Menu System Overview (v4.6.0)
 
 The dashboard provides 4 comprehensive top-level menus with 100+ functions:
 
@@ -485,6 +498,7 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
+- **4.6.0** (2026-02-12) - Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling
 - **4.5.1** (2026-02-11) - Fixed GRIEVANCE_OUTCOMES/generateGrievanceId missing definitions, engagement tracking fixes, 950 Jest unit tests
 - **4.5.0** (2026-02-01) - Security Module, Data Access Layer, Member Self-Service with PIN authentication, comprehensive bug fixes
 - **4.4.1** (2026-01-31) - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
