@@ -171,19 +171,19 @@ describe('DEADLINE_RULES ↔ TIME_CONSTANTS.DEADLINE_DAYS consistency', () => {
 // ============================================================================
 
 describe('getMemberHeaders', () => {
-  test('returns correct number of headers (matches PIN_HASH column)', () => {
+  test('returns correct number of headers (matches STATE column)', () => {
     const headers = getMemberHeaders();
-    // Headers should cover columns up to PIN_HASH (33)
-    expect(headers.length).toBe(MEMBER_COLS.PIN_HASH);
+    // Headers should cover columns up to STATE (39) - includes Employee ID, Department, Hire Date, Street Address, City, State
+    expect(headers.length).toBe(MEMBER_COLS.STATE);
   });
 
   test('first header is Member ID', () => {
     expect(getMemberHeaders()[0]).toBe('Member ID');
   });
 
-  test('last header is PIN Hash', () => {
+  test('last header is State', () => {
     const headers = getMemberHeaders();
-    expect(headers[headers.length - 1]).toBe('PIN Hash');
+    expect(headers[headers.length - 1]).toBe('State');
   });
 
   test('header position matches MEMBER_COLS for key fields', () => {

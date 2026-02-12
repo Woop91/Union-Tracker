@@ -1570,7 +1570,7 @@ function addNewMember(memberData) {
     const newId = `MEM-${timestamp}`;
 
     // Prepare row data using MEMBER_COLS constants (1-indexed)
-    var rowData = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+    var rowData = new Array(MEMBER_COLS.STATE).fill('');
     rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
     rowData[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName || '';
     rowData[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName || '';
@@ -1581,6 +1581,9 @@ function addNewMember(memberData) {
     rowData[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
     rowData[MEMBER_COLS.IS_STEWARD - 1] = 'No';
     rowData[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = new Date();
+    rowData[MEMBER_COLS.EMPLOYEE_ID - 1] = memberData.employeeId || '';
+    rowData[MEMBER_COLS.DEPARTMENT - 1] = memberData.department || '';
+    rowData[MEMBER_COLS.HIRE_DATE - 1] = memberData.hireDate ? new Date(memberData.hireDate) : '';
 
     sheet.appendRow(rowData);
 

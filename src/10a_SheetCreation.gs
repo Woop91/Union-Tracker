@@ -591,10 +591,27 @@ function createMemberDirectory(ss) {
     sheet.getRange(1, MEMBER_COLS.INTEREST_LOCAL, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.collapseAllColumnGroups();
 
+    // Group 3: Mailing Address / PII (AK-AM, columns 37-39) - Hidden by default, PII
+    sheet.getRange(1, MEMBER_COLS.STREET_ADDRESS, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    sheet.collapseAllColumnGroups();
+
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
   } catch (e) {
     Logger.log('Member Directory column group setup skipped: ' + e.toString());
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EMPLOYMENT & PII COLUMN SETUP: Widths, date format, and hide PIN Hash
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.setColumnWidth(MEMBER_COLS.EMPLOYEE_ID, 120);
+  sheet.setColumnWidth(MEMBER_COLS.DEPARTMENT, 140);
+  sheet.setColumnWidth(MEMBER_COLS.HIRE_DATE, 110);
+  sheet.setColumnWidth(MEMBER_COLS.STREET_ADDRESS, 200);
+  sheet.setColumnWidth(MEMBER_COLS.CITY, 120);
+  sheet.setColumnWidth(MEMBER_COLS.STATE, 80);
+
+  // Format Hire Date column as date
+  sheet.getRange(2, MEMBER_COLS.HIRE_DATE, 998, 1).setNumberFormat('MM/dd/yyyy');
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CONDITIONAL FORMATTING: Highlight members with open grievances
@@ -739,7 +756,8 @@ function createGrievanceLog(ss) {
     GRIEVANCE_COLS.STEP3_APPEAL_DUE,
     GRIEVANCE_COLS.STEP3_APPEAL_FILED,
     GRIEVANCE_COLS.DATE_CLOSED,
-    GRIEVANCE_COLS.NEXT_ACTION_DUE
+    GRIEVANCE_COLS.NEXT_ACTION_DUE,
+    GRIEVANCE_COLS.LAST_UPDATED
   ];
 
   dateColumns.forEach(function(col) {
@@ -750,6 +768,9 @@ function createGrievanceLog(ss) {
   sheet.getRange(2, GRIEVANCE_COLS.DAYS_OPEN, 998, 1).setNumberFormat('#,##0');
   // Days to Deadline can show "Overdue" text, so use General format that handles both
   sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, 998, 1).setNumberFormat('#,##0');
+
+  // Format Last Updated (AP) as date-time
+  sheet.getRange(2, GRIEVANCE_COLS.LAST_UPDATED, 998, 1).setNumberFormat('MM/dd/yyyy HH:mm');
 
   // Auto-resize other columns
   sheet.autoResizeColumns(1, headers.length);

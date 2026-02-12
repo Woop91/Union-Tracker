@@ -180,6 +180,7 @@ function getOrCreateSheet(ss, name) {
  * @returns {void}
  */
 function reorderSheetsToStandard(ss) {
+  // Dashboard and Satisfaction sheets are deprecated (v4.3.2/v4.3.8) - excluded from ordering
   var desiredOrder = [
     SHEETS.GETTING_STARTED,
     SHEETS.FAQ,
@@ -188,9 +189,7 @@ function reorderSheetsToStandard(ss) {
     SHEETS.FEEDBACK,
     SHEETS.FUNCTION_CHECKLIST,
     SHEETS.CONFIG_GUIDE,
-    'Config',
-    SHEETS.DASHBOARD,
-    SHEETS.SATISFACTION
+    'Config'
   ];
 
   var position = 1;
