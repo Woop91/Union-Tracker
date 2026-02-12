@@ -1414,7 +1414,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2492 lines)
+// SOURCE: 01_Core.gs (2493 lines)
 // ============================================================================
 
 /**
@@ -2314,7 +2314,7 @@ var MEMBER_COLS = {
 };
 
 // ============================================================================
-// MEETING CHECK-IN LOG COLUMNS (15 columns: A-O)
+// MEETING CHECK-IN LOG COLUMNS (16 columns: A-P)
 // ============================================================================
 
 /**
@@ -2337,7 +2337,8 @@ var MEETING_CHECKIN_COLS = {
   NOTIFY_STEWARDS: 12,   // L - Steward email(s) for attendance report
   CALENDAR_EVENT_ID: 13, // M - Google Calendar event ID
   NOTES_DOC_URL: 14,     // N - Meeting Notes Google Doc URL
-  AGENDA_DOC_URL: 15     // O - Meeting Agenda Google Doc URL
+  AGENDA_DOC_URL: 15,    // O - Meeting Agenda Google Doc URL
+  AGENDA_STEWARDS: 16    // P - Steward emails for early agenda sharing (3 days prior)
 };
 
 /**
@@ -16214,7 +16215,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2922 lines)
+// SOURCE: 05_Integrations.gs (2963 lines)
 // ============================================================================
 
 /**
@@ -16943,9 +16944,36 @@ function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipien
 }
 
 /**
+ * Gets all steward emails from the Member Directory
+ * @returns {string} Comma-separated steward emails
+ */
+function getAllStewardEmails_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet || sheet.getLastRow() < 2) return '';
+
+    var data = sheet.getDataRange().getValues();
+    var emails = [];
+    for (var i = 1; i < data.length; i++) {
+      var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+      if (isSteward === 'Yes' || isSteward === true) {
+        var email = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim();
+        if (email) emails.push(email);
+      }
+    }
+    return emails.join(', ');
+  } catch (e) {
+    Logger.log('Error getting all steward emails: ' + e.message);
+    return '';
+  }
+}
+
+/**
  * Sends scheduled meeting doc notifications from dailyTrigger
- * - Agenda link: 3 days before meeting
- * - Notes link: 1 day before meeting
+ * - Agenda link: 3 days before -> selected stewards (AGENDA_STEWARDS column)
+ * - Agenda link: 1 day before -> ALL stewards (from Member Directory)
+ * - Notes link: 1 day before -> attendance notification stewards (NOTIFY_STEWARDS column)
  * - Sets notes to view-only: 1 day after meeting (for members)
  * @returns {Object} { agendaSent, notesSent, notesPublished }
  */
@@ -16961,6 +16989,7 @@ function processMeetingDocNotifications() {
     today.setHours(0, 0, 0, 0);
 
     var processed = {};  // Track processed meeting IDs
+    var allStewardEmails = null;  // Lazy-loaded
 
     for (var i = 1; i < data.length; i++) {
       var meetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
@@ -16978,18 +17007,31 @@ function processMeetingDocNotifications() {
       var notifyEmails = String(data[i][MEETING_CHECKIN_COLS.NOTIFY_STEWARDS - 1] || '');
       var notesUrl = String(data[i][MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] || '');
       var agendaUrl = String(data[i][MEETING_CHECKIN_COLS.AGENDA_DOC_URL - 1] || '');
+      var agendaStewards = String(data[i][MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1] || '');
       var dateStr = meetingDate.toLocaleDateString();
 
-      // 3 days before: send agenda link to stewards
-      if (diffDays === 3 && agendaUrl && notifyEmails) {
-        emailMeetingDocLink(meetingName, dateStr, agendaUrl, 'agenda', notifyEmails);
+      // 3 days before: send agenda link to SELECTED stewards only
+      if (diffDays === 3 && agendaUrl && agendaStewards) {
+        emailMeetingDocLink(meetingName, dateStr, agendaUrl, 'agenda', agendaStewards);
         result.agendaSent++;
       }
 
-      // 1 day before: send notes link to stewards
-      if (diffDays === 1 && notesUrl && notifyEmails) {
-        emailMeetingDocLink(meetingName, dateStr, notesUrl, 'notes', notifyEmails);
-        result.notesSent++;
+      // 1 day before: send agenda link to ALL stewards, notes link to notify stewards
+      if (diffDays === 1) {
+        if (agendaUrl) {
+          // Lazy-load all steward emails only when needed
+          if (allStewardEmails === null) {
+            allStewardEmails = getAllStewardEmails_();
+          }
+          if (allStewardEmails) {
+            emailMeetingDocLink(meetingName, dateStr, agendaUrl, 'agenda', allStewardEmails);
+            result.agendaSent++;
+          }
+        }
+        if (notesUrl && notifyEmails) {
+          emailMeetingDocLink(meetingName, dateStr, notesUrl, 'notes', notifyEmails);
+          result.notesSent++;
+        }
       }
 
       // 1 day after: set notes to view-only (available to members)
@@ -33940,7 +33982,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1727 lines)
+// SOURCE: 10a_SheetCreation.gs (1729 lines)
 // ============================================================================
 
 /**
@@ -35619,7 +35661,8 @@ function createMeetingCheckInLogSheet(ss) {
     'Notify Stewards',  // L - Steward email(s) for attendance report
     'Calendar Event ID',// M - Google Calendar event ID
     'Notes Doc URL',    // N - Meeting Notes Google Doc URL
-    'Agenda Doc URL'    // O - Meeting Agenda Google Doc URL
+    'Agenda Doc URL',   // O - Meeting Agenda Google Doc URL
+    'Agenda Stewards'   // P - Steward emails for early agenda sharing
   ];
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -35646,6 +35689,7 @@ function createMeetingCheckInLogSheet(ss) {
   sheet.setColumnWidth(13, 150); // M - Calendar Event ID
   sheet.setColumnWidth(14, 250); // N - Notes Doc URL
   sheet.setColumnWidth(15, 250); // O - Agenda Doc URL
+  sheet.setColumnWidth(16, 250); // P - Agenda Stewards
 
   // Format date columns
   sheet.getRange(2, 3, 999, 1).setNumberFormat('MM/DD/YYYY');   // C - Meeting Date
@@ -51137,7 +51181,7 @@ function showSelfServicePortalUrl() {
 
 
 // ============================================================================
-// SOURCE: 14_MeetingCheckIn.gs (981 lines)
+// SOURCE: 14_MeetingCheckIn.gs (1055 lines)
 // ============================================================================
 
 /**
@@ -51173,7 +51217,7 @@ function showSelfServicePortalUrl() {
 function showSetupMeetingDialog() {
   var html = HtmlService.createHtmlOutput(getSetupMeetingHtml_())
     .setWidth(520)
-    .setHeight(580);
+    .setHeight(720);
   SpreadsheetApp.getUi().showModalDialog(html, '📝 Setup New Meeting');
 }
 
@@ -51207,6 +51251,7 @@ function createMeeting(meetingData) {
   var meetingTime = meetingData.time || '09:00';
   var meetingDuration = parseFloat(meetingData.duration) || 1;
   var notifyEmails = meetingData.notifyEmails ? String(meetingData.notifyEmails).trim() : '';
+  var agendaStewards = meetingData.agendaStewards ? String(meetingData.agendaStewards).trim() : '';
 
   // Create Google Calendar event
   var calendarEventId = '';
@@ -51242,7 +51287,7 @@ function createMeeting(meetingData) {
   }
 
   // Add a placeholder row so the meeting exists in the sheet
-  // Columns A-O: ID, Name, Date, Type, MemberID, MemberName, CheckInTime, Email, Time, Duration, Status, Notify, CalendarEventId, NotesUrl, AgendaUrl
+  // Columns A-P: ID, Name, Date, Type, MemberID, MemberName, CheckInTime, Email, Time, Duration, Status, Notify, CalendarEventId, NotesUrl, AgendaUrl, AgendaStewards
   sheet.appendRow([
     meetingId,
     meetingName,
@@ -51258,7 +51303,8 @@ function createMeeting(meetingData) {
     notifyEmails,
     calendarEventId,
     notesDocUrl,
-    agendaDocUrl
+    agendaDocUrl,
+    agendaStewards
   ]);
 
   if (typeof logAuditEvent === 'function') {
@@ -51283,6 +51329,37 @@ function createMeeting(meetingData) {
              (notesDocUrl ? ' Meeting Notes doc created.' : '') +
              (agendaDocUrl ? ' Meeting Agenda doc created.' : '')
   };
+}
+
+/**
+ * Returns a list of stewards with name and email for the setup meeting dialog
+ * Called from the HTML dialog to populate steward checkboxes
+ * @returns {Array} Array of { name, email } objects
+ */
+function getStewardEmailsForMeetingSetup() {
+  var result = [];
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet || sheet.getLastRow() < 2) return result;
+
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+      if (isSteward === 'Yes' || isSteward === true) {
+        var email = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim();
+        if (email) {
+          result.push({
+            name: (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || ''),
+            email: email
+          });
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log('Error getting steward emails: ' + e.message);
+  }
+  return result;
 }
 
 /**
@@ -51820,11 +51897,20 @@ function getSetupMeetingHtml_() {
     '.field .hint{font-size:12px;color:#888;margin-top:4px}' +
     '.row{display:flex;gap:12px}' +
     '.row .field{flex:1}' +
+    '.steward-list{max-height:150px;overflow-y:auto;border:2px solid #e0e0e0;border-radius:8px;padding:8px}' +
+    '.steward-item{display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:14px}' +
+    '.steward-item input[type=checkbox]{width:18px;height:18px;cursor:pointer}' +
+    '.steward-item label{cursor:pointer;flex:1}' +
+    '.steward-item .email{color:#888;font-size:12px}' +
+    '.select-actions{display:flex;gap:8px;margin-top:6px}' +
+    '.select-actions button{padding:4px 10px;font-size:12px;border:1px solid #ddd;border-radius:4px;background:#f5f5f5;cursor:pointer}' +
+    '.select-actions button:hover{background:#e0e0e0}' +
     '.btn{width:100%;padding:14px;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;background:#059669;color:white;margin-top:8px}' +
     '.btn:hover{background:#047857}' +
     '.btn:disabled{background:#ccc;cursor:not-allowed}' +
     '.error{color:#dc2626;font-size:14px;margin-top:10px;text-align:center;padding:10px;background:#fee2e2;border-radius:8px;display:none}' +
     '.success{color:#059669;font-size:14px;margin-top:10px;text-align:center;padding:10px;background:#d1fae5;border-radius:8px;display:none}' +
+    '.section-label{font-weight:700;color:#059669;font-size:13px;margin:20px 0 8px;padding-top:12px;border-top:1px solid #e0e0e0}' +
     '</style></head><body>' +
     '<div class="card">' +
     '<h2>Schedule Meeting</h2>' +
@@ -51863,10 +51949,20 @@ function getSetupMeetingHtml_() {
     '</select>' +
     '</div>' +
     '</div>' +
+    '<div class="section-label">Steward Notifications</div>' +
     '<div class="field">' +
-    '<label for="notifyEmails">Email Attendance To (optional)</label>' +
+    '<label>Email Attendance Report To</label>' +
     '<input type="text" id="notifyEmails" placeholder="steward@email.com, steward2@email.com">' +
-    '<div class="hint">Comma-separated steward emails to receive the attendance report after the meeting</div>' +
+    '<div class="hint">Comma-separated emails to receive attendance report after the meeting</div>' +
+    '</div>' +
+    '<div class="field">' +
+    '<label>Send Agenda Early To (3 days prior)</label>' +
+    '<div id="stewardListContainer" class="steward-list"><em style="color:#888">Loading stewards...</em></div>' +
+    '<div class="select-actions">' +
+    '<button type="button" onclick="selectAllStewards()">Select All</button>' +
+    '<button type="button" onclick="clearAllStewards()">Clear All</button>' +
+    '</div>' +
+    '<div class="hint">Selected stewards get the agenda link 3 days before. All stewards get it the day before regardless.</div>' +
     '</div>' +
     '<button class="btn" id="createBtn" onclick="createMeeting()">Schedule Meeting</button>' +
     '<div id="error" class="error"></div>' +
@@ -51874,6 +51970,27 @@ function getSetupMeetingHtml_() {
     '</div>' +
     '<script>' +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
+    'var stewardData=[];' +
+    // Load stewards on dialog open
+    'google.script.run.withSuccessHandler(function(list){' +
+    '  stewardData=list||[];' +
+    '  var container=document.getElementById("stewardListContainer");' +
+    '  if(stewardData.length===0){container.innerHTML="<em style=\\"color:#888\\">No stewards found</em>";return}' +
+    '  var html="";' +
+    '  stewardData.forEach(function(s,i){' +
+    '    html+="<div class=\\"steward-item\\"><input type=\\"checkbox\\" id=\\"stew_"+i+"\\" value=\\""+s.email+"\\"><label for=\\"stew_"+i+"\\">"+s.name+" <span class=\\"email\\">"+s.email+"</span></label></div>"' +
+    '  });' +
+    '  container.innerHTML=html;' +
+    '}).withFailureHandler(function(){' +
+    '  document.getElementById("stewardListContainer").innerHTML="<em style=\\"color:#888\\">Could not load stewards</em>"' +
+    '}).getStewardEmailsForMeetingSetup();' +
+    'function selectAllStewards(){document.querySelectorAll("#stewardListContainer input[type=checkbox]").forEach(function(cb){cb.checked=true})}' +
+    'function clearAllStewards(){document.querySelectorAll("#stewardListContainer input[type=checkbox]").forEach(function(cb){cb.checked=false})}' +
+    'function getSelectedStewardEmails(){' +
+    '  var emails=[];' +
+    '  document.querySelectorAll("#stewardListContainer input[type=checkbox]:checked").forEach(function(cb){emails.push(cb.value)});' +
+    '  return emails.join(", ");' +
+    '}' +
     'function createMeeting(){' +
     '  var name=document.getElementById("meetingName").value.trim();' +
     '  var date=document.getElementById("meetingDate").value;' +
@@ -51881,6 +51998,7 @@ function getSetupMeetingHtml_() {
     '  var duration=document.getElementById("meetingDuration").value;' +
     '  var type=document.getElementById("meetingType").value;' +
     '  var notifyEmails=document.getElementById("notifyEmails").value.trim();' +
+    '  var agendaStewards=getSelectedStewardEmails();' +
     '  if(!name){showError("Please enter a meeting name");return}' +
     '  if(!date){showError("Please select a date");return}' +
     '  document.getElementById("createBtn").disabled=true;' +
@@ -51901,7 +52019,7 @@ function getSetupMeetingHtml_() {
     '      document.getElementById("createBtn").textContent="Schedule Meeting";' +
     '      showError("Error: "+e.message);' +
     '    })' +
-    '    .createMeeting({name:name,date:date,time:time,duration:duration,type:type,notifyEmails:notifyEmails});' +
+    '    .createMeeting({name:name,date:date,time:time,duration:duration,type:type,notifyEmails:notifyEmails,agendaStewards:agendaStewards});' +
     '}' +
     'function showError(msg){' +
     '  var el=document.getElementById("error");' +

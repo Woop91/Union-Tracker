@@ -724,9 +724,36 @@ function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipien
 }
 
 /**
+ * Gets all steward emails from the Member Directory
+ * @returns {string} Comma-separated steward emails
+ */
+function getAllStewardEmails_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet || sheet.getLastRow() < 2) return '';
+
+    var data = sheet.getDataRange().getValues();
+    var emails = [];
+    for (var i = 1; i < data.length; i++) {
+      var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+      if (isSteward === 'Yes' || isSteward === true) {
+        var email = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim();
+        if (email) emails.push(email);
+      }
+    }
+    return emails.join(', ');
+  } catch (e) {
+    Logger.log('Error getting all steward emails: ' + e.message);
+    return '';
+  }
+}
+
+/**
  * Sends scheduled meeting doc notifications from dailyTrigger
- * - Agenda link: 3 days before meeting
- * - Notes link: 1 day before meeting
+ * - Agenda link: 3 days before -> selected stewards (AGENDA_STEWARDS column)
+ * - Agenda link: 1 day before -> ALL stewards (from Member Directory)
+ * - Notes link: 1 day before -> attendance notification stewards (NOTIFY_STEWARDS column)
  * - Sets notes to view-only: 1 day after meeting (for members)
  * @returns {Object} { agendaSent, notesSent, notesPublished }
  */
@@ -742,6 +769,7 @@ function processMeetingDocNotifications() {
     today.setHours(0, 0, 0, 0);
 
     var processed = {};  // Track processed meeting IDs
+    var allStewardEmails = null;  // Lazy-loaded
 
     for (var i = 1; i < data.length; i++) {
       var meetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
@@ -759,18 +787,31 @@ function processMeetingDocNotifications() {
       var notifyEmails = String(data[i][MEETING_CHECKIN_COLS.NOTIFY_STEWARDS - 1] || '');
       var notesUrl = String(data[i][MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] || '');
       var agendaUrl = String(data[i][MEETING_CHECKIN_COLS.AGENDA_DOC_URL - 1] || '');
+      var agendaStewards = String(data[i][MEETING_CHECKIN_COLS.AGENDA_STEWARDS - 1] || '');
       var dateStr = meetingDate.toLocaleDateString();
 
-      // 3 days before: send agenda link to stewards
-      if (diffDays === 3 && agendaUrl && notifyEmails) {
-        emailMeetingDocLink(meetingName, dateStr, agendaUrl, 'agenda', notifyEmails);
+      // 3 days before: send agenda link to SELECTED stewards only
+      if (diffDays === 3 && agendaUrl && agendaStewards) {
+        emailMeetingDocLink(meetingName, dateStr, agendaUrl, 'agenda', agendaStewards);
         result.agendaSent++;
       }
 
-      // 1 day before: send notes link to stewards
-      if (diffDays === 1 && notesUrl && notifyEmails) {
-        emailMeetingDocLink(meetingName, dateStr, notesUrl, 'notes', notifyEmails);
-        result.notesSent++;
+      // 1 day before: send agenda link to ALL stewards, notes link to notify stewards
+      if (diffDays === 1) {
+        if (agendaUrl) {
+          // Lazy-load all steward emails only when needed
+          if (allStewardEmails === null) {
+            allStewardEmails = getAllStewardEmails_();
+          }
+          if (allStewardEmails) {
+            emailMeetingDocLink(meetingName, dateStr, agendaUrl, 'agenda', allStewardEmails);
+            result.agendaSent++;
+          }
+        }
+        if (notesUrl && notifyEmails) {
+          emailMeetingDocLink(meetingName, dateStr, notesUrl, 'notes', notifyEmails);
+          result.notesSent++;
+        }
       }
 
       // 1 day after: set notes to view-only (available to members)

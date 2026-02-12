@@ -1674,7 +1674,8 @@ function createMeetingCheckInLogSheet(ss) {
     'Notify Stewards',  // L - Steward email(s) for attendance report
     'Calendar Event ID',// M - Google Calendar event ID
     'Notes Doc URL',    // N - Meeting Notes Google Doc URL
-    'Agenda Doc URL'    // O - Meeting Agenda Google Doc URL
+    'Agenda Doc URL',   // O - Meeting Agenda Google Doc URL
+    'Agenda Stewards'   // P - Steward emails for early agenda sharing
   ];
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -1701,6 +1702,7 @@ function createMeetingCheckInLogSheet(ss) {
   sheet.setColumnWidth(13, 150); // M - Calendar Event ID
   sheet.setColumnWidth(14, 250); // N - Notes Doc URL
   sheet.setColumnWidth(15, 250); // O - Agenda Doc URL
+  sheet.setColumnWidth(16, 250); // P - Agenda Stewards
 
   // Format date columns
   sheet.getRange(2, 3, 999, 1).setNumberFormat('MM/DD/YYYY');   // C - Meeting Date
