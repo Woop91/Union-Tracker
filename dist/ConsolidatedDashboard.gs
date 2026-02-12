@@ -1414,7 +1414,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2493 lines)
+// SOURCE: 01_Core.gs (2529 lines)
 // ============================================================================
 
 /**
@@ -2006,6 +2006,42 @@ var VERSION_INFO = {
   BUILD_DATE: '2026-02-12',
   CODENAME: 'Meeting Intelligence & Document Automation'
 };
+
+/**
+ * Complete version history with release dates and codenames.
+ * Ordered newest-first. Every version that has ever shipped is listed here
+ * so that UI, audit, and diagnostic code can look up any past release date.
+ * @const {Array<Object>}
+ */
+var VERSION_HISTORY = [
+  { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling' },
+  { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
+  { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
+  { version: '4.4.1', date: '2026-01-31', codename: 'Build System',                               changes: 'Initial build system with Node.js, source file concatenation' },
+  { version: '4.4.0', date: '2026-01-30', codename: 'Menu Consolidation',                         changes: 'Unified 3-menu system (Union Hub, Tools, Admin), web app dashboards, deprecated command center menu' },
+  { version: '4.3.8', date: '2026-01-28', codename: 'Features Reference',                         changes: 'Satisfaction modal dashboard, Features Reference sheet, hidden satisfaction sheet' },
+  { version: '4.3.7', date: '2026-01-25', codename: 'Help System',                                changes: 'Complete rewrite of help guide with real-time search, menu reference, and FAQ tabs' },
+  { version: '4.3.2', date: '2026-01-20', codename: 'Modal Dashboards',                           changes: 'Deprecated visible Dashboard sheet, switched to SPA-style modal dashboards' },
+  { version: '4.3.0', date: '2026-01-15', codename: 'Checklist & Looker',                         changes: 'Case Checklist system, Looker data integration, dynamic field expansion engine' },
+  { version: '4.1.0', date: '2026-01-10', codename: 'Strategic Config',                           changes: 'Strategic Command Center config, status color mapping, PDF/email branding' },
+  { version: '4.0.0', date: '2026-01-05', codename: 'Strategic Command Center',                   changes: 'Unified master engine, audit logging, sabotage protection, batch processing, mobile views' },
+  { version: '3.6.0', date: '2025-12-20', codename: 'Data Managers',                              changes: 'Member and Grievance data manager refactor, improved validation' },
+  { version: '2.0.0', date: '2025-11-15', codename: 'Modular Architecture',                       changes: 'Split monolith into modular source files, build system, UI/business logic separation' }
+];
+
+/**
+ * Look up release info for a specific version.
+ * @param {string} ver - Version string, e.g. "4.5.0"
+ * @returns {Object|null} The matching VERSION_HISTORY entry, or null.
+ */
+function getVersionDate(ver) {
+  for (var i = 0; i < VERSION_HISTORY.length; i++) {
+    if (VERSION_HISTORY[i].version === ver) {
+      return VERSION_HISTORY[i];
+    }
+  }
+  return null;
+}
 
 // ============================================================================
 // SHEET NAMES
@@ -35721,7 +35757,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1865 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1854 lines)
 // ============================================================================
 
 // ============================================================================
@@ -37327,20 +37363,9 @@ function createFAQSheet(ss) {
     .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
   sheet.setRowHeight(row, 28);
 
-  var versionHistory = [
-    ['v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')', VERSION_INFO.CODENAME, 'Engagement tracking bug fixes, 950+ tests (79 new for engagement), comprehensive code review, ESLint clean, modular source files'],
-    ['v4.5.0 (2026-02-01)', 'Security & Testing', 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files'],
-    ['v4.4.1 (2026-01-31)', 'Build System', 'Initial build system with Node.js, source file concatenation'],
-    ['v4.4.0 (2026-01-30)', 'Menu Consolidation', 'Unified 3-menu system (Union Hub, Tools, Admin), web app dashboards, deprecated command center menu'],
-    ['v4.3.8', 'Features Reference', 'Satisfaction modal dashboard, Features Reference sheet, hidden satisfaction sheet'],
-    ['v4.3.7', 'Help System', 'Complete rewrite of help guide with real-time search, menu reference, and FAQ tabs'],
-    ['v4.3.2', 'Modal Dashboards', 'Deprecated visible Dashboard sheet, switched to SPA-style modal dashboards'],
-    ['v4.3.0', 'Checklist & Looker', 'Case Checklist system, Looker data integration, dynamic field expansion engine'],
-    ['v4.1.0', 'Strategic Config', 'Strategic Command Center config, status color mapping, PDF/email branding'],
-    ['v4.0.0', 'Strategic Command Center', 'Unified master engine, audit logging, sabotage protection, batch processing, mobile views'],
-    ['v3.6.0', 'Data Managers', 'Member and Grievance data manager refactor, improved validation'],
-    ['v2.0.0', 'Modular Architecture', 'Split monolith into modular source files, build system, UI/business logic separation']
-  ];
+  var versionHistory = VERSION_HISTORY.map(function(entry) {
+    return ['v' + entry.version + ' (' + entry.date + ')', entry.codename, entry.changes];
+  });
 
   for (var v = 0; v < versionHistory.length; v++) {
     row++;
@@ -39974,7 +39999,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2055 lines)
+// SOURCE: 10_Main.gs (2049 lines)
 // ============================================================================
 
 /**
@@ -41268,17 +41293,11 @@ function showHelpDialog() {
  */
 function getVersionInfo() {
   return {
-    version: '2.0.0',
+    version: VERSION_INFO.CURRENT,
+    date: VERSION_INFO.BUILD_DATE,
+    codename: VERSION_INFO.CODENAME,
     architecture: 'Modular Multi-File',
-    modules: [
-      'Constants.gs',
-      'UIService.gs',
-      'GrievanceManager.gs',
-      'Integrations.gs',
-      'Maintenance.gs',
-      'FormulaService.gs',
-      'Main.gs'
-    ],
+    history: VERSION_HISTORY,
     lastUpdated: new Date().toISOString()
   };
 }

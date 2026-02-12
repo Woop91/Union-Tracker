@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [4.6.0] - 2026-02-12
 
 ### Added
+- **VERSION_HISTORY constant** (`01_Core.gs`) - Centralized array tracking every release with version number, date, codename, and key changes. Includes `getVersionDate(ver)` lookup function so any code can resolve a version string to its release date
+- **Features sheet now driven by VERSION_HISTORY** (`10b_SurveyDocSheets.gs`) - Replaced hardcoded version table with dynamic rendering from `VERSION_HISTORY`, ensuring dates are always present and consistent
+- **getVersionInfo() updated** (`10_Main.gs`) - Now returns current VERSION_INFO fields plus full VERSION_HISTORY instead of stale 2.0.0 data
 - **Meeting Notes & Agenda Document Automation** - When a meeting is created, Google Docs for Meeting Notes and Meeting Agenda are auto-generated in dedicated Drive folders (`Meeting Notes/`, `Meeting Agenda/`). URLs stored in Meeting Check-In Log columns N-O
 - **Two-Tier Agenda Steward Selection** - Meeting setup dialog lets the organizer select which stewards receive the agenda 3 days before the meeting; ALL stewards receive it at least 1 day before. Agenda is never shared with members
 - **Meeting Notes Dashboard Tab** - New "Meeting Notes" tab in Member Dashboard shows completed meetings chronologically with search and view-only Google Doc links. Notes auto-publish (view-only) 1 day after each meeting
