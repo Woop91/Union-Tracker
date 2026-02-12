@@ -793,7 +793,7 @@ function sanitizeDataForClient(dataArray, fieldsToSanitize) {
 
 
 // ============================================================================
-// SOURCE: 00_DataAccess.gs (618 lines)
+// SOURCE: 00_DataAccess.gs (616 lines)
 // ============================================================================
 
 /**
@@ -1335,42 +1335,40 @@ var TIME_CONSTANTS = {
   /** Milliseconds per week */
   MS_PER_WEEK: 7 * 24 * 60 * 60 * 1000,
 
-  // TODO: HARDCODED — These values are duplicated in 01_Core.gs DEADLINE_RULES.
-  // Both must stay in sync. Consider consolidating to a single source of truth.
-  /** Deadline days configuration */
+  /** Deadline days configuration — references DEADLINE_DEFAULTS (01_Core.gs) as single source of truth */
   DEADLINE_DAYS: {
     /** Days to file grievance after incident */
-    FILING: 21,
+    get FILING() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.FILING_DAYS : 21; },
 
-    /** Days for Step I response (matches DEADLINE_RULES.STEP_1) */
-    STEP1_RESPONSE: 7,
+    /** Days for Step I response */
+    get STEP1_RESPONSE() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : 7; },
 
-    /** Days to appeal to Step II (matches DEADLINE_RULES.STEP_2) */
-    STEP2_APPEAL: 7,
+    /** Days to appeal to Step II */
+    get STEP2_APPEAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_2_APPEAL : 7; },
 
-    /** Days for Step II response (matches DEADLINE_RULES.STEP_2) */
-    STEP2_RESPONSE: 14,
+    /** Days for Step II response */
+    get STEP2_RESPONSE() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_2_RESPONSE : 14; },
 
-    /** Days to appeal to Step III (matches DEADLINE_RULES.STEP_3) */
-    STEP3_APPEAL: 10,
+    /** Days to appeal to Step III */
+    get STEP3_APPEAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_3_APPEAL : 10; },
 
     /** Days before deadline to show warning */
-    WARNING_THRESHOLD: 5,
+    get WARNING_THRESHOLD() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.WARNING_THRESHOLD : 5; },
 
     /** Days before deadline to show critical alert */
-    CRITICAL_THRESHOLD: 2
+    get CRITICAL_THRESHOLD() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.CRITICAL_THRESHOLD : 2; }
   },
 
-  /** Reminder intervals */
+  /** Reminder intervals — references DEADLINE_DEFAULTS (01_Core.gs) as single source of truth */
   REMINDER_DAYS: {
     /** First reminder before deadline */
-    FIRST: 7,
+    get FIRST() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.REMINDER_FIRST : 7; },
 
     /** Second reminder before deadline */
-    SECOND: 3,
+    get SECOND() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.REMINDER_SECOND : 3; },
 
     /** Final reminder before deadline */
-    FINAL: 1
+    get FINAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.REMINDER_FINAL : 1; }
   }
 };
 
@@ -1416,7 +1414,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2570 lines)
+// SOURCE: 01_Core.gs (2653 lines)
 // ============================================================================
 
 /**
@@ -1595,8 +1593,8 @@ function showErrorNotification_(errorInfo) {
 function sendCriticalErrorNotification_(errorInfo) {
   try {
     var adminEmail = Session.getEffectiveUser().getEmail();
-    var subject = '[509 Dashboard] Critical Error: ' + errorInfo.context;
-    var body = 'A critical error occurred in the 509 Dashboard:\n\n' +
+    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
+    var body = 'A critical error occurred in the ' + COMMAND_CONFIG.SYSTEM_NAME + ':\n\n' +
                'Time: ' + errorInfo.timestamp + '\n' +
                'Context: ' + errorInfo.context + '\n' +
                'Message: ' + errorInfo.message + '\n' +
@@ -3216,19 +3214,102 @@ var GRIEVANCE_OUTCOMES = {
 };
 
 /**
- * Deadline rules for grievance step calculations
- * Defines the number of days for responses and appeals at each step
- * Used by deadline calculation functions throughout the system
+ * Default deadline rules for grievance step calculations (fallback values).
+ * Actual values are loaded from Config sheet at runtime via getDeadlineRules().
  * @const {Object}
  */
-// TODO: HARDCODED — Deadline days are duplicated in 00_DataAccess.gs DEADLINE_DAYS.
-// If contract terms change, both locations must be updated or deadlines will be inconsistent.
-// Consider a single source of truth, ideally in the Config sheet.
+var DEADLINE_DEFAULTS = {
+  FILING_DAYS: 21,
+  STEP_1_RESPONSE: 7,
+  STEP_2_APPEAL: 7,
+  STEP_2_RESPONSE: 14,
+  STEP_3_APPEAL: 10,
+  STEP_3_RESPONSE: 21,
+  ARBITRATION_DEMAND: 30,
+  WARNING_THRESHOLD: 5,
+  CRITICAL_THRESHOLD: 2,
+  REMINDER_FIRST: 7,
+  REMINDER_SECOND: 3,
+  REMINDER_FINAL: 1
+};
+
+/**
+ * Reads deadline rules from Config sheet (cols AA-AD), falling back to DEADLINE_DEFAULTS.
+ * This is the single source of truth for all deadline calculations.
+ * @returns {Object} DEADLINE_RULES-compatible object
+ */
+function getDeadlineRules() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var filing = Number(configSheet.getRange(3, CONFIG_COLS.FILING_DEADLINE_DAYS).getValue());
+      var s1Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP1_RESPONSE_DAYS).getValue());
+      var s2Appeal = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS).getValue());
+      var s2Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS).getValue());
+      return {
+        FILING_DAYS: filing || DEADLINE_DEFAULTS.FILING_DAYS,
+        STEP_1: { DAYS_FOR_RESPONSE: s1Resp || DEADLINE_DEFAULTS.STEP_1_RESPONSE },
+        STEP_2: { DAYS_TO_APPEAL: s2Appeal || DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: s2Resp || DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+        STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
+        ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
+      };
+    }
+  } catch (e) {
+    console.log('Error reading deadline config: ' + e.message);
+  }
+  // Fallback to defaults
+  return {
+    FILING_DAYS: DEADLINE_DEFAULTS.FILING_DAYS,
+    STEP_1: { DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_1_RESPONSE },
+    STEP_2: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+    STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
+    ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
+  };
+}
+
+/** @deprecated Use getDeadlineRules() instead. Kept for backward compatibility. */
 var DEADLINE_RULES = {
-  STEP_1: { DAYS_FOR_RESPONSE: 7 },
-  STEP_2: { DAYS_TO_APPEAL: 7, DAYS_FOR_RESPONSE: 14 },
-  STEP_3: { DAYS_TO_APPEAL: 10, DAYS_FOR_RESPONSE: 21 },
-  ARBITRATION: { DAYS_TO_DEMAND: 30 }
+  STEP_1: { DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_1_RESPONSE },
+  STEP_2: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+  STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
+  ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
+};
+
+/**
+ * Dashboard sheet layout configuration.
+ * All cell references for the Dashboard sheet are centralized here.
+ * If the dashboard layout changes, update these values in one place.
+ * @const {Object}
+ */
+var DASHBOARD_LAYOUT = {
+  // ── DATA ROWS ──
+  QUICK_STATS_ROW: 6,           // A6:F6 - Total Members, Stewards, Grievances, Win Rate, Overdue, Due
+  MEMBER_METRICS_ROW: 11,       // A11:D11 - Members, Stewards, Avg Open Rate, Vol Hours
+  GRIEVANCE_METRICS_ROW: 16,    // A16:F16 - Open, Pending, Settled, Won, Denied, Withdrawn
+  TIMELINE_METRICS_ROW: 21,     // A21:D21 - Avg Days Open, Filed, Closed, Avg Resolution
+  CATEGORY_START_ROW: 26,       // A26:F30 - Issue category breakdown (5 rows)
+  CATEGORY_END_ROW: 30,
+  LOCATION_START_ROW: 35,       // A35:F39 - Location breakdown (5 rows)
+  LOCATION_END_ROW: 39,
+  TREND_START_ROW: 44,          // A44:F46 - Month-over-month trends (3 rows)
+  TREND_END_ROW: 46,
+  STEWARD_SUMMARY_ROW: 54,      // A54:F54 - Steward summary
+  BUSIEST_START_ROW: 59,        // A59:F88 - Top 30 busiest stewards
+  BUSIEST_END_ROW: 88,
+  TOP_PERFORMERS_START_ROW: 93, // A93:F102 - Top 10 performers
+  TOP_PERFORMERS_END_ROW: 102,
+  NEEDING_SUPPORT_START_ROW: 107, // A107:F116 - Needing support
+  NEEDING_SUPPORT_END_ROW: 116,
+
+  // ── CHART AREA ──
+  CHART_INPUT_CELL: 'G120',     // Chart number selection input
+  CHART_DISPLAY_ROW: 135,       // Row where chart text displays start
+  CHART_DISPLAY_RANGE: 'A135:G145', // Merge range for chart text displays
+
+  // ── COLUMN COUNTS ──
+  DATA_COLS: 6,                 // Columns A-F for most data sections
+  SPARKLINE_COL: 7              // Column G for sparkline formulas
 };
 
 /**
@@ -7930,7 +8011,7 @@ function composeEmailForMember(memberId) {
  */
 function sendQuickEmail(to, subject, body, memberId) {
   try {
-    MailApp.sendEmail({ to: to, subject: subject, body: body, name: 'SEIU Local 509 Dashboard' });
+    MailApp.sendEmail({ to: to, subject: subject, body: body, name: getOrgNameFromConfig_() + ' Dashboard' });
     return { success: true };
   } catch (e) { throw new Error('Failed to send: ' + e.message); }
 }
@@ -8277,7 +8358,7 @@ function sendMemberDashboardLink() {
       "- Steward Contact Search\n" +
       "- Emergency Weingarten Rights\n\n" +
       "In Solidarity,\n" +
-      "509 Strategic Command Center";
+      COMMAND_CONFIG.SYSTEM_NAME;
 
     try {
       MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);
@@ -21580,7 +21661,7 @@ function runScheduledGhostValidation() {
     var adminEmail = configSheet.getRange(3, CONFIG_COLS.ADMIN_EMAILS, 1, 1).getValue();
 
     if (adminEmail) {
-      var subject = '⚠️ 509 Dashboard: Orphaned Grievances Detected';
+      var subject = '⚠️ ' + COMMAND_CONFIG.SYSTEM_NAME + ': Orphaned Grievances Detected';
       var body = 'The scheduled data integrity check found ' + orphaned.length + ' grievances with invalid Member IDs.\n\n';
 
       orphaned.slice(0, 20).forEach(function(item) {
@@ -21592,7 +21673,7 @@ function runScheduledGhostValidation() {
       }
 
       body += '\nPlease review and correct these records in the Grievance Log.';
-      body += '\n\n--\n509 Dashboard Automated Alert';
+      body += '\n\n--\n' + COMMAND_CONFIG.SYSTEM_NAME + ' Automated Alert';
 
       try {
         MailApp.sendEmail(adminEmail, subject, body);
@@ -26140,7 +26221,7 @@ function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, so
 
 
 // ============================================================================
-// SOURCE: 08b_SearchAndCharts.gs (873 lines)
+// SOURCE: 08b_SearchAndCharts.gs (885 lines)
 // ============================================================================
 
 // ============================================================================
@@ -26591,9 +26672,10 @@ function generateSelectedChart() {
     return;
   }
 
-  var chartNum = sheet.getRange('G120').getValue();
+  var L = DASHBOARD_LAYOUT;
+  var chartNum = sheet.getRange(L.CHART_INPUT_CELL).getValue();
   if (!chartNum || chartNum < 1 || chartNum > 15) {
-    ss.toast('Please enter a valid chart number (1-15) in cell G120', '⚠️ Invalid Selection', 5);
+    ss.toast('Please enter a valid chart number (1-15) in cell ' + L.CHART_INPUT_CELL, '⚠️ Invalid Selection', 5);
     return;
   }
 
@@ -26616,9 +26698,9 @@ function generateSelectedChart() {
     case 2: // Bar Chart - Status Distribution
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.BAR)
-        .addRange(sheet.getRange('A15:A16'))
-        .addRange(sheet.getRange('A16:F16'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.GRIEVANCE_METRICS_ROW - 1, 1, 1, L.DATA_COLS))
+        .addRange(sheet.getRange(L.GRIEVANCE_METRICS_ROW, 1, 1, L.DATA_COLS))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Grievance Status Distribution')
         .setOption('legend', {position: 'bottom'})
         .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.ACCENT_ORANGE, COLORS.STATUS_BLUE, COLORS.UNION_GREEN, '#9CA3AF', '#6B7280'])
@@ -26629,10 +26711,11 @@ function generateSelectedChart() {
       break;
 
     case 3: // Pie Chart - Issue Categories
+      var catRows = L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1;
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.PIE)
-        .addRange(sheet.getRange('A26:B30'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.CATEGORY_START_ROW, 1, catRows, 2))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Grievances by Issue Category')
         .setOption('pieHole', 0)
         .setOption('legend', {position: 'right'})
@@ -26647,10 +26730,11 @@ function generateSelectedChart() {
       break;
 
     case 5: // Column Chart - Location
+      var locRows = L.LOCATION_END_ROW - L.LOCATION_START_ROW + 1;
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.COLUMN)
-        .addRange(sheet.getRange('A35:B39'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.LOCATION_START_ROW, 1, locRows, 2))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Members by Location')
         .setOption('legend', {position: 'none'})
         .setOption('colors', [COLORS.CHART_CYAN])
@@ -26674,8 +26758,8 @@ function generateSelectedChart() {
     case 8: // Stacked Bar
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.BAR)
-        .addRange(sheet.getRange('A26:D30'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.CATEGORY_START_ROW, 1, L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1, 4))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Cases by Issue Category (Open vs Resolved)')
         .setOption('isStacked', true)
         .setOption('legend', {position: 'bottom'})
@@ -26688,8 +26772,8 @@ function generateSelectedChart() {
     case 9: // Donut Chart
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.PIE)
-        .addRange(sheet.getRange('A26:B30'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.CATEGORY_START_ROW, 1, L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1, 2))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Issue Category Distribution')
         .setOption('pieHole', 0.4)
         .setOption('legend', {position: 'right'})
@@ -26710,8 +26794,8 @@ function generateSelectedChart() {
     case 12: // Scatter Plot
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.SCATTER)
-        .addRange(sheet.getRange('A35:C39'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.LOCATION_START_ROW, 1, L.LOCATION_END_ROW - L.LOCATION_START_ROW + 1, 3))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Response Time vs Outcome Analysis')
         .setOption('legend', {position: 'bottom'})
         .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.UNION_GREEN])
@@ -26725,8 +26809,8 @@ function generateSelectedChart() {
     case 13: // Histogram
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.HISTOGRAM)
-        .addRange(sheet.getRange('B26:B30'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.CATEGORY_START_ROW, 2, L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1, 1))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Case Duration Distribution')
         .setOption('legend', {position: 'none'})
         .setOption('colors', [COLORS.CHART_CYAN])
@@ -26746,7 +26830,7 @@ function generateSelectedChart() {
       break;
 
     default:
-      ss.toast('Enter 1-15 in cell G120 to select a chart type. See options table above.', 'ℹ️ Chart Help', 5);
+      ss.toast('Enter 1-15 in cell ' + L.CHART_INPUT_CELL + ' to select a chart type. See options table above.', 'ℹ️ Chart Help', 5);
   }
 
   ss.toast('Chart generated! Scroll down to "Chart Display Area" to view.', '✅ Done', 5);
@@ -26762,7 +26846,8 @@ function generateSelectedChart() {
  * @private
  */
 function createGaugeStyleChart_(sheet) {
-  var winRate = sheet.getRange('D6').getValue() || '0%';
+  var L = DASHBOARD_LAYOUT;
+  var winRate = sheet.getRange(L.QUICK_STATS_ROW, 4).getValue() || '0%';
   var gaugeText = '═══════════════════════════════════════\n' +
                   '           🎯 WIN RATE GAUGE\n' +
                   '═══════════════════════════════════════\n\n' +
@@ -26771,13 +26856,13 @@ function createGaugeStyleChart_(sheet) {
                   '    0%        50%        100%\n\n' +
                   '═══════════════════════════════════════';
 
-  sheet.getRange('A135').setValue(gaugeText)
+  sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue(gaugeText)
     .setFontFamily('Courier New')
     .setFontSize(14)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setBackground('#F0FDF4');
-  sheet.getRange('A135:G145').merge();
+  sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
 /**
@@ -26786,7 +26871,8 @@ function createGaugeStyleChart_(sheet) {
  * @private
  */
 function createScorecardChart_(sheet) {
-  var openCases = sheet.getRange('A16').getValue() || 0;
+  var L = DASHBOARD_LAYOUT;
+  var openCases = sheet.getRange(L.GRIEVANCE_METRICS_ROW, 1).getValue() || 0;
   var scorecardText = '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n' +
                       '┃         📊 OPEN GRIEVANCES          ┃\n' +
                       '┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫\n' +
@@ -26796,13 +26882,13 @@ function createScorecardChart_(sheet) {
                       '┃           ▲ Active Cases            ┃\n' +
                       '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛';
 
-  sheet.getRange('A135').setValue(scorecardText)
+  sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue(scorecardText)
     .setFontFamily('Courier New')
     .setFontSize(14)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setBackground('#FEF3C7');
-  sheet.getRange('A135:G145').merge();
+  sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
 /**
@@ -26811,10 +26897,12 @@ function createScorecardChart_(sheet) {
  * @private
  */
 function createTrendLineChart_(sheet) {
+  var L = DASHBOARD_LAYOUT;
+  var trendRows = L.TREND_END_ROW - L.TREND_START_ROW + 1;
   var chartBuilder = sheet.newChart()
     .setChartType(Charts.ChartType.LINE)
-    .addRange(sheet.getRange('A44:C46'))
-    .setPosition(135, 1, 0, 0)
+    .addRange(sheet.getRange(L.TREND_START_ROW, 1, trendRows, 3))
+    .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
     .setOption('title', 'Month-Over-Month Trends')
     .setOption('legend', {position: 'bottom'})
     .setOption('curveType', 'function')
@@ -26832,10 +26920,12 @@ function createTrendLineChart_(sheet) {
  * @private
  */
 function createAreaChart_(sheet) {
+  var L = DASHBOARD_LAYOUT;
+  var trendRows = L.TREND_END_ROW - L.TREND_START_ROW + 1;
   var chartBuilder = sheet.newChart()
     .setChartType(Charts.ChartType.AREA)
-    .addRange(sheet.getRange('A44:C46'))
-    .setPosition(135, 1, 0, 0)
+    .addRange(sheet.getRange(L.TREND_START_ROW, 1, trendRows, 3))
+    .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
     .setOption('title', 'Cumulative Trend Analysis')
     .setOption('legend', {position: 'bottom'})
     .setOption('colors', [COLORS.CHART_PURPLE, COLORS.CHART_BLUE])
@@ -26852,10 +26942,11 @@ function createAreaChart_(sheet) {
  * @private
  */
 function createComboChart_(sheet) {
+  var L = DASHBOARD_LAYOUT;
   var chartBuilder = sheet.newChart()
     .setChartType(Charts.ChartType.COMBO)
-    .addRange(sheet.getRange('A26:C30'))
-    .setPosition(135, 1, 0, 0)
+    .addRange(sheet.getRange(L.CATEGORY_START_ROW, 1, L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1, 3))
+    .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
     .setOption('title', 'Cases by Category with Trend Line')
     .setOption('legend', {position: 'bottom'})
     .setOption('seriesType', 'bars')
@@ -26874,10 +26965,11 @@ function createComboChart_(sheet) {
  * @private
  */
 function createSummaryTableChart_(sheet) {
-  var openCases = sheet.getRange('A16').getValue() || 0;
-  var resolvedCases = sheet.getRange('D16').getValue() || 0;
-  var winRate = sheet.getRange('D6').getValue() || '0%';
-  var avgDays = sheet.getRange('E6').getValue() || 'N/A';
+  var L = DASHBOARD_LAYOUT;
+  var openCases = sheet.getRange(L.GRIEVANCE_METRICS_ROW, 1).getValue() || 0;
+  var resolvedCases = sheet.getRange(L.GRIEVANCE_METRICS_ROW, 4).getValue() || 0;
+  var winRate = sheet.getRange(L.QUICK_STATS_ROW, 4).getValue() || '0%';
+  var avgDays = sheet.getRange(L.QUICK_STATS_ROW, 5).getValue() || 'N/A';
 
   var tableText = '╔═══════════════════════════════════════════════════════╗\n' +
                   '║            📋 KPI SUMMARY TABLE                       ║\n' +
@@ -26890,13 +26982,13 @@ function createSummaryTableChart_(sheet) {
                   '║  Avg Resolution Time       │  ' + padRight(String(avgDays), 23) + '║\n' +
                   '╚═══════════════════════════════════════════════════════╝';
 
-  sheet.getRange('A135').setValue(tableText)
+  sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue(tableText)
     .setFontFamily('Courier New')
     .setFontSize(12)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setBackground('#F3F4F6');
-  sheet.getRange('A135:G145').merge();
+  sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
 /**
@@ -26908,8 +27000,9 @@ function createStewardLeaderboardChart_(sheet) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
+  var L = DASHBOARD_LAYOUT;
   if (!memberSheet) {
-    sheet.getRange('A135').setValue('Member Directory not found');
+    sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue('Member Directory not found');
     return;
   }
 
@@ -26967,13 +27060,13 @@ function createStewardLeaderboardChart_(sheet) {
 
   leaderboardText += '╚═══════════════════════════════════════════════════════╝';
 
-  sheet.getRange('A135').setValue(leaderboardText)
+  sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue(leaderboardText)
     .setFontFamily('Courier New')
     .setFontSize(11)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setBackground('#EFF6FF');
-  sheet.getRange('A135:G145').merge();
+  sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
 /**
@@ -28024,7 +28117,7 @@ function checkDeadlinesAndNotify_() {
 
   if (urgent.length === 0) return;
 
-  var subject = '509 Dashboard: ' + urgent.length + ' Grievance Deadline(s) Approaching';
+  var subject = COMMAND_CONFIG.SYSTEM_NAME + ': ' + urgent.length + ' Grievance Deadline(s) Approaching';
   var body = 'The following grievances have deadlines within 3 days:\n\n';
 
   for (var j = 0; j < urgent.length; j++) {
@@ -28053,8 +28146,8 @@ function testDeadlineNotifications() {
 
   try {
     MailApp.sendEmail(email,
-      '509 Dashboard Test Notification',
-      'This is a test notification from your 509 Dashboard.\n\n' +
+      COMMAND_CONFIG.SYSTEM_NAME + ' Test Notification',
+      'This is a test notification from your ' + COMMAND_CONFIG.SYSTEM_NAME + '.\n\n' +
       'If you received this email, notifications are working correctly!\n\n' +
       'Dashboard: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl()
     );
@@ -28229,7 +28322,7 @@ function sendStewardDeadlineAlerts() {
         to: email,
         subject: subject,
         body: body,
-        name: 'SEIU Local 509 Dashboard'
+        name: getOrgNameFromConfig_() + ' Dashboard'
       });
       emailsSent++;
       // Mask name in logs for privacy
@@ -28436,13 +28529,13 @@ function executeSendRandomSurveyEmails(opts) {
         'Your Member ID: ' + member.memberId + '\n' +
         '(You will need this to verify your membership when submitting)\n\n' +
         'Thank you for being a member!\n\n' +
-        'SEIU Local 509';
+        getOrgNameFromConfig_();
 
       MailApp.sendEmail({
         to: member.email,
         subject: opts.subject,
         body: body,
-        name: 'SEIU Local 509 Dashboard'
+        name: getOrgNameFromConfig_() + ' Dashboard'
       });
 
       sent++;
@@ -30025,7 +30118,7 @@ function setupCalcFormulasSheet(sheet) {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4036 lines)
+// SOURCE: 09_Dashboards.gs (4042 lines)
 // ============================================================================
 
 /**
@@ -32965,10 +33058,12 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
  * @private
  */
 function writeDashboardValues_(sheet, metrics) {
+  var L = DASHBOARD_LAYOUT;
+
   // ══════════════════════════════════════════════════════════════════════
-  // QUICK STATS (Row 6) - Card layout
+  // QUICK STATS - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A6:F6').setValues([[
+  sheet.getRange(L.QUICK_STATS_ROW, 1, 1, L.DATA_COLS).setValues([[
     metrics.totalMembers,
     metrics.activeStewards,
     metrics.activeGrievances,
@@ -32978,9 +33073,9 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // MEMBER METRICS (Row 11) - Updated for card layout
+  // MEMBER METRICS - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A11:D11').setValues([[
+  sheet.getRange(L.MEMBER_METRICS_ROW, 1, 1, 4).setValues([[
     metrics.totalMembers,
     metrics.activeStewards,
     metrics.avgOpenRate,
@@ -32988,9 +33083,9 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // GRIEVANCE METRICS (Row 16) - Updated for card layout
+  // GRIEVANCE METRICS - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A16:F16').setValues([[
+  sheet.getRange(L.GRIEVANCE_METRICS_ROW, 1, 1, L.DATA_COLS).setValues([[
     metrics.open,
     metrics.pendingInfo,
     metrics.settled,
@@ -33000,9 +33095,9 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // TIMELINE METRICS (Row 21) - Updated for card layout
+  // TIMELINE METRICS - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A21:D21').setValues([[
+  sheet.getRange(L.TIMELINE_METRICS_ROW, 1, 1, 4).setValues([[
     metrics.avgDaysOpen,
     metrics.filedThisMonth,
     metrics.closedThisMonth,
@@ -33010,32 +33105,32 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // TYPE ANALYSIS (Rows 26-30) - Updated for card layout
+  // TYPE ANALYSIS - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var catRowCount = L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1;
   var categoryRows = [];
   for (var c = 0; c < metrics.categories.length; c++) {
     var cat = metrics.categories[c];
     categoryRows.push([cat.name, cat.total, cat.open, cat.resolved, cat.winRate, cat.avgDays]);
   }
-  // Pad with empty rows if less than 5
-  while (categoryRows.length < 5) {
+  while (categoryRows.length < catRowCount) {
     categoryRows.push(['', '', '', '', '', '']);
   }
-  sheet.getRange('A26:F30').setValues(categoryRows);
+  sheet.getRange(L.CATEGORY_START_ROW, 1, catRowCount, L.DATA_COLS).setValues(categoryRows);
 
   // ══════════════════════════════════════════════════════════════════════
-  // LOCATION BREAKDOWN (Rows 35-39) - Updated for card layout
+  // LOCATION BREAKDOWN - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var locRowCount = L.LOCATION_END_ROW - L.LOCATION_START_ROW + 1;
   var locationRows = [];
   for (var l = 0; l < metrics.locations.length; l++) {
     var loc = metrics.locations[l];
     locationRows.push([loc.name, loc.members, loc.grievances, loc.open, loc.winRate, loc.satisfaction]);
   }
-  // Pad with empty rows if less than 5
-  while (locationRows.length < 5) {
+  while (locationRows.length < locRowCount) {
     locationRows.push(['', '', '', '', '', '']);
   }
-  sheet.getRange('A35:F39').setValues(locationRows);
+  sheet.getRange(L.LOCATION_START_ROW, 1, locRowCount, L.DATA_COLS).setValues(locationRows);
 
   // ══════════════════════════════════════════════════════════════════════
   // MONTH-OVER-MONTH TRENDS (Rows 44-46) - Updated for card layout
@@ -33063,10 +33158,11 @@ function writeDashboardValues_(sheet, metrics) {
   var filedTrend = filedChange > 0 ? '>' : (filedChange < 0 ? '<' : '=');
   trendRows.push(['Cases Filed', metrics.trends.filed.thisMonth, metrics.trends.filed.lastMonth, filedChange, filedPct, filedTrend]);
 
-  sheet.getRange('A44:F46').setValues(trendRows);
+  var trendRowCount = L.TREND_END_ROW - L.TREND_START_ROW + 1;
+  sheet.getRange(L.TREND_START_ROW, 1, trendRowCount, L.DATA_COLS).setValues(trendRows);
 
   // ══════════════════════════════════════════════════════════════════════
-  // SPARKLINES (Column G, Rows 44-46) - Color-coded 6-month trends
+  // SPARKLINES - Color-coded 6-month trends
   // Red for grievances (high = bad), Green for members (high = good), Blue for filed
   // ══════════════════════════════════════════════════════════════════════
   var sparklineFormulas = [];
@@ -33087,13 +33183,13 @@ function writeDashboardValues_(sheet, metrics) {
   sparklineFormulas.push([filedSparkline]);
 
   // Write sparkline formulas
-  sheet.getRange('G44').setFormula(grievanceSparkline);
-  sheet.getRange('G45').setFormula(memberSparkline);
-  sheet.getRange('G46').setFormula(filedSparkline);
+  sheet.getRange(L.TREND_START_ROW, L.SPARKLINE_COL).setFormula(grievanceSparkline);
+  sheet.getRange(L.TREND_START_ROW + 1, L.SPARKLINE_COL).setFormula(memberSparkline);
+  sheet.getRange(L.TREND_START_ROW + 2, L.SPARKLINE_COL).setFormula(filedSparkline);
 
   // Color-code change values based on direction
   // For grievances: negative change = green (good), positive = red (bad)
-  var changeCell44 = sheet.getRange('D44');
+  var changeCell44 = sheet.getRange(L.TREND_START_ROW, 4);
   var change44Val = grievanceChange;
   if (change44Val < 0) {
     changeCell44.setFontColor('#059669'); // Green - grievances down is good
@@ -33104,7 +33200,7 @@ function writeDashboardValues_(sheet, metrics) {
   }
 
   // For members: positive change = green (good), negative = red (bad)
-  var changeCell45 = sheet.getRange('D45');
+  var changeCell45 = sheet.getRange(L.TREND_START_ROW + 1, 4);
   if (memberChange > 0) {
     changeCell45.setFontColor('#059669'); // Green - members up is good
   } else if (memberChange < 0) {
@@ -33114,13 +33210,13 @@ function writeDashboardValues_(sheet, metrics) {
   }
 
   // For cases filed: neutral coloring (blue)
-  var changeCell46 = sheet.getRange('D46');
+  var changeCell46 = sheet.getRange(L.TREND_START_ROW + 2, 4);
   changeCell46.setFontColor('#3B82F6'); // Blue - neutral
 
   // ══════════════════════════════════════════════════════════════════════
-  // STEWARD SUMMARY (Row 54) - Updated for card layout
+  // STEWARD SUMMARY - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A54:F54').setValues([[
+  sheet.getRange(L.STEWARD_SUMMARY_ROW, 1, 1, L.DATA_COLS).setValues([[
     metrics.stewardSummary.total,
     metrics.stewardSummary.activeWithCases,
     metrics.stewardSummary.avgCasesPerSteward,
@@ -33130,10 +33226,11 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // TOP 30 BUSIEST STEWARDS (Rows 59-88) - Updated for card layout
+  // TOP 30 BUSIEST STEWARDS - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var busiestRowCount = L.BUSIEST_END_ROW - L.BUSIEST_START_ROW + 1;
   var busiestRows = [];
-  for (var b = 0; b < 30; b++) {
+  for (var b = 0; b < busiestRowCount; b++) {
     if (b < metrics.busiestStewards.length) {
       var steward = metrics.busiestStewards[b];
       busiestRows.push([b + 1, steward.name, steward.active, steward.open, steward.pendingInfo, steward.total]);
@@ -33141,13 +33238,14 @@ function writeDashboardValues_(sheet, metrics) {
       busiestRows.push(['', '', '', '', '', '']);
     }
   }
-  sheet.getRange('A59:F88').setValues(busiestRows);
+  sheet.getRange(L.BUSIEST_START_ROW, 1, busiestRowCount, L.DATA_COLS).setValues(busiestRows);
 
   // ══════════════════════════════════════════════════════════════════════
-  // TOP 10 PERFORMERS (Rows 93-102) - Updated for card layout
+  // TOP 10 PERFORMERS - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var topRowCount = L.TOP_PERFORMERS_END_ROW - L.TOP_PERFORMERS_START_ROW + 1;
   var topRows = [];
-  for (var t = 0; t < 10; t++) {
+  for (var t = 0; t < topRowCount; t++) {
     if (t < metrics.topPerformers.length) {
       var perf = metrics.topPerformers[t];
       topRows.push([t + 1, perf.name, perf.score, perf.winRate, perf.avgDays, perf.overdue]);
@@ -33155,13 +33253,14 @@ function writeDashboardValues_(sheet, metrics) {
       topRows.push(['', '', '', '', '', '']);
     }
   }
-  sheet.getRange('A93:F102').setValues(topRows);
+  sheet.getRange(L.TOP_PERFORMERS_START_ROW, 1, topRowCount, L.DATA_COLS).setValues(topRows);
 
   // ══════════════════════════════════════════════════════════════════════
-  // STEWARDS NEEDING SUPPORT (Rows 107-116) - Updated for card layout
+  // STEWARDS NEEDING SUPPORT - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var supportRowCount = L.NEEDING_SUPPORT_END_ROW - L.NEEDING_SUPPORT_START_ROW + 1;
   var bottomRows = [];
-  for (var n = 0; n < 10; n++) {
+  for (var n = 0; n < supportRowCount; n++) {
     if (n < metrics.needingSupport.length) {
       var need = metrics.needingSupport[n];
       bottomRows.push([n + 1, need.name, need.score, need.winRate, need.avgDays, need.overdue]);
@@ -33169,7 +33268,7 @@ function writeDashboardValues_(sheet, metrics) {
       bottomRows.push(['', '', '', '', '', '']);
     }
   }
-  sheet.getRange('A107:F116').setValues(bottomRows);
+  sheet.getRange(L.NEEDING_SUPPORT_START_ROW, 1, supportRowCount, L.DATA_COLS).setValues(bottomRows);
 
   // ══════════════════════════════════════════════════════════════════════
   // AUTO-APPLY GRADIENT HEATMAPS
@@ -37703,7 +37802,7 @@ function createFeaturesReferenceSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10c_FormHandlers.gs (860 lines)
+// SOURCE: 10c_FormHandlers.gs (923 lines)
 // ============================================================================
 
 // ============================================================================
@@ -37741,13 +37840,16 @@ function createFeaturesReferenceSheet(ss) {
  * Grievance Form Configuration
  * Maps form entry IDs to Member Directory fields for pre-filling
  */
-// TODO: HARDCODED — Form URL and entry IDs will silently break if the Google Form
-// is recreated or restructured. Consider moving to Config sheet or Script Properties.
+/**
+ * Grievance Form Configuration
+ * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
+ * Hardcoded values serve as defaults only — update via Script Properties or Config sheet.
+ */
 var GRIEVANCE_FORM_CONFIG = {
-  // Google Form URL (viewform version for pre-filling)
+  // Default form URL — overridden by Config sheet column P at runtime
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSedX8nf_xXeLe2sCL9MpjkEEmSuSPbjn3fNxMaMNaPlD0H5lA/viewform',
 
-  // Form field entry IDs mapped to their purpose
+  // Default form field entry IDs — overridden by Script Properties at runtime
   FIELD_IDS: {
     MEMBER_ID: 'entry.272049116',
     MEMBER_FIRST_NAME: 'entry.736822578',
@@ -37774,9 +37876,13 @@ var GRIEVANCE_FORM_CONFIG = {
  * Personal Contact Info Form Configuration
  * Maps form entry IDs to Member Directory fields for updating member contact info
  */
-// TODO: HARDCODED — Same risk as GRIEVANCE_FORM_CONFIG above. Move to Config sheet.
+/**
+ * Contact Form Configuration
+ * Form URL reads from Config sheet (column Q), entry IDs read from Script Properties.
+ * Hardcoded values serve as defaults only.
+ */
 var CONTACT_FORM_CONFIG = {
-  // Google Form URL - members fill out blank form, data written to Member Directory on submit
+  // Default form URL — overridden by Config sheet column Q at runtime
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeOs6Kxqca85DYRF1wTP634gMNdEirZdi5mg7aUIY5q7dIfRg/viewform',
 
   // Form field entry IDs mapped to Member Directory columns
@@ -37800,8 +37906,60 @@ var CONTACT_FORM_CONFIG = {
 };
 
 // ============================================================================
-// FORM URL CONFIGURATION HELPERS
+// FORM CONFIGURATION HELPERS
 // ============================================================================
+
+/**
+ * Get form field IDs from Script Properties, falling back to hardcoded defaults.
+ * Admins can update field IDs via Script Properties without touching code.
+ *
+ * Script Property key format: FORM_FIELDS_{formType} (e.g., FORM_FIELDS_GRIEVANCE)
+ * Value format: JSON string of the FIELD_IDS object
+ *
+ * @param {string} formType - 'grievance', 'contact', or 'satisfaction'
+ * @returns {Object} Field ID mapping
+ */
+function getFormFieldIds_(formType) {
+  var defaults = {
+    grievance: GRIEVANCE_FORM_CONFIG.FIELD_IDS,
+    contact: CONTACT_FORM_CONFIG.FIELD_IDS,
+    satisfaction: SATISFACTION_FORM_CONFIG.FIELD_IDS
+  };
+
+  try {
+    var propKey = 'FORM_FIELDS_' + formType.toUpperCase();
+    var stored = PropertiesService.getScriptProperties().getProperty(propKey);
+    if (stored) {
+      var parsed = JSON.parse(stored);
+      // Merge stored over defaults so new fields still work
+      var result = {};
+      var defaultFields = defaults[formType] || {};
+      for (var key in defaultFields) {
+        result[key] = defaultFields[key];
+      }
+      for (var key in parsed) {
+        result[key] = parsed[key];
+      }
+      return result;
+    }
+  } catch (e) {
+    console.log('Error reading form field IDs from Script Properties: ' + e.message);
+  }
+
+  return defaults[formType] || {};
+}
+
+/**
+ * Save form field IDs to Script Properties for a given form type.
+ * Call this after creating/recreating a Google Form to update the entry IDs.
+ *
+ * @param {string} formType - 'grievance', 'contact', or 'satisfaction'
+ * @param {Object} fieldIds - Object mapping field names to entry.XXXXX IDs
+ */
+function saveFormFieldIds_(formType, fieldIds) {
+  var propKey = 'FORM_FIELDS_' + formType.toUpperCase();
+  PropertiesService.getScriptProperties().setProperty(propKey, JSON.stringify(fieldIds));
+}
 
 /**
  * Get form URL from Config sheet, falling back to hardcoded default
@@ -38069,9 +38227,13 @@ function testGrievanceFormSubmission() {
 /**
  * Member Satisfaction Survey Form Configuration
  */
-// TODO: HARDCODED — Same risk as other form configs. Move to Config sheet.
+/**
+ * Satisfaction Survey Form Configuration
+ * Form URL reads from Config sheet (column AR), entry IDs read from Script Properties.
+ * Hardcoded values serve as defaults only.
+ */
 var SATISFACTION_FORM_CONFIG = {
-  // Google Form URLs
+  // Default form URLs — overridden by Config sheet column AR at runtime
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeR4VxrGTEvK-PaQP2S8JXn6xwTwp-vkR9tI5c3PRvfhr75nA/viewform',
   EDIT_URL: 'https://docs.google.com/forms/d/10irg3mZ4kPShcJ5gFHuMoTxvTeZmo_cBs6HGvfasbL0/edit',
 
@@ -38740,7 +38902,7 @@ function viewTestResults() {
  * Get or create the root 509 Dashboard folder in Drive
  */
 function getOrCreateDashboardFolder_() {
-  var folderName = '509 Dashboard - Grievance Files';
+  var folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
   var folders = DriveApp.getFoldersByName(folderName);
 
   if (folders.hasNext()) {
@@ -45701,7 +45863,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4018 lines)
+// SOURCE: 12_Features.gs (4023 lines)
 // ============================================================================
 
 /**
@@ -49245,8 +49407,13 @@ function refreshLookerAnonSatisfaction_() {
  * @private
  */
 function generateAnonHash_(id) {
-  // Use a simple hash that can't be reversed to original ID
-  const salt = 'anon509data'; // TODO: HARDCODED — Weak salt in source code. Move to Script Properties.
+  // Read salt from Script Properties; generate and store one if missing
+  var props = PropertiesService.getScriptProperties();
+  var salt = props.getProperty('ANON_HASH_SALT');
+  if (!salt) {
+    salt = 'anon509data'; // Default fallback — auto-stored on first run
+    props.setProperty('ANON_HASH_SALT', salt);
+  }
   const combined = salt + String(id);
   let hash = 0;
   for (let i = 0; i < combined.length; i++) {
