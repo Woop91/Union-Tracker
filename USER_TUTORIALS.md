@@ -1,7 +1,7 @@
 # 509 Dashboard - User Tutorials
 
-**Version:** 4.0.3
-**Last Updated:** 2026-01-16
+**Version:** 4.6.0
+**Last Updated:** 2026-02-12
 
 Quick, practical tutorials for common tasks in the 509 Dashboard.
 
@@ -19,7 +19,10 @@ Quick, practical tutorials for common tasks in the 509 Dashboard.
 8. [Running System Diagnostics](#8-running-system-diagnostics)
 9. [Seeding Demo Data (for Training)](#9-seeding-demo-data-for-training)
 10. [Exiting Demo Mode](#10-exiting-demo-mode)
-11. [Understanding Hidden Sheet Architecture](#11-understanding-hidden-sheet-architecture) ⭐ NEW
+11. [Understanding Hidden Sheet Architecture](#11-understanding-hidden-sheet-architecture)
+12. [Setting Up a Meeting](#12-setting-up-a-meeting) ⭐ NEW
+13. [Managing Meeting Notes & Agenda](#13-managing-meeting-notes--agenda) ⭐ NEW
+14. [Creating a Member Drive Folder](#14-creating-a-member-drive-folder) ⭐ NEW
 
 ---
 
@@ -478,6 +481,97 @@ If something goes wrong, use these repair functions:
 
 ---
 
+## 12. Setting Up a Meeting
+
+### Creating a New Meeting (3 minutes)
+
+**Step 1: Open Meeting Setup**
+1. Click **Strategic Ops > Meeting Check-In > Setup Meeting**
+2. The setup dialog opens with all options
+
+**Step 2: Fill In Meeting Details**
+| Field | Example |
+|-------|---------|
+| Meeting Name | February General Membership Meeting |
+| Meeting Date | 02/15/2026 |
+| Meeting Time | 6:00 PM |
+| Meeting Type | In-Person (dropdown) |
+| Duration | 60 minutes |
+
+**Step 3: Configure Steward Notifications**
+1. Enter steward emails in "Email Attendance Report To" (comma-separated)
+2. Under "Send Agenda Early To (3 days prior)", check specific stewards who need the agenda early
+3. Use **Select All** or **Clear All** to quickly toggle all stewards
+4. All stewards will receive the agenda at least 1 day before the meeting regardless
+
+**Step 4: Click Create Meeting**
+- A Google Calendar event is created
+- A **Meeting Notes** Google Doc is created in the `Meeting Notes/` folder
+- A **Meeting Agenda** Google Doc is created in the `Meeting Agenda/` folder
+- Links are stored in columns N and O of the Meeting Check-In Log
+
+**You're ready! The system handles notifications automatically.**
+
+---
+
+## 13. Managing Meeting Notes & Agenda
+
+### How Document Automation Works
+
+The system automatically sends meeting documents to stewards on a schedule:
+
+| When | What Happens |
+|------|--------------|
+| **3 days before meeting** | Agenda link emailed to selected stewards (from setup) |
+| **1 day before meeting** | Agenda link emailed to ALL stewards |
+| **1 day before meeting** | Notes link emailed to notification stewards |
+| **1 day after meeting** | Notes set to view-only and visible to members in dashboard |
+
+### Editing Meeting Notes
+
+1. Open the Meeting Check-In Log sheet
+2. Find your meeting row
+3. Click the URL in column N (Notes Doc URL) to open the Google Doc
+4. Edit the document directly - it's a full Google Doc
+
+### Editing Meeting Agenda
+
+1. Open the Meeting Check-In Log sheet
+2. Find your meeting row
+3. Click the URL in column O (Agenda Doc URL) to open the Google Doc
+4. Add agenda items before the meeting
+
+### Viewing Meeting Notes as a Member
+
+1. Open the **Member Dashboard** (Strategic Ops > Command Center > Member Dashboard)
+2. Click the **Meeting Notes** tab
+3. Browse meetings chronologically or use the search bar
+4. Click **View Notes** to open the read-only Google Doc
+
+**Note:** Members can only view notes after the meeting date. Notes are read-only for members.
+
+---
+
+## 14. Creating a Member Drive Folder
+
+### Quick Action Method (30 seconds)
+
+**Step 1: Open Quick Actions**
+1. Select a member row in the Member Directory
+2. Click **Strategic Ops > Cases > Member Quick Actions**
+
+**Step 2: Click "Create Member Folder"**
+1. Click the **Create Member Folder** button (📁 icon)
+2. A Google Drive folder is created for the member
+3. If the member already has a grievance folder, that folder is reused
+
+**Result:**
+- A Drive folder named after the member is created or found
+- You'll see a confirmation with the folder URL
+- Use this folder to store member-related documents
+
+---
+
 ## Quick Reference Card
 
 ### Essential Menu Paths
@@ -535,5 +629,5 @@ If something goes wrong, use these repair functions:
 
 ---
 
-**Version:** 4.0.3
-**Last Updated:** 2026-01-16
+**Version:** 4.6.0
+**Last Updated:** 2026-02-12

@@ -408,8 +408,8 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 5,
-  patch: 1,
+  minor: 6,
+  patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -503,7 +503,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity
   SYSTEM_NAME: "509 Strategic Command Center",
-  VERSION: "4.5.1",
+  VERSION: "4.6.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -580,12 +580,12 @@ var DRIVE_CONFIG = {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 5,
-  PATCH: 1,
-  BUILD: 'v4.5.1',
-  CURRENT: '4.5.1',
-  BUILD_DATE: '2026-02-11',
-  CODENAME: 'Code Audit & Cleanup'
+  MINOR: 6,
+  PATCH: 0,
+  BUILD: 'v4.6.0',
+  CURRENT: '4.6.0',
+  BUILD_DATE: '2026-02-12',
+  CODENAME: 'Meeting Intelligence & Document Automation'
 };
 
 // ============================================================================
@@ -895,11 +895,12 @@ var MEMBER_COLS = {
 };
 
 // ============================================================================
-// MEETING CHECK-IN LOG COLUMNS (8 columns: A-H)
+// MEETING CHECK-IN LOG COLUMNS (16 columns: A-P)
 // ============================================================================
 
 /**
  * Meeting Check-In Log column positions (1-indexed)
+ * Columns A-H are original; I-M added for event scheduling
  * @const {Object}
  */
 var MEETING_CHECKIN_COLS = {
@@ -910,7 +911,25 @@ var MEETING_CHECKIN_COLS = {
   MEMBER_ID: 5,          // E - Checked-in member ID
   MEMBER_NAME: 6,        // F - Member first + last name
   CHECKIN_TIME: 7,       // G - Timestamp of check-in
-  EMAIL: 8               // H - Member email (for lookup)
+  EMAIL: 8,              // H - Member email (for lookup)
+  MEETING_TIME: 9,       // I - Start time (HH:mm)
+  MEETING_DURATION: 10,  // J - Duration in hours
+  EVENT_STATUS: 11,      // K - Scheduled / Active / Completed
+  NOTIFY_STEWARDS: 12,   // L - Steward email(s) for attendance report
+  CALENDAR_EVENT_ID: 13, // M - Google Calendar event ID
+  NOTES_DOC_URL: 14,     // N - Meeting Notes Google Doc URL
+  AGENDA_DOC_URL: 15,    // O - Meeting Agenda Google Doc URL
+  AGENDA_STEWARDS: 16    // P - Steward emails for early agenda sharing (3 days prior)
+};
+
+/**
+ * Meeting event statuses
+ * @const {Object}
+ */
+var MEETING_STATUS = {
+  SCHEDULED: 'Scheduled',
+  ACTIVE: 'Active',
+  COMPLETED: 'Completed'
 };
 
 // ============================================================================

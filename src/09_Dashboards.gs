@@ -2018,32 +2018,33 @@ function syncGrievanceFormulasToLog() {
     // C-D: First Name, Last Name
     grievanceSheet.getRange(2, GRIEVANCE_COLS.FIRST_NAME, nameUpdates.length, 2).setValues(nameUpdates);
 
-    // H: Filing Deadline (column 8)
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.FILING_DEADLINE, deadlineUpdates.length, 1)
-      .setValues(deadlineUpdates.map(function(r) { return [r[0]]; }));
+    // Deadline columns: respect steward overrides (cells with "Steward override" note)
+    var deadlineCols = [
+      { col: GRIEVANCE_COLS.FILING_DEADLINE, idx: 0 },
+      { col: GRIEVANCE_COLS.STEP1_DUE, idx: 1 },
+      { col: GRIEVANCE_COLS.STEP2_APPEAL_DUE, idx: 2 },
+      { col: GRIEVANCE_COLS.STEP2_DUE, idx: 3 },
+      { col: GRIEVANCE_COLS.STEP3_APPEAL_DUE, idx: 4 }
+    ];
 
-    // J: Step I Due (column 10)
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, deadlineUpdates.length, 1)
-      .setValues(deadlineUpdates.map(function(r) { return [r[1]]; }));
+    for (var dc = 0; dc < deadlineCols.length; dc++) {
+      var dlCol = deadlineCols[dc].col;
+      var dlIdx = deadlineCols[dc].idx;
+      var dlRange = grievanceSheet.getRange(2, dlCol, deadlineUpdates.length, 1);
+      var dlNotes = dlRange.getNotes();
+      var dlValues = deadlineUpdates.map(function(r) { return [r[dlIdx]]; });
 
-    // L: Step II Appeal Due (column 12)
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, deadlineUpdates.length, 1)
-      .setValues(deadlineUpdates.map(function(r) { return [r[2]]; }));
+      // Preserve steward-overridden cells: keep existing value, skip formula recalc
+      for (var nr = 0; nr < dlNotes.length; nr++) {
+        if (dlNotes[nr][0] === 'Steward override') {
+          // Keep the existing value in the sheet instead of overwriting
+          dlValues[nr][0] = dlRange.getCell(nr + 1, 1).getValue();
+        }
+      }
 
-    // N: Step II Due (column 14)
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.STEP2_DUE, deadlineUpdates.length, 1)
-      .setValues(deadlineUpdates.map(function(r) { return [r[3]]; }));
-
-    // P: Step III Appeal Due (column 16)
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, deadlineUpdates.length, 1)
-      .setValues(deadlineUpdates.map(function(r) { return [r[4]]; }));
-
-    // Format deadline columns as dates (MM/dd/yyyy)
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.FILING_DEADLINE, deadlineUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, deadlineUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, deadlineUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.STEP2_DUE, deadlineUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
-    grievanceSheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, deadlineUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
+      dlRange.setValues(dlValues);
+      dlRange.setNumberFormat('MM/dd/yyyy');
+    }
 
     // S, T, U: Days Open, Next Action Due, Days to Deadline
     grievanceSheet.getRange(2, GRIEVANCE_COLS.DAYS_OPEN, metricsUpdates.length, 3).setValues(metricsUpdates);

@@ -1,18 +1,23 @@
 /**
  * 509 Dashboard - Meeting Check-In System
  *
- * Stewards create meetings; members check in via a modal dialog
- * using their email and PIN. Check-ins are logged to the
- * Meeting Check-In Log sheet.
+ * Stewards can plan meetings in advance. Events appear in Google Calendar.
+ * On the day of the event the check-in form becomes active.
+ * A few hours after the event ends the check-in becomes inactive.
+ * If multiple events are planned for the same day, members select which event.
+ * Stewards can opt to receive an attendance report via email.
  *
  * Flow:
- * 1. Steward creates a meeting via "Setup Meeting" dialog
- * 2. Steward opens the check-in kiosk dialog (stays open)
- * 3. Members enter email + PIN → click Check In
- * 4. System authenticates, logs attendance, resets form for next member
+ * 1. Steward creates a meeting via "Setup Meeting" dialog (with date, time, duration)
+ * 2. Meeting appears in Google Calendar
+ * 3. On the day of the meeting, check-in becomes active
+ * 4. Steward opens the check-in kiosk dialog (stays open)
+ * 5. Members enter email + PIN -> click Check In
+ * 6. After meeting duration + buffer, check-in deactivates and attendance is emailed
  *
- * @version 1.0.0
- * @requires 01_Core.gs (SHEETS, MEMBER_COLS, MEETING_CHECKIN_COLS, COLORS)
+ * @version 2.0.0
+ * @requires 01_Core.gs (SHEETS, MEMBER_COLS, MEETING_CHECKIN_COLS, MEETING_STATUS, COLORS)
+ * @requires 05_Integrations.gs (createMeetingCalendarEvent, emailMeetingAttendanceReport)
  * @requires 13_MemberSelfService.gs (authenticateMember, verifyPIN, hashPIN)
  */
 
@@ -25,15 +30,15 @@
  */
 function showSetupMeetingDialog() {
   var html = HtmlService.createHtmlOutput(getSetupMeetingHtml_())
-    .setWidth(500)
-    .setHeight(400);
+    .setWidth(520)
+    .setHeight(720);
   SpreadsheetApp.getUi().showModalDialog(html, '📝 Setup New Meeting');
 }
 
 /**
  * Create a new meeting in the Check-In Log sheet
  * Called from the Setup Meeting dialog
- * @param {Object} meetingData - { name, date, type }
+ * @param {Object} meetingData - { name, date, time, duration, type, notifyEmails }
  * @returns {Object} { success, meetingId, error }
  */
 function createMeeting(meetingData) {
@@ -57,8 +62,46 @@ function createMeeting(meetingData) {
   var meetingName = String(meetingData.name).substring(0, 200);
   var meetingType = meetingData.type || 'In-Person';
   var meetingDate = new Date(meetingData.date + 'T00:00:00');
+  var meetingTime = meetingData.time || '09:00';
+  var meetingDuration = parseFloat(meetingData.duration) || 1;
+  var notifyEmails = meetingData.notifyEmails ? String(meetingData.notifyEmails).trim() : '';
+  var agendaStewards = meetingData.agendaStewards ? String(meetingData.agendaStewards).trim() : '';
+
+  // Create Google Calendar event
+  var calendarEventId = '';
+  if (typeof createMeetingCalendarEvent === 'function') {
+    calendarEventId = createMeetingCalendarEvent({
+      meetingId: meetingId,
+      name: meetingName,
+      date: meetingData.date,
+      time: meetingTime,
+      duration: meetingDuration,
+      type: meetingType
+    });
+  }
+
+  // Determine initial status: Active if today, Scheduled if future
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  var eventDay = new Date(meetingDate);
+  eventDay.setHours(0, 0, 0, 0);
+  var initialStatus = (eventDay.getTime() === today.getTime()) ? MEETING_STATUS.ACTIVE : MEETING_STATUS.SCHEDULED;
+
+  // Create Meeting Notes and Agenda Google Docs
+  var notesDocUrl = '';
+  var agendaDocUrl = '';
+  if (typeof createMeetingDocs === 'function') {
+    var docs = createMeetingDocs({
+      meetingId: meetingId,
+      name: meetingName,
+      date: meetingData.date
+    });
+    notesDocUrl = docs.notesUrl || '';
+    agendaDocUrl = docs.agendaUrl || '';
+  }
 
   // Add a placeholder row so the meeting exists in the sheet
+  // Columns A-P: ID, Name, Date, Type, MemberID, MemberName, CheckInTime, Email, Time, Duration, Status, Notify, CalendarEventId, NotesUrl, AgendaUrl, AgendaStewards
   sheet.appendRow([
     meetingId,
     meetingName,
@@ -67,7 +110,15 @@ function createMeeting(meetingData) {
     '',  // No member yet - this is the meeting header
     '',
     '',
-    ''
+    '',
+    meetingTime,
+    meetingDuration,
+    initialStatus,
+    notifyEmails,
+    calendarEventId,
+    notesDocUrl,
+    agendaDocUrl,
+    agendaStewards
   ]);
 
   if (typeof logAuditEvent === 'function') {
@@ -75,15 +126,54 @@ function createMeeting(meetingData) {
       meetingId: meetingId,
       meetingName: meetingName,
       meetingDate: meetingData.date,
-      meetingType: meetingType
+      meetingTime: meetingTime,
+      meetingDuration: meetingDuration,
+      meetingType: meetingType,
+      calendarEvent: calendarEventId ? 'created' : 'skipped',
+      notesDoc: notesDocUrl ? 'created' : 'skipped',
+      agendaDoc: agendaDocUrl ? 'created' : 'skipped'
     });
   }
 
   return {
     success: true,
     meetingId: meetingId,
-    message: 'Meeting "' + meetingName + '" created. ID: ' + meetingId
+    message: 'Meeting "' + meetingName + '" created (ID: ' + meetingId + ').' +
+             (calendarEventId ? ' Calendar event added.' : '') +
+             (notesDocUrl ? ' Meeting Notes doc created.' : '') +
+             (agendaDocUrl ? ' Meeting Agenda doc created.' : '')
   };
+}
+
+/**
+ * Returns a list of stewards with name and email for the setup meeting dialog
+ * Called from the HTML dialog to populate steward checkboxes
+ * @returns {Array} Array of { name, email } objects
+ */
+function getStewardEmailsForMeetingSetup() {
+  var result = [];
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet || sheet.getLastRow() < 2) return result;
+
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+      if (isSteward === 'Yes' || isSteward === true) {
+        var email = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim();
+        if (email) {
+          result.push({
+            name: (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || ''),
+            email: email
+          });
+        }
+      }
+    }
+  } catch (e) {
+    Logger.log('Error getting steward emails: ' + e.message);
+  }
+  return result;
 }
 
 /**
@@ -109,8 +199,8 @@ function generateMeetingId_(sheet, dateStr) {
 }
 
 /**
- * Get active meetings (today or future) for the check-in dialog dropdown
- * @returns {Object} { success, meetings: [{ id, name, date, type }] }
+ * Get all scheduled/active meetings (today or future) for the planning view
+ * @returns {Object} { success, meetings: [{ id, name, date, type, time, status }] }
  */
 function getActiveMeetings() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -133,6 +223,10 @@ function getActiveMeetings() {
     // Only include each meeting once
     if (meetingsMap[meetingId]) continue;
 
+    var eventStatus = String(data[i][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+    // Skip completed meetings
+    if (eventStatus === MEETING_STATUS.COMPLETED) continue;
+
     var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
     if (meetingDate instanceof Date) {
       var d = new Date(meetingDate);
@@ -143,9 +237,88 @@ function getActiveMeetings() {
           id: meetingId,
           name: String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || ''),
           date: meetingDate.toLocaleDateString(),
-          type: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || '')
+          type: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || ''),
+          time: String(data[i][MEETING_CHECKIN_COLS.MEETING_TIME - 1] || ''),
+          status: eventStatus || MEETING_STATUS.SCHEDULED
         };
       }
+    }
+  }
+
+  var meetings = [];
+  for (var key in meetingsMap) {
+    if (meetingsMap.hasOwnProperty(key)) {
+      meetings.push(meetingsMap[key]);
+    }
+  }
+
+  return { success: true, meetings: meetings };
+}
+
+/**
+ * Get meetings eligible for check-in (today only, Active or Scheduled status,
+ * within the active time window)
+ * @returns {Object} { success, meetings: [{ id, name, date, type, time }] }
+ */
+function getCheckInEligibleMeetings() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    return { success: true, meetings: [] };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var now = new Date();
+  var today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  var deactivateHours = 3;
+  if (typeof CALENDAR_CONFIG !== 'undefined' && CALENDAR_CONFIG.MEETING_DEACTIVATE_HOURS) {
+    deactivateHours = CALENDAR_CONFIG.MEETING_DEACTIVATE_HOURS;
+  }
+
+  var meetingsMap = {};
+
+  for (var i = 1; i < data.length; i++) {
+    var meetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+    if (!meetingId) continue;
+    if (meetingsMap[meetingId]) continue;
+
+    var eventStatus = String(data[i][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+    // Only allow Scheduled or Active meetings for check-in
+    if (eventStatus === MEETING_STATUS.COMPLETED) continue;
+
+    var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+    if (!(meetingDate instanceof Date)) continue;
+
+    var d = new Date(meetingDate);
+    d.setHours(0, 0, 0, 0);
+
+    // Only today's meetings
+    if (d.getTime() !== today.getTime()) continue;
+
+    // Check time window: from start of day to meeting end + deactivate buffer
+    var meetingTime = String(data[i][MEETING_CHECKIN_COLS.MEETING_TIME - 1] || '09:00');
+    var durationHours = parseFloat(data[i][MEETING_CHECKIN_COLS.MEETING_DURATION - 1]) || 1;
+    var timeParts = meetingTime.split(':');
+    var startHour = parseInt(timeParts[0], 10) || 9;
+    var startMin = parseInt(timeParts[1], 10) || 0;
+
+    var endTime = new Date(d);
+    endTime.setHours(startHour + Math.floor(durationHours), startMin + (durationHours % 1) * 60, 0, 0);
+
+    var deactivateTime = new Date(endTime.getTime() + deactivateHours * 60 * 60 * 1000);
+
+    // Meeting is eligible if current time is before deactivation cutoff
+    if (now < deactivateTime) {
+      meetingsMap[meetingId] = {
+        id: meetingId,
+        name: String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || ''),
+        date: meetingDate.toLocaleDateString(),
+        type: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || ''),
+        time: meetingTime
+      };
     }
   }
 
@@ -297,7 +470,7 @@ function processMeetingCheckIn(meetingId, email, pin) {
     }
   }
 
-  // Record the check-in
+  // Record the check-in (columns A-H only; I-M are meeting-level metadata)
   checkInSheet.appendRow([
     meetingId,
     meetingName,
@@ -308,6 +481,17 @@ function processMeetingCheckIn(meetingId, email, pin) {
     new Date(),
     email
   ]);
+
+  // If this is a Scheduled meeting getting its first check-in, mark as Active
+  for (var m = 1; m < checkInData.length; m++) {
+    if (String(checkInData[m][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '') === meetingId) {
+      var currentStatus = String(checkInData[m][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+      if (currentStatus === MEETING_STATUS.SCHEDULED) {
+        checkInSheet.getRange(m + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
+      }
+      break;
+    }
+  }
 
   // Audit log
   if (typeof logAuditEvent === 'function') {
@@ -362,6 +546,100 @@ function getMeetingAttendees(meetingId) {
 }
 
 // ============================================================================
+// EVENT LIFECYCLE MANAGEMENT
+// ============================================================================
+
+/**
+ * Activate today's scheduled meetings and deactivate expired ones.
+ * Called from dailyTrigger or hourly trigger.
+ * - Meetings dated today with status "Scheduled" become "Active"
+ * - Meetings whose end time + buffer has passed become "Completed"
+ * - Completed meetings with notify steward emails get attendance report emailed
+ * @returns {Object} { activated, deactivated }
+ */
+function updateMeetingStatuses() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    return { activated: 0, deactivated: 0 };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var now = new Date();
+  var today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  var deactivateHours = 3;
+  if (typeof CALENDAR_CONFIG !== 'undefined' && CALENDAR_CONFIG.MEETING_DEACTIVATE_HOURS) {
+    deactivateHours = CALENDAR_CONFIG.MEETING_DEACTIVATE_HOURS;
+  }
+
+  var activated = 0;
+  var deactivated = 0;
+  var processedIds = {};
+
+  for (var i = 1; i < data.length; i++) {
+    var meetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+    if (!meetingId || processedIds[meetingId]) continue;
+    processedIds[meetingId] = true;
+
+    var eventStatus = String(data[i][MEETING_CHECKIN_COLS.EVENT_STATUS - 1] || '');
+    var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+    if (!(meetingDate instanceof Date)) continue;
+
+    var d = new Date(meetingDate);
+    d.setHours(0, 0, 0, 0);
+
+    // Activate: Scheduled meetings dated today
+    if (eventStatus === MEETING_STATUS.SCHEDULED && d.getTime() === today.getTime()) {
+      sheet.getRange(i + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.ACTIVE);
+      activated++;
+    }
+
+    // Deactivate: Active (or Scheduled past-date) meetings that have expired
+    if (eventStatus === MEETING_STATUS.ACTIVE || eventStatus === MEETING_STATUS.SCHEDULED) {
+      var meetingTime = String(data[i][MEETING_CHECKIN_COLS.MEETING_TIME - 1] || '09:00');
+      var durationHours = parseFloat(data[i][MEETING_CHECKIN_COLS.MEETING_DURATION - 1]) || 1;
+      var timeParts = meetingTime.split(':');
+      var startHour = parseInt(timeParts[0], 10) || 9;
+      var startMin = parseInt(timeParts[1], 10) || 0;
+
+      var endTime = new Date(d);
+      endTime.setHours(startHour + Math.floor(durationHours), startMin + (durationHours % 1) * 60, 0, 0);
+      var deactivateTime = new Date(endTime.getTime() + deactivateHours * 60 * 60 * 1000);
+
+      if (now >= deactivateTime) {
+        sheet.getRange(i + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.COMPLETED);
+        deactivated++;
+
+        // Email attendance report if steward emails are configured
+        var notifyEmails = String(data[i][MEETING_CHECKIN_COLS.NOTIFY_STEWARDS - 1] || '').trim();
+        if (notifyEmails && typeof emailMeetingAttendanceReport === 'function') {
+          try {
+            emailMeetingAttendanceReport(meetingId, notifyEmails);
+          } catch (emailError) {
+            Logger.log('Error emailing attendance for ' + meetingId + ': ' + emailError.message);
+          }
+        }
+      }
+    }
+
+    // Also deactivate past-date Scheduled meetings (event day has passed entirely)
+    if (eventStatus === MEETING_STATUS.SCHEDULED && d < today) {
+      sheet.getRange(i + 1, MEETING_CHECKIN_COLS.EVENT_STATUS).setValue(MEETING_STATUS.COMPLETED);
+      deactivated++;
+    }
+  }
+
+  if (activated > 0 || deactivated > 0) {
+    Logger.log('Meeting status update: ' + activated + ' activated, ' + deactivated + ' deactivated');
+  }
+
+  return { activated: activated, deactivated: deactivated };
+}
+
+// ============================================================================
 // CLEANUP
 // ============================================================================
 
@@ -412,6 +690,7 @@ function cleanupExpiredMeetings() {
 
 /**
  * Setup Meeting dialog HTML (steward-facing)
+ * Includes time, duration, and notification email fields
  * @private
  * @returns {string} HTML content
  */
@@ -425,65 +704,136 @@ function getSetupMeetingHtml_() {
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;padding:20px}' +
     '.card{background:white;border-radius:12px;padding:30px;box-shadow:0 2px 12px rgba(0,0,0,0.1)}' +
     '.card h2{color:#059669;margin-bottom:20px;text-align:center}' +
-    '.field{margin-bottom:20px}' +
-    '.field label{display:block;margin-bottom:8px;font-weight:600;color:#333}' +
-    '.field input,.field select{width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;font-size:16px}' +
-    '.field input:focus,.field select:focus{outline:none;border-color:#059669}' +
-    '.btn{width:100%;padding:14px;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;background:#059669;color:white}' +
+    '.field{margin-bottom:16px}' +
+    '.field label{display:block;margin-bottom:6px;font-weight:600;color:#333;font-size:14px}' +
+    '.field input,.field select,.field textarea{width:100%;padding:10px;border:2px solid #e0e0e0;border-radius:8px;font-size:15px}' +
+    '.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#059669}' +
+    '.field .hint{font-size:12px;color:#888;margin-top:4px}' +
+    '.row{display:flex;gap:12px}' +
+    '.row .field{flex:1}' +
+    '.steward-list{max-height:150px;overflow-y:auto;border:2px solid #e0e0e0;border-radius:8px;padding:8px}' +
+    '.steward-item{display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:14px}' +
+    '.steward-item input[type=checkbox]{width:18px;height:18px;cursor:pointer}' +
+    '.steward-item label{cursor:pointer;flex:1}' +
+    '.steward-item .email{color:#888;font-size:12px}' +
+    '.select-actions{display:flex;gap:8px;margin-top:6px}' +
+    '.select-actions button{padding:4px 10px;font-size:12px;border:1px solid #ddd;border-radius:4px;background:#f5f5f5;cursor:pointer}' +
+    '.select-actions button:hover{background:#e0e0e0}' +
+    '.btn{width:100%;padding:14px;border:none;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;background:#059669;color:white;margin-top:8px}' +
     '.btn:hover{background:#047857}' +
     '.btn:disabled{background:#ccc;cursor:not-allowed}' +
     '.error{color:#dc2626;font-size:14px;margin-top:10px;text-align:center;padding:10px;background:#fee2e2;border-radius:8px;display:none}' +
     '.success{color:#059669;font-size:14px;margin-top:10px;text-align:center;padding:10px;background:#d1fae5;border-radius:8px;display:none}' +
+    '.section-label{font-weight:700;color:#059669;font-size:13px;margin:20px 0 8px;padding-top:12px;border-top:1px solid #e0e0e0}' +
     '</style></head><body>' +
     '<div class="card">' +
-    '<h2>Setup New Meeting</h2>' +
+    '<h2>Schedule Meeting</h2>' +
     '<div class="field">' +
     '<label for="meetingName">Meeting Name</label>' +
     '<input type="text" id="meetingName" placeholder="e.g. Monthly General Meeting">' +
     '</div>' +
+    '<div class="row">' +
     '<div class="field">' +
-    '<label for="meetingDate">Meeting Date</label>' +
+    '<label for="meetingDate">Date</label>' +
     '<input type="date" id="meetingDate">' +
     '</div>' +
     '<div class="field">' +
-    '<label for="meetingType">Meeting Type</label>' +
+    '<label for="meetingTime">Start Time</label>' +
+    '<input type="time" id="meetingTime" value="12:00">' +
+    '</div>' +
+    '</div>' +
+    '<div class="row">' +
+    '<div class="field">' +
+    '<label for="meetingDuration">Duration (hours)</label>' +
+    '<select id="meetingDuration">' +
+    '<option value="0.5">30 min</option>' +
+    '<option value="1" selected>1 hour</option>' +
+    '<option value="1.5">1.5 hours</option>' +
+    '<option value="2">2 hours</option>' +
+    '<option value="3">3 hours</option>' +
+    '<option value="4">4 hours</option>' +
+    '</select>' +
+    '</div>' +
+    '<div class="field">' +
+    '<label for="meetingType">Type</label>' +
     '<select id="meetingType">' +
     '<option value="In-Person">In-Person</option>' +
     '<option value="Virtual">Virtual</option>' +
     '<option value="Hybrid">Hybrid</option>' +
     '</select>' +
     '</div>' +
-    '<button class="btn" id="createBtn" onclick="createMeeting()">Create Meeting</button>' +
+    '</div>' +
+    '<div class="section-label">Steward Notifications</div>' +
+    '<div class="field">' +
+    '<label>Email Attendance Report To</label>' +
+    '<input type="text" id="notifyEmails" placeholder="steward@email.com, steward2@email.com">' +
+    '<div class="hint">Comma-separated emails to receive attendance report after the meeting</div>' +
+    '</div>' +
+    '<div class="field">' +
+    '<label>Send Agenda Early To (3 days prior)</label>' +
+    '<div id="stewardListContainer" class="steward-list"><em style="color:#888">Loading stewards...</em></div>' +
+    '<div class="select-actions">' +
+    '<button type="button" onclick="selectAllStewards()">Select All</button>' +
+    '<button type="button" onclick="clearAllStewards()">Clear All</button>' +
+    '</div>' +
+    '<div class="hint">Selected stewards get the agenda link 3 days before. All stewards get it the day before regardless.</div>' +
+    '</div>' +
+    '<button class="btn" id="createBtn" onclick="createMeeting()">Schedule Meeting</button>' +
     '<div id="error" class="error"></div>' +
     '<div id="success" class="success"></div>' +
     '</div>' +
     '<script>' +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
+    'var stewardData=[];' +
+    // Load stewards on dialog open
+    'google.script.run.withSuccessHandler(function(list){' +
+    '  stewardData=list||[];' +
+    '  var container=document.getElementById("stewardListContainer");' +
+    '  if(stewardData.length===0){container.innerHTML="<em style=\\"color:#888\\">No stewards found</em>";return}' +
+    '  var html="";' +
+    '  stewardData.forEach(function(s,i){' +
+    '    html+="<div class=\\"steward-item\\"><input type=\\"checkbox\\" id=\\"stew_"+i+"\\" value=\\""+s.email+"\\"><label for=\\"stew_"+i+"\\">"+s.name+" <span class=\\"email\\">"+s.email+"</span></label></div>"' +
+    '  });' +
+    '  container.innerHTML=html;' +
+    '}).withFailureHandler(function(){' +
+    '  document.getElementById("stewardListContainer").innerHTML="<em style=\\"color:#888\\">Could not load stewards</em>"' +
+    '}).getStewardEmailsForMeetingSetup();' +
+    'function selectAllStewards(){document.querySelectorAll("#stewardListContainer input[type=checkbox]").forEach(function(cb){cb.checked=true})}' +
+    'function clearAllStewards(){document.querySelectorAll("#stewardListContainer input[type=checkbox]").forEach(function(cb){cb.checked=false})}' +
+    'function getSelectedStewardEmails(){' +
+    '  var emails=[];' +
+    '  document.querySelectorAll("#stewardListContainer input[type=checkbox]:checked").forEach(function(cb){emails.push(cb.value)});' +
+    '  return emails.join(", ");' +
+    '}' +
     'function createMeeting(){' +
     '  var name=document.getElementById("meetingName").value.trim();' +
     '  var date=document.getElementById("meetingDate").value;' +
+    '  var time=document.getElementById("meetingTime").value;' +
+    '  var duration=document.getElementById("meetingDuration").value;' +
     '  var type=document.getElementById("meetingType").value;' +
+    '  var notifyEmails=document.getElementById("notifyEmails").value.trim();' +
+    '  var agendaStewards=getSelectedStewardEmails();' +
     '  if(!name){showError("Please enter a meeting name");return}' +
     '  if(!date){showError("Please select a date");return}' +
     '  document.getElementById("createBtn").disabled=true;' +
-    '  document.getElementById("createBtn").textContent="Creating...";' +
+    '  document.getElementById("createBtn").textContent="Scheduling...";' +
     '  document.getElementById("error").style.display="none";' +
     '  google.script.run' +
     '    .withSuccessHandler(function(r){' +
     '      document.getElementById("createBtn").disabled=false;' +
-    '      document.getElementById("createBtn").textContent="Create Meeting";' +
+    '      document.getElementById("createBtn").textContent="Schedule Meeting";' +
     '      if(r.success){' +
     '        document.getElementById("success").textContent=r.message;' +
     '        document.getElementById("success").style.display="block";' +
-    '        setTimeout(function(){google.script.host.close()},2000);' +
+    '        setTimeout(function(){google.script.host.close()},2500);' +
     '      }else{showError(r.error)}' +
     '    })' +
     '    .withFailureHandler(function(e){' +
     '      document.getElementById("createBtn").disabled=false;' +
-    '      document.getElementById("createBtn").textContent="Create Meeting";' +
+    '      document.getElementById("createBtn").textContent="Schedule Meeting";' +
     '      showError("Error: "+e.message);' +
     '    })' +
-    '    .createMeeting({name:name,date:date,type:type});' +
+    '    .createMeeting({name:name,date:date,time:time,duration:duration,type:type,notifyEmails:notifyEmails,agendaStewards:agendaStewards});' +
     '}' +
     'function showError(msg){' +
     '  var el=document.getElementById("error");' +
@@ -494,7 +844,7 @@ function getSetupMeetingHtml_() {
 
 /**
  * Meeting Check-In kiosk dialog HTML (member-facing)
- * Stays open so multiple members can check in one after another
+ * Only shows today's eligible meetings. If multiple, user selects.
  * @private
  * @returns {string} HTML content
  */
@@ -588,8 +938,8 @@ function getMeetingCheckInHtml_() {
     '</div>' +
 
     '<div id="noMeetings" class="no-meetings" style="display:none">' +
-    '<p style="font-size:18px;margin-bottom:10px">No active meetings found</p>' +
-    '<p style="font-size:14px">Ask your steward to set up a meeting first.</p>' +
+    '<p style="font-size:18px;margin-bottom:10px">No active meetings for today</p>' +
+    '<p style="font-size:14px">Check-in opens on the day of a scheduled event.</p>' +
     '</div>' +
 
     '</div>' +
@@ -597,11 +947,11 @@ function getMeetingCheckInHtml_() {
     '<script>' +
     'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;")}' +
 
-    // Load meetings on open
+    // Load only today's eligible meetings for check-in
     'google.script.run' +
     '  .withSuccessHandler(populateMeetings)' +
     '  .withFailureHandler(function(){document.getElementById("meetingSelect").innerHTML="<option value=\\"\\">Error loading meetings</option>"})' +
-    '  .getActiveMeetings();' +
+    '  .getCheckInEligibleMeetings();' +
 
     'function populateMeetings(result){' +
     '  var sel=document.getElementById("meetingSelect");' +
@@ -613,7 +963,10 @@ function getMeetingCheckInHtml_() {
     '  }' +
     '  var html="<option value=\\"\\">-- Select a meeting --</option>";' +
     '  result.meetings.forEach(function(m){' +
-    '    html+="<option value=\\""+escapeHtml(m.id)+"\\">"+escapeHtml(m.name)+" ("+escapeHtml(m.date)+" - "+escapeHtml(m.type)+")</option>";' +
+    '    var label=escapeHtml(m.name)+" ("+escapeHtml(m.type);' +
+    '    if(m.time)label+=", "+escapeHtml(m.time);' +
+    '    label+=")";' +
+    '    html+="<option value=\\""+escapeHtml(m.id)+"\\">"+label+"</option>";' +
     '  });' +
     '  sel.innerHTML=html;' +
     '  if(result.meetings.length===1){' +

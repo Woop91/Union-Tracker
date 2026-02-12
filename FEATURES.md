@@ -1,9 +1,9 @@
 # 509 Strategic Command Center - Complete Features Reference
 
-**Version:** 4.5.1 | **Codename:** Code Audit & Cleanup
+**Version:** 4.6.0 | **Codename:** Meeting Intelligence & Document Automation
 **Last Updated:** February 2026
 
-> **New in v4.5.1:** Fixed tab population bugs, added sheet tab colors, 950 Jest tests, engagement tracking fixes, consolidated architecture (16 source files)
+> **New in v4.6.0:** Meeting Notes & Agenda document automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override
 
 This document provides a comprehensive, searchable reference of all features in the 509 Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -32,6 +32,8 @@ This document provides a comprehensive, searchable reference of all features in 
 19. [Grievance Reminders](#19-grievance-reminders)
 20. [Looker Studio Integration](#20-looker-studio-integration)
 21. [Member Self-Service & PIN Authentication](#21-member-self-service--pin-authentication)
+22. [Meeting Check-In & Document Automation](#22-meeting-check-in--document-automation)
+23. [Member Drive Folders](#23-member-drive-folders)
 
 ---
 
@@ -60,6 +62,7 @@ This document provides a comprehensive, searchable reference of all features in 
 | **Satisfaction** | 8-section member satisfaction with individual question scores | Section scores, question breakdowns, expandable details |
 | **Resources** | Organization documents and steward contacts | Google Drive folder, steward directory with search |
 | **Compare** | Dashboard comparison and export tool | Period comparison, step-by-step breakdown, satisfaction comparison, denial rate analysis, CSV export |
+| **Meeting Notes** | Chronological meeting notes with view-only links (v4.6.0) | Meeting name, date, search, Google Doc view links |
 | **Help** | FAQ and documentation (PII mode only) | Searchable help with 4 categories and 12+ questions |
 
 ---
@@ -546,10 +549,81 @@ Provides PIN-based member authentication for self-service access to the dashboar
 
 ---
 
+## 22. Meeting Check-In & Document Automation
+
+> **File:** `14_MeetingCheckIn.gs`, `05_Integrations.gs`
+
+Comprehensive meeting management with document creation, scheduled notifications, and a member-facing meeting notes dashboard.
+
+### Meeting Setup & Check-In
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Setup Meeting Dialog** | Creates meetings with name, date, time, type, duration, steward notification settings, and agenda steward selection | `showSetupMeetingDialog()` | setup, create, meeting |
+| **Create Meeting** | Creates meeting row, Google Calendar event, and auto-generates Meeting Notes and Agenda Google Docs | `createMeeting()` | create, calendar, docs |
+| **Check-In Members** | Email or PIN-based member check-in for meetings | `showMeetingCheckInDialog()` | check-in, attendance, email |
+| **Meeting Event Scheduling** | Full calendar lifecycle: creates events, activates/deactivates check-in based on event status | Via `dailyTrigger()` | calendar, scheduling, lifecycle |
+
+### Meeting Document Automation (v4.6.0)
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Auto-Create Meeting Notes Doc** | Google Doc created in `Meeting Notes/` folder when meeting is set up | `createMeetingDocs()` | notes, document, auto-create |
+| **Auto-Create Meeting Agenda Doc** | Google Doc created in `Meeting Agenda/` folder when meeting is set up | `createMeetingDocs()` | agenda, document, auto-create |
+| **Two-Tier Agenda Sharing** | Selected stewards get agenda 3 days before; ALL stewards get it 1 day before. Agenda never shared with members | `processMeetingDocNotifications()` | agenda, steward, sharing |
+| **Meeting Notes Notification** | Stewards in NOTIFY_STEWARDS receive the notes link 1 day before meeting | `processMeetingDocNotifications()` | notes, notification, email |
+| **View-Only Publishing** | Meeting Notes auto-set to view-only 1 day after the meeting | `setDocViewOnlyByLink()` | publish, view-only, sharing |
+| **Steward Selection in Setup** | Dynamic steward checkboxes in meeting setup dialog with Select All / Clear All | `getStewardEmailsForMeetingSetup()` | steward, select, checkboxes |
+
+### Meeting Notes Dashboard Tab (v4.6.0)
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Meeting Notes Tab** | New tab in Member Dashboard showing completed meetings chronologically with search | `getUnifiedDashboardData()` | dashboard, tab, meeting notes |
+| **View-Only Links** | Members can view meeting notes via read-only Google Doc links after the meeting | Within Member Dashboard | view, read-only, link |
+| **Search Meeting Notes** | Client-side search/filter across meeting names and dates | `filterMeetingNotes()` | search, filter, notes |
+
+### Meeting Check-In Log Columns (A-P)
+
+| Column | Letter | Description |
+|--------|--------|-------------|
+| **Meeting ID** | A | Unique meeting identifier |
+| **Meeting Name** | B | Display name for the meeting |
+| **Meeting Date** | C | Scheduled date |
+| **Meeting Type** | D | Virtual / In-Person / Hybrid |
+| **Member ID** | E | Checked-in member ID |
+| **Member Name** | F | Checked-in member name |
+| **Check-In Time** | G | Timestamp of check-in |
+| **Email** | H | Member email |
+| **Meeting Time** | I | Scheduled time of meeting |
+| **Meeting Duration** | J | Duration in minutes |
+| **Event Status** | K | Calendar event status |
+| **Notify Stewards** | L | Steward emails for attendance reports |
+| **Calendar Event ID** | M | Google Calendar event ID |
+| **Notes Doc URL** | N | Meeting Notes Google Doc URL |
+| **Agenda Doc URL** | O | Meeting Agenda Google Doc URL |
+| **Agenda Stewards** | P | Steward emails for early agenda sharing (3 days prior) |
+
+---
+
+## 23. Member Drive Folders
+
+> **File:** `05_Integrations.gs`, `03_UIComponents.gs`
+
+Quick Action to create or reuse a Google Drive folder for any member.
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Create Member Folder** | Creates a Google Drive folder for a member, or reuses an existing grievance folder | `setupDriveFolderForMember(memberId)` | folder, drive, member |
+| **Quick Action Button** | "Create Member Folder" button in Member Quick Actions dialog | Within `showMemberQuickActions()` | button, quick action, UI |
+
+---
+
 ## Version History
 
 | Version | Features Added |
 |---------|----------------|
+| **4.6.0** | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override |
 | **4.5.1** | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |
 | **4.5.0** | Security module, Data Access Layer, Member Self-Service PIN, consolidated architecture |
 | **4.4.1** | Dynamic Engine, Grievance Reminders, Looker Studio Integration (Standard & PII-Free) |
@@ -576,4 +650,4 @@ Provides PIN-based member authentication for self-service access to the dashboar
 
 ---
 
-*509 Strategic Command Center v4.5.1 - A personal project providing comprehensive tools for representatives*
+*509 Strategic Command Center v4.6.0 - A personal project providing comprehensive tools for representatives*
