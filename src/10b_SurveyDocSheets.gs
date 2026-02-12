@@ -1601,20 +1601,9 @@ function createFAQSheet(ss) {
     .setBackground('#065F46').setFontColor('#FFFFFF').setFontWeight('bold');
   sheet.setRowHeight(row, 28);
 
-  var versionHistory = [
-    ['v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')', VERSION_INFO.CODENAME, 'Engagement tracking bug fixes, 950+ tests (79 new for engagement), comprehensive code review, ESLint clean, modular source files'],
-    ['v4.5.0 (2026-02-01)', 'Security & Testing', 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files'],
-    ['v4.4.1 (2026-01-31)', 'Build System', 'Initial build system with Node.js, source file concatenation'],
-    ['v4.4.0 (2026-01-30)', 'Menu Consolidation', 'Unified 3-menu system (Union Hub, Tools, Admin), web app dashboards, deprecated command center menu'],
-    ['v4.3.8', 'Features Reference', 'Satisfaction modal dashboard, Features Reference sheet, hidden satisfaction sheet'],
-    ['v4.3.7', 'Help System', 'Complete rewrite of help guide with real-time search, menu reference, and FAQ tabs'],
-    ['v4.3.2', 'Modal Dashboards', 'Deprecated visible Dashboard sheet, switched to SPA-style modal dashboards'],
-    ['v4.3.0', 'Checklist & Looker', 'Case Checklist system, Looker data integration, dynamic field expansion engine'],
-    ['v4.1.0', 'Strategic Config', 'Strategic Command Center config, status color mapping, PDF/email branding'],
-    ['v4.0.0', 'Strategic Command Center', 'Unified master engine, audit logging, sabotage protection, batch processing, mobile views'],
-    ['v3.6.0', 'Data Managers', 'Member and Grievance data manager refactor, improved validation'],
-    ['v2.0.0', 'Modular Architecture', 'Split monolith into modular source files, build system, UI/business logic separation']
-  ];
+  var versionHistory = VERSION_HISTORY.map(function(entry) {
+    return ['v' + entry.version + ' (' + entry.date + ')', entry.codename, entry.changes];
+  });
 
   for (var v = 0; v < versionHistory.length; v++) {
     row++;

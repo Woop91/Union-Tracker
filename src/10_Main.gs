@@ -1289,17 +1289,11 @@ function showHelpDialog() {
  */
 function getVersionInfo() {
   return {
-    version: '2.0.0',
+    version: VERSION_INFO.CURRENT,
+    date: VERSION_INFO.BUILD_DATE,
+    codename: VERSION_INFO.CODENAME,
     architecture: 'Modular Multi-File',
-    modules: [
-      'Constants.gs',
-      'UIService.gs',
-      'GrievanceManager.gs',
-      'Integrations.gs',
-      'Maintenance.gs',
-      'FormulaService.gs',
-      'Main.gs'
-    ],
+    history: VERSION_HISTORY,
     lastUpdated: new Date().toISOString()
   };
 }

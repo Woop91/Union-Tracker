@@ -588,6 +588,42 @@ var VERSION_INFO = {
   CODENAME: 'Meeting Intelligence & Document Automation'
 };
 
+/**
+ * Complete version history with release dates and codenames.
+ * Ordered newest-first. Every version that has ever shipped is listed here
+ * so that UI, audit, and diagnostic code can look up any past release date.
+ * @const {Array<Object>}
+ */
+var VERSION_HISTORY = [
+  { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling' },
+  { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
+  { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
+  { version: '4.4.1', date: '2026-01-31', codename: 'Build System',                               changes: 'Initial build system with Node.js, source file concatenation' },
+  { version: '4.4.0', date: '2026-01-30', codename: 'Menu Consolidation',                         changes: 'Unified 3-menu system (Union Hub, Tools, Admin), web app dashboards, deprecated command center menu' },
+  { version: '4.3.8', date: '2026-01-28', codename: 'Features Reference',                         changes: 'Satisfaction modal dashboard, Features Reference sheet, hidden satisfaction sheet' },
+  { version: '4.3.7', date: '2026-01-25', codename: 'Help System',                                changes: 'Complete rewrite of help guide with real-time search, menu reference, and FAQ tabs' },
+  { version: '4.3.2', date: '2026-01-20', codename: 'Modal Dashboards',                           changes: 'Deprecated visible Dashboard sheet, switched to SPA-style modal dashboards' },
+  { version: '4.3.0', date: '2026-01-15', codename: 'Checklist & Looker',                         changes: 'Case Checklist system, Looker data integration, dynamic field expansion engine' },
+  { version: '4.1.0', date: '2026-01-10', codename: 'Strategic Config',                           changes: 'Strategic Command Center config, status color mapping, PDF/email branding' },
+  { version: '4.0.0', date: '2026-01-05', codename: 'Strategic Command Center',                   changes: 'Unified master engine, audit logging, sabotage protection, batch processing, mobile views' },
+  { version: '3.6.0', date: '2025-12-20', codename: 'Data Managers',                              changes: 'Member and Grievance data manager refactor, improved validation' },
+  { version: '2.0.0', date: '2025-11-15', codename: 'Modular Architecture',                       changes: 'Split monolith into modular source files, build system, UI/business logic separation' }
+];
+
+/**
+ * Look up release info for a specific version.
+ * @param {string} ver - Version string, e.g. "4.5.0"
+ * @returns {Object|null} The matching VERSION_HISTORY entry, or null.
+ */
+function getVersionDate(ver) {
+  for (var i = 0; i < VERSION_HISTORY.length; i++) {
+    if (VERSION_HISTORY[i].version === ver) {
+      return VERSION_HISTORY[i];
+    }
+  }
+  return null;
+}
+
 // ============================================================================
 // SHEET NAMES
 // ============================================================================
