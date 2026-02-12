@@ -808,7 +808,7 @@ function showCacheStatusDashboard() {
         if (obj.timestamp) {
           age = Math.floor((Date.now() - obj.timestamp) / 1000) + 's';
         }
-      } catch (e) {}
+      } catch (e) { /* cached value may not be valid JSON; skip age display */ }
     }
 
     return '<tr>' +

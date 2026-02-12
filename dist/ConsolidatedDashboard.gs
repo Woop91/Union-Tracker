@@ -20001,7 +20001,7 @@ function showCacheStatusDashboard() {
         if (obj.timestamp) {
           age = Math.floor((Date.now() - obj.timestamp) / 1000) + 's';
         }
-      } catch (e) {}
+      } catch (e) { /* cached value may not be valid JSON; skip age display */ }
     }
 
     return '<tr>' +
@@ -45144,7 +45144,7 @@ function getContractPdfUrl_() {
       var url = configSheet.getRange(3, CONFIG_COLS.CONTRACT_URL).getValue();
       if (url) return url;
     }
-  } catch (e) {}
+  } catch (e) { /* Config sheet may not exist yet; fall back to '#' */ }
   return '#';
 }
 
@@ -45160,7 +45160,7 @@ function getResourceDriveUrl_() {
       var folderId = configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).getValue();
       if (folderId) return 'https://drive.google.com/drive/folders/' + folderId;
     }
-  } catch (e) {}
+  } catch (e) { /* Config sheet may not exist yet; fall back to '#' */ }
   return '#';
 }
 
