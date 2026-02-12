@@ -27,7 +27,7 @@ The 509 Dashboard is a Google Apps Script (GAS) application for managing union s
 - Node.js build system
 - ESLint for code quality (v9.x flat config)
 
-**Version:** 4.5.0
+**Version:** 4.6.0
 
 ---
 
@@ -46,9 +46,9 @@ MULTIPLE-SCRIPS-REPO/
 └── DEVELOPER_GUIDE.md     # This file
 ```
 
-### Modular Design (v4.5.0)
+### Modular Design (v4.6.0)
 
-The codebase follows a layered architecture with 16 modules:
+The codebase follows a layered architecture with 27 modules:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

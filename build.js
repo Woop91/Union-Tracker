@@ -75,7 +75,7 @@ function build() {
  * 509 DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
- * Version: 4.5.1 (2026-02-11)
+ * Version: 4.6.0 (2026-02-12)
  * Build Date: ${new Date().toISOString().split('T')[0]}
  *
  * This file is auto-generated from the src/ directory.
