@@ -30,6 +30,9 @@ jobs:
       - name: Build consolidated file
         run: npm run build
 
+      - name: Run unit tests
+        run: npm run test:unit
+
       - name: Verify build output
         run: |
           if [ ! -f "dist/ConsolidatedDashboard.gs" ]; then
