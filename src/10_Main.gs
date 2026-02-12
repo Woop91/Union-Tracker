@@ -618,10 +618,19 @@ function dailyTrigger() {
       sendDeadlineReminders(settings.reminderDays);
     }
 
+    // Cleanup expired meeting check-in records (>90 days old)
+    var meetingRowsCleaned = 0;
+    try {
+      meetingRowsCleaned = cleanupExpiredMeetings();
+    } catch (e) {
+      console.error('Meeting cleanup error:', e);
+    }
+
     // Log the trigger run
     logAuditEvent('DAILY_TRIGGER', {
       timestamp: new Date().toISOString(),
-      remindersSent: settings.emailReminders
+      remindersSent: settings.emailReminders,
+      meetingRowsCleaned: meetingRowsCleaned
     });
 
   } catch (error) {

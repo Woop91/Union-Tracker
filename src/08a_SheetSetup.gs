@@ -47,6 +47,7 @@ function CREATE_509_DASHBOARD() {
       '• 💡 Feedback & Development (Bug/feature tracking)\n' +
       '• 🤝 Volunteer Hours (track volunteer activities)\n' +
       '• 📅 Meeting Attendance (track meeting participation)\n' +
+      '• 📝 Meeting Check-In Log (email+PIN check-in)\n' +
       '• ✅ Function Checklist (function reference)\n' +
       '• 📋 Features Reference (complete feature list)\n' +
       '• 📚 Getting Started (setup instructions)\n' +
@@ -114,6 +115,9 @@ function CREATE_509_DASHBOARD() {
     createMeetingAttendanceSheet(ss);
     ss.toast('Created Meeting Attendance tracking', '🏗️ Progress', 2);
 
+    createMeetingCheckInLogSheet(ss);
+    ss.toast('Created Meeting Check-In Log', '🏗️ Progress', 2);
+
     saveFormUrlsToConfig_silent(ss);
     ss.toast('Saved form URLs to Config', '🏗️ Progress', 2);
 
@@ -126,11 +130,11 @@ function CREATE_509_DASHBOARD() {
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
-        '13 sheets created:\n' +
+        '14 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
-        '• 🤝 Volunteer Hours, 📅 Meeting Attendance (engagement tracking)\n' +
+        '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +

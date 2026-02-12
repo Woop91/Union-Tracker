@@ -1,10 +1,10 @@
-# 509 Strategic Command Center - v4.5.1 (2026-02-11)
+# 509 Strategic Command Center - v4.5.1
 
-A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **16-file modular architecture** following the Separation of Concerns principle.
+A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **27-file modular architecture** following the Separation of Concerns principle.
 
 ## Architecture Overview
 
-The dashboard uses a streamlined 16-file architecture for clarity and maintainability:
+The dashboard uses a streamlined 27-file architecture for clarity and maintainability:
 
 ```
 src/
@@ -13,17 +13,28 @@ src/
 ├── 01_Core.gs                   # Error handling + Constants (SHEETS, MEMBER_COLS, etc.)
 ├── 02_DataManagers.gs           # Member + Grievance managers
 ├── 03_UIComponents.gs           # Menu, Theme, Mobile, QuickActions, Search
-├── 04_UIService.gs              # Main UI service (dialogs, panels)
+├── 04a_UIMenus.gs               # Menu creation, visual control panel, navigation, dialogs, sidebar
+├── 04b_AccessibilityFeatures.gs # Common styles, comfort view, pomodoro, notepad, import/export
+├── 04c_InteractiveDashboard.gs  # Interactive dashboard, mobile views, data retrieval
+├── 04d_ExecutiveDashboard.gs    # Executive dashboard, steward dashboard, alerts, triggers
+├── 04e_PublicDashboard.gs       # Public member dashboard, unified data endpoints
 ├── 05_Integrations.gs           # Drive, Calendar, WebApp integration
-├── 06_Maintenance.gs            # Diagnostics, Cache, Undo
+├── 06_Maintenance.gs            # Diagnostics, Cache, Undo, Maintenance
 ├── 07_DevTools.gs               # Dev tools + Test framework (remove before prod)
-├── 08_SheetUtils.gs             # Sheet creation, validation, forms
+├── 08a_SheetSetup.gs            # Main setup, utility functions, data validation, multi-select
+├── 08b_SearchAndCharts.gs       # Search functions, chart generation
+├── 08c_FormsAndNotifications.gs # Form handling, notifications, deadline alerts
+├── 08d_AuditAndFormulas.gs      # Audit log, formula sync, hidden calc sheets
 ├── 09_Dashboards.gs             # Satisfaction, Sync, Public dashboards
-├── 10_Code.gs                   # Core business logic
+├── 10a_SheetCreation.gs         # Config, Member Directory, Grievance Log sheet creation
+├── 10b_SurveyDocSheets.gs       # Satisfaction, Feedback, FAQ, Getting Started sheets
+├── 10c_FormHandlers.gs          # Menu handlers, form submissions, flagged reviews
+├── 10d_SyncAndMaintenance.gs    # Formatting, testing, Drive, Calendar, Email, sync, formulas
 ├── 10_Main.gs                   # Main entry point, triggers, edit handlers
 ├── 11_CommandHub.gs             # Command center + Secure dashboard
 ├── 12_Features.gs               # Checklist, Dynamic Engine, Looker
 ├── 13_MemberSelfService.gs      # Member self-service portal with PIN authentication
+├── 14_MeetingCheckIn.gs         # Meeting check-in system with email + PIN auth
 └── MultiSelectDialog.html
 ```
 
@@ -36,17 +47,28 @@ src/
 | **01_Core.gs** | Error handling + Constants (SHEETS, MEMBER_COLS, etc.) |
 | **02_DataManagers.gs** | Member + Grievance managers |
 | **03_UIComponents.gs** | Menu, Theme, Mobile, QuickActions, Search |
-| **04_UIService.gs** | Main UI service (dialogs, panels) |
+| **04a_UIMenus.gs** | Menu creation, visual control panel, navigation, dialogs, sidebar |
+| **04b_AccessibilityFeatures.gs** | Common styles, comfort view, pomodoro, notepad, import/export |
+| **04c_InteractiveDashboard.gs** | Interactive dashboard, mobile views, data retrieval |
+| **04d_ExecutiveDashboard.gs** | Executive dashboard, steward dashboard, alerts, triggers |
+| **04e_PublicDashboard.gs** | Public member dashboard, unified data endpoints |
 | **05_Integrations.gs** | Drive, Calendar, WebApp integration |
-| **06_Maintenance.gs** | Diagnostics, Cache, Undo |
+| **06_Maintenance.gs** | Diagnostics, Cache, Undo, Maintenance |
 | **07_DevTools.gs** | Dev tools + Test framework (remove before prod) |
-| **08_SheetUtils.gs** | Sheet creation, validation, forms |
+| **08a_SheetSetup.gs** | Main setup, utility functions, data validation, multi-select |
+| **08b_SearchAndCharts.gs** | Search functions, chart generation |
+| **08c_FormsAndNotifications.gs** | Form handling, notifications, deadline alerts |
+| **08d_AuditAndFormulas.gs** | Audit log, formula sync, hidden calc sheets |
 | **09_Dashboards.gs** | Satisfaction, Sync, Public dashboards |
-| **10_Code.gs** | Core business logic |
+| **10a_SheetCreation.gs** | Config, Member Directory, Grievance Log sheet creation |
+| **10b_SurveyDocSheets.gs** | Satisfaction, Feedback, FAQ, Getting Started sheets |
+| **10c_FormHandlers.gs** | Menu handlers, form submissions, flagged reviews |
+| **10d_SyncAndMaintenance.gs** | Formatting, testing, Drive, Calendar, Email, sync, formulas |
 | **10_Main.gs** | Main entry point, triggers, edit handlers |
 | **11_CommandHub.gs** | Command center + Secure dashboard |
 | **12_Features.gs** | Checklist, Dynamic Engine, Looker |
 | **13_MemberSelfService.gs** | Member self-service portal with PIN authentication |
+| **14_MeetingCheckIn.gs** | Meeting check-in system with email + PIN authentication |
 | **MultiSelectDialog.html** | Multi-select dialog HTML template |
 
 ## v4.0 Features
@@ -125,11 +147,11 @@ src/
 - **Standalone Analytics Charts**: Dedicated modals for Treemap, Sentiment Trend, and Workload Report
 - **High-Contrast Dark Theme**: Professional dark gradient backgrounds optimized for readability
 
-## Benefits of 16-File Architecture
+## Benefits of 27-File Architecture
 
 1. **Clear Separation**: Each file has one clear purpose
 2. **Easy Navigation**: Numbered prefixes show dependency order on GitHub
-3. **Production Ready**: Delete `07_DevTools.gs` before go-live (15 files in production)
+3. **Production Ready**: Delete `07_DevTools.gs` before go-live (26 files in production)
 4. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
 5. **Easier Maintenance**: Update union rules in one place (`01_Core.gs`)
 6. **Scalability**: Handles 5,000+ members without performance issues
@@ -164,7 +186,7 @@ src/
 
 ### Making Changes
 
-1. Edit files in the `src/` directory (numbered 00-13)
+1. Edit files in the `src/` directory (numbered 00-14)
 2. Copy updated files to Google Apps Script
 3. Save and refresh your Google Sheet
 4. Run `npm run test:unit` to execute 950 Jest unit tests
@@ -178,17 +200,28 @@ src/
 | `01_Core.gs` | Error handling + Constants (SHEETS, MEMBER_COLS, etc.) |
 | `02_DataManagers.gs` | Member + Grievance managers |
 | `03_UIComponents.gs` | Menu, Theme, Mobile, QuickActions, Search |
-| `04_UIService.gs` | Main UI service (dialogs, panels) |
+| `04a_UIMenus.gs` | Menu creation, visual control panel, navigation, dialogs, sidebar |
+| `04b_AccessibilityFeatures.gs` | Common styles, comfort view, pomodoro, notepad, import/export |
+| `04c_InteractiveDashboard.gs` | Interactive dashboard, mobile views, data retrieval |
+| `04d_ExecutiveDashboard.gs` | Executive dashboard, steward dashboard, alerts, triggers |
+| `04e_PublicDashboard.gs` | Public member dashboard, unified data endpoints |
 | `05_Integrations.gs` | Drive, Calendar, WebApp integration |
-| `06_Maintenance.gs` | Diagnostics, Cache, Undo |
+| `06_Maintenance.gs` | Diagnostics, Cache, Undo, Maintenance |
 | `07_DevTools.gs` | Dev tools + Test framework (remove before prod) |
-| `08_SheetUtils.gs` | Sheet creation, validation, forms |
+| `08a_SheetSetup.gs` | Main setup, utility functions, data validation, multi-select |
+| `08b_SearchAndCharts.gs` | Search functions, chart generation |
+| `08c_FormsAndNotifications.gs` | Form handling, notifications, deadline alerts |
+| `08d_AuditAndFormulas.gs` | Audit log, formula sync, hidden calc sheets |
 | `09_Dashboards.gs` | Satisfaction, Sync, Public dashboards |
-| `10_Code.gs` | Core business logic |
+| `10a_SheetCreation.gs` | Config, Member Directory, Grievance Log sheet creation |
+| `10b_SurveyDocSheets.gs` | Satisfaction, Feedback, FAQ, Getting Started sheets |
+| `10c_FormHandlers.gs` | Menu handlers, form submissions, flagged reviews |
+| `10d_SyncAndMaintenance.gs` | Formatting, testing, Drive, Calendar, Email, sync, formulas |
 | `10_Main.gs` | Main entry point, triggers, edit handlers |
 | `11_CommandHub.gs` | Command center + Secure dashboard |
 | `12_Features.gs` | Checklist, Dynamic Engine, Looker |
 | `13_MemberSelfService.gs` | Member self-service portal with PIN authentication |
+| `14_MeetingCheckIn.gs` | Meeting check-in system with email + PIN authentication |
 | `MultiSelectDialog.html` | Multi-select dialog HTML template |
 
 ## Going Live (Production)
@@ -208,20 +241,31 @@ src/
 ├── 01_Core.gs                   # Error handling + Constants
 ├── 02_DataManagers.gs           # Member + Grievance managers
 ├── 03_UIComponents.gs           # Menu, Theme, Mobile, QuickActions, Search
-├── 04_UIService.gs              # Main UI service (dialogs, panels)
+├── 04a_UIMenus.gs               # Menu creation, visual control panel, navigation, dialogs, sidebar
+├── 04b_AccessibilityFeatures.gs # Common styles, comfort view, pomodoro, notepad, import/export
+├── 04c_InteractiveDashboard.gs  # Interactive dashboard, mobile views, data retrieval
+├── 04d_ExecutiveDashboard.gs    # Executive dashboard, steward dashboard, alerts, triggers
+├── 04e_PublicDashboard.gs       # Public member dashboard, unified data endpoints
 ├── 05_Integrations.gs           # Drive, Calendar, WebApp integration
-├── 06_Maintenance.gs            # Diagnostics, Cache, Undo
-├── 08_SheetUtils.gs             # Sheet creation, validation, forms
+├── 06_Maintenance.gs            # Diagnostics, Cache, Undo, Maintenance
+├── 08a_SheetSetup.gs            # Main setup, utility functions, data validation, multi-select
+├── 08b_SearchAndCharts.gs       # Search functions, chart generation
+├── 08c_FormsAndNotifications.gs # Form handling, notifications, deadline alerts
+├── 08d_AuditAndFormulas.gs      # Audit log, formula sync, hidden calc sheets
 ├── 09_Dashboards.gs             # Satisfaction, Sync, Public dashboards
-├── 10_Code.gs                   # Core business logic
+├── 10a_SheetCreation.gs         # Config, Member Directory, Grievance Log sheet creation
+├── 10b_SurveyDocSheets.gs       # Satisfaction, Feedback, FAQ, Getting Started sheets
+├── 10c_FormHandlers.gs          # Menu handlers, form submissions, flagged reviews
+├── 10d_SyncAndMaintenance.gs    # Formatting, testing, Drive, Calendar, Email, sync, formulas
 ├── 10_Main.gs                   # Main entry point, triggers, edit handlers
 ├── 11_CommandHub.gs             # Command center + Secure dashboard
 ├── 12_Features.gs               # Checklist, Dynamic Engine, Looker
 ├── 13_MemberSelfService.gs      # Member self-service portal with PIN authentication
+├── 14_MeetingCheckIn.gs         # Meeting check-in system with email + PIN auth
 └── MultiSelectDialog.html
 ```
 
-**15 files in production** (DevTools removed)
+**26 files in production** (DevTools removed)
 
 ## Key Features
 
@@ -441,9 +485,10 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-- **4.5.1** - Fixed GRIEVANCE_OUTCOMES/generateGrievanceId missing definitions, engagement tracking fixes, 950 Jest unit tests
-- **4.5.0** - Security Module, Data Access Layer, Member Self-Service with PIN authentication, comprehensive bug fixes
-- **4.4.1** - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
+- **4.5.1** (2026-02-11) - Fixed GRIEVANCE_OUTCOMES/generateGrievanceId missing definitions, engagement tracking fixes, 950 Jest unit tests
+- **4.5.0** (2026-02-01) - Security Module, Data Access Layer, Member Self-Service with PIN authentication, comprehensive bug fixes
+- **4.4.1** (2026-01-31) - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
+- **4.4.0** (2026-01-30) - Grievance tracking, member dashboard, satisfaction surveys, calendar integration, email notifications
 - **4.3.8** - Searchable Help Guide & Modal Consolidation: Help modal with menu reference/FAQ, Member Satisfaction sheet hidden
 - **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
 - **4.3.6** - Full Row Styling: Zebra stripes and themes apply to all rows in data sheets
