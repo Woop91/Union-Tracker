@@ -446,9 +446,10 @@ function generateSelectedChart() {
     return;
   }
 
-  var chartNum = sheet.getRange('G120').getValue();
+  var L = DASHBOARD_LAYOUT;
+  var chartNum = sheet.getRange(L.CHART_INPUT_CELL).getValue();
   if (!chartNum || chartNum < 1 || chartNum > 15) {
-    ss.toast('Please enter a valid chart number (1-15) in cell G120', '⚠️ Invalid Selection', 5);
+    ss.toast('Please enter a valid chart number (1-15) in cell ' + L.CHART_INPUT_CELL, '⚠️ Invalid Selection', 5);
     return;
   }
 
@@ -471,9 +472,9 @@ function generateSelectedChart() {
     case 2: // Bar Chart - Status Distribution
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.BAR)
-        .addRange(sheet.getRange('A15:A16'))
-        .addRange(sheet.getRange('A16:F16'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.GRIEVANCE_METRICS_ROW - 1, 1, 1, L.DATA_COLS))
+        .addRange(sheet.getRange(L.GRIEVANCE_METRICS_ROW, 1, 1, L.DATA_COLS))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Grievance Status Distribution')
         .setOption('legend', {position: 'bottom'})
         .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.ACCENT_ORANGE, COLORS.STATUS_BLUE, COLORS.UNION_GREEN, '#9CA3AF', '#6B7280'])
@@ -484,10 +485,11 @@ function generateSelectedChart() {
       break;
 
     case 3: // Pie Chart - Issue Categories
+      var catRows = L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1;
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.PIE)
-        .addRange(sheet.getRange('A26:B30'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.CATEGORY_START_ROW, 1, catRows, 2))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Grievances by Issue Category')
         .setOption('pieHole', 0)
         .setOption('legend', {position: 'right'})
@@ -502,10 +504,11 @@ function generateSelectedChart() {
       break;
 
     case 5: // Column Chart - Location
+      var locRows = L.LOCATION_END_ROW - L.LOCATION_START_ROW + 1;
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.COLUMN)
-        .addRange(sheet.getRange('A35:B39'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.LOCATION_START_ROW, 1, locRows, 2))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Members by Location')
         .setOption('legend', {position: 'none'})
         .setOption('colors', [COLORS.CHART_CYAN])
@@ -529,8 +532,8 @@ function generateSelectedChart() {
     case 8: // Stacked Bar
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.BAR)
-        .addRange(sheet.getRange('A26:D30'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.CATEGORY_START_ROW, 1, L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1, 4))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Cases by Issue Category (Open vs Resolved)')
         .setOption('isStacked', true)
         .setOption('legend', {position: 'bottom'})
@@ -543,8 +546,8 @@ function generateSelectedChart() {
     case 9: // Donut Chart
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.PIE)
-        .addRange(sheet.getRange('A26:B30'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.CATEGORY_START_ROW, 1, L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1, 2))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Issue Category Distribution')
         .setOption('pieHole', 0.4)
         .setOption('legend', {position: 'right'})
@@ -565,8 +568,8 @@ function generateSelectedChart() {
     case 12: // Scatter Plot
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.SCATTER)
-        .addRange(sheet.getRange('A35:C39'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.LOCATION_START_ROW, 1, L.LOCATION_END_ROW - L.LOCATION_START_ROW + 1, 3))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Response Time vs Outcome Analysis')
         .setOption('legend', {position: 'bottom'})
         .setOption('colors', [COLORS.SOLIDARITY_RED, COLORS.UNION_GREEN])
@@ -580,8 +583,8 @@ function generateSelectedChart() {
     case 13: // Histogram
       chartBuilder = sheet.newChart()
         .setChartType(Charts.ChartType.HISTOGRAM)
-        .addRange(sheet.getRange('B26:B30'))
-        .setPosition(135, 1, 0, 0)
+        .addRange(sheet.getRange(L.CATEGORY_START_ROW, 2, L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1, 1))
+        .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
         .setOption('title', 'Case Duration Distribution')
         .setOption('legend', {position: 'none'})
         .setOption('colors', [COLORS.CHART_CYAN])
@@ -601,7 +604,7 @@ function generateSelectedChart() {
       break;
 
     default:
-      ss.toast('Enter 1-15 in cell G120 to select a chart type. See options table above.', 'ℹ️ Chart Help', 5);
+      ss.toast('Enter 1-15 in cell ' + L.CHART_INPUT_CELL + ' to select a chart type. See options table above.', 'ℹ️ Chart Help', 5);
   }
 
   ss.toast('Chart generated! Scroll down to "Chart Display Area" to view.', '✅ Done', 5);
@@ -617,7 +620,8 @@ function generateSelectedChart() {
  * @private
  */
 function createGaugeStyleChart_(sheet) {
-  var winRate = sheet.getRange('D6').getValue() || '0%';
+  var L = DASHBOARD_LAYOUT;
+  var winRate = sheet.getRange(L.QUICK_STATS_ROW, 4).getValue() || '0%';
   var gaugeText = '═══════════════════════════════════════\n' +
                   '           🎯 WIN RATE GAUGE\n' +
                   '═══════════════════════════════════════\n\n' +
@@ -626,13 +630,13 @@ function createGaugeStyleChart_(sheet) {
                   '    0%        50%        100%\n\n' +
                   '═══════════════════════════════════════';
 
-  sheet.getRange('A135').setValue(gaugeText)
+  sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue(gaugeText)
     .setFontFamily('Courier New')
     .setFontSize(14)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setBackground('#F0FDF4');
-  sheet.getRange('A135:G145').merge();
+  sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
 /**
@@ -641,7 +645,8 @@ function createGaugeStyleChart_(sheet) {
  * @private
  */
 function createScorecardChart_(sheet) {
-  var openCases = sheet.getRange('A16').getValue() || 0;
+  var L = DASHBOARD_LAYOUT;
+  var openCases = sheet.getRange(L.GRIEVANCE_METRICS_ROW, 1).getValue() || 0;
   var scorecardText = '┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n' +
                       '┃         📊 OPEN GRIEVANCES          ┃\n' +
                       '┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫\n' +
@@ -651,13 +656,13 @@ function createScorecardChart_(sheet) {
                       '┃           ▲ Active Cases            ┃\n' +
                       '┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛';
 
-  sheet.getRange('A135').setValue(scorecardText)
+  sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue(scorecardText)
     .setFontFamily('Courier New')
     .setFontSize(14)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setBackground('#FEF3C7');
-  sheet.getRange('A135:G145').merge();
+  sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
 /**
@@ -666,10 +671,12 @@ function createScorecardChart_(sheet) {
  * @private
  */
 function createTrendLineChart_(sheet) {
+  var L = DASHBOARD_LAYOUT;
+  var trendRows = L.TREND_END_ROW - L.TREND_START_ROW + 1;
   var chartBuilder = sheet.newChart()
     .setChartType(Charts.ChartType.LINE)
-    .addRange(sheet.getRange('A44:C46'))
-    .setPosition(135, 1, 0, 0)
+    .addRange(sheet.getRange(L.TREND_START_ROW, 1, trendRows, 3))
+    .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
     .setOption('title', 'Month-Over-Month Trends')
     .setOption('legend', {position: 'bottom'})
     .setOption('curveType', 'function')
@@ -687,10 +694,12 @@ function createTrendLineChart_(sheet) {
  * @private
  */
 function createAreaChart_(sheet) {
+  var L = DASHBOARD_LAYOUT;
+  var trendRows = L.TREND_END_ROW - L.TREND_START_ROW + 1;
   var chartBuilder = sheet.newChart()
     .setChartType(Charts.ChartType.AREA)
-    .addRange(sheet.getRange('A44:C46'))
-    .setPosition(135, 1, 0, 0)
+    .addRange(sheet.getRange(L.TREND_START_ROW, 1, trendRows, 3))
+    .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
     .setOption('title', 'Cumulative Trend Analysis')
     .setOption('legend', {position: 'bottom'})
     .setOption('colors', [COLORS.CHART_PURPLE, COLORS.CHART_BLUE])
@@ -707,10 +716,11 @@ function createAreaChart_(sheet) {
  * @private
  */
 function createComboChart_(sheet) {
+  var L = DASHBOARD_LAYOUT;
   var chartBuilder = sheet.newChart()
     .setChartType(Charts.ChartType.COMBO)
-    .addRange(sheet.getRange('A26:C30'))
-    .setPosition(135, 1, 0, 0)
+    .addRange(sheet.getRange(L.CATEGORY_START_ROW, 1, L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1, 3))
+    .setPosition(L.CHART_DISPLAY_ROW, 1, 0, 0)
     .setOption('title', 'Cases by Category with Trend Line')
     .setOption('legend', {position: 'bottom'})
     .setOption('seriesType', 'bars')
@@ -729,10 +739,11 @@ function createComboChart_(sheet) {
  * @private
  */
 function createSummaryTableChart_(sheet) {
-  var openCases = sheet.getRange('A16').getValue() || 0;
-  var resolvedCases = sheet.getRange('D16').getValue() || 0;
-  var winRate = sheet.getRange('D6').getValue() || '0%';
-  var avgDays = sheet.getRange('E6').getValue() || 'N/A';
+  var L = DASHBOARD_LAYOUT;
+  var openCases = sheet.getRange(L.GRIEVANCE_METRICS_ROW, 1).getValue() || 0;
+  var resolvedCases = sheet.getRange(L.GRIEVANCE_METRICS_ROW, 4).getValue() || 0;
+  var winRate = sheet.getRange(L.QUICK_STATS_ROW, 4).getValue() || '0%';
+  var avgDays = sheet.getRange(L.QUICK_STATS_ROW, 5).getValue() || 'N/A';
 
   var tableText = '╔═══════════════════════════════════════════════════════╗\n' +
                   '║            📋 KPI SUMMARY TABLE                       ║\n' +
@@ -745,13 +756,13 @@ function createSummaryTableChart_(sheet) {
                   '║  Avg Resolution Time       │  ' + padRight(String(avgDays), 23) + '║\n' +
                   '╚═══════════════════════════════════════════════════════╝';
 
-  sheet.getRange('A135').setValue(tableText)
+  sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue(tableText)
     .setFontFamily('Courier New')
     .setFontSize(12)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setBackground('#F3F4F6');
-  sheet.getRange('A135:G145').merge();
+  sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
 /**
@@ -763,8 +774,9 @@ function createStewardLeaderboardChart_(sheet) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
+  var L = DASHBOARD_LAYOUT;
   if (!memberSheet) {
-    sheet.getRange('A135').setValue('Member Directory not found');
+    sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue('Member Directory not found');
     return;
   }
 
@@ -822,13 +834,13 @@ function createStewardLeaderboardChart_(sheet) {
 
   leaderboardText += '╚═══════════════════════════════════════════════════════╝';
 
-  sheet.getRange('A135').setValue(leaderboardText)
+  sheet.getRange(L.CHART_DISPLAY_ROW, 1).setValue(leaderboardText)
     .setFontFamily('Courier New')
     .setFontSize(11)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setBackground('#EFF6FF');
-  sheet.getRange('A135:G145').merge();
+  sheet.getRange(L.CHART_DISPLAY_RANGE).merge();
 }
 
 /**

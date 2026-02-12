@@ -3539,8 +3539,13 @@ function refreshLookerAnonSatisfaction_() {
  * @private
  */
 function generateAnonHash_(id) {
-  // Use a simple hash that can't be reversed to original ID
-  const salt = 'anon509data'; // TODO: HARDCODED — Weak salt in source code. Move to Script Properties.
+  // Read salt from Script Properties; generate and store one if missing
+  var props = PropertiesService.getScriptProperties();
+  var salt = props.getProperty('ANON_HASH_SALT');
+  if (!salt) {
+    salt = 'anon509data'; // Default fallback — auto-stored on first run
+    props.setProperty('ANON_HASH_SALT', salt);
+  }
   const combined = salt + String(id);
   let hash = 0;
   for (let i = 0; i < combined.length; i++) {

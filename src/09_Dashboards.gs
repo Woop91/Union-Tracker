@@ -2935,10 +2935,12 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
  * @private
  */
 function writeDashboardValues_(sheet, metrics) {
+  var L = DASHBOARD_LAYOUT;
+
   // ══════════════════════════════════════════════════════════════════════
-  // QUICK STATS (Row 6) - Card layout
+  // QUICK STATS - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A6:F6').setValues([[
+  sheet.getRange(L.QUICK_STATS_ROW, 1, 1, L.DATA_COLS).setValues([[
     metrics.totalMembers,
     metrics.activeStewards,
     metrics.activeGrievances,
@@ -2948,9 +2950,9 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // MEMBER METRICS (Row 11) - Updated for card layout
+  // MEMBER METRICS - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A11:D11').setValues([[
+  sheet.getRange(L.MEMBER_METRICS_ROW, 1, 1, 4).setValues([[
     metrics.totalMembers,
     metrics.activeStewards,
     metrics.avgOpenRate,
@@ -2958,9 +2960,9 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // GRIEVANCE METRICS (Row 16) - Updated for card layout
+  // GRIEVANCE METRICS - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A16:F16').setValues([[
+  sheet.getRange(L.GRIEVANCE_METRICS_ROW, 1, 1, L.DATA_COLS).setValues([[
     metrics.open,
     metrics.pendingInfo,
     metrics.settled,
@@ -2970,9 +2972,9 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // TIMELINE METRICS (Row 21) - Updated for card layout
+  // TIMELINE METRICS - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A21:D21').setValues([[
+  sheet.getRange(L.TIMELINE_METRICS_ROW, 1, 1, 4).setValues([[
     metrics.avgDaysOpen,
     metrics.filedThisMonth,
     metrics.closedThisMonth,
@@ -2980,32 +2982,32 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // TYPE ANALYSIS (Rows 26-30) - Updated for card layout
+  // TYPE ANALYSIS - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var catRowCount = L.CATEGORY_END_ROW - L.CATEGORY_START_ROW + 1;
   var categoryRows = [];
   for (var c = 0; c < metrics.categories.length; c++) {
     var cat = metrics.categories[c];
     categoryRows.push([cat.name, cat.total, cat.open, cat.resolved, cat.winRate, cat.avgDays]);
   }
-  // Pad with empty rows if less than 5
-  while (categoryRows.length < 5) {
+  while (categoryRows.length < catRowCount) {
     categoryRows.push(['', '', '', '', '', '']);
   }
-  sheet.getRange('A26:F30').setValues(categoryRows);
+  sheet.getRange(L.CATEGORY_START_ROW, 1, catRowCount, L.DATA_COLS).setValues(categoryRows);
 
   // ══════════════════════════════════════════════════════════════════════
-  // LOCATION BREAKDOWN (Rows 35-39) - Updated for card layout
+  // LOCATION BREAKDOWN - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var locRowCount = L.LOCATION_END_ROW - L.LOCATION_START_ROW + 1;
   var locationRows = [];
   for (var l = 0; l < metrics.locations.length; l++) {
     var loc = metrics.locations[l];
     locationRows.push([loc.name, loc.members, loc.grievances, loc.open, loc.winRate, loc.satisfaction]);
   }
-  // Pad with empty rows if less than 5
-  while (locationRows.length < 5) {
+  while (locationRows.length < locRowCount) {
     locationRows.push(['', '', '', '', '', '']);
   }
-  sheet.getRange('A35:F39').setValues(locationRows);
+  sheet.getRange(L.LOCATION_START_ROW, 1, locRowCount, L.DATA_COLS).setValues(locationRows);
 
   // ══════════════════════════════════════════════════════════════════════
   // MONTH-OVER-MONTH TRENDS (Rows 44-46) - Updated for card layout
@@ -3033,10 +3035,11 @@ function writeDashboardValues_(sheet, metrics) {
   var filedTrend = filedChange > 0 ? '>' : (filedChange < 0 ? '<' : '=');
   trendRows.push(['Cases Filed', metrics.trends.filed.thisMonth, metrics.trends.filed.lastMonth, filedChange, filedPct, filedTrend]);
 
-  sheet.getRange('A44:F46').setValues(trendRows);
+  var trendRowCount = L.TREND_END_ROW - L.TREND_START_ROW + 1;
+  sheet.getRange(L.TREND_START_ROW, 1, trendRowCount, L.DATA_COLS).setValues(trendRows);
 
   // ══════════════════════════════════════════════════════════════════════
-  // SPARKLINES (Column G, Rows 44-46) - Color-coded 6-month trends
+  // SPARKLINES - Color-coded 6-month trends
   // Red for grievances (high = bad), Green for members (high = good), Blue for filed
   // ══════════════════════════════════════════════════════════════════════
   var sparklineFormulas = [];
@@ -3057,13 +3060,13 @@ function writeDashboardValues_(sheet, metrics) {
   sparklineFormulas.push([filedSparkline]);
 
   // Write sparkline formulas
-  sheet.getRange('G44').setFormula(grievanceSparkline);
-  sheet.getRange('G45').setFormula(memberSparkline);
-  sheet.getRange('G46').setFormula(filedSparkline);
+  sheet.getRange(L.TREND_START_ROW, L.SPARKLINE_COL).setFormula(grievanceSparkline);
+  sheet.getRange(L.TREND_START_ROW + 1, L.SPARKLINE_COL).setFormula(memberSparkline);
+  sheet.getRange(L.TREND_START_ROW + 2, L.SPARKLINE_COL).setFormula(filedSparkline);
 
   // Color-code change values based on direction
   // For grievances: negative change = green (good), positive = red (bad)
-  var changeCell44 = sheet.getRange('D44');
+  var changeCell44 = sheet.getRange(L.TREND_START_ROW, 4);
   var change44Val = grievanceChange;
   if (change44Val < 0) {
     changeCell44.setFontColor('#059669'); // Green - grievances down is good
@@ -3074,7 +3077,7 @@ function writeDashboardValues_(sheet, metrics) {
   }
 
   // For members: positive change = green (good), negative = red (bad)
-  var changeCell45 = sheet.getRange('D45');
+  var changeCell45 = sheet.getRange(L.TREND_START_ROW + 1, 4);
   if (memberChange > 0) {
     changeCell45.setFontColor('#059669'); // Green - members up is good
   } else if (memberChange < 0) {
@@ -3084,13 +3087,13 @@ function writeDashboardValues_(sheet, metrics) {
   }
 
   // For cases filed: neutral coloring (blue)
-  var changeCell46 = sheet.getRange('D46');
+  var changeCell46 = sheet.getRange(L.TREND_START_ROW + 2, 4);
   changeCell46.setFontColor('#3B82F6'); // Blue - neutral
 
   // ══════════════════════════════════════════════════════════════════════
-  // STEWARD SUMMARY (Row 54) - Updated for card layout
+  // STEWARD SUMMARY - Card layout
   // ══════════════════════════════════════════════════════════════════════
-  sheet.getRange('A54:F54').setValues([[
+  sheet.getRange(L.STEWARD_SUMMARY_ROW, 1, 1, L.DATA_COLS).setValues([[
     metrics.stewardSummary.total,
     metrics.stewardSummary.activeWithCases,
     metrics.stewardSummary.avgCasesPerSteward,
@@ -3100,10 +3103,11 @@ function writeDashboardValues_(sheet, metrics) {
   ]]);
 
   // ══════════════════════════════════════════════════════════════════════
-  // TOP 30 BUSIEST STEWARDS (Rows 59-88) - Updated for card layout
+  // TOP 30 BUSIEST STEWARDS - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var busiestRowCount = L.BUSIEST_END_ROW - L.BUSIEST_START_ROW + 1;
   var busiestRows = [];
-  for (var b = 0; b < 30; b++) {
+  for (var b = 0; b < busiestRowCount; b++) {
     if (b < metrics.busiestStewards.length) {
       var steward = metrics.busiestStewards[b];
       busiestRows.push([b + 1, steward.name, steward.active, steward.open, steward.pendingInfo, steward.total]);
@@ -3111,13 +3115,14 @@ function writeDashboardValues_(sheet, metrics) {
       busiestRows.push(['', '', '', '', '', '']);
     }
   }
-  sheet.getRange('A59:F88').setValues(busiestRows);
+  sheet.getRange(L.BUSIEST_START_ROW, 1, busiestRowCount, L.DATA_COLS).setValues(busiestRows);
 
   // ══════════════════════════════════════════════════════════════════════
-  // TOP 10 PERFORMERS (Rows 93-102) - Updated for card layout
+  // TOP 10 PERFORMERS - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var topRowCount = L.TOP_PERFORMERS_END_ROW - L.TOP_PERFORMERS_START_ROW + 1;
   var topRows = [];
-  for (var t = 0; t < 10; t++) {
+  for (var t = 0; t < topRowCount; t++) {
     if (t < metrics.topPerformers.length) {
       var perf = metrics.topPerformers[t];
       topRows.push([t + 1, perf.name, perf.score, perf.winRate, perf.avgDays, perf.overdue]);
@@ -3125,13 +3130,14 @@ function writeDashboardValues_(sheet, metrics) {
       topRows.push(['', '', '', '', '', '']);
     }
   }
-  sheet.getRange('A93:F102').setValues(topRows);
+  sheet.getRange(L.TOP_PERFORMERS_START_ROW, 1, topRowCount, L.DATA_COLS).setValues(topRows);
 
   // ══════════════════════════════════════════════════════════════════════
-  // STEWARDS NEEDING SUPPORT (Rows 107-116) - Updated for card layout
+  // STEWARDS NEEDING SUPPORT - Card layout
   // ══════════════════════════════════════════════════════════════════════
+  var supportRowCount = L.NEEDING_SUPPORT_END_ROW - L.NEEDING_SUPPORT_START_ROW + 1;
   var bottomRows = [];
-  for (var n = 0; n < 10; n++) {
+  for (var n = 0; n < supportRowCount; n++) {
     if (n < metrics.needingSupport.length) {
       var need = metrics.needingSupport[n];
       bottomRows.push([n + 1, need.name, need.score, need.winRate, need.avgDays, need.overdue]);
@@ -3139,7 +3145,7 @@ function writeDashboardValues_(sheet, metrics) {
       bottomRows.push(['', '', '', '', '', '']);
     }
   }
-  sheet.getRange('A107:F116').setValues(bottomRows);
+  sheet.getRange(L.NEEDING_SUPPORT_START_ROW, 1, supportRowCount, L.DATA_COLS).setValues(bottomRows);
 
   // ══════════════════════════════════════════════════════════════════════
   // AUTO-APPLY GRADIENT HEATMAPS

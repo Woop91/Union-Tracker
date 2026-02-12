@@ -537,42 +537,40 @@ var TIME_CONSTANTS = {
   /** Milliseconds per week */
   MS_PER_WEEK: 7 * 24 * 60 * 60 * 1000,
 
-  // TODO: HARDCODED — These values are duplicated in 01_Core.gs DEADLINE_RULES.
-  // Both must stay in sync. Consider consolidating to a single source of truth.
-  /** Deadline days configuration */
+  /** Deadline days configuration — references DEADLINE_DEFAULTS (01_Core.gs) as single source of truth */
   DEADLINE_DAYS: {
     /** Days to file grievance after incident */
-    FILING: 21,
+    get FILING() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.FILING_DAYS : 21; },
 
-    /** Days for Step I response (matches DEADLINE_RULES.STEP_1) */
-    STEP1_RESPONSE: 7,
+    /** Days for Step I response */
+    get STEP1_RESPONSE() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : 7; },
 
-    /** Days to appeal to Step II (matches DEADLINE_RULES.STEP_2) */
-    STEP2_APPEAL: 7,
+    /** Days to appeal to Step II */
+    get STEP2_APPEAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_2_APPEAL : 7; },
 
-    /** Days for Step II response (matches DEADLINE_RULES.STEP_2) */
-    STEP2_RESPONSE: 14,
+    /** Days for Step II response */
+    get STEP2_RESPONSE() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_2_RESPONSE : 14; },
 
-    /** Days to appeal to Step III (matches DEADLINE_RULES.STEP_3) */
-    STEP3_APPEAL: 10,
+    /** Days to appeal to Step III */
+    get STEP3_APPEAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.STEP_3_APPEAL : 10; },
 
     /** Days before deadline to show warning */
-    WARNING_THRESHOLD: 5,
+    get WARNING_THRESHOLD() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.WARNING_THRESHOLD : 5; },
 
     /** Days before deadline to show critical alert */
-    CRITICAL_THRESHOLD: 2
+    get CRITICAL_THRESHOLD() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.CRITICAL_THRESHOLD : 2; }
   },
 
-  /** Reminder intervals */
+  /** Reminder intervals — references DEADLINE_DEFAULTS (01_Core.gs) as single source of truth */
   REMINDER_DAYS: {
     /** First reminder before deadline */
-    FIRST: 7,
+    get FIRST() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.REMINDER_FIRST : 7; },
 
     /** Second reminder before deadline */
-    SECOND: 3,
+    get SECOND() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.REMINDER_SECOND : 3; },
 
     /** Final reminder before deadline */
-    FINAL: 1
+    get FINAL() { return (typeof DEADLINE_DEFAULTS !== 'undefined') ? DEADLINE_DEFAULTS.REMINDER_FINAL : 1; }
   }
 };
 

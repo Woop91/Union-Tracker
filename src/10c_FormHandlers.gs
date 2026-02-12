@@ -33,13 +33,16 @@
  * Grievance Form Configuration
  * Maps form entry IDs to Member Directory fields for pre-filling
  */
-// TODO: HARDCODED — Form URL and entry IDs will silently break if the Google Form
-// is recreated or restructured. Consider moving to Config sheet or Script Properties.
+/**
+ * Grievance Form Configuration
+ * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
+ * Hardcoded values serve as defaults only — update via Script Properties or Config sheet.
+ */
 var GRIEVANCE_FORM_CONFIG = {
-  // Google Form URL (viewform version for pre-filling)
+  // Default form URL — overridden by Config sheet column P at runtime
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSedX8nf_xXeLe2sCL9MpjkEEmSuSPbjn3fNxMaMNaPlD0H5lA/viewform',
 
-  // Form field entry IDs mapped to their purpose
+  // Default form field entry IDs — overridden by Script Properties at runtime
   FIELD_IDS: {
     MEMBER_ID: 'entry.272049116',
     MEMBER_FIRST_NAME: 'entry.736822578',
@@ -66,9 +69,13 @@ var GRIEVANCE_FORM_CONFIG = {
  * Personal Contact Info Form Configuration
  * Maps form entry IDs to Member Directory fields for updating member contact info
  */
-// TODO: HARDCODED — Same risk as GRIEVANCE_FORM_CONFIG above. Move to Config sheet.
+/**
+ * Contact Form Configuration
+ * Form URL reads from Config sheet (column Q), entry IDs read from Script Properties.
+ * Hardcoded values serve as defaults only.
+ */
 var CONTACT_FORM_CONFIG = {
-  // Google Form URL - members fill out blank form, data written to Member Directory on submit
+  // Default form URL — overridden by Config sheet column Q at runtime
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeOs6Kxqca85DYRF1wTP634gMNdEirZdi5mg7aUIY5q7dIfRg/viewform',
 
   // Form field entry IDs mapped to Member Directory columns
@@ -92,8 +99,60 @@ var CONTACT_FORM_CONFIG = {
 };
 
 // ============================================================================
-// FORM URL CONFIGURATION HELPERS
+// FORM CONFIGURATION HELPERS
 // ============================================================================
+
+/**
+ * Get form field IDs from Script Properties, falling back to hardcoded defaults.
+ * Admins can update field IDs via Script Properties without touching code.
+ *
+ * Script Property key format: FORM_FIELDS_{formType} (e.g., FORM_FIELDS_GRIEVANCE)
+ * Value format: JSON string of the FIELD_IDS object
+ *
+ * @param {string} formType - 'grievance', 'contact', or 'satisfaction'
+ * @returns {Object} Field ID mapping
+ */
+function getFormFieldIds_(formType) {
+  var defaults = {
+    grievance: GRIEVANCE_FORM_CONFIG.FIELD_IDS,
+    contact: CONTACT_FORM_CONFIG.FIELD_IDS,
+    satisfaction: SATISFACTION_FORM_CONFIG.FIELD_IDS
+  };
+
+  try {
+    var propKey = 'FORM_FIELDS_' + formType.toUpperCase();
+    var stored = PropertiesService.getScriptProperties().getProperty(propKey);
+    if (stored) {
+      var parsed = JSON.parse(stored);
+      // Merge stored over defaults so new fields still work
+      var result = {};
+      var defaultFields = defaults[formType] || {};
+      for (var key in defaultFields) {
+        result[key] = defaultFields[key];
+      }
+      for (var key in parsed) {
+        result[key] = parsed[key];
+      }
+      return result;
+    }
+  } catch (e) {
+    console.log('Error reading form field IDs from Script Properties: ' + e.message);
+  }
+
+  return defaults[formType] || {};
+}
+
+/**
+ * Save form field IDs to Script Properties for a given form type.
+ * Call this after creating/recreating a Google Form to update the entry IDs.
+ *
+ * @param {string} formType - 'grievance', 'contact', or 'satisfaction'
+ * @param {Object} fieldIds - Object mapping field names to entry.XXXXX IDs
+ */
+function saveFormFieldIds_(formType, fieldIds) {
+  var propKey = 'FORM_FIELDS_' + formType.toUpperCase();
+  PropertiesService.getScriptProperties().setProperty(propKey, JSON.stringify(fieldIds));
+}
 
 /**
  * Get form URL from Config sheet, falling back to hardcoded default
@@ -361,9 +420,13 @@ function testGrievanceFormSubmission() {
 /**
  * Member Satisfaction Survey Form Configuration
  */
-// TODO: HARDCODED — Same risk as other form configs. Move to Config sheet.
+/**
+ * Satisfaction Survey Form Configuration
+ * Form URL reads from Config sheet (column AR), entry IDs read from Script Properties.
+ * Hardcoded values serve as defaults only.
+ */
 var SATISFACTION_FORM_CONFIG = {
-  // Google Form URLs
+  // Default form URLs — overridden by Config sheet column AR at runtime
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeR4VxrGTEvK-PaQP2S8JXn6xwTwp-vkR9tI5c3PRvfhr75nA/viewform',
   EDIT_URL: 'https://docs.google.com/forms/d/10irg3mZ4kPShcJ5gFHuMoTxvTeZmo_cBs6HGvfasbL0/edit',
 

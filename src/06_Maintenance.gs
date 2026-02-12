@@ -2307,7 +2307,7 @@ function runScheduledGhostValidation() {
     var adminEmail = configSheet.getRange(3, CONFIG_COLS.ADMIN_EMAILS, 1, 1).getValue();
 
     if (adminEmail) {
-      var subject = '⚠️ 509 Dashboard: Orphaned Grievances Detected';
+      var subject = '⚠️ ' + COMMAND_CONFIG.SYSTEM_NAME + ': Orphaned Grievances Detected';
       var body = 'The scheduled data integrity check found ' + orphaned.length + ' grievances with invalid Member IDs.\n\n';
 
       orphaned.slice(0, 20).forEach(function(item) {
@@ -2319,7 +2319,7 @@ function runScheduledGhostValidation() {
       }
 
       body += '\nPlease review and correct these records in the Grievance Log.';
-      body += '\n\n--\n509 Dashboard Automated Alert';
+      body += '\n\n--\n' + COMMAND_CONFIG.SYSTEM_NAME + ' Automated Alert';
 
       try {
         MailApp.sendEmail(adminEmail, subject, body);
