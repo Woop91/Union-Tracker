@@ -1762,6 +1762,9 @@ var GRIEVANCE_OUTCOMES = {
  * Used by deadline calculation functions throughout the system
  * @const {Object}
  */
+// TODO: HARDCODED — Deadline days are duplicated in 00_DataAccess.gs DEADLINE_DAYS.
+// If contract terms change, both locations must be updated or deadlines will be inconsistent.
+// Consider a single source of truth, ideally in the Config sheet.
 var DEADLINE_RULES = {
   STEP_1: { DAYS_FOR_RESPONSE: 7 },
   STEP_2: { DAYS_TO_APPEAL: 7, DAYS_FOR_RESPONSE: 14 },

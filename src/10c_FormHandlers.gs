@@ -33,6 +33,8 @@
  * Grievance Form Configuration
  * Maps form entry IDs to Member Directory fields for pre-filling
  */
+// TODO: HARDCODED — Form URL and entry IDs will silently break if the Google Form
+// is recreated or restructured. Consider moving to Config sheet or Script Properties.
 var GRIEVANCE_FORM_CONFIG = {
   // Google Form URL (viewform version for pre-filling)
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSedX8nf_xXeLe2sCL9MpjkEEmSuSPbjn3fNxMaMNaPlD0H5lA/viewform',
@@ -64,6 +66,7 @@ var GRIEVANCE_FORM_CONFIG = {
  * Personal Contact Info Form Configuration
  * Maps form entry IDs to Member Directory fields for updating member contact info
  */
+// TODO: HARDCODED — Same risk as GRIEVANCE_FORM_CONFIG above. Move to Config sheet.
 var CONTACT_FORM_CONFIG = {
   // Google Form URL - members fill out blank form, data written to Member Directory on submit
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeOs6Kxqca85DYRF1wTP634gMNdEirZdi5mg7aUIY5q7dIfRg/viewform',
@@ -358,6 +361,7 @@ function testGrievanceFormSubmission() {
 /**
  * Member Satisfaction Survey Form Configuration
  */
+// TODO: HARDCODED — Same risk as other form configs. Move to Config sheet.
 var SATISFACTION_FORM_CONFIG = {
   // Google Form URLs
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeR4VxrGTEvK-PaQP2S8JXn6xwTwp-vkR9tI5c3PRvfhr75nA/viewform',
