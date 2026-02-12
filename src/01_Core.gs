@@ -895,11 +895,12 @@ var MEMBER_COLS = {
 };
 
 // ============================================================================
-// MEETING CHECK-IN LOG COLUMNS (8 columns: A-H)
+// MEETING CHECK-IN LOG COLUMNS (13 columns: A-M)
 // ============================================================================
 
 /**
  * Meeting Check-In Log column positions (1-indexed)
+ * Columns A-H are original; I-M added for event scheduling
  * @const {Object}
  */
 var MEETING_CHECKIN_COLS = {
@@ -910,7 +911,22 @@ var MEETING_CHECKIN_COLS = {
   MEMBER_ID: 5,          // E - Checked-in member ID
   MEMBER_NAME: 6,        // F - Member first + last name
   CHECKIN_TIME: 7,       // G - Timestamp of check-in
-  EMAIL: 8               // H - Member email (for lookup)
+  EMAIL: 8,              // H - Member email (for lookup)
+  MEETING_TIME: 9,       // I - Start time (HH:mm)
+  MEETING_DURATION: 10,  // J - Duration in hours
+  EVENT_STATUS: 11,      // K - Scheduled / Active / Completed
+  NOTIFY_STEWARDS: 12,   // L - Steward email(s) for attendance report
+  CALENDAR_EVENT_ID: 13  // M - Google Calendar event ID
+};
+
+/**
+ * Meeting event statuses
+ * @const {Object}
+ */
+var MEETING_STATUS = {
+  SCHEDULED: 'Scheduled',
+  ACTIVE: 'Active',
+  COMPLETED: 'Completed'
 };
 
 // ============================================================================

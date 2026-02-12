@@ -1660,14 +1660,19 @@ function createMeetingCheckInLogSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEETING_CHECKIN_LOG);
 
   var headers = [
-    'Meeting ID',     // A - Unique meeting identifier (steward sets)
-    'Meeting Name',   // B - Meeting name/topic
-    'Meeting Date',   // C - Date of meeting
-    'Meeting Type',   // D - Virtual or In-Person
-    'Member ID',      // E - Checked-in member
-    'Member Name',    // F - First + Last name
-    'Check-In Time',  // G - Timestamp when member checked in
-    'Email'           // H - Member email used for check-in
+    'Meeting ID',       // A - Unique meeting identifier (steward sets)
+    'Meeting Name',     // B - Meeting name/topic
+    'Meeting Date',     // C - Date of meeting
+    'Meeting Type',     // D - Virtual or In-Person
+    'Member ID',        // E - Checked-in member
+    'Member Name',      // F - First + Last name
+    'Check-In Time',    // G - Timestamp when member checked in
+    'Email',            // H - Member email used for check-in
+    'Start Time',       // I - Meeting start time (HH:mm)
+    'Duration (hrs)',   // J - Meeting duration in hours
+    'Event Status',     // K - Scheduled / Active / Completed
+    'Notify Stewards',  // L - Steward email(s) for attendance report
+    'Calendar Event ID' // M - Google Calendar event ID
   ];
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -1687,10 +1692,16 @@ function createMeetingCheckInLogSheet(ss) {
   sheet.setColumnWidth(6, 170);  // F - Member Name
   sheet.setColumnWidth(7, 170);  // G - Check-In Time
   sheet.setColumnWidth(8, 200);  // H - Email
+  sheet.setColumnWidth(9, 100);  // I - Start Time
+  sheet.setColumnWidth(10, 110); // J - Duration
+  sheet.setColumnWidth(11, 110); // K - Event Status
+  sheet.setColumnWidth(12, 220); // L - Notify Stewards
+  sheet.setColumnWidth(13, 150); // M - Calendar Event ID
 
   // Format date columns
   sheet.getRange(2, 3, 999, 1).setNumberFormat('MM/DD/YYYY');   // C - Meeting Date
   sheet.getRange(2, 7, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss'); // G - Check-In Time
+  sheet.getRange(2, 9, 999, 1).setNumberFormat('HH:mm');        // I - Start Time
 
   // Freeze header row
   sheet.setFrozenRows(1);

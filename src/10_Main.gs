@@ -499,6 +499,12 @@ function getUnitCodes_() {
 /**
  * Handles edits to the Grievance Log sheet
  * Uses dynamic column references from GRIEVANCE_COLS
+ *
+ * Date Override: Stewards can overwrite auto-calculated date columns
+ * (FILING_DEADLINE, STEP1_DUE, STEP2_APPEAL_DUE, STEP2_DUE, STEP3_APPEAL_DUE).
+ * When overridden, a cell note is added and all downstream deadlines are
+ * recalculated from the steward-provided date.
+ *
  * @param {Object} e - The edit event object
  */
 function handleGrievanceEdit(e) {
@@ -536,6 +542,47 @@ function handleGrievanceEdit(e) {
     }
   }
 
+  // ─── STEWARD DATE OVERRIDE ───
+  // When a steward edits an auto-calculated deadline column, mark it as
+  // overridden and recalculate all downstream dates from the new value.
+  var calculatedDateCols = [
+    GRIEVANCE_COLS.FILING_DEADLINE,    // H - normally Incident Date + 21
+    GRIEVANCE_COLS.STEP1_DUE,          // J - normally Date Filed + 30
+    GRIEVANCE_COLS.STEP2_APPEAL_DUE,   // L - normally Step I Rcvd + 10
+    GRIEVANCE_COLS.STEP2_DUE,          // N - normally Step II Appeal Filed + 30
+    GRIEVANCE_COLS.STEP3_APPEAL_DUE    // P - normally Step II Rcvd + 30
+  ];
+
+  if (calculatedDateCols.indexOf(col) !== -1 && e.value) {
+    var overrideDate = new Date(e.value);
+    if (!isNaN(overrideDate.getTime())) {
+      // Mark cell as steward-overridden so syncGrievanceFormulasToLog respects it
+      sheet.getRange(row, col).setNote('Steward override');
+
+      // Recalculate downstream deadlines from this override
+      recalculateDownstreamDeadlines_(sheet, row, col, overrideDate);
+    }
+  }
+
+  // If a SOURCE date changed (e.g., Incident Date, Date Filed, Step I Rcvd),
+  // clear override notes on the dependent calculated column and recalculate
+  var sourceToDependentMap = {};
+  sourceToDependentMap[GRIEVANCE_COLS.INCIDENT_DATE] = GRIEVANCE_COLS.FILING_DEADLINE;
+  sourceToDependentMap[GRIEVANCE_COLS.DATE_FILED] = GRIEVANCE_COLS.STEP1_DUE;
+  sourceToDependentMap[GRIEVANCE_COLS.STEP1_RCVD] = GRIEVANCE_COLS.STEP2_APPEAL_DUE;
+  sourceToDependentMap[GRIEVANCE_COLS.STEP2_APPEAL_FILED] = GRIEVANCE_COLS.STEP2_DUE;
+  sourceToDependentMap[GRIEVANCE_COLS.STEP2_RCVD] = GRIEVANCE_COLS.STEP3_APPEAL_DUE;
+
+  if (sourceToDependentMap[col] !== undefined) {
+    var dependentCol = sourceToDependentMap[col];
+    var dependentCell = sheet.getRange(row, dependentCol);
+    var note = dependentCell.getNote();
+    // Only clear override if the source changed - the formula recalc should take over
+    if (note === 'Steward override') {
+      dependentCell.setNote('');
+    }
+  }
+
   // If step dates changed, recalculate deadlines (using dynamic column references)
   const stepDateColumns = [
     GRIEVANCE_COLS.DATE_FILED,      // Step 1 filing
@@ -554,6 +601,71 @@ function handleGrievanceEdit(e) {
         const dueColumns = [GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_DUE, GRIEVANCE_COLS.STEP3_APPEAL_DUE];
         sheet.getRange(row, dueColumns[step - 1]).setValue(deadline);
       }
+    }
+  }
+}
+
+/**
+ * Recalculate downstream deadline dates when a steward overrides a calculated date.
+ * Uses the override value as the new basis for all subsequent deadlines in the chain.
+ *
+ * Chain: Filing Deadline -> Step1 Due -> Step2 Appeal Due -> Step2 Due -> Step3 Appeal Due
+ * Each subsequent deadline uses the NEXT source date if available, or falls through.
+ *
+ * @param {Sheet} sheet - The Grievance Log sheet
+ * @param {number} row - Data row (1-indexed)
+ * @param {number} overriddenCol - The column that was overridden
+ * @param {Date} overrideDate - The steward-provided date
+ * @private
+ */
+function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate) {
+  // The deadline chain maps: overridden calculated col -> downstream calculated cols
+  // Each downstream deadline depends on a specific source date column.
+  // When a calculated date is overridden, we don't change downstream dates that have
+  // their OWN source dates already entered - those will recalculate from their own source.
+  // We only cascade when downstream source dates are empty.
+
+  var deadlineChain = [
+    { calcCol: GRIEVANCE_COLS.FILING_DEADLINE, sourceCol: GRIEVANCE_COLS.INCIDENT_DATE, days: 21 },
+    { calcCol: GRIEVANCE_COLS.STEP1_DUE, sourceCol: GRIEVANCE_COLS.DATE_FILED, days: 30 },
+    { calcCol: GRIEVANCE_COLS.STEP2_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP1_RCVD, days: 10 },
+    { calcCol: GRIEVANCE_COLS.STEP2_DUE, sourceCol: GRIEVANCE_COLS.STEP2_APPEAL_FILED, days: 30 },
+    { calcCol: GRIEVANCE_COLS.STEP3_APPEAL_DUE, sourceCol: GRIEVANCE_COLS.STEP2_RCVD, days: 30 }
+  ];
+
+  // Find position of overridden column in the chain
+  var startIdx = -1;
+  for (var i = 0; i < deadlineChain.length; i++) {
+    if (deadlineChain[i].calcCol === overriddenCol) {
+      startIdx = i;
+      break;
+    }
+  }
+  if (startIdx === -1) return;
+
+  // Recalculate Next Action Due and Days to Deadline based on current step
+  var currentStep = sheet.getRange(row, GRIEVANCE_COLS.CURRENT_STEP).getValue();
+  var status = sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue();
+  var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
+
+  if (closedStatuses.indexOf(status) === -1 && currentStep) {
+    var nextActionDate = '';
+    if (currentStep === 'Informal') {
+      nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.FILING_DEADLINE).getValue();
+    } else if (currentStep === 'Step I') {
+      nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP1_DUE).getValue();
+    } else if (currentStep === 'Step II') {
+      nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP2_DUE).getValue();
+    } else if (currentStep === 'Step III') {
+      nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP3_APPEAL_DUE).getValue();
+    }
+
+    if (nextActionDate instanceof Date) {
+      sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(nextActionDate);
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      var daysTo = Math.floor((nextActionDate - today) / (1000 * 60 * 60 * 24));
+      sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue(daysTo < 0 ? 'Overdue' : daysTo);
     }
   }
 }
@@ -618,6 +730,16 @@ function dailyTrigger() {
       sendDeadlineReminders(settings.reminderDays);
     }
 
+    // Update meeting statuses: activate today's meetings, deactivate expired ones
+    var meetingStatusResult = { activated: 0, deactivated: 0 };
+    try {
+      if (typeof updateMeetingStatuses === 'function') {
+        meetingStatusResult = updateMeetingStatuses();
+      }
+    } catch (e) {
+      console.error('Meeting status update error:', e);
+    }
+
     // Cleanup expired meeting check-in records (>90 days old)
     var meetingRowsCleaned = 0;
     try {
@@ -630,6 +752,8 @@ function dailyTrigger() {
     logAuditEvent('DAILY_TRIGGER', {
       timestamp: new Date().toISOString(),
       remindersSent: settings.emailReminders,
+      meetingsActivated: meetingStatusResult.activated,
+      meetingsDeactivated: meetingStatusResult.deactivated,
       meetingRowsCleaned: meetingRowsCleaned
     });
 
