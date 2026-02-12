@@ -1846,6 +1846,12 @@ function createFeaturesReferenceSheet(ss) {
   // Enable text wrapping for description column
   sheet.getRange(startDataRow, 3, features.length, 1).setWrap(true);
 
+  // Remove existing filter if any
+  var existingFilter = sheet.getFilter();
+  if (existingFilter) {
+    existingFilter.remove();
+  }
+
   // Apply filter to data
   var dataRange = sheet.getRange(headerRow, 1, features.length + 1, 5);
   dataRange.createFilter();
