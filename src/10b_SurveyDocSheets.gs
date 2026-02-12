@@ -685,7 +685,30 @@ function populateRoadmapItems(sheet) {
     [timestamp, 'System', 'Reports', 'Feature Request', 'Low',
      'Advanced Precedent Search with AI',
      'Enhance Search Precedents to use AI/ML for semantic matching of grievance outcomes. Would allow natural language queries like "overtime disputes in warehouse" to find relevant past practice examples.',
-     'New', '', '', 'Requires: Google Vertex AI or similar ML API']
+     'New', '', '', 'Requires: Google Vertex AI or similar ML API'],
+    // Row 6 - Secure Export via Email (seiu509.org only)
+    [timestamp, 'System', 'Member Directory', 'Feature Request', 'High',
+     'Secure Export via Email (seiu509.org only)',
+     'Add an export feature that allows exporting a list of all selectable Member Directory items via email. ' +
+     'Export emails MUST only be sent to addresses ending in @seiu509.org. ' +
+     'Any attempt to mass-export or email data to a non-seiu509.org address must be prohibited, ' +
+     'and an automatic alert must be sent to senior leadership (Chief Steward and Admin Emails in Config). ' +
+     'The export should support column selection so stewards can choose which fields to include. ' +
+     'PII columns (Street Address, City, State) require explicit opt-in and are excluded by default.',
+     'New', '', '', 'TODO: Implement email domain validation and leadership alert system'],
+    // Row 7 - Lockdown Mode (Multi-Steward Authorization)
+    [timestamp, 'System', 'Dashboard', 'Feature Request', 'High',
+     'Lockdown Mode (Multi-Steward Authorization)',
+     'Add a "Lockdown" feature that can be triggered by the authorization of multiple stewards (configurable threshold, e.g., 2+). ' +
+     'Lockdown is intended for events of possible security breaches and should: ' +
+     '(1) Immediately disable all export and email functions, ' +
+     '(2) Restrict edit access to the Member Directory and Grievance Log, ' +
+     '(3) Log all access attempts to the Audit Log, ' +
+     '(4) Send an emergency alert to all configured Admin Emails and the Chief Steward, ' +
+     '(5) Display a visible lockdown banner on all sheets. ' +
+     'Lockdown can only be lifted by the same multi-steward authorization process. ' +
+     'A lockdown history should be maintained in the Audit Log.',
+     'New', '', '', 'TODO: Multi-steward auth flow, lockdown state management, access restriction']
   ];
 
   // Only add if rows are empty (don't overwrite existing data)

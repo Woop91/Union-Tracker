@@ -65,7 +65,8 @@ function DIAGNOSE_SETUP() {
     var headers = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
     var requiredHeaders = [
       'Member ID', 'First Name', 'Last Name', 'Job Title',
-      'Work Location', 'Unit', 'Email', 'Phone', 'Is Steward', 'Assigned Steward'
+      'Work Location', 'Unit', 'Email', 'Phone', 'Is Steward', 'Assigned Steward',
+      'Employee ID', 'Department', 'Hire Date'
     ];
 
     requiredHeaders.forEach(function(header) {
@@ -85,7 +86,7 @@ function DIAGNOSE_SETUP() {
     var gHeaders = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
     var requiredGHeaders = [
       'Grievance ID', 'Member ID', 'Date Filed', 'Issue Category', 'Current Step',
-      'Status', 'Next Action Due'
+      'Status', 'Next Action Due', 'Last Updated'
     ];
 
     requiredGHeaders.forEach(function(header) {

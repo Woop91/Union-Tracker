@@ -259,7 +259,7 @@ function advancedSearch(filters) {
         var matches = true;
 
         // Apply department filter
-        if (filters.department && row[MEMBER_COLUMNS.DEPARTMENT] !== filters.department) {
+        if (filters.department && row[MEMBER_COLUMNS.JOB_TITLE] !== filters.department) {
           matches = false;
         }
 
@@ -283,7 +283,7 @@ function advancedSearch(filters) {
             id: row[MEMBER_COLUMNS.ID],
             type: 'member',
             title: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-            subtitle: row[MEMBER_COLUMNS.DEPARTMENT],
+            subtitle: row[MEMBER_COLUMNS.JOB_TITLE],
             row: i + 1
           });
         }
@@ -351,7 +351,7 @@ function getDepartmentList() {
 
     if (!memberSheet) return [];
 
-    var data = memberSheet.getRange(2, MEMBER_COLUMNS.DEPARTMENT + 1,
+    var data = memberSheet.getRange(2, MEMBER_COLUMNS.JOB_TITLE + 1,
       memberSheet.getLastRow() - 1, 1).getValues();
 
     var depts = {};
@@ -384,7 +384,7 @@ function getMemberList() {
       members.push({
         id: data[i][MEMBER_COLUMNS.ID],
         name: data[i][MEMBER_COLUMNS.FIRST_NAME] + ' ' + data[i][MEMBER_COLUMNS.LAST_NAME],
-        department: data[i][MEMBER_COLUMNS.DEPARTMENT]
+        department: data[i][MEMBER_COLUMNS.JOB_TITLE]
       });
     }
   }

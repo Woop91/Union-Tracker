@@ -1080,8 +1080,8 @@ function importMembersFromData(data, mapping) {
       // Generate Member ID
       var memberId = generateMemberID_(firstName, lastName);
 
-      // Build new row with empty values for all columns
-      var newRow = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+      // Build new row with empty values for all columns (up to last column: STATE)
+      var newRow = new Array(MEMBER_COLS.STATE).fill('');
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
       newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
       newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;

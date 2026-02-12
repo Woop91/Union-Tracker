@@ -793,7 +793,7 @@ function sanitizeDataForClient(dataArray, fieldsToSanitize) {
 
 
 // ============================================================================
-// SOURCE: 00_DataAccess.gs (616 lines)
+// SOURCE: 00_DataAccess.gs (618 lines)
 // ============================================================================
 
 /**
@@ -1335,6 +1335,8 @@ var TIME_CONSTANTS = {
   /** Milliseconds per week */
   MS_PER_WEEK: 7 * 24 * 60 * 60 * 1000,
 
+  // TODO: HARDCODED — These values are duplicated in 01_Core.gs DEADLINE_RULES.
+  // Both must stay in sync. Consider consolidating to a single source of truth.
   /** Deadline days configuration */
   DEADLINE_DAYS: {
     /** Days to file grievance after incident */
@@ -1414,7 +1416,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2529 lines)
+// SOURCE: 01_Core.gs (2570 lines)
 // ============================================================================
 
 /**
@@ -2014,6 +2016,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.6.1', date: '2026-02-12', codename: 'PII & Compliance', changes: 'Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (seiu509.org only) and Lockdown future feature roadmap items.' },
   { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling' },
   { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
   { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
@@ -2282,7 +2285,7 @@ var MENU_ICONS = {
 };
 
 // ============================================================================
-// MEMBER DIRECTORY COLUMNS (32 columns total: A-AF)
+// MEMBER DIRECTORY COLUMNS (39 columns total: A-AM)
 // ============================================================================
 
 /**
@@ -2344,10 +2347,28 @@ var MEMBER_COLS = {
   // Section 10: Member Authentication (AG)
   PIN_HASH: 33,                    // AG - Hashed PIN for member self-service portal
 
+  // Section 11: Employment Details (AH-AJ) - Added for Add Member form parity
+  EMPLOYEE_ID: 34,                 // AH - Employee ID (e.g., XX000000)
+  DEPARTMENT: 35,                  // AI - Department / work unit category
+  HIRE_DATE: 36,                   // AJ - Hire date (date format)
+
+  // Section 12: Mailing Address / PII (AK-AM) - Hidden by default, PII
+  STREET_ADDRESS: 37,              // AK - Street address (PII)
+  CITY: 38,                        // AL - City (PII)
+  STATE: 39,                       // AM - State (PII)
+
   // ALIASES - For backward compatibility
   LOCATION: 5,                     // Alias for WORK_LOCATION
   DAYS_TO_DEADLINE: 30             // Alias for NEXT_DEADLINE
 };
+
+/**
+ * Member Directory columns considered PII (Personally Identifiable Information)
+ * These columns are hidden by default and MUST NOT appear in any modals or exports
+ * unless explicitly authorized. Includes mailing address fields.
+ * @const {Array<number>}
+ */
+var PII_MEMBER_COLS = [37, 38, 39]; // STREET_ADDRESS (AK), CITY (AL), STATE (AM)
 
 // ============================================================================
 // MEETING CHECK-IN LOG COLUMNS (16 columns: A-P)
@@ -2388,7 +2409,7 @@ var MEETING_STATUS = {
 };
 
 // ============================================================================
-// GRIEVANCE LOG COLUMNS (35 columns total: A-AI)
+// GRIEVANCE LOG COLUMNS (42 columns total: A-AP)
 // ============================================================================
 
 /**
@@ -2466,7 +2487,10 @@ var GRIEVANCE_COLS = {
   REMINDER_1_DATE: 38,    // AL - First reminder date
   REMINDER_1_NOTE: 39,    // AM - First reminder note (e.g., "Schedule Step II meeting")
   REMINDER_2_DATE: 40,    // AN - Second reminder date
-  REMINDER_2_NOTE: 41     // AO - Second reminder note
+  REMINDER_2_NOTE: 41,    // AO - Second reminder note
+
+  // Section 16: Record Tracking (AP)
+  LAST_UPDATED: 42        // AP - Last Updated timestamp (auto-set on edit)
 };
 
 // ============================================================================
@@ -2566,7 +2590,10 @@ var GRIEVANCE_COLUMNS = {
   REMINDER_1_DATE: 37,     // AL - First reminder date
   REMINDER_1_NOTE: 38,     // AM - First reminder note
   REMINDER_2_DATE: 39,     // AN - Second reminder date
-  REMINDER_2_NOTE: 40      // AO - Second reminder note
+  REMINDER_2_NOTE: 40,     // AO - Second reminder note
+
+  // Record Tracking (0-indexed)
+  RECORD_LAST_UPDATED: 41  // AP - Last Updated timestamp
 };
 
 /**
@@ -2582,7 +2609,7 @@ var MEMBER_COLUMNS = {
   FIRST_NAME: 1,           // B - First Name
   LAST_NAME: 2,            // C - Last Name
   JOB_TITLE: 3,            // D - Job Title
-  DEPARTMENT: 3,           // Alias for JOB_TITLE
+  JOB_DEPT: 3,             // Legacy alias for JOB_TITLE (DEPARTMENT now at index 34)
 
   // Location & Work (0-indexed)
   WORK_LOCATION: 4,        // E - Work Location
@@ -2632,7 +2659,17 @@ var MEMBER_COLUMNS = {
   QUICK_ACTIONS: 31,       // AF - Quick Actions
 
   // Member Authentication (0-indexed)
-  PIN_HASH: 32             // AG - PIN Hash
+  PIN_HASH: 32,            // AG - PIN Hash
+
+  // Employment Details (0-indexed)
+  EMPLOYEE_ID: 33,         // AH - Employee ID
+  DEPARTMENT: 34,          // AI - Department
+  HIRE_DATE: 35,           // AJ - Hire Date
+
+  // Mailing Address / PII (0-indexed) - Hidden by default
+  STREET_ADDRESS: 36,      // AK - Street Address (PII)
+  CITY: 37,                // AL - City (PII)
+  STATE: 38                // AM - State (PII)
 };
 
 // ============================================================================
@@ -3050,7 +3087,9 @@ function getMemberHeaders() {
     'Recent Contact Date', 'Contact Steward', 'Contact Notes',
     'Has Open Grievance?', 'Grievance Status', 'Days to Deadline', 'Start Grievance',
     '⚡ Actions',
-    'PIN Hash'
+    'PIN Hash',
+    'Employee ID', 'Department', 'Hire Date',
+    'Street Address', 'City', 'State'
   ];
 }
 
@@ -3074,7 +3113,8 @@ function getGrievanceHeaders() {
     'Drive Folder ID', 'Drive Folder URL',
     '⚡ Actions',
     'Action Type', 'Checklist Progress',
-    'Reminder 1 Date', 'Reminder 1 Note', 'Reminder 2 Date', 'Reminder 2 Note'
+    'Reminder 1 Date', 'Reminder 1 Note', 'Reminder 2 Date', 'Reminder 2 Note',
+    'Last Updated'
   ];
 }
 
@@ -3181,6 +3221,9 @@ var GRIEVANCE_OUTCOMES = {
  * Used by deadline calculation functions throughout the system
  * @const {Object}
  */
+// TODO: HARDCODED — Deadline days are duplicated in 00_DataAccess.gs DEADLINE_DAYS.
+// If contract terms change, both locations must be updated or deadlines will be inconsistent.
+// Consider a single source of truth, ideally in the Config sheet.
 var DEADLINE_RULES = {
   STEP_1: { DAYS_FOR_RESPONSE: 7 },
   STEP_2: { DAYS_TO_APPEAL: 7, DAYS_FOR_RESPONSE: 14 },
@@ -5033,8 +5076,8 @@ function importMembersFromData(data, mapping) {
       // Generate Member ID
       var memberId = generateMemberID_(firstName, lastName);
 
-      // Build new row with empty values for all columns
-      var newRow = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+      // Build new row with empty values for all columns (up to last column: STATE)
+      var newRow = new Array(MEMBER_COLS.STATE).fill('');
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
       newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
       newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
@@ -19224,7 +19267,7 @@ function addMobileDashboardLinkToConfig() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3418 lines)
+// SOURCE: 06_Maintenance.gs (3419 lines)
 // ============================================================================
 
 /**
@@ -19294,7 +19337,8 @@ function DIAGNOSE_SETUP() {
     var headers = memberSheet.getRange(1, 1, 1, memberSheet.getLastColumn()).getValues()[0];
     var requiredHeaders = [
       'Member ID', 'First Name', 'Last Name', 'Job Title',
-      'Work Location', 'Unit', 'Email', 'Phone', 'Is Steward', 'Assigned Steward'
+      'Work Location', 'Unit', 'Email', 'Phone', 'Is Steward', 'Assigned Steward',
+      'Employee ID', 'Department', 'Hire Date'
     ];
 
     requiredHeaders.forEach(function(header) {
@@ -19314,7 +19358,7 @@ function DIAGNOSE_SETUP() {
     var gHeaders = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
     var requiredGHeaders = [
       'Grievance ID', 'Member ID', 'Date Filed', 'Issue Category', 'Current Step',
-      'Status', 'Next Action Due'
+      'Status', 'Next Action Due', 'Last Updated'
     ];
 
     requiredGHeaders.forEach(function(header) {
@@ -25462,7 +25506,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (630 lines)
+// SOURCE: 08a_SheetSetup.gs (629 lines)
 // ============================================================================
 
 /**
@@ -25647,6 +25691,7 @@ function getOrCreateSheet(ss, name) {
  * @returns {void}
  */
 function reorderSheetsToStandard(ss) {
+  // Dashboard and Satisfaction sheets are deprecated (v4.3.2/v4.3.8) - excluded from ordering
   var desiredOrder = [
     SHEETS.GETTING_STARTED,
     SHEETS.FAQ,
@@ -25655,9 +25700,7 @@ function reorderSheetsToStandard(ss) {
     SHEETS.FEEDBACK,
     SHEETS.FUNCTION_CHECKLIST,
     SHEETS.CONFIG_GUIDE,
-    'Config',
-    SHEETS.DASHBOARD,
-    SHEETS.SATISFACTION
+    'Config'
   ];
 
   var position = 1;
@@ -26361,7 +26404,7 @@ function advancedSearch(filters) {
         var matches = true;
 
         // Apply department filter
-        if (filters.department && row[MEMBER_COLUMNS.DEPARTMENT] !== filters.department) {
+        if (filters.department && row[MEMBER_COLUMNS.JOB_TITLE] !== filters.department) {
           matches = false;
         }
 
@@ -26385,7 +26428,7 @@ function advancedSearch(filters) {
             id: row[MEMBER_COLUMNS.ID],
             type: 'member',
             title: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-            subtitle: row[MEMBER_COLUMNS.DEPARTMENT],
+            subtitle: row[MEMBER_COLUMNS.JOB_TITLE],
             row: i + 1
           });
         }
@@ -26453,7 +26496,7 @@ function getDepartmentList() {
 
     if (!memberSheet) return [];
 
-    var data = memberSheet.getRange(2, MEMBER_COLUMNS.DEPARTMENT + 1,
+    var data = memberSheet.getRange(2, MEMBER_COLUMNS.JOB_TITLE + 1,
       memberSheet.getLastRow() - 1, 1).getValues();
 
     var depts = {};
@@ -26486,7 +26529,7 @@ function getMemberList() {
       members.push({
         id: data[i][MEMBER_COLUMNS.ID],
         name: data[i][MEMBER_COLUMNS.FIRST_NAME] + ' ' + data[i][MEMBER_COLUMNS.LAST_NAME],
-        department: data[i][MEMBER_COLUMNS.DEPARTMENT]
+        department: data[i][MEMBER_COLUMNS.JOB_TITLE]
       });
     }
   }
@@ -34023,7 +34066,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1729 lines)
+// SOURCE: 10a_SheetCreation.gs (1750 lines)
 // ============================================================================
 
 /**
@@ -34619,10 +34662,27 @@ function createMemberDirectory(ss) {
     sheet.getRange(1, MEMBER_COLS.INTEREST_LOCAL, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
     sheet.collapseAllColumnGroups();
 
+    // Group 3: Mailing Address / PII (AK-AM, columns 37-39) - Hidden by default, PII
+    sheet.getRange(1, MEMBER_COLS.STREET_ADDRESS, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    sheet.collapseAllColumnGroups();
+
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
   } catch (e) {
     Logger.log('Member Directory column group setup skipped: ' + e.toString());
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // EMPLOYMENT & PII COLUMN SETUP: Widths, date format, and hide PIN Hash
+  // ═══════════════════════════════════════════════════════════════════════════
+  sheet.setColumnWidth(MEMBER_COLS.EMPLOYEE_ID, 120);
+  sheet.setColumnWidth(MEMBER_COLS.DEPARTMENT, 140);
+  sheet.setColumnWidth(MEMBER_COLS.HIRE_DATE, 110);
+  sheet.setColumnWidth(MEMBER_COLS.STREET_ADDRESS, 200);
+  sheet.setColumnWidth(MEMBER_COLS.CITY, 120);
+  sheet.setColumnWidth(MEMBER_COLS.STATE, 80);
+
+  // Format Hire Date column as date
+  sheet.getRange(2, MEMBER_COLS.HIRE_DATE, 998, 1).setNumberFormat('MM/dd/yyyy');
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CONDITIONAL FORMATTING: Highlight members with open grievances
@@ -34767,7 +34827,8 @@ function createGrievanceLog(ss) {
     GRIEVANCE_COLS.STEP3_APPEAL_DUE,
     GRIEVANCE_COLS.STEP3_APPEAL_FILED,
     GRIEVANCE_COLS.DATE_CLOSED,
-    GRIEVANCE_COLS.NEXT_ACTION_DUE
+    GRIEVANCE_COLS.NEXT_ACTION_DUE,
+    GRIEVANCE_COLS.LAST_UPDATED
   ];
 
   dateColumns.forEach(function(col) {
@@ -34778,6 +34839,9 @@ function createGrievanceLog(ss) {
   sheet.getRange(2, GRIEVANCE_COLS.DAYS_OPEN, 998, 1).setNumberFormat('#,##0');
   // Days to Deadline can show "Overdue" text, so use General format that handles both
   sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, 998, 1).setNumberFormat('#,##0');
+
+  // Format Last Updated (AP) as date-time
+  sheet.getRange(2, GRIEVANCE_COLS.LAST_UPDATED, 998, 1).setNumberFormat('MM/dd/yyyy HH:mm');
 
   // Auto-resize other columns
   sheet.autoResizeColumns(1, headers.length);
@@ -35757,7 +35821,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1854 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1877 lines)
 // ============================================================================
 
 // ============================================================================
@@ -36447,7 +36511,30 @@ function populateRoadmapItems(sheet) {
     [timestamp, 'System', 'Reports', 'Feature Request', 'Low',
      'Advanced Precedent Search with AI',
      'Enhance Search Precedents to use AI/ML for semantic matching of grievance outcomes. Would allow natural language queries like "overtime disputes in warehouse" to find relevant past practice examples.',
-     'New', '', '', 'Requires: Google Vertex AI or similar ML API']
+     'New', '', '', 'Requires: Google Vertex AI or similar ML API'],
+    // Row 6 - Secure Export via Email (seiu509.org only)
+    [timestamp, 'System', 'Member Directory', 'Feature Request', 'High',
+     'Secure Export via Email (seiu509.org only)',
+     'Add an export feature that allows exporting a list of all selectable Member Directory items via email. ' +
+     'Export emails MUST only be sent to addresses ending in @seiu509.org. ' +
+     'Any attempt to mass-export or email data to a non-seiu509.org address must be prohibited, ' +
+     'and an automatic alert must be sent to senior leadership (Chief Steward and Admin Emails in Config). ' +
+     'The export should support column selection so stewards can choose which fields to include. ' +
+     'PII columns (Street Address, City, State) require explicit opt-in and are excluded by default.',
+     'New', '', '', 'TODO: Implement email domain validation and leadership alert system'],
+    // Row 7 - Lockdown Mode (Multi-Steward Authorization)
+    [timestamp, 'System', 'Dashboard', 'Feature Request', 'High',
+     'Lockdown Mode (Multi-Steward Authorization)',
+     'Add a "Lockdown" feature that can be triggered by the authorization of multiple stewards (configurable threshold, e.g., 2+). ' +
+     'Lockdown is intended for events of possible security breaches and should: ' +
+     '(1) Immediately disable all export and email functions, ' +
+     '(2) Restrict edit access to the Member Directory and Grievance Log, ' +
+     '(3) Log all access attempts to the Audit Log, ' +
+     '(4) Send an emergency alert to all configured Admin Emails and the Chief Steward, ' +
+     '(5) Display a visible lockdown banner on all sheets. ' +
+     'Lockdown can only be lifted by the same multi-steward authorization process. ' +
+     'A lockdown history should be maintained in the Audit Log.',
+     'New', '', '', 'TODO: Multi-steward auth flow, lockdown state management, access restriction']
   ];
 
   // Only add if rows are empty (don't overwrite existing data)
@@ -37616,7 +37703,7 @@ function createFeaturesReferenceSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10c_FormHandlers.gs (856 lines)
+// SOURCE: 10c_FormHandlers.gs (860 lines)
 // ============================================================================
 
 // ============================================================================
@@ -37654,6 +37741,8 @@ function createFeaturesReferenceSheet(ss) {
  * Grievance Form Configuration
  * Maps form entry IDs to Member Directory fields for pre-filling
  */
+// TODO: HARDCODED — Form URL and entry IDs will silently break if the Google Form
+// is recreated or restructured. Consider moving to Config sheet or Script Properties.
 var GRIEVANCE_FORM_CONFIG = {
   // Google Form URL (viewform version for pre-filling)
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSedX8nf_xXeLe2sCL9MpjkEEmSuSPbjn3fNxMaMNaPlD0H5lA/viewform',
@@ -37685,6 +37774,7 @@ var GRIEVANCE_FORM_CONFIG = {
  * Personal Contact Info Form Configuration
  * Maps form entry IDs to Member Directory fields for updating member contact info
  */
+// TODO: HARDCODED — Same risk as GRIEVANCE_FORM_CONFIG above. Move to Config sheet.
 var CONTACT_FORM_CONFIG = {
   // Google Form URL - members fill out blank form, data written to Member Directory on submit
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeOs6Kxqca85DYRF1wTP634gMNdEirZdi5mg7aUIY5q7dIfRg/viewform',
@@ -37979,6 +38069,7 @@ function testGrievanceFormSubmission() {
 /**
  * Member Satisfaction Survey Form Configuration
  */
+// TODO: HARDCODED — Same risk as other form configs. Move to Config sheet.
 var SATISFACTION_FORM_CONFIG = {
   // Google Form URLs
   FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeR4VxrGTEvK-PaQP2S8JXn6xwTwp-vkR9tI5c3PRvfhr75nA/viewform',
@@ -39999,7 +40090,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2049 lines)
+// SOURCE: 10_Main.gs (2052 lines)
 // ============================================================================
 
 /**
@@ -41574,7 +41665,7 @@ function addNewMember(memberData) {
     const newId = `MEM-${timestamp}`;
 
     // Prepare row data using MEMBER_COLS constants (1-indexed)
-    var rowData = new Array(MEMBER_COLS.QUICK_ACTIONS).fill('');
+    var rowData = new Array(MEMBER_COLS.STATE).fill('');
     rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
     rowData[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName || '';
     rowData[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName || '';
@@ -41585,6 +41676,9 @@ function addNewMember(memberData) {
     rowData[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
     rowData[MEMBER_COLS.IS_STEWARD - 1] = 'No';
     rowData[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = new Date();
+    rowData[MEMBER_COLS.EMPLOYEE_ID - 1] = memberData.employeeId || '';
+    rowData[MEMBER_COLS.DEPARTMENT - 1] = memberData.department || '';
+    rowData[MEMBER_COLS.HIRE_DATE - 1] = memberData.hireDate ? new Date(memberData.hireDate) : '';
 
     sheet.appendRow(rowData);
 
@@ -49152,7 +49246,7 @@ function refreshLookerAnonSatisfaction_() {
  */
 function generateAnonHash_(id) {
   // Use a simple hash that can't be reversed to original ID
-  const salt = 'anon509data';
+  const salt = 'anon509data'; // TODO: HARDCODED — Weak salt in source code. Move to Script Properties.
   const combined = salt + String(id);
   let hash = 0;
   for (let i = 0; i < combined.length; i++) {

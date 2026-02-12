@@ -595,6 +595,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.6.1', date: '2026-02-12', codename: 'PII & Compliance', changes: 'Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (seiu509.org only) and Lockdown future feature roadmap items.' },
   { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling' },
   { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
   { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
@@ -863,7 +864,7 @@ var MENU_ICONS = {
 };
 
 // ============================================================================
-// MEMBER DIRECTORY COLUMNS (32 columns total: A-AF)
+// MEMBER DIRECTORY COLUMNS (39 columns total: A-AM)
 // ============================================================================
 
 /**
@@ -925,10 +926,28 @@ var MEMBER_COLS = {
   // Section 10: Member Authentication (AG)
   PIN_HASH: 33,                    // AG - Hashed PIN for member self-service portal
 
+  // Section 11: Employment Details (AH-AJ) - Added for Add Member form parity
+  EMPLOYEE_ID: 34,                 // AH - Employee ID (e.g., XX000000)
+  DEPARTMENT: 35,                  // AI - Department / work unit category
+  HIRE_DATE: 36,                   // AJ - Hire date (date format)
+
+  // Section 12: Mailing Address / PII (AK-AM) - Hidden by default, PII
+  STREET_ADDRESS: 37,              // AK - Street address (PII)
+  CITY: 38,                        // AL - City (PII)
+  STATE: 39,                       // AM - State (PII)
+
   // ALIASES - For backward compatibility
   LOCATION: 5,                     // Alias for WORK_LOCATION
   DAYS_TO_DEADLINE: 30             // Alias for NEXT_DEADLINE
 };
+
+/**
+ * Member Directory columns considered PII (Personally Identifiable Information)
+ * These columns are hidden by default and MUST NOT appear in any modals or exports
+ * unless explicitly authorized. Includes mailing address fields.
+ * @const {Array<number>}
+ */
+var PII_MEMBER_COLS = [37, 38, 39]; // STREET_ADDRESS (AK), CITY (AL), STATE (AM)
 
 // ============================================================================
 // MEETING CHECK-IN LOG COLUMNS (16 columns: A-P)
@@ -969,7 +988,7 @@ var MEETING_STATUS = {
 };
 
 // ============================================================================
-// GRIEVANCE LOG COLUMNS (35 columns total: A-AI)
+// GRIEVANCE LOG COLUMNS (42 columns total: A-AP)
 // ============================================================================
 
 /**
@@ -1047,7 +1066,10 @@ var GRIEVANCE_COLS = {
   REMINDER_1_DATE: 38,    // AL - First reminder date
   REMINDER_1_NOTE: 39,    // AM - First reminder note (e.g., "Schedule Step II meeting")
   REMINDER_2_DATE: 40,    // AN - Second reminder date
-  REMINDER_2_NOTE: 41     // AO - Second reminder note
+  REMINDER_2_NOTE: 41,    // AO - Second reminder note
+
+  // Section 16: Record Tracking (AP)
+  LAST_UPDATED: 42        // AP - Last Updated timestamp (auto-set on edit)
 };
 
 // ============================================================================
@@ -1147,7 +1169,10 @@ var GRIEVANCE_COLUMNS = {
   REMINDER_1_DATE: 37,     // AL - First reminder date
   REMINDER_1_NOTE: 38,     // AM - First reminder note
   REMINDER_2_DATE: 39,     // AN - Second reminder date
-  REMINDER_2_NOTE: 40      // AO - Second reminder note
+  REMINDER_2_NOTE: 40,     // AO - Second reminder note
+
+  // Record Tracking (0-indexed)
+  RECORD_LAST_UPDATED: 41  // AP - Last Updated timestamp
 };
 
 /**
@@ -1163,7 +1188,7 @@ var MEMBER_COLUMNS = {
   FIRST_NAME: 1,           // B - First Name
   LAST_NAME: 2,            // C - Last Name
   JOB_TITLE: 3,            // D - Job Title
-  DEPARTMENT: 3,           // Alias for JOB_TITLE
+  JOB_DEPT: 3,             // Legacy alias for JOB_TITLE (DEPARTMENT now at index 34)
 
   // Location & Work (0-indexed)
   WORK_LOCATION: 4,        // E - Work Location
@@ -1213,7 +1238,17 @@ var MEMBER_COLUMNS = {
   QUICK_ACTIONS: 31,       // AF - Quick Actions
 
   // Member Authentication (0-indexed)
-  PIN_HASH: 32             // AG - PIN Hash
+  PIN_HASH: 32,            // AG - PIN Hash
+
+  // Employment Details (0-indexed)
+  EMPLOYEE_ID: 33,         // AH - Employee ID
+  DEPARTMENT: 34,          // AI - Department
+  HIRE_DATE: 35,           // AJ - Hire Date
+
+  // Mailing Address / PII (0-indexed) - Hidden by default
+  STREET_ADDRESS: 36,      // AK - Street Address (PII)
+  CITY: 37,                // AL - City (PII)
+  STATE: 38                // AM - State (PII)
 };
 
 // ============================================================================
@@ -1631,7 +1666,9 @@ function getMemberHeaders() {
     'Recent Contact Date', 'Contact Steward', 'Contact Notes',
     'Has Open Grievance?', 'Grievance Status', 'Days to Deadline', 'Start Grievance',
     '⚡ Actions',
-    'PIN Hash'
+    'PIN Hash',
+    'Employee ID', 'Department', 'Hire Date',
+    'Street Address', 'City', 'State'
   ];
 }
 
@@ -1655,7 +1692,8 @@ function getGrievanceHeaders() {
     'Drive Folder ID', 'Drive Folder URL',
     '⚡ Actions',
     'Action Type', 'Checklist Progress',
-    'Reminder 1 Date', 'Reminder 1 Note', 'Reminder 2 Date', 'Reminder 2 Note'
+    'Reminder 1 Date', 'Reminder 1 Note', 'Reminder 2 Date', 'Reminder 2 Note',
+    'Last Updated'
   ];
 }
 
