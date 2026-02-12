@@ -478,7 +478,7 @@ function authenticateMember(memberId, pin) {
 
     return {
       success: false,
-      error: 'Invalid Member ID or PIN. ' + attemptResult.attemptsRemaining + ' attempts remaining.'
+      error: 'Invalid Member ID or PIN. Please try again.'
     };
   }
 

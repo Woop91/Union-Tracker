@@ -30,8 +30,19 @@ jobs:
       - name: Build consolidated file
         run: npm run build
 
+      - name: Audit dependencies
+        run: npm audit --audit-level=high || true
+
       - name: Run unit tests
         run: npm run test:unit
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 14
 
       - name: Verify build output
         run: |
@@ -46,11 +57,17 @@ jobs:
         run: |
           SIZE=$(stat -f%z "dist/ConsolidatedDashboard.gs" 2>/dev/null || stat -c%s "dist/ConsolidatedDashboard.gs")
           LINES=$(wc -l < "dist/ConsolidatedDashboard.gs")
+          SIZE_KB=$(echo "scale=1; $SIZE/1024" | bc)
           echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **File**: dist/ConsolidatedDashboard.gs" >> $GITHUB_STEP_SUMMARY
-          echo "- **Size**: $(echo "scale=1; $SIZE/1024" | bc) KB" >> $GITHUB_STEP_SUMMARY
+          echo "- **Size**: ${SIZE_KB} KB ($SIZE bytes)" >> $GITHUB_STEP_SUMMARY
           echo "- **Lines**: $LINES" >> $GITHUB_STEP_SUMMARY
+          # Warn if build exceeds 3MB (Google Apps Script limit is ~6MB)
+          if [ "$SIZE" -gt 3145728 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **WARNING**: Build size exceeds 3MB. Google Apps Script limit is ~6MB." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

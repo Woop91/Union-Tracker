@@ -66,6 +66,26 @@ function withErrorHandling(fn, context) {
 }
 
 /**
+ * Creates a standardized success response object
+ * @param {*} [data] - Optional response data
+ * @param {string} [message] - Optional success message
+ * @returns {{success: true, data: *, message: string}}
+ */
+function successResponse(data, message) {
+  return { success: true, data: data || null, message: message || '' };
+}
+
+/**
+ * Creates a standardized error response object
+ * @param {string} error - Error message
+ * @param {string} [context] - Context where error occurred
+ * @returns {{success: false, error: string, context: string}}
+ */
+function errorResponse(error, context) {
+  return { success: false, error: error || 'An unexpected error occurred', context: context || '' };
+}
+
+/**
  * Central error handler
  * @param {Error} error - The error object
  * @param {string} context - Where the error occurred

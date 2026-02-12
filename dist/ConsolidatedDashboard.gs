@@ -1008,7 +1008,7 @@ var DataAccess = {
     var data = this.getAllData(sheetName, { includeHeaders: true });
 
     for (var i = 1; i < data.length; i++) {  // Skip header
-      if (data[i][columnIndex] == searchValue) {  // Loose equality for type coercion
+      if (String(data[i][columnIndex]) === String(searchValue)) {  // String comparison for consistent matching
         return {
           rowNumber: i + 1,  // 1-indexed
           data: data[i]
@@ -1414,7 +1414,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2694 lines)
+// SOURCE: 01_Core.gs (2714 lines)
 // ============================================================================
 
 /**
@@ -1482,6 +1482,26 @@ function withErrorHandling(fn, context) {
       return null;
     }
   };
+}
+
+/**
+ * Creates a standardized success response object
+ * @param {*} [data] - Optional response data
+ * @param {string} [message] - Optional success message
+ * @returns {{success: true, data: *, message: string}}
+ */
+function successResponse(data, message) {
+  return { success: true, data: data || null, message: message || '' };
+}
+
+/**
+ * Creates a standardized error response object
+ * @param {string} error - Error message
+ * @param {string} [context] - Context where error occurred
+ * @returns {{success: false, error: string, context: string}}
+ */
+function errorResponse(error, context) {
+  return { success: false, error: error || 'An unexpected error occurred', context: context || '' };
 }
 
 /**
@@ -4113,7 +4133,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2484 lines)
+// SOURCE: 02_DataManagers.gs (2486 lines)
 // ============================================================================
 
 /**
@@ -5645,7 +5665,10 @@ function advanceGrievanceStep(grievanceId, options) {
       return { success: false, error: 'Grievance not found' };
     }
 
-    const currentStep = data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP];
+    const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP]);
+    if (isNaN(currentStep) || currentStep < 1) {
+      return { success: false, error: 'Invalid current step value for this grievance' };
+    }
     const nextStep = currentStep + 1;
 
     if (nextStep > 4) {
@@ -5655,30 +5678,24 @@ function advanceGrievanceStep(grievanceId, options) {
     const today = new Date();
     const responseDue = calculateResponseDeadline(nextStep, today);
 
-    // Update current step status to completed/appealed
+    // Batch all updates into a single row write where possible
     const currentStepStatusCol = getStepStatusColumn(currentStep);
     sheet.getRange(rowIndex, currentStepStatusCol).setValue(options.currentStepOutcome || 'Appealed');
 
-    // Update next step columns
+    // Collect column updates to batch write
+    var updates = [];
+    updates.push({ col: GRIEVANCE_COLUMNS.CURRENT_STEP + 1, val: nextStep });
+    updates.push({ col: GRIEVANCE_COLUMNS.STATUS + 1, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
+    updates.push({ col: GRIEVANCE_COLUMNS.LAST_UPDATED + 1, val: today });
+
     if (nextStep <= 3) {
       const nextStepDateCol = getStepDateColumn(nextStep);
-      const nextStepDueCol = nextStepDateCol + 1;
-      const nextStepStatusCol = nextStepDateCol + 2;
-
-      sheet.getRange(rowIndex, nextStepDateCol).setValue(today);
-      sheet.getRange(rowIndex, nextStepDueCol).setValue(responseDue);
-      sheet.getRange(rowIndex, nextStepStatusCol).setValue('Pending');
+      updates.push({ col: nextStepDateCol, val: today });
+      updates.push({ col: nextStepDateCol + 1, val: responseDue });
+      updates.push({ col: nextStepDateCol + 2, val: 'Pending' });
     } else {
-      // Arbitration
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.ARBITRATION_DATE + 1).setValue(today);
+      updates.push({ col: GRIEVANCE_COLUMNS.ARBITRATION_DATE + 1, val: today });
     }
-
-    // Update current step and status
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.CURRENT_STEP + 1).setValue(nextStep);
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(
-      nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED
-    );
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(today);
 
     // Add notes if provided
     if (options.notes) {
@@ -5686,7 +5703,12 @@ function advanceGrievanceStep(grievanceId, options) {
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
       const newNotes = existingNotes + (existingNotes ? '\n' : '') +
                        `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${options.notes}`;
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(newNotes);
+      updates.push({ col: GRIEVANCE_COLUMNS.NOTES + 1, val: newNotes });
+    }
+
+    // Write all collected updates
+    for (var u = 0; u < updates.length; u++) {
+      sheet.getRange(rowIndex, updates[u].col).setValue(updates[u].val);
     }
 
     // Log the advancement
@@ -11105,7 +11127,7 @@ function getSmartDashboardHtml() {
 
 
 // ============================================================================
-// SOURCE: 04c_InteractiveDashboard.gs (1697 lines)
+// SOURCE: 04c_InteractiveDashboard.gs (1698 lines)
 // ============================================================================
 
 // ============================================================================
@@ -11276,6 +11298,7 @@ function getInteractiveDashboardHtml() {
     '.filter-select:focus{outline:none;border-color:#7C3AED}' +
 
     // Search input
+    '.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}' +
     '.search-container{position:relative;margin-bottom:12px}' +
     '.search-input{width:100%;padding:10px 10px 10px 36px;border:2px solid #e5e7eb;border-radius:8px;font-size:13px;transition:border-color 0.2s}' +
     '.search-input:focus{outline:none;border-color:#7C3AED}' +
@@ -11352,24 +11375,24 @@ function getInteractiveDashboardHtml() {
     '</div>' +
 
     // Tab Navigation (6 tabs now - including My Cases)
-    '<div class="tabs">' +
-    '<button class="tab active" onclick="switchTab(\'overview\',this)" id="tab-overview"><span class="tab-icon">📊</span>Overview</button>' +
-    '<button class="tab" onclick="switchTab(\'mycases\',this)" id="tab-mycases"><span class="tab-icon">👤</span>My Cases</button>' +
-    '<button class="tab" onclick="switchTab(\'members\',this)" id="tab-members"><span class="tab-icon">👥</span>Members</button>' +
-    '<button class="tab" onclick="switchTab(\'grievances\',this)" id="tab-grievances"><span class="tab-icon">📋</span>Grievances</button>' +
-    '<button class="tab" onclick="switchTab(\'analytics\',this)" id="tab-analytics"><span class="tab-icon">📈</span>Analytics</button>' +
-    '<button class="tab" onclick="switchTab(\'resources\',this)" id="tab-resources"><span class="tab-icon">🔗</span>Links</button>' +
+    '<div class="tabs" role="tablist" aria-label="Dashboard navigation">' +
+    '<button class="tab active" role="tab" aria-selected="true" aria-controls="content-overview" onclick="switchTab(\'overview\',this)" id="tab-overview"><span class="tab-icon">📊</span>Overview</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-mycases" onclick="switchTab(\'mycases\',this)" id="tab-mycases"><span class="tab-icon">👤</span>My Cases</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-members" onclick="switchTab(\'members\',this)" id="tab-members"><span class="tab-icon">👥</span>Members</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-grievances" onclick="switchTab(\'grievances\',this)" id="tab-grievances"><span class="tab-icon">📋</span>Grievances</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-analytics" onclick="switchTab(\'analytics\',this)" id="tab-analytics"><span class="tab-icon">📈</span>Analytics</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-resources" onclick="switchTab(\'resources\',this)" id="tab-resources"><span class="tab-icon">🔗</span>Links</button>' +
     '</div>' +
 
     // Overview Tab
-    '<div class="tab-content active" id="content-overview">' +
+    '<div class="tab-content active" id="content-overview" role="tabpanel" aria-labelledby="tab-overview">' +
     '<div class="stats-grid" id="overview-stats"><div class="loading"><div class="spinner"></div><p>Loading stats...</p></div></div>' +
     '<div id="overview-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px"></div>' +
     '<div id="overview-overdue" style="margin-top:15px"></div>' +
     '</div>' +
 
     // My Cases Tab - Shows steward's assigned grievances
-    '<div class="tab-content" id="content-mycases">' +
+    '<div class="tab-content" id="content-mycases" role="tabpanel" aria-labelledby="tab-mycases">' +
     '<div class="section-card" style="background:linear-gradient(135deg,#f0f4ff,#e8f0fe);border-left:4px solid #7C3AED;margin-bottom:15px">' +
     '<div style="display:flex;align-items:center;gap:10px"><span style="font-size:24px">👤</span><div><strong>My Assigned Cases</strong><div style="font-size:12px;color:#666">Grievances where you are the assigned steward</div></div></div>' +
     '</div>' +
@@ -11384,8 +11407,8 @@ function getInteractiveDashboardHtml() {
     '</div>' +
 
     // Members Tab
-    '<div class="tab-content" id="content-members">' +
-    '<div class="search-container"><span class="search-icon">🔍</span><input type="text" class="search-input" id="member-search" placeholder="Search by name, ID, title, location..." oninput="filterMembers()"></div>' +
+    '<div class="tab-content" id="content-members" role="tabpanel" aria-labelledby="tab-members">' +
+    '<div class="search-container"><span class="search-icon" aria-hidden="true">🔍</span><label for="member-search" class="sr-only">Search members</label><input type="text" class="search-input" id="member-search" placeholder="Search by name, ID, title, location..." oninput="filterMembers()" aria-label="Search members by name, ID, title, or location"></div>' +
     '<div class="filter-bar" id="member-filters"></div>' +
     '<div style="margin-bottom:12px"><button class="action-btn action-btn-primary" onclick="showAddMemberForm()">➕ Add New Member</button></div>' +
     '<div class="list-container" id="members-list"><div class="loading"><div class="spinner"></div><p>Loading members...</p></div></div>' +
@@ -11413,8 +11436,8 @@ function getInteractiveDashboardHtml() {
     '</div>' +
 
     // Grievances Tab
-    '<div class="tab-content" id="content-grievances">' +
-    '<div class="search-container"><span class="search-icon">🔍</span><input type="text" class="search-input" id="grievance-search" placeholder="Search by ID, member name, issue..." oninput="filterGrievances()"></div>' +
+    '<div class="tab-content" id="content-grievances" role="tabpanel" aria-labelledby="tab-grievances">' +
+    '<div class="search-container"><span class="search-icon" aria-hidden="true">🔍</span><label for="grievance-search" class="sr-only">Search grievances</label><input type="text" class="search-input" id="grievance-search" placeholder="Search by ID, member name, issue..." oninput="filterGrievances()" aria-label="Search grievances by ID, member name, or issue"></div>' +
     '<div class="filter-bar" id="grievance-filter-bar">' +
     '<button class="action-btn action-btn-primary active" data-filter="all" onclick="filterGrievanceStatus(\'all\',this)">All</button>' +
     '<button class="action-btn action-btn-secondary" data-filter="Open" onclick="filterGrievanceStatus(\'Open\',this)">Open</button>' +
@@ -11426,12 +11449,12 @@ function getInteractiveDashboardHtml() {
     '</div>' +
 
     // Analytics Tab
-    '<div class="tab-content" id="content-analytics">' +
+    '<div class="tab-content" id="content-analytics" role="tabpanel" aria-labelledby="tab-analytics">' +
     '<div id="analytics-charts"><div class="loading"><div class="spinner"></div><p>Loading analytics...</p></div></div>' +
     '</div>' +
 
     // Resources Tab
-    '<div class="tab-content" id="content-resources">' +
+    '<div class="tab-content" id="content-resources" role="tabpanel" aria-labelledby="tab-resources">' +
     '<div id="resources-content"><div class="loading"><div class="spinner"></div><p>Loading links...</p></div></div>' +
     '</div>' +
 
@@ -27139,7 +27162,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1536 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (1548 lines)
 // ============================================================================
 
 
@@ -27562,7 +27585,11 @@ function setupContactFormTrigger() {
     // Extract form ID from URL
     var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match) {
-      ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+      ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
       return;
     }
     var formId = match[1];
@@ -27645,7 +27672,11 @@ function setupGrievanceFormTrigger() {
       // Extract form ID from URL
       var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
       if (!match) {
-        ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+        ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
         return;
       }
       formId = match[1];
@@ -27982,7 +28013,11 @@ function setupSatisfactionFormTrigger() {
     // Extract form ID from URL
     var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match) {
-      ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+      ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
       return;
     }
     var formId = match[1];
@@ -50402,7 +50437,7 @@ function authenticateMember(memberId, pin) {
 
     return {
       success: false,
-      error: 'Invalid Member ID or PIN. ' + attemptResult.attemptsRemaining + ' attempts remaining.'
+      error: 'Invalid Member ID or PIN. Please try again.'
     };
   }
 

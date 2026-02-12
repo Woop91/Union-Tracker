@@ -1527,7 +1527,10 @@ function advanceGrievanceStep(grievanceId, options) {
       return { success: false, error: 'Grievance not found' };
     }
 
-    const currentStep = data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP];
+    const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP]);
+    if (isNaN(currentStep) || currentStep < 1) {
+      return { success: false, error: 'Invalid current step value for this grievance' };
+    }
     const nextStep = currentStep + 1;
 
     if (nextStep > 4) {
@@ -1537,30 +1540,24 @@ function advanceGrievanceStep(grievanceId, options) {
     const today = new Date();
     const responseDue = calculateResponseDeadline(nextStep, today);
 
-    // Update current step status to completed/appealed
+    // Batch all updates into a single row write where possible
     const currentStepStatusCol = getStepStatusColumn(currentStep);
     sheet.getRange(rowIndex, currentStepStatusCol).setValue(options.currentStepOutcome || 'Appealed');
 
-    // Update next step columns
+    // Collect column updates to batch write
+    var updates = [];
+    updates.push({ col: GRIEVANCE_COLUMNS.CURRENT_STEP + 1, val: nextStep });
+    updates.push({ col: GRIEVANCE_COLUMNS.STATUS + 1, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
+    updates.push({ col: GRIEVANCE_COLUMNS.LAST_UPDATED + 1, val: today });
+
     if (nextStep <= 3) {
       const nextStepDateCol = getStepDateColumn(nextStep);
-      const nextStepDueCol = nextStepDateCol + 1;
-      const nextStepStatusCol = nextStepDateCol + 2;
-
-      sheet.getRange(rowIndex, nextStepDateCol).setValue(today);
-      sheet.getRange(rowIndex, nextStepDueCol).setValue(responseDue);
-      sheet.getRange(rowIndex, nextStepStatusCol).setValue('Pending');
+      updates.push({ col: nextStepDateCol, val: today });
+      updates.push({ col: nextStepDateCol + 1, val: responseDue });
+      updates.push({ col: nextStepDateCol + 2, val: 'Pending' });
     } else {
-      // Arbitration
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.ARBITRATION_DATE + 1).setValue(today);
+      updates.push({ col: GRIEVANCE_COLUMNS.ARBITRATION_DATE + 1, val: today });
     }
-
-    // Update current step and status
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.CURRENT_STEP + 1).setValue(nextStep);
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(
-      nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED
-    );
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(today);
 
     // Add notes if provided
     if (options.notes) {
@@ -1568,7 +1565,12 @@ function advanceGrievanceStep(grievanceId, options) {
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
       const newNotes = existingNotes + (existingNotes ? '\n' : '') +
                        `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${options.notes}`;
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(newNotes);
+      updates.push({ col: GRIEVANCE_COLUMNS.NOTES + 1, val: newNotes });
+    }
+
+    // Write all collected updates
+    for (var u = 0; u < updates.length; u++) {
+      sheet.getRange(rowIndex, updates[u].col).setValue(updates[u].val);
     }
 
     // Log the advancement

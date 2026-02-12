@@ -210,7 +210,7 @@ var DataAccess = {
     var data = this.getAllData(sheetName, { includeHeaders: true });
 
     for (var i = 1; i < data.length; i++) {  // Skip header
-      if (data[i][columnIndex] == searchValue) {  // Loose equality for type coercion
+      if (String(data[i][columnIndex]) === String(searchValue)) {  // String comparison for consistent matching
         return {
           rowNumber: i + 1,  // 1-indexed
           data: data[i]

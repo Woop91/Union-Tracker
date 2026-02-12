@@ -88,6 +88,8 @@ module.exports = [
         // Error handling (01_Core.gs)
         handleError: 'readonly',
         withErrorHandling: 'readonly',
+        successResponse: 'readonly',
+        errorResponse: 'readonly',
         PerformanceTimer: 'readonly',
         sanitizeHtml: 'readonly',
         sanitizeForQuery: 'readonly',
@@ -117,9 +119,10 @@ module.exports = [
       'valid-typeof': 'warn',
 
       // Security-related
-      'no-eval': 'warn',
-      'no-implied-eval': 'warn',
-      'no-new-func': 'warn',
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+      'no-with': 'error',
 
       // ==========================================
       // DISABLED RULES (For legacy compatibility)
@@ -131,8 +134,7 @@ module.exports = [
       'no-unused-vars': 'off',
       'no-redeclare': 'off',
       'no-empty': 'off',
-      'eqeqeq': 'off',
-      'no-with': 'off',
+      'eqeqeq': 'warn',
       'semi': 'off',
       'quotes': 'off',
       'indent': 'off',

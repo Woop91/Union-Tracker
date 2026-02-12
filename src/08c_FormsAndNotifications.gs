@@ -418,7 +418,11 @@ function setupContactFormTrigger() {
     // Extract form ID from URL
     var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match) {
-      ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+      ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
       return;
     }
     var formId = match[1];
@@ -501,7 +505,11 @@ function setupGrievanceFormTrigger() {
       // Extract form ID from URL
       var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
       if (!match) {
-        ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+        ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
         return;
       }
       formId = match[1];
@@ -838,7 +846,11 @@ function setupSatisfactionFormTrigger() {
     // Extract form ID from URL
     var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match) {
-      ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+      ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
       return;
     }
     var formId = match[1];
