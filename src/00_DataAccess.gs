@@ -537,6 +537,8 @@ var TIME_CONSTANTS = {
   /** Milliseconds per week */
   MS_PER_WEEK: 7 * 24 * 60 * 60 * 1000,
 
+  // TODO: HARDCODED — These values are duplicated in 01_Core.gs DEADLINE_RULES.
+  // Both must stay in sync. Consider consolidating to a single source of truth.
   /** Deadline days configuration */
   DEADLINE_DAYS: {
     /** Days to file grievance after incident */

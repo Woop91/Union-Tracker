@@ -3540,7 +3540,7 @@ function refreshLookerAnonSatisfaction_() {
  */
 function generateAnonHash_(id) {
   // Use a simple hash that can't be reversed to original ID
-  const salt = 'anon509data';
+  const salt = 'anon509data'; // TODO: HARDCODED — Weak salt in source code. Move to Script Properties.
   const combined = salt + String(id);
   let hash = 0;
   for (let i = 0; i < combined.length; i++) {
