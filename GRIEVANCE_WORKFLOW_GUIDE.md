@@ -29,7 +29,7 @@ The Grievance Workflow feature allows stewards to start grievances directly from
    - **Row 3**: Steward Email
    - **Row 4**: Steward Phone
 
-Alternatively, use the menu: **509 Tools > ⚖️ Grievance Tools > ⚙️ Setup Steward Contact Info**
+Alternatively, use the menu: **Strategic Ops > Steward Management > Steward Contact Forms**
 
 ### Step 2: Create a Google Form (Optional but Recommended)
 
@@ -70,7 +70,7 @@ To enable the full workflow with automatic form submissions:
 
 5. **Update the Configuration in Code:**
    - Open the Google Sheets Apps Script editor
-   - Find the file **08_Code.gs**
+   - Find the file **08c_FormsAndNotifications.gs** (or search for `GRIEVANCE_FORM_CONFIG`)
    - Update the `GRIEVANCE_FORM_CONFIG` object:
 
 ```javascript
@@ -127,7 +127,7 @@ When forms are submitted:
 ### Starting a New Grievance
 
 1. **Open the Menu:**
-   - Go to **509 Tools > ⚖️ Grievance Tools > 🚀 Start New Grievance**
+   - Go to **Strategic Ops > Cases > New Case/Grievance**
 
 2. **Select a Member:**
    - A dialog will appear with a searchable list of members
@@ -185,7 +185,7 @@ When a grievance is submitted through the form:
 
 **Problem**: Form fields are empty when opened
 **Solution**:
-- Check that field entry IDs are correct in `Code.gs`
+- Check that field entry IDs are correct in `08c_FormsAndNotifications.gs`
 - Verify steward contact info is entered in Config tab
 - Ensure member has complete information in Member Directory
 
@@ -219,12 +219,13 @@ When a grievance is submitted through the form:
 
 ### Menu Locations
 
-All grievance workflow features are in:
-**509 Tools > ⚖️ Grievance Tools**
+Grievance workflow features are spread across these menus:
 
-- **🚀 Start New Grievance**: Open member selection dialog
-- **⚙️ Setup Steward Contact Info**: Configure steward details
-- **📖 Help & Support**: Access documentation and tutorials
+- **Strategic Ops > Cases > New Case/Grievance**: Open the grievance form
+- **Strategic Ops > Cases > Edit Selected**: Modify an existing grievance
+- **Strategic Ops > Cases > Advance Step**: Move to the next step
+- **Union Hub > Grievances > View Active**: Filter to open/pending grievances
+- **Union Hub > Grievances > Bulk Update**: Update multiple grievances at once
 
 ### Related Documentation
 
@@ -239,7 +240,7 @@ All grievance workflow features are in:
 
 1. **Keep Contact Info Updated**: Regularly check that steward contact info in Config is current
 2. **Review Submissions**: Check the Grievance Log after form submissions to verify accuracy
-3. **Use Dashboard & My Cases**: Open Dashboard via menu and check the My Cases tab to monitor your assigned grievances
+3. **Use Dashboard & My Cases**: Open **Strategic Ops > Command Center > Steward Dashboard** and check the My Cases tab to monitor your assigned grievances
 4. **Email Multiple Recipients**: You can send PDFs to multiple people at once (comma-separated emails)
 5. **Train Members**: Show members how to access the grievance form if they need to file directly
 
@@ -279,5 +280,5 @@ For technical support with Google Apps Script, consult the [Google Apps Script D
 
 ---
 
-**Last Updated**: 2026-01-16
-**Version**: 4.0.3
+**Last Updated**: 2026-02-12
+**Version**: 4.6.0

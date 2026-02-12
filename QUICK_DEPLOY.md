@@ -1,148 +1,170 @@
-# Quick Deploy - Union Steward Dashboard
+# Quick Deploy - 509 Union Steward Dashboard
 
-## 16-File Modular Deployment
+**Version:** 4.6.0 | **Architecture:** 27-File Modular
 
-Deploy the **Union Steward Dashboard** using the **16 source files** in the `src/` folder.
+Deploy the 509 Union Steward Dashboard to a Google Sheet using the source files in `src/`.
 
 ---
 
 ## What You Get
 
-- 16 modular source files for easy maintenance
-- 11 visible sheets + 6 hidden calculation sheets
-- Demo data seeding (members + grievances)
-- 12-section Dashboard with real-time metrics
+- 27 modular source files (26 in production, after removing DevTools)
+- Visible sheets: Config, Member Directory, Grievance Log, Dashboard, Member Satisfaction, Getting Started, FAQ, Config Guide
+- 8 hidden calculation sheets with self-healing formulas
+- Demo data seeding (1,000 members + 300 grievances)
+- 4 menu systems with 100+ functions
+- Steward Dashboard, Member Dashboard, and Executive Dashboard
+- Meeting management with auto-generated Google Docs
+- Mobile-optimized quick actions and web app portal
 - Comfort View accessibility features
-- Strategic Command Center with dual dashboards
-- Mobile-optimized quick actions and web app
 
 ---
 
-## 5-Minute Setup
+## Setup
 
-### **Step 1: Get the Files**
+### Step 1: Get the Files
 
 ```bash
 git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
 cd MULTIPLE-SCRIPS-REPO/src
 ```
 
-### **Step 2: Create a New Google Sheet**
+### Step 2: Create a New Google Sheet
 
 1. Go to [sheets.google.com](https://sheets.google.com)
 2. Click **"+ Blank"** to create a new spreadsheet
 3. Name it **"Union Steward Dashboard"**
 
-### **Step 3: Open Apps Script Editor**
+### Step 3: Open Apps Script Editor
 
-1. In your Google Sheet, click **Extensions → Apps Script**
+1. In your Google Sheet, click **Extensions > Apps Script**
 2. Rename the project to **"Union Dashboard Scripts"**
 
-### **Step 4: Create and Paste Each Source File**
+### Step 4: Create and Paste Each Source File
 
-For each file in the `src/` folder, create a new script file in Apps Script:
+For each `.gs` file in the `src/` folder, create a new script file in Apps Script:
 
 1. Click **+** next to "Files" to add a new script file
-2. Name it exactly as shown (without .gs extension)
+2. Name it exactly as shown (without the `.gs` extension)
 3. Paste the contents from the corresponding source file
+4. Repeat for all 27 files plus the HTML file
+
+**Files to copy (in order):**
 
 | Create File | Paste From |
 |-------------|------------|
-| `01_Constants` | `src/01_Constants.gs` |
-| `02_MemberManager` | `src/02_MemberManager.gs` |
-| `03_GrievanceManager` | `src/03_GrievanceManager.gs` |
-| `04_UIService` | `src/04_UIService.gs` |
+| `00_Security` | `src/00_Security.gs` |
+| `00_DataAccess` | `src/00_DataAccess.gs` |
+| `01_Core` | `src/01_Core.gs` |
+| `02_DataManagers` | `src/02_DataManagers.gs` |
+| `03_UIComponents` | `src/03_UIComponents.gs` |
+| `04a_UIMenus` | `src/04a_UIMenus.gs` |
+| `04b_AccessibilityFeatures` | `src/04b_AccessibilityFeatures.gs` |
+| `04c_InteractiveDashboard` | `src/04c_InteractiveDashboard.gs` |
+| `04d_ExecutiveDashboard` | `src/04d_ExecutiveDashboard.gs` |
+| `04e_PublicDashboard` | `src/04e_PublicDashboard.gs` |
 | `05_Integrations` | `src/05_Integrations.gs` |
 | `06_Maintenance` | `src/06_Maintenance.gs` |
 | `07_DevTools` | `src/07_DevTools.gs` |
-| `08_Code` | `src/08_Code.gs` |
-| `09_Main` | `src/09_Main.gs` |
-| `10_CommandCenter` | `src/10_CommandCenter.gs` |
-| `11_SecureMemberDashboard` | `src/11_SecureMemberDashboard.gs` |
+| `08a_SheetSetup` | `src/08a_SheetSetup.gs` |
+| `08b_SearchAndCharts` | `src/08b_SearchAndCharts.gs` |
+| `08c_FormsAndNotifications` | `src/08c_FormsAndNotifications.gs` |
+| `08d_AuditAndFormulas` | `src/08d_AuditAndFormulas.gs` |
+| `09_Dashboards` | `src/09_Dashboards.gs` |
+| `10a_SheetCreation` | `src/10a_SheetCreation.gs` |
+| `10b_SurveyDocSheets` | `src/10b_SurveyDocSheets.gs` |
+| `10c_FormHandlers` | `src/10c_FormHandlers.gs` |
+| `10d_SyncAndMaintenance` | `src/10d_SyncAndMaintenance.gs` |
+| `10_Main` | `src/10_Main.gs` |
+| `11_CommandHub` | `src/11_CommandHub.gs` |
+| `12_Features` | `src/12_Features.gs` |
+| `13_MemberSelfService` | `src/13_MemberSelfService.gs` |
+| `14_MeetingCheckIn` | `src/14_MeetingCheckIn.gs` |
+| `MultiSelectDialog` | `src/MultiSelectDialog.html` (create as HTML file) |
 
-5. **Save** the project (Ctrl+S)
+**Save** the project (Ctrl+S).
 
-### **Step 5: Authorize the Script**
+### Step 5: Authorize the Script
 
 1. Select **`CREATE_509_DASHBOARD`** from the function dropdown
 2. Click the **Run** button
-3. Click **"Review permissions"** → Choose your account
-4. Click **"Advanced"** → **"Go to Union Dashboard Scripts (unsafe)"**
+3. Click **"Review permissions"** > Choose your account
+4. Click **"Advanced"** > **"Go to Union Dashboard Scripts (unsafe)"**
 5. Click **"Allow"**
-6. The script creates all sheets (~10-15 seconds)
+6. The script creates all sheets automatically
 
-### **Step 6: Refresh the Page**
+### Step 6: Refresh the Page
 
 1. Close the Apps Script editor tab
 2. Go back to your Google Sheet
 3. **Refresh the page** (F5)
-4. You should see **2 custom menus** appear:
-   - **Dashboard** - Main menu with submenus for Search, Grievances, Members, Calendar, View, and Admin
-   - **509 Command** - Strategic Command Center with analytics and automation
+4. You should see **4 custom menus** appear:
+   - **Union Hub** -- Main menu for search, grievances, members, calendar, view settings
+   - **Admin** -- System administration, data sync, cache, setup
+   - **Strategic Ops** -- Command center, analytics, steward management
+   - **Field Portal** -- Mobile access, field analytics, web app
 
-### **Step 7: Seed Test Data (Optional)**
+### Step 7: Seed Test Data (Optional)
 
-1. Click **Dashboard → Admin → Demo Data → Seed All Sample Data**
-2. Wait for seeding to complete (~30 seconds)
+1. Click **Admin > Demo Data > Seed All Sample Data**
+2. Wait for seeding to complete
+3. This creates 1,000 test members, 300 grievances, and 50 survey responses
 
 ---
 
 ## You're Done!
 
-Your dashboard is fully operational with:
+Your dashboard is fully operational.
 
-### Visible Sheets
-- **Config** - Dropdown values and settings
-- **Member Directory** - 32 columns for member records
-- **Grievance Log** - 35 columns for grievance tracking
-- **Dashboard** - 12 analytics sections
-- **Interactive Dashboard** - Real-time metrics with My Cases tab
-- **Member Satisfaction** - Survey response tracking
-- **Feedback** - Bug/feature tracking
-- **Function Checklist** - Function reference
-- **Getting Started** - Setup instructions
-- **FAQ** - Common questions
-- **Config Guide** - Configuration help
+### Visible Sheets Created
 
-### Hidden Sheets (Auto-managed)
-- 6 calculation sheets with self-healing formulas
+- **Config** -- Dropdown values and organization settings
+- **Member Directory** -- Union member records (34 columns)
+- **Grievance Log** -- Grievance tracking (34+ columns)
+- **Dashboard** -- Summary statistics and metrics
+- **Member Satisfaction** -- Survey response tracking
+- **Getting Started** -- Setup instructions
+- **FAQ** -- Common questions and answers
+- **Config Guide** -- Configuration help
+
+### Hidden Sheets (Auto-Managed)
+
+8 calculation sheets with self-healing formulas power the auto-updating columns.
 
 ---
 
-## Source Files Overview
+## Alternative: Deploy with clasp
 
-| File | Purpose |
-|------|---------|
-| `01_Constants.gs` | Configuration constants, column mappings, themes |
-| `02_MemberManager.gs` | Member operations and directory management |
-| `03_GrievanceManager.gs` | Grievance lifecycle and deadline tracking |
-| `04_UIService.gs` | UI, Comfort View, mobile, Strategic Command Center |
-| `05_Integrations.gs` | Drive, Calendar, WebApp integration |
-| `06_Maintenance.gs` | Diagnostics, caching, performance |
-| `07_DevTools.gs` | Test data generation (DELETE BEFORE PROD) |
-| `08_Code.gs` | Core setup, hidden sheets, dashboard creation |
-| `09_Main.gs` | Entry point and triggers |
-| `10_CommandCenter.gs` | Strategic Command Center features |
-| `11_SecureMemberDashboard.gs` | Material Design member portal with analytics |
+If you prefer automated deployment:
+
+```bash
+cd MULTIPLE-SCRIPS-REPO
+npm install
+clasp login
+clasp create --type sheets --title "Union Dashboard"
+clasp push
+```
+
+Then open the sheet, run `CREATE_509_DASHBOARD`, and refresh.
 
 ---
 
 ## Troubleshooting
 
-### **Menus don't appear?**
+### Menus don't appear?
 - Refresh the page (F5)
-- Run `onOpen()` manually from Apps Script editor
+- Run `onOpen()` manually from the Apps Script editor
 
-### **Authorization error?**
+### Authorization error?
 - Complete Step 5 fully
 - Close and reopen the Google Sheet
 
-### **Dashboard shows errors?**
-- Click **Dashboard → Admin → Repair Dashboard**
-- Click **Dashboard → Admin → Diagnose Setup** to check system health
+### Dashboard shows errors?
+- Run **Admin > System Diagnostics** to check system health
+- Run **Admin > Repair Dashboard** to fix common issues
 
-### **Hidden sheets missing?**
-- Click **Dashboard → Admin → Setup All Hidden Sheets**
+### Hidden sheets missing?
+- Run **Admin > Setup > Setup All Hidden Sheets**
 
 ---
 
@@ -151,21 +173,20 @@ Your dashboard is fully operational with:
 To update to a new version:
 
 1. Pull the latest code: `git pull`
-2. In Apps Script editor, update only the changed files
+2. In the Apps Script editor, update only the changed files
 3. Save and refresh your Google Sheet
-
-**Tip:** Only `01_Constants.gs` and `08_Code.gs` typically need updates for bug fixes.
 
 ---
 
 ## Before Production
 
-**Remove Demo Tools:**
-1. Run **Dashboard → Admin → Demo Data → NUKE SEEDED DATA**
+1. Run **Admin > Demo Data > NUKE SEEDED DATA** to remove all test data
 2. Delete `07_DevTools` from your Apps Script project
+3. Configure the Config sheet with your organization's real data
+
+See [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) for the full production transition process.
 
 ---
 
-**Version:** 4.0.3 (Unified Master Engine)
-**Architecture:** 11-File Modular
-**Last Updated:** 2026-01-16
+**Version:** 4.6.0 (27-File Modular Architecture)
+**Last Updated:** 2026-02-12

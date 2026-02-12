@@ -37,18 +37,21 @@ The 509 Dashboard is a Google Apps Script (GAS) application for managing union s
 
 ```
 MULTIPLE-SCRIPS-REPO/
-├── src/                    # Source files (.gs)
+├── src/                    # 27 source files (.gs) + 1 HTML
+├── test/                   # Jest unit tests (950+ tests)
 ├── dist/                   # Build output (auto-generated)
+├── setup-instructions/     # Optional feature setup guides
 ├── .github/workflows/      # CI/CD configuration
 ├── build.js               # Build script
+├── jest.config.js         # Test configuration
+├── eslint.config.js       # Linting configuration (v9 flat config)
 ├── package.json           # Dependencies and scripts
-├── .eslintrc.js           # Linting configuration
 └── DEVELOPER_GUIDE.md     # This file
 ```
 
 ### Modular Design (v4.6.0)
 
-The codebase follows a layered architecture with 27 modules:
+The codebase follows a layered architecture with 27 modules organized by numbered prefix:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -60,7 +63,7 @@ The codebase follows a layered architecture with 27 modules:
         ▼                     ▼                      ▼
 ┌───────────────┐   ┌────────────────┐   ┌────────────────────┐
 │  UI Layer     │   │  Data Layer    │   │  Services/Features  │
-│  03/04        │   │  02/08/10_Code │   │  05/06/09/11/12/13  │
+│  03/04a-e     │   │  02/08a-d/10*  │   │  05/06/09/11-14    │
 └───────────────┘   └────────────────┘   └────────────────────┘
         │                     │                      │
         └─────────────────────┼──────────────────────┘
@@ -83,48 +86,6 @@ The codebase follows a layered architecture with 27 modules:
                     └───────────────┘
 ```
 
-### Detailed Module Dependency Graph
-
-```
-                    ┌─────────────────────────────────────────┐
-                    │            USER INTERACTION              │
-                    │         (Spreadsheet / Menu)             │
-                    └────────────────────┬────────────────────┘
-                                         │
-                    ┌────────────────────▼────────────────────┐
-                    │              10_Main.gs                  │
-                    │         onOpen(), onEdit()               │
-                    └────────────────────┬────────────────────┘
-                                         │
-         ┌───────────────────────────────┼───────────────────────────────┐
-         │                               │                               │
-         ▼                               ▼                               ▼
-┌─────────────────┐           ┌─────────────────┐           ┌─────────────────┐
-│   UI LAYER      │           │   DATA LAYER    │           │  FEATURE LAYER  │
-├─────────────────┤           ├─────────────────┤           ├─────────────────┤
-│ 03_UIComponents │           │ 02_DataManagers │           │ 11_CommandHub   │
-│ 04_UIService    │           │ 08_SheetUtils   │           │ 12_Features     │
-│                 │           │ 10_Code         │           │ 13_MemberSelf.. │
-└────────┬────────┘           └────────┬────────┘           └────────┬────────┘
-         │                             │                             │
-         │     ┌───────────────────────┼───────────────────────┐     │
-         │     │                       │                       │     │
-         │     ▼                       ▼                       ▼     │
-         │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-         │  │ MAINTENANCE     │  │ INTEGRATION     │  │  DEV TOOLS      │
-         │  ├─────────────────┤  ├─────────────────┤  ├─────────────────┤
-         │  │ 06_Maintenance  │  │ 05_Integrations │  │ 07_DevTools     │
-         │  │                 │  │ 09_Dashboards   │  │                 │
-         │  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘
-         │           │                    │                    │
-         └───────────┴────────────────────┴────────────────────┘
-                                         │
-                    ┌────────────────────▼────────────────────┐
-                    │             01_Core.gs                   │
-                    │   SHEETS, COLORS, COLS, CONFIG           │
-                    └──────────────────────────────────────────┘
-```
-
 ---
 
 ## Module Structure
@@ -133,8 +94,8 @@ The codebase follows a layered architecture with 27 modules:
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `00_Security.gs` | Security utilities | `escapeHtml`, `checkWebAppAuthorization`, `maskEmail`, `validateWebAppRequest` |
-| `00_DataAccess.gs` | Data Access Layer | `DataAccess.getSheet`, `DataAccess.getMemberById`, `TIME_CONSTANTS` |
+| `00_Security.gs` | Security utilities, XSS prevention, access control | `escapeHtml`, `checkWebAppAuthorization`, `maskEmail`, `validateWebAppRequest` |
+| `00_DataAccess.gs` | Data Access Layer, time constants, cached sheet access | `DataAccess.getSheet`, `DataAccess.getMemberById`, `TIME_CONSTANTS` |
 | `01_Core.gs` | Error handling + Constants | `handleError`, `SHEETS`, `MEMBER_COLS`, `GRIEVANCE_COLS` |
 
 ### Data Modules
@@ -142,38 +103,60 @@ The codebase follows a layered architecture with 27 modules:
 | File | Purpose | Key Functions |
 |------|---------|---------------|
 | `02_DataManagers.gs` | Member + Grievance CRUD | `addMember`, `updateMember`, `createGrievance` |
-| `08_SheetUtils.gs` | Sheet creation, validation | `getOrCreateSheet`, `setupDataValidation`, `onEditMultiSelect` |
+| `08a_SheetSetup.gs` | Main setup, utility functions, data validation, multi-select | `getOrCreateSheet`, `setupDataValidation`, `onEditMultiSelect` |
+| `08b_SearchAndCharts.gs` | Search functions, chart generation | `desktopSearch`, `buildChart` |
+| `08c_FormsAndNotifications.gs` | Form handling, notifications, deadline alerts | `sendDeadlineAlerts`, `processFormSubmission` |
+| `08d_AuditAndFormulas.gs` | Audit log, formula sync, hidden calc sheets | `logAuditEntry`, `setupCalcFormulasSheet` |
 
 ### UI Modules
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `03_UIComponents.gs` | Menu, Theme, Mobile | `createDashboardMenu`, `applyTheme`, `showQuickActions` |
-| `04_UIService.gs` | Dialogs and panels | `showMemberDialog`, `showGrievanceForm`, `getUnifiedDashboardHtml` |
+| `03_UIComponents.gs` | Menu, Theme, Mobile, QuickActions, Search | `createDashboardMenu`, `applyTheme`, `showQuickActions` |
+| `04a_UIMenus.gs` | Menu creation, visual control panel, navigation, dialogs | `buildMenuStructure`, `showNavigationSidebar` |
+| `04b_AccessibilityFeatures.gs` | Comfort view, focus mode, import/export | `setupComfortView`, `showComfortViewPanel` |
+| `04c_InteractiveDashboard.gs` | Interactive dashboard, mobile views, data retrieval | `showInteractiveDashboard`, `getMobileViewData` |
+| `04d_ExecutiveDashboard.gs` | Executive dashboard, steward dashboard, alerts | `showExecutiveDashboard`, `showStewardAlerts` |
+| `04e_PublicDashboard.gs` | Public member dashboard, unified data endpoints | `getUnifiedDashboardData`, `buildMemberDashboard` |
 
 ### Service Modules
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `05_Integrations.gs` | Drive, Calendar, WebApp | `doGet`, `syncToCalendar`, `setupDriveFolder` |
+| `05_Integrations.gs` | Drive, Calendar, WebApp integration | `doGet`, `syncToCalendar`, `setupDriveFolder`, `createMeetingDocs` |
 | `06_Maintenance.gs` | Diagnostics, Cache, Undo | `DIAGNOSE_SETUP`, `getCachedData`, `undoLastAction` |
-| `09_Dashboards.gs` | Satisfaction, Sync, Public | `getSatisfactionData`, `onEditAutoSync`, `buildPublicPortal` |
+| `09_Dashboards.gs` | Satisfaction, Sync, Public dashboards | `getSatisfactionData`, `onEditAutoSync`, `buildPublicPortal` |
+
+### Business Logic & Entry Point
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `10_Main.gs` | Entry point + Triggers | `onOpen`, `onEdit` (consolidated dispatcher), `dailyTrigger` |
+| `10a_SheetCreation.gs` | Config, Member Directory, Grievance Log sheet creation | `createConfigSheet`, `createMemberDirectorySheet` |
+| `10b_SurveyDocSheets.gs` | Satisfaction, Feedback, FAQ, Getting Started sheets | `createSatisfactionSheet`, `createFAQSheet` |
+| `10c_FormHandlers.gs` | Menu handlers, form submissions, flagged reviews | `onGrievanceFormSubmit`, `handleFlaggedReview` |
+| `10d_SyncAndMaintenance.gs` | Formatting, testing, Drive, Calendar, Email, sync | `syncAllData`, `applyGlobalFormatting` |
 
 ### Feature Modules
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `10_Code.gs` | Core business logic | `calculateDeadlines`, `processGrievanceStep` |
-| `10_Main.gs` | Entry point + Triggers | `onOpen`, `onEdit` (consolidated dispatcher) |
 | `11_CommandHub.gs` | Command center + Secure dashboard | `showCommandCenter`, `buildSecureDashboard` |
-| `12_Features.gs` | Checklist, Dynamic, Looker | `handleChecklistEdit`, `buildSafeQuery` |
-| `13_MemberSelfService.gs` | Member self-service portal | PIN authentication, member-facing portal |
+| `12_Features.gs` | Dynamic Engine, Looker Studio, Checklist | `handleChecklistEdit`, `buildSafeQuery`, `setupLookerIntegration` |
+| `13_MemberSelfService.gs` | Member self-service portal with PIN authentication | `generateMemberPIN`, `authenticateMember`, `showMemberSelfService` |
+| `14_MeetingCheckIn.gs` | Meeting check-in system with email + PIN auth | `showSetupMeetingDialog`, `createMeeting`, `showMeetingCheckInDialog` |
+
+### HTML Template
+
+| File | Purpose |
+|------|---------|
+| `MultiSelectDialog.html` | Multi-select dialog HTML template |
 
 ### Development Module (Remove in Production)
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `07_DevTools.gs` | Test data generation | `SEED_TEST_DATA`, `NUKE_SEEDED_DATA` |
+| `07_DevTools.gs` | Test data generation (delete before go-live) | `SEED_TEST_DATA`, `NUKE_SEEDED_DATA` |
 
 ---
 
@@ -319,26 +302,37 @@ npm run deploy
 
 ### Build Order
 
-Files must be concatenated in dependency order (16 files):
+Files must be concatenated in dependency order (27 files):
 
 ```javascript
 const BUILD_ORDER = [
-  '00_Security.gs',           // Security utilities, XSS prevention, access control
-  '00_DataAccess.gs',         // Data Access Layer, time constants
-  '01_Core.gs',               // Error handling + Constants (SHEETS, MEMBER_COLS, etc.)
-  '02_DataManagers.gs',       // Member + Grievance CRUD managers
-  '03_UIComponents.gs',       // Menu, Theme, Mobile, QuickActions, Search
-  '04_UIService.gs',          // Main UI service (dialogs, panels, forms)
-  '05_Integrations.gs',       // Drive, Calendar, WebApp integration
-  '06_Maintenance.gs',        // Diagnostics, Cache, Undo/Redo
-  '07_DevTools.gs',           // Dev tools + Test framework (remove before prod)
-  '08_SheetUtils.gs',         // Sheet creation, validation, search, charts, forms
-  '09_Dashboards.gs',         // Satisfaction, Sync, Public dashboards
-  '10_Code.gs',               // Core business logic
-  '10_Main.gs',               // Main entry point, onOpen, onEdit, triggers
-  '11_CommandHub.gs',         // Command center + Secure member dashboard
-  '12_Features.gs',           // Checklist, Dynamic Engine, Looker Studio
-  '13_MemberSelfService.gs'   // Member self-service portal with PIN auth
+  '00_Security.gs',               // Security utilities, XSS prevention, access control
+  '00_DataAccess.gs',             // Data Access Layer, time constants
+  '01_Core.gs',                   // Error handling + Constants (SHEETS, MEMBER_COLS, etc.)
+  '02_DataManagers.gs',           // Member + Grievance CRUD managers
+  '03_UIComponents.gs',           // Menu, Theme, Mobile, QuickActions, Search
+  '04a_UIMenus.gs',               // Menu creation, visual control panel, dialogs
+  '04b_AccessibilityFeatures.gs', // Comfort view, focus mode, import/export
+  '04c_InteractiveDashboard.gs',  // Interactive dashboard, mobile views
+  '04d_ExecutiveDashboard.gs',    // Executive dashboard, steward dashboard, alerts
+  '04e_PublicDashboard.gs',       // Public member dashboard, unified data endpoints
+  '05_Integrations.gs',           // Drive, Calendar, WebApp integration
+  '06_Maintenance.gs',            // Diagnostics, Cache, Undo/Redo
+  '07_DevTools.gs',               // Dev tools + Test framework (remove before prod)
+  '08a_SheetSetup.gs',            // Main setup, utility functions, data validation
+  '08b_SearchAndCharts.gs',       // Search functions, chart generation
+  '08c_FormsAndNotifications.gs', // Form handling, notifications, deadline alerts
+  '08d_AuditAndFormulas.gs',      // Audit log, formula sync, hidden calc sheets
+  '09_Dashboards.gs',             // Satisfaction, Sync, Public dashboards
+  '10a_SheetCreation.gs',         // Config, Member Directory, Grievance Log creation
+  '10b_SurveyDocSheets.gs',       // Satisfaction, Feedback, FAQ, Getting Started sheets
+  '10c_FormHandlers.gs',          // Menu handlers, form submissions, flagged reviews
+  '10d_SyncAndMaintenance.gs',    // Formatting, testing, Drive, Calendar, sync
+  '10_Main.gs',                   // Main entry point, onOpen, onEdit, triggers
+  '11_CommandHub.gs',             // Command center + Secure member dashboard
+  '12_Features.gs',               // Checklist, Dynamic Engine, Looker Studio
+  '13_MemberSelfService.gs',      // Member self-service portal with PIN auth
+  '14_MeetingCheckIn.gs'          // Meeting check-in system with email + PIN auth
 ];
 ```
 
