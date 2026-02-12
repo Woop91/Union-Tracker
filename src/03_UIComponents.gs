@@ -1695,20 +1695,7 @@ function getMemberDataById_(memberId) {
   return null;
 }
 
-/**
- * Helper: Get organization name from Config
- * @private
- * @returns {string} Organization name or default value
- */
-function getOrgNameFromConfig_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (configSheet) {
-    var orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue();
-    if (orgName) return orgName;
-  }
-  return 'SEIU Local 509';
-}
+// getOrgNameFromConfig_() is defined in 01_Core.gs as the single source of truth
 
 // ============================================================================
 // MEMBER GRIEVANCE HISTORY AND ACTIONS
