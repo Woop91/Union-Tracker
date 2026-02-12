@@ -1445,7 +1445,7 @@ function composeEmailForMember(memberId) {
  */
 function sendQuickEmail(to, subject, body, memberId) {
   try {
-    MailApp.sendEmail({ to: to, subject: subject, body: body, name: 'SEIU Local 509 Dashboard' });
+    MailApp.sendEmail({ to: to, subject: subject, body: body, name: getOrgNameFromConfig_() + ' Dashboard' });
     return { success: true };
   } catch (e) { throw new Error('Failed to send: ' + e.message); }
 }
@@ -1792,7 +1792,7 @@ function sendMemberDashboardLink() {
       "- Steward Contact Search\n" +
       "- Emergency Weingarten Rights\n\n" +
       "In Solidarity,\n" +
-      "509 Strategic Command Center";
+      COMMAND_CONFIG.SYSTEM_NAME;
 
     try {
       MailApp.sendEmail(email, COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + " Your Union Dashboard Access", body);

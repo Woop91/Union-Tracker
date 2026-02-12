@@ -1001,7 +1001,7 @@ function checkDeadlinesAndNotify_() {
 
   if (urgent.length === 0) return;
 
-  var subject = '509 Dashboard: ' + urgent.length + ' Grievance Deadline(s) Approaching';
+  var subject = COMMAND_CONFIG.SYSTEM_NAME + ': ' + urgent.length + ' Grievance Deadline(s) Approaching';
   var body = 'The following grievances have deadlines within 3 days:\n\n';
 
   for (var j = 0; j < urgent.length; j++) {
@@ -1030,8 +1030,8 @@ function testDeadlineNotifications() {
 
   try {
     MailApp.sendEmail(email,
-      '509 Dashboard Test Notification',
-      'This is a test notification from your 509 Dashboard.\n\n' +
+      COMMAND_CONFIG.SYSTEM_NAME + ' Test Notification',
+      'This is a test notification from your ' + COMMAND_CONFIG.SYSTEM_NAME + '.\n\n' +
       'If you received this email, notifications are working correctly!\n\n' +
       'Dashboard: ' + SpreadsheetApp.getActiveSpreadsheet().getUrl()
     );
@@ -1206,7 +1206,7 @@ function sendStewardDeadlineAlerts() {
         to: email,
         subject: subject,
         body: body,
-        name: 'SEIU Local 509 Dashboard'
+        name: getOrgNameFromConfig_() + ' Dashboard'
       });
       emailsSent++;
       // Mask name in logs for privacy
@@ -1413,13 +1413,13 @@ function executeSendRandomSurveyEmails(opts) {
         'Your Member ID: ' + member.memberId + '\n' +
         '(You will need this to verify your membership when submitting)\n\n' +
         'Thank you for being a member!\n\n' +
-        'SEIU Local 509';
+        getOrgNameFromConfig_();
 
       MailApp.sendEmail({
         to: member.email,
         subject: opts.subject,
         body: body,
-        name: 'SEIU Local 509 Dashboard'
+        name: getOrgNameFromConfig_() + ' Dashboard'
       });
 
       sent++;

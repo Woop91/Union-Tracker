@@ -174,8 +174,8 @@ function showErrorNotification_(errorInfo) {
 function sendCriticalErrorNotification_(errorInfo) {
   try {
     var adminEmail = Session.getEffectiveUser().getEmail();
-    var subject = '[509 Dashboard] Critical Error: ' + errorInfo.context;
-    var body = 'A critical error occurred in the 509 Dashboard:\n\n' +
+    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
+    var body = 'A critical error occurred in the ' + COMMAND_CONFIG.SYSTEM_NAME + ':\n\n' +
                'Time: ' + errorInfo.timestamp + '\n' +
                'Context: ' + errorInfo.context + '\n' +
                'Message: ' + errorInfo.message + '\n' +
@@ -1795,19 +1795,102 @@ var GRIEVANCE_OUTCOMES = {
 };
 
 /**
- * Deadline rules for grievance step calculations
- * Defines the number of days for responses and appeals at each step
- * Used by deadline calculation functions throughout the system
+ * Default deadline rules for grievance step calculations (fallback values).
+ * Actual values are loaded from Config sheet at runtime via getDeadlineRules().
  * @const {Object}
  */
-// TODO: HARDCODED — Deadline days are duplicated in 00_DataAccess.gs DEADLINE_DAYS.
-// If contract terms change, both locations must be updated or deadlines will be inconsistent.
-// Consider a single source of truth, ideally in the Config sheet.
+var DEADLINE_DEFAULTS = {
+  FILING_DAYS: 21,
+  STEP_1_RESPONSE: 7,
+  STEP_2_APPEAL: 7,
+  STEP_2_RESPONSE: 14,
+  STEP_3_APPEAL: 10,
+  STEP_3_RESPONSE: 21,
+  ARBITRATION_DEMAND: 30,
+  WARNING_THRESHOLD: 5,
+  CRITICAL_THRESHOLD: 2,
+  REMINDER_FIRST: 7,
+  REMINDER_SECOND: 3,
+  REMINDER_FINAL: 1
+};
+
+/**
+ * Reads deadline rules from Config sheet (cols AA-AD), falling back to DEADLINE_DEFAULTS.
+ * This is the single source of truth for all deadline calculations.
+ * @returns {Object} DEADLINE_RULES-compatible object
+ */
+function getDeadlineRules() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var filing = Number(configSheet.getRange(3, CONFIG_COLS.FILING_DEADLINE_DAYS).getValue());
+      var s1Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP1_RESPONSE_DAYS).getValue());
+      var s2Appeal = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS).getValue());
+      var s2Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS).getValue());
+      return {
+        FILING_DAYS: filing || DEADLINE_DEFAULTS.FILING_DAYS,
+        STEP_1: { DAYS_FOR_RESPONSE: s1Resp || DEADLINE_DEFAULTS.STEP_1_RESPONSE },
+        STEP_2: { DAYS_TO_APPEAL: s2Appeal || DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: s2Resp || DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+        STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
+        ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
+      };
+    }
+  } catch (e) {
+    console.log('Error reading deadline config: ' + e.message);
+  }
+  // Fallback to defaults
+  return {
+    FILING_DAYS: DEADLINE_DEFAULTS.FILING_DAYS,
+    STEP_1: { DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_1_RESPONSE },
+    STEP_2: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+    STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
+    ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
+  };
+}
+
+/** @deprecated Use getDeadlineRules() instead. Kept for backward compatibility. */
 var DEADLINE_RULES = {
-  STEP_1: { DAYS_FOR_RESPONSE: 7 },
-  STEP_2: { DAYS_TO_APPEAL: 7, DAYS_FOR_RESPONSE: 14 },
-  STEP_3: { DAYS_TO_APPEAL: 10, DAYS_FOR_RESPONSE: 21 },
-  ARBITRATION: { DAYS_TO_DEMAND: 30 }
+  STEP_1: { DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_1_RESPONSE },
+  STEP_2: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+  STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
+  ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
+};
+
+/**
+ * Dashboard sheet layout configuration.
+ * All cell references for the Dashboard sheet are centralized here.
+ * If the dashboard layout changes, update these values in one place.
+ * @const {Object}
+ */
+var DASHBOARD_LAYOUT = {
+  // ── DATA ROWS ──
+  QUICK_STATS_ROW: 6,           // A6:F6 - Total Members, Stewards, Grievances, Win Rate, Overdue, Due
+  MEMBER_METRICS_ROW: 11,       // A11:D11 - Members, Stewards, Avg Open Rate, Vol Hours
+  GRIEVANCE_METRICS_ROW: 16,    // A16:F16 - Open, Pending, Settled, Won, Denied, Withdrawn
+  TIMELINE_METRICS_ROW: 21,     // A21:D21 - Avg Days Open, Filed, Closed, Avg Resolution
+  CATEGORY_START_ROW: 26,       // A26:F30 - Issue category breakdown (5 rows)
+  CATEGORY_END_ROW: 30,
+  LOCATION_START_ROW: 35,       // A35:F39 - Location breakdown (5 rows)
+  LOCATION_END_ROW: 39,
+  TREND_START_ROW: 44,          // A44:F46 - Month-over-month trends (3 rows)
+  TREND_END_ROW: 46,
+  STEWARD_SUMMARY_ROW: 54,      // A54:F54 - Steward summary
+  BUSIEST_START_ROW: 59,        // A59:F88 - Top 30 busiest stewards
+  BUSIEST_END_ROW: 88,
+  TOP_PERFORMERS_START_ROW: 93, // A93:F102 - Top 10 performers
+  TOP_PERFORMERS_END_ROW: 102,
+  NEEDING_SUPPORT_START_ROW: 107, // A107:F116 - Needing support
+  NEEDING_SUPPORT_END_ROW: 116,
+
+  // ── CHART AREA ──
+  CHART_INPUT_CELL: 'G120',     // Chart number selection input
+  CHART_DISPLAY_ROW: 135,       // Row where chart text displays start
+  CHART_DISPLAY_RANGE: 'A135:G145', // Merge range for chart text displays
+
+  // ── COLUMN COUNTS ──
+  DATA_COLS: 6,                 // Columns A-F for most data sections
+  SPARKLINE_COL: 7              // Column G for sparkline formulas
 };
 
 /**

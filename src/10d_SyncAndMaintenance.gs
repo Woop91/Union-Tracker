@@ -167,7 +167,7 @@ function viewTestResults() {
  * Get or create the root 509 Dashboard folder in Drive
  */
 function getOrCreateDashboardFolder_() {
-  var folderName = '509 Dashboard - Grievance Files';
+  var folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
   var folders = DriveApp.getFoldersByName(folderName);
 
   if (folders.hasNext()) {
