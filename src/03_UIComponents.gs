@@ -1305,6 +1305,7 @@ function showMemberQuickActions(row) {
     '<button class="action-btn" onclick="google.script.run.openGrievanceFormForMember(' + row + ');google.script.host.close()"><span class="icon">📋</span><span><div class="title">Start New Grievance</div><div class="desc">Create a grievance for this member</div></span></button>' +
     '<button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(\'' + memberId + '\');google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>' +
     '<button class="action-btn" onclick="navigator.clipboard.writeText(\'' + memberId + '\');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">' + memberId + '</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+\'\\n\'+r.folderUrl)}else{alert(\'Error: \'+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(\'' + memberId + '\')"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>' +
     emailButtons +
     '</div>' +
     '<button class="close" onclick="google.script.host.close()">Close</button>' +

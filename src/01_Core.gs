@@ -895,7 +895,7 @@ var MEMBER_COLS = {
 };
 
 // ============================================================================
-// MEETING CHECK-IN LOG COLUMNS (13 columns: A-M)
+// MEETING CHECK-IN LOG COLUMNS (15 columns: A-O)
 // ============================================================================
 
 /**
@@ -916,7 +916,9 @@ var MEETING_CHECKIN_COLS = {
   MEETING_DURATION: 10,  // J - Duration in hours
   EVENT_STATUS: 11,      // K - Scheduled / Active / Completed
   NOTIFY_STEWARDS: 12,   // L - Steward email(s) for attendance report
-  CALENDAR_EVENT_ID: 13  // M - Google Calendar event ID
+  CALENDAR_EVENT_ID: 13, // M - Google Calendar event ID
+  NOTES_DOC_URL: 14,     // N - Meeting Notes Google Doc URL
+  AGENDA_DOC_URL: 15     // O - Meeting Agenda Google Doc URL
 };
 
 /**

@@ -558,6 +558,328 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
 }
 
 // ============================================================================
+// MEETING DOCS (Notes & Agenda) INTEGRATION
+// ============================================================================
+
+/**
+ * Gets or creates the Meeting Notes folder under the root Drive folder
+ * @return {Folder} The Meeting Notes folder
+ */
+function getOrCreateMeetingNotesFolder() {
+  var rootFolder = getOrCreateRootFolder();
+  var folderName = 'Meeting Notes';
+  var folders = rootFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  var newFolder = rootFolder.createFolder(folderName);
+  newFolder.setDescription('Meeting Notes - Auto-managed by Union Dashboard');
+  return newFolder;
+}
+
+/**
+ * Gets or creates the Meeting Agenda folder under the root Drive folder
+ * @return {Folder} The Meeting Agenda folder
+ */
+function getOrCreateMeetingAgendaFolder() {
+  var rootFolder = getOrCreateRootFolder();
+  var folderName = 'Meeting Agenda';
+  var folders = rootFolder.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  var newFolder = rootFolder.createFolder(folderName);
+  newFolder.setDescription('Meeting Agenda - Auto-managed by Union Dashboard (Steward access only)');
+  return newFolder;
+}
+
+/**
+ * Creates Meeting Notes and Meeting Agenda Google Docs for a meeting
+ * Notes: shared view-only with members (day after meeting)
+ * Agenda: shared with stewards only (3 days prior), NOT shared with members
+ * @param {Object} meetingData - { meetingId, name, date }
+ * @returns {Object} { notesUrl, agendaUrl }
+ */
+function createMeetingDocs(meetingData) {
+  var result = { notesUrl: '', agendaUrl: '' };
+  try {
+    var dateStr = meetingData.date || '';
+    var meetingName = meetingData.name || 'Meeting';
+
+    // Create Meeting Notes doc
+    var notesFolder = getOrCreateMeetingNotesFolder();
+    var notesTitle = 'Meeting Notes - ' + meetingName + ' - ' + dateStr;
+    var notesDoc = DocumentApp.create(notesTitle);
+    var notesBody = notesDoc.getBody();
+    notesBody.appendParagraph(notesTitle).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    notesBody.appendParagraph('Meeting ID: ' + (meetingData.meetingId || ''));
+    notesBody.appendParagraph('Date: ' + dateStr);
+    notesBody.appendParagraph('');
+    notesBody.appendParagraph('Notes:').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    notesBody.appendParagraph('');
+    notesDoc.saveAndClose();
+
+    // Move to Meeting Notes folder
+    var notesFile = DriveApp.getFileById(notesDoc.getId());
+    notesFolder.addFile(notesFile);
+    var parents = notesFile.getParents();
+    while (parents.hasNext()) {
+      var parent = parents.next();
+      if (parent.getId() !== notesFolder.getId()) {
+        parent.removeFile(notesFile);
+      }
+    }
+    result.notesUrl = notesDoc.getUrl();
+
+    // Create Meeting Agenda doc
+    var agendaFolder = getOrCreateMeetingAgendaFolder();
+    var agendaTitle = 'Meeting Agenda - ' + meetingName + ' - ' + dateStr;
+    var agendaDoc = DocumentApp.create(agendaTitle);
+    var agendaBody = agendaDoc.getBody();
+    agendaBody.appendParagraph(agendaTitle).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    agendaBody.appendParagraph('Meeting ID: ' + (meetingData.meetingId || ''));
+    agendaBody.appendParagraph('Date: ' + dateStr);
+    agendaBody.appendParagraph('');
+    agendaBody.appendParagraph('Agenda Items:').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    agendaBody.appendParagraph('1. ');
+    agendaBody.appendParagraph('2. ');
+    agendaBody.appendParagraph('3. ');
+    agendaBody.appendParagraph('');
+    agendaBody.appendParagraph('Action Items:').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    agendaBody.appendParagraph('');
+    agendaDoc.saveAndClose();
+
+    // Move to Meeting Agenda folder
+    var agendaFile = DriveApp.getFileById(agendaDoc.getId());
+    agendaFolder.addFile(agendaFile);
+    var agendaParents = agendaFile.getParents();
+    while (agendaParents.hasNext()) {
+      var agendaParent = agendaParents.next();
+      if (agendaParent.getId() !== agendaFolder.getId()) {
+        agendaParent.removeFile(agendaFile);
+      }
+    }
+    result.agendaUrl = agendaDoc.getUrl();
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('MEETING_DOCS_CREATED', {
+        meetingId: meetingData.meetingId,
+        notesDocUrl: result.notesUrl,
+        agendaDocUrl: result.agendaUrl
+      });
+    }
+  } catch (error) {
+    Logger.log('Error creating meeting docs: ' + error.message);
+  }
+  return result;
+}
+
+/**
+ * Sets a Google Doc to view-only for anyone with the link
+ * Used to make meeting notes viewable by members after the meeting
+ * @param {string} docUrl - The Google Doc URL
+ */
+function setDocViewOnlyByLink(docUrl) {
+  try {
+    // Extract file ID from URL
+    var match = docUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (!match) return;
+    var fileId = match[1];
+    var file = DriveApp.getFileById(fileId);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (error) {
+    Logger.log('Error setting doc to view-only: ' + error.message);
+  }
+}
+
+/**
+ * Sends meeting document links to stewards via email
+ * @param {string} meetingName - Name of the meeting
+ * @param {string} meetingDate - Date of the meeting
+ * @param {string} docUrl - The document URL to share
+ * @param {string} docType - 'notes' or 'agenda'
+ * @param {string} recipientEmails - Comma-separated steward emails
+ */
+function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipientEmails) {
+  if (!recipientEmails || !docUrl) return;
+  try {
+    var typeLabel = docType === 'agenda' ? 'Meeting Agenda' : 'Meeting Notes';
+    var body = '<h2>' + typeLabel + '</h2>' +
+      '<p><strong>Meeting:</strong> ' + meetingName + '</p>' +
+      '<p><strong>Date:</strong> ' + meetingDate + '</p>' +
+      '<p>Click the link below to access the ' + typeLabel.toLowerCase() + ':</p>' +
+      '<p><a href="' + docUrl + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
+      'Open ' + typeLabel + '</a></p>' +
+      '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
+
+    MailApp.sendEmail({
+      to: recipientEmails,
+      subject: typeLabel + ': ' + meetingName + ' (' + meetingDate + ')',
+      htmlBody: body,
+      name: 'Union Dashboard'
+    });
+  } catch (error) {
+    Logger.log('Error emailing meeting doc link: ' + error.message);
+  }
+}
+
+/**
+ * Sends scheduled meeting doc notifications from dailyTrigger
+ * - Agenda link: 3 days before meeting
+ * - Notes link: 1 day before meeting
+ * - Sets notes to view-only: 1 day after meeting (for members)
+ * @returns {Object} { agendaSent, notesSent, notesPublished }
+ */
+function processMeetingDocNotifications() {
+  var result = { agendaSent: 0, notesSent: 0, notesPublished: 0 };
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (!sheet || sheet.getLastRow() < 2) return result;
+
+    var data = sheet.getDataRange().getValues();
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    var processed = {};  // Track processed meeting IDs
+
+    for (var i = 1; i < data.length; i++) {
+      var meetingId = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
+      if (!meetingId || processed[meetingId]) continue;
+      processed[meetingId] = true;
+
+      var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+      if (!(meetingDate instanceof Date)) continue;
+
+      var meetingDay = new Date(meetingDate);
+      meetingDay.setHours(0, 0, 0, 0);
+      var diffDays = Math.round((meetingDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+      var meetingName = String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || '');
+      var notifyEmails = String(data[i][MEETING_CHECKIN_COLS.NOTIFY_STEWARDS - 1] || '');
+      var notesUrl = String(data[i][MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] || '');
+      var agendaUrl = String(data[i][MEETING_CHECKIN_COLS.AGENDA_DOC_URL - 1] || '');
+      var dateStr = meetingDate.toLocaleDateString();
+
+      // 3 days before: send agenda link to stewards
+      if (diffDays === 3 && agendaUrl && notifyEmails) {
+        emailMeetingDocLink(meetingName, dateStr, agendaUrl, 'agenda', notifyEmails);
+        result.agendaSent++;
+      }
+
+      // 1 day before: send notes link to stewards
+      if (diffDays === 1 && notesUrl && notifyEmails) {
+        emailMeetingDocLink(meetingName, dateStr, notesUrl, 'notes', notifyEmails);
+        result.notesSent++;
+      }
+
+      // 1 day after: set notes to view-only (available to members)
+      if (diffDays === -1 && notesUrl) {
+        setDocViewOnlyByLink(notesUrl);
+        result.notesPublished++;
+      }
+    }
+  } catch (error) {
+    Logger.log('Error processing meeting doc notifications: ' + error.message);
+  }
+  return result;
+}
+
+// ============================================================================
+// MEMBER DRIVE FOLDER
+// ============================================================================
+
+/**
+ * Creates or retrieves a Google Drive folder for a member
+ * If the member has an existing grievance with a folder, reuses that folder
+ * Otherwise creates a new folder under the root folder
+ * @param {string} memberId - The member ID
+ * @returns {Object} { success, folderUrl, folderId, message, error }
+ */
+function setupDriveFolderForMember(memberId) {
+  try {
+    if (!memberId) {
+      return { success: false, error: 'Member ID is required' };
+    }
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!memberSheet) return { success: false, error: 'Member Directory not found' };
+
+    // Find member row
+    var memberData = memberSheet.getDataRange().getValues();
+    var memberRow = -1;
+    var firstName = '';
+    var lastName = '';
+    for (var i = 1; i < memberData.length; i++) {
+      if (String(memberData[i][MEMBER_COLS.MEMBER_ID - 1]) === String(memberId)) {
+        memberRow = i + 1;
+        firstName = memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '';
+        lastName = memberData[i][MEMBER_COLS.LAST_NAME - 1] || '';
+        break;
+      }
+    }
+    if (memberRow === -1) {
+      return { success: false, error: 'Member not found: ' + memberId };
+    }
+
+    // Check if member has an existing grievance with a Drive folder
+    var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
+      var gData = grievanceSheet.getDataRange().getValues();
+      for (var g = 1; g < gData.length; g++) {
+        if (String(gData[g][GRIEVANCE_COLS.MEMBER_ID - 1]) === String(memberId)) {
+          var existingUrl = gData[g][GRIEVANCE_COLS.DRIVE_FOLDER_URL - 1];
+          if (existingUrl) {
+            return {
+              success: true,
+              folderUrl: existingUrl,
+              message: 'Using existing grievance folder for this member'
+            };
+          }
+        }
+      }
+    }
+
+    // No existing folder found - create a new one
+    var rootFolder = getOrCreateRootFolder();
+    var folderName = sanitizeFolderName(lastName) + ', ' + sanitizeFolderName(firstName) + ' - ' + memberId;
+
+    // Check if folder already exists
+    var existingFolders = rootFolder.getFoldersByName(folderName);
+    if (existingFolders.hasNext()) {
+      var existing = existingFolders.next();
+      return {
+        success: true,
+        folderId: existing.getId(),
+        folderUrl: existing.getUrl(),
+        message: 'Folder already exists'
+      };
+    }
+
+    var newFolder = rootFolder.createFolder(folderName);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('MEMBER_FOLDER_CREATED', {
+        memberId: memberId,
+        folderId: newFolder.getId(),
+        folderName: folderName
+      });
+    }
+
+    return {
+      success: true,
+      folderId: newFolder.getId(),
+      folderUrl: newFolder.getUrl(),
+      message: 'Folder created successfully'
+    };
+  } catch (error) {
+    Logger.log('Error creating member Drive folder: ' + error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ============================================================================
 // GRIEVANCE CALENDAR INTEGRATION
 // ============================================================================
 

@@ -740,6 +740,16 @@ function dailyTrigger() {
       console.error('Meeting status update error:', e);
     }
 
+    // Process meeting doc notifications (agenda 3 days before, notes 1 day before, publish 1 day after)
+    var meetingDocResult = { agendaSent: 0, notesSent: 0, notesPublished: 0 };
+    try {
+      if (typeof processMeetingDocNotifications === 'function') {
+        meetingDocResult = processMeetingDocNotifications();
+      }
+    } catch (e) {
+      console.error('Meeting doc notification error:', e);
+    }
+
     // Cleanup expired meeting check-in records (>90 days old)
     var meetingRowsCleaned = 0;
     try {
@@ -754,6 +764,9 @@ function dailyTrigger() {
       remindersSent: settings.emailReminders,
       meetingsActivated: meetingStatusResult.activated,
       meetingsDeactivated: meetingStatusResult.deactivated,
+      meetingDocAgendaSent: meetingDocResult.agendaSent,
+      meetingDocNotesSent: meetingDocResult.notesSent,
+      meetingDocNotesPublished: meetingDocResult.notesPublished,
       meetingRowsCleaned: meetingRowsCleaned
     });
 

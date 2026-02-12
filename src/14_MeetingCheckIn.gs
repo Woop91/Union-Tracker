@@ -86,8 +86,21 @@ function createMeeting(meetingData) {
   eventDay.setHours(0, 0, 0, 0);
   var initialStatus = (eventDay.getTime() === today.getTime()) ? MEETING_STATUS.ACTIVE : MEETING_STATUS.SCHEDULED;
 
+  // Create Meeting Notes and Agenda Google Docs
+  var notesDocUrl = '';
+  var agendaDocUrl = '';
+  if (typeof createMeetingDocs === 'function') {
+    var docs = createMeetingDocs({
+      meetingId: meetingId,
+      name: meetingName,
+      date: meetingData.date
+    });
+    notesDocUrl = docs.notesUrl || '';
+    agendaDocUrl = docs.agendaUrl || '';
+  }
+
   // Add a placeholder row so the meeting exists in the sheet
-  // Columns A-M: ID, Name, Date, Type, MemberID, MemberName, CheckInTime, Email, Time, Duration, Status, Notify, CalendarEventId
+  // Columns A-O: ID, Name, Date, Type, MemberID, MemberName, CheckInTime, Email, Time, Duration, Status, Notify, CalendarEventId, NotesUrl, AgendaUrl
   sheet.appendRow([
     meetingId,
     meetingName,
@@ -101,7 +114,9 @@ function createMeeting(meetingData) {
     meetingDuration,
     initialStatus,
     notifyEmails,
-    calendarEventId
+    calendarEventId,
+    notesDocUrl,
+    agendaDocUrl
   ]);
 
   if (typeof logAuditEvent === 'function') {
@@ -112,7 +127,9 @@ function createMeeting(meetingData) {
       meetingTime: meetingTime,
       meetingDuration: meetingDuration,
       meetingType: meetingType,
-      calendarEvent: calendarEventId ? 'created' : 'skipped'
+      calendarEvent: calendarEventId ? 'created' : 'skipped',
+      notesDoc: notesDocUrl ? 'created' : 'skipped',
+      agendaDoc: agendaDocUrl ? 'created' : 'skipped'
     });
   }
 
@@ -120,7 +137,9 @@ function createMeeting(meetingData) {
     success: true,
     meetingId: meetingId,
     message: 'Meeting "' + meetingName + '" created (ID: ' + meetingId + ').' +
-             (calendarEventId ? ' Calendar event added.' : '')
+             (calendarEventId ? ' Calendar event added.' : '') +
+             (notesDocUrl ? ' Meeting Notes doc created.' : '') +
+             (agendaDocUrl ? ' Meeting Agenda doc created.' : '')
   };
 }
 
