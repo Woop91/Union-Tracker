@@ -1,22 +1,29 @@
-# Resource Dropbox
+# Resource Dropbox (Member Document Submission Folder)
 
-## Instructions: Setting Up the Shared Docs Folder
+## Overview
+
+The Resource Dropbox is a shared Google Drive folder where members can submit documents (forms, receipts, evidence, etc.) to the union. This is separate from the main Resource Drive folder (which is read-only for members).
+
+---
+
+## Instructions: Setting Up the Document Dropbox
 
 ### Step 1: Create the Google Drive Folder
 
 1. Go to Google Drive
-2. Click **"+ New"** → **"New folder"**
-3. Name it something like "Member Resources" or "Shared Documents"
+2. Click **"+ New"** > **"New folder"**
+3. Name it something like "Member Submissions" or "Document Dropbox"
 4. Click **Create**
 
 ### Step 2: Set Sharing Permissions
 
-1. Right-click the folder → **"Share"**
+1. Right-click the folder > **"Share"**
 2. Under **"General access"**, change to:
-   - "Anyone with the link" (if members just need view access)
-   - Or add specific email addresses for restricted access
-3. Set permission level to **"Viewer"** (recommended) or **"Editor"**
-4. Click **Done**
+   - **"Anyone with the link"** with **"Editor"** permission (if members need to upload files)
+   - Or add specific email addresses for controlled access
+3. Click **Done**
+
+**Note:** Unlike the Resource Drive folder (which uses Viewer access), the Dropbox folder typically needs **Editor** access so members can upload documents.
 
 ### Step 3: Get the Folder ID
 
@@ -37,24 +44,33 @@ https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz123456
 
 1. Open your Google Spreadsheet
 2. Go to the **Config** sheet
-3. Find **Column Y** (labeled "DRIVE_FOLDER_ID" in the Integration section)
+3. Find the appropriate column for the Dropbox folder ID in the Integration section
 4. Paste the folder ID into that cell
 
 ### Step 5: Verify It Works
 
-1. Open a member dashboard
-2. Look for the **"Resources"** button (green button with folder icon)
-3. Click it - should open your shared folder
+1. Open a dashboard or member portal
+2. Look for a document submission or upload option
+3. Confirm that files can be uploaded to the folder
 
 ---
 
-## What to Put in the Folder
+## Difference Between Resource Drive and Resource Dropbox
 
-Consider adding:
+| Feature | Resource Drive (04) | Resource Dropbox (05) |
+|---------|--------------------|-----------------------|
+| **Purpose** | Share documents with members | Collect documents from members |
+| **Access Level** | Viewer (read-only) | Editor (upload allowed) |
+| **Content** | Bylaws, contracts, meeting minutes | Forms, receipts, evidence, submissions |
+| **Direction** | Union > Members | Members > Union |
 
-- Union bylaws/constitution
-- Contract/CBA documents
-- Meeting minutes
-- Training materials
-- Forms and templates
-- Contact information sheets
+---
+
+## What Members Might Submit
+
+- Signed grievance forms
+- Supporting evidence or documentation
+- Contact information update forms
+- Satisfaction survey attachments
+- Training completion certificates
+- Expense receipts for reimbursement

@@ -1,522 +1,495 @@
-# 509 Strategic Command Center - v4.6.0
+# 509 Strategic Command Center
 
-A comprehensive Google Sheets-based dashboard for managing union grievances, member records, and deadline tracking. This version implements a **27-file modular architecture** following the Separation of Concerns principle.
+**Version 4.6.0** | Union Steward Dashboard for Google Sheets
 
-## Architecture Overview
+A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 27-file modular architecture.
 
-The dashboard uses a streamlined 27-file architecture for clarity and maintainability:
+---
 
-```
-src/
-├── 00_Security.gs               # Security utilities, XSS prevention, access control
-├── 00_DataAccess.gs             # Data Access Layer, time constants, cached sheet access
-├── 01_Core.gs                   # Error handling + Constants (SHEETS, MEMBER_COLS, etc.)
-├── 02_DataManagers.gs           # Member + Grievance managers
-├── 03_UIComponents.gs           # Menu, Theme, Mobile, QuickActions, Search
-├── 04a_UIMenus.gs               # Menu creation, visual control panel, navigation, dialogs, sidebar
-├── 04b_AccessibilityFeatures.gs # Common styles, comfort view, pomodoro, notepad, import/export
-├── 04c_InteractiveDashboard.gs  # Interactive dashboard, mobile views, data retrieval
-├── 04d_ExecutiveDashboard.gs    # Executive dashboard, steward dashboard, alerts, triggers
-├── 04e_PublicDashboard.gs       # Public member dashboard, unified data endpoints
-├── 05_Integrations.gs           # Drive, Calendar, WebApp integration
-├── 06_Maintenance.gs            # Diagnostics, Cache, Undo, Maintenance
-├── 07_DevTools.gs               # Dev tools + Test framework (remove before prod)
-├── 08a_SheetSetup.gs            # Main setup, utility functions, data validation, multi-select
-├── 08b_SearchAndCharts.gs       # Search functions, chart generation
-├── 08c_FormsAndNotifications.gs # Form handling, notifications, deadline alerts
-├── 08d_AuditAndFormulas.gs      # Audit log, formula sync, hidden calc sheets
-├── 09_Dashboards.gs             # Satisfaction, Sync, Public dashboards
-├── 10a_SheetCreation.gs         # Config, Member Directory, Grievance Log sheet creation
-├── 10b_SurveyDocSheets.gs       # Satisfaction, Feedback, FAQ, Getting Started sheets
-├── 10c_FormHandlers.gs          # Menu handlers, form submissions, flagged reviews
-├── 10d_SyncAndMaintenance.gs    # Formatting, testing, Drive, Calendar, Email, sync, formulas
-├── 10_Main.gs                   # Main entry point, triggers, edit handlers
-├── 11_CommandHub.gs             # Command center + Secure dashboard
-├── 12_Features.gs               # Checklist, Dynamic Engine, Looker
-├── 13_MemberSelfService.gs      # Member self-service portal with PIN authentication
-├── 14_MeetingCheckIn.gs         # Meeting check-in system with email + PIN auth
-└── MultiSelectDialog.html
-```
+## Table of Contents
 
-### Module Descriptions
+- [What It Does](#what-it-does)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Going Live (Production)](#going-live-production)
+- [Key Features](#key-features)
+- [Menu System](#menu-system)
+- [Deadline Rules (Article 23A)](#deadline-rules-article-23a)
+- [Sheets Structure](#sheets-structure)
+- [Development](#development)
+- [Architecture](#architecture)
+- [Troubleshooting](#troubleshooting)
+- [Documentation Index](#documentation-index)
+- [Contributing](#contributing)
+- [Version History](#version-history)
+- [License](#license)
 
-| Module | Purpose |
-|--------|---------|
-| **00_Security.gs** | Security utilities, XSS prevention, access control |
-| **00_DataAccess.gs** | Data Access Layer, time constants, cached sheet access |
-| **01_Core.gs** | Error handling + Constants (SHEETS, MEMBER_COLS, etc.) |
-| **02_DataManagers.gs** | Member + Grievance managers |
-| **03_UIComponents.gs** | Menu, Theme, Mobile, QuickActions, Search |
-| **04a_UIMenus.gs** | Menu creation, visual control panel, navigation, dialogs, sidebar |
-| **04b_AccessibilityFeatures.gs** | Common styles, comfort view, pomodoro, notepad, import/export |
-| **04c_InteractiveDashboard.gs** | Interactive dashboard, mobile views, data retrieval |
-| **04d_ExecutiveDashboard.gs** | Executive dashboard, steward dashboard, alerts, triggers |
-| **04e_PublicDashboard.gs** | Public member dashboard, unified data endpoints |
-| **05_Integrations.gs** | Drive, Calendar, WebApp integration |
-| **06_Maintenance.gs** | Diagnostics, Cache, Undo, Maintenance |
-| **07_DevTools.gs** | Dev tools + Test framework (remove before prod) |
-| **08a_SheetSetup.gs** | Main setup, utility functions, data validation, multi-select |
-| **08b_SearchAndCharts.gs** | Search functions, chart generation |
-| **08c_FormsAndNotifications.gs** | Form handling, notifications, deadline alerts |
-| **08d_AuditAndFormulas.gs** | Audit log, formula sync, hidden calc sheets |
-| **09_Dashboards.gs** | Satisfaction, Sync, Public dashboards |
-| **10a_SheetCreation.gs** | Config, Member Directory, Grievance Log sheet creation |
-| **10b_SurveyDocSheets.gs** | Satisfaction, Feedback, FAQ, Getting Started sheets |
-| **10c_FormHandlers.gs** | Menu handlers, form submissions, flagged reviews |
-| **10d_SyncAndMaintenance.gs** | Formatting, testing, Drive, Calendar, Email, sync, formulas |
-| **10_Main.gs** | Main entry point, triggers, edit handlers |
-| **11_CommandHub.gs** | Command center + Secure dashboard |
-| **12_Features.gs** | Checklist, Dynamic Engine, Looker |
-| **13_MemberSelfService.gs** | Member self-service portal with PIN authentication |
-| **14_MeetingCheckIn.gs** | Meeting check-in system with email + PIN authentication |
-| **MultiSelectDialog.html** | Multi-select dialog HTML template |
+---
 
-## v4.0 Features
+## What It Does
 
-- **Security Fortress**: Audit Log & Sabotage Protection (>15 cells mass deletion detection)
-- **High-Performance Engine**: Batch Array Processing for 5,000+ members
-- **PDF Signature Engine**: Legal signature-ready PDF generation from templates
-- **Mobile/Pocket View**: Field-optimized column hiding for smartphone access
-- **Production Mode**: NUKE logic with UI self-hiding (Demo Data menu disappears)
-- **Analytics & Insights**: Unit Health Reports, Grievance Trends analysis
-- **Scaling Hooks**: OCR transcription and Sentiment analysis placeholders
+The 509 Dashboard gives union stewards and leadership a centralized place to:
 
-## v4.0.2 Features
+- **Track grievances** from filing through resolution with automatic deadline calculations
+- **Manage member records** with contact info, job metadata, and steward assignments
+- **Monitor deadlines** with color-coded urgency and Google Calendar sync
+- **Run dashboards** for executive analytics, member-facing stats, and steward workload
+- **Automate meetings** with auto-generated Google Docs for notes and agendas
+- **Generate PDFs** for grievance forms with digital signature blocks
+- **Send notifications** for overdue cases, escalation alerts, and reminders
+- **Protect privacy** with PII masking on all public-facing dashboards
 
-- **Secure Member Dashboard**: Interactive modal with Google Charts (pie chart for issue categories, gauge for trust score, area chart for trends)
-- **Material Icons Integration**: Professional iconography throughout the UI
-- **Live Steward Search**: Real-time filtering of steward directory by name, unit, or location
-- **Progress Tracking**: Visual progress bars for union goals (steward coverage, survey participation)
-- **Steward Performance Modal**: View active cases, total cases, and win rates for all stewards
-- **Email Dashboard Link**: One-click email sending of dashboard URL to selected members
-- **Zero PII Exposure**: All member-facing views show only aggregate statistics
+The system runs entirely inside Google Sheets with no external servers required.
 
-## v4.6.0 Features (CURRENT)
+---
 
-- **Meeting Notes & Agenda Document Automation**: Auto-creates Google Docs for Meeting Notes and Meeting Agenda when a meeting is set up, stored in dedicated Drive folders
-- **Two-Tier Steward Agenda Sharing**: Meeting organizer selects which stewards get agenda early (3 days before); ALL stewards receive it at least 1 day before. Agenda never shared with members
-- **Meeting Notes Dashboard Tab**: New tab in Member Dashboard showing completed meetings chronologically with search and view-only Google Doc links
-- **Scheduled Meeting Document Notifications**: Daily trigger sends agenda/notes emails at the right time and auto-publishes notes as view-only after the meeting
-- **Member Drive Folder Quick Action**: "Create Member Folder" button in Quick Actions creates/reuses a Google Drive folder per member
-- **Meeting Event Scheduling**: Full Google Calendar lifecycle for meetings with event creation, check-in activation/deactivation
-- **Grievance Date Override**: Stewards can overwrite grievance dates with downstream deadline recalculation
-- **Meeting Check-In Log Expansion**: 16 columns (A-P) with Notes Doc URL, Agenda Doc URL, and Agenda Stewards columns
+## Quick Start
 
-## v4.5.0 Features
+If you want to try it out quickly with demo data:
 
-- **Security Module** (`00_Security.gs`): XSS prevention, input sanitization, access control utilities
-- **Data Access Layer** (`00_DataAccess.gs`): Centralized sheet access with caching, time constants
-- **Member Self-Service** (`13_MemberSelfService.gs`): Member self-service portal with PIN authentication
-- **950 Jest Unit Tests**: Comprehensive test suite (`npm run test:unit`)
-- **Comprehensive Bug Fixes**: Stability improvements across all modules
-- **Dynamic Engine**: Extensible feature framework with caching, unified data loading, and batch operations
-- **Member Leaders**: Organizational layer tracking stewards and member leaders with role/unit info
-- **Column Expansion**: No-code custom columns with form generation and batch saves
-- **Self-Healing Architecture**: Automated formula repair in hidden calculation sheets
-- **Grievance Reminders**: Two reminder dates with notes for scheduling meetings (columns AL-AO)
-- **Reminder Dialog**: Dark-themed modal for managing grievance reminders
-- **Automated Reminder Notifications**: Daily 8 AM trigger with toast notifications for due reminders
-- **Looker Studio Integration (Standard)**: Hidden `_Looker_*` sheets for internal dashboards
-- **Looker Studio Integration (PII-Free)**: Anonymized `_Looker_Anon_*` sheets for external/compliance use
-- **Anonymization Features**: Non-reversible hashes, bucketed values, categorized roles, engagement levels
-- **Restricted Data Sources**: Looker limited to Member Directory, Grievance Log, and Member Satisfaction only
+1. Deploy the scripts to Google Apps Script (see [Installation](#installation))
+2. Refresh your Google Sheet -- 4 custom menus will appear
+3. Go to **Admin > Demo Data > Seed All Sample Data**
+4. Explore the dashboard using the **Union Hub** and **Strategic Ops** menus
 
-## v4.3.x Features
+When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove all test data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for details.
 
-- **Searchable Help Guide**: Modal help system with 4 tabs (Overview, Menu Reference, FAQ, Quick Tips), real-time search filtering
-- **Two-Dashboard Architecture**: Unified Steward Dashboard (internal, with PII) and Member Dashboard (public, no PII)
-- **Steward Dashboard**: 6 tabs - Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction
-- **Member Satisfaction Analysis**: 8 survey sections with scores, progress bars, and question breakdowns
-- **Production Mode Polish**: Demo Data menu properly hides after NUKE in all menus
-- **NUKE Enhancements**: 3-5 minute warnings, cleans documentation tabs, adds repo link to FAQ, applies tab colors
-- **Professional Tab Colors**: Blue (data sheets), Green (documentation), Red (satisfaction), Orange (config)
-- **Dynamic Row Styling**: `applyZebraStripes()` and `applyThemeToSheet_()` use `getMaxRows()` to style ALL rows
-- **DIALOG_SIZES Constant**: Standard modal dimensions (SMALL, MEDIUM, LARGE, FULLSCREEN, SIDEBAR)
-- **Removed Features**: Pomodoro Timer and Quick Capture Notepad removed from menus
-
-## v4.2.0 Features
-
-- **Modal SPA Architecture**: All dashboards converted from sheet-based to responsive modal dialogs
-- **Executive Dashboard Modal**: Chart.js visualizations with win rate donut, status pie, and trends line chart
-- **Bridge Pattern Implementation**: Server-side JSON aggregation with client-side rendering for performance
-- **Web App Entry Point**: `doGet(e)` handler for URL parameter routing (`?member=ID` for personalized portal)
-- **Secure Member Portal**: Personalized member view via URL with PII protection and safety valve scrubbing
-- **Public Statistics Portal**: Aggregate union statistics portal for public-facing deployment
-- **Email Portal Links**: Send personalized dashboard URLs directly to members
-- **Code Cleanup**: Removed 9 orphaned sheet-based helper functions, resolved 3 duplicate function conflicts
-- **Dark Gradient Theme**: Professional dark theme with Chart.js visualizations across all modals
-
-## v4.0.3 Features
-
-- **Material Design Integration**: Full Material Design UI with Google Material Icons and Roboto typography
-- **Google Charts Analytics**: Interactive Treemap for unit density visualization and Area Charts for sentiment trends
-- **Safety Valve PII Scrubbing**: Auto-redaction of phone numbers and SSN patterns from public-facing dashboards
-- **Weingarten Rights Utility**: Emergency rights statement with tap-to-expand for member protection during meetings
-- **Unit Density Heat Map**: Visual representation of grievance activity by unit (green → yellow → red coloring)
-- **Sentiment Trend Analysis**: Union morale tracking over time from survey data
-- **Steward Workload Balancing**: Workload metrics with overload detection (flags stewards with 8+ active cases)
-- **Standalone Analytics Charts**: Dedicated modals for Treemap, Sentiment Trend, and Workload Report
-- **High-Contrast Dark Theme**: Professional dark gradient backgrounds optimized for readability
-
-## Benefits of 27-File Architecture
-
-1. **Clear Separation**: Each file has one clear purpose
-2. **Easy Navigation**: Numbered prefixes show dependency order on GitHub
-3. **Production Ready**: Delete `07_DevTools.gs` before go-live (26 files in production)
-4. **Isolation of Failures**: A bug in Calendar sync won't break the Member Directory
-5. **Easier Maintenance**: Update union rules in one place (`01_Core.gs`)
-6. **Scalability**: Handles 5,000+ members without performance issues
-7. **Extensibility**: Dynamic Engine enables no-code custom columns and features
-8. **Analytics Ready**: Looker Studio integration with both internal and PII-free options
+---
 
 ## Installation
 
 ### Prerequisites
 
-- Google account with Google Sheets
-- [clasp](https://github.com/google/clasp) CLI (optional, for deployment)
+- Google account with Google Sheets access
+- Node.js 18+ and npm (for building and testing locally)
+- [clasp](https://github.com/google/clasp) CLI (optional, for automated deployment)
 
-### Setup
+### Option A: Manual Deployment
 
-1. Clone the repository:
+1. **Clone the repository:**
+
    ```bash
    git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
    cd MULTIPLE-SCRIPS-REPO
    ```
 
-2. Deploy to Google Apps Script:
-   - **Option A**: Copy each file from `src/` to your Google Apps Script project manually
-   - **Option B**: Use clasp for automated deployment:
-     ```bash
-     clasp login
-     clasp create --type sheets --title "Union Dashboard"
-     clasp push
-     ```
+2. **Create a new Google Sheet** at [sheets.google.com](https://sheets.google.com)
 
-## Development Workflow
+3. **Open the Apps Script editor:** Extensions > Apps Script
 
-### Making Changes
+4. **Copy each file** from the `src/` folder into the Apps Script editor:
+   - Click the **+** button next to "Files" to create a new script file
+   - Name it to match the source file (without the `.gs` extension)
+   - Paste the contents from the corresponding `src/` file
+   - Repeat for all 27 `.gs` files and the `.html` file
 
-1. Edit files in the `src/` directory (numbered 00-14)
-2. Copy updated files to Google Apps Script
-3. Save and refresh your Google Sheet
-4. Run `npm run test:unit` to execute 950 Jest unit tests
+5. **Run the initial setup:**
+   - Select `CREATE_509_DASHBOARD` from the function dropdown
+   - Click **Run**
+   - Authorize the script when prompted (Advanced > Go to project name > Allow)
 
-### Source Files
+6. **Refresh your Google Sheet** -- the menus will appear
 
-| File | Purpose |
-|------|---------|
-| `00_Security.gs` | Security utilities, XSS prevention, access control |
-| `00_DataAccess.gs` | Data Access Layer, time constants, cached sheet access |
-| `01_Core.gs` | Error handling + Constants (SHEETS, MEMBER_COLS, etc.) |
-| `02_DataManagers.gs` | Member + Grievance managers |
-| `03_UIComponents.gs` | Menu, Theme, Mobile, QuickActions, Search |
-| `04a_UIMenus.gs` | Menu creation, visual control panel, navigation, dialogs, sidebar |
-| `04b_AccessibilityFeatures.gs` | Common styles, comfort view, pomodoro, notepad, import/export |
-| `04c_InteractiveDashboard.gs` | Interactive dashboard, mobile views, data retrieval |
-| `04d_ExecutiveDashboard.gs` | Executive dashboard, steward dashboard, alerts, triggers |
-| `04e_PublicDashboard.gs` | Public member dashboard, unified data endpoints |
-| `05_Integrations.gs` | Drive, Calendar, WebApp integration |
-| `06_Maintenance.gs` | Diagnostics, Cache, Undo, Maintenance |
-| `07_DevTools.gs` | Dev tools + Test framework (remove before prod) |
-| `08a_SheetSetup.gs` | Main setup, utility functions, data validation, multi-select |
-| `08b_SearchAndCharts.gs` | Search functions, chart generation |
-| `08c_FormsAndNotifications.gs` | Form handling, notifications, deadline alerts |
-| `08d_AuditAndFormulas.gs` | Audit log, formula sync, hidden calc sheets |
-| `09_Dashboards.gs` | Satisfaction, Sync, Public dashboards |
-| `10a_SheetCreation.gs` | Config, Member Directory, Grievance Log sheet creation |
-| `10b_SurveyDocSheets.gs` | Satisfaction, Feedback, FAQ, Getting Started sheets |
-| `10c_FormHandlers.gs` | Menu handlers, form submissions, flagged reviews |
-| `10d_SyncAndMaintenance.gs` | Formatting, testing, Drive, Calendar, Email, sync, formulas |
-| `10_Main.gs` | Main entry point, triggers, edit handlers |
-| `11_CommandHub.gs` | Command center + Secure dashboard |
-| `12_Features.gs` | Checklist, Dynamic Engine, Looker |
-| `13_MemberSelfService.gs` | Member self-service portal with PIN authentication |
-| `14_MeetingCheckIn.gs` | Meeting check-in system with email + PIN authentication |
-| `MultiSelectDialog.html` | Multi-select dialog HTML template |
+### Option B: Automated Deployment with clasp
+
+1. **Clone and install:**
+
+   ```bash
+   git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
+   cd MULTIPLE-SCRIPS-REPO
+   npm install
+   ```
+
+2. **Login and create the project:**
+
+   ```bash
+   clasp login
+   clasp create --type sheets --title "Union Dashboard"
+   ```
+
+3. **Deploy:**
+
+   ```bash
+   clasp push
+   ```
+
+4. **Open the sheet and refresh** -- run `CREATE_509_DASHBOARD` from the Apps Script editor to initialize.
+
+### First-Time Configuration
+
+After installation, configure the system for your organization:
+
+1. Open the **Config** sheet tab
+2. Fill in your organization's data:
+   - Column A: Job Titles
+   - Column B: Office Locations
+   - Column C: Units
+   - Column F: Supervisors
+   - Column G: Managers
+   - Column H: Stewards
+3. Run **Admin > System Diagnostics** to verify everything is set up correctly
+
+See [USER_TUTORIALS.md](USER_TUTORIALS.md) for step-by-step walkthroughs.
+
+---
 
 ## Going Live (Production)
 
-Before deploying to production:
+When you're ready to move from testing to real data:
 
-1. **Run cleanup**: Execute `NUKE_SEEDED_DATA()` to remove all test data
-2. **Delete DevTools**: Remove `07_DevTools.gs` from your Apps Script project
-3. **Save**: The Demo menu will automatically disappear
+1. Run **Admin > Demo Data > NUKE SEEDED DATA** to remove all test data
+2. Delete `07_DevTools.gs` from your Apps Script project (Extensions > Apps Script > right-click > Delete)
+3. Refresh the sheet -- the Demo menu disappears automatically
 
-## File Structure After Production
+After that, you have **26 production files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
 
-```
-src/
-├── 00_Security.gs               # Security utilities, XSS prevention, access control
-├── 00_DataAccess.gs             # Data Access Layer, time constants, cached sheet access
-├── 01_Core.gs                   # Error handling + Constants
-├── 02_DataManagers.gs           # Member + Grievance managers
-├── 03_UIComponents.gs           # Menu, Theme, Mobile, QuickActions, Search
-├── 04a_UIMenus.gs               # Menu creation, visual control panel, navigation, dialogs, sidebar
-├── 04b_AccessibilityFeatures.gs # Common styles, comfort view, pomodoro, notepad, import/export
-├── 04c_InteractiveDashboard.gs  # Interactive dashboard, mobile views, data retrieval
-├── 04d_ExecutiveDashboard.gs    # Executive dashboard, steward dashboard, alerts, triggers
-├── 04e_PublicDashboard.gs       # Public member dashboard, unified data endpoints
-├── 05_Integrations.gs           # Drive, Calendar, WebApp integration
-├── 06_Maintenance.gs            # Diagnostics, Cache, Undo, Maintenance
-├── 08a_SheetSetup.gs            # Main setup, utility functions, data validation, multi-select
-├── 08b_SearchAndCharts.gs       # Search functions, chart generation
-├── 08c_FormsAndNotifications.gs # Form handling, notifications, deadline alerts
-├── 08d_AuditAndFormulas.gs      # Audit log, formula sync, hidden calc sheets
-├── 09_Dashboards.gs             # Satisfaction, Sync, Public dashboards
-├── 10a_SheetCreation.gs         # Config, Member Directory, Grievance Log sheet creation
-├── 10b_SurveyDocSheets.gs       # Satisfaction, Feedback, FAQ, Getting Started sheets
-├── 10c_FormHandlers.gs          # Menu handlers, form submissions, flagged reviews
-├── 10d_SyncAndMaintenance.gs    # Formatting, testing, Drive, Calendar, Email, sync, formulas
-├── 10_Main.gs                   # Main entry point, triggers, edit handlers
-├── 11_CommandHub.gs             # Command center + Secure dashboard
-├── 12_Features.gs               # Checklist, Dynamic Engine, Looker
-├── 13_MemberSelfService.gs      # Member self-service portal with PIN authentication
-├── 14_MeetingCheckIn.gs         # Meeting check-in system with email + PIN auth
-└── MultiSelectDialog.html
-```
-
-**26 files in production** (DevTools removed)
+---
 
 ## Key Features
 
-- **Grievance Tracking**: Full lifecycle from filing to resolution
-- **Member Directory**: Contact info, job metadata, steward assignments
-- **Deadline Management**: Auto-calculated deadlines with Calendar sync
-- **Drive Integration**: Auto-created folders for each grievance and per member
-- **Meeting Management**: Check-in system with auto-generated Notes & Agenda docs, scheduled steward notifications
-- **Meeting Notes Dashboard**: Chronological view of completed meeting notes with search and view-only links
-- **Comfort View**: ADHD-friendly themes, focus mode, reduced motion
-- **Mobile UI**: Quick actions optimized for phone access
-- **Data Integrity**: Batch operations, validation, orphan detection
-- **Audit Logging**: Track all changes with timestamps
+### Grievance Management
+- Full lifecycle tracking: filing, step advancement, resolution
+- Auto-calculated deadlines based on Article 23A rules
+- Step escalation: Step I > Step II > Step III > Arbitration
+- Status tracking with color-coded rows (Open, Pending, Won, Denied, Settled, In Arbitration, Closed)
+- Reminder system with two reminder slots per grievance
 
-## Menu System Overview (v4.6.0)
+### Member Management
+- Centralized member directory with contact info and job metadata
+- Auto-generated Member IDs (format: M + initials + digits)
+- Steward assignments and workload tracking
+- Import/export capabilities
+- Self-service portal with PIN authentication
 
-The dashboard provides 4 comprehensive top-level menus with 100+ functions:
+### Meeting Management (v4.6.0)
+- Auto-created Google Docs for Meeting Notes and Meeting Agenda
+- Two-tier steward agenda sharing (selected stewards get it 3 days early, all stewards 1 day before)
+- Meeting check-in system with attendance logging
+- Meeting Notes dashboard tab with chronological view and search
+- Google Calendar integration for scheduling
 
-### 📊 Union Hub (Main Menu)
-| Submenu | Key Features |
-|---------|--------------|
-| 🔍 Search | Desktop, Quick, and Advanced search |
-| 📋 Grievances | Create, edit, bulk update, view active, analytics |
-| 👥 Members | Add, find, import/export, steward directory, contact forms, surveys, ID management |
-| 📅 Calendar | Sync deadlines, view upcoming, clear events |
-| 📁 Google Drive | Setup folders, view files, batch create |
-| 🔔 Notifications | Settings, test notifications |
-| 👁️ View | Dashboards, mobile URL, dark mode, themes |
-| ♿ Comfort View | Focus mode, zebra stripes, pomodoro, notepad |
-| 📝 Multi-Select | Editor, auto-open triggers |
+### Dashboards & Analytics
+- **Steward Dashboard**: Internal view with 11 tabs -- Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Meeting Notes
+- **Member Dashboard**: PII-safe view for sharing with members
+- **Executive Dashboard**: High-level metrics with Chart.js visualizations
+- **Interactive Dashboard**: Customizable metrics and chart types
+- Hot spot detection, sentiment analysis, and workload balancing
 
-### 🛠️ Admin (System Administration)
-| Submenu | Key Features |
-|---------|--------------|
-| ⚙️ Automation | Auto-refresh, midnight triggers, email snapshots |
-| 🔄 Data Sync | Sync all data, grievance/member sync, triggers |
-| ✅ Validation | Bulk validation, settings, indicators |
-| 🗄️ Cache | Cache status, warm up, clear caches |
-| 🏗️ Setup | Hidden sheets, data validations, defaults |
-| 🎭 Demo Data | Seed sample data, nuke seeded data |
+### Drive & Calendar Integration
+- Auto-created Drive folders for each grievance (with step subfolders)
+- Per-member Drive folders via Quick Actions
+- Deadline sync to Google Calendar
+- Automated meeting event creation
 
-### 🎯 Strategic Ops (Strategic Operations)
-| Submenu | Key Features |
-|---------|--------------|
-| 👁️ Command Center | Executive/Member dashboards, steward performance |
-| 🎯 Strategic Intelligence | Hot zones, rising stars, hostility report |
-| 📊 Analytics & Charts | Treemap, sentiment trends, workload report |
-| 🆔 ID & Data Engines | ID generation, duplicate check, PDF creation |
-| 👤 Steward Management | Promote/demote, contact forms, surveys |
-
-### 📱 Field Portal (Mobile/Field Operations)
-| Submenu | Key Features |
-|---------|--------------|
-| 📱 Field Accessibility | Mobile view, get mobile URL |
-| 📈 Analytics & Insights | Unit health, grievance trends, precedents |
-| 🌐 Web App & Portal | Build portals, send emails, JSON APIs |
-
-See [AIR.md](AIR.md) for the complete menu structure documentation.
-
-## Advanced Features
-
-### Drive Integration
-- Auto-create folder structure for each grievance
-- Organized subfolders for each step
-- Direct links from grievance records
-
-### Self-Healing Formulas
-- Six hidden calculation sheets power dashboard statistics
-- Automatic recalculation on data changes
-- Repair functions for recovery
-
-### Performance & Caching
-- CacheService integration for optimized data retrieval
-- Undo/Redo system with 50 action history
-- Batch operations with retry logic
+### Notifications & Alerts
+- Daily overdue alerts (8 AM trigger)
+- Escalation notifications for Step II/III/Arbitration
+- Scheduled meeting document emails
+- Email snapshots and dashboard links
 
 ### Accessibility (Comfort View)
-- Focus-friendly themes and distraction-free mode
-- Pomodoro timer integration
-- High contrast and reduced motion options
-- Customizable color themes
+- ADHD-friendly themes with soft colors
+- Focus mode and zebra stripes
+- Adjustable font sizes and high-contrast options
+- Reduced motion setting
+- Gridline toggle
 
-### Data Integrity
-- Orphan record detection
-- Steward workload balancing
-- Auto-archive for old records
-- Comprehensive data validation
+### Security
+- XSS prevention with HTML escaping
+- PII masking for public dashboards (phone numbers, SSNs auto-redacted)
+- Formula injection protection
+- Input sanitization and validation
+- Audit logging of all changes
+- Sabotage detection (mass deletion alerts)
 
-### Mobile & Quick Actions
-- Mobile-optimized UI components
-- Quick action dialogs for common tasks
-- Responsive design support
+### Looker Studio Integration
+- **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
+- **PII-Free**: Anonymized `_Looker_Anon_*` sheets for external stakeholders
+- Non-reversible hashes, bucketed values, and engagement levels
 
-### Web Application
-- Standalone web app deployment
-- REST API endpoints
-- Cross-origin request handling
+---
 
-### Developer Tools
-- Debug logging utilities
-- Configuration export/import
-- Test suite automation
-- Performance profiling
+## Menu System
 
-### Strategic Command Center (v4.0.0)
+The dashboard provides 4 top-level menus:
 
-The 509 Strategic Command Center provides executive-level analytics and automation:
+### Union Hub (Main Menu)
 
-#### Dual-Dashboard Architecture
-- **Executive Command (PII)**: Internal dashboard with member names, steward workload, grievance insights
-- **Member Analytics (No PII)**: PII-safe dashboard with morale gauge, leadership pipeline, heatmaps
+| Submenu | What It Does |
+|---------|--------------|
+| Search | Desktop, Quick, and Advanced search |
+| Grievances | Create, edit, bulk update, view active grievances |
+| Members | Add, find, import/export, steward directory, surveys |
+| Calendar | Sync deadlines, view upcoming, clear events |
+| Google Drive | Setup folders, view files, batch create |
+| Notifications | Email settings, test notifications |
+| View | Dashboards, dark mode, themes |
+| Comfort View | Focus mode, zebra stripes, font sizes |
+| Multi-Select | Multi-select editor, auto-open triggers |
 
-#### Strategic Intelligence
-- **Unit Hot Zones**: Identifies locations with 3+ active grievances
-- **Rising Stars**: Highlights top-performing stewards by score and win rate
-- **Management Hostility Funnel**: Analyzes denial rates across grievance steps
-- **Bargaining Cheat Sheet**: Strategic data for contract negotiations
+### Admin (System Administration)
 
-#### Automation Engines
-- **Midnight Auto-Refresh**: Daily 12AM trigger refreshes dashboards and sends overdue alerts
-- **Auto-ID Generator**: Creates member IDs using configurable unit codes from Config sheet
-- **Stage-Gate Workflow**: Sends escalation alerts when cases reach Step II/III/Arbitration
-- **Duplicate Detection**: Finds and highlights duplicate Member IDs
+| Submenu | What It Does |
+|---------|--------------|
+| Automation | Auto-refresh, midnight triggers, email snapshots |
+| Data Sync | Sync all data, install triggers |
+| Validation | Bulk validation, settings, indicators |
+| Cache | Cache status, warm up, clear caches |
+| Setup | Hidden sheets, data validations, defaults |
+| Demo Data | Seed sample data, nuke seeded data |
 
-#### Document Generation
-- **PDF Engine**: Creates grievance PDFs with digital signature blocks
-- **Email Automation**: Weekly PDF snapshots and escalation notifications
+### Strategic Ops (Strategic Operations)
 
-#### Steward Management
-- **Promote/Demote**: One-click steward status changes with toolkit emails
-- **Workload Tracking**: Visual steward case load distribution
+| Submenu | What It Does |
+|---------|--------------|
+| Command Center | Steward/Member dashboards, steward performance |
+| Strategic Intelligence | Hot zones, rising stars, hostility report |
+| Analytics & Charts | Treemap, sentiment trends, workload report |
+| ID & Data Engines | ID generation, duplicate check, PDF creation |
+| Steward Management | Promote/demote, contact forms, surveys |
 
-#### Dynamic Configuration (Config Sheet)
-All settings are configurable without code changes:
+### Field Portal (Mobile/Field Operations)
 
-| Column | Setting | Format |
-|--------|---------|--------|
-| AS | Chief Steward Email | email@example.com |
-| AT | Unit Codes | `Main Station:MS,Field Ops:FO` |
-| AU | Archive Folder ID | Google Drive folder ID |
-| AV | Escalation Statuses | `In Arbitration,Appealed` |
-| AW | Escalation Steps | `Step II,Step III,Arbitration` |
+| Submenu | What It Does |
+|---------|--------------|
+| Field Accessibility | Mobile view, get mobile URL |
+| Analytics & Insights | Unit health, grievance trends, precedents |
+| Web App & Portal | Build portals, send emails, JSON APIs |
 
-#### Status Color Mapping
-Automatic status-based coloring for Grievance Log:
+---
+
+## Deadline Rules (Article 23A)
+
+Deadlines are calculated in business days (excluding weekends):
+
+| Step | Action | Days |
+|------|--------|------|
+| Filing | From incident date | 21 days |
+| Step I | Management response | 7 days |
+| Step II | Appeal deadline | 7 days |
+| Step II | Management response | 14 days |
+| Step III | Appeal deadline | 10 days |
+| Step III | Management response | 21 days |
+| Arbitration | Demand deadline | 30 days |
+
+### Status Colors
 
 | Status | Color | Meaning |
 |--------|-------|---------|
 | Open | Yellow | Active case |
-| Pending Info | Purple | Waiting on info |
+| Pending Info | Purple | Waiting on information |
 | Won | Green | Victory |
 | Denied | Red | Loss |
 | Settled | Blue | Negotiated resolution |
 | In Arbitration | Red | High stakes |
 | Closed | Gray | Complete |
 
-## Deadline Rules (Article 23A)
-
-| Step | Action | Days |
-|------|--------|------|
-| Step 1 | Management response | 7 days |
-| Step 2 | Appeal deadline | 7 days |
-| Step 2 | Management response | 14 days |
-| Step 3 | Appeal deadline | 10 days |
-| Step 3 | Management response | 21 days |
-| Arbitration | Demand deadline | 30 days |
-
-*Deadlines are calculated in business days (excluding weekends)*
+---
 
 ## Sheets Structure
 
 ### Visible Sheets
-- **Member Directory**: Union member records
-- **Grievance Tracker**: Active and resolved grievances
-- **Calendar Sync**: Calendar integration status
-- **Reports**: Generated reports
-- **Dashboard**: Summary statistics
-- **Settings**: Configuration options
-- **Audit Log**: System activity log
 
-### Hidden Sheets (Auto-managed)
-- `_Dashboard_Calc`: Dashboard statistics
-- `_Grievance_Calc`: Grievance aggregations
-- `_Grievance_Formulas`: Named formula references
-- `_Member_Lookup`: Member lookup data
-- `_Steward_Contact_Calc`: Steward contact calculations
-- `_Steward_Performance_Calc`: Steward performance metrics
-- `_Audit_Log`: System activity log
-- `_Checklist_Calc`: Checklist calculations
+| Sheet | Purpose |
+|-------|---------|
+| Config | Dropdown values and organization settings |
+| Member Directory | Union member records (34 columns) |
+| Grievance Log | Grievance tracking (34+ columns) |
+| Dashboard | Summary statistics and metrics |
+| Member Satisfaction | Survey response tracking |
+| Getting Started | Setup instructions |
+| FAQ | Common questions and answers |
+| Config Guide | Configuration help |
+
+### Hidden Sheets (Auto-Managed)
+
+These sheets power the auto-updating columns. You don't need to edit them.
+
+| Sheet | Purpose |
+|-------|---------|
+| `_Dashboard_Calc` | Dashboard summary metrics |
+| `_Grievance_Calc` | Grievance data for Member Directory |
+| `_Grievance_Formulas` | Self-healing formulas for timeline columns |
+| `_Member_Lookup` | Member data for Grievance Log |
+| `_Steward_Contact_Calc` | Steward contact calculations |
+| `_Steward_Performance_Calc` | Steward performance scores |
+| `_Audit_Log` | System activity log |
+| `_Checklist_Calc` | Checklist calculations |
+
+---
+
+## Development
+
+### Setup
+
+```bash
+git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
+cd MULTIPLE-SCRIPS-REPO
+npm install
+```
+
+### Available Commands
+
+```bash
+npm run build          # Build consolidated file (dist/ConsolidatedDashboard.gs)
+npm run build --prod   # Production build (excludes DevTools)
+npm run lint           # ESLint code quality checks
+npm run lint:fix       # Auto-fix ESLint issues
+npm run test:unit      # Run 950+ Jest unit tests
+npm test               # Full pipeline: lint + build + test
+npm run clean          # Clean dist directory
+npm run deploy         # Deploy to Google Apps Script (requires clasp)
+```
+
+### Making Changes
+
+1. Edit files in the `src/` directory
+2. Run `npm run lint` to check for issues
+3. Run `npm run build` to generate the consolidated file
+4. Run `npm run test:unit` to execute tests
+5. Copy updated files to Google Apps Script (or use `clasp push`)
+
+See the [Developer Guide](DEVELOPER_GUIDE.md) for architecture details, code patterns, and debugging tips.
+
+---
+
+## Architecture
+
+The codebase uses a 27-file modular architecture with numbered prefixes that indicate load order and purpose:
+
+| Prefix | Layer | Files |
+|--------|-------|-------|
+| 00 | Foundation | `00_Security.gs`, `00_DataAccess.gs` |
+| 01 | Core | `01_Core.gs` (constants, error handling) |
+| 02 | Data | `02_DataManagers.gs` |
+| 03-04 | UI | `03_UIComponents.gs`, `04a_UIMenus.gs`, `04b_AccessibilityFeatures.gs`, `04c_InteractiveDashboard.gs`, `04d_ExecutiveDashboard.gs`, `04e_PublicDashboard.gs` |
+| 05 | Integrations | `05_Integrations.gs` (Drive, Calendar, WebApp) |
+| 06 | Maintenance | `06_Maintenance.gs` (diagnostics, cache, undo) |
+| 07 | Dev Tools | `07_DevTools.gs` (remove before production) |
+| 08 | Sheet Utilities | `08a_SheetSetup.gs`, `08b_SearchAndCharts.gs`, `08c_FormsAndNotifications.gs`, `08d_AuditAndFormulas.gs` |
+| 09 | Dashboards | `09_Dashboards.gs` |
+| 10 | Business Logic | `10_Main.gs`, `10a_SheetCreation.gs`, `10b_SurveyDocSheets.gs`, `10c_FormHandlers.gs`, `10d_SyncAndMaintenance.gs` |
+| 11 | Command Hub | `11_CommandHub.gs` |
+| 12 | Features | `12_Features.gs` (Dynamic Engine, Looker) |
+| 13 | Self-Service | `13_MemberSelfService.gs` (PIN auth) |
+| 14 | Meetings | `14_MeetingCheckIn.gs` |
+| -- | HTML | `MultiSelectDialog.html` |
+
+### Design Principles
+
+- **Separation of Concerns**: Each file has one clear purpose
+- **Numbered Prefixes**: Show dependency order for build concatenation
+- **Production Ready**: Delete `07_DevTools.gs` for a 26-file production deployment
+- **Failure Isolation**: A bug in Calendar sync won't break the Member Directory
+- **Self-Healing**: Hidden calculation sheets auto-repair their formulas
+- **Performance**: CacheService integration and batch operations handle 5,000+ members
+
+---
 
 ## Troubleshooting
 
 ### Running Diagnostics
-1. Open **Union Dashboard** menu
-2. Select **Admin Tools > System Diagnostics**
-3. Review errors and warnings
-4. Click **Run Repair** to fix common issues
+
+1. Go to **Admin > System Diagnostics**
+2. Review the diagnostic report for errors and warnings
+3. Click **Run Repair** to fix common issues
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| Missing sheets | Run **Repair Dashboard** |
-| Broken formulas | Run **Repair Dashboard** |
+| Problem | Solution |
+|---------|----------|
+| Menus don't appear | Refresh the page (F5), or run `onOpen()` from the Apps Script editor |
+| Missing sheets | Run **Admin > Setup > Hidden Sheets** or `CREATE_509_DASHBOARD()` |
+| Broken formulas | Run **Admin > Repair Dashboard** |
 | Calendar not syncing | Check Calendar permissions in Settings |
-| Slow performance | Reduce data in Member Directory |
+| Columns not auto-updating | Run **Admin > Data Sync > Sync All Data** |
+| Dashboard shows stale data | Run **Admin > Cache > Clear All Caches** |
+| Slow performance | Clear caches and reduce data in Member Directory |
+| Authorization error | Re-authorize: run any function from the Apps Script editor and follow the prompts |
+| Hidden sheets missing | Run **Admin > Setup > Setup All Hidden Sheets** |
+| Demo menu won't go away | Close and reopen the spreadsheet after running NUKE |
+
+### FAQ
+
+**Q: How many members can it handle?**
+A: The system is optimized for 5,000+ members using batch operations and caching.
+
+**Q: Can I use this on mobile?**
+A: Yes. Use **Field Portal > Field Accessibility > Mobile View** for a phone-optimized layout, or access the web app portal.
+
+**Q: Is member data visible to everyone?**
+A: No. The Member Dashboard uses PII masking to hide personal information. Only the Steward Dashboard shows full member data.
+
+**Q: Can I undo changes?**
+A: The system has a 50-action undo/redo history. You can also check the audit log for change tracking.
+
+**Q: How do I back up my data?**
+A: Use Google Sheets' built-in version history (File > Version history) or make a copy of the spreadsheet (File > Make a copy).
+
+---
+
+## Documentation Index
+
+| Document | Description |
+|----------|-------------|
+| [FEATURES.md](FEATURES.md) | Complete searchable feature reference (23 categories) |
+| [USER_TUTORIALS.md](USER_TUTORIALS.md) | Step-by-step tutorials for common tasks |
+| [STEWARD_GUIDE.md](STEWARD_GUIDE.md) | Guide for stewards using the system |
+| [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | Architecture, code patterns, and debugging |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute to the project |
+| [CHANGELOG.md](CHANGELOG.md) | Detailed version history |
+| [INTERACTIVE_DASHBOARD_GUIDE.md](INTERACTIVE_DASHBOARD_GUIDE.md) | Dashboard customization guide |
+| [COMFORT_VIEW_GUIDE.md](COMFORT_VIEW_GUIDE.md) | Accessibility and visual comfort features |
+| [GRIEVANCE_WORKFLOW_GUIDE.md](GRIEVANCE_WORKFLOW_GUIDE.md) | Grievance filing workflow |
+| [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) | Demo data seeding and cleanup |
+| [QUICK_DEPLOY.md](QUICK_DEPLOY.md) | Fast deployment instructions |
+| [AIR.md](AIR.md) | Full architecture and implementation reference |
+| [SECURITY_REVIEW.md](SECURITY_REVIEW.md) | Security analysis and findings |
+
+### Setup Guides
+
+| Guide | Description |
+|-------|-------------|
+| [Heatmap Setup](setup-instructions/01_HEATMAP_SETUP.md) | Color gradient configuration |
+| [OCR Setup](setup-instructions/02_OCR_SETUP.md) | Google Cloud Vision API for OCR |
+| [Drive URL Setup](setup-instructions/04_RESOURCE_DRIVE_URL_LINK_SETUP.md) | Shared documents folder linking |
+| [Dropbox Setup](setup-instructions/05_RESOURCE_DROPBOX_SETUP.md) | Resource dropbox folder setup |
+| [PDF Generation](setup-instructions/06_PDF_GENERATION_SETUP.md) | PDF template and email setup |
+
+---
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make changes in `src/` files
-4. Test with `npm run build`
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Edit files in `src/`
+4. Run `npm test` (lint + build + tests)
+5. Commit with descriptive messages
+6. Submit a pull request
 
-## License
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
-MIT License - see LICENSE file for details.
+---
 
 ## Version History
 
-- **4.6.0** (2026-02-12) - Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling
-- **4.5.1** (2026-02-11) - Fixed GRIEVANCE_OUTCOMES/generateGrievanceId missing definitions, engagement tracking fixes, 950 Jest unit tests
-- **4.5.0** (2026-02-01) - Security Module, Data Access Layer, Member Self-Service with PIN authentication, comprehensive bug fixes
-- **4.4.1** (2026-01-31) - Dynamic Engine & Looker Studio: Member Leaders, Column Expansion, Self-Healing, Grievance Reminders, Looker Integration (Standard & PII-Free)
-- **4.4.0** (2026-01-30) - Grievance tracking, member dashboard, satisfaction surveys, calendar integration, email notifications
-- **4.3.8** - Searchable Help Guide & Modal Consolidation: Help modal with menu reference/FAQ, Member Satisfaction sheet hidden
-- **4.3.7** - Dynamic Row Styling: Uses `getMaxRows()` for styling all sheet rows
-- **4.3.6** - Full Row Styling: Zebra stripes and themes apply to all rows in data sheets
-- **4.3.5** - Production Polish: Demo menu fix, NUKE cleans docs and applies tab colors
-- **4.3.4** - Satisfaction Analytics: 8-section survey analysis in both dashboards
-- **4.3.3** - Unified Two-Dashboard Architecture: Steward Dashboard + Member Dashboard
-- **4.3.2** - Modal Dashboard Consolidation: Deprecated sheet-based dashboards
-- **4.2.0** - Modal Command Center: All dashboards converted to modal SPA architecture, Web App entry point with member portal, removed orphaned code
-- **4.1.0** - Multi-Key Smart Match for duplicate prevention, Analytics wiring, Search Precedents feature
-- **4.0.3** - Material Design Integration with Google Charts, Safety Valve PII scrubbing, Weingarten Rights utility (11-file architecture)
-- **4.0.2** - Secure Member Dashboard with live steward search and zero PII exposure
-- **4.0.0** - Unified Master Engine with PDF generation, mobile view, analytics hooks
-- **3.6.0** - Strategic Command Center with dual-dashboards, midnight auto-refresh, dynamic config
-- **2.3.0** - Enhanced grievance dashboard with 9-file modular architecture
-- **2.2.0** - Complete feature parity with 16-module modular architecture
-- **2.0.0** - Initial modular multi-file architecture
-- **1.x** - Original monolithic version
+| Version | Date | Highlights |
+|---------|------|------------|
+| **4.6.0** | 2026-02-12 | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling |
+| **4.5.1** | 2026-02-11 | Engagement tracking fixes, 950 Jest unit tests, critical bug fixes |
+| **4.5.0** | 2026-02-01 | Security module, Data Access Layer, Member Self-Service with PIN auth, consolidated 27-file architecture |
+| **4.4.1** | 2026-01-31 | Dynamic Engine, Looker Studio integration, Grievance Reminders |
+| **4.4.0** | 2026-01-30 | Grievance tracking, dashboards, satisfaction surveys, calendar integration |
+| **4.3.x** | 2026-01 | Searchable Help Guide, two-dashboard architecture, production polish |
+| **4.2.0** | 2026-01 | Modal SPA architecture, Web App entry point, member portal |
+| **4.0.x** | 2026-01 | Strategic Command Center, PDF engine, mobile view, Material Design |
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
+
+---
+
+## License
+
+MIT License - Free for personal use. See LICENSE file for details.
+
+**Creator:** Wardis N. Vizcaino (wardis@pm.me)

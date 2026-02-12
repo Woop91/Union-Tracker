@@ -445,8 +445,8 @@ Your dashboard is **production-ready**! 🚀
 
 ---
 
-**Last Updated**: 2026-01-18
-**Version**: 4.3.8
+**Last Updated**: 2026-02-12
+**Version**: 4.6.0
 
 ---
 

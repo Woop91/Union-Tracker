@@ -53,50 +53,67 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 ```
 .
-├── src/                    # Source files (16 .gs + 1 .html)
-│   ├── 00_Security.gs      # Security utilities, XSS prevention
-│   ├── 00_DataAccess.gs    # Data Access Layer
-│   ├── 01_Core.gs          # Error handling + Constants
-│   ├── 02_DataManagers.gs  # Member + Grievance managers
-│   ├── 03_UIComponents.gs  # Menu, Theme, Mobile
-│   ├── 04_UIService.gs     # UI dialogs and panels
-│   ├── 05_Integrations.gs  # External integrations
-│   ├── 06_Maintenance.gs   # Diagnostics, cache, undo
-│   ├── 07_DevTools.gs      # Development tools
-│   ├── 08_SheetUtils.gs    # Sheet creation, validation
-│   ├── 09_Dashboards.gs    # Dashboards and sync
-│   ├── 10_Code.gs          # Core business logic
-│   ├── 10_Main.gs          # Main entry point
-│   ├── 11_CommandHub.gs    # Command center
-│   ├── 12_Features.gs      # Checklist, Dynamic, Looker
-│   ├── 13_MemberSelfService.gs  # PIN authentication
+├── src/                    # Source files (27 .gs + 1 .html)
+│   ├── 00_Security.gs              # Security utilities, XSS prevention
+│   ├── 00_DataAccess.gs            # Data Access Layer
+│   ├── 01_Core.gs                  # Error handling + Constants
+│   ├── 02_DataManagers.gs          # Member + Grievance managers
+│   ├── 03_UIComponents.gs          # Menu, Theme, Mobile
+│   ├── 04a_UIMenus.gs              # Menu creation, dialogs, sidebar
+│   ├── 04b_AccessibilityFeatures.gs # Comfort view, focus mode, import/export
+│   ├── 04c_InteractiveDashboard.gs # Interactive dashboard, mobile views
+│   ├── 04d_ExecutiveDashboard.gs   # Executive dashboard, alerts
+│   ├── 04e_PublicDashboard.gs      # Public member dashboard
+│   ├── 05_Integrations.gs          # Drive, Calendar, WebApp
+│   ├── 06_Maintenance.gs           # Diagnostics, cache, undo
+│   ├── 07_DevTools.gs              # Development tools (remove before prod)
+│   ├── 08a_SheetSetup.gs           # Setup, utilities, data validation
+│   ├── 08b_SearchAndCharts.gs      # Search functions, chart generation
+│   ├── 08c_FormsAndNotifications.gs # Forms, notifications, alerts
+│   ├── 08d_AuditAndFormulas.gs     # Audit log, formula sync
+│   ├── 09_Dashboards.gs            # Dashboards and sync
+│   ├── 10a_SheetCreation.gs        # Sheet creation functions
+│   ├── 10b_SurveyDocSheets.gs      # Survey, FAQ, Getting Started sheets
+│   ├── 10c_FormHandlers.gs         # Form submissions, flagged reviews
+│   ├── 10d_SyncAndMaintenance.gs   # Data sync, formatting, maintenance
+│   ├── 10_Main.gs                  # Main entry point, triggers
+│   ├── 11_CommandHub.gs            # Command center
+│   ├── 12_Features.gs              # Dynamic Engine, Looker Studio
+│   ├── 13_MemberSelfService.gs     # PIN authentication portal
+│   ├── 14_MeetingCheckIn.gs        # Meeting check-in system
 │   └── MultiSelectDialog.html
 ├── test/                   # Jest unit tests
 │   ├── gas-mock.js         # GAS environment mocks
 │   ├── load-source.js      # Source file loader
-│   └── *.test.js           # Test files (950 tests)
+│   └── *.test.js           # Test files (950+ tests)
 ├── dist/                   # Built output (auto-generated)
+├── setup-instructions/     # Optional feature setup guides
 ├── .github/workflows/      # CI/CD configuration
 ├── build.js               # Build script
 ├── jest.config.js         # Jest configuration
 ├── package.json           # Node.js configuration
-└── eslint.config.mjs      # ESLint configuration
+└── eslint.config.js       # ESLint configuration (v9 flat config)
 ```
 
 ### Module Naming Convention
 
 | Prefix | Purpose |
 |--------|---------|
-| 00_ | Utilities loaded first |
+| 00_ | Foundation (security, data access) |
 | 01_ | Constants and configuration |
-| 02_-03_ | Data managers |
-| 04_ | UI/presentation layer |
-| 05_ | External integrations |
+| 02_ | Data managers (member, grievance) |
+| 03_ | UI components (menu, theme, mobile) |
+| 04a-e_ | UI features (menus, accessibility, dashboards) |
+| 05_ | External integrations (Drive, Calendar, WebApp) |
 | 06_ | Maintenance and diagnostics |
-| 07_ | Development tools |
-| 08_ | Core business logic |
-| 09_ | Main entry point |
-| 10_+ | Feature modules |
+| 07_ | Development tools (remove before production) |
+| 08a-d_ | Sheet utilities (setup, search, forms, audit) |
+| 09_ | Dashboard sync and satisfaction |
+| 10_, 10a-d_ | Business logic, sheet creation, entry point |
+| 11_ | Command center hub |
+| 12_ | Feature extensions (Dynamic Engine, Looker) |
+| 13_ | Member self-service (PIN auth) |
+| 14_ | Meeting check-in system |
 
 ## Coding Standards
 

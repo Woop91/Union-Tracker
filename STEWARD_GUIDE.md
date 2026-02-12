@@ -7,7 +7,7 @@
 
 ### 📊 Steward Workload Dashboard
 
-**Access:** `🛡️ Data Integrity > 📊 Steward Workload Dashboard`
+**Access:** `Strategic Ops > Analytics & Charts > Workload Report`
 
 The new **Steward Workload Dashboard** helps leadership balance case assignments across stewards:
 
@@ -29,7 +29,7 @@ The new **Steward Workload Dashboard** helps leadership balance case assignments
 
 ### 📱 Mobile Steward Portal
 
-**Access:** `🛡️ Data Integrity > 📱 Create/Update Steward Portal`
+**Access:** `Field Portal > Field Accessibility > Mobile View`
 
 A mobile-optimized portal sheet for stewards in the field:
 
@@ -88,7 +88,7 @@ As a steward, you can now send satisfaction surveys directly to members:
 
 ## 🆕 NEW: My Cases Tab - Track Your Assigned Grievances!
 
-**Access:** `📊 509 Dashboard > 📊 Dashboard > My Cases tab`
+**Access:** `Strategic Ops > Command Center > Steward Dashboard > My Cases tab`
 
 The new **My Cases** tab lets you view all grievances assigned to YOU in one place:
 
@@ -234,7 +234,7 @@ Run these reports weekly to **celebrate your progress**:
 
 **📈 Member Completion Rate:**
 ```
-509 Tools → Data Validation → Run Integrity Check
+Admin > Validation > Run Bulk Validation
 ```
 - See how many fields you've completed
 - **Goal**: Increase completion % each week!
@@ -242,7 +242,7 @@ Run these reports weekly to **celebrate your progress**:
 
 **👥 Engagement Tracking:**
 ```
-509 Tools → Member Engagement → Update Engagement Levels
+Admin > Data Sync > Sync All Data
 ```
 - See how many members moved from "Low" to "Medium" or "High"
 - **Goal**: Help 5 members level up each month!
@@ -468,25 +468,25 @@ Run these reports weekly to **celebrate your progress**:
 
 **To See Your Progress:**
 ```
-509 Tools → 🔍 Data Validation → Run Integrity Check
+Admin > Validation > Run Bulk Validation
 ```
 **Result**: See completion percentages and celebrate improvements!
 
 **To Find Members Needing Updates:**
 ```
-509 Tools → 👥 Member Engagement → Find Inactive Members
+Union Hub > Members > Find Member (filter by blank fields)
 ```
 **Result**: Instant list of who could use your outreach!
 
 **To Track Your Impact:**
 ```
-509 Tools → 📊 Data Management → Rebuild Dashboard
+Admin > Data Sync > Sync All Data
 ```
 **Result**: See how the dashboard improves with your updates!
 
 **To Update Engagement Levels:**
 ```
-509 Tools → 👥 Member Engagement → Update Engagement Levels
+Admin > Automation > Auto-Refresh
 ```
 **Result**: Automatic analysis based on activity!
 
@@ -589,8 +589,8 @@ Reach out to your fellow stewards or leadership. We're all in this together! �
 
 ---
 
-**Last Updated**: January 2026
-**Version**: 4.0.3
+**Last Updated**: February 2026
+**Version**: 4.6.0
 **Created with**: Deep appreciation for steward dedication
 **Purpose**: Celebrating and supporting stewards everywhere 💙
 

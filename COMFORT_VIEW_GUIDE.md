@@ -1,5 +1,7 @@
 # Comfort View Dashboard Guide
 
+**Version:** 4.6.0 | **Last Updated:** 2026-02-12
+
 ## Quick Setup (Do This First!)
 
 ### One-Click Setup
@@ -469,4 +471,8 @@ View → Comfort View → Comfort View Panel
 **You've got this!**
 
 *Dashboard designed with visual comfort in mind*
-*Questions? Check View → Comfort View menu*
+*Questions? Check Union Hub > Comfort View menu*
+
+---
+
+**Version:** 4.6.0 | **Last Updated:** 2026-02-12
