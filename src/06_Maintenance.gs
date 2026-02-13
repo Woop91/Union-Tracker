@@ -732,7 +732,7 @@ function getCachedStewards() {
   return getCachedData(CACHE_KEYS.ALL_STEWARDS, function() {
     var members = getCachedMembers();
     return members.filter(function(row) {
-      return row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes';
+      return isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1]);
     });
   }, 600);
 }

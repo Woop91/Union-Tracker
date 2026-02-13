@@ -160,7 +160,7 @@ function getStewardEmailsForMeetingSetup() {
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
-      if (isSteward === 'Yes' || isSteward === true) {
+      if (isTruthyValue(isSteward)) {
         var email = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim();
         if (email) {
           result.push({

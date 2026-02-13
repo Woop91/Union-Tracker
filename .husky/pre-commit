@@ -1,17 +1,30 @@
 #!/bin/sh
-# Pre-commit hook - runs linting and build before allowing commit
+# Pre-commit hook - runs lint-staged and build verification before allowing commit
 
-echo "🔍 Running pre-commit checks..."
+echo "Running pre-commit checks..."
 echo ""
 
-# Run lint only (faster than full test)
-npm run lint
+# Step 1: Lint staged files only (faster than linting all files)
+echo "[1/2] Linting staged files..."
+npx lint-staged
 
 if [ $? -ne 0 ]; then
   echo ""
-  echo "❌ Lint failed. Please fix errors before committing."
+  echo "Lint failed. Fix the errors above before committing."
+  echo "  Run 'npm run lint:fix' to auto-fix some issues."
+  exit 1
+fi
+
+# Step 2: Build verification
+echo ""
+echo "[2/2] Verifying build..."
+npm run build > /dev/null 2>&1
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "Build failed. Run 'npm run build' to see details."
   exit 1
 fi
 
 echo ""
-echo "✅ Pre-commit checks passed!"
+echo "Pre-commit checks passed."

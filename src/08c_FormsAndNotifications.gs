@@ -335,6 +335,23 @@ function onContactFormSubmit(e) {
       // Log with masked name for privacy
       Logger.log('Created new member ' + memberId + ': ' + maskedName);
 
+      // Send acknowledgment email if email provided
+      if (email) {
+        try {
+          MailApp.sendEmail({
+            to: email,
+            subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Welcome to WFSE Local 509',
+            body: 'Hello ' + firstName + ',\n\n' +
+              'Thank you for submitting your contact information. ' +
+              'Your Member ID is: ' + memberId + '\n\n' +
+              'Your information has been recorded and a union steward will be in touch.\n\n' +
+              'Best regards,\nWFSE Local 509'
+          });
+        } catch (emailError) {
+          Logger.log('Could not send welcome email: ' + emailError.message);
+        }
+      }
+
     } else {
       // Update existing member record with form data
       var updates = [];
@@ -418,7 +435,11 @@ function setupContactFormTrigger() {
     // Extract form ID from URL
     var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match) {
-      ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+      ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
       return;
     }
     var formId = match[1];
@@ -501,7 +522,11 @@ function setupGrievanceFormTrigger() {
       // Extract form ID from URL
       var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
       if (!match) {
-        ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+        ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
         return;
       }
       formId = match[1];
@@ -784,6 +809,21 @@ function onSatisfactionFormSubmit(e) {
 
     Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + newRow[SATISFACTION_COLS.VERIFIED - 1]);
 
+    // Send thank-you email if respondent email available
+    if (email) {
+      try {
+        MailApp.sendEmail({
+          to: email,
+          subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Thank You for Your Feedback',
+          body: 'Thank you for completing the member satisfaction survey.\n\n' +
+            'Your feedback helps us improve our representation and services.\n\n' +
+            'Best regards,\nWFSE Local 509'
+        });
+      } catch (emailError) {
+        Logger.log('Could not send survey thank-you email: ' + emailError.message);
+      }
+    }
+
   } catch (error) {
     Logger.log('Error processing satisfaction survey submission: ' + error.message);
     throw error;
@@ -838,7 +878,11 @@ function setupSatisfactionFormTrigger() {
     // Extract form ID from URL
     var match = formUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!match) {
-      ui.alert('Invalid URL', 'Could not extract form ID from URL.', ui.ButtonSet.OK);
+      ui.alert('Invalid URL',
+        'Could not extract form ID from URL.\n\n' +
+        'Please use the form\'s edit URL. It should look like:\n' +
+        'https://docs.google.com/forms/d/YOUR_FORM_ID/edit',
+        ui.ButtonSet.OK);
       return;
     }
     var formId = match[1];

@@ -66,6 +66,41 @@ function withErrorHandling(fn, context) {
 }
 
 /**
+ * Creates a standardized success response object
+ * @param {*} [data] - Optional response data
+ * @param {string} [message] - Optional success message
+ * @returns {{success: true, data: *, message: string}}
+ */
+function successResponse(data, message) {
+  return { success: true, data: data || null, message: message || '' };
+}
+
+/**
+ * Creates a standardized error response object
+ * @param {string} error - Error message
+ * @param {string} [context] - Context where error occurred
+ * @returns {{success: false, error: string, context: string}}
+ */
+function errorResponse(error, context) {
+  return { success: false, error: error || 'An unexpected error occurred', context: context || '' };
+}
+
+/**
+ * Normalizes boolean-like values from Google Sheets to a consistent boolean.
+ * Handles: true, 'Yes', 'TRUE', 'true', 'yes', 1, '1'
+ * @param {*} value - The value to check
+ * @returns {boolean} True if the value represents a truthy/yes value
+ */
+function isTruthyValue(value) {
+  if (value === true || value === 1) return true;
+  if (typeof value === 'string') {
+    var lower = value.trim().toLowerCase();
+    return lower === 'yes' || lower === 'true' || lower === '1';
+  }
+  return false;
+}
+
+/**
  * Central error handler
  * @param {Error} error - The error object
  * @param {string} context - Where the error occurred

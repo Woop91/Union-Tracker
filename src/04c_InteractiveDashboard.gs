@@ -166,6 +166,7 @@ function getInteractiveDashboardHtml() {
     '.filter-select:focus{outline:none;border-color:#7C3AED}' +
 
     // Search input
+    '.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}' +
     '.search-container{position:relative;margin-bottom:12px}' +
     '.search-input{width:100%;padding:10px 10px 10px 36px;border:2px solid #e5e7eb;border-radius:8px;font-size:13px;transition:border-color 0.2s}' +
     '.search-input:focus{outline:none;border-color:#7C3AED}' +
@@ -242,24 +243,24 @@ function getInteractiveDashboardHtml() {
     '</div>' +
 
     // Tab Navigation (6 tabs now - including My Cases)
-    '<div class="tabs">' +
-    '<button class="tab active" onclick="switchTab(\'overview\',this)" id="tab-overview"><span class="tab-icon">📊</span>Overview</button>' +
-    '<button class="tab" onclick="switchTab(\'mycases\',this)" id="tab-mycases"><span class="tab-icon">👤</span>My Cases</button>' +
-    '<button class="tab" onclick="switchTab(\'members\',this)" id="tab-members"><span class="tab-icon">👥</span>Members</button>' +
-    '<button class="tab" onclick="switchTab(\'grievances\',this)" id="tab-grievances"><span class="tab-icon">📋</span>Grievances</button>' +
-    '<button class="tab" onclick="switchTab(\'analytics\',this)" id="tab-analytics"><span class="tab-icon">📈</span>Analytics</button>' +
-    '<button class="tab" onclick="switchTab(\'resources\',this)" id="tab-resources"><span class="tab-icon">🔗</span>Links</button>' +
+    '<div class="tabs" role="tablist" aria-label="Dashboard navigation">' +
+    '<button class="tab active" role="tab" aria-selected="true" aria-controls="content-overview" onclick="switchTab(\'overview\',this)" id="tab-overview"><span class="tab-icon">📊</span>Overview</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-mycases" onclick="switchTab(\'mycases\',this)" id="tab-mycases"><span class="tab-icon">👤</span>My Cases</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-members" onclick="switchTab(\'members\',this)" id="tab-members"><span class="tab-icon">👥</span>Members</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-grievances" onclick="switchTab(\'grievances\',this)" id="tab-grievances"><span class="tab-icon">📋</span>Grievances</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-analytics" onclick="switchTab(\'analytics\',this)" id="tab-analytics"><span class="tab-icon">📈</span>Analytics</button>' +
+    '<button class="tab" role="tab" aria-selected="false" aria-controls="content-resources" onclick="switchTab(\'resources\',this)" id="tab-resources"><span class="tab-icon">🔗</span>Links</button>' +
     '</div>' +
 
     // Overview Tab
-    '<div class="tab-content active" id="content-overview">' +
+    '<div class="tab-content active" id="content-overview" role="tabpanel" aria-labelledby="tab-overview">' +
     '<div class="stats-grid" id="overview-stats"><div class="loading"><div class="spinner"></div><p>Loading stats...</p></div></div>' +
     '<div id="overview-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px"></div>' +
     '<div id="overview-overdue" style="margin-top:15px"></div>' +
     '</div>' +
 
     // My Cases Tab - Shows steward's assigned grievances
-    '<div class="tab-content" id="content-mycases">' +
+    '<div class="tab-content" id="content-mycases" role="tabpanel" aria-labelledby="tab-mycases">' +
     '<div class="section-card" style="background:linear-gradient(135deg,#f0f4ff,#e8f0fe);border-left:4px solid #7C3AED;margin-bottom:15px">' +
     '<div style="display:flex;align-items:center;gap:10px"><span style="font-size:24px">👤</span><div><strong>My Assigned Cases</strong><div style="font-size:12px;color:#666">Grievances where you are the assigned steward</div></div></div>' +
     '</div>' +
@@ -274,8 +275,8 @@ function getInteractiveDashboardHtml() {
     '</div>' +
 
     // Members Tab
-    '<div class="tab-content" id="content-members">' +
-    '<div class="search-container"><span class="search-icon">🔍</span><input type="text" class="search-input" id="member-search" placeholder="Search by name, ID, title, location..." oninput="filterMembers()"></div>' +
+    '<div class="tab-content" id="content-members" role="tabpanel" aria-labelledby="tab-members">' +
+    '<div class="search-container"><span class="search-icon" aria-hidden="true">🔍</span><label for="member-search" class="sr-only">Search members</label><input type="text" class="search-input" id="member-search" placeholder="Search by name, ID, title, location..." oninput="filterMembers()" aria-label="Search members by name, ID, title, or location"></div>' +
     '<div class="filter-bar" id="member-filters"></div>' +
     '<div style="margin-bottom:12px"><button class="action-btn action-btn-primary" onclick="showAddMemberForm()">➕ Add New Member</button></div>' +
     '<div class="list-container" id="members-list"><div class="loading"><div class="spinner"></div><p>Loading members...</p></div></div>' +
@@ -303,8 +304,8 @@ function getInteractiveDashboardHtml() {
     '</div>' +
 
     // Grievances Tab
-    '<div class="tab-content" id="content-grievances">' +
-    '<div class="search-container"><span class="search-icon">🔍</span><input type="text" class="search-input" id="grievance-search" placeholder="Search by ID, member name, issue..." oninput="filterGrievances()"></div>' +
+    '<div class="tab-content" id="content-grievances" role="tabpanel" aria-labelledby="tab-grievances">' +
+    '<div class="search-container"><span class="search-icon" aria-hidden="true">🔍</span><label for="grievance-search" class="sr-only">Search grievances</label><input type="text" class="search-input" id="grievance-search" placeholder="Search by ID, member name, issue..." oninput="filterGrievances()" aria-label="Search grievances by ID, member name, or issue"></div>' +
     '<div class="filter-bar" id="grievance-filter-bar">' +
     '<button class="action-btn action-btn-primary active" data-filter="all" onclick="filterGrievanceStatus(\'all\',this)">All</button>' +
     '<button class="action-btn action-btn-secondary" data-filter="Open" onclick="filterGrievanceStatus(\'Open\',this)">Open</button>' +
@@ -316,12 +317,12 @@ function getInteractiveDashboardHtml() {
     '</div>' +
 
     // Analytics Tab
-    '<div class="tab-content" id="content-analytics">' +
+    '<div class="tab-content" id="content-analytics" role="tabpanel" aria-labelledby="tab-analytics">' +
     '<div id="analytics-charts"><div class="loading"><div class="spinner"></div><p>Loading analytics...</p></div></div>' +
     '</div>' +
 
     // Resources Tab
-    '<div class="tab-content" id="content-resources">' +
+    '<div class="tab-content" id="content-resources" role="tabpanel" aria-labelledby="tab-resources">' +
     '<div id="resources-content"><div class="loading"><div class="spinner"></div><p>Loading links...</p></div></div>' +
     '</div>' +
 
@@ -341,9 +342,10 @@ function getInteractiveDashboardHtml() {
     // Tab switching with error handling
     'function switchTab(tabName,btn){' +
     '  safeRun(function(){' +
-    '    document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});' +
+    '    document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active");t.setAttribute("aria-selected","false")});' +
     '    document.querySelectorAll(".tab-content").forEach(function(c){c.classList.remove("active")});' +
     '    btn.classList.add("active");' +
+    '    btn.setAttribute("aria-selected","true");' +
     '    document.getElementById("content-"+tabName).classList.add("active");' +
     '    if(tabName==="mycases"&&myCases.length===0)loadMyCases();' +
     '    if(tabName==="members"&&allMembers.length===0)loadMembers();' +
@@ -352,6 +354,26 @@ function getInteractiveDashboardHtml() {
     '    if(tabName==="resources")loadResources();' +
     '  });' +
     '}' +
+
+    // Keyboard navigation for tabs
+    'document.addEventListener("keydown",function(e){' +
+    '  var activeTab=document.querySelector(".tab.active");' +
+    '  if(!activeTab)return;' +
+    '  var tabs=Array.prototype.slice.call(document.querySelectorAll(".tab"));' +
+    '  var idx=tabs.indexOf(activeTab);' +
+    '  if(idx===-1)return;' +
+    '  if(e.key==="ArrowRight"||e.key==="ArrowDown"){' +
+    '    e.preventDefault();' +
+    '    var next=tabs[(idx+1)%tabs.length];' +
+    '    next.click();' +
+    '    next.focus();' +
+    '  }else if(e.key==="ArrowLeft"||e.key==="ArrowUp"){' +
+    '    e.preventDefault();' +
+    '    var prev=tabs[(idx-1+tabs.length)%tabs.length];' +
+    '    prev.click();' +
+    '    prev.focus();' +
+    '  }' +
+    '});' +
 
     // Load overview data with error handling
     'function loadOverview(){' +
@@ -1005,7 +1027,7 @@ function getInteractiveOverviewData() {
       if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return;
 
       data.totalMembers++;
-      if (row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.activeStewards++;
+      if (isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) data.activeStewards++;
 
       // Count by location
       var location = row[MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
@@ -1073,9 +1095,9 @@ function getInteractiveMemberData() {
       phone: row[MEMBER_COLS.PHONE - 1] || '',
       preferredComm: row[MEMBER_COLS.PREFERRED_COMM - 1] || 'N/A',
       supervisor: row[MEMBER_COLS.SUPERVISOR - 1] || 'N/A',
-      isSteward: row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes',
+      isSteward: isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1]),
       assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1] || 'N/A',
-      hasOpenGrievance: row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] === 'Yes',
+      hasOpenGrievance: isTruthyValue(row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1]),
       grievanceStatus: row[MEMBER_COLS.GRIEVANCE_STATUS - 1] || ''
     };
   }).filter(function(m) { return m !== null; });
@@ -1145,7 +1167,7 @@ function getMyStewardCases() {
     var memberData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, MEMBER_COLS.IS_STEWARD).getValues();
     for (var i = 0; i < memberData.length; i++) {
       var memberEmail = memberData[i][MEMBER_COLS.EMAIL - 1] || '';
-      if (memberEmail.toLowerCase() === email.toLowerCase() && memberData[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+      if (memberEmail.toLowerCase() === email.toLowerCase() && isTruthyValue(memberData[i][MEMBER_COLS.IS_STEWARD - 1])) {
         userStewardName = ((memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (memberData[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
         break;
       }
@@ -1250,8 +1272,8 @@ function getInteractiveAnalyticsData() {
       if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return;
 
       data.memberStats.total++;
-      if (row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.memberStats.stewards++;
-      if (row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] === 'Yes') data.memberStats.withOpenGrievance++;
+      if (isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) data.memberStats.stewards++;
+      if (isTruthyValue(row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1])) data.memberStats.withOpenGrievance++;
 
       var location = row[MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
       if (!locationMap[location]) locationMap[location] = { members: 0, grievances: 0, open: 0 };

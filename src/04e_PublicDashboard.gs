@@ -271,7 +271,7 @@ function getUnifiedDashboardData(includePII) {
       var phone = memberData[m][MEMBER_COLS.PHONE - 1] || '';
       var location = memberData[m][MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
       var unit = memberData[m][MEMBER_COLS.UNIT - 1] || 'Unknown';
-      var isSteward = memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes';
+      var isSteward = isTruthyValue(memberData[m][MEMBER_COLS.IS_STEWARD - 1]);
       var lastUpdated = memberData[m][MEMBER_COLS.RECENT_CONTACT_DATE - 1];
 
       // Engagement metrics from columns Q-W
@@ -308,13 +308,13 @@ function getUnifiedDashboardData(includePII) {
       }
 
       // Track union interest (Yes/True/true values)
-      if (interestLocal && (interestLocal === 'Yes' || interestLocal === true || interestLocal === 'TRUE' || interestLocal === 'true')) {
+      if (isTruthyValue(interestLocal)) {
         interestLocalCount++;
       }
-      if (interestChapter && (interestChapter === 'Yes' || interestChapter === true || interestChapter === 'TRUE' || interestChapter === 'true')) {
+      if (isTruthyValue(interestChapter)) {
         interestChapterCount++;
       }
-      if (interestAllied && (interestAllied === 'Yes' || interestAllied === true || interestAllied === 'TRUE' || interestAllied === 'true')) {
+      if (isTruthyValue(interestAllied)) {
         interestAlliedCount++;
       }
 
@@ -1102,7 +1102,7 @@ function getUnifiedDashboardData(includePII) {
  * @returns {string} JSON dashboard data
  */
 function getUnifiedDashboardDataAPI(isPII) {
-  return getUnifiedDashboardData(isPII === true || isPII === 'true');
+  return getUnifiedDashboardData(isTruthyValue(isPII));
 }
 
 /**
@@ -1114,7 +1114,7 @@ function getUnifiedDashboardDataAPI(isPII) {
  * @returns {string} JSON dashboard data filtered by date range
  */
 function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
-  var fullData = JSON.parse(getUnifiedDashboardData(isPII === true || isPII === 'true'));
+  var fullData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
 
   // If no filtering requested, return full data
   if (!days && !fromDate) {

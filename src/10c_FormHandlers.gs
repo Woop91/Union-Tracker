@@ -185,7 +185,7 @@ function getCurrentStewardInfo_(ss) {
     var email = data[i][MEMBER_COLS.EMAIL - 1];
     var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
 
-    if (email && email.toLowerCase() === currentUserEmail.toLowerCase() && isSteward === 'Yes') {
+    if (email && email.toLowerCase() === currentUserEmail.toLowerCase() && isTruthyValue(isSteward)) {
       return {
         firstName: data[i][MEMBER_COLS.FIRST_NAME - 1] || '',
         lastName: data[i][MEMBER_COLS.LAST_NAME - 1] || '',

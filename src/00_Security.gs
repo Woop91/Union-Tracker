@@ -355,7 +355,7 @@ function getUserRole_(email) {
           var memberEmail = data[i][MEMBER_COLUMNS.EMAIL] || '';
           if (memberEmail.toLowerCase() === email.toLowerCase()) {
             var isSteward = data[i][MEMBER_COLUMNS.IS_STEWARD];
-            if (isSteward === true || isSteward === 'Yes' || isSteward === 'TRUE') {
+            if (isTruthyValue(isSteward)) {
               return 'steward';
             }
             return 'member';

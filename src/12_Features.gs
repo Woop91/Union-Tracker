@@ -761,7 +761,7 @@ function handleChecklistEdit(e) {
     return;
   }
 
-  var completed = e.value === 'TRUE' || e.value === true;
+  var completed = isTruthyValue(e.value);
   var caseId = sheet.getRange(row, CHECKLIST_COLS.CASE_ID).getValue();
 
   if (completed) {
@@ -1594,7 +1594,7 @@ function loadMemberData_(options) {
           rowNumber: i + 1
         });
       }
-    } else if (roleStr === 'Yes' || roleValue === true) {
+    } else if (isTruthyValue(roleStr) || isTruthyValue(roleValue)) {
       const steward = { rowNumber: i + 1, fullName: fullName };
       for (let j = 0; j < headers.length; j++) {
         steward[headers[j]] = row[j];

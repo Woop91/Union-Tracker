@@ -114,6 +114,94 @@ function verifyPIN(pin, memberId, storedHash) {
   return computedHash === storedHash;
 }
 
+/**
+ * Assign an initial PIN to a member and optionally email it
+ * @param {string} memberId - The member ID
+ * @param {Object} [options] - Optional settings
+ * @param {boolean} [options.sendEmail] - Whether to email the PIN to the member
+ * @returns {Object} Result with success status and generated PIN
+ */
+function assignMemberPIN(memberId, options) {
+  options = options || {};
+
+  if (!memberId) {
+    return errorResponse('Member ID is required', 'assignMemberPIN');
+  }
+
+  memberId = String(memberId).trim().toUpperCase();
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!sheet) {
+    return errorResponse('System configuration error. Please contact your steward.', 'assignMemberPIN');
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var memberRow = -1;
+  var memberEmail = null;
+  var memberName = null;
+
+  for (var i = 1; i < data.length; i++) {
+    var rowId = String(data[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    if (rowId === memberId) {
+      memberRow = i + 1;
+      memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
+      memberName = ((data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
+      break;
+    }
+  }
+
+  if (memberRow === -1) {
+    return errorResponse('Member not found', 'assignMemberPIN');
+  }
+
+  // Check if member already has a PIN
+  var existingHash = data[memberRow - 1][PIN_CONFIG.PIN_COLUMN - 1];
+  if (existingHash) {
+    return errorResponse('Member already has a PIN assigned. Use PIN reset instead.', 'assignMemberPIN');
+  }
+
+  // Generate and store PIN
+  var newPin = generateMemberPIN();
+  var hashedPin = hashPIN(newPin, memberId);
+  sheet.getRange(memberRow, PIN_CONFIG.PIN_COLUMN).setValue(hashedPin);
+
+  // Log the assignment
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('PIN_ASSIGNED', {
+      memberId: memberId,
+      assignedBy: Session.getActiveUser().getEmail()
+    });
+  }
+
+  // Optionally email the PIN to the member
+  if (options.sendEmail && memberEmail) {
+    try {
+      MailApp.sendEmail({
+        to: memberEmail,
+        subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Your Self-Service Portal PIN',
+        body: 'Hello ' + memberName + ',\n\n' +
+          'A PIN has been set up for you to access the Member Self-Service Portal.\n\n' +
+          'Your PIN is: ' + newPin + '\n\n' +
+          'Please change your PIN after your first login for security.\n\n' +
+          'If you did not expect this, please contact your union steward.\n\n' +
+          'Best regards,\nWFSE Local 509'
+      });
+    } catch (emailError) {
+      Logger.log('Could not send PIN email to member: ' + emailError.message);
+    }
+  }
+
+  return {
+    success: true,
+    memberId: memberId,
+    pin: newPin,
+    emailSent: !!(options.sendEmail && memberEmail),
+    message: 'PIN assigned successfully' + (options.sendEmail && memberEmail ? ' and emailed to member' : '')
+  };
+}
+
 // ============================================================================
 // EMAIL-BASED PIN RESET
 // ============================================================================
@@ -136,7 +224,7 @@ function generateResetToken_() {
  */
 function requestPINReset(memberId) {
   if (!memberId) {
-    return { success: false, error: 'Member ID is required' };
+    return errorResponse('Member ID is required', 'requestPINReset');
   }
 
   memberId = String(memberId).trim().toUpperCase();
@@ -146,7 +234,7 @@ function requestPINReset(memberId) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'System error' };
+    return errorResponse('System configuration error. Please contact your steward.', 'requestPINReset');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -280,7 +368,7 @@ function completePINReset(memberId, token, newPin) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'System error' };
+    return errorResponse('System configuration error. Please try again later.', 'completePINReset');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -433,7 +521,7 @@ function authenticateMember(memberId, pin) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'System error: Member directory not found' };
+    return errorResponse('System temporarily unavailable. Please try again later.', 'authenticateMember');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -478,7 +566,7 @@ function authenticateMember(memberId, pin) {
 
     return {
       success: false,
-      error: 'Invalid Member ID or PIN. ' + attemptResult.attemptsRemaining + ' attempts remaining.'
+      error: 'Invalid Member ID or PIN. Please try again.'
     };
   }
 
