@@ -179,7 +179,7 @@ function parseFormDate_(dateStr) {
       return dateStr; // Return as-is if can't parse
     }
     return date;
-  } catch (e) {
+  } catch (_e) {
     return dateStr;
   }
 }
@@ -1022,7 +1022,7 @@ function checkDeadlinesAndNotify_() {
 
   var data = sheet.getDataRange().getValues();
   var today = new Date();
-  var threeDaysAhead = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+  var _threeDaysAhead = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
   var urgent = [];
 
   for (var i = 1; i < data.length; i++) {
@@ -1339,7 +1339,7 @@ function configureAlertSettings() {
  */
 function sendRandomSurveyEmails() {
   var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Show configuration dialog
   var html = HtmlService.createHtmlOutput(
@@ -1392,7 +1392,7 @@ function executeSendRandomSurveyEmails(opts) {
 
   // Get all members with valid emails
   var memberData = memberSheet.getDataRange().getValues();
-  var headers = memberData[0];
+  var _headers = memberData[0];
   var emailCol = MEMBER_COLS.EMAIL - 1;
   var memberIdCol = MEMBER_COLS.MEMBER_ID - 1;
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;
@@ -1406,7 +1406,7 @@ function executeSendRandomSurveyEmails(opts) {
     logData.forEach(function(row) {
       if (row[0]) surveyLog[row[0]] = new Date(row[1]);
     });
-  } catch(e) { /* No log yet */ }
+  } catch(_e) { /* No log yet */ }
 
   var cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - opts.excludeDays);

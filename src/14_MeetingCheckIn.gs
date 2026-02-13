@@ -43,7 +43,7 @@ function showSetupMeetingDialog() {
  */
 function createMeeting(meetingData) {
   if (!meetingData || !meetingData.name || !meetingData.date) {
-    return { success: false, error: 'Meeting name and date are required' };
+    return errorResponse('Meeting name and date are required');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -358,14 +358,14 @@ function showMeetingCheckInDialog() {
 function processMeetingCheckIn(meetingId, email, pin) {
   // Validate inputs
   if (!meetingId || !email || !pin) {
-    return { success: false, error: 'Meeting, email, and PIN are required' };
+    return errorResponse('Meeting, email, and PIN are required');
   }
 
   email = String(email).trim().toLowerCase();
   pin = String(pin).trim();
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { success: false, error: 'Please enter a valid email address' };
+    return errorResponse('Please enter a valid email address');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -373,14 +373,14 @@ function processMeetingCheckIn(meetingId, email, pin) {
   // Look up member by email
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!memberSheet) {
-    return { success: false, error: 'System error: Member directory not found' };
+    return errorResponse('System error: Member directory not found');
   }
 
   var memberData = memberSheet.getDataRange().getValues();
   var memberId = null;
   var memberName = '';
   var storedHash = '';
-  var memberRow = -1;
+  var _memberRow = -1;
 
   for (var i = 1; i < memberData.length; i++) {
     var rowEmail = String(memberData[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
@@ -389,49 +389,37 @@ function processMeetingCheckIn(meetingId, email, pin) {
       memberName = String(memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
                    String(memberData[i][MEMBER_COLS.LAST_NAME - 1] || '');
       storedHash = String(memberData[i][MEMBER_PIN_COLS.PIN_HASH - 1] || '');
-      memberRow = i;
+      _memberRow = i;
       break;
     }
   }
 
   if (!memberId) {
-    return { success: false, error: 'No member found with that email address' };
+    return errorResponse('No member found with that email address');
   }
 
   // Check for lockout
   if (typeof checkPINLockout === 'function') {
     var lockoutStatus = checkPINLockout(memberId);
     if (lockoutStatus.isLocked) {
-      return {
-        success: false,
-        error: 'Account temporarily locked. Try again in ' + lockoutStatus.remainingMinutes + ' minutes.'
-      };
+      return errorResponse('Account temporarily locked. Try again in ' + lockoutStatus.remainingMinutes + ' minutes.');
     }
   }
 
   // Verify PIN
   if (!storedHash) {
-    return {
-      success: false,
-      error: 'PIN not set. Please contact your steward to set up your PIN.'
-    };
+    return errorResponse('PIN not set. Please contact your steward to set up your PIN.');
   }
 
   if (!verifyPIN(pin, memberId, storedHash)) {
     if (typeof recordFailedPINAttempt === 'function') {
       var attemptResult = recordFailedPINAttempt(memberId);
       if (attemptResult.isNowLocked) {
-        return {
-          success: false,
-          error: 'Too many failed attempts. Account locked for ' + PIN_CONFIG.LOCKOUT_MINUTES + ' minutes.'
-        };
+        return errorResponse('Too many failed attempts. Account locked for ' + PIN_CONFIG.LOCKOUT_MINUTES + ' minutes.');
       }
-      return {
-        success: false,
-        error: 'Invalid PIN. ' + attemptResult.attemptsRemaining + ' attempts remaining.'
-      };
+      return errorResponse('Invalid PIN. ' + attemptResult.attemptsRemaining + ' attempts remaining.');
     }
-    return { success: false, error: 'Invalid PIN' };
+    return errorResponse('Invalid PIN');
   }
 
   // PIN correct - clear failed attempts
@@ -442,7 +430,7 @@ function processMeetingCheckIn(meetingId, email, pin) {
   // Check if already checked in to this meeting
   var checkInSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
   if (!checkInSheet) {
-    return { success: false, error: 'Meeting check-in sheet not found' };
+    return errorResponse('Meeting check-in sheet not found');
   }
 
   var checkInData = checkInSheet.getDataRange().getValues();
@@ -450,10 +438,7 @@ function processMeetingCheckIn(meetingId, email, pin) {
     var rowMeetingId = String(checkInData[j][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
     var rowMemberId = String(checkInData[j][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
     if (rowMeetingId === meetingId && rowMemberId === memberId) {
-      return {
-        success: false,
-        error: memberName.trim() + ' is already checked in to this meeting.'
-      };
+      return errorResponse(memberName.trim() + ' is already checked in to this meeting.');
     }
   }
 
@@ -515,7 +500,7 @@ function processMeetingCheckIn(meetingId, email, pin) {
  */
 function getMeetingAttendees(meetingId) {
   if (!meetingId) {
-    return { success: false, error: 'Meeting ID is required' };
+    return errorResponse('Meeting ID is required');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();

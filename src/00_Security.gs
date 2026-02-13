@@ -259,7 +259,7 @@ function buildSafeQuery(sheetName, query, headers) {
 function getCurrentUserEmail() {
   try {
     return Session.getActiveUser().getEmail() || 'Unknown';
-  } catch (e) {
+  } catch (_e) {
     return 'Unknown';
   }
 }

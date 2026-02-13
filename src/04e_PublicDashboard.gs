@@ -257,7 +257,7 @@ function getUnifiedDashboardData(includePII) {
   // Process Members
   if (memberSheet && memberSheet.getLastRow() > 1) {
     var memberData = memberSheet.getDataRange().getValues();
-    var headers = memberData[0];
+    var _headers = memberData[0];
 
     for (var m = 1; m < memberData.length; m++) {
       var memberId = memberData[m][MEMBER_COLS.MEMBER_ID - 1];
@@ -439,7 +439,7 @@ function getUnifiedDashboardData(includePII) {
   // Get current user email for My Cases
   try {
     data.currentUserEmail = Session.getActiveUser().getEmail();
-  } catch (e) {
+  } catch (_e) {
     data.currentUserEmail = '';
   }
 
@@ -450,8 +450,8 @@ function getUnifiedDashboardData(includePII) {
   var step1Total = 0, step1Denials = 0;
   var step2Total = 0, step2Denials = 0;
   var settlementDays = [];
-  var stepDays = { step1: [], step2: [], step3: [], arb: [] };  // Days at each step
-  var mgmtResponseDays = [];
+  var _stepDays = { step1: [], step2: [], step3: [], arb: [] };  // Days at each step
+  var _mgmtResponseDays = [];
   var monthlyFilingsMap = {};
   var monthlyResolvedMap = {};  // v4.4.0 - Track resolved by month
 
@@ -1175,7 +1175,7 @@ function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
  * @returns {string} Complete HTML for the web app
  */
 function getUnifiedDashboardHtml(isPII) {
-  var mode = isPII ? 'steward' : 'member';
+  var _mode = isPII ? 'steward' : 'member';
   var title = isPII ? '509 STEWARD COMMAND CENTER' : '509 MEMBER DASHBOARD';
   var badge = isPII ? '<span class="pii-badge">INTERNAL USE - CONTAINS PII</span>' : '<span class="member-badge">MEMBER VIEW</span>';
 

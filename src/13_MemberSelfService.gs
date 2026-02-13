@@ -311,7 +311,7 @@ function requestPINReset(memberId) {
     if (typeof secureLog === 'function') {
       secureLog('PINResetError', 'Failed to send reset email', { memberId: memberId, error: e.message });
     }
-    return { success: false, error: 'Failed to send email. Please try again or contact your steward.' };
+    return errorResponse('Failed to send email. Please try again or contact your steward.');
   }
 
   return { success: true, message: 'If your Member ID is valid, a reset email has been sent.' };
@@ -326,7 +326,7 @@ function requestPINReset(memberId) {
  */
 function completePINReset(memberId, token, newPin) {
   if (!memberId || !token || !newPin) {
-    return { success: false, error: 'All fields are required' };
+    return errorResponse('All fields are required');
   }
 
   memberId = String(memberId).trim().toUpperCase();
@@ -335,7 +335,7 @@ function completePINReset(memberId, token, newPin) {
 
   // Validate new PIN format
   if (!/^\d{6}$/.test(newPin)) {
-    return { success: false, error: 'PIN must be exactly 6 digits' };
+    return errorResponse('PIN must be exactly 6 digits');
   }
 
   // Retrieve and verify token
@@ -344,14 +344,14 @@ function completePINReset(memberId, token, newPin) {
   var storedData = cache.get(cacheKey);
 
   if (!storedData) {
-    return { success: false, error: 'Reset code has expired or is invalid. Please request a new one.' };
+    return errorResponse('Reset code has expired or is invalid. Please request a new one.');
   }
 
   var tokenData;
   try {
     tokenData = JSON.parse(storedData);
-  } catch (e) {
-    return { success: false, error: 'Invalid reset data. Please request a new code.' };
+  } catch (_e) {
+    return errorResponse('Invalid reset data. Please request a new code.');
   }
 
   // Verify token matches
@@ -360,7 +360,7 @@ function completePINReset(memberId, token, newPin) {
     if (typeof secureLog === 'function') {
       secureLog('PINResetFailed', 'Invalid reset token', { memberId: memberId });
     }
-    return { success: false, error: 'Invalid reset code. Please check and try again.' };
+    return errorResponse('Invalid reset code. Please check and try again.');
   }
 
   // Token is valid - update the PIN
@@ -383,7 +383,7 @@ function completePINReset(memberId, token, newPin) {
   }
 
   if (!memberRow) {
-    return { success: false, error: 'Member not found' };
+    return errorResponse('Member not found');
   }
 
   // Hash and store new PIN
@@ -416,7 +416,7 @@ function completePINReset(memberId, token, newPin) {
 function checkPINLockout(memberId) {
   var cache = CacheService.getScriptCache();
   var lockoutKey = 'pin_lockout_' + memberId;
-  var attemptsKey = 'pin_attempts_' + memberId;
+  var _attemptsKey = 'pin_attempts_' + memberId;
 
   var lockoutTime = cache.get(lockoutKey);
   if (lockoutTime) {
@@ -540,7 +540,7 @@ function authenticateMember(memberId, pin) {
   if (memberRow === -1) {
     // Don't reveal whether member exists - record as failed attempt
     recordFailedPINAttempt(memberId);
-    return { success: false, error: 'Invalid Member ID or PIN' };
+    return errorResponse('Invalid Member ID or PIN');
   }
 
   // Check if PIN is set
@@ -629,7 +629,7 @@ function validateMemberSession(token) {
       valid: true,
       memberId: session.memberId
     };
-  } catch (e) {
+  } catch (_e) {
     return { valid: false };
   }
 }
@@ -650,11 +650,11 @@ function generateMemberPINForSteward(memberId) {
   var userRole = getUserRole_(userEmail);
 
   if (userRole !== 'admin' && userRole !== 'steward') {
-    return { success: false, error: 'Only stewards can generate member PINs' };
+    return errorResponse('Only stewards can generate member PINs');
   }
 
   if (!memberId) {
-    return { success: false, error: 'Member ID is required' };
+    return errorResponse('Member ID is required');
   }
 
   memberId = String(memberId).trim().toUpperCase();
@@ -664,7 +664,7 @@ function generateMemberPINForSteward(memberId) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'Member directory not found' };
+    return errorResponse('Member directory not found');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -681,7 +681,7 @@ function generateMemberPINForSteward(memberId) {
   }
 
   if (memberRow === -1) {
-    return { success: false, error: 'Member not found: ' + memberId };
+    return errorResponse('Member not found: ' + memberId);
   }
 
   // Generate new PIN
@@ -958,7 +958,7 @@ function showBulkGeneratePINDialog() {
 function getMemberProfileBySession(sessionToken) {
   var session = validateMemberSession(sessionToken);
   if (!session.valid) {
-    return { success: false, error: 'Session expired. Please log in again.' };
+    return errorResponse('Session expired. Please log in again.');
   }
 
   var memberId = session.memberId;
@@ -966,7 +966,7 @@ function getMemberProfileBySession(sessionToken) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'System error' };
+    return errorResponse('System error');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -994,7 +994,7 @@ function getMemberProfileBySession(sessionToken) {
     }
   }
 
-  return { success: false, error: 'Member not found' };
+  return errorResponse('Member not found');
 }
 
 /**
@@ -1006,7 +1006,7 @@ function getMemberProfileBySession(sessionToken) {
 function updateMemberContact(sessionToken, updates) {
   var session = validateMemberSession(sessionToken);
   if (!session.valid) {
-    return { success: false, error: 'Session expired. Please log in again.' };
+    return errorResponse('Session expired. Please log in again.');
   }
 
   var memberId = session.memberId;
@@ -1024,7 +1024,7 @@ function updateMemberContact(sessionToken, updates) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'System error' };
+    return errorResponse('System error');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -1039,7 +1039,7 @@ function updateMemberContact(sessionToken, updates) {
   }
 
   if (memberRow === -1) {
-    return { success: false, error: 'Member not found' };
+    return errorResponse('Member not found');
   }
 
   // Apply updates
@@ -1050,7 +1050,7 @@ function updateMemberContact(sessionToken, updates) {
 
       // Basic validation
       if (field === 'email' && value && !isValidEmailMSS_(value)) {
-        return { success: false, error: 'Invalid email format' };
+        return errorResponse('Invalid email format');
       }
       if (field === 'phone' && value) {
         value = formatPhoneNumber_(value);
@@ -1062,7 +1062,7 @@ function updateMemberContact(sessionToken, updates) {
   }
 
   if (updated.length === 0) {
-    return { success: false, error: 'No valid fields to update' };
+    return errorResponse('No valid fields to update');
   }
 
   // Log the update
@@ -1108,7 +1108,7 @@ function formatPhoneNumber_(phone) {
 function getMemberGrievances(sessionToken) {
   var session = validateMemberSession(sessionToken);
   if (!session.valid) {
-    return { success: false, error: 'Session expired. Please log in again.' };
+    return errorResponse('Session expired. Please log in again.');
   }
 
   var memberId = session.memberId;
@@ -1162,7 +1162,7 @@ function formatDateMSS_(date) {
     var d = new Date(date);
     if (isNaN(d.getTime())) return '';
     return Utilities.formatDate(d, Session.getScriptTimeZone(), 'MMM d, yyyy');
-  } catch (e) {
+  } catch (_e) {
     return '';
   }
 }

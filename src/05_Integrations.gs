@@ -483,13 +483,13 @@ function deleteMeetingCalendarEvent(eventId) {
  */
 function emailMeetingAttendanceReport(meetingId, recipientEmails) {
   if (!meetingId || !recipientEmails) {
-    return { success: false, error: 'Meeting ID and recipient emails are required' };
+    return errorResponse('Meeting ID and recipient emails are required');
   }
 
   try {
     var result = getMeetingAttendees(meetingId);
     if (!result.success) {
-      return { success: false, error: result.error || 'Could not retrieve attendance data' };
+      return errorResponse(result.error || 'Could not retrieve attendance data');
     }
 
     // Find meeting details from the check-in log
@@ -556,7 +556,7 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     return { success: true, message: 'Attendance report emailed to ' + recipientEmails };
   } catch (error) {
     Logger.log('Error emailing attendance report: ' + error.message);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -843,12 +843,12 @@ function processMeetingDocNotifications() {
 function setupDriveFolderForMember(memberId) {
   try {
     if (!memberId) {
-      return { success: false, error: 'Member ID is required' };
+      return errorResponse('Member ID is required');
     }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-    if (!memberSheet) return { success: false, error: 'Member Directory not found' };
+    if (!memberSheet) return errorResponse('Member Directory not found');
 
     // Find member row
     var memberData = memberSheet.getDataRange().getValues();
@@ -864,7 +864,7 @@ function setupDriveFolderForMember(memberId) {
       }
     }
     if (memberRow === -1) {
-      return { success: false, error: 'Member not found: ' + memberId };
+      return errorResponse('Member not found: ' + memberId);
     }
 
     // Check if member has an existing grievance with a Drive folder
@@ -919,7 +919,7 @@ function setupDriveFolderForMember(memberId) {
     };
   } catch (error) {
     Logger.log('Error creating member Drive folder: ' + error.message);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -1000,7 +1000,7 @@ function syncDeadlinesToCalendar() {
 
   } catch (error) {
     console.error('Error syncing to calendar:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -1119,7 +1119,7 @@ function clearAllCalendarEvents() {
 
   } catch (error) {
     console.error('Error clearing calendar:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -1185,7 +1185,7 @@ function sendDeadlineReminders(daysAhead) {
 
   } catch (error) {
     console.error('Error sending reminders:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -1200,12 +1200,12 @@ function sendEmailToMember(memberId, subject, body) {
   try {
     const member = getMemberById(memberId);
     if (!member) {
-      return { success: false, error: 'Member not found' };
+      return errorResponse('Member not found');
     }
 
     const email = member['Email'] || member[Object.keys(member)[MEMBER_COLUMNS.EMAIL]];
     if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
-      return { success: false, error: 'Invalid email address' };
+      return errorResponse('Invalid email address');
     }
 
     MailApp.sendEmail({
@@ -1221,7 +1221,7 @@ function sendEmailToMember(memberId, subject, body) {
 
   } catch (error) {
     console.error('Error sending email:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -2800,7 +2800,7 @@ function getWebAppResourceLinks() {
           }
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // Ignore errors reading config
     }
   }
@@ -2914,7 +2914,7 @@ function addMobileDashboardLinkToConfig() {
   }
 
   // Find first empty row in column AZ (or create Mobile Dashboard URL section)
-  var lastRow = configSheet.getLastRow();
+  var _lastRow = configSheet.getLastRow();
   var targetRow = 2;
   var targetCol = 52; // Column AZ
 

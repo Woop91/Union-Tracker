@@ -309,7 +309,7 @@ function buildSafeQuery(sheetName, query, headers) {
 function getCurrentUserEmail() {
   try {
     return Session.getActiveUser().getEmail() || 'Unknown';
-  } catch (e) {
+  } catch (_e) {
     return 'Unknown';
   }
 }
@@ -2038,7 +2038,7 @@ function getOrgNameFromConfig_() {
       var orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue();
       if (orgName) return orgName;
     }
-  } catch (e) {
+  } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
   return 'SEIU Local 509';
@@ -2059,7 +2059,7 @@ function getSystemName_() {
       var localNumber = configSheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER).getValue();
       if (localNumber) return localNumber + ' Strategic Command Center';
     }
-  } catch (e) {
+  } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
   return '509 Strategic Command Center';
@@ -6124,7 +6124,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
     }
 
     if (rowIndex === -1) {
-      return { success: false, error: 'Grievance not found' };
+      return errorResponse('Grievance not found');
     }
 
     const today = new Date();
@@ -6167,7 +6167,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
 
   } catch (error) {
     console.error('Error resolving grievance:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -8455,7 +8455,7 @@ function emailDashboardLink_UIService_() {
   // Get member email and name from the selected row
   var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
   var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
-  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var _lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
 
   if (!email || !email.toString().includes('@')) {
     SpreadsheetApp.getUi().alert('No valid email found for this member.');
@@ -8470,7 +8470,7 @@ function emailDashboardLink_UIService_() {
       var configOrgName = configSheet.getRange(2, CONFIG_COLS.ORG_NAME).getValue();
       if (configOrgName) orgName = configOrgName;
     }
-  } catch (e) {
+  } catch (_e) {
     // Use default org name
   }
 
@@ -10346,7 +10346,7 @@ function startPomodoroTimer() {
   ss.toast('🍅 Pomodoro started! Focus for 25 minutes.\n\nYou\'ll get a notification when the session ends.', 'Pomodoro Timer', 10);
 
   // Create a time-driven trigger for 25 minutes from now
-  var triggerTime = new Date(new Date().getTime() + 25 * 60 * 1000);
+  var _triggerTime = new Date(new Date().getTime() + 25 * 60 * 1000);
 
   // Store the start time
   PropertiesService.getUserProperties().setProperty('pomodoroStart', new Date().toISOString());
@@ -10415,7 +10415,7 @@ function saveQuickCaptureNotes(notes) {
     userProps.setProperty('quickCaptureLastSaved', new Date().toISOString());
     return { success: true, message: 'Notes saved' };
   } catch (e) {
-    return { success: false, message: e.message };
+    return errorResponse(e.message);
   }
 }
 
@@ -10430,7 +10430,7 @@ function clearQuickCaptureNotes() {
     userProps.deleteProperty('quickCaptureLastSaved');
     return { success: true, message: 'Notes cleared' };
   } catch (e) {
-    return { success: false, message: e.message };
+    return errorResponse(e.message);
   }
 }
 
@@ -10678,13 +10678,13 @@ function processMemberImport(csvData) {
     var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!sheet) {
-      return { success: false, error: 'Member Directory sheet not found' };
+      return errorResponse('Member Directory sheet not found');
     }
 
     // Parse CSV
     var lines = csvData.split(/\r?\n/).filter(function(l) { return l.trim(); });
     if (lines.length < 2) {
-      return { success: false, error: 'Need at least header and one data row' };
+      return errorResponse('Need at least header and one data row');
     }
 
     // Parse header and map columns
@@ -10692,11 +10692,11 @@ function processMemberImport(csvData) {
     var columnMap = mapImportColumns_(headers);
 
     if (!columnMap.firstName || !columnMap.lastName) {
-      return { success: false, error: 'Required columns missing: First Name, Last Name' };
+      return errorResponse('Required columns missing: First Name, Last Name');
     }
 
     // Get existing data to find last row
-    var lastRow = sheet.getLastRow();
+    var _lastRow = sheet.getLastRow();
 
     // Process data rows
     var importedCount = 0;
@@ -10735,7 +10735,7 @@ function processMemberImport(csvData) {
     return { success: true, count: importedCount };
 
   } catch (e) {
-    return { success: false, error: e.message };
+    return errorResponse(e.message);
   }
 }
 
@@ -12654,7 +12654,7 @@ function getInteractiveAnalyticsData() {
             });
             var sectionAvg = sectionValidCount > 0 ? (sectionTotal / sectionValidCount).toFixed(1) : 0;
             data.surveyResults.bySection.push({ name: section.name, avg: parseFloat(sectionAvg) });
-          } catch (e) {
+          } catch (_e) {
             data.surveyResults.bySection.push({ name: section.name, avg: 0 });
           }
         });
@@ -13381,7 +13381,7 @@ function removeMidnightTrigger() {
  */
 function midnightAutoRefresh() {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var _ss = SpreadsheetApp.getActiveSpreadsheet();
     var startTime = new Date();
 
     Logger.log('Midnight Auto-Refresh started at ' + startTime.toISOString());
@@ -13720,14 +13720,14 @@ function checkDuplicateMemberIDs_UIService_() {
  * @returns {File} The created PDF file
  */
 function createGrievancePDF_UIService_(data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Get or create archive folder
   var folder;
   if (COMMAND_CONFIG.ARCHIVE_FOLDER_ID) {
     try {
       folder = DriveApp.getFolderById(COMMAND_CONFIG.ARCHIVE_FOLDER_ID);
-    } catch (e) {
+    } catch (_e) {
       folder = DriveApp.createFolder('509 Grievance Archive');
     }
   } else {
@@ -14160,7 +14160,7 @@ function getUnifiedDashboardData(includePII) {
   // Process Members
   if (memberSheet && memberSheet.getLastRow() > 1) {
     var memberData = memberSheet.getDataRange().getValues();
-    var headers = memberData[0];
+    var _headers = memberData[0];
 
     for (var m = 1; m < memberData.length; m++) {
       var memberId = memberData[m][MEMBER_COLS.MEMBER_ID - 1];
@@ -14342,7 +14342,7 @@ function getUnifiedDashboardData(includePII) {
   // Get current user email for My Cases
   try {
     data.currentUserEmail = Session.getActiveUser().getEmail();
-  } catch (e) {
+  } catch (_e) {
     data.currentUserEmail = '';
   }
 
@@ -14353,8 +14353,8 @@ function getUnifiedDashboardData(includePII) {
   var step1Total = 0, step1Denials = 0;
   var step2Total = 0, step2Denials = 0;
   var settlementDays = [];
-  var stepDays = { step1: [], step2: [], step3: [], arb: [] };  // Days at each step
-  var mgmtResponseDays = [];
+  var _stepDays = { step1: [], step2: [], step3: [], arb: [] };  // Days at each step
+  var _mgmtResponseDays = [];
   var monthlyFilingsMap = {};
   var monthlyResolvedMap = {};  // v4.4.0 - Track resolved by month
 
@@ -15078,7 +15078,7 @@ function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
  * @returns {string} Complete HTML for the web app
  */
 function getUnifiedDashboardHtml(isPII) {
-  var mode = isPII ? 'steward' : 'member';
+  var _mode = isPII ? 'steward' : 'member';
   var title = isPII ? '509 STEWARD COMMAND CENTER' : '509 MEMBER DASHBOARD';
   var badge = isPII ? '<span class="pii-badge">INTERNAL USE - CONTAINS PII</span>' : '<span class="member-badge">MEMBER VIEW</span>';
 
@@ -16955,13 +16955,13 @@ function deleteMeetingCalendarEvent(eventId) {
  */
 function emailMeetingAttendanceReport(meetingId, recipientEmails) {
   if (!meetingId || !recipientEmails) {
-    return { success: false, error: 'Meeting ID and recipient emails are required' };
+    return errorResponse('Meeting ID and recipient emails are required');
   }
 
   try {
     var result = getMeetingAttendees(meetingId);
     if (!result.success) {
-      return { success: false, error: result.error || 'Could not retrieve attendance data' };
+      return errorResponse(result.error || 'Could not retrieve attendance data');
     }
 
     // Find meeting details from the check-in log
@@ -17028,7 +17028,7 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     return { success: true, message: 'Attendance report emailed to ' + recipientEmails };
   } catch (error) {
     Logger.log('Error emailing attendance report: ' + error.message);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -17315,12 +17315,12 @@ function processMeetingDocNotifications() {
 function setupDriveFolderForMember(memberId) {
   try {
     if (!memberId) {
-      return { success: false, error: 'Member ID is required' };
+      return errorResponse('Member ID is required');
     }
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-    if (!memberSheet) return { success: false, error: 'Member Directory not found' };
+    if (!memberSheet) return errorResponse('Member Directory not found');
 
     // Find member row
     var memberData = memberSheet.getDataRange().getValues();
@@ -17336,7 +17336,7 @@ function setupDriveFolderForMember(memberId) {
       }
     }
     if (memberRow === -1) {
-      return { success: false, error: 'Member not found: ' + memberId };
+      return errorResponse('Member not found: ' + memberId);
     }
 
     // Check if member has an existing grievance with a Drive folder
@@ -17391,7 +17391,7 @@ function setupDriveFolderForMember(memberId) {
     };
   } catch (error) {
     Logger.log('Error creating member Drive folder: ' + error.message);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -17472,7 +17472,7 @@ function syncDeadlinesToCalendar() {
 
   } catch (error) {
     console.error('Error syncing to calendar:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -17591,7 +17591,7 @@ function clearAllCalendarEvents() {
 
   } catch (error) {
     console.error('Error clearing calendar:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -17657,7 +17657,7 @@ function sendDeadlineReminders(daysAhead) {
 
   } catch (error) {
     console.error('Error sending reminders:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -17672,12 +17672,12 @@ function sendEmailToMember(memberId, subject, body) {
   try {
     const member = getMemberById(memberId);
     if (!member) {
-      return { success: false, error: 'Member not found' };
+      return errorResponse('Member not found');
     }
 
     const email = member['Email'] || member[Object.keys(member)[MEMBER_COLUMNS.EMAIL]];
     if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
-      return { success: false, error: 'Invalid email address' };
+      return errorResponse('Invalid email address');
     }
 
     MailApp.sendEmail({
@@ -17693,7 +17693,7 @@ function sendEmailToMember(memberId, subject, body) {
 
   } catch (error) {
     console.error('Error sending email:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -19272,7 +19272,7 @@ function getWebAppResourceLinks() {
           }
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // Ignore errors reading config
     }
   }
@@ -19386,7 +19386,7 @@ function addMobileDashboardLinkToConfig() {
   }
 
   // Find first empty row in column AZ (or create Mobile Dashboard URL section)
-  var lastRow = configSheet.getLastRow();
+  var _lastRow = configSheet.getLastRow();
   var targetRow = 2;
   var targetCol = 52; // Column AZ
 
@@ -19575,7 +19575,7 @@ function DIAGNOSE_SETUP() {
   try {
     CalendarApp.getAllCalendars();
     results.checks.push('Calendar access: OK');
-  } catch (e) {
+  } catch (_e) {
     results.warnings.push('Cannot access Calendar - sync features may not work');
   }
 
@@ -19584,7 +19584,7 @@ function DIAGNOSE_SETUP() {
   try {
     DriveApp.getRootFolder();
     results.checks.push('Drive access: OK');
-  } catch (e) {
+  } catch (_e) {
     results.warnings.push('Cannot access Drive - folder features may not work');
   }
 
@@ -19700,7 +19700,7 @@ function removeDeprecatedTabs() {
         try {
           ss.deleteSheet(sheet);
           removed.push(name);
-        } catch (e) {
+        } catch (_e) {
           Logger.log('Could not delete sheet: ' + name);
         }
       }
@@ -20252,7 +20252,7 @@ function showCacheStatusDashboard() {
         if (obj.timestamp) {
           age = Math.floor((Date.now() - obj.timestamp) / 1000) + 's';
         }
-      } catch (e) { /* cached value may not be valid JSON; skip age display */ }
+      } catch (_e) { /* cached value may not be valid JSON; skip age display */ }
     }
 
     return '<tr>' +
@@ -20923,7 +20923,7 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
   );
 
   if (response1 !== ui.Button.YES) {
-    return { success: false, message: 'Cancelled by user' };
+    return errorResponse('Cancelled by user');
   }
 
   const response2 = ui.alert(
@@ -20933,7 +20933,7 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
   );
 
   if (response2 !== ui.Button.YES) {
-    return { success: false, message: 'Cancelled by user' };
+    return errorResponse('Cancelled by user');
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -20974,14 +20974,14 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   );
 
   if (response !== ui.Button.YES) {
-    return { success: false, message: 'Cancelled' };
+    return errorResponse('Cancelled');
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
 
   if (!sheet) {
-    return { success: false, error: 'Grievance Tracker not found' };
+    return errorResponse('Grievance Tracker not found');
   }
 
   const lastRow = sheet.getLastRow();
@@ -21017,7 +21017,7 @@ function createWeeklySnapshot() {
   var archiveFolderId = '';
   try {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
-  } catch (e) {
+  } catch (_e) {
     // Fall back to a default if config is not available
   }
 
@@ -21067,12 +21067,12 @@ function createAutomatedSnapshot() {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
   } catch (e) {
     Logger.log('Could not get archive folder ID: ' + e.message);
-    return { success: false, error: 'Archive folder not configured' };
+    return errorResponse('Archive folder not configured');
   }
 
   if (!archiveFolderId) {
     Logger.log('Archive folder not configured');
-    return { success: false, error: 'Archive folder not configured' };
+    return errorResponse('Archive folder not configured');
   }
 
   try {
@@ -21091,7 +21091,7 @@ function createAutomatedSnapshot() {
 
   } catch (e) {
     Logger.log('Failed to create automated snapshot: ' + e.message);
-    return { success: false, error: e.message };
+    return errorResponse(e.message);
   }
 }
 
@@ -22813,7 +22813,7 @@ var Assert = {
   },
   assertThrows: function(fn, message) {
     var threw = false;
-    try { fn(); } catch (e) { threw = true; }
+    try { fn(); } catch (_e) { threw = true; }
     if (!threw) throw new Error(message || 'Expected function to throw');
   },
   assertApproximately: function(expected, actual, tolerance, message) {
@@ -24565,7 +24565,7 @@ var Assert = {
   },
   assertThrows: function(fn, message) {
     var threw = false;
-    try { fn(); } catch (e) { threw = true; }
+    try { fn(); } catch (_e) { threw = true; }
     if (!threw) throw new Error(message || 'Expected function to throw');
   },
   assertApproximately: function(expected, actual, tolerance, message) {
@@ -24582,7 +24582,7 @@ function isLargeDataset() {
     var ss = SpreadsheetApp.getActive();
     var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
     return memberDir ? memberDir.getLastRow() > TEST_LARGE_DATASET_THRESHOLD : false;
-  } catch (e) { return false; }
+  } catch (_e) { return false; }
 }
 
 function createTestMember(memberId) {
@@ -25163,7 +25163,7 @@ var Assert = {
     var threw = false;
     try {
       fn();
-    } catch (e) {
+    } catch (_e) {
       threw = true;
     }
     if (!threw) {
@@ -25456,7 +25456,7 @@ function test_GrievanceIdFormat() {
  * Tests array helper functions
  */
 function test_ArrayHelpers() {
-  var arr = [1, 2, 3, 4, 5];
+  var _arr = [1, 2, 3, 4, 5];
 
   // Test unique function
   var withDups = [1, 2, 2, 3, 3, 3];
@@ -26430,7 +26430,7 @@ function getDesktopSearchData(query, tab, filters) {
         if (dateFiled) {
           try {
             filedDateStr = Utilities.formatDate(new Date(dateFiled), Session.getScriptTimeZone(), 'MM/dd/yyyy');
-          } catch(e) {
+          } catch(_e) {
             filedDateStr = dateFiled.toString();
           }
         }
@@ -27385,7 +27385,7 @@ function parseFormDate_(dateStr) {
       return dateStr; // Return as-is if can't parse
     }
     return date;
-  } catch (e) {
+  } catch (_e) {
     return dateStr;
   }
 }
@@ -28228,7 +28228,7 @@ function checkDeadlinesAndNotify_() {
 
   var data = sheet.getDataRange().getValues();
   var today = new Date();
-  var threeDaysAhead = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
+  var _threeDaysAhead = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
   var urgent = [];
 
   for (var i = 1; i < data.length; i++) {
@@ -28545,7 +28545,7 @@ function configureAlertSettings() {
  */
 function sendRandomSurveyEmails() {
   var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Show configuration dialog
   var html = HtmlService.createHtmlOutput(
@@ -28598,7 +28598,7 @@ function executeSendRandomSurveyEmails(opts) {
 
   // Get all members with valid emails
   var memberData = memberSheet.getDataRange().getValues();
-  var headers = memberData[0];
+  var _headers = memberData[0];
   var emailCol = MEMBER_COLS.EMAIL - 1;
   var memberIdCol = MEMBER_COLS.MEMBER_ID - 1;
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;
@@ -28612,7 +28612,7 @@ function executeSendRandomSurveyEmails(opts) {
     logData.forEach(function(row) {
       if (row[0]) surveyLog[row[0]] = new Date(row[1]);
     });
-  } catch(e) { /* No log yet */ }
+  } catch(_e) { /* No log yet */ }
 
   var cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - opts.excludeDays);
@@ -29178,7 +29178,7 @@ function setupGrievanceCalcSheet() {
   var memberIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
   var gMemberIdCol = getColumnLetter(GRIEVANCE_COLS.MEMBER_ID);
   var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
-  var gNextActionCol = getColumnLetter(GRIEVANCE_COLS.NEXT_ACTION_DUE);
+  var _gNextActionCol = getColumnLetter(GRIEVANCE_COLS.NEXT_ACTION_DUE);
   var gResolutionCol = getColumnLetter(GRIEVANCE_COLS.RESOLUTION);
   var gDateFiledCol = getColumnLetter(GRIEVANCE_COLS.DATE_FILED);
 
@@ -29468,11 +29468,11 @@ function setupMemberLookupSheet() {
 
   // Get column letters
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var mFirstCol = getColumnLetter(MEMBER_COLS.FIRST_NAME);
-  var mLastCol = getColumnLetter(MEMBER_COLS.LAST_NAME);
-  var mEmailCol = getColumnLetter(MEMBER_COLS.EMAIL);
-  var mUnitCol = getColumnLetter(MEMBER_COLS.UNIT);
-  var mLocCol = getColumnLetter(MEMBER_COLS.WORK_LOCATION);
+  var _mFirstCol = getColumnLetter(MEMBER_COLS.FIRST_NAME);
+  var _mLastCol = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var _mEmailCol = getColumnLetter(MEMBER_COLS.EMAIL);
+  var _mUnitCol = getColumnLetter(MEMBER_COLS.UNIT);
+  var _mLocCol = getColumnLetter(MEMBER_COLS.WORK_LOCATION);
   var mStewardCol = getColumnLetter(MEMBER_COLS.ASSIGNED_STEWARD);
 
   // Formula to get unique member IDs from Grievance Log
@@ -29703,13 +29703,13 @@ function setupAllHiddenSheets() {
 
   // Core grievance/member calculation sheets (7 total)
   // Each function creates the sheet if missing or updates if exists
-  try { setupGrievanceCalcSheet(); created++; } catch (e) { repaired++; }
-  try { setupGrievanceFormulasSheet(); created++; } catch (e) { repaired++; }
-  try { setupMemberLookupSheet(); created++; } catch (e) { repaired++; }
-  try { setupStewardContactCalcSheet(); created++; } catch (e) { repaired++; }
-  try { setupDashboardCalcSheet(); created++; } catch (e) { repaired++; }
-  try { setupStewardPerformanceCalcSheet(); created++; } catch (e) { repaired++; }
-  try { setupChecklistCalcSheet(); created++; } catch (e) { repaired++; }
+  try { setupGrievanceCalcSheet(); created++; } catch (_e) { repaired++; }
+  try { setupGrievanceFormulasSheet(); created++; } catch (_e) { repaired++; }
+  try { setupMemberLookupSheet(); created++; } catch (_e) { repaired++; }
+  try { setupStewardContactCalcSheet(); created++; } catch (_e) { repaired++; }
+  try { setupDashboardCalcSheet(); created++; } catch (_e) { repaired++; }
+  try { setupStewardPerformanceCalcSheet(); created++; } catch (_e) { repaired++; }
+  try { setupChecklistCalcSheet(); created++; } catch (_e) { repaired++; }
 
   ss.toast('All 7 hidden sheets created!', '✅ Success', 3);
 
@@ -31322,7 +31322,7 @@ function getSatisfactionTrendData(period) {
       result.issuesTrend.push({ name: issue, count: issueMap[issue] });
     }
     result.issuesTrend.sort(function(a, b) { return b.count - a.count; });
-  } catch(e) { /* ignore if column doesn't exist */ }
+  } catch(_e) { /* ignore if column doesn't exist */ }
 
   return result;
 }
@@ -32846,13 +32846,13 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
   var thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   var lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   var lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-  var oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+  var _oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   // ══════════════════════════════════════════════════════════════════════
   // MEMBER METRICS
   // ══════════════════════════════════════════════════════════════════════
   var openRates = [];
-  var stewardCounts = {};
+  var _stewardCounts = {};
 
   for (var m = 1; m < memberData.length; m++) {
     var row = memberData[m];
@@ -32906,7 +32906,7 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     var dateClosed = gRow[GRIEVANCE_COLS.DATE_CLOSED - 1];
     var daysOpen = gRow[GRIEVANCE_COLS.DAYS_OPEN - 1];
     var daysToDeadline = gRow[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var nextActionDue = gRow[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
+    var _nextActionDue = gRow[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
 
     // Status counts
     if (status === 'Open') metrics.open++;
@@ -33418,9 +33418,9 @@ function writeDashboardValues_(sheet, metrics) {
  */
 function applyDashboardGradients_(sheet) {
   // Define gradient color scale (Green -> Yellow -> Red)
-  var greenColor = '#D1FAE5';  // Low values (good for some metrics)
-  var yellowColor = '#FEF3C7'; // Mid values
-  var redColor = '#FCA5A5';    // High values (bad for some metrics)
+  var _greenColor = '#D1FAE5';  // Low values (good for some metrics)
+  var _yellowColor = '#FEF3C7'; // Mid values
+  var _redColor = '#FCA5A5';    // High values (bad for some metrics)
 
   // Reverse scale (Red -> Yellow -> Green) for positive metrics
   var redToGreen = {
@@ -34920,7 +34920,7 @@ function createMemberDirectory(ss) {
   // ═══════════════════════════════════════════════════════════════════════════
   // CONDITIONAL FORMATTING: Highlight members with open grievances
   // ═══════════════════════════════════════════════════════════════════════════
-  var lastRow = Math.max(sheet.getLastRow(), 2);
+  var _lastRow = Math.max(sheet.getLastRow(), 2);
   var hasOpenGrievanceRange = sheet.getRange(2, MEMBER_COLS.HAS_OPEN_GRIEVANCE, 4999, 1);
 
   var redRule = SpreadsheetApp.newConditionalFormatRule()
@@ -35141,9 +35141,9 @@ function createGrievanceLog(ss) {
 
   // Progress bar spans: Step I (J-K), Step II (L-O), Step III (P-Q), Date Closed (R)
   var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 2);         // J-K
-  var step2Range = sheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 4999, 4);  // L-O
-  var step3Range = sheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 4999, 2);  // P-Q
-  var closedRange = sheet.getRange(2, GRIEVANCE_COLS.DATE_CLOSED, 4999, 1);      // R
+  var _step2Range = sheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 4999, 4);  // L-O
+  var _step3Range = sheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 4999, 2);  // P-Q
+  var _closedRange = sheet.getRange(2, GRIEVANCE_COLS.DATE_CLOSED, 4999, 1);      // R
   var allStepsRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 9);      // J-R (all 9 columns)
 
   // Completed cases: All columns green (Closed, Won, Denied, Settled, Withdrawn)
@@ -35651,7 +35651,7 @@ function createDashboard(ss) {
   // NUMBER FORMATTING: Use comma separators for all numeric values (1,000)
   var numberFormat = '#,##0';
   var decimalFormat = '#,##0.0';
-  var percentFormat = '0.0%';
+  var _percentFormat = '0.0%';
 
   // Quick Stats row (row 6) - updated row numbers
   sheet.getRange('A6:C6').setNumberFormat(numberFormat);
@@ -38640,16 +38640,16 @@ function setupTimelineColumnGroups() {
   ss.toast('Setting up column groups...', '👁️ View', 2);
 
   // Group Step I columns (J-K)
-  var step1Range = sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, 1, 2);
+  var _step1Range = sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, 1, 2);
   sheet.getColumnGroup(GRIEVANCE_COLS.STEP1_DUE, 1);
 
   // Group Step II columns (L-O)
   sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
-  var step2Group = sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 1, 4);
+  var _step2Group = sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 1, 4);
   sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
 
   // Group Step III columns (P-Q)
-  var step3Group = sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 1, 2);
+  var _step3Group = sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 1, 2);
 
   // Create the groups
   try {
@@ -38691,9 +38691,9 @@ function applyStepHighlighting() {
   var rules = sheet.getConditionalFormatRules();
 
   // Colors
-  var grayText = SpreadsheetApp.newColor().setRgbColor('#9e9e9e').build();
-  var greenBg = SpreadsheetApp.newColor().setRgbColor('#e8f5e9').build();
-  var currentStepCol = GRIEVANCE_COLS.CURRENT_STEP; // Column F
+  var _grayText = SpreadsheetApp.newColor().setRgbColor('#9e9e9e').build();
+  var _greenBg = SpreadsheetApp.newColor().setRgbColor('#e8f5e9').build();
+  var _currentStepCol = GRIEVANCE_COLS.CURRENT_STEP; // Column F
 
   // Rule 1: Gray out Step I columns (J-K) if current step is Informal
   var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, lastRow - 1, 2);
@@ -39134,7 +39134,7 @@ function showGrievanceFiles() {
  */
 function showUpcomingDeadlinesFromCalendar() {
   var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   try {
     var calendar = CalendarApp.getDefaultCalendar();
@@ -39630,7 +39630,7 @@ function autoCreateMissingGrievanceFolders_() {
     var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
     var firstName = data[i][GRIEVANCE_COLS.FIRST_NAME - 1];
     var lastName = data[i][GRIEVANCE_COLS.LAST_NAME - 1];
-    var issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'General';
+    var _issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'General';
     var dateFiled = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
     var existingFolderId = data[i][GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1];
 
@@ -39883,7 +39883,7 @@ function checkDataQuality() {
   var invalidMemberIds = 0;
 
   grievanceData.forEach(function(row) {
-    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+    var _grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
     var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
 
     if (!memberId || memberId === '') {
@@ -39907,7 +39907,7 @@ function checkDataQuality() {
  * Fix data quality issues with interactive dialog
  */
 function fixDataQualityIssues() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
 
   var issues = checkDataQuality();
@@ -40596,7 +40596,7 @@ function handleSecurityAudit_(e) {
     var userEmail = '';
     try {
       userEmail = Session.getActiveUser().getEmail() || 'Unknown';
-    } catch (authError) {
+    } catch (_authError) {
       userEmail = 'Auth Required';
     }
 
@@ -40612,7 +40612,7 @@ function handleSecurityAudit_(e) {
       var chiefEmail = '';
       try {
         chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
-      } catch (configError) {
+      } catch (_configError) {
         // Config not available
       }
 
@@ -41710,7 +41710,7 @@ function updateGrievance(grievanceId, updates) {
     }
 
     if (rowIndex === -1) {
-      return { success: false, error: 'Grievance not found' };
+      return errorResponse('Grievance not found');
     }
 
     // Update each provided field
@@ -41737,7 +41737,7 @@ function updateGrievance(grievanceId, updates) {
 
   } catch (error) {
     console.error('Error updating grievance:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -41953,7 +41953,7 @@ function addNewMember(memberData) {
     const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
     if (!sheet) {
-      return { success: false, error: 'Member Directory sheet not found' };
+      return errorResponse('Member Directory sheet not found');
     }
 
     // Generate unique member ID using timestamp to avoid collisions from row deletions
@@ -41992,7 +41992,7 @@ function addNewMember(memberData) {
 
   } catch (error) {
     console.error('Error adding member:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -42661,7 +42661,7 @@ function toggleMobileView() {
       navToMobile();
       props.setProperty('MOBILE_VIEW_ENABLED', 'true');
     }
-  } catch (e) {
+  } catch (_e) {
     // Fallback: just try to show all columns (safe default)
     showAllMemberColumns();
     SpreadsheetApp.getUi().alert('Restored to full view. Use this toggle to switch between mobile and desktop views.');
@@ -42876,7 +42876,7 @@ function showV4StatusReport() {
   try {
     var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
     report += '  Chief Steward Email: ' + (chiefEmail ? '✅ Set' : '⚠️ Not configured') + '\n';
-  } catch (e) {
+  } catch (_e) {
     report += '  Chief Steward Email: ⚠️ Unable to check\n';
   }
 
@@ -43389,21 +43389,21 @@ function showDiagnosticReport() {
   try {
     var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID);
     report += '  PDF Template: ' + (templateId ? '✅ Configured' : '⚠️ Not set') + '\n';
-  } catch (e) {
+  } catch (_e) {
     report += '  PDF Template: ⚠️ Unable to check\n';
   }
 
   try {
     var archiveId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID);
     report += '  Archive Folder: ' + (archiveId ? '✅ Configured' : '⚠️ Not set') + '\n';
-  } catch (e) {
+  } catch (_e) {
     report += '  Archive Folder: ⚠️ Unable to check\n';
   }
 
   try {
     var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
     report += '  Chief Steward Email: ' + (chiefEmail ? '✅ ' + chiefEmail : '⚠️ Not set') + '\n';
-  } catch (e) {
+  } catch (_e) {
     report += '  Chief Steward Email: ⚠️ Unable to check\n';
   }
 
@@ -44257,7 +44257,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
     if (!sheet) {
-      return { success: false, message: 'Grievance Log not found' };
+      return errorResponse('Grievance Log not found');
     }
 
     // Find the grievance row
@@ -44272,11 +44272,11 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     }
 
     if (grievanceRow === -1) {
-      return { success: false, message: 'Grievance not found: ' + grievanceId };
+      return errorResponse('Grievance not found: ' + grievanceId);
     }
 
     var fieldsPopulated = [];
-    var textLower = text.toLowerCase();
+    var _textLower = text.toLowerCase();
 
     // Pattern matching for common grievance form fields
     var patterns = {
@@ -44446,7 +44446,7 @@ function transcribeHandwrittenForm(fileId) {
  * @returns {Object} Unit health analysis result
  */
 function calculateUnitHealth(unitName) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Count grievances for this unit
   var grievanceCount = getGrievanceCountForUnit(unitName);
@@ -45004,7 +45004,7 @@ function setupOCRApiKey() {
 function saveOCRApiKey(apiKey) {
   try {
     if (!apiKey || apiKey.trim().length < 10) {
-      return { success: false, message: 'Invalid API key format' };
+      return errorResponse('Invalid API key format');
     }
 
     var props = PropertiesService.getScriptProperties();
@@ -45018,7 +45018,7 @@ function saveOCRApiKey(apiKey) {
 
     return { success: true, message: 'API key saved successfully! You can now use OCR features.' };
   } catch (e) {
-    return { success: false, message: 'Failed to save: ' + e.message };
+    return errorResponse('Failed to save: ' + e.message);
   }
 }
 
@@ -45032,7 +45032,7 @@ function testOCRConnection() {
     var apiKey = props.getProperty('CLOUD_VISION_API_KEY');
 
     if (!apiKey) {
-      return { success: false, message: 'No API key configured. Please save an API key first.' };
+      return errorResponse('No API key configured. Please save an API key first.');
     }
 
     // Make a minimal test request to validate the API key
@@ -45069,15 +45069,15 @@ function testOCRConnection() {
       if (errorData.error && errorData.error.message.indexOf('image') !== -1) {
         return { success: true, message: 'API key is valid! OCR is ready to use.' };
       }
-      return { success: false, message: 'API Error: ' + (errorData.error ? errorData.error.message : responseBody) };
+      return errorResponse('API Error: ' + (errorData.error ? errorData.error.message : responseBody));
     } else if (responseCode === 403) {
-      return { success: false, message: 'API key invalid or Cloud Vision API not enabled. Check your Google Cloud Console.' };
+      return errorResponse('API key invalid or Cloud Vision API not enabled. Check your Google Cloud Console.');
     } else {
-      return { success: false, message: 'Unexpected response (' + responseCode + '): ' + responseBody.substring(0, 200) };
+      return errorResponse('Unexpected response (' + responseCode + '): ' + responseBody.substring(0, 200));
     }
 
   } catch (e) {
-    return { success: false, message: 'Connection test failed: ' + e.message };
+    return errorResponse('Connection test failed: ' + e.message);
   }
 }
 
@@ -45553,7 +45553,7 @@ function getContractPdfUrl_() {
       var url = configSheet.getRange(3, CONFIG_COLS.CONTRACT_URL).getValue();
       if (url) return url;
     }
-  } catch (e) { /* Config sheet may not exist yet; fall back to '#' */ }
+  } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }
   return '#';
 }
 
@@ -45569,7 +45569,7 @@ function getResourceDriveUrl_() {
       var folderId = configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).getValue();
       if (folderId) return 'https://drive.google.com/drive/folders/' + folderId;
     }
-  } catch (e) { /* Config sheet may not exist yet; fall back to '#' */ }
+  } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }
   return '#';
 }
 
@@ -45643,7 +45643,7 @@ function sendPortalEmailToSelectedMember() {
 
   var memberId = sheet.getRange(row, MEMBER_COLS.MEMBER_ID).getValue();
   var memberEmail = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
-  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var _firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
 
   if (!memberId) {
     ui.alert('Send Portal Email',
@@ -45714,7 +45714,7 @@ function getMemberProfile(memberId) {
   var data = memberSheet.getDataRange().getValues();
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] == memberId) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
       return {
         memberId: memberId,
         firstName: data[i][MEMBER_COLS.FIRST_NAME - 1] || '',
@@ -45748,7 +45748,7 @@ function sendMemberDashboardEmail(memberId) {
   var member = null;
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] == memberId) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
       member = {
         email: data[i][MEMBER_COLS.EMAIL - 1],
         firstName: data[i][MEMBER_COLS.FIRST_NAME - 1]
@@ -46158,7 +46158,7 @@ function generateChecklistId_(offset) {
  */
 function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   if (!caseId) {
-    return { success: false, error: 'Case ID is required' };
+    return errorResponse('Case ID is required');
   }
 
   // Default to Grievance if not specified
@@ -46168,7 +46168,7 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   var templateItems = getChecklistTemplate(actionType, issueCategory);
 
   if (!templateItems || templateItems.length === 0) {
-    return { success: false, error: 'No template found for this action type' };
+    return errorResponse('No template found for this action type');
   }
 
   var sheet = getOrCreateChecklistSheet();
@@ -46372,7 +46372,7 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return { success: false, error: 'Checklist item not found' };
+    return errorResponse('Checklist item not found');
   }
 
   var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
@@ -46403,7 +46403,7 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
     }
   }
 
-  return { success: false, error: 'Checklist item not found' };
+  return errorResponse('Checklist item not found');
 }
 
 /**
@@ -46417,7 +46417,7 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
  */
 function addChecklistItem(caseId, itemText, category, required, dueDate) {
   if (!caseId || !itemText) {
-    return { success: false, error: 'Case ID and item text are required' };
+    return errorResponse('Case ID and item text are required');
   }
 
   // Validate category
@@ -46501,7 +46501,7 @@ function deleteChecklistItem(checklistId) {
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return { success: false, error: 'Checklist item not found' };
+    return errorResponse('Checklist item not found');
   }
 
   var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
@@ -46519,7 +46519,7 @@ function deleteChecklistItem(checklistId) {
     }
   }
 
-  return { success: false, error: 'Checklist item not found' };
+  return errorResponse('Checklist item not found');
 }
 
 /**
@@ -46533,7 +46533,7 @@ function updateChecklistItem(checklistId, updates) {
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return { success: false, error: 'Checklist item not found' };
+    return errorResponse('Checklist item not found');
   }
 
   var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
@@ -46562,7 +46562,7 @@ function updateChecklistItem(checklistId, updates) {
     }
   }
 
-  return { success: false, error: 'Checklist item not found' };
+  return errorResponse('Checklist item not found');
 }
 
 /**
@@ -46655,7 +46655,7 @@ function updateAllChecklistProgress() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) {
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   var lastRow = grievanceSheet.getLastRow();
@@ -46691,7 +46691,7 @@ function createChecklistsForExistingCases() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) {
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   var lastRow = grievanceSheet.getLastRow();
@@ -47000,14 +47000,14 @@ function getChecklistDialogHtml(caseId) {
  */
 function createChecklistForCaseId(caseId) {
   if (!caseId) {
-    return { success: false, error: 'No case ID provided' };
+    return errorResponse('No case ID provided');
   }
 
   // Look up the grievance to get action type and category
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) {
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -47034,7 +47034,7 @@ function createChecklistForSelectedCase() {
   var row = sheet.getActiveRange().getRow();
 
   if (row <= 1) {
-    return { success: false, error: 'No case selected' };
+    return errorResponse('No case selected');
   }
 
   var caseId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
@@ -47054,7 +47054,7 @@ function setupActionTypeColumn() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) {
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   // Check if Action Type header exists
@@ -47356,7 +47356,7 @@ function syncChecklistCalcToGrievanceLog() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!grievanceSheet) {
     Logger.log('Grievance Log not found');
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   var grievanceLastRow = grievanceSheet.getLastRow();
@@ -47493,7 +47493,7 @@ function getHeaderMap(sheetName, forceRefresh) {
     if (cached) {
       try {
         return JSON.parse(cached);
-      } catch (e) {
+      } catch (_e) {
         // Cache corrupted, rebuild
       }
     }
@@ -47518,7 +47518,7 @@ function getHeaderMap(sheetName, forceRefresh) {
   // Cache for 5 minutes
   try {
     cache.put(cacheKey, JSON.stringify(headerMap), EXTENSION_CONFIG.CACHE_TTL_SECONDS);
-  } catch (e) {
+  } catch (_e) {
     // Cache write failed, continue without caching
   }
 
@@ -47805,7 +47805,7 @@ function generateExpansionFieldsHtml(memberId) {
  */
 function saveExpansionData(memberId, customData) {
   if (!memberId || !customData) {
-    return { success: false, error: 'Member ID and data required' };
+    return errorResponse('Member ID and data required');
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -47813,14 +47813,14 @@ function saveExpansionData(memberId, customData) {
   const sheet = ss.getSheetByName(sheetName);
 
   if (!sheet) {
-    return { success: false, error: 'Sheet not found' };
+    return errorResponse('Sheet not found');
   }
 
   const headerMap = getHeaderMap(sheetName);
   const result = loadMemberData_({ findMemberId: memberId });
 
   if (!result.found) {
-    return { success: false, error: 'Member not found' };
+    return errorResponse('Member not found');
   }
 
   const memberRow = result.found.row;
@@ -47878,7 +47878,7 @@ function setupMemberLeaderRole() {
 
   if (!configSheet) {
     SpreadsheetApp.getUi().alert('Error: Config sheet not found');
-    return { success: false, error: 'Config sheet not found' };
+    return errorResponse('Config sheet not found');
   }
 
   const yesNoCol = (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.YES_NO) || 5;
@@ -48006,14 +48006,14 @@ function getDynamicEngineStatus() {
  */
 function setGrievanceReminder(grievanceId, reminderNum, reminderDate, reminderNote) {
   if (!grievanceId || (reminderNum !== 1 && reminderNum !== 2)) {
-    return { success: false, error: 'Invalid grievance ID or reminder number' };
+    return errorResponse('Invalid grievance ID or reminder number');
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG || 'Grievance Log');
 
   if (!sheet) {
-    return { success: false, error: 'Grievance Log sheet not found' };
+    return errorResponse('Grievance Log sheet not found');
   }
 
   // Find the grievance row
@@ -48028,19 +48028,19 @@ function setGrievanceReminder(grievanceId, reminderNum, reminderDate, reminderNo
   }
 
   if (rowIndex === -1) {
-    return { success: false, error: 'Grievance not found: ' + grievanceId };
+    return errorResponse('Grievance not found: ' + grievanceId);
   }
 
   // Determine which columns to update
   const dateCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_DATE : GRIEVANCE_COLS.REMINDER_2_DATE;
-  const noteCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_NOTE : GRIEVANCE_COLS.REMINDER_2_NOTE;
+  const _noteCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_NOTE : GRIEVANCE_COLS.REMINDER_2_NOTE;
 
   // Parse date if string
   let parsedDate = reminderDate;
   if (typeof reminderDate === 'string' && reminderDate) {
     parsedDate = new Date(reminderDate);
     if (isNaN(parsedDate.getTime())) {
-      return { success: false, error: 'Invalid date format' };
+      return errorResponse('Invalid date format');
     }
   }
 
@@ -49671,8 +49671,8 @@ function getScoreBucket_(score) {
  * Shows help dialog for PII-free Looker connection.
  */
 function showLookerAnonConnectionHelp() {
-  const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  const ssUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
+  const _ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  const _ssUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
 
   const html = `<!DOCTYPE html>
 <html>
@@ -50341,7 +50341,7 @@ function requestPINReset(memberId) {
     if (typeof secureLog === 'function') {
       secureLog('PINResetError', 'Failed to send reset email', { memberId: memberId, error: e.message });
     }
-    return { success: false, error: 'Failed to send email. Please try again or contact your steward.' };
+    return errorResponse('Failed to send email. Please try again or contact your steward.');
   }
 
   return { success: true, message: 'If your Member ID is valid, a reset email has been sent.' };
@@ -50356,7 +50356,7 @@ function requestPINReset(memberId) {
  */
 function completePINReset(memberId, token, newPin) {
   if (!memberId || !token || !newPin) {
-    return { success: false, error: 'All fields are required' };
+    return errorResponse('All fields are required');
   }
 
   memberId = String(memberId).trim().toUpperCase();
@@ -50365,7 +50365,7 @@ function completePINReset(memberId, token, newPin) {
 
   // Validate new PIN format
   if (!/^\d{6}$/.test(newPin)) {
-    return { success: false, error: 'PIN must be exactly 6 digits' };
+    return errorResponse('PIN must be exactly 6 digits');
   }
 
   // Retrieve and verify token
@@ -50374,14 +50374,14 @@ function completePINReset(memberId, token, newPin) {
   var storedData = cache.get(cacheKey);
 
   if (!storedData) {
-    return { success: false, error: 'Reset code has expired or is invalid. Please request a new one.' };
+    return errorResponse('Reset code has expired or is invalid. Please request a new one.');
   }
 
   var tokenData;
   try {
     tokenData = JSON.parse(storedData);
-  } catch (e) {
-    return { success: false, error: 'Invalid reset data. Please request a new code.' };
+  } catch (_e) {
+    return errorResponse('Invalid reset data. Please request a new code.');
   }
 
   // Verify token matches
@@ -50390,7 +50390,7 @@ function completePINReset(memberId, token, newPin) {
     if (typeof secureLog === 'function') {
       secureLog('PINResetFailed', 'Invalid reset token', { memberId: memberId });
     }
-    return { success: false, error: 'Invalid reset code. Please check and try again.' };
+    return errorResponse('Invalid reset code. Please check and try again.');
   }
 
   // Token is valid - update the PIN
@@ -50413,7 +50413,7 @@ function completePINReset(memberId, token, newPin) {
   }
 
   if (!memberRow) {
-    return { success: false, error: 'Member not found' };
+    return errorResponse('Member not found');
   }
 
   // Hash and store new PIN
@@ -50446,7 +50446,7 @@ function completePINReset(memberId, token, newPin) {
 function checkPINLockout(memberId) {
   var cache = CacheService.getScriptCache();
   var lockoutKey = 'pin_lockout_' + memberId;
-  var attemptsKey = 'pin_attempts_' + memberId;
+  var _attemptsKey = 'pin_attempts_' + memberId;
 
   var lockoutTime = cache.get(lockoutKey);
   if (lockoutTime) {
@@ -50570,7 +50570,7 @@ function authenticateMember(memberId, pin) {
   if (memberRow === -1) {
     // Don't reveal whether member exists - record as failed attempt
     recordFailedPINAttempt(memberId);
-    return { success: false, error: 'Invalid Member ID or PIN' };
+    return errorResponse('Invalid Member ID or PIN');
   }
 
   // Check if PIN is set
@@ -50659,7 +50659,7 @@ function validateMemberSession(token) {
       valid: true,
       memberId: session.memberId
     };
-  } catch (e) {
+  } catch (_e) {
     return { valid: false };
   }
 }
@@ -50680,11 +50680,11 @@ function generateMemberPINForSteward(memberId) {
   var userRole = getUserRole_(userEmail);
 
   if (userRole !== 'admin' && userRole !== 'steward') {
-    return { success: false, error: 'Only stewards can generate member PINs' };
+    return errorResponse('Only stewards can generate member PINs');
   }
 
   if (!memberId) {
-    return { success: false, error: 'Member ID is required' };
+    return errorResponse('Member ID is required');
   }
 
   memberId = String(memberId).trim().toUpperCase();
@@ -50694,7 +50694,7 @@ function generateMemberPINForSteward(memberId) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'Member directory not found' };
+    return errorResponse('Member directory not found');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -50711,7 +50711,7 @@ function generateMemberPINForSteward(memberId) {
   }
 
   if (memberRow === -1) {
-    return { success: false, error: 'Member not found: ' + memberId };
+    return errorResponse('Member not found: ' + memberId);
   }
 
   // Generate new PIN
@@ -50988,7 +50988,7 @@ function showBulkGeneratePINDialog() {
 function getMemberProfileBySession(sessionToken) {
   var session = validateMemberSession(sessionToken);
   if (!session.valid) {
-    return { success: false, error: 'Session expired. Please log in again.' };
+    return errorResponse('Session expired. Please log in again.');
   }
 
   var memberId = session.memberId;
@@ -50996,7 +50996,7 @@ function getMemberProfileBySession(sessionToken) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'System error' };
+    return errorResponse('System error');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -51024,7 +51024,7 @@ function getMemberProfileBySession(sessionToken) {
     }
   }
 
-  return { success: false, error: 'Member not found' };
+  return errorResponse('Member not found');
 }
 
 /**
@@ -51036,7 +51036,7 @@ function getMemberProfileBySession(sessionToken) {
 function updateMemberContact(sessionToken, updates) {
   var session = validateMemberSession(sessionToken);
   if (!session.valid) {
-    return { success: false, error: 'Session expired. Please log in again.' };
+    return errorResponse('Session expired. Please log in again.');
   }
 
   var memberId = session.memberId;
@@ -51054,7 +51054,7 @@ function updateMemberContact(sessionToken, updates) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
   if (!sheet) {
-    return { success: false, error: 'System error' };
+    return errorResponse('System error');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -51069,7 +51069,7 @@ function updateMemberContact(sessionToken, updates) {
   }
 
   if (memberRow === -1) {
-    return { success: false, error: 'Member not found' };
+    return errorResponse('Member not found');
   }
 
   // Apply updates
@@ -51080,7 +51080,7 @@ function updateMemberContact(sessionToken, updates) {
 
       // Basic validation
       if (field === 'email' && value && !isValidEmailMSS_(value)) {
-        return { success: false, error: 'Invalid email format' };
+        return errorResponse('Invalid email format');
       }
       if (field === 'phone' && value) {
         value = formatPhoneNumber_(value);
@@ -51092,7 +51092,7 @@ function updateMemberContact(sessionToken, updates) {
   }
 
   if (updated.length === 0) {
-    return { success: false, error: 'No valid fields to update' };
+    return errorResponse('No valid fields to update');
   }
 
   // Log the update
@@ -51138,7 +51138,7 @@ function formatPhoneNumber_(phone) {
 function getMemberGrievances(sessionToken) {
   var session = validateMemberSession(sessionToken);
   if (!session.valid) {
-    return { success: false, error: 'Session expired. Please log in again.' };
+    return errorResponse('Session expired. Please log in again.');
   }
 
   var memberId = session.memberId;
@@ -51192,7 +51192,7 @@ function formatDateMSS_(date) {
     var d = new Date(date);
     if (isNaN(d.getTime())) return '';
     return Utilities.formatDate(d, Session.getScriptTimeZone(), 'MMM d, yyyy');
-  } catch (e) {
+  } catch (_e) {
     return '';
   }
 }
@@ -51688,7 +51688,7 @@ function showSelfServicePortalUrl() {
 
 
 // ============================================================================
-// SOURCE: 14_MeetingCheckIn.gs (1055 lines)
+// SOURCE: 14_MeetingCheckIn.gs (1040 lines)
 // ============================================================================
 
 /**
@@ -51736,7 +51736,7 @@ function showSetupMeetingDialog() {
  */
 function createMeeting(meetingData) {
   if (!meetingData || !meetingData.name || !meetingData.date) {
-    return { success: false, error: 'Meeting name and date are required' };
+    return errorResponse('Meeting name and date are required');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -52051,14 +52051,14 @@ function showMeetingCheckInDialog() {
 function processMeetingCheckIn(meetingId, email, pin) {
   // Validate inputs
   if (!meetingId || !email || !pin) {
-    return { success: false, error: 'Meeting, email, and PIN are required' };
+    return errorResponse('Meeting, email, and PIN are required');
   }
 
   email = String(email).trim().toLowerCase();
   pin = String(pin).trim();
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { success: false, error: 'Please enter a valid email address' };
+    return errorResponse('Please enter a valid email address');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -52066,14 +52066,14 @@ function processMeetingCheckIn(meetingId, email, pin) {
   // Look up member by email
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!memberSheet) {
-    return { success: false, error: 'System error: Member directory not found' };
+    return errorResponse('System error: Member directory not found');
   }
 
   var memberData = memberSheet.getDataRange().getValues();
   var memberId = null;
   var memberName = '';
   var storedHash = '';
-  var memberRow = -1;
+  var _memberRow = -1;
 
   for (var i = 1; i < memberData.length; i++) {
     var rowEmail = String(memberData[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
@@ -52082,49 +52082,37 @@ function processMeetingCheckIn(meetingId, email, pin) {
       memberName = String(memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
                    String(memberData[i][MEMBER_COLS.LAST_NAME - 1] || '');
       storedHash = String(memberData[i][MEMBER_PIN_COLS.PIN_HASH - 1] || '');
-      memberRow = i;
+      _memberRow = i;
       break;
     }
   }
 
   if (!memberId) {
-    return { success: false, error: 'No member found with that email address' };
+    return errorResponse('No member found with that email address');
   }
 
   // Check for lockout
   if (typeof checkPINLockout === 'function') {
     var lockoutStatus = checkPINLockout(memberId);
     if (lockoutStatus.isLocked) {
-      return {
-        success: false,
-        error: 'Account temporarily locked. Try again in ' + lockoutStatus.remainingMinutes + ' minutes.'
-      };
+      return errorResponse('Account temporarily locked. Try again in ' + lockoutStatus.remainingMinutes + ' minutes.');
     }
   }
 
   // Verify PIN
   if (!storedHash) {
-    return {
-      success: false,
-      error: 'PIN not set. Please contact your steward to set up your PIN.'
-    };
+    return errorResponse('PIN not set. Please contact your steward to set up your PIN.');
   }
 
   if (!verifyPIN(pin, memberId, storedHash)) {
     if (typeof recordFailedPINAttempt === 'function') {
       var attemptResult = recordFailedPINAttempt(memberId);
       if (attemptResult.isNowLocked) {
-        return {
-          success: false,
-          error: 'Too many failed attempts. Account locked for ' + PIN_CONFIG.LOCKOUT_MINUTES + ' minutes.'
-        };
+        return errorResponse('Too many failed attempts. Account locked for ' + PIN_CONFIG.LOCKOUT_MINUTES + ' minutes.');
       }
-      return {
-        success: false,
-        error: 'Invalid PIN. ' + attemptResult.attemptsRemaining + ' attempts remaining.'
-      };
+      return errorResponse('Invalid PIN. ' + attemptResult.attemptsRemaining + ' attempts remaining.');
     }
-    return { success: false, error: 'Invalid PIN' };
+    return errorResponse('Invalid PIN');
   }
 
   // PIN correct - clear failed attempts
@@ -52135,7 +52123,7 @@ function processMeetingCheckIn(meetingId, email, pin) {
   // Check if already checked in to this meeting
   var checkInSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
   if (!checkInSheet) {
-    return { success: false, error: 'Meeting check-in sheet not found' };
+    return errorResponse('Meeting check-in sheet not found');
   }
 
   var checkInData = checkInSheet.getDataRange().getValues();
@@ -52143,10 +52131,7 @@ function processMeetingCheckIn(meetingId, email, pin) {
     var rowMeetingId = String(checkInData[j][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
     var rowMemberId = String(checkInData[j][MEETING_CHECKIN_COLS.MEMBER_ID - 1] || '');
     if (rowMeetingId === meetingId && rowMemberId === memberId) {
-      return {
-        success: false,
-        error: memberName.trim() + ' is already checked in to this meeting.'
-      };
+      return errorResponse(memberName.trim() + ' is already checked in to this meeting.');
     }
   }
 
@@ -52208,7 +52193,7 @@ function processMeetingCheckIn(meetingId, email, pin) {
  */
 function getMeetingAttendees(meetingId) {
   if (!meetingId) {
-    return { success: false, error: 'Meeting ID is required' };
+    return errorResponse('Meeting ID is required');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();

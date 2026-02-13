@@ -233,7 +233,7 @@ function startPomodoroTimer() {
   ss.toast('🍅 Pomodoro started! Focus for 25 minutes.\n\nYou\'ll get a notification when the session ends.', 'Pomodoro Timer', 10);
 
   // Create a time-driven trigger for 25 minutes from now
-  var triggerTime = new Date(new Date().getTime() + 25 * 60 * 1000);
+  var _triggerTime = new Date(new Date().getTime() + 25 * 60 * 1000);
 
   // Store the start time
   PropertiesService.getUserProperties().setProperty('pomodoroStart', new Date().toISOString());
@@ -302,7 +302,7 @@ function saveQuickCaptureNotes(notes) {
     userProps.setProperty('quickCaptureLastSaved', new Date().toISOString());
     return { success: true, message: 'Notes saved' };
   } catch (e) {
-    return { success: false, message: e.message };
+    return errorResponse(e.message);
   }
 }
 
@@ -317,7 +317,7 @@ function clearQuickCaptureNotes() {
     userProps.deleteProperty('quickCaptureLastSaved');
     return { success: true, message: 'Notes cleared' };
   } catch (e) {
-    return { success: false, message: e.message };
+    return errorResponse(e.message);
   }
 }
 
@@ -565,13 +565,13 @@ function processMemberImport(csvData) {
     var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!sheet) {
-      return { success: false, error: 'Member Directory sheet not found' };
+      return errorResponse('Member Directory sheet not found');
     }
 
     // Parse CSV
     var lines = csvData.split(/\r?\n/).filter(function(l) { return l.trim(); });
     if (lines.length < 2) {
-      return { success: false, error: 'Need at least header and one data row' };
+      return errorResponse('Need at least header and one data row');
     }
 
     // Parse header and map columns
@@ -579,11 +579,11 @@ function processMemberImport(csvData) {
     var columnMap = mapImportColumns_(headers);
 
     if (!columnMap.firstName || !columnMap.lastName) {
-      return { success: false, error: 'Required columns missing: First Name, Last Name' };
+      return errorResponse('Required columns missing: First Name, Last Name');
     }
 
     // Get existing data to find last row
-    var lastRow = sheet.getLastRow();
+    var _lastRow = sheet.getLastRow();
 
     // Process data rows
     var importedCount = 0;
@@ -622,7 +622,7 @@ function processMemberImport(csvData) {
     return { success: true, count: importedCount };
 
   } catch (e) {
-    return { success: false, error: e.message };
+    return errorResponse(e.message);
   }
 }
 

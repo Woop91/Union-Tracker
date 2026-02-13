@@ -1811,7 +1811,7 @@ function emailDashboardLink_UIService_() {
   // Get member email and name from the selected row
   var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
   var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
-  var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+  var _lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
 
   if (!email || !email.toString().includes('@')) {
     SpreadsheetApp.getUi().alert('No valid email found for this member.');
@@ -1826,7 +1826,7 @@ function emailDashboardLink_UIService_() {
       var configOrgName = configSheet.getRange(2, CONFIG_COLS.ORG_NAME).getValue();
       if (configOrgName) orgName = configOrgName;
     }
-  } catch (e) {
+  } catch (_e) {
     // Use default org name
   }
 

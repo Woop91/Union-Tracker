@@ -616,7 +616,7 @@ function createMemberDirectory(ss) {
   // ═══════════════════════════════════════════════════════════════════════════
   // CONDITIONAL FORMATTING: Highlight members with open grievances
   // ═══════════════════════════════════════════════════════════════════════════
-  var lastRow = Math.max(sheet.getLastRow(), 2);
+  var _lastRow = Math.max(sheet.getLastRow(), 2);
   var hasOpenGrievanceRange = sheet.getRange(2, MEMBER_COLS.HAS_OPEN_GRIEVANCE, 4999, 1);
 
   var redRule = SpreadsheetApp.newConditionalFormatRule()
@@ -837,9 +837,9 @@ function createGrievanceLog(ss) {
 
   // Progress bar spans: Step I (J-K), Step II (L-O), Step III (P-Q), Date Closed (R)
   var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 2);         // J-K
-  var step2Range = sheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 4999, 4);  // L-O
-  var step3Range = sheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 4999, 2);  // P-Q
-  var closedRange = sheet.getRange(2, GRIEVANCE_COLS.DATE_CLOSED, 4999, 1);      // R
+  var _step2Range = sheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 4999, 4);  // L-O
+  var _step3Range = sheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 4999, 2);  // P-Q
+  var _closedRange = sheet.getRange(2, GRIEVANCE_COLS.DATE_CLOSED, 4999, 1);      // R
   var allStepsRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 9);      // J-R (all 9 columns)
 
   // Completed cases: All columns green (Closed, Won, Denied, Settled, Withdrawn)
@@ -1347,7 +1347,7 @@ function createDashboard(ss) {
   // NUMBER FORMATTING: Use comma separators for all numeric values (1,000)
   var numberFormat = '#,##0';
   var decimalFormat = '#,##0.0';
-  var percentFormat = '0.0%';
+  var _percentFormat = '0.0%';
 
   // Quick Stats row (row 6) - updated row numbers
   sheet.getRange('A6:C6').setNumberFormat(numberFormat);

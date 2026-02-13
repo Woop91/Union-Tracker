@@ -265,7 +265,7 @@ function showGrievanceFiles() {
  */
 function showUpcomingDeadlinesFromCalendar() {
   var ui = SpreadsheetApp.getUi();
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   try {
     var calendar = CalendarApp.getDefaultCalendar();
@@ -761,7 +761,7 @@ function autoCreateMissingGrievanceFolders_() {
     var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
     var firstName = data[i][GRIEVANCE_COLS.FIRST_NAME - 1];
     var lastName = data[i][GRIEVANCE_COLS.LAST_NAME - 1];
-    var issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'General';
+    var _issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'General';
     var dateFiled = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
     var existingFolderId = data[i][GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1];
 
@@ -1014,7 +1014,7 @@ function checkDataQuality() {
   var invalidMemberIds = 0;
 
   grievanceData.forEach(function(row) {
-    var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+    var _grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
     var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
 
     if (!memberId || memberId === '') {
@@ -1038,7 +1038,7 @@ function checkDataQuality() {
  * Fix data quality issues with interactive dialog
  */
 function fixDataQualityIssues() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
 
   var issues = checkDataQuality();

@@ -213,7 +213,7 @@ function toggleMobileView() {
       navToMobile();
       props.setProperty('MOBILE_VIEW_ENABLED', 'true');
     }
-  } catch (e) {
+  } catch (_e) {
     // Fallback: just try to show all columns (safe default)
     showAllMemberColumns();
     SpreadsheetApp.getUi().alert('Restored to full view. Use this toggle to switch between mobile and desktop views.');
@@ -428,7 +428,7 @@ function showV4StatusReport() {
   try {
     var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
     report += '  Chief Steward Email: ' + (chiefEmail ? '✅ Set' : '⚠️ Not configured') + '\n';
-  } catch (e) {
+  } catch (_e) {
     report += '  Chief Steward Email: ⚠️ Unable to check\n';
   }
 
@@ -941,21 +941,21 @@ function showDiagnosticReport() {
   try {
     var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID);
     report += '  PDF Template: ' + (templateId ? '✅ Configured' : '⚠️ Not set') + '\n';
-  } catch (e) {
+  } catch (_e) {
     report += '  PDF Template: ⚠️ Unable to check\n';
   }
 
   try {
     var archiveId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID);
     report += '  Archive Folder: ' + (archiveId ? '✅ Configured' : '⚠️ Not set') + '\n';
-  } catch (e) {
+  } catch (_e) {
     report += '  Archive Folder: ⚠️ Unable to check\n';
   }
 
   try {
     var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
     report += '  Chief Steward Email: ' + (chiefEmail ? '✅ ' + chiefEmail : '⚠️ Not set') + '\n';
-  } catch (e) {
+  } catch (_e) {
     report += '  Chief Steward Email: ⚠️ Unable to check\n';
   }
 
@@ -1809,7 +1809,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
     if (!sheet) {
-      return { success: false, message: 'Grievance Log not found' };
+      return errorResponse('Grievance Log not found');
     }
 
     // Find the grievance row
@@ -1824,11 +1824,11 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     }
 
     if (grievanceRow === -1) {
-      return { success: false, message: 'Grievance not found: ' + grievanceId };
+      return errorResponse('Grievance not found: ' + grievanceId);
     }
 
     var fieldsPopulated = [];
-    var textLower = text.toLowerCase();
+    var _textLower = text.toLowerCase();
 
     // Pattern matching for common grievance form fields
     var patterns = {
@@ -1998,7 +1998,7 @@ function transcribeHandwrittenForm(fileId) {
  * @returns {Object} Unit health analysis result
  */
 function calculateUnitHealth(unitName) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Count grievances for this unit
   var grievanceCount = getGrievanceCountForUnit(unitName);
@@ -2556,7 +2556,7 @@ function setupOCRApiKey() {
 function saveOCRApiKey(apiKey) {
   try {
     if (!apiKey || apiKey.trim().length < 10) {
-      return { success: false, message: 'Invalid API key format' };
+      return errorResponse('Invalid API key format');
     }
 
     var props = PropertiesService.getScriptProperties();
@@ -2570,7 +2570,7 @@ function saveOCRApiKey(apiKey) {
 
     return { success: true, message: 'API key saved successfully! You can now use OCR features.' };
   } catch (e) {
-    return { success: false, message: 'Failed to save: ' + e.message };
+    return errorResponse('Failed to save: ' + e.message);
   }
 }
 
@@ -2584,7 +2584,7 @@ function testOCRConnection() {
     var apiKey = props.getProperty('CLOUD_VISION_API_KEY');
 
     if (!apiKey) {
-      return { success: false, message: 'No API key configured. Please save an API key first.' };
+      return errorResponse('No API key configured. Please save an API key first.');
     }
 
     // Make a minimal test request to validate the API key
@@ -2621,15 +2621,15 @@ function testOCRConnection() {
       if (errorData.error && errorData.error.message.indexOf('image') !== -1) {
         return { success: true, message: 'API key is valid! OCR is ready to use.' };
       }
-      return { success: false, message: 'API Error: ' + (errorData.error ? errorData.error.message : responseBody) };
+      return errorResponse('API Error: ' + (errorData.error ? errorData.error.message : responseBody));
     } else if (responseCode === 403) {
-      return { success: false, message: 'API key invalid or Cloud Vision API not enabled. Check your Google Cloud Console.' };
+      return errorResponse('API key invalid or Cloud Vision API not enabled. Check your Google Cloud Console.');
     } else {
-      return { success: false, message: 'Unexpected response (' + responseCode + '): ' + responseBody.substring(0, 200) };
+      return errorResponse('Unexpected response (' + responseCode + '): ' + responseBody.substring(0, 200));
     }
 
   } catch (e) {
-    return { success: false, message: 'Connection test failed: ' + e.message };
+    return errorResponse('Connection test failed: ' + e.message);
   }
 }
 
@@ -3105,7 +3105,7 @@ function getContractPdfUrl_() {
       var url = configSheet.getRange(3, CONFIG_COLS.CONTRACT_URL).getValue();
       if (url) return url;
     }
-  } catch (e) { /* Config sheet may not exist yet; fall back to '#' */ }
+  } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }
   return '#';
 }
 
@@ -3121,7 +3121,7 @@ function getResourceDriveUrl_() {
       var folderId = configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).getValue();
       if (folderId) return 'https://drive.google.com/drive/folders/' + folderId;
     }
-  } catch (e) { /* Config sheet may not exist yet; fall back to '#' */ }
+  } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }
   return '#';
 }
 
@@ -3195,7 +3195,7 @@ function sendPortalEmailToSelectedMember() {
 
   var memberId = sheet.getRange(row, MEMBER_COLS.MEMBER_ID).getValue();
   var memberEmail = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
-  var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+  var _firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
 
   if (!memberId) {
     ui.alert('Send Portal Email',
@@ -3266,7 +3266,7 @@ function getMemberProfile(memberId) {
   var data = memberSheet.getDataRange().getValues();
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] == memberId) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
       return {
         memberId: memberId,
         firstName: data[i][MEMBER_COLS.FIRST_NAME - 1] || '',
@@ -3300,7 +3300,7 @@ function sendMemberDashboardEmail(memberId) {
   var member = null;
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] == memberId) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
       member = {
         email: data[i][MEMBER_COLS.EMAIL - 1],
         firstName: data[i][MEMBER_COLS.FIRST_NAME - 1]

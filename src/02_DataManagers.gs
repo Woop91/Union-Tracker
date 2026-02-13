@@ -1971,7 +1971,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
     }
 
     if (rowIndex === -1) {
-      return { success: false, error: 'Grievance not found' };
+      return errorResponse('Grievance not found');
     }
 
     const today = new Date();
@@ -2014,7 +2014,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
 
   } catch (error) {
     console.error('Error resolving grievance:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 

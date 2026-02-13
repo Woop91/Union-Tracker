@@ -619,7 +619,7 @@ function getOrgNameFromConfig_() {
       var orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue();
       if (orgName) return orgName;
     }
-  } catch (e) {
+  } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
   return 'SEIU Local 509';
@@ -640,7 +640,7 @@ function getSystemName_() {
       var localNumber = configSheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER).getValue();
       if (localNumber) return localNumber + ' Strategic Command Center';
     }
-  } catch (e) {
+  } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
   return '509 Strategic Command Center';
