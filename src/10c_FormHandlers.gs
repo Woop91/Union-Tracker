@@ -699,16 +699,16 @@ function setupTimelineColumnGroups() {
   ss.toast('Setting up column groups...', '👁️ View', 2);
 
   // Group Step I columns (J-K)
-  var step1Range = sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, 1, 2);
+  var _step1Range = sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, 1, 2);
   sheet.getColumnGroup(GRIEVANCE_COLS.STEP1_DUE, 1);
 
   // Group Step II columns (L-O)
   sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
-  var step2Group = sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 1, 4);
+  var _step2Group = sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 1, 4);
   sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
 
   // Group Step III columns (P-Q)
-  var step3Group = sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 1, 2);
+  var _step3Group = sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 1, 2);
 
   // Create the groups
   try {
@@ -750,9 +750,9 @@ function applyStepHighlighting() {
   var rules = sheet.getConditionalFormatRules();
 
   // Colors
-  var grayText = SpreadsheetApp.newColor().setRgbColor('#9e9e9e').build();
-  var greenBg = SpreadsheetApp.newColor().setRgbColor('#e8f5e9').build();
-  var currentStepCol = GRIEVANCE_COLS.CURRENT_STEP; // Column F
+  var _grayText = SpreadsheetApp.newColor().setRgbColor('#9e9e9e').build();
+  var _greenBg = SpreadsheetApp.newColor().setRgbColor('#e8f5e9').build();
+  var _currentStepCol = GRIEVANCE_COLS.CURRENT_STEP; // Column F
 
   // Rule 1: Gray out Step I columns (J-K) if current step is Informal
   var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, lastRow - 1, 2);

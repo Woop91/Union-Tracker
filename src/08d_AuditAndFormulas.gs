@@ -387,7 +387,7 @@ function setupGrievanceCalcSheet() {
   var memberIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
   var gMemberIdCol = getColumnLetter(GRIEVANCE_COLS.MEMBER_ID);
   var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
-  var gNextActionCol = getColumnLetter(GRIEVANCE_COLS.NEXT_ACTION_DUE);
+  var _gNextActionCol = getColumnLetter(GRIEVANCE_COLS.NEXT_ACTION_DUE);
   var gResolutionCol = getColumnLetter(GRIEVANCE_COLS.RESOLUTION);
   var gDateFiledCol = getColumnLetter(GRIEVANCE_COLS.DATE_FILED);
 
@@ -677,11 +677,11 @@ function setupMemberLookupSheet() {
 
   // Get column letters
   var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var mFirstCol = getColumnLetter(MEMBER_COLS.FIRST_NAME);
-  var mLastCol = getColumnLetter(MEMBER_COLS.LAST_NAME);
-  var mEmailCol = getColumnLetter(MEMBER_COLS.EMAIL);
-  var mUnitCol = getColumnLetter(MEMBER_COLS.UNIT);
-  var mLocCol = getColumnLetter(MEMBER_COLS.WORK_LOCATION);
+  var _mFirstCol = getColumnLetter(MEMBER_COLS.FIRST_NAME);
+  var _mLastCol = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var _mEmailCol = getColumnLetter(MEMBER_COLS.EMAIL);
+  var _mUnitCol = getColumnLetter(MEMBER_COLS.UNIT);
+  var _mLocCol = getColumnLetter(MEMBER_COLS.WORK_LOCATION);
   var mStewardCol = getColumnLetter(MEMBER_COLS.ASSIGNED_STEWARD);
 
   // Formula to get unique member IDs from Grievance Log
@@ -912,13 +912,13 @@ function setupAllHiddenSheets() {
 
   // Core grievance/member calculation sheets (7 total)
   // Each function creates the sheet if missing or updates if exists
-  try { setupGrievanceCalcSheet(); created++; } catch (e) { repaired++; }
-  try { setupGrievanceFormulasSheet(); created++; } catch (e) { repaired++; }
-  try { setupMemberLookupSheet(); created++; } catch (e) { repaired++; }
-  try { setupStewardContactCalcSheet(); created++; } catch (e) { repaired++; }
-  try { setupDashboardCalcSheet(); created++; } catch (e) { repaired++; }
-  try { setupStewardPerformanceCalcSheet(); created++; } catch (e) { repaired++; }
-  try { setupChecklistCalcSheet(); created++; } catch (e) { repaired++; }
+  try { setupGrievanceCalcSheet(); created++; } catch (_e) { repaired++; }
+  try { setupGrievanceFormulasSheet(); created++; } catch (_e) { repaired++; }
+  try { setupMemberLookupSheet(); created++; } catch (_e) { repaired++; }
+  try { setupStewardContactCalcSheet(); created++; } catch (_e) { repaired++; }
+  try { setupDashboardCalcSheet(); created++; } catch (_e) { repaired++; }
+  try { setupStewardPerformanceCalcSheet(); created++; } catch (_e) { repaired++; }
+  try { setupChecklistCalcSheet(); created++; } catch (_e) { repaired++; }
 
   ss.toast('All 7 hidden sheets created!', '✅ Success', 3);
 

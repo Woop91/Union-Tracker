@@ -1507,7 +1507,7 @@ function getInteractiveAnalyticsData() {
             });
             var sectionAvg = sectionValidCount > 0 ? (sectionTotal / sectionValidCount).toFixed(1) : 0;
             data.surveyResults.bySection.push({ name: section.name, avg: parseFloat(sectionAvg) });
-          } catch (e) {
+          } catch (_e) {
             data.surveyResults.bySection.push({ name: section.name, avg: 0 });
           }
         });

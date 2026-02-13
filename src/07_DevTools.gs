@@ -1698,7 +1698,7 @@ var Assert = {
   },
   assertThrows: function(fn, message) {
     var threw = false;
-    try { fn(); } catch (e) { threw = true; }
+    try { fn(); } catch (_e) { threw = true; }
     if (!threw) throw new Error(message || 'Expected function to throw');
   },
   assertApproximately: function(expected, actual, tolerance, message) {
@@ -1715,7 +1715,7 @@ function isLargeDataset() {
     var ss = SpreadsheetApp.getActive();
     var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
     return memberDir ? memberDir.getLastRow() > TEST_LARGE_DATASET_THRESHOLD : false;
-  } catch (e) { return false; }
+  } catch (_e) { return false; }
 }
 
 function createTestMember(memberId) {
@@ -2296,7 +2296,7 @@ var Assert = {
     var threw = false;
     try {
       fn();
-    } catch (e) {
+    } catch (_e) {
       threw = true;
     }
     if (!threw) {
@@ -2589,7 +2589,7 @@ function test_GrievanceIdFormat() {
  * Tests array helper functions
  */
 function test_ArrayHelpers() {
-  var arr = [1, 2, 3, 4, 5];
+  var _arr = [1, 2, 3, 4, 5];
 
   // Test unique function
   var withDups = [1, 2, 2, 3, 3, 3];

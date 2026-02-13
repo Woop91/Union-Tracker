@@ -156,7 +156,7 @@ function generateChecklistId_(offset) {
  */
 function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   if (!caseId) {
-    return { success: false, error: 'Case ID is required' };
+    return errorResponse('Case ID is required');
   }
 
   // Default to Grievance if not specified
@@ -166,7 +166,7 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   var templateItems = getChecklistTemplate(actionType, issueCategory);
 
   if (!templateItems || templateItems.length === 0) {
-    return { success: false, error: 'No template found for this action type' };
+    return errorResponse('No template found for this action type');
   }
 
   var sheet = getOrCreateChecklistSheet();
@@ -370,7 +370,7 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return { success: false, error: 'Checklist item not found' };
+    return errorResponse('Checklist item not found');
   }
 
   var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
@@ -401,7 +401,7 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
     }
   }
 
-  return { success: false, error: 'Checklist item not found' };
+  return errorResponse('Checklist item not found');
 }
 
 /**
@@ -415,7 +415,7 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
  */
 function addChecklistItem(caseId, itemText, category, required, dueDate) {
   if (!caseId || !itemText) {
-    return { success: false, error: 'Case ID and item text are required' };
+    return errorResponse('Case ID and item text are required');
   }
 
   // Validate category
@@ -499,7 +499,7 @@ function deleteChecklistItem(checklistId) {
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return { success: false, error: 'Checklist item not found' };
+    return errorResponse('Checklist item not found');
   }
 
   var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
@@ -517,7 +517,7 @@ function deleteChecklistItem(checklistId) {
     }
   }
 
-  return { success: false, error: 'Checklist item not found' };
+  return errorResponse('Checklist item not found');
 }
 
 /**
@@ -531,7 +531,7 @@ function updateChecklistItem(checklistId, updates) {
   var lastRow = sheet.getLastRow();
 
   if (lastRow < 2) {
-    return { success: false, error: 'Checklist item not found' };
+    return errorResponse('Checklist item not found');
   }
 
   var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
@@ -560,7 +560,7 @@ function updateChecklistItem(checklistId, updates) {
     }
   }
 
-  return { success: false, error: 'Checklist item not found' };
+  return errorResponse('Checklist item not found');
 }
 
 /**
@@ -653,7 +653,7 @@ function updateAllChecklistProgress() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) {
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   var lastRow = grievanceSheet.getLastRow();
@@ -689,7 +689,7 @@ function createChecklistsForExistingCases() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) {
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   var lastRow = grievanceSheet.getLastRow();
@@ -998,14 +998,14 @@ function getChecklistDialogHtml(caseId) {
  */
 function createChecklistForCaseId(caseId) {
   if (!caseId) {
-    return { success: false, error: 'No case ID provided' };
+    return errorResponse('No case ID provided');
   }
 
   // Look up the grievance to get action type and category
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) {
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   var data = sheet.getDataRange().getValues();
@@ -1032,7 +1032,7 @@ function createChecklistForSelectedCase() {
   var row = sheet.getActiveRange().getRow();
 
   if (row <= 1) {
-    return { success: false, error: 'No case selected' };
+    return errorResponse('No case selected');
   }
 
   var caseId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
@@ -1052,7 +1052,7 @@ function setupActionTypeColumn() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) {
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   // Check if Action Type header exists
@@ -1354,7 +1354,7 @@ function syncChecklistCalcToGrievanceLog() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!grievanceSheet) {
     Logger.log('Grievance Log not found');
-    return { success: false, error: 'Grievance Log not found' };
+    return errorResponse('Grievance Log not found');
   }
 
   var grievanceLastRow = grievanceSheet.getLastRow();
@@ -1491,7 +1491,7 @@ function getHeaderMap(sheetName, forceRefresh) {
     if (cached) {
       try {
         return JSON.parse(cached);
-      } catch (e) {
+      } catch (_e) {
         // Cache corrupted, rebuild
       }
     }
@@ -1516,7 +1516,7 @@ function getHeaderMap(sheetName, forceRefresh) {
   // Cache for 5 minutes
   try {
     cache.put(cacheKey, JSON.stringify(headerMap), EXTENSION_CONFIG.CACHE_TTL_SECONDS);
-  } catch (e) {
+  } catch (_e) {
     // Cache write failed, continue without caching
   }
 
@@ -1803,7 +1803,7 @@ function generateExpansionFieldsHtml(memberId) {
  */
 function saveExpansionData(memberId, customData) {
   if (!memberId || !customData) {
-    return { success: false, error: 'Member ID and data required' };
+    return errorResponse('Member ID and data required');
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1811,14 +1811,14 @@ function saveExpansionData(memberId, customData) {
   const sheet = ss.getSheetByName(sheetName);
 
   if (!sheet) {
-    return { success: false, error: 'Sheet not found' };
+    return errorResponse('Sheet not found');
   }
 
   const headerMap = getHeaderMap(sheetName);
   const result = loadMemberData_({ findMemberId: memberId });
 
   if (!result.found) {
-    return { success: false, error: 'Member not found' };
+    return errorResponse('Member not found');
   }
 
   const memberRow = result.found.row;
@@ -1876,7 +1876,7 @@ function setupMemberLeaderRole() {
 
   if (!configSheet) {
     SpreadsheetApp.getUi().alert('Error: Config sheet not found');
-    return { success: false, error: 'Config sheet not found' };
+    return errorResponse('Config sheet not found');
   }
 
   const yesNoCol = (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.YES_NO) || 5;
@@ -2004,14 +2004,14 @@ function getDynamicEngineStatus() {
  */
 function setGrievanceReminder(grievanceId, reminderNum, reminderDate, reminderNote) {
   if (!grievanceId || (reminderNum !== 1 && reminderNum !== 2)) {
-    return { success: false, error: 'Invalid grievance ID or reminder number' };
+    return errorResponse('Invalid grievance ID or reminder number');
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG || 'Grievance Log');
 
   if (!sheet) {
-    return { success: false, error: 'Grievance Log sheet not found' };
+    return errorResponse('Grievance Log sheet not found');
   }
 
   // Find the grievance row
@@ -2026,19 +2026,19 @@ function setGrievanceReminder(grievanceId, reminderNum, reminderDate, reminderNo
   }
 
   if (rowIndex === -1) {
-    return { success: false, error: 'Grievance not found: ' + grievanceId };
+    return errorResponse('Grievance not found: ' + grievanceId);
   }
 
   // Determine which columns to update
   const dateCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_DATE : GRIEVANCE_COLS.REMINDER_2_DATE;
-  const noteCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_NOTE : GRIEVANCE_COLS.REMINDER_2_NOTE;
+  const _noteCol = reminderNum === 1 ? GRIEVANCE_COLS.REMINDER_1_NOTE : GRIEVANCE_COLS.REMINDER_2_NOTE;
 
   // Parse date if string
   let parsedDate = reminderDate;
   if (typeof reminderDate === 'string' && reminderDate) {
     parsedDate = new Date(reminderDate);
     if (isNaN(parsedDate.getTime())) {
-      return { success: false, error: 'Invalid date format' };
+      return errorResponse('Invalid date format');
     }
   }
 
@@ -3669,8 +3669,8 @@ function getScoreBucket_(score) {
  * Shows help dialog for PII-free Looker connection.
  */
 function showLookerAnonConnectionHelp() {
-  const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  const ssUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
+  const _ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+  const _ssUrl = SpreadsheetApp.getActiveSpreadsheet().getUrl();
 
   const html = `<!DOCTYPE html>
 <html>

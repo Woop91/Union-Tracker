@@ -114,7 +114,7 @@ function getDesktopSearchData(query, tab, filters) {
         if (dateFiled) {
           try {
             filedDateStr = Utilities.formatDate(new Date(dateFiled), Session.getScriptTimeZone(), 'MM/dd/yyyy');
-          } catch(e) {
+          } catch(_e) {
             filedDateStr = dateFiled.toString();
           }
         }

@@ -132,7 +132,7 @@ function DIAGNOSE_SETUP() {
   try {
     CalendarApp.getAllCalendars();
     results.checks.push('Calendar access: OK');
-  } catch (e) {
+  } catch (_e) {
     results.warnings.push('Cannot access Calendar - sync features may not work');
   }
 
@@ -141,7 +141,7 @@ function DIAGNOSE_SETUP() {
   try {
     DriveApp.getRootFolder();
     results.checks.push('Drive access: OK');
-  } catch (e) {
+  } catch (_e) {
     results.warnings.push('Cannot access Drive - folder features may not work');
   }
 
@@ -257,7 +257,7 @@ function removeDeprecatedTabs() {
         try {
           ss.deleteSheet(sheet);
           removed.push(name);
-        } catch (e) {
+        } catch (_e) {
           Logger.log('Could not delete sheet: ' + name);
         }
       }
@@ -809,7 +809,7 @@ function showCacheStatusDashboard() {
         if (obj.timestamp) {
           age = Math.floor((Date.now() - obj.timestamp) / 1000) + 's';
         }
-      } catch (e) { /* cached value may not be valid JSON; skip age display */ }
+      } catch (_e) { /* cached value may not be valid JSON; skip age display */ }
     }
 
     return '<tr>' +
@@ -1480,7 +1480,7 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
   );
 
   if (response1 !== ui.Button.YES) {
-    return { success: false, message: 'Cancelled by user' };
+    return errorResponse('Cancelled by user');
   }
 
   const response2 = ui.alert(
@@ -1490,7 +1490,7 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
   );
 
   if (response2 !== ui.Button.YES) {
-    return { success: false, message: 'Cancelled by user' };
+    return errorResponse('Cancelled by user');
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1531,14 +1531,14 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   );
 
   if (response !== ui.Button.YES) {
-    return { success: false, message: 'Cancelled' };
+    return errorResponse('Cancelled');
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
 
   if (!sheet) {
-    return { success: false, error: 'Grievance Tracker not found' };
+    return errorResponse('Grievance Tracker not found');
   }
 
   const lastRow = sheet.getLastRow();
@@ -1574,7 +1574,7 @@ function createWeeklySnapshot() {
   var archiveFolderId = '';
   try {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
-  } catch (e) {
+  } catch (_e) {
     // Fall back to a default if config is not available
   }
 
@@ -1624,12 +1624,12 @@ function createAutomatedSnapshot() {
     archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
   } catch (e) {
     Logger.log('Could not get archive folder ID: ' + e.message);
-    return { success: false, error: 'Archive folder not configured' };
+    return errorResponse('Archive folder not configured');
   }
 
   if (!archiveFolderId) {
     Logger.log('Archive folder not configured');
-    return { success: false, error: 'Archive folder not configured' };
+    return errorResponse('Archive folder not configured');
   }
 
   try {
@@ -1648,7 +1648,7 @@ function createAutomatedSnapshot() {
 
   } catch (e) {
     Logger.log('Failed to create automated snapshot: ' + e.message);
-    return { success: false, error: e.message };
+    return errorResponse(e.message);
   }
 }
 
@@ -3370,7 +3370,7 @@ var Assert = {
   },
   assertThrows: function(fn, message) {
     var threw = false;
-    try { fn(); } catch (e) { threw = true; }
+    try { fn(); } catch (_e) { threw = true; }
     if (!threw) throw new Error(message || 'Expected function to throw');
   },
   assertApproximately: function(expected, actual, tolerance, message) {

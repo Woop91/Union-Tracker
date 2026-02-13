@@ -205,7 +205,7 @@ function handleSecurityAudit_(e) {
     var userEmail = '';
     try {
       userEmail = Session.getActiveUser().getEmail() || 'Unknown';
-    } catch (authError) {
+    } catch (_authError) {
       userEmail = 'Auth Required';
     }
 
@@ -221,7 +221,7 @@ function handleSecurityAudit_(e) {
       var chiefEmail = '';
       try {
         chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
-      } catch (configError) {
+      } catch (_configError) {
         // Config not available
       }
 
@@ -1319,7 +1319,7 @@ function updateGrievance(grievanceId, updates) {
     }
 
     if (rowIndex === -1) {
-      return { success: false, error: 'Grievance not found' };
+      return errorResponse('Grievance not found');
     }
 
     // Update each provided field
@@ -1346,7 +1346,7 @@ function updateGrievance(grievanceId, updates) {
 
   } catch (error) {
     console.error('Error updating grievance:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 
@@ -1562,7 +1562,7 @@ function addNewMember(memberData) {
     const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
     if (!sheet) {
-      return { success: false, error: 'Member Directory sheet not found' };
+      return errorResponse('Member Directory sheet not found');
     }
 
     // Generate unique member ID using timestamp to avoid collisions from row deletions
@@ -1601,7 +1601,7 @@ function addNewMember(memberData) {
 
   } catch (error) {
     console.error('Error adding member:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message);
   }
 }
 

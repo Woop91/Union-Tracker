@@ -1065,7 +1065,7 @@ function getSatisfactionTrendData(period) {
       result.issuesTrend.push({ name: issue, count: issueMap[issue] });
     }
     result.issuesTrend.sort(function(a, b) { return b.count - a.count; });
-  } catch(e) { /* ignore if column doesn't exist */ }
+  } catch(_e) { /* ignore if column doesn't exist */ }
 
   return result;
 }
@@ -2589,13 +2589,13 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
   var thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   var lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   var lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-  var oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+  var _oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   // ══════════════════════════════════════════════════════════════════════
   // MEMBER METRICS
   // ══════════════════════════════════════════════════════════════════════
   var openRates = [];
-  var stewardCounts = {};
+  var _stewardCounts = {};
 
   for (var m = 1; m < memberData.length; m++) {
     var row = memberData[m];
@@ -2649,7 +2649,7 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     var dateClosed = gRow[GRIEVANCE_COLS.DATE_CLOSED - 1];
     var daysOpen = gRow[GRIEVANCE_COLS.DAYS_OPEN - 1];
     var daysToDeadline = gRow[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var nextActionDue = gRow[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
+    var _nextActionDue = gRow[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
 
     // Status counts
     if (status === 'Open') metrics.open++;
@@ -3161,9 +3161,9 @@ function writeDashboardValues_(sheet, metrics) {
  */
 function applyDashboardGradients_(sheet) {
   // Define gradient color scale (Green -> Yellow -> Red)
-  var greenColor = '#D1FAE5';  // Low values (good for some metrics)
-  var yellowColor = '#FEF3C7'; // Mid values
-  var redColor = '#FCA5A5';    // High values (bad for some metrics)
+  var _greenColor = '#D1FAE5';  // Low values (good for some metrics)
+  var _yellowColor = '#FEF3C7'; // Mid values
+  var _redColor = '#FCA5A5';    // High values (bad for some metrics)
 
   // Reverse scale (Red -> Yellow -> Green) for positive metrics
   var redToGreen = {

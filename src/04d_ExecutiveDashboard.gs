@@ -510,7 +510,7 @@ function removeMidnightTrigger() {
  */
 function midnightAutoRefresh() {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var _ss = SpreadsheetApp.getActiveSpreadsheet();
     var startTime = new Date();
 
     Logger.log('Midnight Auto-Refresh started at ' + startTime.toISOString());
@@ -849,14 +849,14 @@ function checkDuplicateMemberIDs_UIService_() {
  * @returns {File} The created PDF file
  */
 function createGrievancePDF_UIService_(data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Get or create archive folder
   var folder;
   if (COMMAND_CONFIG.ARCHIVE_FOLDER_ID) {
     try {
       folder = DriveApp.getFolderById(COMMAND_CONFIG.ARCHIVE_FOLDER_ID);
-    } catch (e) {
+    } catch (_e) {
       folder = DriveApp.createFolder('509 Grievance Archive');
     }
   } else {
