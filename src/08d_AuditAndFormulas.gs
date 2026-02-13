@@ -1218,23 +1218,24 @@ function setupCalcDeadlinesSheet(sheet) {
   sheet.getRange('A3').setValue('Deadline Rules (Days)');
   sheet.getRange('A3').setFontWeight('bold');
 
+  var rules = getDeadlineRules();
   sheet.getRange('A4').setValue('Step 1 Response');
-  sheet.getRange('B4').setValue(DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE);
+  sheet.getRange('B4').setValue(rules.STEP_1.DAYS_FOR_RESPONSE);
 
   sheet.getRange('A5').setValue('Step 2 Appeal');
-  sheet.getRange('B5').setValue(DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL);
+  sheet.getRange('B5').setValue(rules.STEP_2.DAYS_TO_APPEAL);
 
   sheet.getRange('A6').setValue('Step 2 Response');
-  sheet.getRange('B6').setValue(DEADLINE_RULES.STEP_2.DAYS_FOR_RESPONSE);
+  sheet.getRange('B6').setValue(rules.STEP_2.DAYS_FOR_RESPONSE);
 
   sheet.getRange('A7').setValue('Step 3 Appeal');
-  sheet.getRange('B7').setValue(DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL);
+  sheet.getRange('B7').setValue(rules.STEP_3.DAYS_TO_APPEAL);
 
   sheet.getRange('A8').setValue('Step 3 Response');
-  sheet.getRange('B8').setValue(DEADLINE_RULES.STEP_3.DAYS_FOR_RESPONSE);
+  sheet.getRange('B8').setValue(rules.STEP_3.DAYS_FOR_RESPONSE);
 
   sheet.getRange('A9').setValue('Arbitration Demand');
-  sheet.getRange('B9').setValue(DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND);
+  sheet.getRange('B9').setValue(rules.ARBITRATION.DAYS_TO_DEMAND);
 
   // Upcoming deadlines calculation
   sheet.getRange('D1').setValue('Upcoming Deadlines (Next 14 Days)');

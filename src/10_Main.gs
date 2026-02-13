@@ -1866,7 +1866,14 @@ function exportMemberDirectory(format) {
     throw new Error('Member Directory sheet not found');
   }
 
-  const data = sheet.getDataRange().getValues();
+  // Exclude PII and sensitive columns (PIN_HASH, STREET_ADDRESS, CITY, STATE)
+  var allData = sheet.getDataRange().getValues();
+  var excludeCols = PII_MEMBER_COLS.concat([MEMBER_COLS.PIN_HASH]);
+  const data = allData.map(function(row) {
+    return row.filter(function(_, colIdx) {
+      return excludeCols.indexOf(colIdx + 1) === -1;
+    });
+  });
 
   switch (format) {
     case 'csv':

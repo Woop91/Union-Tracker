@@ -29,11 +29,12 @@
  */
 function createDashboardMenu() {
   var ui = SpreadsheetApp.getUi();
+  var localNumber = getLocalNumberFromConfig_();
 
   // ============================================================================
-  // MENU 1: 509 Union Hub - Primary Operations
+  // MENU 1: Union Hub - Primary Operations
   // ============================================================================
-  ui.createMenu('📊 509 Union Hub')
+  ui.createMenu('📊 ' + localNumber + ' Union Hub')
     .addItem('👥 Member Dashboard', 'showPublicMemberDashboard')
     .addItem('🛡️ Steward Dashboard', 'showStewardDashboard')
     .addSeparator()

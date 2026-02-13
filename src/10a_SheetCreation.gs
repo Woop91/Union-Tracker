@@ -613,6 +613,9 @@ function createMemberDirectory(ss) {
   // Format Hire Date column as date
   sheet.getRange(2, MEMBER_COLS.HIRE_DATE, 998, 1).setNumberFormat('MM/dd/yyyy');
 
+  // Hide PIN Hash column (sensitive data — should not be visible in the sheet)
+  sheet.hideColumns(MEMBER_COLS.PIN_HASH, 1);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // CONDITIONAL FORMATTING: Highlight members with open grievances
   // ═══════════════════════════════════════════════════════════════════════════
