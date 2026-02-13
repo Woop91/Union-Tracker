@@ -11,7 +11,7 @@ module.exports = {
   coverageReporters: ['text', 'text-summary', 'html', 'lcov'],
   coverageThreshold: {
     global: {
-      lines: 30
+      lines: 100
     }
   },
   watchPathIgnorePatterns: ['dist/', 'coverage/', 'node_modules/']

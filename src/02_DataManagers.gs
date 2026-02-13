@@ -217,7 +217,7 @@ function getAllStewards() {
 
   for (var i = 1; i < data.length; i++) {
     var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
-    if (isSteward === 'Yes' || isSteward === true) {
+    if (isTruthyValue(isSteward)) {
       var steward = {};
       for (var j = 0; j < headers.length; j++) {
         steward[headers[j]] = data[i][j];
@@ -579,7 +579,7 @@ function promoteSelectedMemberToSteward() {
   var fullName = firstName + ' ' + lastName;
   var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
 
-  if (currentStatus === 'Yes' || currentStatus === true) {
+  if (isTruthyValue(currentStatus)) {
     ui.alert(fullName + ' is already a Steward');
     return;
   }
@@ -652,7 +652,7 @@ function demoteSelectedSteward() {
   var fullName = firstName + ' ' + lastName;
   var currentStatus = sheet.getRange(row, MEMBER_COLS.IS_STEWARD).getValue();
 
-  if (currentStatus !== 'Yes' && currentStatus !== true) {
+  if (!isTruthyValue(currentStatus)) {
     ui.alert(fullName + ' is not currently a Steward');
     return;
   }
@@ -1032,7 +1032,7 @@ function importMembersFromData(data, mapping) {
     var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!sheet) {
-      return { success: false, message: 'Member Directory sheet not found' };
+      return errorResponse('Member Directory sheet not found', 'bulkImportMembers');
     }
 
     // Get existing data for duplicate checking
@@ -1124,7 +1124,7 @@ function importMembersFromData(data, mapping) {
 
   } catch (e) {
     console.error('Import error: ' + e.message);
-    return { success: false, message: e.message };
+    return errorResponse(e.message, 'bulkImportMembers');
   }
 }
 
@@ -1203,7 +1203,7 @@ function startNewGrievance(grievanceData) {
     // Validate required fields
     const validation = validateGrievanceData(grievanceData);
     if (!validation.valid) {
-      return { success: false, error: validation.error };
+      return errorResponse(validation.error, 'createGrievance');
     }
 
     // Generate new grievance ID
@@ -1259,7 +1259,7 @@ function startNewGrievance(grievanceData) {
 
   } catch (error) {
     console.error('Error creating grievance:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message, 'createGrievance');
   }
 }
 
@@ -1524,17 +1524,17 @@ function advanceGrievanceStep(grievanceId, options) {
     }
 
     if (rowIndex === -1) {
-      return { success: false, error: 'Grievance not found' };
+      return errorResponse('Grievance not found', 'advanceGrievanceStep');
     }
 
     const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP]);
     if (isNaN(currentStep) || currentStep < 1) {
-      return { success: false, error: 'Invalid current step value for this grievance' };
+      return errorResponse('Invalid current step value for this grievance', 'advanceGrievanceStep');
     }
     const nextStep = currentStep + 1;
 
     if (nextStep > 4) {
-      return { success: false, error: 'Grievance is already at arbitration level' };
+      return errorResponse('Grievance is already at arbitration level', 'advanceGrievanceStep');
     }
 
     const today = new Date();
@@ -1590,7 +1590,7 @@ function advanceGrievanceStep(grievanceId, options) {
 
   } catch (error) {
     console.error('Error advancing grievance:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message, 'advanceGrievanceStep');
   }
 }
 

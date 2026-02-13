@@ -1,12 +1,12 @@
 #!/bin/sh
-# Pre-commit hook - runs linting and build verification before allowing commit
+# Pre-commit hook - runs lint-staged and build verification before allowing commit
 
 echo "Running pre-commit checks..."
 echo ""
 
-# Step 1: Lint
-echo "[1/2] Linting source files..."
-npm run lint
+# Step 1: Lint staged files only (faster than linting all files)
+echo "[1/2] Linting staged files..."
+npx lint-staged
 
 if [ $? -ne 0 ]; then
   echo ""

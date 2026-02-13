@@ -86,6 +86,21 @@ function errorResponse(error, context) {
 }
 
 /**
+ * Normalizes boolean-like values from Google Sheets to a consistent boolean.
+ * Handles: true, 'Yes', 'TRUE', 'true', 'yes', 1, '1'
+ * @param {*} value - The value to check
+ * @returns {boolean} True if the value represents a truthy/yes value
+ */
+function isTruthyValue(value) {
+  if (value === true || value === 1) return true;
+  if (typeof value === 'string') {
+    var lower = value.trim().toLowerCase();
+    return lower === 'yes' || lower === 'true' || lower === '1';
+  }
+  return false;
+}
+
+/**
  * Central error handler
  * @param {Error} error - The error object
  * @param {string} context - Where the error occurred

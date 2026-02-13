@@ -29,11 +29,14 @@
   "author": "Dashboard Team",
   "license": "MIT",
   "devDependencies": {
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
     "@google/clasp": "^2.4.2",
     "@types/google-apps-script": "^1.0.83",
     "eslint": "^9.39.0",
     "husky": "^9.1.7",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "lint-staged": "^16.2.7"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -41,5 +44,15 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Woop91/MULTIPLE-SCRIPS-REPO"
+  },
+  "lint-staged": {
+    "src/**/*.gs": [
+      "eslint"
+    ]
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
+    ]
   }
 }

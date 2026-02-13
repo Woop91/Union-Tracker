@@ -728,7 +728,7 @@ function getAggregateSatisfactionStats() {
   var validRows = data.filter(function(row) {
     var verified = row[SATISFACTION_COLS.VERIFIED - 1];
     var isLatest = row[SATISFACTION_COLS.IS_LATEST - 1];
-    return verified === 'Yes' && isLatest === 'Yes';
+    return isTruthyValue(verified) && isTruthyValue(isLatest);
   });
 
   if (validRows.length === 0) {
@@ -885,7 +885,7 @@ function getSatisfactionResponseData() {
       trust: trust,
       protected: protected_,
       recommend: recommend,
-      stewardContact: stewardContact === 'Yes',
+      stewardContact: isTruthyValue(stewardContact),
       stewardRating: stewardRating
     });
   }
@@ -2603,7 +2603,7 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
 
     metrics.totalMembers++;
 
-    if (row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+    if (isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) {
       metrics.activeStewards++;
     }
 
@@ -3738,7 +3738,7 @@ function getPublicOverviewData() {
 
       // Count stewards
       var isSteward = memberData[i][MEMBER_COLS.IS_STEWARD - 1];
-      if (isSteward === true || isSteward === 'Yes' || isSteward === 'TRUE') {
+      if (isTruthyValue(isSteward)) {
         stewardCount++;
       }
     }
@@ -3809,10 +3809,10 @@ function getPublicSurveyData(includeHistory) {
     var isLatest = data[i][SATISFACTION_COLS.IS_LATEST - 1];
 
     // Only include Verified='Yes' responses
-    if (verified !== 'Yes') continue;
+    if (!isTruthyValue(verified)) continue;
 
     // If not including history, only include IS_LATEST='Yes'
-    if (!includeHistory && isLatest !== 'Yes') continue;
+    if (!includeHistory && !isTruthyValue(isLatest)) continue;
 
     validRows.push(data[i]);
   }
@@ -3976,7 +3976,7 @@ function getPublicStewardData() {
 
   for (var i = 1; i < data.length; i++) {
     var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
-    if (isSteward !== true && isSteward !== 'Yes' && isSteward !== 'TRUE') continue;
+    if (!isTruthyValue(isSteward)) continue;
 
     var firstName = data[i][MEMBER_COLS.FIRST_NAME - 1] || '';
     var lastName = data[i][MEMBER_COLS.LAST_NAME - 1] || '';
@@ -4021,7 +4021,7 @@ function getStewardCoverageStats() {
 
     memberCount++;
     var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
-    if (isSteward === true || isSteward === 'Yes' || isSteward === 'TRUE') {
+    if (isTruthyValue(isSteward)) {
       stewardCount++;
     }
   }

@@ -90,6 +90,7 @@ module.exports = [
         withErrorHandling: 'readonly',
         successResponse: 'readonly',
         errorResponse: 'readonly',
+        isTruthyValue: 'readonly',
         PerformanceTimer: 'readonly',
         sanitizeHtml: 'readonly',
         sanitizeForQuery: 'readonly',
@@ -131,7 +132,7 @@ module.exports = [
       // These are disabled to allow existing code to pass
       // Enable gradually as code is cleaned up
       'no-undef': 'off',
-      'no-unused-vars': 'off',
+      'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_', vars: 'local' }],
       'no-redeclare': 'off',
       'no-empty': 'off',
       'eqeqeq': 'warn',

@@ -398,7 +398,7 @@ var DataAccess = {
       if (options.location && row[MEMBER_COLUMNS.WORK_LOCATION] !== options.location) continue;
       if (options.stewardsOnly) {
         var isSteward = row[MEMBER_COLUMNS.IS_STEWARD];
-        if (isSteward !== true && isSteward !== 'Yes' && isSteward !== 'TRUE') continue;
+        if (!isTruthyValue(isSteward)) continue;
       }
 
       members.push({

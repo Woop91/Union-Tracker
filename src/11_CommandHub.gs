@@ -2081,7 +2081,7 @@ function getRecentSurveyAverage(unitName) {
     var verified = row[SATISFACTION_COLS.VERIFIED - 1];
     var isLatest = row[SATISFACTION_COLS.IS_LATEST - 1];
 
-    if (verified !== 'Yes' || isLatest !== 'Yes') continue;
+    if (!isTruthyValue(verified) || !isTruthyValue(isLatest)) continue;
 
     // Check if worksite matches unit (partial match for flexibility)
     var worksite = (row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '').toString().trim().toLowerCase();

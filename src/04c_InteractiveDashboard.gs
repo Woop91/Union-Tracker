@@ -342,9 +342,10 @@ function getInteractiveDashboardHtml() {
     // Tab switching with error handling
     'function switchTab(tabName,btn){' +
     '  safeRun(function(){' +
-    '    document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active")});' +
+    '    document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active");t.setAttribute("aria-selected","false")});' +
     '    document.querySelectorAll(".tab-content").forEach(function(c){c.classList.remove("active")});' +
     '    btn.classList.add("active");' +
+    '    btn.setAttribute("aria-selected","true");' +
     '    document.getElementById("content-"+tabName).classList.add("active");' +
     '    if(tabName==="mycases"&&myCases.length===0)loadMyCases();' +
     '    if(tabName==="members"&&allMembers.length===0)loadMembers();' +
@@ -353,6 +354,26 @@ function getInteractiveDashboardHtml() {
     '    if(tabName==="resources")loadResources();' +
     '  });' +
     '}' +
+
+    // Keyboard navigation for tabs
+    'document.addEventListener("keydown",function(e){' +
+    '  var activeTab=document.querySelector(".tab.active");' +
+    '  if(!activeTab)return;' +
+    '  var tabs=Array.prototype.slice.call(document.querySelectorAll(".tab"));' +
+    '  var idx=tabs.indexOf(activeTab);' +
+    '  if(idx===-1)return;' +
+    '  if(e.key==="ArrowRight"||e.key==="ArrowDown"){' +
+    '    e.preventDefault();' +
+    '    var next=tabs[(idx+1)%tabs.length];' +
+    '    next.click();' +
+    '    next.focus();' +
+    '  }else if(e.key==="ArrowLeft"||e.key==="ArrowUp"){' +
+    '    e.preventDefault();' +
+    '    var prev=tabs[(idx-1+tabs.length)%tabs.length];' +
+    '    prev.click();' +
+    '    prev.focus();' +
+    '  }' +
+    '});' +
 
     // Load overview data with error handling
     'function loadOverview(){' +
@@ -1006,7 +1027,7 @@ function getInteractiveOverviewData() {
       if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return;
 
       data.totalMembers++;
-      if (row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.activeStewards++;
+      if (isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) data.activeStewards++;
 
       // Count by location
       var location = row[MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
@@ -1074,9 +1095,9 @@ function getInteractiveMemberData() {
       phone: row[MEMBER_COLS.PHONE - 1] || '',
       preferredComm: row[MEMBER_COLS.PREFERRED_COMM - 1] || 'N/A',
       supervisor: row[MEMBER_COLS.SUPERVISOR - 1] || 'N/A',
-      isSteward: row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes',
+      isSteward: isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1]),
       assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1] || 'N/A',
-      hasOpenGrievance: row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] === 'Yes',
+      hasOpenGrievance: isTruthyValue(row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1]),
       grievanceStatus: row[MEMBER_COLS.GRIEVANCE_STATUS - 1] || ''
     };
   }).filter(function(m) { return m !== null; });
@@ -1146,7 +1167,7 @@ function getMyStewardCases() {
     var memberData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, MEMBER_COLS.IS_STEWARD).getValues();
     for (var i = 0; i < memberData.length; i++) {
       var memberEmail = memberData[i][MEMBER_COLS.EMAIL - 1] || '';
-      if (memberEmail.toLowerCase() === email.toLowerCase() && memberData[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+      if (memberEmail.toLowerCase() === email.toLowerCase() && isTruthyValue(memberData[i][MEMBER_COLS.IS_STEWARD - 1])) {
         userStewardName = ((memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (memberData[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
         break;
       }
@@ -1251,8 +1272,8 @@ function getInteractiveAnalyticsData() {
       if (!memberId || (typeof memberId === 'string' && !memberId.toString().match(/^M/i))) return;
 
       data.memberStats.total++;
-      if (row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes') data.memberStats.stewards++;
-      if (row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] === 'Yes') data.memberStats.withOpenGrievance++;
+      if (isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) data.memberStats.stewards++;
+      if (isTruthyValue(row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1])) data.memberStats.withOpenGrievance++;
 
       var location = row[MEMBER_COLS.WORK_LOCATION - 1] || 'Unknown';
       if (!locationMap[location]) locationMap[location] = { members: 0, grievances: 0, open: 0 };

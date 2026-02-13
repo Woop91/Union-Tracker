@@ -117,7 +117,7 @@ function getDashboardStats() {
     for (var m = 1; m < memberData.length; m++) {
       if (memberData[m][MEMBER_COLS.MEMBER_ID - 1]) {
         stats.totalMembers++;
-        if (memberData[m][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') stats.stewardCount++;
+        if (isTruthyValue(memberData[m][MEMBER_COLS.IS_STEWARD - 1])) stats.stewardCount++;
       }
     }
   }

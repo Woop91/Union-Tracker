@@ -58,6 +58,7 @@ const HTML_FILES = [
 ];
 
 function build() {
+  const startTime = Date.now();
   console.log('Building consolidated dashboard...\n');
 
   // Ensure dist directory exists
@@ -148,7 +149,8 @@ function build() {
   // Write output file
   fs.writeFileSync(OUTPUT_FILE, output, 'utf8');
 
-  console.log(`\nBuild complete!`);
+  const elapsed = Date.now() - startTime;
+  console.log(`\nBuild complete! (${elapsed}ms)`);
   console.log(`  Output: ${OUTPUT_FILE}`);
   console.log(`  Total lines: ${totalLines}`);
   console.log(`  File size: ${(output.length / 1024).toFixed(1)} KB`);

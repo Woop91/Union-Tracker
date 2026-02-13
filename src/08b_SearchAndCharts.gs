@@ -273,7 +273,7 @@ function advancedSearch(filters) {
 
         // Apply steward filter
         if (filters.stewardOnly && matches) {
-          if (row[MEMBER_COLUMNS.IS_STEWARD] !== 'Yes') {
+          if (!isTruthyValue(row[MEMBER_COLUMNS.IS_STEWARD])) {
             matches = false;
           }
         }
@@ -804,7 +804,7 @@ function createStewardLeaderboardChart_(sheet) {
 
   // Find stewards and look up their case counts
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+    if (isTruthyValue(data[i][MEMBER_COLS.IS_STEWARD - 1])) {
       var fullName = data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1];
       stewards.push({
         name: fullName,

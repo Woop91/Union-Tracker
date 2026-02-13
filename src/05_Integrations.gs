@@ -76,7 +76,7 @@ function setupDriveFolderForGrievance(grievanceId) {
     // Get grievance data
     const grievance = getGrievanceById(grievanceId);
     if (!grievance) {
-      return { success: false, error: 'Grievance not found' };
+      return errorResponse('Grievance not found', 'setupDriveFolderForGrievance');
     }
 
     // Extract fields for folder naming
@@ -130,6 +130,18 @@ function setupDriveFolderForGrievance(grievanceId) {
     newFolder.createFolder('Step 3 - Review');
     newFolder.createFolder('Supporting Documents');
 
+    // Share folder with assigned steward if available
+    if (grievance && grievance.steward) {
+      try {
+        var stewardEmail = typeof grievance.stewardEmail === 'string' ? grievance.stewardEmail : '';
+        if (stewardEmail) {
+          newFolder.addEditor(stewardEmail);
+        }
+      } catch (shareError) {
+        Logger.log('Could not share folder with steward: ' + shareError.message);
+      }
+    }
+
     // Update grievance record with folder link
     updateGrievanceFolderLink(grievanceId, newFolder.getUrl());
 
@@ -149,7 +161,7 @@ function setupDriveFolderForGrievance(grievanceId) {
 
   } catch (error) {
     console.error('Error creating Drive folder:', error);
-    return { success: false, error: error.message };
+    return errorResponse(error.message, 'setupDriveFolderForGrievance');
   }
 }
 
@@ -207,34 +219,25 @@ function setupFolderForSelectedGrievance() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
 
-  // Check if we're in the Grievance Log
-  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
-    ui.alert('📁 Setup Grievance Folder',
-      'Please select a grievance row in the Grievance Log sheet first.',
-      ui.ButtonSet.OK);
-    return;
-  }
-
   var range = ss.getActiveRange();
   var row = range.getRow();
 
-  // Skip header row
-  if (row < 2) {
-    ui.alert('📁 Setup Grievance Folder',
-      'Please select a data row (not the header).',
-      ui.ButtonSet.OK);
+  // Validate selection
+  var validationError = null;
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
+    validationError = 'Please select a grievance row in the Grievance Log sheet first.';
+  } else if (range.getRow() < 2) {
+    validationError = 'Please select a data row (not the header).';
+  } else if (!sheet.getRange(range.getRow(), GRIEVANCE_COLS.GRIEVANCE_ID).getValue()) {
+    validationError = 'No Grievance ID found in the selected row.';
+  }
+
+  if (validationError) {
+    ui.alert('📁 Setup Grievance Folder', validationError, ui.ButtonSet.OK);
     return;
   }
 
-  // Get grievance ID from column A
-  var grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
-
-  if (!grievanceId) {
-    ui.alert('📁 Setup Grievance Folder',
-      'No Grievance ID found in the selected row.',
-      ui.ButtonSet.OK);
-    return;
-  }
+  var grievanceId = sheet.getRange(range.getRow(), GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
 
   // Check if folder already exists
   var existingUrl = sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
@@ -737,7 +740,7 @@ function getAllStewardEmails_() {
     var emails = [];
     for (var i = 1; i < data.length; i++) {
       var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
-      if (isSteward === 'Yes' || isSteward === true) {
+      if (isTruthyValue(isSteward)) {
         var email = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim();
         if (email) emails.push(email);
       }
@@ -2749,9 +2752,9 @@ function getWebAppMemberList() {
         unit: row[MEMBER_COLS.UNIT - 1] || 'N/A',
         email: row[MEMBER_COLS.EMAIL - 1] || '',
         phone: row[MEMBER_COLS.PHONE - 1] || '',
-        isSteward: row[MEMBER_COLS.IS_STEWARD - 1] === 'Yes',
+        isSteward: isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1]),
         supervisor: row[MEMBER_COLS.SUPERVISOR - 1] || 'N/A',
-        hasOpenGrievance: row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] === 'Yes'
+        hasOpenGrievance: isTruthyValue(row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1])
       };
     }).filter(function(m) { return m !== null; }).slice(0, 100);
 
