@@ -1,22 +1,20 @@
 /**
  * ============================================================================
- * UIService.gs - Unified Interface Logic
+ * 04a_UIMenus.gs - Menu System & Navigation
  * ============================================================================
  *
- * This module handles all user interface components including:
- * - Search dialogs (desktop and mobile)
- * - Multi-select editors
+ * This module handles menu creation and navigation including:
+ * - Menu bar creation and organization
+ * - Navigation sidebar
  * - Quick action menus
- * - Sidebars and modal dialogs
- * - Theme management
- * - HTML generation utilities
+ * - Visual control panel dialogs
  *
  * SEPARATION OF CONCERNS: This file contains ONLY UI/presentation logic.
  * All business logic should remain in their respective modules.
  *
- * @fileoverview UI components and dialog management
- * @version 2.0.0
- * @requires Constants.gs
+ * @fileoverview Menu system, navigation, and dialog management
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================

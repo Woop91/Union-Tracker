@@ -1,10 +1,10 @@
 /**
  * ============================================================================
- * 00_ErrorHandler.gs - Centralized Error Handling
+ * 01_Core.gs - Core Constants, Error Handling & Configuration
  * ============================================================================
  *
- * This module provides centralized error handling, logging, and user
- * notification utilities for the entire dashboard application.
+ * This module provides centralized error handling, logging, constants,
+ * configuration, and column definitions for the entire dashboard application.
  *
  * Features:
  * - Consistent error logging with context
@@ -12,9 +12,11 @@
  * - Error tracking and reporting
  * - Performance monitoring
  * - Input sanitization
+ * - Sheet and column constants
+ * - Version management
  *
- * @fileoverview Centralized error handling utilities
- * @version 1.0.0
+ * @fileoverview Core constants, error handling, and configuration
+ * @version 4.6.0
  */
 
 // ============================================================================
@@ -115,7 +117,7 @@ function handleError(error, context, level) {
     context: context || 'Unknown',
     message: error.message || String(error),
     stack: error.stack || '',
-    user: Session.getActiveUser().getEmail() || 'Unknown'
+    user: (function() { try { return Session.getActiveUser().getEmail() || 'Unknown'; } catch (_e) { return 'Unknown'; } })()
   };
 
   // Log to console
@@ -514,7 +516,7 @@ function clearErrorLog() {
  * Single source of truth for all configuration constants.
  * This file must be loaded first in the build order.
  *
- * @version 4.1.0
+ * @version 4.6.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -671,8 +673,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
-  { version: '4.6.1', date: '2026-02-12', codename: 'PII & Compliance', changes: 'Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (seiu509.org only) and Lockdown future feature roadmap items.' },
-  { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling' },
+  { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling. Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (seiu509.org only) and Lockdown future feature roadmap items.' },
   { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
   { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
   { version: '4.4.1', date: '2026-01-31', codename: 'Build System',                               changes: 'Initial build system with Node.js, source file concatenation' },
@@ -1203,7 +1204,7 @@ var GRIEVANCE_COLUMNS = {
   // Calculated metrics (0-indexed)
   DAYS_OPEN: 18,           // S - Days Open
   NEXT_ACTION_DUE: 19,     // T - Next Action Due
-  LAST_UPDATED: 19,        // Alias for NEXT_ACTION_DUE
+  LAST_UPDATED: 41,        // Alias for RECORD_LAST_UPDATED (AP)
   DAYS_TO_DEADLINE: 20,    // U - Days to Deadline
 
   // Case details (0-indexed)

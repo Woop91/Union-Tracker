@@ -1,17 +1,18 @@
 /**
  * ============================================================================
- * 02_MemberManager.gs - Member Directory Operations
+ * 02_DataManagers.gs - Member & Grievance Data Operations
  * ============================================================================
  *
- * This module handles all member-related operations including:
+ * This module handles all member and grievance data operations including:
  * - Member directory management
  * - Steward promotion/demotion
  * - Member ID generation and validation
  * - Member data sync
+ * - Grievance tracking and management
  *
- * @fileoverview Member directory operations and steward management
- * @version 3.6.0
- * @requires 01_Constants.gs
+ * @fileoverview Member directory and grievance data operations
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================
@@ -1175,11 +1176,11 @@ function showExportMembersDialog() {
  * - Batch recalculation of deadlines
  *
  * SEPARATION OF CONCERNS: This file contains ONLY grievance business logic.
- * UI components are in UIService.gs, integrations in Integrations.gs.
+ * UI components are in 04a_UIMenus.gs, integrations in 05_Integrations.gs.
  *
  * @fileoverview Grievance lifecycle management
- * @version 2.0.0
- * @requires Constants.gs
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================
