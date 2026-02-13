@@ -3,8 +3,9 @@ node_modules/
 
 # Build output (dist/ is now tracked for consolidated file)
 
-# Clasp authentication
+# Clasp authentication and project config
 .clasprc.json
+.clasp.json
 
 # IDE settings
 .idea/

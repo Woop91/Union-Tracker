@@ -14,8 +14,7 @@
     "ci": "npm run clean && npm run lint && npm run build && npm run test:unit",
     "watch": "node build.js --watch",
     "clean": "node build.js --clean",
-    "manifest": "node build.js --manifest",
-    "deploy": "npm run test && npm run build:prod && npm run manifest && clasp push",
+    "deploy": "npm run test && npm run build:prod && clasp push",
     "open": "clasp open",
     "prepare": "husky"
   },
