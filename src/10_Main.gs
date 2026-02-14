@@ -118,6 +118,15 @@ function onEdit(e) {
       applyAutoStyleToRow_(sheet, row);  // Auto-styling
       handleStageGateWorkflow_(e);        // Escalation alerts
 
+      // Auto-sort by priority (always run, regardless of auto-sync trigger)
+      if (typeof sortGrievanceLogByStatus === 'function') {
+        try {
+          sortGrievanceLogByStatus();
+        } catch (sortError) {
+          Logger.log('Auto-sort error: ' + sortError.message);
+        }
+      }
+
       // Auto-sync after grievance edits
       if (typeof onEditAutoSync === 'function') {
         try {

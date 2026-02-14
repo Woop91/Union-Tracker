@@ -652,16 +652,17 @@ function sortGrievanceLogByStatus() {
   // Write sorted data back
   dataRange.setValues(data);
 
-  // Re-apply checkboxes to Message Alert column (AC) - setValues overwrites them
+  // Re-apply checkboxes - setValues overwrites them
   if (lastRow >= 2) {
     sheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, lastRow - 1, 1).insertCheckboxes();
+    sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, lastRow - 1, 1).insertCheckboxes();
   }
 
   // Apply highlighting to Message Alert rows
   applyMessageAlertHighlighting_(sheet, lastRow);
 
   Logger.log('Grievance Log sorted by status priority');
-  ss.toast('Grievance Log sorted by status priority', '📊 Sorted', 2);
+  ss.toast('Grievance Log sorted by status priority', 'Sorted', 2);
 }
 
 /**

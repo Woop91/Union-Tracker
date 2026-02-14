@@ -572,23 +572,43 @@ function getCachedData(key, loader, ttl) {
   try {
     // Check memory cache first (fastest)
     var memCache = CacheService.getScriptCache();
-    var cached = memCache.get(key);
+    var cached = null;
+    try {
+      cached = memCache.get(key);
+    } catch (_memErr) {
+      // CacheService may be unavailable
+    }
     if (cached) {
-      if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Memory] ' + key);
-      return JSON.parse(cached);
+      try {
+        if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Memory] ' + key);
+        return JSON.parse(cached);
+      } catch (_parseErr) {
+        // Corrupted cache entry, remove it
+        try { memCache.remove(key); } catch (_e) {}
+      }
     }
 
     // Check properties cache (persistent)
-    var propsCache = PropertiesService.getScriptProperties();
-    var propsCached = propsCache.getProperty(key);
-    if (propsCached) {
-      var obj = JSON.parse(propsCached);
-      if (obj.timestamp && (Date.now() - obj.timestamp) < (ttl * 1000)) {
-        // Refresh memory cache from properties
-        memCache.put(key, JSON.stringify(obj.data), ttl);
-        if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Props] ' + key);
-        return obj.data;
+    try {
+      var propsCache = PropertiesService.getScriptProperties();
+      var propsCached = propsCache.getProperty(key);
+      if (propsCached) {
+        var obj = JSON.parse(propsCached);
+        if (obj.timestamp && (Date.now() - obj.timestamp) < (ttl * 1000)) {
+          // Refresh memory cache from properties
+          var str = JSON.stringify(obj.data);
+          if (str.length < 100000) {
+            try { memCache.put(key, str, Math.min(ttl, 21600)); } catch (_e) {}
+          }
+          if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Props] ' + key);
+          return obj.data;
+        } else {
+          // Expired - clean up stale property
+          try { propsCache.deleteProperty(key); } catch (_e) {}
+        }
       }
+    } catch (_propsErr) {
+      // Properties unavailable, continue to loader
     }
 
     // Cache miss - load fresh data
@@ -600,7 +620,12 @@ function getCachedData(key, loader, ttl) {
   } catch (e) {
     Logger.log('Cache error for ' + key + ': ' + e.message);
     // Fallback to direct load on error
-    return loader();
+    try {
+      return loader();
+    } catch (loaderErr) {
+      Logger.log('Loader also failed for ' + key + ': ' + loaderErr.message);
+      return null;
+    }
   }
 }
 
@@ -616,18 +641,29 @@ function setCachedData(key, data, ttl) {
 
   try {
     var str = JSON.stringify(data);
+    if (!str) return;
 
-    // Store in memory cache (max 6 hours)
-    var memCache = CacheService.getScriptCache();
-    memCache.put(key, str, Math.min(ttl, 21600));
-
-    // Store in properties if under size limit (100KB)
+    // CacheService limit is 100KB per key
     if (str.length < 100000) {
-      var propsCache = PropertiesService.getScriptProperties();
-      propsCache.setProperty(key, JSON.stringify({
-        data: data,
-        timestamp: Date.now()
-      }));
+      try {
+        var memCache = CacheService.getScriptCache();
+        memCache.put(key, str, Math.min(ttl, 21600));
+      } catch (_memErr) {
+        Logger.log('Memory cache write failed for ' + key + ': data too large or service unavailable');
+      }
+    }
+
+    // PropertiesService limit is ~9KB per property
+    if (str.length < 9000) {
+      try {
+        var propsCache = PropertiesService.getScriptProperties();
+        propsCache.setProperty(key, JSON.stringify({
+          data: data,
+          timestamp: Date.now()
+        }));
+      } catch (_propsErr) {
+        Logger.log('Properties cache write failed for ' + key);
+      }
     }
   } catch (e) {
     Logger.log('Set cache error for ' + key + ': ' + e.message);
@@ -1578,20 +1614,40 @@ function createWeeklySnapshot() {
     // Fall back to a default if config is not available
   }
 
+  var folder;
   if (!archiveFolderId) {
-    ui.alert(
-      'Archive Folder Not Configured',
-      'Please set the Archive Folder ID in the Config sheet (column AU) or COMMAND_CONFIG.ARCHIVE_FOLDER_ID.\n\n' +
-      'To find a folder ID:\n' +
-      '1. Open the target folder in Google Drive\n' +
-      '2. Copy the ID from the URL (after /folders/)',
-      ui.ButtonSet.OK
-    );
-    return;
+    // Auto-create archive folder if not configured
+    try {
+      var folders = DriveApp.getFoldersByName('509 Dashboard Archive');
+      if (folders.hasNext()) {
+        folder = folders.next();
+      } else {
+        folder = DriveApp.createFolder('509 Dashboard Archive');
+      }
+      archiveFolderId = folder.getId();
+      // Save to Config sheet for future use
+      try {
+        var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+        if (configSheet) {
+          configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).setValue(archiveFolderId);
+        }
+      } catch (_saveErr) {
+        Logger.log('Could not save archive folder ID to config: ' + _saveErr.message);
+      }
+      ss.toast('Auto-created archive folder in Google Drive.', 'Archive Setup', 3);
+    } catch (createErr) {
+      ui.alert('Archive Folder Error',
+        'Could not auto-create archive folder: ' + createErr.message + '\n\n' +
+        'You can manually set the Archive Folder ID in the Config sheet (column AU).',
+        ui.ButtonSet.OK);
+      return;
+    }
   }
 
   try {
-    var folder = DriveApp.getFolderById(archiveFolderId);
+    if (!folder) {
+      folder = DriveApp.getFolderById(archiveFolderId);
+    }
     var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd_HH-mm');
     var snapshotName = '509_SNAPSHOT_' + date;
 

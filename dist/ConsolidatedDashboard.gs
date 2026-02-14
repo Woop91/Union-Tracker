@@ -793,7 +793,7 @@ function sanitizeDataForClient(dataArray, fieldsToSanitize) {
 
 
 // ============================================================================
-// SOURCE: 00_DataAccess.gs (616 lines)
+// SOURCE: 00_DataAccess.gs (626 lines)
 // ============================================================================
 
 /**
@@ -873,20 +873,30 @@ var DataAccess = {
   getSheet: function(sheetName) {
     if (!sheetName) return null;
 
-    // Check sheet cache
+    // Check sheet cache - verify cached sheet is still valid
     if (_spreadsheetCache.sheets[sheetName]) {
-      return _spreadsheetCache.sheets[sheetName];
+      try {
+        // Verify the cached sheet reference is still valid
+        _spreadsheetCache.sheets[sheetName].getName();
+        return _spreadsheetCache.sheets[sheetName];
+      } catch (_e) {
+        // Cached reference is stale (sheet may have been deleted/renamed)
+        delete _spreadsheetCache.sheets[sheetName];
+      }
     }
 
     // Get from spreadsheet
     var ss = this.getSpreadsheet();
-    var sheet = ss.getSheetByName(sheetName);
-
-    if (sheet) {
-      _spreadsheetCache.sheets[sheetName] = sheet;
+    try {
+      var sheet = ss.getSheetByName(sheetName);
+      if (sheet) {
+        _spreadsheetCache.sheets[sheetName] = sheet;
+      }
+      return sheet;
+    } catch (e) {
+      Logger.log('Error accessing sheet "' + sheetName + '": ' + e.message);
+      return null;
     }
-
-    return sheet;
   },
 
   /**
@@ -1414,7 +1424,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2730 lines)
+// SOURCE: 01_Core.gs (2739 lines)
 // ============================================================================
 
 /**
@@ -1981,7 +1991,8 @@ var COMMAND_CONFIG = {
     HEADER_TEXT: '#ffffff',
     ALT_ROW: '#f8fafc',
     FONT: 'Roboto',
-    FONT_SIZE: 10
+    FONT_SIZE: 10,
+    HEADER_SIZE: 11
   },
 
   // Status Color Mapping for Auto-Styling (matches DEFAULT_CONFIG.GRIEVANCE_STATUS)
@@ -2370,7 +2381,7 @@ var MENU_ICONS = {
 };
 
 // ============================================================================
-// MEMBER DIRECTORY COLUMNS (39 columns total: A-AM)
+// MEMBER DIRECTORY COLUMNS (40 columns total: A-AN)
 // ============================================================================
 
 /**
@@ -2385,35 +2396,35 @@ var MEMBER_COLS = {
   LAST_NAME: 3,                    // C
   JOB_TITLE: 4,                    // D
 
-  // Section 2: Location & Work (E-G)
+  // Section 2: Location & Work (E-H)
   WORK_LOCATION: 5,                // E
   UNIT: 6,                         // F
-  OFFICE_DAYS: 7,                  // G - Multi-select: days member works in office
+  CUBICLE: 7,                      // G - Cubicle / workspace ID (hidden by default)
+  OFFICE_DAYS: 8,                  // H - Multi-select: days member works in office
 
-  // Section 3: Contact Information (H-K)
-  EMAIL: 8,                        // H
-  PHONE: 9,                        // I
-  PREFERRED_COMM: 10,              // J - Multi-select: preferred communication methods
-  BEST_TIME: 11,                   // K - Multi-select: best times to reach member
+  // Section 3: Contact Information (I-L)
+  EMAIL: 9,                        // I
+  PHONE: 10,                       // J
+  PREFERRED_COMM: 11,              // K - Multi-select: preferred communication methods
+  BEST_TIME: 12,                   // L - Multi-select: best times to reach member
 
-  // Section 4: Organizational Structure (L-P)
-  SUPERVISOR: 12,                  // L
-  MANAGER: 13,                     // M
-  IS_STEWARD: 14,                  // N
-  COMMITTEES: 15,                  // O - Multi-select: which committees steward is in
-  ASSIGNED_STEWARD: 16,            // P - Multi-select: assigned steward(s)
+  // Section 4: Organizational Structure (M-Q)
+  SUPERVISOR: 13,                  // M
+  MANAGER: 14,                     // N
+  IS_STEWARD: 15,                  // O
+  COMMITTEES: 16,                  // P - Multi-select: which committees steward is in
+  ASSIGNED_STEWARD: 17,            // Q - Multi-select: assigned steward(s)
 
-  // Section 5: Engagement Metrics (Q-T) - Hidden by default
-  LAST_VIRTUAL_MTG: 17,            // Q
-  LAST_INPERSON_MTG: 18,           // R
-  OPEN_RATE: 19,                   // S
-  VOLUNTEER_HOURS: 20,             // T
+  // Section 5: Engagement Metrics (R-U) - Hidden by default
+  LAST_VIRTUAL_MTG: 18,            // R
+  LAST_INPERSON_MTG: 19,           // S
+  OPEN_RATE: 20,                   // T
+  VOLUNTEER_HOURS: 21,             // U
 
-  // Section 6: Member Interests (U-X) - Hidden by default
-  INTEREST_LOCAL: 21,              // U
-  INTEREST_CHAPTER: 22,            // V
-  INTEREST_ALLIED: 23,             // W
-  HOME_TOWN: 24,                   // X - Connection building
+  // Section 6: Member Interests (V-X) - Hidden by default
+  INTEREST_LOCAL: 22,              // V
+  INTEREST_CHAPTER: 23,            // W
+  INTEREST_ALLIED: 24,             // X
 
   // Section 7: Steward Contact Tracking (Y-AA)
   RECENT_CONTACT_DATE: 25,         // Y
@@ -2453,7 +2464,7 @@ var MEMBER_COLS = {
  * unless explicitly authorized. Includes mailing address fields.
  * @const {Array<number>}
  */
-var PII_MEMBER_COLS = [37, 38, 39]; // STREET_ADDRESS (AK), CITY (AL), STATE (AM)
+var PII_MEMBER_COLS = [37, 38, 39]; // STREET_ADDRESS, CITY, STATE
 
 // ============================================================================
 // MEETING CHECK-IN LOG COLUMNS (16 columns: A-P)
@@ -2494,7 +2505,7 @@ var MEETING_STATUS = {
 };
 
 // ============================================================================
-// GRIEVANCE LOG COLUMNS (42 columns total: A-AP)
+// GRIEVANCE LOG COLUMNS (41 columns total: A-AO)
 // ============================================================================
 
 /**
@@ -2542,40 +2553,39 @@ var GRIEVANCE_COLS = {
   ARTICLES: 22,           // V - Articles Violated
   ISSUE_CATEGORY: 23,     // W - Issue Category
 
-  // Section 9: Contact & Location (X-AA)
+  // Section 9: Contact & Location (X-Z)
   MEMBER_EMAIL: 24,       // X - Member Email
-  UNIT: 25,               // Y - Unit
-  LOCATION: 26,           // Z - Work Location (Site)
-  STEWARD: 27,            // AA - Assigned Steward (Name)
+  LOCATION: 25,           // Y - Work Location (Site)
+  STEWARD: 26,            // Z - Assigned Steward (Name)
 
-  // Section 10: Resolution (AB)
-  RESOLUTION: 28,         // AB - Resolution Summary
+  // Section 10: Resolution (AA)
+  RESOLUTION: 27,         // AA - Resolution Summary
 
-  // Section 11: Coordinator Notifications (AC-AF)
-  MESSAGE_ALERT: 29,      // AC - Message Alert checkbox
-  COORDINATOR_MESSAGE: 30,// AD - Coordinator's message text
-  ACKNOWLEDGED_BY: 31,    // AE - Steward who acknowledged
-  ACKNOWLEDGED_DATE: 32,  // AF - When steward acknowledged
+  // Section 11: Coordinator Notifications (AB-AE)
+  MESSAGE_ALERT: 28,      // AB - Message Alert checkbox
+  COORDINATOR_MESSAGE: 29,// AC - Coordinator's message text
+  ACKNOWLEDGED_BY: 30,    // AD - Steward who acknowledged
+  ACKNOWLEDGED_DATE: 31,  // AE - When steward acknowledged
 
-  // Section 12: Drive Integration (AG-AH)
-  DRIVE_FOLDER_ID: 33,    // AG - Google Drive folder ID
-  DRIVE_FOLDER_URL: 34,   // AH - Google Drive folder URL
+  // Section 12: Drive Integration (AF-AG)
+  DRIVE_FOLDER_ID: 32,    // AF - Google Drive folder ID
+  DRIVE_FOLDER_URL: 33,   // AG - Google Drive folder URL
 
-  // Section 13: Quick Actions (AI)
-  QUICK_ACTIONS: 35,      // AI - Checkbox to open Quick Actions dialog
+  // Section 13: Quick Actions (AH)
+  QUICK_ACTIONS: 34,      // AH - Checkbox to open Quick Actions dialog
 
-  // Section 14: Action Type & Checklist (AJ-AK)
-  ACTION_TYPE: 36,        // AJ - Action Type (Grievance, Records Request, etc.)
-  CHECKLIST_PROGRESS: 37, // AK - Checklist Progress (e.g., "5/8" or "62%")
+  // Section 14: Action Type & Checklist (AI-AJ)
+  ACTION_TYPE: 35,        // AI - Action Type (Grievance, Records Request, etc.)
+  CHECKLIST_PROGRESS: 36, // AJ - Checklist Progress (e.g., "5/8" or "62%")
 
-  // Section 15: Reminders (AL-AO) - For scheduling meetings/follow-ups
-  REMINDER_1_DATE: 38,    // AL - First reminder date
-  REMINDER_1_NOTE: 39,    // AM - First reminder note (e.g., "Schedule Step II meeting")
-  REMINDER_2_DATE: 40,    // AN - Second reminder date
-  REMINDER_2_NOTE: 41,    // AO - Second reminder note
+  // Section 15: Reminders (AK-AN) - For scheduling meetings/follow-ups
+  REMINDER_1_DATE: 37,    // AK - First reminder date
+  REMINDER_1_NOTE: 38,    // AL - First reminder note (e.g., "Schedule Step II meeting")
+  REMINDER_2_DATE: 39,    // AM - Second reminder date
+  REMINDER_2_NOTE: 40,    // AN - Second reminder note
 
-  // Section 16: Record Tracking (AP)
-  LAST_UPDATED: 42        // AP - Last Updated timestamp (auto-set on edit)
+  // Section 16: Record Tracking (AO)
+  LAST_UPDATED: 41        // AO - Last Updated timestamp (auto-set on edit)
 };
 
 // ============================================================================
@@ -2633,7 +2643,7 @@ var GRIEVANCE_COLUMNS = {
   // Calculated metrics (0-indexed)
   DAYS_OPEN: 18,           // S - Days Open
   NEXT_ACTION_DUE: 19,     // T - Next Action Due
-  LAST_UPDATED: 41,        // Alias for RECORD_LAST_UPDATED (AP)
+  LAST_UPDATED: 40,        // Alias for RECORD_LAST_UPDATED (AO)
   DAYS_TO_DEADLINE: 20,    // U - Days to Deadline
 
   // Case details (0-indexed)
@@ -2644,41 +2654,40 @@ var GRIEVANCE_COLUMNS = {
 
   // Contact & Location (0-indexed)
   MEMBER_EMAIL: 23,        // X - Member Email
-  UNIT: 24,                // Y - Unit
-  LOCATION: 25,            // Z - Work Location
-  STEWARD: 26,             // AA - Assigned Steward
+  LOCATION: 24,            // Y - Work Location
+  STEWARD: 25,             // Z - Assigned Steward
 
   // Resolution (0-indexed)
-  RESOLUTION: 27,          // AB - Resolution Summary
-  OUTCOME: 27,             // Alias for RESOLUTION
-  NOTES: 27,               // Alias for RESOLUTION (used for notes)
+  RESOLUTION: 26,          // AA - Resolution Summary
+  OUTCOME: 26,             // Alias for RESOLUTION
+  NOTES: 26,               // Alias for RESOLUTION (used for notes)
 
   // Coordinator (0-indexed)
-  MESSAGE_ALERT: 28,       // AC - Message Alert
-  COORDINATOR_MESSAGE: 29, // AD - Coordinator Message
-  ACKNOWLEDGED_BY: 30,     // AE - Acknowledged By
-  ACKNOWLEDGED_DATE: 31,   // AF - Acknowledged Date
+  MESSAGE_ALERT: 27,       // AB - Message Alert
+  COORDINATOR_MESSAGE: 28, // AC - Coordinator Message
+  ACKNOWLEDGED_BY: 29,     // AD - Acknowledged By
+  ACKNOWLEDGED_DATE: 30,   // AE - Acknowledged Date
 
   // Drive (0-indexed)
-  DRIVE_FOLDER_ID: 32,     // AG - Drive Folder ID
-  DRIVE_FOLDER_URL: 33,    // AH - Drive Folder URL
-  DRIVE_FOLDER: 33,        // Alias for DRIVE_FOLDER_URL
+  DRIVE_FOLDER_ID: 31,     // AF - Drive Folder ID
+  DRIVE_FOLDER_URL: 32,    // AG - Drive Folder URL
+  DRIVE_FOLDER: 32,        // Alias for DRIVE_FOLDER_URL
 
   // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 34,       // AI - Quick Actions
+  QUICK_ACTIONS: 33,       // AH - Quick Actions
 
   // Action Type & Checklist (0-indexed)
-  ACTION_TYPE: 35,         // AJ - Action Type
-  CHECKLIST_PROGRESS: 36,  // AK - Checklist Progress
+  ACTION_TYPE: 34,         // AI - Action Type
+  CHECKLIST_PROGRESS: 35,  // AJ - Checklist Progress
 
   // Reminders (0-indexed)
-  REMINDER_1_DATE: 37,     // AL - First reminder date
-  REMINDER_1_NOTE: 38,     // AM - First reminder note
-  REMINDER_2_DATE: 39,     // AN - Second reminder date
-  REMINDER_2_NOTE: 40,     // AO - Second reminder note
+  REMINDER_1_DATE: 36,     // AK - First reminder date
+  REMINDER_1_NOTE: 37,     // AL - First reminder note
+  REMINDER_2_DATE: 38,     // AM - Second reminder date
+  REMINDER_2_NOTE: 39,     // AN - Second reminder note
 
   // Record Tracking (0-indexed)
-  RECORD_LAST_UPDATED: 41  // AP - Last Updated timestamp
+  RECORD_LAST_UPDATED: 40  // AO - Last Updated timestamp
 };
 
 /**
@@ -2700,32 +2709,32 @@ var MEMBER_COLUMNS = {
   WORK_LOCATION: 4,        // E - Work Location
   LOCATION: 4,             // Alias
   UNIT: 5,                 // F - Unit
-  OFFICE_DAYS: 6,          // G - Office Days
+  CUBICLE: 6,              // G - Cubicle (hidden)
+  OFFICE_DAYS: 7,          // H - Office Days
 
   // Contact (0-indexed)
-  EMAIL: 7,                // H - Email
-  PHONE: 8,                // I - Phone
-  PREFERRED_COMM: 9,       // J - Preferred Communication
-  BEST_TIME: 10,           // K - Best Time to Contact
+  EMAIL: 8,                // I - Email
+  PHONE: 9,                // J - Phone
+  PREFERRED_COMM: 10,      // K - Preferred Communication
+  BEST_TIME: 11,           // L - Best Time to Contact
 
   // Organization (0-indexed)
-  SUPERVISOR: 11,          // L - Supervisor
-  MANAGER: 12,             // M - Manager
-  IS_STEWARD: 13,          // N - Is Steward
-  COMMITTEES: 14,          // O - Committees
-  ASSIGNED_STEWARD: 15,    // P - Assigned Steward
+  SUPERVISOR: 12,          // M - Supervisor
+  MANAGER: 13,             // N - Manager
+  IS_STEWARD: 14,          // O - Is Steward
+  COMMITTEES: 15,          // P - Committees
+  ASSIGNED_STEWARD: 16,    // Q - Assigned Steward
 
   // Engagement (0-indexed)
-  LAST_VIRTUAL_MTG: 16,    // Q - Last Virtual Meeting
-  LAST_INPERSON_MTG: 17,   // R - Last In-Person Meeting
-  OPEN_RATE: 18,           // S - Open Rate
-  VOLUNTEER_HOURS: 19,     // T - Volunteer Hours
+  LAST_VIRTUAL_MTG: 17,    // R - Last Virtual Meeting
+  LAST_INPERSON_MTG: 18,   // S - Last In-Person Meeting
+  OPEN_RATE: 19,           // T - Open Rate
+  VOLUNTEER_HOURS: 20,     // U - Volunteer Hours
 
   // Interests (0-indexed)
-  INTEREST_LOCAL: 20,      // U - Interest in Local
-  INTEREST_CHAPTER: 21,    // V - Interest in Chapter
-  INTEREST_ALLIED: 22,     // W - Interest in Allied
-  HOME_TOWN: 23,           // X - Home Town
+  INTEREST_LOCAL: 21,      // V - Interest in Local
+  INTEREST_CHAPTER: 22,    // W - Interest in Chapter
+  INTEREST_ALLIED: 23,     // X - Interest in Allied
 
   // Contact Tracking (0-indexed)
   RECENT_CONTACT_DATE: 24, // Y - Recent Contact Date
@@ -3164,11 +3173,11 @@ function mapGrievanceRow(row) {
 function getMemberHeaders() {
   return [
     'Member ID', 'First Name', 'Last Name', 'Job Title',
-    'Work Location', 'Unit', 'Office Days',
+    'Work Location', 'Unit', 'Cubicle', 'Office Days',
     'Email', 'Phone', 'Preferred Communication', 'Best Time to Contact',
     'Supervisor', 'Manager', 'Is Steward', 'Committees', 'Assigned Steward',
     'Last Virtual Mtg', 'Last In-Person Mtg', 'Open Rate %', 'Volunteer Hours',
-    'Interest: Local', 'Interest: Chapter', 'Interest: Allied', 'Home Town',
+    'Interest: Local', 'Interest: Chapter', 'Interest: Allied',
     'Recent Contact Date', 'Contact Steward', 'Contact Notes',
     'Has Open Grievance?', 'Grievance Status', 'Days to Deadline', 'Start Grievance',
     '⚡ Actions',
@@ -3192,7 +3201,7 @@ function getGrievanceHeaders() {
     'Step III Appeal Due', 'Step III Appeal Filed', 'Date Closed',
     'Days Open', 'Next Action Due', 'Days to Deadline',
     'Articles Violated', 'Issue Category',
-    'Member Email', 'Unit', 'Work Location', 'Assigned Steward',
+    'Member Email', 'Work Location', 'Assigned Steward',
     'Resolution',
     'Message Alert', 'Coordinator Message', 'Acknowledged By', 'Acknowledged Date',
     'Drive Folder ID', 'Drive Folder URL',
@@ -4159,7 +4168,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2487 lines)
+// SOURCE: 02_DataManagers.gs (2490 lines)
 // ============================================================================
 
 /**
@@ -6654,7 +6663,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2547 lines)
+// SOURCE: 03_UIComponents.gs (2749 lines)
 // ============================================================================
 
 /**
@@ -6736,6 +6745,8 @@ function createDashboardMenu() {
 
     .addSeparator()
     .addItem('⚡ Quick Actions', 'showQuickActionsMenu')
+    .addItem('📅 Open Google Calendar', 'openGoogleCalendar')
+    .addItem('📁 Open Google Drive', 'openGoogleDrive')
     .addItem('📖 Help & Documentation', 'showHelpDialog')
     .addToUi();
 
@@ -6769,11 +6780,12 @@ function createDashboardMenu() {
 
     .addSubMenu(ui.createMenu('🎛️ View & Display')
       .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
-      .addItem('📱 Toggle Mobile View', 'toggleMobileView')
-      .addItem('📱 Pocket View', 'navToMobile')
-      .addItem('🖥️ Restore Desktop View', 'showAllMemberColumns')
+      .addItem('📱 Toggle Pocket View', 'toggleMobileView')
+      .addItem('📱 Pocket View (Active Sheet)', 'navToMobile')
+      .addItem('🖥️ Restore All Columns', 'showAllColumns')
       .addSeparator()
       .addItem('🎨 Apply Theme', 'APPLY_SYSTEM_THEME')
+      .addItem('🎨 Theme Presets', 'showThemePresetPicker')
       .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
       .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'))
 
@@ -6962,6 +6974,49 @@ function showConfirmation(message, title) {
  * @param {string} title - The dialog title
  * @returns {void}
  */
+/**
+ * Opens Google Calendar in a new browser tab
+ */
+function openGoogleCalendar() {
+  var html = HtmlService.createHtmlOutput(
+    '<script>window.open("https://calendar.google.com", "_blank");google.script.host.close();</script>'
+  ).setWidth(1).setHeight(1);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Opening Calendar...');
+}
+
+/**
+ * Opens Google Drive in a new browser tab
+ */
+function openGoogleDrive() {
+  var html = HtmlService.createHtmlOutput(
+    '<script>window.open("https://drive.google.com", "_blank");google.script.host.close();</script>'
+  ).setWidth(1).setHeight(1);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Opening Drive...');
+}
+
+/**
+ * Sets up theme-related columns and applies theme to all sheets.
+ * This is the handler for the "Setup Theme Columns" menu item.
+ */
+function setupThemeColumns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast('Applying theme to all sheets...', 'Theme Setup', 2);
+
+  try {
+    // Apply the system theme (header styling + alternating rows)
+    APPLY_SYSTEM_THEME();
+
+    // Apply tab colors
+    if (typeof applyTabColors_ === 'function') {
+      applyTabColors_(ss);
+    }
+
+    ss.toast('Theme columns and styling applied to all sheets!', 'Theme Setup Complete', 5);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Theme setup error: ' + e.message);
+  }
+}
+
 function showAlert(message, title) {
   SpreadsheetApp.getUi().alert(title || 'Alert', message, SpreadsheetApp.getUi().ButtonSet.OK);
 }
@@ -7095,25 +7150,180 @@ function applyThemeToSheet_(sheet) {
 
   if (lastCol < 1 || lastRow < 1) return;
 
+  // Get the active theme preset
+  var theme = getActiveThemePreset_();
+
   // Apply header styling (row 1)
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
   headerRange
-    .setBackground(COLORS.PRIMARY_PURPLE)
-    .setFontColor(COLORS.WHITE)
+    .setBackground(theme.headerBg)
+    .setFontColor(theme.headerText)
     .setFontWeight('bold')
+    .setFontFamily(theme.font)
+    .setFontSize(theme.headerSize)
     .setHorizontalAlignment('center');
 
-  // Apply alternating row colors for data rows
+  // Apply data row styling
   if (lastRow > 1) {
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    dataRange
+      .setFontFamily(theme.font)
+      .setFontSize(theme.fontSize);
+
+    // Apply alternating row colors
     for (var row = 2; row <= lastRow; row++) {
       var rowRange = sheet.getRange(row, 1, 1, lastCol);
       if (row % 2 === 0) {
-        rowRange.setBackground('#f1f5f9');
+        rowRange.setBackground(theme.altRow);
       } else {
         rowRange.setBackground('#ffffff');
       }
     }
   }
+}
+
+// ============================================================================
+// THEME PRESETS
+// ============================================================================
+
+/**
+ * Available theme presets that apply to all tabs
+ */
+var THEME_PRESETS = {
+  'default': {
+    name: 'Default (Dark Slate)',
+    headerBg: '#1e293b',
+    headerText: '#ffffff',
+    altRow: '#f8fafc',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'union-blue': {
+    name: 'Union Blue',
+    headerBg: '#1e40af',
+    headerText: '#ffffff',
+    altRow: '#eff6ff',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'forest': {
+    name: 'Forest Green',
+    headerBg: '#166534',
+    headerText: '#ffffff',
+    altRow: '#f0fdf4',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'charcoal': {
+    name: 'Charcoal',
+    headerBg: '#374151',
+    headerText: '#f9fafb',
+    altRow: '#f3f4f6',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'midnight': {
+    name: 'Midnight Purple',
+    headerBg: '#581c87',
+    headerText: '#ffffff',
+    altRow: '#faf5ff',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'crimson': {
+    name: 'Crimson',
+    headerBg: '#991b1b',
+    headerText: '#ffffff',
+    altRow: '#fef2f2',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'steel': {
+    name: 'Steel Gray',
+    headerBg: '#475569',
+    headerText: '#ffffff',
+    altRow: '#f1f5f9',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'ocean': {
+    name: 'Ocean Teal',
+    headerBg: '#115e59',
+    headerText: '#ffffff',
+    altRow: '#f0fdfa',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  }
+};
+
+/**
+ * Gets the active theme preset based on saved settings
+ * @returns {Object} Theme preset with colors and font settings
+ * @private
+ */
+function getActiveThemePreset_() {
+  var themeKey = getCurrentTheme();
+  return THEME_PRESETS[themeKey] || THEME_PRESETS['default'];
+}
+
+/**
+ * Shows theme preset picker dialog
+ */
+function showThemePresetPicker() {
+  var currentTheme = getCurrentTheme();
+  var presetNames = Object.keys(THEME_PRESETS);
+  var html = '<html><head><style>' +
+    'body { font-family: Roboto, sans-serif; padding: 16px; }' +
+    '.preset { display: flex; align-items: center; padding: 10px; margin: 6px 0; border-radius: 6px; cursor: pointer; border: 2px solid #e5e7eb; }' +
+    '.preset:hover { border-color: #3b82f6; }' +
+    '.preset.active { border-color: #2563eb; background: #eff6ff; }' +
+    '.swatch { width: 32px; height: 32px; border-radius: 4px; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; }' +
+    '.name { font-weight: 500; }' +
+    '.btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 12px; }' +
+    '.btn-primary { background: #2563eb; color: white; }' +
+    '.btn-primary:hover { background: #1d4ed8; }' +
+    '</style></head><body>';
+
+  html += '<h3 style="margin-top:0">Choose Theme Preset</h3>';
+
+  for (var i = 0; i < presetNames.length; i++) {
+    var key = presetNames[i];
+    var preset = THEME_PRESETS[key];
+    var activeClass = key === currentTheme ? ' active' : '';
+    html += '<div class="preset' + activeClass + '" onclick="selectTheme(\'' + key + '\')">' +
+      '<div class="swatch" style="background:' + preset.headerBg + '">Aa</div>' +
+      '<div class="name">' + preset.name + '</div></div>';
+  }
+
+  html += '<script>' +
+    'function selectTheme(key) { google.script.run.withSuccessHandler(function() { google.script.host.close(); }).applyThemePreset(key); }' +
+    '</script></body></html>';
+
+  var output = HtmlService.createHtmlOutput(html).setWidth(340).setHeight(480);
+  SpreadsheetApp.getUi().showModalDialog(output, 'Theme Presets');
+}
+
+/**
+ * Applies a theme preset by key to all sheets
+ * @param {string} presetKey - Theme preset key from THEME_PRESETS
+ */
+function applyThemePreset(presetKey) {
+  if (!THEME_PRESETS[presetKey]) {
+    SpreadsheetApp.getActiveSpreadsheet().toast('Unknown theme preset: ' + presetKey, 'Error', 3);
+    return;
+  }
+
+  saveVisualSetting('theme', presetKey);
+  APPLY_SYSTEM_THEME();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Applied "' + THEME_PRESETS[presetKey].name + '" theme to all tabs!', 'Theme', 3);
 }
 
 /**
@@ -7129,35 +7339,9 @@ function applyGlobalStyling() {
  * @returns {void}
  */
 function resetToDefaultTheme() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheets();
-
-  sheets.forEach(function(sheet) {
-    var sheetName = sheet.getName();
-    if (sheetName.indexOf('_Calc') === 0) return;
-
-    var lastCol = sheet.getLastColumn();
-    var lastRow = sheet.getLastRow();
-
-    if (lastCol < 1 || lastRow < 1) return;
-
-    // Reset header to default
-    var headerRange = sheet.getRange(1, 1, 1, lastCol);
-    headerRange
-      .setBackground(COLORS.PRIMARY_PURPLE)
-      .setFontColor(COLORS.WHITE)
-      .setFontWeight('bold');
-
-    // Reset data rows to white
-    if (lastRow > 1) {
-      var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
-      dataRange
-        .setBackground('#ffffff')
-        .setFontColor('#1e293b');
-    }
-  });
-
-  ss.toast('Theme reset to default!', 'Theme', 3);
+  saveVisualSetting('theme', 'default');
+  APPLY_SYSTEM_THEME();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Theme reset to default!', 'Theme', 3);
 }
 
 /**
@@ -7532,17 +7716,44 @@ function undoADHDDefaults() {
  */
 function refreshAllVisuals() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var startTime = Date.now();
+  var MAX_RUNTIME_MS = 120000; // 2 minute safety limit
 
-  // Reapply theme
-  APPLY_SYSTEM_THEME();
+  ss.toast('Refreshing visuals...', 'Refresh', 2);
 
-  // Reapply ADHD settings if enabled
-  var settings = getADHDSettings();
-  if (settings.zebraStripes) {
-    applyZebraStripesToAllSheets_();
+  try {
+    // Reapply theme with timeout protection
+    var sheets = ss.getSheets();
+    var processed = 0;
+    for (var i = 0; i < sheets.length; i++) {
+      // Check timeout
+      if (Date.now() - startTime > MAX_RUNTIME_MS) {
+        ss.toast('Refresh stopped after processing ' + processed + '/' + sheets.length + ' sheets (timeout).', 'Refresh', 5);
+        return;
+      }
+
+      var sheetName = sheets[i].getName();
+      if (sheetName.indexOf('_Calc') === 0 || sheetName.indexOf('_Audit') === 0) continue;
+
+      try {
+        applyThemeToSheet_(sheets[i]);
+        processed++;
+      } catch (_e) {
+        Logger.log('Skipped theme for sheet: ' + sheetName + ': ' + _e.message);
+      }
+    }
+
+    // Reapply ADHD settings if enabled
+    var settings = getADHDSettings();
+    if (settings.zebraStripes) {
+      applyZebraStripesToAllSheets_();
+    }
+
+    ss.toast('All visuals refreshed! (' + processed + ' sheets)', 'Refresh', 3);
+  } catch (e) {
+    ss.toast('Refresh error: ' + e.message, 'Error', 5);
+    Logger.log('refreshAllVisuals error: ' + e.toString());
   }
-
-  ss.toast('All visuals refreshed!', 'Refresh', 3);
 }
 
 
@@ -19465,7 +19676,7 @@ function addMobileDashboardLinkToConfig() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3402 lines)
+// SOURCE: 06_Maintenance.gs (3458 lines)
 // ============================================================================
 
 /**
@@ -20042,23 +20253,43 @@ function getCachedData(key, loader, ttl) {
   try {
     // Check memory cache first (fastest)
     var memCache = CacheService.getScriptCache();
-    var cached = memCache.get(key);
+    var cached = null;
+    try {
+      cached = memCache.get(key);
+    } catch (_memErr) {
+      // CacheService may be unavailable
+    }
     if (cached) {
-      if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Memory] ' + key);
-      return JSON.parse(cached);
+      try {
+        if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Memory] ' + key);
+        return JSON.parse(cached);
+      } catch (_parseErr) {
+        // Corrupted cache entry, remove it
+        try { memCache.remove(key); } catch (_e) {}
+      }
     }
 
     // Check properties cache (persistent)
-    var propsCache = PropertiesService.getScriptProperties();
-    var propsCached = propsCache.getProperty(key);
-    if (propsCached) {
-      var obj = JSON.parse(propsCached);
-      if (obj.timestamp && (Date.now() - obj.timestamp) < (ttl * 1000)) {
-        // Refresh memory cache from properties
-        memCache.put(key, JSON.stringify(obj.data), ttl);
-        if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Props] ' + key);
-        return obj.data;
+    try {
+      var propsCache = PropertiesService.getScriptProperties();
+      var propsCached = propsCache.getProperty(key);
+      if (propsCached) {
+        var obj = JSON.parse(propsCached);
+        if (obj.timestamp && (Date.now() - obj.timestamp) < (ttl * 1000)) {
+          // Refresh memory cache from properties
+          var str = JSON.stringify(obj.data);
+          if (str.length < 100000) {
+            try { memCache.put(key, str, Math.min(ttl, 21600)); } catch (_e) {}
+          }
+          if (CACHE_CONFIG.ENABLE_LOGGING) Logger.log('[CACHE HIT - Props] ' + key);
+          return obj.data;
+        } else {
+          // Expired - clean up stale property
+          try { propsCache.deleteProperty(key); } catch (_e) {}
+        }
       }
+    } catch (_propsErr) {
+      // Properties unavailable, continue to loader
     }
 
     // Cache miss - load fresh data
@@ -20070,7 +20301,12 @@ function getCachedData(key, loader, ttl) {
   } catch (e) {
     Logger.log('Cache error for ' + key + ': ' + e.message);
     // Fallback to direct load on error
-    return loader();
+    try {
+      return loader();
+    } catch (loaderErr) {
+      Logger.log('Loader also failed for ' + key + ': ' + loaderErr.message);
+      return null;
+    }
   }
 }
 
@@ -20086,18 +20322,29 @@ function setCachedData(key, data, ttl) {
 
   try {
     var str = JSON.stringify(data);
+    if (!str) return;
 
-    // Store in memory cache (max 6 hours)
-    var memCache = CacheService.getScriptCache();
-    memCache.put(key, str, Math.min(ttl, 21600));
-
-    // Store in properties if under size limit (100KB)
+    // CacheService limit is 100KB per key
     if (str.length < 100000) {
-      var propsCache = PropertiesService.getScriptProperties();
-      propsCache.setProperty(key, JSON.stringify({
-        data: data,
-        timestamp: Date.now()
-      }));
+      try {
+        var memCache = CacheService.getScriptCache();
+        memCache.put(key, str, Math.min(ttl, 21600));
+      } catch (_memErr) {
+        Logger.log('Memory cache write failed for ' + key + ': data too large or service unavailable');
+      }
+    }
+
+    // PropertiesService limit is ~9KB per property
+    if (str.length < 9000) {
+      try {
+        var propsCache = PropertiesService.getScriptProperties();
+        propsCache.setProperty(key, JSON.stringify({
+          data: data,
+          timestamp: Date.now()
+        }));
+      } catch (_propsErr) {
+        Logger.log('Properties cache write failed for ' + key);
+      }
     }
   } catch (e) {
     Logger.log('Set cache error for ' + key + ': ' + e.message);
@@ -21048,20 +21295,40 @@ function createWeeklySnapshot() {
     // Fall back to a default if config is not available
   }
 
+  var folder;
   if (!archiveFolderId) {
-    ui.alert(
-      'Archive Folder Not Configured',
-      'Please set the Archive Folder ID in the Config sheet (column AU) or COMMAND_CONFIG.ARCHIVE_FOLDER_ID.\n\n' +
-      'To find a folder ID:\n' +
-      '1. Open the target folder in Google Drive\n' +
-      '2. Copy the ID from the URL (after /folders/)',
-      ui.ButtonSet.OK
-    );
-    return;
+    // Auto-create archive folder if not configured
+    try {
+      var folders = DriveApp.getFoldersByName('509 Dashboard Archive');
+      if (folders.hasNext()) {
+        folder = folders.next();
+      } else {
+        folder = DriveApp.createFolder('509 Dashboard Archive');
+      }
+      archiveFolderId = folder.getId();
+      // Save to Config sheet for future use
+      try {
+        var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+        if (configSheet) {
+          configSheet.getRange(3, CONFIG_COLS.ARCHIVE_FOLDER_ID).setValue(archiveFolderId);
+        }
+      } catch (_saveErr) {
+        Logger.log('Could not save archive folder ID to config: ' + _saveErr.message);
+      }
+      ss.toast('Auto-created archive folder in Google Drive.', 'Archive Setup', 3);
+    } catch (createErr) {
+      ui.alert('Archive Folder Error',
+        'Could not auto-create archive folder: ' + createErr.message + '\n\n' +
+        'You can manually set the Archive Folder ID in the Config sheet (column AU).',
+        ui.ButtonSet.OK);
+      return;
+    }
   }
 
   try {
-    var folder = DriveApp.getFolderById(archiveFolderId);
+    if (!folder) {
+      folder = DriveApp.getFolderById(archiveFolderId);
+    }
     var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd_HH-mm');
     var snapshotName = '509_SNAPSHOT_' + date;
 
@@ -25687,7 +25954,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (629 lines)
+// SOURCE: 08a_SheetSetup.gs (638 lines)
 // ============================================================================
 
 /**
@@ -25748,7 +26015,7 @@ function CREATE_509_DASHBOARD() {
       'Note: All dashboards are now modal-based (popup windows).\n' +
       'Access them via: Union Hub > Dashboards menu.\n\n' +
       'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
-      'Existing sheets with matching names will be recreated.\n\n' +
+      'Existing sheets with data will be preserved (headers updated only).\n\n' +
       'Continue?',
       ui.ButtonSet.YES_NO
     );
@@ -25859,6 +26126,15 @@ function CREATE_509_DASHBOARD() {
 function getOrCreateSheet(ss, name) {
   var sheet = ss.getSheetByName(name);
   if (sheet) {
+    // CRITICAL: Never clear sheets that contain user data.
+    // Only clear if the sheet is empty (no data rows beyond header).
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      // Sheet has data - preserve it. Only update headers if needed.
+      Logger.log('Sheet "' + name + '" has ' + (lastRow - 1) + ' data rows - preserving existing data');
+      return sheet;
+    }
+    // Sheet is empty or has only headers - safe to clear and rebuild
     sheet.clear();
   } else {
     sheet = ss.insertSheet(name);
@@ -34310,7 +34586,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1753 lines)
+// SOURCE: 10a_SheetCreation.gs (1758 lines)
 // ============================================================================
 
 /**
@@ -34405,7 +34681,7 @@ function createConfigSheet(ss) {
 
   // Apply column headers (Row 2)
   sheet.getRange(2, 1, 1, columnHeaders.length).setValues([columnHeaders])
-    .setBackground(COLORS.PRIMARY_PURPLE)
+    .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
     .setFontColor(COLORS.WHITE)
     .setFontWeight('bold')
     .setHorizontalAlignment('center');
@@ -34849,13 +35125,14 @@ function createConfigGuideSheet(ss) {
  */
 function createMemberDirectory(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEMBER_DIR);
-  sheet.clear();
-
-  var headers = getMemberHeaders();
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setBackground(COLORS.PRIMARY_PURPLE)
-    .setFontColor(COLORS.WHITE)
-    .setFontWeight('bold');
+  // getOrCreateSheet now preserves data - only set headers on empty sheets
+  if (sheet.getLastRow() <= 1) {
+    var headers = getMemberHeaders();
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+      .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+      .setFontColor(COLORS.WHITE)
+      .setFontWeight('bold');
+  }
 
   // Freeze header row
   sheet.setFrozenRows(1);
@@ -34866,6 +35143,9 @@ function createMemberDirectory(ss) {
   sheet.setColumnWidth(MEMBER_COLS.LAST_NAME, 120);
   sheet.setColumnWidth(MEMBER_COLS.EMAIL, 200);
   sheet.setColumnWidth(MEMBER_COLS.CONTACT_NOTES, 250);
+
+  // Hide Cubicle column by default
+  sheet.hideColumns(MEMBER_COLS.CUBICLE);
 
   // Add checkbox for Start Grievance column (pre-allocate for future rows)
   sheet.getRange(2, MEMBER_COLS.START_GRIEVANCE, 4999, 1).insertCheckboxes();
@@ -35038,13 +35318,14 @@ function createMemberDirectory(ss) {
  */
 function createGrievanceLog(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.GRIEVANCE_LOG);
-  sheet.clear();
-
-  var headers = getGrievanceHeaders();
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setBackground(COLORS.PRIMARY_PURPLE)
-    .setFontColor(COLORS.WHITE)
-    .setFontWeight('bold');
+  // getOrCreateSheet now preserves data - only set headers on empty sheets
+  if (sheet.getLastRow() <= 1) {
+    var headers = getGrievanceHeaders();
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+      .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+      .setFontColor(COLORS.WHITE)
+      .setFontWeight('bold');
+  }
 
   // Freeze header row
   sheet.setFrozenRows(1);
@@ -38878,7 +39159,7 @@ function unfreezeAllColumns() {
 
 
 // ============================================================================
-// SOURCE: 10d_SyncAndMaintenance.gs (1518 lines)
+// SOURCE: 10d_SyncAndMaintenance.gs (1519 lines)
 // ============================================================================
 
 // ============================================================================
@@ -39535,16 +39816,17 @@ function sortGrievanceLogByStatus() {
   // Write sorted data back
   dataRange.setValues(data);
 
-  // Re-apply checkboxes to Message Alert column (AC) - setValues overwrites them
+  // Re-apply checkboxes - setValues overwrites them
   if (lastRow >= 2) {
     sheet.getRange(2, GRIEVANCE_COLS.MESSAGE_ALERT, lastRow - 1, 1).insertCheckboxes();
+    sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, lastRow - 1, 1).insertCheckboxes();
   }
 
   // Apply highlighting to Message Alert rows
   applyMessageAlertHighlighting_(sheet, lastRow);
 
   Logger.log('Grievance Log sorted by status priority');
-  ss.toast('Grievance Log sorted by status priority', '📊 Sorted', 2);
+  ss.toast('Grievance Log sorted by status priority', 'Sorted', 2);
 }
 
 /**
@@ -40401,7 +40683,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2059 lines)
+// SOURCE: 10_Main.gs (2068 lines)
 // ============================================================================
 
 /**
@@ -40523,6 +40805,15 @@ function onEdit(e) {
       handleGrievanceEdit(e);
       applyAutoStyleToRow_(sheet, row);  // Auto-styling
       handleStageGateWorkflow_(e);        // Escalation alerts
+
+      // Auto-sort by priority (always run, regardless of auto-sync trigger)
+      if (typeof sortGrievanceLogByStatus === 'function') {
+        try {
+          sortGrievanceLogByStatus();
+        } catch (sortError) {
+          Logger.log('Auto-sort error: ' + sortError.message);
+        }
+      }
 
       // Auto-sync after grievance edits
       if (typeof onEditAutoSync === 'function') {
@@ -42465,7 +42756,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3561 lines)
+// SOURCE: 11_CommandHub.gs (3666 lines)
 // ============================================================================
 
 /**
@@ -42587,57 +42878,40 @@ function navigateToMobileView() {
 }
 
 /**
- * v4.0 Mobile/Pocket View Navigation
- * Optimizes the Member Directory for smartphone viewing by hiding non-essential columns.
- * Shows only: Member ID, Name, Status, Phone for quick field access.
+ * v4.6 Pocket View Navigation
+ * Detects current sheet (Member Directory or Grievance Log) and applies
+ * appropriate pocket view by hiding non-essential columns.
  *
- * Call showAllMemberColumns() to restore full view.
+ * Member Directory pocket view HIDES: PIN Hash, Employee ID, Hire Date, Department
+ * Member Directory pocket view SHOWS: First Name, Last Name, Email, Phone,
+ *   Recent Contact Date, Contact Steward, Contact Notes, and more
+ *
+ * Grievance Log pocket view HIDES: Grievance ID, Member ID, Articles Violated,
+ *   Issue Category, Work Location, Resolution, Checklist Progress,
+ *   Reminder 1 Date, Reminder 1 Note, Reminder 2 Date, Reminder 2 Note, Last Updated
+ *
+ * Call showAllColumns() to restore full view.
  */
 function navToMobile() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var activeSheet = ss.getActiveSheet();
+  var activeSheetName = activeSheet.getName();
 
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Member Directory not found');
-    return;
-  }
-
-  // Mobile Optimization: Hide non-essential columns for phone view
-  // Keep visible: A (Member ID), B (First Name), C (Last Name), I (Phone), N (Is Steward)
-  // Hide columns D-H (Job, Location, Unit, Office Days, Email) - columns 4-8
-  // Hide columns J-M (Preferred Comm to Manager) - columns 10-13
-  // Hide columns O-AF (Committees to Quick Actions) - columns 15-32
-
-  try {
-    // Hide columns 4-8 (D-H)
-    if (sheet.getMaxColumns() >= 8) {
-      sheet.hideColumns(4, 5);  // Hide 5 columns starting at column 4
-    }
-
-    // Hide columns 10-13 (J-M)
-    if (sheet.getMaxColumns() >= 13) {
-      sheet.hideColumns(10, 4);  // Hide 4 columns starting at column 10
-    }
-
-    // Hide columns 15-32 (O-AF) if they exist
-    if (sheet.getMaxColumns() >= 32) {
-      sheet.hideColumns(15, 18);  // Hide 18 columns starting at column 15
-    } else if (sheet.getMaxColumns() >= 15) {
-      sheet.hideColumns(15, sheet.getMaxColumns() - 14);
-    }
-
-    sheet.activate();
-    ss.toast('📱 Mobile View Optimized. Essential columns visible for phone access.', COMMAND_CONFIG.SYSTEM_NAME, 5);
-  } catch (e) {
-    SpreadsheetApp.getUi().alert('Error enabling mobile view: ' + e.message);
+  // Determine which sheet to apply pocket view to
+  if (activeSheetName === SHEETS.GRIEVANCE_LOG) {
+    applyGrievancePocketView_();
+  } else {
+    applyMemberPocketView_();
   }
 }
 
 /**
- * v4.0 Restore Full View
- * Shows all columns in Member Directory after Mobile View was enabled.
+ * Applies pocket view to Member Directory
+ * Hides: PIN Hash, Employee ID, Hire Date, Department
+ * Shows: Name, Email, Phone, Recent Contact Date, Contact Steward, Contact Notes
+ * @private
  */
-function showAllMemberColumns() {
+function applyMemberPocketView_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -42647,9 +42921,131 @@ function showAllMemberColumns() {
   }
 
   try {
-    // Show all columns
+    // First show all columns, then hide specific ones
     sheet.showColumns(1, sheet.getMaxColumns());
-    ss.toast('✅ All columns restored.', COMMAND_CONFIG.SYSTEM_NAME, 3);
+
+    // Columns to HIDE in pocket view:
+    // PIN Hash, Employee ID, Hire Date, Department
+    var colsToHide = [
+      MEMBER_COLS.PIN_HASH,       // AG - PIN Hash
+      MEMBER_COLS.EMPLOYEE_ID,    // AH - Employee ID
+      MEMBER_COLS.HIRE_DATE,      // AJ - Hire Date
+      MEMBER_COLS.DEPARTMENT      // AI - Department
+    ];
+
+    // Also hide: Cubicle (already hidden), Engagement metrics, Interests, PII
+    colsToHide.push(MEMBER_COLS.CUBICLE);           // Cubicle
+    colsToHide.push(MEMBER_COLS.LAST_VIRTUAL_MTG);  // Last Virtual Mtg
+    colsToHide.push(MEMBER_COLS.LAST_INPERSON_MTG); // Last In-Person Mtg
+    colsToHide.push(MEMBER_COLS.OPEN_RATE);          // Open Rate
+    colsToHide.push(MEMBER_COLS.VOLUNTEER_HOURS);    // Volunteer Hours
+    colsToHide.push(MEMBER_COLS.INTEREST_LOCAL);     // Interest: Local
+    colsToHide.push(MEMBER_COLS.INTEREST_CHAPTER);   // Interest: Chapter
+    colsToHide.push(MEMBER_COLS.INTEREST_ALLIED);    // Interest: Allied
+    colsToHide.push(MEMBER_COLS.STREET_ADDRESS);     // Street Address (PII)
+    colsToHide.push(MEMBER_COLS.CITY);               // City (PII)
+    colsToHide.push(MEMBER_COLS.STATE);              // State (PII)
+
+    // Hide each column individually
+    for (var i = 0; i < colsToHide.length; i++) {
+      if (colsToHide[i] <= sheet.getMaxColumns()) {
+        sheet.hideColumns(colsToHide[i]);
+      }
+    }
+
+    sheet.activate();
+    ss.toast('Pocket View: Member Directory. Key columns visible for quick access.', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error enabling pocket view: ' + e.message);
+  }
+}
+
+/**
+ * Applies pocket view to Grievance Log
+ * Hides: Grievance ID, Member ID, Articles Violated, Issue Category,
+ *   Work Location, Resolution, Checklist Progress,
+ *   Reminder 1 Date, Reminder 1 Note, Reminder 2 Date, Reminder 2 Note, Last Updated
+ * @private
+ */
+function applyGrievancePocketView_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Grievance Log not found');
+    return;
+  }
+
+  try {
+    // First show all columns, then hide specific ones
+    sheet.showColumns(1, sheet.getMaxColumns());
+
+    // Columns to HIDE in grievance pocket view:
+    var colsToHide = [
+      GRIEVANCE_COLS.GRIEVANCE_ID,       // Grievance ID
+      GRIEVANCE_COLS.MEMBER_ID,          // Member ID
+      GRIEVANCE_COLS.ARTICLES,           // Articles Violated
+      GRIEVANCE_COLS.ISSUE_CATEGORY,     // Issue Category
+      GRIEVANCE_COLS.LOCATION,           // Work Location
+      GRIEVANCE_COLS.RESOLUTION,         // Resolution
+      GRIEVANCE_COLS.CHECKLIST_PROGRESS, // Checklist Progress
+      GRIEVANCE_COLS.REMINDER_1_DATE,    // Reminder 1 Date
+      GRIEVANCE_COLS.REMINDER_1_NOTE,    // Reminder 1 Note
+      GRIEVANCE_COLS.REMINDER_2_DATE,    // Reminder 2 Date
+      GRIEVANCE_COLS.REMINDER_2_NOTE,    // Reminder 2 Note
+      GRIEVANCE_COLS.LAST_UPDATED        // Last Updated
+    ];
+
+    for (var i = 0; i < colsToHide.length; i++) {
+      if (colsToHide[i] <= sheet.getMaxColumns()) {
+        sheet.hideColumns(colsToHide[i]);
+      }
+    }
+
+    sheet.activate();
+    ss.toast('Pocket View: Grievance Log. Essential columns visible.', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error enabling pocket view: ' + e.message);
+  }
+}
+
+/**
+ * Restore Full View
+ * Shows all columns on the active sheet (Member Directory or Grievance Log).
+ */
+function showAllMemberColumns() {
+  showAllColumns();
+}
+
+/**
+ * Restore all columns for the active sheet
+ */
+function showAllColumns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var activeSheet = ss.getActiveSheet();
+  var activeSheetName = activeSheet.getName();
+
+  // Restore on the active sheet
+  var sheet = activeSheet;
+  if (activeSheetName !== SHEETS.MEMBER_DIR && activeSheetName !== SHEETS.GRIEVANCE_LOG) {
+    // Default to Member Directory
+    sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  }
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Sheet not found');
+    return;
+  }
+
+  try {
+    sheet.showColumns(1, sheet.getMaxColumns());
+
+    // Re-hide Cubicle column in Member Directory (always hidden)
+    if (sheet.getName() === SHEETS.MEMBER_DIR) {
+      sheet.hideColumns(MEMBER_COLS.CUBICLE);
+    }
+
+    ss.toast('All columns restored.', COMMAND_CONFIG.SYSTEM_NAME, 3);
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error showing columns: ' + e.message);
   }

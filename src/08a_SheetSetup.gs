@@ -56,7 +56,7 @@ function CREATE_509_DASHBOARD() {
       'Note: All dashboards are now modal-based (popup windows).\n' +
       'Access them via: Union Hub > Dashboards menu.\n\n' +
       'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
-      'Existing sheets with matching names will be recreated.\n\n' +
+      'Existing sheets with data will be preserved (headers updated only).\n\n' +
       'Continue?',
       ui.ButtonSet.YES_NO
     );
@@ -167,6 +167,15 @@ function CREATE_509_DASHBOARD() {
 function getOrCreateSheet(ss, name) {
   var sheet = ss.getSheetByName(name);
   if (sheet) {
+    // CRITICAL: Never clear sheets that contain user data.
+    // Only clear if the sheet is empty (no data rows beyond header).
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      // Sheet has data - preserve it. Only update headers if needed.
+      Logger.log('Sheet "' + name + '" has ' + (lastRow - 1) + ' data rows - preserving existing data');
+      return sheet;
+    }
+    // Sheet is empty or has only headers - safe to clear and rebuild
     sheet.clear();
   } else {
     sheet = ss.insertSheet(name);
