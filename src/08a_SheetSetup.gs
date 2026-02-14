@@ -12,7 +12,7 @@
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Sheet creation and management functions
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 

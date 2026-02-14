@@ -1445,7 +1445,7 @@ function getDeadlineUrgency(daysToDeadline) {
  * - Version management
  *
  * @fileoverview Core constants, error handling, and configuration
- * @version 4.6.0
+ * @version 4.7.0
  */
 
 // ============================================================================
@@ -1874,7 +1874,7 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 6,
+  minor: 7,
   patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
@@ -1945,7 +1945,7 @@ function clearErrorLog() {
  * Single source of truth for all configuration constants.
  * This file must be loaded first in the build order.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -1969,7 +1969,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.6.0",
+  VERSION: "4.7.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -2098,12 +2098,12 @@ function getLocalNumberFromConfig_() {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 6,
+  MINOR: 7,
   PATCH: 0,
-  BUILD: 'v4.6.0',
-  CURRENT: '4.6.0',
-  BUILD_DATE: '2026-02-12',
-  CODENAME: 'Meeting Intelligence & Document Automation'
+  BUILD: 'v4.7.0',
+  CURRENT: '4.7.0',
+  BUILD_DATE: '2026-02-14',
+  CODENAME: 'Security Hardening & Code Quality'
 };
 
 /**
@@ -4186,7 +4186,7 @@ function getMobileOptimizedHead() {
  * - Grievance tracking and management
  *
  * @fileoverview Member directory and grievance data operations
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -5354,7 +5354,7 @@ function showExportMembersDialog() {
  * UI components are in 04a_UIMenus.gs, integrations in 05_Integrations.gs.
  *
  * @fileoverview Grievance lifecycle management
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -6681,7 +6681,7 @@ function highlightUrgentGrievances() {
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Menu creation and navigation functions
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -9436,7 +9436,7 @@ function getAdvancedSearchHtml() {
  * All business logic should remain in their respective modules.
  *
  * @fileoverview Menu system, navigation, and dialog management
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -16720,7 +16720,7 @@ function getUnifiedDashboardHtml(isPII) {
  * remains responsive.
  *
  * @fileoverview External service integrations
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -19687,7 +19687,7 @@ function addMobileDashboardLinkToConfig() {
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview System diagnostics and repair functions
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -23146,7 +23146,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2737 lines)
+// SOURCE: 07_DevTools.gs (2760 lines)
 // ============================================================================
 
 /**
@@ -23165,9 +23165,30 @@ var VALIDATION_MESSAGES = {
  * Once deleted, all seed/nuke functions will be gone and stewards
  * cannot accidentally trigger a data wipe.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
+
+/**
+ * Runtime guard: prevents SEED/NUKE from running if demo mode was disabled.
+ * Returns true if it's safe to run demo operations.
+ * @returns {boolean}
+ * @private
+ */
+function isDemoSafeToRun_() {
+  if (isDemoModeDisabled()) {
+    try {
+      SpreadsheetApp.getUi().alert(
+        'Production Mode',
+        'Demo functions are disabled in production.\n\n' +
+        'To re-enable: Run disableDemoMode() with value "false" in Script Properties.',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    } catch (_e) { /* headless context */ }
+    return false;
+  }
+  return true;
+}
 
 // ============================================================================
 // DEMO MODE TRACKING
@@ -23285,6 +23306,8 @@ function trackSeededGrievanceIdsBatch(grievanceIds) {
  * Auto-installs the sync trigger for live updates between sheets
  */
 function SEED_SAMPLE_DATA() {
+  if (!isDemoSafeToRun_()) return;
+
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -25905,7 +25928,7 @@ function showTestDashboard() {
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Sheet creation and management functions
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -30498,7 +30521,7 @@ function setupCalcFormulasSheet(sheet) {
  * - Worksite/role breakdown analytics
  * - Value synchronization and dashboard updates
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -34506,7 +34529,7 @@ function getStewardCoverageStats() {
  * This is a source file used to generate ConsolidatedDashboard.gs.
  * Deploy ONLY ConsolidatedDashboard.gs to avoid function conflicts.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -40592,7 +40615,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2071 lines)
+// SOURCE: 10_Main.gs (2050 lines)
 // ============================================================================
 
 /**
@@ -40617,7 +40640,7 @@ function removeDeprecatedDashboard() {
  *   node build.js
  *
  * @fileoverview Main entry point and trigger functions
- * @version 4.6.0
+ * @version 4.7.0
  * @author Dashboard Team
  */
 
@@ -40685,8 +40708,8 @@ function onEdit(e) {
     var sheetName = sheet.getName();
     var row = e.range.getRow();
 
-    // Skip header rows
-    if (row <= 1) return;
+    // Skip header rows and hidden/calculation sheets (start with '_')
+    if (row <= 1 || sheetName.charAt(0) === '_') return;
 
     // ========================================
     // 1. Security Audit & Change Tracking
@@ -40696,7 +40719,6 @@ function onEdit(e) {
     // ========================================
     // 2. Multi-Select Dropdown Handler
     // ========================================
-    // Call the consolidated multi-select handler (defined in 08_SheetUtils.gs)
     if (typeof onEditMultiSelect === 'function') {
       try {
         onEditMultiSelect(e);
@@ -40706,73 +40728,54 @@ function onEdit(e) {
     }
 
     // ========================================
-    // 3. Sheet-Specific Handlers
+    // 3. Sheet-Specific Handlers (else-if: only one sheet matches)
     // ========================================
 
-    // Grievance Log edits
     if (sheetName === SHEETS.GRIEVANCE_LOG) {
+      // Grievance Log edits
       handleGrievanceEdit(e);
-      applyAutoStyleToRow_(sheet, row);  // Auto-styling
-      handleStageGateWorkflow_(e);        // Escalation alerts
+      applyAutoStyleToRow_(sheet, row);
+      handleStageGateWorkflow_(e);
 
-      // Auto-sort by priority (always run, regardless of auto-sync trigger)
       if (typeof sortGrievanceLogByStatus === 'function') {
-        try {
-          sortGrievanceLogByStatus();
-        } catch (sortError) {
-          Logger.log('Auto-sort error: ' + sortError.message);
-        }
+        try { sortGrievanceLogByStatus(); }
+        catch (sortError) { Logger.log('Auto-sort error: ' + sortError.message); }
       }
 
-      // Auto-sync after grievance edits
       if (typeof onEditAutoSync === 'function') {
-        try {
-          onEditAutoSync(e);
-        } catch (syncError) {
-          console.log('AutoSync handler error: ' + syncError.message);
-        }
+        try { onEditAutoSync(e); }
+        catch (syncError) { console.log('AutoSync handler error: ' + syncError.message); }
       }
-    }
 
-    // Member Directory edits
-    if (sheetName === SHEETS.MEMBER_DIR) {
+    } else if (sheetName === SHEETS.MEMBER_DIR) {
+      // Member Directory edits
       handleMemberEdit(e);
-      applyAutoStyleToRow_(sheet, row);  // Auto-styling
-    }
+      applyAutoStyleToRow_(sheet, row);
 
-    // Case Checklist edits
-    if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
+    } else if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
+      // Case Checklist edits
       if (typeof handleChecklistEdit === 'function') {
         handleChecklistEdit(e);
       }
-    }
 
-    // Volunteer Hours edits - auto-sync to Member Directory
-    if (sheetName === SHEETS.VOLUNTEER_HOURS) {
+    } else if (sheetName === SHEETS.VOLUNTEER_HOURS) {
+      // Volunteer Hours edits
       if (typeof syncVolunteerHoursToMemberDirectory === 'function') {
-        try {
-          syncVolunteerHoursToMemberDirectory();
-        } catch (syncError) {
-          Logger.log('Volunteer Hours sync error: ' + syncError.message);
-        }
+        try { syncVolunteerHoursToMemberDirectory(); }
+        catch (syncError) { Logger.log('Volunteer Hours sync error: ' + syncError.message); }
       }
-    }
 
-    // Meeting Attendance edits - auto-sync to Member Directory
-    if (sheetName === SHEETS.MEETING_ATTENDANCE) {
+    } else if (sheetName === SHEETS.MEETING_ATTENDANCE) {
+      // Meeting Attendance edits
       if (typeof syncMeetingAttendanceToMemberDirectory === 'function') {
-        try {
-          syncMeetingAttendanceToMemberDirectory();
-        } catch (syncError) {
-          Logger.log('Meeting Attendance sync error: ' + syncError.message);
-        }
+        try { syncMeetingAttendanceToMemberDirectory(); }
+        catch (syncError) { Logger.log('Meeting Attendance sync error: ' + syncError.message); }
       }
     }
 
     // ========================================
-    // 4. Additional Audit Logging (optional)
+    // 4. Additional Audit Logging (high-value sheets only)
     // ========================================
-    // Only run detailed audit for specific sheets to avoid performance impact
     if (typeof onEditAudit === 'function' &&
         (sheetName === SHEETS.GRIEVANCE_LOG || sheetName === SHEETS.MEMBER_DIR)) {
       try {
@@ -40784,7 +40787,6 @@ function onEdit(e) {
 
   } catch (error) {
     console.error('Error in onEdit:', error);
-    // Don't show error to user for automatic functions
   }
 }
 
@@ -42694,7 +42696,7 @@ function navigateToMemberRow(row) {
  * NOTE: This file provides consolidated access to Strategic Command Center
  * features. Core implementations are in their respective module files.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * ============================================================================
  */
 
@@ -46365,7 +46367,7 @@ function getErrorPageHtml_(message) {
  * Manages case checklists for grievances and other action types.
  * Provides functions for creating, updating, and tracking checklist items.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -50405,7 +50407,7 @@ function getLookerStatus() {
  * - All access and changes are audit logged
  * - Members can only view/edit their own data
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -52118,7 +52120,7 @@ function showSelfServicePortalUrl() {
  * 5. Members enter email + PIN -> click Check In
  * 6. After meeting duration + buffer, check-in deactivates and attendance is emailed
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs (SHEETS, MEMBER_COLS, MEETING_CHECKIN_COLS, MEETING_STATUS, COLORS)
  * @requires 05_Integrations.gs (createMeetingCalendarEvent, emailMeetingAttendanceReport)
  * @requires 13_MemberSelfService.gs (authenticateMember, verifyPIN, hashPIN)

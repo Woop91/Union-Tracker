@@ -15,7 +15,7 @@
  * 5. Members enter email + PIN -> click Check In
  * 6. After meeting duration + buffer, check-in deactivates and attendance is emailed
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs (SHEETS, MEMBER_COLS, MEETING_CHECKIN_COLS, MEETING_STATUS, COLORS)
  * @requires 05_Integrations.gs (createMeetingCalendarEvent, emailMeetingAttendanceReport)
  * @requires 13_MemberSelfService.gs (authenticateMember, verifyPIN, hashPIN)

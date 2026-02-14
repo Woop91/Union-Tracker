@@ -4,7 +4,7 @@
  * Manages case checklists for grievances and other action types.
  * Provides functions for creating, updating, and tracking checklist items.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 

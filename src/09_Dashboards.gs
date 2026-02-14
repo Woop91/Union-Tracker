@@ -12,7 +12,7 @@
  * - Worksite/role breakdown analytics
  * - Value synchronization and dashboard updates
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
