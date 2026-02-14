@@ -1424,7 +1424,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2739 lines)
+// SOURCE: 01_Core.gs (2737 lines)
 // ============================================================================
 
 /**
@@ -3087,6 +3087,7 @@ function mapMemberRow(row) {
     jobTitle: row[MEMBER_COLS.JOB_TITLE - 1] || '',
     workLocation: row[MEMBER_COLS.WORK_LOCATION - 1] || '',
     unit: row[MEMBER_COLS.UNIT - 1] || '',
+    cubicle: row[MEMBER_COLS.CUBICLE - 1] || '',
     officeDays: row[MEMBER_COLS.OFFICE_DAYS - 1] || '',
     email: row[MEMBER_COLS.EMAIL - 1] || '',
     phone: row[MEMBER_COLS.PHONE - 1] || '',
@@ -3104,7 +3105,6 @@ function mapMemberRow(row) {
     interestLocal: row[MEMBER_COLS.INTEREST_LOCAL - 1] || '',
     interestChapter: row[MEMBER_COLS.INTEREST_CHAPTER - 1] || '',
     interestAllied: row[MEMBER_COLS.INTEREST_ALLIED - 1] || '',
-    homeTown: row[MEMBER_COLS.HOME_TOWN - 1] || '',
     recentContactDate: row[MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '',
     contactSteward: row[MEMBER_COLS.CONTACT_STEWARD - 1] || '',
     contactNotes: row[MEMBER_COLS.CONTACT_NOTES - 1] || '',
@@ -3147,7 +3147,6 @@ function mapGrievanceRow(row) {
     articles: row[GRIEVANCE_COLS.ARTICLES - 1] || '',
     issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
     memberEmail: row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] || '',
-    unit: row[GRIEVANCE_COLS.UNIT - 1] || '',
     location: row[GRIEVANCE_COLS.LOCATION - 1] || '',
     steward: row[GRIEVANCE_COLS.STEWARD - 1] || '',
     resolution: row[GRIEVANCE_COLS.RESOLUTION - 1] || '',
@@ -3471,8 +3470,7 @@ var JOB_METADATA_FIELDS = [
   { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
   { label: 'Manager', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Managers' },
   { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
-  { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' },
-  { label: 'Home Town', memberCol: MEMBER_COLS.HOME_TOWN, configCol: CONFIG_COLS.HOME_TOWNS, configName: 'Home Towns' }
+  { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
 ];
 
 /**
@@ -11374,7 +11372,7 @@ function getSmartDashboardHtml() {
 
 
 // ============================================================================
-// SOURCE: 04c_InteractiveDashboard.gs (1719 lines)
+// SOURCE: 04c_InteractiveDashboard.gs (1718 lines)
 // ============================================================================
 
 // ============================================================================
@@ -12519,7 +12517,6 @@ function getInteractiveGrievanceData() {
       isOverdue: daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0),
       daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || 0,
       location: row[GRIEVANCE_COLS.LOCATION - 1] || 'N/A',
-      unit: row[GRIEVANCE_COLS.UNIT - 1] || 'N/A',
       steward: row[GRIEVANCE_COLS.STEWARD - 1] || 'N/A',
       resolution: row[GRIEVANCE_COLS.RESOLUTION - 1] || ''
     };
@@ -13164,7 +13161,7 @@ function getDashboardStats() {
     logData.forEach(function(row) {
       var status = (row[GRIEVANCE_COLS.STATUS - 1] || '').toString().toLowerCase();
       var currentStep = (row[GRIEVANCE_COLS.CURRENT_STEP - 1] || '').toString().toLowerCase();
-      var unit = row[GRIEVANCE_COLS.UNIT - 1] || 'Unknown';
+      var unit = row[GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
       var steward = row[GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
 
       // Count active vs closed
@@ -16705,7 +16702,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2966 lines)
+// SOURCE: 05_Integrations.gs (2964 lines)
 // ============================================================================
 
 /**
@@ -18056,7 +18053,6 @@ function createPDFForSelectedGrievance() {
     status: sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue(),
     articles: sheet.getRange(row, GRIEVANCE_COLS.ARTICLES).getValue(),
     details: sheet.getRange(row, GRIEVANCE_COLS.RESOLUTION).getValue() || 'Pending',
-    unit: sheet.getRange(row, GRIEVANCE_COLS.UNIT).getValue(),
     location: sheet.getRange(row, GRIEVANCE_COLS.LOCATION).getValue(),
     steward: sheet.getRange(row, GRIEVANCE_COLS.STEWARD).getValue(),
     memberEmail: sheet.getRange(row, GRIEVANCE_COLS.MEMBER_EMAIL).getValue()
@@ -19407,7 +19403,6 @@ function getWebAppGrievanceList() {
         isOverdue: daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0),
         daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || 0,
         location: row[GRIEVANCE_COLS.LOCATION - 1] || 'N/A',
-        unit: row[GRIEVANCE_COLS.UNIT - 1] || 'N/A',
         steward: row[GRIEVANCE_COLS.STEWARD - 1] || 'N/A',
         resolution: row[GRIEVANCE_COLS.RESOLUTION - 1] || ''
       };
@@ -25954,7 +25949,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (638 lines)
+// SOURCE: 08a_SheetSetup.gs (637 lines)
 // ============================================================================
 
 /**
@@ -26258,7 +26253,6 @@ function setupDataValidations() {
   setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_LOCAL, configSheet, CONFIG_COLS.YES_NO);
   setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_CHAPTER, configSheet, CONFIG_COLS.YES_NO);
   setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_ALLIED, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.HOME_TOWN, configSheet, CONFIG_COLS.HOME_TOWNS);
   setDropdownValidation(memberSheet, MEMBER_COLS.CONTACT_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
 
   // Member Directory Validations - Multi-select dropdowns
@@ -44921,7 +44915,7 @@ function getGrievanceCountForUnit(unitName) {
 
   if (!sheet || sheet.getLastRow() < 2) return 0;
 
-  var data = sheet.getRange(2, GRIEVANCE_COLS.UNIT, sheet.getLastRow() - 1, 1).getValues();
+  var data = sheet.getRange(2, GRIEVANCE_COLS.LOCATION, sheet.getLastRow() - 1, 1).getValues();
   var count = 0;
 
   data.forEach(function(row) {
