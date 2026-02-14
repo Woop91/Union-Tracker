@@ -103,3 +103,65 @@ describe('Email HTML escaping', () => {
     expect(escaped).toContain('&lt;script&gt;');
   });
 });
+
+// ============================================================================
+// sanitizeFolderName
+// ============================================================================
+
+describe('sanitizeFolderName', () => {
+  test('returns Unknown for empty input', () => {
+    expect(sanitizeFolderName('')).toBe('Unknown');
+    expect(sanitizeFolderName(null)).toBe('Unknown');
+    expect(sanitizeFolderName(undefined)).toBe('Unknown');
+  });
+
+  test('removes illegal characters', () => {
+    expect(sanitizeFolderName('file<>:"/\\|?*name')).toBe('filename');
+  });
+
+  test('replaces spaces with underscores', () => {
+    expect(sanitizeFolderName('John Doe Case')).toBe('John_Doe_Case');
+  });
+
+  test('collapses multiple spaces', () => {
+    expect(sanitizeFolderName('John   Doe')).toBe('John_Doe');
+  });
+
+  test('truncates to 50 characters', () => {
+    const longName = 'A'.repeat(60);
+    expect(sanitizeFolderName(longName).length).toBe(50);
+  });
+
+  test('handles normal names without changes', () => {
+    expect(sanitizeFolderName('GRV-001_Smith_2026')).toBe('GRV-001_Smith_2026');
+  });
+});
+
+// ============================================================================
+// BATCH_LIMITS configuration
+// ============================================================================
+
+describe('BATCH_LIMITS', () => {
+  test('has reasonable execution time limit', () => {
+    expect(BATCH_LIMITS.MAX_EXECUTION_TIME_MS).toBe(300000);
+  });
+
+  test('has max API calls per batch', () => {
+    expect(BATCH_LIMITS.MAX_API_CALLS_PER_BATCH).toBe(50);
+  });
+});
+
+// ============================================================================
+// CALENDAR_CONFIG structure
+// ============================================================================
+
+describe('CALENDAR_CONFIG structure', () => {
+  test('has MEETING_CALENDAR_NAME', () => {
+    expect(CALENDAR_CONFIG.MEETING_CALENDAR_NAME).toBeTruthy();
+  });
+
+  test('has MEETING_DEACTIVATE_HOURS', () => {
+    expect(typeof CALENDAR_CONFIG.MEETING_DEACTIVATE_HOURS).toBe('number');
+    expect(CALENDAR_CONFIG.MEETING_DEACTIVATE_HOURS).toBeGreaterThan(0);
+  });
+});

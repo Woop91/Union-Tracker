@@ -14,7 +14,7 @@
  * remains responsive.
  *
  * @fileoverview External service integrations
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 

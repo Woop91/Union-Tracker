@@ -11,7 +11,7 @@
  * - Grievance tracking and management
  *
  * @fileoverview Member directory and grievance data operations
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 
@@ -1179,7 +1179,7 @@ function showExportMembersDialog() {
  * UI components are in 04a_UIMenus.gs, integrations in 05_Integrations.gs.
  *
  * @fileoverview Grievance lifecycle management
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 

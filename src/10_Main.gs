@@ -20,7 +20,7 @@
  *   node build.js
  *
  * @fileoverview Main entry point and trigger functions
- * @version 4.6.0
+ * @version 4.7.0
  * @author Dashboard Team
  */
 
@@ -88,8 +88,8 @@ function onEdit(e) {
     var sheetName = sheet.getName();
     var row = e.range.getRow();
 
-    // Skip header rows
-    if (row <= 1) return;
+    // Skip header rows and hidden/calculation sheets (start with '_')
+    if (row <= 1 || sheetName.charAt(0) === '_') return;
 
     // ========================================
     // 1. Security Audit & Change Tracking
@@ -99,7 +99,6 @@ function onEdit(e) {
     // ========================================
     // 2. Multi-Select Dropdown Handler
     // ========================================
-    // Call the consolidated multi-select handler (defined in 08_SheetUtils.gs)
     if (typeof onEditMultiSelect === 'function') {
       try {
         onEditMultiSelect(e);
@@ -109,73 +108,54 @@ function onEdit(e) {
     }
 
     // ========================================
-    // 3. Sheet-Specific Handlers
+    // 3. Sheet-Specific Handlers (else-if: only one sheet matches)
     // ========================================
 
-    // Grievance Log edits
     if (sheetName === SHEETS.GRIEVANCE_LOG) {
+      // Grievance Log edits
       handleGrievanceEdit(e);
-      applyAutoStyleToRow_(sheet, row);  // Auto-styling
-      handleStageGateWorkflow_(e);        // Escalation alerts
+      applyAutoStyleToRow_(sheet, row);
+      handleStageGateWorkflow_(e);
 
-      // Auto-sort by priority (always run, regardless of auto-sync trigger)
       if (typeof sortGrievanceLogByStatus === 'function') {
-        try {
-          sortGrievanceLogByStatus();
-        } catch (sortError) {
-          Logger.log('Auto-sort error: ' + sortError.message);
-        }
+        try { sortGrievanceLogByStatus(); }
+        catch (sortError) { Logger.log('Auto-sort error: ' + sortError.message); }
       }
 
-      // Auto-sync after grievance edits
       if (typeof onEditAutoSync === 'function') {
-        try {
-          onEditAutoSync(e);
-        } catch (syncError) {
-          console.log('AutoSync handler error: ' + syncError.message);
-        }
+        try { onEditAutoSync(e); }
+        catch (syncError) { console.log('AutoSync handler error: ' + syncError.message); }
       }
-    }
 
-    // Member Directory edits
-    if (sheetName === SHEETS.MEMBER_DIR) {
+    } else if (sheetName === SHEETS.MEMBER_DIR) {
+      // Member Directory edits
       handleMemberEdit(e);
-      applyAutoStyleToRow_(sheet, row);  // Auto-styling
-    }
+      applyAutoStyleToRow_(sheet, row);
 
-    // Case Checklist edits
-    if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
+    } else if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
+      // Case Checklist edits
       if (typeof handleChecklistEdit === 'function') {
         handleChecklistEdit(e);
       }
-    }
 
-    // Volunteer Hours edits - auto-sync to Member Directory
-    if (sheetName === SHEETS.VOLUNTEER_HOURS) {
+    } else if (sheetName === SHEETS.VOLUNTEER_HOURS) {
+      // Volunteer Hours edits
       if (typeof syncVolunteerHoursToMemberDirectory === 'function') {
-        try {
-          syncVolunteerHoursToMemberDirectory();
-        } catch (syncError) {
-          Logger.log('Volunteer Hours sync error: ' + syncError.message);
-        }
+        try { syncVolunteerHoursToMemberDirectory(); }
+        catch (syncError) { Logger.log('Volunteer Hours sync error: ' + syncError.message); }
       }
-    }
 
-    // Meeting Attendance edits - auto-sync to Member Directory
-    if (sheetName === SHEETS.MEETING_ATTENDANCE) {
+    } else if (sheetName === SHEETS.MEETING_ATTENDANCE) {
+      // Meeting Attendance edits
       if (typeof syncMeetingAttendanceToMemberDirectory === 'function') {
-        try {
-          syncMeetingAttendanceToMemberDirectory();
-        } catch (syncError) {
-          Logger.log('Meeting Attendance sync error: ' + syncError.message);
-        }
+        try { syncMeetingAttendanceToMemberDirectory(); }
+        catch (syncError) { Logger.log('Meeting Attendance sync error: ' + syncError.message); }
       }
     }
 
     // ========================================
-    // 4. Additional Audit Logging (optional)
+    // 4. Additional Audit Logging (high-value sheets only)
     // ========================================
-    // Only run detailed audit for specific sheets to avoid performance impact
     if (typeof onEditAudit === 'function' &&
         (sheetName === SHEETS.GRIEVANCE_LOG || sheetName === SHEETS.MEMBER_DIR)) {
       try {
@@ -187,7 +167,6 @@ function onEdit(e) {
 
   } catch (error) {
     console.error('Error in onEdit:', error);
-    // Don't show error to user for automatic functions
   }
 }
 

@@ -7,7 +7,7 @@
  * This is a source file used to generate ConsolidatedDashboard.gs.
  * Deploy ONLY ConsolidatedDashboard.gs to avoid function conflicts.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 

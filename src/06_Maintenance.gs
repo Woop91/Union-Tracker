@@ -12,7 +12,7 @@
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview System diagnostics and repair functions
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 

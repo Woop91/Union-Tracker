@@ -14,9 +14,30 @@
  * Once deleted, all seed/nuke functions will be gone and stewards
  * cannot accidentally trigger a data wipe.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
+
+/**
+ * Runtime guard: prevents SEED/NUKE from running if demo mode was disabled.
+ * Returns true if it's safe to run demo operations.
+ * @returns {boolean}
+ * @private
+ */
+function isDemoSafeToRun_() {
+  if (isDemoModeDisabled()) {
+    try {
+      SpreadsheetApp.getUi().alert(
+        'Production Mode',
+        'Demo functions are disabled in production.\n\n' +
+        'To re-enable: Run disableDemoMode() with value "false" in Script Properties.',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    } catch (_e) { /* headless context */ }
+    return false;
+  }
+  return true;
+}
 
 // ============================================================================
 // DEMO MODE TRACKING
@@ -134,6 +155,8 @@ function trackSeededGrievanceIdsBatch(grievanceIds) {
  * Auto-installs the sync trigger for live updates between sheets
  */
 function SEED_SAMPLE_DATA() {
+  if (!isDemoSafeToRun_()) return;
+
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 

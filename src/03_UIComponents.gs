@@ -11,7 +11,7 @@
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Menu creation and navigation functions
- * @version 4.6.0
+ * @version 4.7.0
  * @requires 01_Core.gs
  */
 

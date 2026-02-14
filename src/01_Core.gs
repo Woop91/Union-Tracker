@@ -16,7 +16,7 @@
  * - Version management
  *
  * @fileoverview Core constants, error handling, and configuration
- * @version 4.6.0
+ * @version 4.7.0
  */
 
 // ============================================================================
@@ -445,7 +445,7 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 6,
+  minor: 7,
   patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
@@ -516,7 +516,7 @@ function clearErrorLog() {
  * Single source of truth for all configuration constants.
  * This file must be loaded first in the build order.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -540,7 +540,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.6.0",
+  VERSION: "4.7.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -669,12 +669,12 @@ function getLocalNumberFromConfig_() {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 6,
+  MINOR: 7,
   PATCH: 0,
-  BUILD: 'v4.6.0',
-  CURRENT: '4.6.0',
-  BUILD_DATE: '2026-02-12',
-  CODENAME: 'Meeting Intelligence & Document Automation'
+  BUILD: 'v4.7.0',
+  CURRENT: '4.7.0',
+  BUILD_DATE: '2026-02-14',
+  CODENAME: 'Security Hardening & Code Quality'
 };
 
 /**

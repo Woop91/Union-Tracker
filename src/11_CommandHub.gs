@@ -21,7 +21,7 @@
  * NOTE: This file provides consolidated access to Strategic Command Center
  * features. Core implementations are in their respective module files.
  *
- * @version 4.6.0
+ * @version 4.7.0
  * ============================================================================
  */
 
