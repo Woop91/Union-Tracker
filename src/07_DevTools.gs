@@ -492,8 +492,12 @@ function seedSatisfactionData() {
   }
 
   function randomPriorities() {
-    var shuffled = priorities.slice().sort(function() { return 0.5 - Math.random(); });
-    return shuffled.slice(0, 3).join(', ');
+    var arr = priorities.slice();
+    for (var j = arr.length - 1; j > 0; j--) {
+      var k = Math.floor(Math.random() * (j + 1));
+      var tmp = arr[j]; arr[j] = arr[k]; arr[k] = tmp;
+    }
+    return arr.slice(0, 3).join(', ');
   }
 
   for (var i = 0; i < 50; i++) {

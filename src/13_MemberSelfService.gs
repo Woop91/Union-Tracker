@@ -769,14 +769,39 @@ function showGeneratePINDialog() {
   var result = generateMemberPINForSteward(memberId);
 
   if (result.success) {
-    ui.alert(
-      'PIN Generated',
-      'New PIN for ' + result.memberName + ':\n\n' +
-      '    ' + result.pin + '\n\n' +
-      'Please provide this PIN to the member securely.\n' +
-      'They can use it with their Member ID to access the self-service portal.',
-      ui.ButtonSet.OK
-    );
+    // Email the PIN to the member instead of displaying in plaintext
+    var memberEmail = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
+    if (memberEmail && String(memberEmail).includes('@')) {
+      try {
+        var orgName = '';
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        MailApp.sendEmail({
+          to: String(memberEmail),
+          subject: orgName + ' - Your Self-Service Portal PIN',
+          body: 'Hello ' + result.memberName + ',\n\n' +
+                'Your new self-service portal PIN is: ' + result.pin + '\n\n' +
+                'Use this PIN along with your Member ID (' + result.memberId + ') to access the member portal.\n\n' +
+                'If you did not request this PIN, please contact your steward.\n\n' +
+                '- ' + orgName
+        });
+        ui.alert('PIN Generated & Emailed',
+          'A new PIN for ' + result.memberName + ' has been generated and emailed to ' + memberEmail + '.\n\n' +
+          'The PIN was NOT displayed here for security.',
+          ui.ButtonSet.OK);
+      } catch (emailErr) {
+        // Fall back to showing PIN if email fails
+        ui.alert('PIN Generated (Email Failed)',
+          'New PIN for ' + result.memberName + ': ' + result.pin + '\n\n' +
+          'Email delivery failed (' + emailErr.message + '). Please provide this PIN securely.',
+          ui.ButtonSet.OK);
+      }
+    } else {
+      // No email on file - must show PIN
+      ui.alert('PIN Generated (No Email)',
+        'New PIN for ' + result.memberName + ': ' + result.pin + '\n\n' +
+        'No email address on file. Please provide this PIN to the member securely.',
+        ui.ButtonSet.OK);
+    }
   } else {
     ui.alert('Error', result.error, ui.ButtonSet.OK);
   }
@@ -870,7 +895,8 @@ function showBulkGeneratePINDialog() {
     'Bulk Generate PINs',
     'This will generate PINs for all members who do not currently have one.\n\n' +
     'Members who already have a PIN will be skipped.\n\n' +
-    'A report will be generated showing all new PINs.\n\n' +
+    'Each member will receive their PIN via email.\n' +
+    'Members without an email on file will be listed for manual distribution.\n\n' +
     'Continue?',
     ui.ButtonSet.YES_NO
   );
@@ -878,15 +904,20 @@ function showBulkGeneratePINDialog() {
   if (response !== ui.Button.YES) return;
 
   var data = sheet.getDataRange().getValues();
-  var generated = [];
+  var emailed = 0;
+  var noEmailList = [];
   var skipped = 0;
   var errors = [];
+
+  var orgName = '';
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
     var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
-    var memberName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
-                     (data[i][MEMBER_COLS.LAST_NAME - 1] || '');
+    var memberName = ((data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
+                     (data[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
+    var memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
     var existingPin = data[i][PIN_CONFIG.PIN_COLUMN - 1];
 
     if (!memberId) continue;
@@ -898,68 +929,70 @@ function showBulkGeneratePINDialog() {
 
     var result = generateMemberPINForSteward(memberId);
     if (result.success) {
-      generated.push({
-        memberId: memberId,
-        memberName: memberName.trim(),
-        pin: result.pin
-      });
+      // Try to email the PIN to the member
+      if (memberEmail && String(memberEmail).includes('@')) {
+        try {
+          MailApp.sendEmail({
+            to: String(memberEmail),
+            subject: orgName + ' - Your Self-Service Portal PIN',
+            body: 'Hello ' + memberName + ',\n\n' +
+                  'Your new self-service portal PIN is: ' + result.pin + '\n\n' +
+                  'Use this PIN along with your Member ID (' + memberId + ') to access the member portal.\n\n' +
+                  'If you did not request this PIN, please contact your steward.\n\n' +
+                  '- ' + orgName
+          });
+          emailed++;
+        } catch (emailErr) {
+          noEmailList.push(memberName + ' (' + memberId + '): email failed - ' + emailErr.message);
+        }
+      } else {
+        noEmailList.push(memberName + ' (' + memberId + '): no email on file');
+      }
     } else {
       errors.push(memberId + ': ' + result.error);
     }
   }
 
-  // Show results
-  var message = 'Bulk PIN Generation Complete\n\n';
-  message += 'Generated: ' + generated.length + ' new PINs\n';
-  message += 'Skipped: ' + skipped + ' (already had PINs)\n';
+  // Audit log
+  if ((emailed + noEmailList.length) > 0 && typeof logAuditEvent === 'function') {
+    logAuditEvent('BULK_PIN_GENERATION', {
+      emailed: emailed,
+      noEmail: noEmailList.length,
+      generatedBy: (function() { try { return Session.getActiveUser().getEmail(); } catch (_e) { return 'Unknown'; } })()
+    });
+  }
+
+  // Show summary (no PINs displayed)
+  var htmlContent = '<html><head>' + getMobileOptimizedHead() + '</head><body style="font-family:sans-serif;padding:10px;">';
+  htmlContent += '<h3>Bulk PIN Generation Complete</h3>';
+  htmlContent += '<p><strong>Emailed:</strong> ' + emailed + ' PINs sent directly to members<br>';
+  htmlContent += '<strong>Skipped:</strong> ' + skipped + ' (already had PINs)<br>';
   if (errors.length > 0) {
-    message += 'Errors: ' + errors.length + '\n';
+    htmlContent += '<strong>Errors:</strong> ' + errors.length + '<br>';
+  }
+  htmlContent += '</p>';
+
+  if (noEmailList.length > 0) {
+    htmlContent += '<h4>Members needing manual PIN distribution (' + noEmailList.length + '):</h4>';
+    htmlContent += '<textarea readonly style="width:100%;height:200px;font-family:monospace;">';
+    for (var n = 0; n < noEmailList.length; n++) {
+      htmlContent += escapeHtml(noEmailList[n]) + '\n';
+    }
+    htmlContent += '</textarea>';
+    htmlContent += '<p><em>Contact these members directly to provide portal access.</em></p>';
   }
 
-  if (generated.length > 0) {
-    // Audit log the bulk PIN generation event (without the PINs themselves)
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('BULK_PIN_GENERATION', {
-        count: generated.length,
-        memberIds: generated.map(function(g) { return g.memberId; }),
-        generatedBy: (function() { try { return Session.getActiveUser().getEmail(); } catch (_e) { return 'Unknown'; } })()
-      });
+  if (errors.length > 0) {
+    htmlContent += '<h4>Errors:</h4><pre>';
+    for (var e = 0; e < Math.min(errors.length, 10); e++) {
+      htmlContent += escapeHtml(errors[e]) + '\n';
     }
-
-    message += '\n--- New PINs ---\n';
-    for (var j = 0; j < generated.length && j < 50; j++) {
-      message += generated[j].memberName + ' (' + generated[j].memberId + '): ' + generated[j].pin + '\n';
-    }
-    if (generated.length > 50) {
-      message += '... and ' + (generated.length - 50) + ' more\n';
-    }
-    message += '\nIMPORTANT: Note these PINs to distribute to members.\n';
-    message += 'They will not be shown again.';
+    htmlContent += '</pre>';
   }
 
-  // Use a scrollable HTML dialog for large results
-  if (generated.length > 10) {
-    var htmlContent = '<html><head>' + getMobileOptimizedHead() + '</head><body style="font-family:sans-serif;padding:10px;">';
-    htmlContent += '<h3>Bulk PIN Generation Complete</h3>';
-    htmlContent += '<p><strong>Generated:</strong> ' + generated.length + ' new PINs<br>';
-    htmlContent += '<strong>Skipped:</strong> ' + skipped + ' (already had PINs)</p>';
-    if (generated.length > 0) {
-      htmlContent += '<h4>New PINs (copy this list!):</h4>';
-      htmlContent += '<textarea readonly style="width:100%;height:300px;font-family:monospace;">';
-      for (var k = 0; k < generated.length; k++) {
-        htmlContent += generated[k].memberName + ' (' + generated[k].memberId + '): ' + generated[k].pin + '\n';
-      }
-      htmlContent += '</textarea>';
-    }
-    htmlContent += '</body></html>';
-
-    var htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-      .setWidth(500)
-      .setHeight(500);
-    ui.showModalDialog(htmlOutput, 'Bulk PIN Generation Results');
-  } else {
-    ui.alert('Bulk PIN Generation', message, ui.ButtonSet.OK);
-  }
+  htmlContent += '</body></html>';
+  var htmlOutput = HtmlService.createHtmlOutput(htmlContent).setWidth(500).setHeight(400);
+  ui.showModalDialog(htmlOutput, 'Bulk PIN Generation Results');
 }
 
 // ============================================================================

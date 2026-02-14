@@ -10335,7 +10335,7 @@ function getDashboardSidebarHtml() {
 
 
 // ============================================================================
-// SOURCE: 04b_AccessibilityFeatures.gs (1035 lines)
+// SOURCE: 04b_AccessibilityFeatures.gs (1031 lines)
 // ============================================================================
 
 // ============================================================================
@@ -10571,9 +10571,6 @@ function startPomodoroTimer() {
 
   // Show starting message
   ss.toast('🍅 Pomodoro started! Focus for 25 minutes.\n\nYou\'ll get a notification when the session ends.', 'Pomodoro Timer', 10);
-
-  // Create a time-driven trigger for 25 minutes from now
-  var _triggerTime = new Date(new Date().getTime() + 25 * 60 * 1000);
 
   // Store the start time
   PropertiesService.getUserProperties().setProperty('pomodoroStart', new Date().toISOString());
@@ -11061,8 +11058,7 @@ function showExportDialog_UIService_() {
   var blob = Utilities.newBlob(csv, 'text/csv', fileName);
   var file = DriveApp.createFile(blob);
 
-  // Make file accessible
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  // File inherits default Drive sharing permissions
 
   // Show download link
   var html = HtmlService.createHtmlOutput(
@@ -12362,7 +12358,7 @@ function getInteractiveDashboardHtml() {
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">🌐 External Links</div><div class=\\"link-grid\\">";' +
     '  if(data.orgWebsite)html+="<a href=\\""+data.orgWebsite+"\\" target=\\"_blank\\" class=\\"resource-link\\">🏛️ Organization Website</a>";' +
-    '  html+="<a href=\\"https://github.com/Woop91/509-dashboard-second\\" target=\\"_blank\\" class=\\"resource-link\\">📦 GitHub Repository</a>";' +
+    '  if(data.githubRepo)html+="<a href=\\""+data.githubRepo+"\\" target=\\"_blank\\" class=\\"resource-link\\">📦 GitHub Repository</a>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">⚡ Quick Actions</div><div class=\\"link-grid\\">";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showMobileUnifiedSearch()\\">🔍 Search All</button>";' +
@@ -17399,7 +17395,7 @@ function setDocViewOnlyByLink(docUrl) {
     if (!match) return;
     var fileId = match[1];
     var file = DriveApp.getFileById(fileId);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (error) {
     Logger.log('Error setting doc to view-only: ' + error.message);
   }
@@ -19488,7 +19484,7 @@ function getWebAppResourceLinks() {
     satisfactionForm: '',
     spreadsheetUrl: ss.getUrl(),
     orgWebsite: '',
-    githubRepo: 'https://github.com/Woop91/509-dashboard-second'
+    githubRepo: ''  // Set via Config sheet ORG_WEBSITE or manually
   };
 
   // Try to get form URLs from Config sheet
@@ -23150,7 +23146,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2733 lines)
+// SOURCE: 07_DevTools.gs (2737 lines)
 // ============================================================================
 
 /**
@@ -23647,8 +23643,12 @@ function seedSatisfactionData() {
   }
 
   function randomPriorities() {
-    var shuffled = priorities.slice().sort(function() { return 0.5 - Math.random(); });
-    return shuffled.slice(0, 3).join(', ');
+    var arr = priorities.slice();
+    for (var j = arr.length - 1; j > 0; j--) {
+      var k = Math.floor(Math.random() * (j + 1));
+      var tmp = arr[j]; arr[j] = arr[k]; arr[k] = tmp;
+    }
+    return arr.slice(0, 3).join(', ');
   }
 
   for (var i = 0; i < 50; i++) {
@@ -26225,7 +26225,7 @@ function setMemberIdValidation(grievanceSheet, memberSheet) {
     .setAllowInvalid(false)
     .build();
 
-  var targetRange = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_ID, 998, 1);
+  var targetRange = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_ID, Math.max(1, grievanceSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -26256,7 +26256,7 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     .setAllowInvalid(false)
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -26287,7 +26287,7 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     .setAllowInvalid(true)  // Allow comma-separated values
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -26472,7 +26472,7 @@ function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourc
     .setAllowInvalid(false)
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -26503,7 +26503,7 @@ function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, so
     .setAllowInvalid(true)
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -27420,7 +27420,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1585 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (1589 lines)
 // ============================================================================
 
 
@@ -28903,9 +28903,13 @@ function executeSendRandomSurveyEmails(opts) {
     }
   });
 
-  // Update survey email log
+  // Update survey email log - find actual last row in log column to avoid overwriting
   if (newLogEntries.length > 0) {
-    var nextRow = Object.keys(surveyLog).length + 2;
+    var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow(), 1).getValues();
+    var nextRow = 2;
+    for (var lr = logValues.length - 1; lr >= 0; lr--) {
+      if (logValues[lr][0]) { nextRow = lr + 3; break; }
+    }
     configSheet.getRange(nextRow, surveyLogCol, newLogEntries.length, 2).setValues(newLogEntries);
   }
 
@@ -29010,7 +29014,7 @@ function getQuarterFromDate(date) {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (1467 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (1462 lines)
 // ============================================================================
 
 // ============================================================================
@@ -30063,13 +30067,8 @@ function refreshAllHiddenFormulas() {
     SHEETS.STEWARD_PERFORMANCE_CALC
   ];
 
-  hiddenSheetNames.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      // Force recalc by getting values
-      sheet.getDataRange().getValues();
-    }
-  });
+  // Force recalculation of all pending formulas
+  SpreadsheetApp.flush();
 
   // Then sync
   syncAllData();
@@ -30482,7 +30481,7 @@ function setupCalcFormulasSheet(sheet) {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4042 lines)
+// SOURCE: 09_Dashboards.gs (4008 lines)
 // ============================================================================
 
 /**
@@ -31027,15 +31026,7 @@ function getSatisfactionOverviewData() {
   if (!sheet) return data;
 
   // Check if there's data by looking at column A (Timestamp)
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return data;
 
@@ -31309,15 +31300,7 @@ function getSatisfactionResponseData() {
   if (!sheet) return [];
 
   // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return [];
 
@@ -31396,15 +31379,7 @@ function getSatisfactionSectionData() {
   if (!sheet) return result;
 
   // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return result;
 
@@ -31729,15 +31704,7 @@ function getSatisfactionAnalyticsData() {
   if (!sheet) return result;
 
   // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return result;
 
@@ -32202,13 +32169,7 @@ function computeSatisfactionRowAverages(row) {
  * @return {number} The last row number with data
  */
 function getSheetLastRow(sheet) {
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      return i;
-    }
-  }
-  return timestamps.length;
+  return sheet.getLastRow();
 }
 
 
@@ -33076,13 +33037,11 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
   var thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   var lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   var lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-  var _oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   // ══════════════════════════════════════════════════════════════════════
   // MEMBER METRICS
   // ══════════════════════════════════════════════════════════════════════
   var openRates = [];
-  var _stewardCounts = {};
 
   for (var m = 1; m < memberData.length; m++) {
     var row = memberData[m];
@@ -33136,7 +33095,6 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     var dateClosed = gRow[GRIEVANCE_COLS.DATE_CLOSED - 1];
     var daysOpen = gRow[GRIEVANCE_COLS.DAYS_OPEN - 1];
     var daysToDeadline = gRow[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var _nextActionDue = gRow[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
 
     // Status counts
     if (status === 'Open') metrics.open++;
@@ -34001,13 +33959,20 @@ function getFlaggedSubmissionsData() {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function approveFlaggedSubmission(rowNum) {
+  // Verify caller is an authorized steward
+  var email = '';
+  try { email = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  if (!email) {
+    throw new Error('Authorization required: unable to verify user identity');
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
-  if (!satSheet || rowNum < 2) return;
+  if (!satSheet || rowNum < 2 || rowNum > satSheet.getLastRow()) return;
 
   satSheet.getRange(rowNum, SATISFACTION_COLS.VERIFIED).setValue('Yes');
-  satSheet.getRange(rowNum, SATISFACTION_COLS.REVIEWER_NOTES).setValue('Manually approved on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  satSheet.getRange(rowNum, SATISFACTION_COLS.REVIEWER_NOTES).setValue('Approved by ' + email + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
 
   // Update dashboard
   syncSatisfactionValues();
@@ -34051,7 +34016,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
       lastName: (s['Last Name'] || '').toString().replace(/"/g, '\\"'),
       unit: (s['Unit'] || 'General').toString().replace(/"/g, '\\"'),
       location: (s['Work Location'] || '').toString().replace(/"/g, '\\"'),
-      email: (s['Email'] || '').toString().replace(/"/g, '\\"')
+      email: ''  // Redacted from public dashboard for privacy
     };
   });
 
@@ -34529,7 +34494,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1758 lines)
+// SOURCE: 10a_SheetCreation.gs (1759 lines)
 // ============================================================================
 
 /**
@@ -34574,7 +34539,13 @@ function getStewardCoverageStats() {
  */
 function createConfigSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.CONFIG);
-  sheet.clear();
+  // Only clear if sheet is new or has no meaningful data (≤2 rows = headers only)
+  if (sheet.getLastRow() <= 2) {
+    sheet.clear();
+  } else {
+    Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear to preserve settings');
+    return sheet;
+  }
 
   // Row 1: Section Headers (grouped categories)
   var sectionHeaders = [
@@ -34667,11 +34638,11 @@ function createConfigSheet(ss) {
   // Alert Days (S) - default notification intervals
   sheet.getRange(3, CONFIG_COLS.ALERT_DAYS, 1, 1).setValue('3, 7, 14');
 
-  // Organization defaults (SEIU Local 509)
-  sheet.getRange(3, CONFIG_COLS.ORG_NAME, 1, 1).setValue('SEIU Local 509');
-  sheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER, 1, 1).setValue('509');
-  sheet.getRange(3, CONFIG_COLS.MAIN_ADDRESS, 1, 1).setValue('293 Boston Post Road West, 4th Floor, Marlborough, MA 01752');
-  sheet.getRange(3, CONFIG_COLS.MAIN_PHONE, 1, 1).setValue('774-843-7509');
+  // Organization defaults (placeholders — update in Config sheet)
+  sheet.getRange(3, CONFIG_COLS.ORG_NAME, 1, 1).setValue('Your Union Name');
+  sheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER, 1, 1).setValue('000');
+  sheet.getRange(3, CONFIG_COLS.MAIN_ADDRESS, 1, 1).setValue('123 Main Street, Suite 100, City, ST 00000');
+  sheet.getRange(3, CONFIG_COLS.MAIN_PHONE, 1, 1).setValue('555-000-0000');
 
   // Deadline defaults (in days) — values from DEADLINE_DEFAULTS (01_Core.gs)
   sheet.getRange(3, CONFIG_COLS.FILING_DEADLINE_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.FILING_DAYS);
@@ -34685,20 +34656,20 @@ function createConfigSheet(ss) {
     .setValues(bestTimes.map(function(v) { return [v]; }));
 
   // Contract articles
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_GRIEVANCE, 1, 1).setValue('Article 23A');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_DISCIPLINE, 1, 1).setValue('Article 12');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_WORKLOAD, 1, 1).setValue('Article 15');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_NAME, 1, 1).setValue('2023-2026 CBA');
+  sheet.getRange(3, CONFIG_COLS.CONTRACT_GRIEVANCE, 1, 1).setValue('Article XX');
+  sheet.getRange(3, CONFIG_COLS.CONTRACT_DISCIPLINE, 1, 1).setValue('Article YY');
+  sheet.getRange(3, CONFIG_COLS.CONTRACT_WORKLOAD, 1, 1).setValue('Article ZZ');
+  sheet.getRange(3, CONFIG_COLS.CONTRACT_NAME, 1, 1).setValue('Current CBA');
 
   // Org identity
-  sheet.getRange(3, CONFIG_COLS.UNION_PARENT, 1, 1).setValue('SEIU');
-  sheet.getRange(3, CONFIG_COLS.STATE_REGION, 1, 1).setValue('Massachusetts');
-  sheet.getRange(3, CONFIG_COLS.ORG_WEBSITE, 1, 1).setValue('https://www.seiu509.org/');
+  sheet.getRange(3, CONFIG_COLS.UNION_PARENT, 1, 1).setValue('Your Parent Union');
+  sheet.getRange(3, CONFIG_COLS.STATE_REGION, 1, 1).setValue('Your State');
+  sheet.getRange(3, CONFIG_COLS.ORG_WEBSITE, 1, 1).setValue('https://www.example.org/');
 
   // Extended contact
-  sheet.getRange(3, CONFIG_COLS.MAIN_FAX, 1, 1).setValue('508-485-8529');
-  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_NAME, 1, 1).setValue('Marc');
-  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_EMAIL, 1, 1).setValue('marc@seiu509.org');
+  sheet.getRange(3, CONFIG_COLS.MAIN_FAX, 1, 1).setValue('555-000-0001');
+  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_NAME, 1, 1).setValue('Contact Name');
+  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_EMAIL, 1, 1).setValue('contact@example.org');
 
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
@@ -35227,8 +35198,7 @@ function createMemberDirectory(ss) {
     .setRanges([daysDeadlineRange])
     .build();
 
-  var rules = sheet.getConditionalFormatRules();
-  rules.push(redRule, emptyEmailRule, emptyPhoneRule, deadlineOverdueRule, deadline1to3Rule, deadline4to7Rule, deadlineOnTrackRule);
+  var rules = [redRule, emptyEmailRule, emptyPhoneRule, deadlineOverdueRule, deadline1to3Rule, deadline4to7Rule, deadlineOnTrackRule];
   sheet.setConditionalFormatRules(rules);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -35379,9 +35349,6 @@ function createGrievanceLog(ss) {
 
   // Progress bar spans: Step I (J-K), Step II (L-O), Step III (P-Q), Date Closed (R)
   var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 2);         // J-K
-  var _step2Range = sheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 4999, 4);  // L-O
-  var _step3Range = sheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 4999, 2);  // P-Q
-  var _closedRange = sheet.getRange(2, GRIEVANCE_COLS.DATE_CLOSED, 4999, 1);      // R
   var allStepsRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 9);      // J-R (all 9 columns)
 
   // Completed cases: All columns green (Closed, Won, Denied, Settled, Withdrawn)
@@ -35422,11 +35389,10 @@ function createGrievanceLog(ss) {
     .build();
 
   // Apply all rules (order matters - more specific rules first)
-  var rules = sheet.getConditionalFormatRules();
-  rules.push(
+  var rules = [
     deadlineOverdueRule, deadline1to3Rule, deadline4to7Rule, deadlineOnTrackRule,
     completedRule, step3ProgressRule, step2ProgressRule, step1ProgressRule, notReachedRule
-  );
+  ];
   sheet.setConditionalFormatRules(rules);
 
   // Set tab color
@@ -38218,8 +38184,8 @@ function createFeaturesReferenceSheet(ss) {
  * Hardcoded values serve as defaults only — update via Script Properties or Config sheet.
  */
 var GRIEVANCE_FORM_CONFIG = {
-  // Default form URL — overridden by Config sheet column P at runtime
-  FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSedX8nf_xXeLe2sCL9MpjkEEmSuSPbjn3fNxMaMNaPlD0H5lA/viewform',
+  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('grievance')
+  FORM_URL: '',
 
   // Default form field entry IDs — overridden by Script Properties at runtime
   FIELD_IDS: {
@@ -38254,8 +38220,8 @@ var GRIEVANCE_FORM_CONFIG = {
  * Hardcoded values serve as defaults only.
  */
 var CONTACT_FORM_CONFIG = {
-  // Default form URL — overridden by Config sheet column Q at runtime
-  FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeOs6Kxqca85DYRF1wTP634gMNdEirZdi5mg7aUIY5q7dIfRg/viewform',
+  // Form URL — set in Config sheet column Q, read via getFormUrlFromConfig('contact')
+  FORM_URL: '',
 
   // Form field entry IDs mapped to Member Directory columns
   FIELD_IDS: {
@@ -38605,9 +38571,9 @@ function testGrievanceFormSubmission() {
  * Hardcoded values serve as defaults only.
  */
 var SATISFACTION_FORM_CONFIG = {
-  // Default form URLs — overridden by Config sheet column AR at runtime
-  FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeR4VxrGTEvK-PaQP2S8JXn6xwTwp-vkR9tI5c3PRvfhr75nA/viewform',
-  EDIT_URL: 'https://docs.google.com/forms/d/10irg3mZ4kPShcJ5gFHuMoTxvTeZmo_cBs6HGvfasbL0/edit',
+  // Form URLs — set in Config sheet column AR, read via getFormUrlFromConfig('satisfaction')
+  FORM_URL: '',
+  EDIT_URL: '',
 
   // Form field entry IDs (from pre-filled URL)
   FIELD_IDS: {
@@ -40775,7 +40741,7 @@ function onEdit(e) {
     }
 
     // Case Checklist edits
-    if (sheetName === 'Case Checklist' || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
+    if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
       if (typeof handleChecklistEdit === 'function') {
         handleChecklistEdit(e);
       }
@@ -40868,7 +40834,7 @@ function handleSecurityAudit_(e) {
         // Config not available
       }
 
-      if (chiefEmail) {
+      if (chiefEmail && MailApp.getRemainingDailyQuota() > 0) {
         try {
           MailApp.sendEmail({
             to: chiefEmail,
@@ -41814,9 +41780,9 @@ function showHelpDialog() {
               </div>
             </div>
 
-            <a href="https://github.com/Woop91/MULTIPLE-SCRIPS-REPO" target="_blank" class="repo-link">
+            <a href="' + escapeHtml(getConfigValue_(CONFIG_COLS.ORG_WEBSITE) || '#') + '" target="_blank" class="repo-link">
               <span class="material-icons" style="font-size: 16px;">open_in_new</span>
-              GitHub Repository (fresh copies, documentation, updates)
+              Organization Website
             </a>
           </div>
 
@@ -43532,7 +43498,7 @@ function addRepoLinkToFAQ_(ss) {
     );
 
     // Add the repo link
-    var repoUrl = 'https://github.com/Woop91/MULTIPLE-SCRIPS-REPO';
+    var repoUrl = getConfigValue_(CONFIG_COLS.ORG_WEBSITE) || '';
     faqSheet.getRange(linkRow + 2, 1).setValue(repoUrl);
     faqSheet.getRange(linkRow + 2, 1)
       .setFontColor('#1a73e8')
@@ -50422,7 +50388,7 @@ function getLookerStatus() {
 
 
 // ============================================================================
-// SOURCE: 13_MemberSelfService.gs (1672 lines)
+// SOURCE: 13_MemberSelfService.gs (1705 lines)
 // ============================================================================
 
 /**
@@ -51196,14 +51162,39 @@ function showGeneratePINDialog() {
   var result = generateMemberPINForSteward(memberId);
 
   if (result.success) {
-    ui.alert(
-      'PIN Generated',
-      'New PIN for ' + result.memberName + ':\n\n' +
-      '    ' + result.pin + '\n\n' +
-      'Please provide this PIN to the member securely.\n' +
-      'They can use it with their Member ID to access the self-service portal.',
-      ui.ButtonSet.OK
-    );
+    // Email the PIN to the member instead of displaying in plaintext
+    var memberEmail = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
+    if (memberEmail && String(memberEmail).includes('@')) {
+      try {
+        var orgName = '';
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        MailApp.sendEmail({
+          to: String(memberEmail),
+          subject: orgName + ' - Your Self-Service Portal PIN',
+          body: 'Hello ' + result.memberName + ',\n\n' +
+                'Your new self-service portal PIN is: ' + result.pin + '\n\n' +
+                'Use this PIN along with your Member ID (' + result.memberId + ') to access the member portal.\n\n' +
+                'If you did not request this PIN, please contact your steward.\n\n' +
+                '- ' + orgName
+        });
+        ui.alert('PIN Generated & Emailed',
+          'A new PIN for ' + result.memberName + ' has been generated and emailed to ' + memberEmail + '.\n\n' +
+          'The PIN was NOT displayed here for security.',
+          ui.ButtonSet.OK);
+      } catch (emailErr) {
+        // Fall back to showing PIN if email fails
+        ui.alert('PIN Generated (Email Failed)',
+          'New PIN for ' + result.memberName + ': ' + result.pin + '\n\n' +
+          'Email delivery failed (' + emailErr.message + '). Please provide this PIN securely.',
+          ui.ButtonSet.OK);
+      }
+    } else {
+      // No email on file - must show PIN
+      ui.alert('PIN Generated (No Email)',
+        'New PIN for ' + result.memberName + ': ' + result.pin + '\n\n' +
+        'No email address on file. Please provide this PIN to the member securely.',
+        ui.ButtonSet.OK);
+    }
   } else {
     ui.alert('Error', result.error, ui.ButtonSet.OK);
   }
@@ -51297,7 +51288,8 @@ function showBulkGeneratePINDialog() {
     'Bulk Generate PINs',
     'This will generate PINs for all members who do not currently have one.\n\n' +
     'Members who already have a PIN will be skipped.\n\n' +
-    'A report will be generated showing all new PINs.\n\n' +
+    'Each member will receive their PIN via email.\n' +
+    'Members without an email on file will be listed for manual distribution.\n\n' +
     'Continue?',
     ui.ButtonSet.YES_NO
   );
@@ -51305,15 +51297,20 @@ function showBulkGeneratePINDialog() {
   if (response !== ui.Button.YES) return;
 
   var data = sheet.getDataRange().getValues();
-  var generated = [];
+  var emailed = 0;
+  var noEmailList = [];
   var skipped = 0;
   var errors = [];
+
+  var orgName = '';
+  try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
 
   // Start from row 2 (index 1) to skip header
   for (var i = 1; i < data.length; i++) {
     var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
-    var memberName = (data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
-                     (data[i][MEMBER_COLS.LAST_NAME - 1] || '');
+    var memberName = ((data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' +
+                     (data[i][MEMBER_COLS.LAST_NAME - 1] || '')).trim();
+    var memberEmail = data[i][MEMBER_COLS.EMAIL - 1];
     var existingPin = data[i][PIN_CONFIG.PIN_COLUMN - 1];
 
     if (!memberId) continue;
@@ -51325,68 +51322,70 @@ function showBulkGeneratePINDialog() {
 
     var result = generateMemberPINForSteward(memberId);
     if (result.success) {
-      generated.push({
-        memberId: memberId,
-        memberName: memberName.trim(),
-        pin: result.pin
-      });
+      // Try to email the PIN to the member
+      if (memberEmail && String(memberEmail).includes('@')) {
+        try {
+          MailApp.sendEmail({
+            to: String(memberEmail),
+            subject: orgName + ' - Your Self-Service Portal PIN',
+            body: 'Hello ' + memberName + ',\n\n' +
+                  'Your new self-service portal PIN is: ' + result.pin + '\n\n' +
+                  'Use this PIN along with your Member ID (' + memberId + ') to access the member portal.\n\n' +
+                  'If you did not request this PIN, please contact your steward.\n\n' +
+                  '- ' + orgName
+          });
+          emailed++;
+        } catch (emailErr) {
+          noEmailList.push(memberName + ' (' + memberId + '): email failed - ' + emailErr.message);
+        }
+      } else {
+        noEmailList.push(memberName + ' (' + memberId + '): no email on file');
+      }
     } else {
       errors.push(memberId + ': ' + result.error);
     }
   }
 
-  // Show results
-  var message = 'Bulk PIN Generation Complete\n\n';
-  message += 'Generated: ' + generated.length + ' new PINs\n';
-  message += 'Skipped: ' + skipped + ' (already had PINs)\n';
+  // Audit log
+  if ((emailed + noEmailList.length) > 0 && typeof logAuditEvent === 'function') {
+    logAuditEvent('BULK_PIN_GENERATION', {
+      emailed: emailed,
+      noEmail: noEmailList.length,
+      generatedBy: (function() { try { return Session.getActiveUser().getEmail(); } catch (_e) { return 'Unknown'; } })()
+    });
+  }
+
+  // Show summary (no PINs displayed)
+  var htmlContent = '<html><head>' + getMobileOptimizedHead() + '</head><body style="font-family:sans-serif;padding:10px;">';
+  htmlContent += '<h3>Bulk PIN Generation Complete</h3>';
+  htmlContent += '<p><strong>Emailed:</strong> ' + emailed + ' PINs sent directly to members<br>';
+  htmlContent += '<strong>Skipped:</strong> ' + skipped + ' (already had PINs)<br>';
   if (errors.length > 0) {
-    message += 'Errors: ' + errors.length + '\n';
+    htmlContent += '<strong>Errors:</strong> ' + errors.length + '<br>';
+  }
+  htmlContent += '</p>';
+
+  if (noEmailList.length > 0) {
+    htmlContent += '<h4>Members needing manual PIN distribution (' + noEmailList.length + '):</h4>';
+    htmlContent += '<textarea readonly style="width:100%;height:200px;font-family:monospace;">';
+    for (var n = 0; n < noEmailList.length; n++) {
+      htmlContent += escapeHtml(noEmailList[n]) + '\n';
+    }
+    htmlContent += '</textarea>';
+    htmlContent += '<p><em>Contact these members directly to provide portal access.</em></p>';
   }
 
-  if (generated.length > 0) {
-    // Audit log the bulk PIN generation event (without the PINs themselves)
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('BULK_PIN_GENERATION', {
-        count: generated.length,
-        memberIds: generated.map(function(g) { return g.memberId; }),
-        generatedBy: (function() { try { return Session.getActiveUser().getEmail(); } catch (_e) { return 'Unknown'; } })()
-      });
+  if (errors.length > 0) {
+    htmlContent += '<h4>Errors:</h4><pre>';
+    for (var e = 0; e < Math.min(errors.length, 10); e++) {
+      htmlContent += escapeHtml(errors[e]) + '\n';
     }
-
-    message += '\n--- New PINs ---\n';
-    for (var j = 0; j < generated.length && j < 50; j++) {
-      message += generated[j].memberName + ' (' + generated[j].memberId + '): ' + generated[j].pin + '\n';
-    }
-    if (generated.length > 50) {
-      message += '... and ' + (generated.length - 50) + ' more\n';
-    }
-    message += '\nIMPORTANT: Note these PINs to distribute to members.\n';
-    message += 'They will not be shown again.';
+    htmlContent += '</pre>';
   }
 
-  // Use a scrollable HTML dialog for large results
-  if (generated.length > 10) {
-    var htmlContent = '<html><head>' + getMobileOptimizedHead() + '</head><body style="font-family:sans-serif;padding:10px;">';
-    htmlContent += '<h3>Bulk PIN Generation Complete</h3>';
-    htmlContent += '<p><strong>Generated:</strong> ' + generated.length + ' new PINs<br>';
-    htmlContent += '<strong>Skipped:</strong> ' + skipped + ' (already had PINs)</p>';
-    if (generated.length > 0) {
-      htmlContent += '<h4>New PINs (copy this list!):</h4>';
-      htmlContent += '<textarea readonly style="width:100%;height:300px;font-family:monospace;">';
-      for (var k = 0; k < generated.length; k++) {
-        htmlContent += generated[k].memberName + ' (' + generated[k].memberId + '): ' + generated[k].pin + '\n';
-      }
-      htmlContent += '</textarea>';
-    }
-    htmlContent += '</body></html>';
-
-    var htmlOutput = HtmlService.createHtmlOutput(htmlContent)
-      .setWidth(500)
-      .setHeight(500);
-    ui.showModalDialog(htmlOutput, 'Bulk PIN Generation Results');
-  } else {
-    ui.alert('Bulk PIN Generation', message, ui.ButtonSet.OK);
-  }
+  htmlContent += '</body></html>';
+  var htmlOutput = HtmlService.createHtmlOutput(htmlContent).setWidth(500).setHeight(400);
+  ui.showModalDialog(htmlOutput, 'Bulk PIN Generation Results');
 }
 
 // ============================================================================
@@ -53157,6 +53156,7 @@ function getMultiSelectDialog_HTML() {
 <html>
 <head>
   <base target="_top">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">
   <style>
     * {

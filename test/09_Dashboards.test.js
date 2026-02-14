@@ -112,19 +112,9 @@ describe('computeAverage_', () => {
 // ============================================================================
 
 describe('getSheetLastRow', () => {
-  test('returns index of first empty row in column A', () => {
+  test('returns last row from sheet', () => {
     const mockSheet = createMockSheet('Test');
-    const timestamps = [['Header'], ['2026-01-01'], ['2026-01-02'], [''], ['']];
-    mockSheet.getRange.mockReturnValue(createMockRange(timestamps));
-
-    const result = getSheetLastRow(mockSheet);
-    expect(result).toBe(3);
-  });
-
-  test('returns total length when no empty rows', () => {
-    const mockSheet = createMockSheet('Test');
-    const timestamps = [['Header'], ['2026-01-01'], ['2026-01-02']];
-    mockSheet.getRange.mockReturnValue(createMockRange(timestamps));
+    mockSheet.getLastRow.mockReturnValue(3);
 
     const result = getSheetLastRow(mockSheet);
     expect(result).toBe(3);
@@ -132,20 +122,18 @@ describe('getSheetLastRow', () => {
 
   test('returns 1 when only header exists', () => {
     const mockSheet = createMockSheet('Test');
-    const timestamps = [['Header'], [''], ['']];
-    mockSheet.getRange.mockReturnValue(createMockRange(timestamps));
+    mockSheet.getLastRow.mockReturnValue(1);
 
     const result = getSheetLastRow(mockSheet);
     expect(result).toBe(1);
   });
 
-  test('handles null values as empty', () => {
+  test('returns 0 for empty sheet', () => {
     const mockSheet = createMockSheet('Test');
-    const timestamps = [['Header'], ['data'], [null]];
-    mockSheet.getRange.mockReturnValue(createMockRange(timestamps));
+    mockSheet.getLastRow.mockReturnValue(0);
 
     const result = getSheetLastRow(mockSheet);
-    expect(result).toBe(2);
+    expect(result).toBe(0);
   });
 });
 

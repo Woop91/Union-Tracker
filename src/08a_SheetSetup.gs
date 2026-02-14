@@ -332,7 +332,7 @@ function setMemberIdValidation(grievanceSheet, memberSheet) {
     .setAllowInvalid(false)
     .build();
 
-  var targetRange = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_ID, 998, 1);
+  var targetRange = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_ID, Math.max(1, grievanceSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -363,7 +363,7 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     .setAllowInvalid(false)
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -394,7 +394,7 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     .setAllowInvalid(true)  // Allow comma-separated values
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -579,7 +579,7 @@ function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourc
     .setAllowInvalid(false)
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -610,7 +610,7 @@ function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, so
     .setAllowInvalid(true)
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, 998, 1);
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 

@@ -1478,9 +1478,13 @@ function executeSendRandomSurveyEmails(opts) {
     }
   });
 
-  // Update survey email log
+  // Update survey email log - find actual last row in log column to avoid overwriting
   if (newLogEntries.length > 0) {
-    var nextRow = Object.keys(surveyLog).length + 2;
+    var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow(), 1).getValues();
+    var nextRow = 2;
+    for (var lr = logValues.length - 1; lr >= 0; lr--) {
+      if (logValues[lr][0]) { nextRow = lr + 3; break; }
+    }
     configSheet.getRange(nextRow, surveyLogCol, newLogEntries.length, 2).setValues(newLogEntries);
   }
 

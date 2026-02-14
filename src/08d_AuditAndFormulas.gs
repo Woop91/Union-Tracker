@@ -1048,13 +1048,8 @@ function refreshAllHiddenFormulas() {
     SHEETS.STEWARD_PERFORMANCE_CALC
   ];
 
-  hiddenSheetNames.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      // Force recalc by getting values
-      sheet.getDataRange().getValues();
-    }
-  });
+  // Force recalculation of all pending formulas
+  SpreadsheetApp.flush();
 
   // Then sync
   syncAllData();

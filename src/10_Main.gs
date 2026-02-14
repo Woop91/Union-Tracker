@@ -144,7 +144,7 @@ function onEdit(e) {
     }
 
     // Case Checklist edits
-    if (sheetName === 'Case Checklist' || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
+    if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
       if (typeof handleChecklistEdit === 'function') {
         handleChecklistEdit(e);
       }
@@ -237,7 +237,7 @@ function handleSecurityAudit_(e) {
         // Config not available
       }
 
-      if (chiefEmail) {
+      if (chiefEmail && MailApp.getRemainingDailyQuota() > 0) {
         try {
           MailApp.sendEmail({
             to: chiefEmail,
@@ -1183,9 +1183,9 @@ function showHelpDialog() {
               </div>
             </div>
 
-            <a href="https://github.com/Woop91/MULTIPLE-SCRIPS-REPO" target="_blank" class="repo-link">
+            <a href="' + escapeHtml(getConfigValue_(CONFIG_COLS.ORG_WEBSITE) || '#') + '" target="_blank" class="repo-link">
               <span class="material-icons" style="font-size: 16px;">open_in_new</span>
-              GitHub Repository (fresh copies, documentation, updates)
+              Organization Website
             </a>
           </div>
 
