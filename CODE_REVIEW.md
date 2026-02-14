@@ -4,7 +4,7 @@
 **Reviewer:** Claude Code (Opus 4.6)
 **Scope:** Full codebase review — 27 source files (~138K lines), 21 test files, config/build, docs
 **Lint Status:** ESLint passes clean
-**Test Status:** 1008+ tests passing across 21 suites
+**Test Status:** 1008+ tests passing across 19 suites
 
 ---
 
@@ -15,7 +15,7 @@ This is a comprehensive Google Apps Script application for union/organization ma
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
 | Critical | 8 | XSS vulnerabilities, broken setup refs, unauthenticated data access, public file sharing |
-| High | 18 | HTML injection, performance bottlenecks, race conditions, hardcoded credentials |
+| High | 17 | Performance bottlenecks, race conditions, hardcoded credentials, trigger limits |
 | Medium | 22 | Missing input validation, shared state conflicts, dead code, inconsistent constants |
 | Low | 14 | Unused variables, documentation staleness, minor UX issues |
 | Test Quality | 12 | False positives, missing happy-path tests, mock isolation gaps |
@@ -144,21 +144,7 @@ The `Assert` object is declared at line 1677 with methods `assertEquals`, `asser
 
 ## High Priority Issues
 
-### H1. String Split Bug in `importMembersFromText()`
-
-**File:** `src/10_Main.gs:1572`
-
-```javascript
-const lines = text.split('\\n').filter(line => line.trim());
-```
-
-`'\\n'` is a two-character literal (backslash + n), not a newline. Text from a textarea will contain real `\n` characters, so the split produces a single-element array.
-
-**Fix:** Change to `text.split('\n')`.
-
----
-
-### H2. Dual Column Constant Systems
+### H1. Dual Column Constant Systems
 
 The codebase maintains two parallel column indexing systems:
 - **0-indexed** (`GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`) for array access
@@ -170,7 +156,7 @@ Mixed usage within single files (e.g., `08b_SearchAndCharts.gs` uses both) creat
 
 ---
 
-### H3. Performance: Row-by-Row API Calls in Loops
+### H2. Performance: Row-by-Row API Calls in Loops
 
 Multiple functions make individual Google Sheets API calls per row, causing severe performance bottlenecks:
 
@@ -192,7 +178,7 @@ Multiple functions make individual Google Sheets API calls per row, causing seve
 
 ---
 
-### H4. Race Conditions — No LockService Usage
+### H3. Race Conditions — No LockService Usage
 
 Multiple read-then-write operations are vulnerable to concurrent access:
 
@@ -208,7 +194,7 @@ Multiple read-then-write operations are vulnerable to concurrent access:
 
 ---
 
-### H5. Hardcoded Google Form URLs and Entry IDs
+### H4. Hardcoded Google Form URLs and Entry IDs
 
 **File:** `src/10c_FormHandlers.gs:43, 79, 430-431`
 
@@ -218,7 +204,7 @@ Real Google Form URLs with live form IDs are hardcoded as defaults. The edit URL
 
 ---
 
-### H6. `onEdit` Handler Performance — Excessive API Calls Per Edit
+### H5. `onEdit` Handler Performance — Excessive API Calls Per Edit
 
 **File:** `src/10_Main.gs:83-192`
 
@@ -226,7 +212,7 @@ A single edit to the Grievance Log triggers: security audit (creates/finds sheet
 
 ---
 
-### H7. Sabotage Detection False Positives
+### H6. Sabotage Detection False Positives
 
 **File:** `src/10_Main.gs:226-262`
 
@@ -234,7 +220,7 @@ Fires when `numCells > 15 && !e.value`. But `!e.value` is also true for multi-ce
 
 ---
 
-### H8. `NUKE_DATABASE` Deletes Audit Log
+### H7. `NUKE_DATABASE` Deletes Audit Log
 
 **File:** `src/11_CommandHub.gs:685-689`
 
@@ -244,7 +230,7 @@ The nuclear wipe logs the event, then immediately deletes the audit sheet. The a
 
 ---
 
-### H9. Fabricated Historical Member Data
+### H8. Fabricated Historical Member Data
 
 **File:** `src/09_Dashboards.gs:2807-2813`
 
@@ -254,7 +240,7 @@ The 6-month member history is fabricated: `[0.92, 0.94, 0.96, 0.97, 0.99, 1.0] *
 
 ---
 
-### H10. Auto-Sync Options Configuration is Non-Functional
+### H9. Auto-Sync Options Configuration is Non-Functional
 
 **File:** `src/09_Dashboards.gs:2460-2474 vs 2209-2301`
 
@@ -262,7 +248,7 @@ Users can configure sync options via `installAutoSyncTrigger()` (saved to Script
 
 ---
 
-### H11. Email Sending in Simple `onEdit` Trigger Context
+### H10. Email Sending in Simple `onEdit` Trigger Context
 
 **File:** `src/10_Main.gs:239-253, 409`
 
@@ -272,7 +258,7 @@ Users can configure sync options via `installAutoSyncTrigger()` (saved to Script
 
 ---
 
-### H12. `appendRow()` in Loops for Bulk Import
+### H11. `appendRow()` in Loops for Bulk Import
 
 **File:** `src/04b_AccessibilityFeatures.gs:613`
 
@@ -282,7 +268,7 @@ Each imported CSV row triggers a separate `sheet.appendRow()`. For large imports
 
 ---
 
-### H13. Timing-Based PIN Verification Not Constant-Time
+### H12. Timing-Based PIN Verification Not Constant-Time
 
 **File:** `src/13_MemberSelfService.gs:110-115`
 
@@ -292,7 +278,7 @@ Each imported CSV row triggers a separate `sheet.appendRow()`. For large imports
 
 ---
 
-### H14. Hardcoded Organization PII in Source Code
+### H13. Hardcoded Organization PII in Source Code
 
 **File:** `src/10a_SheetCreation.gs:137-167`
 
@@ -302,7 +288,7 @@ Real organization data is hardcoded: physical address, phone, fax, contact name,
 
 ---
 
-### H15. Conditional Formatting Rule Accumulation
+### H14. Conditional Formatting Rule Accumulation
 
 **Files:** `src/10c_FormHandlers.gs:750,877`, `src/10d_SyncAndMaintenance.gs:55-56,111-112`
 
@@ -312,7 +298,7 @@ Functions push new conditional formatting rules without removing old ones. Repea
 
 ---
 
-### H16. API Key Exposed in URL Query String
+### H15. API Key Exposed in URL Query String
 
 **File:** `src/11_CommandHub.gs:2721`
 
@@ -322,7 +308,7 @@ Functions push new conditional formatting rules without removing old ones. Repea
 
 ---
 
-### H17. `approveFlaggedSubmission` Accepts Raw Row Numbers Without Authorization
+### H16. `approveFlaggedSubmission` Accepts Raw Row Numbers Without Authorization
 
 **File:** `src/09_Dashboards.gs:3516-3544`
 
@@ -330,7 +316,7 @@ Client-side JavaScript passes `rowNum` directly. No check that the caller has ad
 
 ---
 
-### H18. Survey Email Log May Overwrite Config Data
+### H17. Survey Email Log May Overwrite Config Data
 
 **File:** `src/08c_FormsAndNotifications.gs:1477-1479`
 
@@ -605,7 +591,7 @@ At least 8 different `escapeHtml()` implementations exist across client-side HTM
 - **Security fundamentals are strong:** SHA-256 PIN hashing with per-member salt, rate limiting with configurable lockout, session tokens, audit logging, IDOR protection on web app endpoints
 - **PII protection is thoughtful:** `safetyValveScrub()`, anonymized Looker sheets, PII-free exports, `maskName()`/`maskEmail()` in logs, dual-mode public/steward dashboards
 - **Accessibility is comprehensive:** High contrast mode, large text mode, keyboard navigation with arrow keys, ARIA attributes, touch target compliance, Pomodoro timer, ADHD-friendly features
-- **Test suite is extensive:** 1008+ tests across 21 suites, all passing, with ESLint clean
+- **Test suite is extensive:** 1008+ tests across 19 suites, all passing, with ESLint clean
 - **Error handling is defensive:** Consistent `typeof === 'function'` checks for cross-module dependencies, try-catch with individual error handling per operation
 - **Self-healing architecture:** Hidden calculation sheets with formula repair functions, diagnostic/repair pipeline
 - **User experience:** Progress toasts during long operations, color-coded conditional formatting, steward override system with cell notes, lazy-loading dashboard tabs
@@ -621,7 +607,7 @@ The codebase is a substantial and feature-rich application with strong security 
 1. **XSS vulnerabilities** (20+ locations) — systematic fix needed via consistent `escapeHtml()` usage
 2. **Performance bottlenecks** (11+ locations) — batch API calls instead of per-row operations
 3. **Race conditions** (5+ locations) — add `LockService` to read-check-write sequences
-4. **Broken references** (`HIDDEN_SHEETS`, `ASSIGNED_STEWARD`) — fix undefined constants
+4. **Broken references** (`HIDDEN_SHEETS`, `ASSIGNED_STEWARD`) — fix undefined constant properties
 5. **Test reliability** (8+ false positives) — ensure tests actually exercise production code
 
 The architectural debt (monolithic files, inline HTML, duplicate constants) is manageable and can be addressed incrementally without affecting functionality.
