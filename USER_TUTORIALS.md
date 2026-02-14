@@ -1,7 +1,7 @@
 # 509 Dashboard - User Tutorials
 
-**Version:** 4.6.0
-**Last Updated:** 2026-02-12
+**Version:** 4.7.0
+**Last Updated:** 2026-02-14
 
 Quick, practical tutorials for common tasks in the 509 Dashboard.
 
@@ -629,5 +629,5 @@ The system automatically sends meeting documents to stewards on a schedule:
 
 ---
 
-**Version:** 4.6.0
-**Last Updated:** 2026-02-12
+**Version:** 4.7.0
+**Last Updated:** 2026-02-14

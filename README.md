@@ -1,6 +1,6 @@
 # 509 Strategic Command Center
 
-**Version 4.6.0** | Union Steward Dashboard for Google Sheets
+**Version 4.7.0** | Union Steward Dashboard for Google Sheets
 
 A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 27-file modular architecture.
 
@@ -477,6 +477,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| **4.7.0** | 2026-02-14 | Security hardening, 40+ code review fixes, 1090 tests across 20 suites, deduplicated escapeHtml, lint clean |
 | **4.6.0** | 2026-02-12 | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling |
 | **4.5.1** | 2026-02-11 | Engagement tracking fixes, 950 Jest unit tests, critical bug fixes |
 | **4.5.0** | 2026-02-01 | Security module, Data Access Layer, Member Self-Service with PIN auth, consolidated 27-file architecture |
