@@ -614,8 +614,9 @@ function sortGrievanceLogByStatus() {
   var lastRow = sheet.getLastRow();
   if (lastRow < 3) return; // Need at least 2 data rows to sort
 
-  // Get all data (excluding header row)
-  var dataRange = sheet.getRange(2, 1, lastRow - 1, 34);
+  // Get all data (excluding header row) - use actual column count to avoid truncation
+  var lastCol = sheet.getLastColumn();
+  var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
   var data = dataRange.getValues();
 
   // Sort with Message Alert first, then by status priority
@@ -677,7 +678,7 @@ function applyMessageAlertHighlighting_(sheet, lastRow) {
 
   for (var i = 0; i < alertValues.length; i++) {
     var row = i + 2;
-    var rowRange = sheet.getRange(row, 1, 1, 34);
+    var rowRange = sheet.getRange(row, 1, 1, sheet.getLastColumn());
 
     if (alertValues[i][0] === true) {
       // Highlight the entire row

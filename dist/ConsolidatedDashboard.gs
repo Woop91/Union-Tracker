@@ -1414,16 +1414,16 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2729 lines)
+// SOURCE: 01_Core.gs (2730 lines)
 // ============================================================================
 
 /**
  * ============================================================================
- * 00_ErrorHandler.gs - Centralized Error Handling
+ * 01_Core.gs - Core Constants, Error Handling & Configuration
  * ============================================================================
  *
- * This module provides centralized error handling, logging, and user
- * notification utilities for the entire dashboard application.
+ * This module provides centralized error handling, logging, constants,
+ * configuration, and column definitions for the entire dashboard application.
  *
  * Features:
  * - Consistent error logging with context
@@ -1431,9 +1431,11 @@ function getDeadlineUrgency(daysToDeadline) {
  * - Error tracking and reporting
  * - Performance monitoring
  * - Input sanitization
+ * - Sheet and column constants
+ * - Version management
  *
- * @fileoverview Centralized error handling utilities
- * @version 1.0.0
+ * @fileoverview Core constants, error handling, and configuration
+ * @version 4.6.0
  */
 
 // ============================================================================
@@ -1534,7 +1536,7 @@ function handleError(error, context, level) {
     context: context || 'Unknown',
     message: error.message || String(error),
     stack: error.stack || '',
-    user: Session.getActiveUser().getEmail() || 'Unknown'
+    user: (function() { try { return Session.getActiveUser().getEmail() || 'Unknown'; } catch (_e) { return 'Unknown'; } })()
   };
 
   // Log to console
@@ -1933,7 +1935,7 @@ function clearErrorLog() {
  * Single source of truth for all configuration constants.
  * This file must be loaded first in the build order.
  *
- * @version 4.1.0
+ * @version 4.6.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -2100,8 +2102,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
-  { version: '4.6.1', date: '2026-02-12', codename: 'PII & Compliance', changes: 'Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (seiu509.org only) and Lockdown future feature roadmap items.' },
-  { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling' },
+  { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling. Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (seiu509.org only) and Lockdown future feature roadmap items.' },
   { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
   { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
   { version: '4.4.1', date: '2026-01-31', codename: 'Build System',                               changes: 'Initial build system with Node.js, source file concatenation' },
@@ -2632,7 +2633,7 @@ var GRIEVANCE_COLUMNS = {
   // Calculated metrics (0-indexed)
   DAYS_OPEN: 18,           // S - Days Open
   NEXT_ACTION_DUE: 19,     // T - Next Action Due
-  LAST_UPDATED: 19,        // Alias for NEXT_ACTION_DUE
+  LAST_UPDATED: 41,        // Alias for RECORD_LAST_UPDATED (AP)
   DAYS_TO_DEADLINE: 20,    // U - Days to Deadline
 
   // Case details (0-indexed)
@@ -4158,23 +4159,24 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2486 lines)
+// SOURCE: 02_DataManagers.gs (2487 lines)
 // ============================================================================
 
 /**
  * ============================================================================
- * 02_MemberManager.gs - Member Directory Operations
+ * 02_DataManagers.gs - Member & Grievance Data Operations
  * ============================================================================
  *
- * This module handles all member-related operations including:
+ * This module handles all member and grievance data operations including:
  * - Member directory management
  * - Steward promotion/demotion
  * - Member ID generation and validation
  * - Member data sync
+ * - Grievance tracking and management
  *
- * @fileoverview Member directory operations and steward management
- * @version 3.6.0
- * @requires 01_Constants.gs
+ * @fileoverview Member directory and grievance data operations
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================
@@ -5338,11 +5340,11 @@ function showExportMembersDialog() {
  * - Batch recalculation of deadlines
  *
  * SEPARATION OF CONCERNS: This file contains ONLY grievance business logic.
- * UI components are in UIService.gs, integrations in Integrations.gs.
+ * UI components are in 04a_UIMenus.gs, integrations in 05_Integrations.gs.
  *
  * @fileoverview Grievance lifecycle management
- * @version 2.0.0
- * @requires Constants.gs
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================
@@ -9204,28 +9206,26 @@ function getAdvancedSearchHtml() {
 
 
 // ============================================================================
-// SOURCE: 04a_UIMenus.gs (913 lines)
+// SOURCE: 04a_UIMenus.gs (911 lines)
 // ============================================================================
 
 /**
  * ============================================================================
- * UIService.gs - Unified Interface Logic
+ * 04a_UIMenus.gs - Menu System & Navigation
  * ============================================================================
  *
- * This module handles all user interface components including:
- * - Search dialogs (desktop and mobile)
- * - Multi-select editors
+ * This module handles menu creation and navigation including:
+ * - Menu bar creation and organization
+ * - Navigation sidebar
  * - Quick action menus
- * - Sidebars and modal dialogs
- * - Theme management
- * - HTML generation utilities
+ * - Visual control panel dialogs
  *
  * SEPARATION OF CONCERNS: This file contains ONLY UI/presentation logic.
  * All business logic should remain in their respective modules.
  *
- * @fileoverview UI components and dialog management
- * @version 2.0.0
- * @requires Constants.gs
+ * @fileoverview Menu system, navigation, and dialog management
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================
@@ -38888,7 +38888,7 @@ function unfreezeAllColumns() {
 
 
 // ============================================================================
-// SOURCE: 10d_SyncAndMaintenance.gs (1517 lines)
+// SOURCE: 10d_SyncAndMaintenance.gs (1518 lines)
 // ============================================================================
 
 // ============================================================================
@@ -39507,8 +39507,9 @@ function sortGrievanceLogByStatus() {
   var lastRow = sheet.getLastRow();
   if (lastRow < 3) return; // Need at least 2 data rows to sort
 
-  // Get all data (excluding header row)
-  var dataRange = sheet.getRange(2, 1, lastRow - 1, 34);
+  // Get all data (excluding header row) - use actual column count to avoid truncation
+  var lastCol = sheet.getLastColumn();
+  var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
   var data = dataRange.getValues();
 
   // Sort with Message Alert first, then by status priority
@@ -39570,7 +39571,7 @@ function applyMessageAlertHighlighting_(sheet, lastRow) {
 
   for (var i = 0; i < alertValues.length; i++) {
     var row = i + 2;
-    var rowRange = sheet.getRange(row, 1, 1, 34);
+    var rowRange = sheet.getRange(row, 1, 1, sheet.getLastColumn());
 
     if (alertValues[i][0] === true) {
       // Highlight the entire row
@@ -42149,7 +42150,7 @@ function importMembersFromText(text) {
     throw new Error('Member Directory sheet not found');
   }
 
-  const lines = text.split('\\n').filter(line => line.trim());
+  const lines = text.split('\n').filter(line => line.trim());
   let imported = 0;
 
   for (const line of lines) {
@@ -50056,7 +50057,7 @@ function getLookerStatus() {
 
 
 // ============================================================================
-// SOURCE: 13_MemberSelfService.gs (1658 lines)
+// SOURCE: 13_MemberSelfService.gs (1657 lines)
 // ============================================================================
 
 /**
@@ -51195,8 +51196,7 @@ function getMemberGrievances(sessionToken) {
         filedDate: formatDateMSS_(data[i][GRIEVANCE_COLS.DATE_FILED - 1]),
         steward: data[i][GRIEVANCE_COLS.STEWARD - 1] || '',
         nextDeadline: formatDateMSS_(data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1]),
-        resolution: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '',
-        outcome: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || ''
+        resolution: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || ''
       });
     }
   }
@@ -51240,7 +51240,7 @@ function getMemberSelfServicePortalHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Member Self-Service Portal</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0}' +
@@ -51630,7 +51630,7 @@ function getMemberSelfServicePortalHtml() {
     '    html+="<div class=\\"grievance-detail\\"><strong>Steward:</strong> "+escapeHtml(g.steward||"Not assigned")+"</div>";' +
     '    if(g.nextDeadline)html+="<div class=\\"grievance-detail\\"><strong>Next Deadline:</strong> "+escapeHtml(g.nextDeadline)+"</div>";' +
     '    if(g.resolution)html+="<div class=\\"grievance-detail\\" style=\\"margin-top:10px;padding-top:10px;border-top:1px solid #e0e0e0\\"><strong>Resolution:</strong> "+escapeHtml(g.resolution)+"</div>";' +
-    '    if(g.outcome)html+="<div class=\\"grievance-detail\\"><strong>Outcome:</strong> "+escapeHtml(g.outcome)+"</div>";' +
+    '    if(g.resolution)html+="<div class=\\"grievance-detail\\"><strong>Resolution:</strong> "+escapeHtml(g.resolution)+"</div>";' +
     '    html+="</div>";' +
     '  });' +
     '  document.getElementById("grievancesContent").innerHTML=html;' +

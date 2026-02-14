@@ -1134,8 +1134,7 @@ function getMemberGrievances(sessionToken) {
         filedDate: formatDateMSS_(data[i][GRIEVANCE_COLS.DATE_FILED - 1]),
         steward: data[i][GRIEVANCE_COLS.STEWARD - 1] || '',
         nextDeadline: formatDateMSS_(data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1]),
-        resolution: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '',
-        outcome: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || ''
+        resolution: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || ''
       });
     }
   }
@@ -1179,7 +1178,7 @@ function getMemberSelfServicePortalHtml() {
   return '<!DOCTYPE html>' +
     '<html><head>' +
     '<meta charset="UTF-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">' +
     '<title>Member Self-Service Portal</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0}' +
@@ -1569,7 +1568,7 @@ function getMemberSelfServicePortalHtml() {
     '    html+="<div class=\\"grievance-detail\\"><strong>Steward:</strong> "+escapeHtml(g.steward||"Not assigned")+"</div>";' +
     '    if(g.nextDeadline)html+="<div class=\\"grievance-detail\\"><strong>Next Deadline:</strong> "+escapeHtml(g.nextDeadline)+"</div>";' +
     '    if(g.resolution)html+="<div class=\\"grievance-detail\\" style=\\"margin-top:10px;padding-top:10px;border-top:1px solid #e0e0e0\\"><strong>Resolution:</strong> "+escapeHtml(g.resolution)+"</div>";' +
-    '    if(g.outcome)html+="<div class=\\"grievance-detail\\"><strong>Outcome:</strong> "+escapeHtml(g.outcome)+"</div>";' +
+    '    if(g.resolution)html+="<div class=\\"grievance-detail\\"><strong>Resolution:</strong> "+escapeHtml(g.resolution)+"</div>";' +
     '    html+="</div>";' +
     '  });' +
     '  document.getElementById("grievancesContent").innerHTML=html;' +

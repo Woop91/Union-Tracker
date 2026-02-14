@@ -1734,7 +1734,7 @@ function importMembersFromText(text) {
     throw new Error('Member Directory sheet not found');
   }
 
-  const lines = text.split('\\n').filter(line => line.trim());
+  const lines = text.split('\n').filter(line => line.trim());
   let imported = 0;
 
   for (const line of lines) {
