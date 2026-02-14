@@ -75,20 +75,30 @@ var DataAccess = {
   getSheet: function(sheetName) {
     if (!sheetName) return null;
 
-    // Check sheet cache
+    // Check sheet cache - verify cached sheet is still valid
     if (_spreadsheetCache.sheets[sheetName]) {
-      return _spreadsheetCache.sheets[sheetName];
+      try {
+        // Verify the cached sheet reference is still valid
+        _spreadsheetCache.sheets[sheetName].getName();
+        return _spreadsheetCache.sheets[sheetName];
+      } catch (_e) {
+        // Cached reference is stale (sheet may have been deleted/renamed)
+        delete _spreadsheetCache.sheets[sheetName];
+      }
     }
 
     // Get from spreadsheet
     var ss = this.getSpreadsheet();
-    var sheet = ss.getSheetByName(sheetName);
-
-    if (sheet) {
-      _spreadsheetCache.sheets[sheetName] = sheet;
+    try {
+      var sheet = ss.getSheetByName(sheetName);
+      if (sheet) {
+        _spreadsheetCache.sheets[sheetName] = sheet;
+      }
+      return sheet;
+    } catch (e) {
+      Logger.log('Error accessing sheet "' + sheetName + '": ' + e.message);
+      return null;
     }
-
-    return sheet;
   },
 
   /**

@@ -562,7 +562,8 @@ var COMMAND_CONFIG = {
     HEADER_TEXT: '#ffffff',
     ALT_ROW: '#f8fafc',
     FONT: 'Roboto',
-    FONT_SIZE: 10
+    FONT_SIZE: 10,
+    HEADER_SIZE: 11
   },
 
   // Status Color Mapping for Auto-Styling (matches DEFAULT_CONFIG.GRIEVANCE_STATUS)
@@ -951,7 +952,7 @@ var MENU_ICONS = {
 };
 
 // ============================================================================
-// MEMBER DIRECTORY COLUMNS (39 columns total: A-AM)
+// MEMBER DIRECTORY COLUMNS (40 columns total: A-AN)
 // ============================================================================
 
 /**
@@ -966,35 +967,35 @@ var MEMBER_COLS = {
   LAST_NAME: 3,                    // C
   JOB_TITLE: 4,                    // D
 
-  // Section 2: Location & Work (E-G)
+  // Section 2: Location & Work (E-H)
   WORK_LOCATION: 5,                // E
   UNIT: 6,                         // F
-  OFFICE_DAYS: 7,                  // G - Multi-select: days member works in office
+  CUBICLE: 7,                      // G - Cubicle / workspace ID (hidden by default)
+  OFFICE_DAYS: 8,                  // H - Multi-select: days member works in office
 
-  // Section 3: Contact Information (H-K)
-  EMAIL: 8,                        // H
-  PHONE: 9,                        // I
-  PREFERRED_COMM: 10,              // J - Multi-select: preferred communication methods
-  BEST_TIME: 11,                   // K - Multi-select: best times to reach member
+  // Section 3: Contact Information (I-L)
+  EMAIL: 9,                        // I
+  PHONE: 10,                       // J
+  PREFERRED_COMM: 11,              // K - Multi-select: preferred communication methods
+  BEST_TIME: 12,                   // L - Multi-select: best times to reach member
 
-  // Section 4: Organizational Structure (L-P)
-  SUPERVISOR: 12,                  // L
-  MANAGER: 13,                     // M
-  IS_STEWARD: 14,                  // N
-  COMMITTEES: 15,                  // O - Multi-select: which committees steward is in
-  ASSIGNED_STEWARD: 16,            // P - Multi-select: assigned steward(s)
+  // Section 4: Organizational Structure (M-Q)
+  SUPERVISOR: 13,                  // M
+  MANAGER: 14,                     // N
+  IS_STEWARD: 15,                  // O
+  COMMITTEES: 16,                  // P - Multi-select: which committees steward is in
+  ASSIGNED_STEWARD: 17,            // Q - Multi-select: assigned steward(s)
 
-  // Section 5: Engagement Metrics (Q-T) - Hidden by default
-  LAST_VIRTUAL_MTG: 17,            // Q
-  LAST_INPERSON_MTG: 18,           // R
-  OPEN_RATE: 19,                   // S
-  VOLUNTEER_HOURS: 20,             // T
+  // Section 5: Engagement Metrics (R-U) - Hidden by default
+  LAST_VIRTUAL_MTG: 18,            // R
+  LAST_INPERSON_MTG: 19,           // S
+  OPEN_RATE: 20,                   // T
+  VOLUNTEER_HOURS: 21,             // U
 
-  // Section 6: Member Interests (U-X) - Hidden by default
-  INTEREST_LOCAL: 21,              // U
-  INTEREST_CHAPTER: 22,            // V
-  INTEREST_ALLIED: 23,             // W
-  HOME_TOWN: 24,                   // X - Connection building
+  // Section 6: Member Interests (V-X) - Hidden by default
+  INTEREST_LOCAL: 22,              // V
+  INTEREST_CHAPTER: 23,            // W
+  INTEREST_ALLIED: 24,             // X
 
   // Section 7: Steward Contact Tracking (Y-AA)
   RECENT_CONTACT_DATE: 25,         // Y
@@ -1034,7 +1035,7 @@ var MEMBER_COLS = {
  * unless explicitly authorized. Includes mailing address fields.
  * @const {Array<number>}
  */
-var PII_MEMBER_COLS = [37, 38, 39]; // STREET_ADDRESS (AK), CITY (AL), STATE (AM)
+var PII_MEMBER_COLS = [37, 38, 39]; // STREET_ADDRESS, CITY, STATE
 
 // ============================================================================
 // MEETING CHECK-IN LOG COLUMNS (16 columns: A-P)
@@ -1075,7 +1076,7 @@ var MEETING_STATUS = {
 };
 
 // ============================================================================
-// GRIEVANCE LOG COLUMNS (42 columns total: A-AP)
+// GRIEVANCE LOG COLUMNS (41 columns total: A-AO)
 // ============================================================================
 
 /**
@@ -1123,40 +1124,39 @@ var GRIEVANCE_COLS = {
   ARTICLES: 22,           // V - Articles Violated
   ISSUE_CATEGORY: 23,     // W - Issue Category
 
-  // Section 9: Contact & Location (X-AA)
+  // Section 9: Contact & Location (X-Z)
   MEMBER_EMAIL: 24,       // X - Member Email
-  UNIT: 25,               // Y - Unit
-  LOCATION: 26,           // Z - Work Location (Site)
-  STEWARD: 27,            // AA - Assigned Steward (Name)
+  LOCATION: 25,           // Y - Work Location (Site)
+  STEWARD: 26,            // Z - Assigned Steward (Name)
 
-  // Section 10: Resolution (AB)
-  RESOLUTION: 28,         // AB - Resolution Summary
+  // Section 10: Resolution (AA)
+  RESOLUTION: 27,         // AA - Resolution Summary
 
-  // Section 11: Coordinator Notifications (AC-AF)
-  MESSAGE_ALERT: 29,      // AC - Message Alert checkbox
-  COORDINATOR_MESSAGE: 30,// AD - Coordinator's message text
-  ACKNOWLEDGED_BY: 31,    // AE - Steward who acknowledged
-  ACKNOWLEDGED_DATE: 32,  // AF - When steward acknowledged
+  // Section 11: Coordinator Notifications (AB-AE)
+  MESSAGE_ALERT: 28,      // AB - Message Alert checkbox
+  COORDINATOR_MESSAGE: 29,// AC - Coordinator's message text
+  ACKNOWLEDGED_BY: 30,    // AD - Steward who acknowledged
+  ACKNOWLEDGED_DATE: 31,  // AE - When steward acknowledged
 
-  // Section 12: Drive Integration (AG-AH)
-  DRIVE_FOLDER_ID: 33,    // AG - Google Drive folder ID
-  DRIVE_FOLDER_URL: 34,   // AH - Google Drive folder URL
+  // Section 12: Drive Integration (AF-AG)
+  DRIVE_FOLDER_ID: 32,    // AF - Google Drive folder ID
+  DRIVE_FOLDER_URL: 33,   // AG - Google Drive folder URL
 
-  // Section 13: Quick Actions (AI)
-  QUICK_ACTIONS: 35,      // AI - Checkbox to open Quick Actions dialog
+  // Section 13: Quick Actions (AH)
+  QUICK_ACTIONS: 34,      // AH - Checkbox to open Quick Actions dialog
 
-  // Section 14: Action Type & Checklist (AJ-AK)
-  ACTION_TYPE: 36,        // AJ - Action Type (Grievance, Records Request, etc.)
-  CHECKLIST_PROGRESS: 37, // AK - Checklist Progress (e.g., "5/8" or "62%")
+  // Section 14: Action Type & Checklist (AI-AJ)
+  ACTION_TYPE: 35,        // AI - Action Type (Grievance, Records Request, etc.)
+  CHECKLIST_PROGRESS: 36, // AJ - Checklist Progress (e.g., "5/8" or "62%")
 
-  // Section 15: Reminders (AL-AO) - For scheduling meetings/follow-ups
-  REMINDER_1_DATE: 38,    // AL - First reminder date
-  REMINDER_1_NOTE: 39,    // AM - First reminder note (e.g., "Schedule Step II meeting")
-  REMINDER_2_DATE: 40,    // AN - Second reminder date
-  REMINDER_2_NOTE: 41,    // AO - Second reminder note
+  // Section 15: Reminders (AK-AN) - For scheduling meetings/follow-ups
+  REMINDER_1_DATE: 37,    // AK - First reminder date
+  REMINDER_1_NOTE: 38,    // AL - First reminder note (e.g., "Schedule Step II meeting")
+  REMINDER_2_DATE: 39,    // AM - Second reminder date
+  REMINDER_2_NOTE: 40,    // AN - Second reminder note
 
-  // Section 16: Record Tracking (AP)
-  LAST_UPDATED: 42        // AP - Last Updated timestamp (auto-set on edit)
+  // Section 16: Record Tracking (AO)
+  LAST_UPDATED: 41        // AO - Last Updated timestamp (auto-set on edit)
 };
 
 // ============================================================================
@@ -1214,7 +1214,7 @@ var GRIEVANCE_COLUMNS = {
   // Calculated metrics (0-indexed)
   DAYS_OPEN: 18,           // S - Days Open
   NEXT_ACTION_DUE: 19,     // T - Next Action Due
-  LAST_UPDATED: 41,        // Alias for RECORD_LAST_UPDATED (AP)
+  LAST_UPDATED: 40,        // Alias for RECORD_LAST_UPDATED (AO)
   DAYS_TO_DEADLINE: 20,    // U - Days to Deadline
 
   // Case details (0-indexed)
@@ -1225,41 +1225,40 @@ var GRIEVANCE_COLUMNS = {
 
   // Contact & Location (0-indexed)
   MEMBER_EMAIL: 23,        // X - Member Email
-  UNIT: 24,                // Y - Unit
-  LOCATION: 25,            // Z - Work Location
-  STEWARD: 26,             // AA - Assigned Steward
+  LOCATION: 24,            // Y - Work Location
+  STEWARD: 25,             // Z - Assigned Steward
 
   // Resolution (0-indexed)
-  RESOLUTION: 27,          // AB - Resolution Summary
-  OUTCOME: 27,             // Alias for RESOLUTION
-  NOTES: 27,               // Alias for RESOLUTION (used for notes)
+  RESOLUTION: 26,          // AA - Resolution Summary
+  OUTCOME: 26,             // Alias for RESOLUTION
+  NOTES: 26,               // Alias for RESOLUTION (used for notes)
 
   // Coordinator (0-indexed)
-  MESSAGE_ALERT: 28,       // AC - Message Alert
-  COORDINATOR_MESSAGE: 29, // AD - Coordinator Message
-  ACKNOWLEDGED_BY: 30,     // AE - Acknowledged By
-  ACKNOWLEDGED_DATE: 31,   // AF - Acknowledged Date
+  MESSAGE_ALERT: 27,       // AB - Message Alert
+  COORDINATOR_MESSAGE: 28, // AC - Coordinator Message
+  ACKNOWLEDGED_BY: 29,     // AD - Acknowledged By
+  ACKNOWLEDGED_DATE: 30,   // AE - Acknowledged Date
 
   // Drive (0-indexed)
-  DRIVE_FOLDER_ID: 32,     // AG - Drive Folder ID
-  DRIVE_FOLDER_URL: 33,    // AH - Drive Folder URL
-  DRIVE_FOLDER: 33,        // Alias for DRIVE_FOLDER_URL
+  DRIVE_FOLDER_ID: 31,     // AF - Drive Folder ID
+  DRIVE_FOLDER_URL: 32,    // AG - Drive Folder URL
+  DRIVE_FOLDER: 32,        // Alias for DRIVE_FOLDER_URL
 
   // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 34,       // AI - Quick Actions
+  QUICK_ACTIONS: 33,       // AH - Quick Actions
 
   // Action Type & Checklist (0-indexed)
-  ACTION_TYPE: 35,         // AJ - Action Type
-  CHECKLIST_PROGRESS: 36,  // AK - Checklist Progress
+  ACTION_TYPE: 34,         // AI - Action Type
+  CHECKLIST_PROGRESS: 35,  // AJ - Checklist Progress
 
   // Reminders (0-indexed)
-  REMINDER_1_DATE: 37,     // AL - First reminder date
-  REMINDER_1_NOTE: 38,     // AM - First reminder note
-  REMINDER_2_DATE: 39,     // AN - Second reminder date
-  REMINDER_2_NOTE: 40,     // AO - Second reminder note
+  REMINDER_1_DATE: 36,     // AK - First reminder date
+  REMINDER_1_NOTE: 37,     // AL - First reminder note
+  REMINDER_2_DATE: 38,     // AM - Second reminder date
+  REMINDER_2_NOTE: 39,     // AN - Second reminder note
 
   // Record Tracking (0-indexed)
-  RECORD_LAST_UPDATED: 41  // AP - Last Updated timestamp
+  RECORD_LAST_UPDATED: 40  // AO - Last Updated timestamp
 };
 
 /**
@@ -1281,32 +1280,32 @@ var MEMBER_COLUMNS = {
   WORK_LOCATION: 4,        // E - Work Location
   LOCATION: 4,             // Alias
   UNIT: 5,                 // F - Unit
-  OFFICE_DAYS: 6,          // G - Office Days
+  CUBICLE: 6,              // G - Cubicle (hidden)
+  OFFICE_DAYS: 7,          // H - Office Days
 
   // Contact (0-indexed)
-  EMAIL: 7,                // H - Email
-  PHONE: 8,                // I - Phone
-  PREFERRED_COMM: 9,       // J - Preferred Communication
-  BEST_TIME: 10,           // K - Best Time to Contact
+  EMAIL: 8,                // I - Email
+  PHONE: 9,                // J - Phone
+  PREFERRED_COMM: 10,      // K - Preferred Communication
+  BEST_TIME: 11,           // L - Best Time to Contact
 
   // Organization (0-indexed)
-  SUPERVISOR: 11,          // L - Supervisor
-  MANAGER: 12,             // M - Manager
-  IS_STEWARD: 13,          // N - Is Steward
-  COMMITTEES: 14,          // O - Committees
-  ASSIGNED_STEWARD: 15,    // P - Assigned Steward
+  SUPERVISOR: 12,          // M - Supervisor
+  MANAGER: 13,             // N - Manager
+  IS_STEWARD: 14,          // O - Is Steward
+  COMMITTEES: 15,          // P - Committees
+  ASSIGNED_STEWARD: 16,    // Q - Assigned Steward
 
   // Engagement (0-indexed)
-  LAST_VIRTUAL_MTG: 16,    // Q - Last Virtual Meeting
-  LAST_INPERSON_MTG: 17,   // R - Last In-Person Meeting
-  OPEN_RATE: 18,           // S - Open Rate
-  VOLUNTEER_HOURS: 19,     // T - Volunteer Hours
+  LAST_VIRTUAL_MTG: 17,    // R - Last Virtual Meeting
+  LAST_INPERSON_MTG: 18,   // S - Last In-Person Meeting
+  OPEN_RATE: 19,           // T - Open Rate
+  VOLUNTEER_HOURS: 20,     // U - Volunteer Hours
 
   // Interests (0-indexed)
-  INTEREST_LOCAL: 20,      // U - Interest in Local
-  INTEREST_CHAPTER: 21,    // V - Interest in Chapter
-  INTEREST_ALLIED: 22,     // W - Interest in Allied
-  HOME_TOWN: 23,           // X - Home Town
+  INTEREST_LOCAL: 21,      // V - Interest in Local
+  INTEREST_CHAPTER: 22,    // W - Interest in Chapter
+  INTEREST_ALLIED: 23,     // X - Interest in Allied
 
   // Contact Tracking (0-indexed)
   RECENT_CONTACT_DATE: 24, // Y - Recent Contact Date
@@ -1745,11 +1744,11 @@ function mapGrievanceRow(row) {
 function getMemberHeaders() {
   return [
     'Member ID', 'First Name', 'Last Name', 'Job Title',
-    'Work Location', 'Unit', 'Office Days',
+    'Work Location', 'Unit', 'Cubicle', 'Office Days',
     'Email', 'Phone', 'Preferred Communication', 'Best Time to Contact',
     'Supervisor', 'Manager', 'Is Steward', 'Committees', 'Assigned Steward',
     'Last Virtual Mtg', 'Last In-Person Mtg', 'Open Rate %', 'Volunteer Hours',
-    'Interest: Local', 'Interest: Chapter', 'Interest: Allied', 'Home Town',
+    'Interest: Local', 'Interest: Chapter', 'Interest: Allied',
     'Recent Contact Date', 'Contact Steward', 'Contact Notes',
     'Has Open Grievance?', 'Grievance Status', 'Days to Deadline', 'Start Grievance',
     '⚡ Actions',
@@ -1773,7 +1772,7 @@ function getGrievanceHeaders() {
     'Step III Appeal Due', 'Step III Appeal Filed', 'Date Closed',
     'Days Open', 'Next Action Due', 'Days to Deadline',
     'Articles Violated', 'Issue Category',
-    'Member Email', 'Unit', 'Work Location', 'Assigned Steward',
+    'Member Email', 'Work Location', 'Assigned Steward',
     'Resolution',
     'Message Alert', 'Coordinator Message', 'Acknowledged By', 'Acknowledged Date',
     'Drive Folder ID', 'Drive Folder URL',

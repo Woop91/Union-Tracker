@@ -77,6 +77,8 @@ function createDashboardMenu() {
 
     .addSeparator()
     .addItem('⚡ Quick Actions', 'showQuickActionsMenu')
+    .addItem('📅 Open Google Calendar', 'openGoogleCalendar')
+    .addItem('📁 Open Google Drive', 'openGoogleDrive')
     .addItem('📖 Help & Documentation', 'showHelpDialog')
     .addToUi();
 
@@ -110,11 +112,12 @@ function createDashboardMenu() {
 
     .addSubMenu(ui.createMenu('🎛️ View & Display')
       .addItem('🎛️ Visual Control Panel', 'showVisualControlPanel')
-      .addItem('📱 Toggle Mobile View', 'toggleMobileView')
-      .addItem('📱 Pocket View', 'navToMobile')
-      .addItem('🖥️ Restore Desktop View', 'showAllMemberColumns')
+      .addItem('📱 Toggle Pocket View', 'toggleMobileView')
+      .addItem('📱 Pocket View (Active Sheet)', 'navToMobile')
+      .addItem('🖥️ Restore All Columns', 'showAllColumns')
       .addSeparator()
       .addItem('🎨 Apply Theme', 'APPLY_SYSTEM_THEME')
+      .addItem('🎨 Theme Presets', 'showThemePresetPicker')
       .addItem('🔄 Reset to Default', 'resetToDefaultTheme')
       .addItem('✨ Refresh All Visuals', 'refreshAllVisuals'))
 
@@ -303,6 +306,49 @@ function showConfirmation(message, title) {
  * @param {string} title - The dialog title
  * @returns {void}
  */
+/**
+ * Opens Google Calendar in a new browser tab
+ */
+function openGoogleCalendar() {
+  var html = HtmlService.createHtmlOutput(
+    '<script>window.open("https://calendar.google.com", "_blank");google.script.host.close();</script>'
+  ).setWidth(1).setHeight(1);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Opening Calendar...');
+}
+
+/**
+ * Opens Google Drive in a new browser tab
+ */
+function openGoogleDrive() {
+  var html = HtmlService.createHtmlOutput(
+    '<script>window.open("https://drive.google.com", "_blank");google.script.host.close();</script>'
+  ).setWidth(1).setHeight(1);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Opening Drive...');
+}
+
+/**
+ * Sets up theme-related columns and applies theme to all sheets.
+ * This is the handler for the "Setup Theme Columns" menu item.
+ */
+function setupThemeColumns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast('Applying theme to all sheets...', 'Theme Setup', 2);
+
+  try {
+    // Apply the system theme (header styling + alternating rows)
+    APPLY_SYSTEM_THEME();
+
+    // Apply tab colors
+    if (typeof applyTabColors_ === 'function') {
+      applyTabColors_(ss);
+    }
+
+    ss.toast('Theme columns and styling applied to all sheets!', 'Theme Setup Complete', 5);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Theme setup error: ' + e.message);
+  }
+}
+
 function showAlert(message, title) {
   SpreadsheetApp.getUi().alert(title || 'Alert', message, SpreadsheetApp.getUi().ButtonSet.OK);
 }
@@ -436,25 +482,180 @@ function applyThemeToSheet_(sheet) {
 
   if (lastCol < 1 || lastRow < 1) return;
 
+  // Get the active theme preset
+  var theme = getActiveThemePreset_();
+
   // Apply header styling (row 1)
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
   headerRange
-    .setBackground(COLORS.PRIMARY_PURPLE)
-    .setFontColor(COLORS.WHITE)
+    .setBackground(theme.headerBg)
+    .setFontColor(theme.headerText)
     .setFontWeight('bold')
+    .setFontFamily(theme.font)
+    .setFontSize(theme.headerSize)
     .setHorizontalAlignment('center');
 
-  // Apply alternating row colors for data rows
+  // Apply data row styling
   if (lastRow > 1) {
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    dataRange
+      .setFontFamily(theme.font)
+      .setFontSize(theme.fontSize);
+
+    // Apply alternating row colors
     for (var row = 2; row <= lastRow; row++) {
       var rowRange = sheet.getRange(row, 1, 1, lastCol);
       if (row % 2 === 0) {
-        rowRange.setBackground('#f1f5f9');
+        rowRange.setBackground(theme.altRow);
       } else {
         rowRange.setBackground('#ffffff');
       }
     }
   }
+}
+
+// ============================================================================
+// THEME PRESETS
+// ============================================================================
+
+/**
+ * Available theme presets that apply to all tabs
+ */
+var THEME_PRESETS = {
+  'default': {
+    name: 'Default (Dark Slate)',
+    headerBg: '#1e293b',
+    headerText: '#ffffff',
+    altRow: '#f8fafc',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'union-blue': {
+    name: 'Union Blue',
+    headerBg: '#1e40af',
+    headerText: '#ffffff',
+    altRow: '#eff6ff',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'forest': {
+    name: 'Forest Green',
+    headerBg: '#166534',
+    headerText: '#ffffff',
+    altRow: '#f0fdf4',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'charcoal': {
+    name: 'Charcoal',
+    headerBg: '#374151',
+    headerText: '#f9fafb',
+    altRow: '#f3f4f6',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'midnight': {
+    name: 'Midnight Purple',
+    headerBg: '#581c87',
+    headerText: '#ffffff',
+    altRow: '#faf5ff',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'crimson': {
+    name: 'Crimson',
+    headerBg: '#991b1b',
+    headerText: '#ffffff',
+    altRow: '#fef2f2',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'steel': {
+    name: 'Steel Gray',
+    headerBg: '#475569',
+    headerText: '#ffffff',
+    altRow: '#f1f5f9',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  },
+  'ocean': {
+    name: 'Ocean Teal',
+    headerBg: '#115e59',
+    headerText: '#ffffff',
+    altRow: '#f0fdfa',
+    font: 'Roboto',
+    fontSize: 10,
+    headerSize: 11
+  }
+};
+
+/**
+ * Gets the active theme preset based on saved settings
+ * @returns {Object} Theme preset with colors and font settings
+ * @private
+ */
+function getActiveThemePreset_() {
+  var themeKey = getCurrentTheme();
+  return THEME_PRESETS[themeKey] || THEME_PRESETS['default'];
+}
+
+/**
+ * Shows theme preset picker dialog
+ */
+function showThemePresetPicker() {
+  var currentTheme = getCurrentTheme();
+  var presetNames = Object.keys(THEME_PRESETS);
+  var html = '<html><head><style>' +
+    'body { font-family: Roboto, sans-serif; padding: 16px; }' +
+    '.preset { display: flex; align-items: center; padding: 10px; margin: 6px 0; border-radius: 6px; cursor: pointer; border: 2px solid #e5e7eb; }' +
+    '.preset:hover { border-color: #3b82f6; }' +
+    '.preset.active { border-color: #2563eb; background: #eff6ff; }' +
+    '.swatch { width: 32px; height: 32px; border-radius: 4px; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; }' +
+    '.name { font-weight: 500; }' +
+    '.btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 12px; }' +
+    '.btn-primary { background: #2563eb; color: white; }' +
+    '.btn-primary:hover { background: #1d4ed8; }' +
+    '</style></head><body>';
+
+  html += '<h3 style="margin-top:0">Choose Theme Preset</h3>';
+
+  for (var i = 0; i < presetNames.length; i++) {
+    var key = presetNames[i];
+    var preset = THEME_PRESETS[key];
+    var activeClass = key === currentTheme ? ' active' : '';
+    html += '<div class="preset' + activeClass + '" onclick="selectTheme(\'' + key + '\')">' +
+      '<div class="swatch" style="background:' + preset.headerBg + '">Aa</div>' +
+      '<div class="name">' + preset.name + '</div></div>';
+  }
+
+  html += '<script>' +
+    'function selectTheme(key) { google.script.run.withSuccessHandler(function() { google.script.host.close(); }).applyThemePreset(key); }' +
+    '</script></body></html>';
+
+  var output = HtmlService.createHtmlOutput(html).setWidth(340).setHeight(480);
+  SpreadsheetApp.getUi().showModalDialog(output, 'Theme Presets');
+}
+
+/**
+ * Applies a theme preset by key to all sheets
+ * @param {string} presetKey - Theme preset key from THEME_PRESETS
+ */
+function applyThemePreset(presetKey) {
+  if (!THEME_PRESETS[presetKey]) {
+    SpreadsheetApp.getActiveSpreadsheet().toast('Unknown theme preset: ' + presetKey, 'Error', 3);
+    return;
+  }
+
+  saveVisualSetting('theme', presetKey);
+  APPLY_SYSTEM_THEME();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Applied "' + THEME_PRESETS[presetKey].name + '" theme to all tabs!', 'Theme', 3);
 }
 
 /**
@@ -470,35 +671,9 @@ function applyGlobalStyling() {
  * @returns {void}
  */
 function resetToDefaultTheme() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheets = ss.getSheets();
-
-  sheets.forEach(function(sheet) {
-    var sheetName = sheet.getName();
-    if (sheetName.indexOf('_Calc') === 0) return;
-
-    var lastCol = sheet.getLastColumn();
-    var lastRow = sheet.getLastRow();
-
-    if (lastCol < 1 || lastRow < 1) return;
-
-    // Reset header to default
-    var headerRange = sheet.getRange(1, 1, 1, lastCol);
-    headerRange
-      .setBackground(COLORS.PRIMARY_PURPLE)
-      .setFontColor(COLORS.WHITE)
-      .setFontWeight('bold');
-
-    // Reset data rows to white
-    if (lastRow > 1) {
-      var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
-      dataRange
-        .setBackground('#ffffff')
-        .setFontColor('#1e293b');
-    }
-  });
-
-  ss.toast('Theme reset to default!', 'Theme', 3);
+  saveVisualSetting('theme', 'default');
+  APPLY_SYSTEM_THEME();
+  SpreadsheetApp.getActiveSpreadsheet().toast('Theme reset to default!', 'Theme', 3);
 }
 
 /**
@@ -873,17 +1048,44 @@ function undoADHDDefaults() {
  */
 function refreshAllVisuals() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var startTime = Date.now();
+  var MAX_RUNTIME_MS = 120000; // 2 minute safety limit
 
-  // Reapply theme
-  APPLY_SYSTEM_THEME();
+  ss.toast('Refreshing visuals...', 'Refresh', 2);
 
-  // Reapply ADHD settings if enabled
-  var settings = getADHDSettings();
-  if (settings.zebraStripes) {
-    applyZebraStripesToAllSheets_();
+  try {
+    // Reapply theme with timeout protection
+    var sheets = ss.getSheets();
+    var processed = 0;
+    for (var i = 0; i < sheets.length; i++) {
+      // Check timeout
+      if (Date.now() - startTime > MAX_RUNTIME_MS) {
+        ss.toast('Refresh stopped after processing ' + processed + '/' + sheets.length + ' sheets (timeout).', 'Refresh', 5);
+        return;
+      }
+
+      var sheetName = sheets[i].getName();
+      if (sheetName.indexOf('_Calc') === 0 || sheetName.indexOf('_Audit') === 0) continue;
+
+      try {
+        applyThemeToSheet_(sheets[i]);
+        processed++;
+      } catch (_e) {
+        Logger.log('Skipped theme for sheet: ' + sheetName + ': ' + _e.message);
+      }
+    }
+
+    // Reapply ADHD settings if enabled
+    var settings = getADHDSettings();
+    if (settings.zebraStripes) {
+      applyZebraStripesToAllSheets_();
+    }
+
+    ss.toast('All visuals refreshed! (' + processed + ' sheets)', 'Refresh', 3);
+  } catch (e) {
+    ss.toast('Refresh error: ' + e.message, 'Error', 5);
+    Logger.log('refreshAllVisuals error: ' + e.toString());
   }
-
-  ss.toast('All visuals refreshed!', 'Refresh', 3);
 }
 
 

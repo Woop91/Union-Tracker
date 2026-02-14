@@ -90,7 +90,7 @@ function createConfigSheet(ss) {
 
   // Apply column headers (Row 2)
   sheet.getRange(2, 1, 1, columnHeaders.length).setValues([columnHeaders])
-    .setBackground(COLORS.PRIMARY_PURPLE)
+    .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
     .setFontColor(COLORS.WHITE)
     .setFontWeight('bold')
     .setHorizontalAlignment('center');
@@ -534,13 +534,14 @@ function createConfigGuideSheet(ss) {
  */
 function createMemberDirectory(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEMBER_DIR);
-  sheet.clear();
-
-  var headers = getMemberHeaders();
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setBackground(COLORS.PRIMARY_PURPLE)
-    .setFontColor(COLORS.WHITE)
-    .setFontWeight('bold');
+  // getOrCreateSheet now preserves data - only set headers on empty sheets
+  if (sheet.getLastRow() <= 1) {
+    var headers = getMemberHeaders();
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+      .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+      .setFontColor(COLORS.WHITE)
+      .setFontWeight('bold');
+  }
 
   // Freeze header row
   sheet.setFrozenRows(1);
@@ -551,6 +552,9 @@ function createMemberDirectory(ss) {
   sheet.setColumnWidth(MEMBER_COLS.LAST_NAME, 120);
   sheet.setColumnWidth(MEMBER_COLS.EMAIL, 200);
   sheet.setColumnWidth(MEMBER_COLS.CONTACT_NOTES, 250);
+
+  // Hide Cubicle column by default
+  sheet.hideColumns(MEMBER_COLS.CUBICLE);
 
   // Add checkbox for Start Grievance column (pre-allocate for future rows)
   sheet.getRange(2, MEMBER_COLS.START_GRIEVANCE, 4999, 1).insertCheckboxes();
@@ -723,13 +727,14 @@ function createMemberDirectory(ss) {
  */
 function createGrievanceLog(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.GRIEVANCE_LOG);
-  sheet.clear();
-
-  var headers = getGrievanceHeaders();
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
-    .setBackground(COLORS.PRIMARY_PURPLE)
-    .setFontColor(COLORS.WHITE)
-    .setFontWeight('bold');
+  // getOrCreateSheet now preserves data - only set headers on empty sheets
+  if (sheet.getLastRow() <= 1) {
+    var headers = getGrievanceHeaders();
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+      .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
+      .setFontColor(COLORS.WHITE)
+      .setFontWeight('bold');
+  }
 
   // Freeze header row
   sheet.setFrozenRows(1);

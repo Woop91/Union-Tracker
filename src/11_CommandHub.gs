@@ -117,57 +117,40 @@ function navigateToMobileView() {
 }
 
 /**
- * v4.0 Mobile/Pocket View Navigation
- * Optimizes the Member Directory for smartphone viewing by hiding non-essential columns.
- * Shows only: Member ID, Name, Status, Phone for quick field access.
+ * v4.6 Pocket View Navigation
+ * Detects current sheet (Member Directory or Grievance Log) and applies
+ * appropriate pocket view by hiding non-essential columns.
  *
- * Call showAllMemberColumns() to restore full view.
+ * Member Directory pocket view HIDES: PIN Hash, Employee ID, Hire Date, Department
+ * Member Directory pocket view SHOWS: First Name, Last Name, Email, Phone,
+ *   Recent Contact Date, Contact Steward, Contact Notes, and more
+ *
+ * Grievance Log pocket view HIDES: Grievance ID, Member ID, Articles Violated,
+ *   Issue Category, Work Location, Resolution, Checklist Progress,
+ *   Reminder 1 Date, Reminder 1 Note, Reminder 2 Date, Reminder 2 Note, Last Updated
+ *
+ * Call showAllColumns() to restore full view.
  */
 function navToMobile() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var activeSheet = ss.getActiveSheet();
+  var activeSheetName = activeSheet.getName();
 
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Member Directory not found');
-    return;
-  }
-
-  // Mobile Optimization: Hide non-essential columns for phone view
-  // Keep visible: A (Member ID), B (First Name), C (Last Name), I (Phone), N (Is Steward)
-  // Hide columns D-H (Job, Location, Unit, Office Days, Email) - columns 4-8
-  // Hide columns J-M (Preferred Comm to Manager) - columns 10-13
-  // Hide columns O-AF (Committees to Quick Actions) - columns 15-32
-
-  try {
-    // Hide columns 4-8 (D-H)
-    if (sheet.getMaxColumns() >= 8) {
-      sheet.hideColumns(4, 5);  // Hide 5 columns starting at column 4
-    }
-
-    // Hide columns 10-13 (J-M)
-    if (sheet.getMaxColumns() >= 13) {
-      sheet.hideColumns(10, 4);  // Hide 4 columns starting at column 10
-    }
-
-    // Hide columns 15-32 (O-AF) if they exist
-    if (sheet.getMaxColumns() >= 32) {
-      sheet.hideColumns(15, 18);  // Hide 18 columns starting at column 15
-    } else if (sheet.getMaxColumns() >= 15) {
-      sheet.hideColumns(15, sheet.getMaxColumns() - 14);
-    }
-
-    sheet.activate();
-    ss.toast('📱 Mobile View Optimized. Essential columns visible for phone access.', COMMAND_CONFIG.SYSTEM_NAME, 5);
-  } catch (e) {
-    SpreadsheetApp.getUi().alert('Error enabling mobile view: ' + e.message);
+  // Determine which sheet to apply pocket view to
+  if (activeSheetName === SHEETS.GRIEVANCE_LOG) {
+    applyGrievancePocketView_();
+  } else {
+    applyMemberPocketView_();
   }
 }
 
 /**
- * v4.0 Restore Full View
- * Shows all columns in Member Directory after Mobile View was enabled.
+ * Applies pocket view to Member Directory
+ * Hides: PIN Hash, Employee ID, Hire Date, Department
+ * Shows: Name, Email, Phone, Recent Contact Date, Contact Steward, Contact Notes
+ * @private
  */
-function showAllMemberColumns() {
+function applyMemberPocketView_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -177,9 +160,131 @@ function showAllMemberColumns() {
   }
 
   try {
-    // Show all columns
+    // First show all columns, then hide specific ones
     sheet.showColumns(1, sheet.getMaxColumns());
-    ss.toast('✅ All columns restored.', COMMAND_CONFIG.SYSTEM_NAME, 3);
+
+    // Columns to HIDE in pocket view:
+    // PIN Hash, Employee ID, Hire Date, Department
+    var colsToHide = [
+      MEMBER_COLS.PIN_HASH,       // AG - PIN Hash
+      MEMBER_COLS.EMPLOYEE_ID,    // AH - Employee ID
+      MEMBER_COLS.HIRE_DATE,      // AJ - Hire Date
+      MEMBER_COLS.DEPARTMENT      // AI - Department
+    ];
+
+    // Also hide: Cubicle (already hidden), Engagement metrics, Interests, PII
+    colsToHide.push(MEMBER_COLS.CUBICLE);           // Cubicle
+    colsToHide.push(MEMBER_COLS.LAST_VIRTUAL_MTG);  // Last Virtual Mtg
+    colsToHide.push(MEMBER_COLS.LAST_INPERSON_MTG); // Last In-Person Mtg
+    colsToHide.push(MEMBER_COLS.OPEN_RATE);          // Open Rate
+    colsToHide.push(MEMBER_COLS.VOLUNTEER_HOURS);    // Volunteer Hours
+    colsToHide.push(MEMBER_COLS.INTEREST_LOCAL);     // Interest: Local
+    colsToHide.push(MEMBER_COLS.INTEREST_CHAPTER);   // Interest: Chapter
+    colsToHide.push(MEMBER_COLS.INTEREST_ALLIED);    // Interest: Allied
+    colsToHide.push(MEMBER_COLS.STREET_ADDRESS);     // Street Address (PII)
+    colsToHide.push(MEMBER_COLS.CITY);               // City (PII)
+    colsToHide.push(MEMBER_COLS.STATE);              // State (PII)
+
+    // Hide each column individually
+    for (var i = 0; i < colsToHide.length; i++) {
+      if (colsToHide[i] <= sheet.getMaxColumns()) {
+        sheet.hideColumns(colsToHide[i]);
+      }
+    }
+
+    sheet.activate();
+    ss.toast('Pocket View: Member Directory. Key columns visible for quick access.', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error enabling pocket view: ' + e.message);
+  }
+}
+
+/**
+ * Applies pocket view to Grievance Log
+ * Hides: Grievance ID, Member ID, Articles Violated, Issue Category,
+ *   Work Location, Resolution, Checklist Progress,
+ *   Reminder 1 Date, Reminder 1 Note, Reminder 2 Date, Reminder 2 Note, Last Updated
+ * @private
+ */
+function applyGrievancePocketView_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Grievance Log not found');
+    return;
+  }
+
+  try {
+    // First show all columns, then hide specific ones
+    sheet.showColumns(1, sheet.getMaxColumns());
+
+    // Columns to HIDE in grievance pocket view:
+    var colsToHide = [
+      GRIEVANCE_COLS.GRIEVANCE_ID,       // Grievance ID
+      GRIEVANCE_COLS.MEMBER_ID,          // Member ID
+      GRIEVANCE_COLS.ARTICLES,           // Articles Violated
+      GRIEVANCE_COLS.ISSUE_CATEGORY,     // Issue Category
+      GRIEVANCE_COLS.LOCATION,           // Work Location
+      GRIEVANCE_COLS.RESOLUTION,         // Resolution
+      GRIEVANCE_COLS.CHECKLIST_PROGRESS, // Checklist Progress
+      GRIEVANCE_COLS.REMINDER_1_DATE,    // Reminder 1 Date
+      GRIEVANCE_COLS.REMINDER_1_NOTE,    // Reminder 1 Note
+      GRIEVANCE_COLS.REMINDER_2_DATE,    // Reminder 2 Date
+      GRIEVANCE_COLS.REMINDER_2_NOTE,    // Reminder 2 Note
+      GRIEVANCE_COLS.LAST_UPDATED        // Last Updated
+    ];
+
+    for (var i = 0; i < colsToHide.length; i++) {
+      if (colsToHide[i] <= sheet.getMaxColumns()) {
+        sheet.hideColumns(colsToHide[i]);
+      }
+    }
+
+    sheet.activate();
+    ss.toast('Pocket View: Grievance Log. Essential columns visible.', COMMAND_CONFIG.SYSTEM_NAME, 5);
+  } catch (e) {
+    SpreadsheetApp.getUi().alert('Error enabling pocket view: ' + e.message);
+  }
+}
+
+/**
+ * Restore Full View
+ * Shows all columns on the active sheet (Member Directory or Grievance Log).
+ */
+function showAllMemberColumns() {
+  showAllColumns();
+}
+
+/**
+ * Restore all columns for the active sheet
+ */
+function showAllColumns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var activeSheet = ss.getActiveSheet();
+  var activeSheetName = activeSheet.getName();
+
+  // Restore on the active sheet
+  var sheet = activeSheet;
+  if (activeSheetName !== SHEETS.MEMBER_DIR && activeSheetName !== SHEETS.GRIEVANCE_LOG) {
+    // Default to Member Directory
+    sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  }
+
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Sheet not found');
+    return;
+  }
+
+  try {
+    sheet.showColumns(1, sheet.getMaxColumns());
+
+    // Re-hide Cubicle column in Member Directory (always hidden)
+    if (sheet.getName() === SHEETS.MEMBER_DIR) {
+      sheet.hideColumns(MEMBER_COLS.CUBICLE);
+    }
+
+    ss.toast('All columns restored.', COMMAND_CONFIG.SYSTEM_NAME, 3);
   } catch (e) {
     SpreadsheetApp.getUi().alert('Error showing columns: ' + e.message);
   }
