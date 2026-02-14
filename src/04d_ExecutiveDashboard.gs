@@ -61,7 +61,7 @@ function getDashboardStats() {
     logData.forEach(function(row) {
       var status = (row[GRIEVANCE_COLS.STATUS - 1] || '').toString().toLowerCase();
       var currentStep = (row[GRIEVANCE_COLS.CURRENT_STEP - 1] || '').toString().toLowerCase();
-      var unit = row[GRIEVANCE_COLS.UNIT - 1] || 'Unknown';
+      var unit = row[GRIEVANCE_COLS.LOCATION - 1] || 'Unknown';
       var steward = row[GRIEVANCE_COLS.STEWARD - 1] || 'Unassigned';
 
       // Count active vs closed

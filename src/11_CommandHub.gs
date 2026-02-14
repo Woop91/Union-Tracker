@@ -2160,7 +2160,7 @@ function getGrievanceCountForUnit(unitName) {
 
   if (!sheet || sheet.getLastRow() < 2) return 0;
 
-  var data = sheet.getRange(2, GRIEVANCE_COLS.UNIT, sheet.getLastRow() - 1, 1).getValues();
+  var data = sheet.getRange(2, GRIEVANCE_COLS.LOCATION, sheet.getLastRow() - 1, 1).getValues();
   var count = 0;
 
   data.forEach(function(row) {

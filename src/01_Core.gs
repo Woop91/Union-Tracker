@@ -1658,6 +1658,7 @@ function mapMemberRow(row) {
     jobTitle: row[MEMBER_COLS.JOB_TITLE - 1] || '',
     workLocation: row[MEMBER_COLS.WORK_LOCATION - 1] || '',
     unit: row[MEMBER_COLS.UNIT - 1] || '',
+    cubicle: row[MEMBER_COLS.CUBICLE - 1] || '',
     officeDays: row[MEMBER_COLS.OFFICE_DAYS - 1] || '',
     email: row[MEMBER_COLS.EMAIL - 1] || '',
     phone: row[MEMBER_COLS.PHONE - 1] || '',
@@ -1675,7 +1676,6 @@ function mapMemberRow(row) {
     interestLocal: row[MEMBER_COLS.INTEREST_LOCAL - 1] || '',
     interestChapter: row[MEMBER_COLS.INTEREST_CHAPTER - 1] || '',
     interestAllied: row[MEMBER_COLS.INTEREST_ALLIED - 1] || '',
-    homeTown: row[MEMBER_COLS.HOME_TOWN - 1] || '',
     recentContactDate: row[MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '',
     contactSteward: row[MEMBER_COLS.CONTACT_STEWARD - 1] || '',
     contactNotes: row[MEMBER_COLS.CONTACT_NOTES - 1] || '',
@@ -1718,7 +1718,6 @@ function mapGrievanceRow(row) {
     articles: row[GRIEVANCE_COLS.ARTICLES - 1] || '',
     issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
     memberEmail: row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] || '',
-    unit: row[GRIEVANCE_COLS.UNIT - 1] || '',
     location: row[GRIEVANCE_COLS.LOCATION - 1] || '',
     steward: row[GRIEVANCE_COLS.STEWARD - 1] || '',
     resolution: row[GRIEVANCE_COLS.RESOLUTION - 1] || '',
@@ -2042,8 +2041,7 @@ var JOB_METADATA_FIELDS = [
   { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
   { label: 'Manager', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Managers' },
   { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
-  { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' },
-  { label: 'Home Town', memberCol: MEMBER_COLS.HOME_TOWN, configCol: CONFIG_COLS.HOME_TOWNS, configName: 'Home Towns' }
+  { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
 ];
 
 /**

@@ -1346,7 +1346,6 @@ function createPDFForSelectedGrievance() {
     status: sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue(),
     articles: sheet.getRange(row, GRIEVANCE_COLS.ARTICLES).getValue(),
     details: sheet.getRange(row, GRIEVANCE_COLS.RESOLUTION).getValue() || 'Pending',
-    unit: sheet.getRange(row, GRIEVANCE_COLS.UNIT).getValue(),
     location: sheet.getRange(row, GRIEVANCE_COLS.LOCATION).getValue(),
     steward: sheet.getRange(row, GRIEVANCE_COLS.STEWARD).getValue(),
     memberEmail: sheet.getRange(row, GRIEVANCE_COLS.MEMBER_EMAIL).getValue()
@@ -2697,7 +2696,6 @@ function getWebAppGrievanceList() {
         isOverdue: daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0),
         daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || 0,
         location: row[GRIEVANCE_COLS.LOCATION - 1] || 'N/A',
-        unit: row[GRIEVANCE_COLS.UNIT - 1] || 'N/A',
         steward: row[GRIEVANCE_COLS.STEWARD - 1] || 'N/A',
         resolution: row[GRIEVANCE_COLS.RESOLUTION - 1] || ''
       };
