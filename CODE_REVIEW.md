@@ -18,7 +18,7 @@ This is a comprehensive Google Apps Script application for union/organization ma
 | High | 17 | Performance bottlenecks, race conditions, hardcoded credentials, trigger limits |
 | Medium | 22 | Missing input validation, shared state conflicts, dead code, inconsistent constants |
 | Low | 14 | Unused variables, documentation staleness, minor UX issues |
-| Test Quality | 12 | False positives, missing happy-path tests, mock isolation gaps |
+| Test Quality | 21 | False positives, missing happy-path tests, mock isolation gaps, coverage gaps |
 
 ---
 
