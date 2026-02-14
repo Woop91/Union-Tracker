@@ -1,5 +1,5 @@
 /**
- * 509 Dashboard - Satisfaction Engine Module
+ * 09_Dashboards.gs - Satisfaction Engine Module
  *
  * Member satisfaction survey management, dashboard display, analytics,
  * and trend analysis functionality.
@@ -12,7 +12,7 @@
  * - Worksite/role breakdown analytics
  * - Value synchronization and dashboard updates
  *
- * @version 1.0.0
+ * @version 4.6.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 

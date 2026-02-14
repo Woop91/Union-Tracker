@@ -1,5 +1,7 @@
 # Code Review Recommendations
 
+> **Note:** This code review was conducted at v4.5.0.
+
 **Repository:** Union Steward Dashboard (v4.5.0)
 **Review Date:** February 2026
 **Reviewer:** Claude Code
@@ -49,7 +51,7 @@ All innerHTML assignments now use `escapeHtml()` to sanitize user-controlled dat
 | `09_Dashboards.gs` | 316-331 | User data (worksite, role, shift) directly concatenated |
 | `05_Integrations.gs` | 1499-1501 | Member/grievance fields injected without sanitization |
 | `10_Main.gs` | 1788, 1791 | Error messages directly concatenated |
-| `04_UIService.gs` | 2457, 2478 | Member data rendered without escaping |
+| `04a_UIMenus.gs / 04b-04e (UI modules)` | 2457, 2478 | Member data rendered without escaping |
 
 **Recommendation:**
 ```javascript
@@ -74,7 +76,7 @@ Configuration values are directly interpolated into Google Sheets formulas witho
 | File | Lines | Issue |
 |------|-------|-------|
 | `12_Features.gs` | 1647, 1651-1652 | Sheet names in QUERY formulas |
-| `08_SheetUtils.gs` | 3377, 3720, 4080, 4147 | Template literals with unsanitized sheet names |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 3377, 3720, 4080, 4147 | Template literals with unsanitized sheet names |
 
 **Recommendation:**
 ```javascript
@@ -288,8 +290,8 @@ var DataAccess = (function() {
 | `10_Main.gs:73` | `onEdit` (main) |
 | `06_Maintenance.gs:3294` | `onEditWithAuditLogging` |
 | `07_DevTools.gs:2044` | `onEditValidation` |
-| `08_SheetUtils.gs:429` | `onEditMultiSelect` |
-| `08_SheetUtils.gs:3059` | `onEditAudit` |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules):429` | `onEditMultiSelect` |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules):3059` | `onEditAudit` |
 | `09_Dashboards.gs:2183` | `onEditAutoSync` |
 
 **Recommendation:** Single dispatcher pattern:
@@ -326,12 +328,12 @@ var TriggerRouter = {
 
 | File | Lines | Functions | Recommendation |
 |------|-------|-----------|----------------|
-| `04_UIService.gs` | 7,127 | 197 | Split into 4 files |
-| `10_Code.gs` | 5,406 | 50 | Split into 3 files |
-| `08_SheetUtils.gs` | 4,442 | 90 | Split into 4 files |
+| `04a_UIMenus.gs / 04b-04e (UI modules)` | 7,127 | 197 | Split into 4 files |
+| `10_Main.gs / 10a-10d (Main modules)` | 5,406 | 50 | Split into 3 files |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 4,442 | 90 | Split into 4 files |
 
 **Recommended Structure for UIService:**
-- `04_UIService.gs` - Dialog orchestration (keep ~2000 lines)
+- `04a_UIMenus.gs / 04b-04e (UI modules)` - Dialog orchestration (keep ~2000 lines)
 - `04a_UIComponents.gs` - HTML generation helpers
 - `04b_UIThemes.gs` - Theme and styling logic
 - `04c_UISearch.gs` - Search interface logic
@@ -531,7 +533,7 @@ Almost all rules are turned off in `.eslintrc.js`. Consider gradually enabling:
 | P0 | Fix XSS vulnerabilities | Multiple | 1-2 days |
 | P0 | Add input validation to doGet | 05_Integrations.gs | 1 day |
 | P0 | Implement access control | 05_Integrations.gs | 2-3 days |
-| P1 | Fix formula injection | 08_SheetUtils.gs, 12_Features.gs | 1 day |
+| P1 | Fix formula injection | 08a_SheetSetup.gs / 08b-08d (Sheet utility modules), 12_Features.gs | 1 day |
 | P1 | Remove PII from logs | Multiple | 0.5 days |
 
 ### Short-term (Code Quality - Week 2-3)

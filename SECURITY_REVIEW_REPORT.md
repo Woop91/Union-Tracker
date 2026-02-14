@@ -1,5 +1,7 @@
 # Security Review Report
 
+> **Note:** This security review was conducted at v4.5.0.
+
 **Repository:** Union Steward Dashboard (v4.5.0)
 **Review Date:** February 2026
 **Reviewer:** Claude Code Security Review
@@ -53,8 +55,8 @@ Multiple locations inject user-controlled data directly into innerHTML without s
 | File | Lines | Vulnerable Data |
 |------|-------|-----------------|
 | `09_Dashboards.gs` | 316-331 | `r.worksite`, `r.role`, `r.shift`, `r.date`, `r.timeInRole` |
-| `04_UIService.gs` | 2453-2461 | `m.name`, `m.id`, `m.title`, `m.location`, `m.email`, `m.phone`, `m.supervisor`, `m.assignedSteward`, `m.officeDays` |
-| `04_UIService.gs` | 2500-2501 | Location and unit names in dropdown options |
+| `04a_UIMenus.gs / 04b-04e (UI modules)` | 2453-2461 | `m.name`, `m.id`, `m.title`, `m.location`, `m.email`, `m.phone`, `m.supervisor`, `m.assignedSteward`, `m.officeDays` |
+| `04a_UIMenus.gs / 04b-04e (UI modules)` | 2500-2501 | Location and unit names in dropdown options |
 | `05_Integrations.gs` | 1499-1501 | Member and grievance fields in HTML |
 
 **Vulnerable Code Example (09_Dashboards.gs:316-331):**
@@ -94,8 +96,8 @@ Sheet names and user-controllable values are directly interpolated into Google S
 | File | Lines | Issue |
 |------|-------|-------|
 | `12_Features.gs` | 1647 | `EXTENSION_CONFIG.MEMBER_SHEET` in QUERY formula |
-| `08_SheetUtils.gs` | 3377, 3382-3405 | `SHEETS.*` constants in FILTER/COUNTIFS formulas |
-| `08_SheetUtils.gs` | 3720-3728 | Dynamic VLOOKUP formulas |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 3377, 3382-3405 | `SHEETS.*` constants in FILTER/COUNTIFS formulas |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 3720-3728 | Dynamic VLOOKUP formulas |
 
 **Vulnerable Code Example (12_Features.gs:1647):**
 ```javascript
@@ -155,9 +157,9 @@ Email addresses, member IDs, and other PII are logged despite the availability o
 | File | Line | PII Exposed |
 |------|------|-------------|
 | `05_Integrations.gs` | 897 | `'Grievance PDF emailed to: ' + data.memberEmail` |
-| `08_SheetUtils.gs` | 1759 | Member name, match type |
-| `08_SheetUtils.gs` | 1764, 1796 | `firstName + ' ' + lastName` |
-| `08_SheetUtils.gs` | 2669, 2671 | Steward name and email |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 1759 | Member name, match type |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 1764, 1796 | `firstName + ' ' + lastName` |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 2669, 2671 | Steward name and email |
 | `10_Main.gs` | 226-227 | User email in sabotage alert |
 
 **Remediation:** Replace `Logger.log()` with `secureLog()` for all PII-containing messages.
@@ -353,7 +355,7 @@ Replace all direct innerHTML concatenation with sanitized versions:
 
 **Files to update:**
 - `09_Dashboards.gs` - Lines 316-331
-- `04_UIService.gs` - Lines 2453-2461, 2500-2501
+- `04a_UIMenus.gs / 04b-04e (UI modules)` - Lines 2453-2461, 2500-2501
 - All functions generating HTML with user data
 
 #### Fix Formula Injection

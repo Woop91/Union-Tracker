@@ -1,5 +1,5 @@
 /**
- * 509 Dashboard - Main Entry Point
+ * 10a_SheetCreation.gs - Main Entry Point
  *
  * Core setup functions, menu system, and sheet creation.
  *
@@ -7,7 +7,7 @@
  * This is a source file used to generate ConsolidatedDashboard.gs.
  * Deploy ONLY ConsolidatedDashboard.gs to avoid function conflicts.
  *
- * @version 1.0.0
+ * @version 4.6.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 

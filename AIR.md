@@ -19,7 +19,7 @@
 
 ## Quick Start
 
-1. Copy all 11 files from `src/` to Google Apps Script (create each as a separate script file)
+1. Copy all 27 files from `src/` to Google Apps Script (create each as a separate script file)
 2. Run `CREATE_509_DASHBOARD()` to create sheets + 6 hidden calculation sheets
 3. Use `Dashboard > Admin > Demo Data > Seed All Sample Data` to populate test data
 4. Customize Config sheet with your organization's values
@@ -158,24 +158,41 @@ When the "Start Grievance" checkbox (column AE) is checked in Member Directory:
 
 ## File Architecture
 
-### Modular Architecture (11 Source Files)
+### Modular Architecture (27 Source Files)
 
-This repository implements a **streamlined 11-file modular architecture** following the Separation of Concerns principle. Each module handles a specific aspect of the dashboard functionality.
+This repository implements a **streamlined 27-file modular architecture** following the Separation of Concerns principle. Each module handles a specific aspect of the dashboard functionality.
 
 ```
 MULTIPLE-SCRIPS-REPO/
-├── src/                        # Source files (11 modules) - copy all to Google Apps Script
-│   ├── 01_Constants.gs         # Configuration constants (SHEETS, COLORS, MEMBER_COLS, GRIEVANCE_COLS, COMMAND_CONFIG, UI_THEME)
-│   ├── 02_MemberManager.gs     # Member operations, steward management, ID generation, batch processing
-│   ├── 03_GrievanceManager.gs  # Grievance lifecycle, deadlines, step advancement, traffic lights
-│   ├── 04_UIService.gs         # UI, Comfort View, mobile, Strategic Command Center dashboards
+├── src/                        # Source files (27 modules) - copy all to Google Apps Script
+│   ├── 00_Security.gs          # Security layer and access control
+│   ├── 00_DataAccess.gs        # Data access abstraction layer
+│   ├── 01_Core.gs              # Configuration constants (SHEETS, COLORS, MEMBER_COLS, GRIEVANCE_COLS, COMMAND_CONFIG, UI_THEME)
+│   ├── 02_DataManagers.gs      # Member & grievance operations, steward management, ID generation, batch processing
+│   ├── 03_UIComponents.gs      # Shared UI components, dialogs, styles
+│   ├── 04a_UIMenus.gs          # Menu system creation and organization
+│   ├── 04b_AccessibilityFeatures.gs  # Comfort View, ADHD-friendly features, focus mode
+│   ├── 04c_InteractiveDashboard.gs   # Interactive dashboard modal and tabs
+│   ├── 04d_ExecutiveDashboard.gs     # Executive dashboard with PII, analytics
+│   ├── 04e_PublicDashboard.gs        # Public/member dashboard (no PII), unified web app
 │   ├── 05_Integrations.gs      # Google Drive, Calendar, WebApp, email notifications, PDF engine
 │   ├── 06_Maintenance.gs       # Admin tools, diagnostics, caching, validation, snapshots
 │   ├── 07_DevTools.gs          # Demo data seeding - DELETE BEFORE PRODUCTION
-│   ├── 08_Code.gs              # Core setup, hidden sheets, dashboard creation, multi-select
-│   ├── 09_Main.gs              # Entry point, onOpen, onEdit triggers, sabotage protection
-│   ├── 10_CommandCenter.gs     # 509 Strategic Command Center features
-│   └── 11_SecureMemberDashboard.gs  # Material Design member portal, analytics, PII scrubbing
+│   ├── 08a_SheetSetup.gs       # Core setup, sheet creation, data validations
+│   ├── 08b_SearchAndCharts.gs  # Search functionality and chart system
+│   ├── 08c_FormsAndNotifications.gs  # Form workflows, email notifications
+│   ├── 08d_AuditAndFormulas.gs # Audit log, hidden sheets, formula management
+│   ├── 09_Dashboards.gs        # Dashboard value sync, metrics computation
+│   ├── 10_Main.gs              # Entry point, onOpen, onEdit triggers, sabotage protection
+│   ├── 10a_SheetCreation.gs    # Sheet creation helpers and templates
+│   ├── 10b_SurveyDocSheets.gs  # Survey and documentation sheet creation
+│   ├── 10c_FormHandlers.gs     # Form submission handlers
+│   ├── 10d_SyncAndMaintenance.gs  # Data sync and maintenance operations
+│   ├── 11_CommandHub.gs        # 509 Strategic Command Center features
+│   ├── 12_Features.gs          # Additional feature modules
+│   ├── 13_MemberSelfService.gs # Material Design member portal, analytics, PII scrubbing
+│   ├── 14_MeetingCheckIn.gs    # Meeting check-in and attendance tracking
+│   └── MultiSelectDialog.html  # Multi-select dialog HTML template
 ├── AIR.md                      # Architecture & Implementation Reference (this document)
 ├── README.md                   # Quick start guide
 ├── QUICK_DEPLOY.md             # 5-minute deployment guide
@@ -184,7 +201,7 @@ MULTIPLE-SCRIPS-REPO/
 
 ### Deployment
 
-Copy all 11 `.gs` files from `src/` to your Google Apps Script project. Each file should be created as a separate script file in the Apps Script editor.
+Copy all 27 files from `src/` to your Google Apps Script project. Each file should be created as a separate script file in the Apps Script editor (the `.html` file should be created as an HTML file).
 
 ### File Descriptions (11-File Architecture)
 

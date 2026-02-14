@@ -1,5 +1,7 @@
 # Security Review Report
 
+> **Note:** This security review was conducted at v4.5.0. The project is now at v4.6.0.
+
 **Repository:** Union Steward Dashboard v4.5.0
 **Review Date:** February 2, 2026
 **Reviewer:** Claude Code Security Analysis
@@ -43,7 +45,7 @@ All innerHTML assignments now use `escapeHtml()` to sanitize user-controlled dat
 | `09_Dashboards.gs` | 316-331 | `c.innerHTML=data.map(...)` with `r.worksite`, `r.role`, `r.shift` |
 | `10_Main.gs` | 1831-1838 | `html += ... m.name + ... m.id + ... m.email` |
 | `11_CommandHub.gs` | 1230-1241 | `name`, `id`, `email` directly concatenated |
-| `04_UIService.gs` | 669-674 | `item.id`, `item.label` in innerHTML |
+| `04a_UIMenus.gs / 04b-04e (UI modules)` | 669-674 | `item.id`, `item.label` in innerHTML |
 | `05_Integrations.gs` | 1528, 1706, 1890 | Member/grievance data in innerHTML |
 
 **Proof of Concept:**
@@ -74,7 +76,7 @@ container.innerHTML = '<div>' + escapeHtml(member.name) + '</div>';
 - `src/09_Dashboards.gs:316-331`
 - `src/10_Main.gs:1831-1838`
 - `src/11_CommandHub.gs:1230-1241`
-- `src/04_UIService.gs:669-674, 2373, 2449, 2602`
+- `src/04a_UIMenus.gs / 04b-04e (UI modules):669-674, 2373, 2449, 2602`
 - `src/05_Integrations.gs:1528, 1706, 1890`
 - `src/03_UIComponents.gs:2119, 2232`
 
@@ -146,7 +148,7 @@ Some QUERY formulas still use unsanitized sheet names:
 
 | File | Line | Issue |
 |------|------|-------|
-| `08_SheetUtils.gs` | 3377, 3720, 4080, 4147 | Template literals with sheet names |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 3377, 3720, 4080, 4147 | Template literals with sheet names |
 | `12_Features.gs` | 1647, 1651-1652 | Sheet names in QUERY formulas |
 | `01_Core.gs` | 216-220 | `sanitizeForQuery()` only escapes quotes/backslashes |
 
@@ -167,7 +169,7 @@ While `00_Security.gs` provides PII masking functions, some logs still expose se
 
 | File | Line | Data Exposed |
 |------|------|--------------|
-| `08_SheetUtils.gs` | 2669, 2671 | Email addresses in plaintext |
+| `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` | 2669, 2671 | Email addresses in plaintext |
 | `10_Main.gs` | 226 | User email in sabotage alerts |
 | `05_Integrations.gs` | 897 | Member email logged |
 | `11_CommandHub.gs` | 2554 | Last 6 chars of API key logged |
@@ -342,7 +344,7 @@ All dependencies are development-only and do not run in production (Google Apps 
 |---|-------|--------|-------|
 | 4 | Replace all direct PII logging with `secureLog()` | 1 day | Multiple |
 | 5 | Change X-Frame-Options to DENY for internal pages | 0.5 days | 2 files |
-| 6 | Strengthen formula sanitization | 1 day | `01_Core.gs`, `08_SheetUtils.gs` |
+| 6 | Strengthen formula sanitization | 1 day | `01_Core.gs`, `08a_SheetSetup.gs / 08b-08d (Sheet utility modules)` |
 
 ### Medium-term (P2)
 

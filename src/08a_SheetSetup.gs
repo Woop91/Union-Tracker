@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * SheetCreation.gs - Sheet Creation and Management
+ * 08a_SheetSetup.gs - Sheet Creation and Management
  * ============================================================================
  *
  * This module handles all sheet creation functions including:
@@ -12,8 +12,8 @@
  * REFACTORED: Split from 08_Code.gs for better maintainability
  *
  * @fileoverview Sheet creation and management functions
- * @version 1.0.0
- * @requires 01_Constants.gs
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================

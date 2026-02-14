@@ -10,7 +10,7 @@ Done. Here's what was added:
 
 1. Go to **Grievance Log** sheet
 2. Select a grievance row
-3. Menu: **509 Command → Grievance Tools → Create PDF for Selected**
+3. Menu: **Strategic Ops → Grievance Tools → Create PDF for Selected**
 4. Confirm to create PDF
 5. New prompt appears: "Would you like to email this PDF to [member@email.com]?"
 6. Click **Yes** to send

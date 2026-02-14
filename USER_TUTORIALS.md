@@ -189,16 +189,16 @@ After entering, these columns auto-populate:
 
 ---
 
-## 6. Customizing the Custom View Dashboard
+## 6. Using the Interactive Dashboard
 
 ### Accessing the Dashboard
 
 **Option 1: Modal Popup** (⚠️ PROTECTED)
-- Click **📊 509 Dashboard** → **📊 Dashboard**
+- Click **⚙️ Admin** → **📊 Show Steward Dashboard**
 - Opens a tabbed popup with Overview, My Cases, Members, Grievances, Analytics
 
 **Option 2: Sheet Tab**
-- Click the **🎯 Custom View** sheet tab directly
+- Click the **🎯 Interactive Dashboard** sheet tab directly
 - Use dropdowns to customize metrics and charts
 
 ### Selecting Metrics

@@ -836,26 +836,27 @@ function getChecklistDialogHtml(caseId) {
       var catItems = checklistData.byCategory[cat];
 
       itemsHtml += '<div class="category-section">';
-      itemsHtml += '<div class="category-header">' + cat + ' (' + catItems.length + ')</div>';
+      itemsHtml += '<div class="category-header">' + escapeHtml(cat) + ' (' + catItems.length + ')</div>';
 
       for (var i = 0; i < catItems.length; i++) {
         var item = catItems[i];
         var checkedAttr = item.completed ? 'checked' : '';
         var completedClass = item.completed ? 'completed' : '';
         var requiredBadge = item.required ? '<span class="badge required">Required</span>' : '';
+        var safeChecklistId = String(item.checklistId || '').replace(/[^a-zA-Z0-9_-]/g, '');
 
         itemsHtml += '<div class="checklist-item ' + completedClass + '">';
         itemsHtml += '  <label class="checkbox-container">';
-        itemsHtml += '    <input type="checkbox" ' + checkedAttr + ' onchange="toggleItem(\'' + item.checklistId + '\', this.checked)">';
+        itemsHtml += '    <input type="checkbox" ' + checkedAttr + ' onchange="toggleItem(\'' + safeChecklistId + '\', this.checked)">';
         itemsHtml += '    <span class="checkmark"></span>';
         itemsHtml += '  </label>';
         itemsHtml += '  <div class="item-content">';
-        itemsHtml += '    <div class="item-text">' + item.itemText + ' ' + requiredBadge + '</div>';
+        itemsHtml += '    <div class="item-text">' + escapeHtml(item.itemText) + ' ' + requiredBadge + '</div>';
         if (item.completed && item.completedBy) {
-          itemsHtml += '    <div class="item-meta">Completed by ' + item.completedBy + '</div>';
+          itemsHtml += '    <div class="item-meta">Completed by ' + escapeHtml(item.completedBy) + '</div>';
         }
         itemsHtml += '  </div>';
-        itemsHtml += '  <button class="btn-icon" onclick="deleteItem(\'' + item.checklistId + '\')" title="Delete item">x</button>';
+        itemsHtml += '  <button class="btn-icon" onclick="deleteItem(\'' + safeChecklistId + '\')" title="Delete item">x</button>';
         itemsHtml += '</div>';
       }
 

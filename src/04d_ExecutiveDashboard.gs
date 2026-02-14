@@ -202,11 +202,12 @@ function getExecutiveDashboardHtml_() {
     '    </div>' +
     '  </div>' +
     '  <script>' +
+    '    function escapeHtml(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#39;")}' +
     '    window.onload = function() {' +
     '      google.script.run.withSuccessHandler(renderDashboard).withFailureHandler(showError).getDashboardStats();' +
     '    };' +
     '    function showError(err) {' +
-    '      document.getElementById("content").innerHTML = "<div class=\\"loading\\">Error loading data: " + err.message + "</div>";' +
+    '      document.getElementById("content").innerHTML = "<div class=\\"loading\\">Error loading data: " + escapeHtml(err.message) + "</div>";' +
     '    }' +
     '    function renderDashboard(jsonStats) {' +
     '      var stats = JSON.parse(jsonStats);' +
@@ -245,7 +246,7 @@ function getExecutiveDashboardHtml_() {
     '    function renderStewardList(workload) {' +
     '      var html = "";' +
     '      if (!workload || workload.length === 0) { html = "<div style=\\"color:#94a3b8;text-align:center;padding:20px;\\">No active cases assigned</div>"; }' +
-    '      else { workload.slice(0, 10).forEach(function(s) { html += "<div class=\\"steward-item\\"><span class=\\"steward-name\\">" + s.name + "</span><span class=\\"steward-count\\">" + s.count + "</span></div>"; }); }' +
+    '      else { workload.slice(0, 10).forEach(function(s) { html += "<div class=\\"steward-item\\"><span class=\\"steward-name\\">" + escapeHtml(s.name) + "</span><span class=\\"steward-count\\">" + s.count + "</span></div>"; }); }' +
     '      document.getElementById("stewardList").innerHTML = html;' +
     '    }' +
     '  </script>' +
@@ -972,7 +973,12 @@ function createPDFForSelectedGrievance_UIService_() {
              '\nResolution: ' + (data[GRIEVANCE_COLS.RESOLUTION - 1] || 'Pending')
   };
 
-  var pdf = createGrievancePDF(grievanceData);
+  // Get or create the grievance archive folder
+  var archiveFolderName = COMMAND_CONFIG.ARCHIVE_FOLDER_NAME || '509 Grievance Archive';
+  var folders = DriveApp.getFoldersByName(archiveFolderName);
+  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(archiveFolderName);
+
+  var pdf = createGrievancePDF(folder, grievanceData);
 
   SpreadsheetApp.getUi().alert('PDF created successfully!\n\nFile: ' + pdf.getName() +
     '\n\nYou can find it in your 509 Grievance Archive folder.');

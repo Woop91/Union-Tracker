@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * Integrations.gs - External Service Integration
+ * 05_Integrations.gs - External Service Integration
  * ============================================================================
  *
  * This module handles all interactions with external Google services:
@@ -14,8 +14,8 @@
  * remains responsive.
  *
  * @fileoverview External service integrations
- * @version 2.0.0
- * @requires Constants.gs
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================
