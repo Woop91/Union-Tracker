@@ -540,9 +540,9 @@ function createConfigGuideSheet(ss) {
  */
 function createMemberDirectory(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEMBER_DIR);
+  var headers = getMemberHeaders();
   // getOrCreateSheet now preserves data - only set headers on empty sheets
   if (sheet.getLastRow() <= 1) {
-    var headers = getMemberHeaders();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
       .setFontColor(COLORS.WHITE)
@@ -732,9 +732,9 @@ function createMemberDirectory(ss) {
  */
 function createGrievanceLog(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.GRIEVANCE_LOG);
+  var headers = getGrievanceHeaders();
   // getOrCreateSheet now preserves data - only set headers on empty sheets
   if (sheet.getLastRow() <= 1) {
-    var headers = getGrievanceHeaders();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
       .setFontColor(COLORS.WHITE)
