@@ -23142,7 +23142,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2799 lines)
+// SOURCE: 07_DevTools.gs (2796 lines)
 // ============================================================================
 
 /**
@@ -23862,7 +23862,6 @@ function SEED_MEMBERS(count, grievancePercent) {
   var supervisors = getConfigValues(configSheet, CONFIG_COLS.SUPERVISORS);
   var managers = getConfigValues(configSheet, CONFIG_COLS.MANAGERS);
   var stewards = getConfigValues(configSheet, CONFIG_COLS.STEWARDS);
-  var homeTowns = getConfigValues(configSheet, CONFIG_COLS.HOME_TOWNS);
   var committees = getConfigValues(configSheet, CONFIG_COLS.STEWARD_COMMITTEES);
 
   // Expanded name pools for better variety (100+ names each = 10,000+ unique combinations)
@@ -23963,7 +23962,6 @@ function SEED_MEMBERS(count, grievancePercent) {
       isSteward,
       isSteward === 'Yes' ? randomChoice(committees) : '',
       assignedSteward,
-      randomChoice(homeTowns),
       recentContactDate,
       contactSteward,
       contactNotes
@@ -24032,7 +24030,6 @@ function SEED_MEMBERS_ONLY(count) {
   var supervisors = getConfigValues(configSheet, CONFIG_COLS.SUPERVISORS);
   var managers = getConfigValues(configSheet, CONFIG_COLS.MANAGERS);
   var stewards = getConfigValues(configSheet, CONFIG_COLS.STEWARDS);
-  var homeTowns = getConfigValues(configSheet, CONFIG_COLS.HOME_TOWNS);
   var committees = getConfigValues(configSheet, CONFIG_COLS.STEWARD_COMMITTEES);
 
   // Expanded name pools for better variety
@@ -24114,7 +24111,7 @@ function SEED_MEMBERS_ONLY(count) {
       email, phone, randomChoice(commMethods), 'Morning',
       randomChoice(supervisors), randomChoice(managers),
       isSteward, isSteward === 'Yes' ? randomChoice(committees) : '', assignedSteward,
-      randomChoice(homeTowns), recentContactDate, contactSteward, contactNotes
+      recentContactDate, contactSteward, contactNotes
     );
 
     rows.push(row);
@@ -24143,7 +24140,7 @@ function SEED_MEMBERS_ONLY(count) {
 /**
  * Generate a single member row with all 31 columns
  */
-function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, location, unit, officeDays, email, phone, prefComm, bestTime, supervisor, manager, isSteward, committees, assignedSteward, homeTown, recentContactDate, contactSteward, contactNotes) {
+function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, location, unit, officeDays, email, phone, prefComm, bestTime, supervisor, manager, isSteward, committees, assignedSteward, recentContactDate, contactSteward, contactNotes) {
   var today = new Date();
   var lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -24154,24 +24151,24 @@ function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, locati
     jobTitle,                                    // 4: Job Title (D)
     location,                                    // 5: Work Location (E)
     unit,                                        // 6: Unit (F)
-    officeDays,                                  // 7: Office Days (G)
-    email,                                       // 8: Email (H)
-    phone,                                       // 9: Phone (I)
-    prefComm,                                    // 10: Preferred Communication (J)
-    bestTime,                                    // 11: Best Time (K)
-    supervisor,                                  // 12: Supervisor (L)
-    manager,                                     // 13: Manager (M)
-    isSteward,                                   // 14: Is Steward (N)
-    committees,                                  // 15: Committees (O)
-    assignedSteward,                             // 16: Assigned Steward (P)
-    randomDate(lastMonth, today),                // 17: Last Virtual Mtg (Q)
-    randomDate(lastMonth, today),                // 18: Last In-Person Mtg (R)
-    Math.floor(Math.random() * 100),             // 19: Open Rate % (S)
-    Math.floor(Math.random() * 20),              // 20: Volunteer Hours (T)
-    Math.random() < 0.3 ? 'Yes' : 'No',          // 21: Interest Local (U)
-    Math.random() < 0.2 ? 'Yes' : 'No',          // 22: Interest Chapter (V)
-    Math.random() < 0.1 ? 'Yes' : 'No',          // 23: Interest Allied (W)
-    homeTown || '',                              // 24: Home Town (X)
+    '',                                          // 7: Cubicle (G) — hidden, not seeded
+    officeDays,                                  // 8: Office Days (H)
+    email,                                       // 9: Email (I)
+    phone,                                       // 10: Phone (J)
+    prefComm,                                    // 11: Preferred Communication (K)
+    bestTime,                                    // 12: Best Time to Contact (L)
+    supervisor,                                  // 13: Supervisor (M)
+    manager,                                     // 14: Manager (N)
+    isSteward,                                   // 15: Is Steward (O)
+    committees,                                  // 16: Committees (P)
+    assignedSteward,                             // 17: Assigned Steward (Q)
+    randomDate(lastMonth, today),                // 18: Last Virtual Mtg (R)
+    randomDate(lastMonth, today),                // 19: Last In-Person Mtg (S)
+    Math.floor(Math.random() * 100),             // 20: Open Rate % (T)
+    Math.floor(Math.random() * 20),              // 21: Volunteer Hours (U)
+    Math.random() < 0.3 ? 'Yes' : 'No',          // 22: Interest Local (V)
+    Math.random() < 0.2 ? 'Yes' : 'No',          // 23: Interest Chapter (W)
+    Math.random() < 0.1 ? 'Yes' : 'No',          // 24: Interest Allied (X)
     recentContactDate || '',                     // 25: Recent Contact Date (Y)
     contactSteward || '',                        // 26: Contact Steward (Z)
     contactNotes || '',                          // 27: Contact Notes (AA)
