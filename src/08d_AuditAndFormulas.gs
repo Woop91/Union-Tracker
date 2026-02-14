@@ -12,9 +12,14 @@ function setupAuditLogSheet() {
 
   if (!sheet) {
     sheet = ss.insertSheet(SHEETS.AUDIT_LOG);
+    sheet.clear();
+  } else if (sheet.getLastRow() <= 1) {
+    sheet.clear();
+  } else {
+    // Audit log has existing data — do not clear (compliance requirement)
+    Logger.log('setupAuditLogSheet: Sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear');
+    return;
   }
-
-  sheet.clear();
 
   // Headers
   var headers = [

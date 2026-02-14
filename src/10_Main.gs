@@ -223,7 +223,10 @@ function handleSecurityAudit_(e) {
     var alertMessage = '';
 
     // SABOTAGE PROTECTION: Detect mass deletions (>15 cells cleared)
-    if (numCells > 15 && !e.value) {
+    // Exclude multi-cell paste operations (e.value is undefined for pastes AND deletions,
+    // but pastes set range values while deletions clear them)
+    var rangeIsEmpty = range.isBlank();
+    if (numCells > 15 && !e.value && rangeIsEmpty) {
       alertMessage = 'MASS_DELETION_ALERT';
 
       // Send alert to Chief Steward
@@ -249,7 +252,7 @@ function handleSecurityAudit_(e) {
                   COMMAND_CONFIG.EMAIL.FOOTER
           });
         } catch (emailError) {
-          Logger.log('Failed to send sabotage alert: ' + emailError.message);
+          Logger.log('Sabotage alert email failed (simple onEdit limit): ' + emailError.message);
         }
       }
 

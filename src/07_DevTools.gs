@@ -1670,7 +1670,7 @@ function addDays(date, days) {
 
 // ==================== TEST CONFIGURATION ====================
 
-var TEST_RESULTS = { passed: [], failed: [], skipped: [] };
+// TEST_RESULTS tracking is handled within individual test runner functions
 var TEST_MAX_EXECUTION_MS = 5 * 60 * 1000;
 var TEST_LARGE_DATASET_THRESHOLD = 5000;
 
@@ -1705,7 +1705,34 @@ var Assert = {
     tolerance = tolerance || 0.001;
     if (Math.abs(expected - actual) > tolerance) throw new Error((message || 'Values not approximately equal') + '\nExpected: ' + expected + '\nActual: ' + actual);
   },
-  fail: function(message) { throw new Error(message || 'Test failed'); }
+  fail: function(message) { throw new Error(message || 'Test failed'); },
+  // Aliases for compatibility with second API convention
+  isTrue: function(value, message) {
+    if (!value) throw new Error(message || 'Expected true but got: ' + value);
+  },
+  isFalse: function(value, message) {
+    if (value) throw new Error(message || 'Expected false but got: ' + value);
+  },
+  equals: function(expected, actual, message) {
+    if (expected !== actual) throw new Error(message || 'Expected ' + expected + ' but got: ' + actual);
+  },
+  notEquals: function(expected, actual, message) {
+    if (expected === actual) throw new Error(message || 'Expected values to be different but both were: ' + actual);
+  },
+  isDefined: function(value, message) {
+    if (value === undefined || value === null) throw new Error(message || 'Expected value to be defined');
+  },
+  isArray: function(value, message) {
+    if (!Array.isArray(value)) throw new Error(message || 'Expected array but got: ' + typeof value);
+  },
+  contains: function(array, value, message) {
+    if (array.indexOf(value) === -1) throw new Error(message || 'Expected array to contain: ' + value);
+  },
+  throws: function(fn, message) {
+    var threw = false;
+    try { fn(); } catch (_e) { threw = true; }
+    if (!threw) throw new Error(message || 'Expected function to throw an error');
+  }
 };
 
 // ==================== TEST HELPERS ====================
@@ -2199,111 +2226,7 @@ var TestSuite = {
   }
 };
 
-// ============================================================================
-// ASSERTION HELPERS
-// ============================================================================
-
-/**
- * Assertion helper
- */
-var Assert = {
-  /**
-   * Asserts that a value is truthy
-   * @param {*} value - Value to check
-   * @param {string} [message] - Error message
-   */
-  isTrue: function(value, message) {
-    if (!value) {
-      throw new Error(message || 'Expected true but got: ' + value);
-    }
-  },
-
-  /**
-   * Asserts that a value is falsy
-   * @param {*} value - Value to check
-   * @param {string} [message] - Error message
-   */
-  isFalse: function(value, message) {
-    if (value) {
-      throw new Error(message || 'Expected false but got: ' + value);
-    }
-  },
-
-  /**
-   * Asserts that two values are equal
-   * @param {*} expected - Expected value
-   * @param {*} actual - Actual value
-   * @param {string} [message] - Error message
-   */
-  equals: function(expected, actual, message) {
-    if (expected !== actual) {
-      throw new Error(message || 'Expected ' + expected + ' but got: ' + actual);
-    }
-  },
-
-  /**
-   * Asserts that two values are not equal
-   * @param {*} expected - Expected value
-   * @param {*} actual - Actual value
-   * @param {string} [message] - Error message
-   */
-  notEquals: function(expected, actual, message) {
-    if (expected === actual) {
-      throw new Error(message || 'Expected values to be different but both were: ' + actual);
-    }
-  },
-
-  /**
-   * Asserts that a value is defined (not undefined or null)
-   * @param {*} value - Value to check
-   * @param {string} [message] - Error message
-   */
-  isDefined: function(value, message) {
-    if (value === undefined || value === null) {
-      throw new Error(message || 'Expected value to be defined');
-    }
-  },
-
-  /**
-   * Asserts that a value is an array
-   * @param {*} value - Value to check
-   * @param {string} [message] - Error message
-   */
-  isArray: function(value, message) {
-    if (!Array.isArray(value)) {
-      throw new Error(message || 'Expected array but got: ' + typeof value);
-    }
-  },
-
-  /**
-   * Asserts that an array contains a value
-   * @param {Array} array - Array to check
-   * @param {*} value - Value to find
-   * @param {string} [message] - Error message
-   */
-  contains: function(array, value, message) {
-    if (array.indexOf(value) === -1) {
-      throw new Error(message || 'Expected array to contain: ' + value);
-    }
-  },
-
-  /**
-   * Asserts that a function throws an error
-   * @param {Function} fn - Function to execute
-   * @param {string} [message] - Error message
-   */
-  throws: function(fn, message) {
-    var threw = false;
-    try {
-      fn();
-    } catch (_e) {
-      threw = true;
-    }
-    if (!threw) {
-      throw new Error(message || 'Expected function to throw an error');
-    }
-  }
-};
+// NOTE: Assert object is defined once at line 1677 with both API styles merged
 
 // ============================================================================
 // TEST CASES - CONSTANTS

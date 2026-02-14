@@ -776,6 +776,10 @@ var SHEET_NAMES = SHEETS;
 var HIDDEN_SHEETS = {
   CALC_STATS: '_Dashboard_Calc',
   CALC_FORMULAS: '_Grievance_Formulas',
+  CALC_MEMBERS: '_Members_Calc',
+  CALC_GRIEVANCES: '_Grievances_Calc',
+  CALC_DEADLINES: '_Deadlines_Calc',
+  CALC_SYNC: '_Sync_Calc',
   GRIEVANCE_CALC: '_Grievance_Calc',
   MEMBER_LOOKUP: '_Member_Lookup',
   STEWARD_CONTACT_CALC: '_Steward_Contact_Calc',

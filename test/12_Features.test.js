@@ -639,9 +639,8 @@ describe('invalidateHeaderCache', () => {
     expect(() => invalidateHeaderCache('TestSheet')).not.toThrow();
   });
 
-  test('calls cache remove (function executes without error)', () => {
-    invalidateHeaderCache('Member Directory');
-    // Verify it completed without throwing
-    expect(true).toBe(true);
+  test('invalidateHeaderCache is callable and does not throw', () => {
+    expect(typeof invalidateHeaderCache).toBe('function');
+    expect(() => invalidateHeaderCache('Member Directory')).not.toThrow();
   });
 });

@@ -527,8 +527,8 @@ function openCellMultiSelectEditor() {
     return;
   }
 
-  // Store target cell coordinates for the callback
-  var props = PropertiesService.getDocumentProperties();
+  // Store target cell coordinates for the callback (UserProperties to avoid multi-user conflicts)
+  var props = PropertiesService.getUserProperties();
   props.setProperty('multiSelectRow', row.toString());
   props.setProperty('multiSelectCol', col.toString());
 

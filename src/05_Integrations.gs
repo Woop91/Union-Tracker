@@ -367,7 +367,7 @@ function openGrievanceFolder() {
 
   if (folderUrl) {
     const html = HtmlService.createHtmlOutput(
-      `<script>window.open('${folderUrl}', '_blank'); google.script.host.close();</script>`
+      `<script>window.open(${JSON.stringify(folderUrl)}, '_blank'); google.script.host.close();</script>`
     ).setWidth(100).setHeight(50);
     SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
   } else {
@@ -376,7 +376,7 @@ function openGrievanceFolder() {
       const result = setupDriveFolderForGrievance(grievanceId);
       if (result.success) {
         const html = HtmlService.createHtmlOutput(
-          `<script>window.open('${result.folderUrl}', '_blank'); google.script.host.close();</script>`
+          `<script>window.open(${JSON.stringify(result.folderUrl)}, '_blank'); google.script.host.close();</script>`
         ).setWidth(100).setHeight(50);
         SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
       }

@@ -890,9 +890,9 @@ function getSatisfactionResponseData() {
     });
   }
 
-  // Sort by date (most recent first)
+  // Sort by date (most recent first) - use Date parsing for correct chronological order
   responses.sort(function(a, b) {
-    return b.date.localeCompare(a.date);
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
   return responses;
@@ -2803,13 +2803,13 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     return metrics.activeGrievances + monthlyFiledCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0) -
            monthlyClosedCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0);
   });
-  // For members, use current count as base (historical member data not tracked)
+  // Member count history not tracked — show current count consistently (no fabricated trends)
   metrics.sixMonthHistory.members = [
-    Math.round(metrics.totalMembers * 0.92),
-    Math.round(metrics.totalMembers * 0.94),
-    Math.round(metrics.totalMembers * 0.96),
-    Math.round(metrics.totalMembers * 0.97),
-    Math.round(metrics.totalMembers * 0.99),
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
     metrics.totalMembers
   ];
 

@@ -376,7 +376,7 @@ describe('getUndoHistory', () => {
       setProperty: jest.fn(),
       deleteProperty: jest.fn()
     };
-    PropertiesService.getScriptProperties.mockReturnValue(mockProps);
+    PropertiesService.getUserProperties.mockReturnValue(mockProps);
 
     const history = getUndoHistory();
 
@@ -390,7 +390,7 @@ describe('getUndoHistory', () => {
       setProperty: jest.fn(),
       deleteProperty: jest.fn()
     };
-    PropertiesService.getScriptProperties.mockReturnValue(mockProps);
+    PropertiesService.getUserProperties.mockReturnValue(mockProps);
 
     const history = getUndoHistory();
 
@@ -413,7 +413,7 @@ describe('saveUndoHistory', () => {
       setProperty: jest.fn(),
       deleteProperty: jest.fn()
     };
-    PropertiesService.getScriptProperties.mockReturnValue(mockProps);
+    PropertiesService.getUserProperties.mockReturnValue(mockProps);
 
     const history = { actions: [{ type: 'TEST' }], currentIndex: 1 };
     saveUndoHistory(history);
@@ -430,7 +430,7 @@ describe('saveUndoHistory', () => {
       setProperty: jest.fn(),
       deleteProperty: jest.fn()
     };
-    PropertiesService.getScriptProperties.mockReturnValue(mockProps);
+    PropertiesService.getUserProperties.mockReturnValue(mockProps);
 
     // Create history exceeding the limit
     const actions = [];
@@ -460,7 +460,7 @@ describe('clearUndoHistory', () => {
       setProperty: jest.fn(),
       deleteProperty: jest.fn()
     };
-    PropertiesService.getScriptProperties.mockReturnValue(mockProps);
+    PropertiesService.getUserProperties.mockReturnValue(mockProps);
 
     clearUndoHistory();
 
@@ -484,7 +484,7 @@ describe('recordAction', () => {
       setProperty: jest.fn(),
       deleteProperty: jest.fn()
     };
-    PropertiesService.getScriptProperties.mockReturnValue(mockProps);
+    PropertiesService.getUserProperties.mockReturnValue(mockProps);
 
     recordAction('EDIT_CELL', 'Edited field X', { old: 1 }, { new: 2 });
 
@@ -511,7 +511,7 @@ describe('recordAction', () => {
       setProperty: jest.fn(),
       deleteProperty: jest.fn()
     };
-    PropertiesService.getScriptProperties.mockReturnValue(mockProps);
+    PropertiesService.getUserProperties.mockReturnValue(mockProps);
 
     recordAction('A3', 'third', null, null);
 

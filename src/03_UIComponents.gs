@@ -980,7 +980,7 @@ function applyThemeToSheet(sheet, theme) {
 function previewTheme(themeKey) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
-  applyThemeToSheet_(sheet);
+  applyThemeToSheet_(sheet, themeKey);
   ss.toast('Previewing ' + themeKey + ' theme', 'Theme Preview', 2);
 }
 
@@ -1470,10 +1470,10 @@ function showMemberQuickActions(row) {
   if (email) {
     emailButtons =
       '<div class="section-header">📨 Email Options</div>' +
-      '<button class="action-btn" onclick="google.script.run.composeEmailForMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Send Custom Email</div><div class="desc">Compose email to ' + email + '</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailDashboardLinkToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">🔗</span><span><div class="title">Send Dashboard Link</div><div class="desc">Share dashboard access with member</div></span></button>';
+      '<button class="action-btn" onclick="google.script.run.composeEmailForMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Send Custom Email</div><div class="desc">Compose email to ' + escapeHtml(email) + '</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailDashboardLinkToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">🔗</span><span><div class="title">Send Dashboard Link</div><div class="desc">Share dashboard access with member</div></span></button>';
   }
 
   var html = HtmlService.createHtmlOutput(
@@ -1499,16 +1499,16 @@ function showMemberQuickActions(row) {
     '</style></head><body><div class="container">' +
     '<h2>⚡ Quick Actions</h2>' +
     '<div class="info">' +
-    '<div class="name">' + name + '</div>' +
-    '<div class="id">' + memberId + ' | ' + (email || 'No email') + '</div>' +
+    '<div class="name">' + escapeHtml(name) + '</div>' +
+    '<div class="id">' + escapeHtml(memberId) + ' | ' + escapeHtml(email || 'No email') + '</div>' +
     '<div class="status">' + (hasOpen === 'Yes' ? '<span class="badge open">🔴 Has Open Grievance</span>' : '<span class="badge none">🟢 No Open Grievances</span>') + '</div>' +
     '</div>' +
     '<div class="actions">' +
     '<div class="section-header">📋 Member Actions</div>' +
     '<button class="action-btn" onclick="google.script.run.openGrievanceFormForMember(' + row + ');google.script.host.close()"><span class="icon">📋</span><span><div class="title">Start New Grievance</div><div class="desc">Create a grievance for this member</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(\'' + memberId + '\');google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>' +
-    '<button class="action-btn" onclick="navigator.clipboard.writeText(\'' + memberId + '\');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">' + memberId + '</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+\'\\n\'+r.folderUrl)}else{alert(\'Error: \'+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(\'' + memberId + '\')"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>' +
+    '<button class="action-btn" onclick="navigator.clipboard.writeText(\'' + escapeHtml(memberId) + '\');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">' + escapeHtml(memberId) + '</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+\'\\n\'+r.folderUrl)}else{alert(\'Error: \'+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(\'' + escapeHtml(memberId) + '\')"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>' +
     emailButtons +
     '</div>' +
     '<button class="close" onclick="google.script.host.close()">Close</button>' +
@@ -1943,7 +1943,7 @@ function openGrievanceFormForMember(row) {
  */
 function syncSingleGrievanceToCalendar(grievanceId) {
   SpreadsheetApp.getActiveSpreadsheet().toast('📅 Syncing ' + grievanceId + '...', 'Calendar', 3);
-  if (typeof syncDeadlinesToCalendar === 'function') syncDeadlinesToCalendar();
+  if (typeof syncDeadlinesToCalendar === 'function') syncDeadlinesToCalendar(grievanceId);
 }
 
 // ============================================================================
@@ -2014,7 +2014,6 @@ function emailDashboardLink_UIService_() {
   // Get member email and name from the selected row
   var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
   var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
-  var _lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
 
   if (!email || !email.toString().includes('@')) {
     SpreadsheetApp.getUi().alert('No valid email found for this member.');

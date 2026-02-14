@@ -1135,7 +1135,7 @@ function sendStewardDeadlineAlerts() {
     var currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
     var nextDue = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
     var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var steward = row[GRIEVANCE_COLS.ASSIGNED_STEWARD - 1] || '';
+    var steward = row[GRIEVANCE_COLS.STEWARD - 1] || '';
 
     // Skip closed grievances
     if (closedStatuses.indexOf(status) !== -1) continue;
@@ -1438,7 +1438,12 @@ function executeSendRandomSurveyEmails(opts) {
   }
 
   // Shuffle and select random members
-  var shuffled = eligibleMembers.sort(function() { return 0.5 - Math.random(); });
+  // Fisher-Yates shuffle for uniform distribution
+  var shuffled = eligibleMembers.slice();
+  for (var si = shuffled.length - 1; si > 0; si--) {
+    var sj = Math.floor(Math.random() * (si + 1));
+    var temp = shuffled[si]; shuffled[si] = shuffled[sj]; shuffled[sj] = temp;
+  }
   var selected = shuffled.slice(0, Math.min(opts.count, shuffled.length));
 
   // Send emails

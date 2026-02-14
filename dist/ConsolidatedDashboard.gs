@@ -1424,7 +1424,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2737 lines)
+// SOURCE: 01_Core.gs (2741 lines)
 // ============================================================================
 
 /**
@@ -2205,6 +2205,10 @@ var SHEET_NAMES = SHEETS;
 var HIDDEN_SHEETS = {
   CALC_STATS: '_Dashboard_Calc',
   CALC_FORMULAS: '_Grievance_Formulas',
+  CALC_MEMBERS: '_Members_Calc',
+  CALC_GRIEVANCES: '_Grievances_Calc',
+  CALC_DEADLINES: '_Deadlines_Calc',
+  CALC_SYNC: '_Sync_Calc',
   GRIEVANCE_CALC: '_Grievance_Calc',
   MEMBER_LOOKUP: '_Member_Lookup',
   STEWARD_CONTACT_CALC: '_Steward_Contact_Calc',
@@ -6661,7 +6665,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2749 lines)
+// SOURCE: 03_UIComponents.gs (2748 lines)
 // ============================================================================
 
 /**
@@ -7646,7 +7650,7 @@ function applyThemeToSheet(sheet, theme) {
 function previewTheme(themeKey) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
-  applyThemeToSheet_(sheet);
+  applyThemeToSheet_(sheet, themeKey);
   ss.toast('Previewing ' + themeKey + ' theme', 'Theme Preview', 2);
 }
 
@@ -8136,10 +8140,10 @@ function showMemberQuickActions(row) {
   if (email) {
     emailButtons =
       '<div class="section-header">📨 Email Options</div>' +
-      '<button class="action-btn" onclick="google.script.run.composeEmailForMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Send Custom Email</div><div class="desc">Compose email to ' + email + '</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailDashboardLinkToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">🔗</span><span><div class="title">Send Dashboard Link</div><div class="desc">Share dashboard access with member</div></span></button>';
+      '<button class="action-btn" onclick="google.script.run.composeEmailForMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Send Custom Email</div><div class="desc">Compose email to ' + escapeHtml(email) + '</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailDashboardLinkToMember(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">🔗</span><span><div class="title">Send Dashboard Link</div><div class="desc">Share dashboard access with member</div></span></button>';
   }
 
   var html = HtmlService.createHtmlOutput(
@@ -8165,16 +8169,16 @@ function showMemberQuickActions(row) {
     '</style></head><body><div class="container">' +
     '<h2>⚡ Quick Actions</h2>' +
     '<div class="info">' +
-    '<div class="name">' + name + '</div>' +
-    '<div class="id">' + memberId + ' | ' + (email || 'No email') + '</div>' +
+    '<div class="name">' + escapeHtml(name) + '</div>' +
+    '<div class="id">' + escapeHtml(memberId) + ' | ' + escapeHtml(email || 'No email') + '</div>' +
     '<div class="status">' + (hasOpen === 'Yes' ? '<span class="badge open">🔴 Has Open Grievance</span>' : '<span class="badge none">🟢 No Open Grievances</span>') + '</div>' +
     '</div>' +
     '<div class="actions">' +
     '<div class="section-header">📋 Member Actions</div>' +
     '<button class="action-btn" onclick="google.script.run.openGrievanceFormForMember(' + row + ');google.script.host.close()"><span class="icon">📋</span><span><div class="title">Start New Grievance</div><div class="desc">Create a grievance for this member</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(\'' + memberId + '\');google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>' +
-    '<button class="action-btn" onclick="navigator.clipboard.writeText(\'' + memberId + '\');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">' + memberId + '</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+\'\\n\'+r.folderUrl)}else{alert(\'Error: \'+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(\'' + memberId + '\')"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.showMemberGrievanceHistory(\'' + escapeHtml(memberId) + '\');google.script.host.close()"><span class="icon">📁</span><span><div class="title">View Grievance History</div><div class="desc">See all grievances for this member</div></span></button>' +
+    '<button class="action-btn" onclick="navigator.clipboard.writeText(\'' + escapeHtml(memberId) + '\');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Member ID</div><div class="desc">' + escapeHtml(memberId) + '</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(r){if(r.success){alert(r.message+\'\\n\'+r.folderUrl)}else{alert(\'Error: \'+r.error)}}).withFailureHandler(function(e){alert(e.message)}).setupDriveFolderForMember(\'' + escapeHtml(memberId) + '\')"><span class="icon">📁</span><span><div class="title">Create Member Folder</div><div class="desc">Setup Google Drive folder for this member</div></span></button>' +
     emailButtons +
     '</div>' +
     '<button class="close" onclick="google.script.host.close()">Close</button>' +
@@ -8609,7 +8613,7 @@ function openGrievanceFormForMember(row) {
  */
 function syncSingleGrievanceToCalendar(grievanceId) {
   SpreadsheetApp.getActiveSpreadsheet().toast('📅 Syncing ' + grievanceId + '...', 'Calendar', 3);
-  if (typeof syncDeadlinesToCalendar === 'function') syncDeadlinesToCalendar();
+  if (typeof syncDeadlinesToCalendar === 'function') syncDeadlinesToCalendar(grievanceId);
 }
 
 // ============================================================================
@@ -8680,7 +8684,6 @@ function emailDashboardLink_UIService_() {
   // Get member email and name from the selected row
   var email = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
   var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
-  var _lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
 
   if (!email || !email.toString().includes('@')) {
     SpreadsheetApp.getUi().alert('No valid email found for this member.');
@@ -9947,8 +9950,8 @@ function openCellMultiSelectEditor() {
     return;
   }
 
-  // Store target cell coordinates for the callback
-  var props = PropertiesService.getDocumentProperties();
+  // Store target cell coordinates for the callback (UserProperties to avoid multi-user conflicts)
+  var props = PropertiesService.getUserProperties();
   props.setProperty('multiSelectRow', row.toString());
   props.setProperty('multiSelectCol', col.toString());
 
@@ -17074,7 +17077,7 @@ function openGrievanceFolder() {
 
   if (folderUrl) {
     const html = HtmlService.createHtmlOutput(
-      `<script>window.open('${folderUrl}', '_blank'); google.script.host.close();</script>`
+      `<script>window.open(${JSON.stringify(folderUrl)}, '_blank'); google.script.host.close();</script>`
     ).setWidth(100).setHeight(50);
     SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
   } else {
@@ -17083,7 +17086,7 @@ function openGrievanceFolder() {
       const result = setupDriveFolderForGrievance(grievanceId);
       if (result.success) {
         const html = HtmlService.createHtmlOutput(
-          `<script>window.open('${result.folderUrl}', '_blank'); google.script.host.close();</script>`
+          `<script>window.open(${JSON.stringify(result.folderUrl)}, '_blank'); google.script.host.close();</script>`
         ).setWidth(100).setHeight(50);
         SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
       }
@@ -19671,7 +19674,7 @@ function addMobileDashboardLinkToConfig() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3458 lines)
+// SOURCE: 06_Maintenance.gs (3471 lines)
 // ============================================================================
 
 /**
@@ -19926,19 +19929,22 @@ function removeDeprecatedTabs() {
   ];
 
   var removed = [];
-  ss.getSheets().forEach(function(sheet) {
+  var sheets = ss.getSheets();
+  for (var i = sheets.length - 1; i >= 0; i--) {
+    var sheet = sheets[i];
     var name = sheet.getName();
-    deprecatedSheets.forEach(function(prefix) {
-      if (name.indexOf(prefix) === 0) {
+    for (var j = 0; j < deprecatedSheets.length; j++) {
+      if (name.indexOf(deprecatedSheets[j]) === 0) {
         try {
           ss.deleteSheet(sheet);
           removed.push(name);
         } catch (_e) {
           Logger.log('Could not delete sheet: ' + name);
         }
+        break;
       }
-    });
-  });
+    }
+  }
 
   if (removed.length > 0) {
     SpreadsheetApp.getUi().alert(
@@ -20106,12 +20112,12 @@ function showModalDiagnostics() {
     '.btn{padding:10px 20px;border:none;border-radius:6px;cursor:pointer;background:#7c3aed;color:white}' +
     '</style></head><body>' +
     '<div class="title">Modal Diagnostics</div>' +
-    '<span class="status-' + (results.status === 'OK' ? 'ok' : 'error') + '">' + results.status + '</span>' +
-    '<p>' + results.summary + '</p>' +
+    '<span class="status-' + (results.status === 'OK' ? 'ok' : 'error') + '">' + escapeHtml(results.status) + '</span>' +
+    '<p>' + escapeHtml(results.summary) + '</p>' +
     '<div class="card"><strong>Sheet Checks</strong><table>' +
     '<tr><th>Sheet</th><th>Status</th></tr>' +
     results.sheetChecks.map(function(c) {
-      return '<tr><td>' + c.name + '</td><td>' + (c.found ? '✅' : '❌') + '</td></tr>';
+      return '<tr><td>' + escapeHtml(c.name) + '</td><td>' + (c.found ? '✅' : '❌') + '</td></tr>';
     }).join('') +
     '</table></div>' +
     '<button class="btn" onclick="google.script.host.close()">Close</button>' +
@@ -20607,7 +20613,7 @@ var UNDO_CONFIG = {
  * @returns {Object} History object with actions array and currentIndex
  */
 function getUndoHistory() {
-  var props = PropertiesService.getScriptProperties();
+  var props = PropertiesService.getUserProperties();
   var json = props.getProperty(UNDO_CONFIG.STORAGE_KEY);
 
   if (json) {
@@ -20623,7 +20629,7 @@ function getUndoHistory() {
  * @returns {void}
  */
 function saveUndoHistory(history) {
-  var props = PropertiesService.getScriptProperties();
+  var props = PropertiesService.getUserProperties();
 
   // Trim history if over limit
   if (history.actions.length > UNDO_CONFIG.MAX_HISTORY) {
@@ -20639,7 +20645,7 @@ function saveUndoHistory(history) {
  * @returns {void}
  */
 function clearUndoHistory() {
-  PropertiesService.getScriptProperties().deleteProperty(UNDO_CONFIG.STORAGE_KEY);
+  PropertiesService.getUserProperties().deleteProperty(UNDO_CONFIG.STORAGE_KEY);
   SpreadsheetApp.getActiveSpreadsheet().toast('History cleared', 'Undo/Redo', 3);
 }
 
@@ -21243,6 +21249,16 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   );
 
   if (response !== ui.Button.YES) {
+    return errorResponse('Cancelled');
+  }
+
+  // Second confirmation required
+  const response2 = ui.alert(
+    '⚠️ FINAL WARNING',
+    'All grievance data will be PERMANENTLY deleted. Are you absolutely certain?',
+    ui.ButtonSet.YES_NO
+  );
+  if (response2 !== ui.Button.YES) {
     return errorResponse('Cancelled');
   }
 
@@ -23134,7 +23150,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2810 lines)
+// SOURCE: 07_DevTools.gs (2733 lines)
 // ============================================================================
 
 /**
@@ -24809,7 +24825,7 @@ function addDays(date, days) {
 
 // ==================== TEST CONFIGURATION ====================
 
-var TEST_RESULTS = { passed: [], failed: [], skipped: [] };
+// TEST_RESULTS tracking is handled within individual test runner functions
 var TEST_MAX_EXECUTION_MS = 5 * 60 * 1000;
 var TEST_LARGE_DATASET_THRESHOLD = 5000;
 
@@ -24844,7 +24860,34 @@ var Assert = {
     tolerance = tolerance || 0.001;
     if (Math.abs(expected - actual) > tolerance) throw new Error((message || 'Values not approximately equal') + '\nExpected: ' + expected + '\nActual: ' + actual);
   },
-  fail: function(message) { throw new Error(message || 'Test failed'); }
+  fail: function(message) { throw new Error(message || 'Test failed'); },
+  // Aliases for compatibility with second API convention
+  isTrue: function(value, message) {
+    if (!value) throw new Error(message || 'Expected true but got: ' + value);
+  },
+  isFalse: function(value, message) {
+    if (value) throw new Error(message || 'Expected false but got: ' + value);
+  },
+  equals: function(expected, actual, message) {
+    if (expected !== actual) throw new Error(message || 'Expected ' + expected + ' but got: ' + actual);
+  },
+  notEquals: function(expected, actual, message) {
+    if (expected === actual) throw new Error(message || 'Expected values to be different but both were: ' + actual);
+  },
+  isDefined: function(value, message) {
+    if (value === undefined || value === null) throw new Error(message || 'Expected value to be defined');
+  },
+  isArray: function(value, message) {
+    if (!Array.isArray(value)) throw new Error(message || 'Expected array but got: ' + typeof value);
+  },
+  contains: function(array, value, message) {
+    if (array.indexOf(value) === -1) throw new Error(message || 'Expected array to contain: ' + value);
+  },
+  throws: function(fn, message) {
+    var threw = false;
+    try { fn(); } catch (_e) { threw = true; }
+    if (!threw) throw new Error(message || 'Expected function to throw an error');
+  }
 };
 
 // ==================== TEST HELPERS ====================
@@ -25338,111 +25381,7 @@ var TestSuite = {
   }
 };
 
-// ============================================================================
-// ASSERTION HELPERS
-// ============================================================================
-
-/**
- * Assertion helper
- */
-var Assert = {
-  /**
-   * Asserts that a value is truthy
-   * @param {*} value - Value to check
-   * @param {string} [message] - Error message
-   */
-  isTrue: function(value, message) {
-    if (!value) {
-      throw new Error(message || 'Expected true but got: ' + value);
-    }
-  },
-
-  /**
-   * Asserts that a value is falsy
-   * @param {*} value - Value to check
-   * @param {string} [message] - Error message
-   */
-  isFalse: function(value, message) {
-    if (value) {
-      throw new Error(message || 'Expected false but got: ' + value);
-    }
-  },
-
-  /**
-   * Asserts that two values are equal
-   * @param {*} expected - Expected value
-   * @param {*} actual - Actual value
-   * @param {string} [message] - Error message
-   */
-  equals: function(expected, actual, message) {
-    if (expected !== actual) {
-      throw new Error(message || 'Expected ' + expected + ' but got: ' + actual);
-    }
-  },
-
-  /**
-   * Asserts that two values are not equal
-   * @param {*} expected - Expected value
-   * @param {*} actual - Actual value
-   * @param {string} [message] - Error message
-   */
-  notEquals: function(expected, actual, message) {
-    if (expected === actual) {
-      throw new Error(message || 'Expected values to be different but both were: ' + actual);
-    }
-  },
-
-  /**
-   * Asserts that a value is defined (not undefined or null)
-   * @param {*} value - Value to check
-   * @param {string} [message] - Error message
-   */
-  isDefined: function(value, message) {
-    if (value === undefined || value === null) {
-      throw new Error(message || 'Expected value to be defined');
-    }
-  },
-
-  /**
-   * Asserts that a value is an array
-   * @param {*} value - Value to check
-   * @param {string} [message] - Error message
-   */
-  isArray: function(value, message) {
-    if (!Array.isArray(value)) {
-      throw new Error(message || 'Expected array but got: ' + typeof value);
-    }
-  },
-
-  /**
-   * Asserts that an array contains a value
-   * @param {Array} array - Array to check
-   * @param {*} value - Value to find
-   * @param {string} [message] - Error message
-   */
-  contains: function(array, value, message) {
-    if (array.indexOf(value) === -1) {
-      throw new Error(message || 'Expected array to contain: ' + value);
-    }
-  },
-
-  /**
-   * Asserts that a function throws an error
-   * @param {Function} fn - Function to execute
-   * @param {string} [message] - Error message
-   */
-  throws: function(fn, message) {
-    var threw = false;
-    try {
-      fn();
-    } catch (_e) {
-      threw = true;
-    }
-    if (!threw) {
-      throw new Error(message || 'Expected function to throw an error');
-    }
-  }
-};
+// NOTE: Assert object is defined once at line 1677 with both API styles merged
 
 // ============================================================================
 // TEST CASES - CONSTANTS
@@ -27481,7 +27420,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1580 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (1585 lines)
 // ============================================================================
 
 
@@ -28621,7 +28560,7 @@ function sendStewardDeadlineAlerts() {
     var currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
     var nextDue = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
     var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var steward = row[GRIEVANCE_COLS.ASSIGNED_STEWARD - 1] || '';
+    var steward = row[GRIEVANCE_COLS.STEWARD - 1] || '';
 
     // Skip closed grievances
     if (closedStatuses.indexOf(status) !== -1) continue;
@@ -28924,7 +28863,12 @@ function executeSendRandomSurveyEmails(opts) {
   }
 
   // Shuffle and select random members
-  var shuffled = eligibleMembers.sort(function() { return 0.5 - Math.random(); });
+  // Fisher-Yates shuffle for uniform distribution
+  var shuffled = eligibleMembers.slice();
+  for (var si = shuffled.length - 1; si > 0; si--) {
+    var sj = Math.floor(Math.random() * (si + 1));
+    var temp = shuffled[si]; shuffled[si] = shuffled[sj]; shuffled[sj] = temp;
+  }
   var selected = shuffled.slice(0, Math.min(opts.count, shuffled.length));
 
   // Send emails
@@ -29066,7 +29010,7 @@ function getQuarterFromDate(date) {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (1462 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (1467 lines)
 // ============================================================================
 
 // ============================================================================
@@ -29083,9 +29027,14 @@ function setupAuditLogSheet() {
 
   if (!sheet) {
     sheet = ss.insertSheet(SHEETS.AUDIT_LOG);
+    sheet.clear();
+  } else if (sheet.getLastRow() <= 1) {
+    sheet.clear();
+  } else {
+    // Audit log has existing data — do not clear (compliance requirement)
+    Logger.log('setupAuditLogSheet: Sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear');
+    return;
   }
-
-  sheet.clear();
 
   // Headers
   var headers = [
@@ -31428,9 +31377,9 @@ function getSatisfactionResponseData() {
     });
   }
 
-  // Sort by date (most recent first)
+  // Sort by date (most recent first) - use Date parsing for correct chronological order
   responses.sort(function(a, b) {
-    return b.date.localeCompare(a.date);
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
   return responses;
@@ -33341,13 +33290,13 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     return metrics.activeGrievances + monthlyFiledCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0) -
            monthlyClosedCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0);
   });
-  // For members, use current count as base (historical member data not tracked)
+  // Member count history not tracked — show current count consistently (no fabricated trends)
   metrics.sixMonthHistory.members = [
-    Math.round(metrics.totalMembers * 0.92),
-    Math.round(metrics.totalMembers * 0.94),
-    Math.round(metrics.totalMembers * 0.96),
-    Math.round(metrics.totalMembers * 0.97),
-    Math.round(metrics.totalMembers * 0.99),
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
     metrics.totalMembers
   ];
 
@@ -40677,7 +40626,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2068 lines)
+// SOURCE: 10_Main.gs (2071 lines)
 // ============================================================================
 
 /**
@@ -40905,7 +40854,10 @@ function handleSecurityAudit_(e) {
     var alertMessage = '';
 
     // SABOTAGE PROTECTION: Detect mass deletions (>15 cells cleared)
-    if (numCells > 15 && !e.value) {
+    // Exclude multi-cell paste operations (e.value is undefined for pastes AND deletions,
+    // but pastes set range values while deletions clear them)
+    var rangeIsEmpty = range.isBlank();
+    if (numCells > 15 && !e.value && rangeIsEmpty) {
       alertMessage = 'MASS_DELETION_ALERT';
 
       // Send alert to Chief Steward
@@ -40931,7 +40883,7 @@ function handleSecurityAudit_(e) {
                   COMMAND_CONFIG.EMAIL.FOOTER
           });
         } catch (emailError) {
-          Logger.log('Failed to send sabotage alert: ' + emailError.message);
+          Logger.log('Sabotage alert email failed (simple onEdit limit): ' + emailError.message);
         }
       }
 
@@ -42750,7 +42702,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3666 lines)
+// SOURCE: 11_CommandHub.gs (3683 lines)
 // ============================================================================
 
 /**
@@ -43437,10 +43389,22 @@ function NUKE_DATABASE() {
     // Persist to ScriptProperties so the record survives audit sheet deletion
     PropertiesService.getScriptProperties().setProperty('LAST_NUCLEAR_WIPE', JSON.stringify(wipeRecord));
 
-    // Delete _Audit_Log hidden sheet
+    // Archive _Audit_Log before deletion for compliance
     var auditLogSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
     if (auditLogSheet) {
-      try { ss.deleteSheet(auditLogSheet); } catch (e) { Logger.log('Could not delete _Audit_Log: ' + e.message); }
+      try {
+        var auditData = auditLogSheet.getDataRange().getValues();
+        if (auditData.length > 1) {
+          var csv = auditData.map(function(row) {
+            return row.map(function(val) {
+              var s = String(val);
+              return (s.indexOf(',') !== -1 || s.indexOf('"') !== -1) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            }).join(',');
+          }).join('\n');
+          DriveApp.createFile(Utilities.newBlob(csv, 'text/csv', 'AUDIT_LOG_BACKUP_' + new Date().getTime() + '.csv'));
+        }
+        ss.deleteSheet(auditLogSheet);
+      } catch (e) { Logger.log('Could not archive/delete _Audit_Log: ' + e.message); }
     }
 
     // Clean up demo references from documentation tabs
@@ -45473,10 +45437,11 @@ function testOCRConnection() {
     };
 
     var response = UrlFetchApp.fetch(
-      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      'https://vision.googleapis.com/v1/images:annotate',
       {
         method: 'POST',
         contentType: 'application/json',
+        headers: { 'X-Goog-Api-Key': apiKey },
         payload: JSON.stringify(testRequest),
         muteHttpExceptions: true
       }
@@ -45767,8 +45732,12 @@ function safetyValveScrub(data) {
   // Mask SSN-like patterns: 000-00-0000
   var ssnRegex = /\b\d{3}-\d{2}-\d{4}\b/g;
 
+  // Mask email addresses
+  var emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+
   return data.replace(phoneRegex, "[REDACTED CONTACT]")
-             .replace(ssnRegex, "[REDACTED ID]");
+             .replace(ssnRegex, "[REDACTED ID]")
+             .replace(emailRegex, "[REDACTED EMAIL]");
 }
 
 /**
@@ -46264,10 +46233,10 @@ function getMemberPortalHtml_(profile) {
     '  <div class="container">' +
     '    <div class="header">' +
     '      <h1>509 MEMBER PORTAL</h1>' +
-    '      <div class="welcome">Welcome, ' + profile.firstName + '!</div>' +
+    '      <div class="welcome">Welcome, ' + escapeHtml(profile.firstName) + '!</div>' +
     '      <div class="member-badge">' +
     '        <i class="material-icons" style="font-size:16px">' + (profile.isSteward ? 'verified' : 'person') + '</i>' +
-    '        ' + (profile.isSteward ? 'Union Steward' : 'Union Member') + ' - ' + profile.unit +
+    '        ' + (profile.isSteward ? 'Union Steward' : 'Union Member') + ' - ' + escapeHtml(profile.unit) +
     '      </div>' +
     '    </div>' +
     '    ' +
@@ -46284,7 +46253,7 @@ function getMemberPortalHtml_(profile) {
     '    <div class="card">' +
     '      <div class="card-title"><i class="material-icons">people</i> Your Stewards</div>' +
     stewards.slice(0, 5).map(function(s) {
-      return '<div class="steward-item"><span>' + s['First Name'] + ' ' + s['Last Name'] + '</span><span class="pill">' + s['Unit'] + '</span></div>';
+      return '<div class="steward-item"><span>' + escapeHtml(s['First Name']) + ' ' + escapeHtml(s['Last Name']) + '</span><span class="pill">' + escapeHtml(s['Unit']) + '</span></div>';
     }).join('') +
     '    </div>' +
     '    ' +
@@ -46378,7 +46347,7 @@ function getPublicPortalHtml_(stats, stewards, satisfaction) {
     '    <div class="card">' +
     '      <div class="card-title"><i class="material-icons">people</i> Find a Steward</div>' +
     stewards.map(function(s) {
-      return '<div class="steward-item"><span>' + s['First Name'] + ' ' + s['Last Name'] + '</span><span class="pill">' + s['Unit'] + '</span></div>';
+      return '<div class="steward-item"><span>' + escapeHtml(s['First Name']) + ' ' + escapeHtml(s['Last Name']) + '</span><span class="pill">' + escapeHtml(s['Unit']) + '</span></div>';
     }).join('') +
     '    </div>' +
     '    ' +
@@ -46413,7 +46382,7 @@ function getErrorPageHtml_(message) {
     '  <div class="error-box">' +
     '    <i class="material-icons error-icon">error_outline</i>' +
     '    <div class="error-title">Access Error</div>' +
-    '    <div class="error-msg">' + message + '</div>' +
+    '    <div class="error-msg">' + escapeHtml(message) + '</div>' +
     '  </div>' +
     '</body>' +
     '</html>';
@@ -46421,7 +46390,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4024 lines)
+// SOURCE: 12_Features.gs (4027 lines)
 // ============================================================================
 
 /**
@@ -46550,27 +46519,34 @@ function createChecklistSheet_(ss) {
  */
 function generateChecklistId_(offset) {
   offset = offset || 0;
-  var sheet = getOrCreateChecklistSheet();
-  var lastRow = sheet.getLastRow();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
 
-  if (lastRow < 2) {
-    return 'CL-' + String(1 + offset).padStart(5, '0');
-  }
+  try {
+    var sheet = getOrCreateChecklistSheet();
+    var lastRow = sheet.getLastRow();
 
-  var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
-  var maxNum = 0;
+    if (lastRow < 2) {
+      return 'CL-' + String(1 + offset).padStart(5, '0');
+    }
 
-  for (var i = 0; i < ids.length; i++) {
-    var id = ids[i][0];
-    if (id && typeof id === 'string' && id.indexOf('CL-') === 0) {
-      var numPart = parseInt(id.substring(3), 10);
-      if (!isNaN(numPart) && numPart > maxNum) {
-        maxNum = numPart;
+    var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
+    var maxNum = 0;
+
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i][0];
+      if (id && typeof id === 'string' && id.indexOf('CL-') === 0) {
+        var numPart = parseInt(id.substring(3), 10);
+        if (!isNaN(numPart) && numPart > maxNum) {
+          maxNum = numPart;
+        }
       }
     }
-  }
 
-  return 'CL-' + String(maxNum + 1 + offset).padStart(5, '0');
+    return 'CL-' + String(maxNum + 1 + offset).padStart(5, '0');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -49970,17 +49946,13 @@ function generateAnonHash_(id) {
   var props = PropertiesService.getScriptProperties();
   var salt = props.getProperty('ANON_HASH_SALT');
   if (!salt) {
-    salt = 'anon509data'; // Default fallback — auto-stored on first run
+    salt = Utilities.getUuid(); // Generate random salt on first run
     props.setProperty('ANON_HASH_SALT', salt);
   }
   const combined = salt + String(id);
-  let hash = 0;
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return 'A' + Math.abs(hash).toString(36).toUpperCase().substring(0, 8);
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
+  const encoded = Utilities.base64Encode(digest).substring(0, 12);
+  return 'A' + encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
 }
 
 /**
@@ -50450,7 +50422,7 @@ function getLookerStatus() {
 
 
 // ============================================================================
-// SOURCE: 13_MemberSelfService.gs (1666 lines)
+// SOURCE: 13_MemberSelfService.gs (1672 lines)
 // ============================================================================
 
 /**
@@ -50566,7 +50538,14 @@ function verifyPIN(pin, memberId, storedHash) {
   if (!pin || !memberId || !storedHash) return false;
 
   var computedHash = hashPIN(pin, memberId);
-  return computedHash === storedHash;
+
+  // Constant-time comparison to prevent timing attacks
+  if (computedHash.length !== storedHash.length) return false;
+  var result = 0;
+  for (var i = 0; i < computedHash.length; i++) {
+    result |= computedHash.charCodeAt(i) ^ storedHash.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 /**
@@ -50669,7 +50648,7 @@ function assignMemberPIN(memberId, options) {
 function generateResetToken_() {
   // Use Utilities.getUuid() for better randomness than Math.random()
   var uuid = Utilities.getUuid().replace(/-/g, '').toUpperCase();
-  return uuid.substring(0, 8);
+  return uuid.substring(0, 16);
 }
 
 /**
@@ -52032,7 +52011,6 @@ function getMemberSelfServicePortalHtml() {
     '    html+="<div class=\\"grievance-detail\\"><strong>Steward:</strong> "+escapeHtml(g.steward||"Not assigned")+"</div>";' +
     '    if(g.nextDeadline)html+="<div class=\\"grievance-detail\\"><strong>Next Deadline:</strong> "+escapeHtml(g.nextDeadline)+"</div>";' +
     '    if(g.resolution)html+="<div class=\\"grievance-detail\\" style=\\"margin-top:10px;padding-top:10px;border-top:1px solid #e0e0e0\\"><strong>Resolution:</strong> "+escapeHtml(g.resolution)+"</div>";' +
-    '    if(g.resolution)html+="<div class=\\"grievance-detail\\"><strong>Resolution:</strong> "+escapeHtml(g.resolution)+"</div>";' +
     '    html+="</div>";' +
     '  });' +
     '  document.getElementById("grievancesContent").innerHTML=html;' +

@@ -111,7 +111,14 @@ function verifyPIN(pin, memberId, storedHash) {
   if (!pin || !memberId || !storedHash) return false;
 
   var computedHash = hashPIN(pin, memberId);
-  return computedHash === storedHash;
+
+  // Constant-time comparison to prevent timing attacks
+  if (computedHash.length !== storedHash.length) return false;
+  var result = 0;
+  for (var i = 0; i < computedHash.length; i++) {
+    result |= computedHash.charCodeAt(i) ^ storedHash.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 /**
@@ -214,7 +221,7 @@ function assignMemberPIN(memberId, options) {
 function generateResetToken_() {
   // Use Utilities.getUuid() for better randomness than Math.random()
   var uuid = Utilities.getUuid().replace(/-/g, '').toUpperCase();
-  return uuid.substring(0, 8);
+  return uuid.substring(0, 16);
 }
 
 /**
@@ -1577,7 +1584,6 @@ function getMemberSelfServicePortalHtml() {
     '    html+="<div class=\\"grievance-detail\\"><strong>Steward:</strong> "+escapeHtml(g.steward||"Not assigned")+"</div>";' +
     '    if(g.nextDeadline)html+="<div class=\\"grievance-detail\\"><strong>Next Deadline:</strong> "+escapeHtml(g.nextDeadline)+"</div>";' +
     '    if(g.resolution)html+="<div class=\\"grievance-detail\\" style=\\"margin-top:10px;padding-top:10px;border-top:1px solid #e0e0e0\\"><strong>Resolution:</strong> "+escapeHtml(g.resolution)+"</div>";' +
-    '    if(g.resolution)html+="<div class=\\"grievance-detail\\"><strong>Resolution:</strong> "+escapeHtml(g.resolution)+"</div>";' +
     '    html+="</div>";' +
     '  });' +
     '  document.getElementById("grievancesContent").innerHTML=html;' +
