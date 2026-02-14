@@ -327,13 +327,13 @@ describe('findExistingMember', () => {
   beforeEach(() => jest.clearAllMocks());
 
   // Build a mock data array matching MEMBER_COLS layout
-  // MEMBER_ID=1(idx0), FIRST_NAME=2(idx1), LAST_NAME=3(idx2), ... EMAIL=8(idx7)
-  const headers = ['Member ID', 'First Name', 'Last Name', 'Job Title', 'Work Location', 'Unit', 'Office Days', 'Email'];
+  // MEMBER_ID=1(idx0), FIRST_NAME=2(idx1), LAST_NAME=3(idx2), ... CUBICLE=7(idx6), OFFICE_DAYS=8(idx7), EMAIL=9(idx8)
+  const headers = ['Member ID', 'First Name', 'Last Name', 'Job Title', 'Work Location', 'Unit', 'Cubicle', 'Office Days', 'Email'];
   const memberData = [
     headers,
-    ['MS-101-H', 'John', 'Doe', 'Analyst', 'Main', 'Unit A', 'Mon', 'john.doe@example.com'],
-    ['MS-102-H', 'Jane', 'Smith', 'Manager', 'Field', 'Unit B', 'Tue', 'jane.smith@example.com'],
-    ['MS-103-H', 'Bob', 'Wilson', 'Tech', 'Remote', 'Unit A', 'Wed', 'bob.wilson@example.com']
+    ['MS-101-H', 'John', 'Doe', 'Analyst', 'Main', 'Unit A', '', 'Mon', 'john.doe@example.com'],
+    ['MS-102-H', 'Jane', 'Smith', 'Manager', 'Field', 'Unit B', '', 'Tue', 'jane.smith@example.com'],
+    ['MS-103-H', 'Bob', 'Wilson', 'Tech', 'Remote', 'Unit A', '', 'Wed', 'bob.wilson@example.com']
   ];
 
   test('matches by Member ID with HIGH confidence', () => {
