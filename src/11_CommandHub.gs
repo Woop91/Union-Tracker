@@ -1331,7 +1331,7 @@ function getSearchDialogHtml_() {
       </div>
 
       <script>
-        function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\\//g,"&#x2F;");}
+        ${getClientSideEscapeHtml()}
         document.getElementById('searchQuery').addEventListener('keypress', function(e) {
           if (e.key === 'Enter') doSearch();
         });
@@ -2525,11 +2525,7 @@ function showOCRDialog() {
     '    "</div>";' +
     '  }' +
     '}' +
-    'function escapeHtml(text) {' +
-    '  var div = document.createElement("div");' +
-    '  div.textContent = text;' +
-    '  return div.innerHTML;' +
-    '}' +
+    ' + getClientSideEscapeHtml() + ' +
     'document.getElementById("fileId").addEventListener("keypress", function(e) {' +
     '  if (e.key === "Enter") runOCR();' +
     '});' +
@@ -2834,7 +2830,7 @@ function showSearchPrecedents() {
     '  <div class="empty">Enter search terms to find historical grievances</div>' +
     '</div>' +
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'function searchPrecedents() {' +
     '  var query = document.getElementById("searchQuery").value;' +
     '  var outcomeFilter = document.getElementById("filterOutcome").value;' +

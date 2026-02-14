@@ -154,14 +154,8 @@ function viewTestResults() {
 }
 
 // ============================================================================
-// ============================================================================
 // GOOGLE DRIVE INTEGRATION
 // ============================================================================
-
-/**
- * Create a Google Drive folder for the selected grievance
- */
-// Note: setupDriveFolderForGrievance() defined in modular file - see respective module
 
 /**
  * Get or create the root 509 Dashboard folder in Drive
@@ -246,19 +240,9 @@ function showGrievanceFiles() {
   }
 }
 
-/**
- * Batch create folders for all grievances without folders
- */
-// Note: batchCreateGrievanceFolders() defined in modular file - see respective module
-
 // ============================================================================
 // GOOGLE CALENDAR INTEGRATION
 // ============================================================================
-
-/**
- * Sync grievance deadlines to Google Calendar with rate limit handling
- */
-// Note: syncDeadlinesToCalendar() defined in modular file - see respective module
 
 /**
  * Show upcoming deadlines from calendar with member names
@@ -343,110 +327,9 @@ function buildGrievanceMemberLookup() {
   return lookup;
 }
 
-/**
- * Clear all 509 Dashboard calendar events
- */
-// Note: clearAllCalendarEvents() defined in modular file - see respective module
-
-// ============================================================================
-// EMAIL NOTIFICATIONS
-// ============================================================================
-
-/**
- * Show notification settings dialog
- */
-
-/**
- * Install daily trigger for notifications
- */
-
-/**
- * Remove daily notification trigger
- */
-
-/**
- * Check deadlines and send notification email (called by trigger)
- */
-
-/**
- * Test the notification system
- */
-
-/**
- * Send daily digest to all stewards with their assigned grievance deadlines
- * Each steward gets their own personalized email
- */
-
-/**
- * Manual trigger to send steward alerts now
- */
-
-/**
- * Configure alert settings
- */
-
-// ============================================================================
-// AUDIT LOGGING - Multi-Steward Accountability
-// ============================================================================
-
-/**
- * Setup the hidden audit log sheet
- * Tracks all changes to Member Directory and Grievance Log
- */
-
-/**
- * Log an audit event
- * @param {string} sheetName - Name of the sheet where change occurred
- * @param {number} row - Row number
- * @param {number} col - Column number
- * @param {string} fieldName - Name of the field/column
- * @param {string} oldValue - Previous value
- * @param {string} newValue - New value
- * @param {string} recordId - ID of the record (Member ID or Grievance ID)
- * @param {string} actionType - Type of action (Edit, Delete, Create)
- */
-// Note: logAuditEvent() defined in modular file - see respective module
-
-/**
- * onEdit trigger for audit logging
- * Tracks changes to Member Directory and Grievance Log
- */
-
-/**
- * Install the audit trigger
- */
-
-/**
- * Remove the audit trigger
- */
-
-/**
- * View the audit log sheet
- */
-
-/**
- * Clear audit entries older than 30 days
- */
-
-/**
- * Get audit summary for a specific record
- * @param {string} recordId - Member ID or Grievance ID
- * @returns {Array} Array of audit entries for this record
- */
-
 // ============================================================================
 // GRIEVANCE TOOLS - ADDITIONAL FUNCTIONS
 // ============================================================================
-
-/**
- * Setup Live Grievance Links - Syncs grievance data to Member Directory
- * Uses static values (no formulas) to avoid #REF! errors
- */
-
-/**
- * Remove Member ID dropdown from Grievance Log
- * Clears any existing data validation to allow free text entry
- */
 
 /**
  * Fix existing "Overdue" text in Days to Deadline column
@@ -500,104 +383,8 @@ function fixOverdueTextToNumbers() {
 }
 
 // ============================================================================
-// MEMBER SATISFACTION DASHBOARD
+// GRIEVANCE LOG SORTING
 // ============================================================================
-
-/**
- * Shows the Member Satisfaction Dashboard modal popup
- * Menu Location: 👤 Dashboard > 📊 Member Satisfaction
- */
-
-/**
- * Returns the HTML for the Member Satisfaction Dashboard with tabs
- */
-
-/**
- * Get overview data for satisfaction dashboard
- */
-
-/**
- * Get individual response data for satisfaction dashboard
- */
-
-/**
- * Get section-level data for satisfaction dashboard
- */
-
-/**
- * Get trend data for satisfaction dashboard - responses over time
- */
-
-/**
- * Get breakdown data for satisfaction dashboard
- */
-
-/**
- * Get insights data for satisfaction dashboard
- */
-
-/**
- * Get drill-down data for specific categories
- */
-
-/**
- * Get location-specific drill-down data
- */
-
-/**
- * Helper function to get last row with data
- */
-
-/**
- * Get analytics data for satisfaction dashboard insights
- */
-/**
- * 509 Dashboard - Hidden Sheet Architecture
- *
- * Self-healing hidden calculation sheets with auto-sync triggers.
- * Provides automatic cross-sheet data population.
- *
- * ⚠️ WARNING: DO NOT DEPLOY THIS FILE DIRECTLY
- * This is a source file used to generate ConsolidatedDashboard.gs.
- * Deploy ONLY ConsolidatedDashboard.gs to avoid function conflicts.
- *
- * @version 1.0.0
- * @license Free for use by non-profit collective bargaining groups and unions
- */
-
-// ============================================================================
-// HIDDEN SHEET 1: _Grievance_Calc
-// Source: Grievance Log → Destination: Member Directory (AB-AD)
-// ============================================================================
-
-/**
- * Setup the _Grievance_Calc hidden sheet with self-healing formulas
- * Calculates: Has Open Grievance, Grievance Status, Next Deadline per member
- */
-
-/**
- * Sync grievance data directly from Grievance Log to Member Directory
- * Calculates Has Open Grievance, Status, and Days to Deadline per member
- * Fixed in v1.6.0: Now calculates directly instead of using MINIFS (which ignores "Overdue" text)
- */
-
-// ============================================================================
-// HIDDEN SHEET 2: _Grievance_Formulas (SELF-HEALING)
-// Source: Grievance Log → Destination: Grievance Log (calculated columns)
-// This sheet contains all auto-calculated formulas and syncs them back
-// ============================================================================
-
-/**
- * Setup the _Grievance_Formulas hidden sheet with self-healing formulas
- * Calculates: First Name, Last Name, Email, Unit, Location, Steward (from Member Dir)
- *            Filing Deadline, Step I-III dates, Days Open, Next Action Due, Days to Deadline
- */
-
-/**
- * Sync calculated formulas from hidden sheet to Grievance Log
- * This is the self-healing function - it copies calculated values to the Grievance Log
- * Member data (Name, Email, Unit, Location, Steward) is looked up directly from Member Directory
- */
 
 /**
  * Auto-sort the Grievance Log by status priority
@@ -690,55 +477,6 @@ function applyMessageAlertHighlighting_(sheet, lastRow) {
     }
   }
 }
-
-// ============================================================================
-// HIDDEN SHEET 3: _Member_Lookup
-// Source: Member Directory → Destination: Grievance Log (C,D,X-AA)
-// ============================================================================
-
-/**
- * Setup the _Member_Lookup hidden sheet with self-healing formulas
- * Looks up: First Name, Last Name, Email, Unit, Location, Steward from Member Directory
- */
-
-/**
- * Sync member data from hidden sheet to Grievance Log
- */
-
-// ============================================================================
-// HIDDEN SHEET 4: _Steward_Contact_Calc
-// Source: Member Directory (Y-AA) → Aggregates steward contact tracking metrics
-// ============================================================================
-
-/**
- * Setup the _Steward_Contact_Calc hidden sheet with self-healing formulas
- * Tracks and aggregates steward contact data from Member Directory
- */
-
-// ============================================================================
-// HIDDEN SHEET 6: _Steward_Performance_Calc
-// Source: Grievance Log → Steward Performance Metrics
-// ============================================================================
-
-/**
- * Setup the _Steward_Performance_Calc hidden sheet
- * Calculates detailed steward performance metrics
- */
-
-// ============================================================================
-// AUTO-SYNC TRIGGERS
-// ============================================================================
-
-/**
- * Sync new values from Member Directory to Config (bidirectional sync)
- * When a user enters a new value in a job metadata field, add it to Config
- * @param {Object} e - The edit event object
- */
-
-/**
- * Master onEdit trigger - routes to appropriate sync function
- * Install this as an installable trigger
- */
 
 /**
  * Automatically create Drive folders for grievances that don't have one
@@ -861,126 +599,9 @@ function openGrievanceFormForRow_(sheet, row) {
   ss.toast('Grievance form opened for ' + memberData.firstName + ' ' + memberData.lastName, '📋 Form Opened', 3);
 }
 
-/**
- * Install the auto-sync trigger with options dialog
- * Users can customize the sync behavior
- */
-
-/**
- * Install auto-sync trigger with saved options
- * @param {Object} options - Sync configuration options
- */
-
-/**
- * Get auto-sync options (with defaults)
- */
-
-/**
- * Quick install (no dialog) - used by repair functions
- */
-
-/**
- * Remove the auto-sync trigger
- */
-
 // ============================================================================
-// HIDDEN SHEET 5: _Dashboard_Calc
-// Source: Member Directory + Grievance Log → Dashboard Summary Statistics
+// DATA QUALITY
 // ============================================================================
-
-/**
- * Setup the _Dashboard_Calc hidden sheet with self-healing formulas
- * Calculates key dashboard metrics that auto-update
- */
-
-// ============================================================================
-// MASTER SETUP & REPAIR FUNCTIONS
-// ============================================================================
-
-/**
- * Setup all hidden calculation sheets
- * @returns {Object} Result object with created and repaired counts
- */
-
-/**
- * Repair all hidden sheets - recreates formulas and syncs data
- */
-
-/**
- * Verify all hidden sheets and triggers
- */
-
-/**
- * Manual sync all data with data quality validation
- */
-
-// ============================================================================
-// DASHBOARD VALUE SYNC (No formulas in visible sheets)
-// ============================================================================
-
-/**
- * Sync computed values to Dashboard sheet (no formulas)
- * Replaces all Dashboard formulas with JavaScript-computed values
- * Called during CREATE_509_DASHBOARD and on data changes
- */
-
-/**
- * Compute all Dashboard metrics from raw data
- * @private
- */
-
-/**
- * Write computed values to Dashboard sheet
- * Row numbers updated to match new card-style layout
- * @private
- */
-
-/**
- * Apply gradient heatmaps to Dashboard for visual data analysis
- * Auto-applies color scales to key metrics
- * @param {Sheet} sheet - The Dashboard sheet
- * @private
- */
-
-/**
- * Sync Member Satisfaction sheet with computed values (no formulas)
- * Calculates section averages for all response rows and dashboard summary
- */
-
-/**
- * Compute section averages for satisfaction survey rows
- * @param {Array} responseData - 2D array of survey response data
- * @return {Array} 2D array of section averages (11 columns per row)
- * @private
- */
-
-/**
- * Compute average of numeric values in a row range
- * @param {Array} row - Single row of data
- * @param {number} startIdx - Start index (0-based)
- * @param {number} endIdx - End index (0-based, inclusive)
- * @return {number|string} Average or empty string if no valid values
- * @private
- */
-
-/**
- * Write satisfaction dashboard summary values
- * @param {Sheet} sheet - The Satisfaction sheet
- * @param {Array} responseData - Raw response data
- * @param {Array} sectionAverages - Computed section averages
- * @private
- */
-
-/**
- * Compute section averages for a single new survey response row
- * Used by onSatisfactionFormSubmit for efficiency (only computes one row)
- * @param {number} row - Row number of the new response
- */
-
-/**
- * Sync Feedback sheet with computed values (no formulas)
- * Calculates feedback metrics and writes values
- */
 
 /**
  * Check data quality and return list of issues
@@ -1149,10 +770,6 @@ function showGrievancesWithMissingMemberIds() {
 }
 
 /**
- * Refresh all formulas (force recalculation)
- */
-
-/**
  * Repair checkboxes in Grievance Log (Message Alert column AC)
  * Call this after any bulk data operations that might overwrite checkboxes
  */
@@ -1201,74 +818,6 @@ function repairAllCheckboxes() {
 
   ss.toast('All checkboxes repaired!', '✅ Success', 3);
 }
-/**
- * ============================================================================
- * FormulaService.gs - Hidden Sheet & Formula Logic
- * ============================================================================
- *
- * This module manages the six hidden calculation sheets that power the
- * dashboard's "self-healing" formula system. These sheets contain complex
- * formulas that aggregate, calculate, and cross-reference data.
- *
- * SEPARATION OF CONCERNS: This logic is highly specialized and most users
- * will never need to touch this file. Isolating it reduces the risk of
- * breaking cross-sheet data syncs.
- *
- * Hidden Sheets:
- * - _CalcMembers: Member statistics and lookups
- * - _CalcGrievances: Grievance aggregations
- * - _CalcDeadlines: Deadline calculations and alerts
- * - _CalcStats: Dashboard statistics
- * - _CalcSync: Cross-sheet synchronization
- * - _CalcFormulas: Named formula references
- *
- * @fileoverview Hidden sheet and formula management
- * @version 2.0.0
- * @requires Constants.gs
- */
-
-// ============================================================================
-// INDIVIDUAL SHEET SETUP FUNCTIONS
-// ============================================================================
-// Note: setupAllHiddenSheets() and repairAllHiddenSheets() are defined in
-// HiddenSheets.gs which contains the comprehensive hidden sheet management.
-// ============================================================================
-
-/**
- * Sets up the _CalcMembers hidden sheet
- * Contains member statistics and lookup tables
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcGrievances hidden sheet
- * Contains grievance aggregations and summaries
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcDeadlines hidden sheet
- * Contains deadline calculations and alert logic
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcStats hidden sheet
- * Contains dashboard-wide statistics
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcSync hidden sheet
- * Contains cross-sheet synchronization logic
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcFormulas hidden sheet
- * Contains named formula references for use in other sheets
- * @param {Sheet} sheet - The sheet to set up
- */
 
 // ============================================================================
 // ENGAGEMENT TRACKING SYNC FUNCTIONS
@@ -1471,48 +1020,3 @@ function removeDeprecatedDashboard() {
   }
 }
 
-// ============================================================================
-// FORMULA HELPERS
-// ============================================================================
-
-/**
- * Gets a value from a hidden calculation sheet
- * @param {string} sheetName - The hidden sheet name
- * @param {string} cellRef - The cell reference (e.g., 'B4')
- * @return {*} The cell value
- */
-
-/**
- * Gets department list from calc sheet
- * @return {string[]} Array of department names
- */
-
-/**
- * Gets member list for dropdowns
- * @return {Array} Array of member objects with id, name, department
- */
-
-
-// ============================================================================
-// SEARCH FUNCTIONS (Used by UIService)
-// ============================================================================
-
-/**
- * Searches the dashboard for matching records
- * @param {string} query - Search query
- * @param {string} searchType - 'all', 'members', or 'grievances'
- * @param {Object} filters - Additional filters
- * @return {Array} Search results
- */
-
-/**
- * Quick search for instant results
- * @param {string} query - Search query
- * @return {Array} Quick search results
- */
-
-/**
- * Advanced search with complex filters
- * @param {Object} filters - Search filters
- * @return {Array} Search results
- */

@@ -768,7 +768,7 @@ function getSetupMeetingHtml_() {
     '<div id="success" class="success"></div>' +
     '</div>' +
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#39;")}' +
+    ' + getClientSideEscapeHtml() + ' +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
     'var stewardData=[];' +
     // Load stewards on dialog open
@@ -931,7 +931,7 @@ function getMeetingCheckInHtml_() {
     '</div>' +
 
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;")}' +
+    ' + getClientSideEscapeHtml() + ' +
 
     // Load only today's eligible meetings for check-in
     'google.script.run' +

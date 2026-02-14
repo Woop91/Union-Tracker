@@ -5187,7 +5187,7 @@ function getImportMembersHtml_() {
     '    .importMembersFromData(parsedData, mapping);' +
     '}' +
     '' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'function showStatus(msg, isError) {' +
     '  var area = document.getElementById("statusArea");' +
     '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + escapeHtml(msg) + "</div>";' +
@@ -6665,7 +6665,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2748 lines)
+// SOURCE: 03_UIComponents.gs (2744 lines)
 // ============================================================================
 
 /**
@@ -9026,11 +9026,7 @@ function getDesktopSearchHtml() {
             '<div class="no-results"><p>Error: ' + error.message + '</p></div>';
         }
 
-        function escapeHtml(text) {
-          const div = document.createElement('div');
-          div.textContent = text;
-          return div.innerHTML;
-        }
+        ${getClientSideEscapeHtml()}
 
         // Load departments on init
         google.script.run
@@ -10082,7 +10078,7 @@ function getMultiSelectHtml(items, callback) {
       </div>
 
       <script>
-        function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\\//g,"&#x2F;");}
+        ${getClientSideEscapeHtml()}
         const items = ${itemsJson};
         const callbackFn = '${callback}';
         let filteredItems = [...items];
@@ -10279,7 +10275,7 @@ function getDashboardSidebarHtml() {
       </div>
 
       <script>
-        function escapeHtml(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
+        ${getClientSideEscapeHtml()}
         function loadStats() {
           google.script.run
             .withSuccessHandler(function(stats) {
@@ -11705,7 +11701,7 @@ function getInteractiveDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
     // Debug mode and error handler wrapper
@@ -13301,7 +13297,7 @@ function getExecutiveDashboardHtml_() {
     '    </div>' +
     '  </div>' +
     '  <script>' +
-    '    function escapeHtml(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#39;")}' +
+    ' + getClientSideEscapeHtml() + ' +
     '    window.onload = function() {' +
     '      google.script.run.withSuccessHandler(renderDashboard).withFailureHandler(showError).getDashboardStats();' +
     '    };' +
@@ -15695,7 +15691,7 @@ function getUnifiedDashboardHtml(isPII) {
 
     // JavaScript
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+escapeHtml(e.message)+"</div>"}' +
@@ -18772,7 +18768,7 @@ function getWebAppSearchHtml() {
     '</nav>' +
 
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var currentTab="all";' +
     'var searchTimeout=null;' +
     'var lastQuery="";' +
@@ -18949,7 +18945,7 @@ function getWebAppGrievanceListHtml() {
     '</nav>' +
 
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -19149,7 +19145,7 @@ function getWebAppMemberListHtml() {
     '</nav>' +
 
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -30766,7 +30762,7 @@ function getSatisfactionDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var allResponses=[];var currentFilter="all";var analyticsLoaded=false;var sectionsLoaded=false;' +
 
     // Tab switching
@@ -33892,7 +33888,7 @@ function getFlaggedSubmissionsHtml() {
     '<div id="content"><div class="empty-state">Loading...</div></div>' +
     '</div>' +
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'function load(){google.script.run.withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
@@ -34092,7 +34088,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '.trend-area { margin-top: 10px; }' +
     '</style>' +
     '<script type="text/javascript">' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'google.charts.load("current", {"packages":["corechart", "gauge"]});' +
     'google.charts.setOnLoadCallback(drawCharts);' +
     'function drawCharts() {' +
@@ -38163,44 +38159,13 @@ function createFeaturesReferenceSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10c_FormHandlers.gs (923 lines)
+// SOURCE: 10c_FormHandlers.gs (682 lines)
 // ============================================================================
 
 // ============================================================================
-// MENU HANDLER FUNCTIONS
+// FORM CONFIGURATIONS
 // ============================================================================
 
-/**
- * Show the desktop unified search dialog
- * Optimized for larger screens with advanced filtering
- */
-// Note: showDesktopSearch() defined in modular file - see respective module
-
-/**
- * Get locations for desktop search filter dropdown
- * @returns {Array} Array of unique locations
- */
-
-/**
- * Get search data for desktop search
- * Searches more fields than mobile: job title, location, issue type, etc.
- * @param {string} query - Search query
- * @param {string} tab - Tab filter: 'all', 'members', 'grievances'
- * @param {Object} filters - Additional filters: status, location, isSteward
- * @returns {Array} Array of search results
- */
-
-/**
- * Navigate to a search result in the spreadsheet
- * @param {string} type - 'member' or 'grievance'
- * @param {string} id - The record ID
- * @param {number} row - The row number
- */
-
-/**
- * Grievance Form Configuration
- * Maps form entry IDs to Member Directory fields for pre-filling
- */
 /**
  * Grievance Form Configuration
  * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
@@ -38323,20 +38288,6 @@ function saveFormFieldIds_(formType, fieldIds) {
 }
 
 /**
- * Get form URL from Config sheet, falling back to hardcoded default
- * This allows admins to update form links without touching code
- * @param {string} formType - 'grievance', 'contact', or 'satisfaction'
- * @returns {string} The form URL
- */
-
-/**
- * Start a new grievance for a member
- * Opens pre-filled Google Form with member info from Member Directory
- * Can be triggered from Member Directory "Start Grievance" checkbox or menu
- */
-// Note: startNewGrievance() defined in modular file - see respective module
-
-/**
  * Get current user's steward info from Member Directory
  * @private
  */
@@ -38366,36 +38317,9 @@ function getCurrentStewardInfo_(ss) {
   return { firstName: '', lastName: '', email: currentUserEmail };
 }
 
-/**
- * Build pre-filled grievance form URL
- * @private
- */
-
 // ============================================================================
 // GRIEVANCE FORM SUBMISSION HANDLER
 // ============================================================================
-
-/**
- * Handle grievance form submission
- * This function is triggered when a grievance form is submitted.
- * It adds the grievance to the Grievance Log and creates a Drive folder.
- *
- * To set up: Run setupGrievanceFormTrigger() once, or manually add an
- * installable trigger for this function on the form.
- *
- * @param {Object} e - Form submission event object
- */
-// Note: onGrievanceFormSubmit() defined in modular file - see respective module
-
-/**
- * Get a value from form named responses
- * @private
- */
-
-/**
- * Parse a date string from form submission
- * @private
- */
 
 /**
  * Get existing grievance IDs for collision detection
@@ -38555,39 +38479,9 @@ function testGrievanceFormSubmission() {
 }
 
 // ============================================================================
-// PERSONAL CONTACT INFO FORM HANDLER
-// ============================================================================
-
-/**
- * Show the Personal Contact Info form link
- * Members fill out the blank form and data is written to Member Directory on submit
- */
-
-/**
- * Handle contact form submission
- * Writes member data to Member Directory (updates existing or creates new)
- *
- * @param {Object} e - Form submission event object
- */
-
-/**
- * Get multiple values from form response (for checkbox questions)
- * Returns comma-separated string
- * @private
- */
-
-/**
- * Set up the contact form submission trigger
- * Run this once to enable automatic processing of form submissions
- */
-
-// ============================================================================
 // MEMBER SATISFACTION SURVEY FORM HANDLER
 // ============================================================================
 
-/**
- * Member Satisfaction Survey Form Configuration
- */
 /**
  * Satisfaction Survey Form Configuration
  * Form URL reads from Config sheet (column AR), entry IDs read from Script Properties.
@@ -38608,148 +38502,9 @@ var SATISFACTION_FORM_CONFIG = {
   }
 };
 
-/**
- * Show the Member Satisfaction Survey form link
- * Survey responses are written to the Member Satisfaction sheet
- */
-
-/**
- * Save form URLs to the Config tab for easy reference and updating
- * Writes Grievance Form, Contact Form, and Satisfaction Survey URLs to Config columns P, Q, AR
- */
-
-/**
- * Silent version - used during CREATE_509_DASHBOARD setup
- * @param {Spreadsheet} ss - The spreadsheet object
- * @private
- */
-
-/**
- * Handle satisfaction survey form submission
- * Writes survey responses to the Member Satisfaction sheet
- *
- * @param {Object} e - Form submission event object
- */
-
-/**
- * Set up the satisfaction survey form submission trigger
- * Run this once to enable automatic processing of survey submissions
- */
-
 // ============================================================================
-// SURVEY ENHANCEMENTS - Auto-Email, Quarterly Tracking, Member Auth
+// REFRESH & SYNC FUNCTIONS
 // ============================================================================
-
-/**
- * Send satisfaction survey emails to random members
- * Allows stewards to email a configurable number of random members
- */
-
-/**
- * Execute sending random survey emails
- * @param {Object} opts - Options {count, subject, excludeDays}
- * @returns {string} Result message
- */
-
-/**
- * Validate that an email belongs to a member in the directory
- * @param {string} email - Email to validate
- * @returns {Object|null} Member info if valid, null otherwise
- */
-
-/**
- * Get the current quarter string (e.g., "2026-Q1")
- * @returns {string} Quarter string
- */
-
-/**
- * Get quarter string from a date
- * @param {Date} date - Date to get quarter from
- * @returns {string} Quarter string
- */
-
-// ============================================================================
-// FLAGGED SUBMISSIONS REVIEW - Admin interface for pending survey responses
-// ============================================================================
-
-/**
- * Show the flagged submissions review interface
- * Displays count and email addresses of Pending Review submissions
- * Protects actual survey answers - only shows metadata
- */
-
-/**
- * Get HTML for flagged submissions review interface
- * @returns {string} HTML content
- */
-
-/**
- * Get data for flagged submissions review
- * @returns {Object} Pending submissions data (email, date, row number - NO survey answers)
- */
-
-/**
- * Approve a flagged submission - mark as Verified
- * @param {number} rowNum - Row number (1-indexed)
- */
-
-/**
- * Reject a flagged submission - mark as Rejected
- * @param {number} rowNum - Row number (1-indexed)
- */
-
-// ============================================================================
-// PUBLIC MEMBER DASHBOARD - Stats without PII
-// ============================================================================
-
-// REMOVED: showPublicMemberDashboard_Code_DEPRECATED - Use showPublicMemberDashboard() in 11_SecureMemberDashboard.gs instead
-
-/**
- * Generates HTML for the secure member dashboard
- * @param {Object} stats - Grievance statistics
- * @param {Array} stewards - Array of steward objects
- * @param {Object} satisfaction - Satisfaction statistics
- * @param {Object} coverage - Steward coverage statistics
- * @returns {string} HTML content
- */
-
-/**
- * Get public overview data (no PII)
- * @returns {Object} Overview statistics
- */
-
-/**
- * Get public survey data (anonymized)
- * Filters to only include Verified='Yes' and optionally IS_LATEST='Yes' responses
- * @param {boolean} includeHistory - If true, include superseded responses; if false, only latest per member
- * @returns {Object} Survey statistics
- */
-
-/**
- * Get public grievance data (no PII)
- * @returns {Object} Grievance statistics
- */
-
-/**
- * Get public steward data (contact info only)
- * @returns {Object} Steward directory
- */
-
-/**
- * Aggregates survey data into chart-ready, non-PII formats.
- * Returns only aggregate metrics without exposing individual survey responses.
- * @returns {Object} Aggregate satisfaction statistics
- */
-
-/**
- * Gets steward coverage ratio for progress tracking
- * @returns {Object} Coverage statistics
- */
-
-/**
- * Uses hidden sheet formulas for self-healing calculations
- */
-// Note: recalcAllGrievancesBatched() defined in modular file - see respective module
 
 /**
  * Refresh Member Directory calculated columns (AB-AD: Has Open Grievance, Status, Next Deadline)
@@ -39091,7 +38846,7 @@ function unfreezeAllColumns() {
 
 
 // ============================================================================
-// SOURCE: 10d_SyncAndMaintenance.gs (1519 lines)
+// SOURCE: 10d_SyncAndMaintenance.gs (1023 lines)
 // ============================================================================
 
 // ============================================================================
@@ -39250,14 +39005,8 @@ function viewTestResults() {
 }
 
 // ============================================================================
-// ============================================================================
 // GOOGLE DRIVE INTEGRATION
 // ============================================================================
-
-/**
- * Create a Google Drive folder for the selected grievance
- */
-// Note: setupDriveFolderForGrievance() defined in modular file - see respective module
 
 /**
  * Get or create the root 509 Dashboard folder in Drive
@@ -39342,19 +39091,9 @@ function showGrievanceFiles() {
   }
 }
 
-/**
- * Batch create folders for all grievances without folders
- */
-// Note: batchCreateGrievanceFolders() defined in modular file - see respective module
-
 // ============================================================================
 // GOOGLE CALENDAR INTEGRATION
 // ============================================================================
-
-/**
- * Sync grievance deadlines to Google Calendar with rate limit handling
- */
-// Note: syncDeadlinesToCalendar() defined in modular file - see respective module
 
 /**
  * Show upcoming deadlines from calendar with member names
@@ -39439,110 +39178,9 @@ function buildGrievanceMemberLookup() {
   return lookup;
 }
 
-/**
- * Clear all 509 Dashboard calendar events
- */
-// Note: clearAllCalendarEvents() defined in modular file - see respective module
-
-// ============================================================================
-// EMAIL NOTIFICATIONS
-// ============================================================================
-
-/**
- * Show notification settings dialog
- */
-
-/**
- * Install daily trigger for notifications
- */
-
-/**
- * Remove daily notification trigger
- */
-
-/**
- * Check deadlines and send notification email (called by trigger)
- */
-
-/**
- * Test the notification system
- */
-
-/**
- * Send daily digest to all stewards with their assigned grievance deadlines
- * Each steward gets their own personalized email
- */
-
-/**
- * Manual trigger to send steward alerts now
- */
-
-/**
- * Configure alert settings
- */
-
-// ============================================================================
-// AUDIT LOGGING - Multi-Steward Accountability
-// ============================================================================
-
-/**
- * Setup the hidden audit log sheet
- * Tracks all changes to Member Directory and Grievance Log
- */
-
-/**
- * Log an audit event
- * @param {string} sheetName - Name of the sheet where change occurred
- * @param {number} row - Row number
- * @param {number} col - Column number
- * @param {string} fieldName - Name of the field/column
- * @param {string} oldValue - Previous value
- * @param {string} newValue - New value
- * @param {string} recordId - ID of the record (Member ID or Grievance ID)
- * @param {string} actionType - Type of action (Edit, Delete, Create)
- */
-// Note: logAuditEvent() defined in modular file - see respective module
-
-/**
- * onEdit trigger for audit logging
- * Tracks changes to Member Directory and Grievance Log
- */
-
-/**
- * Install the audit trigger
- */
-
-/**
- * Remove the audit trigger
- */
-
-/**
- * View the audit log sheet
- */
-
-/**
- * Clear audit entries older than 30 days
- */
-
-/**
- * Get audit summary for a specific record
- * @param {string} recordId - Member ID or Grievance ID
- * @returns {Array} Array of audit entries for this record
- */
-
 // ============================================================================
 // GRIEVANCE TOOLS - ADDITIONAL FUNCTIONS
 // ============================================================================
-
-/**
- * Setup Live Grievance Links - Syncs grievance data to Member Directory
- * Uses static values (no formulas) to avoid #REF! errors
- */
-
-/**
- * Remove Member ID dropdown from Grievance Log
- * Clears any existing data validation to allow free text entry
- */
 
 /**
  * Fix existing "Overdue" text in Days to Deadline column
@@ -39596,104 +39234,8 @@ function fixOverdueTextToNumbers() {
 }
 
 // ============================================================================
-// MEMBER SATISFACTION DASHBOARD
+// GRIEVANCE LOG SORTING
 // ============================================================================
-
-/**
- * Shows the Member Satisfaction Dashboard modal popup
- * Menu Location: 👤 Dashboard > 📊 Member Satisfaction
- */
-
-/**
- * Returns the HTML for the Member Satisfaction Dashboard with tabs
- */
-
-/**
- * Get overview data for satisfaction dashboard
- */
-
-/**
- * Get individual response data for satisfaction dashboard
- */
-
-/**
- * Get section-level data for satisfaction dashboard
- */
-
-/**
- * Get trend data for satisfaction dashboard - responses over time
- */
-
-/**
- * Get breakdown data for satisfaction dashboard
- */
-
-/**
- * Get insights data for satisfaction dashboard
- */
-
-/**
- * Get drill-down data for specific categories
- */
-
-/**
- * Get location-specific drill-down data
- */
-
-/**
- * Helper function to get last row with data
- */
-
-/**
- * Get analytics data for satisfaction dashboard insights
- */
-/**
- * 509 Dashboard - Hidden Sheet Architecture
- *
- * Self-healing hidden calculation sheets with auto-sync triggers.
- * Provides automatic cross-sheet data population.
- *
- * ⚠️ WARNING: DO NOT DEPLOY THIS FILE DIRECTLY
- * This is a source file used to generate ConsolidatedDashboard.gs.
- * Deploy ONLY ConsolidatedDashboard.gs to avoid function conflicts.
- *
- * @version 1.0.0
- * @license Free for use by non-profit collective bargaining groups and unions
- */
-
-// ============================================================================
-// HIDDEN SHEET 1: _Grievance_Calc
-// Source: Grievance Log → Destination: Member Directory (AB-AD)
-// ============================================================================
-
-/**
- * Setup the _Grievance_Calc hidden sheet with self-healing formulas
- * Calculates: Has Open Grievance, Grievance Status, Next Deadline per member
- */
-
-/**
- * Sync grievance data directly from Grievance Log to Member Directory
- * Calculates Has Open Grievance, Status, and Days to Deadline per member
- * Fixed in v1.6.0: Now calculates directly instead of using MINIFS (which ignores "Overdue" text)
- */
-
-// ============================================================================
-// HIDDEN SHEET 2: _Grievance_Formulas (SELF-HEALING)
-// Source: Grievance Log → Destination: Grievance Log (calculated columns)
-// This sheet contains all auto-calculated formulas and syncs them back
-// ============================================================================
-
-/**
- * Setup the _Grievance_Formulas hidden sheet with self-healing formulas
- * Calculates: First Name, Last Name, Email, Unit, Location, Steward (from Member Dir)
- *            Filing Deadline, Step I-III dates, Days Open, Next Action Due, Days to Deadline
- */
-
-/**
- * Sync calculated formulas from hidden sheet to Grievance Log
- * This is the self-healing function - it copies calculated values to the Grievance Log
- * Member data (Name, Email, Unit, Location, Steward) is looked up directly from Member Directory
- */
 
 /**
  * Auto-sort the Grievance Log by status priority
@@ -39786,55 +39328,6 @@ function applyMessageAlertHighlighting_(sheet, lastRow) {
     }
   }
 }
-
-// ============================================================================
-// HIDDEN SHEET 3: _Member_Lookup
-// Source: Member Directory → Destination: Grievance Log (C,D,X-AA)
-// ============================================================================
-
-/**
- * Setup the _Member_Lookup hidden sheet with self-healing formulas
- * Looks up: First Name, Last Name, Email, Unit, Location, Steward from Member Directory
- */
-
-/**
- * Sync member data from hidden sheet to Grievance Log
- */
-
-// ============================================================================
-// HIDDEN SHEET 4: _Steward_Contact_Calc
-// Source: Member Directory (Y-AA) → Aggregates steward contact tracking metrics
-// ============================================================================
-
-/**
- * Setup the _Steward_Contact_Calc hidden sheet with self-healing formulas
- * Tracks and aggregates steward contact data from Member Directory
- */
-
-// ============================================================================
-// HIDDEN SHEET 6: _Steward_Performance_Calc
-// Source: Grievance Log → Steward Performance Metrics
-// ============================================================================
-
-/**
- * Setup the _Steward_Performance_Calc hidden sheet
- * Calculates detailed steward performance metrics
- */
-
-// ============================================================================
-// AUTO-SYNC TRIGGERS
-// ============================================================================
-
-/**
- * Sync new values from Member Directory to Config (bidirectional sync)
- * When a user enters a new value in a job metadata field, add it to Config
- * @param {Object} e - The edit event object
- */
-
-/**
- * Master onEdit trigger - routes to appropriate sync function
- * Install this as an installable trigger
- */
 
 /**
  * Automatically create Drive folders for grievances that don't have one
@@ -39957,126 +39450,9 @@ function openGrievanceFormForRow_(sheet, row) {
   ss.toast('Grievance form opened for ' + memberData.firstName + ' ' + memberData.lastName, '📋 Form Opened', 3);
 }
 
-/**
- * Install the auto-sync trigger with options dialog
- * Users can customize the sync behavior
- */
-
-/**
- * Install auto-sync trigger with saved options
- * @param {Object} options - Sync configuration options
- */
-
-/**
- * Get auto-sync options (with defaults)
- */
-
-/**
- * Quick install (no dialog) - used by repair functions
- */
-
-/**
- * Remove the auto-sync trigger
- */
-
 // ============================================================================
-// HIDDEN SHEET 5: _Dashboard_Calc
-// Source: Member Directory + Grievance Log → Dashboard Summary Statistics
+// DATA QUALITY
 // ============================================================================
-
-/**
- * Setup the _Dashboard_Calc hidden sheet with self-healing formulas
- * Calculates key dashboard metrics that auto-update
- */
-
-// ============================================================================
-// MASTER SETUP & REPAIR FUNCTIONS
-// ============================================================================
-
-/**
- * Setup all hidden calculation sheets
- * @returns {Object} Result object with created and repaired counts
- */
-
-/**
- * Repair all hidden sheets - recreates formulas and syncs data
- */
-
-/**
- * Verify all hidden sheets and triggers
- */
-
-/**
- * Manual sync all data with data quality validation
- */
-
-// ============================================================================
-// DASHBOARD VALUE SYNC (No formulas in visible sheets)
-// ============================================================================
-
-/**
- * Sync computed values to Dashboard sheet (no formulas)
- * Replaces all Dashboard formulas with JavaScript-computed values
- * Called during CREATE_509_DASHBOARD and on data changes
- */
-
-/**
- * Compute all Dashboard metrics from raw data
- * @private
- */
-
-/**
- * Write computed values to Dashboard sheet
- * Row numbers updated to match new card-style layout
- * @private
- */
-
-/**
- * Apply gradient heatmaps to Dashboard for visual data analysis
- * Auto-applies color scales to key metrics
- * @param {Sheet} sheet - The Dashboard sheet
- * @private
- */
-
-/**
- * Sync Member Satisfaction sheet with computed values (no formulas)
- * Calculates section averages for all response rows and dashboard summary
- */
-
-/**
- * Compute section averages for satisfaction survey rows
- * @param {Array} responseData - 2D array of survey response data
- * @return {Array} 2D array of section averages (11 columns per row)
- * @private
- */
-
-/**
- * Compute average of numeric values in a row range
- * @param {Array} row - Single row of data
- * @param {number} startIdx - Start index (0-based)
- * @param {number} endIdx - End index (0-based, inclusive)
- * @return {number|string} Average or empty string if no valid values
- * @private
- */
-
-/**
- * Write satisfaction dashboard summary values
- * @param {Sheet} sheet - The Satisfaction sheet
- * @param {Array} responseData - Raw response data
- * @param {Array} sectionAverages - Computed section averages
- * @private
- */
-
-/**
- * Compute section averages for a single new survey response row
- * Used by onSatisfactionFormSubmit for efficiency (only computes one row)
- * @param {number} row - Row number of the new response
- */
-
-/**
- * Sync Feedback sheet with computed values (no formulas)
- * Calculates feedback metrics and writes values
- */
 
 /**
  * Check data quality and return list of issues
@@ -40245,10 +39621,6 @@ function showGrievancesWithMissingMemberIds() {
 }
 
 /**
- * Refresh all formulas (force recalculation)
- */
-
-/**
  * Repair checkboxes in Grievance Log (Message Alert column AC)
  * Call this after any bulk data operations that might overwrite checkboxes
  */
@@ -40297,74 +39669,6 @@ function repairAllCheckboxes() {
 
   ss.toast('All checkboxes repaired!', '✅ Success', 3);
 }
-/**
- * ============================================================================
- * FormulaService.gs - Hidden Sheet & Formula Logic
- * ============================================================================
- *
- * This module manages the six hidden calculation sheets that power the
- * dashboard's "self-healing" formula system. These sheets contain complex
- * formulas that aggregate, calculate, and cross-reference data.
- *
- * SEPARATION OF CONCERNS: This logic is highly specialized and most users
- * will never need to touch this file. Isolating it reduces the risk of
- * breaking cross-sheet data syncs.
- *
- * Hidden Sheets:
- * - _CalcMembers: Member statistics and lookups
- * - _CalcGrievances: Grievance aggregations
- * - _CalcDeadlines: Deadline calculations and alerts
- * - _CalcStats: Dashboard statistics
- * - _CalcSync: Cross-sheet synchronization
- * - _CalcFormulas: Named formula references
- *
- * @fileoverview Hidden sheet and formula management
- * @version 2.0.0
- * @requires Constants.gs
- */
-
-// ============================================================================
-// INDIVIDUAL SHEET SETUP FUNCTIONS
-// ============================================================================
-// Note: setupAllHiddenSheets() and repairAllHiddenSheets() are defined in
-// HiddenSheets.gs which contains the comprehensive hidden sheet management.
-// ============================================================================
-
-/**
- * Sets up the _CalcMembers hidden sheet
- * Contains member statistics and lookup tables
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcGrievances hidden sheet
- * Contains grievance aggregations and summaries
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcDeadlines hidden sheet
- * Contains deadline calculations and alert logic
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcStats hidden sheet
- * Contains dashboard-wide statistics
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcSync hidden sheet
- * Contains cross-sheet synchronization logic
- * @param {Sheet} sheet - The sheet to set up
- */
-
-/**
- * Sets up the _CalcFormulas hidden sheet
- * Contains named formula references for use in other sheets
- * @param {Sheet} sheet - The sheet to set up
- */
 
 // ============================================================================
 // ENGAGEMENT TRACKING SYNC FUNCTIONS
@@ -40567,51 +39871,6 @@ function removeDeprecatedDashboard() {
   }
 }
 
-// ============================================================================
-// FORMULA HELPERS
-// ============================================================================
-
-/**
- * Gets a value from a hidden calculation sheet
- * @param {string} sheetName - The hidden sheet name
- * @param {string} cellRef - The cell reference (e.g., 'B4')
- * @return {*} The cell value
- */
-
-/**
- * Gets department list from calc sheet
- * @return {string[]} Array of department names
- */
-
-/**
- * Gets member list for dropdowns
- * @return {Array} Array of member objects with id, name, department
- */
-
-
-// ============================================================================
-// SEARCH FUNCTIONS (Used by UIService)
-// ============================================================================
-
-/**
- * Searches the dashboard for matching records
- * @param {string} query - Search query
- * @param {string} searchType - 'all', 'members', or 'grievances'
- * @param {Object} filters - Additional filters
- * @return {Array} Search results
- */
-
-/**
- * Quick search for instant results
- * @param {string} query - Search query
- * @return {Array} Quick search results
- */
-
-/**
- * Advanced search with complex filters
- * @param {Object} filters - Search filters
- * @return {Array} Search results
- */
 
 
 // ============================================================================
@@ -42572,7 +41831,7 @@ function showFindMemberDialog() {
         <div id="results" class="results"></div>
       </div>
       <script>
-        function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\\//g,"&#x2F;");}
+        ${getClientSideEscapeHtml()}
         document.getElementById('searchTerm').addEventListener('keypress', function(e) {
           if (e.key === 'Enter') searchMembers();
         });
@@ -42670,7 +41929,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3683 lines)
+// SOURCE: 11_CommandHub.gs (3679 lines)
 // ============================================================================
 
 /**
@@ -44006,7 +43265,7 @@ function getSearchDialogHtml_() {
       </div>
 
       <script>
-        function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\\//g,"&#x2F;");}
+        ${getClientSideEscapeHtml()}
         document.getElementById('searchQuery').addEventListener('keypress', function(e) {
           if (e.key === 'Enter') doSearch();
         });
@@ -45200,11 +44459,7 @@ function showOCRDialog() {
     '    "</div>";' +
     '  }' +
     '}' +
-    'function escapeHtml(text) {' +
-    '  var div = document.createElement("div");' +
-    '  div.textContent = text;' +
-    '  return div.innerHTML;' +
-    '}' +
+    ' + getClientSideEscapeHtml() + ' +
     'document.getElementById("fileId").addEventListener("keypress", function(e) {' +
     '  if (e.key === "Enter") runOCR();' +
     '});' +
@@ -45509,7 +44764,7 @@ function showSearchPrecedents() {
     '  <div class="empty">Enter search terms to find historical grievances</div>' +
     '</div>' +
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'function searchPrecedents() {' +
     '  var query = document.getElementById("searchQuery").value;' +
     '  var outcomeFilter = document.getElementById("filterOutcome").value;' +
@@ -51805,7 +51060,7 @@ function getMemberSelfServicePortalHtml() {
     '</div>' +
 
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var sessionToken=null;' +
     'var profileData=null;' +
 
@@ -52873,7 +52128,7 @@ function getSetupMeetingHtml_() {
     '<div id="success" class="success"></div>' +
     '</div>' +
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#39;")}' +
+    ' + getClientSideEscapeHtml() + ' +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
     'var stewardData=[];' +
     // Load stewards on dialog open
@@ -53036,7 +52291,7 @@ function getMeetingCheckInHtml_() {
     '</div>' +
 
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;")}' +
+    ' + getClientSideEscapeHtml() + ' +
 
     // Load only today's eligible meetings for check-in
     'google.script.run' +

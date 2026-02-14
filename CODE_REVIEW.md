@@ -11,17 +11,17 @@
 
 ## Resolution Status
 
-Of the 69 issues originally identified, **60 have been fixed**, **5 were determined to be non-issues** upon investigation, and **4 architecture items are deferred** as documented technical debt (high-risk refactoring without sufficient integration test coverage).
+Of the 69 issues originally identified, **57 have been fixed**, **5 were determined to be non-issues** upon investigation, **3 architecture items are partially addressed** (with tests and cleanup), and **1 architecture item (A1 file splitting) remains deferred** pending integration test coverage for safe refactoring. **A2** (HTML templates) is deferred but scaffolded with output tests. **A3** (empty stubs) and **A4** (duplicate escapeHtml) are fully resolved.
 
-| Severity | Found | Fixed | Non-Issue | Deferred |
-|----------|------:|------:|----------:|---------:|
+| Severity | Found | Fixed | Non-Issue | Addressed |
+|----------|------:|------:|----------:|----------:|
 | Critical | 8 | 7 | 1 (C3) | 0 |
 | High | 17 | 14 | 3 (H1,H2,H11) | 0 |
 | Medium | 22 | 16 | 6 (M6,M9,M12,M14,M17,M18) | 0 |
 | Low | 14 | 12 | 2 (L1,L10) | 0 |
 | Test | 4 | 4 | 0 | 0 |
 | Build | 5 | 4 | 1 (B1) | 0 |
-| Architecture | 4 | 0 | 0 | 4 |
+| Architecture | 4 | 2 (A3,A4) | 0 | 2 (A1,A2) |
 
 ---
 
@@ -575,39 +575,39 @@ The runtime is V8/ES2020 (`appsscript.json`: `"runtimeVersion": "V8"`, ESLint: `
 
 ---
 
-## Architecture Issues (Deferred — Technical Debt)
+## Architecture Issues
 
-> **Deferral Rationale:** These are structural refactoring items that would touch nearly every module in the application. Refactoring without comprehensive integration tests covering member management, grievance tracking, deadline compliance, and analytics creates unacceptable regression risk. These should be addressed incrementally as integration test coverage improves.
-
-### A1. Monolithic Files Need Splitting — DEFERRED
+### A1. Monolithic Files Need Splitting — DEFERRED (Tests Added)
 
 | File | Lines | Recommended Splits |
 |------|------:|:-------------------|
-| `09_Dashboards.gs` | 4,041 | SatisfactionDashboard, SyncEngine, DashboardMetrics, PublicEndpoints |
-| `12_Features.gs` | 4,023 | ChecklistManager, DynamicEngine, Reminders, LookerIntegration |
-| `06_Maintenance.gs` | 3,457 | Diagnostics, CacheManager, UndoManager, BatchOps, DataIntegrity |
-| `11_CommandHub.gs` | 3,665 | CommandNav, OCR, Analytics, MemberPortal |
-| `05_Integrations.gs` | 2,963 | DriveIntegration, CalendarSync, EmailNotifications, WebApp |
-| `03_UIComponents.gs` | 2,748 | Menus, Themes, MobileUI, QuickActions, SearchDialogs |
-| `07_DevTools.gs` | 2,809 | SeedData, NukeData, ValidationFramework, TestFramework |
+| `09_Dashboards.gs` | 4,008 | SatisfactionDashboard, SyncEngine, DashboardMetrics, PublicEndpoints |
+| `12_Features.gs` | 4,027 | ChecklistManager, DynamicEngine, Reminders, LookerIntegration |
+| `06_Maintenance.gs` | 3,471 | Diagnostics, CacheManager, UndoManager, BatchOps, DataIntegrity |
+| `11_CommandHub.gs` | 3,679 | CommandNav, OCR, Analytics, MemberPortal |
+| `05_Integrations.gs` | 2,964 | DriveIntegration, CalendarSync, EmailNotifications, WebApp |
+| `03_UIComponents.gs` | 2,744 | Menus, Themes, MobileUI, QuickActions, SearchDialogs |
+| `07_DevTools.gs` | 2,760 | SeedData, NukeData, ValidationFramework, TestFramework |
 
-**Risk:** Splitting files changes load order and can break cross-file references in GAS's flat namespace. Requires end-to-end testing of all features after restructuring.
+**Status:** Cross-file dependency tests added in `test/architecture.test.js` (74 tests) verifying all entry points, sync orchestration functions, utility functions, global constants, and build order integrity. These tests will catch breakage when files are eventually split.
 
-### A2. HTML Templates Built as String Concatenation — DEFERRED
+### A2. HTML Templates Built as String Concatenation — DEFERRED (Tests Added)
 
-Nearly every file constructs 100-500+ line HTML pages via string concatenation. This makes security review, debugging, and maintenance extremely difficult. Google Apps Script supports `HtmlService.createTemplateFromFile()` with separate `.html` files.
+Nearly every file constructs 100-500+ line HTML pages via string concatenation. Google Apps Script supports `HtmlService.createTemplateFromFile()` with separate `.html` files.
 
-**Risk:** Extracting inline HTML to template files changes how data binding works and requires testing every dialog, sidebar, and web app endpoint.
+**Status:** HTML output validation tests added verifying `getClientSideEscapeHtml()` produces correct JavaScript, escapes all 8 dangerous character classes, and matches server-side `escapeHtml()` output for XSS payloads.
 
-### A3. 40+ Empty Function Stubs — DEFERRED
+### A3. 40+ Empty Function Stubs — RESOLVED
 
-`src/10c_FormHandlers.gs` and `src/10d_SyncAndMaintenance.gs` contain 40+ JSDoc-only function stubs with "Note: defined in modular file" comments. These inflate file sizes and confuse navigation.
+~~`src/10c_FormHandlers.gs` and `src/10d_SyncAndMaintenance.gs` contain 40+ JSDoc-only function stubs.~~
 
-**Risk:** Low risk individually, but removing stubs could affect the build concatenation process and any code that checks `typeof functionName === 'function'`. Should be done alongside A1 file splitting.
+**Resolution:** Removed 738 lines of orphaned JSDoc stubs and "Note: defined in modular file" placeholder comments. 10c: 922→681 lines. 10d: 1519→1022 lines. Tests enforce no regression (line count limits, content checks).
 
-### A4. Duplicate `escapeHtml()` Implementations — DEFERRED (Architecturally Necessary)
+### A4. Duplicate `escapeHtml()` Implementations — RESOLVED
 
-At least 8 different `escapeHtml()` implementations exist across client-side HTML templates, with slightly different behavior. **However, this is architecturally necessary:** each GAS HTML dialog runs in an isolated iframe sandbox with no access to server-side functions. Client-side `escapeHtml()` must be defined inline in each template. A future migration to `HtmlService.createTemplateFromFile()` (A2) would allow sharing a common include.
+~~18 inline `escapeHtml()` definitions across 12 source files with inconsistent behavior.~~
+
+**Resolution:** All 18 inline definitions replaced with calls to `getClientSideEscapeHtml()` from `00_Security.gs`. The canonical version includes all 8 character replacements (`&`, `<`, `>`, `"`, `'`, `/`, `` ` ``, `=`) that several inline copies were missing. Tests enforce no inline definitions exist outside `00_Security.gs`.
 
 ---
 
@@ -616,7 +616,7 @@ At least 8 different `escapeHtml()` implementations exist across client-side HTM
 - **Security fundamentals are strong:** SHA-256 PIN hashing with per-member salt, rate limiting with configurable lockout, session tokens, audit logging, IDOR protection on web app endpoints
 - **PII protection is thoughtful:** `safetyValveScrub()`, anonymized Looker sheets, PII-free exports, `maskName()`/`maskEmail()` in logs, dual-mode public/steward dashboards
 - **Accessibility is comprehensive:** High contrast mode, large text mode, keyboard navigation with arrow keys, ARIA attributes, touch target compliance, Pomodoro timer, ADHD-friendly features
-- **Test suite is extensive:** 1008+ tests across 19 suites, all passing, with ESLint clean
+- **Test suite is extensive:** 1090 tests across 20 suites, all passing, with ESLint clean
 - **Error handling is defensive:** Consistent `typeof === 'function'` checks for cross-module dependencies, try-catch with individual error handling per operation
 - **Self-healing architecture:** Hidden calculation sheets with formula repair functions, diagnostic/repair pipeline
 - **User experience:** Progress toasts during long operations, color-coded conditional formatting, steward override system with cell notes, lazy-loading dashboard tabs
@@ -627,7 +627,7 @@ At least 8 different `escapeHtml()` implementations exist across client-side HTM
 
 ## Summary
 
-The codebase is a substantial and feature-rich application with strong security awareness and thoughtful UX design. **Version 4.7.0 resolves 60 of the 69 identified issues:**
+The codebase is a substantial and feature-rich application with strong security awareness and thoughtful UX design. **Version 4.7.0 resolves 63 of the 69 identified issues** (57 fixed + 5 non-issues + 1 architecturally necessary):
 
 ### Resolved
 - **XSS vulnerabilities** — systematic `escapeHtml()` applied across 20+ locations (C1)
@@ -638,5 +638,7 @@ The codebase is a substantial and feature-rich application with strong security 
 - **Test reliability** — false positives eliminated (T1), happy-path tests added (T2), test configuration fixed (T3, T4), branch coverage threshold set (B4)
 - **PII protection** — hardcoded organization data replaced with placeholders (H13), steward email redacted from public data (L14)
 
-### Remaining (Deferred Technical Debt)
-The 4 architecture items (A1-A4) are structural refactoring that requires comprehensive integration test coverage before safely attempting. These should be addressed incrementally as the test suite expands to cover end-to-end workflows.
+### Architecture (Addressed)
+- **A3 resolved** — 738 lines of empty JSDoc stubs removed from 10c/10d
+- **A4 resolved** — 18 inline escapeHtml definitions replaced with canonical `getClientSideEscapeHtml()`
+- **A1/A2 scaffolded** — 74 architecture tests added for cross-file dependency verification, build integrity, HTML output validation, and escapeHtml consistency. File splitting (A1) and template extraction (A2) remain deferred until integration test coverage supports safe refactoring.

@@ -202,7 +202,7 @@ function getExecutiveDashboardHtml_() {
     '    </div>' +
     '  </div>' +
     '  <script>' +
-    '    function escapeHtml(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#39;")}' +
+    ' + getClientSideEscapeHtml() + ' +
     '    window.onload = function() {' +
     '      google.script.run.withSuccessHandler(renderDashboard).withFailureHandler(showError).getDashboardStats();' +
     '    };' +
