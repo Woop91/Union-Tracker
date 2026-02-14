@@ -368,54 +368,44 @@ function seedFeedbackData() {
     return;
   }
 
-  // Generate 3 sample feedback entries
+  // Generate 3 sample feedback entries using FEEDBACK_COLS for dynamic column placement
   var now = new Date();
   var oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   var threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
 
+  var maxCol = FEEDBACK_COLS.NOTES; // last defined column
+  function buildFeedbackRow(timestamp, submittedBy, category, type, priority, title, description, status, assignedTo, resolution, notes) {
+    var row = [];
+    for (var i = 0; i < maxCol; i++) { row.push(''); }
+    row[FEEDBACK_COLS.TIMESTAMP - 1] = timestamp;
+    row[FEEDBACK_COLS.SUBMITTED_BY - 1] = submittedBy;
+    row[FEEDBACK_COLS.CATEGORY - 1] = category;
+    row[FEEDBACK_COLS.TYPE - 1] = type;
+    row[FEEDBACK_COLS.PRIORITY - 1] = priority;
+    row[FEEDBACK_COLS.TITLE - 1] = title;
+    row[FEEDBACK_COLS.DESCRIPTION - 1] = description;
+    row[FEEDBACK_COLS.STATUS - 1] = status;
+    row[FEEDBACK_COLS.ASSIGNED_TO - 1] = assignedTo;
+    row[FEEDBACK_COLS.RESOLUTION - 1] = resolution;
+    row[FEEDBACK_COLS.NOTES - 1] = notes;
+    return row;
+  }
+
   var sampleFeedback = [
-    // Entry 1: Bug report (resolved)
-    [
-      oneWeekAgo,                                    // A: Timestamp
-      'John Smith',                                  // B: Submitted By
-      'Dashboard',                                   // C: Category
-      'Bug',                                         // D: Type
-      'Medium',                                      // E: Priority
-      'Dashboard metrics not refreshing',            // F: Title
-      'The Quick Stats section sometimes shows stale data after editing the Grievance Log. Requires manual refresh to update.', // G: Description
-      'Resolved',                                    // H: Status
-      'Tech Team',                                   // I: Assigned To
-      'Added auto-refresh trigger on Grievance Log edit. Metrics now update within 30 seconds.', // J: Resolution
-      'User confirmed fix working'                   // K: Notes
-    ],
-    // Entry 2: Feature request (in progress)
-    [
-      threeDaysAgo,                                  // A: Timestamp
-      'Mary Johnson',                                // B: Submitted By
-      'Member Directory',                            // C: Category
-      'Feature Request',                             // D: Type
-      'High',                                        // E: Priority
-      'Bulk import members from CSV',                // F: Title
-      'Would like ability to import multiple members at once from a CSV file instead of entering one by one.', // G: Description
-      'In Progress',                                 // H: Status
-      'Tech Team',                                   // I: Assigned To
-      '',                                            // J: Resolution
-      'Targeting v2.2 release'                       // K: Notes
-    ],
-    // Entry 3: Improvement (new)
-    [
-      now,                                           // A: Timestamp
-      'Robert Williams',                             // B: Submitted By
-      'Reports',                                     // C: Category
-      'Improvement',                                 // D: Type
-      'Low',                                         // E: Priority
-      'Add PDF export for Dashboard',                // F: Title
-      'It would be helpful to export the Dashboard as a PDF for sharing with chapter leadership during meetings.', // G: Description
-      'New',                                         // H: Status
-      '',                                            // I: Assigned To
-      '',                                            // J: Resolution
-      ''                                             // K: Notes
-    ]
+    buildFeedbackRow(oneWeekAgo, 'John Smith', 'Dashboard', 'Bug', 'Medium',
+      'Dashboard metrics not refreshing',
+      'The Quick Stats section sometimes shows stale data after editing the Grievance Log. Requires manual refresh to update.',
+      'Resolved', 'Tech Team',
+      'Added auto-refresh trigger on Grievance Log edit. Metrics now update within 30 seconds.',
+      'User confirmed fix working'),
+    buildFeedbackRow(threeDaysAgo, 'Mary Johnson', 'Member Directory', 'Feature Request', 'High',
+      'Bulk import members from CSV',
+      'Would like ability to import multiple members at once from a CSV file instead of entering one by one.',
+      'In Progress', 'Tech Team', '', 'Targeting v2.2 release'),
+    buildFeedbackRow(now, 'Robert Williams', 'Reports', 'Improvement', 'Low',
+      'Add PDF export for Dashboard',
+      'It would be helpful to export the Dashboard as a PDF for sharing with chapter leadership during meetings.',
+      'New', '', '', '')
   ];
 
   // Write sample data
@@ -523,6 +513,8 @@ function seedSatisfactionData() {
     return arr.slice(0, 3).join(', ');
   }
 
+  var maxCol = SATISFACTION_COLS.Q67_ADDITIONAL; // last seeded column
+
   for (var i = 0; i < 50; i++) {
     // Spread responses over last 60 days
     var daysAgo = Math.floor(Math.random() * 60);
@@ -533,116 +525,111 @@ function seedSatisfactionData() {
     // Branching: 40% filed grievance
     var filedGrievance = Math.random() < 0.4;
 
-    // Build row (68 columns: A-BP)
+    // Build row using SATISFACTION_COLS for dynamic column placement
     var row = [];
+    for (var c = 0; c < maxCol; c++) { row.push(''); }
 
-    // A: Timestamp
-    row.push(timestamp);
+    // Timestamp
+    row[SATISFACTION_COLS.TIMESTAMP - 1] = timestamp;
 
-    // B-F: Work Context (Q1-5)
-    row.push(randomItem(worksites));           // Q1: Worksite
-    row.push(randomItem(roles));               // Q2: Role
-    row.push(randomItem(shifts));              // Q3: Shift
-    row.push(randomItem(tenures));             // Q4: Time in role
-    row.push(hadStewardContact ? 'Yes' : 'No'); // Q5: Steward contact
+    // Work Context (Q1-5)
+    row[SATISFACTION_COLS.Q1_WORKSITE - 1] = randomItem(worksites);
+    row[SATISFACTION_COLS.Q2_ROLE - 1] = randomItem(roles);
+    row[SATISFACTION_COLS.Q3_SHIFT - 1] = randomItem(shifts);
+    row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] = randomItem(tenures);
+    row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] = hadStewardContact ? 'Yes' : 'No';
 
-    // G-J: Overall Satisfaction (Q6-9) - everyone answers
-    row.push(weightedRating());  // Q6: Satisfied with rep
-    row.push(weightedRating());  // Q7: Trust union
-    row.push(weightedRating());  // Q8: Feel protected
-    row.push(weightedRating());  // Q9: Recommend
+    // Overall Satisfaction (Q6-9) - everyone answers
+    row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q7_TRUST_UNION - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q9_RECOMMEND - 1] = weightedRating();
 
-    // K-R: Steward Ratings 3A (Q10-17) - only if had contact
+    // Steward Ratings 3A (Q10-17) - only if had contact
     if (hadStewardContact) {
-      row.push(weightedRating());  // Q10: Timely response
-      row.push(weightedRating());  // Q11: Treated with respect
-      row.push(weightedRating());  // Q12: Explained options
-      row.push(weightedRating());  // Q13: Followed through
-      row.push(weightedRating());  // Q14: Advocated
-      row.push(weightedRating());  // Q15: Safe concerns
-      row.push(weightedRating());  // Q16: Confidentiality
-      row.push(randomItem(stewardComments)); // Q17: Improvement suggestions
-    } else {
-      row.push('', '', '', '', '', '', '', ''); // Empty if no contact
+      row[SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q11_TREATED_RESPECT - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q13_FOLLOWED_THROUGH - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q14_ADVOCATED - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q15_SAFE_CONCERNS - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q17_STEWARD_IMPROVE - 1] = randomItem(stewardComments);
     }
 
-    // S-U: Steward Access 3B (Q18-20) - only if NO contact
+    // Steward Access 3B (Q18-20) - only if NO contact
     if (!hadStewardContact) {
-      row.push(weightedRating());  // Q18: Know how to contact
-      row.push(weightedRating());  // Q19: Confident would get help
-      row.push(weightedRating());  // Q20: Easy to find
-    } else {
-      row.push('', '', ''); // Empty if had contact
+      row[SATISFACTION_COLS.Q18_KNOW_CONTACT - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q19_CONFIDENT_HELP - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q20_EASY_FIND - 1] = weightedRating();
     }
 
-    // V-Z: Chapter Effectiveness (Q21-25) - everyone
-    row.push(weightedRating());  // Q21: Reps understand issues
-    row.push(weightedRating());  // Q22: Chapter communication
-    row.push(weightedRating());  // Q23: Organizes effectively
-    row.push(weightedRating());  // Q24: Know chapter contact
-    row.push(weightedRating());  // Q25: Fair representation
+    // Chapter Effectiveness (Q21-25) - everyone
+    row[SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q22_CHAPTER_COMM - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q23_ORGANIZES - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q24_REACH_CHAPTER - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q25_FAIR_REP - 1] = weightedRating();
 
-    // AA-AF: Local Leadership (Q26-31) - everyone
-    row.push(weightedRating());  // Q26: Decisions communicated
-    row.push(weightedRating());  // Q27: Understand process
-    row.push(weightedRating());  // Q28: Transparent finances
-    row.push(weightedRating());  // Q29: Accountable
-    row.push(weightedRating());  // Q30: Fair processes
-    row.push(weightedRating());  // Q31: Welcomes opinions
+    // Local Leadership (Q26-31) - everyone
+    row[SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q29_ACCOUNTABLE - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q30_FAIR_PROCESSES - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1] = weightedRating();
 
-    // AG-AK: Contract Enforcement (Q32-36) - everyone
-    row.push(weightedRating());  // Q32: Enforces contract
-    row.push(weightedRating());  // Q33: Realistic timelines
-    row.push(weightedRating());  // Q34: Clear updates
-    row.push(weightedRating());  // Q35: Frontline priority
-    row.push(filedGrievance ? 'Yes' : 'No'); // Q36: Filed grievance
+    // Contract Enforcement (Q32-36) - everyone
+    row[SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q33_REALISTIC_TIMELINES - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q34_CLEAR_UPDATES - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] = filedGrievance ? 'Yes' : 'No';
 
-    // AL-AO: Representation 6A (Q37-40) - only if filed grievance
+    // Representation 6A (Q37-40) - only if filed grievance
     if (filedGrievance) {
-      row.push(weightedRating());  // Q37: Understood steps
-      row.push(weightedRating());  // Q38: Felt supported
-      row.push(weightedRating());  // Q39: Updates often enough
-      row.push(weightedRating());  // Q40: Outcome justified
-    } else {
-      row.push('', '', '', ''); // Empty if no grievance
+      row[SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q38_FELT_SUPPORTED - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q39_UPDATES_OFTEN - 1] = weightedRating();
+      row[SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1] = weightedRating();
     }
 
-    // AP-AT: Communication (Q41-45) - everyone
-    row.push(weightedRating());  // Q41: Clear & actionable
-    row.push(weightedRating());  // Q42: Enough information
-    row.push(weightedRating());  // Q43: Find info easily
-    row.push(weightedRating());  // Q44: Reaches all shifts
-    row.push(weightedRating());  // Q45: Meetings worth attending
+    // Communication (Q41-45) - everyone
+    row[SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q42_ENOUGH_INFO - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q43_FIND_EASILY - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q44_ALL_SHIFTS - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1] = weightedRating();
 
-    // AU-AY: Member Voice (Q46-50) - everyone
-    row.push(weightedRating());  // Q46: Voice matters
-    row.push(weightedRating());  // Q47: Seeks input
-    row.push(weightedRating());  // Q48: Dignity
-    row.push(weightedRating());  // Q49: Newer members supported
-    row.push(weightedRating());  // Q50: Conflict handled respectfully
+    // Member Voice (Q46-50) - everyone
+    row[SATISFACTION_COLS.Q46_VOICE_MATTERS - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q47_SEEKS_INPUT - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q48_DIGNITY - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q49_NEWER_SUPPORTED - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1] = weightedRating();
 
-    // AZ-BD: Value & Action (Q51-55) - everyone
-    row.push(weightedRating());  // Q51: Good value for dues
-    row.push(weightedRating());  // Q52: Priorities reflect needs
-    row.push(weightedRating());  // Q53: Prepared to mobilize
-    row.push(weightedRating());  // Q54: Know how to get involved
-    row.push(weightedRating());  // Q55: Can win together
+    // Value & Action (Q51-55) - everyone
+    row[SATISFACTION_COLS.Q51_GOOD_VALUE - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q52_PRIORITIES_NEEDS - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q54_HOW_INVOLVED - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q55_WIN_TOGETHER - 1] = weightedRating();
 
-    // BE-BL: Scheduling (Q56-63) - everyone
-    row.push(weightedRating());  // Q56: Understand changes
-    row.push(weightedRating());  // Q57: Adequately informed
-    row.push(weightedRating());  // Q58: Clear criteria
-    row.push(weightedRating());  // Q59: Work under expectations
-    row.push(weightedRating());  // Q60: Effective outcomes
-    row.push(weightedRating());  // Q61: Supports wellbeing
-    row.push(weightedRating());  // Q62: Concerns taken seriously
-    row.push(randomItem(schedulingChallenges)); // Q63: Scheduling challenge
+    // Scheduling (Q56-63) - everyone
+    row[SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q58_CLEAR_CRITERIA - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q59_WORK_EXPECTATIONS - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1] = weightedRating();
+    row[SATISFACTION_COLS.Q63_SCHEDULING_CHALLENGE - 1] = randomItem(schedulingChallenges);
 
-    // BM-BP: Priorities & Close (Q64-68) - everyone
-    row.push(randomPriorities());         // Q64: Top 3 priorities
-    row.push(randomItem(oneChanges));     // Q65: #1 change to make
-    row.push(randomItem(keepDoing));      // Q66: Keep doing
-    row.push('');                         // Q67: Additional comments (mostly empty)
+    // Priorities & Close (Q64-67) - everyone
+    row[SATISFACTION_COLS.Q64_TOP_PRIORITIES - 1] = randomPriorities();
+    row[SATISFACTION_COLS.Q65_ONE_CHANGE - 1] = randomItem(oneChanges);
+    row[SATISFACTION_COLS.Q66_KEEP_DOING - 1] = randomItem(keepDoing);
+    // Q67_ADDITIONAL left as '' (mostly empty)
 
     sampleData.push(row);
   }
@@ -1209,7 +1196,8 @@ function SEED_GRIEVANCES(count) {
 }
 
 /**
- * Generate a single grievance row with all 34 columns
+ * Generate a single grievance row using GRIEVANCE_COLS for column placement.
+ * Column positions are fully dynamic — reordering GRIEVANCE_COLS won't break seeding.
  */
 function generateSingleGrievanceRow(grievanceId, memberId, firstName, lastName, status, step, incidentDate, articles, category, email, unit, location, steward) {
   var today = new Date();
@@ -1287,42 +1275,66 @@ function generateSingleGrievanceRow(grievanceId, memberId, firstName, lastName, 
   var resolutions = ['Won - Full remedy', 'Won - Partial remedy', 'Settled - Compromise', 'Denied', 'Withdrawn', 'Pending'];
   var resolution = dateClosed ? randomChoice(resolutions) : '';
 
-  return [
-    grievanceId,              // 1: Grievance ID (A)
-    memberId,                 // 2: Member ID (B)
-    firstName,                // 3: First Name (C)
-    lastName,                 // 4: Last Name (D)
-    status,                   // 5: Status (E)
-    step,                     // 6: Current Step (F)
-    incidentDate,             // 7: Incident Date (G)
-    filingDeadline,           // 8: Filing Deadline (H)
-    dateFiled,                // 9: Date Filed (I)
-    step1Due,                 // 10: Step I Due (J)
-    step1Rcvd,                // 11: Step I Rcvd (K)
-    step2AppealDue,           // 12: Step II Appeal Due (L)
-    step2AppealFiled,         // 13: Step II Appeal Filed (M)
-    step2Due,                 // 14: Step II Due (N)
-    step2Rcvd,                // 15: Step II Rcvd (O)
-    step3AppealDue,           // 16: Step III Appeal Due (P)
-    step3AppealFiled,         // 17: Step III Appeal Filed (Q)
-    dateClosed,               // 18: Date Closed (R)
-    daysOpen,                 // 19: Days Open (S)
-    nextActionDue,            // 20: Next Action Due (T)
-    daysToDeadline,           // 21: Days to Deadline (U)
-    articles,                 // 22: Articles Violated (V)
-    category,                 // 23: Issue Category (W)
-    email,                    // 24: Member Email (X)
-    unit,                     // 25: Unit (Y)
-    location,                 // 26: Location (Z)
-    steward,                  // 27: Steward (AA)
-    resolution,               // 28: Resolution (AB)
-    false,                    // 29: Message Alert (AC)
-    '',                       // 30: Coordinator Message (AD)
-    '',                       // 31: Acknowledged By (AE)
-    '',                       // 32: Acknowledged Date (AF)
-    '',                       // 33: Drive Folder ID (AG)
-    ''                        // 34: Drive Folder URL (AH)
-  ];
+  // Build row sized to the last GRIEVANCE_COLS column, filled with empty strings
+  var maxCol = GRIEVANCE_COLS.LAST_UPDATED; // last defined column
+  var row = [];
+  for (var i = 0; i < maxCol; i++) { row.push(''); }
+
+  // Identity
+  row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId;
+  row[GRIEVANCE_COLS.MEMBER_ID - 1] = memberId;
+  row[GRIEVANCE_COLS.FIRST_NAME - 1] = firstName;
+  row[GRIEVANCE_COLS.LAST_NAME - 1] = lastName;
+
+  // Status & Assignment
+  row[GRIEVANCE_COLS.STATUS - 1] = status;
+  row[GRIEVANCE_COLS.CURRENT_STEP - 1] = step;
+
+  // Timeline - Filing
+  row[GRIEVANCE_COLS.INCIDENT_DATE - 1] = incidentDate;
+  row[GRIEVANCE_COLS.FILING_DEADLINE - 1] = filingDeadline;
+  row[GRIEVANCE_COLS.DATE_FILED - 1] = dateFiled;
+
+  // Timeline - Step I
+  row[GRIEVANCE_COLS.STEP1_DUE - 1] = step1Due;
+  row[GRIEVANCE_COLS.STEP1_RCVD - 1] = step1Rcvd;
+
+  // Timeline - Step II
+  row[GRIEVANCE_COLS.STEP2_APPEAL_DUE - 1] = step2AppealDue;
+  row[GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1] = step2AppealFiled;
+  row[GRIEVANCE_COLS.STEP2_DUE - 1] = step2Due;
+  row[GRIEVANCE_COLS.STEP2_RCVD - 1] = step2Rcvd;
+
+  // Timeline - Step III
+  row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1] = step3AppealDue;
+  row[GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1] = step3AppealFiled;
+  row[GRIEVANCE_COLS.DATE_CLOSED - 1] = dateClosed;
+
+  // Calculated Metrics
+  row[GRIEVANCE_COLS.DAYS_OPEN - 1] = daysOpen;
+  row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] = nextActionDue;
+  row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] = daysToDeadline;
+
+  // Case Details
+  row[GRIEVANCE_COLS.ARTICLES - 1] = articles;
+  row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = category;
+
+  // Contact & Location
+  row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] = email;
+  row[GRIEVANCE_COLS.LOCATION - 1] = location;
+  row[GRIEVANCE_COLS.STEWARD - 1] = steward;
+
+  // Resolution
+  row[GRIEVANCE_COLS.RESOLUTION - 1] = resolution;
+
+  // Coordinator Notifications
+  row[GRIEVANCE_COLS.MESSAGE_ALERT - 1] = false;
+  // COORDINATOR_MESSAGE, ACKNOWLEDGED_BY, ACKNOWLEDGED_DATE left as ''
+
+  // Drive Integration
+  // DRIVE_FOLDER_ID, DRIVE_FOLDER_URL left as ''
+
+  return row;
 }
 
 // ============================================================================
@@ -1830,10 +1842,30 @@ function isLargeDataset() {
 function createTestMember(memberId) {
   var ss = SpreadsheetApp.getActive();
   var memberDir = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  var testData = [
-    memberId || 'TEST-M001', 'Test', 'Member', '', '', '', 'Monday', 'test@union.org', '(555) 123-4567',
-    'Email', 'Mornings', '', '', 'No', '', '', new Date(), new Date(), 85, 10, 'Yes', 'Yes', 'No', '', new Date(), '', '', '', '', '', ''
-  ];
+
+  // Build row using MEMBER_COLS for dynamic column placement
+  var maxCol = MEMBER_COLS.STATE;
+  var testData = [];
+  for (var i = 0; i < maxCol; i++) { testData.push(''); }
+
+  testData[MEMBER_COLS.MEMBER_ID - 1] = memberId || 'TEST-M001';
+  testData[MEMBER_COLS.FIRST_NAME - 1] = 'Test';
+  testData[MEMBER_COLS.LAST_NAME - 1] = 'Member';
+  testData[MEMBER_COLS.OFFICE_DAYS - 1] = 'Monday';
+  testData[MEMBER_COLS.EMAIL - 1] = 'test@union.org';
+  testData[MEMBER_COLS.PHONE - 1] = '(555) 123-4567';
+  testData[MEMBER_COLS.PREFERRED_COMM - 1] = 'Email';
+  testData[MEMBER_COLS.BEST_TIME - 1] = 'Mornings';
+  testData[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+  testData[MEMBER_COLS.LAST_VIRTUAL_MTG - 1] = new Date();
+  testData[MEMBER_COLS.LAST_INPERSON_MTG - 1] = new Date();
+  testData[MEMBER_COLS.OPEN_RATE - 1] = 85;
+  testData[MEMBER_COLS.VOLUNTEER_HOURS - 1] = 10;
+  testData[MEMBER_COLS.INTEREST_LOCAL - 1] = 'Yes';
+  testData[MEMBER_COLS.INTEREST_CHAPTER - 1] = 'Yes';
+  testData[MEMBER_COLS.INTEREST_ALLIED - 1] = 'No';
+  testData[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = new Date();
+
   var startRow = Math.max(memberDir.getLastRow() + 1, 2);
   memberDir.getRange(startRow, 1, 1, testData.length).setValues([testData]);
   return memberId || 'TEST-M001';
