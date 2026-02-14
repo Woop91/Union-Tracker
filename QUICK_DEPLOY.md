@@ -1,6 +1,6 @@
 # Quick Deploy - 509 Union Steward Dashboard
 
-**Version:** 4.6.0 | **Architecture:** 27-File Modular
+**Version:** 4.7.0 | **Architecture:** 27-File Modular
 
 Deploy the 509 Union Steward Dashboard to a Google Sheet using the source files in `src/`.
 
@@ -188,5 +188,5 @@ See [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) for the full production transition 
 
 ---
 
-**Version:** 4.6.0 (27-File Modular Architecture)
-**Last Updated:** 2026-02-12
+**Version:** 4.7.0 (27-File Modular Architecture)
+**Last Updated:** 2026-02-14

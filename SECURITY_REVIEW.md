@@ -1,6 +1,6 @@
 # Security Review Report
 
-> **Note:** This security review was conducted at v4.5.0. The project is now at v4.6.0.
+> **Note:** This security review was conducted at v4.5.0. The project is now at v4.7.0.
 
 **Repository:** Union Steward Dashboard v4.5.0
 **Review Date:** February 2, 2026

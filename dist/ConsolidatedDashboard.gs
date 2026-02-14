@@ -15687,7 +15687,7 @@ function getUnifiedDashboardHtml(isPII) {
     '</div></div>' +
 
     // Footer with Help/FAQ button
-    '<div class="footer"><span>Data refreshes on load | v4.4.0</span><div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="showFAQ()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">help</i>Help</button><button class="btn btn-secondary" onclick="location.reload()">Refresh</button></div></div>' +
+    '<div class="footer"><span>Data refreshes on load | v4.7.0</span><div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="showFAQ()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">help</i>Help</button><button class="btn btn-secondary" onclick="location.reload()">Refresh</button></div></div>' +
 
     // JavaScript
     '<script>' +
@@ -29033,7 +29033,7 @@ function getQuarterFromDate(date) {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (1462 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (1454 lines)
 // ============================================================================
 
 // ============================================================================
@@ -30076,17 +30076,9 @@ function verifyHiddenSheets() {
 function refreshAllHiddenFormulas() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Touch each hidden sheet to force recalc (6 hidden sheets)
-  var hiddenSheetNames = [
-    SHEETS.GRIEVANCE_CALC,
-    SHEETS.GRIEVANCE_FORMULAS,
-    SHEETS.MEMBER_LOOKUP,
-    SHEETS.STEWARD_CONTACT_CALC,
-    SHEETS.DASHBOARD_CALC,
-    SHEETS.STEWARD_PERFORMANCE_CALC
-  ];
-
-  // Force recalculation of all pending formulas
+  // Force recalculation of all pending formulas (covers all 6 hidden sheets:
+  // GRIEVANCE_CALC, GRIEVANCE_FORMULAS, MEMBER_LOOKUP, STEWARD_CONTACT_CALC,
+  // DASHBOARD_CALC, STEWARD_PERFORMANCE_CALC)
   SpreadsheetApp.flush();
 
   // Then sync

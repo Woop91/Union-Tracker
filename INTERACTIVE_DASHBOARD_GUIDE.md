@@ -606,7 +606,7 @@ Potential additions (from Future Features sheet):
 
 ---
 
-**Version:** 4.6.0
+**Version:** 4.7.0
 **Last Updated:** February 2026
 
 *A personal project providing data-driven insights for representatives* 📊

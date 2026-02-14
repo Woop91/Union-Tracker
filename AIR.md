@@ -1,7 +1,7 @@
 # 509 Dashboard - Architecture & Implementation Reference
 
-**Version:** 4.6.0 (Meeting Docs, Member Folders, Agenda Sharing, 950+ Tests)
-**Last Updated:** 2026-02-12
+**Version:** 4.7.0 (Security Hardening, Code Quality, 1090+ Tests)
+**Last Updated:** 2026-02-14
 **Purpose:** A personal project for grievance tracking and member engagement
 
 > **Disclaimer:** This is a personal project and is not affiliated with or endorsed by any union or labor organization. It is shared freely for others to use and customize.

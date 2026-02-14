@@ -1038,17 +1038,9 @@ function verifyHiddenSheets() {
 function refreshAllHiddenFormulas() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Touch each hidden sheet to force recalc (6 hidden sheets)
-  var hiddenSheetNames = [
-    SHEETS.GRIEVANCE_CALC,
-    SHEETS.GRIEVANCE_FORMULAS,
-    SHEETS.MEMBER_LOOKUP,
-    SHEETS.STEWARD_CONTACT_CALC,
-    SHEETS.DASHBOARD_CALC,
-    SHEETS.STEWARD_PERFORMANCE_CALC
-  ];
-
-  // Force recalculation of all pending formulas
+  // Force recalculation of all pending formulas (covers all 6 hidden sheets:
+  // GRIEVANCE_CALC, GRIEVANCE_FORMULAS, MEMBER_LOOKUP, STEWARD_CONTACT_CALC,
+  // DASHBOARD_CALC, STEWARD_PERFORMANCE_CALC)
   SpreadsheetApp.flush();
 
   // Then sync

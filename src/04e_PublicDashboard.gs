@@ -1554,7 +1554,7 @@ function getUnifiedDashboardHtml(isPII) {
     '</div></div>' +
 
     // Footer with Help/FAQ button
-    '<div class="footer"><span>Data refreshes on load | v4.4.0</span><div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="showFAQ()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">help</i>Help</button><button class="btn btn-secondary" onclick="location.reload()">Refresh</button></div></div>' +
+    '<div class="footer"><span>Data refreshes on load | v4.7.0</span><div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="showFAQ()"><i class="material-icons" style="font-size:14px;vertical-align:middle;margin-right:4px">help</i>Help</button><button class="btn btn-secondary" onclick="location.reload()">Refresh</button></div></div>' +
 
     // JavaScript
     '<script>' +

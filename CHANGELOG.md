@@ -5,6 +5,27 @@ All notable changes to the 509 Union Dashboard project will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.0] - 2026-02-14
+
+### Fixed
+- **40+ code review issues resolved** across security, correctness, performance, and test quality
+- **XSS hardening** — all Critical security issues from comprehensive code review addressed
+- **onEdit optimization** — reduced redundant processing in edit trigger handlers
+- **DevTools guard** — added production environment check to prevent accidental DevTools execution
+- **Deduplicated `escapeHtml`** — consolidated duplicate implementations into single canonical function in `00_Security.gs`
+- **Removed empty stubs** — cleaned up placeholder functions that had no implementation (A3 architecture item)
+- **Broken `GRIEVANCE_COLS.UNIT` and `MEMBER_COLS.HOME_TOWN` references** — removed 9 references to non-existent column mappings
+- **Data safety improvements** — 14 critical corrections for data integrity, UX, and reliability
+- **Dashboard footer version** — updated from v4.4.0 to v4.7.0
+- **Unused variable lint warning** — removed unused `hiddenSheetNames` in `08d_AuditAndFormulas.gs`
+
+### Changed
+- Version bumped to 4.7.0 across all files (VERSION_INFO, package.json, API_VERSION)
+- Test suite expanded from 1016 to 1090 tests across 20 suites (was 19)
+- 74 new architecture and happy-path tests added
+- CODE_REVIEW.md updated with resolution status for all 69 identified issues
+- Updated README.md, SECURITY_REVIEW.md version references to 4.7.0
+
 ## [4.6.0] - 2026-02-12
 
 ### Added
