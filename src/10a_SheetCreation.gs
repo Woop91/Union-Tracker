@@ -540,9 +540,9 @@ function createConfigGuideSheet(ss) {
  */
 function createMemberDirectory(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEMBER_DIR);
+  var headers = getMemberHeaders();
   // getOrCreateSheet now preserves data - only set headers on empty sheets
   if (sheet.getLastRow() <= 1) {
-    var headers = getMemberHeaders();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
       .setFontColor(COLORS.WHITE)
@@ -593,16 +593,30 @@ function createMemberDirectory(ss) {
   // COLUMN GROUPS: Group and hide optional columns for cleaner view
   // ═══════════════════════════════════════════════════════════════════════════
   try {
+    var maxRows = sheet.getMaxRows();
+    var memberGroupRanges = [
+      sheet.getRange(1, MEMBER_COLS.LAST_VIRTUAL_MTG, maxRows, 4),
+      sheet.getRange(1, MEMBER_COLS.INTEREST_LOCAL, maxRows, 4),
+      sheet.getRange(1, MEMBER_COLS.STREET_ADDRESS, maxRows, 3)
+    ];
+
+    // Clear any existing column groups first to prevent duplicates on re-run
+    memberGroupRanges.forEach(function(range) {
+      for (var d = 0; d < 8; d++) {
+        try { range.shiftColumnGroupDepth(-1); } catch(e) { break; }
+      }
+    });
+
     // Group 1: Engagement Metrics (Q-T, columns 17-20) - Hidden by default
-    sheet.getRange(1, MEMBER_COLS.LAST_VIRTUAL_MTG, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
+    memberGroupRanges[0].shiftColumnGroupDepth(1);
     sheet.collapseAllColumnGroups();
 
     // Group 2: Member Interests (U-X, columns 21-24) - Hidden by default
-    sheet.getRange(1, MEMBER_COLS.INTEREST_LOCAL, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
+    memberGroupRanges[1].shiftColumnGroupDepth(1);
     sheet.collapseAllColumnGroups();
 
     // Group 3: Mailing Address / PII (AK-AM, columns 37-39) - Hidden by default, PII
-    sheet.getRange(1, MEMBER_COLS.STREET_ADDRESS, sheet.getMaxRows(), 3).shiftColumnGroupDepth(1);
+    memberGroupRanges[2].shiftColumnGroupDepth(1);
     sheet.collapseAllColumnGroups();
 
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
@@ -732,9 +746,9 @@ function createMemberDirectory(ss) {
  */
 function createGrievanceLog(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.GRIEVANCE_LOG);
+  var headers = getGrievanceHeaders();
   // getOrCreateSheet now preserves data - only set headers on empty sheets
   if (sheet.getLastRow() <= 1) {
-    var headers = getGrievanceHeaders();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setBackground(COMMAND_CONFIG.THEME.HEADER_BG)
       .setFontColor(COLORS.WHITE)
@@ -790,11 +804,26 @@ function createGrievanceLog(ss) {
 
   // Setup column groups for timeline (Step I, II, III collapsible)
   try {
-    sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
-    sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
-    sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, sheet.getMaxRows(), 2).shiftColumnGroupDepth(1);
+    var grMaxRows = sheet.getMaxRows();
+    var grievanceGroupRanges = [
+      sheet.getRange(1, GRIEVANCE_COLS.STEP1_DUE, grMaxRows, 2),
+      sheet.getRange(1, GRIEVANCE_COLS.STEP2_APPEAL_DUE, grMaxRows, 4),
+      sheet.getRange(1, GRIEVANCE_COLS.STEP3_APPEAL_DUE, grMaxRows, 2),
+      sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, grMaxRows, 4)
+    ];
+
+    // Clear any existing column groups first to prevent duplicates on re-run
+    grievanceGroupRanges.forEach(function(range) {
+      for (var d = 0; d < 8; d++) {
+        try { range.shiftColumnGroupDepth(-1); } catch(e) { break; }
+      }
+    });
+
+    grievanceGroupRanges[0].shiftColumnGroupDepth(1);
+    grievanceGroupRanges[1].shiftColumnGroupDepth(1);
+    grievanceGroupRanges[2].shiftColumnGroupDepth(1);
     // Group Coordinator columns AC-AF (Message Alert, Coordinator Message, Acknowledged By, Acknowledged Date)
-    sheet.getRange(1, GRIEVANCE_COLS.MESSAGE_ALERT, sheet.getMaxRows(), 4).shiftColumnGroupDepth(1);
+    grievanceGroupRanges[3].shiftColumnGroupDepth(1);
     sheet.setColumnGroupControlPosition(SpreadsheetApp.GroupControlTogglePosition.AFTER);
     // Collapse all groups by default (including coordinator columns AC-AF)
     sheet.collapseAllColumnGroups();
