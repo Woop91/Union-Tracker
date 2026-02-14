@@ -1401,7 +1401,8 @@ function getNextGrievanceId(sheet) {
  * @return {Object} Calculated deadline dates
  */
 function calculateInitialDeadlines(filingDate) {
-  const step1Due = addBusinessDays(filingDate, DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE);
+  var rules = getDeadlineRules();
+  const step1Due = addBusinessDays(filingDate, rules.STEP_1.DAYS_FOR_RESPONSE);
 
   return {
     step1Due: step1Due
@@ -1415,17 +1416,18 @@ function calculateInitialDeadlines(filingDate) {
  * @return {Date} Deadline for next step
  */
 function calculateNextStepDeadline(currentStep, currentStepDate) {
+  var rules = getDeadlineRules();
   let daysToAdd;
 
   switch (currentStep) {
     case 1:
-      daysToAdd = DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL;
+      daysToAdd = rules.STEP_2.DAYS_TO_APPEAL;
       break;
     case 2:
-      daysToAdd = DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL;
+      daysToAdd = rules.STEP_3.DAYS_TO_APPEAL;
       break;
     case 3:
-      daysToAdd = DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND;
+      daysToAdd = rules.ARBITRATION.DAYS_TO_DEMAND;
       break;
     default:
       return null;
@@ -1441,17 +1443,18 @@ function calculateNextStepDeadline(currentStep, currentStepDate) {
  * @return {Date} Response deadline
  */
 function calculateResponseDeadline(step, stepDate) {
+  var rules = getDeadlineRules();
   let daysToAdd;
 
   switch (step) {
     case 1:
-      daysToAdd = DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE;
+      daysToAdd = rules.STEP_1.DAYS_FOR_RESPONSE;
       break;
     case 2:
-      daysToAdd = DEADLINE_RULES.STEP_2.DAYS_FOR_RESPONSE;
+      daysToAdd = rules.STEP_2.DAYS_FOR_RESPONSE;
       break;
     case 3:
-      daysToAdd = DEADLINE_RULES.STEP_3.DAYS_FOR_RESPONSE;
+      daysToAdd = rules.STEP_3.DAYS_FOR_RESPONSE;
       break;
     default:
       return null;

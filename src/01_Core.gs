@@ -633,17 +633,27 @@ function getOrgNameFromConfig_() {
  * @returns {string} System name (e.g., "509 Strategic Command Center")
  */
 function getSystemName_() {
+  return getLocalNumberFromConfig_() + ' Strategic Command Center';
+}
+
+/**
+ * Get local number from Config sheet, falling back to default.
+ * Used for UI elements like menu names.
+ * @private
+ * @returns {string} Local number (e.g., "509")
+ */
+function getLocalNumberFromConfig_() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       var localNumber = configSheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER).getValue();
-      if (localNumber) return localNumber + ' Strategic Command Center';
+      if (localNumber) return String(localNumber);
     }
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  return '509 Strategic Command Center';
+  return '509';
 }
 
 // ============================================================================

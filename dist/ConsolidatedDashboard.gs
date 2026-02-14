@@ -2052,17 +2052,27 @@ function getOrgNameFromConfig_() {
  * @returns {string} System name (e.g., "509 Strategic Command Center")
  */
 function getSystemName_() {
+  return getLocalNumberFromConfig_() + ' Strategic Command Center';
+}
+
+/**
+ * Get local number from Config sheet, falling back to default.
+ * Used for UI elements like menu names.
+ * @private
+ * @returns {string} Local number (e.g., "509")
+ */
+function getLocalNumberFromConfig_() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       var localNumber = configSheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER).getValue();
-      if (localNumber) return localNumber + ' Strategic Command Center';
+      if (localNumber) return String(localNumber);
     }
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  return '509 Strategic Command Center';
+  return '509';
 }
 
 // ============================================================================
@@ -5554,7 +5564,8 @@ function getNextGrievanceId(sheet) {
  * @return {Object} Calculated deadline dates
  */
 function calculateInitialDeadlines(filingDate) {
-  const step1Due = addBusinessDays(filingDate, DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE);
+  var rules = getDeadlineRules();
+  const step1Due = addBusinessDays(filingDate, rules.STEP_1.DAYS_FOR_RESPONSE);
 
   return {
     step1Due: step1Due
@@ -5568,17 +5579,18 @@ function calculateInitialDeadlines(filingDate) {
  * @return {Date} Deadline for next step
  */
 function calculateNextStepDeadline(currentStep, currentStepDate) {
+  var rules = getDeadlineRules();
   let daysToAdd;
 
   switch (currentStep) {
     case 1:
-      daysToAdd = DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL;
+      daysToAdd = rules.STEP_2.DAYS_TO_APPEAL;
       break;
     case 2:
-      daysToAdd = DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL;
+      daysToAdd = rules.STEP_3.DAYS_TO_APPEAL;
       break;
     case 3:
-      daysToAdd = DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND;
+      daysToAdd = rules.ARBITRATION.DAYS_TO_DEMAND;
       break;
     default:
       return null;
@@ -5594,17 +5606,18 @@ function calculateNextStepDeadline(currentStep, currentStepDate) {
  * @return {Date} Response deadline
  */
 function calculateResponseDeadline(step, stepDate) {
+  var rules = getDeadlineRules();
   let daysToAdd;
 
   switch (step) {
     case 1:
-      daysToAdd = DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE;
+      daysToAdd = rules.STEP_1.DAYS_FOR_RESPONSE;
       break;
     case 2:
-      daysToAdd = DEADLINE_RULES.STEP_2.DAYS_FOR_RESPONSE;
+      daysToAdd = rules.STEP_2.DAYS_FOR_RESPONSE;
       break;
     case 3:
-      daysToAdd = DEADLINE_RULES.STEP_3.DAYS_FOR_RESPONSE;
+      daysToAdd = rules.STEP_3.DAYS_FOR_RESPONSE;
       break;
     default:
       return null;
@@ -6639,7 +6652,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2546 lines)
+// SOURCE: 03_UIComponents.gs (2547 lines)
 // ============================================================================
 
 /**
@@ -6673,11 +6686,12 @@ function highlightUrgentGrievances() {
  */
 function createDashboardMenu() {
   var ui = SpreadsheetApp.getUi();
+  var localNumber = getLocalNumberFromConfig_();
 
   // ============================================================================
-  // MENU 1: 509 Union Hub - Primary Operations
+  // MENU 1: Union Hub - Primary Operations
   // ============================================================================
-  ui.createMenu('📊 509 Union Hub')
+  ui.createMenu('📊 ' + localNumber + ' Union Hub')
     .addItem('👥 Member Dashboard', 'showPublicMemberDashboard')
     .addItem('🛡️ Steward Dashboard', 'showStewardDashboard')
     .addSeparator()
@@ -10108,7 +10122,7 @@ function getDashboardSidebarHtml() {
 
 
 // ============================================================================
-// SOURCE: 04b_AccessibilityFeatures.gs (1029 lines)
+// SOURCE: 04b_AccessibilityFeatures.gs (1035 lines)
 // ============================================================================
 
 // ============================================================================
@@ -10808,8 +10822,14 @@ function showExportDialog_UIService_() {
     return;
   }
 
-  // Get data
-  var data = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  // Get data, excluding PII and sensitive columns (PIN_HASH, STREET_ADDRESS, CITY, STATE)
+  var allData = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  var excludeCols = PII_MEMBER_COLS.concat([MEMBER_COLS.PIN_HASH]);
+  var data = allData.map(function(row) {
+    return row.filter(function(_, colIdx) {
+      return excludeCols.indexOf(colIdx + 1) === -1;
+    });
+  });
 
   // Convert to CSV
   var csv = data.map(function(row) {
@@ -28786,7 +28806,7 @@ function getQuarterFromDate(date) {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (1461 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (1462 lines)
 // ============================================================================
 
 // ============================================================================
@@ -30009,23 +30029,24 @@ function setupCalcDeadlinesSheet(sheet) {
   sheet.getRange('A3').setValue('Deadline Rules (Days)');
   sheet.getRange('A3').setFontWeight('bold');
 
+  var rules = getDeadlineRules();
   sheet.getRange('A4').setValue('Step 1 Response');
-  sheet.getRange('B4').setValue(DEADLINE_RULES.STEP_1.DAYS_FOR_RESPONSE);
+  sheet.getRange('B4').setValue(rules.STEP_1.DAYS_FOR_RESPONSE);
 
   sheet.getRange('A5').setValue('Step 2 Appeal');
-  sheet.getRange('B5').setValue(DEADLINE_RULES.STEP_2.DAYS_TO_APPEAL);
+  sheet.getRange('B5').setValue(rules.STEP_2.DAYS_TO_APPEAL);
 
   sheet.getRange('A6').setValue('Step 2 Response');
-  sheet.getRange('B6').setValue(DEADLINE_RULES.STEP_2.DAYS_FOR_RESPONSE);
+  sheet.getRange('B6').setValue(rules.STEP_2.DAYS_FOR_RESPONSE);
 
   sheet.getRange('A7').setValue('Step 3 Appeal');
-  sheet.getRange('B7').setValue(DEADLINE_RULES.STEP_3.DAYS_TO_APPEAL);
+  sheet.getRange('B7').setValue(rules.STEP_3.DAYS_TO_APPEAL);
 
   sheet.getRange('A8').setValue('Step 3 Response');
-  sheet.getRange('B8').setValue(DEADLINE_RULES.STEP_3.DAYS_FOR_RESPONSE);
+  sheet.getRange('B8').setValue(rules.STEP_3.DAYS_FOR_RESPONSE);
 
   sheet.getRange('A9').setValue('Arbitration Demand');
-  sheet.getRange('B9').setValue(DEADLINE_RULES.ARBITRATION.DAYS_TO_DEMAND);
+  sheet.getRange('B9').setValue(rules.ARBITRATION.DAYS_TO_DEMAND);
 
   // Upcoming deadlines calculation
   sheet.getRange('D1').setValue('Upcoming Deadlines (Next 14 Days)');
@@ -34299,7 +34320,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1750 lines)
+// SOURCE: 10a_SheetCreation.gs (1753 lines)
 // ============================================================================
 
 /**
@@ -34916,6 +34937,9 @@ function createMemberDirectory(ss) {
 
   // Format Hire Date column as date
   sheet.getRange(2, MEMBER_COLS.HIRE_DATE, 998, 1).setNumberFormat('MM/dd/yyyy');
+
+  // Hide PIN Hash column (sensitive data — should not be visible in the sheet)
+  sheet.hideColumns(MEMBER_COLS.PIN_HASH, 1);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // CONDITIONAL FORMATTING: Highlight members with open grievances
@@ -40386,7 +40410,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2052 lines)
+// SOURCE: 10_Main.gs (2059 lines)
 // ============================================================================
 
 /**
@@ -42257,7 +42281,14 @@ function exportMemberDirectory(format) {
     throw new Error('Member Directory sheet not found');
   }
 
-  const data = sheet.getDataRange().getValues();
+  // Exclude PII and sensitive columns (PIN_HASH, STREET_ADDRESS, CITY, STATE)
+  var allData = sheet.getDataRange().getValues();
+  var excludeCols = PII_MEMBER_COLS.concat([MEMBER_COLS.PIN_HASH]);
+  const data = allData.map(function(row) {
+    return row.filter(function(_, colIdx) {
+      return excludeCols.indexOf(colIdx + 1) === -1;
+    });
+  });
 
   switch (format) {
     case 'csv':

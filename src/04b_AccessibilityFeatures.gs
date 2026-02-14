@@ -695,8 +695,14 @@ function showExportDialog_UIService_() {
     return;
   }
 
-  // Get data
-  var data = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  // Get data, excluding PII and sensitive columns (PIN_HASH, STREET_ADDRESS, CITY, STATE)
+  var allData = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
+  var excludeCols = PII_MEMBER_COLS.concat([MEMBER_COLS.PIN_HASH]);
+  var data = allData.map(function(row) {
+    return row.filter(function(_, colIdx) {
+      return excludeCols.indexOf(colIdx + 1) === -1;
+    });
+  });
 
   // Convert to CSV
   var csv = data.map(function(row) {
