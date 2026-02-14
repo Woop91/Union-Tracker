@@ -107,9 +107,10 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    clasp create --type sheets --title "Union Dashboard"
    ```
 
-3. **Deploy:**
+3. **Build and deploy:**
 
    ```bash
+   npm run build:prod
    clasp push
    ```
 
@@ -452,6 +453,7 @@ A: Use Google Sheets' built-in version history (File > Version history) or make 
 |-------|-------------|
 | [Heatmap Setup](setup-instructions/01_HEATMAP_SETUP.md) | Color gradient configuration |
 | [OCR Setup](setup-instructions/02_OCR_SETUP.md) | Google Cloud Vision API for OCR |
+| [CLASP Deployment](setup-instructions/03_CLASP_SETUP.md) | Complete CLASP deployment guide |
 | [Drive URL Setup](setup-instructions/04_RESOURCE_DRIVE_URL_LINK_SETUP.md) | Shared documents folder linking |
 | [Dropbox Setup](setup-instructions/05_RESOURCE_DROPBOX_SETUP.md) | Resource dropbox folder setup |
 | [PDF Generation](setup-instructions/06_PDF_GENERATION_SETUP.md) | PDF template and email setup |

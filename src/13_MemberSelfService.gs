@@ -1,5 +1,5 @@
 /**
- * 509 Dashboard - Member Self-Service Portal
+ * 13_MemberSelfService.gs - Member Self-Service Portal
  *
  * This module provides PIN-based authentication for members to:
  * - Look up their own information
@@ -12,7 +12,7 @@
  * - All access and changes are audit logged
  * - Members can only view/edit their own data
  *
- * @version 1.0.0
+ * @version 4.6.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -910,6 +910,15 @@ function showBulkGeneratePINDialog() {
   }
 
   if (generated.length > 0) {
+    // Audit log the bulk PIN generation event (without the PINs themselves)
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('BULK_PIN_GENERATION', {
+        count: generated.length,
+        memberIds: generated.map(function(g) { return g.memberId; }),
+        generatedBy: (function() { try { return Session.getActiveUser().getEmail(); } catch (_e) { return 'Unknown'; } })()
+      });
+    }
+
     message += '\n--- New PINs ---\n';
     for (var j = 0; j < generated.length && j < 50; j++) {
       message += generated[j].memberName + ' (' + generated[j].memberId + '): ' + generated[j].pin + '\n';

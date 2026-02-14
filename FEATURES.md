@@ -43,7 +43,7 @@ This document provides a comprehensive, searchable reference of all features in 
 
 | Feature | Description | Menu Path | Keywords |
 |---------|-------------|-----------|----------|
-| **Steward Dashboard** | Internal dashboard with 6 tabs: Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction. Contains member names and PII - for steward use only. | Strategic Ops > Command Center > Steward Dashboard | internal, analytics, PII, workload |
+| **Steward Dashboard** | Internal dashboard with 11 tabs: Overview, My Cases, Workload, Analytics, Directory, Hot Spots, Bargaining, Satisfaction, Resources, Compare, Meeting Notes. Contains member names and PII - for steward use only. | Strategic Ops > Command Center > Steward Dashboard | internal, analytics, PII, workload |
 | **Member Dashboard** | PII-safe dashboard for sharing with members. Shows aggregate stats, steward directory, and satisfaction scores without personal information. | Strategic Ops > Command Center > Member Dashboard | public, aggregate, safe, sharing |
 | **Executive Command Dashboard** | Legacy 5-tab modal with Overview, My Cases, Grievances, Members, and Analytics tabs. | Union Hub > Dashboards > Dashboard | executive, overview, legacy |
 | **Interactive Dashboard** | Customizable dashboard with 20+ metrics and 7 chart types. | See INTERACTIVE_DASHBOARD_GUIDE.md | charts, metrics, customizable |

@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * MenuBuilder.gs - Menu System and Navigation
+ * 03_UIComponents.gs - Menu System and Navigation
  * ============================================================================
  *
  * This module handles all menu-related functions including:
@@ -11,8 +11,8 @@
  * REFACTORED: Split from 04_UIService.gs for better maintainability
  *
  * @fileoverview Menu creation and navigation functions
- * @version 1.0.0
- * @requires 01_Constants.gs
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================

@@ -438,7 +438,7 @@ function getInteractiveDashboardHtml() {
     '    if(overdue.length===0){document.getElementById("overview-overdue").innerHTML="";return}' +
     '    var html="<div class=\\"chart-container\\" style=\\"border-left:4px solid #dc2626\\"><div class=\\"chart-title\\">⚠️ Overdue Cases ("+overdue.length+")</div>";' +
     '    html+="<div class=\\"list-container\\">";' +
-    '    overdue.slice(0,3).forEach(function(g){html+="<div class=\\"list-item\\" onclick=\\"showGrievanceDetail(\'"+g.id+"\')\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+g.id+" - "+g.memberName+"</div><div class=\\"list-item-subtitle\\">"+g.issueType+" • "+g.currentStep+"</div></div><span class=\\"badge badge-overdue\\">Overdue</span></div>"});' +
+    '    overdue.slice(0,3).forEach(function(g){html+="<div class=\\"list-item\\" onclick=\\"showGrievanceDetail(\'"+escapeHtml(g.id)+"\')\\"><div class=\\"list-item-main\\"><div class=\\"list-item-title\\">"+escapeHtml(g.id)+" - "+escapeHtml(g.memberName)+"</div><div class=\\"list-item-subtitle\\">"+escapeHtml(g.issueType)+" • "+escapeHtml(g.currentStep)+"</div></div><span class=\\"badge badge-overdue\\">Overdue</span></div>"});' +
     '    if(overdue.length>3)html+="<button class=\\"action-btn action-btn-danger\\" style=\\"width:100%;margin-top:8px\\" onclick=\\"switchTab(\'grievances\',document.getElementById(\'tab-grievances\'));setTimeout(function(){filterGrievanceStatus(\'Overdue\',document.querySelector(\'[data-filter=Overdue]\'))},300)\\">View All "+overdue.length+" Overdue Cases</button>";' +
     '    html+="</div></div>";' +
     '    document.getElementById("overview-overdue").innerHTML=html;' +

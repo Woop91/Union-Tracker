@@ -245,11 +245,11 @@ This enables:
 - Real-time dashboard updates
 - Member snapshot updates
 
-### 5. Customize Custom View Dashboard
+### 5. Open the Steward Dashboard
 
-**Tab**: Click the `🎯 Custom View` sheet tab, or **Menu**: `📊 509 Dashboard > 📊 Dashboard`
+**Menu**: `⚙️ Admin > 📊 Show Steward Dashboard`
 
-Create custom views for:
+The steward dashboard modal provides:
 - Key metrics you track
 - Charts you need most
 - Your preferred layout
@@ -471,7 +471,7 @@ In version 4.3.x, the NUKE functionality was significantly enhanced:
 - NUKE now also deletes _Audit_Log hidden sheet
 
 **v4.3.3 - Two-Dashboard Architecture:**
-- Unified Steward Dashboard with 6 tabs (Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction)
+- Unified Steward Dashboard with 11 tabs (Overview, Workload, Analytics, Hot Spots, Bargaining, Satisfaction, Trends, Alerts, Reports, Settings, Help)
 - Member Dashboard for public/member view without PII
 - Added DIALOG_SIZES constant for standard modal dimensions
 

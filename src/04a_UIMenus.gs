@@ -837,14 +837,14 @@ function getDashboardSidebarHtml() {
         </div>
 
         <div class="section-title">Quick Links</div>
-        <a href="#" class="quick-link" onclick="goToSheet('${SHEET_NAMES.GRIEVANCE_TRACKER}')">
-          📋 Grievance Tracker
+        <a href="#" class="quick-link" onclick="goToSheet('${SHEETS.GRIEVANCE_LOG}')">
+          📋 Grievance Log
         </a>
-        <a href="#" class="quick-link" onclick="goToSheet('${SHEET_NAMES.MEMBER_DIRECTORY}')">
+        <a href="#" class="quick-link" onclick="goToSheet('${SHEETS.MEMBER_DIR}')">
           👥 Member Directory
         </a>
-        <a href="#" class="quick-link" onclick="goToSheet('${SHEET_NAMES.REPORTS}')">
-          📊 Reports
+        <a href="#" class="quick-link" onclick="goToSheet('${SHEETS.DASHBOARD}')">
+          📊 Dashboard
         </a>
         <a href="#" class="quick-link" onclick="showSearch()">
           🔍 Search Dashboard
@@ -856,6 +856,7 @@ function getDashboardSidebarHtml() {
       </div>
 
       <script>
+        function escapeHtml(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
         function loadStats() {
           google.script.run
             .withSuccessHandler(function(stats) {
@@ -878,8 +879,8 @@ function getDashboardSidebarHtml() {
               container.innerHTML = deadlines.map(function(d) {
                 const urgentClass = d.daysLeft <= 3 ? 'urgent' : '';
                 return '<div class="deadline-item ' + urgentClass + '">' +
-                       '<div>' + d.grievanceId + '<br><small>' + d.step + '</small></div>' +
-                       '<div style="text-align:right">' + d.daysLeft + ' days<br><small>' + d.date + '</small></div>' +
+                       '<div>' + escapeHtml(d.grievanceId) + '<br><small>' + escapeHtml(d.step) + '</small></div>' +
+                       '<div style="text-align:right">' + d.daysLeft + ' days<br><small>' + escapeHtml(d.date) + '</small></div>' +
                        '</div>';
               }).join('');
             })

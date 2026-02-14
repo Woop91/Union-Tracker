@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * 509 STRATEGIC COMMAND CENTER - UNIFIED MASTER ENGINE (v4.0)
+ * 11_CommandHub.gs - STRATEGIC COMMAND CENTER
  * ============================================================================
  * STATUS: Production Ready / Harmonized / High-Performance
  *
@@ -20,6 +20,8 @@
  *
  * NOTE: This file provides consolidated access to Strategic Command Center
  * features. Core implementations are in their respective module files.
+ *
+ * @version 4.6.0
  * ============================================================================
  */
 
@@ -233,12 +235,18 @@ function toggleMobileView() {
  * @returns {string} The next sequence number as a 4-digit padded string
  */
 function getNextSequence(prefix) {
-  var props = PropertiesService.getScriptProperties();
-  var key = 'SEQUENCE_' + prefix;
-  var current = parseInt(props.getProperty(key) || '0', 10);
-  var next = current + 1;
-  props.setProperty(key, String(next));
-  return String(next).padStart(4, '0');
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var props = PropertiesService.getScriptProperties();
+    var key = 'SEQUENCE_' + prefix;
+    var current = parseInt(props.getProperty(key) || '0', 10);
+    var next = current + 1;
+    props.setProperty(key, String(next));
+    return String(next).padStart(4, '0');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -559,11 +567,15 @@ function NUKE_DATABASE() {
       try { ss.deleteSheet(functionChecklistSheet); } catch (e) { Logger.log('Could not delete Function Checklist: ' + e.message); }
     }
 
-    // Log the action BEFORE deleting audit sheet so it's recorded
-    logAuditEvent('NUCLEAR_WIPE', {
-      performedBy: Session.getActiveUser().getEmail(),
+    // Log the nuclear wipe to both audit sheet AND ScriptProperties (durable record)
+    var wipeRecord = {
+      event: 'NUCLEAR_WIPE',
+      performedBy: (function() { try { return Session.getActiveUser().getEmail(); } catch (_e) { return 'Unknown'; } })(),
       timestamp: new Date().toISOString()
-    });
+    };
+    logAuditEvent('NUCLEAR_WIPE', wipeRecord);
+    // Persist to ScriptProperties so the record survives audit sheet deletion
+    PropertiesService.getScriptProperties().setProperty('LAST_NUCLEAR_WIPE', JSON.stringify(wipeRecord));
 
     // Delete _Audit_Log hidden sheet
     var auditLogSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);

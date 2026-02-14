@@ -38,7 +38,7 @@ The 509 Dashboard is a Google Apps Script (GAS) application for managing union s
 ```
 MULTIPLE-SCRIPS-REPO/
 ├── src/                    # 27 source files (.gs) + 1 HTML
-├── test/                   # Jest unit tests (950+ tests)
+├── test/                   # Jest unit tests (1008 tests)
 ├── dist/                   # Build output (auto-generated)
 ├── setup-instructions/     # Optional feature setup guides
 ├── .github/workflows/      # CI/CD configuration
@@ -342,7 +342,7 @@ const BUILD_ORDER = [
 
 ### Jest Test Suite (Primary)
 
-The project uses **Jest v29.7.0** as its primary test framework, with 950 tests across 18 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
+The project uses **Jest v29.7.0** as its primary test framework, with 1008 tests across 19 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
 
 #### Running Tests
 
@@ -360,13 +360,25 @@ npm test
 test/
 ├── gas-mock.js                    # GAS global mocks (SpreadsheetApp, Logger, etc.)
 ├── load-source.js                 # Loads .gs source files into Node.js global scope
-├── 00_Security.test.js            # Security module tests
+├── modules.test.js                # Cross-module integration tests
 ├── 00_DataAccess.test.js          # Data Access Layer tests
+├── 00_Security.test.js            # Security module tests
 ├── 01_Core.test.js                # Core constants and error handling tests
+├── 02_DataManagers.test.js        # Member and grievance data manager tests
+├── 03_UIComponents.test.js        # UI component tests
+├── 04_UIService.test.js           # UI service tests
+├── 04e_PublicDashboard.test.js    # Public dashboard tests
 ├── 05_Integrations.test.js        # Integrations tests
+├── 06_Maintenance.test.js         # Maintenance and diagnostics tests
+├── 07_DevTools.test.js            # Dev tools tests
+├── 08_SheetUtils.test.js          # Sheet utility tests
+├── 09_Dashboards.test.js          # Dashboard tests
+├── 10_Code.test.js                # Code and sheet creation tests
 ├── 10_Main.test.js                # Main entry point tests
+├── 11_CommandHub.test.js          # Command hub tests
+├── 12_Features.test.js            # Features and checklist tests
 ├── 13_MemberSelfService.test.js   # Member self-service portal tests
-└── modules.test.js                # Cross-module integration tests
+└── 14_MeetingCheckIn.test.js      # Meeting check-in system tests
 ```
 
 #### Writing Tests

@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * Diagnostics.gs - System Diagnostics and Repair
+ * 06_Maintenance.gs - System Diagnostics and Repair
  * ============================================================================
  *
  * This module handles all diagnostic and repair functions including:
@@ -12,8 +12,8 @@
  * REFACTORED: Split from 06_Maintenance.gs for better maintainability
  *
  * @fileoverview System diagnostics and repair functions
- * @version 1.0.0
- * @requires 01_Constants.gs
+ * @version 4.6.0
+ * @requires 01_Core.gs
  */
 
 // ============================================================================
@@ -1689,8 +1689,8 @@ function navigateToAuditLog() {
   if (!auditSheet) {
     // Create audit log if it doesn't exist
     auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-    auditSheet.getRange('A1:F1').setValues([['Timestamp', 'User', 'Sheet', 'Cell', 'Old Value', 'New Value']]);
-    auditSheet.getRange('A1:F1')
+    auditSheet.getRange('A1:E1').setValues([['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']]);
+    auditSheet.getRange('A1:E1')
       .setFontWeight('bold')
       .setBackground(COLORS.CARD_DARK_BG)
       .setFontColor(COLORS.CARD_DARK_TEXT);
@@ -1878,25 +1878,8 @@ function saveSettings(settings) {
 
 // ==================== CACHE CONFIGURATION ====================
 
-var CACHE_CONFIG = {
-  MEMORY_TTL: 300,
-  PROPS_TTL: 3600,
-  ENABLE_LOGGING: false
-};
-
-var CACHE_KEYS = {
-  ALL_GRIEVANCES: 'cache_grievances',
-  ALL_MEMBERS: 'cache_members',
-  ALL_STEWARDS: 'cache_stewards',
-  DASHBOARD_METRICS: 'cache_metrics',
-  CONFIG_VALUES: 'cache_config_values'
-};
-
-// ==================== CACHING FUNCTIONS ====================
-
-// ==================== UNDO/REDO SYSTEM ====================
-
-var UNDO_CONFIG = { MAX_HISTORY: 50, STORAGE_KEY: 'undoRedoHistory' };
+// NOTE: CACHE_CONFIG, CACHE_KEYS, and UNDO_CONFIG are already declared above (lines 536-887).
+// Duplicate declarations removed to prevent silent overwrites.
 
 /**
  * 509 Dashboard - Data Integrity and Performance Enhancements

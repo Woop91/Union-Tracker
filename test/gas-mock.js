@@ -200,6 +200,7 @@ global.ScriptApp = {
 global.LockService = {
   getScriptLock: jest.fn(() => ({
     tryLock: jest.fn(() => true),
+    waitLock: jest.fn(),
     releaseLock: jest.fn()
   }))
 };

@@ -1,5 +1,5 @@
 /**
- * 509 Dashboard - Meeting Check-In System
+ * 14_MeetingCheckIn.gs - Meeting Check-In System
  *
  * Stewards can plan meetings in advance. Events appear in Google Calendar.
  * On the day of the event the check-in form becomes active.
@@ -15,7 +15,7 @@
  * 5. Members enter email + PIN -> click Check In
  * 6. After meeting duration + buffer, check-in deactivates and attendance is emailed
  *
- * @version 2.0.0
+ * @version 4.6.0
  * @requires 01_Core.gs (SHEETS, MEMBER_COLS, MEETING_CHECKIN_COLS, MEETING_STATUS, COLORS)
  * @requires 05_Integrations.gs (createMeetingCalendarEvent, emailMeetingAttendanceReport)
  * @requires 13_MemberSelfService.gs (authenticateMember, verifyPIN, hashPIN)
@@ -768,6 +768,7 @@ function getSetupMeetingHtml_() {
     '<div id="success" class="success"></div>' +
     '</div>' +
     '<script>' +
+    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#39;")}' +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
     'var stewardData=[];' +
     // Load stewards on dialog open
@@ -777,7 +778,7 @@ function getSetupMeetingHtml_() {
     '  if(stewardData.length===0){container.innerHTML="<em style=\\"color:#888\\">No stewards found</em>";return}' +
     '  var html="";' +
     '  stewardData.forEach(function(s,i){' +
-    '    html+="<div class=\\"steward-item\\"><input type=\\"checkbox\\" id=\\"stew_"+i+"\\" value=\\""+s.email+"\\"><label for=\\"stew_"+i+"\\">"+s.name+" <span class=\\"email\\">"+s.email+"</span></label></div>"' +
+    '    html+="<div class=\\"steward-item\\"><input type=\\"checkbox\\" id=\\"stew_"+i+"\\" value=\\""+escapeHtml(s.email)+"\\"><label for=\\"stew_"+i+"\\">"+escapeHtml(s.name)+" <span class=\\"email\\">"+escapeHtml(s.email)+"</span></label></div>"' +
     '  });' +
     '  container.innerHTML=html;' +
     '}).withFailureHandler(function(){' +

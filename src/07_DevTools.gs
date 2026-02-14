@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * DEVELOPER TOOLS - DELETE THIS FILE BEFORE PRODUCTION
+ * 07_DevTools.gs - DEVELOPER TOOLS - DELETE THIS FILE BEFORE PRODUCTION
  * ============================================================================
  *
  * This file contains demo data seeding and nuclear cleanup functions.
@@ -14,7 +14,7 @@
  * Once deleted, all seed/nuke functions will be gone and stewards
  * cannot accidentally trigger a data wipe.
  *
- * @version 2.0.0
+ * @version 4.6.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
@@ -478,6 +478,24 @@ function seedSatisfactionData() {
   var sampleData = [];
   var now = new Date();
 
+  // Helper functions for generating seed data (defined outside loop)
+  function weightedRating() {
+    var r = Math.random();
+    if (r < 0.1) return Math.floor(Math.random() * 3) + 1;      // 1-3 (10%)
+    if (r < 0.3) return Math.floor(Math.random() * 2) + 4;      // 4-5 (20%)
+    if (r < 0.6) return Math.floor(Math.random() * 2) + 6;      // 6-7 (30%)
+    return Math.floor(Math.random() * 3) + 8;                    // 8-10 (40%)
+  }
+
+  function randomItem(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function randomPriorities() {
+    var shuffled = priorities.slice().sort(function() { return 0.5 - Math.random(); });
+    return shuffled.slice(0, 3).join(', ');
+  }
+
   for (var i = 0; i < 50; i++) {
     // Spread responses over last 60 days
     var daysAgo = Math.floor(Math.random() * 60);
@@ -487,24 +505,6 @@ function seedSatisfactionData() {
     var hadStewardContact = Math.random() < 0.7;
     // Branching: 40% filed grievance
     var filedGrievance = Math.random() < 0.4;
-
-    // Generate weighted random rating (skewed positive: 6-10 more likely)
-    function weightedRating() {
-      var r = Math.random();
-      if (r < 0.1) return Math.floor(Math.random() * 3) + 1;      // 1-3 (10%)
-      if (r < 0.3) return Math.floor(Math.random() * 2) + 4;      // 4-5 (20%)
-      if (r < 0.6) return Math.floor(Math.random() * 2) + 6;      // 6-7 (30%)
-      return Math.floor(Math.random() * 3) + 8;                    // 8-10 (40%)
-    }
-
-    function randomItem(arr) {
-      return arr[Math.floor(Math.random() * arr.length)];
-    }
-
-    function randomPriorities() {
-      var shuffled = priorities.slice().sort(function() { return 0.5 - Math.random(); });
-      return shuffled.slice(0, 3).join(', ');
-    }
 
     // Build row (68 columns: A-BP)
     var row = [];
@@ -799,7 +799,7 @@ function SEED_MEMBERS(count, grievancePercent) {
 
     // Write in batches
     if (rows.length >= batchSize || i === count - 1) {
-      sheet.getRange(startRow, 1, rows.length, 31).setValues(rows);
+      sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
       startRow += rows.length;
       rows = [];
       Utilities.sleep(100);
@@ -947,7 +947,7 @@ function SEED_MEMBERS_ONLY(count) {
 
     // Write in batches
     if (rows.length >= batchSize || i === count - 1) {
-      sheet.getRange(startRow, 1, rows.length, 31).setValues(rows);
+      sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
       startRow += rows.length;
       rows = [];
       Utilities.sleep(50);
@@ -1142,7 +1142,7 @@ function SEED_GRIEVANCES(count) {
     rows.push(row);
 
     if (rows.length >= batchSize || i === count - 1) {
-      grievanceSheet.getRange(startRow, 1, rows.length, 34).setValues(rows);
+      grievanceSheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
       startRow += rows.length;
       rows = [];
       Utilities.sleep(100);

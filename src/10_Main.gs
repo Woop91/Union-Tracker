@@ -1,18 +1,18 @@
 /**
  * ============================================================================
- * Main.gs - Dashboard Entry Point & Triggers
+ * 10_Main.gs - Dashboard Entry Point & Triggers
  * ============================================================================
  *
  * This is the main entry point for the Union Steward Dashboard.
  * It contains trigger functions and coordinates between all modules.
  *
  * Module Architecture:
- * - Constants.gs     : Configuration and constants (single source of truth)
- * - UIService.gs     : Dialogs, sidebars, and UI components
- * - GrievanceManager.gs : Grievance lifecycle management
- * - Integrations.gs  : Drive, Calendar, and email services
- * - Maintenance.gs   : Admin tools and diagnostics
- * - FormulaService.gs: Hidden sheet and formula logic
+ * - 01_Core.gs       : Configuration and constants (single source of truth)
+ * - 03_UIComponents.gs : Dialogs, sidebars, and UI components
+ * - 04_GrievanceManager.gs : Grievance lifecycle management
+ * - 05_Integrations.gs : Drive, Calendar, and email services
+ * - 06_Maintenance.gs : Admin tools and diagnostics
+ * - 08a_SheetSetup.gs : Hidden sheet and formula logic
  *
  * Build Instructions:
  * During development, keep files separate. Use build.js to merge all files
@@ -20,7 +20,7 @@
  *   node build.js
  *
  * @fileoverview Main entry point and trigger functions
- * @version 2.0.0
+ * @version 4.6.0
  * @author Dashboard Team
  */
 
@@ -665,7 +665,7 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
       var today = new Date();
       today.setHours(0, 0, 0, 0);
       var daysTo = Math.floor((nextActionDate - today) / (1000 * 60 * 60 * 24));
-      sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue(daysTo < 0 ? 'Overdue' : daysTo);
+      sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue(daysTo);
     }
   }
 }
