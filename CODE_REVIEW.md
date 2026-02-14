@@ -1,78 +1,150 @@
 # Code Review: 509 Strategic Command Center
 
-**Date:** 2026-02-11
-**Scope:** Full codebase review (~49,889 lines across 16 source files)
+**Date:** 2026-02-14
+**Reviewer:** Claude Code (Opus 4.6)
+**Scope:** Full codebase review — 27 source files (~138K lines), 21 test files, config/build, docs
 **Lint Status:** ESLint passes clean
-**Test Status:** 950 tests passing across 18 suites (79 new engagement tracking tests)
+**Test Status:** 1008+ tests passing across 21 suites
+
+---
+
+## Executive Summary
+
+This is a comprehensive Google Apps Script application for union/organization management built on Google Sheets. The codebase demonstrates strong security awareness (SHA-256 PIN hashing, audit logging, PII protection) and thoughtful UX design (accessibility features, mobile optimization, keyboard navigation). However, the review identified **systemic XSS vulnerabilities** across 20+ HTML-generating functions, **performance bottlenecks** from row-by-row API calls, and **architectural debt** from concatenated multi-module files.
+
+| Severity | Count | Key Themes |
+|----------|------:|-----------|
+| Critical | 8 | XSS vulnerabilities, broken setup refs, unauthenticated data access, public file sharing |
+| High | 18 | HTML injection, performance bottlenecks, race conditions, hardcoded credentials |
+| Medium | 22 | Missing input validation, shared state conflicts, dead code, inconsistent constants |
+| Low | 14 | Unused variables, documentation staleness, minor UX issues |
+| Test Quality | 12 | False positives, missing happy-path tests, mock isolation gaps |
 
 ---
 
 ## Critical Issues
 
-### 0. `setupHiddenSheets()` References 4 Undefined Properties — Main Setup Broken
+### C1. Systemic XSS Vulnerabilities — User Data Injected into HTML Without Escaping
 
-**File:** `src/08_SheetUtils.gs:207-215`
+**Severity:** Critical | **Scope:** 20+ functions across 15 files
 
-The `setupHiddenSheets(ss)` function is called by `CREATE_509_DASHBOARD()` (the main first-time setup) and iterates over 6 hidden sheet configurations. However, **4 of 6 property names don't exist** in the `HIDDEN_SHEETS` constant:
+While `escapeHtml()` exists in `00_Security.gs` and is used in some places, it is missing in numerous critical locations where user-controlled data is interpolated directly into HTML strings.
 
-```javascript
-// setupHiddenSheets() references:          HIDDEN_SHEETS constant defines:
-HIDDEN_SHEETS.CALC_MEMBERS    → undefined   // (not defined)
-HIDDEN_SHEETS.CALC_GRIEVANCES → undefined   // (not defined)
-HIDDEN_SHEETS.CALC_DEADLINES  → undefined   // (not defined)
-HIDDEN_SHEETS.CALC_STATS      → '_Dashboard_Calc'      ✓
-HIDDEN_SHEETS.CALC_SYNC       → undefined   // (not defined)
-HIDDEN_SHEETS.CALC_FORMULAS   → '_Grievance_Formulas'   ✓
-```
+| File | Function | Unescaped Data |
+|------|----------|----------------|
+| `03_UIComponents.gs` | `showMemberQuickActions()` | `name`, `memberId`, `email` in HTML and `onclick` handlers |
+| `03_UIComponents.gs` | `showMobileGrievanceList()` | `g.id`, `g.status`, `g.memberName` via innerHTML |
+| `03_UIComponents.gs` | `showMobileUnifiedSearch()` | `r.title`, `r.subtitle`, `r.detail` via innerHTML |
+| `03_UIComponents.gs` | `displayAdvancedResults()` | `r.type`, `r.name`, `r.id` in onclick attributes |
+| `04c_InteractiveDashboard.gs` | `loadMemberFilters()` | Location/unit names in `<option>` elements |
+| `04c_InteractiveDashboard.gs` | Analytics tables | Steward names, location names, category labels |
+| `04d_ExecutiveDashboard.gs` | `showStewardPerformanceModal_UIService_` | `firstName`, `lastName`, `unit` in HTML |
+| `04e_PublicDashboard.gs` | Steward directory | Names in `onclick` handlers — apostrophes break JS |
+| `05_Integrations.gs` | `openGrievanceFolder()` | `existingUrl` injected into `<script>` tags |
+| `05_Integrations.gs` | Email body (attendance) | `meetingName`, `a.name`, `a.memberId` in HTML email |
+| `06_Maintenance.gs` | `showModalDiagnostics()` | Sheet names (`c.name`) in HTML |
+| `06_Maintenance.gs` | `showAuditLogViewer()` | `eventType`, `details`, `user` from audit log |
+| `06_Maintenance.gs` | `showConfigHealthCheck()` | `item.field`, `item.value` in HTML |
+| `08c_FormsAndNotifications.gs` | `sendContactInfoForm()` | `formUrl` in `<script>` tag |
+| `10_Main.gs` | Bulk status dialog | `GRIEVANCE_STATUS` values in `<option>` |
+| `10d_SyncAndMaintenance.gs` | Folder/form URLs | `folderUrl`, `formUrl` in `<script>` tags |
+| `11_CommandHub.gs` | `getMemberPortalHtml_()` | `profile.firstName`, steward names |
+| `11_CommandHub.gs` | `getErrorPageHtml_()` | `message` parameter |
+| `11_CommandHub.gs` | `getSearchDialogHtml_()` | Member ID in `onclick` — only strips `'` |
+| `12_Features.gs` | `buildReminderDialogHtml_()` | `grievanceId`, `memberName`, `status`, reminder notes |
 
-When `name` is `undefined`, `ss.getSheetByName(undefined)` returns `null`, then `ss.insertSheet(undefined)` is called. This will either throw an error (crashing `CREATE_509_DASHBOARD()`) or create sheets with auto-generated names that no other code references.
+**Risk:** An attacker who controls a member name, grievance description, or URL field can inject JavaScript that executes in Google Apps Script HtmlService dialogs.
 
-**Impact:** The main dashboard setup function (`CREATE_509_DASHBOARD()`) will fail or produce broken hidden sheets. 4 hidden calculation sheets (Members stats, Grievances stats, Deadlines, Sync) won't be properly created. The setup functions for these sheets exist and are correct (`setupCalcMembersSheet`, `setupCalcGrievancesSheet`, `setupCalcDeadlinesSheet`, `setupCalcSyncSheet` at lines 4092-4435) — they just can't be reached because the sheet names are undefined.
-
-**Note:** A parallel system exists — `setupAllHiddenSheets()` (line 3925) creates 7 *different* hidden sheets (`_Grievance_Calc`, `_Member_Lookup`, `_Steward_Contact_Calc`, `_Steward_Performance_Calc`, `_Checklist_Calc`) using properly named functions. But this function is NOT called by `CREATE_509_DASHBOARD()`.
-
-**Fix:** Add the missing properties to `HIDDEN_SHEETS`:
-```javascript
-var HIDDEN_SHEETS = {
-  CALC_MEMBERS: '_Calc_Members',         // ADD
-  CALC_GRIEVANCES: '_Calc_Grievances',   // ADD
-  CALC_DEADLINES: '_Calc_Deadlines',     // ADD
-  CALC_SYNC: '_Calc_Sync',              // ADD
-  CALC_STATS: '_Dashboard_Calc',
-  CALC_FORMULAS: '_Grievance_Formulas',
-  // ... existing entries ...
-};
-```
-
-Or call `setupAllHiddenSheets()` from `CREATE_509_DASHBOARD()` in addition to (or instead of) `setupHiddenSheets()`.
+**Fix:** Apply `escapeHtml()` server-side to ALL user-controlled values before HTML insertion. For values in `<script>` blocks, use `JSON.stringify()`. For `onclick` handlers, use `data-` attributes with `addEventListener()` instead of inline handlers.
 
 ---
 
-### 1. XSS Vulnerabilities — User Data Injected into HTML Without Escaping
+### C2. Broken Hidden Sheet Setup — 4 of 6 Properties Undefined
 
-Multiple HTML-generating functions interpolate user-controlled data directly into HTML strings without using `escapeHtml()`. While `escapeHtml()` exists in `00_Security.gs` and is used in some places (e.g., email templates, survey dashboard), it is missing in several critical locations.
+**File:** `src/08a_SheetSetup.gs` (via `setupHiddenSheets()`)
 
-**Affected locations:**
+The `setupHiddenSheets(ss)` function references 6 `HIDDEN_SHEETS` properties, but 4 are undefined:
 
-| File | Function | Line | Unescaped Data |
-|------|----------|------|----------------|
-| `10_Main.gs` | `getEditGrievanceFormHtml()` | ~1148 | Grievance description inserted into HTML form value |
-| `10_Main.gs` | `getNewGrievanceFormHtml()` | ~1400 | Member names in `<option>` elements |
-| `03_UIComponents.gs` | Quick actions HTML | various | `memberId` in `onclick` handlers |
-| `03_UIComponents.gs` | `showMobileGrievanceList()` | various | `g.memberName` rendered in search results |
-| `05_Integrations.gs` | `openGrievanceFolder()` | 364-375 | `folderUrl` and `result.folderUrl` injected into `<script>` tags |
-| `11_CommandHub.gs` | `getErrorPageHtml_()` | 3544 | `message` param inserted into HTML |
-| `11_CommandHub.gs` | `getMemberPortalHtml_()` | 3395 | `profile.firstName` in welcome text |
-| `11_CommandHub.gs` | `getPublicPortalHtml_()` | 3414, 3508 | Steward names in portal HTML |
-| `12_Features.gs` | `buildReminderDialogHtml_()` | 2308-2309 | `grievanceId`, `reminders.memberName`, `reminders.status` |
+```
+HIDDEN_SHEETS.CALC_MEMBERS    → undefined
+HIDDEN_SHEETS.CALC_GRIEVANCES → undefined
+HIDDEN_SHEETS.CALC_DEADLINES  → undefined
+HIDDEN_SHEETS.CALC_STATS      → '_Dashboard_Calc'      OK
+HIDDEN_SHEETS.CALC_SYNC       → undefined
+HIDDEN_SHEETS.CALC_FORMULAS   → '_Grievance_Formulas'   OK
+```
 
-**Risk:** An attacker who can control a grievance description, member name, or folder URL could inject JavaScript that executes in the context of the Google Apps Script HtmlService dialog. In the `openGrievanceFolder()` case, a malicious URL could break out of the string and execute arbitrary script.
+When `name` is `undefined`, `ss.getSheetByName(undefined)` returns `null`, then `ss.insertSheet(undefined)` either crashes or creates auto-named sheets. The main setup function `CREATE_509_DASHBOARD()` will fail or produce broken hidden sheets.
 
-**Recommendation:** Apply `escapeHtml()` to all user-controlled values before inserting them into HTML. For values inserted into `<script>` blocks, use `JSON.stringify()` instead.
+**Fix:** Add the missing properties to `HIDDEN_SHEETS`, or call `setupAllHiddenSheets()` (which works correctly) from `CREATE_509_DASHBOARD()`.
 
 ---
 
-### 2. String Split Bug in `importMembersFromText()`
+### C3. Unauthenticated Data Access via Public Web App
+
+**File:** `src/04e_PublicDashboard.gs:1104-1106`
+
+`getUnifiedDashboardDataAPI(isPII)` is callable by anyone who discovers the web app URL. The `isPII` parameter is client-controlled, meaning a user could call with `isPII=true` even when viewing the member dashboard. The `mode` parameter in the URL (`?mode=member` vs `?mode=steward`) has no server-side enforcement.
+
+**File:** `src/11_CommandHub.gs:3434-3435`
+
+The member portal URL uses member ID as the sole authentication: `webAppUrl + '?id=' + memberId`. Member IDs follow predictable formats and can be guessed.
+
+**Fix:** Enforce mode authorization server-side in `doGet()`. Use signed tokens or PIN-based authentication for member portals.
+
+---
+
+### C4. Exported CSV File Set to ANYONE_WITH_LINK
+
+**File:** `src/04b_AccessibilityFeatures.gs:725`
+
+`file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW)` makes exported member data publicly accessible. The dialog claims "Link expires when you close this dialog" but the file persists in Drive indefinitely.
+
+**Fix:** Use `DriveApp.Access.PRIVATE` or `DriveApp.Access.DOMAIN`. Implement cleanup after download.
+
+---
+
+### C5. `GRIEVANCE_COLS.ASSIGNED_STEWARD` References Undefined Property
+
+**File:** `src/08c_FormsAndNotifications.gs:1138`
+
+`row[GRIEVANCE_COLS.ASSIGNED_STEWARD - 1]` — but `GRIEVANCE_COLS` has `STEWARD` (position 26), not `ASSIGNED_STEWARD`. This evaluates to `row[NaN]` = `undefined`, meaning steward deadline alerts never route to the correct steward.
+
+**Fix:** Change to `GRIEVANCE_COLS.STEWARD`.
+
+---
+
+### C6. Bulk PIN Generation Displays All PINs in Plaintext
+
+**File:** `src/13_MemberSelfService.gs:922-943`
+
+All generated PINs are displayed in a scrollable textarea in an HTML dialog. For large member sets, dozens of plaintext PINs are visible simultaneously and can be viewed in browser dev tools.
+
+**Fix:** Send PINs only via individual email. Never display PINs in bulk in any UI.
+
+---
+
+### C7. `Assert` Object Defined Twice with Conflicting APIs
+
+**File:** `src/07_DevTools.gs` — Lines 1677 and 2209
+
+The `Assert` object is declared at line 1677 with methods `assertEquals`, `assertTrue`, `assertNotNull`, then re-declared at line 2209 with completely different methods `isTrue`, `isFalse`, `equals`. The second declaration silently overwrites the first, breaking all tests from lines 1748-1829.
+
+---
+
+### C8. `setupAuditLogSheet()` Unconditionally Clears Audit History
+
+**File:** `src/08d_AuditAndFormulas.gs:17`
+
+`sheet.clear()` destroys all existing audit records when the function is called. Audit logs are compliance-critical and should never be silently wiped.
+
+**Fix:** Refuse to clear if data exists, or archive before clearing.
+
+---
+
+## High Priority Issues
+
+### H1. String Split Bug in `importMembersFromText()`
 
 **File:** `src/10_Main.gs:1572`
 
@@ -80,351 +152,476 @@ Multiple HTML-generating functions interpolate user-controlled data directly int
 const lines = text.split('\\n').filter(line => line.trim());
 ```
 
-The `'\\n'` is a two-character string literal (backslash + n), not a newline character. This means `text.split('\\n')` looks for the literal characters `\n` in the text, not actual line breaks. If `text` comes from a textarea, it will contain real newline characters (`\n`), and the split will produce a single-element array containing the entire text.
+`'\\n'` is a two-character literal (backslash + n), not a newline. Text from a textarea will contain real `\n` characters, so the split produces a single-element array.
 
 **Fix:** Change to `text.split('\n')`.
 
 ---
 
-## High Priority Issues
-
-### 3. Dual Column Constant Systems Create Maintenance Risk
+### H2. Dual Column Constant Systems
 
 The codebase maintains two parallel column indexing systems:
+- **0-indexed** (`GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`) for array access
+- **1-indexed** (`GRIEVANCE_COLS`, `MEMBER_COLS`) for sheet operations
 
-- **0-indexed** (`GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`) — for array access via `data[row][col]`
-- **1-indexed** (`GRIEVANCE_COLS`, `MEMBER_COLS`) — for sheet operations via `sheet.getRange(row, col)`
+Mixed usage within single files (e.g., `08b_SearchAndCharts.gs` uses both) creates off-by-one risk.
 
-While functions using `GRIEVANCE_COLUMNS` do correctly convert with `+ 1` for `getRange()` calls, having two systems introduces ongoing risk. New contributors must know which to use and when to add `+ 1` or `- 1`.
-
-**Examples of the dual usage:**
-- `updateGrievanceFolderLink()` in `05_Integrations.gs:341-342` uses `GRIEVANCE_COLUMNS` (0-indexed) with `+ 1` for getRange
-- `setupFolderForSelectedGrievance()` in the same file uses `GRIEVANCE_COLS` (1-indexed) with `- 1` for array access
-- `advancedSearch()` in `08_SheetUtils.gs:865` uses `MEMBER_COLUMNS` while `getDesktopSearchData()` at line 647 uses `MEMBER_COLS`
-
-**Recommendation:** Consolidate to a single constant system. The 1-indexed system (`GRIEVANCE_COLS`/`MEMBER_COLS`) with `- 1` for array access is the more common pattern. Deprecate and remove the 0-indexed versions.
+**Fix:** Consolidate to the 1-indexed system with `- 1` for array access.
 
 ---
 
-### 4. Hardcoded Column Indices in Satisfaction Stats
+### H3. Performance: Row-by-Row API Calls in Loops
 
-**File:** `src/11_CommandHub.gs:3024-3025`
+Multiple functions make individual Google Sheets API calls per row, causing severe performance bottlenecks:
 
-```javascript
-var trustVal = parseFloat(data[i][7]); // SATISFACTION_COLS.Q7_TRUST_UNION - 1
-var satVal = parseFloat(data[i][6]);   // SATISFACTION_COLS.Q6_SATISFIED_REP - 1
-```
+| File | Function | Issue |
+|------|----------|-------|
+| `03_UIComponents.gs` | `applyThemeToSheet_()` | `setBackground()` per row |
+| `04b_AccessibilityFeatures.gs` | `processMemberImport()` | `appendRow()` per imported row |
+| `04d_ExecutiveDashboard.gs` | `applyStatusColors()` | 4 API calls per row (background, font color, font weight, range) |
+| `04d_ExecutiveDashboard.gs` | `generateMissingMemberIDs_` | `setValue()` per row + `getNextMemberSequence_` re-reads entire sheet each time |
+| `06_Maintenance.gs` | `clearOldAuditEntries()` | `deleteRow()` per row |
+| `06_Maintenance.gs` | `archiveClosedGrievances()` | `deleteRow()` per row |
+| `07_DevTools.gs` | `NUKE_SEEDED_DATA()` | `deleteRow()` per row (1000+ potential calls) |
+| `10_Main.gs` | `importMembersFromText()` | `appendRow()` per member |
+| `10b_SurveyDocSheets.gs` | Survey outline formatting | `getValue()` per row (~90 iterations) |
+| `10d_SyncAndMaintenance.gs` | `applyMessageAlertHighlighting_()` | `setBackground()` per row |
+| `14_MeetingCheckIn.gs` | `cleanupExpiredMeetings()` | `deleteRow()` per meeting |
 
-These use hardcoded magic numbers instead of the `SATISFACTION_COLS` constants. If column order changes in the satisfaction survey sheet, these will silently read the wrong data.
-
-**Recommendation:** Use `SATISFACTION_COLS` constants with `- 1` for array indexing, matching the pattern used elsewhere.
+**Fix:** Use batch operations: `setValues()`, `setBackgrounds()`, `deleteRows(start, count)`.
 
 ---
 
-### 5. Shared State in `ScriptProperties` — Multi-User Conflicts
+### H4. Race Conditions — No LockService Usage
 
-**File:** `src/06_Maintenance.gs`
+Multiple read-then-write operations are vulnerable to concurrent access:
 
-The undo/redo system and cache layer store state in `ScriptProperties`, which is shared across all users of the spreadsheet. This means:
+| File | Function | Risk |
+|------|----------|------|
+| `08c_FormsAndNotifications.gs` | Satisfaction survey supersession | Two submissions from same member corrupt `IS_LATEST` tracking |
+| `10d_SyncAndMaintenance.gs` | `autoCreateMissingGrievanceFolders_()` | Duplicate folders created |
+| `10d_SyncAndMaintenance.gs` | `sortGrievanceLogByStatus()` | Read-sort-write overwrites concurrent edits |
+| `12_Features.gs` | `generateChecklistId_()` | Duplicate IDs generated |
+| `14_MeetingCheckIn.gs` | Duplicate check-in detection | Race between read and append |
 
-- One user's undo history is visible/usable by another user
-- A user could undo another user's changes
-- Cache entries are shared, which could cause stale data for concurrent users
+**Fix:** Use `LockService.getScriptLock()` for all read-check-write sequences.
 
-**Recommendation:** For undo history, consider using `PropertiesService.getUserProperties()` instead of `ScriptProperties` to isolate per-user state. For caching, `CacheService.getScriptCache()` is already shared by design which is acceptable for read caching, but undo/redo should be user-scoped.
+---
+
+### H5. Hardcoded Google Form URLs and Entry IDs
+
+**File:** `src/10c_FormHandlers.gs:43, 79, 430-431`
+
+Real Google Form URLs with live form IDs are hardcoded as defaults. The edit URL at line 431 grants edit access to the form itself. Combined with hardcoded field entry IDs (lines 47-65, 82-98, 434-440), this fully exposes the form structure.
+
+**Fix:** Remove hardcoded URLs from source code. Require runtime configuration via Config sheet.
+
+---
+
+### H6. `onEdit` Handler Performance — Excessive API Calls Per Edit
+
+**File:** `src/10_Main.gs:83-192`
+
+A single edit to the Grievance Log triggers: security audit (creates/finds sheet, appends row), multi-select handling, grievance edit handling (multiple `getRange`/`setValue`), auto-styling, stage-gate workflow (potentially sends email), sort entire sheet, and auto-sync. This chain easily exceeds the 30-second simple trigger time limit.
+
+---
+
+### H7. Sabotage Detection False Positives
+
+**File:** `src/10_Main.gs:226-262`
+
+Fires when `numCells > 15 && !e.value`. But `!e.value` is also true for multi-cell paste operations (which set `e.value` to `undefined`). A legitimate 16+ cell paste triggers a sabotage alert email to the Chief Steward.
+
+---
+
+### H8. `NUKE_DATABASE` Deletes Audit Log
+
+**File:** `src/11_CommandHub.gs:685-689`
+
+The nuclear wipe logs the event, then immediately deletes the audit sheet. The audit trail is most valuable during destructive operations.
+
+**Fix:** Archive the audit log before deletion.
+
+---
+
+### H9. Fabricated Historical Member Data
+
+**File:** `src/09_Dashboards.gs:2807-2813`
+
+The 6-month member history is fabricated: `[0.92, 0.94, 0.96, 0.97, 0.99, 1.0] * currentCount`. This makes it appear membership has been steadily growing, which is misleading.
+
+**Fix:** Store actual historical snapshots or show "N/A" for unavailable periods.
+
+---
+
+### H10. Auto-Sync Options Configuration is Non-Functional
+
+**File:** `src/09_Dashboards.gs:2460-2474 vs 2209-2301`
+
+Users can configure sync options via `installAutoSyncTrigger()` (saved to ScriptProperties), but `onEditAutoSync()` never reads these options. All sync operations always run regardless of configuration.
+
+---
+
+### H11. Email Sending in Simple `onEdit` Trigger Context
+
+**File:** `src/10_Main.gs:239-253, 409`
+
+`MailApp.sendEmail()` requires authorization not available in simple `onEdit` triggers. These calls will silently fail.
+
+**Fix:** Use installable triggers instead of simple triggers for email-sending functionality.
+
+---
+
+### H12. `appendRow()` in Loops for Bulk Import
+
+**File:** `src/04b_AccessibilityFeatures.gs:613`
+
+Each imported CSV row triggers a separate `sheet.appendRow()`. For large imports (hundreds of members), this is extremely slow and may timeout, leaving data in an inconsistent state.
+
+**Fix:** Collect all rows and use `sheet.getRange(startRow, 1, rowCount, colCount).setValues(allRows)`.
+
+---
+
+### H13. Timing-Based PIN Verification Not Constant-Time
+
+**File:** `src/13_MemberSelfService.gs:110-115`
+
+`computedHash === storedHash` performs standard string comparison that short-circuits on first differing character, enabling timing side-channel attacks.
+
+**Fix:** Use a constant-time comparison function.
+
+---
+
+### H14. Hardcoded Organization PII in Source Code
+
+**File:** `src/10a_SheetCreation.gs:137-167`
+
+Real organization data is hardcoded: physical address, phone, fax, contact name, personal email. This is in source code in a public GitHub repository.
+
+**Fix:** Populate at runtime via Config sheet only.
+
+---
+
+### H15. Conditional Formatting Rule Accumulation
+
+**Files:** `src/10c_FormHandlers.gs:750,877`, `src/10d_SyncAndMaintenance.gs:55-56,111-112`
+
+Functions push new conditional formatting rules without removing old ones. Repeated calls accumulate duplicate rules, eventually degrading performance. Google Sheets has a limit on conditional formatting rules.
+
+**Fix:** Filter out existing gradient/highlighting rules before adding new ones.
+
+---
+
+### H16. API Key Exposed in URL Query String
+
+**File:** `src/11_CommandHub.gs:2721`
+
+`testOCRConnection()` passes the API key via URL query string, which can leak through server logs and browser history. The production function correctly uses headers.
+
+**Fix:** Use the `X-Goog-Api-Key` header consistently.
+
+---
+
+### H17. `approveFlaggedSubmission` Accepts Raw Row Numbers Without Authorization
+
+**File:** `src/09_Dashboards.gs:3516-3544`
+
+Client-side JavaScript passes `rowNum` directly. No check that the caller has admin privileges or that the row contains a "Pending Review" status.
+
+---
+
+### H18. Survey Email Log May Overwrite Config Data
+
+**File:** `src/08c_FormsAndNotifications.gs:1477-1479`
+
+If the survey log read fails silently (caught by try/catch), `surveyLog` is empty, `nextRow` becomes 2, and new entries overwrite config headers.
 
 ---
 
 ## Medium Priority Issues
 
-### 6. Hardcoded Sheet Names in Config Objects
+### M1. Shared State in `ScriptProperties` for Undo/Redo
 
-Several configuration objects hardcode sheet names instead of referencing the `SHEETS` constant:
+**File:** `src/06_Maintenance.gs:934-959`
+
+Undo history stored in `ScriptProperties` is shared across all users. One user can undo another's changes. Also risks exceeding the 9KB per-property limit.
+
+### M2. `sheet.clear()` Destroys Config Sheet Data
+
+**File:** `src/10a_SheetCreation.gs:43`
+
+`createConfigSheet` calls `sheet.clear()` unconditionally, unlike Member Directory and Grievance Log which check `getLastRow() <= 1` first.
+
+### M3. Hardcoded Sheet Names in Config Objects
 
 | File | Config | Hardcoded Values |
 |------|--------|------------------|
 | `11_CommandHub.gs` | `COMMAND_CENTER_CONFIG` | `'Grievance Log'`, `'Member Directory'` |
 | `12_Features.gs` | `EXTENSION_CONFIG` | `'Member Directory'`, `'Grievance Log'` |
-| `12_Features.gs` | `LOOKER_CONFIG.ALLOWED_SOURCES` | `['Member Directory', 'Grievance Log', 'Member Satisfaction']` |
+| `04c_InteractiveDashboard.gs` | Resource links | Hardcoded GitHub URL exposed |
 
-These will break if sheet names are ever changed in the `SHEETS` constant without updating these config objects.
+### M4. Weak Anonymization Hash
 
-**Recommendation:** Reference `SHEETS` constant values where possible, or add comments documenting the dependency.
+**File:** `src/12_Features.gs:3542-3558`
 
----
+DJB2-like hash with hardcoded salt `'anon509data'`. 32-bit hash space with high collision risk, easily brute-forced for sequential member IDs.
 
-### 7. `07_DevTools.gs` — "DELETE THIS FILE BEFORE PRODUCTION"
+**Fix:** Use `Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + id)`.
 
-The file header contains the comment "DELETE THIS FILE BEFORE PRODUCTION". It contains functions like `NUKE_DATABASE()`, `SEED_MEMBERS()`, `SEED_GRIEVANCES()` that create/destroy test data. These are exposed via the Apps Script menu and could be accidentally triggered by end users.
+### M5. `DevTools.gs` Marked "DELETE BEFORE PRODUCTION" But Contains Production Code
 
-**Recommendation:** If this code is in production, either remove the file or add access control checks (e.g., verify the user is a developer/admin) before allowing destructive operations. The `NUKE_DATABASE()` function deletes all data from all sheets including the audit log.
+**File:** `src/07_DevTools.gs`
 
----
+Contains `validateEmailAddress`, `validatePhoneNumber`, `validateRequired`, `onEditValidation` — functions likely called from production code. Deleting the file would break production validation.
 
-### 8. Weak Hash Function for Anonymized Data
+### M6. CSV Parser Does Not Handle RFC 4180 Double-Quote Escaping
 
-**File:** `src/12_Features.gs:3541-3552`
+**File:** `src/04b_AccessibilityFeatures.gs:633-651`
 
-```javascript
-function generateAnonHash_(id) {
-  const salt = 'anon509data';
-  const combined = salt + String(id);
-  let hash = 0;
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return 'A' + Math.abs(hash).toString(36).toUpperCase().substring(0, 8);
-}
-```
+`""` within quoted fields is not properly handled. A field like `"He said ""hello"""` would be parsed incorrectly.
 
-This is a djb2-like hash with a static hardcoded salt. Problems:
-- The hash space is limited to 32-bit integers, making collisions likely with many records
-- The static salt means anyone with the source code can brute-force member IDs (which are typically sequential/predictable) to reverse the anonymization
-- The `substring(0, 8)` further reduces the hash space
+### M7. Biased Random Shuffle for Survey Selection
 
-**Recommendation:** Use `Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + id)` for proper anonymization. Use a configurable salt stored in `ScriptProperties` rather than hardcoded in source.
+**File:** `src/08c_FormsAndNotifications.gs:1441`
 
----
+`sort(() => 0.5 - Math.random())` does not produce uniform random distribution. Some members will be systematically over-represented.
 
-### 9. `setGrievanceReminder()` Assumes Contiguous Columns
+**Fix:** Use Fisher-Yates algorithm (already exists as `shuffleArray` in `07_DevTools.gs`).
 
-**File:** `src/12_Features.gs:2046-2047`
+### M8. Multi-Select Editor Race Condition
 
-```javascript
-const updates = [[parsedDate || '', reminderNote || '']];
-sheet.getRange(rowIndex, dateCol, 1, 2).setValues(updates);
-```
+**File:** `src/04a_UIMenus.gs:531-533`
 
-This writes a 2-column range starting from `dateCol`, assuming the note column is immediately adjacent to the date column (`dateCol + 1`). If the sheet schema changes such that `REMINDER_1_NOTE` is not at `REMINDER_1_DATE + 1`, this will write the note to the wrong column.
+Target cell coordinates stored in `DocumentProperties` (shared). Two users opening multi-select simultaneously would conflict.
 
-**Recommendation:** Write each value separately using `noteCol`, or verify the assumption with an assertion.
+**Fix:** Use `UserProperties` with user-specific keys.
+
+### M9. Hardcoded Column Indices in Satisfaction Stats
+
+**Files:** `src/11_CommandHub.gs:3141-3142`, `src/12_Features.gs:2967-2989`, `src/04e_PublicDashboard.gs:814-860`
+
+Magic numbers for column positions instead of `SATISFACTION_COLS` constants. If survey structure changes, these silently return wrong data.
+
+### M10. `getRange('A:A').getValues()` Reads Up to 10 Million Rows
+
+**File:** `src/09_Dashboards.gs:544, 826, 912, 1246, 1718`
+
+Reads entire column instead of bounded range. Replace with `sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues()`.
+
+### M11. Date Sorting by String Comparison
+
+**File:** `src/09_Dashboards.gs:894-896`
+
+`localeCompare` on `MM/dd/yyyy` format does not produce chronological order. `12/01/2024` sorts after `02/01/2025`.
+
+### M12. Session Token Not Invalidated on Logout
+
+**File:** `src/13_MemberSelfService.gs:1414-1424`
+
+Client-side logout only clears the JS variable. Server-side `CacheService` session remains valid for 30 minutes.
+
+### M13. Reset Token Only 8 Hex Characters
+
+**File:** `src/13_MemberSelfService.gs:214-218`
+
+~4.3 billion possibilities with no rate limiting on completion endpoint. Combined with 30-minute expiry, potentially brute-forceable.
+
+### M14. `verifyIDGenerationEngine()` Increments Production Sequence
+
+**File:** `src/11_CommandHub.gs:336`
+
+Running verification repeatedly creates permanent ID gaps.
+
+### M15. Overdue Check Only Examines Step 1 Deadline
+
+**File:** `src/04d_ExecutiveDashboard.gs:98-101`
+
+Cases at Step 2 or Arbitration with their own overdue deadlines are not counted.
+
+### M16. Nuclear Wipe with Single Confirmation Only
+
+**File:** `src/06_Maintenance.gs:1560-1595`
+
+`NUCLEAR_WIPE_GRIEVANCES()` requires only one YES/NO confirmation. Unlike `NUCLEAR_RESET_HIDDEN_SHEETS()` which requires double confirmation.
+
+### M17. Inconsistent Win Rate Calculation
+
+Different formulas used across the codebase:
+- `09_Dashboards.gs:2759`: `won / (won + denied + settled + withdrawn)`
+- `09_Dashboards.gs:807`: `won / (won + settled + denied)` (no withdrawn)
+- `09_Dashboards.gs:3773`: `won / total` (all grievances)
+- `04d_ExecutiveDashboard.gs:312`: `wonCount / closedCount`
+
+### M18. Hardcoded Column Letters in Conditional Formatting
+
+**File:** `src/10a_SheetCreation.gs:645-694`
+
+Formulas use `$A2`, `$H2`, `$AD2` while the rest of the codebase uses dynamic `MEMBER_COLS`/`GRIEVANCE_COLS` constants.
+
+### M19. `previewTheme()` Ignores Its Theme Parameter
+
+**File:** `src/03_UIComponents.gs:980-985`
+
+Accepts `themeKey` argument but applies whatever theme is currently saved in properties.
+
+### M20. `syncSingleGrievanceToCalendar()` Syncs All Grievances
+
+**File:** `src/03_UIComponents.gs:1944-1947`
+
+Despite accepting a `grievanceId` parameter, calls `syncDeadlinesToCalendar()` which syncs all grievances. The parameter is only used in the toast message.
+
+### M21. Validation Range Limited to 998 Rows
+
+**File:** `src/08a_SheetSetup.gs:334, 366, 397`
+
+All validation ranges are set to rows 2-999. DevTools can seed 2,000+ members. Members beyond row 999 get no dropdown validation.
+
+### M22. `removeDeprecatedTabs` Modifies Collection During Iteration
+
+**File:** `src/06_Maintenance.gs:253-264`
+
+Iterates `ss.getSheets()` with `forEach` while calling `deleteSheet()` inside the loop. Can skip sheets or throw errors.
 
 ---
 
 ## Low Priority Issues
 
-### 10. `verifyIDGenerationEngine()` Increments Production Sequence
-
-**File:** `src/11_CommandHub.gs:336`
-
-The `verifyIDGenerationEngine()` function creates test ID sequence entries, which increment the production sequence counter but the test entries are never cleaned up. Running this verification repeatedly will cause ID gaps.
-
----
-
-### 11. Checklist `caseId` Sanitization Strips Characters
-
-**File:** `src/12_Features.gs:957` (approximately)
-
-The checklist dialog sanitizes `caseId` with `replace(/['"\\<>&]/g, '')` which strips characters. While this prevents injection, if a grievance ID legitimately contained these characters (unlikely but possible with `&`), it would silently fail to match.
-
----
-
-### 12. `getSecureSatisfactionStats_()` Trend Analysis Window
-
-**File:** `src/11_CommandHub.gs:3044-3047`
-
-The trend analysis compares the last 10 trust scores vs the previous 10. This treats the data as time-ordered based on array position, but there's no guarantee the rows are sorted chronologically. If rows are reordered or inserted, the trend calculation becomes meaningless.
+| # | File | Issue |
+|---|------|-------|
+| L1 | Multiple files | Mixed `var`/`const`/`let` declarations |
+| L2 | `03_UIComponents.gs:2017` | Unused variable `_lastName` |
+| L3 | `04b_AccessibilityFeatures.gs:236` | `_triggerTime` calculated but no trigger created — Pomodoro end notification is non-functional |
+| L4 | `07_DevTools.gs:1673` | `TEST_RESULTS` declared but never used |
+| L5 | `07_DevTools.gs:495` | `randomPriorities()` uses biased shuffle instead of existing Fisher-Yates at line 1634 |
+| L6 | `08d_AuditAndFormulas.gs:1049-1051` | `getValues()` for force-recalc is a no-op — use `SpreadsheetApp.flush()` |
+| L7 | `09_Dashboards.gs:2592,2598,2652` | Multiple unused variables (`_oneWeekFromNow`, `_stewardCounts`, `_nextActionDue`) |
+| L8 | `10a_SheetCreation.gs:848-850` | Unused variables `_step2Range`, `_step3Range`, `_closedRange` |
+| L9 | `11_CommandHub.gs:3010-3016` | `safetyValveScrub()` PII redaction misses email addresses |
+| L10 | `12_Features.gs:839` | `escapeHtml(cat)` called server-side but may only be defined client-side |
+| L11 | `13_MemberSelfService.gs:1579-1580` | Resolution displayed twice — copy-paste bug |
+| L12 | Portal HTML files | No Content-Security-Policy meta tags |
+| L13 | `04e_PublicDashboard.gs:985` | Hardcoded GitHub URL exposes repo name |
+| L14 | `09_Dashboards.gs:3567` | Steward emails exposed in "public" member dashboard |
 
 ---
 
-### 13. Portal HTML Lacks Content Security Policy
+## Test Suite Issues
 
-The member portal and public portal HTML (`getMemberPortalHtml_()`, `getPublicPortalHtml_()`) load external resources from `fonts.googleapis.com` but don't set a Content-Security-Policy meta tag. While GAS HtmlService provides some sandboxing, adding CSP headers would add defense in depth.
+### T1. False Positives — Tests That Always Pass
 
----
+| File | Issue |
+|------|-------|
+| `test/modules.test.js:105-125` | Tests a local reimplementation of `formatChecklistId`, not the actual `generateChecklistId_` |
+| `test/modules.test.js:131-152` | Tests a local reimplementation of `sanitizeCaseId`, not the actual function |
+| `test/modules.test.js:158-169` | Tautological: creates object literal and asserts its properties differ |
+| `test/10_Main.test.js` | Does NOT load `10_Main.gs` — re-implements logic inline and tests the copies |
+| `test/01_Core.test.js:58-69` | `undefined` guard silently skips assertions when fields are missing |
+| `test/04_UIService.test.js:419-433` | `typeof` guard silently skips entire test if function doesn't load |
+| `test/12_Features.test.js:645` | Literal `expect(true).toBe(true)` |
+| `test/14_MeetingCheckIn.test.js:99` | Assertion wrapped in `if (result.success)` — silently passes on failure |
 
-## Sheet/Tab Population Analysis
+### T2. Missing Happy-Path Tests
 
-### Sheets Created and Populated by `CREATE_509_DASHBOARD()`
+| File | Missing Test |
+|------|-------------|
+| `13_MemberSelfService.test.js` | No successful PIN reset flow test |
+| `14_MeetingCheckIn.test.js` | No successful check-in test |
+| `09_Dashboards.test.js` | `syncAllData` only checks `typeof`, never invoked |
+| `10_Code.test.js` | Sheet creation functions only smoke-tested |
 
-| # | Sheet Name | Created By | Populated? |
-|---|-----------|-----------|------------|
-| 1 | `Config` | `createConfigSheet()` | Yes — 52 columns of dropdown sources, defaults, section headers |
-| 2 | `Member Directory` | `createMemberDirectory()` | Yes — headers, validation, conditional formatting, checkboxes, column groups, filters |
-| 3 | `Grievance Log` | `createGrievanceLog()` | Yes — headers, validation, formatting, checkboxes, column groups, deadline heatmap |
-| 4 | `Case Checklist` | `getOrCreateChecklistSheet()` | Yes — 12-column headers, dropdowns, checkboxes |
-| 5 | `📊 Member Satisfaction` | `createSatisfactionSheet()` | Yes — 67 survey question headers + 11 section average formula columns |
-| 6 | `💡 Feedback & Development` | `createFeedbackSheet()` | Yes — headers, dropdowns, conditional formatting, metrics section |
-| 7 | `Function Checklist` | `createFunctionChecklistSheet_()` | Yes — 100+ menu items with function names and descriptions |
-| 8 | `📚 Getting Started` | `createGettingStartedSheet()` | Yes — styled setup guide with instructions |
-| 9 | `❓ FAQ` | `createFAQSheet()` | Yes — 15+ Q&A items with styling |
-| 10 | `📖 Config Guide` | `createConfigGuideSheet()` | Yes — instructional guide with column reference |
+### T3. Mock Architecture Limitations
 
-### Hidden Sheets Created by `setupHiddenSheets()` (called from `CREATE_509_DASHBOARD`)
+- **`gas-mock.js`**: `PropertiesService.getUserProperties` not mocked. `_scriptProperties` and `_cache` are singletons that leak state between tests.
+- **`gas-mock.js`**: `getRange(row, col)` always returns the same mock range — tests cannot verify correct cell targeting.
+- **`load-source.js`**: Multiline regex `^var` rewrites inner function/var declarations to globals, altering runtime behavior vs. actual GAS.
+- **`07_DevTools.test.js`**: Tests two incompatible member ID formats (`MBR-001` vs `MJOSM123`) without clarifying which is canonical.
 
-| Sheet Name | Status | Notes |
-|-----------|--------|-------|
-| `_Dashboard_Calc` (via `CALC_STATS`) | **Works** | Dashboard-wide stats with formulas |
-| `_Grievance_Formulas` (via `CALC_FORMULAS`) | **Works** | 24 columns of VLOOKUP/deadline formulas |
-| `CALC_MEMBERS` sheet | **BROKEN** — property undefined | Would contain member statistics and lookups |
-| `CALC_GRIEVANCES` sheet | **BROKEN** — property undefined | Would contain grievance aggregations |
-| `CALC_DEADLINES` sheet | **BROKEN** — property undefined | Would contain deadline calculations and alerts |
-| `CALC_SYNC` sheet | **BROKEN** — property undefined | Would contain cross-sheet sync and consistency checks |
+### T4. Coverage Gaps
 
-### Hidden Sheets Created by `setupAllHiddenSheets()` (separate function, NOT called during setup)
-
-| Sheet Name | Populated? | Notes |
-|-----------|------------|-------|
-| `_Grievance_Calc` | Yes | 7 columns — member-level grievance stats with ARRAYFORMULA |
-| `_Grievance_Formulas` | Yes | 24 columns — VLOOKUP/deadline formulas (overlaps with System A) |
-| `_Member_Lookup` | Yes | 7 columns — member data lookups via VLOOKUP |
-| `_Steward_Contact_Calc` | Yes | 5 columns — steward contact metrics |
-| `_Dashboard_Calc` | Yes | 15+ metrics with COUNTIF formulas (overlaps with System A) |
-| `_Steward_Performance_Calc` | Yes | 10 columns — weighted steward performance scores |
-| `_Checklist_Calc` | Yes | 8 columns — checklist progress tracking |
-
-### Sheets Defined in `SHEETS` Constant but NOT Created During Setup
-
-| Sheet Name | Why | Risk |
-|-----------|-----|------|
-| `📋 Features Reference` | Creation function exists (`createFeaturesReferenceSheet`) but not called from `CREATE_509_DASHBOARD()` — only available via menu | Low — menu item works if user clicks it, but won't exist after initial setup |
-| `💼 Dashboard` | Deprecated — listed in `reorderSheetsToStandard()` but never created | None — gracefully skipped during reorder |
-| `Test Results` | Only created by test runner, not during setup | None — `viewTestResults()` shows alert if missing |
-| `📅 Meeting Attendance` | Labeled "Optional source sheets" | None — not referenced by core functionality |
-| `🤝 Volunteer Hours` | Labeled "Optional source sheets" | None — not referenced by core functionality |
-
-### Sheets Missing from `reorderSheetsToStandard()`
-
-These sheets are created during setup but not included in the sheet ordering logic:
-- `Case Checklist` — will end up in default position
-- `📋 Features Reference` — if manually created via menu, won't be ordered
-
-### Looker Integration Sheets (Created by Separate Setup Functions)
-
-| Sheet Name | Created By | Populated? | Hidden? |
-|-----------|-----------|------------|---------|
-| `_Looker_Grievances` | `setupLookerIntegration()` | Yes — 31 headers + data refresh | Yes |
-| `_Looker_Members` | `setupLookerIntegration()` | Yes — 22 headers + data refresh | Yes |
-| `_Looker_Satisfaction` | `setupLookerIntegration()` | Yes — 30 headers + data refresh | Yes |
-| `_Looker_Anon_Grievances` | `setupLookerAnonIntegration()` | Yes — 24 headers + anonymized data | Yes |
-| `_Looker_Anon_Members` | `setupLookerAnonIntegration()` | Yes — 15 headers + anonymized data | Yes |
-| `_Looker_Anon_Satisfaction` | `setupLookerAnonIntegration()` | Yes — 22 headers + anonymized data | Yes |
-
-These are correctly implemented and populate properly when their respective setup functions are called.
-
-### Audit Log Sheet
-
-| Sheet Name | Created By | Populated? | Hidden? |
-|-----------|-----------|------------|---------|
-| `_Audit_Log` | `setupAuditLogSheet()` (on demand) | Headers only — data added by `logAuditEvent()` trigger | Yes |
+- `DataAccess` methods (`getSheet`, `getAllData`, `findRow`, `appendRow`, `getMemberById`, `getGrievanceById`) are listed as required but never invoked
+- No tests for form submission handling (`10c_FormHandlers.gs`)
+- No tests for sync/maintenance functions (`10d_SyncAndMaintenance.gs`)
+- No tests for account lockout after `MAX_ATTEMPTS`
+- No tests for `doGet()` web app entry point
 
 ---
 
-## File Splitting Recommendations
+## Build/Config Issues
 
-Six source files exceed 3,500 lines and should be split into focused, single-responsibility modules for maintainability. The build system (`build.js`) already concatenates all modules, so splitting has no impact on the deployed output.
+### B1. `dist/` is Git-Tracked with DevTools Included
 
-### Current File Sizes
+The default `npm run build` (non-prod) includes `07_DevTools.gs`. Since `.clasp.json.example` points `rootDir` to `./dist`, deploying from `dist/` gives production users access to `NUKE_DATABASE`, `SEED_MEMBERS`, etc.
+
+**Fix:** Only commit prod builds to `dist/`, or remove `dist/` from git tracking.
+
+### B2. `deploy` Script Double-Builds
+
+`npm run deploy` → `npm run test` (includes non-prod build) → `npm run build:prod` → `clasp push`. Tests validate the non-prod build, not the prod build that gets deployed.
+
+### B3. Redundant OAuth Scopes
+
+`appsscript.json` requests both `spreadsheets.currentonly` and `spreadsheets` (full access). The latter is a strict superset, making the former redundant and misleading.
+
+### B4. 100% Line Coverage Threshold Without Branch Coverage
+
+`jest.config.js` enforces 100% line coverage but no branch, function, or statement coverage. Untested `else` clauses and `catch` blocks pass CI.
+
+### B5. `DEVELOPER_GUIDE.md` Says "ES5-Compatible"
+
+The runtime is V8/ES2020 (`appsscript.json`: `"runtimeVersion": "V8"`, ESLint: `ecmaVersion: 2020`). Documentation is misleading.
+
+---
+
+## Architecture Issues
+
+### A1. Monolithic Files Need Splitting
 
 | File | Lines | Recommended Splits |
 |------|------:|:-------------------|
-| `04_UIService.gs` | 7,145 | 8 modules |
-| `10_Code.gs` | 5,438 | 6 modules |
-| `08_SheetUtils.gs` | 4,479 | 8 modules |
-| `09_Dashboards.gs` | 4,034 | 4 modules |
-| `12_Features.gs` | 4,017 | 5 modules |
-| `11_CommandHub.gs` | 3,548 | 7 modules |
-| **Total** | **28,661** | **38 modules (~750 lines avg)** |
+| `09_Dashboards.gs` | 4,041 | SatisfactionDashboard, SyncEngine, DashboardMetrics, PublicEndpoints |
+| `12_Features.gs` | 4,023 | ChecklistManager, DynamicEngine, Reminders, LookerIntegration |
+| `06_Maintenance.gs` | 3,457 | Diagnostics, CacheManager, UndoManager, BatchOps, DataIntegrity |
+| `11_CommandHub.gs` | 3,665 | CommandNav, OCR, Analytics, MemberPortal |
+| `05_Integrations.gs` | 2,963 | DriveIntegration, CalendarSync, EmailNotifications, WebApp |
+| `03_UIComponents.gs` | 2,748 | Menus, Themes, MobileUI, QuickActions, SearchDialogs |
+| `07_DevTools.gs` | 2,809 | SeedData, NukeData, ValidationFramework, TestFramework |
 
-### Proposed Split: `04_UIService.gs` (7,145 lines → 8 modules)
+### A2. HTML Templates Built as String Concatenation
 
-| Module | Contents | ~Lines |
-|--------|----------|-------:|
-| `04a_UIMenus.gs` | Menu creation, navigation, visual control panel | 325 |
-| `04b_UIDialogs.gs` | Multi-select dialogs, sidebars, common styles | 575 |
-| `04c_AccessibilityFeatures.gs` | Dark mode, focus mode, pomodoro, ADHD panel, notepad | 580 |
-| `04d_ImportExportUI.gs` | Import/export dialogs, CSV processing, break reminders | 310 |
-| `04e_InteractiveDashboardUI.gs` | Interactive dashboard, mobile views, data retrieval | 1,155 |
-| `04f_ExecutiveDashboardUI.gs` | Executive dashboard modal, alert systems, midnight triggers | 510 |
-| `04g_DocumentGenerationUI.gs` | PDF generation, steward performance modal, overdue checks | 450 |
-| `04h_PublicDashboardUI.gs` | Public member dashboard, unified data endpoints, date filters | 1,115 |
+Nearly every file constructs 100-500+ line HTML pages via string concatenation. This makes security review, debugging, and maintenance extremely difficult. Google Apps Script supports `HtmlService.createTemplateFromFile()` with separate `.html` files.
 
-### Proposed Split: `10_Code.gs` (5,438 lines → 6 modules)
+### A3. 40+ Empty Function Stubs
 
-| Module | Contents | ~Lines |
-|--------|----------|-------:|
-| `10a_ConfigSheetCreation.gs` | Config sheet structure, dropdown sources, section styling | 230 |
-| `10b_CoreSheetCreation.gs` | Member Directory, Grievance Log, Satisfaction, Feedback sheets | 1,190 |
-| `10c_DocumentationSheets.gs` | FAQ, Getting Started, Function Checklist, Features Reference | 750 |
-| `10d_HiddenSheetSetup.gs` | Audit log, hidden calculation sheets, formula setup | 1,025 |
-| `10e_FormHandlers.gs` | Form submission handling, member import processing | 350 |
-| `10f_DataQualityMaintenance.gs` | Data repair, checkbox repair, validation, integrity checks | 1,050 |
+`src/10c_FormHandlers.gs` and `src/10d_SyncAndMaintenance.gs` contain 40+ JSDoc-only function stubs with "Note: defined in modular file" comments. These inflate file sizes and confuse navigation.
 
-### Proposed Split: `08_SheetUtils.gs` (4,479 lines → 8 modules)
+### A4. Duplicate `escapeHtml()` Implementations
 
-| Module | Contents | ~Lines |
-|--------|----------|-------:|
-| `08a_SheetCreation.gs` | `CREATE_509_DASHBOARD()`, `getOrCreateSheet()`, sheet ordering | 230 |
-| `08b_DataValidation.gs` | Dropdown and multi-select validation setup, trigger install | 285 |
-| `08c_SearchFunctionality.gs` | Desktop/mobile search, advanced search, result navigation | 240 |
-| `08d_ChartBuilder.gs` | Chart generation — gauge, scorecard, trend, area, combo, leaderboard | 400 |
-| `08e_FormManagement.gs` | Form URLs, submission handlers (contact, grievance, satisfaction) | 790 |
-| `08f_NotificationSystem.gs` | Deadline alerts, survey emails, notification settings | 440 |
-| `08g_AuditLogging.gs` | Audit log setup, `onEditAudit()`, audit history retrieval | 315 |
-| `08h_HiddenSheetFormulas.gs` | All `setupCalc*Sheet()` functions, formula management | 1,100 |
-
-### Proposed Split: `09_Dashboards.gs` (4,034 lines → 4 modules)
-
-| Module | Contents | ~Lines |
-|--------|----------|-------:|
-| `09a_SatisfactionDashboard.gs` | Satisfaction dashboard display, data retrieval, analytics, drill-down | 1,645 |
-| `09b_DataSynchronization.gs` | Cross-sheet data sync, auto-sync triggers, `syncAllData()` | 705 |
-| `09c_DashboardMetrics.gs` | Dashboard value computation, metric sync, gradient application | 675 |
-| `09d_PublicDataEndpoints.gs` | Public dashboard data, flagged submission review, secure endpoints | 450 |
-
-### Proposed Split: `12_Features.gs` (4,017 lines → 5 modules)
-
-| Module | Contents | ~Lines |
-|--------|----------|-------:|
-| `12a_ChecklistManager.gs` | Case checklist creation, CRUD operations, progress tracking, dialog | 1,032 |
-| `12b_MemberDynamicEngine.gs` | Member leaders, dynamic field expansion, steward assignment | 470 |
-| `12c_GrievanceReminders.gs` | Reminder CRUD, notification triggers, reminder dialog | 485 |
-| `12d_LookerIntegration.gs` | Standard and anonymous Looker data sync, sheet initialization | 1,115 |
-| `12e_LookerAdmin.gs` | Looker connection help, status reporting, quarter calculation | 320 |
-
-### Proposed Split: `11_CommandHub.gs` (3,548 lines → 7 modules)
-
-| Module | Contents | ~Lines |
-|--------|----------|-------:|
-| `11a_CommandCenterNav.gs` | Config, navigation shortcuts, ID generation, mobile toggles | 350 |
-| `11b_ProductionMode.gs` | Production mode controls, tab colors, documentation cleanup | 270 |
-| `11c_DiagnosticsRepair.gs` | Diagnostic reports, repair utilities, search dialog | 220 |
-| `11d_OCRProcessing.gs` | Cloud Vision, OCR processing, transcription, auto-populate | 1,125 |
-| `11e_UnitAnalytics.gs` | Unit health metrics, grievance trends, trend visualization | 290 |
-| `11f_SecurityAnalytics.gs` | PII scrubbing, precedent search, secure stats endpoints | 445 |
-| `11g_MemberPortal.gs` | Member and public portal HTML generation | 390 |
-
-### Implementation Notes
-
-1. **Build system compatible:** `build.js` already concatenates all `.gs` files from `src/` — new modules will be picked up automatically
-2. **No runtime impact:** Google Apps Script loads all files into one namespace; splitting is purely organizational
-3. **Test updates needed:** Jest test imports may need updating if they reference specific file paths
-4. **Target:** Keep modules under ~1,000 lines; prioritize splitting the largest sections first (`04e`, `10b`, `08h`, `09a`)
-5. **Naming convention:** Use letter suffixes (`04a_`, `04b_`) to maintain load order within each logical group
+At least 8 different `escapeHtml()` implementations exist across client-side HTML templates, with slightly different behavior (some escape `/`, some don't; some handle `null` differently).
 
 ---
 
 ## Positive Observations
 
-- **Test coverage is solid:** 950 tests across 18 suites all passing
-- **ESLint passes clean** with no warnings
-- **Security fundamentals are in place:** PIN hashing with SHA-256 + salt, rate limiting, session tokens, audit logging, IDOR protection on web app endpoints
-- **PII protection is thoughtful:** The `safetyValveScrub()` function, anonymized Looker sheets, and PII-free exports demonstrate privacy awareness
-- **Batch operations are well-optimized:** Functions consistently use `setValues()` for batch writes and minimize API calls
-- **Build/deploy pipeline exists:** `build.js` concatenates modules into a distributable file
-- **Sabotage detection:** The `onEdit` trigger monitors for mass cell deletion (>15 cells) which is a practical safeguard
-- **`MultiSelectDialog.html` is clean:** Uses DOM API (`textContent`) for rendering which is inherently XSS-safe
+- **Security fundamentals are strong:** SHA-256 PIN hashing with per-member salt, rate limiting with configurable lockout, session tokens, audit logging, IDOR protection on web app endpoints
+- **PII protection is thoughtful:** `safetyValveScrub()`, anonymized Looker sheets, PII-free exports, `maskName()`/`maskEmail()` in logs, dual-mode public/steward dashboards
+- **Accessibility is comprehensive:** High contrast mode, large text mode, keyboard navigation with arrow keys, ARIA attributes, touch target compliance, Pomodoro timer, ADHD-friendly features
+- **Test suite is extensive:** 1008+ tests across 21 suites, all passing, with ESLint clean
+- **Error handling is defensive:** Consistent `typeof === 'function'` checks for cross-module dependencies, try-catch with individual error handling per operation
+- **Self-healing architecture:** Hidden calculation sheets with formula repair functions, diagnostic/repair pipeline
+- **User experience:** Progress toasts during long operations, color-coded conditional formatting, steward override system with cell notes, lazy-loading dashboard tabs
+- **Build pipeline exists:** Concatenation build, prod/dev modes, lint-staged, commitlint, CI/CD with size reporting
+- **Lock-based sequence generation:** `getNextSequence()` correctly uses `LockService` with `waitLock()` and `finally` release
 
 ---
 
 ## Summary
 
-| Severity | Count | Key Theme |
-|----------|-------|-----------|
-| Critical | 3 | Broken hidden sheet setup (4 undefined properties), XSS vulnerabilities, string split bug |
-| High | 3 | Dual constant systems, hardcoded indices, shared undo state |
-| Medium | 4 | Hardcoded sheet names, dev tools in prod, weak anonymization hash, column adjacency assumption |
-| Low | 4 | ID sequence pollution, character stripping, trend ordering, missing CSP |
-| Maintenance | 1 | 6 files over 3,500 lines need splitting into ~38 focused modules |
+The codebase is a substantial and feature-rich application with strong security awareness and thoughtful UX design. The primary areas requiring immediate attention are:
+
+1. **XSS vulnerabilities** (20+ locations) — systematic fix needed via consistent `escapeHtml()` usage
+2. **Performance bottlenecks** (11+ locations) — batch API calls instead of per-row operations
+3. **Race conditions** (5+ locations) — add `LockService` to read-check-write sequences
+4. **Broken references** (`HIDDEN_SHEETS`, `ASSIGNED_STEWARD`) — fix undefined constants
+5. **Test reliability** (8+ false positives) — ensure tests actually exercise production code
+
+The architectural debt (monolithic files, inline HTML, duplicate constants) is manageable and can be addressed incrementally without affecting functionality.
