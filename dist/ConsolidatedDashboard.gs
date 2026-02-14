@@ -23142,7 +23142,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2796 lines)
+// SOURCE: 07_DevTools.gs (2815 lines)
 // ============================================================================
 
 /**
@@ -24138,45 +24138,64 @@ function SEED_MEMBERS_ONLY(count) {
 }
 
 /**
- * Generate a single member row with all 31 columns
+ * Generate a single member row using MEMBER_COLS for column placement.
+ * Column positions are fully dynamic — reordering MEMBER_COLS won't break seeding.
  */
 function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, location, unit, officeDays, email, phone, prefComm, bestTime, supervisor, manager, isSteward, committees, assignedSteward, recentContactDate, contactSteward, contactNotes) {
   var today = new Date();
   var lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  return [
-    memberId,                                    // 1: Member ID (A)
-    firstName,                                   // 2: First Name (B)
-    lastName,                                    // 3: Last Name (C)
-    jobTitle,                                    // 4: Job Title (D)
-    location,                                    // 5: Work Location (E)
-    unit,                                        // 6: Unit (F)
-    '',                                          // 7: Cubicle (G) — hidden, not seeded
-    officeDays,                                  // 8: Office Days (H)
-    email,                                       // 9: Email (I)
-    phone,                                       // 10: Phone (J)
-    prefComm,                                    // 11: Preferred Communication (K)
-    bestTime,                                    // 12: Best Time to Contact (L)
-    supervisor,                                  // 13: Supervisor (M)
-    manager,                                     // 14: Manager (N)
-    isSteward,                                   // 15: Is Steward (O)
-    committees,                                  // 16: Committees (P)
-    assignedSteward,                             // 17: Assigned Steward (Q)
-    randomDate(lastMonth, today),                // 18: Last Virtual Mtg (R)
-    randomDate(lastMonth, today),                // 19: Last In-Person Mtg (S)
-    Math.floor(Math.random() * 100),             // 20: Open Rate % (T)
-    Math.floor(Math.random() * 20),              // 21: Volunteer Hours (U)
-    Math.random() < 0.3 ? 'Yes' : 'No',          // 22: Interest Local (V)
-    Math.random() < 0.2 ? 'Yes' : 'No',          // 23: Interest Chapter (W)
-    Math.random() < 0.1 ? 'Yes' : 'No',          // 24: Interest Allied (X)
-    recentContactDate || '',                     // 25: Recent Contact Date (Y)
-    contactSteward || '',                        // 26: Contact Steward (Z)
-    contactNotes || '',                          // 27: Contact Notes (AA)
-    '',                                          // 28: Has Open Grievance (AB)
-    '',                                          // 29: Grievance Status (AC)
-    '',                                          // 30: Next Deadline (AD)
-    false                                        // 31: Start Grievance (AE)
-  ];
+  // Build row sized to the last MEMBER_COLS column, filled with empty strings
+  var maxCol = MEMBER_COLS.STATE; // last defined column
+  var row = [];
+  for (var i = 0; i < maxCol; i++) { row.push(''); }
+
+  // Identity & Core Info
+  row[MEMBER_COLS.MEMBER_ID - 1] = memberId;
+  row[MEMBER_COLS.FIRST_NAME - 1] = firstName;
+  row[MEMBER_COLS.LAST_NAME - 1] = lastName;
+  row[MEMBER_COLS.JOB_TITLE - 1] = jobTitle;
+
+  // Location & Work
+  row[MEMBER_COLS.WORK_LOCATION - 1] = location;
+  row[MEMBER_COLS.UNIT - 1] = unit;
+  // CUBICLE left empty (hidden column, not seeded)
+  row[MEMBER_COLS.OFFICE_DAYS - 1] = officeDays;
+
+  // Contact Information
+  row[MEMBER_COLS.EMAIL - 1] = email;
+  row[MEMBER_COLS.PHONE - 1] = phone;
+  row[MEMBER_COLS.PREFERRED_COMM - 1] = prefComm;
+  row[MEMBER_COLS.BEST_TIME - 1] = bestTime;
+
+  // Organizational Structure
+  row[MEMBER_COLS.SUPERVISOR - 1] = supervisor;
+  row[MEMBER_COLS.MANAGER - 1] = manager;
+  row[MEMBER_COLS.IS_STEWARD - 1] = isSteward;
+  row[MEMBER_COLS.COMMITTEES - 1] = committees;
+  row[MEMBER_COLS.ASSIGNED_STEWARD - 1] = assignedSteward;
+
+  // Engagement Metrics
+  row[MEMBER_COLS.LAST_VIRTUAL_MTG - 1] = randomDate(lastMonth, today);
+  row[MEMBER_COLS.LAST_INPERSON_MTG - 1] = randomDate(lastMonth, today);
+  row[MEMBER_COLS.OPEN_RATE - 1] = Math.floor(Math.random() * 100);
+  row[MEMBER_COLS.VOLUNTEER_HOURS - 1] = Math.floor(Math.random() * 20);
+
+  // Member Interests
+  row[MEMBER_COLS.INTEREST_LOCAL - 1] = Math.random() < 0.3 ? 'Yes' : 'No';
+  row[MEMBER_COLS.INTEREST_CHAPTER - 1] = Math.random() < 0.2 ? 'Yes' : 'No';
+  row[MEMBER_COLS.INTEREST_ALLIED - 1] = Math.random() < 0.1 ? 'Yes' : 'No';
+
+  // Steward Contact Tracking
+  row[MEMBER_COLS.RECENT_CONTACT_DATE - 1] = recentContactDate || '';
+  row[MEMBER_COLS.CONTACT_STEWARD - 1] = contactSteward || '';
+  row[MEMBER_COLS.CONTACT_NOTES - 1] = contactNotes || '';
+
+  // Grievance Management (script-calculated, leave empty)
+  // HAS_OPEN_GRIEVANCE, GRIEVANCE_STATUS, NEXT_DEADLINE left as ''
+  row[MEMBER_COLS.START_GRIEVANCE - 1] = false;
+
+  return row;
 }
 
 /**
