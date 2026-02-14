@@ -250,19 +250,22 @@ function removeDeprecatedTabs() {
   ];
 
   var removed = [];
-  ss.getSheets().forEach(function(sheet) {
+  var sheets = ss.getSheets();
+  for (var i = sheets.length - 1; i >= 0; i--) {
+    var sheet = sheets[i];
     var name = sheet.getName();
-    deprecatedSheets.forEach(function(prefix) {
-      if (name.indexOf(prefix) === 0) {
+    for (var j = 0; j < deprecatedSheets.length; j++) {
+      if (name.indexOf(deprecatedSheets[j]) === 0) {
         try {
           ss.deleteSheet(sheet);
           removed.push(name);
         } catch (_e) {
           Logger.log('Could not delete sheet: ' + name);
         }
+        break;
       }
-    });
-  });
+    }
+  }
 
   if (removed.length > 0) {
     SpreadsheetApp.getUi().alert(
@@ -430,12 +433,12 @@ function showModalDiagnostics() {
     '.btn{padding:10px 20px;border:none;border-radius:6px;cursor:pointer;background:#7c3aed;color:white}' +
     '</style></head><body>' +
     '<div class="title">Modal Diagnostics</div>' +
-    '<span class="status-' + (results.status === 'OK' ? 'ok' : 'error') + '">' + results.status + '</span>' +
-    '<p>' + results.summary + '</p>' +
+    '<span class="status-' + (results.status === 'OK' ? 'ok' : 'error') + '">' + escapeHtml(results.status) + '</span>' +
+    '<p>' + escapeHtml(results.summary) + '</p>' +
     '<div class="card"><strong>Sheet Checks</strong><table>' +
     '<tr><th>Sheet</th><th>Status</th></tr>' +
     results.sheetChecks.map(function(c) {
-      return '<tr><td>' + c.name + '</td><td>' + (c.found ? '✅' : '❌') + '</td></tr>';
+      return '<tr><td>' + escapeHtml(c.name) + '</td><td>' + (c.found ? '✅' : '❌') + '</td></tr>';
     }).join('') +
     '</table></div>' +
     '<button class="btn" onclick="google.script.host.close()">Close</button>' +
@@ -931,7 +934,7 @@ var UNDO_CONFIG = {
  * @returns {Object} History object with actions array and currentIndex
  */
 function getUndoHistory() {
-  var props = PropertiesService.getScriptProperties();
+  var props = PropertiesService.getUserProperties();
   var json = props.getProperty(UNDO_CONFIG.STORAGE_KEY);
 
   if (json) {
@@ -947,7 +950,7 @@ function getUndoHistory() {
  * @returns {void}
  */
 function saveUndoHistory(history) {
-  var props = PropertiesService.getScriptProperties();
+  var props = PropertiesService.getUserProperties();
 
   // Trim history if over limit
   if (history.actions.length > UNDO_CONFIG.MAX_HISTORY) {
@@ -963,7 +966,7 @@ function saveUndoHistory(history) {
  * @returns {void}
  */
 function clearUndoHistory() {
-  PropertiesService.getScriptProperties().deleteProperty(UNDO_CONFIG.STORAGE_KEY);
+  PropertiesService.getUserProperties().deleteProperty(UNDO_CONFIG.STORAGE_KEY);
   SpreadsheetApp.getActiveSpreadsheet().toast('History cleared', 'Undo/Redo', 3);
 }
 
@@ -1567,6 +1570,16 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   );
 
   if (response !== ui.Button.YES) {
+    return errorResponse('Cancelled');
+  }
+
+  // Second confirmation required
+  const response2 = ui.alert(
+    '⚠️ FINAL WARNING',
+    'All grievance data will be PERMANENTLY deleted. Are you absolutely certain?',
+    ui.ButtonSet.YES_NO
+  );
+  if (response2 !== ui.Button.YES) {
     return errorResponse('Cancelled');
   }
 

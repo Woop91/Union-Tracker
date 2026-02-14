@@ -20,11 +20,22 @@ global.Utilities = {
     return date.toISOString();
   }),
   computeDigest: jest.fn((algo, data, charset) => {
+    // Mock hash with full avalanche: every input byte affects all output bytes
     const hash = new Array(32).fill(0);
     for (let i = 0; i < data.length; i++) {
-      hash[i % 32] = (hash[i % 32] + data.charCodeAt(i) + i) & 0xFF;
+      const c = data.charCodeAt(i);
+      for (let j = 0; j < 32; j++) {
+        hash[j] = (hash[j] * 31 + c + i + j) & 0xFF;
+      }
     }
     return hash;
+  }),
+  base64Encode: jest.fn((input) => {
+    // Simple mock base64 encoding for byte arrays
+    if (Array.isArray(input)) {
+      return Buffer.from(input).toString('base64');
+    }
+    return Buffer.from(String(input)).toString('base64');
   }),
   DigestAlgorithm: { SHA_256: 'SHA_256' },
   Charset: { UTF_8: 'UTF_8' },
@@ -43,9 +54,20 @@ global.Session = {
 };
 
 // --- PropertiesService ---
-const _scriptProperties = {};
+let _scriptProperties = {};
+let _userProperties = {};
 global.PropertiesService = {
   getScriptProperties: jest.fn(() => ({
+    getProperty: jest.fn(key => _scriptProperties[key] || null),
+    setProperty: jest.fn((key, val) => { _scriptProperties[key] = val; }),
+    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; })
+  })),
+  getUserProperties: jest.fn(() => ({
+    getProperty: jest.fn(key => _userProperties[key] || null),
+    setProperty: jest.fn((key, val) => { _userProperties[key] = val; }),
+    deleteProperty: jest.fn(key => { delete _userProperties[key]; })
+  })),
+  getDocumentProperties: jest.fn(() => ({
     getProperty: jest.fn(key => _scriptProperties[key] || null),
     setProperty: jest.fn((key, val) => { _scriptProperties[key] = val; }),
     deleteProperty: jest.fn(key => { delete _scriptProperties[key]; })
@@ -53,7 +75,7 @@ global.PropertiesService = {
 };
 
 // --- CacheService ---
-const _cache = {};
+let _cache = {};
 global.CacheService = {
   getScriptCache: jest.fn(() => ({
     get: jest.fn(key => _cache[key] || null),
@@ -61,6 +83,13 @@ global.CacheService = {
     remove: jest.fn(key => { delete _cache[key]; })
   }))
 };
+
+// Reset stores between tests to prevent singleton leaks
+afterEach(() => {
+  for (const key of Object.keys(_scriptProperties)) delete _scriptProperties[key];
+  for (const key of Object.keys(_userProperties)) delete _userProperties[key];
+  for (const key of Object.keys(_cache)) delete _cache[key];
+});
 
 // --- Mock Sheet / Range / Spreadsheet ---
 function createMockRange(values) {

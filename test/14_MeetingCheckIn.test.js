@@ -96,9 +96,8 @@ describe('createMeeting', () => {
       date: '2026-05-20'
     });
 
-    if (result.success) {
-      expect(result.meetingId).toContain('20260520');
-    }
+    expect(result.success).toBe(true);
+    expect(result.meetingId).toContain('20260520');
   });
 
   test('defaults type to In-Person when not provided', () => {

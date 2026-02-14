@@ -49,7 +49,7 @@ describe('MEMBER_COLS ↔ MEMBER_COLUMNS (1-indexed vs 0-indexed)', () => {
     'EMAIL', 'PHONE', 'PREFERRED_COMM', 'BEST_TIME',
     'SUPERVISOR', 'MANAGER', 'IS_STEWARD', 'COMMITTEES', 'ASSIGNED_STEWARD',
     'LAST_VIRTUAL_MTG', 'LAST_INPERSON_MTG', 'OPEN_RATE', 'VOLUNTEER_HOURS',
-    'INTEREST_LOCAL', 'INTEREST_CHAPTER', 'INTEREST_ALLIED', 'HOME_TOWN',
+    'INTEREST_LOCAL', 'INTEREST_CHAPTER', 'INTEREST_ALLIED',
     'RECENT_CONTACT_DATE', 'CONTACT_STEWARD', 'CONTACT_NOTES',
     'HAS_OPEN_GRIEVANCE', 'GRIEVANCE_STATUS', 'NEXT_DEADLINE', 'START_GRIEVANCE',
     'QUICK_ACTIONS', 'PIN_HASH'
@@ -63,9 +63,10 @@ describe('MEMBER_COLS ↔ MEMBER_COLUMNS (1-indexed vs 0-indexed)', () => {
       if (field === 'MEMBER_ID') columnsKey = 'MEMBER_ID';
       if (field === 'NEXT_DEADLINE') columnsKey = 'NEXT_DEADLINE';
 
-      if (MEMBER_COLS[colsKey] !== undefined && MEMBER_COLUMNS[columnsKey] !== undefined) {
-        expect(MEMBER_COLS[colsKey] - 1).toBe(MEMBER_COLUMNS[columnsKey]);
-      }
+      // Always assert — fields in the check list must exist
+      expect(MEMBER_COLS[colsKey]).toBeDefined();
+      expect(MEMBER_COLUMNS[columnsKey]).toBeDefined();
+      expect(MEMBER_COLS[colsKey] - 1).toBe(MEMBER_COLUMNS[columnsKey]);
     });
   });
 

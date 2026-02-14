@@ -36,9 +36,8 @@ describe('GRIEVANCE_FORM_CONFIG', () => {
     expect(GRIEVANCE_FORM_CONFIG).toBeDefined();
   });
 
-  test('has a FORM_URL string', () => {
+  test('has a FORM_URL property (configured via Config sheet)', () => {
     expect(typeof GRIEVANCE_FORM_CONFIG.FORM_URL).toBe('string');
-    expect(GRIEVANCE_FORM_CONFIG.FORM_URL.length).toBeGreaterThan(0);
   });
 
   test('FIELD_IDS has 18 entries', () => {
@@ -67,9 +66,8 @@ describe('CONTACT_FORM_CONFIG', () => {
     expect(CONTACT_FORM_CONFIG).toBeDefined();
   });
 
-  test('has a FORM_URL string', () => {
+  test('has a FORM_URL property (configured via Config sheet)', () => {
     expect(typeof CONTACT_FORM_CONFIG.FORM_URL).toBe('string');
-    expect(CONTACT_FORM_CONFIG.FORM_URL).toContain('docs.google.com/forms');
   });
 
   test('FIELD_IDS has 15 entries', () => {
@@ -93,9 +91,8 @@ describe('SATISFACTION_FORM_CONFIG', () => {
     expect(SATISFACTION_FORM_CONFIG).toBeDefined();
   });
 
-  test('has FORM_URL', () => {
+  test('has FORM_URL property (configured via Config sheet)', () => {
     expect(typeof SATISFACTION_FORM_CONFIG.FORM_URL).toBe('string');
-    expect(SATISFACTION_FORM_CONFIG.FORM_URL.length).toBeGreaterThan(0);
   });
 
   test('FIELD_IDS has entries', () => {

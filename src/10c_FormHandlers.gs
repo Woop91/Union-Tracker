@@ -39,8 +39,8 @@
  * Hardcoded values serve as defaults only — update via Script Properties or Config sheet.
  */
 var GRIEVANCE_FORM_CONFIG = {
-  // Default form URL — overridden by Config sheet column P at runtime
-  FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSedX8nf_xXeLe2sCL9MpjkEEmSuSPbjn3fNxMaMNaPlD0H5lA/viewform',
+  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('grievance')
+  FORM_URL: '',
 
   // Default form field entry IDs — overridden by Script Properties at runtime
   FIELD_IDS: {
@@ -75,8 +75,8 @@ var GRIEVANCE_FORM_CONFIG = {
  * Hardcoded values serve as defaults only.
  */
 var CONTACT_FORM_CONFIG = {
-  // Default form URL — overridden by Config sheet column Q at runtime
-  FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeOs6Kxqca85DYRF1wTP634gMNdEirZdi5mg7aUIY5q7dIfRg/viewform',
+  // Form URL — set in Config sheet column Q, read via getFormUrlFromConfig('contact')
+  FORM_URL: '',
 
   // Form field entry IDs mapped to Member Directory columns
   FIELD_IDS: {
@@ -426,9 +426,9 @@ function testGrievanceFormSubmission() {
  * Hardcoded values serve as defaults only.
  */
 var SATISFACTION_FORM_CONFIG = {
-  // Default form URLs — overridden by Config sheet column AR at runtime
-  FORM_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSeR4VxrGTEvK-PaQP2S8JXn6xwTwp-vkR9tI5c3PRvfhr75nA/viewform',
-  EDIT_URL: 'https://docs.google.com/forms/d/10irg3mZ4kPShcJ5gFHuMoTxvTeZmo_cBs6HGvfasbL0/edit',
+  // Form URLs — set in Config sheet column AR, read via getFormUrlFromConfig('satisfaction')
+  FORM_URL: '',
+  EDIT_URL: '',
 
   // Form field entry IDs (from pre-filled URL)
   FIELD_IDS: {

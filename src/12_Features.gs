@@ -124,27 +124,34 @@ function createChecklistSheet_(ss) {
  */
 function generateChecklistId_(offset) {
   offset = offset || 0;
-  var sheet = getOrCreateChecklistSheet();
-  var lastRow = sheet.getLastRow();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
 
-  if (lastRow < 2) {
-    return 'CL-' + String(1 + offset).padStart(5, '0');
-  }
+  try {
+    var sheet = getOrCreateChecklistSheet();
+    var lastRow = sheet.getLastRow();
 
-  var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
-  var maxNum = 0;
+    if (lastRow < 2) {
+      return 'CL-' + String(1 + offset).padStart(5, '0');
+    }
 
-  for (var i = 0; i < ids.length; i++) {
-    var id = ids[i][0];
-    if (id && typeof id === 'string' && id.indexOf('CL-') === 0) {
-      var numPart = parseInt(id.substring(3), 10);
-      if (!isNaN(numPart) && numPart > maxNum) {
-        maxNum = numPart;
+    var ids = sheet.getRange(2, CHECKLIST_COLS.CHECKLIST_ID, lastRow - 1, 1).getValues();
+    var maxNum = 0;
+
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i][0];
+      if (id && typeof id === 'string' && id.indexOf('CL-') === 0) {
+        var numPart = parseInt(id.substring(3), 10);
+        if (!isNaN(numPart) && numPart > maxNum) {
+          maxNum = numPart;
+        }
       }
     }
-  }
 
-  return 'CL-' + String(maxNum + 1 + offset).padStart(5, '0');
+    return 'CL-' + String(maxNum + 1 + offset).padStart(5, '0');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -3544,17 +3551,13 @@ function generateAnonHash_(id) {
   var props = PropertiesService.getScriptProperties();
   var salt = props.getProperty('ANON_HASH_SALT');
   if (!salt) {
-    salt = 'anon509data'; // Default fallback — auto-stored on first run
+    salt = Utilities.getUuid(); // Generate random salt on first run
     props.setProperty('ANON_HASH_SALT', salt);
   }
   const combined = salt + String(id);
-  let hash = 0;
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return 'A' + Math.abs(hash).toString(36).toUpperCase().substring(0, 8);
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
+  const encoded = Utilities.base64Encode(digest).substring(0, 12);
+  return 'A' + encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase();
 }
 
 /**

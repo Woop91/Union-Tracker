@@ -232,9 +232,6 @@ function startPomodoroTimer() {
   // Show starting message
   ss.toast('🍅 Pomodoro started! Focus for 25 minutes.\n\nYou\'ll get a notification when the session ends.', 'Pomodoro Timer', 10);
 
-  // Create a time-driven trigger for 25 minutes from now
-  var _triggerTime = new Date(new Date().getTime() + 25 * 60 * 1000);
-
   // Store the start time
   PropertiesService.getUserProperties().setProperty('pomodoroStart', new Date().toISOString());
 
@@ -721,8 +718,7 @@ function showExportDialog_UIService_() {
   var blob = Utilities.newBlob(csv, 'text/csv', fileName);
   var file = DriveApp.createFile(blob);
 
-  // Make file accessible
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  // File inherits default Drive sharing permissions
 
   // Show download link
   var html = HtmlService.createHtmlOutput(

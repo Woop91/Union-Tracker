@@ -682,10 +682,22 @@ function NUKE_DATABASE() {
     // Persist to ScriptProperties so the record survives audit sheet deletion
     PropertiesService.getScriptProperties().setProperty('LAST_NUCLEAR_WIPE', JSON.stringify(wipeRecord));
 
-    // Delete _Audit_Log hidden sheet
+    // Archive _Audit_Log before deletion for compliance
     var auditLogSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
     if (auditLogSheet) {
-      try { ss.deleteSheet(auditLogSheet); } catch (e) { Logger.log('Could not delete _Audit_Log: ' + e.message); }
+      try {
+        var auditData = auditLogSheet.getDataRange().getValues();
+        if (auditData.length > 1) {
+          var csv = auditData.map(function(row) {
+            return row.map(function(val) {
+              var s = String(val);
+              return (s.indexOf(',') !== -1 || s.indexOf('"') !== -1) ? '"' + s.replace(/"/g, '""') + '"' : s;
+            }).join(',');
+          }).join('\n');
+          DriveApp.createFile(Utilities.newBlob(csv, 'text/csv', 'AUDIT_LOG_BACKUP_' + new Date().getTime() + '.csv'));
+        }
+        ss.deleteSheet(auditLogSheet);
+      } catch (e) { Logger.log('Could not archive/delete _Audit_Log: ' + e.message); }
     }
 
     // Clean up demo references from documentation tabs
@@ -813,7 +825,7 @@ function addRepoLinkToFAQ_(ss) {
     );
 
     // Add the repo link
-    var repoUrl = 'https://github.com/Woop91/MULTIPLE-SCRIPS-REPO';
+    var repoUrl = getConfigValue_(CONFIG_COLS.ORG_WEBSITE) || '';
     faqSheet.getRange(linkRow + 2, 1).setValue(repoUrl);
     faqSheet.getRange(linkRow + 2, 1)
       .setFontColor('#1a73e8')
@@ -2718,10 +2730,11 @@ function testOCRConnection() {
     };
 
     var response = UrlFetchApp.fetch(
-      'https://vision.googleapis.com/v1/images:annotate?key=' + apiKey,
+      'https://vision.googleapis.com/v1/images:annotate',
       {
         method: 'POST',
         contentType: 'application/json',
+        headers: { 'X-Goog-Api-Key': apiKey },
         payload: JSON.stringify(testRequest),
         muteHttpExceptions: true
       }
@@ -3012,8 +3025,12 @@ function safetyValveScrub(data) {
   // Mask SSN-like patterns: 000-00-0000
   var ssnRegex = /\b\d{3}-\d{2}-\d{4}\b/g;
 
+  // Mask email addresses
+  var emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+
   return data.replace(phoneRegex, "[REDACTED CONTACT]")
-             .replace(ssnRegex, "[REDACTED ID]");
+             .replace(ssnRegex, "[REDACTED ID]")
+             .replace(emailRegex, "[REDACTED EMAIL]");
 }
 
 /**
@@ -3509,10 +3526,10 @@ function getMemberPortalHtml_(profile) {
     '  <div class="container">' +
     '    <div class="header">' +
     '      <h1>509 MEMBER PORTAL</h1>' +
-    '      <div class="welcome">Welcome, ' + profile.firstName + '!</div>' +
+    '      <div class="welcome">Welcome, ' + escapeHtml(profile.firstName) + '!</div>' +
     '      <div class="member-badge">' +
     '        <i class="material-icons" style="font-size:16px">' + (profile.isSteward ? 'verified' : 'person') + '</i>' +
-    '        ' + (profile.isSteward ? 'Union Steward' : 'Union Member') + ' - ' + profile.unit +
+    '        ' + (profile.isSteward ? 'Union Steward' : 'Union Member') + ' - ' + escapeHtml(profile.unit) +
     '      </div>' +
     '    </div>' +
     '    ' +
@@ -3529,7 +3546,7 @@ function getMemberPortalHtml_(profile) {
     '    <div class="card">' +
     '      <div class="card-title"><i class="material-icons">people</i> Your Stewards</div>' +
     stewards.slice(0, 5).map(function(s) {
-      return '<div class="steward-item"><span>' + s['First Name'] + ' ' + s['Last Name'] + '</span><span class="pill">' + s['Unit'] + '</span></div>';
+      return '<div class="steward-item"><span>' + escapeHtml(s['First Name']) + ' ' + escapeHtml(s['Last Name']) + '</span><span class="pill">' + escapeHtml(s['Unit']) + '</span></div>';
     }).join('') +
     '    </div>' +
     '    ' +
@@ -3623,7 +3640,7 @@ function getPublicPortalHtml_(stats, stewards, satisfaction) {
     '    <div class="card">' +
     '      <div class="card-title"><i class="material-icons">people</i> Find a Steward</div>' +
     stewards.map(function(s) {
-      return '<div class="steward-item"><span>' + s['First Name'] + ' ' + s['Last Name'] + '</span><span class="pill">' + s['Unit'] + '</span></div>';
+      return '<div class="steward-item"><span>' + escapeHtml(s['First Name']) + ' ' + escapeHtml(s['Last Name']) + '</span><span class="pill">' + escapeHtml(s['Unit']) + '</span></div>';
     }).join('') +
     '    </div>' +
     '    ' +
@@ -3658,7 +3675,7 @@ function getErrorPageHtml_(message) {
     '  <div class="error-box">' +
     '    <i class="material-icons error-icon">error_outline</i>' +
     '    <div class="error-title">Access Error</div>' +
-    '    <div class="error-msg">' + message + '</div>' +
+    '    <div class="error-msg">' + escapeHtml(message) + '</div>' +
     '  </div>' +
     '</body>' +
     '</html>';

@@ -22,7 +22,7 @@ This guide provides an overview of the codebase architecture, development workfl
 The 509 Dashboard is a Google Apps Script (GAS) application for managing union steward activities, grievances, and member information within Google Sheets.
 
 **Key Technologies:**
-- Google Apps Script (ES5-compatible JavaScript)
+- Google Apps Script (V8 Runtime with ES2020 support)
 - Google Sheets API
 - Node.js build system
 - ESLint for code quality (v9.x flat config)
@@ -422,8 +422,8 @@ showTestDashboard();
 
 ### General Rules
 
-1. **Use `var` instead of `let`/`const`** - GAS uses ES5
-2. **No arrow functions** - Use `function` keyword
+1. **Prefer `var` for GAS compatibility** - V8 runtime supports `let`/`const` but `var` is used by convention
+2. **Arrow functions are supported** - but `function` keyword is used by project convention
 3. **JSDoc comments** - Document all public functions
 4. **Semicolons required** - End statements with `;`
 

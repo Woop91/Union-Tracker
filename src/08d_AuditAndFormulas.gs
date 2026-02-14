@@ -12,9 +12,14 @@ function setupAuditLogSheet() {
 
   if (!sheet) {
     sheet = ss.insertSheet(SHEETS.AUDIT_LOG);
+    sheet.clear();
+  } else if (sheet.getLastRow() <= 1) {
+    sheet.clear();
+  } else {
+    // Audit log has existing data — do not clear (compliance requirement)
+    Logger.log('setupAuditLogSheet: Sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear');
+    return;
   }
-
-  sheet.clear();
 
   // Headers
   var headers = [
@@ -1043,13 +1048,8 @@ function refreshAllHiddenFormulas() {
     SHEETS.STEWARD_PERFORMANCE_CALC
   ];
 
-  hiddenSheetNames.forEach(function(name) {
-    var sheet = ss.getSheetByName(name);
-    if (sheet) {
-      // Force recalc by getting values
-      sheet.getDataRange().getValues();
-    }
-  });
+  // Force recalculation of all pending formulas
+  SpreadsheetApp.flush();
 
   // Then sync
   syncAllData();

@@ -540,15 +540,7 @@ function getSatisfactionOverviewData() {
   if (!sheet) return data;
 
   // Check if there's data by looking at column A (Timestamp)
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return data;
 
@@ -822,15 +814,7 @@ function getSatisfactionResponseData() {
   if (!sheet) return [];
 
   // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return [];
 
@@ -890,9 +874,9 @@ function getSatisfactionResponseData() {
     });
   }
 
-  // Sort by date (most recent first)
+  // Sort by date (most recent first) - use Date parsing for correct chronological order
   responses.sort(function(a, b) {
-    return b.date.localeCompare(a.date);
+    return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
   return responses;
@@ -909,15 +893,7 @@ function getSatisfactionSectionData() {
   if (!sheet) return result;
 
   // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return result;
 
@@ -1242,15 +1218,7 @@ function getSatisfactionAnalyticsData() {
   if (!sheet) return result;
 
   // Check if there's data
-  var lastRow = 1;
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      lastRow = i;
-      break;
-    }
-    lastRow = i + 1;
-  }
+  var lastRow = sheet.getLastRow();
 
   if (lastRow <= 1) return result;
 
@@ -1715,13 +1683,7 @@ function computeSatisfactionRowAverages(row) {
  * @return {number} The last row number with data
  */
 function getSheetLastRow(sheet) {
-  var timestamps = sheet.getRange('A:A').getValues();
-  for (var i = 1; i < timestamps.length; i++) {
-    if (timestamps[i][0] === '' || timestamps[i][0] === null) {
-      return i;
-    }
-  }
-  return timestamps.length;
+  return sheet.getLastRow();
 }
 
 
@@ -2589,13 +2551,11 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
   var thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   var lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   var lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-  var _oneWeekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   // ══════════════════════════════════════════════════════════════════════
   // MEMBER METRICS
   // ══════════════════════════════════════════════════════════════════════
   var openRates = [];
-  var _stewardCounts = {};
 
   for (var m = 1; m < memberData.length; m++) {
     var row = memberData[m];
@@ -2649,7 +2609,6 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     var dateClosed = gRow[GRIEVANCE_COLS.DATE_CLOSED - 1];
     var daysOpen = gRow[GRIEVANCE_COLS.DAYS_OPEN - 1];
     var daysToDeadline = gRow[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
-    var _nextActionDue = gRow[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
 
     // Status counts
     if (status === 'Open') metrics.open++;
@@ -2803,13 +2762,13 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     return metrics.activeGrievances + monthlyFiledCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0) -
            monthlyClosedCounts.slice(idx + 1).reduce(function(a, b) { return a + b; }, 0);
   });
-  // For members, use current count as base (historical member data not tracked)
+  // Member count history not tracked — show current count consistently (no fabricated trends)
   metrics.sixMonthHistory.members = [
-    Math.round(metrics.totalMembers * 0.92),
-    Math.round(metrics.totalMembers * 0.94),
-    Math.round(metrics.totalMembers * 0.96),
-    Math.round(metrics.totalMembers * 0.97),
-    Math.round(metrics.totalMembers * 0.99),
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
+    metrics.totalMembers,
     metrics.totalMembers
   ];
 
@@ -3514,13 +3473,20 @@ function getFlaggedSubmissionsData() {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function approveFlaggedSubmission(rowNum) {
+  // Verify caller is an authorized steward
+  var email = '';
+  try { email = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  if (!email) {
+    throw new Error('Authorization required: unable to verify user identity');
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
 
-  if (!satSheet || rowNum < 2) return;
+  if (!satSheet || rowNum < 2 || rowNum > satSheet.getLastRow()) return;
 
   satSheet.getRange(rowNum, SATISFACTION_COLS.VERIFIED).setValue('Yes');
-  satSheet.getRange(rowNum, SATISFACTION_COLS.REVIEWER_NOTES).setValue('Manually approved on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  satSheet.getRange(rowNum, SATISFACTION_COLS.REVIEWER_NOTES).setValue('Approved by ' + email + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
 
   // Update dashboard
   syncSatisfactionValues();
@@ -3564,7 +3530,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
       lastName: (s['Last Name'] || '').toString().replace(/"/g, '\\"'),
       unit: (s['Unit'] || 'General').toString().replace(/"/g, '\\"'),
       location: (s['Work Location'] || '').toString().replace(/"/g, '\\"'),
-      email: (s['Email'] || '').toString().replace(/"/g, '\\"')
+      email: ''  // Redacted from public dashboard for privacy
     };
   });
 

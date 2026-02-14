@@ -40,7 +40,13 @@
  */
 function createConfigSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.CONFIG);
-  sheet.clear();
+  // Only clear if sheet is new or has no meaningful data (≤2 rows = headers only)
+  if (sheet.getLastRow() <= 2) {
+    sheet.clear();
+  } else {
+    Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear to preserve settings');
+    return sheet;
+  }
 
   // Row 1: Section Headers (grouped categories)
   var sectionHeaders = [
@@ -133,11 +139,11 @@ function createConfigSheet(ss) {
   // Alert Days (S) - default notification intervals
   sheet.getRange(3, CONFIG_COLS.ALERT_DAYS, 1, 1).setValue('3, 7, 14');
 
-  // Organization defaults (SEIU Local 509)
-  sheet.getRange(3, CONFIG_COLS.ORG_NAME, 1, 1).setValue('SEIU Local 509');
-  sheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER, 1, 1).setValue('509');
-  sheet.getRange(3, CONFIG_COLS.MAIN_ADDRESS, 1, 1).setValue('293 Boston Post Road West, 4th Floor, Marlborough, MA 01752');
-  sheet.getRange(3, CONFIG_COLS.MAIN_PHONE, 1, 1).setValue('774-843-7509');
+  // Organization defaults (placeholders — update in Config sheet)
+  sheet.getRange(3, CONFIG_COLS.ORG_NAME, 1, 1).setValue('Your Union Name');
+  sheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER, 1, 1).setValue('000');
+  sheet.getRange(3, CONFIG_COLS.MAIN_ADDRESS, 1, 1).setValue('123 Main Street, Suite 100, City, ST 00000');
+  sheet.getRange(3, CONFIG_COLS.MAIN_PHONE, 1, 1).setValue('555-000-0000');
 
   // Deadline defaults (in days) — values from DEADLINE_DEFAULTS (01_Core.gs)
   sheet.getRange(3, CONFIG_COLS.FILING_DEADLINE_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.FILING_DAYS);
@@ -151,20 +157,20 @@ function createConfigSheet(ss) {
     .setValues(bestTimes.map(function(v) { return [v]; }));
 
   // Contract articles
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_GRIEVANCE, 1, 1).setValue('Article 23A');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_DISCIPLINE, 1, 1).setValue('Article 12');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_WORKLOAD, 1, 1).setValue('Article 15');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_NAME, 1, 1).setValue('2023-2026 CBA');
+  sheet.getRange(3, CONFIG_COLS.CONTRACT_GRIEVANCE, 1, 1).setValue('Article XX');
+  sheet.getRange(3, CONFIG_COLS.CONTRACT_DISCIPLINE, 1, 1).setValue('Article YY');
+  sheet.getRange(3, CONFIG_COLS.CONTRACT_WORKLOAD, 1, 1).setValue('Article ZZ');
+  sheet.getRange(3, CONFIG_COLS.CONTRACT_NAME, 1, 1).setValue('Current CBA');
 
   // Org identity
-  sheet.getRange(3, CONFIG_COLS.UNION_PARENT, 1, 1).setValue('SEIU');
-  sheet.getRange(3, CONFIG_COLS.STATE_REGION, 1, 1).setValue('Massachusetts');
-  sheet.getRange(3, CONFIG_COLS.ORG_WEBSITE, 1, 1).setValue('https://www.seiu509.org/');
+  sheet.getRange(3, CONFIG_COLS.UNION_PARENT, 1, 1).setValue('Your Parent Union');
+  sheet.getRange(3, CONFIG_COLS.STATE_REGION, 1, 1).setValue('Your State');
+  sheet.getRange(3, CONFIG_COLS.ORG_WEBSITE, 1, 1).setValue('https://www.example.org/');
 
   // Extended contact
-  sheet.getRange(3, CONFIG_COLS.MAIN_FAX, 1, 1).setValue('508-485-8529');
-  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_NAME, 1, 1).setValue('Marc');
-  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_EMAIL, 1, 1).setValue('marc@seiu509.org');
+  sheet.getRange(3, CONFIG_COLS.MAIN_FAX, 1, 1).setValue('555-000-0001');
+  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_NAME, 1, 1).setValue('Contact Name');
+  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_EMAIL, 1, 1).setValue('contact@example.org');
 
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
@@ -693,8 +699,7 @@ function createMemberDirectory(ss) {
     .setRanges([daysDeadlineRange])
     .build();
 
-  var rules = sheet.getConditionalFormatRules();
-  rules.push(redRule, emptyEmailRule, emptyPhoneRule, deadlineOverdueRule, deadline1to3Rule, deadline4to7Rule, deadlineOnTrackRule);
+  var rules = [redRule, emptyEmailRule, emptyPhoneRule, deadlineOverdueRule, deadline1to3Rule, deadline4to7Rule, deadlineOnTrackRule];
   sheet.setConditionalFormatRules(rules);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -845,9 +850,6 @@ function createGrievanceLog(ss) {
 
   // Progress bar spans: Step I (J-K), Step II (L-O), Step III (P-Q), Date Closed (R)
   var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 2);         // J-K
-  var _step2Range = sheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, 4999, 4);  // L-O
-  var _step3Range = sheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, 4999, 2);  // P-Q
-  var _closedRange = sheet.getRange(2, GRIEVANCE_COLS.DATE_CLOSED, 4999, 1);      // R
   var allStepsRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 9);      // J-R (all 9 columns)
 
   // Completed cases: All columns green (Closed, Won, Denied, Settled, Withdrawn)
@@ -888,11 +890,10 @@ function createGrievanceLog(ss) {
     .build();
 
   // Apply all rules (order matters - more specific rules first)
-  var rules = sheet.getConditionalFormatRules();
-  rules.push(
+  var rules = [
     deadlineOverdueRule, deadline1to3Rule, deadline4to7Rule, deadlineOnTrackRule,
     completedRule, step3ProgressRule, step2ProgressRule, step1ProgressRule, notReachedRule
-  );
+  ];
   sheet.setConditionalFormatRules(rules);
 
   // Set tab color

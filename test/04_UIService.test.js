@@ -416,11 +416,10 @@ describe('HTML generator functions (smoke tests)', () => {
   });
 
   test('getDashboardSidebarHtml returns HTML string', () => {
-    if (typeof getDashboardSidebarHtml === 'function') {
-      const html = getDashboardSidebarHtml();
-      expect(typeof html).toBe('string');
-      expect(html).toContain('<!DOCTYPE html>');
-    }
+    expect(typeof getDashboardSidebarHtml).toBe('function');
+    const html = getDashboardSidebarHtml();
+    expect(typeof html).toBe('string');
+    expect(html).toContain('<!DOCTYPE html>');
   });
 
   test('getMultiSelectHtml returns HTML string', () => {

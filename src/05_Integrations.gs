@@ -367,7 +367,7 @@ function openGrievanceFolder() {
 
   if (folderUrl) {
     const html = HtmlService.createHtmlOutput(
-      `<script>window.open('${folderUrl}', '_blank'); google.script.host.close();</script>`
+      `<script>window.open(${JSON.stringify(folderUrl)}, '_blank'); google.script.host.close();</script>`
     ).setWidth(100).setHeight(50);
     SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
   } else {
@@ -376,7 +376,7 @@ function openGrievanceFolder() {
       const result = setupDriveFolderForGrievance(grievanceId);
       if (result.success) {
         const html = HtmlService.createHtmlOutput(
-          `<script>window.open('${result.folderUrl}', '_blank'); google.script.host.close();</script>`
+          `<script>window.open(${JSON.stringify(result.folderUrl)}, '_blank'); google.script.host.close();</script>`
         ).setWidth(100).setHeight(50);
         SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
       }
@@ -689,7 +689,7 @@ function setDocViewOnlyByLink(docUrl) {
     if (!match) return;
     var fileId = match[1];
     var file = DriveApp.getFileById(fileId);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (error) {
     Logger.log('Error setting doc to view-only: ' + error.message);
   }
@@ -2778,7 +2778,7 @@ function getWebAppResourceLinks() {
     satisfactionForm: '',
     spreadsheetUrl: ss.getUrl(),
     orgWebsite: '',
-    githubRepo: 'https://github.com/Woop91/509-dashboard-second'
+    githubRepo: ''  // Set via Config sheet ORG_WEBSITE or manually
   };
 
   // Try to get form URLs from Config sheet
