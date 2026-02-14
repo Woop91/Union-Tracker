@@ -1410,7 +1410,7 @@ function getMemberSelfServicePortalHtml() {
     '</div>' +
 
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var sessionToken=null;' +
     'var profileData=null;' +
 

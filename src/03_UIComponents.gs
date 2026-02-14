@@ -2356,11 +2356,7 @@ function getDesktopSearchHtml() {
             '<div class="no-results"><p>Error: ' + error.message + '</p></div>';
         }
 
-        function escapeHtml(text) {
-          const div = document.createElement('div');
-          div.textContent = text;
-          return div.innerHTML;
-        }
+        ${getClientSideEscapeHtml()}
 
         // Load departments on init
         google.script.run

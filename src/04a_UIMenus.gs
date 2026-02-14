@@ -659,7 +659,7 @@ function getMultiSelectHtml(items, callback) {
       </div>
 
       <script>
-        function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#x27;").replace(/\\//g,"&#x2F;");}
+        ${getClientSideEscapeHtml()}
         const items = ${itemsJson};
         const callbackFn = '${callback}';
         let filteredItems = [...items];
@@ -856,7 +856,7 @@ function getDashboardSidebarHtml() {
       </div>
 
       <script>
-        function escapeHtml(s){if(!s)return"";return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
+        ${getClientSideEscapeHtml()}
         function loadStats() {
           google.script.run
             .withSuccessHandler(function(stats) {

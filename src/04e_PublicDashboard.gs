@@ -1558,7 +1558,7 @@ function getUnifiedDashboardHtml(isPII) {
 
     // JavaScript
     '<script>' +
-    'function escapeHtml(t){if(t==null)return"";return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\'/g,"&#x27;").replace(/\\//g,"&#x2F;");}' +
+    ' + getClientSideEscapeHtml() + ' +
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+escapeHtml(e.message)+"</div>"}' +

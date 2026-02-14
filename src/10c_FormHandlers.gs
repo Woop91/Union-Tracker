@@ -1,38 +1,7 @@
 // ============================================================================
-// MENU HANDLER FUNCTIONS
+// FORM CONFIGURATIONS
 // ============================================================================
 
-/**
- * Show the desktop unified search dialog
- * Optimized for larger screens with advanced filtering
- */
-// Note: showDesktopSearch() defined in modular file - see respective module
-
-/**
- * Get locations for desktop search filter dropdown
- * @returns {Array} Array of unique locations
- */
-
-/**
- * Get search data for desktop search
- * Searches more fields than mobile: job title, location, issue type, etc.
- * @param {string} query - Search query
- * @param {string} tab - Tab filter: 'all', 'members', 'grievances'
- * @param {Object} filters - Additional filters: status, location, isSteward
- * @returns {Array} Array of search results
- */
-
-/**
- * Navigate to a search result in the spreadsheet
- * @param {string} type - 'member' or 'grievance'
- * @param {string} id - The record ID
- * @param {number} row - The row number
- */
-
-/**
- * Grievance Form Configuration
- * Maps form entry IDs to Member Directory fields for pre-filling
- */
 /**
  * Grievance Form Configuration
  * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
@@ -155,20 +124,6 @@ function saveFormFieldIds_(formType, fieldIds) {
 }
 
 /**
- * Get form URL from Config sheet, falling back to hardcoded default
- * This allows admins to update form links without touching code
- * @param {string} formType - 'grievance', 'contact', or 'satisfaction'
- * @returns {string} The form URL
- */
-
-/**
- * Start a new grievance for a member
- * Opens pre-filled Google Form with member info from Member Directory
- * Can be triggered from Member Directory "Start Grievance" checkbox or menu
- */
-// Note: startNewGrievance() defined in modular file - see respective module
-
-/**
  * Get current user's steward info from Member Directory
  * @private
  */
@@ -198,36 +153,9 @@ function getCurrentStewardInfo_(ss) {
   return { firstName: '', lastName: '', email: currentUserEmail };
 }
 
-/**
- * Build pre-filled grievance form URL
- * @private
- */
-
 // ============================================================================
 // GRIEVANCE FORM SUBMISSION HANDLER
 // ============================================================================
-
-/**
- * Handle grievance form submission
- * This function is triggered when a grievance form is submitted.
- * It adds the grievance to the Grievance Log and creates a Drive folder.
- *
- * To set up: Run setupGrievanceFormTrigger() once, or manually add an
- * installable trigger for this function on the form.
- *
- * @param {Object} e - Form submission event object
- */
-// Note: onGrievanceFormSubmit() defined in modular file - see respective module
-
-/**
- * Get a value from form named responses
- * @private
- */
-
-/**
- * Parse a date string from form submission
- * @private
- */
 
 /**
  * Get existing grievance IDs for collision detection
@@ -387,39 +315,9 @@ function testGrievanceFormSubmission() {
 }
 
 // ============================================================================
-// PERSONAL CONTACT INFO FORM HANDLER
-// ============================================================================
-
-/**
- * Show the Personal Contact Info form link
- * Members fill out the blank form and data is written to Member Directory on submit
- */
-
-/**
- * Handle contact form submission
- * Writes member data to Member Directory (updates existing or creates new)
- *
- * @param {Object} e - Form submission event object
- */
-
-/**
- * Get multiple values from form response (for checkbox questions)
- * Returns comma-separated string
- * @private
- */
-
-/**
- * Set up the contact form submission trigger
- * Run this once to enable automatic processing of form submissions
- */
-
-// ============================================================================
 // MEMBER SATISFACTION SURVEY FORM HANDLER
 // ============================================================================
 
-/**
- * Member Satisfaction Survey Form Configuration
- */
 /**
  * Satisfaction Survey Form Configuration
  * Form URL reads from Config sheet (column AR), entry IDs read from Script Properties.
@@ -440,148 +338,9 @@ var SATISFACTION_FORM_CONFIG = {
   }
 };
 
-/**
- * Show the Member Satisfaction Survey form link
- * Survey responses are written to the Member Satisfaction sheet
- */
-
-/**
- * Save form URLs to the Config tab for easy reference and updating
- * Writes Grievance Form, Contact Form, and Satisfaction Survey URLs to Config columns P, Q, AR
- */
-
-/**
- * Silent version - used during CREATE_509_DASHBOARD setup
- * @param {Spreadsheet} ss - The spreadsheet object
- * @private
- */
-
-/**
- * Handle satisfaction survey form submission
- * Writes survey responses to the Member Satisfaction sheet
- *
- * @param {Object} e - Form submission event object
- */
-
-/**
- * Set up the satisfaction survey form submission trigger
- * Run this once to enable automatic processing of survey submissions
- */
-
 // ============================================================================
-// SURVEY ENHANCEMENTS - Auto-Email, Quarterly Tracking, Member Auth
+// REFRESH & SYNC FUNCTIONS
 // ============================================================================
-
-/**
- * Send satisfaction survey emails to random members
- * Allows stewards to email a configurable number of random members
- */
-
-/**
- * Execute sending random survey emails
- * @param {Object} opts - Options {count, subject, excludeDays}
- * @returns {string} Result message
- */
-
-/**
- * Validate that an email belongs to a member in the directory
- * @param {string} email - Email to validate
- * @returns {Object|null} Member info if valid, null otherwise
- */
-
-/**
- * Get the current quarter string (e.g., "2026-Q1")
- * @returns {string} Quarter string
- */
-
-/**
- * Get quarter string from a date
- * @param {Date} date - Date to get quarter from
- * @returns {string} Quarter string
- */
-
-// ============================================================================
-// FLAGGED SUBMISSIONS REVIEW - Admin interface for pending survey responses
-// ============================================================================
-
-/**
- * Show the flagged submissions review interface
- * Displays count and email addresses of Pending Review submissions
- * Protects actual survey answers - only shows metadata
- */
-
-/**
- * Get HTML for flagged submissions review interface
- * @returns {string} HTML content
- */
-
-/**
- * Get data for flagged submissions review
- * @returns {Object} Pending submissions data (email, date, row number - NO survey answers)
- */
-
-/**
- * Approve a flagged submission - mark as Verified
- * @param {number} rowNum - Row number (1-indexed)
- */
-
-/**
- * Reject a flagged submission - mark as Rejected
- * @param {number} rowNum - Row number (1-indexed)
- */
-
-// ============================================================================
-// PUBLIC MEMBER DASHBOARD - Stats without PII
-// ============================================================================
-
-// REMOVED: showPublicMemberDashboard_Code_DEPRECATED - Use showPublicMemberDashboard() in 11_SecureMemberDashboard.gs instead
-
-/**
- * Generates HTML for the secure member dashboard
- * @param {Object} stats - Grievance statistics
- * @param {Array} stewards - Array of steward objects
- * @param {Object} satisfaction - Satisfaction statistics
- * @param {Object} coverage - Steward coverage statistics
- * @returns {string} HTML content
- */
-
-/**
- * Get public overview data (no PII)
- * @returns {Object} Overview statistics
- */
-
-/**
- * Get public survey data (anonymized)
- * Filters to only include Verified='Yes' and optionally IS_LATEST='Yes' responses
- * @param {boolean} includeHistory - If true, include superseded responses; if false, only latest per member
- * @returns {Object} Survey statistics
- */
-
-/**
- * Get public grievance data (no PII)
- * @returns {Object} Grievance statistics
- */
-
-/**
- * Get public steward data (contact info only)
- * @returns {Object} Steward directory
- */
-
-/**
- * Aggregates survey data into chart-ready, non-PII formats.
- * Returns only aggregate metrics without exposing individual survey responses.
- * @returns {Object} Aggregate satisfaction statistics
- */
-
-/**
- * Gets steward coverage ratio for progress tracking
- * @returns {Object} Coverage statistics
- */
-
-/**
- * Uses hidden sheet formulas for self-healing calculations
- */
-// Note: recalcAllGrievancesBatched() defined in modular file - see respective module
 
 /**
  * Refresh Member Directory calculated columns (AB-AD: Has Open Grievance, Status, Next Deadline)
