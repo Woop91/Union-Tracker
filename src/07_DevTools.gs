@@ -1505,11 +1505,30 @@ function NUKE_SEEDED_DATA() {
     // Delete seeded grievances first (they reference members)
     if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
       var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, 1).getValues();
-      for (var g = grievanceData.length - 1; g >= 0; g--) {
-        var gId = String(grievanceData[g][0] || '');
-        if (seededIdPattern.test(gId)) {
-          grievanceSheet.deleteRow(g + 2);
+      var totalGrievanceRows = grievanceData.length;
+
+      // Count how many rows match the seeded pattern
+      for (var gc = 0; gc < totalGrievanceRows; gc++) {
+        if (seededIdPattern.test(String(grievanceData[gc][0] || ''))) {
           deletedGrievances++;
+        }
+      }
+
+      if (deletedGrievances === totalGrievanceRows) {
+        // ALL rows are seeded — use clearContent to avoid "cannot delete all non-frozen rows" error
+        grievanceSheet.getRange(2, 1, totalGrievanceRows, grievanceSheet.getLastColumn())
+          .clearContent()
+          .setBackground(null)
+          .clearNote();
+      } else {
+        // Only some rows are seeded — delete individually bottom-up
+        deletedGrievances = 0;
+        for (var g = totalGrievanceRows - 1; g >= 0; g--) {
+          var gId = String(grievanceData[g][0] || '');
+          if (seededIdPattern.test(gId)) {
+            grievanceSheet.deleteRow(g + 2);
+            deletedGrievances++;
+          }
         }
       }
     }
@@ -1517,11 +1536,31 @@ function NUKE_SEEDED_DATA() {
     // Delete seeded members
     if (memberSheet && memberSheet.getLastRow() > 1) {
       var memberData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, 1).getValues();
-      for (var m = memberData.length - 1; m >= 0; m--) {
-        var mId = String(memberData[m][0] || '');
-        if (seededIdPattern.test(mId)) {
-          memberSheet.deleteRow(m + 2);
-          deletedMembers++;
+      var totalMemberRows = memberData.length;
+
+      // Count how many rows match the seeded pattern
+      var seededMemberCount = 0;
+      for (var mc = 0; mc < totalMemberRows; mc++) {
+        if (seededIdPattern.test(String(memberData[mc][0] || ''))) {
+          seededMemberCount++;
+        }
+      }
+
+      if (seededMemberCount === totalMemberRows) {
+        // ALL rows are seeded — use clearContent to avoid "cannot delete all non-frozen rows" error
+        memberSheet.getRange(2, 1, totalMemberRows, memberSheet.getLastColumn())
+          .clearContent()
+          .setBackground(null)
+          .clearNote();
+        deletedMembers = seededMemberCount;
+      } else {
+        // Only some rows are seeded — delete individually bottom-up
+        for (var m = totalMemberRows - 1; m >= 0; m--) {
+          var mId = String(memberData[m][0] || '');
+          if (seededIdPattern.test(mId)) {
+            memberSheet.deleteRow(m + 2);
+            deletedMembers++;
+          }
         }
       }
     }
