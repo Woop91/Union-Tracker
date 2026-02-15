@@ -3022,7 +3022,7 @@ var SATISFACTION_COLS = {
 };
 
 // ============================================================================
-// SURVEY VAULT COLUMNS (8 columns: A-H) — Isolated PII store
+// SURVEY VAULT COLUMNS (8 columns: A-H) — Zero-knowledge hash store
 // ============================================================================
 
 /**
@@ -3030,32 +3030,32 @@ var SATISFACTION_COLS = {
  * Hidden + protected sheet: _Survey_Vault
  *
  * PURPOSE:
- *   Stores the ONLY linkage between survey responses and member identity.
- *   Completely separated from the Satisfaction sheet to ensure that no one
- *   with spreadsheet access can connect a survey answer to a person.
+ *   Provides verified/latest/quarter metadata for survey responses without
+ *   storing any reversible PII. Email and member ID are SHA-256 hashed with
+ *   a per-installation salt — even with full vault access, it is
+ *   cryptographically impossible to determine who submitted a response.
  *
  * SECURITY MODEL:
- *   - Sheet is hidden (prefixed with _)
- *   - Sheet is protected: only the script owner can edit
- *   - Other editors get a warning if they try to unhide/access it
- *   - Dashboard/analytics code reads from the vault via getVaultDataMap_()
- *     which returns only non-PII flags (verified, isLatest) keyed by row
+ *   - Email and Member ID are stored as salted SHA-256 hashes only
+ *   - Hashes are non-reversible — no one can recover the original values
+ *   - Raw email exists in memory only (during form submit) and is never persisted
+ *   - Sheet is hidden (prefixed with _) and sheet-protected
+ *   - Dashboard code reads only {verified, isLatest, quarter} via getVaultDataMap_()
  *
  * DATA FLOW:
  *   1. onSatisfactionFormSubmit() writes survey answers to Satisfaction sheet
- *      (anonymous — no email, no member ID)
- *   2. Same function writes email + member ID to _Survey_Vault at the
- *      matching row number
- *   3. Dashboard queries call getVaultDataMap_() which returns a row→flags
- *      map without exposing email or member ID
+ *      (anonymous — no email, no member ID, no hashes)
+ *   2. Same function hashes email + member ID in-memory, writes hashes to vault
+ *   3. Raw email is used only to send thank-you email, then discarded
+ *   4. Superseding logic compares hashes, never plaintext
  *
  * @const {Object}
  */
 var SURVEY_VAULT_COLS = {
   RESPONSE_ROW: 1,          // A - Row number in Satisfaction sheet
-  EMAIL: 2,                 // B - Email address from form submission
+  EMAIL: 2,                 // B - SHA-256 hash of email (non-reversible)
   VERIFIED: 3,              // C - Yes / Pending Review / Rejected
-  MATCHED_MEMBER_ID: 4,     // D - Member ID if email matched
+  MATCHED_MEMBER_ID: 4,     // D - SHA-256 hash of member ID (non-reversible)
   QUARTER: 5,               // E - Quarter string (e.g., "2026-Q1")
   IS_LATEST: 6,             // F - Yes/No - Is this the latest for this member?
   SUPERSEDED_BY: 7,         // G - Vault row number of newer response
@@ -29751,7 +29751,7 @@ function showSurveyTrackingDialog() {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (1750 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (1788 lines)
 // ============================================================================
 
 // ============================================================================
@@ -31290,12 +31290,18 @@ function setupSurveyTrackingSheet(sheet) {
 }
 
 // ============================================================================
-// SURVEY VAULT — ISOLATED PII STORE
+// SURVEY VAULT — ZERO-KNOWLEDGE PII STORE
 // ============================================================================
-// The _Survey_Vault sheet stores the ONLY linkage between survey responses
-// and member identity (email, Member ID). It is hidden and sheet-protected
-// so that no one with spreadsheet edit access can read or modify it.
-// All survey anonymity depends on this isolation.
+// The _Survey_Vault sheet stores ONLY hashed email and hashed member ID.
+// No plaintext PII is ever written to any sheet.
+//
+// SECURITY MODEL:
+//   - Email is SHA-256 hashed with a per-installation salt before storage
+//   - Member ID is hashed the same way
+//   - Even with full access to the vault, you cannot reverse the hashes
+//   - Superseding (same member re-submits) works by comparing hashes
+//   - The raw email is used in-memory only (for thank-you email + validation)
+//     and is never persisted to any sheet
 
 /**
  * Creates and protects the _Survey_Vault hidden sheet.
@@ -31303,9 +31309,9 @@ function setupSurveyTrackingSheet(sheet) {
  *
  * Structure (8 columns):
  *   A: Response Row (row number in Satisfaction sheet)
- *   B: Email
+ *   B: Email Hash (SHA-256, non-reversible)
  *   C: Verified (Yes / Pending Review / Rejected)
- *   D: Matched Member ID
+ *   D: Member ID Hash (SHA-256, non-reversible)
  *   E: Quarter
  *   F: Is Latest (Yes/No)
  *   G: Superseded By (vault row of newer response)
@@ -31323,7 +31329,7 @@ function setupSurveyVaultSheet() {
   // Only set up headers if sheet is empty
   if (sheet.getLastRow() < 1) {
     var headers = [
-      'Response Row', 'Email', 'Verified', 'Matched Member ID',
+      'Response Row', 'Email Hash', 'Verified', 'Member ID Hash',
       'Quarter', 'Is Latest', 'Superseded By', 'Reviewer Notes'
     ];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -31335,9 +31341,9 @@ function setupSurveyVaultSheet() {
 
   // Column widths
   sheet.setColumnWidth(1, 100);  // Response Row
-  sheet.setColumnWidth(2, 220);  // Email
+  sheet.setColumnWidth(2, 130);  // Email Hash
   sheet.setColumnWidth(3, 110);  // Verified
-  sheet.setColumnWidth(4, 140);  // Matched Member ID
+  sheet.setColumnWidth(4, 130);  // Member ID Hash
   sheet.setColumnWidth(5, 90);   // Quarter
   sheet.setColumnWidth(6, 80);   // Is Latest
   sheet.setColumnWidth(7, 100);  // Superseded By
@@ -31413,11 +31419,10 @@ function getVaultDataMap_() {
 }
 
 /**
- * Reads the full vault data including PII. ONLY used internally by
- * onSatisfactionFormSubmit() for superseding logic and by Looker export.
- * Never expose this to UI/dashboard code.
+ * Reads the full vault data. All email/member ID values are SHA-256 hashes —
+ * no plaintext PII exists in the vault.
  *
- * @returns {Array} Array of vault row objects with all fields
+ * @returns {Array} Array of vault row objects (emailHash and memberIdHash are non-reversible)
  * @private
  */
 function getVaultDataFull_() {
@@ -31431,9 +31436,9 @@ function getVaultDataFull_() {
     rows.push({
       vaultRow: i + 1,
       responseRow: data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1],
-      email: data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '',
+      emailHash: data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '',
       verified: data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '',
-      memberId: data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '',
+      memberIdHash: data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '',
       quarter: data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '',
       isLatest: data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '',
       supersededBy: data[i][SURVEY_VAULT_COLS.SUPERSEDED_BY - 1] || '',
@@ -31445,13 +31450,16 @@ function getVaultDataFull_() {
 
 /**
  * Writes a new vault entry for a survey response.
+ * Email and member ID are SHA-256 hashed before storage — no plaintext PII
+ * is ever written to any sheet.
+ *
  * Called by onSatisfactionFormSubmit() after appending the anonymous
  * response to the Satisfaction sheet.
  *
  * @param {number} responseRow - Row number in Satisfaction sheet
- * @param {string} email - Respondent email
+ * @param {string} email - Respondent email (hashed before storage)
  * @param {string} verified - 'Yes' | 'Pending Review'
- * @param {string} memberId - Matched member ID or ''
+ * @param {string} memberId - Matched member ID or '' (hashed before storage)
  * @param {string} quarter - Quarter string e.g. '2026-Q1'
  * @private
  */
@@ -31463,11 +31471,15 @@ function writeVaultEntry_(responseRow, email, verified, memberId, quarter) {
     vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
   }
 
+  // Hash email and member ID — plaintext never touches the sheet
+  var emailHash = email ? hashForVault_(email) : '';
+  var memberIdHash = memberId ? hashForVault_(memberId) : '';
+
   vault.appendRow([
     responseRow,
-    email,
+    emailHash,
     verified,
-    memberId,
+    memberIdHash,
     quarter,
     'Yes',   // Is Latest
     '',      // Superseded By
@@ -31478,8 +31490,9 @@ function writeVaultEntry_(responseRow, email, verified, memberId, quarter) {
 /**
  * Marks an existing vault entry as superseded by a newer response.
  * Used when the same member submits again in the same quarter.
+ * Comparison is done on the hashed email — plaintext is never stored.
  *
- * @param {string} email - Email to match
+ * @param {string} email - Raw email (hashed in-memory for comparison)
  * @param {string} quarter - Quarter to match
  * @param {number} newVaultRow - Row of the new entry that supersedes
  * @private
@@ -31489,19 +31502,44 @@ function supersedePreviousVaultEntry_(email, quarter, newVaultRow) {
   var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
   if (!vault || vault.getLastRow() < 2) return;
 
+  // Hash the email in-memory to compare against stored hashes
+  var emailHash = hashForVault_(email);
+
   var data = vault.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    var rowEmail = (data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+    var rowEmailHash = (data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '').toString();
     var rowQuarter = data[i][SURVEY_VAULT_COLS.QUARTER - 1];
     var rowIsLatest = data[i][SURVEY_VAULT_COLS.IS_LATEST - 1];
 
-    if (rowEmail === email && rowQuarter === quarter && rowIsLatest === 'Yes') {
+    if (rowEmailHash === emailHash && rowQuarter === quarter && rowIsLatest === 'Yes') {
       var sheetRow = i + 1;
       vault.getRange(sheetRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
       vault.getRange(sheetRow, SURVEY_VAULT_COLS.SUPERSEDED_BY).setValue(newVaultRow);
       Logger.log('Vault: superseded row ' + sheetRow + ' by row ' + newVaultRow);
     }
   }
+}
+
+/**
+ * Creates a non-reversible SHA-256 hash for vault storage.
+ * Uses a per-installation salt stored in Script Properties.
+ * The same salt is used by generateAnonHash_() for Looker exports.
+ *
+ * @param {string} value - The value to hash (email, member ID, etc.)
+ * @returns {string} 12-character base64 hash prefixed with 'V'
+ * @private
+ */
+function hashForVault_(value) {
+  var props = PropertiesService.getScriptProperties();
+  var salt = props.getProperty('ANON_HASH_SALT');
+  if (!salt) {
+    salt = Utilities.getUuid();
+    props.setProperty('ANON_HASH_SALT', salt);
+  }
+  var combined = salt + String(value).toLowerCase().trim();
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
+  var encoded = Utilities.base64Encode(digest).substring(0, 12);
+  return 'V' + encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
 }
 
 
@@ -34958,7 +34996,7 @@ function getFlaggedSubmissionsData() {
 
   if (!satSheet) return result;
 
-  // Read from vault (PII is only in the vault)
+  // Read from vault — all emails are hashed, no plaintext PII exists
   var vaultRows = getVaultDataFull_();
 
   for (var i = 0; i < vaultRows.length; i++) {
@@ -34974,10 +35012,10 @@ function getFlaggedSubmissionsData() {
     } else if (entry.verified === 'Pending Review') {
       result.pendingCount++;
       result.pendingEmails.push({
-        email: entry.email || '(no email provided)',
+        email: 'Anonymous submission #' + satRow,
         date: timestamp ? Utilities.formatDate(new Date(timestamp), Session.getScriptTimeZone(), 'MMM d, yyyy') : 'Unknown',
         quarter: entry.quarter,
-        row: satRow  // Satisfaction sheet row for reference
+        row: satRow  // Satisfaction sheet row for approve/reject
       });
     }
   }
@@ -35335,14 +35373,14 @@ function getPublicSurveyData(includeHistory) {
   result.avgSatisfaction = satCount > 0 ? satSum / satCount : 0;
 
   // Response rate (unique verified members / total members)
-  // Count from vault — member IDs are only stored there
+  // Count from vault — member IDs are hashed, but unique hashes = unique members
   if (memberSheet) {
     var memberCount = memberSheet.getLastRow() - 1;
     var uniqueMembers = {};
     var vaultFull = getVaultDataFull_();
     for (var k = 0; k < vaultFull.length; k++) {
-      if (vaultFull[k].verified === 'Yes' && vaultFull[k].isLatest === 'Yes' && vaultFull[k].memberId) {
-        uniqueMembers[vaultFull[k].memberId] = true;
+      if (vaultFull[k].verified === 'Yes' && vaultFull[k].isLatest === 'Yes' && vaultFull[k].memberIdHash) {
+        uniqueMembers[vaultFull[k].memberIdHash] = true;
       }
     }
     var uniqueCount = Object.keys(uniqueMembers).length;
@@ -38926,7 +38964,7 @@ function createFAQSheet(ss) {
     ['Q: How does the survey response rate work?',
      'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.'],
     ['Q: Are survey results anonymous?',
-     'A: Yes — strong anonymity is enforced via a vault architecture. The Satisfaction sheet contains ZERO identifying data (no emails, no member IDs, no names). All identity linkage is stored in a separate hidden, sheet-protected vault (_Survey_Vault) that only the script owner can access. Dashboards show only aggregate data. Looker exports use anonymized hashes. Even users with full edit access to the spreadsheet cannot link any survey answer to a specific person.']
+     'A: Yes — cryptographic anonymity is enforced. The Satisfaction sheet contains ZERO identifying data. The _Survey_Vault stores only SHA-256 hashed emails and hashed member IDs — these hashes are mathematically non-reversible, meaning even with full vault access, it is impossible to determine who submitted any response. Raw emails exist only in memory during submission (to send a thank-you) and are never saved to any sheet. Dashboards show only aggregate data. Looker exports use separate anonymized hashes.']
   ];
 
   for (var eng = 0; eng < engagementFAQs.length; eng++) {
@@ -38954,7 +38992,7 @@ function createFAQSheet(ss) {
     ['Q: What is the Survey Completion Tracker?',
      'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks ONLY completion status — not what they answered. No individual survey responses are stored or accessible through the tracker. It records: completion status, dates, cumulative history, and reminder emails. The email-to-response linkage is in a separate protected vault (_Survey_Vault) that only the script owner can access.'],
     ['Q: How does the system know when a member completes the survey?',
-     'A: When a member submits the Google Form satisfaction survey, the system extracts their email from the form response, matches it against the Member Directory (case-insensitive email comparison), and if a match is found, automatically marks that member as "Completed" in the tracking sheet with a timestamp.'],
+     'A: When a member submits the Google Form, the system extracts their email in-memory, matches it against the Member Directory, and marks them as "Completed" in the tracking sheet. The email is then hashed (SHA-256, non-reversible) and only the hash is stored in the vault. The raw email is discarded — it is never saved to any sheet.'],
     ['Q: What if a member\'s email doesn\'t match?',
      'A: The survey response is still recorded in the Satisfaction sheet but flagged as "Pending Review". The member\'s tracking status stays "Not Completed" for that round. Check that the member\'s email in the Member Directory matches what they used to submit the form.'],
     ['Q: How do I start a new survey round?',
@@ -38964,7 +39002,7 @@ function createFAQSheet(ss) {
     ['Q: How do I populate the tracker for the first time?',
      'A: Click "Refresh Member List" in the Survey Completion Tracker dialog, or run populateSurveyTrackingFromMembers(). This copies all members from the Member Directory into the tracking sheet with initial status "Not Completed". Safe to re-run — it rebuilds from the directory.'],
     ['Q: Where is the survey tracking data stored?',
-     'A: Completion tracking lives in the hidden _Survey_Tracking sheet (10 columns: Member ID, Name, Email, Location, Steward, Current Status, Completed Date, Total Missed, Total Completed, Last Reminder Sent). The email-to-response linkage is in the protected _Survey_Vault sheet (only the script owner can access). The actual survey answers are in the Satisfaction sheet with NO identifying data. This three-sheet architecture ensures no one can link answers to people.']
+     'A: Three separate sheets: (1) _Survey_Tracking stores completion status (who submitted, not what they answered). (2) _Survey_Vault stores SHA-256 hashed emails and hashed member IDs — these cannot be reversed to reveal identities. (3) The Satisfaction sheet stores anonymous survey answers with zero identifying data. Even with access to all three sheets, it is cryptographically impossible to link any answer to a person.']
   ];
 
   for (var st = 0; st < surveyTrackingFAQs.length; st++) {

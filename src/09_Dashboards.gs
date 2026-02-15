@@ -3447,7 +3447,7 @@ function getFlaggedSubmissionsData() {
 
   if (!satSheet) return result;
 
-  // Read from vault (PII is only in the vault)
+  // Read from vault — all emails are hashed, no plaintext PII exists
   var vaultRows = getVaultDataFull_();
 
   for (var i = 0; i < vaultRows.length; i++) {
@@ -3463,10 +3463,10 @@ function getFlaggedSubmissionsData() {
     } else if (entry.verified === 'Pending Review') {
       result.pendingCount++;
       result.pendingEmails.push({
-        email: entry.email || '(no email provided)',
+        email: 'Anonymous submission #' + satRow,
         date: timestamp ? Utilities.formatDate(new Date(timestamp), Session.getScriptTimeZone(), 'MMM d, yyyy') : 'Unknown',
         quarter: entry.quarter,
-        row: satRow  // Satisfaction sheet row for reference
+        row: satRow  // Satisfaction sheet row for approve/reject
       });
     }
   }
@@ -3824,14 +3824,14 @@ function getPublicSurveyData(includeHistory) {
   result.avgSatisfaction = satCount > 0 ? satSum / satCount : 0;
 
   // Response rate (unique verified members / total members)
-  // Count from vault — member IDs are only stored there
+  // Count from vault — member IDs are hashed, but unique hashes = unique members
   if (memberSheet) {
     var memberCount = memberSheet.getLastRow() - 1;
     var uniqueMembers = {};
     var vaultFull = getVaultDataFull_();
     for (var k = 0; k < vaultFull.length; k++) {
-      if (vaultFull[k].verified === 'Yes' && vaultFull[k].isLatest === 'Yes' && vaultFull[k].memberId) {
-        uniqueMembers[vaultFull[k].memberId] = true;
+      if (vaultFull[k].verified === 'Yes' && vaultFull[k].isLatest === 'Yes' && vaultFull[k].memberIdHash) {
+        uniqueMembers[vaultFull[k].memberIdHash] = true;
       }
     }
     var uniqueCount = Object.keys(uniqueMembers).length;

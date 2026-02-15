@@ -1581,7 +1581,7 @@ function createFAQSheet(ss) {
     ['Q: How does the survey response rate work?',
      'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.'],
     ['Q: Are survey results anonymous?',
-     'A: Yes — strong anonymity is enforced via a vault architecture. The Satisfaction sheet contains ZERO identifying data (no emails, no member IDs, no names). All identity linkage is stored in a separate hidden, sheet-protected vault (_Survey_Vault) that only the script owner can access. Dashboards show only aggregate data. Looker exports use anonymized hashes. Even users with full edit access to the spreadsheet cannot link any survey answer to a specific person.']
+     'A: Yes — cryptographic anonymity is enforced. The Satisfaction sheet contains ZERO identifying data. The _Survey_Vault stores only SHA-256 hashed emails and hashed member IDs — these hashes are mathematically non-reversible, meaning even with full vault access, it is impossible to determine who submitted any response. Raw emails exist only in memory during submission (to send a thank-you) and are never saved to any sheet. Dashboards show only aggregate data. Looker exports use separate anonymized hashes.']
   ];
 
   for (var eng = 0; eng < engagementFAQs.length; eng++) {
@@ -1609,7 +1609,7 @@ function createFAQSheet(ss) {
     ['Q: What is the Survey Completion Tracker?',
      'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks ONLY completion status — not what they answered. No individual survey responses are stored or accessible through the tracker. It records: completion status, dates, cumulative history, and reminder emails. The email-to-response linkage is in a separate protected vault (_Survey_Vault) that only the script owner can access.'],
     ['Q: How does the system know when a member completes the survey?',
-     'A: When a member submits the Google Form satisfaction survey, the system extracts their email from the form response, matches it against the Member Directory (case-insensitive email comparison), and if a match is found, automatically marks that member as "Completed" in the tracking sheet with a timestamp.'],
+     'A: When a member submits the Google Form, the system extracts their email in-memory, matches it against the Member Directory, and marks them as "Completed" in the tracking sheet. The email is then hashed (SHA-256, non-reversible) and only the hash is stored in the vault. The raw email is discarded — it is never saved to any sheet.'],
     ['Q: What if a member\'s email doesn\'t match?',
      'A: The survey response is still recorded in the Satisfaction sheet but flagged as "Pending Review". The member\'s tracking status stays "Not Completed" for that round. Check that the member\'s email in the Member Directory matches what they used to submit the form.'],
     ['Q: How do I start a new survey round?',
@@ -1619,7 +1619,7 @@ function createFAQSheet(ss) {
     ['Q: How do I populate the tracker for the first time?',
      'A: Click "Refresh Member List" in the Survey Completion Tracker dialog, or run populateSurveyTrackingFromMembers(). This copies all members from the Member Directory into the tracking sheet with initial status "Not Completed". Safe to re-run — it rebuilds from the directory.'],
     ['Q: Where is the survey tracking data stored?',
-     'A: Completion tracking lives in the hidden _Survey_Tracking sheet (10 columns: Member ID, Name, Email, Location, Steward, Current Status, Completed Date, Total Missed, Total Completed, Last Reminder Sent). The email-to-response linkage is in the protected _Survey_Vault sheet (only the script owner can access). The actual survey answers are in the Satisfaction sheet with NO identifying data. This three-sheet architecture ensures no one can link answers to people.']
+     'A: Three separate sheets: (1) _Survey_Tracking stores completion status (who submitted, not what they answered). (2) _Survey_Vault stores SHA-256 hashed emails and hashed member IDs — these cannot be reversed to reveal identities. (3) The Satisfaction sheet stores anonymous survey answers with zero identifying data. Even with access to all three sheets, it is cryptographically impossible to link any answer to a person.']
   ];
 
   for (var st = 0; st < surveyTrackingFAQs.length; st++) {

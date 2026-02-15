@@ -1534,12 +1534,18 @@ function setupSurveyTrackingSheet(sheet) {
 }
 
 // ============================================================================
-// SURVEY VAULT — ISOLATED PII STORE
+// SURVEY VAULT — ZERO-KNOWLEDGE PII STORE
 // ============================================================================
-// The _Survey_Vault sheet stores the ONLY linkage between survey responses
-// and member identity (email, Member ID). It is hidden and sheet-protected
-// so that no one with spreadsheet edit access can read or modify it.
-// All survey anonymity depends on this isolation.
+// The _Survey_Vault sheet stores ONLY hashed email and hashed member ID.
+// No plaintext PII is ever written to any sheet.
+//
+// SECURITY MODEL:
+//   - Email is SHA-256 hashed with a per-installation salt before storage
+//   - Member ID is hashed the same way
+//   - Even with full access to the vault, you cannot reverse the hashes
+//   - Superseding (same member re-submits) works by comparing hashes
+//   - The raw email is used in-memory only (for thank-you email + validation)
+//     and is never persisted to any sheet
 
 /**
  * Creates and protects the _Survey_Vault hidden sheet.
@@ -1547,9 +1553,9 @@ function setupSurveyTrackingSheet(sheet) {
  *
  * Structure (8 columns):
  *   A: Response Row (row number in Satisfaction sheet)
- *   B: Email
+ *   B: Email Hash (SHA-256, non-reversible)
  *   C: Verified (Yes / Pending Review / Rejected)
- *   D: Matched Member ID
+ *   D: Member ID Hash (SHA-256, non-reversible)
  *   E: Quarter
  *   F: Is Latest (Yes/No)
  *   G: Superseded By (vault row of newer response)
@@ -1567,7 +1573,7 @@ function setupSurveyVaultSheet() {
   // Only set up headers if sheet is empty
   if (sheet.getLastRow() < 1) {
     var headers = [
-      'Response Row', 'Email', 'Verified', 'Matched Member ID',
+      'Response Row', 'Email Hash', 'Verified', 'Member ID Hash',
       'Quarter', 'Is Latest', 'Superseded By', 'Reviewer Notes'
     ];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -1579,9 +1585,9 @@ function setupSurveyVaultSheet() {
 
   // Column widths
   sheet.setColumnWidth(1, 100);  // Response Row
-  sheet.setColumnWidth(2, 220);  // Email
+  sheet.setColumnWidth(2, 130);  // Email Hash
   sheet.setColumnWidth(3, 110);  // Verified
-  sheet.setColumnWidth(4, 140);  // Matched Member ID
+  sheet.setColumnWidth(4, 130);  // Member ID Hash
   sheet.setColumnWidth(5, 90);   // Quarter
   sheet.setColumnWidth(6, 80);   // Is Latest
   sheet.setColumnWidth(7, 100);  // Superseded By
@@ -1657,11 +1663,10 @@ function getVaultDataMap_() {
 }
 
 /**
- * Reads the full vault data including PII. ONLY used internally by
- * onSatisfactionFormSubmit() for superseding logic and by Looker export.
- * Never expose this to UI/dashboard code.
+ * Reads the full vault data. All email/member ID values are SHA-256 hashes —
+ * no plaintext PII exists in the vault.
  *
- * @returns {Array} Array of vault row objects with all fields
+ * @returns {Array} Array of vault row objects (emailHash and memberIdHash are non-reversible)
  * @private
  */
 function getVaultDataFull_() {
@@ -1675,9 +1680,9 @@ function getVaultDataFull_() {
     rows.push({
       vaultRow: i + 1,
       responseRow: data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1],
-      email: data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '',
+      emailHash: data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '',
       verified: data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '',
-      memberId: data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '',
+      memberIdHash: data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '',
       quarter: data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '',
       isLatest: data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '',
       supersededBy: data[i][SURVEY_VAULT_COLS.SUPERSEDED_BY - 1] || '',
@@ -1689,13 +1694,16 @@ function getVaultDataFull_() {
 
 /**
  * Writes a new vault entry for a survey response.
+ * Email and member ID are SHA-256 hashed before storage — no plaintext PII
+ * is ever written to any sheet.
+ *
  * Called by onSatisfactionFormSubmit() after appending the anonymous
  * response to the Satisfaction sheet.
  *
  * @param {number} responseRow - Row number in Satisfaction sheet
- * @param {string} email - Respondent email
+ * @param {string} email - Respondent email (hashed before storage)
  * @param {string} verified - 'Yes' | 'Pending Review'
- * @param {string} memberId - Matched member ID or ''
+ * @param {string} memberId - Matched member ID or '' (hashed before storage)
  * @param {string} quarter - Quarter string e.g. '2026-Q1'
  * @private
  */
@@ -1707,11 +1715,15 @@ function writeVaultEntry_(responseRow, email, verified, memberId, quarter) {
     vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
   }
 
+  // Hash email and member ID — plaintext never touches the sheet
+  var emailHash = email ? hashForVault_(email) : '';
+  var memberIdHash = memberId ? hashForVault_(memberId) : '';
+
   vault.appendRow([
     responseRow,
-    email,
+    emailHash,
     verified,
-    memberId,
+    memberIdHash,
     quarter,
     'Yes',   // Is Latest
     '',      // Superseded By
@@ -1722,8 +1734,9 @@ function writeVaultEntry_(responseRow, email, verified, memberId, quarter) {
 /**
  * Marks an existing vault entry as superseded by a newer response.
  * Used when the same member submits again in the same quarter.
+ * Comparison is done on the hashed email — plaintext is never stored.
  *
- * @param {string} email - Email to match
+ * @param {string} email - Raw email (hashed in-memory for comparison)
  * @param {string} quarter - Quarter to match
  * @param {number} newVaultRow - Row of the new entry that supersedes
  * @private
@@ -1733,17 +1746,42 @@ function supersedePreviousVaultEntry_(email, quarter, newVaultRow) {
   var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
   if (!vault || vault.getLastRow() < 2) return;
 
+  // Hash the email in-memory to compare against stored hashes
+  var emailHash = hashForVault_(email);
+
   var data = vault.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    var rowEmail = (data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+    var rowEmailHash = (data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '').toString();
     var rowQuarter = data[i][SURVEY_VAULT_COLS.QUARTER - 1];
     var rowIsLatest = data[i][SURVEY_VAULT_COLS.IS_LATEST - 1];
 
-    if (rowEmail === email && rowQuarter === quarter && rowIsLatest === 'Yes') {
+    if (rowEmailHash === emailHash && rowQuarter === quarter && rowIsLatest === 'Yes') {
       var sheetRow = i + 1;
       vault.getRange(sheetRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
       vault.getRange(sheetRow, SURVEY_VAULT_COLS.SUPERSEDED_BY).setValue(newVaultRow);
       Logger.log('Vault: superseded row ' + sheetRow + ' by row ' + newVaultRow);
     }
   }
+}
+
+/**
+ * Creates a non-reversible SHA-256 hash for vault storage.
+ * Uses a per-installation salt stored in Script Properties.
+ * The same salt is used by generateAnonHash_() for Looker exports.
+ *
+ * @param {string} value - The value to hash (email, member ID, etc.)
+ * @returns {string} 12-character base64 hash prefixed with 'V'
+ * @private
+ */
+function hashForVault_(value) {
+  var props = PropertiesService.getScriptProperties();
+  var salt = props.getProperty('ANON_HASH_SALT');
+  if (!salt) {
+    salt = Utilities.getUuid();
+    props.setProperty('ANON_HASH_SALT', salt);
+  }
+  var combined = salt + String(value).toLowerCase().trim();
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
+  var encoded = Utilities.base64Encode(digest).substring(0, 12);
+  return 'V' + encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
 }

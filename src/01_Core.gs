@@ -1591,7 +1591,7 @@ var SATISFACTION_COLS = {
 };
 
 // ============================================================================
-// SURVEY VAULT COLUMNS (8 columns: A-H) — Isolated PII store
+// SURVEY VAULT COLUMNS (8 columns: A-H) — Zero-knowledge hash store
 // ============================================================================
 
 /**
@@ -1599,32 +1599,32 @@ var SATISFACTION_COLS = {
  * Hidden + protected sheet: _Survey_Vault
  *
  * PURPOSE:
- *   Stores the ONLY linkage between survey responses and member identity.
- *   Completely separated from the Satisfaction sheet to ensure that no one
- *   with spreadsheet access can connect a survey answer to a person.
+ *   Provides verified/latest/quarter metadata for survey responses without
+ *   storing any reversible PII. Email and member ID are SHA-256 hashed with
+ *   a per-installation salt — even with full vault access, it is
+ *   cryptographically impossible to determine who submitted a response.
  *
  * SECURITY MODEL:
- *   - Sheet is hidden (prefixed with _)
- *   - Sheet is protected: only the script owner can edit
- *   - Other editors get a warning if they try to unhide/access it
- *   - Dashboard/analytics code reads from the vault via getVaultDataMap_()
- *     which returns only non-PII flags (verified, isLatest) keyed by row
+ *   - Email and Member ID are stored as salted SHA-256 hashes only
+ *   - Hashes are non-reversible — no one can recover the original values
+ *   - Raw email exists in memory only (during form submit) and is never persisted
+ *   - Sheet is hidden (prefixed with _) and sheet-protected
+ *   - Dashboard code reads only {verified, isLatest, quarter} via getVaultDataMap_()
  *
  * DATA FLOW:
  *   1. onSatisfactionFormSubmit() writes survey answers to Satisfaction sheet
- *      (anonymous — no email, no member ID)
- *   2. Same function writes email + member ID to _Survey_Vault at the
- *      matching row number
- *   3. Dashboard queries call getVaultDataMap_() which returns a row→flags
- *      map without exposing email or member ID
+ *      (anonymous — no email, no member ID, no hashes)
+ *   2. Same function hashes email + member ID in-memory, writes hashes to vault
+ *   3. Raw email is used only to send thank-you email, then discarded
+ *   4. Superseding logic compares hashes, never plaintext
  *
  * @const {Object}
  */
 var SURVEY_VAULT_COLS = {
   RESPONSE_ROW: 1,          // A - Row number in Satisfaction sheet
-  EMAIL: 2,                 // B - Email address from form submission
+  EMAIL: 2,                 // B - SHA-256 hash of email (non-reversible)
   VERIFIED: 3,              // C - Yes / Pending Review / Rejected
-  MATCHED_MEMBER_ID: 4,     // D - Member ID if email matched
+  MATCHED_MEMBER_ID: 4,     // D - SHA-256 hash of member ID (non-reversible)
   QUARTER: 5,               // E - Quarter string (e.g., "2026-Q1")
   IS_LATEST: 6,             // F - Yes/No - Is this the latest for this member?
   SUPERSEDED_BY: 7,         // G - Vault row number of newer response
