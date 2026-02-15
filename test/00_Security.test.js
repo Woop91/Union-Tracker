@@ -309,3 +309,102 @@ describe('ACCESS_CONTROL', () => {
     expect(ACCESS_CONTROL.ALLOWED_PAGES).toContain('portal');
   });
 });
+
+// ============================================================================
+// SECURITY_SEVERITY
+// ============================================================================
+
+describe('SECURITY_SEVERITY', () => {
+  test('defines all severity levels', () => {
+    expect(SECURITY_SEVERITY.CRITICAL).toBe('CRITICAL');
+    expect(SECURITY_SEVERITY.HIGH).toBe('HIGH');
+    expect(SECURITY_SEVERITY.MEDIUM).toBe('MEDIUM');
+    expect(SECURITY_SEVERITY.LOW).toBe('LOW');
+  });
+});
+
+// ============================================================================
+// recordSecurityEvent
+// ============================================================================
+
+describe('recordSecurityEvent', () => {
+  beforeEach(() => {
+    global.logAuditEvent = jest.fn();
+  });
+
+  test('is a function', () => {
+    expect(typeof recordSecurityEvent).toBe('function');
+  });
+
+  test('logs audit event for any severity', () => {
+    recordSecurityEvent('TEST_EVENT', SECURITY_SEVERITY.LOW, 'Test description', { foo: 'bar' });
+    expect(logAuditEvent).toHaveBeenCalledWith('SECURITY_TEST_EVENT', expect.objectContaining({
+      _severity: 'LOW',
+      _description: 'Test description',
+      foo: 'bar'
+    }));
+  });
+
+  test('calls sendSecurityAlertEmail_ for CRITICAL events', () => {
+    // MailApp.sendEmail is mocked — just verify it doesn't throw
+    expect(() => {
+      recordSecurityEvent('CRITICAL_TEST', SECURITY_SEVERITY.CRITICAL, 'Critical event', {});
+    }).not.toThrow();
+  });
+
+  test('queues HIGH events for digest', () => {
+    recordSecurityEvent('HIGH_TEST', SECURITY_SEVERITY.HIGH, 'High event', { detail: 'x' });
+
+    // Verify event was queued in properties
+    const props = PropertiesService.getScriptProperties();
+    const queue = JSON.parse(props.getProperty('SECURITY_DIGEST_QUEUE') || '[]');
+    expect(queue.length).toBeGreaterThan(0);
+    expect(queue[queue.length - 1].event).toBe('HIGH_TEST');
+  });
+
+  test('does not queue LOW or MEDIUM events for digest', () => {
+    // Clear any existing queue
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty('SECURITY_DIGEST_QUEUE', '[]');
+
+    recordSecurityEvent('LOW_TEST', SECURITY_SEVERITY.LOW, 'Low event', {});
+    recordSecurityEvent('MED_TEST', SECURITY_SEVERITY.MEDIUM, 'Medium event', {});
+
+    const queue = JSON.parse(props.getProperty('SECURITY_DIGEST_QUEUE') || '[]');
+    expect(queue.length).toBe(0);
+  });
+});
+
+// ============================================================================
+// queueSecurityDigestEvent_ and sendDailySecurityDigest
+// ============================================================================
+
+describe('sendDailySecurityDigest', () => {
+  test('is a function', () => {
+    expect(typeof sendDailySecurityDigest).toBe('function');
+  });
+
+  test('does not throw when queue is empty', () => {
+    expect(() => sendDailySecurityDigest()).not.toThrow();
+  });
+
+  test('does not send email when queue is empty', () => {
+    MailApp.sendEmail.mockClear();
+    sendDailySecurityDigest();
+    expect(MailApp.sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+// ============================================================================
+// showSecurityStatusDialog
+// ============================================================================
+
+describe('showSecurityStatusDialog', () => {
+  test('is a function', () => {
+    expect(typeof showSecurityStatusDialog).toBe('function');
+  });
+
+  test('does not throw when called', () => {
+    expect(() => showSecurityStatusDialog()).not.toThrow();
+  });
+});

@@ -468,6 +468,13 @@ function recordFailedPINAttempt(memberId) {
       });
     }
 
+    // Alert admin of potential brute force attempt
+    if (typeof recordSecurityEvent === 'function') {
+      recordSecurityEvent('PIN_BRUTE_FORCE', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.HIGH : 'HIGH',
+        'Member account locked after ' + attempts + ' failed PIN attempts (possible brute force)',
+        { memberId: memberId, attempts: attempts, lockoutMinutes: PIN_CONFIG.LOCKOUT_MINUTES });
+    }
+
     return { attemptsRemaining: 0, isNowLocked: true };
   }
 
