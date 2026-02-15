@@ -2089,7 +2089,7 @@ function getTestFunctionRegistry() {
 // ==================== VALIDATION FRAMEWORK ====================
 
 var VALIDATION_PATTERNS = {
-  EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  EMAIL: /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   PHONE_US: /^[\+]?1?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$/,
   // ID format: M/G prefix + 2 chars from first name + 2 chars from last name + 3 random digits
   MEMBER_ID: /^M[A-Z]{4}\d{3}$/,      // e.g., MJOSM123 (M + John Smith + 123)
@@ -2108,9 +2108,13 @@ var VALIDATION_MESSAGES = {
 
 function validateEmailAddress(email) {
   if (!email || email.toString().trim() === '') return { valid: false, message: VALIDATION_MESSAGES.EMAIL_EMPTY };
+  // Handle Google Sheets auto-converting emails to Date or other types
+  if (email instanceof Date) return { valid: false, message: VALIDATION_MESSAGES.EMAIL_INVALID };
   var clean = email.toString().trim().toLowerCase();
+  // Remove invisible/zero-width characters that may be pasted in
+  clean = clean.replace(/[\u200B\u200C\u200D\uFEFF\u00A0]/g, '');
   if (!VALIDATION_PATTERNS.EMAIL.test(clean)) return { valid: false, message: VALIDATION_MESSAGES.EMAIL_INVALID };
-  var typos = { 'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'yaho.com': 'yahoo.com' };
+  var typos = { 'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com', 'gamil.com': 'gmail.com', 'gnail.com': 'gmail.com', 'hotmal.com': 'hotmail.com', 'outlok.com': 'outlook.com' };
   var domain = clean.split('@')[1];
   if (typos[domain]) return { valid: true, message: 'Did you mean ' + clean.split('@')[0] + '@' + typos[domain] + '?', suggestion: clean.split('@')[0] + '@' + typos[domain] };
   return { valid: true, message: 'Valid email' };

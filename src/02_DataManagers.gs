@@ -334,7 +334,7 @@ function syncMemberGrievanceData() {
 /**
  * Generates missing Member IDs for all members without one
  * Uses unit-based prefixes from COMMAND_CONFIG or Config sheet
- * Format: UNIT_CODE-SEQUENCE-H (e.g., MS-101-H)
+ * Format: UNIT_CODE-NNNNN-H (e.g., MS-48271-H) with unique random numbers
  */
 function generateMissingMemberIDs() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -347,6 +347,14 @@ function generateMissingMemberIDs() {
 
   var data = sheet.getDataRange().getValues();
   var unitCodes = getUnitCodes_();
+
+  // Collect all existing IDs into a set for uniqueness checks
+  var existingIds = {};
+  for (var j = 1; j < data.length; j++) {
+    var id = data[j][MEMBER_COLS.MEMBER_ID - 1];
+    if (id) existingIds[id] = true;
+  }
+
   var countAdded = 0;
 
   for (var i = 1; i < data.length; i++) {
@@ -356,9 +364,9 @@ function generateMissingMemberIDs() {
     // If ID is blank but member has data
     if (!currentId && (unit || data[i][MEMBER_COLS.FIRST_NAME - 1])) {
       var prefix = unitCodes[unit] || 'GEN';
-      var nextNum = getNextSequence_(prefix, sheet);
-      var newId = prefix + '-' + nextNum + '-H';
+      var newId = generateUniqueId_(prefix, existingIds);
 
+      existingIds[newId] = true;
       sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
       countAdded++;
     }
@@ -366,6 +374,28 @@ function generateMissingMemberIDs() {
 
   ss.toast('Generated ' + countAdded + ' new Member IDs', COMMAND_CONFIG.SYSTEM_NAME, 5);
   return countAdded;
+}
+
+/**
+ * Generates a unique ID for a given prefix using random numbers
+ * Ensures no collision with any existing IDs
+ * @param {string} prefix - The unit code prefix (e.g., "MS")
+ * @param {Object} existingIds - Map of existing IDs for uniqueness check
+ * @returns {string} Unique member ID (e.g., "MS-48271-H")
+ * @private
+ */
+function generateUniqueId_(prefix, existingIds) {
+  var maxAttempts = 1000;
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    // Generate a random 5-digit number (10000-99999) for uniqueness
+    var randomNum = Math.floor(Math.random() * 90000) + 10000;
+    var candidateId = prefix + '-' + randomNum + '-H';
+    if (!existingIds[candidateId]) {
+      return candidateId;
+    }
+  }
+  // Fallback: use timestamp-based ID to guarantee uniqueness
+  return prefix + '-' + String(Date.now()).slice(-6) + '-H';
 }
 
 /**

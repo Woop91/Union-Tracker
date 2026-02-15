@@ -117,6 +117,10 @@ function onEdit(e) {
       applyAutoStyleToRow_(sheet, row);
       handleStageGateWorkflow_(e);
 
+      // Bidirectional sync: sync custom dropdown values back to Config
+      try { syncDropdownToConfig_(e, sheetName); }
+      catch (syncErr) { console.log('Config sync error: ' + syncErr.message); }
+
       if (typeof sortGrievanceLogByStatus === 'function') {
         try { sortGrievanceLogByStatus(); }
         catch (sortError) { Logger.log('Auto-sort error: ' + sortError.message); }
@@ -131,6 +135,10 @@ function onEdit(e) {
       // Member Directory edits
       handleMemberEdit(e);
       applyAutoStyleToRow_(sheet, row);
+
+      // Bidirectional sync: sync custom dropdown values back to Config
+      try { syncDropdownToConfig_(e, sheetName); }
+      catch (syncErr) { console.log('Config sync error: ' + syncErr.message); }
 
     } else if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
       // Case Checklist edits
@@ -706,6 +714,61 @@ function handleMemberEdit(e) {
       );
     }
   }
+}
+
+/**
+ * Bidirectional sync: when a user enters a custom value in a dropdown column,
+ * add it to the corresponding Config sheet column so it appears for future use.
+ * @param {Object} e - The edit event object
+ * @param {string} sheetName - Name of the edited sheet
+ * @private
+ */
+function syncDropdownToConfig_(e, sheetName) {
+  var newValue = e.value;
+  // Only handle single-cell text edits with a non-empty value
+  if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') return;
+  newValue = newValue.trim();
+
+  var col = e.range.getColumn();
+
+  // Map sheet columns to their corresponding Config column
+  var configCol = null;
+  if (sheetName === SHEETS.MEMBER_DIR) {
+    var memberToConfig = {};
+    memberToConfig[MEMBER_COLS.JOB_TITLE] = CONFIG_COLS.JOB_TITLES;
+    memberToConfig[MEMBER_COLS.WORK_LOCATION] = CONFIG_COLS.OFFICE_LOCATIONS;
+    memberToConfig[MEMBER_COLS.UNIT] = CONFIG_COLS.UNITS;
+    memberToConfig[MEMBER_COLS.SUPERVISOR] = CONFIG_COLS.SUPERVISORS;
+    memberToConfig[MEMBER_COLS.MANAGER] = CONFIG_COLS.MANAGERS;
+    configCol = memberToConfig[col];
+  } else if (sheetName === SHEETS.GRIEVANCE_LOG) {
+    var grievanceToConfig = {};
+    grievanceToConfig[GRIEVANCE_COLS.STATUS] = CONFIG_COLS.GRIEVANCE_STATUS;
+    grievanceToConfig[GRIEVANCE_COLS.CURRENT_STEP] = CONFIG_COLS.GRIEVANCE_STEP;
+    grievanceToConfig[GRIEVANCE_COLS.ISSUE_CATEGORY] = CONFIG_COLS.ISSUE_CATEGORY;
+    configCol = grievanceToConfig[col];
+  }
+
+  if (!configCol) return; // Not a synced dropdown column
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) return;
+
+  // Check if the value already exists in Config
+  var lastRow = configSheet.getLastRow();
+  var configRows = lastRow >= 3 ? lastRow - 2 : 0;
+  if (configRows > 0) {
+    var existingValues = configSheet.getRange(3, configCol, configRows, 1).getValues();
+    for (var i = 0; i < existingValues.length; i++) {
+      if (existingValues[i][0] && existingValues[i][0].toString().trim() === newValue) {
+        return; // Already exists, no need to add
+      }
+    }
+  }
+
+  // Add the new value to the first empty row in the Config column
+  addToConfigDropdown_(configCol, newValue);
 }
 
 /**

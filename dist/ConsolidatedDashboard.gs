@@ -4286,7 +4286,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2663 lines)
+// SOURCE: 02_DataManagers.gs (2693 lines)
 // ============================================================================
 
 /**
@@ -4625,7 +4625,7 @@ function syncMemberGrievanceData() {
 /**
  * Generates missing Member IDs for all members without one
  * Uses unit-based prefixes from COMMAND_CONFIG or Config sheet
- * Format: UNIT_CODE-SEQUENCE-H (e.g., MS-101-H)
+ * Format: UNIT_CODE-NNNNN-H (e.g., MS-48271-H) with unique random numbers
  */
 function generateMissingMemberIDs() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4638,6 +4638,14 @@ function generateMissingMemberIDs() {
 
   var data = sheet.getDataRange().getValues();
   var unitCodes = getUnitCodes_();
+
+  // Collect all existing IDs into a set for uniqueness checks
+  var existingIds = {};
+  for (var j = 1; j < data.length; j++) {
+    var id = data[j][MEMBER_COLS.MEMBER_ID - 1];
+    if (id) existingIds[id] = true;
+  }
+
   var countAdded = 0;
 
   for (var i = 1; i < data.length; i++) {
@@ -4647,9 +4655,9 @@ function generateMissingMemberIDs() {
     // If ID is blank but member has data
     if (!currentId && (unit || data[i][MEMBER_COLS.FIRST_NAME - 1])) {
       var prefix = unitCodes[unit] || 'GEN';
-      var nextNum = getNextSequence_(prefix, sheet);
-      var newId = prefix + '-' + nextNum + '-H';
+      var newId = generateUniqueId_(prefix, existingIds);
 
+      existingIds[newId] = true;
       sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
       countAdded++;
     }
@@ -4657,6 +4665,28 @@ function generateMissingMemberIDs() {
 
   ss.toast('Generated ' + countAdded + ' new Member IDs', COMMAND_CONFIG.SYSTEM_NAME, 5);
   return countAdded;
+}
+
+/**
+ * Generates a unique ID for a given prefix using random numbers
+ * Ensures no collision with any existing IDs
+ * @param {string} prefix - The unit code prefix (e.g., "MS")
+ * @param {Object} existingIds - Map of existing IDs for uniqueness check
+ * @returns {string} Unique member ID (e.g., "MS-48271-H")
+ * @private
+ */
+function generateUniqueId_(prefix, existingIds) {
+  var maxAttempts = 1000;
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    // Generate a random 5-digit number (10000-99999) for uniqueness
+    var randomNum = Math.floor(Math.random() * 90000) + 10000;
+    var candidateId = prefix + '-' + randomNum + '-H';
+    if (!existingIds[candidateId]) {
+      return candidateId;
+    }
+  }
+  // Fallback: use timestamp-based ID to guarantee uniqueness
+  return prefix + '-' + String(Date.now()).slice(-6) + '-H';
 }
 
 /**
@@ -23424,7 +23454,7 @@ var Assert = {
 // ==================== VALIDATION FRAMEWORK ====================
 
 var VALIDATION_PATTERNS = {
-  EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  EMAIL: /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   PHONE_US: /^[\+]?1?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$/,
   // ID format: M/G prefix + 2 chars from first name + 2 chars from last name + 3 random digits
   MEMBER_ID: /^M[A-Z]{4}\d{3}$/,      // e.g., MJOSM123 (M + John Smith + 123)
@@ -23454,7 +23484,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2947 lines)
+// SOURCE: 07_DevTools.gs (2951 lines)
 // ============================================================================
 
 /**
@@ -25548,7 +25578,7 @@ function getTestFunctionRegistry() {
 // ==================== VALIDATION FRAMEWORK ====================
 
 var VALIDATION_PATTERNS = {
-  EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+  EMAIL: /^[^\s@]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
   PHONE_US: /^[\+]?1?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$/,
   // ID format: M/G prefix + 2 chars from first name + 2 chars from last name + 3 random digits
   MEMBER_ID: /^M[A-Z]{4}\d{3}$/,      // e.g., MJOSM123 (M + John Smith + 123)
@@ -25567,9 +25597,13 @@ var VALIDATION_MESSAGES = {
 
 function validateEmailAddress(email) {
   if (!email || email.toString().trim() === '') return { valid: false, message: VALIDATION_MESSAGES.EMAIL_EMPTY };
+  // Handle Google Sheets auto-converting emails to Date or other types
+  if (email instanceof Date) return { valid: false, message: VALIDATION_MESSAGES.EMAIL_INVALID };
   var clean = email.toString().trim().toLowerCase();
+  // Remove invisible/zero-width characters that may be pasted in
+  clean = clean.replace(/[\u200B\u200C\u200D\uFEFF\u00A0]/g, '');
   if (!VALIDATION_PATTERNS.EMAIL.test(clean)) return { valid: false, message: VALIDATION_MESSAGES.EMAIL_INVALID };
-  var typos = { 'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'yaho.com': 'yahoo.com' };
+  var typos = { 'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com', 'gamil.com': 'gmail.com', 'gnail.com': 'gmail.com', 'hotmal.com': 'hotmail.com', 'outlok.com': 'outlook.com' };
   var domain = clean.split('@')[1];
   if (typos[domain]) return { valid: true, message: 'Did you mean ' + clean.split('@')[0] + '@' + typos[domain] + '?', suggestion: clean.split('@')[0] + '@' + typos[domain] };
   return { valid: true, message: 'Valid email' };
@@ -26406,7 +26440,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (649 lines)
+// SOURCE: 08a_SheetSetup.gs (613 lines)
 // ============================================================================
 
 /**
@@ -26768,22 +26802,13 @@ function setMemberIdValidation(grievanceSheet, memberSheet) {
  * @returns {void}
  */
 function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  var rowCount = Math.max(10, actualRows + 10);
+  // Use a large fixed range (500 rows) so Config values added later are always included
+  var rowCount = 500;
   var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(false)
+    .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
   var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
@@ -26799,17 +26824,8 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
  * @returns {void}
  */
 function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  var rowCount = Math.max(10, actualRows + 10);
+  // Use a large fixed range (500 rows) so Config values added later are always included
+  var rowCount = 500;
   var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
 
   var rule = SpreadsheetApp.newDataValidation()
@@ -26984,22 +27000,13 @@ function removeMultiSelectTrigger() {
  * @returns {void}
  */
 function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourceCol) {
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  var rowCount = Math.max(10, actualRows + 10);
+  // Use a large fixed range (500 rows) so Config values added later are always included
+  var rowCount = 500;
   var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(false)
+    .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
   var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
@@ -27015,17 +27022,8 @@ function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourc
  * @returns {void}
  */
 function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, sourceCol) {
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  var rowCount = Math.max(10, actualRows + 10);
+  // Use a large fixed range (500 rows) so Config values added later are always included
+  var rowCount = 500;
   var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
 
   var rule = SpreadsheetApp.newDataValidation()
@@ -36423,16 +36421,16 @@ function createMemberDirectory(ss) {
   var emailRange = sheet.getRange(2, MEMBER_COLS.EMAIL, 4999, 1);
   var phoneRange = sheet.getRange(2, MEMBER_COLS.PHONE, 4999, 1);
 
-  // Rule: Red background for empty Email
+  // Rule: Red background for empty Email (column I = $I2)
   var emptyEmailRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($H2))')
+    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($I2))')
     .setBackground('#ffcdd2')  // Red background for missing email
     .setRanges([emailRange])
     .build();
 
-  // Rule: Red background for empty Phone
+  // Rule: Red background for empty Phone (column J = $J2)
   var emptyPhoneRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($I2))')
+    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($J2))')
     .setBackground('#ffcdd2')  // Red background for missing phone
     .setRanges([phoneRange])
     .build();
@@ -41217,7 +41215,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2050 lines)
+// SOURCE: 10_Main.gs (2113 lines)
 // ============================================================================
 
 /**
@@ -41339,6 +41337,10 @@ function onEdit(e) {
       applyAutoStyleToRow_(sheet, row);
       handleStageGateWorkflow_(e);
 
+      // Bidirectional sync: sync custom dropdown values back to Config
+      try { syncDropdownToConfig_(e, sheetName); }
+      catch (syncErr) { console.log('Config sync error: ' + syncErr.message); }
+
       if (typeof sortGrievanceLogByStatus === 'function') {
         try { sortGrievanceLogByStatus(); }
         catch (sortError) { Logger.log('Auto-sort error: ' + sortError.message); }
@@ -41353,6 +41355,10 @@ function onEdit(e) {
       // Member Directory edits
       handleMemberEdit(e);
       applyAutoStyleToRow_(sheet, row);
+
+      // Bidirectional sync: sync custom dropdown values back to Config
+      try { syncDropdownToConfig_(e, sheetName); }
+      catch (syncErr) { console.log('Config sync error: ' + syncErr.message); }
 
     } else if (sheetName === SHEETS.CASE_CHECKLIST || (typeof CHECKLIST_SHEET_NAME !== 'undefined' && sheetName === CHECKLIST_SHEET_NAME)) {
       // Case Checklist edits
@@ -41928,6 +41934,61 @@ function handleMemberEdit(e) {
       );
     }
   }
+}
+
+/**
+ * Bidirectional sync: when a user enters a custom value in a dropdown column,
+ * add it to the corresponding Config sheet column so it appears for future use.
+ * @param {Object} e - The edit event object
+ * @param {string} sheetName - Name of the edited sheet
+ * @private
+ */
+function syncDropdownToConfig_(e, sheetName) {
+  var newValue = e.value;
+  // Only handle single-cell text edits with a non-empty value
+  if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') return;
+  newValue = newValue.trim();
+
+  var col = e.range.getColumn();
+
+  // Map sheet columns to their corresponding Config column
+  var configCol = null;
+  if (sheetName === SHEETS.MEMBER_DIR) {
+    var memberToConfig = {};
+    memberToConfig[MEMBER_COLS.JOB_TITLE] = CONFIG_COLS.JOB_TITLES;
+    memberToConfig[MEMBER_COLS.WORK_LOCATION] = CONFIG_COLS.OFFICE_LOCATIONS;
+    memberToConfig[MEMBER_COLS.UNIT] = CONFIG_COLS.UNITS;
+    memberToConfig[MEMBER_COLS.SUPERVISOR] = CONFIG_COLS.SUPERVISORS;
+    memberToConfig[MEMBER_COLS.MANAGER] = CONFIG_COLS.MANAGERS;
+    configCol = memberToConfig[col];
+  } else if (sheetName === SHEETS.GRIEVANCE_LOG) {
+    var grievanceToConfig = {};
+    grievanceToConfig[GRIEVANCE_COLS.STATUS] = CONFIG_COLS.GRIEVANCE_STATUS;
+    grievanceToConfig[GRIEVANCE_COLS.CURRENT_STEP] = CONFIG_COLS.GRIEVANCE_STEP;
+    grievanceToConfig[GRIEVANCE_COLS.ISSUE_CATEGORY] = CONFIG_COLS.ISSUE_CATEGORY;
+    configCol = grievanceToConfig[col];
+  }
+
+  if (!configCol) return; // Not a synced dropdown column
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) return;
+
+  // Check if the value already exists in Config
+  var lastRow = configSheet.getLastRow();
+  var configRows = lastRow >= 3 ? lastRow - 2 : 0;
+  if (configRows > 0) {
+    var existingValues = configSheet.getRange(3, configCol, configRows, 1).getValues();
+    for (var i = 0; i < existingValues.length; i++) {
+      if (existingValues[i][0] && existingValues[i][0].toString().trim() === newValue) {
+        return; // Already exists, no need to add
+      }
+    }
+  }
+
+  // Add the new value to the first empty row in the Config column
+  addToConfigDropdown_(configCol, newValue);
 }
 
 /**

@@ -357,22 +357,13 @@ function setMemberIdValidation(grievanceSheet, memberSheet) {
  * @returns {void}
  */
 function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  var rowCount = Math.max(10, actualRows + 10);
+  // Use a large fixed range (500 rows) so Config values added later are always included
+  var rowCount = 500;
   var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(false)
+    .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
   var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
@@ -388,17 +379,8 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
  * @returns {void}
  */
 function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  var rowCount = Math.max(10, actualRows + 10);
+  // Use a large fixed range (500 rows) so Config values added later are always included
+  var rowCount = 500;
   var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
 
   var rule = SpreadsheetApp.newDataValidation()
@@ -573,22 +555,13 @@ function removeMultiSelectTrigger() {
  * @returns {void}
  */
 function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourceCol) {
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  var rowCount = Math.max(10, actualRows + 10);
+  // Use a large fixed range (500 rows) so Config values added later are always included
+  var rowCount = 500;
   var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(false)
+    .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
   var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
@@ -604,17 +577,8 @@ function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourc
  * @returns {void}
  */
 function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, sourceCol) {
-  var configLastRow = configSheet.getLastRow();
-  var configData = configSheet.getRange(3, sourceCol, Math.max(1, configLastRow - 2), 1).getValues();
-  var actualRows = 0;
-
-  for (var i = 0; i < configData.length; i++) {
-    if (configData[i][0] !== '' && configData[i][0] !== null) {
-      actualRows = i + 1;
-    }
-  }
-
-  var rowCount = Math.max(10, actualRows + 10);
+  // Use a large fixed range (500 rows) so Config values added later are always included
+  var rowCount = 500;
   var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
 
   var rule = SpreadsheetApp.newDataValidation()
