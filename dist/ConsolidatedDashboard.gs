@@ -2185,8 +2185,8 @@ var SHEETS = {
   //   -> updateSurveyTrackingOnSubmit_() marks member "Completed" in this sheet.
   // Management: showSurveyTrackingDialog() in 08c_FormsAndNotifications.gs
   SURVEY_TRACKING: '_Survey_Tracking',
-  // Survey Vault (hidden + protected) — stores email/member ID linkage
-  // for survey responses. Separated from Satisfaction sheet for anonymity.
+  // Survey Vault (hidden + protected) — stores SHA-256 hashed email/member ID
+  // for survey responses. No plaintext PII. Separated from Satisfaction sheet for anonymity.
   SURVEY_VAULT: '_Survey_Vault',
   // Satisfaction & Feedback sheets
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
@@ -28563,7 +28563,7 @@ function onSatisfactionFormSubmit(e) {
     satSheet.appendRow(newRow);
     var newRowNum = satSheet.getLastRow();
 
-    // ── Write PII to vault (separate protected sheet) ──
+    // ── Write hashed PII to vault (separate protected sheet) ──
     // Supersede any previous entry from same email+quarter
     if (memberMatch) {
       supersedePreviousVaultEntry_(email, currentQuarter, newRowNum);
@@ -28586,7 +28586,7 @@ function onSatisfactionFormSubmit(e) {
       }
     }
 
-    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + verified + ' | PII stored in vault');
+    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + verified + ' | Hashed PII stored in vault');
 
     // Send thank-you email if respondent email available
     if (email) {
@@ -37847,10 +37847,10 @@ function createSatisfactionSheet(ss) {
   // Populate computed values (no formulas in visible sheet)
   syncSatisfactionValues();
 
-  // Ensure vault sheet exists for PII isolation
+  // Ensure vault sheet exists for hashed PII isolation
   setupSurveyVaultSheet();
 
-  Logger.log('Member Satisfaction sheet created — PII stored in _Survey_Vault (protected)');
+  Logger.log('Member Satisfaction sheet created — hashed PII stored in _Survey_Vault (protected)');
 
   // Set tab color
   sheet.setTabColor(COLORS.UNION_GREEN);
@@ -38383,9 +38383,9 @@ function createFunctionChecklistSheet_() {
     ['1️⃣7️⃣ Survey', 'Survey Tracking', '📧 Send Reminders', 'sendSurveyCompletionReminders', 'Emails non-respondents with 7-day cooldown. Uses survey URL from Config (col AR)'],
     ['1️⃣7️⃣ Survey', 'Survey Tracking', '📊 Get Stats', 'getSurveyCompletionStats', 'Returns { total, completed, notCompleted, rate } for current round'],
     ['1️⃣7️⃣ Survey', 'Hidden Sheet Setup', '🔧 Setup Tracking Sheet', 'setupSurveyTrackingSheet', 'Creates hidden _Survey_Tracking with 10-column structure (called by setupHiddenSheets)'],
-    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Setup Vault Sheet', 'setupSurveyVaultSheet', 'Creates hidden + protected _Survey_Vault with 8-column PII store. Only script owner can access.'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Setup Vault Sheet', 'setupSurveyVaultSheet', 'Creates hidden + protected _Survey_Vault with 8-column SHA-256 hashed PII store. Only script owner can access.'],
     ['1️⃣7️⃣ Survey', 'Survey Vault', '🔍 Get Vault Map (No PII)', 'getVaultDataMap_', 'Returns row→{verified,isLatest,quarter} map for dashboard filtering. Never exposes email/member ID.'],
-    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Write Vault Entry', 'writeVaultEntry_', 'Appends email/member ID to vault for a new survey response. Called by onSatisfactionFormSubmit.'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Write Vault Entry', 'writeVaultEntry_', 'Hashes email/member ID (SHA-256) and appends to vault for a new survey response. Called by onSatisfactionFormSubmit.'],
 
     // ═══ PHASE 18: Navigation & Views (v4.1) ═══
     ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
@@ -39252,7 +39252,7 @@ function createFeaturesReferenceSheet(ss) {
 
     // Survey Completion Tracking
     ['Survey Tracking', 'Survey Completion Tracker', 'Management dialog showing completion stats (total, completed, not completed, rate %) with action buttons.', 'showSurveyTrackingDialog()', 'survey, tracking, completion, stats'],
-    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory. PII stored in protected _Survey_Vault only.', 'Automatic via form trigger', 'auto, detect, email, form, trigger, vault'],
+    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory. Email/member ID are SHA-256 hashed — only hashes stored in protected _Survey_Vault.', 'Automatic via form trigger', 'auto, detect, email, form, trigger, vault'],
     ['Survey Tracking', 'Populate Tracking', 'Syncs all members from Member Directory into the tracking sheet with initial "Not Completed" status. Safe to re-run.', 'Survey Tracker > Refresh Member List', 'populate, sync, members, refresh'],
     ['Survey Tracking', 'Start New Round', 'Resets all members to "Not Completed", increments Total Missed for non-respondents from previous round.', 'Survey Tracker > Start New Round', 'round, reset, new, missed'],
     ['Survey Tracking', 'Send Reminders', 'Emails non-respondents with survey link from Config. 7-day cooldown between reminders per member.', 'Survey Tracker > Send Reminders', 'reminder, email, cooldown, notify'],
@@ -49983,7 +49983,7 @@ function initializeLookerAnonSatisfactionSheet_() {
   const sheet = ss.getSheetByName(LOOKER_CONFIG.SHEETS_ANON.SATISFACTION);
   if (!sheet) return;
 
-  // Survey data is already mostly anonymous, just remove any potential PII linkages
+  // Survey data is fully anonymous — Satisfaction sheet has zero identifying data
   const headers = [
     'Response Hash', 'Response Month', 'Response Quarter', 'Response Year',
     'Worksite', 'Role Category', 'Shift', 'Tenure Bucket',
@@ -50235,7 +50235,7 @@ function refreshLookerAnonMembers_() {
 }
 
 /**
- * Refreshes anonymized Satisfaction sheet - surveys are already mostly anonymous.
+ * Refreshes anonymized Satisfaction sheet - surveys contain zero identifying data.
  * @private
  * @returns {number} Number of rows exported
  */

@@ -1,6 +1,6 @@
 # Security Review Report
 
-> **Note:** This security review was conducted at v4.5.0. The project is now at v4.7.0.
+> **Note:** This security review was conducted at v4.5.0. The project is now at v4.8.0.
 
 **Repository:** Union Steward Dashboard v4.5.0
 **Review Date:** February 2, 2026
@@ -23,12 +23,13 @@ This comprehensive security review analyzed the Union Steward Dashboard, a Googl
 | Secrets Management | LOW | **Properly implemented** |
 | Formula Injection | LOW | **Fixed in v4.5.0** |
 | PII Exposure | LOW | **secureLog() used for audit events** |
+| Survey Anonymity | LOW | **Zero-knowledge vault — SHA-256 hashed email/member ID, no plaintext PII in any sheet** |
 | Clickjacking | LOW | **ALLOWALL X-Frame-Options used** |
 | Dependency Security | LOW | **Dev dependencies only** |
 
 ### Overall Risk Assessment: **LOW**
 
-The application has comprehensive security controls including escapeHtml() on all innerHTML assignments, role-based access control on all sensitive web app pages, input validation with allowlists, formula injection prevention, PII-safe logging via secureLog(), and 276 unit tests.
+The application has comprehensive security controls including escapeHtml() on all innerHTML assignments, role-based access control on all sensitive web app pages, input validation with allowlists, formula injection prevention, PII-safe logging via secureLog(), zero-knowledge survey vault (SHA-256 hashed PII, no plaintext in any sheet), and 276 unit tests.
 
 ---
 
@@ -164,6 +165,8 @@ A malicious sheet name or user input could execute formulas like:
 ### 2.1 PII Exposure in Logs - MEDIUM
 
 **Status:** PARTIALLY ADDRESSED
+
+**Note (v4.8.0):** Survey-related PII is now fully protected via the zero-knowledge `_Survey_Vault`. All email and member ID values are SHA-256 hashed before storage — no plaintext PII exists in any sheet. The vault is hidden and sheet-protected (script owner only). Survey log entries reference hashed identifiers only.
 
 While `00_Security.gs` provides PII masking functions, some logs still expose sensitive data:
 
@@ -318,7 +321,18 @@ All dependencies are development-only and do not run in production (Google Apps 
 | Mass deletion alerts | **Implemented** | >15 cells triggers email alert |
 | PII masking in logs | **Implemented** | `secureLog()` used for audit events, sabotage alerts |
 
-### 4.5 Secrets Management
+### 4.5 Survey Data Protection (v4.8.0)
+
+| Control | Status | Notes |
+|---------|--------|-------|
+| Anonymous survey answers | **Implemented** | Satisfaction sheet contains zero identifying data |
+| PII hashing | **Implemented** | SHA-256 with per-installation salt via `hashForVault_()` |
+| Vault isolation | **Implemented** | `_Survey_Vault` hidden + sheet-protected (owner only) |
+| API boundary | **Implemented** | `getVaultDataMap_()` returns only non-PII flags |
+| Looker export | **Implemented** | `_Looker_Satisfaction` contains no member IDs or email |
+| In-memory-only email | **Implemented** | Raw email exists only during form submission |
+
+### 4.6 Secrets Management
 
 | Control | Status | Notes |
 |---------|--------|-------|
@@ -370,6 +384,7 @@ All dependencies are development-only and do not run in production (Google Apps 
 - [x] No hardcoded secrets
 
 ### Not Implemented / Incomplete
+- [x] Zero-knowledge survey vault with SHA-256 hashed PII (v4.8.0)
 - [x] Consistent XSS prevention across all views (escapeHtml applied to all innerHTML)
 - [x] Complete access control on all web endpoints (search/grievances/members require steward role)
 - [x] PII masking in all log statements (secureLog used for audit events)
@@ -403,8 +418,9 @@ The Union Steward Dashboard has a comprehensive security posture with all critic
 2. **Access Control** - Role-based authorization on all sensitive web app pages (search, grievances, members)
 3. **Formula Injection** - Fixed with start-of-string anchored regex in `escapeForFormula()`
 4. **PII Protection** - `secureLog()` used for audit events, `getCurrentUserEmail()` helper available
-5. **Input Validation** - Allowlists for web app parameters, dangerous pattern detection
-6. **Testing** - 950 Jest unit tests covering security functions
+5. **Survey Anonymity (v4.8.0)** - Zero-knowledge `_Survey_Vault` with SHA-256 hashed email/member ID; no plaintext PII in any sheet; Satisfaction sheet contains zero identifying data
+6. **Input Validation** - Allowlists for web app parameters, dangerous pattern detection
+7. **Testing** - 950 Jest unit tests covering security functions
 
 Remaining low-priority items: clickjacking protection (X-Frame-Options) and regular dependency audits.
 

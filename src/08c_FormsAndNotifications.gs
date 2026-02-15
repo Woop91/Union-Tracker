@@ -781,7 +781,7 @@ function onSatisfactionFormSubmit(e) {
     satSheet.appendRow(newRow);
     var newRowNum = satSheet.getLastRow();
 
-    // ── Write PII to vault (separate protected sheet) ──
+    // ── Write hashed PII to vault (separate protected sheet) ──
     // Supersede any previous entry from same email+quarter
     if (memberMatch) {
       supersedePreviousVaultEntry_(email, currentQuarter, newRowNum);
@@ -804,7 +804,7 @@ function onSatisfactionFormSubmit(e) {
       }
     }
 
-    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + verified + ' | PII stored in vault');
+    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + verified + ' | Hashed PII stored in vault');
 
     // Send thank-you email if respondent email available
     if (email) {

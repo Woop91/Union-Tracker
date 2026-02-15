@@ -198,6 +198,8 @@ After that, you have **26 production files** and a clean system ready for real m
 ### Security
 - XSS prevention with HTML escaping
 - PII masking for public dashboards (phone numbers, SSNs auto-redacted)
+- Zero-knowledge survey vault: email and member ID stored as SHA-256 hashes only (non-reversible)
+- Survey responses are cryptographically anonymous — no one can link answers to members
 - Formula injection protection
 - Input sanitization and validation
 - Audit logging of all changes
@@ -207,6 +209,7 @@ After that, you have **26 production files** and a clean system ready for real m
 - **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
 - **PII-Free**: Anonymized `_Looker_Anon_*` sheets for external stakeholders
 - Non-reversible hashes, bucketed values, and engagement levels
+- Survey data uses zero-knowledge vault — `_Looker_Satisfaction` contains no member IDs or emails
 
 ---
 
@@ -220,7 +223,7 @@ The dashboard provides 4 top-level menus:
 |---------|--------------|
 | Search | Desktop, Quick, and Advanced search |
 | Grievances | Create, edit, bulk update, view active grievances |
-| Members | Add, find, import/export, steward directory, surveys |
+| Members | Add, find, import/export, steward directory, anonymous surveys |
 | Calendar | Sync deadlines, view upcoming, clear events |
 | Google Drive | Setup folders, view files, batch create |
 | Notifications | Email settings, test notifications |

@@ -3193,7 +3193,7 @@ function initializeLookerAnonSatisfactionSheet_() {
   const sheet = ss.getSheetByName(LOOKER_CONFIG.SHEETS_ANON.SATISFACTION);
   if (!sheet) return;
 
-  // Survey data is already mostly anonymous, just remove any potential PII linkages
+  // Survey data is fully anonymous — Satisfaction sheet has zero identifying data
   const headers = [
     'Response Hash', 'Response Month', 'Response Quarter', 'Response Year',
     'Worksite', 'Role Category', 'Shift', 'Tenure Bucket',
@@ -3445,7 +3445,7 @@ function refreshLookerAnonMembers_() {
 }
 
 /**
- * Refreshes anonymized Satisfaction sheet - surveys are already mostly anonymous.
+ * Refreshes anonymized Satisfaction sheet - surveys contain zero identifying data.
  * @private
  * @returns {number} Number of rows exported
  */

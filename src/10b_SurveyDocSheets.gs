@@ -464,10 +464,10 @@ function createSatisfactionSheet(ss) {
   // Populate computed values (no formulas in visible sheet)
   syncSatisfactionValues();
 
-  // Ensure vault sheet exists for PII isolation
+  // Ensure vault sheet exists for hashed PII isolation
   setupSurveyVaultSheet();
 
-  Logger.log('Member Satisfaction sheet created — PII stored in _Survey_Vault (protected)');
+  Logger.log('Member Satisfaction sheet created — hashed PII stored in _Survey_Vault (protected)');
 
   // Set tab color
   sheet.setTabColor(COLORS.UNION_GREEN);
@@ -1000,9 +1000,9 @@ function createFunctionChecklistSheet_() {
     ['1️⃣7️⃣ Survey', 'Survey Tracking', '📧 Send Reminders', 'sendSurveyCompletionReminders', 'Emails non-respondents with 7-day cooldown. Uses survey URL from Config (col AR)'],
     ['1️⃣7️⃣ Survey', 'Survey Tracking', '📊 Get Stats', 'getSurveyCompletionStats', 'Returns { total, completed, notCompleted, rate } for current round'],
     ['1️⃣7️⃣ Survey', 'Hidden Sheet Setup', '🔧 Setup Tracking Sheet', 'setupSurveyTrackingSheet', 'Creates hidden _Survey_Tracking with 10-column structure (called by setupHiddenSheets)'],
-    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Setup Vault Sheet', 'setupSurveyVaultSheet', 'Creates hidden + protected _Survey_Vault with 8-column PII store. Only script owner can access.'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Setup Vault Sheet', 'setupSurveyVaultSheet', 'Creates hidden + protected _Survey_Vault with 8-column SHA-256 hashed PII store. Only script owner can access.'],
     ['1️⃣7️⃣ Survey', 'Survey Vault', '🔍 Get Vault Map (No PII)', 'getVaultDataMap_', 'Returns row→{verified,isLatest,quarter} map for dashboard filtering. Never exposes email/member ID.'],
-    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Write Vault Entry', 'writeVaultEntry_', 'Appends email/member ID to vault for a new survey response. Called by onSatisfactionFormSubmit.'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Write Vault Entry', 'writeVaultEntry_', 'Hashes email/member ID (SHA-256) and appends to vault for a new survey response. Called by onSatisfactionFormSubmit.'],
 
     // ═══ PHASE 18: Navigation & Views (v4.1) ═══
     ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
@@ -1869,7 +1869,7 @@ function createFeaturesReferenceSheet(ss) {
 
     // Survey Completion Tracking
     ['Survey Tracking', 'Survey Completion Tracker', 'Management dialog showing completion stats (total, completed, not completed, rate %) with action buttons.', 'showSurveyTrackingDialog()', 'survey, tracking, completion, stats'],
-    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory. PII stored in protected _Survey_Vault only.', 'Automatic via form trigger', 'auto, detect, email, form, trigger, vault'],
+    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory. Email/member ID are SHA-256 hashed — only hashes stored in protected _Survey_Vault.', 'Automatic via form trigger', 'auto, detect, email, form, trigger, vault'],
     ['Survey Tracking', 'Populate Tracking', 'Syncs all members from Member Directory into the tracking sheet with initial "Not Completed" status. Safe to re-run.', 'Survey Tracker > Refresh Member List', 'populate, sync, members, refresh'],
     ['Survey Tracking', 'Start New Round', 'Resets all members to "Not Completed", increments Total Missed for non-respondents from previous round.', 'Survey Tracker > Start New Round', 'round, reset, new, missed'],
     ['Survey Tracking', 'Send Reminders', 'Emails non-respondents with survey link from Config. 7-day cooldown between reminders per member.', 'Survey Tracker > Send Reminders', 'reminder, email, cooldown, notify'],

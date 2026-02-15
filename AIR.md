@@ -884,6 +884,7 @@ var BATCH_LIMITS = {
 
 **Form Response Area (A-BP):** Auto-populated by linked Google Form (68 questions + timestamp)
 **Summary/Chart Data Area (BT-CD):** Section averages for charts and dashboards
+**No PII on this sheet:** Email and member ID are stored as SHA-256 hashes in the protected `_Survey_Vault` sheet (see SURVEY_VAULT_COLS)
 
 ```javascript
 var SATISFACTION_COLS = {
@@ -913,6 +914,23 @@ var SATISFACTION_COLS = {
   AVG_MEMBER_VOICE: 80,           // CB - Avg of Q46-Q50
   AVG_VALUE_ACTION: 81,           // CC - Avg of Q51-Q55
   AVG_SCHEDULING: 82              // CD - Avg of Q56-Q62
+
+  // VERIFICATION COLUMNS REMOVED (v4.8 — Zero-Knowledge Vault)
+  // EMAIL, VERIFIED, MATCHED_MEMBER_ID, QUARTER, IS_LATEST,
+  // SUPERSEDED_BY, REVIEWER_NOTES are now in SURVEY_VAULT_COLS.
+  // All values are SHA-256 hashed — no plaintext PII on any sheet.
+};
+
+// Zero-Knowledge Survey Vault (hidden + protected sheet: _Survey_Vault)
+var SURVEY_VAULT_COLS = {
+  RESPONSE_ROW: 1,          // A - Row number in Satisfaction sheet
+  EMAIL: 2,                 // B - SHA-256 hash of email (non-reversible)
+  VERIFIED: 3,              // C - Yes / Pending Review / Rejected
+  MATCHED_MEMBER_ID: 4,     // D - SHA-256 hash of member ID (non-reversible)
+  QUARTER: 5,               // E - Quarter string (e.g., "2026-Q1")
+  IS_LATEST: 6,             // F - Yes/No
+  SUPERSEDED_BY: 7,         // G - Vault row number of newer response
+  REVIEWER_NOTES: 8         // H - Notes from reviewer
 };
 
 // Survey Section Definitions for Analysis
@@ -2188,44 +2206,40 @@ The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-base
 
 ### Version 2.2.0 / v3.48 (2026-01-14) - Survey Verification, Data Integrity & Steward Workload
 
-**New Survey Verification System:**
-- Survey responses are now verified against the Member Directory
-- Email matching: Survey respondent email is compared against member contact emails
-- Verified responses are marked with `Verified: Yes`
-- Unmatched emails are flagged as `Pending Review` for manual review
+**Survey Verification System (Updated v4.8 — Zero-Knowledge Vault):**
+- Survey responses are verified against the Member Directory via email matching
+- Email is processed in-memory only — never saved to any sheet in plaintext
+- Email and member ID are SHA-256 hashed (salted, non-reversible) and stored in `_Survey_Vault`
+- Verified responses marked with `Verified: Yes` in the vault
+- Unmatched emails flagged as `Pending Review` for anonymous admin review
 - Rejected submissions excluded from all statistics
+- The Satisfaction sheet contains ZERO identifying data
 
-**New Quarterly Tracking with History:**
-- Each survey response is assigned a quarter (e.g., "2026-Q1")
+**Quarterly Tracking with History:**
+- Each survey response is assigned a quarter (e.g., "2026-Q1") in the vault
 - Members can submit multiple responses per quarter - only the latest counts in stats
-- Historical responses preserved (not deleted) with `IS_LATEST: No` marking
-- Previous responses marked with reference to newer submission (`SUPERSEDED_BY` column)
+- Superseding logic compares hashed emails (plaintext never stored)
+- Historical responses preserved with `IS_LATEST: No` in the vault
 - Toggle in Member Dashboard to include/exclude historical responses from statistics
 
-**New Flagged Submissions Review Interface:**
-- Menu: 509 Dashboard > Survey Tools > 🔍 Review Flagged Submissions
+**Flagged Submissions Review Interface:**
+- Menu: 509 Dashboard > Survey Tools > Review Flagged Submissions
 - Shows count of pending review submissions
-- Displays email addresses of unverified submissions (survey answers protected)
+- Displays "Anonymous submission #N" (email is hashed — never shown to reviewer)
 - One-click Approve or Reject actions for administrators
 - Functions: `showFlaggedSubmissionsReview()`, `getFlaggedSubmissionsData()`, `approveFlaggedSubmission()`, `rejectFlaggedSubmission()`
 
-**Public Member Dashboard Updates:**
-- Survey statistics now filter to only show Verified responses
-- Response rate calculated from unique verified member IDs
-- New toggle: "Include historical responses" checkbox
-- When enabled, shows all responses including superseded entries
-- Visual warning when historical data is included
-
-**New SATISFACTION_COLS Columns (Constants.gs):**
+**Zero-Knowledge Vault Architecture (SURVEY_VAULT_COLS):**
 | Column | Name | Purpose |
 |--------|------|---------|
-| CE (83) | EMAIL | Email address from form submission |
-| CF (84) | VERIFIED | Yes / Pending Review / Rejected |
-| CG (85) | MATCHED_MEMBER_ID | Member ID if email matched |
-| CH (86) | QUARTER | Quarter string (e.g., "2026-Q1") |
-| CI (87) | IS_LATEST | Yes/No - Is this the latest for this member this quarter? |
-| CJ (88) | SUPERSEDED_BY | Row number of newer response (if superseded) |
-| CK (89) | REVIEWER_NOTES | Notes from reviewer |
+| A (1) | RESPONSE_ROW | Row number in Satisfaction sheet |
+| B (2) | EMAIL | SHA-256 hash of email (non-reversible) |
+| C (3) | VERIFIED | Yes / Pending Review / Rejected |
+| D (4) | MATCHED_MEMBER_ID | SHA-256 hash of member ID (non-reversible) |
+| E (5) | QUARTER | Quarter string (e.g., "2026-Q1") |
+| F (6) | IS_LATEST | Yes/No |
+| G (7) | SUPERSEDED_BY | Vault row of newer response |
+| H (8) | REVIEWER_NOTES | Notes from reviewer |
 
 **Email Collection Configuration:**
 For verification to work, the Google Form must collect respondent emails. Two options:
@@ -2234,15 +2248,18 @@ For verification to work, the Google Form must collect respondent emails. Two op
 
 If neither is configured, all submissions will be marked as "Pending Review" and require manual approval.
 
-**Updated Functions:**
-- `onSatisfactionFormSubmit(e)` - Now includes email verification and quarterly tracking
-- `validateMemberEmail(email)` - Validates email against Member Directory
-- `getCurrentQuarter()` - Returns current quarter string
-- `getPublicSurveyData(includeHistory)` - Now accepts toggle for historical data
+**Vault Functions (08d_AuditAndFormulas.gs):**
+- `setupSurveyVaultSheet()` - Creates hidden + protected vault with SHA-256 column headers
+- `hashForVault_(value)` - Salted SHA-256 hash (shares salt with `generateAnonHash_()`)
+- `writeVaultEntry_(row, email, verified, memberId, quarter)` - Hashes before writing
+- `supersedePreviousVaultEntry_(email, quarter, newRow)` - Compares hashes, not plaintext
+- `getVaultDataMap_()` - Returns {verified, isLatest, quarter} only — never exposes PII
+- `getVaultDataFull_()` - Returns hashed values (emailHash, memberIdHash)
 
-**Files Modified (Survey Verification):**
-- `Constants.gs` - Added SATISFACTION_COLS verification columns
-- `Code.gs` - Updated form handler, added review interface, updated public dashboard
+**Updated Functions:**
+- `onSatisfactionFormSubmit(e)` - Writes anonymous answers to Satisfaction, hashed PII to vault
+- `approveFlaggedSubmission(rowNum)` / `rejectFlaggedSubmission(rowNum)` - Write to vault, not Satisfaction sheet
+- `syncSatisfactionValues()`, `getPublicSurveyData()`, `getSatisfactionByUnit()` - Read from vault via `getVaultDataMap_()`
 
 **New Data Integrity Module (DataIntegrity.gs):**
 - New file: `DataIntegrity.gs` (~1000 lines) providing comprehensive data management
