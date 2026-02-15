@@ -910,6 +910,7 @@ function getImportMembersHtml_() {
     'var totalImported = 0;' +
     'var totalSkipped = 0;' +
     'var importStartTime = 0;' +
+    'var filteredData = [];' +
     'var targetFields = [' +
     '  {key: "firstName", label: "First Name", required: true},' +
     '  {key: "lastName", label: "Last Name", required: true},' +
@@ -1019,21 +1020,55 @@ function getImportMembersHtml_() {
     '  document.getElementById("statusArea").innerHTML = "";' +
     '  document.getElementById("progressSection").style.display = "block";' +
     '  updateProgress(0, parsedData.length, 0, 0);' +
-    '  processBatch(0);' +
+    '  document.getElementById("progressText").textContent = "Checking for duplicates...";' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(existingKeys) {' +
+    '      var uniqueRows = [];' +
+    '      var seenEmails = existingKeys.emails || {};' +
+    '      var seenNames = existingKeys.names || {};' +
+    '      for (var i = 0; i < parsedData.length; i++) {' +
+    '        var row = parsedData[i];' +
+    '        var fn = currentMapping.firstName !== undefined ? (row[currentMapping.firstName] || "").trim() : "";' +
+    '        var ln = currentMapping.lastName !== undefined ? (row[currentMapping.lastName] || "").trim() : "";' +
+    '        var em = currentMapping.email !== undefined ? (row[currentMapping.email] || "").trim() : "";' +
+    '        if (!fn && !ln) { totalSkipped++; continue; }' +
+    '        var emLow = em.toLowerCase();' +
+    '        var nmLow = (fn + " " + ln).toLowerCase().trim();' +
+    '        if ((emLow && seenEmails[emLow]) || seenNames[nmLow]) { totalSkipped++; continue; }' +
+    '        if (emLow) seenEmails[emLow] = true;' +
+    '        seenNames[nmLow] = true;' +
+    '        uniqueRows.push(row);' +
+    '      }' +
+    '      filteredData = uniqueRows;' +
+    '      if (filteredData.length === 0) {' +
+    '        updateProgress(parsedData.length, parsedData.length, 0, totalSkipped);' +
+    '        document.getElementById("progressText").textContent = "Complete!";' +
+    '        document.getElementById("importBtn").textContent = "Done!";' +
+    '        showStatus("No new members to import. " + totalSkipped + " skipped as duplicates.", false);' +
+    '        return;' +
+    '      }' +
+    '      updateProgress(totalSkipped, parsedData.length, 0, totalSkipped);' +
+    '      processBatch(0);' +
+    '    })' +
+    '    .withFailureHandler(function(e) {' +
+    '      showStatus("Error: " + e.message, true);' +
+    '      showPartialResults();' +
+    '    })' +
+    '    .getExistingMemberKeys();' +
     '}' +
     '' +
     'function processBatch(startIndex) {' +
-    '  var batch = parsedData.slice(startIndex, startIndex + BATCH_SIZE);' +
+    '  var batch = filteredData.slice(startIndex, startIndex + BATCH_SIZE);' +
     '  if (batch.length === 0) { finishImport(); return; }' +
-    '  var processed = Math.min(startIndex + batch.length, parsedData.length);' +
-    '  document.getElementById("progressText").textContent = "Processing rows " + (startIndex + 1) + " \\u2013 " + processed + " of " + parsedData.length + "...";' +
+    '  var batchEnd = Math.min(startIndex + batch.length, filteredData.length);' +
+    '  document.getElementById("progressText").textContent = "Importing " + (startIndex + 1) + " \\u2013 " + batchEnd + " of " + filteredData.length + " unique members...";' +
     '  google.script.run' +
     '    .withSuccessHandler(function(result) {' +
     '      if (result.success) {' +
     '        totalImported += result.imported;' +
     '        totalSkipped += result.skipped;' +
     '        var nextStart = startIndex + BATCH_SIZE;' +
-    '        updateProgress(Math.min(nextStart, parsedData.length), parsedData.length, totalImported, totalSkipped);' +
+    '        updateProgress(totalImported + totalSkipped, parsedData.length, totalImported, totalSkipped);' +
     '        processBatch(nextStart);' +
     '      } else {' +
     '        showStatus("Import failed at row " + (startIndex + 1) + ": " + (result.error || result.message), true);' +
@@ -1193,7 +1228,32 @@ function importMembersFromData(data, mapping) {
 }
 
 /**
+ * Returns existing member emails and names for client-side duplicate checking.
+ * Called once before import begins to avoid redundant sheet reads per batch.
+ * @returns {Object} {emails: {email: true}, names: {name: true}}
+ */
+function getExistingMemberKeys() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var emails = {};
+  var names = {};
+
+  if (sheet && sheet.getLastRow() > 1) {
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var email = (data[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+      var name = ((data[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (data[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
+      if (email) emails[email] = true;
+      if (name) names[name] = true;
+    }
+  }
+
+  return { emails: emails, names: names };
+}
+
+/**
  * Imports a batch of members from parsed CSV data (called by progress bar UI)
+ * Data has already been deduplicated client-side against existing members.
  * @param {Array<Array>} batchData - 2D array of CSV data for this batch
  * @param {Object} mapping - Column mapping object {fieldName: columnIndex}
  * @returns {Object} Result with imported/skipped counts for this batch
@@ -1207,50 +1267,44 @@ function importMembersBatch(batchData, mapping) {
       return errorResponse('Member Directory sheet not found', 'importMembersBatch');
     }
 
-    // Get existing data for duplicate checking
-    var existingData = sheet.getDataRange().getValues();
-    var existingEmails = {};
-    var existingNames = {};
-
-    for (var i = 1; i < existingData.length; i++) {
-      var existEmail = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
-      var existName = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
-      if (existEmail) existingEmails[existEmail] = true;
-      if (existName) existingNames[existName] = true;
+    // Read existing Member IDs once for this batch (for ID generation)
+    var existingIds = {};
+    if (sheet.getLastRow() > 1) {
+      var ids = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1).getValues();
+      ids.forEach(function(r) { if (r[0]) existingIds[r[0]] = true; });
     }
 
     var imported = 0;
     var skipped = 0;
     var newRows = [];
 
+    // Dedup already done client-side; just build rows and generate IDs
     for (var j = 0; j < batchData.length; j++) {
       var row = batchData[j];
 
       var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
       var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
-      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
 
-      // Skip if no name
       if (!firstName && !lastName) {
         skipped++;
         continue;
       }
 
-      // Check for duplicates
-      var emailLower = email.toLowerCase();
-      var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
-
-      if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
-        skipped++;
-        continue;
+      // Generate Member ID inline using pre-read existingIds
+      var prefix = 'M';
+      var firstPart = (firstName || 'XX').substring(0, 2).toUpperCase();
+      var lastPart = (lastName || 'XX').substring(0, 2).toUpperCase();
+      var namePrefix = prefix + firstPart + lastPart;
+      var memberId = '';
+      for (var num = 100; num < 1000; num++) {
+        var newId = namePrefix + num;
+        if (!existingIds[newId]) {
+          memberId = newId;
+          existingIds[newId] = true;
+          break;
+        }
       }
-
-      // Mark as existing to prevent duplicates within batch
-      if (emailLower) existingEmails[emailLower] = true;
-      existingNames[nameLower] = true;
-
-      // Generate Member ID
-      var memberId = generateMemberID_(firstName, lastName);
+      if (!memberId) memberId = namePrefix + String(Date.now()).slice(-3);
 
       // Build new row
       var newRow = new Array(MEMBER_COLS.STATE).fill('');
@@ -1266,7 +1320,6 @@ function importMembersBatch(batchData, mapping) {
       if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
       if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
 
-      // Default Is Steward to No
       newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
 
       newRows.push(newRow);
@@ -1279,7 +1332,7 @@ function importMembersBatch(batchData, mapping) {
       sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
     }
 
-    // Log the batch import (only if rows were actually imported)
+    // Log the batch import
     if (imported > 0) {
       logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
         action: 'BATCH_IMPORT',
