@@ -508,73 +508,73 @@ function applyStepHighlighting() {
   var lastRow = Math.max(sheet.getLastRow(), 2);
   var rules = sheet.getConditionalFormatRules();
 
-  // Colors
-  var _grayText = SpreadsheetApp.newColor().setRgbColor('#9e9e9e').build();
-  var _greenBg = SpreadsheetApp.newColor().setRgbColor('#e8f5e9').build();
-  var _currentStepCol = GRIEVANCE_COLS.CURRENT_STEP; // Column F
+  // Dynamic column letters from constants
+  var grColStep = getColumnLetter(GRIEVANCE_COLS.CURRENT_STEP);
+  var grColDaysDeadline = getColumnLetter(GRIEVANCE_COLS.DAYS_TO_DEADLINE);
+  var grColNextDue = getColumnLetter(GRIEVANCE_COLS.NEXT_ACTION_DUE);
 
-  // Rule 1: Gray out Step I columns (J-K) if current step is Informal
+  // Rule 1: Gray out Step I columns if current step is Informal
   var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, lastRow - 1, 2);
   var rule1 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$F2="Informal"')
+    .whenFormulaSatisfied('=$' + grColStep + '2="Informal"')
     .setFontColor('#9e9e9e')
     .setRanges([step1Range])
     .build();
 
-  // Rule 2: Gray out Step II columns (L-O) if current step is Informal or Step I
+  // Rule 2: Gray out Step II columns if current step is Informal or Step I
   var step2Range = sheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, lastRow - 1, 4);
   var rule2 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($F2="Informal",$F2="Step I")')
+    .whenFormulaSatisfied('=OR($' + grColStep + '2="Informal",$' + grColStep + '2="Step I")')
     .setFontColor('#9e9e9e')
     .setRanges([step2Range])
     .build();
 
-  // Rule 3: Gray out Step III columns (P-Q) if not at Step III or beyond
+  // Rule 3: Gray out Step III columns if not at Step III or beyond
   var step3Range = sheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, lastRow - 1, 2);
   var rule3 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($F2="Informal",$F2="Step I",$F2="Step II")')
+    .whenFormulaSatisfied('=OR($' + grColStep + '2="Informal",$' + grColStep + '2="Step I",$' + grColStep + '2="Step II")')
     .setFontColor('#9e9e9e')
     .setRanges([step3Range])
     .build();
 
   // -------------------------------------------------------------------------
-  // DEADLINE STATUS RULES (Days to Deadline column U)
+  // DEADLINE STATUS RULES
   // Order matters: more specific rules first, then broader ones
   // -------------------------------------------------------------------------
 
   var daysDeadlineRange = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1);
   var nextDueRange = sheet.getRange(2, GRIEVANCE_COLS.NEXT_ACTION_DUE, lastRow - 1, 1);
 
-  // Rule 4: 🔴 Red - Overdue (Days to Deadline shows "Overdue" or negative/0)
+  // Rule 4: Red - Overdue (Days to Deadline shows "Overdue" or negative/0)
   var rule4 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($U2="Overdue",AND(ISNUMBER($U2),$U2<=0))')
+    .whenFormulaSatisfied('=OR($' + grColDaysDeadline + '2="Overdue",AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2<=0))')
     .setBackground('#ffebee')
     .setFontColor('#c62828')
     .setBold(true)
     .setRanges([daysDeadlineRange])
     .build();
 
-  // Rule 5: 🟠 Orange - Due in 1-3 days
+  // Rule 5: Orange - Due in 1-3 days
   var rule5 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>=1,$U2<=3)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=1,$' + grColDaysDeadline + '2<=3)')
     .setBackground('#fff3e0')
     .setFontColor('#e65100')
     .setBold(true)
     .setRanges([daysDeadlineRange])
     .build();
 
-  // Rule 6: 🟡 Yellow - Due in 4-7 days
+  // Rule 6: Yellow - Due in 4-7 days
   var rule6 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>=4,$U2<=7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=4,$' + grColDaysDeadline + '2<=7)')
     .setBackground('#fffde7')
     .setFontColor('#f57f17')
     .setBold(false)
     .setRanges([daysDeadlineRange])
     .build();
 
-  // Rule 7: 🟢 Green - On Track (more than 7 days remaining)
+  // Rule 7: Green - On Track (more than 7 days remaining)
   var rule7 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>7)')
     .setBackground('#e8f5e9')
     .setFontColor('#2e7d32')
     .setBold(false)
@@ -583,7 +583,7 @@ function applyStepHighlighting() {
 
   // Rule 8: Red highlight for Next Action Due if overdue
   var rule8 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($T2<>"",$T2<TODAY())')
+    .whenFormulaSatisfied('=AND($' + grColNextDue + '2<>"",$' + grColNextDue + '2<TODAY())')
     .setBackground('#ffebee')
     .setFontColor('#c62828')
     .setBold(true)
@@ -592,7 +592,7 @@ function applyStepHighlighting() {
 
   // Rule 9: Orange for Next Action Due within 3 days
   var rule9 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($T2<>"",($T2-TODAY())>=0,($T2-TODAY())<=3)')
+    .whenFormulaSatisfied('=AND($' + grColNextDue + '2<>"",($' + grColNextDue + '2-TODAY())>=0,($' + grColNextDue + '2-TODAY())<=3)')
     .setBackground('#fff3e0')
     .setFontColor('#e65100')
     .setBold(true)

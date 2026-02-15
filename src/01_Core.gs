@@ -1447,6 +1447,50 @@ var CONFIG_COLS = {
 };
 
 // ============================================================================
+// STEWARD PERFORMANCE CALC COLUMNS (Hidden Sheet - 1-indexed)
+// ============================================================================
+
+/**
+ * Steward Performance calculation sheet column positions (1-indexed)
+ * Hidden sheet: _Steward_Performance_Calc
+ * @const {Object}
+ */
+var STEWARD_PERF_COLS = {
+  STEWARD: 1,           // A - Steward name
+  TOTAL_CASES: 2,       // B - Total grievance cases
+  ACTIVE: 3,            // C - Active cases
+  CLOSED: 4,            // D - Closed cases
+  WON: 5,               // E - Won cases
+  WIN_RATE: 6,          // F - Win rate %
+  AVG_DAYS: 7,          // G - Average days to resolve
+  OVERDUE: 8,           // H - Overdue cases
+  DUE_THIS_WEEK: 9,     // I - Cases due this week
+  PERFORMANCE_SCORE: 10 // J - Composite performance score
+};
+
+// ============================================================================
+// AUDIT LOG COLUMNS (Hidden Sheet - 1-indexed)
+// ============================================================================
+
+/**
+ * Audit Log sheet column positions (1-indexed)
+ * Hidden sheet: _Audit_Log
+ * @const {Object}
+ */
+var AUDIT_LOG_COLS = {
+  TIMESTAMP: 1,      // A - Timestamp
+  USER_EMAIL: 2,     // B - User email
+  SHEET: 3,          // C - Sheet name
+  ROW: 4,            // D - Row number
+  COLUMN: 5,         // E - Column number
+  FIELD_NAME: 6,     // F - Field name
+  OLD_VALUE: 7,      // G - Old value
+  NEW_VALUE: 8,      // H - New value
+  RECORD_ID: 9,      // I - Record ID
+  ACTION_TYPE: 10    // J - Action type
+};
+
+// ============================================================================
 // SATISFACTION SURVEY COLUMNS (Google Form Response + Summary)
 // ============================================================================
 

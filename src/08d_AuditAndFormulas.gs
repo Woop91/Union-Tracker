@@ -48,16 +48,16 @@ function setupAuditLogSheet() {
   sheet.setFrozenRows(1);
 
   // Set column widths
-  sheet.setColumnWidth(1, 160); // Timestamp
-  sheet.setColumnWidth(2, 200); // User Email
-  sheet.setColumnWidth(3, 120); // Sheet
-  sheet.setColumnWidth(4, 50);  // Row
-  sheet.setColumnWidth(5, 50);  // Column
-  sheet.setColumnWidth(6, 150); // Field Name
-  sheet.setColumnWidth(7, 200); // Old Value
-  sheet.setColumnWidth(8, 200); // New Value
-  sheet.setColumnWidth(9, 100); // Record ID
-  sheet.setColumnWidth(10, 100); // Action Type
+  sheet.setColumnWidth(AUDIT_LOG_COLS.TIMESTAMP, 160);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.USER_EMAIL, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.SHEET, 120);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.ROW, 50);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.COLUMN, 50);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.FIELD_NAME, 150);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.OLD_VALUE, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.NEW_VALUE, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.RECORD_ID, 100);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.ACTION_TYPE, 100);
 
   // Hide the sheet
   sheet.hideSheet();
@@ -311,14 +311,14 @@ function getAuditHistory(recordId) {
   var history = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][8] === recordId) { // Column I is Record ID
+    if (data[i][AUDIT_LOG_COLS.RECORD_ID - 1] === recordId) {
       history.push({
-        timestamp: data[i][0],
-        user: data[i][1],
-        field: data[i][5],
-        oldValue: data[i][6],
-        newValue: data[i][7],
-        action: data[i][9]
+        timestamp: data[i][AUDIT_LOG_COLS.TIMESTAMP - 1],
+        user: data[i][AUDIT_LOG_COLS.USER_EMAIL - 1],
+        field: data[i][AUDIT_LOG_COLS.FIELD_NAME - 1],
+        oldValue: data[i][AUDIT_LOG_COLS.OLD_VALUE - 1],
+        newValue: data[i][AUDIT_LOG_COLS.NEW_VALUE - 1],
+        action: data[i][AUDIT_LOG_COLS.ACTION_TYPE - 1]
       });
     }
   }

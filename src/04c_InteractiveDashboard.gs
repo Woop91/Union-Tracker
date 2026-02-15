@@ -1427,19 +1427,19 @@ function getInteractiveAnalyticsData() {
   var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
   if (perfSheet && perfSheet.getLastRow() > 1) {
     try {
-      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), 10).getValues();
+      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), STEWARD_PERF_COLS.PERFORMANCE_SCORE).getValues();
       data.stewardPerformance.topPerformers = perfData
-        .filter(function(row) { return row[0] && row[9]; }) // Has name and score
+        .filter(function(row) { return row[STEWARD_PERF_COLS.STEWARD - 1] && row[STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]; })
         .map(function(row) {
           return {
-            name: row[0],
-            totalCases: row[1] || 0,
-            active: row[2] || 0,
-            closed: row[3] || 0,
-            won: row[4] || 0,
-            winRate: row[5] || 0,
-            avgDays: row[6] || 0,
-            score: row[9] || 0
+            name: row[STEWARD_PERF_COLS.STEWARD - 1],
+            totalCases: row[STEWARD_PERF_COLS.TOTAL_CASES - 1] || 0,
+            active: row[STEWARD_PERF_COLS.ACTIVE - 1] || 0,
+            closed: row[STEWARD_PERF_COLS.CLOSED - 1] || 0,
+            won: row[STEWARD_PERF_COLS.WON - 1] || 0,
+            winRate: row[STEWARD_PERF_COLS.WIN_RATE - 1] || 0,
+            avgDays: row[STEWARD_PERF_COLS.AVG_DAYS - 1] || 0,
+            score: row[STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1] || 0
           };
         })
         .sort(function(a, b) { return b.score - a.score; })
