@@ -296,7 +296,9 @@ function checkWebAppAuthorization(requiredRole) {
     result.email = email;
 
     // Check if access control is enabled
-    if (!ACCESS_CONTROL.ENABLED) {
+    // v4.5.2: Even when access control is disabled, ALWAYS enforce role checks
+    // for privileged roles (steward/admin) to protect PII access.
+    if (!ACCESS_CONTROL.ENABLED && requiredRole !== 'steward' && requiredRole !== 'admin') {
       result.isAuthorized = true;
       result.role = 'user';
       return result;

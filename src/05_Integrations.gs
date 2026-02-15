@@ -1675,10 +1675,12 @@ function doGet(e) {
   // Step 2: Check for unified dashboard mode parameter
   var mode = validation.params.mode || (e && e.parameter && e.parameter.mode);
   if (mode === 'steward' || mode === 'member') {
-    var isPII = (mode === 'steward');
+    // v4.5.2: isPII is determined by auth result, NOT the URL parameter.
+    // Default to false; only grant PII access after confirmed steward/admin authorization.
+    var isPII = false;
 
-    // Steward mode requires authorization (contains PII)
-    if (isPII) {
+    if (mode === 'steward') {
+      // Steward mode requires authorization (contains PII)
       var authResult = checkWebAppAuthorization('steward');
       if (!authResult.isAuthorized) {
         secureLog('doGet', 'Unauthorized steward access attempt', {
@@ -1687,6 +1689,8 @@ function doGet(e) {
         });
         return getAccessDeniedPage(authResult.message || 'Steward access required');
       }
+      // PII access granted ONLY after successful authorization check
+      isPII = true;
       secureLog('doGet', 'Steward access granted', { email: authResult.email });
     }
 
