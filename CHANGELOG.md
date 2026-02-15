@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [4.8.0] - 2026-02-15
 
 ### Security
+- **Security event alerting system** — threat detection and notifications integrated at web app, edit trigger, and self-service auth entry points
 - **Zero-knowledge survey vault** — all survey verification data (email, member ID) stored as SHA-256 hashes only
 - No plaintext PII is ever written to any sheet — raw email exists in memory only during form submission
 - `_Survey_Vault` sheet is hidden and sheet-protected (script owner only)
@@ -22,8 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FAQ section for survey completion tracking (7 Q&As)
 - Features Reference entries for survey tracking (6 entries)
 - Function Checklist entries for vault functions
+- Security event alerting hooks in `05_Integrations.gs`, `10_Main.gs`, `13_MemberSelfService.gs`
 
 ### Changed
+- **Member ID format** — changed from random 5-digit (`MS-48271-H`) to sequential (`MS-101-H`) for import reliability
+- **Import dedup** — now happens once client-side instead of per-batch for faster processing
+- `generateUniqueId_()` replaced by `getNextSequence_()` for deterministic sequential IDs
+- **Is Steward / Best Time to Contact** columns now use dynamic constants directly, removing redundant fallback values
 - `onSatisfactionFormSubmit()` — writes anonymous answers to Satisfaction sheet, hashed PII to vault
 - `approveFlaggedSubmission()` / `rejectFlaggedSubmission()` — now write to vault, not Satisfaction sheet
 - `syncSatisfactionValues()`, `getPublicSurveyData()`, `getSatisfactionByUnit()` — read verification status from vault via `getVaultDataMap_()`

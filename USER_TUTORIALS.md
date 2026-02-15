@@ -66,7 +66,7 @@ Quick, practical tutorials for common tasks in the 509 Dashboard.
 **Step 3: Enter Required Fields**
 | Column | Field | Example |
 |--------|-------|---------|
-| A | Member ID | MJASM123 (M + first 2 chars of first/last name + 3 digits) |
+| A | Member ID | Auto-generated (e.g., MS-101-H) or leave blank for auto-fill |
 | B | First Name | Jane |
 | C | Last Name | Smith |
 | D | Job Title | Case Worker (use dropdown) |

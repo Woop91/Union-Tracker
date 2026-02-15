@@ -157,7 +157,7 @@ After that, you have **26 production files** and a clean system ready for real m
 
 ### Member Management
 - Centralized member directory with contact info and job metadata
-- Auto-generated Member IDs (format: M + initials + digits)
+- Auto-generated Member IDs (format: UNIT_CODE-SEQUENCE-H, e.g., MS-101-H)
 - Steward assignments and workload tracking
 - Import/export capabilities
 - Self-service portal with PIN authentication
