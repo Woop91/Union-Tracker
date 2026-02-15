@@ -748,6 +748,8 @@ var SHEETS = {
   AUDIT_LOG: '_Audit_Log',
   // Case Checklist
   CASE_CHECKLIST: 'Case Checklist',
+  // Survey Completion Tracking (hidden)
+  SURVEY_TRACKING: '_Survey_Tracking',
   // Satisfaction & Feedback sheets
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
   // Data is preserved for modal access. Use removeDeprecatedTabs() to hide.
@@ -785,7 +787,8 @@ var HIDDEN_SHEETS = {
   STEWARD_CONTACT_CALC: '_Steward_Contact_Calc',
   STEWARD_PERFORMANCE_CALC: '_Steward_Performance_Calc',
   AUDIT_LOG: '_Audit_Log',
-  CHECKLIST_CALC: '_Checklist_Calc'
+  CHECKLIST_CALC: '_Checklist_Calc',
+  SURVEY_TRACKING: '_Survey_Tracking'
 };
 
 // ============================================================================
@@ -1592,6 +1595,29 @@ var SATISFACTION_SECTIONS = {
   VALUE_ACTION: { name: 'Value & Collective Action', questions: [52,53,54,55,56], scale: true },
   SCHEDULING: { name: 'Scheduling/Office Days', questions: [57,58,59,60,61,62,63], scale: true },
   PRIORITIES: { name: 'Priorities & Close', questions: [65,66,67,68], scale: false }
+};
+
+// ============================================================================
+// SURVEY TRACKING COLUMNS (10 columns: A-J)
+// ============================================================================
+
+/**
+ * Survey Completion Tracking column positions (1-indexed)
+ * Hidden sheet: _Survey_Tracking
+ * Tracks per-member survey completion status across survey rounds
+ * @const {Object}
+ */
+var SURVEY_TRACKING_COLS = {
+  MEMBER_ID: 1,              // A - Member ID (linked to Member Directory)
+  MEMBER_NAME: 2,            // B - Full name (cached for display)
+  EMAIL: 3,                  // C - Member email
+  WORK_LOCATION: 4,          // D - Work location
+  ASSIGNED_STEWARD: 5,       // E - Assigned steward name(s)
+  CURRENT_STATUS: 6,         // F - Current round: Completed / Not Completed
+  COMPLETED_DATE: 7,         // G - Date completed (blank if not completed)
+  TOTAL_MISSED: 8,           // H - Cumulative surveys missed
+  TOTAL_COMPLETED: 9,        // I - Cumulative surveys completed
+  LAST_REMINDER_SENT: 10     // J - Date of last reminder email sent
 };
 
 // ============================================================================

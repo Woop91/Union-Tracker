@@ -7306,7 +7306,17 @@ function showThemePresetPicker() {
   }
 
   html += '<script>' +
-    'function selectTheme(key) { google.script.run.withSuccessHandler(function() { google.script.host.close(); }).applyThemePreset(key); }' +
+    'function selectTheme(key) {' +
+    '  var items = document.querySelectorAll(".preset");' +
+    '  items.forEach(function(el) { el.style.pointerEvents = "none"; el.style.opacity = "0.6"; });' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function() { google.script.host.close(); })' +
+    '    .withFailureHandler(function(err) {' +
+    '      items.forEach(function(el) { el.style.pointerEvents = ""; el.style.opacity = ""; });' +
+    '      alert("Failed to apply theme: " + err.message);' +
+    '    })' +
+    '    .applyThemePreset(key);' +
+    '}' +
     '</script></body></html>';
 
   var output = HtmlService.createHtmlOutput(html).setWidth(340).setHeight(480);
@@ -7611,7 +7621,13 @@ function deactivateFocusMode() {
  */
 function getCurrentTheme() {
   var props = PropertiesService.getUserProperties();
-  return props.getProperty('visual_theme') || 'default';
+  var stored = props.getProperty('visual_theme');
+  if (!stored) return 'default';
+  try {
+    return JSON.parse(stored);
+  } catch(e) {
+    return stored;
+  }
 }
 
 /**
