@@ -24,19 +24,8 @@ function setupAuditLogSheet() {
     return;
   }
 
-  // Headers
-  var headers = [
-    'Timestamp',
-    'User Email',
-    'Sheet',
-    'Row',
-    'Column',
-    'Field Name',
-    'Old Value',
-    'New Value',
-    'Record ID',
-    'Action Type'
-  ];
+  // Headers — auto-derived from AUDIT_LOG_HEADER_MAP_
+  var headers = getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
@@ -891,8 +880,8 @@ function setupStewardPerformanceCalcSheet() {
 
   sheet.clear();
 
-  // Headers
-  var headers = ['Steward', 'Total Cases', 'Active', 'Closed', 'Won', 'Win Rate %', 'Avg Days', 'Overdue', 'Due This Week', 'Performance Score'];
+  // Headers — auto-derived from STEWARD_PERF_HEADER_MAP_
+  var headers = getHeadersFromMap_(STEWARD_PERF_HEADER_MAP_);
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
     .setBackground(COLORS.LIGHT_GRAY);
@@ -1529,18 +1518,8 @@ function setupCalcFormulasSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupSurveyTrackingSheet(sheet) {
-  var headers = [
-    'Member ID',          // A
-    'Member Name',        // B
-    'Email',              // C
-    'Work Location',      // D
-    'Assigned Steward',   // E
-    'Current Status',     // F
-    'Completed Date',     // G
-    'Total Missed',       // H
-    'Total Completed',    // I
-    'Last Reminder Sent'  // J
-  ];
+  // Headers — auto-derived from SURVEY_TRACKING_HEADER_MAP_
+  var headers = getHeadersFromMap_(SURVEY_TRACKING_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
@@ -1613,10 +1592,8 @@ function setupSurveyVaultSheet() {
 
   // Only set up headers if sheet is empty
   if (sheet.getLastRow() < 1) {
-    var headers = [
-      'Response Row', 'Email Hash', 'Verified', 'Member ID Hash',
-      'Quarter', 'Is Latest', 'Superseded By', 'Reviewer Notes'
-    ];
+    // Headers — auto-derived from SURVEY_VAULT_HEADER_MAP_
+    var headers = getHeadersFromMap_(SURVEY_VAULT_HEADER_MAP_);
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setFontWeight('bold')
       .setBackground('#7F1D1D')

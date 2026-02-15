@@ -486,20 +486,8 @@ function createFeedbackSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.FEEDBACK);
   sheet.clear();
 
-  // Headers
-  var headers = [
-    'Timestamp',       // A - Auto-generated
-    'Submitted By',    // B
-    'Category',        // C
-    'Type',            // D
-    'Priority',        // E
-    'Title',           // F
-    'Description',     // G
-    'Status',          // H
-    'Assigned To',     // I
-    'Resolution',      // J
-    'Notes'            // K
-  ];
+  // Headers — auto-derived from FEEDBACK_HEADER_MAP_
+  var headers = getHeadersFromMap_(FEEDBACK_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')

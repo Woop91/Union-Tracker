@@ -36,21 +36,8 @@ function getOrCreateChecklistSheet() {
 function createChecklistSheet_(ss) {
   var sheet = ss.insertSheet(CHECKLIST_SHEET_NAME);
 
-  // Set up headers
-  var headers = [
-    'Checklist ID',
-    'Case ID',
-    'Action Type',
-    'Item',
-    'Category',
-    'Required',
-    'Completed',
-    'Completed By',
-    'Completed Date',
-    'Due Date',
-    'Notes',
-    'Sort Order'
-  ];
+  // Headers — auto-derived from CHECKLIST_HEADER_MAP_
+  var headers = getHeadersFromMap_(CHECKLIST_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 

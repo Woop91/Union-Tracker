@@ -67,24 +67,8 @@ function createConfigSheet(ss) {
     '── MOBILE DASHBOARD ──'                            // AZ (1 col) - LAST COLUMN
   ];
 
-  // Row 2: Column Headers (A-AZ = 52 columns total)
-  var columnHeaders = [
-    'Job Titles', 'Office Locations', 'Units', 'Office Days', 'Yes/No (Dropdowns)',       // A-E
-    'Supervisors', 'Managers',                                                             // F-G
-    'Stewards', 'Steward Committees',                                                      // H-I
-    'Grievance Status', 'Grievance Step', 'Issue Category', 'Articles Violated',          // J-M
-    'Communication Methods', 'Grievance Coordinators', 'Grievance Form URL', 'Contact Form URL', // N-Q
-    'Admin Emails', 'Alert Days Before Deadline', 'Notification Recipients',              // R-T
-    'Organization Name', 'Local Number', 'Main Office Address', 'Main Phone',             // U-X
-    'Google Drive Folder ID', 'Google Calendar ID',                                       // Y-Z
-    'Filing Deadline Days', 'Step I Response Days', 'Step II Appeal Days', 'Step II Response Days', // AA-AD
-    'Best Times to Contact', 'Home Towns',                                                // AE-AF
-    'Contract Article (Grievance)', 'Contract Article (Discipline)', 'Contract Article (Workload)', 'Contract Name', // AG-AJ
-    'Union Parent', 'State/Region', 'Organization Website',                               // AK-AM
-    'Office Addresses', 'Main Fax', 'Main Contact Name', 'Main Contact Email', 'Satisfaction Survey URL', // AN-AR
-    'Chief Steward Email', 'Unit Codes', 'Archive Folder ID', 'Escalation Statuses', 'Escalation Steps', 'Template ID', 'PDF Folder ID', // AS-AY
-    '📱 Mobile Dashboard URL'                                                              // AZ - LAST COLUMN
-  ];
+  // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
+  var columnHeaders = getHeadersFromMap_(CONFIG_HEADER_MAP_);
 
   // Apply section headers (Row 1)
   sheet.getRange(1, 1, 1, sectionHeaders.length).setValues([sectionHeaders])
@@ -1730,24 +1714,8 @@ function createMeetingAttendanceSheet(ss) {
 function createMeetingCheckInLogSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEETING_CHECKIN_LOG);
 
-  var headers = [
-    'Meeting ID',       // A - Unique meeting identifier (steward sets)
-    'Meeting Name',     // B - Meeting name/topic
-    'Meeting Date',     // C - Date of meeting
-    'Meeting Type',     // D - Virtual or In-Person
-    'Member ID',        // E - Checked-in member
-    'Member Name',      // F - First + Last name
-    'Check-In Time',    // G - Timestamp when member checked in
-    'Email',            // H - Member email used for check-in
-    'Start Time',       // I - Meeting start time (HH:mm)
-    'Duration (hrs)',   // J - Meeting duration in hours
-    'Event Status',     // K - Scheduled / Active / Completed
-    'Notify Stewards',  // L - Steward email(s) for attendance report
-    'Calendar Event ID',// M - Google Calendar event ID
-    'Notes Doc URL',    // N - Meeting Notes Google Doc URL
-    'Agenda Doc URL',   // O - Meeting Agenda Google Doc URL
-    'Agenda Stewards'   // P - Steward emails for early agenda sharing
-  ];
+  // Headers — auto-derived from MEETING_CHECKIN_HEADER_MAP_
+  var headers = getHeadersFromMap_(MEETING_CHECKIN_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
