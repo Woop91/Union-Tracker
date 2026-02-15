@@ -1071,18 +1071,17 @@ var FEEDBACK_COLS = {
 | D | Job Title | JOB_TITLES (A) | No |
 | E | Work Location | OFFICE_LOCATIONS (B) | No |
 | F | Unit | UNITS (C) | No |
-| G | Office Days | OFFICE_DAYS (D) | **Yes** |
-| J | Preferred Communication | COMM_METHODS (N) | **Yes** |
-| K | Best Time to Contact | BEST_TIMES (AE) | **Yes** |
-| L | Supervisor | SUPERVISORS (F) | No |
-| M | Manager | MANAGERS (G) | No |
-| N | Is Steward | YES_NO (E) | No |
-| O | Committees | STEWARD_COMMITTEES (I) | **Yes** |
-| P | Assigned Steward | STEWARDS (H) | **Yes** |
-| U | Interest: Local | YES_NO (E) | No |
-| V | Interest: Chapter | YES_NO (E) | No |
-| W | Interest: Allied | YES_NO (E) | No |
-| X | Home Town | HOME_TOWNS (AF) | No |
+| H | Office Days | OFFICE_DAYS (D) | **Yes** |
+| K | Preferred Communication | COMM_METHODS (N) | **Yes** |
+| L | Best Time to Contact | BEST_TIMES (AE) | **Yes** |
+| M | Supervisor | SUPERVISORS (F) | No |
+| N | Manager | MANAGERS (G) | No |
+| O | Is Steward | YES_NO (E) | No |
+| P | Committees | STEWARD_COMMITTEES (I) | **Yes** |
+| Q | Assigned Steward | STEWARDS (H) | **Yes** |
+| V | Interest: Local | YES_NO (E) | No |
+| W | Interest: Chapter | YES_NO (E) | No |
+| X | Interest: Allied | YES_NO (E) | No |
 | Z | Contact Steward | STEWARDS (H) | No |
 
 ### Grievance Log Dropdowns (5 columns)
