@@ -426,6 +426,13 @@ function seedFeedbackData() {
  * Seed survey tracking data from existing Member Directory.
  * Populates _Survey_Tracking with all members and simulates
  * realistic completion patterns (~40% completed, ~60% not completed).
+ *
+ * In production, tracking data is populated by populateSurveyTrackingFromMembers()
+ * and updated automatically when members submit the satisfaction survey
+ * (via the Google Form trigger -> onSatisfactionFormSubmit() -> updateSurveyTrackingOnSubmit_()).
+ *
+ * See SURVEY_TRACKING_COLS in 01_Core.gs for full flow documentation.
+ * See 08c_FormsAndNotifications.gs "SURVEY COMPLETION TRACKING" section for all functions.
  */
 function seedSurveyTrackingData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();

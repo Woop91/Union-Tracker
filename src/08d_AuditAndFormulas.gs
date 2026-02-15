@@ -1455,11 +1455,36 @@ function setupCalcFormulasSheet(sheet) {
 // ============================================================================
 // SURVEY TRACKING HIDDEN SHEET SETUP
 // ============================================================================
+//
+// This function creates the hidden _Survey_Tracking sheet structure.
+// It is called by setupHiddenSheets() in 08a_SheetSetup.gs during
+// CREATE_509_DASHBOARD(). The sheet is hidden from users automatically.
+//
+// SURVEY TRACKER FLOW OVERVIEW:
+//   1. CREATE_509_DASHBOARD() -> setupHiddenSheets() -> setupSurveyTrackingSheet()
+//      Creates the hidden sheet with 10 columns (A-J per SURVEY_TRACKING_COLS).
+//   2. populateSurveyTrackingFromMembers() copies all members from Member Directory.
+//   3. When a member submits the Google Form satisfaction survey:
+//      Google trigger -> onSatisfactionFormSubmit(e) -> validates respondent email
+//      against Member Directory -> updateSurveyTrackingOnSubmit_(memberId)
+//      marks the member as "Completed" with timestamp.
+//   4. Stewards manage rounds via showSurveyTrackingDialog():
+//      - "Start New Round" resets all statuses, increments missed counts
+//      - "Send Reminders" emails non-respondents (7-day cooldown)
+//      - "Refresh Member List" re-syncs from Member Directory
+//
+// All tracking functions are in 08c_FormsAndNotifications.gs.
+// Column constants are in 01_Core.gs (SURVEY_TRACKING_COLS).
+// ============================================================================
 
 /**
  * Sets up the hidden _Survey_Tracking sheet with headers and formatting.
  * This sheet tracks per-member survey completion status across rounds.
- * Columns match SURVEY_TRACKING_COLS (A-J).
+ * Columns match SURVEY_TRACKING_COLS in 01_Core.gs (A-J).
+ *
+ * Called by: setupHiddenSheets() in 08a_SheetSetup.gs
+ * Column constants: SURVEY_TRACKING_COLS in 01_Core.gs
+ *
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupSurveyTrackingSheet(sheet) {

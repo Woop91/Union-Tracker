@@ -982,7 +982,15 @@ function createFunctionChecklistSheet_() {
     // ═══ PHASE 17: Forms & Submissions (v4.1) ═══
     ['1️⃣7️⃣ Forms', 'Form Triggers', '📝 On Grievance Submit', 'onGrievanceFormSubmit', 'Handles grievance form submissions with auto-ID and PDF'],
     ['1️⃣7️⃣ Forms', 'Form Triggers', '📝 On Contact Submit', 'onContactFormSubmit', 'Handles contact form with multi-key duplicate prevention'],
-    ['1️⃣7️⃣ Forms', 'Form Triggers', '📝 On Satisfaction Submit', 'onSatisfactionFormSubmit', 'Handles satisfaction survey with email verification'],
+    ['1️⃣7️⃣ Forms', 'Form Triggers', '📝 On Satisfaction Submit', 'onSatisfactionFormSubmit', 'Handles satisfaction survey with email verification. Also updates _Survey_Tracking via updateSurveyTrackingOnSubmit_().'],
+
+    // ═══ PHASE 17b: Survey Completion Tracking ═══
+    ['1️⃣7️⃣ Survey', 'Survey Tracking', '📋 Tracker Dialog', 'showSurveyTrackingDialog', 'Management UI with completion stats and action buttons (Refresh, New Round, Reminders)'],
+    ['1️⃣7️⃣ Survey', 'Survey Tracking', '👥 Populate Tracking', 'populateSurveyTrackingFromMembers', 'Syncs member list from Member Directory into _Survey_Tracking sheet'],
+    ['1️⃣7️⃣ Survey', 'Survey Tracking', '🔄 Start New Round', 'startNewSurveyRound', 'Resets all to "Not Completed", increments missed counts for non-respondents'],
+    ['1️⃣7️⃣ Survey', 'Survey Tracking', '📧 Send Reminders', 'sendSurveyCompletionReminders', 'Emails non-respondents with 7-day cooldown. Uses survey URL from Config (col AR)'],
+    ['1️⃣7️⃣ Survey', 'Survey Tracking', '📊 Get Stats', 'getSurveyCompletionStats', 'Returns { total, completed, notCompleted, rate } for current round'],
+    ['1️⃣7️⃣ Survey', 'Hidden Sheet Setup', '🔧 Setup Tracking Sheet', 'setupSurveyTrackingSheet', 'Creates hidden _Survey_Tracking with 10-column structure (called by setupHiddenSheets)'],
 
     // ═══ PHASE 18: Navigation & Views (v4.1) ═══
     ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
@@ -1269,6 +1277,7 @@ function createGettingStartedSheet(ss) {
   var dashboardInfo = [
     ['💼 Dashboard', 'Executive overview with key metrics, steward performance, and trends'],
     ['📊 Member Satisfaction', 'Survey results dashboard (requires linked Google Form)'],
+    ['📋 Survey Tracker', 'Tracks per-member survey completion across rounds. Auto-detects completions via email matching when members submit the Google Form. Manage via showSurveyTrackingDialog().'],
     ['📱 Mobile Dashboard', 'Touch-friendly view for phones and tablets']
   ];
 
@@ -1572,6 +1581,44 @@ function createFAQSheet(ss) {
     sheet.setRowHeight(row, 45);
   }
 
+  // ═══ CATEGORY: SURVEY COMPLETION TRACKING ═══
+  row += 2;
+  sheet.getRange(row, 1, 1, 5).merge()
+    .setValue('📋 SURVEY COMPLETION TRACKING')
+    .setBackground(categoryBg)
+    .setFontWeight('bold')
+    .setFontSize(14)
+    .setFontColor('#065F46');
+  sheet.setRowHeight(row, 35);
+
+  var surveyTrackingFAQs = [
+    ['Q: What is the Survey Completion Tracker?',
+     'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks completion status, dates, cumulative history, and reminder emails. Access it via the Survey Completion Tracker dialog.'],
+    ['Q: How does the system know when a member completes the survey?',
+     'A: When a member submits the Google Form satisfaction survey, the system extracts their email from the form response, matches it against the Member Directory (case-insensitive email comparison), and if a match is found, automatically marks that member as "Completed" in the tracking sheet with a timestamp.'],
+    ['Q: What if a member\'s email doesn\'t match?',
+     'A: The survey response is still recorded in the Satisfaction sheet but flagged as "Pending Review". The member\'s tracking status stays "Not Completed" for that round. Check that the member\'s email in the Member Directory matches what they used to submit the form.'],
+    ['Q: How do I start a new survey round?',
+     'A: Use the Survey Completion Tracker dialog and click "Start New Survey Round". This resets all members to "Not Completed", clears completion dates, and increments the Total Missed counter for anyone who didn\'t complete the previous round.'],
+    ['Q: How do reminder emails work?',
+     'A: Click "Send Reminders" in the Survey Completion Tracker dialog. It emails all members with status "Not Completed" who have a valid email. There\'s a 7-day cooldown between reminders to avoid spam. The Last Reminder Sent date is recorded per member.'],
+    ['Q: How do I populate the tracker for the first time?',
+     'A: Click "Refresh Member List" in the Survey Completion Tracker dialog, or run populateSurveyTrackingFromMembers(). This copies all members from the Member Directory into the tracking sheet with initial status "Not Completed". Safe to re-run — it rebuilds from the directory.'],
+    ['Q: Where is the survey tracking data stored?',
+     'A: In the hidden _Survey_Tracking sheet (10 columns: Member ID, Name, Email, Location, Steward, Current Status, Completed Date, Total Missed, Total Completed, Last Reminder Sent). It\'s created automatically during dashboard setup.']
+  ];
+
+  for (var st = 0; st < surveyTrackingFAQs.length; st++) {
+    row++;
+    sheet.getRange(row, 1, 1, 5).merge().setValue(surveyTrackingFAQs[st][0])
+      .setBackground(questionBg).setFontWeight('bold').setFontColor('#065F46').setWrap(true);
+    sheet.setRowHeight(row, 30);
+    row++;
+    sheet.getRange(row, 1, 1, 5).merge().setValue(surveyTrackingFAQs[st][1])
+      .setBackground(answerBg).setFontColor(textColor).setWrap(true);
+    sheet.setRowHeight(row, 55);
+  }
+
   // ═══ CATEGORY: ADVANCED ═══
   row += 2;
   sheet.getRange(row, 1, 1, 5).merge()
@@ -1806,8 +1853,16 @@ function createFeaturesReferenceSheet(ss) {
     ['Documents', 'Create PDF', 'Generate signature-ready PDF with legal blocks.', 'Strategic Ops > ID Engines > Create PDF', 'PDF, generate, signature'],
     ['Documents', 'Email PDF', 'Send generated PDFs via email.', 'After PDF generation', 'email, PDF, send'],
 
+    // Survey Completion Tracking
+    ['Survey Tracking', 'Survey Completion Tracker', 'Management dialog showing completion stats (total, completed, not completed, rate %) with action buttons.', 'showSurveyTrackingDialog()', 'survey, tracking, completion, stats'],
+    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory.', 'Automatic via form trigger', 'auto, detect, email, form, trigger'],
+    ['Survey Tracking', 'Populate Tracking', 'Syncs all members from Member Directory into the tracking sheet with initial "Not Completed" status. Safe to re-run.', 'Survey Tracker > Refresh Member List', 'populate, sync, members, refresh'],
+    ['Survey Tracking', 'Start New Round', 'Resets all members to "Not Completed", increments Total Missed for non-respondents from previous round.', 'Survey Tracker > Start New Round', 'round, reset, new, missed'],
+    ['Survey Tracking', 'Send Reminders', 'Emails non-respondents with survey link from Config. 7-day cooldown between reminders per member.', 'Survey Tracker > Send Reminders', 'reminder, email, cooldown, notify'],
+    ['Survey Tracking', 'Completion Stats', 'Returns total members, completed count, not completed count, and completion rate percentage.', 'getSurveyCompletionStats()', 'stats, rate, percentage, count'],
+
     // Demo Tools
-    ['Demo Tools', 'Seed Sample Data', 'Generate 1,000 test members and 300 grievances.', 'Admin > Demo Data > Seed All', 'seed, demo, test'],
+    ['Demo Tools', 'Seed Sample Data', 'Generate 1,000 test members, 300 grievances, and survey tracking data.', 'Admin > Demo Data > Seed All', 'seed, demo, test'],
     ['Demo Tools', 'NUKE Seeded Data', 'Remove all demo data (preserves real data).', 'Admin > Demo Data > NUKE', 'nuke, delete, cleanup']
   ];
 
