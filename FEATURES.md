@@ -485,7 +485,7 @@ Creates hidden sheets for internal Looker reports with full member data.
 |------------|--------|---------------|
 | `_Looker_Members` | Member Directory | Full member data with names, contact info, grievance stats |
 | `_Looker_Grievances` | Grievance Log | Full grievance data with member names, dates, outcomes |
-| `_Looker_Satisfaction` | Member Satisfaction | Survey responses with section averages and scores |
+| `_Looker_Satisfaction` | Member Satisfaction | Anonymous survey responses with section averages (no email, no member ID — verification via vault hashes only) |
 
 ### PII-Free Integration (Anonymized)
 

@@ -5,6 +5,31 @@ All notable changes to the 509 Union Dashboard project will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.0] - 2026-02-15
+
+### Security
+- **Zero-knowledge survey vault** — all survey verification data (email, member ID) stored as SHA-256 hashes only
+- No plaintext PII is ever written to any sheet — raw email exists in memory only during form submission
+- `_Survey_Vault` sheet is hidden and sheet-protected (script owner only)
+- Satisfaction sheet contains zero identifying data — cryptographically impossible to link answers to members
+- Flagged submissions review now shows "Anonymous submission #N" instead of email
+- `_Looker_Satisfaction` export no longer contains member IDs or verification status
+
+### Added
+- `hashForVault_(value)` — salted SHA-256 hash function for vault storage
+- `SURVEY_VAULT_COLS` constants for 8-column vault structure
+- Survey Completion Tracker with dialog, reminders, and round management
+- FAQ section for survey completion tracking (7 Q&As)
+- Features Reference entries for survey tracking (6 entries)
+- Function Checklist entries for vault functions
+
+### Changed
+- `onSatisfactionFormSubmit()` — writes anonymous answers to Satisfaction sheet, hashed PII to vault
+- `approveFlaggedSubmission()` / `rejectFlaggedSubmission()` — now write to vault, not Satisfaction sheet
+- `syncSatisfactionValues()`, `getPublicSurveyData()`, `getSatisfactionByUnit()` — read verification status from vault via `getVaultDataMap_()`
+- `SATISFACTION_COLS.EMAIL` through `REVIEWER_NOTES` deprecated (set to -1)
+- Verification columns (CE-CK) removed from Satisfaction sheet entirely
+
 ## [4.7.0] - 2026-02-14
 
 ### Fixed

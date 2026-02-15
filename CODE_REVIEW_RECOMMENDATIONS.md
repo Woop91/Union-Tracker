@@ -1,6 +1,6 @@
 # Code Review Recommendations
 
-> **Note:** This code review was conducted at v4.5.0.
+> **Note:** This code review was conducted at v4.5.0. The project is now at v4.8.0.
 
 **Repository:** Union Steward Dashboard (v4.5.0)
 **Review Date:** February 2026
@@ -16,7 +16,7 @@ This comprehensive code review analyzed 13 Google Apps Script modules totaling 4
 
 | Category | Score | Status |
 |----------|-------|--------|
-| Security | 9/10 | XSS fixed, access control implemented, PII logging secured, formula injection fixed |
+| Security | 9/10 | XSS fixed, access control implemented, PII logging secured, formula injection fixed, zero-knowledge survey vault (v4.8.0) |
 | Code Quality | 8/10 | Consistent patterns, comprehensive validation, escapeHtml() throughout |
 | Architecture | 7/10 | Data Access Layer implemented, modular design, caching layer |
 | Testing | 10/10 | 950 Jest tests across 18 suites, all 16 modules covered |
@@ -124,7 +124,9 @@ function doGet(e) {
 
 **Severity: FIXED (was MEDIUM)**
 
-PII logging has been secured with `secureLog()` and `getCurrentUserEmail()` helper. Previously:
+PII logging has been secured with `secureLog()` and `getCurrentUserEmail()` helper. Additionally, as of v4.8.0, survey-related PII (email, member ID) is SHA-256 hashed before storage in the `_Survey_Vault` — no plaintext survey PII exists in any sheet or log entry.
+
+Previously:
 
 | File | Line | Data Exposed |
 |------|------|--------------|
@@ -570,7 +572,7 @@ Almost all rules are turned off in `.eslintrc.js`. Consider gradually enabling:
 This codebase demonstrates strong functionality with comprehensive security controls and extensive test coverage. All critical security vulnerabilities (XSS, missing access control, formula injection, PII logging) have been resolved in v4.5.0. The project has:
 
 - **950 Jest tests** across 18 test suites covering all 16 source modules
-- **Comprehensive security**: `escapeHtml()` on all innerHTML, role-based access control, `secureLog()` for PII, formula injection prevention
+- **Comprehensive security**: `escapeHtml()` on all innerHTML, role-based access control, `secureLog()` for PII, formula injection prevention, zero-knowledge survey vault with SHA-256 hashed PII (v4.8.0)
 - **Data Access Layer** with caching and centralized spreadsheet access
 - **Production build system** with `--prod` flag excluding dev tools
 - **Excellent documentation**: Security review, developer guide, changelog, all actively maintained

@@ -73,15 +73,23 @@ As a steward, you can now send satisfaction surveys directly to members:
 
 **Note:** Survey verification is primarily an admin function, but stewards should be aware:
 
-🔍 **How It Works:**
-- Surveys are verified against Member Directory by email
-- Only verified responses count in statistics
-- Unmatched emails are flagged for admin review
-- Each response is tracked by quarter (e.g., "2026-Q1")
+🔒 **Anonymity Guarantee:**
+- Survey responses are **cryptographically anonymous** — no one can link answers to members
+- Email is used only to verify the respondent is a real member, then immediately hashed (SHA-256)
+- The raw email is **never saved** to any sheet — only a non-reversible hash is stored
+- Even the spreadsheet owner cannot determine who submitted any particular response
+
+🔍 **How Verification Works:**
+- When a member submits the survey, their email is checked against the Member Directory in-memory
+- If matched, the response is marked "Verified" and a thank-you email is sent
+- The email is then hashed and the plaintext is discarded
+- Unmatched emails are flagged for admin review (reviewer sees "Anonymous submission #N", not the email)
+- Each response is tracked by quarter (e.g., "2026-Q1") using hashed identifiers
 
 📈 **What This Means for You:**
 - Encourage members to use their registered email when completing surveys
 - Survey stats reflect actual member feedback, not duplicate submissions
+- **Members can answer honestly** — their identity cannot be connected to their responses
 - Historical responses are preserved for comparison
 
 ---

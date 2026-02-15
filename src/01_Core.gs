@@ -754,8 +754,8 @@ var SHEETS = {
   //   -> updateSurveyTrackingOnSubmit_() marks member "Completed" in this sheet.
   // Management: showSurveyTrackingDialog() in 08c_FormsAndNotifications.gs
   SURVEY_TRACKING: '_Survey_Tracking',
-  // Survey Vault (hidden + protected) — stores email/member ID linkage
-  // for survey responses. Separated from Satisfaction sheet for anonymity.
+  // Survey Vault (hidden + protected) — stores SHA-256 hashed email/member ID
+  // for survey responses. No plaintext PII. Separated from Satisfaction sheet for anonymity.
   SURVEY_VAULT: '_Survey_Vault',
   // Satisfaction & Feedback sheets
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
