@@ -743,19 +743,27 @@ function addToConfigDropdown_(configCol, value) {
 
   if (!configSheet) return;
 
-  // Find first empty row in the column
-  var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
-  var emptyRow = 3;
+  var lastRow = configSheet.getLastRow();
+  var rowCount = lastRow >= 3 ? lastRow - 2 : 0;
 
-  for (var i = 0; i < colData.length; i++) {
-    if (!colData[i][0]) {
-      emptyRow = i + 3;
-      break;
+  if (rowCount > 0) {
+    var colData = configSheet.getRange(3, configCol, rowCount, 1).getValues();
+    var emptyRow = -1;
+
+    for (var i = 0; i < colData.length; i++) {
+      var cellVal = (colData[i][0] || '').toString().trim();
+      // Skip if value already exists (prevent duplicates)
+      if (cellVal === value.toString().trim()) return;
+      if (!cellVal && emptyRow === -1) {
+        emptyRow = i + 3;
+      }
     }
-    emptyRow = i + 4;
-  }
 
-  configSheet.getRange(emptyRow, configCol).setValue(value);
+    if (emptyRow === -1) emptyRow = lastRow + 1;
+    configSheet.getRange(emptyRow, configCol).setValue(value);
+  } else {
+    configSheet.getRange(3, configCol).setValue(value);
+  }
 }
 
 /**
@@ -778,6 +786,142 @@ function removeFromConfigDropdown_(configCol, value) {
       break;
     }
   }
+}
+
+// ============================================================================
+// STEWARD STATUS SYNC (Bidirectional)
+// ============================================================================
+
+/**
+ * Bidirectional sync between Member Directory IS_STEWARD column and Config STEWARDS list.
+ * - Members marked "Yes" in IS_STEWARD are added to Config STEWARDS if missing.
+ * - Names in Config STEWARDS that match a member get IS_STEWARD set to "Yes" if not already.
+ * - Members marked "No"/blank in IS_STEWARD are removed from Config STEWARDS.
+ * - Names in Config STEWARDS that don't match any member are left untouched (manual entries).
+ * Can be called manually from the menu or automatically via triggers.
+ */
+function syncStewardStatus() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!memberSheet || !configSheet) {
+    Logger.log('syncStewardStatus: Required sheets not found');
+    return;
+  }
+
+  // --- Read Member Directory ---
+  var memberData = memberSheet.getDataRange().getValues();
+  // Build a map: "First Last" -> { row, isSteward }
+  var memberMap = {};        // fullName -> { row: number, isSteward: boolean }
+  var stewardsInDirectory = []; // fullNames of members with IS_STEWARD = Yes
+
+  for (var i = 1; i < memberData.length; i++) {
+    var firstName = (memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim();
+    var lastName = (memberData[i][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim();
+    if (!firstName && !lastName) continue; // skip blank rows
+
+    var fullName = firstName + ' ' + lastName;
+    var isSteward = isTruthyValue(memberData[i][MEMBER_COLS.IS_STEWARD - 1]);
+
+    memberMap[fullName] = { row: i + 1, isSteward: isSteward };
+    if (isSteward) {
+      stewardsInDirectory.push(fullName);
+    }
+  }
+
+  // --- Read Config STEWARDS column ---
+  var lastRow = configSheet.getLastRow();
+  var configRows = lastRow >= 3 ? lastRow - 2 : 0;
+  var configStewardNames = []; // { name: string, row: number }
+
+  if (configRows > 0) {
+    var configData = configSheet.getRange(3, CONFIG_COLS.STEWARDS, configRows, 1).getValues();
+    for (var c = 0; c < configData.length; c++) {
+      var name = (configData[c][0] || '').toString().trim();
+      if (name) {
+        configStewardNames.push({ name: name, row: c + 3 });
+      }
+    }
+  }
+
+  var configNameSet = {};
+  for (var s = 0; s < configStewardNames.length; s++) {
+    configNameSet[configStewardNames[s].name] = configStewardNames[s].row;
+  }
+
+  var changes = 0;
+
+  // --- Direction 1: Member Directory -> Config ---
+  // If IS_STEWARD = Yes but name not in Config, add it
+  for (var d = 0; d < stewardsInDirectory.length; d++) {
+    var stewardName = stewardsInDirectory[d];
+    if (!configNameSet[stewardName]) {
+      addToConfigDropdown_(CONFIG_COLS.STEWARDS, stewardName);
+      changes++;
+    }
+  }
+
+  // If IS_STEWARD != Yes but name IS in Config, remove from Config
+  for (var name in configNameSet) {
+    if (memberMap[name] && !memberMap[name].isSteward) {
+      configSheet.getRange(configNameSet[name], CONFIG_COLS.STEWARDS).clearContent();
+      changes++;
+    }
+  }
+
+  // --- Direction 2: Config -> Member Directory ---
+  // If name is in Config STEWARDS but member IS_STEWARD != Yes, set to Yes
+  for (var cn = 0; cn < configStewardNames.length; cn++) {
+    var configName = configStewardNames[cn].name;
+    if (memberMap[configName] && !memberMap[configName].isSteward) {
+      memberSheet.getRange(memberMap[configName].row, MEMBER_COLS.IS_STEWARD).setValue('Yes');
+      changes++;
+    }
+  }
+
+  // --- Compact Config column (remove blank gaps) ---
+  if (changes > 0) {
+    compactConfigColumn_(CONFIG_COLS.STEWARDS);
+  }
+
+  Logger.log('syncStewardStatus: ' + changes + ' change(s) applied');
+  ss.toast(changes > 0
+    ? '✅ Steward status synced (' + changes + ' change' + (changes > 1 ? 's' : '') + ')'
+    : '✅ Steward status already in sync',
+    COMMAND_CONFIG.SYSTEM_NAME, 5);
+}
+
+/**
+ * Compacts a Config column by removing blank gaps between values.
+ * Shifts all non-empty values to the top starting at row 3.
+ * @param {number} configCol - The Config column number to compact
+ * @private
+ */
+function compactConfigColumn_(configCol) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) return;
+
+  var lastRow = configSheet.getLastRow();
+  if (lastRow < 3) return;
+
+  var range = configSheet.getRange(3, configCol, lastRow - 2, 1);
+  var values = range.getValues();
+
+  // Collect non-empty values
+  var compacted = [];
+  for (var i = 0; i < values.length; i++) {
+    var val = (values[i][0] || '').toString().trim();
+    if (val) compacted.push([val]);
+  }
+
+  // Pad with empty strings to fill the original range
+  while (compacted.length < values.length) {
+    compacted.push(['']);
+  }
+
+  range.setValues(compacted);
 }
 
 // ============================================================================

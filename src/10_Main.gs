@@ -159,6 +159,10 @@ function onEdit(e) {
         try { syncMeetingAttendanceToMemberDirectory(); }
         catch (syncError) { Logger.log('Meeting Attendance sync error: ' + syncError.message); }
       }
+
+    } else if (sheetName === SHEETS.CONFIG) {
+      // Config sheet edits — sync STEWARDS column to Member Directory
+      handleConfigStewardEdit_(e);
     }
 
     // ========================================
@@ -714,6 +718,23 @@ function handleMemberEdit(e) {
       );
     }
   }
+
+  // Sync IS_STEWARD changes to Config STEWARDS list in real time
+  if (col === MEMBER_COLS.IS_STEWARD) {
+    var firstName = sheet.getRange(row, MEMBER_COLS.FIRST_NAME).getValue();
+    var lastName = sheet.getRange(row, MEMBER_COLS.LAST_NAME).getValue();
+    var fullName = (firstName || '').toString().trim() + ' ' + (lastName || '').toString().trim();
+
+    if (fullName.trim()) {
+      if (isTruthyValue(e.value)) {
+        // Promoted to steward — add to Config if not already present
+        addToConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
+      } else {
+        // Demoted from steward — remove from Config
+        removeFromConfigDropdown_(CONFIG_COLS.STEWARDS, fullName);
+      }
+    }
+  }
 }
 
 /**
@@ -769,6 +790,59 @@ function syncDropdownToConfig_(e, sheetName) {
 
   // Add the new value to the first empty row in the Config column
   addToConfigDropdown_(configCol, newValue);
+}
+
+/**
+ * Handles edits to the Config sheet's STEWARDS column.
+ * When a steward name is added or removed in Config, updates the matching
+ * member's IS_STEWARD field in the Member Directory.
+ * @param {Object} e - The edit event object
+ * @private
+ */
+function handleConfigStewardEdit_(e) {
+  var col = e.range.getColumn();
+  var row = e.range.getRow();
+
+  // Only handle edits to the STEWARDS column (H), data rows (row >= 3)
+  if (col !== CONFIG_COLS.STEWARDS || row < 3) return;
+
+  var newValue = (e.value || '').toString().trim();
+  var oldValue = (e.oldValue || '').toString().trim();
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet) return;
+
+  var memberData = memberSheet.getDataRange().getValues();
+
+  // If a name was removed (cell cleared or old value replaced), set that member to No
+  if (oldValue && oldValue !== newValue) {
+    for (var i = 1; i < memberData.length; i++) {
+      var firstName = (memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim();
+      var lastName = (memberData[i][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim();
+      var fullName = firstName + ' ' + lastName;
+      if (fullName === oldValue) {
+        memberSheet.getRange(i + 1, MEMBER_COLS.IS_STEWARD).setValue('No');
+        break;
+      }
+    }
+  }
+
+  // If a new name was added, set that member to Yes
+  if (newValue) {
+    for (var j = 1; j < memberData.length; j++) {
+      var fn = (memberData[j][MEMBER_COLS.FIRST_NAME - 1] || '').toString().trim();
+      var ln = (memberData[j][MEMBER_COLS.LAST_NAME - 1] || '').toString().trim();
+      var full = fn + ' ' + ln;
+      if (full === newValue) {
+        var currentStatus = memberData[j][MEMBER_COLS.IS_STEWARD - 1];
+        if (!isTruthyValue(currentStatus)) {
+          memberSheet.getRange(j + 1, MEMBER_COLS.IS_STEWARD).setValue('Yes');
+        }
+        break;
+      }
+    }
+  }
 }
 
 /**
