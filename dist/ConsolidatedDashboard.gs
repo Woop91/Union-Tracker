@@ -1426,7 +1426,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2741 lines)
+// SOURCE: 01_Core.gs (2767 lines)
 // ============================================================================
 
 /**
@@ -2179,6 +2179,8 @@ var SHEETS = {
   AUDIT_LOG: '_Audit_Log',
   // Case Checklist
   CASE_CHECKLIST: 'Case Checklist',
+  // Survey Completion Tracking (hidden)
+  SURVEY_TRACKING: '_Survey_Tracking',
   // Satisfaction & Feedback sheets
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
   // Data is preserved for modal access. Use removeDeprecatedTabs() to hide.
@@ -2216,7 +2218,8 @@ var HIDDEN_SHEETS = {
   STEWARD_CONTACT_CALC: '_Steward_Contact_Calc',
   STEWARD_PERFORMANCE_CALC: '_Steward_Performance_Calc',
   AUDIT_LOG: '_Audit_Log',
-  CHECKLIST_CALC: '_Checklist_Calc'
+  CHECKLIST_CALC: '_Checklist_Calc',
+  SURVEY_TRACKING: '_Survey_Tracking'
 };
 
 // ============================================================================
@@ -3023,6 +3026,29 @@ var SATISFACTION_SECTIONS = {
   VALUE_ACTION: { name: 'Value & Collective Action', questions: [52,53,54,55,56], scale: true },
   SCHEDULING: { name: 'Scheduling/Office Days', questions: [57,58,59,60,61,62,63], scale: true },
   PRIORITIES: { name: 'Priorities & Close', questions: [65,66,67,68], scale: false }
+};
+
+// ============================================================================
+// SURVEY TRACKING COLUMNS (10 columns: A-J)
+// ============================================================================
+
+/**
+ * Survey Completion Tracking column positions (1-indexed)
+ * Hidden sheet: _Survey_Tracking
+ * Tracks per-member survey completion status across survey rounds
+ * @const {Object}
+ */
+var SURVEY_TRACKING_COLS = {
+  MEMBER_ID: 1,              // A - Member ID (linked to Member Directory)
+  MEMBER_NAME: 2,            // B - Full name (cached for display)
+  EMAIL: 3,                  // C - Member email
+  WORK_LOCATION: 4,          // D - Work location
+  ASSIGNED_STEWARD: 5,       // E - Assigned steward name(s)
+  CURRENT_STATUS: 6,         // F - Current round: Completed / Not Completed
+  COMPLETED_DATE: 7,         // G - Date completed (blank if not completed)
+  TOTAL_MISSED: 8,           // H - Cumulative surveys missed
+  TOTAL_COMPLETED: 9,        // I - Cumulative surveys completed
+  LAST_REMINDER_SENT: 10     // J - Date of last reminder email sent
 };
 
 // ============================================================================
@@ -6667,7 +6693,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2744 lines)
+// SOURCE: 03_UIComponents.gs (2760 lines)
 // ============================================================================
 
 /**
@@ -23167,7 +23193,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2847 lines)
+// SOURCE: 07_DevTools.gs (2940 lines)
 // ============================================================================
 
 /**
@@ -23340,6 +23366,7 @@ function SEED_SAMPLE_DATA() {
     '• 300 sample grievances (30%)\n' +
     '• 50 sample survey responses\n' +
     '• 3 sample feedback entries\n' +
+    '• Survey completion tracking data\n' +
     '• Auto-sync trigger for live updates\n\n' +
     'Note: Some members may have multiple grievances.\n' +
     'Member Directory will auto-update when Grievance Log changes.\n\n' +
@@ -23363,6 +23390,9 @@ function SEED_SAMPLE_DATA() {
   ss.toast('Seeding feedback entries...', '🌱 Seeding', 2);
   seedFeedbackData();
 
+  ss.toast('Seeding survey tracking data...', '🌱 Seeding', 2);
+  seedSurveyTrackingData();
+
   ss.toast('Installing auto-sync trigger...', '🔧 Setup', 3);
   installAutoSyncTriggerQuick();
 
@@ -23373,6 +23403,7 @@ function SEED_SAMPLE_DATA() {
     '• 300 grievances added (30%)\n' +
     '• 50 survey responses added\n' +
     '• 3 feedback entries added\n' +
+    '• Survey tracking populated\n' +
     '• Auto-sync trigger installed\n\n' +
     'Member Directory columns (Has Open Grievance?, Grievance Status, Days to Deadline) ' +
     'will now auto-update when you edit the Grievance Log.', ui.ButtonSet.OK);
@@ -23587,6 +23618,94 @@ function seedFeedbackData() {
   sheet.getRange(2, FEEDBACK_COLS.TIMESTAMP, sampleFeedback.length, 1).setNumberFormat('MM/dd/yyyy HH:mm');
 
   Logger.log('Seeded ' + sampleFeedback.length + ' sample feedback entries');
+}
+
+/**
+ * Seed survey tracking data from existing Member Directory.
+ * Populates _Survey_Tracking with all members and simulates
+ * realistic completion patterns (~40% completed, ~60% not completed).
+ */
+function seedSurveyTrackingData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!trackingSheet) {
+    Logger.log('Survey Tracking sheet not found. It will be created during setup.');
+    return;
+  }
+
+  if (!memberSheet || memberSheet.getLastRow() < 2) {
+    Logger.log('Member Directory empty or missing. Skipping survey tracking seed.');
+    return;
+  }
+
+  // Check if already seeded
+  if (trackingSheet.getLastRow() > 1) {
+    Logger.log('Survey Tracking already has data. Skipping seed.');
+    return;
+  }
+
+  var memberData = memberSheet.getDataRange().getValues();
+  var rows = [];
+  var now = new Date();
+
+  for (var i = 1; i < memberData.length; i++) {
+    var memberId = memberData[i][MEMBER_COLS.MEMBER_ID - 1];
+    if (!memberId) continue;
+
+    var firstName = memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '';
+    var lastName = memberData[i][MEMBER_COLS.LAST_NAME - 1] || '';
+    var email = memberData[i][MEMBER_COLS.EMAIL - 1] || '';
+    var location = memberData[i][MEMBER_COLS.WORK_LOCATION - 1] || '';
+    var steward = memberData[i][MEMBER_COLS.ASSIGNED_STEWARD - 1] || '';
+
+    // ~40% completed current round
+    var completed = Math.random() < 0.4;
+    var completedDate = '';
+    if (completed) {
+      var daysAgo = Math.floor(Math.random() * 30);
+      completedDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    }
+
+    // Simulate 0-3 prior rounds of history
+    var priorRounds = Math.floor(Math.random() * 4);
+    var totalCompleted = completed ? 1 : 0;
+    var totalMissed = 0;
+    for (var r = 0; r < priorRounds; r++) {
+      if (Math.random() < 0.5) {
+        totalCompleted++;
+      } else {
+        totalMissed++;
+      }
+    }
+
+    // ~30% of non-completed members got a reminder
+    var lastReminder = '';
+    if (!completed && Math.random() < 0.3) {
+      var reminderDaysAgo = Math.floor(Math.random() * 14) + 1;
+      lastReminder = new Date(now.getTime() - reminderDaysAgo * 24 * 60 * 60 * 1000);
+    }
+
+    rows.push([
+      memberId,
+      (firstName + ' ' + lastName).trim(),
+      email,
+      location,
+      steward,
+      completed ? 'Completed' : 'Not Completed',
+      completedDate,
+      totalMissed,
+      totalCompleted,
+      lastReminder
+    ]);
+  }
+
+  if (rows.length > 0) {
+    trackingSheet.getRange(2, 1, rows.length, 10).setValues(rows);
+  }
+
+  Logger.log('Seeded survey tracking for ' + rows.length + ' members');
 }
 
 /**
@@ -26019,7 +26138,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (637 lines)
+// SOURCE: 08a_SheetSetup.gs (638 lines)
 // ============================================================================
 
 /**
@@ -26260,7 +26379,8 @@ function setupHiddenSheets(ss) {
     { name: HIDDEN_SHEETS.CALC_DEADLINES, setup: setupCalcDeadlinesSheet },
     { name: HIDDEN_SHEETS.CALC_STATS, setup: setupCalcStatsSheet },
     { name: HIDDEN_SHEETS.CALC_SYNC, setup: setupCalcSyncSheet },
-    { name: HIDDEN_SHEETS.CALC_FORMULAS, setup: setupCalcFormulasSheet }
+    { name: HIDDEN_SHEETS.CALC_FORMULAS, setup: setupCalcFormulasSheet },
+    { name: HIDDEN_SHEETS.SURVEY_TRACKING, setup: setupSurveyTrackingSheet }
   ];
 
   hiddenSheets.forEach(function(config) {
@@ -27551,7 +27671,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1589 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (1912 lines)
 // ============================================================================
 
 
@@ -28363,6 +28483,15 @@ function onSatisfactionFormSubmit(e) {
     // Update dashboard summary values
     syncSatisfactionValues();
 
+    // Update survey completion tracking if member was matched
+    if (memberMatch && memberMatch.memberId) {
+      try {
+        updateSurveyTrackingOnSubmit_(memberMatch.memberId);
+      } catch (trackErr) {
+        Logger.log('Survey tracking update error: ' + trackErr.message);
+      }
+    }
+
     Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + newRow[SATISFACTION_COLS.VERIFIED - 1]);
 
     // Send thank-you email if respondent email available
@@ -29118,6 +29247,320 @@ function getQuarterFromDate(date) {
 
 
 
+// ============================================================================
+// SURVEY COMPLETION TRACKING
+// ============================================================================
+
+/**
+ * Populates the _Survey_Tracking sheet from the Member Directory.
+ * Creates one row per active member with their info and initial status.
+ * Safe to re-run: clears existing data rows and rebuilds from directory.
+ */
+function populateSurveyTrackingFromMembers() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!trackingSheet || !memberSheet) {
+    Logger.log('populateSurveyTracking: Required sheets not found');
+    return;
+  }
+
+  var memberData = memberSheet.getDataRange().getValues();
+  if (memberData.length < 2) {
+    Logger.log('populateSurveyTracking: No members found');
+    return;
+  }
+
+  // Clear existing data (preserve header)
+  if (trackingSheet.getLastRow() > 1) {
+    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, 10).clear();
+  }
+
+  var rows = [];
+  for (var i = 1; i < memberData.length; i++) {
+    var memberId = memberData[i][MEMBER_COLS.MEMBER_ID - 1];
+    if (!memberId) continue;
+
+    var firstName = memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '';
+    var lastName = memberData[i][MEMBER_COLS.LAST_NAME - 1] || '';
+
+    rows.push([
+      memberId,                                                        // A - Member ID
+      (firstName + ' ' + lastName).trim(),                             // B - Member Name
+      memberData[i][MEMBER_COLS.EMAIL - 1] || '',                      // C - Email
+      memberData[i][MEMBER_COLS.WORK_LOCATION - 1] || '',              // D - Work Location
+      memberData[i][MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',           // E - Assigned Steward
+      'Not Completed',                                                 // F - Current Status
+      '',                                                              // G - Completed Date
+      0,                                                               // H - Total Missed
+      0,                                                               // I - Total Completed
+      ''                                                               // J - Last Reminder Sent
+    ]);
+  }
+
+  if (rows.length > 0) {
+    trackingSheet.getRange(2, 1, rows.length, 10).setValues(rows);
+  }
+
+  Logger.log('populateSurveyTracking: Populated ' + rows.length + ' member rows');
+}
+
+/**
+ * Updates survey tracking when a satisfaction form is submitted.
+ * Marks the member as "Completed" for the current round.
+ * Called from onSatisfactionFormSubmit when a member match is found.
+ * @param {string} matchedMemberId - The matched member ID from form submission
+ */
+function updateSurveyTrackingOnSubmit_(matchedMemberId) {
+  if (!matchedMemberId) return;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
+  if (!trackingSheet) return;
+
+  var data = trackingSheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][SURVEY_TRACKING_COLS.MEMBER_ID - 1] === matchedMemberId) {
+      var rowNum = i + 1;
+      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.CURRENT_STATUS).setValue('Completed');
+      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.COMPLETED_DATE).setValue(new Date());
+      var prevCompleted = parseInt(data[i][SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1]) || 0;
+      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.TOTAL_COMPLETED).setValue(prevCompleted + 1);
+      Logger.log('Survey tracking updated for member: ' + matchedMemberId);
+      return;
+    }
+  }
+
+  Logger.log('Survey tracking: member ' + matchedMemberId + ' not found in tracking sheet');
+}
+
+/**
+ * Starts a new survey round. Resets Current Status to "Not Completed"
+ * for all members and clears Completed Date. Increments Total Missed
+ * for members who did not complete the previous round.
+ */
+function startNewSurveyRound() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
+
+  if (!trackingSheet || trackingSheet.getLastRow() < 2) {
+    Logger.log('startNewSurveyRound: No tracking data found');
+    try {
+      SpreadsheetApp.getUi().alert('No survey tracking data found. Run "Populate Survey Tracking" first.');
+    } catch (_e) { /* headless */ }
+    return;
+  }
+
+  var data = trackingSheet.getDataRange().getValues();
+  var updates = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var currentStatus = data[i][SURVEY_TRACKING_COLS.CURRENT_STATUS - 1];
+    var totalMissed = parseInt(data[i][SURVEY_TRACKING_COLS.TOTAL_MISSED - 1]) || 0;
+
+    // Increment missed count for members who didn't complete last round
+    if (currentStatus !== 'Completed') {
+      totalMissed++;
+    }
+
+    updates.push([
+      'Not Completed',  // F - Reset status
+      '',               // G - Clear completed date
+      totalMissed       // H - Updated missed count
+    ]);
+  }
+
+  if (updates.length > 0) {
+    trackingSheet.getRange(2, SURVEY_TRACKING_COLS.CURRENT_STATUS, updates.length, 3)
+      .setValues(updates);
+  }
+
+  Logger.log('startNewSurveyRound: Reset ' + updates.length + ' members for new round');
+  try {
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'New survey round started. ' + updates.length + ' members reset to Not Completed.',
+      'Survey Tracking', 5
+    );
+  } catch (_e) { /* headless */ }
+}
+
+/**
+ * Sends reminder emails to members who have not completed the current survey round.
+ * Only sends to members with a valid email and Current Status = "Not Completed".
+ * Respects a configurable cooldown period (default 7 days) between reminders.
+ */
+function sendSurveyCompletionReminders() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+
+  if (!trackingSheet || trackingSheet.getLastRow() < 2) {
+    Logger.log('sendSurveyCompletionReminders: No tracking data');
+    return 'No survey tracking data found.';
+  }
+
+  // Get survey URL from Config
+  var surveyUrl = '';
+  if (configSheet) {
+    try {
+      var configData = configSheet.getDataRange().getValues();
+      if (configData.length > 2 && configData[0].length >= 44) {
+        surveyUrl = configData[2][43] || ''; // Column AR (Satisfaction Survey URL)
+      }
+    } catch (_e) { /* no survey URL configured */ }
+  }
+
+  var data = trackingSheet.getDataRange().getValues();
+  var now = new Date();
+  var cooldownDays = 7;
+  var sentCount = 0;
+  var skippedCount = 0;
+
+  var orgName = '';
+  try {
+    orgName = configSheet.getRange(3, 21).getValue() || 'Your Union';
+  } catch (_e) {
+    orgName = 'Your Union';
+  }
+
+  for (var i = 1; i < data.length; i++) {
+    var status = data[i][SURVEY_TRACKING_COLS.CURRENT_STATUS - 1];
+    var email = (data[i][SURVEY_TRACKING_COLS.EMAIL - 1] || '').toString().trim();
+    var memberName = data[i][SURVEY_TRACKING_COLS.MEMBER_NAME - 1] || 'Member';
+    var lastReminder = data[i][SURVEY_TRACKING_COLS.LAST_REMINDER_SENT - 1];
+
+    if (status === 'Completed' || !email || !email.includes('@')) continue;
+
+    // Skip if reminder was sent within cooldown period
+    if (lastReminder) {
+      var daysSinceReminder = (now - new Date(lastReminder)) / (1000 * 60 * 60 * 24);
+      if (daysSinceReminder < cooldownDays) {
+        skippedCount++;
+        continue;
+      }
+    }
+
+    try {
+      var body = 'Dear ' + memberName + ',\n\n' +
+        'This is a friendly reminder that we have not yet received your response to the current member satisfaction survey.\n\n' +
+        'Your feedback is valuable and helps us improve our representation and services.\n\n';
+
+      if (surveyUrl) {
+        body += 'Please complete the survey here: ' + surveyUrl + '\n\n';
+      }
+
+      body += 'Thank you for your participation.\n\n' +
+        'In Solidarity,\n' + orgName;
+
+      MailApp.sendEmail({
+        to: email,
+        subject: (typeof COMMAND_CONFIG !== 'undefined' ? COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX : '') + 'Survey Completion Reminder',
+        body: body
+      });
+
+      var rowNum = i + 1;
+      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.LAST_REMINDER_SENT).setValue(now);
+      sentCount++;
+    } catch (emailError) {
+      Logger.log('Reminder email failed for ' + email + ': ' + emailError.message);
+    }
+  }
+
+  var result = 'Reminders sent: ' + sentCount + ', Skipped (cooldown): ' + skippedCount;
+  Logger.log('sendSurveyCompletionReminders: ' + result);
+  return result;
+}
+
+/**
+ * Shows survey completion statistics in a toast/alert.
+ * Provides a quick overview of current round participation.
+ */
+function getSurveyCompletionStats() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
+
+  if (!trackingSheet || trackingSheet.getLastRow() < 2) {
+    return { total: 0, completed: 0, notCompleted: 0, rate: '0%' };
+  }
+
+  var data = trackingSheet.getDataRange().getValues();
+  var total = 0;
+  var completed = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][SURVEY_TRACKING_COLS.MEMBER_ID - 1]) continue;
+    total++;
+    if (data[i][SURVEY_TRACKING_COLS.CURRENT_STATUS - 1] === 'Completed') {
+      completed++;
+    }
+  }
+
+  var notCompleted = total - completed;
+  var rate = total > 0 ? Math.round((completed / total) * 100) + '%' : '0%';
+
+  return {
+    total: total,
+    completed: completed,
+    notCompleted: notCompleted,
+    rate: rate
+  };
+}
+
+/**
+ * Shows a dialog with survey tracking management options
+ */
+function showSurveyTrackingDialog() {
+  var stats = getSurveyCompletionStats();
+
+  var html = HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><html><head><base target="_top">' +
+    '<style>' +
+    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;background:#f5f5f5}' +
+    '.container{background:white;padding:25px;border-radius:12px;max-width:500px}' +
+    'h2{color:#7c3aed;margin-top:0}' +
+    '.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:15px 0}' +
+    '.stat{background:#f8f9fa;padding:15px;border-radius:8px;text-align:center}' +
+    '.stat .num{font-size:28px;font-weight:bold;color:#7c3aed}' +
+    '.stat .label{font-size:12px;color:#6b7280;margin-top:4px}' +
+    '.stat.green .num{color:#10b981}' +
+    '.stat.red .num{color:#ef4444}' +
+    '.btn{display:block;width:100%;padding:12px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:600;margin:8px 0;box-sizing:border-box}' +
+    '.btn-primary{background:#7c3aed;color:white}' +
+    '.btn-success{background:#10b981;color:white}' +
+    '.btn-warning{background:#f59e0b;color:white}' +
+    '.btn-secondary{background:#e5e7eb;color:#374151}' +
+    '.info{background:#eff6ff;padding:10px;border-radius:6px;font-size:13px;color:#1e40af;margin:10px 0}' +
+    '</style></head><body>' +
+    '<div class="container">' +
+    '<h2>Survey Completion Tracker</h2>' +
+    '<div class="stats">' +
+    '<div class="stat"><div class="num">' + stats.total + '</div><div class="label">Total Members</div></div>' +
+    '<div class="stat green"><div class="num">' + stats.completed + '</div><div class="label">Completed</div></div>' +
+    '<div class="stat red"><div class="num">' + stats.notCompleted + '</div><div class="label">Not Completed</div></div>' +
+    '<div class="stat"><div class="num">' + stats.rate + '</div><div class="label">Completion Rate</div></div>' +
+    '</div>' +
+    '<div class="info">Survey tracking monitors member participation across survey rounds. ' +
+    'Completion is auto-tracked when members submit the satisfaction survey.</div>' +
+    '<button class="btn btn-primary" onclick="run(\'populateSurveyTrackingFromMembers\')">Refresh Member List</button>' +
+    '<button class="btn btn-warning" onclick="confirmNewRound()">Start New Survey Round</button>' +
+    '<button class="btn btn-success" onclick="run(\'sendSurveyCompletionReminders\')">Send Reminders</button>' +
+    '<button class="btn btn-secondary" onclick="google.script.host.close()">Close</button>' +
+    '</div>' +
+    '<script>' +
+    'function run(fn){' +
+    '  document.querySelectorAll(".btn").forEach(function(b){b.disabled=true;b.style.opacity="0.6"});' +
+    '  google.script.run.withSuccessHandler(function(r){alert(r||"Done!");location.reload()})' +
+    '  .withFailureHandler(function(e){alert("Error: "+e.message);location.reload()})[fn]();}' +
+    'function confirmNewRound(){' +
+    '  if(confirm("Start a new survey round?\\n\\nThis will:\\n- Reset all members to Not Completed\\n- Increment missed count for non-respondents\\n\\nContinue?")){' +
+    '    run("startNewSurveyRound");}}' +
+    '</script></body></html>'
+  ).setWidth(520).setHeight(520);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Survey Completion Tracker');
+}
+
 /**
  * ============================================================================
  * AUDIT LOG MODULE (08i_AuditLog.gs)
@@ -29145,7 +29588,7 @@ function getQuarterFromDate(date) {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (1454 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (1510 lines)
 // ============================================================================
 
 // ============================================================================
@@ -30600,6 +31043,62 @@ function setupCalcFormulasSheet(sheet) {
   // Next grievance ID prefix
   sheet.getRange('A16').setValue('GRIEVANCE_ID_PREFIX');
   sheet.getRange('B16').setFormula('="GRV-"&YEAR(TODAY())&"-"');
+}
+
+// ============================================================================
+// SURVEY TRACKING HIDDEN SHEET SETUP
+// ============================================================================
+
+/**
+ * Sets up the hidden _Survey_Tracking sheet with headers and formatting.
+ * This sheet tracks per-member survey completion status across rounds.
+ * Columns match SURVEY_TRACKING_COLS (A-J).
+ * @param {Sheet} sheet - The sheet to set up
+ */
+function setupSurveyTrackingSheet(sheet) {
+  var headers = [
+    'Member ID',          // A
+    'Member Name',        // B
+    'Email',              // C
+    'Work Location',      // D
+    'Assigned Steward',   // E
+    'Current Status',     // F
+    'Completed Date',     // G
+    'Total Missed',       // H
+    'Total Completed',    // I
+    'Last Reminder Sent'  // J
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setBackground(COLORS.HEADER_BG)
+    .setFontColor(COLORS.WHITE)
+    .setHorizontalAlignment('center');
+
+  // Column widths
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.MEMBER_ID, 100);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.MEMBER_NAME, 180);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.EMAIL, 220);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.WORK_LOCATION, 160);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.ASSIGNED_STEWARD, 160);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.CURRENT_STATUS, 130);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.COMPLETED_DATE, 130);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.TOTAL_MISSED, 100);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.TOTAL_COMPLETED, 120);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.LAST_REMINDER_SENT, 140);
+
+  // Date formatting
+  sheet.getRange(2, SURVEY_TRACKING_COLS.COMPLETED_DATE, 998, 1).setNumberFormat('MM/DD/YYYY');
+  sheet.getRange(2, SURVEY_TRACKING_COLS.LAST_REMINDER_SENT, 998, 1).setNumberFormat('MM/DD/YYYY');
+
+  // Number formatting for counters
+  sheet.getRange(2, SURVEY_TRACKING_COLS.TOTAL_MISSED, 998, 1).setNumberFormat('0');
+  sheet.getRange(2, SURVEY_TRACKING_COLS.TOTAL_COMPLETED, 998, 1).setNumberFormat('0');
+
+  // Freeze header row
+  sheet.setFrozenRows(1);
+
+  Logger.log('Survey Tracking hidden sheet set up');
 }
 
 

@@ -1451,3 +1451,59 @@ function setupCalcFormulasSheet(sheet) {
   sheet.getRange('A16').setValue('GRIEVANCE_ID_PREFIX');
   sheet.getRange('B16').setFormula('="GRV-"&YEAR(TODAY())&"-"');
 }
+
+// ============================================================================
+// SURVEY TRACKING HIDDEN SHEET SETUP
+// ============================================================================
+
+/**
+ * Sets up the hidden _Survey_Tracking sheet with headers and formatting.
+ * This sheet tracks per-member survey completion status across rounds.
+ * Columns match SURVEY_TRACKING_COLS (A-J).
+ * @param {Sheet} sheet - The sheet to set up
+ */
+function setupSurveyTrackingSheet(sheet) {
+  var headers = [
+    'Member ID',          // A
+    'Member Name',        // B
+    'Email',              // C
+    'Work Location',      // D
+    'Assigned Steward',   // E
+    'Current Status',     // F
+    'Completed Date',     // G
+    'Total Missed',       // H
+    'Total Completed',    // I
+    'Last Reminder Sent'  // J
+  ];
+
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setBackground(COLORS.HEADER_BG)
+    .setFontColor(COLORS.WHITE)
+    .setHorizontalAlignment('center');
+
+  // Column widths
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.MEMBER_ID, 100);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.MEMBER_NAME, 180);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.EMAIL, 220);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.WORK_LOCATION, 160);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.ASSIGNED_STEWARD, 160);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.CURRENT_STATUS, 130);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.COMPLETED_DATE, 130);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.TOTAL_MISSED, 100);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.TOTAL_COMPLETED, 120);
+  sheet.setColumnWidth(SURVEY_TRACKING_COLS.LAST_REMINDER_SENT, 140);
+
+  // Date formatting
+  sheet.getRange(2, SURVEY_TRACKING_COLS.COMPLETED_DATE, 998, 1).setNumberFormat('MM/DD/YYYY');
+  sheet.getRange(2, SURVEY_TRACKING_COLS.LAST_REMINDER_SENT, 998, 1).setNumberFormat('MM/DD/YYYY');
+
+  // Number formatting for counters
+  sheet.getRange(2, SURVEY_TRACKING_COLS.TOTAL_MISSED, 998, 1).setNumberFormat('0');
+  sheet.getRange(2, SURVEY_TRACKING_COLS.TOTAL_COMPLETED, 998, 1).setNumberFormat('0');
+
+  // Freeze header row
+  sheet.setFrozenRows(1);
+
+  Logger.log('Survey Tracking hidden sheet set up');
+}
