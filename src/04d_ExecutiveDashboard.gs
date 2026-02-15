@@ -731,68 +731,10 @@ function emailExecutivePDF() {
 
 /**
  * Generates missing Member IDs - UI Service version (Legacy)
- * NOTE: Renamed to avoid duplicate. Use generateMissingMemberIDs() from 02_MemberManager.gs
- * @deprecated Use generateMissingMemberIDs() from 02_MemberManager.gs
+ * @deprecated Use generateMissingMemberIDs() from 02_DataManagers.gs
  */
 function generateMissingMemberIDs_UIService_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
-    return;
-  }
-
-  var data = sheet.getDataRange().getValues();
-  var countAdded = 0;
-
-  // Get unit codes from Config sheet (falls back to defaults if not configured)
-  var unitCodes = getUnitCodes_();
-
-  for (var i = 1; i < data.length; i++) {
-    var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
-    var unit = data[i][MEMBER_COLS.UNIT - 1];
-
-    // ID is empty but Unit is present
-    if (!memberId && unit) {
-      var prefix = unitCodes[unit] || "GEN";
-      var nextNum = getNextMemberSequence_(prefix);
-      var newId = prefix + "-" + nextNum + "-H";
-
-      sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
-      countAdded++;
-    }
-  }
-
-  ss.toast(countAdded + ' IDs generated for the 509 Command Center.', 'ID Engine', 5);
-}
-
-/**
- * Gets the next sequence number for a given prefix
- * @param {string} prefix - The unit code prefix (e.g., "MS")
- * @returns {number} The next sequence number
- * @private
- */
-function getNextMemberSequence_(prefix) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!sheet) return 100;
-
-  var ids = sheet.getRange(1, MEMBER_COLS.MEMBER_ID, sheet.getLastRow(), 1).getValues().flat();
-  var max = 100;
-
-  ids.forEach(function(id) {
-    if (typeof id === 'string' && id.startsWith(prefix + '-')) {
-      var parts = id.split('-');
-      if (parts.length >= 2) {
-        var n = parseInt(parts[1]);
-        if (!isNaN(n) && n > max) max = n;
-      }
-    }
-  });
-
-  return max + 1;
+  generateMissingMemberIDs();
 }
 
 /**

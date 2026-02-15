@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `CONTACT_FORM_CONFIG.FIELD_IDS` — expanded from 15 to 20 entries
 - `onContactFormSubmit()` — now extracts and stores Hire Date, Employee ID, Street Address, City, and Zip Code
+- **Unified Member ID system** — all ID generation now uses `generateNameBasedId()` (format: `MJASM472`)
+- `generateMissingMemberIDs()` and `generateMissingMemberIDsBatch()` now produce name-based IDs instead of unit-code IDs
+- `verifyIDGenerationEngine()` updated to test and report on name-based format
+
+### Removed
+- `generateUniqueId_()` — legacy random unit-code ID generator (`MS-48271-H` format)
+- `getNextSequence_()` — legacy sequential counter for unit-code IDs
+- `getNextSequence()` — sequential ID counter using Script Properties
+- `getNextMemberSequence_()` — duplicate sequential counter in Executive Dashboard
 
 ## [4.8.0] - 2026-02-15
 

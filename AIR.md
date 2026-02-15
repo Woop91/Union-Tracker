@@ -237,11 +237,10 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
 - `DEFAULT_CONFIG` - Default dropdown values
 - `MULTI_SELECT_COLS` - Configuration for multi-select columns
 - `getMultiSelectConfig()` - Get multi-select config for a column
-- `getNextSequence_(prefix, sheet)` - Get next sequential ID number for a given prefix
-  - **Format:** `UNIT_CODE-SEQUENCE-H` (e.g., `MS-101-H`)
-  - **Member ID:** Sequential per unit code from Config sheet (e.g., `MS-101-H`, `GEN-42-H`)
-  - **Grievance ID:** `GJOSM456` (G + "John Smith" → JO + SM + 456)
-  - Scans existing IDs to find highest number and increments
+- `generateNameBasedId(prefix, firstName, lastName, existingIds)` - Generate unique ID from member name
+  - **Member ID format:** `M` + first 2 chars of first name + first 2 chars of last name + 3 random digits (e.g., `MJASM472` for Jane Smith)
+  - **Grievance ID format:** `G` + first 2 chars of first name + first 2 chars of last name + 3 random digits (e.g., `GJOSM456`)
+  - Collision detection with up to 100 retries, then UUID fallback
 - `getColumnLetter()` - Convert column number to letter
 - `getColumnNumber()` - Convert column letter to number
 - `mapMemberRow()` - Map row array to member object
@@ -256,10 +255,9 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
   - `getMemberById()` - Lookup member by ID
   - `searchMembers()` - Search members by name/email/ID
 - Member ID Generation:
-  - `generateMemberID_()` - Generate unique Member ID (M + name prefix + digits)
-  - `generateMissingMemberIDs()` **(NEW v3.6.5)** - Batch generate unit-based IDs (e.g., MS-104-H)
-  - `getNextSequence_(prefix, sheet)` **(NEW v3.6.5)** - Get next sequence number for unit
-  - `checkDuplicateMemberIDs()` **(NEW v3.6.5)** - Find and report duplicate IDs
+  - `generateNameBasedId(prefix, firstName, lastName, existingIds)` - Generate unique name-based ID (e.g., `MJASM472`)
+  - `generateMissingMemberIDs()` - Batch generate name-based IDs for members without one
+  - `checkDuplicateMemberIDs()` - Find and report duplicate IDs
   - `findExistingMember(searchParams, dataArray)` **(NEW v4.1)** - Multi-key smart match for duplicate prevention
   - `showFindMemberDialog()` **(v4.3.10)** - UI wrapper for member search (renamed from findExistingMember to avoid conflict)
 - Steward Management:
@@ -2134,7 +2132,7 @@ The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-base
 - `PDF_FOLDER_ID: 51` - Google Drive folder ID for PDF archives
 
 **Member ID Generation System (02_MemberManager.gs):**
-- `generateMissingMemberIDs()` - Batch generate unit-based IDs (e.g., MS-104-H format)
+- `generateMissingMemberIDs()` - Batch generate name-based IDs (e.g., MJASM472 format)
 - `getNextSequence_(prefix, sheet)` - Get next sequence number for unit code
 - `checkDuplicateMemberIDs()` - Find and report duplicate Member IDs
 

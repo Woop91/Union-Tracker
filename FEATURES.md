@@ -128,7 +128,7 @@ This document provides a comprehensive, searchable reference of all features in 
 
 | Feature | Description | Menu Path | Keywords |
 |---------|-------------|-----------|----------|
-| **Auto-Generate Member IDs** | Creates sequential IDs using unit codes from Config sheet (e.g., MS-101-H). | Strategic Ops > ID Engines > Generate Missing IDs | ID, generate, auto |
+| **Auto-Generate Member IDs** | Creates name-based IDs from member names (e.g., MJASM472 for Jane Smith). | Strategic Ops > ID Engines > Generate Missing IDs | ID, generate, auto |
 | **Check Duplicate IDs** | Finds and highlights duplicate Member IDs in the directory. | Strategic Ops > ID Engines > Check Duplicates | duplicate, check, validate |
 | **Unit Code Configuration** | Custom unit codes for ID generation (e.g., Main Station:MS). | Config sheet column AT | unit, code, config |
 
@@ -136,7 +136,7 @@ This document provides a comprehensive, searchable reference of all features in 
 
 | Column | Description | Auto-Calculated? |
 |--------|-------------|------------------|
-| **Member ID** | Unique identifier (UNIT-SEQ-H format, e.g., MS-101-H) | Optional auto-gen |
+| **Member ID** | Unique identifier (name-based format, e.g., MJASM472) | Optional auto-gen |
 | **Has Open Grievance** | Yes/No based on Grievance Log | Yes |
 | **Grievance Status** | Current status if has open grievance | Yes |
 | **Days to Deadline** | Days remaining on current grievance | Yes |

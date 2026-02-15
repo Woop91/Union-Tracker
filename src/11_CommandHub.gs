@@ -331,33 +331,11 @@ function toggleMobileView() {
 // v4.0 HIGH-PERFORMANCE DATA ENGINE
 // ============================================================================
 
-/**
- * v4.0 Sequential ID Generator
- * Gets the next sequence number for a given prefix from stored properties.
- * Used for generating Member IDs with unit code prefixes.
- *
- * @param {string} prefix - The unit code prefix (e.g., "MS", "FO", "HC")
- * @returns {string} The next sequence number as a 4-digit padded string
- */
-function getNextSequence(prefix) {
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(10000);
-    var props = PropertiesService.getScriptProperties();
-    var key = 'SEQUENCE_' + prefix;
-    var current = parseInt(props.getProperty(key) || '0', 10);
-    var next = current + 1;
-    props.setProperty(key, String(next));
-    return String(next).padStart(4, '0');
-  } finally {
-    lock.releaseLock();
-  }
-}
 
 /**
- * v4.0 Batch Member ID Generator (High-Performance)
+ * Batch Member ID Generator (High-Performance)
  * Uses batch array processing to generate IDs for up to 5,000 members without lag.
- * Reads unit codes from Config sheet or falls back to defaults.
+ * Format: M + first 2 letters of first name + first 2 letters of last name + 3 random digits
  */
 function generateMissingMemberIDsBatch() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -370,17 +348,25 @@ function generateMissingMemberIDsBatch() {
 
   // Batch read all data
   var data = sheet.getDataRange().getValues();
-  var unitCodes = getUnitCodes_();
   var countAdded = 0;
+
+  // Collect existing IDs for collision detection
+  var existingIds = {};
+  for (var j = 1; j < data.length; j++) {
+    var id = data[j][MEMBER_COLS.MEMBER_ID - 1];
+    if (id) existingIds[id] = true;
+  }
 
   // Process in memory (no individual cell writes)
   for (var i = 1; i < data.length; i++) {
-    // Check if Member ID is empty and Unit exists
-    if (!data[i][MEMBER_COLS.MEMBER_ID - 1] && data[i][MEMBER_COLS.UNIT - 1]) {
-      var unit = data[i][MEMBER_COLS.UNIT - 1];
-      var prefix = unitCodes[unit] || 'GEN';
-      var nextNum = getNextSequence(prefix);
-      data[i][MEMBER_COLS.MEMBER_ID - 1] = prefix + '-' + nextNum + '-H';
+    var firstName = data[i][MEMBER_COLS.FIRST_NAME - 1];
+    var lastName = data[i][MEMBER_COLS.LAST_NAME - 1];
+
+    // Check if Member ID is empty and member has name data
+    if (!data[i][MEMBER_COLS.MEMBER_ID - 1] && (firstName || lastName)) {
+      var newId = generateNameBasedId('M', firstName, lastName, existingIds);
+      data[i][MEMBER_COLS.MEMBER_ID - 1] = newId;
+      existingIds[newId] = true;
       countAdded++;
     }
   }
@@ -390,7 +376,7 @@ function generateMissingMemberIDsBatch() {
     sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   }
 
-  ss.toast('✅ ' + countAdded + ' IDs generated.', COMMAND_CONFIG.SYSTEM_NAME, 3);
+  ss.toast(countAdded + ' IDs generated.', COMMAND_CONFIG.SYSTEM_NAME, 3);
 
   return {
     generated: countAdded,
@@ -417,38 +403,23 @@ function refreshMemberView() {
 }
 
 /**
- * v4.0 ID Generation Engine Verification
- * Tests the ID generation system to ensure proper sequencing and format.
+ * ID Generation Engine Verification
+ * Tests the name-based ID generation system and reports Member Directory statistics.
  */
 function verifyIDGenerationEngine() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var props = PropertiesService.getScriptProperties();
 
   var report = '🔍 ID GENERATION ENGINE VERIFICATION\n';
   report += '=' .repeat(45) + '\n\n';
 
-  // Check current sequences
-  report += '📊 CURRENT SEQUENCE COUNTERS:\n';
-  var unitCodes = getUnitCodes_();
-  var sequenceKeys = Object.keys(unitCodes).map(function(unit) {
-    return 'SEQUENCE_' + unitCodes[unit];
-  });
-
-  // Add GEN prefix for generic IDs
-  sequenceKeys.push('SEQUENCE_GEN');
-
-  sequenceKeys.forEach(function(key) {
-    var value = props.getProperty(key) || '0';
-    report += '  ' + key + ': ' + value + '\n';
-  });
-
-  // Test ID format generation
-  report += '\n🧪 TEST ID GENERATION:\n';
-  var testPrefix = 'TEST';
-  var testSeq = getNextSequence(testPrefix);
-  report += '  Generated: ' + testPrefix + '-' + testSeq + '-H\n';
-  report += '  Format Valid: ' + (testSeq.length === 4 ? '✅ Yes' : '❌ No') + '\n';
+  // Test name-based ID generation
+  report += '🧪 TEST ID GENERATION (Name-Based):\n';
+  report += '  Format: M + 2 chars first name + 2 chars last name + 3 digits\n';
+  var testId = generateNameBasedId('M', 'Jane', 'Smith', {});
+  report += '  Test (Jane Smith): ' + testId + '\n';
+  var formatValid = /^M[A-Z]{4}\d{3}$/.test(testId);
+  report += '  Format Valid: ' + (formatValid ? '✅ Yes' : '❌ No') + '\n';
 
   // Check Member Directory for ID statistics
   report += '\n📈 MEMBER ID STATISTICS:\n';
@@ -457,13 +428,18 @@ function verifyIDGenerationEngine() {
     var data = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1).getValues();
     var withID = 0;
     var withoutID = 0;
-    var idFormats = {};
+    var nameBasedCount = 0;
+    var legacyCount = 0;
 
     data.forEach(function(row) {
       if (row[0]) {
         withID++;
-        var prefix = String(row[0]).split('-')[0];
-        idFormats[prefix] = (idFormats[prefix] || 0) + 1;
+        var idStr = String(row[0]);
+        if (/^M[A-Z]{4}\d{3}/.test(idStr)) {
+          nameBasedCount++;
+        } else {
+          legacyCount++;
+        }
       } else {
         withoutID++;
       }
@@ -471,10 +447,10 @@ function verifyIDGenerationEngine() {
 
     report += '  Members with ID: ' + withID + '\n';
     report += '  Members without ID: ' + withoutID + '\n';
-    report += '\n  ID Prefix Distribution:\n';
-    Object.keys(idFormats).forEach(function(prefix) {
-      report += '    ' + prefix + ': ' + idFormats[prefix] + '\n';
-    });
+    report += '  Name-based IDs (current format): ' + nameBasedCount + '\n';
+    if (legacyCount > 0) {
+      report += '  Legacy IDs (old format): ' + legacyCount + '\n';
+    }
   } else {
     report += '  No member data found.\n';
   }
