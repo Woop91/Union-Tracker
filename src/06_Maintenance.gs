@@ -1435,7 +1435,12 @@ function showUndoRedoPanel() {
 // ============================================================================
 
 /**
- * Logs an audit event to the Audit Log sheet
+ * Logs an audit event to the Audit Log sheet.
+ * v4.8.1: Adds an Integrity Hash column (F) that forms a hash chain —
+ * each row's hash includes the previous row's hash, so any tampering
+ * (edit, insert, or delete) breaks the chain and is detectable via
+ * verifyAuditLogIntegrity().
+ *
  * @param {string} eventType - The type of event from AUDIT_EVENTS
  * @param {Object} details - Event details object
  */
@@ -1447,8 +1452,22 @@ function logAuditEvent(eventType, details) {
     // Create audit sheet if it doesn't exist
     if (!auditSheet) {
       auditSheet = ss.insertSheet(SHEET_NAMES.AUDIT_LOG);
-      auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
+      auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID', 'Integrity Hash']);
       auditSheet.setFrozenRows(1);
+    } else {
+      // Ensure Integrity Hash header exists (upgrade path for existing sheets)
+      var headers = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+      var hasIntegrityCol = false;
+      for (var h = 0; h < headers.length; h++) {
+        if (String(headers[h]).trim() === 'Integrity Hash') {
+          hasIntegrityCol = true;
+          break;
+        }
+      }
+      if (!hasIntegrityCol) {
+        var nextCol = auditSheet.getLastColumn() + 1;
+        auditSheet.getRange(1, nextCol).setValue('Integrity Hash');
+      }
     }
 
     // Build log entry
@@ -1457,7 +1476,30 @@ function logAuditEvent(eventType, details) {
     const detailsJson = JSON.stringify(details);
     const sessionId = Session.getTemporaryActiveUserKey() || '';
 
-    auditSheet.appendRow([timestamp, eventType, user, detailsJson, sessionId]);
+    // Compute integrity hash chained to previous row
+    var previousHash = '';
+    var lastRow = auditSheet.getLastRow();
+    if (lastRow >= 2) {
+      // Find Integrity Hash column index
+      var headerRow = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+      var integrityColIdx = -1;
+      for (var i = 0; i < headerRow.length; i++) {
+        if (String(headerRow[i]).trim() === 'Integrity Hash') {
+          integrityColIdx = i + 1; // 1-indexed
+          break;
+        }
+      }
+      if (integrityColIdx > 0) {
+        previousHash = String(auditSheet.getRange(lastRow, integrityColIdx).getValue() || '');
+      }
+    }
+
+    var integrityHash = '';
+    if (typeof computeAuditRowHash_ === 'function') {
+      integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, user, detailsJson, sessionId);
+    }
+
+    auditSheet.appendRow([timestamp, eventType, user, detailsJson, sessionId, integrityHash]);
 
     // Trim old entries if sheet gets too large (keep last 10,000)
     const rowCount = auditSheet.getLastRow();
