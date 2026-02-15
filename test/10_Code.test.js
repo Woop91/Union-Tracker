@@ -70,8 +70,8 @@ describe('CONTACT_FORM_CONFIG', () => {
     expect(typeof CONTACT_FORM_CONFIG.FORM_URL).toBe('string');
   });
 
-  test('FIELD_IDS has 15 entries', () => {
-    expect(Object.keys(CONTACT_FORM_CONFIG.FIELD_IDS).length).toBe(15);
+  test('FIELD_IDS has 20 entries', () => {
+    expect(Object.keys(CONTACT_FORM_CONFIG.FIELD_IDS).length).toBe(20);
   });
 
   test('FIELD_IDS includes FIRST_NAME, LAST_NAME, EMAIL, PHONE', () => {
@@ -79,6 +79,14 @@ describe('CONTACT_FORM_CONFIG', () => {
     expect(CONTACT_FORM_CONFIG.FIELD_IDS.LAST_NAME).toBeDefined();
     expect(CONTACT_FORM_CONFIG.FIELD_IDS.EMAIL).toBeDefined();
     expect(CONTACT_FORM_CONFIG.FIELD_IDS.PHONE).toBeDefined();
+  });
+
+  test('FIELD_IDS includes HIRE_DATE, EMPLOYEE_ID, STREET_ADDRESS, CITY, ZIP_CODE', () => {
+    expect(CONTACT_FORM_CONFIG.FIELD_IDS.HIRE_DATE).toBeDefined();
+    expect(CONTACT_FORM_CONFIG.FIELD_IDS.EMPLOYEE_ID).toBeDefined();
+    expect(CONTACT_FORM_CONFIG.FIELD_IDS.STREET_ADDRESS).toBeDefined();
+    expect(CONTACT_FORM_CONFIG.FIELD_IDS.CITY).toBeDefined();
+    expect(CONTACT_FORM_CONFIG.FIELD_IDS.ZIP_CODE).toBeDefined();
   });
 });
 

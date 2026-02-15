@@ -365,6 +365,7 @@ describe('PII_MEMBER_COLS', () => {
     expect(PII_MEMBER_COLS).toContain(MEMBER_COLS.STREET_ADDRESS);
     expect(PII_MEMBER_COLS).toContain(MEMBER_COLS.CITY);
     expect(PII_MEMBER_COLS).toContain(MEMBER_COLS.STATE);
+    expect(PII_MEMBER_COLS).toContain(MEMBER_COLS.ZIP_CODE);
   });
 });
 
@@ -557,8 +558,8 @@ describe('getColumnLetter for all *_COLS values', () => {
 // ============================================================================
 
 describe('Header map column coverage completeness', () => {
-  test('MEMBER_HEADER_MAP_ length matches MEMBER_COLS.STATE (last column)', () => {
-    expect(MEMBER_HEADER_MAP_.length).toBe(MEMBER_COLS.STATE);
+  test('MEMBER_HEADER_MAP_ length matches MEMBER_COLS.ZIP_CODE (last column)', () => {
+    expect(MEMBER_HEADER_MAP_.length).toBe(MEMBER_COLS.ZIP_CODE);
   });
 
   test('GRIEVANCE_HEADER_MAP_ length matches max GRIEVANCE_COLS value', () => {
