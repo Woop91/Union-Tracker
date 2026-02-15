@@ -39838,7 +39838,7 @@ function createGettingStartedSheet(ss) {
   var memberSteps = [
     ['2.1', 'Go to the Member Directory tab'],
     ['2.2', 'Click on the first empty row (row 2 if empty)'],
-    ['2.3', 'Enter a Member ID (format: MJOHN123 - M + first 2 letters of first/last name + 3 digits)'],
+    ['2.3', 'Enter a Member ID (format: MS-101-H) or leave blank to auto-generate via Strategic Ops > ID Engines'],
     ['2.4', 'Fill in First Name, Last Name, and Email (required fields)'],
     ['2.5', 'Use the dropdowns for Job Title, Location, and other fields'],
     ['2.6', 'TIP: Columns AB-AD auto-populate from Grievance Log - don\'t edit them manually!']
@@ -40050,7 +40050,7 @@ function createFAQSheet(ss) {
     ['Q: How do I set up the dashboard for the first time?',
      'A: Go to Admin menu → DIAGNOSE SETUP to check your system, then customize the Config tab with your organization\'s dropdown values (job titles, locations, stewards, etc.).'],
     ['Q: Can I use this with existing member data?',
-     'A: Yes! You can paste member data into the Member Directory tab. Just make sure the columns match and Member IDs follow the format (MJOHN123).'],
+     'A: Yes! You can paste member data into the Member Directory tab. Just make sure the columns match. Use Strategic Ops > ID Engines > Generate Missing IDs to auto-fill any blank Member IDs.'],
     ['Q: How do I test the system without real data?',
      'A: Use Admin → Demo → Seed All Sample Data to generate 1,000 test members and 300 grievances. Use NUKE SEEDED DATA when done testing.']
   ];
@@ -40078,7 +40078,7 @@ function createFAQSheet(ss) {
 
   var memberFAQs = [
     ['Q: What format should Member IDs use?',
-     'A: Format is M + first 2 letters of first name + first 2 letters of last name + 3 random digits. Example: John Smith → MJOSM123'],
+     'A: Format is UNIT_CODE-SEQUENCE-H using unit codes from the Config sheet. Example: MS-101-H (Main Station, member 101). Use Strategic Ops > ID Engines > Generate Missing IDs to auto-fill.'],
     ['Q: Why are columns AB-AD not editable?',
      'A: These columns are auto-calculated from the Grievance Log. Has Open Grievance, Grievance Status, and Days to Deadline update automatically.'],
     ['Q: How do I assign a steward to multiple members?',
@@ -40425,7 +40425,7 @@ function createFeaturesReferenceSheet(ss) {
     ['Member Management', 'Find Member', 'Search for specific member by name, ID, or other criteria.', 'Union Hub > Members > Find Member', 'find, search, lookup'],
     ['Member Management', 'Import Members', 'Bulk import member data from external sources.', 'Union Hub > Members > Import Members', 'import, bulk, external'],
     ['Member Management', 'Export Members', 'Export member directory to CSV or other formats.', 'Union Hub > Members > Export Members', 'export, CSV, download'],
-    ['Member Management', 'Generate Member IDs', 'Creates IDs in format M + First2 + Last2 + 3 digits (e.g., MJOSM123).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
+    ['Member Management', 'Generate Member IDs', 'Creates sequential IDs using unit codes from Config sheet (e.g., MS-101-H).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
     ['Member Management', 'Check Duplicate IDs', 'Finds and highlights duplicate Member IDs in the directory.', 'Strategic Ops > ID Engines > Check Duplicates', 'duplicate, check, validate'],
 
     // Steward Tools

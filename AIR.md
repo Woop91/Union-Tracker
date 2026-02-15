@@ -237,11 +237,11 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
 - `DEFAULT_CONFIG` - Default dropdown values
 - `MULTI_SELECT_COLS` - Configuration for multi-select columns
 - `getMultiSelectConfig()` - Get multi-select config for a column
-- `generateNameBasedId(prefix, firstName, lastName, existingIds)` - Generate unique ID
-  - **Format:** `PREFIX + first 2 chars of firstName + first 2 chars of lastName + 3 random digits`
-  - **Member ID:** `MJOSM123` (M + "John Smith" → JO + SM + 123)
+- `getNextSequence_(prefix, sheet)` - Get next sequential ID number for a given prefix
+  - **Format:** `UNIT_CODE-SEQUENCE-H` (e.g., `MS-101-H`)
+  - **Member ID:** Sequential per unit code from Config sheet (e.g., `MS-101-H`, `GEN-42-H`)
   - **Grievance ID:** `GJOSM456` (G + "John Smith" → JO + SM + 456)
-  - Includes collision detection to ensure uniqueness
+  - Scans existing IDs to find highest number and increments
 - `getColumnLetter()` - Convert column number to letter
 - `getColumnNumber()` - Convert column letter to number
 - `mapMemberRow()` - Map row array to member object

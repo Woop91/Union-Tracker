@@ -27,7 +27,7 @@ The 509 Dashboard is a Google Apps Script (GAS) application for managing union s
 - Node.js build system
 - ESLint for code quality (v9.x flat config)
 
-**Version:** 4.7.0
+**Version:** 4.8.0
 
 ---
 
@@ -193,6 +193,23 @@ if (!authResult.isAuthorized) {
   return getAccessDeniedPage(authResult.message);
 }
 ```
+
+### Security Event Alerting
+
+The `00_Security.gs` module includes a security event alerting system that detects and notifies on suspicious activity. Hooks are integrated at key entry points:
+
+- **`05_Integrations.gs`** — web app access monitoring
+- **`10_Main.gs`** — edit trigger threat detection
+- **`13_MemberSelfService.gs`** — failed authentication attempt tracking
+
+### Member ID Generation
+
+Member IDs use a **sequential format** based on unit codes from the Config sheet:
+
+- **Format:** `UNIT_CODE-SEQUENCE-H` (e.g., `MS-101-H`, `GEN-42-H`)
+- **Function:** `getNextSequence_(prefix, sheet)` scans existing IDs to find the highest number and increments
+- **Import dedup:** Happens once client-side before batch processing for performance
+- IDs are generated via Strategic Ops > ID Engines > Generate Missing IDs
 
 ### PII Masking for Logs
 
