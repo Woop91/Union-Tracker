@@ -2700,7 +2700,7 @@ function initializeLookerSatisfactionSheet_() {
     'Communication Avg', 'Member Voice Avg', 'Value Action Avg', 'Scheduling Avg',
     'Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Would Recommend',
     'Filed Grievance', 'Representation Avg',
-    'Verification Status', 'Matched Member ID', 'Quarter Period',
+    'Is Verified', 'Quarter Period',
     'Last Updated'
   ];
 
@@ -2955,7 +2955,9 @@ function refreshLookerSatisfaction_() {
 
   const now = new Date();
   const exportData = [];
-  const cols = typeof SATISFACTION_COLS !== 'undefined' ? SATISFACTION_COLS : {};
+
+  // Load vault data for verification status (PII stays in vault)
+  const vaultMap = typeof getVaultDataMap_ === 'function' ? getVaultDataMap_() : {};
 
   for (let i = 1; i < sourceData.length; i++) {
     const row = sourceData[i];
@@ -2964,6 +2966,7 @@ function refreshLookerSatisfaction_() {
 
     // Generate response ID
     const responseId = 'SR' + String(i).padStart(5, '0');
+    const satRow = i + 1; // 1-indexed sheet row
 
     // Date dimensions
     const respMonth = timestamp instanceof Date ? Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM') : '';
@@ -2995,10 +2998,10 @@ function refreshLookerSatisfaction_() {
     const wouldRecommend = row[9] || '';
     const filedGrievance = row[36] || '';
 
-    // Verification columns (if they exist)
-    const verificationStatus = cols.VERIFIED ? (row[cols.VERIFIED - 1] || '') : '';
-    const matchedMemberId = cols.MATCHED_MEMBER_ID ? (row[cols.MATCHED_MEMBER_ID - 1] || '') : '';
-    const quarterPeriod = cols.QUARTER ? (row[cols.QUARTER - 1] || '') : respQuarter;
+    // Verification from vault — boolean only, no PII exposed
+    const vEntry = vaultMap[satRow] || {};
+    const isVerified = vEntry.verified === 'Yes' ? 'Yes' : 'No';
+    const quarterPeriod = vEntry.quarter || respQuarter;
 
     exportData.push([
       responseId,
@@ -3027,8 +3030,7 @@ function refreshLookerSatisfaction_() {
       wouldRecommend,
       filedGrievance,
       repAvg,
-      verificationStatus,
-      matchedMemberId,
+      isVerified,
       quarterPeriod,
       now
     ]);
@@ -3065,7 +3067,7 @@ function setupLookerAnonIntegration() {
     'This will create ANONYMIZED data sheets for external Looker reports:\n\n' +
     '• _Looker_Anon_Members - Aggregated member data (no names/contact)\n' +
     '• _Looker_Anon_Grievances - Case data (no member info)\n' +
-    '• _Looker_Anon_Satisfaction - Survey data (already anonymous)\n\n' +
+    '• _Looker_Anon_Satisfaction - Survey data (hashed, no email/member ID)\n\n' +
     'These sheets contain NO personally identifiable information (PII).\n' +
     'Safe for external dashboards and compliance reporting.\n\n' +
     'Continue?',

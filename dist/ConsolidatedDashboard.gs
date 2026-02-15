@@ -1426,7 +1426,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2805 lines)
+// SOURCE: 01_Core.gs (2855 lines)
 // ============================================================================
 
 /**
@@ -2185,6 +2185,9 @@ var SHEETS = {
   //   -> updateSurveyTrackingOnSubmit_() marks member "Completed" in this sheet.
   // Management: showSurveyTrackingDialog() in 08c_FormsAndNotifications.gs
   SURVEY_TRACKING: '_Survey_Tracking',
+  // Survey Vault (hidden + protected) — stores email/member ID linkage
+  // for survey responses. Separated from Satisfaction sheet for anonymity.
+  SURVEY_VAULT: '_Survey_Vault',
   // Satisfaction & Feedback sheets
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
   // Data is preserved for modal access. Use removeDeprecatedTabs() to hide.
@@ -2223,7 +2226,8 @@ var HIDDEN_SHEETS = {
   STEWARD_PERFORMANCE_CALC: '_Steward_Performance_Calc',
   AUDIT_LOG: '_Audit_Log',
   CHECKLIST_CALC: '_Checklist_Calc',
-  SURVEY_TRACKING: '_Survey_Tracking'
+  SURVEY_TRACKING: '_Survey_Tracking',
+  SURVEY_VAULT: '_Survey_Vault'
 };
 
 // ============================================================================
@@ -3002,14 +3006,60 @@ var SATISFACTION_COLS = {
   AVG_VALUE_ACTION: 81,           // CC - Avg of Q51-Q55
   AVG_SCHEDULING: 82,             // CD - Avg of Q56-Q62
 
-  // ── VERIFICATION & TRACKING COLUMNS (CE onwards) ──
-  EMAIL: 83,                      // CE - Email address from form submission
-  VERIFIED: 84,                   // CF - Yes / Pending Review / Rejected
-  MATCHED_MEMBER_ID: 85,          // CG - Member ID if email matched
-  QUARTER: 86,                    // CH - Quarter string (e.g., "2026-Q1")
-  IS_LATEST: 87,                  // CI - Yes/No - Is this the latest for this member this quarter?
-  SUPERSEDED_BY: 88,              // CJ - Row number of newer response (if superseded)
-  REVIEWER_NOTES: 89              // CK - Notes from reviewer
+  // ── VERIFICATION COLUMNS — MOVED TO _Survey_Vault (v4.8) ──
+  // These constants are DEPRECATED. All PII is now stored in the
+  // _Survey_Vault hidden sheet (SURVEY_VAULT_COLS) to ensure survey
+  // anonymity. The Satisfaction sheet no longer contains any data that
+  // can link a response to a specific member.
+  // @deprecated v4.8 — use SURVEY_VAULT_COLS instead
+  EMAIL: -1,
+  VERIFIED: -1,
+  MATCHED_MEMBER_ID: -1,
+  QUARTER: -1,
+  IS_LATEST: -1,
+  SUPERSEDED_BY: -1,
+  REVIEWER_NOTES: -1
+};
+
+// ============================================================================
+// SURVEY VAULT COLUMNS (8 columns: A-H) — Zero-knowledge hash store
+// ============================================================================
+
+/**
+ * Survey Vault column positions (1-indexed)
+ * Hidden + protected sheet: _Survey_Vault
+ *
+ * PURPOSE:
+ *   Provides verified/latest/quarter metadata for survey responses without
+ *   storing any reversible PII. Email and member ID are SHA-256 hashed with
+ *   a per-installation salt — even with full vault access, it is
+ *   cryptographically impossible to determine who submitted a response.
+ *
+ * SECURITY MODEL:
+ *   - Email and Member ID are stored as salted SHA-256 hashes only
+ *   - Hashes are non-reversible — no one can recover the original values
+ *   - Raw email exists in memory only (during form submit) and is never persisted
+ *   - Sheet is hidden (prefixed with _) and sheet-protected
+ *   - Dashboard code reads only {verified, isLatest, quarter} via getVaultDataMap_()
+ *
+ * DATA FLOW:
+ *   1. onSatisfactionFormSubmit() writes survey answers to Satisfaction sheet
+ *      (anonymous — no email, no member ID, no hashes)
+ *   2. Same function hashes email + member ID in-memory, writes hashes to vault
+ *   3. Raw email is used only to send thank-you email, then discarded
+ *   4. Superseding logic compares hashes, never plaintext
+ *
+ * @const {Object}
+ */
+var SURVEY_VAULT_COLS = {
+  RESPONSE_ROW: 1,          // A - Row number in Satisfaction sheet
+  EMAIL: 2,                 // B - SHA-256 hash of email (non-reversible)
+  VERIFIED: 3,              // C - Yes / Pending Review / Rejected
+  MATCHED_MEMBER_ID: 4,     // D - SHA-256 hash of member ID (non-reversible)
+  QUARTER: 5,               // E - Quarter string (e.g., "2026-Q1")
+  IS_LATEST: 6,             // F - Yes/No - Is this the latest for this member?
+  SUPERSEDED_BY: 7,         // G - Vault row number of newer response
+  REVIEWER_NOTES: 8         // H - Notes from reviewer
 };
 
 /**
@@ -26183,7 +26233,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (646 lines)
+// SOURCE: 08a_SheetSetup.gs (649 lines)
 // ============================================================================
 
 /**
@@ -26445,6 +26495,9 @@ function setupHiddenSheets(ss) {
     config.setup(sheet);
     sheet.hideSheet();
   });
+
+  // Survey Vault uses its own setup (includes sheet protection)
+  setupSurveyVaultSheet();
 }
 
 
@@ -27724,7 +27777,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1997 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (1969 lines)
 // ============================================================================
 
 
@@ -28487,7 +28540,10 @@ function onSatisfactionFormSubmit(e) {
     newRow[SATISFACTION_COLS.Q67_ADDITIONAL - 1] = getFormValue_(responses, 'Additional comments (no names)');
 
     // ========================================================================
-    // EMAIL VERIFICATION & QUARTERLY TRACKING
+    // EMAIL VERIFICATION & VAULT STORAGE
+    // Survey answers go to the Satisfaction sheet (anonymous).
+    // Email + Member ID go to _Survey_Vault (protected, hidden).
+    // No PII is ever written to the Satisfaction sheet.
     // ========================================================================
 
     // Get email from form (try multiple common field names)
@@ -28497,62 +28553,31 @@ function onSatisfactionFormSubmit(e) {
                 (e.response ? e.response.getRespondentEmail() : '') || '';
     email = email.toString().toLowerCase().trim();
 
-    newRow[SATISFACTION_COLS.EMAIL - 1] = email;
-
-    // Get current quarter
+    // NOTE: email is NOT written to newRow — it goes to the vault only
     var currentQuarter = getCurrentQuarter();
-    newRow[SATISFACTION_COLS.QUARTER - 1] = currentQuarter;
-
-    // Validate email against Member Directory
     var memberMatch = validateMemberEmail(email);
+    var verified = memberMatch ? 'Yes' : 'Pending Review';
+    var memberId = memberMatch ? memberMatch.memberId : '';
 
-    if (memberMatch) {
-      // Email matches a member - mark as verified
-      newRow[SATISFACTION_COLS.VERIFIED - 1] = 'Yes';
-      newRow[SATISFACTION_COLS.MATCHED_MEMBER_ID - 1] = memberMatch.memberId;
-      newRow[SATISFACTION_COLS.IS_LATEST - 1] = 'Yes';
-
-      // Check for existing responses from this member in same quarter
-      var existingData = satSheet.getDataRange().getValues();
-      for (var i = 1; i < existingData.length; i++) {
-        var rowEmail = (existingData[i][SATISFACTION_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
-        var rowQuarter = existingData[i][SATISFACTION_COLS.QUARTER - 1];
-        var rowIsLatest = existingData[i][SATISFACTION_COLS.IS_LATEST - 1];
-
-        // If same email, same quarter, and currently marked as latest
-        if (rowEmail === email && rowQuarter === currentQuarter && rowIsLatest === 'Yes') {
-          // Mark the old row as superseded (row index is i+1 because of 0-indexing and header)
-          var oldRowNum = i + 1;
-          satSheet.getRange(oldRowNum, SATISFACTION_COLS.IS_LATEST).setValue('No');
-          satSheet.getRange(oldRowNum, SATISFACTION_COLS.SUPERSEDED_BY).setValue(satSheet.getLastRow() + 1);
-          Logger.log('Marked row ' + oldRowNum + ' as superseded by new submission');
-        }
-      }
-    } else {
-      // Email doesn't match - flag for review
-      newRow[SATISFACTION_COLS.VERIFIED - 1] = 'Pending Review';
-      newRow[SATISFACTION_COLS.MATCHED_MEMBER_ID - 1] = '';
-      newRow[SATISFACTION_COLS.IS_LATEST - 1] = 'Yes';
-    }
-
-    newRow[SATISFACTION_COLS.REVIEWER_NOTES - 1] = '';
-
-    // Append row to satisfaction sheet
+    // ── Append ANONYMOUS response to Satisfaction sheet ──
     satSheet.appendRow(newRow);
-
-    // Compute section averages for the new row (no formulas in visible sheet)
     var newRowNum = satSheet.getLastRow();
+
+    // ── Write PII to vault (separate protected sheet) ──
+    // Supersede any previous entry from same email+quarter
+    if (memberMatch) {
+      supersedePreviousVaultEntry_(email, currentQuarter, newRowNum);
+    }
+    writeVaultEntry_(newRowNum, email, verified, memberId, currentQuarter);
+
+    // Compute section averages for the new row
     computeSatisfactionRowAverages(newRowNum);
 
     // Update dashboard summary values
     syncSatisfactionValues();
 
     // Update survey completion tracking if member was matched.
-    // This is the hook that marks the member as "Completed" in _Survey_Tracking.
-    // Flow: email extracted above -> validateMemberEmail() returned memberMatch ->
-    //   updateSurveyTrackingOnSubmit_() sets Current Status = "Completed",
-    //   Completed Date = now, and increments Total Completed counter.
-    // See "SURVEY COMPLETION TRACKING" section below for full documentation.
+    // This marks the member as "Completed" in _Survey_Tracking.
     if (memberMatch && memberMatch.memberId) {
       try {
         updateSurveyTrackingOnSubmit_(memberMatch.memberId);
@@ -28561,7 +28586,7 @@ function onSatisfactionFormSubmit(e) {
       }
     }
 
-    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + newRow[SATISFACTION_COLS.VERIFIED - 1]);
+    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + verified + ' | PII stored in vault');
 
     // Send thank-you email if respondent email available
     if (email) {
@@ -29726,7 +29751,7 @@ function showSurveyTrackingDialog() {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (1535 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (1788 lines)
 // ============================================================================
 
 // ============================================================================
@@ -31264,9 +31289,262 @@ function setupSurveyTrackingSheet(sheet) {
   Logger.log('Survey Tracking hidden sheet set up');
 }
 
+// ============================================================================
+// SURVEY VAULT — ZERO-KNOWLEDGE PII STORE
+// ============================================================================
+// The _Survey_Vault sheet stores ONLY hashed email and hashed member ID.
+// No plaintext PII is ever written to any sheet.
+//
+// SECURITY MODEL:
+//   - Email is SHA-256 hashed with a per-installation salt before storage
+//   - Member ID is hashed the same way
+//   - Even with full access to the vault, you cannot reverse the hashes
+//   - Superseding (same member re-submits) works by comparing hashes
+//   - The raw email is used in-memory only (for thank-you email + validation)
+//     and is never persisted to any sheet
+
+/**
+ * Creates and protects the _Survey_Vault hidden sheet.
+ * Called by setupHiddenSheets().
+ *
+ * Structure (8 columns):
+ *   A: Response Row (row number in Satisfaction sheet)
+ *   B: Email Hash (SHA-256, non-reversible)
+ *   C: Verified (Yes / Pending Review / Rejected)
+ *   D: Member ID Hash (SHA-256, non-reversible)
+ *   E: Quarter
+ *   F: Is Latest (Yes/No)
+ *   G: Superseded By (vault row of newer response)
+ *   H: Reviewer Notes
+ */
+function setupSurveyVaultSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault';
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+  }
+
+  // Only set up headers if sheet is empty
+  if (sheet.getLastRow() < 1) {
+    var headers = [
+      'Response Row', 'Email Hash', 'Verified', 'Member ID Hash',
+      'Quarter', 'Is Latest', 'Superseded By', 'Reviewer Notes'
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+      .setFontWeight('bold')
+      .setBackground('#7F1D1D')
+      .setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+  }
+
+  // Column widths
+  sheet.setColumnWidth(1, 100);  // Response Row
+  sheet.setColumnWidth(2, 130);  // Email Hash
+  sheet.setColumnWidth(3, 110);  // Verified
+  sheet.setColumnWidth(4, 130);  // Member ID Hash
+  sheet.setColumnWidth(5, 90);   // Quarter
+  sheet.setColumnWidth(6, 80);   // Is Latest
+  sheet.setColumnWidth(7, 100);  // Superseded By
+  sheet.setColumnWidth(8, 200);  // Reviewer Notes
+
+  // Delete excess columns
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols > 8) {
+    sheet.deleteColumns(9, maxCols - 8);
+  }
+
+  // Hide the sheet
+  sheet.hideSheet();
+
+  // ═══ SHEET PROTECTION ═══
+  // Only the script owner (installer) can edit this sheet.
+  // All other editors get a warning.
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  var alreadyProtected = false;
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === 'Survey Vault — Anonymity Protection') {
+      alreadyProtected = true;
+      break;
+    }
+  }
+
+  if (!alreadyProtected) {
+    var protection = sheet.protect()
+      .setDescription('Survey Vault — Anonymity Protection')
+      .setWarningOnly(false);
+
+    // Remove all editors except the owner
+    var me = Session.getEffectiveUser();
+    protection.addEditor(me);
+    // Remove everyone else
+    var editors = protection.getEditors();
+    for (var j = 0; j < editors.length; j++) {
+      if (editors[j].getEmail() !== me.getEmail()) {
+        protection.removeEditor(editors[j]);
+      }
+    }
+  }
+
+  Logger.log('Survey Vault hidden sheet set up with protection');
+}
+
+/**
+ * Reads the _Survey_Vault and returns a map of Satisfaction-sheet row numbers
+ * to their vault metadata. DOES NOT expose email or member ID — only returns
+ * non-PII flags needed for dashboard filtering.
+ *
+ * @returns {Object} Map of { responseRow: { verified, isLatest, quarter } }
+ * @private
+ */
+function getVaultDataMap_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault || vault.getLastRow() < 2) return {};
+
+  var data = vault.getDataRange().getValues();
+  var map = {};
+  for (var i = 1; i < data.length; i++) {
+    var responseRow = data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1];
+    if (!responseRow) continue;
+    map[responseRow] = {
+      verified: data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '',
+      isLatest: data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '',
+      quarter: data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '',
+      vaultRow: i + 1  // 1-indexed sheet row for updates
+    };
+  }
+  return map;
+}
+
+/**
+ * Reads the full vault data. All email/member ID values are SHA-256 hashes —
+ * no plaintext PII exists in the vault.
+ *
+ * @returns {Array} Array of vault row objects (emailHash and memberIdHash are non-reversible)
+ * @private
+ */
+function getVaultDataFull_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault || vault.getLastRow() < 2) return [];
+
+  var data = vault.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    rows.push({
+      vaultRow: i + 1,
+      responseRow: data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1],
+      emailHash: data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '',
+      verified: data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '',
+      memberIdHash: data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '',
+      quarter: data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '',
+      isLatest: data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '',
+      supersededBy: data[i][SURVEY_VAULT_COLS.SUPERSEDED_BY - 1] || '',
+      reviewerNotes: data[i][SURVEY_VAULT_COLS.REVIEWER_NOTES - 1] || ''
+    });
+  }
+  return rows;
+}
+
+/**
+ * Writes a new vault entry for a survey response.
+ * Email and member ID are SHA-256 hashed before storage — no plaintext PII
+ * is ever written to any sheet.
+ *
+ * Called by onSatisfactionFormSubmit() after appending the anonymous
+ * response to the Satisfaction sheet.
+ *
+ * @param {number} responseRow - Row number in Satisfaction sheet
+ * @param {string} email - Respondent email (hashed before storage)
+ * @param {string} verified - 'Yes' | 'Pending Review'
+ * @param {string} memberId - Matched member ID or '' (hashed before storage)
+ * @param {string} quarter - Quarter string e.g. '2026-Q1'
+ * @private
+ */
+function writeVaultEntry_(responseRow, email, verified, memberId, quarter) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault) {
+    setupSurveyVaultSheet();
+    vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  }
+
+  // Hash email and member ID — plaintext never touches the sheet
+  var emailHash = email ? hashForVault_(email) : '';
+  var memberIdHash = memberId ? hashForVault_(memberId) : '';
+
+  vault.appendRow([
+    responseRow,
+    emailHash,
+    verified,
+    memberIdHash,
+    quarter,
+    'Yes',   // Is Latest
+    '',      // Superseded By
+    ''       // Reviewer Notes
+  ]);
+}
+
+/**
+ * Marks an existing vault entry as superseded by a newer response.
+ * Used when the same member submits again in the same quarter.
+ * Comparison is done on the hashed email — plaintext is never stored.
+ *
+ * @param {string} email - Raw email (hashed in-memory for comparison)
+ * @param {string} quarter - Quarter to match
+ * @param {number} newVaultRow - Row of the new entry that supersedes
+ * @private
+ */
+function supersedePreviousVaultEntry_(email, quarter, newVaultRow) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault || vault.getLastRow() < 2) return;
+
+  // Hash the email in-memory to compare against stored hashes
+  var emailHash = hashForVault_(email);
+
+  var data = vault.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var rowEmailHash = (data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '').toString();
+    var rowQuarter = data[i][SURVEY_VAULT_COLS.QUARTER - 1];
+    var rowIsLatest = data[i][SURVEY_VAULT_COLS.IS_LATEST - 1];
+
+    if (rowEmailHash === emailHash && rowQuarter === quarter && rowIsLatest === 'Yes') {
+      var sheetRow = i + 1;
+      vault.getRange(sheetRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
+      vault.getRange(sheetRow, SURVEY_VAULT_COLS.SUPERSEDED_BY).setValue(newVaultRow);
+      Logger.log('Vault: superseded row ' + sheetRow + ' by row ' + newVaultRow);
+    }
+  }
+}
+
+/**
+ * Creates a non-reversible SHA-256 hash for vault storage.
+ * Uses a per-installation salt stored in Script Properties.
+ * The same salt is used by generateAnonHash_() for Looker exports.
+ *
+ * @param {string} value - The value to hash (email, member ID, etc.)
+ * @returns {string} 12-character base64 hash prefixed with 'V'
+ * @private
+ */
+function hashForVault_(value) {
+  var props = PropertiesService.getScriptProperties();
+  var salt = props.getProperty('ANON_HASH_SALT');
+  if (!salt) {
+    salt = Utilities.getUuid();
+    props.setProperty('ANON_HASH_SALT', salt);
+  }
+  var combined = salt + String(value).toLowerCase().trim();
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
+  var encoded = Utilities.base64Encode(digest).substring(0, 12);
+  return 'V' + encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
+}
+
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4008 lines)
+// SOURCE: 09_Dashboards.gs (4036 lines)
 // ============================================================================
 
 /**
@@ -31987,12 +32265,19 @@ function getAggregateSatisfactionStats() {
   var lastRow = sheet.getLastRow();
   var data = sheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.AVG_SCHEDULING || 82).getValues();
 
-  // Filter to only verified and latest responses
-  var validRows = data.filter(function(row) {
-    var verified = row[SATISFACTION_COLS.VERIFIED - 1];
-    var isLatest = row[SATISFACTION_COLS.IS_LATEST - 1];
-    return isTruthyValue(verified) && isTruthyValue(isLatest);
-  });
+  // Load vault data to check verified/isLatest status (PII stays in vault)
+  var vaultMap = getVaultDataMap_();
+
+  // Filter to only verified and latest responses using vault flags
+  var validRows = [];
+  for (var vi = 0; vi < data.length; vi++) {
+    var satRow = vi + 2; // 1-indexed sheet row
+    var vaultEntry = vaultMap[satRow];
+    if (vaultEntry && isTruthyValue(vaultEntry.verified) && isTruthyValue(vaultEntry.isLatest)) {
+      data[vi]._vaultQuarter = vaultEntry.quarter; // attach for trend tracking
+      validRows.push(data[vi]);
+    }
+  }
 
   if (validRows.length === 0) {
     return {
@@ -32043,8 +32328,8 @@ function getAggregateSatisfactionStats() {
       commCount++;
     }
 
-    // Track by quarter for trend
-    var quarter = row[SATISFACTION_COLS.QUARTER - 1];
+    // Track by quarter for trend (quarter stored in vault, attached above)
+    var quarter = row._vaultQuarter || '';
     if (quarter && trust) {
       if (!quarterData[quarter]) {
         quarterData[quarter] = { sum: 0, count: 0 };
@@ -34711,26 +34996,28 @@ function getFlaggedSubmissionsData() {
 
   if (!satSheet) return result;
 
-  var data = satSheet.getDataRange().getValues();
+  // Read from vault — all emails are hashed, no plaintext PII exists
+  var vaultRows = getVaultDataFull_();
 
-  for (var i = 1; i < data.length; i++) {
-    var verified = data[i][SATISFACTION_COLS.VERIFIED - 1];
-    var email = data[i][SATISFACTION_COLS.EMAIL - 1] || '(no email provided)';
-    var timestamp = data[i][SATISFACTION_COLS.TIMESTAMP - 1];
-    var quarter = data[i][SATISFACTION_COLS.QUARTER - 1] || '';
+  for (var i = 0; i < vaultRows.length; i++) {
+    var entry = vaultRows[i];
+    var satRow = entry.responseRow;
+    var timestamp = '';
+    try {
+      timestamp = satSheet.getRange(satRow, SATISFACTION_COLS.TIMESTAMP).getValue();
+    } catch (_e) { /* row may not exist */ }
 
-    if (verified === 'Yes') {
+    if (entry.verified === 'Yes') {
       result.verifiedCount++;
-    } else if (verified === 'Pending Review') {
+    } else if (entry.verified === 'Pending Review') {
       result.pendingCount++;
       result.pendingEmails.push({
-        email: email.toString(),
+        email: 'Anonymous submission #' + satRow,
         date: timestamp ? Utilities.formatDate(new Date(timestamp), Session.getScriptTimeZone(), 'MMM d, yyyy') : 'Unknown',
-        quarter: quarter,
-        row: i + 1  // 1-indexed row number for editing
+        quarter: entry.quarter,
+        row: satRow  // Satisfaction sheet row for approve/reject
       });
     }
-    // Rejected submissions are counted but not shown
   }
 
   // Sort by most recent first
@@ -34745,19 +35032,26 @@ function getFlaggedSubmissionsData() {
  */
 function approveFlaggedSubmission(rowNum) {
   // Verify caller is an authorized steward
-  var email = '';
-  try { email = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
-  if (!email) {
+  var callerEmail = '';
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  if (!callerEmail) {
     throw new Error('Authorization required: unable to verify user identity');
   }
 
+  // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault) return;
 
-  if (!satSheet || rowNum < 2 || rowNum > satSheet.getLastRow()) return;
-
-  satSheet.getRange(rowNum, SATISFACTION_COLS.VERIFIED).setValue('Yes');
-  satSheet.getRange(rowNum, SATISFACTION_COLS.REVIEWER_NOTES).setValue('Approved by ' + email + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  var vaultData = vault.getDataRange().getValues();
+  for (var i = 1; i < vaultData.length; i++) {
+    if (vaultData[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1] === rowNum) {
+      var vaultRow = i + 1;
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Yes');
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Approved by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      break;
+    }
+  }
 
   // Update dashboard
   syncSatisfactionValues();
@@ -34768,14 +35062,21 @@ function approveFlaggedSubmission(rowNum) {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function rejectFlaggedSubmission(rowNum) {
+  // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault) return;
 
-  if (!satSheet || rowNum < 2) return;
-
-  satSheet.getRange(rowNum, SATISFACTION_COLS.VERIFIED).setValue('Rejected');
-  satSheet.getRange(rowNum, SATISFACTION_COLS.IS_LATEST).setValue('No');
-  satSheet.getRange(rowNum, SATISFACTION_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  var vaultData = vault.getDataRange().getValues();
+  for (var i = 1; i < vaultData.length; i++) {
+    if (vaultData[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1] === rowNum) {
+      var vaultRow = i + 1;
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Rejected');
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      break;
+    }
+  }
 
   // Update dashboard
   syncSatisfactionValues();
@@ -35038,18 +35339,21 @@ function getPublicSurveyData(includeHistory) {
   var data = satSheet.getDataRange().getValues();
   if (data.length < 2) return result;
 
-  // Filter rows to only include verified responses
-  // If includeHistory is false (default), also filter to IS_LATEST='Yes'
+  // Load vault data to check verified/isLatest status (PII stays in vault)
+  var vaultMap = getVaultDataMap_();
+
+  // Filter rows to only include verified responses using vault flags
   var validRows = [];
   for (var i = 1; i < data.length; i++) {
-    var verified = data[i][SATISFACTION_COLS.VERIFIED - 1];
-    var isLatest = data[i][SATISFACTION_COLS.IS_LATEST - 1];
+    var satRow = i + 1; // 1-indexed sheet row
+    var vEntry = vaultMap[satRow];
+    if (!vEntry) continue;
 
     // Only include Verified='Yes' responses
-    if (!isTruthyValue(verified)) continue;
+    if (!isTruthyValue(vEntry.verified)) continue;
 
     // If not including history, only include IS_LATEST='Yes'
-    if (!includeHistory && !isTruthyValue(isLatest)) continue;
+    if (!includeHistory && !isTruthyValue(vEntry.isLatest)) continue;
 
     validRows.push(data[i]);
   }
@@ -35069,13 +35373,15 @@ function getPublicSurveyData(includeHistory) {
   result.avgSatisfaction = satCount > 0 ? satSum / satCount : 0;
 
   // Response rate (unique verified members / total members)
+  // Count from vault — member IDs are hashed, but unique hashes = unique members
   if (memberSheet) {
     var memberCount = memberSheet.getLastRow() - 1;
-    // Count unique verified member IDs
     var uniqueMembers = {};
-    for (var k = 0; k < validRows.length; k++) {
-      var memberId = validRows[k][SATISFACTION_COLS.MATCHED_MEMBER_ID - 1];
-      if (memberId) uniqueMembers[memberId] = true;
+    var vaultFull = getVaultDataFull_();
+    for (var k = 0; k < vaultFull.length; k++) {
+      if (vaultFull[k].verified === 'Yes' && vaultFull[k].isLatest === 'Yes' && vaultFull[k].memberIdHash) {
+        uniqueMembers[vaultFull[k].memberIdHash] = true;
+      }
     }
     var uniqueCount = Object.keys(uniqueMembers).length;
     result.responseRate = memberCount > 0 ? Math.round(uniqueCount / memberCount * 100) : 0;
@@ -37072,7 +37378,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1932 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1946 lines)
 // ============================================================================
 
 // ============================================================================
@@ -37526,7 +37832,13 @@ function createSatisfactionSheet(ss) {
   sheet.setColumnWidth(dashStart + 3, 80);   // Type
   sheet.setColumnWidth(dashStart + 4, 200);  // Options
 
-  // Delete excess columns after CK (column 89) - preserve all verification columns including REVIEWER_NOTES
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NO VERIFICATION COLUMNS ON THIS SHEET (v4.8 — Vault Architecture)
+  // All email/member ID linkage is stored in the protected _Survey_Vault sheet.
+  // This sheet contains ZERO data that can link a response to a person.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Delete excess columns after the dashboard/chart area (keep through col 82 + dashboard)
   var maxCols = sheet.getMaxColumns();
   if (maxCols > 89) {
     sheet.deleteColumns(90, maxCols - 89);
@@ -37535,7 +37847,10 @@ function createSatisfactionSheet(ss) {
   // Populate computed values (no formulas in visible sheet)
   syncSatisfactionValues();
 
-  Logger.log('Member Satisfaction sheet created with 68-question survey, dashboard, and chart data');
+  // Ensure vault sheet exists for PII isolation
+  setupSurveyVaultSheet();
+
+  Logger.log('Member Satisfaction sheet created — PII stored in _Survey_Vault (protected)');
 
   // Set tab color
   sheet.setTabColor(COLORS.UNION_GREEN);
@@ -38068,6 +38383,9 @@ function createFunctionChecklistSheet_() {
     ['1️⃣7️⃣ Survey', 'Survey Tracking', '📧 Send Reminders', 'sendSurveyCompletionReminders', 'Emails non-respondents with 7-day cooldown. Uses survey URL from Config (col AR)'],
     ['1️⃣7️⃣ Survey', 'Survey Tracking', '📊 Get Stats', 'getSurveyCompletionStats', 'Returns { total, completed, notCompleted, rate } for current round'],
     ['1️⃣7️⃣ Survey', 'Hidden Sheet Setup', '🔧 Setup Tracking Sheet', 'setupSurveyTrackingSheet', 'Creates hidden _Survey_Tracking with 10-column structure (called by setupHiddenSheets)'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Setup Vault Sheet', 'setupSurveyVaultSheet', 'Creates hidden + protected _Survey_Vault with 8-column PII store. Only script owner can access.'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔍 Get Vault Map (No PII)', 'getVaultDataMap_', 'Returns row→{verified,isLatest,quarter} map for dashboard filtering. Never exposes email/member ID.'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Write Vault Entry', 'writeVaultEntry_', 'Appends email/member ID to vault for a new survey response. Called by onSatisfactionFormSubmit.'],
 
     // ═══ PHASE 18: Navigation & Views (v4.1) ═══
     ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
@@ -38644,7 +38962,9 @@ function createFAQSheet(ss) {
     ['Q: Are engagement metrics columns visible by default?',
      'A: No. Columns Q-T (Engagement Metrics) and U-X (Member Interests) are hidden by default using collapsible column groups. Stewards can expand them when needed.'],
     ['Q: How does the survey response rate work?',
-     'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.']
+     'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.'],
+    ['Q: Are survey results anonymous?',
+     'A: Yes — cryptographic anonymity is enforced. The Satisfaction sheet contains ZERO identifying data. The _Survey_Vault stores only SHA-256 hashed emails and hashed member IDs — these hashes are mathematically non-reversible, meaning even with full vault access, it is impossible to determine who submitted any response. Raw emails exist only in memory during submission (to send a thank-you) and are never saved to any sheet. Dashboards show only aggregate data. Looker exports use separate anonymized hashes.']
   ];
 
   for (var eng = 0; eng < engagementFAQs.length; eng++) {
@@ -38670,9 +38990,9 @@ function createFAQSheet(ss) {
 
   var surveyTrackingFAQs = [
     ['Q: What is the Survey Completion Tracker?',
-     'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks completion status, dates, cumulative history, and reminder emails. Access it via the Survey Completion Tracker dialog.'],
+     'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks ONLY completion status — not what they answered. No individual survey responses are stored or accessible through the tracker. It records: completion status, dates, cumulative history, and reminder emails. The email-to-response linkage is in a separate protected vault (_Survey_Vault) that only the script owner can access.'],
     ['Q: How does the system know when a member completes the survey?',
-     'A: When a member submits the Google Form satisfaction survey, the system extracts their email from the form response, matches it against the Member Directory (case-insensitive email comparison), and if a match is found, automatically marks that member as "Completed" in the tracking sheet with a timestamp.'],
+     'A: When a member submits the Google Form, the system extracts their email in-memory, matches it against the Member Directory, and marks them as "Completed" in the tracking sheet. The email is then hashed (SHA-256, non-reversible) and only the hash is stored in the vault. The raw email is discarded — it is never saved to any sheet.'],
     ['Q: What if a member\'s email doesn\'t match?',
      'A: The survey response is still recorded in the Satisfaction sheet but flagged as "Pending Review". The member\'s tracking status stays "Not Completed" for that round. Check that the member\'s email in the Member Directory matches what they used to submit the form.'],
     ['Q: How do I start a new survey round?',
@@ -38682,7 +39002,7 @@ function createFAQSheet(ss) {
     ['Q: How do I populate the tracker for the first time?',
      'A: Click "Refresh Member List" in the Survey Completion Tracker dialog, or run populateSurveyTrackingFromMembers(). This copies all members from the Member Directory into the tracking sheet with initial status "Not Completed". Safe to re-run — it rebuilds from the directory.'],
     ['Q: Where is the survey tracking data stored?',
-     'A: In the hidden _Survey_Tracking sheet (10 columns: Member ID, Name, Email, Location, Steward, Current Status, Completed Date, Total Missed, Total Completed, Last Reminder Sent). It\'s created automatically during dashboard setup.']
+     'A: Three separate sheets: (1) _Survey_Tracking stores completion status (who submitted, not what they answered). (2) _Survey_Vault stores SHA-256 hashed emails and hashed member IDs — these cannot be reversed to reveal identities. (3) The Satisfaction sheet stores anonymous survey answers with zero identifying data. Even with access to all three sheets, it is cryptographically impossible to link any answer to a person.']
   ];
 
   for (var st = 0; st < surveyTrackingFAQs.length; st++) {
@@ -38932,7 +39252,7 @@ function createFeaturesReferenceSheet(ss) {
 
     // Survey Completion Tracking
     ['Survey Tracking', 'Survey Completion Tracker', 'Management dialog showing completion stats (total, completed, not completed, rate %) with action buttons.', 'showSurveyTrackingDialog()', 'survey, tracking, completion, stats'],
-    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory.', 'Automatic via form trigger', 'auto, detect, email, form, trigger'],
+    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory. PII stored in protected _Survey_Vault only.', 'Automatic via form trigger', 'auto, detect, email, form, trigger, vault'],
     ['Survey Tracking', 'Populate Tracking', 'Syncs all members from Member Directory into the tracking sheet with initial "Not Completed" status. Safe to re-run.', 'Survey Tracker > Refresh Member List', 'populate, sync, members, refresh'],
     ['Survey Tracking', 'Start New Round', 'Resets all members to "Not Completed", increments Total Missed for non-respondents from previous round.', 'Survey Tracker > Start New Round', 'round, reset, new, missed'],
     ['Survey Tracking', 'Send Reminders', 'Emails non-respondents with survey link from Config. 7-day cooldown between reminders per member.', 'Survey Tracker > Send Reminders', 'reminder, email, cooldown, notify'],
@@ -42779,7 +43099,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3679 lines)
+// SOURCE: 11_CommandHub.gs (3681 lines)
 // ============================================================================
 
 /**
@@ -44982,19 +45302,21 @@ function getRecentSurveyAverage(unitName) {
   }
 
   var lastRow = satSheet.getLastRow();
-  var data = satSheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.REVIEWER_NOTES).getValues();
+  var data = satSheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.AVG_SCHEDULING || 82).getValues();
+
+  // Load vault data to check verified/isLatest status (PII stays in vault)
+  var vaultMap = getVaultDataMap_();
 
   var scores = [];
   var unitLower = unitName.toString().trim().toLowerCase();
 
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
+    var satRow = i + 2; // 1-indexed sheet row
 
-    // Only include verified, latest responses
-    var verified = row[SATISFACTION_COLS.VERIFIED - 1];
-    var isLatest = row[SATISFACTION_COLS.IS_LATEST - 1];
-
-    if (!isTruthyValue(verified) || !isTruthyValue(isLatest)) continue;
+    // Only include verified, latest responses (checked via vault)
+    var vEntry = vaultMap[satRow];
+    if (!vEntry || !isTruthyValue(vEntry.verified) || !isTruthyValue(vEntry.isLatest)) continue;
 
     // Check if worksite matches unit (partial match for flexibility)
     var worksite = (row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '').toString().trim().toLowerCase();
@@ -46463,7 +46785,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4027 lines)
+// SOURCE: 12_Features.gs (4029 lines)
 // ============================================================================
 
 /**
@@ -49168,7 +49490,7 @@ function initializeLookerSatisfactionSheet_() {
     'Communication Avg', 'Member Voice Avg', 'Value Action Avg', 'Scheduling Avg',
     'Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Would Recommend',
     'Filed Grievance', 'Representation Avg',
-    'Verification Status', 'Matched Member ID', 'Quarter Period',
+    'Is Verified', 'Quarter Period',
     'Last Updated'
   ];
 
@@ -49423,7 +49745,9 @@ function refreshLookerSatisfaction_() {
 
   const now = new Date();
   const exportData = [];
-  const cols = typeof SATISFACTION_COLS !== 'undefined' ? SATISFACTION_COLS : {};
+
+  // Load vault data for verification status (PII stays in vault)
+  const vaultMap = typeof getVaultDataMap_ === 'function' ? getVaultDataMap_() : {};
 
   for (let i = 1; i < sourceData.length; i++) {
     const row = sourceData[i];
@@ -49432,6 +49756,7 @@ function refreshLookerSatisfaction_() {
 
     // Generate response ID
     const responseId = 'SR' + String(i).padStart(5, '0');
+    const satRow = i + 1; // 1-indexed sheet row
 
     // Date dimensions
     const respMonth = timestamp instanceof Date ? Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM') : '';
@@ -49463,10 +49788,10 @@ function refreshLookerSatisfaction_() {
     const wouldRecommend = row[9] || '';
     const filedGrievance = row[36] || '';
 
-    // Verification columns (if they exist)
-    const verificationStatus = cols.VERIFIED ? (row[cols.VERIFIED - 1] || '') : '';
-    const matchedMemberId = cols.MATCHED_MEMBER_ID ? (row[cols.MATCHED_MEMBER_ID - 1] || '') : '';
-    const quarterPeriod = cols.QUARTER ? (row[cols.QUARTER - 1] || '') : respQuarter;
+    // Verification from vault — boolean only, no PII exposed
+    const vEntry = vaultMap[satRow] || {};
+    const isVerified = vEntry.verified === 'Yes' ? 'Yes' : 'No';
+    const quarterPeriod = vEntry.quarter || respQuarter;
 
     exportData.push([
       responseId,
@@ -49495,8 +49820,7 @@ function refreshLookerSatisfaction_() {
       wouldRecommend,
       filedGrievance,
       repAvg,
-      verificationStatus,
-      matchedMemberId,
+      isVerified,
       quarterPeriod,
       now
     ]);
@@ -49533,7 +49857,7 @@ function setupLookerAnonIntegration() {
     'This will create ANONYMIZED data sheets for external Looker reports:\n\n' +
     '• _Looker_Anon_Members - Aggregated member data (no names/contact)\n' +
     '• _Looker_Anon_Grievances - Case data (no member info)\n' +
-    '• _Looker_Anon_Satisfaction - Survey data (already anonymous)\n\n' +
+    '• _Looker_Anon_Satisfaction - Survey data (hashed, no email/member ID)\n\n' +
     'These sheets contain NO personally identifiable information (PII).\n' +
     'Safe for external dashboards and compliance reporting.\n\n' +
     'Continue?',

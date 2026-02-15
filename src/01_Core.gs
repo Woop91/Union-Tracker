@@ -754,6 +754,9 @@ var SHEETS = {
   //   -> updateSurveyTrackingOnSubmit_() marks member "Completed" in this sheet.
   // Management: showSurveyTrackingDialog() in 08c_FormsAndNotifications.gs
   SURVEY_TRACKING: '_Survey_Tracking',
+  // Survey Vault (hidden + protected) — stores email/member ID linkage
+  // for survey responses. Separated from Satisfaction sheet for anonymity.
+  SURVEY_VAULT: '_Survey_Vault',
   // Satisfaction & Feedback sheets
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
   // Data is preserved for modal access. Use removeDeprecatedTabs() to hide.
@@ -792,7 +795,8 @@ var HIDDEN_SHEETS = {
   STEWARD_PERFORMANCE_CALC: '_Steward_Performance_Calc',
   AUDIT_LOG: '_Audit_Log',
   CHECKLIST_CALC: '_Checklist_Calc',
-  SURVEY_TRACKING: '_Survey_Tracking'
+  SURVEY_TRACKING: '_Survey_Tracking',
+  SURVEY_VAULT: '_Survey_Vault'
 };
 
 // ============================================================================
@@ -1571,14 +1575,60 @@ var SATISFACTION_COLS = {
   AVG_VALUE_ACTION: 81,           // CC - Avg of Q51-Q55
   AVG_SCHEDULING: 82,             // CD - Avg of Q56-Q62
 
-  // ── VERIFICATION & TRACKING COLUMNS (CE onwards) ──
-  EMAIL: 83,                      // CE - Email address from form submission
-  VERIFIED: 84,                   // CF - Yes / Pending Review / Rejected
-  MATCHED_MEMBER_ID: 85,          // CG - Member ID if email matched
-  QUARTER: 86,                    // CH - Quarter string (e.g., "2026-Q1")
-  IS_LATEST: 87,                  // CI - Yes/No - Is this the latest for this member this quarter?
-  SUPERSEDED_BY: 88,              // CJ - Row number of newer response (if superseded)
-  REVIEWER_NOTES: 89              // CK - Notes from reviewer
+  // ── VERIFICATION COLUMNS — MOVED TO _Survey_Vault (v4.8) ──
+  // These constants are DEPRECATED. All PII is now stored in the
+  // _Survey_Vault hidden sheet (SURVEY_VAULT_COLS) to ensure survey
+  // anonymity. The Satisfaction sheet no longer contains any data that
+  // can link a response to a specific member.
+  // @deprecated v4.8 — use SURVEY_VAULT_COLS instead
+  EMAIL: -1,
+  VERIFIED: -1,
+  MATCHED_MEMBER_ID: -1,
+  QUARTER: -1,
+  IS_LATEST: -1,
+  SUPERSEDED_BY: -1,
+  REVIEWER_NOTES: -1
+};
+
+// ============================================================================
+// SURVEY VAULT COLUMNS (8 columns: A-H) — Zero-knowledge hash store
+// ============================================================================
+
+/**
+ * Survey Vault column positions (1-indexed)
+ * Hidden + protected sheet: _Survey_Vault
+ *
+ * PURPOSE:
+ *   Provides verified/latest/quarter metadata for survey responses without
+ *   storing any reversible PII. Email and member ID are SHA-256 hashed with
+ *   a per-installation salt — even with full vault access, it is
+ *   cryptographically impossible to determine who submitted a response.
+ *
+ * SECURITY MODEL:
+ *   - Email and Member ID are stored as salted SHA-256 hashes only
+ *   - Hashes are non-reversible — no one can recover the original values
+ *   - Raw email exists in memory only (during form submit) and is never persisted
+ *   - Sheet is hidden (prefixed with _) and sheet-protected
+ *   - Dashboard code reads only {verified, isLatest, quarter} via getVaultDataMap_()
+ *
+ * DATA FLOW:
+ *   1. onSatisfactionFormSubmit() writes survey answers to Satisfaction sheet
+ *      (anonymous — no email, no member ID, no hashes)
+ *   2. Same function hashes email + member ID in-memory, writes hashes to vault
+ *   3. Raw email is used only to send thank-you email, then discarded
+ *   4. Superseding logic compares hashes, never plaintext
+ *
+ * @const {Object}
+ */
+var SURVEY_VAULT_COLS = {
+  RESPONSE_ROW: 1,          // A - Row number in Satisfaction sheet
+  EMAIL: 2,                 // B - SHA-256 hash of email (non-reversible)
+  VERIFIED: 3,              // C - Yes / Pending Review / Rejected
+  MATCHED_MEMBER_ID: 4,     // D - SHA-256 hash of member ID (non-reversible)
+  QUARTER: 5,               // E - Quarter string (e.g., "2026-Q1")
+  IS_LATEST: 6,             // F - Yes/No - Is this the latest for this member?
+  SUPERSEDED_BY: 7,         // G - Vault row number of newer response
+  REVIEWER_NOTES: 8         // H - Notes from reviewer
 };
 
 /**

@@ -257,6 +257,9 @@ function setupHiddenSheets(ss) {
     config.setup(sheet);
     sheet.hideSheet();
   });
+
+  // Survey Vault uses its own setup (includes sheet protection)
+  setupSurveyVaultSheet();
 }
 
 
