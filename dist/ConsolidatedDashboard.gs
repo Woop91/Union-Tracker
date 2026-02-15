@@ -16699,7 +16699,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2968 lines)
+// SOURCE: 05_Integrations.gs (2971 lines)
 // ============================================================================
 
 /**
@@ -18406,36 +18406,9 @@ function doGet(e) {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
   }
 
-  // Step 3: Check for member ID parameter (member portal mode)
-  var memberId = validation.params.id || (e && e.parameter && e.parameter.id);
-  if (memberId) {
-    // Validate member ID format
-    if (!isValidMemberId(memberId)) {
-      secureLog('doGet', 'Invalid member ID format', { id: memberId });
-      return getAccessDeniedPage('Invalid member ID format');
-    }
-
-    // v4.5.1: Require authentication to access member portals (IDOR protection)
-    var portalAuthResult = checkWebAppAuthorization('member');
-    if (!portalAuthResult.isAuthorized) {
-      secureLog('doGet', 'Unauthorized member portal access attempt', {
-        requestedMemberId: memberId,
-        email: portalAuthResult.email,
-        role: portalAuthResult.role
-      });
-      return getAccessDeniedPage(portalAuthResult.message || 'Authentication required to view member portal');
-    }
-    secureLog('doGet', 'Member portal access granted', { memberId: memberId, email: portalAuthResult.email });
-
-    // Delegate to member portal (defined in 11_SecureMemberDashboard.gs)
-    if (typeof buildMemberPortal === 'function') {
-      return buildMemberPortal(memberId);
-    }
-    // Fallback to public portal
-    if (typeof buildPublicPortal === 'function') {
-      return buildPublicPortal();
-    }
-  }
+  // Step 3: (Removed in v4.5.2) The ?id= member portal route has been removed.
+  // Members access their portal via ?page=selfservice using either Google account
+  // verification or PIN authentication. This eliminates IDOR risk from URL-based member IDs.
 
   // Step 4: Standard page routing for mobile dashboard (legacy support)
   var page = validation.params.page || (e && e.parameter && e.parameter.page) || 'dashboard';
@@ -18445,8 +18418,24 @@ function doGet(e) {
   if (typeof isDashboardMemberAuthRequired === 'function' && isDashboardMemberAuthRequired()) {
     var publicPages = ['dashboard', 'portal'];
     if (publicPages.indexOf(page) >= 0 || !page) {
-      // Redirect to self-service portal for authentication
-      secureLog('doGet', 'Dashboard auth required - redirecting to selfservice', { requestedPage: page });
+      secureLog('doGet', 'Dashboard auth required - checking member auth', { requestedPage: page });
+
+      // Try Google account verification first
+      try {
+        var dashAuthUser = Session.getEffectiveUser();
+        var dashAuthEmail = dashAuthUser ? dashAuthUser.getEmail() : null;
+        if (dashAuthEmail && typeof getMemberIdByEmail === 'function') {
+          var dashLinkedId = getMemberIdByEmail(dashAuthEmail);
+          if (dashLinkedId && typeof buildMemberPortal === 'function') {
+            secureLog('doGet', 'Dashboard auth - member verified via Google account', { email: dashAuthEmail });
+            return buildMemberPortal(dashLinkedId);
+          }
+        }
+      } catch (dashGoogleErr) {
+        // Google auth not available - fall through to PIN login
+      }
+
+      // No linked Google account - show PIN login form
       if (typeof getMemberSelfServicePortalHtml === 'function') {
         var authHtml = getMemberSelfServicePortalHtml();
         return HtmlService.createHtmlOutput(authHtml)
@@ -18486,7 +18475,21 @@ function doGet(e) {
       html = getWebAppLinksHtml();
       break;
     case 'selfservice':
-      // v4.5.1: Member self-service portal with PIN authentication
+      // v4.5.2: Try Google account verification first, fall back to PIN
+      try {
+        var selfServiceUser = Session.getEffectiveUser();
+        var selfServiceEmail = selfServiceUser ? selfServiceUser.getEmail() : null;
+        if (selfServiceEmail && typeof getMemberIdByEmail === 'function') {
+          var linkedMemberId = getMemberIdByEmail(selfServiceEmail);
+          if (linkedMemberId && typeof buildMemberPortal === 'function') {
+            secureLog('doGet', 'Member authenticated via Google account', { email: selfServiceEmail });
+            return buildMemberPortal(linkedMemberId);
+          }
+        }
+      } catch (googleAuthErr) {
+        // Google auth not available - fall through to PIN login
+      }
+      // No linked Google account found - show PIN login form
       if (typeof getMemberSelfServicePortalHtml === 'function') {
         html = getMemberSelfServicePortalHtml();
       } else {
@@ -49759,7 +49762,7 @@ function getLookerStatus() {
 
 
 // ============================================================================
-// SOURCE: 13_MemberSelfService.gs (1705 lines)
+// SOURCE: 13_MemberSelfService.gs (1732 lines)
 // ============================================================================
 
 /**
@@ -50257,6 +50260,33 @@ function clearPINAttempts(memberId) {
 // ============================================================================
 // MEMBER AUTHENTICATION
 // ============================================================================
+
+/**
+ * Look up a member ID by their Google account email.
+ * Used to auto-authenticate members who have a linked Google account.
+ * @param {string} email - The Google account email to look up
+ * @returns {string|null} Member ID if found, null otherwise
+ */
+function getMemberIdByEmail(email) {
+  if (!email) return null;
+
+  email = String(email).trim().toLowerCase();
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
+    if (rowEmail === email) {
+      var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
+      return memberId ? String(memberId).trim() : null;
+    }
+  }
+
+  return null;
+}
 
 /**
  * Authenticate a member with their ID and PIN
