@@ -32712,7 +32712,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4042 lines)
+// SOURCE: 09_Dashboards.gs (4044 lines)
 // ============================================================================
 
 /**
@@ -33263,18 +33263,20 @@ function getSatisfactionOverviewData() {
 
   data.totalResponses = lastRow - 1;
 
-  // Get satisfaction scores (Q6-Q9 are columns G-J, 1-indexed as 7-10)
-  var satisfactionRange = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, data.totalResponses, 4).getValues();
+  // Get satisfaction scores (Q6-Q9) — dynamic range from SATISFACTION_COLS
+  var satRangeStart = SATISFACTION_COLS.Q6_SATISFIED_REP;
+  var satRangeCount = SATISFACTION_COLS.Q9_RECOMMEND - satRangeStart + 1;
+  var satisfactionRange = sheet.getRange(2, satRangeStart, data.totalResponses, satRangeCount).getValues();
 
   var sumOverall = 0, sumTrust = 0, sumProtected = 0, sumRecommend = 0;
   var promoters = 0, detractors = 0;
   var validCount = 0;
 
   satisfactionRange.forEach(function(row) {
-    var satisfied = parseFloat(row[0]) || 0;
-    var trust = parseFloat(row[1]) || 0;
-    var protected_ = parseFloat(row[2]) || 0;
-    var recommend = parseFloat(row[3]) || 0;
+    var satisfied = parseFloat(row[SATISFACTION_COLS.Q6_SATISFIED_REP - satRangeStart]) || 0;
+    var trust = parseFloat(row[SATISFACTION_COLS.Q7_TRUST_UNION - satRangeStart]) || 0;
+    var protected_ = parseFloat(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - satRangeStart]) || 0;
+    var recommend = parseFloat(row[SATISFACTION_COLS.Q9_RECOMMEND - satRangeStart]) || 0;
 
     if (satisfied > 0) {
       sumOverall += satisfied;
@@ -34175,16 +34177,16 @@ function computeSectionAverages_(responseData) {
 
     // Derive indices from SATISFACTION_COLS (1-indexed, used as 0-indexed array indices)
     // Overall Satisfaction (Q6-9)
-    averages.push(computeAverage_(row, SATISFACTION_COLS.Q6_SATISFIED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
 
     // Steward Rating (Q10-16)
-    averages.push(computeAverage_(row, SATISFACTION_COLS.Q10_TIMELY - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
 
     // Steward Access (Q18-20)
     averages.push(computeAverage_(row, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
 
     // Chapter (Q21-25)
-    averages.push(computeAverage_(row, SATISFACTION_COLS.Q21_REPS_UNDERSTAND - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
 
     // Leadership (Q26-31)
     averages.push(computeAverage_(row, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
@@ -34252,7 +34254,7 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
   var totalResponses = responseData.length;
   var responsePeriod = 'No data';
   if (totalResponses > 0) {
-    var timestamps = responseData.map(function(r) { return r[0]; }).filter(function(t) { return t instanceof Date; });
+    var timestamps = responseData.map(function(r) { return r[SATISFACTION_COLS.TIMESTAMP - 1]; }).filter(function(t) { return t instanceof Date; });
     if (timestamps.length > 0) {
       var minDate = new Date(Math.min.apply(null, timestamps));
       var maxDate = new Date(Math.max.apply(null, timestamps));
@@ -34295,28 +34297,28 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
   for (var d = 0; d < responseData.length; d++) {
     var row = responseData[d];
 
-    // Shift (column D, index 3)
-    var shift = row[3];
+    // Shift (Q3)
+    var shift = row[SATISFACTION_COLS.Q3_SHIFT - 1];
     if (shift === 'Day') shifts.Day++;
     else if (shift === 'Evening') shifts.Evening++;
     else if (shift === 'Night') shifts.Night++;
     else if (shift === 'Rotating') shifts.Rotating++;
 
-    // Tenure (column E, index 4)
-    var ten = String(row[4] || '');
+    // Tenure (Q4)
+    var ten = String(row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] || '');
     if (ten.indexOf('<1') >= 0) tenure['<1']++;
     else if (ten.indexOf('1-3') >= 0) tenure['1-3']++;
     else if (ten.indexOf('4-7') >= 0) tenure['4-7']++;
     else if (ten.indexOf('8-15') >= 0) tenure['8-15']++;
     else if (ten.indexOf('15+') >= 0) tenure['15+']++;
 
-    // Steward contact (column F, index 5)
-    if (row[5] === 'Yes') stewardContact.Yes++;
-    else if (row[5] === 'No') stewardContact.No++;
+    // Steward contact (Q5)
+    if (row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] === 'Yes') stewardContact.Yes++;
+    else if (row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] === 'No') stewardContact.No++;
 
-    // Filed grievance (column AK, index 36)
-    if (row[36] === 'Yes') filedGrievance.Yes++;
-    else if (row[36] === 'No') filedGrievance.No++;
+    // Filed grievance (Q36)
+    if (row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] === 'Yes') filedGrievance.Yes++;
+    else if (row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] === 'No') filedGrievance.No++;
   }
 
   // Write Demographics (rows 4-23, columns CH-CI)
@@ -34375,10 +34377,10 @@ function computeSatisfactionRowAverages(row) {
 
   var averages = [];
 
-  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q6_SATISFIED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
-  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q10_TIMELY - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
   averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
-  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q21_REPS_UNDERSTAND - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
   averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
   averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
   averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
