@@ -2700,7 +2700,7 @@ function initializeLookerSatisfactionSheet_() {
     'Communication Avg', 'Member Voice Avg', 'Value Action Avg', 'Scheduling Avg',
     'Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Would Recommend',
     'Filed Grievance', 'Representation Avg',
-    'Verification Status', 'Matched Member ID', 'Quarter Period',
+    'Is Verified', 'Quarter Period',
     'Last Updated'
   ];
 
@@ -2995,9 +2995,8 @@ function refreshLookerSatisfaction_() {
     const wouldRecommend = row[9] || '';
     const filedGrievance = row[36] || '';
 
-    // Verification columns (if they exist)
-    const verificationStatus = cols.VERIFIED ? (row[cols.VERIFIED - 1] || '') : '';
-    const matchedMemberId = cols.MATCHED_MEMBER_ID ? (row[cols.MATCHED_MEMBER_ID - 1] || '') : '';
+    // Verification columns (if they exist) — anonymized: boolean only, no member ID
+    const isVerified = cols.VERIFIED ? (row[cols.VERIFIED - 1] === 'Yes' ? 'Yes' : 'No') : '';
     const quarterPeriod = cols.QUARTER ? (row[cols.QUARTER - 1] || '') : respQuarter;
 
     exportData.push([
@@ -3027,8 +3026,7 @@ function refreshLookerSatisfaction_() {
       wouldRecommend,
       filedGrievance,
       repAvg,
-      verificationStatus,
-      matchedMemberId,
+      isVerified,
       quarterPeriod,
       now
     ]);
@@ -3065,7 +3063,7 @@ function setupLookerAnonIntegration() {
     'This will create ANONYMIZED data sheets for external Looker reports:\n\n' +
     '• _Looker_Anon_Members - Aggregated member data (no names/contact)\n' +
     '• _Looker_Anon_Grievances - Case data (no member info)\n' +
-    '• _Looker_Anon_Satisfaction - Survey data (already anonymous)\n\n' +
+    '• _Looker_Anon_Satisfaction - Survey data (hashed, no email/member ID)\n\n' +
     'These sheets contain NO personally identifiable information (PII).\n' +
     'Safe for external dashboards and compliance reporting.\n\n' +
     'Continue?',

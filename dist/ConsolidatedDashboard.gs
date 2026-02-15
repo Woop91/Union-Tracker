@@ -37072,7 +37072,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1932 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1978 lines)
 // ============================================================================
 
 // ============================================================================
@@ -37525,6 +37525,50 @@ function createSatisfactionSheet(ss) {
   sheet.setColumnWidth(dashStart + 2, 280);  // Question column
   sheet.setColumnWidth(dashStart + 3, 80);   // Type
   sheet.setColumnWidth(dashStart + 4, 200);  // Options
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // VERIFICATION COLUMNS (CE-CK, cols 83-89) — ADMIN-ONLY, HIDDEN BY DEFAULT
+  // These link survey responses to member identity for email verification.
+  // They are grouped and collapsed to protect respondent anonymity.
+  // Only admins with sheet access can expand this group.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  var verificationHeaders = [
+    '⚠️ Email (Admin Only)',    // CE (83)
+    'Verified',                 // CF (84)
+    '⚠️ Member ID (Admin)',    // CG (85)
+    'Quarter',                  // CH (86)
+    'Is Latest',                // CI (87)
+    'Superseded By',            // CJ (88)
+    'Reviewer Notes'            // CK (89)
+  ];
+
+  sheet.getRange(1, SATISFACTION_COLS.EMAIL, 1, verificationHeaders.length)
+    .setValues([verificationHeaders])
+    .setFontWeight('bold')
+    .setBackground('#DC2626')
+    .setFontColor(COLORS.WHITE)
+    .setWrap(true);
+
+  // Group and collapse verification columns so they're hidden by default
+  try {
+    sheet.getColumnGroup(SATISFACTION_COLS.EMAIL, 1);
+  } catch (noGroup) {
+    // No existing group — create one
+  }
+  sheet.getRange(1, SATISFACTION_COLS.EMAIL, 1, 7).shiftColumnGroupDepth(1);
+  sheet.getColumnGroup(SATISFACTION_COLS.EMAIL, 1).collapse();
+
+  // Add anonymity notice in row 2 of the verification section
+  sheet.getRange(2, SATISFACTION_COLS.EMAIL, 1, 7).merge()
+    .setValue('⚠️ CONFIDENTIAL: These columns link responses to members for verification only. '
+      + 'Do NOT share this sheet with survey responses visible. '
+      + 'Use _Looker_Anon_Satisfaction for external reporting.')
+    .setBackground('#FEF2F2')
+    .setFontColor('#991B1B')
+    .setFontWeight('bold')
+    .setFontSize(9)
+    .setWrap(true);
 
   // Delete excess columns after CK (column 89) - preserve all verification columns including REVIEWER_NOTES
   var maxCols = sheet.getMaxColumns();
@@ -38644,7 +38688,9 @@ function createFAQSheet(ss) {
     ['Q: Are engagement metrics columns visible by default?',
      'A: No. Columns Q-T (Engagement Metrics) and U-X (Member Interests) are hidden by default using collapsible column groups. Stewards can expand them when needed.'],
     ['Q: How does the survey response rate work?',
-     'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.']
+     'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.'],
+    ['Q: Are survey results anonymous?',
+     'A: Yes — all dashboards, reports, and Looker exports show ONLY aggregate data (averages by section, breakdowns by worksite/role). No individual responses are ever displayed. The system does collect email to verify that respondents are actual members, but these verification columns (CE-CK) are grouped, collapsed, and hidden by default with a red "Admin Only" warning. For external reporting, always use _Looker_Anon_Satisfaction which contains zero PII.']
   ];
 
   for (var eng = 0; eng < engagementFAQs.length; eng++) {
@@ -38670,7 +38716,7 @@ function createFAQSheet(ss) {
 
   var surveyTrackingFAQs = [
     ['Q: What is the Survey Completion Tracker?',
-     'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks completion status, dates, cumulative history, and reminder emails. Access it via the Survey Completion Tracker dialog.'],
+     'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks ONLY completion status — not what they answered. No individual survey responses are stored or accessible through the tracker. It records: completion status, dates, cumulative history, and reminder emails.'],
     ['Q: How does the system know when a member completes the survey?',
      'A: When a member submits the Google Form satisfaction survey, the system extracts their email from the form response, matches it against the Member Directory (case-insensitive email comparison), and if a match is found, automatically marks that member as "Completed" in the tracking sheet with a timestamp.'],
     ['Q: What if a member\'s email doesn\'t match?',
@@ -38682,7 +38728,7 @@ function createFAQSheet(ss) {
     ['Q: How do I populate the tracker for the first time?',
      'A: Click "Refresh Member List" in the Survey Completion Tracker dialog, or run populateSurveyTrackingFromMembers(). This copies all members from the Member Directory into the tracking sheet with initial status "Not Completed". Safe to re-run — it rebuilds from the directory.'],
     ['Q: Where is the survey tracking data stored?',
-     'A: In the hidden _Survey_Tracking sheet (10 columns: Member ID, Name, Email, Location, Steward, Current Status, Completed Date, Total Missed, Total Completed, Last Reminder Sent). It\'s created automatically during dashboard setup.']
+     'A: In the hidden _Survey_Tracking sheet (10 columns: Member ID, Name, Email, Location, Steward, Current Status, Completed Date, Total Missed, Total Completed, Last Reminder Sent). It\'s created automatically during dashboard setup. Important: this sheet tracks who completed the survey, NOT what they answered — individual survey responses cannot be linked back to members through the tracker.']
   ];
 
   for (var st = 0; st < surveyTrackingFAQs.length; st++) {
@@ -46463,7 +46509,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4027 lines)
+// SOURCE: 12_Features.gs (4025 lines)
 // ============================================================================
 
 /**
@@ -49168,7 +49214,7 @@ function initializeLookerSatisfactionSheet_() {
     'Communication Avg', 'Member Voice Avg', 'Value Action Avg', 'Scheduling Avg',
     'Satisfied with Rep', 'Trust Union', 'Feel Protected', 'Would Recommend',
     'Filed Grievance', 'Representation Avg',
-    'Verification Status', 'Matched Member ID', 'Quarter Period',
+    'Is Verified', 'Quarter Period',
     'Last Updated'
   ];
 
@@ -49463,9 +49509,8 @@ function refreshLookerSatisfaction_() {
     const wouldRecommend = row[9] || '';
     const filedGrievance = row[36] || '';
 
-    // Verification columns (if they exist)
-    const verificationStatus = cols.VERIFIED ? (row[cols.VERIFIED - 1] || '') : '';
-    const matchedMemberId = cols.MATCHED_MEMBER_ID ? (row[cols.MATCHED_MEMBER_ID - 1] || '') : '';
+    // Verification columns (if they exist) — anonymized: boolean only, no member ID
+    const isVerified = cols.VERIFIED ? (row[cols.VERIFIED - 1] === 'Yes' ? 'Yes' : 'No') : '';
     const quarterPeriod = cols.QUARTER ? (row[cols.QUARTER - 1] || '') : respQuarter;
 
     exportData.push([
@@ -49495,8 +49540,7 @@ function refreshLookerSatisfaction_() {
       wouldRecommend,
       filedGrievance,
       repAvg,
-      verificationStatus,
-      matchedMemberId,
+      isVerified,
       quarterPeriod,
       now
     ]);
@@ -49533,7 +49577,7 @@ function setupLookerAnonIntegration() {
     'This will create ANONYMIZED data sheets for external Looker reports:\n\n' +
     '• _Looker_Anon_Members - Aggregated member data (no names/contact)\n' +
     '• _Looker_Anon_Grievances - Case data (no member info)\n' +
-    '• _Looker_Anon_Satisfaction - Survey data (already anonymous)\n\n' +
+    '• _Looker_Anon_Satisfaction - Survey data (hashed, no email/member ID)\n\n' +
     'These sheets contain NO personally identifiable information (PII).\n' +
     'Safe for external dashboards and compliance reporting.\n\n' +
     'Continue?',
