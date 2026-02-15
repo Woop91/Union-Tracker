@@ -116,6 +116,17 @@ function createMockRange(values) {
   };
 }
 
+function createMockProtection() {
+  return {
+    setDescription: jest.fn(function() { return this; }),
+    setWarningOnly: jest.fn(function() { return this; }),
+    addEditor: jest.fn(function() { return this; }),
+    removeEditor: jest.fn(function() { return this; }),
+    getEditors: jest.fn(() => []),
+    getDescription: jest.fn(() => '')
+  };
+}
+
 function createMockSheet(name, data) {
   return {
     getName: jest.fn(() => name),
@@ -123,15 +134,19 @@ function createMockSheet(name, data) {
     getRange: jest.fn(() => createMockRange()),
     getLastRow: jest.fn(() => (data ? data.length : 1)),
     getLastColumn: jest.fn(() => (data && data[0] ? data[0].length : 1)),
+    getMaxColumns: jest.fn(() => (data && data[0] ? data[0].length : 10)),
     appendRow: jest.fn(),
     deleteRow: jest.fn(),
     deleteRows: jest.fn(),
+    deleteColumns: jest.fn(),
     hideSheet: jest.fn(),
     showSheet: jest.fn(),
     setFrozenRows: jest.fn(),
     setColumnWidth: jest.fn(),
     setTabColor: jest.fn(),
-    clear: jest.fn()
+    clear: jest.fn(),
+    protect: jest.fn(() => createMockProtection()),
+    getProtections: jest.fn(() => [])
   };
 }
 
@@ -172,7 +187,8 @@ global.SpreadsheetApp = {
     requireValueInList: jest.fn(function() { return this; }),
     setAllowInvalid: jest.fn(function() { return this; }),
     build: jest.fn(() => ({}))
-  }))
+  })),
+  ProtectionType: { SHEET: 'SHEET', RANGE: 'RANGE' }
 };
 
 // --- HtmlService ---
@@ -234,4 +250,4 @@ global.LockService = {
   }))
 };
 
-module.exports = { createMockRange, createMockSheet, createMockSpreadsheet };
+module.exports = { createMockRange, createMockSheet, createMockSpreadsheet, createMockProtection };

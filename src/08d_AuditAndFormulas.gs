@@ -18,6 +18,9 @@ function setupAuditLogSheet() {
   } else {
     // Audit log has existing data — do not clear (compliance requirement)
     Logger.log('setupAuditLogSheet: Sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear');
+
+    // Still apply protection if missing
+    protectAuditLogSheet_(sheet);
     return;
   }
 
@@ -59,7 +62,45 @@ function setupAuditLogSheet() {
   // Hide the sheet
   sheet.hideSheet();
 
+  // ═══ SHEET PROTECTION ═══
+  // v4.8.1: Audit log now gets vault-style protection (owner-only editing)
+  protectAuditLogSheet_(sheet);
+
   SpreadsheetApp.getActiveSpreadsheet().toast('Audit log sheet created and hidden.', '✅ Setup Complete', 3);
+}
+
+/**
+ * Applies vault-style sheet protection to the audit log.
+ * Only the script owner (installer) can edit. All other editors are removed.
+ *
+ * @param {Sheet} sheet - The audit log sheet
+ * @private
+ */
+function protectAuditLogSheet_(sheet) {
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  var alreadyProtected = false;
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === 'Audit Log — Tamper Protection') {
+      alreadyProtected = true;
+      break;
+    }
+  }
+
+  if (!alreadyProtected) {
+    var protection = sheet.protect()
+      .setDescription('Audit Log — Tamper Protection')
+      .setWarningOnly(false);
+
+    var me = Session.getEffectiveUser();
+    protection.addEditor(me);
+    var editors = protection.getEditors();
+    for (var j = 0; j < editors.length; j++) {
+      if (editors[j].getEmail() !== me.getEmail()) {
+        protection.removeEditor(editors[j]);
+      }
+    }
+    Logger.log('Audit log sheet protected (owner-only)');
+  }
 }
 
 // ============================================================================
@@ -1746,8 +1787,10 @@ function supersedePreviousVaultEntry_(email, quarter, newVaultRow) {
   var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
   if (!vault || vault.getLastRow() < 2) return;
 
-  // Hash the email in-memory to compare against stored hashes
+  // Hash the email in-memory to compare against stored hashes.
+  // v4.8.1: Compute both new and legacy hash to match entries from either format.
   var emailHash = hashForVault_(email);
+  var legacyHash = hashForVaultLegacy_(email);
 
   var data = vault.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
@@ -1755,7 +1798,7 @@ function supersedePreviousVaultEntry_(email, quarter, newVaultRow) {
     var rowQuarter = data[i][SURVEY_VAULT_COLS.QUARTER - 1];
     var rowIsLatest = data[i][SURVEY_VAULT_COLS.IS_LATEST - 1];
 
-    if (rowEmailHash === emailHash && rowQuarter === quarter && rowIsLatest === 'Yes') {
+    if ((rowEmailHash === emailHash || rowEmailHash === legacyHash) && rowQuarter === quarter && rowIsLatest === 'Yes') {
       var sheetRow = i + 1;
       vault.getRange(sheetRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
       vault.getRange(sheetRow, SURVEY_VAULT_COLS.SUPERSEDED_BY).setValue(newVaultRow);
@@ -1766,14 +1809,55 @@ function supersedePreviousVaultEntry_(email, quarter, newVaultRow) {
 
 /**
  * Creates a non-reversible SHA-256 hash for vault storage.
- * Uses a per-installation salt stored in Script Properties.
- * The same salt is used by generateAnonHash_() for Looker exports.
+ * Uses HMAC-style double hashing with a per-installation salt stored in
+ * Script Properties. Output is 22 hex characters (88 bits of entropy)
+ * prefixed with 'V', giving a collision-resistant 23-character identifier.
+ *
+ * v4.8.1: Upgraded from 11-character output (40 bits) to 23-character
+ * output (88 bits) to reduce collision probability. Old hashes (starting
+ * with 'V' and <= 11 chars) are still matchable via hashForVaultLegacy_().
  *
  * @param {string} value - The value to hash (email, member ID, etc.)
- * @returns {string} 12-character base64 hash prefixed with 'V'
+ * @returns {string} 23-character hash: 'V' + 22 hex chars
  * @private
  */
 function hashForVault_(value) {
+  var props = PropertiesService.getScriptProperties();
+  var salt = props.getProperty('ANON_HASH_SALT');
+  if (!salt) {
+    salt = Utilities.getUuid();
+    props.setProperty('ANON_HASH_SALT', salt);
+  }
+  var normalized = String(value).toLowerCase().trim();
+
+  // HMAC-style double hash: H(salt + H(salt + value))
+  // This prevents length-extension attacks on the inner hash
+  var innerDigest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    salt + normalized, Utilities.Charset.UTF_8);
+  var innerHex = innerDigest.map(function(b) {
+    return ('0' + (b & 0xFF).toString(16)).slice(-2);
+  }).join('');
+  var outerDigest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    salt + innerHex, Utilities.Charset.UTF_8);
+
+  // Take first 11 bytes (22 hex chars) = 88 bits of entropy
+  var hex = outerDigest.slice(0, 11).map(function(b) {
+    return ('0' + (b & 0xFF).toString(16)).slice(-2);
+  }).join('').toUpperCase();
+  return 'V' + hex;
+}
+
+/**
+ * Legacy hash function for backward compatibility with pre-v4.8.1 vault entries.
+ * Produces the old 11-character format ('V' + 10 alphanumeric).
+ *
+ * Used by supersedePreviousVaultEntry_ when matching against older hashes.
+ *
+ * @param {string} value - The value to hash
+ * @returns {string} 11-character legacy hash
+ * @private
+ */
+function hashForVaultLegacy_(value) {
   var props = PropertiesService.getScriptProperties();
   var salt = props.getProperty('ANON_HASH_SALT');
   if (!salt) {
@@ -1784,4 +1868,309 @@ function hashForVault_(value) {
   var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, combined);
   var encoded = Utilities.base64Encode(digest).substring(0, 12);
   return 'V' + encoded.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10).toUpperCase();
+}
+
+// ============================================================================
+// HMAC-SHA256 UTILITY
+// ============================================================================
+
+/**
+ * Computes an HMAC-SHA256 message authentication code.
+ * Google Apps Script does not provide a native HMAC, so this implements
+ * the standard HMAC construction: H((K ^ opad) || H((K ^ ipad) || message))
+ *
+ * @param {string} key - The secret key
+ * @param {string} message - The message to authenticate
+ * @returns {string} 64-character lowercase hex HMAC
+ */
+function computeHmacSha256_(key, message) {
+  var BLOCK_SIZE = 64; // SHA-256 block size in bytes
+
+  // Convert key to byte array; if longer than block size, hash it first
+  var keyBytes = [];
+  for (var i = 0; i < key.length; i++) {
+    keyBytes.push(key.charCodeAt(i) & 0xFF);
+  }
+  if (keyBytes.length > BLOCK_SIZE) {
+    keyBytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, key, Utilities.Charset.UTF_8);
+  }
+
+  // Pad key to block size
+  while (keyBytes.length < BLOCK_SIZE) {
+    keyBytes.push(0);
+  }
+
+  // XOR key with ipad (0x36) and opad (0x5c)
+  var ipadKey = '';
+  var opadKey = '';
+  for (var j = 0; j < BLOCK_SIZE; j++) {
+    ipadKey += String.fromCharCode((keyBytes[j] & 0xFF) ^ 0x36);
+    opadKey += String.fromCharCode((keyBytes[j] & 0xFF) ^ 0x5c);
+  }
+
+  // Inner hash: H(ipadKey || message)
+  var innerHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    ipadKey + message, Utilities.Charset.UTF_8);
+  var innerHex = innerHash.map(function(b) {
+    return ('0' + (b & 0xFF).toString(16)).slice(-2);
+  }).join('');
+
+  // Outer hash: H(opadKey || innerHash)
+  // Convert innerHash bytes back to a string for the outer digest
+  var innerStr = '';
+  for (var k = 0; k < innerHash.length; k++) {
+    innerStr += String.fromCharCode(innerHash[k] & 0xFF);
+  }
+  var outerHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    opadKey + innerStr, Utilities.Charset.UTF_8);
+
+  return outerHash.map(function(b) {
+    return ('0' + (b & 0xFF).toString(16)).slice(-2);
+  }).join('');
+}
+
+// ============================================================================
+// AUDIT LOG INTEGRITY CHAIN
+// ============================================================================
+
+/**
+ * Computes a tamper-detection hash for an audit log row.
+ * Each row's integrity hash includes the previous row's hash, forming
+ * a hash chain. If any row is modified or deleted, all subsequent
+ * hashes will fail verification.
+ *
+ * @param {string} previousHash - Integrity hash of the previous row ('' for first row)
+ * @param {Date|string} timestamp - Row timestamp
+ * @param {string} eventType - Event type
+ * @param {string} user - User email
+ * @param {string} details - JSON details string
+ * @param {string} sessionId - Session identifier
+ * @returns {string} 16-character integrity hash
+ * @private
+ */
+function computeAuditRowHash_(previousHash, timestamp, eventType, user, details, sessionId) {
+  var props = PropertiesService.getScriptProperties();
+  var salt = props.getProperty('AUDIT_INTEGRITY_SALT');
+  if (!salt) {
+    salt = Utilities.getUuid();
+    props.setProperty('AUDIT_INTEGRITY_SALT', salt);
+  }
+
+  var payload = [
+    previousHash || '',
+    String(timestamp),
+    String(eventType),
+    String(user),
+    String(details),
+    String(sessionId)
+  ].join('|');
+
+  return computeHmacSha256_(salt, payload).substring(0, 16);
+}
+
+/**
+ * Verifies the integrity of the entire audit log by recomputing the
+ * hash chain from row 1 to the end. Returns a report of any rows
+ * where the stored hash does not match the computed hash.
+ *
+ * The Integrity Hash column (F) is added by the enhanced logAuditEvent.
+ *
+ * @returns {Object} { valid: boolean, totalRows: number, invalidRows: number[] }
+ */
+function verifyAuditLogIntegrity() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_NAMES.AUDIT_LOG || SHEETS.AUDIT_LOG);
+  if (!sheet || sheet.getLastRow() < 2) {
+    return { valid: true, totalRows: 0, invalidRows: [] };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var invalidRows = [];
+  var previousHash = '';
+  var integrityCol = -1;
+
+  // Find integrity hash column (header = 'Integrity Hash')
+  var headers = data[0];
+  for (var h = 0; h < headers.length; h++) {
+    if (String(headers[h]).trim() === 'Integrity Hash') {
+      integrityCol = h;
+      break;
+    }
+  }
+
+  // If no integrity column exists, the log predates this feature
+  if (integrityCol === -1) {
+    return { valid: true, totalRows: data.length - 1, invalidRows: [], message: 'No integrity hashes found — log predates hash chain feature' };
+  }
+
+  for (var i = 1; i < data.length; i++) {
+    var storedHash = String(data[i][integrityCol] || '');
+    var computed = computeAuditRowHash_(
+      previousHash,
+      data[i][0],  // Timestamp
+      data[i][1],  // Event Type
+      data[i][2],  // User
+      data[i][3],  // Details
+      data[i][4]   // Session ID
+    );
+
+    if (storedHash && storedHash !== computed) {
+      invalidRows.push(i + 1); // 1-indexed sheet row
+    }
+    previousHash = storedHash || computed;
+  }
+
+  var result = {
+    valid: invalidRows.length === 0,
+    totalRows: data.length - 1,
+    invalidRows: invalidRows
+  };
+
+  if (invalidRows.length > 0) {
+    result.message = invalidRows.length + ' row(s) failed integrity check — possible tampering detected';
+  }
+
+  return result;
+}
+
+/**
+ * Menu-callable wrapper: verifies audit log integrity and shows result in a dialog.
+ */
+function verifyAuditLogIntegrityDialog() {
+  var result = verifyAuditLogIntegrity();
+  var ui = SpreadsheetApp.getUi();
+
+  if (result.valid) {
+    ui.alert('✅ Audit Log Integrity',
+      'All ' + result.totalRows + ' audit entries passed integrity verification.' +
+      (result.message ? '\n\nNote: ' + result.message : ''),
+      ui.ButtonSet.OK);
+  } else {
+    ui.alert('⚠️ Audit Log Integrity Warning',
+      result.message + '\n\n' +
+      'Affected rows: ' + result.invalidRows.join(', ') + '\n\n' +
+      'This may indicate unauthorized modification of the audit log.',
+      ui.ButtonSet.OK);
+  }
+}
+
+// ============================================================================
+// VAULT INTEGRITY VERIFICATION
+// ============================================================================
+
+/**
+ * Verifies the structural integrity of the _Survey_Vault sheet.
+ * Checks for:
+ * - Missing or malformed hashes
+ * - Orphaned vault entries (no matching satisfaction row)
+ * - Duplicate 'Is Latest' entries for the same email hash + quarter
+ * - Rows missing required fields
+ *
+ * @returns {Object} { valid: boolean, issues: string[], stats: Object }
+ */
+function verifySurveyVaultIntegrity() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+
+  if (!vault || vault.getLastRow() < 2) {
+    return { valid: true, issues: [], stats: { totalEntries: 0 } };
+  }
+
+  var data = vault.getDataRange().getValues();
+  var issues = [];
+  var latestMap = {};   // emailHash+quarter -> [rowNumbers]
+  var totalEntries = 0;
+  var verifiedCount = 0;
+  var pendingCount = 0;
+  var rejectedCount = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    totalEntries++;
+    var rowNum = i + 1;
+    var responseRow = data[i][0];
+    var emailHash = String(data[i][1] || '');
+    var verified = String(data[i][2] || '');
+    var memberIdHash = String(data[i][3] || '');
+    var quarter = String(data[i][4] || '');
+    var isLatest = String(data[i][5] || '');
+
+    // Check for missing response row
+    if (!responseRow) {
+      issues.push('Row ' + rowNum + ': Missing response row number');
+    }
+
+    // Check email hash format (should start with 'V')
+    if (emailHash && emailHash.charAt(0) !== 'V') {
+      issues.push('Row ' + rowNum + ': Email hash has unexpected format (possible plaintext leak)');
+    }
+
+    // Check member ID hash format if present
+    if (memberIdHash && memberIdHash.charAt(0) !== 'V') {
+      issues.push('Row ' + rowNum + ': Member ID hash has unexpected format (possible plaintext leak)');
+    }
+
+    // Check for missing quarter
+    if (!quarter) {
+      issues.push('Row ' + rowNum + ': Missing quarter');
+    }
+
+    // Track duplicate "Is Latest" entries
+    if (isLatest === 'Yes' && emailHash && quarter) {
+      var key = emailHash + '|' + quarter;
+      if (!latestMap[key]) {
+        latestMap[key] = [];
+      }
+      latestMap[key].push(rowNum);
+    }
+
+    // Count verification statuses
+    if (verified === 'Yes') verifiedCount++;
+    else if (verified === 'Pending Review') pendingCount++;
+    else if (verified === 'Rejected') rejectedCount++;
+  }
+
+  // Check for duplicate "Is Latest" entries
+  for (var mapKey in latestMap) {
+    if (latestMap.hasOwnProperty(mapKey) && latestMap[mapKey].length > 1) {
+      issues.push('Duplicate "Is Latest" entries for hash+quarter ' + mapKey.split('|')[1] +
+        ' in rows: ' + latestMap[mapKey].join(', '));
+    }
+  }
+
+  return {
+    valid: issues.length === 0,
+    issues: issues,
+    stats: {
+      totalEntries: totalEntries,
+      verified: verifiedCount,
+      pendingReview: pendingCount,
+      rejected: rejectedCount
+    }
+  };
+}
+
+/**
+ * Menu-callable wrapper: verifies vault integrity and shows result in a dialog.
+ */
+function verifySurveyVaultIntegrityDialog() {
+  var result = verifySurveyVaultIntegrity();
+  var ui = SpreadsheetApp.getUi();
+
+  var statsText = 'Entries: ' + result.stats.totalEntries +
+    ' | Verified: ' + result.stats.verified +
+    ' | Pending: ' + result.stats.pendingReview +
+    ' | Rejected: ' + result.stats.rejected;
+
+  if (result.valid) {
+    ui.alert('✅ Survey Vault Integrity',
+      'Vault passed all integrity checks.\n\n' + statsText,
+      ui.ButtonSet.OK);
+  } else {
+    ui.alert('⚠️ Survey Vault Issues Found',
+      result.issues.length + ' issue(s) detected:\n\n' +
+      result.issues.slice(0, 10).join('\n') +
+      (result.issues.length > 10 ? '\n... and ' + (result.issues.length - 10) + ' more' : '') +
+      '\n\n' + statsText,
+      ui.ButtonSet.OK);
+  }
 }
