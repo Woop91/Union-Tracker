@@ -629,10 +629,21 @@ function getSatisfactionSurveyLink() {
 }
 
 /**
- * Handle satisfaction survey form submission
- * Writes survey responses to the Member Satisfaction sheet
+ * Handle satisfaction survey form submission.
+ * Writes survey responses to the Member Satisfaction sheet, validates the
+ * respondent's email against the Member Directory, and updates the survey
+ * completion tracker if a member match is found.
  *
- * @param {Object} e - Form submission event object
+ * Triggered by: Google Forms onFormSubmit trigger
+ *   (installed via setupSatisfactionFormTrigger() below)
+ *
+ * Survey tracking integration (added for _Survey_Tracking):
+ *   After recording the response, if validateMemberEmail() finds a match,
+ *   this function calls updateSurveyTrackingOnSubmit_(memberId) to mark
+ *   the member as "Completed" in the tracking sheet. See the
+ *   "SURVEY COMPLETION TRACKING" section below for full flow documentation.
+ *
+ * @param {Object} e - Form submission event object with e.namedValues
  */
 function onSatisfactionFormSubmit(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -807,7 +818,12 @@ function onSatisfactionFormSubmit(e) {
     // Update dashboard summary values
     syncSatisfactionValues();
 
-    // Update survey completion tracking if member was matched
+    // Update survey completion tracking if member was matched.
+    // This is the hook that marks the member as "Completed" in _Survey_Tracking.
+    // Flow: email extracted above -> validateMemberEmail() returned memberMatch ->
+    //   updateSurveyTrackingOnSubmit_() sets Current Status = "Completed",
+    //   Completed Date = now, and increments Total Completed counter.
+    // See "SURVEY COMPLETION TRACKING" section below for full documentation.
     if (memberMatch && memberMatch.memberId) {
       try {
         updateSurveyTrackingOnSubmit_(memberMatch.memberId);
@@ -1511,9 +1527,18 @@ function executeSendRandomSurveyEmails(opts) {
 // ============================================================================
 
 /**
- * Validate that an email belongs to a member in the directory
- * @param {string} email - Email to validate
- * @returns {Object|null} Member info if valid, null otherwise
+ * Validate that an email belongs to a member in the directory.
+ * Scans Member Directory column I (MEMBER_COLS.EMAIL) for a case-insensitive match.
+ *
+ * This is the critical link in survey completion detection:
+ *   onSatisfactionFormSubmit() extracts the respondent's email from the Google Form,
+ *   then calls this function. If a match is found, the returned memberId is passed
+ *   to updateSurveyTrackingOnSubmit_() to mark the survey as completed in the
+ *   _Survey_Tracking sheet. If no match, the response is flagged "Pending Review"
+ *   and tracking status stays "Not Completed".
+ *
+ * @param {string} email - Email to validate (case-insensitive comparison)
+ * @returns {Object|null} { memberId, firstName, lastName } if match found, null otherwise
  */
 function validateMemberEmail(email) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1573,6 +1598,66 @@ function getQuarterFromDate(date) {
 
 // ============================================================================
 // SURVEY COMPLETION TRACKING
+// ============================================================================
+//
+// This section implements the per-member survey completion tracker.
+// It monitors which members have completed the satisfaction survey in the
+// current round and maintains cumulative participation history.
+//
+// ── HOW COMPLETION IS DETECTED ──────────────────────────────────────────────
+//
+//   The system detects survey completion via email matching on form submit:
+//
+//   1. TRIGGER: setupSatisfactionFormTrigger() (below in this file) installs a
+//      Google Apps Script trigger that fires onSatisfactionFormSubmit(e) each
+//      time a member submits the satisfaction Google Form.
+//
+//   2. EMAIL EXTRACTION: onSatisfactionFormSubmit() extracts the respondent's
+//      email from the form event by trying, in order:
+//        - Form field named "Email Address"
+//        - Form field named "Email" or "email"
+//        - Google's built-in e.response.getRespondentEmail()
+//
+//   3. EMAIL-TO-MEMBER MATCHING: validateMemberEmail(email) (this file, ~line
+//      1518) scans the Member Directory sheet column I (MEMBER_COLS.EMAIL) for
+//      a case-insensitive match. Returns { memberId, firstName, lastName } or null.
+//
+//   4. TRACKING UPDATE: If a match is found, onSatisfactionFormSubmit() calls
+//      updateSurveyTrackingOnSubmit_(memberMatch.memberId) which finds the
+//      member's row in the _Survey_Tracking sheet and writes:
+//        - Current Status   = "Completed"
+//        - Completed Date   = current timestamp
+//        - Total Completed  = previous value + 1
+//
+//   5. NO MATCH: If the email doesn't match any member (typo, personal email,
+//      non-member), the survey response is still recorded in the Satisfaction
+//      sheet (flagged as "Pending Review"), but the tracker is NOT updated —
+//      that member stays "Not Completed" for the round.
+//
+// ── ROUND MANAGEMENT ────────────────────────────────────────────────────────
+//
+//   - startNewSurveyRound(): Resets all members to "Not Completed", increments
+//     Total Missed for anyone who didn't complete the previous round.
+//   - sendSurveyCompletionReminders(): Emails non-respondents with a 7-day
+//     cooldown between reminders. Uses survey URL from Config sheet (col AR).
+//   - showSurveyTrackingDialog(): Management UI showing stats + action buttons.
+//
+// ── DATA FLOW ───────────────────────────────────────────────────────────────
+//
+//   Member Directory ──populate()──> _Survey_Tracking (hidden sheet)
+//        (source)                         │
+//   Google Form ─> onSatisfactionFormSubmit() ─> updateSurveyTrackingOnSubmit_()
+//                                         │
+//   showSurveyTrackingDialog() <──────────┘ reads stats
+//
+// ── RELATED CODE ────────────────────────────────────────────────────────────
+//
+//   Constants:    SURVEY_TRACKING_COLS    in 01_Core.gs
+//   Sheet name:   SHEETS.SURVEY_TRACKING  in 01_Core.gs ('_Survey_Tracking')
+//   Sheet setup:  setupSurveyTrackingSheet()  in 08d_AuditAndFormulas.gs
+//   Hidden init:  setupHiddenSheets()     in 08a_SheetSetup.gs
+//   Seed data:    seedSurveyTrackingData() in 07_DevTools.gs
+//
 // ============================================================================
 
 /**

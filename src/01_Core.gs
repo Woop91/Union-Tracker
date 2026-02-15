@@ -748,7 +748,11 @@ var SHEETS = {
   AUDIT_LOG: '_Audit_Log',
   // Case Checklist
   CASE_CHECKLIST: 'Case Checklist',
-  // Survey Completion Tracking (hidden)
+  // Survey Completion Tracking (hidden) - tracks per-member survey participation.
+  // See SURVEY_TRACKING_COLS below for column layout.
+  // Detection flow: Google Form submit -> onSatisfactionFormSubmit() -> validateMemberEmail()
+  //   -> updateSurveyTrackingOnSubmit_() marks member "Completed" in this sheet.
+  // Management: showSurveyTrackingDialog() in 08c_FormsAndNotifications.gs
   SURVEY_TRACKING: '_Survey_Tracking',
   // Satisfaction & Feedback sheets
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
@@ -1604,7 +1608,41 @@ var SATISFACTION_SECTIONS = {
 /**
  * Survey Completion Tracking column positions (1-indexed)
  * Hidden sheet: _Survey_Tracking
- * Tracks per-member survey completion status across survey rounds
+ *
+ * PURPOSE:
+ *   Tracks per-member survey completion status across multiple survey rounds.
+ *   Lets stewards see who has/hasn't completed the satisfaction survey and
+ *   send targeted reminders to non-respondents.
+ *
+ * HOW COMPLETION IS DETECTED:
+ *   1. A Google Forms trigger calls onSatisfactionFormSubmit(e)
+ *      when a member submits the satisfaction survey.
+ *      (Trigger installed via setupSatisfactionFormTrigger() in 08c_FormsAndNotifications.gs)
+ *   2. The respondent's email is extracted from the form response
+ *      (tries field names "Email Address", "Email", or Google's respondent email).
+ *   3. validateMemberEmail(email) in 08c_FormsAndNotifications.gs scans the
+ *      Member Directory (MEMBER_COLS.EMAIL, column I) for a case-insensitive match.
+ *   4. If a match is found, updateSurveyTrackingOnSubmit_(memberId) looks up the
+ *      member in this _Survey_Tracking sheet and sets:
+ *        - CURRENT_STATUS  = "Completed"
+ *        - COMPLETED_DATE  = now
+ *        - TOTAL_COMPLETED = previous + 1
+ *   5. If no email match is found, the satisfaction response is still recorded
+ *      but tracking status remains "Not Completed" for that member.
+ *
+ * RELATED FUNCTIONS (all in 08c_FormsAndNotifications.gs):
+ *   - populateSurveyTrackingFromMembers() : Syncs member list from Member Directory
+ *   - updateSurveyTrackingOnSubmit_(id)   : Auto-called on form submit (the detection hook)
+ *   - startNewSurveyRound()               : Resets statuses, increments missed counts
+ *   - sendSurveyCompletionReminders()     : Emails non-respondents (7-day cooldown)
+ *   - getSurveyCompletionStats()          : Returns { total, completed, notCompleted, rate }
+ *   - showSurveyTrackingDialog()          : Management UI modal
+ *
+ * SHEET SETUP:
+ *   - setupSurveyTrackingSheet() in 08d_AuditAndFormulas.gs
+ *   - Registered in setupHiddenSheets() in 08a_SheetSetup.gs
+ *   - Seed data: seedSurveyTrackingData() in 07_DevTools.gs
+ *
  * @const {Object}
  */
 var SURVEY_TRACKING_COLS = {

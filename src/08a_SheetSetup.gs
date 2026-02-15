@@ -225,7 +225,15 @@ function reorderSheetsToStandard(ss) {
 }
 
 /**
- * Sets up hidden calculation sheets
+ * Sets up hidden calculation sheets.
+ * Creates (or recreates) each hidden sheet, runs its setup function, and hides it.
+ *
+ * Includes the _Survey_Tracking sheet which tracks per-member survey completion.
+ * Survey tracking detection flow:
+ *   Google Form submit -> onSatisfactionFormSubmit() -> validateMemberEmail()
+ *   -> updateSurveyTrackingOnSubmit_() in 08c_FormsAndNotifications.gs
+ * See SURVEY_TRACKING_COLS in 01_Core.gs for full documentation.
+ *
  * @param {Spreadsheet} ss - The spreadsheet
  * @returns {void}
  */
