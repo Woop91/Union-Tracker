@@ -1469,14 +1469,15 @@ const EXTENSION_CONFIG = {
 };
 
 // Pre-computed column indices (0-based for array access)
+// Uses MEMBER_COLS from 01_Core.gs (always loaded first in GAS alphabetical order)
 const COL_IDX = {
-  MEMBER_ID: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.MEMBER_ID : 1) - 1,
-  FIRST_NAME: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.FIRST_NAME : 2) - 1,
-  LAST_NAME: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.LAST_NAME : 3) - 1,
-  EMAIL: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.EMAIL : 9) - 1,
-  UNIT: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.UNIT : 6) - 1,
-  WORK_LOCATION: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.WORK_LOCATION : 5) - 1,
-  IS_STEWARD: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.IS_STEWARD : 15) - 1
+  MEMBER_ID: MEMBER_COLS.MEMBER_ID - 1,
+  FIRST_NAME: MEMBER_COLS.FIRST_NAME - 1,
+  LAST_NAME: MEMBER_COLS.LAST_NAME - 1,
+  EMAIL: MEMBER_COLS.EMAIL - 1,
+  UNIT: MEMBER_COLS.UNIT - 1,
+  WORK_LOCATION: MEMBER_COLS.WORK_LOCATION - 1,
+  IS_STEWARD: MEMBER_COLS.IS_STEWARD - 1
 };
 
 // ============================================================================
@@ -1554,7 +1555,7 @@ function invalidateHeaderCache(sheetName) {
 function loadMemberData_(options) {
   options = options || {};
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) || EXTENSION_CONFIG.MEMBER_SHEET;
+  const sheetName = SHEETS.MEMBER_DIR;
   const sheet = ss.getSheetByName(sheetName);
 
   if (!sheet) {
@@ -1682,14 +1683,12 @@ function repairDynamicFormulas() {
   }
 
   const startRow = EXTENSION_CONFIG.DYNAMIC_FORMULA_ROW;
-  const isStewardCol = (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.IS_STEWARD : 15);
-  const colLetter = typeof getColumnLetter === 'function' ? getColumnLetter(isStewardCol) : 'O';
+  const isStewardCol = MEMBER_COLS.IS_STEWARD;
+  const colLetter = getColumnLetter(isStewardCol);
 
   // Build all values and formulas for batch write
   // Use safeSheetNameForFormula to prevent formula injection attacks
-  const safeSheetName = typeof safeSheetNameForFormula === 'function'
-    ? safeSheetNameForFormula(EXTENSION_CONFIG.MEMBER_SHEET)
-    : "'" + String(EXTENSION_CONFIG.MEMBER_SHEET).replace(/'/g, "''") + "'";
+  const safeSheetName = safeSheetNameForFormula(SHEETS.MEMBER_DIR);
   const safeLeaderRole = String(EXTENSION_CONFIG.LEADER_ROLE_NAME || '').replace(/"/g, '""');
 
   const batchData = [
@@ -1722,7 +1721,7 @@ function repairDynamicFormulas() {
  * @returns {Object} Object with extraHeaders and memberData
  */
 function getExpansionColumnData(memberId) {
-  const sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) || EXTENSION_CONFIG.MEMBER_SHEET;
+  const sheetName = SHEETS.MEMBER_DIR;
   const headerMap = getHeaderMap(sheetName);
   const coreCount = EXTENSION_CONFIG.CORE_COLUMN_COUNT;
 
@@ -1736,7 +1735,7 @@ function getExpansionColumnData(memberId) {
       extraHeaders.push({
         name: name,
         column: col,
-        letter: typeof getColumnLetter === 'function' ? getColumnLetter(col) : ''
+        letter: getColumnLetter(col)
       });
     }
   }
@@ -1815,7 +1814,7 @@ function saveExpansionData(memberId, customData) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) || EXTENSION_CONFIG.MEMBER_SHEET;
+  const sheetName = SHEETS.MEMBER_DIR;
   const sheet = ss.getSheetByName(sheetName);
 
   if (!sheet) {
@@ -1879,7 +1878,7 @@ function saveExpansionData(memberId, customData) {
  */
 function setupMemberLeaderRole() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const configSheetName = (typeof SHEETS !== 'undefined' && SHEETS.CONFIG) || 'Config';
+  const configSheetName = SHEETS.CONFIG;
   const configSheet = ss.getSheetByName(configSheetName);
 
   if (!configSheet) {
@@ -1887,7 +1886,7 @@ function setupMemberLeaderRole() {
     return errorResponse('Config sheet not found');
   }
 
-  const yesNoCol = (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.YES_NO) || 5;
+  const yesNoCol = CONFIG_COLS.YES_NO;
   const existingValues = configSheet.getRange(3, yesNoCol, 10, 1).getValues().flat().filter(Boolean);
 
   if (existingValues.indexOf(EXTENSION_CONFIG.LEADER_ROLE_NAME) !== -1) {
@@ -1932,7 +1931,7 @@ function setupDynamicEngine() {
   }
 
   // Invalidate cache before setup
-  invalidateHeaderCache(EXTENSION_CONFIG.MEMBER_SHEET);
+  invalidateHeaderCache(SHEETS.MEMBER_DIR);
 
   const roleResult = setupMemberLeaderRole();
   const formulaResult = repairDynamicFormulas();
