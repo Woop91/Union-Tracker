@@ -236,7 +236,8 @@ function setupHiddenSheets(ss) {
     { name: HIDDEN_SHEETS.CALC_DEADLINES, setup: setupCalcDeadlinesSheet },
     { name: HIDDEN_SHEETS.CALC_STATS, setup: setupCalcStatsSheet },
     { name: HIDDEN_SHEETS.CALC_SYNC, setup: setupCalcSyncSheet },
-    { name: HIDDEN_SHEETS.CALC_FORMULAS, setup: setupCalcFormulasSheet }
+    { name: HIDDEN_SHEETS.CALC_FORMULAS, setup: setupCalcFormulasSheet },
+    { name: HIDDEN_SHEETS.SURVEY_TRACKING, setup: setupSurveyTrackingSheet }
   ];
 
   hiddenSheets.forEach(function(config) {

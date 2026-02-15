@@ -168,6 +168,7 @@ function SEED_SAMPLE_DATA() {
     '• 300 sample grievances (30%)\n' +
     '• 50 sample survey responses\n' +
     '• 3 sample feedback entries\n' +
+    '• Survey completion tracking data\n' +
     '• Auto-sync trigger for live updates\n\n' +
     'Note: Some members may have multiple grievances.\n' +
     'Member Directory will auto-update when Grievance Log changes.\n\n' +
@@ -191,6 +192,9 @@ function SEED_SAMPLE_DATA() {
   ss.toast('Seeding feedback entries...', '🌱 Seeding', 2);
   seedFeedbackData();
 
+  ss.toast('Seeding survey tracking data...', '🌱 Seeding', 2);
+  seedSurveyTrackingData();
+
   ss.toast('Installing auto-sync trigger...', '🔧 Setup', 3);
   installAutoSyncTriggerQuick();
 
@@ -201,6 +205,7 @@ function SEED_SAMPLE_DATA() {
     '• 300 grievances added (30%)\n' +
     '• 50 survey responses added\n' +
     '• 3 feedback entries added\n' +
+    '• Survey tracking populated\n' +
     '• Auto-sync trigger installed\n\n' +
     'Member Directory columns (Has Open Grievance?, Grievance Status, Days to Deadline) ' +
     'will now auto-update when you edit the Grievance Log.', ui.ButtonSet.OK);
@@ -415,6 +420,94 @@ function seedFeedbackData() {
   sheet.getRange(2, FEEDBACK_COLS.TIMESTAMP, sampleFeedback.length, 1).setNumberFormat('MM/dd/yyyy HH:mm');
 
   Logger.log('Seeded ' + sampleFeedback.length + ' sample feedback entries');
+}
+
+/**
+ * Seed survey tracking data from existing Member Directory.
+ * Populates _Survey_Tracking with all members and simulates
+ * realistic completion patterns (~40% completed, ~60% not completed).
+ */
+function seedSurveyTrackingData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var trackingSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!trackingSheet) {
+    Logger.log('Survey Tracking sheet not found. It will be created during setup.');
+    return;
+  }
+
+  if (!memberSheet || memberSheet.getLastRow() < 2) {
+    Logger.log('Member Directory empty or missing. Skipping survey tracking seed.');
+    return;
+  }
+
+  // Check if already seeded
+  if (trackingSheet.getLastRow() > 1) {
+    Logger.log('Survey Tracking already has data. Skipping seed.');
+    return;
+  }
+
+  var memberData = memberSheet.getDataRange().getValues();
+  var rows = [];
+  var now = new Date();
+
+  for (var i = 1; i < memberData.length; i++) {
+    var memberId = memberData[i][MEMBER_COLS.MEMBER_ID - 1];
+    if (!memberId) continue;
+
+    var firstName = memberData[i][MEMBER_COLS.FIRST_NAME - 1] || '';
+    var lastName = memberData[i][MEMBER_COLS.LAST_NAME - 1] || '';
+    var email = memberData[i][MEMBER_COLS.EMAIL - 1] || '';
+    var location = memberData[i][MEMBER_COLS.WORK_LOCATION - 1] || '';
+    var steward = memberData[i][MEMBER_COLS.ASSIGNED_STEWARD - 1] || '';
+
+    // ~40% completed current round
+    var completed = Math.random() < 0.4;
+    var completedDate = '';
+    if (completed) {
+      var daysAgo = Math.floor(Math.random() * 30);
+      completedDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+    }
+
+    // Simulate 0-3 prior rounds of history
+    var priorRounds = Math.floor(Math.random() * 4);
+    var totalCompleted = completed ? 1 : 0;
+    var totalMissed = 0;
+    for (var r = 0; r < priorRounds; r++) {
+      if (Math.random() < 0.5) {
+        totalCompleted++;
+      } else {
+        totalMissed++;
+      }
+    }
+
+    // ~30% of non-completed members got a reminder
+    var lastReminder = '';
+    if (!completed && Math.random() < 0.3) {
+      var reminderDaysAgo = Math.floor(Math.random() * 14) + 1;
+      lastReminder = new Date(now.getTime() - reminderDaysAgo * 24 * 60 * 60 * 1000);
+    }
+
+    rows.push([
+      memberId,
+      (firstName + ' ' + lastName).trim(),
+      email,
+      location,
+      steward,
+      completed ? 'Completed' : 'Not Completed',
+      completedDate,
+      totalMissed,
+      totalCompleted,
+      lastReminder
+    ]);
+  }
+
+  if (rows.length > 0) {
+    trackingSheet.getRange(2, 1, rows.length, 10).setValues(rows);
+  }
+
+  Logger.log('Seeded survey tracking for ' + rows.length + ' members');
 }
 
 /**
