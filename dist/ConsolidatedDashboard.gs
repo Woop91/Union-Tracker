@@ -48462,7 +48462,7 @@ function repairChecklistCalcSheet() {
  *    - Creates a new hierarchy level for organizational "nodes"
  *    - Member Leaders connect members without case-management duties
  *    - Filtered out of Grievance dropdowns via IS_STEWARD column
- *    - Uses "Member Leader" value in IS_STEWARD column (column N)
+ *    - Uses "Member Leader" value in IS_STEWARD column (column O)
  *
  * 2. Column Expansion (Dynamic Engine)
  *    - "No-Code" feature for adding custom columns
@@ -48497,10 +48497,10 @@ const COL_IDX = {
   MEMBER_ID: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.MEMBER_ID : 1) - 1,
   FIRST_NAME: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.FIRST_NAME : 2) - 1,
   LAST_NAME: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.LAST_NAME : 3) - 1,
-  EMAIL: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.EMAIL : 8) - 1,
-  UNIT: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.UNIT : 5) - 1,
-  WORK_LOCATION: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.WORK_LOCATION : 6) - 1,
-  IS_STEWARD: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.IS_STEWARD : 14) - 1
+  EMAIL: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.EMAIL : 9) - 1,
+  UNIT: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.UNIT : 6) - 1,
+  WORK_LOCATION: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.WORK_LOCATION : 5) - 1,
+  IS_STEWARD: (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.IS_STEWARD : 15) - 1
 };
 
 // ============================================================================
@@ -48706,8 +48706,8 @@ function repairDynamicFormulas() {
   }
 
   const startRow = EXTENSION_CONFIG.DYNAMIC_FORMULA_ROW;
-  const isStewardCol = (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.IS_STEWARD : 14);
-  const colLetter = typeof getColumnLetter === 'function' ? getColumnLetter(isStewardCol) : 'N';
+  const isStewardCol = (typeof MEMBER_COLS !== 'undefined' ? MEMBER_COLS.IS_STEWARD : 15);
+  const colLetter = typeof getColumnLetter === 'function' ? getColumnLetter(isStewardCol) : 'O';
 
   // Build all values and formulas for batch write
   // Use safeSheetNameForFormula to prevent formula injection attacks

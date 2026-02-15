@@ -72,16 +72,21 @@ Quick, practical tutorials for common tasks in the 509 Dashboard.
 | D | Job Title | Case Worker (use dropdown) |
 | E | Work Location | Boston Office (use dropdown) |
 | F | Unit | Unit 8 (use dropdown) |
-| H | Email | jane.smith@email.com |
-| I | Phone | (555) 123-4567 |
-| J | Is Steward | No (use dropdown) |
+| I | Email | jane.smith@email.com |
+| J | Phone | (555) 123-4567 |
+| O | Is Steward | No (use dropdown) |
 
 **Step 4: Optional Fields**
-- Columns K-M: Supervisor, Manager, Assigned Steward
-- Columns Q-T: Engagement metrics
-- Columns U-W: Interest flags
+- Column G: Cubicle / workspace ID
+- Column H: Office Days (multi-select)
+- Column K: Preferred Communication (multi-select)
+- Column L: Best Time to Contact (multi-select)
+- Columns M-N: Supervisor, Manager
+- Columns P-Q: Committees, Assigned Steward
+- Columns R-U: Engagement metrics
+- Columns V-X: Interest flags
 
-**Columns Z-AD are auto-calculated - don't edit them!**
+**Columns AB-AD are auto-calculated - don't edit them!**
 
 ---
 
@@ -586,13 +591,17 @@ The system automatically sends meeting documents to stewards on a schedule:
 
 ### Column Reference
 
-**Member Directory (34 columns A-AH)**
+**Member Directory (39 columns A-AM)**
 - A: Member ID
 - B-C: Name
-- D-F: Work info
-- H-I: Contact
-- J: Is Steward
-- AB-AD, AF-AH: Auto-calculated (don't edit)
+- D-F: Work info (Job Title, Location, Unit)
+- G: Cubicle (hidden)
+- H: Office Days
+- I-L: Contact (Email, Phone, Preferred Comm, Best Time)
+- M-N: Supervisor, Manager
+- O: Is Steward
+- P-Q: Committees, Assigned Steward
+- AB-AD: Auto-calculated (don't edit)
 
 **Grievance Log (34 columns A-AH)**
 - A: Grievance ID
