@@ -1536,8 +1536,8 @@ function getInteractiveResourceLinks() {
 
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
-      // Get URLs from Config sheet row 2
-      var row = configSheet.getRange(2, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      // Get URLs from Config sheet row 3 (data row; rows 1-2 are headers)
+      var row = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
       links.grievanceForm = row[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
       links.contactForm = row[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
       links.satisfactionForm = row[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
@@ -1566,7 +1566,8 @@ function getInteractiveMemberFilters() {
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
       var lastRow = configSheet.getLastRow();
-      var data = configSheet.getRange(2, 1, lastRow - 1, CONFIG_COLS.OFFICE_DAYS).getValues();
+      if (lastRow < 3) return filters;
+      var data = configSheet.getRange(3, 1, lastRow - 2, CONFIG_COLS.OFFICE_DAYS).getValues();
 
       // Get unique values from config
       data.forEach(function(row) {

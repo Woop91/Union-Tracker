@@ -12313,7 +12313,7 @@ function getSmartDashboardHtml() {
 
 
 // ============================================================================
-// SOURCE: 04c_InteractiveDashboard.gs (1718 lines)
+// SOURCE: 04c_InteractiveDashboard.gs (1719 lines)
 // ============================================================================
 
 // ============================================================================
@@ -13854,8 +13854,8 @@ function getInteractiveResourceLinks() {
 
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
-      // Get URLs from Config sheet row 2
-      var row = configSheet.getRange(2, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      // Get URLs from Config sheet row 3 (data row; rows 1-2 are headers)
+      var row = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
       links.grievanceForm = row[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
       links.contactForm = row[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
       links.satisfactionForm = row[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
@@ -13884,7 +13884,8 @@ function getInteractiveMemberFilters() {
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
       var lastRow = configSheet.getLastRow();
-      var data = configSheet.getRange(2, 1, lastRow - 1, CONFIG_COLS.OFFICE_DAYS).getValues();
+      if (lastRow < 3) return filters;
+      var data = configSheet.getRange(3, 1, lastRow - 2, CONFIG_COLS.OFFICE_DAYS).getValues();
 
       // Get unique values from config
       data.forEach(function(row) {
@@ -17643,7 +17644,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2986 lines)
+// SOURCE: 05_Integrations.gs (2977 lines)
 // ============================================================================
 
 /**
@@ -20451,23 +20452,14 @@ function getWebAppResourceLinks() {
     githubRepo: ''  // Set via Config sheet ORG_WEBSITE or manually
   };
 
-  // Try to get form URLs from Config sheet
-  if (configSheet) {
+  // Get form URLs from Config sheet using CONFIG_COLS constants (data in row 3)
+  if (configSheet && configSheet.getLastRow() >= 3) {
     try {
-      var configData = configSheet.getDataRange().getValues();
-      for (var i = 0; i < configData.length; i++) {
-        var row = configData[i];
-        for (var j = 0; j < row.length; j++) {
-          var val = String(row[j] || '').toLowerCase();
-          if (val.indexOf('grievance') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.grievanceForm = String(row[j + 1]);
-          } else if (val.indexOf('contact') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.contactForm = String(row[j + 1]);
-          } else if (val.indexOf('satisfaction') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.satisfactionForm = String(row[j + 1]);
-          }
-        }
-      }
+      var configRow = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      links.grievanceForm = configRow[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
+      links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
+      links.satisfactionForm = configRow[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
+      links.orgWebsite = configRow[CONFIG_COLS.ORG_WEBSITE - 1] || '';
     } catch (_e) {
       // Ignore errors reading config
     }
@@ -28616,7 +28608,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1969 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (1966 lines)
 // ============================================================================
 
 
@@ -29789,17 +29781,17 @@ function sendStewardDeadlineAlerts() {
     });
   }
 
-  // Get steward emails from Config sheet
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  // Get steward emails from Member Directory (stewards are members with IS_STEWARD = Yes)
   var stewardEmails = {};
-  if (configSheet) {
-    var configData = configSheet.getDataRange().getValues();
-    // Look for Steward Emails column (assume it's after Stewards column)
-    for (var c = 1; c < configData.length; c++) {
-      var stewardName = configData[c][CONFIG_COLS.STEWARDS - 1];
-      var stewardEmail = configData[c][CONFIG_COLS.STEWARDS]; // Next column
-      if (stewardName && stewardEmail && stewardEmail.indexOf('@') !== -1) {
-        stewardEmails[stewardName] = stewardEmail;
+  for (var s = 1; s < memberData.length; s++) {
+    var isSteward = memberData[s][MEMBER_COLS.IS_STEWARD - 1];
+    if (isTruthyValue(isSteward)) {
+      var sFirstName = memberData[s][MEMBER_COLS.FIRST_NAME - 1] || '';
+      var sLastName = memberData[s][MEMBER_COLS.LAST_NAME - 1] || '';
+      var sFullName = (sFirstName + ' ' + sLastName).trim();
+      var sEmail = memberData[s][MEMBER_COLS.EMAIL - 1] || '';
+      if (sFullName && sEmail && sEmail.indexOf('@') !== -1) {
+        stewardEmails[sFullName] = sEmail;
       }
     }
   }
@@ -30402,14 +30394,11 @@ function sendSurveyCompletionReminders() {
     return 'No survey tracking data found.';
   }
 
-  // Get survey URL from Config
+  // Get survey URL from Config using CONFIG_COLS constant (data in row 3)
   var surveyUrl = '';
-  if (configSheet) {
+  if (configSheet && configSheet.getLastRow() >= 3) {
     try {
-      var configData = configSheet.getDataRange().getValues();
-      if (configData.length > 2 && configData[0].length >= 44) {
-        surveyUrl = configData[2][43] || ''; // Column AR (Satisfaction Survey URL)
-      }
+      surveyUrl = configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '';
     } catch (_e) { /* no survey URL configured */ }
   }
 
@@ -30421,7 +30410,7 @@ function sendSurveyCompletionReminders() {
 
   var orgName = '';
   try {
-    orgName = configSheet.getRange(3, 21).getValue() || 'Your Union';
+    orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue() || 'Your Union';
   } catch (_e) {
     orgName = 'Your Union';
   }
@@ -32772,7 +32761,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4036 lines)
+// SOURCE: 09_Dashboards.gs (4046 lines)
 // ============================================================================
 
 /**
@@ -35589,23 +35578,33 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     }
   }
 
-  // Get top 5 locations from Config
-  for (var l = 0; l < 5; l++) {
-    var locName = configData[2 + l] ? configData[2 + l][CONFIG_COLS.OFFICE_LOCATIONS - 1] : '';
-    if (locName) {
-      var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
-      locData.members = memberLocations[locName] || 0;
-      var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
-
-      metrics.locations.push({
-        name: locName,
-        members: locData.members,
-        grievances: locData.grievances,
-        open: locData.open,
-        winRate: locWinRate,
-        satisfaction: '-'
-      });
+  // Get locations dynamically from Config column (skip header rows 0-1, data starts at index 2)
+  var configLocations = [];
+  for (var cl = 2; cl < configData.length; cl++) {
+    var configLoc = configData[cl] ? configData[cl][CONFIG_COLS.OFFICE_LOCATIONS - 1] : '';
+    if (configLoc && String(configLoc).trim() !== '') {
+      configLocations.push(String(configLoc).trim());
     }
+  }
+  // Use top 5 locations by member count
+  configLocations.sort(function(a, b) {
+    return (memberLocations[b] || 0) - (memberLocations[a] || 0);
+  });
+  var topLocations = configLocations.slice(0, 5);
+  for (var l = 0; l < topLocations.length; l++) {
+    var locName = topLocations[l];
+    var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
+    locData.members = memberLocations[locName] || 0;
+    var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
+
+    metrics.locations.push({
+      name: locName,
+      members: locData.members,
+      grievances: locData.grievances,
+      open: locData.open,
+      winRate: locWinRate,
+      satisfaction: '-'
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -47710,7 +47709,7 @@ function getContractPdfUrl_() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
-      var url = configSheet.getRange(3, CONFIG_COLS.CONTRACT_URL).getValue();
+      var url = configSheet.getRange(3, CONFIG_COLS.ORG_WEBSITE).getValue();
       if (url) return url;
     }
   } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }

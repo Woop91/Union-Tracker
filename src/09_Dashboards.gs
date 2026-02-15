@@ -2812,23 +2812,33 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     }
   }
 
-  // Get top 5 locations from Config
-  for (var l = 0; l < 5; l++) {
-    var locName = configData[2 + l] ? configData[2 + l][CONFIG_COLS.OFFICE_LOCATIONS - 1] : '';
-    if (locName) {
-      var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
-      locData.members = memberLocations[locName] || 0;
-      var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
-
-      metrics.locations.push({
-        name: locName,
-        members: locData.members,
-        grievances: locData.grievances,
-        open: locData.open,
-        winRate: locWinRate,
-        satisfaction: '-'
-      });
+  // Get locations dynamically from Config column (skip header rows 0-1, data starts at index 2)
+  var configLocations = [];
+  for (var cl = 2; cl < configData.length; cl++) {
+    var configLoc = configData[cl] ? configData[cl][CONFIG_COLS.OFFICE_LOCATIONS - 1] : '';
+    if (configLoc && String(configLoc).trim() !== '') {
+      configLocations.push(String(configLoc).trim());
     }
+  }
+  // Use top 5 locations by member count
+  configLocations.sort(function(a, b) {
+    return (memberLocations[b] || 0) - (memberLocations[a] || 0);
+  });
+  var topLocations = configLocations.slice(0, 5);
+  for (var l = 0; l < topLocations.length; l++) {
+    var locName = topLocations[l];
+    var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
+    locData.members = memberLocations[locName] || 0;
+    var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
+
+    metrics.locations.push({
+      name: locName,
+      members: locData.members,
+      grievances: locData.grievances,
+      open: locData.open,
+      winRate: locWinRate,
+      satisfaction: '-'
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════
