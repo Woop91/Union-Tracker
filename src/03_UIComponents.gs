@@ -56,7 +56,8 @@ function createDashboardMenu() {
       .addItem('🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs')
       .addSeparator()
       .addItem('⬆️ Promote to Steward', 'promoteSelectedMemberToSteward')
-      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward'))
+      .addItem('⬇️ Demote Steward', 'demoteSelectedSteward')
+      .addItem('🔄 Sync Steward Status', 'syncStewardStatus'))
 
     .addSubMenu(ui.createMenu('📋 Cases & Grievances')
       .addItem('➕ New Case/Grievance', 'showNewGrievanceDialog')
