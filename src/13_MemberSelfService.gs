@@ -495,6 +495,33 @@ function clearPINAttempts(memberId) {
 // ============================================================================
 
 /**
+ * Look up a member ID by their Google account email.
+ * Used to auto-authenticate members who have a linked Google account.
+ * @param {string} email - The Google account email to look up
+ * @returns {string|null} Member ID if found, null otherwise
+ */
+function getMemberIdByEmail(email) {
+  if (!email) return null;
+
+  email = String(email).trim().toLowerCase();
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = String(data[i][MEMBER_COLS.EMAIL - 1] || '').trim().toLowerCase();
+    if (rowEmail === email) {
+      var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
+      return memberId ? String(memberId).trim() : null;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Authenticate a member with their ID and PIN
  * @param {string} memberId - The member ID
  * @param {string} pin - The PIN to verify
