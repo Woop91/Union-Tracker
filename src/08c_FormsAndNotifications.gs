@@ -1655,7 +1655,7 @@ function populateSurveyTrackingFromMembers() {
 
   // Clear existing data (preserve header)
   if (trackingSheet.getLastRow() > 1) {
-    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, 10).clear();
+    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).clear();
   }
 
   var rows = [];
@@ -1681,7 +1681,7 @@ function populateSurveyTrackingFromMembers() {
   }
 
   if (rows.length > 0) {
-    trackingSheet.getRange(2, 1, rows.length, 10).setValues(rows);
+    trackingSheet.getRange(2, 1, rows.length, SURVEY_TRACKING_HEADER_MAP_.length).setValues(rows);
   }
 
   Logger.log('populateSurveyTracking: Populated ' + rows.length + ' member rows');

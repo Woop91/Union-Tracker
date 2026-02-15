@@ -851,8 +851,8 @@ function syncVolunteerHoursToMemberDirectory() {
 
   for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
     var row = volunteerData[i];
-    var memberId = row[1];  // Column B - Member ID
-    var hours = row[5];     // Column F - Hours
+    var memberId = row[1];  // Column B - Member ID (Volunteer Hours sheet - no shared constant)
+    var hours = row[5];     // Column F - Hours (Volunteer Hours sheet - no shared constant)
 
     if (!memberId) continue;
 
@@ -913,10 +913,10 @@ function syncMeetingAttendanceToMemberDirectory() {
 
   for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
     var row = attendanceData[i];
-    var meetingDate = row[1];     // Column B - Meeting Date
-    var meetingType = row[2];     // Column C - Meeting Type
-    var memberId = row[4];        // Column E - Member ID
-    var attended = row[6];        // Column G - Attended (checkbox)
+    var meetingDate = row[1];     // Column B - Meeting Date (Meeting Attendance sheet - no shared constant)
+    var meetingType = row[2];     // Column C - Meeting Type (Meeting Attendance sheet - no shared constant)
+    var memberId = row[4];        // Column E - Member ID (Meeting Attendance sheet - no shared constant)
+    var attended = row[6];        // Column G - Attended (Meeting Attendance sheet - no shared constant)
 
     if (!memberId || !attended || !meetingDate) continue;
 

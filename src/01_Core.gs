@@ -1248,6 +1248,22 @@ var AUDIT_LOG_HEADER_MAP_ = [
 var AUDIT_LOG_COLS = buildColsFromMap_(AUDIT_LOG_HEADER_MAP_);
 
 // ============================================================================
+// EVENT AUDIT LOG COLUMNS — used by logAuditEvent() in 06_Maintenance.gs
+// Same sheet, different schema from the edit-level AUDIT_LOG_COLS.
+// ============================================================================
+
+var EVENT_AUDIT_HEADER_MAP_ = [
+  { key: 'TIMESTAMP',      header: 'Timestamp' },
+  { key: 'EVENT_TYPE',     header: 'Event Type' },
+  { key: 'USER',           header: 'User' },
+  { key: 'DETAILS',        header: 'Details' },
+  { key: 'SESSION_ID',     header: 'Session ID' },
+  { key: 'INTEGRITY_HASH', header: 'Integrity Hash' }
+];
+
+var EVENT_AUDIT_COLS = buildColsFromMap_(EVENT_AUDIT_HEADER_MAP_);
+
+// ============================================================================
 // SATISFACTION SURVEY COLUMNS (Google Form Response + Summary)
 // ============================================================================
 

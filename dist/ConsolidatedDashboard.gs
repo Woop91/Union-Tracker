@@ -1839,7 +1839,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2813 lines)
+// SOURCE: 01_Core.gs (2829 lines)
 // ============================================================================
 
 /**
@@ -3090,6 +3090,22 @@ var AUDIT_LOG_HEADER_MAP_ = [
 ];
 
 var AUDIT_LOG_COLS = buildColsFromMap_(AUDIT_LOG_HEADER_MAP_);
+
+// ============================================================================
+// EVENT AUDIT LOG COLUMNS — used by logAuditEvent() in 06_Maintenance.gs
+// Same sheet, different schema from the edit-level AUDIT_LOG_COLS.
+// ============================================================================
+
+var EVENT_AUDIT_HEADER_MAP_ = [
+  { key: 'TIMESTAMP',      header: 'Timestamp' },
+  { key: 'EVENT_TYPE',     header: 'Event Type' },
+  { key: 'USER',           header: 'User' },
+  { key: 'DETAILS',        header: 'Details' },
+  { key: 'SESSION_ID',     header: 'Session ID' },
+  { key: 'INTEGRITY_HASH', header: 'Integrity Hash' }
+];
+
+var EVENT_AUDIT_COLS = buildColsFromMap_(EVENT_AUDIT_HEADER_MAP_);
 
 // ============================================================================
 // SATISFACTION SURVEY COLUMNS (Google Form Response + Summary)
@@ -22119,14 +22135,14 @@ function getRecentAuditLogs(count) {
 
   if (numRows <= 0) return [];
 
-  const data = auditSheet.getRange(startRow, 1, numRows, 5).getValues();
+  const data = auditSheet.getRange(startRow, 1, numRows, EVENT_AUDIT_COLS.SESSION_ID).getValues();
 
   return data.map(row => ({
-    timestamp: row[0],
-    eventType: row[1],
-    user: row[2],
-    details: row[3],
-    sessionId: row[4]
+    timestamp: row[EVENT_AUDIT_COLS.TIMESTAMP - 1],
+    eventType: row[EVENT_AUDIT_COLS.EVENT_TYPE - 1],
+    user: row[EVENT_AUDIT_COLS.USER - 1],
+    details: row[EVENT_AUDIT_COLS.DETAILS - 1],
+    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1]
   })).reverse();
 }
 
@@ -23482,10 +23498,10 @@ function showAuditLogViewer() {
 
   // Reverse to show most recent first
   data.reverse().forEach(function(row) {
-    var timestamp = row[0] instanceof Date ? row[0].toLocaleString() : row[0];
-    var user = row[1] ? row[1].split('@')[0] : 'Unknown';
-    var eventType = row[2] || '';
-    var details = row[3] || '';
+    var timestamp = row[EVENT_AUDIT_COLS.TIMESTAMP - 1] instanceof Date ? row[EVENT_AUDIT_COLS.TIMESTAMP - 1].toLocaleString() : row[EVENT_AUDIT_COLS.TIMESTAMP - 1];
+    var user = row[EVENT_AUDIT_COLS.USER - 1] ? row[EVENT_AUDIT_COLS.USER - 1].split('@')[0] : 'Unknown';
+    var eventType = row[EVENT_AUDIT_COLS.EVENT_TYPE - 1] || '';
+    var details = row[EVENT_AUDIT_COLS.DETAILS - 1] || '';
 
     var eventClass = eventType.indexOf('STATUS') !== -1 ? 'status' :
                      (eventType.indexOf('STEWARD') !== -1 ? 'steward' :
@@ -30226,7 +30242,7 @@ function populateSurveyTrackingFromMembers() {
 
   // Clear existing data (preserve header)
   if (trackingSheet.getLastRow() > 1) {
-    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, 10).clear();
+    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).clear();
   }
 
   var rows = [];
@@ -30252,7 +30268,7 @@ function populateSurveyTrackingFromMembers() {
   }
 
   if (rows.length > 0) {
-    trackingSheet.getRange(2, 1, rows.length, 10).setValues(rows);
+    trackingSheet.getRange(2, 1, rows.length, SURVEY_TRACKING_HEADER_MAP_.length).setValues(rows);
   }
 
   Logger.log('populateSurveyTracking: Populated ' + rows.length + ' member rows');
@@ -30804,7 +30820,7 @@ function clearOldAuditEntries() {
 
   // Find rows older than 30 days (skip header)
   for (var i = data.length - 1; i >= 1; i--) {
-    var timestamp = data[i][0];
+    var timestamp = data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1];
     if (timestamp instanceof Date && timestamp < cutoffDate) {
       rowsToDelete.push(i + 1); // +1 for 1-indexed rows
     }
@@ -32526,11 +32542,11 @@ function verifyAuditLogIntegrity() {
     var storedHash = String(data[i][integrityCol] || '');
     var computed = computeAuditRowHash_(
       previousHash,
-      data[i][0],  // Timestamp
-      data[i][1],  // Event Type
-      data[i][2],  // User
-      data[i][3],  // Details
-      data[i][4]   // Session ID
+      data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1],
+      data[i][EVENT_AUDIT_COLS.EVENT_TYPE - 1],
+      data[i][EVENT_AUDIT_COLS.USER - 1],
+      data[i][EVENT_AUDIT_COLS.DETAILS - 1],
+      data[i][EVENT_AUDIT_COLS.SESSION_ID - 1]
     );
 
     if (storedHash && storedHash !== computed) {
@@ -32606,12 +32622,12 @@ function verifySurveyVaultIntegrity() {
   for (var i = 1; i < data.length; i++) {
     totalEntries++;
     var rowNum = i + 1;
-    var responseRow = data[i][0];
-    var emailHash = String(data[i][1] || '');
-    var verified = String(data[i][2] || '');
-    var memberIdHash = String(data[i][3] || '');
-    var quarter = String(data[i][4] || '');
-    var isLatest = String(data[i][5] || '');
+    var responseRow = data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1];
+    var emailHash = String(data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '');
+    var verified = String(data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '');
+    var memberIdHash = String(data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '');
+    var quarter = String(data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '');
+    var isLatest = String(data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '');
 
     // Check for missing response row
     if (!responseRow) {
@@ -32696,7 +32712,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4046 lines)
+// SOURCE: 09_Dashboards.gs (4042 lines)
 // ============================================================================
 
 /**
@@ -34122,15 +34138,18 @@ function syncSatisfactionValues() {
     return;
   }
 
-  // Get all response data (columns A-BK, 1-63)
-  var responseData = sheet.getRange(2, 1, lastRow - 1, 63).getValues();
+  // Get all response data (up to last scale question column)
+  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS; // last Likert-scale question
+  var responseData = sheet.getRange(2, 1, lastRow - 1, lastResponseCol).getValues();
 
   // Calculate section averages for each row
   var sectionAverages = computeSectionAverages_(responseData);
 
-  // Write section averages to columns BT-CD (72-82)
+  // Write section averages to summary area
+  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
   if (sectionAverages.length > 0) {
-    sheet.getRange(2, 72, sectionAverages.length, 11).setValues(sectionAverages);
+    sheet.getRange(2, summaryStart, sectionAverages.length, summaryCols).setValues(sectionAverages);
   }
 
   // Calculate and write dashboard metrics
@@ -34154,38 +34173,39 @@ function computeSectionAverages_(responseData) {
 
     var averages = [];
 
-    // Overall Satisfaction (Q6-9: columns G-J, indices 6-9)
-    averages.push(computeAverage_(row, 6, 9));
+    // Derive indices from SATISFACTION_COLS (1-indexed, used as 0-indexed array indices)
+    // Overall Satisfaction (Q6-9)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q6_SATISFIED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
 
-    // Steward Rating (Q10-16: columns K-Q, indices 10-16)
-    averages.push(computeAverage_(row, 10, 16));
+    // Steward Rating (Q10-16)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q10_TIMELY - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
 
-    // Steward Access (Q18-20: columns S-U, indices 18-20)
-    averages.push(computeAverage_(row, 18, 20));
+    // Steward Access (Q18-20)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
 
-    // Chapter (Q21-25: columns V-Z, indices 21-25)
-    averages.push(computeAverage_(row, 21, 25));
+    // Chapter (Q21-25)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q21_REPS_UNDERSTAND - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
 
-    // Leadership (Q26-31: columns AA-AF, indices 26-31)
-    averages.push(computeAverage_(row, 26, 31));
+    // Leadership (Q26-31)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
 
-    // Contract (Q32-35: columns AG-AJ, indices 32-35)
-    averages.push(computeAverage_(row, 32, 35));
+    // Contract (Q32-35)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
 
-    // Representation (Q37-40: columns AL-AO, indices 37-40)
-    averages.push(computeAverage_(row, 37, 40));
+    // Representation (Q37-40)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
 
-    // Communication (Q41-45: columns AP-AT, indices 41-45)
-    averages.push(computeAverage_(row, 41, 45));
+    // Communication (Q41-45)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1));
 
-    // Member Voice (Q46-50: columns AU-AY, indices 46-50)
-    averages.push(computeAverage_(row, 46, 50));
+    // Member Voice (Q46-50)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1));
 
-    // Value/Action (Q51-55: columns AZ-BD, indices 51-55)
-    averages.push(computeAverage_(row, 51, 55));
+    // Value/Action (Q51-55)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
 
-    // Scheduling (Q56-62: columns BE-BK, indices 56-62)
-    averages.push(computeAverage_(row, 56, 62));
+    // Scheduling (Q56-62)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
     results.push(averages);
   }
@@ -34347,38 +34367,30 @@ function computeSatisfactionRowAverages(row) {
 
   if (!sheet || row < 2) return;
 
-  // Get the response data for this row (columns A-BK, 1-63)
-  var rowData = sheet.getRange(row, 1, 1, 63).getValues()[0];
+  // Get the response data for this row
+  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS;
+  var rowData = sheet.getRange(row, 1, 1, lastResponseCol).getValues()[0];
 
-  if (!rowData[0]) return; // Skip if no timestamp
+  if (!rowData[SATISFACTION_COLS.TIMESTAMP - 1]) return; // Skip if no timestamp
 
   var averages = [];
 
-  // Overall Satisfaction (Q6-9: indices 6-9)
-  averages.push(computeAverage_(rowData, 6, 9));
-  // Steward Rating (Q10-16: indices 10-16)
-  averages.push(computeAverage_(rowData, 10, 16));
-  // Steward Access (Q18-20: indices 18-20)
-  averages.push(computeAverage_(rowData, 18, 20));
-  // Chapter (Q21-25: indices 21-25)
-  averages.push(computeAverage_(rowData, 21, 25));
-  // Leadership (Q26-31: indices 26-31)
-  averages.push(computeAverage_(rowData, 26, 31));
-  // Contract (Q32-35: indices 32-35)
-  averages.push(computeAverage_(rowData, 32, 35));
-  // Representation (Q37-40: indices 37-40)
-  averages.push(computeAverage_(rowData, 37, 40));
-  // Communication (Q41-45: indices 41-45)
-  averages.push(computeAverage_(rowData, 41, 45));
-  // Member Voice (Q46-50: indices 46-50)
-  averages.push(computeAverage_(rowData, 46, 50));
-  // Value/Action (Q51-55: indices 51-55)
-  averages.push(computeAverage_(rowData, 51, 55));
-  // Scheduling (Q56-62: indices 56-62)
-  averages.push(computeAverage_(rowData, 56, 62));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q6_SATISFIED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q10_TIMELY - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q21_REPS_UNDERSTAND - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
-  // Write section averages to this row (columns BT-CD, 72-82)
-  sheet.getRange(row, 72, 1, 11).setValues([averages]);
+  // Write section averages to summary area
+  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
+  sheet.getRange(row, summaryStart, 1, summaryCols).setValues([averages]);
 }
 
 // ============================================================================
@@ -38495,10 +38507,10 @@ function createMeetingCheckInLogSheet(ss) {
   sheet.setColumnWidth(15, 250); // O - Agenda Doc URL
   sheet.setColumnWidth(16, 250); // P - Agenda Stewards
 
-  // Format date columns
-  sheet.getRange(2, 3, 999, 1).setNumberFormat('MM/DD/YYYY');   // C - Meeting Date
-  sheet.getRange(2, 7, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss'); // G - Check-In Time
-  sheet.getRange(2, 9, 999, 1).setNumberFormat('HH:mm');        // I - Start Time
+  // Format date columns — column numbers from MEETING_CHECKIN_COLS
+  sheet.getRange(2, MEETING_CHECKIN_COLS.MEETING_DATE, 999, 1).setNumberFormat('MM/DD/YYYY');
+  sheet.getRange(2, MEETING_CHECKIN_COLS.CHECKIN_TIME, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss');
+  sheet.getRange(2, MEETING_CHECKIN_COLS.MEETING_TIME, 999, 1).setNumberFormat('HH:mm');
 
   // Freeze header row
   sheet.setFrozenRows(1);
@@ -42002,8 +42014,8 @@ function syncVolunteerHoursToMemberDirectory() {
 
   for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
     var row = volunteerData[i];
-    var memberId = row[1];  // Column B - Member ID
-    var hours = row[5];     // Column F - Hours
+    var memberId = row[1];  // Column B - Member ID (Volunteer Hours sheet - no shared constant)
+    var hours = row[5];     // Column F - Hours (Volunteer Hours sheet - no shared constant)
 
     if (!memberId) continue;
 
@@ -42064,10 +42076,10 @@ function syncMeetingAttendanceToMemberDirectory() {
 
   for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
     var row = attendanceData[i];
-    var meetingDate = row[1];     // Column B - Meeting Date
-    var meetingType = row[2];     // Column C - Meeting Type
-    var memberId = row[4];        // Column E - Member ID
-    var attended = row[6];        // Column G - Attended (checkbox)
+    var meetingDate = row[1];     // Column B - Meeting Date (Meeting Attendance sheet - no shared constant)
+    var meetingType = row[2];     // Column C - Meeting Type (Meeting Attendance sheet - no shared constant)
+    var memberId = row[4];        // Column E - Member ID (Meeting Attendance sheet - no shared constant)
+    var attended = row[6];        // Column G - Attended (Meeting Attendance sheet - no shared constant)
 
     if (!memberId || !attended || !meetingDate) continue;
 
@@ -48263,7 +48275,7 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   if (rows.length > 0) {
     var lastRow = sheet.getLastRow();
     var startRow = lastRow + 1;
-    sheet.getRange(startRow, 1, rows.length, 12).setValues(rows);
+    sheet.getRange(startRow, 1, rows.length, CHECKLIST_HEADER_MAP_.length).setValues(rows);
 
     // Add checkboxes to the new rows
     sheet.getRange(startRow, CHECKLIST_COLS.COMPLETED, rows.length, 1).insertCheckboxes();
@@ -48305,7 +48317,7 @@ function getChecklistItems(caseId) {
     return [];
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, CHECKLIST_HEADER_MAP_.length).getValues();
   var items = [];
 
   for (var i = 0; i < data.length; i++) {
@@ -48431,7 +48443,7 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
     return errorResponse('Checklist item not found');
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, CHECKLIST_HEADER_MAP_.length).getValues();
 
   for (var i = 0; i < data.length; i++) {
     if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
@@ -48592,7 +48604,7 @@ function updateChecklistItem(checklistId, updates) {
     return errorResponse('Checklist item not found');
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, CHECKLIST_HEADER_MAP_.length).getValues();
 
   for (var i = 0; i < data.length; i++) {
     if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
@@ -49325,10 +49337,10 @@ function setupChecklistCalcSheet() {
   // Get the checklist sheet name for formula references
   var clSheet = "'" + (CHECKLIST_SHEET_NAME || 'Case Checklist') + "'";
 
-  // Column letters for checklist columns
-  var caseIdCol = 'B';      // CHECKLIST_COLS.CASE_ID = 2
-  var completedCol = 'G';   // CHECKLIST_COLS.COMPLETED = 7
-  var requiredCol = 'F';    // CHECKLIST_COLS.REQUIRED = 6
+  // Column letters for checklist columns — auto-derived from constants
+  var caseIdCol = getColumnLetter(CHECKLIST_COLS.CASE_ID);
+  var completedCol = getColumnLetter(CHECKLIST_COLS.COMPLETED);
+  var requiredCol = getColumnLetter(CHECKLIST_COLS.REQUIRED);
 
   // Column A: Unique Case IDs from checklist
   // ARRAYFORMULA with UNIQUE to get all case IDs
@@ -51023,30 +51035,30 @@ function refreshLookerSatisfaction_() {
     const respQuarter = timestamp instanceof Date ? getQuarter_(timestamp) : '';
     const respYear = timestamp instanceof Date ? timestamp.getFullYear() : '';
 
-    // Calculate section averages using SATISFACTION_COLS if available
-    const overallSatAvg = calculateSectionAvg_(row, [6, 7, 8, 9]); // Q6-Q9
-    const stewardRatingAvg = calculateSectionAvg_(row, [10, 11, 12, 13, 14, 15, 16]); // Q10-Q16
-    const stewardAccessAvg = calculateSectionAvg_(row, [18, 19, 20]); // Q18-Q20
-    const chapterAvg = calculateSectionAvg_(row, [21, 22, 23, 24, 25]); // Q21-Q25
-    const leadershipAvg = calculateSectionAvg_(row, [26, 27, 28, 29, 30, 31]); // Q26-Q31
-    const contractAvg = calculateSectionAvg_(row, [32, 33, 34, 35]); // Q32-Q35
-    const commAvg = calculateSectionAvg_(row, [41, 42, 43, 44, 45]); // Q41-Q45
-    const voiceAvg = calculateSectionAvg_(row, [46, 47, 48, 49, 50]); // Q46-Q50
-    const valueAvg = calculateSectionAvg_(row, [51, 52, 53, 54, 55]); // Q51-Q55
-    const schedAvg = calculateSectionAvg_(row, [56, 57, 58, 59, 60, 61, 62]); // Q56-Q62
-    const repAvg = calculateSectionAvg_(row, [37, 38, 39, 40]); // Q37-Q40
+    // Calculate section averages using SATISFACTION_COLS (0-indexed for row access)
+    const overallSatAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q7_TRUST_UNION - 1, SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1]);
+    const stewardRatingAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q11_TREATED_RESPECT - 1, SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS - 1, SATISFACTION_COLS.Q13_FOLLOWED_THROUGH - 1, SATISFACTION_COLS.Q14_ADVOCATED - 1, SATISFACTION_COLS.Q15_SAFE_CONCERNS - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1]);
+    const stewardAccessAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q19_CONFIDENT_HELP - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1]);
+    const chapterAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q22_CHAPTER_COMM - 1, SATISFACTION_COLS.Q23_ORGANIZES - 1, SATISFACTION_COLS.Q24_REACH_CHAPTER - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1]);
+    const leadershipAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS - 1, SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE - 1, SATISFACTION_COLS.Q29_ACCOUNTABLE - 1, SATISFACTION_COLS.Q30_FAIR_PROCESSES - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1]);
+    const contractAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q33_REALISTIC_TIMELINES - 1, SATISFACTION_COLS.Q34_CLEAR_UPDATES - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1]);
+    const commAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q42_ENOUGH_INFO - 1, SATISFACTION_COLS.Q43_FIND_EASILY - 1, SATISFACTION_COLS.Q44_ALL_SHIFTS - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1]);
+    const voiceAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q47_SEEKS_INPUT - 1, SATISFACTION_COLS.Q48_DIGNITY - 1, SATISFACTION_COLS.Q49_NEWER_SUPPORTED - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1]);
+    const valueAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q52_PRIORITIES_NEEDS - 1, SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1, SATISFACTION_COLS.Q54_HOW_INVOLVED - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1]);
+    const schedAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED - 1, SATISFACTION_COLS.Q58_CLEAR_CRITERIA - 1, SATISFACTION_COLS.Q59_WORK_EXPECTATIONS - 1, SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES - 1, SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1]);
+    const repAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q38_FELT_SUPPORTED - 1, SATISFACTION_COLS.Q39_UPDATES_OFTEN - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1]);
 
-    // Get individual key questions (0-indexed)
-    const worksite = row[1] || '';
-    const role = row[2] || '';
-    const shift = row[3] || '';
-    const timeInRole = row[4] || '';
-    const hasStewardContact = row[5] || '';
-    const satisfiedRep = row[6] || '';
-    const trustUnion = row[7] || '';
-    const feelProtected = row[8] || '';
-    const wouldRecommend = row[9] || '';
-    const filedGrievance = row[36] || '';
+    // Get individual key questions (0-indexed from SATISFACTION_COLS)
+    const worksite = row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '';
+    const role = row[SATISFACTION_COLS.Q2_ROLE - 1] || '';
+    const shift = row[SATISFACTION_COLS.Q3_SHIFT - 1] || '';
+    const timeInRole = row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] || '';
+    const hasStewardContact = row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] || '';
+    const satisfiedRep = row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1] || '';
+    const trustUnion = row[SATISFACTION_COLS.Q7_TRUST_UNION - 1] || '';
+    const feelProtected = row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1] || '';
+    const wouldRecommend = row[SATISFACTION_COLS.Q9_RECOMMEND - 1] || '';
+    const filedGrievance = row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] || '';
 
     // Verification from vault — boolean only, no PII exposed
     const vEntry = vaultMap[satRow] || {};
@@ -51525,32 +51537,32 @@ function refreshLookerAnonSatisfaction_() {
     const respQuarter = timestamp instanceof Date ? getQuarter_(timestamp) : '';
     const respYear = timestamp instanceof Date ? timestamp.getFullYear() : '';
 
-    // Calculate section averages
-    const overallSatAvg = calculateSectionAvg_(row, [6, 7, 8, 9]);
-    const stewardRatingAvg = calculateSectionAvg_(row, [10, 11, 12, 13, 14, 15, 16]);
-    const stewardAccessAvg = calculateSectionAvg_(row, [18, 19, 20]);
-    const chapterAvg = calculateSectionAvg_(row, [21, 22, 23, 24, 25]);
-    const leadershipAvg = calculateSectionAvg_(row, [26, 27, 28, 29, 30, 31]);
-    const contractAvg = calculateSectionAvg_(row, [32, 33, 34, 35]);
-    const commAvg = calculateSectionAvg_(row, [41, 42, 43, 44, 45]);
-    const voiceAvg = calculateSectionAvg_(row, [46, 47, 48, 49, 50]);
-    const valueAvg = calculateSectionAvg_(row, [51, 52, 53, 54, 55]);
-    const schedAvg = calculateSectionAvg_(row, [56, 57, 58, 59, 60, 61, 62]);
-    const repAvg = calculateSectionAvg_(row, [37, 38, 39, 40]);
+    // Calculate section averages using SATISFACTION_COLS (0-indexed for row access)
+    const overallSatAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q7_TRUST_UNION - 1, SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1]);
+    const stewardRatingAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q11_TREATED_RESPECT - 1, SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS - 1, SATISFACTION_COLS.Q13_FOLLOWED_THROUGH - 1, SATISFACTION_COLS.Q14_ADVOCATED - 1, SATISFACTION_COLS.Q15_SAFE_CONCERNS - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1]);
+    const stewardAccessAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q19_CONFIDENT_HELP - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1]);
+    const chapterAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q22_CHAPTER_COMM - 1, SATISFACTION_COLS.Q23_ORGANIZES - 1, SATISFACTION_COLS.Q24_REACH_CHAPTER - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1]);
+    const leadershipAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS - 1, SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE - 1, SATISFACTION_COLS.Q29_ACCOUNTABLE - 1, SATISFACTION_COLS.Q30_FAIR_PROCESSES - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1]);
+    const contractAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q33_REALISTIC_TIMELINES - 1, SATISFACTION_COLS.Q34_CLEAR_UPDATES - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1]);
+    const commAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q42_ENOUGH_INFO - 1, SATISFACTION_COLS.Q43_FIND_EASILY - 1, SATISFACTION_COLS.Q44_ALL_SHIFTS - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1]);
+    const voiceAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q47_SEEKS_INPUT - 1, SATISFACTION_COLS.Q48_DIGNITY - 1, SATISFACTION_COLS.Q49_NEWER_SUPPORTED - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1]);
+    const valueAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q52_PRIORITIES_NEEDS - 1, SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1, SATISFACTION_COLS.Q54_HOW_INVOLVED - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1]);
+    const schedAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED - 1, SATISFACTION_COLS.Q58_CLEAR_CRITERIA - 1, SATISFACTION_COLS.Q59_WORK_EXPECTATIONS - 1, SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES - 1, SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1]);
+    const repAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q38_FELT_SUPPORTED - 1, SATISFACTION_COLS.Q39_UPDATES_OFTEN - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1]);
 
-    // Get individual questions - BUCKETED for aggregation
-    const worksite = row[1] || '';
-    const role = categorizeRole_(row[2] || '');
-    const shift = row[3] || '';
-    const timeInRole = categorizeTenure_(row[4] || '');
-    const hasStewardContact = row[5] || '';
-    const filedGrievance = row[36] || '';
+    // Get individual questions - BUCKETED for aggregation (0-indexed from SATISFACTION_COLS)
+    const worksite = row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '';
+    const role = categorizeRole_(row[SATISFACTION_COLS.Q2_ROLE - 1] || '');
+    const shift = row[SATISFACTION_COLS.Q3_SHIFT - 1] || '';
+    const timeInRole = categorizeTenure_(row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] || '');
+    const hasStewardContact = row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] || '';
+    const filedGrievance = row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] || '';
 
     // Bucket satisfaction scores (1-10 → Low/Medium/High)
-    const satisfiedBucket = getScoreBucket_(row[6]);
-    const trustBucket = getScoreBucket_(row[7]);
-    const protectedBucket = getScoreBucket_(row[8]);
-    const recommendBucket = getScoreBucket_(row[9]);
+    const satisfiedBucket = getScoreBucket_(row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1]);
+    const trustBucket = getScoreBucket_(row[SATISFACTION_COLS.Q7_TRUST_UNION - 1]);
+    const protectedBucket = getScoreBucket_(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]);
+    const recommendBucket = getScoreBucket_(row[SATISFACTION_COLS.Q9_RECOMMEND - 1]);
 
     exportData.push([
       responseHash,

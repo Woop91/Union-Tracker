@@ -1421,15 +1421,18 @@ function syncSatisfactionValues() {
     return;
   }
 
-  // Get all response data (columns A-BK, 1-63)
-  var responseData = sheet.getRange(2, 1, lastRow - 1, 63).getValues();
+  // Get all response data (up to last scale question column)
+  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS; // last Likert-scale question
+  var responseData = sheet.getRange(2, 1, lastRow - 1, lastResponseCol).getValues();
 
   // Calculate section averages for each row
   var sectionAverages = computeSectionAverages_(responseData);
 
-  // Write section averages to columns BT-CD (72-82)
+  // Write section averages to summary area
+  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
   if (sectionAverages.length > 0) {
-    sheet.getRange(2, 72, sectionAverages.length, 11).setValues(sectionAverages);
+    sheet.getRange(2, summaryStart, sectionAverages.length, summaryCols).setValues(sectionAverages);
   }
 
   // Calculate and write dashboard metrics
@@ -1453,38 +1456,39 @@ function computeSectionAverages_(responseData) {
 
     var averages = [];
 
-    // Overall Satisfaction (Q6-9: columns G-J, indices 6-9)
-    averages.push(computeAverage_(row, 6, 9));
+    // Derive indices from SATISFACTION_COLS (1-indexed, used as 0-indexed array indices)
+    // Overall Satisfaction (Q6-9)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q6_SATISFIED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
 
-    // Steward Rating (Q10-16: columns K-Q, indices 10-16)
-    averages.push(computeAverage_(row, 10, 16));
+    // Steward Rating (Q10-16)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q10_TIMELY - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
 
-    // Steward Access (Q18-20: columns S-U, indices 18-20)
-    averages.push(computeAverage_(row, 18, 20));
+    // Steward Access (Q18-20)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
 
-    // Chapter (Q21-25: columns V-Z, indices 21-25)
-    averages.push(computeAverage_(row, 21, 25));
+    // Chapter (Q21-25)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q21_REPS_UNDERSTAND - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
 
-    // Leadership (Q26-31: columns AA-AF, indices 26-31)
-    averages.push(computeAverage_(row, 26, 31));
+    // Leadership (Q26-31)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
 
-    // Contract (Q32-35: columns AG-AJ, indices 32-35)
-    averages.push(computeAverage_(row, 32, 35));
+    // Contract (Q32-35)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
 
-    // Representation (Q37-40: columns AL-AO, indices 37-40)
-    averages.push(computeAverage_(row, 37, 40));
+    // Representation (Q37-40)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
 
-    // Communication (Q41-45: columns AP-AT, indices 41-45)
-    averages.push(computeAverage_(row, 41, 45));
+    // Communication (Q41-45)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1));
 
-    // Member Voice (Q46-50: columns AU-AY, indices 46-50)
-    averages.push(computeAverage_(row, 46, 50));
+    // Member Voice (Q46-50)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1));
 
-    // Value/Action (Q51-55: columns AZ-BD, indices 51-55)
-    averages.push(computeAverage_(row, 51, 55));
+    // Value/Action (Q51-55)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
 
-    // Scheduling (Q56-62: columns BE-BK, indices 56-62)
-    averages.push(computeAverage_(row, 56, 62));
+    // Scheduling (Q56-62)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
     results.push(averages);
   }
@@ -1646,38 +1650,30 @@ function computeSatisfactionRowAverages(row) {
 
   if (!sheet || row < 2) return;
 
-  // Get the response data for this row (columns A-BK, 1-63)
-  var rowData = sheet.getRange(row, 1, 1, 63).getValues()[0];
+  // Get the response data for this row
+  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS;
+  var rowData = sheet.getRange(row, 1, 1, lastResponseCol).getValues()[0];
 
-  if (!rowData[0]) return; // Skip if no timestamp
+  if (!rowData[SATISFACTION_COLS.TIMESTAMP - 1]) return; // Skip if no timestamp
 
   var averages = [];
 
-  // Overall Satisfaction (Q6-9: indices 6-9)
-  averages.push(computeAverage_(rowData, 6, 9));
-  // Steward Rating (Q10-16: indices 10-16)
-  averages.push(computeAverage_(rowData, 10, 16));
-  // Steward Access (Q18-20: indices 18-20)
-  averages.push(computeAverage_(rowData, 18, 20));
-  // Chapter (Q21-25: indices 21-25)
-  averages.push(computeAverage_(rowData, 21, 25));
-  // Leadership (Q26-31: indices 26-31)
-  averages.push(computeAverage_(rowData, 26, 31));
-  // Contract (Q32-35: indices 32-35)
-  averages.push(computeAverage_(rowData, 32, 35));
-  // Representation (Q37-40: indices 37-40)
-  averages.push(computeAverage_(rowData, 37, 40));
-  // Communication (Q41-45: indices 41-45)
-  averages.push(computeAverage_(rowData, 41, 45));
-  // Member Voice (Q46-50: indices 46-50)
-  averages.push(computeAverage_(rowData, 46, 50));
-  // Value/Action (Q51-55: indices 51-55)
-  averages.push(computeAverage_(rowData, 51, 55));
-  // Scheduling (Q56-62: indices 56-62)
-  averages.push(computeAverage_(rowData, 56, 62));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q6_SATISFIED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q10_TIMELY - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q21_REPS_UNDERSTAND - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
-  // Write section averages to this row (columns BT-CD, 72-82)
-  sheet.getRange(row, 72, 1, 11).setValues([averages]);
+  // Write section averages to summary area
+  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
+  sheet.getRange(row, summaryStart, 1, summaryCols).setValues([averages]);
 }
 
 // ============================================================================

@@ -262,7 +262,7 @@ function clearOldAuditEntries() {
 
   // Find rows older than 30 days (skip header)
   for (var i = data.length - 1; i >= 1; i--) {
-    var timestamp = data[i][0];
+    var timestamp = data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1];
     if (timestamp instanceof Date && timestamp < cutoffDate) {
       rowsToDelete.push(i + 1); // +1 for 1-indexed rows
     }
@@ -1984,11 +1984,11 @@ function verifyAuditLogIntegrity() {
     var storedHash = String(data[i][integrityCol] || '');
     var computed = computeAuditRowHash_(
       previousHash,
-      data[i][0],  // Timestamp
-      data[i][1],  // Event Type
-      data[i][2],  // User
-      data[i][3],  // Details
-      data[i][4]   // Session ID
+      data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1],
+      data[i][EVENT_AUDIT_COLS.EVENT_TYPE - 1],
+      data[i][EVENT_AUDIT_COLS.USER - 1],
+      data[i][EVENT_AUDIT_COLS.DETAILS - 1],
+      data[i][EVENT_AUDIT_COLS.SESSION_ID - 1]
     );
 
     if (storedHash && storedHash !== computed) {
@@ -2064,12 +2064,12 @@ function verifySurveyVaultIntegrity() {
   for (var i = 1; i < data.length; i++) {
     totalEntries++;
     var rowNum = i + 1;
-    var responseRow = data[i][0];
-    var emailHash = String(data[i][1] || '');
-    var verified = String(data[i][2] || '');
-    var memberIdHash = String(data[i][3] || '');
-    var quarter = String(data[i][4] || '');
-    var isLatest = String(data[i][5] || '');
+    var responseRow = data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1];
+    var emailHash = String(data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '');
+    var verified = String(data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '');
+    var memberIdHash = String(data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '');
+    var quarter = String(data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '');
+    var isLatest = String(data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '');
 
     // Check for missing response row
     if (!responseRow) {

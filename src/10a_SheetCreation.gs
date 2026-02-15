@@ -1743,10 +1743,10 @@ function createMeetingCheckInLogSheet(ss) {
   sheet.setColumnWidth(15, 250); // O - Agenda Doc URL
   sheet.setColumnWidth(16, 250); // P - Agenda Stewards
 
-  // Format date columns
-  sheet.getRange(2, 3, 999, 1).setNumberFormat('MM/DD/YYYY');   // C - Meeting Date
-  sheet.getRange(2, 7, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss'); // G - Check-In Time
-  sheet.getRange(2, 9, 999, 1).setNumberFormat('HH:mm');        // I - Start Time
+  // Format date columns — column numbers from MEETING_CHECKIN_COLS
+  sheet.getRange(2, MEETING_CHECKIN_COLS.MEETING_DATE, 999, 1).setNumberFormat('MM/DD/YYYY');
+  sheet.getRange(2, MEETING_CHECKIN_COLS.CHECKIN_TIME, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss');
+  sheet.getRange(2, MEETING_CHECKIN_COLS.MEETING_TIME, 999, 1).setNumberFormat('HH:mm');
 
   // Freeze header row
   sheet.setFrozenRows(1);

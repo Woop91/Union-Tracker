@@ -1530,14 +1530,14 @@ function getRecentAuditLogs(count) {
 
   if (numRows <= 0) return [];
 
-  const data = auditSheet.getRange(startRow, 1, numRows, 5).getValues();
+  const data = auditSheet.getRange(startRow, 1, numRows, EVENT_AUDIT_COLS.SESSION_ID).getValues();
 
   return data.map(row => ({
-    timestamp: row[0],
-    eventType: row[1],
-    user: row[2],
-    details: row[3],
-    sessionId: row[4]
+    timestamp: row[EVENT_AUDIT_COLS.TIMESTAMP - 1],
+    eventType: row[EVENT_AUDIT_COLS.EVENT_TYPE - 1],
+    user: row[EVENT_AUDIT_COLS.USER - 1],
+    details: row[EVENT_AUDIT_COLS.DETAILS - 1],
+    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1]
   })).reverse();
 }
 
@@ -2893,10 +2893,10 @@ function showAuditLogViewer() {
 
   // Reverse to show most recent first
   data.reverse().forEach(function(row) {
-    var timestamp = row[0] instanceof Date ? row[0].toLocaleString() : row[0];
-    var user = row[1] ? row[1].split('@')[0] : 'Unknown';
-    var eventType = row[2] || '';
-    var details = row[3] || '';
+    var timestamp = row[EVENT_AUDIT_COLS.TIMESTAMP - 1] instanceof Date ? row[EVENT_AUDIT_COLS.TIMESTAMP - 1].toLocaleString() : row[EVENT_AUDIT_COLS.TIMESTAMP - 1];
+    var user = row[EVENT_AUDIT_COLS.USER - 1] ? row[EVENT_AUDIT_COLS.USER - 1].split('@')[0] : 'Unknown';
+    var eventType = row[EVENT_AUDIT_COLS.EVENT_TYPE - 1] || '';
+    var details = row[EVENT_AUDIT_COLS.DETAILS - 1] || '';
 
     var eventClass = eventType.indexOf('STATUS') !== -1 ? 'status' :
                      (eventType.indexOf('STEWARD') !== -1 ? 'steward' :
