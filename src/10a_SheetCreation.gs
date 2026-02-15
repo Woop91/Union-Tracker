@@ -660,16 +660,16 @@ function createMemberDirectory(ss) {
   var emailRange = sheet.getRange(2, MEMBER_COLS.EMAIL, 4999, 1);
   var phoneRange = sheet.getRange(2, MEMBER_COLS.PHONE, 4999, 1);
 
-  // Rule: Red background for empty Email
+  // Rule: Red background for empty Email (column I = $I2)
   var emptyEmailRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($H2))')
+    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($I2))')
     .setBackground('#ffcdd2')  // Red background for missing email
     .setRanges([emailRange])
     .build();
 
-  // Rule: Red background for empty Phone
+  // Rule: Red background for empty Phone (column J = $J2)
   var emptyPhoneRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($I2))')
+    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($J2))')
     .setBackground('#ffcdd2')  // Red background for missing phone
     .setRanges([phoneRange])
     .build();
