@@ -1669,6 +1669,11 @@ function doGet(e) {
   var validation = validateWebAppRequest(e);
   if (!validation.isValid) {
     secureLog('doGet', 'Invalid request parameters', { errors: validation.errors });
+    if (typeof recordSecurityEvent === 'function') {
+      recordSecurityEvent('INVALID_REQUEST', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.MEDIUM : 'MEDIUM',
+        'Invalid web app request parameters detected',
+        { errors: validation.errors });
+    }
     return getAccessDeniedPage('Invalid request: ' + validation.errors.join(', '));
   }
 
@@ -1687,6 +1692,11 @@ function doGet(e) {
           email: authResult.email,
           role: authResult.role
         });
+        if (typeof recordSecurityEvent === 'function') {
+          recordSecurityEvent('UNAUTHORIZED_ACCESS', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.HIGH : 'HIGH',
+            'Unauthorized steward mode access attempt',
+            { email: authResult.email, role: authResult.role, page: 'steward' });
+        }
         return getAccessDeniedPage(authResult.message || 'Steward access required');
       }
       // PII access granted ONLY after successful authorization check
@@ -1751,6 +1761,11 @@ function doGet(e) {
         email: pageAuthResult.email,
         role: pageAuthResult.role
       });
+      if (typeof recordSecurityEvent === 'function') {
+        recordSecurityEvent('UNAUTHORIZED_ACCESS', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.HIGH : 'HIGH',
+          'Unauthorized access to ' + page + ' page',
+          { email: pageAuthResult.email, role: pageAuthResult.role, page: page });
+      }
       return getAccessDeniedPage(pageAuthResult.message || 'Steward authorization required to view ' + page);
     }
     secureLog('doGet', 'Authorized access to ' + page + ' page', { email: pageAuthResult.email });

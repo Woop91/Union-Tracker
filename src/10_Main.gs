@@ -249,6 +249,13 @@ function handleSecurityAudit_(e) {
         sheet: range.getSheet().getName(),
         cellsAffected: numCells
       });
+
+      // Record through centralized security event system
+      if (typeof recordSecurityEvent === 'function') {
+        recordSecurityEvent('MASS_DELETION', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.CRITICAL : 'CRITICAL',
+          'Mass deletion of ' + numCells + ' cells detected in ' + range.getSheet().getName(),
+          { email: userEmail, sheet: range.getSheet().getName(), range: range.getA1Notation(), cellsAffected: numCells });
+      }
     }
 
     // Detect large-scale changes (not necessarily malicious but notable)
