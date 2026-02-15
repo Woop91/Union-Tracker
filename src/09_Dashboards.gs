@@ -716,12 +716,19 @@ function getAggregateSatisfactionStats() {
   var lastRow = sheet.getLastRow();
   var data = sheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.AVG_SCHEDULING || 82).getValues();
 
-  // Filter to only verified and latest responses
-  var validRows = data.filter(function(row) {
-    var verified = row[SATISFACTION_COLS.VERIFIED - 1];
-    var isLatest = row[SATISFACTION_COLS.IS_LATEST - 1];
-    return isTruthyValue(verified) && isTruthyValue(isLatest);
-  });
+  // Load vault data to check verified/isLatest status (PII stays in vault)
+  var vaultMap = getVaultDataMap_();
+
+  // Filter to only verified and latest responses using vault flags
+  var validRows = [];
+  for (var vi = 0; vi < data.length; vi++) {
+    var satRow = vi + 2; // 1-indexed sheet row
+    var vaultEntry = vaultMap[satRow];
+    if (vaultEntry && isTruthyValue(vaultEntry.verified) && isTruthyValue(vaultEntry.isLatest)) {
+      data[vi]._vaultQuarter = vaultEntry.quarter; // attach for trend tracking
+      validRows.push(data[vi]);
+    }
+  }
 
   if (validRows.length === 0) {
     return {
@@ -772,8 +779,8 @@ function getAggregateSatisfactionStats() {
       commCount++;
     }
 
-    // Track by quarter for trend
-    var quarter = row[SATISFACTION_COLS.QUARTER - 1];
+    // Track by quarter for trend (quarter stored in vault, attached above)
+    var quarter = row._vaultQuarter || '';
     if (quarter && trust) {
       if (!quarterData[quarter]) {
         quarterData[quarter] = { sum: 0, count: 0 };
@@ -3440,26 +3447,28 @@ function getFlaggedSubmissionsData() {
 
   if (!satSheet) return result;
 
-  var data = satSheet.getDataRange().getValues();
+  // Read from vault (PII is only in the vault)
+  var vaultRows = getVaultDataFull_();
 
-  for (var i = 1; i < data.length; i++) {
-    var verified = data[i][SATISFACTION_COLS.VERIFIED - 1];
-    var email = data[i][SATISFACTION_COLS.EMAIL - 1] || '(no email provided)';
-    var timestamp = data[i][SATISFACTION_COLS.TIMESTAMP - 1];
-    var quarter = data[i][SATISFACTION_COLS.QUARTER - 1] || '';
+  for (var i = 0; i < vaultRows.length; i++) {
+    var entry = vaultRows[i];
+    var satRow = entry.responseRow;
+    var timestamp = '';
+    try {
+      timestamp = satSheet.getRange(satRow, SATISFACTION_COLS.TIMESTAMP).getValue();
+    } catch (_e) { /* row may not exist */ }
 
-    if (verified === 'Yes') {
+    if (entry.verified === 'Yes') {
       result.verifiedCount++;
-    } else if (verified === 'Pending Review') {
+    } else if (entry.verified === 'Pending Review') {
       result.pendingCount++;
       result.pendingEmails.push({
-        email: email.toString(),
+        email: entry.email || '(no email provided)',
         date: timestamp ? Utilities.formatDate(new Date(timestamp), Session.getScriptTimeZone(), 'MMM d, yyyy') : 'Unknown',
-        quarter: quarter,
-        row: i + 1  // 1-indexed row number for editing
+        quarter: entry.quarter,
+        row: satRow  // Satisfaction sheet row for reference
       });
     }
-    // Rejected submissions are counted but not shown
   }
 
   // Sort by most recent first
@@ -3474,19 +3483,26 @@ function getFlaggedSubmissionsData() {
  */
 function approveFlaggedSubmission(rowNum) {
   // Verify caller is an authorized steward
-  var email = '';
-  try { email = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
-  if (!email) {
+  var callerEmail = '';
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  if (!callerEmail) {
     throw new Error('Authorization required: unable to verify user identity');
   }
 
+  // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault) return;
 
-  if (!satSheet || rowNum < 2 || rowNum > satSheet.getLastRow()) return;
-
-  satSheet.getRange(rowNum, SATISFACTION_COLS.VERIFIED).setValue('Yes');
-  satSheet.getRange(rowNum, SATISFACTION_COLS.REVIEWER_NOTES).setValue('Approved by ' + email + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  var vaultData = vault.getDataRange().getValues();
+  for (var i = 1; i < vaultData.length; i++) {
+    if (vaultData[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1] === rowNum) {
+      var vaultRow = i + 1;
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Yes');
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Approved by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      break;
+    }
+  }
 
   // Update dashboard
   syncSatisfactionValues();
@@ -3497,14 +3513,21 @@ function approveFlaggedSubmission(rowNum) {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function rejectFlaggedSubmission(rowNum) {
+  // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault) return;
 
-  if (!satSheet || rowNum < 2) return;
-
-  satSheet.getRange(rowNum, SATISFACTION_COLS.VERIFIED).setValue('Rejected');
-  satSheet.getRange(rowNum, SATISFACTION_COLS.IS_LATEST).setValue('No');
-  satSheet.getRange(rowNum, SATISFACTION_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+  var vaultData = vault.getDataRange().getValues();
+  for (var i = 1; i < vaultData.length; i++) {
+    if (vaultData[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1] === rowNum) {
+      var vaultRow = i + 1;
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Rejected');
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      break;
+    }
+  }
 
   // Update dashboard
   syncSatisfactionValues();
@@ -3767,18 +3790,21 @@ function getPublicSurveyData(includeHistory) {
   var data = satSheet.getDataRange().getValues();
   if (data.length < 2) return result;
 
-  // Filter rows to only include verified responses
-  // If includeHistory is false (default), also filter to IS_LATEST='Yes'
+  // Load vault data to check verified/isLatest status (PII stays in vault)
+  var vaultMap = getVaultDataMap_();
+
+  // Filter rows to only include verified responses using vault flags
   var validRows = [];
   for (var i = 1; i < data.length; i++) {
-    var verified = data[i][SATISFACTION_COLS.VERIFIED - 1];
-    var isLatest = data[i][SATISFACTION_COLS.IS_LATEST - 1];
+    var satRow = i + 1; // 1-indexed sheet row
+    var vEntry = vaultMap[satRow];
+    if (!vEntry) continue;
 
     // Only include Verified='Yes' responses
-    if (!isTruthyValue(verified)) continue;
+    if (!isTruthyValue(vEntry.verified)) continue;
 
     // If not including history, only include IS_LATEST='Yes'
-    if (!includeHistory && !isTruthyValue(isLatest)) continue;
+    if (!includeHistory && !isTruthyValue(vEntry.isLatest)) continue;
 
     validRows.push(data[i]);
   }
@@ -3798,13 +3824,15 @@ function getPublicSurveyData(includeHistory) {
   result.avgSatisfaction = satCount > 0 ? satSum / satCount : 0;
 
   // Response rate (unique verified members / total members)
+  // Count from vault — member IDs are only stored there
   if (memberSheet) {
     var memberCount = memberSheet.getLastRow() - 1;
-    // Count unique verified member IDs
     var uniqueMembers = {};
-    for (var k = 0; k < validRows.length; k++) {
-      var memberId = validRows[k][SATISFACTION_COLS.MATCHED_MEMBER_ID - 1];
-      if (memberId) uniqueMembers[memberId] = true;
+    var vaultFull = getVaultDataFull_();
+    for (var k = 0; k < vaultFull.length; k++) {
+      if (vaultFull[k].verified === 'Yes' && vaultFull[k].isLatest === 'Yes' && vaultFull[k].memberId) {
+        uniqueMembers[vaultFull[k].memberId] = true;
+      }
     }
     var uniqueCount = Object.keys(uniqueMembers).length;
     result.responseRate = memberCount > 0 ? Math.round(uniqueCount / memberCount * 100) : 0;

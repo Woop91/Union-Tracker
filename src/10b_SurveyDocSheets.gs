@@ -450,50 +450,12 @@ function createSatisfactionSheet(ss) {
   sheet.setColumnWidth(dashStart + 4, 200);  // Options
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // VERIFICATION COLUMNS (CE-CK, cols 83-89) — ADMIN-ONLY, HIDDEN BY DEFAULT
-  // These link survey responses to member identity for email verification.
-  // They are grouped and collapsed to protect respondent anonymity.
-  // Only admins with sheet access can expand this group.
+  // NO VERIFICATION COLUMNS ON THIS SHEET (v4.8 — Vault Architecture)
+  // All email/member ID linkage is stored in the protected _Survey_Vault sheet.
+  // This sheet contains ZERO data that can link a response to a person.
   // ═══════════════════════════════════════════════════════════════════════════
 
-  var verificationHeaders = [
-    '⚠️ Email (Admin Only)',    // CE (83)
-    'Verified',                 // CF (84)
-    '⚠️ Member ID (Admin)',    // CG (85)
-    'Quarter',                  // CH (86)
-    'Is Latest',                // CI (87)
-    'Superseded By',            // CJ (88)
-    'Reviewer Notes'            // CK (89)
-  ];
-
-  sheet.getRange(1, SATISFACTION_COLS.EMAIL, 1, verificationHeaders.length)
-    .setValues([verificationHeaders])
-    .setFontWeight('bold')
-    .setBackground('#DC2626')
-    .setFontColor(COLORS.WHITE)
-    .setWrap(true);
-
-  // Group and collapse verification columns so they're hidden by default
-  try {
-    sheet.getColumnGroup(SATISFACTION_COLS.EMAIL, 1);
-  } catch (noGroup) {
-    // No existing group — create one
-  }
-  sheet.getRange(1, SATISFACTION_COLS.EMAIL, 1, 7).shiftColumnGroupDepth(1);
-  sheet.getColumnGroup(SATISFACTION_COLS.EMAIL, 1).collapse();
-
-  // Add anonymity notice in row 2 of the verification section
-  sheet.getRange(2, SATISFACTION_COLS.EMAIL, 1, 7).merge()
-    .setValue('⚠️ CONFIDENTIAL: These columns link responses to members for verification only. '
-      + 'Do NOT share this sheet with survey responses visible. '
-      + 'Use _Looker_Anon_Satisfaction for external reporting.')
-    .setBackground('#FEF2F2')
-    .setFontColor('#991B1B')
-    .setFontWeight('bold')
-    .setFontSize(9)
-    .setWrap(true);
-
-  // Delete excess columns after CK (column 89) - preserve all verification columns including REVIEWER_NOTES
+  // Delete excess columns after the dashboard/chart area (keep through col 82 + dashboard)
   var maxCols = sheet.getMaxColumns();
   if (maxCols > 89) {
     sheet.deleteColumns(90, maxCols - 89);
@@ -502,7 +464,10 @@ function createSatisfactionSheet(ss) {
   // Populate computed values (no formulas in visible sheet)
   syncSatisfactionValues();
 
-  Logger.log('Member Satisfaction sheet created with 68-question survey, dashboard, and chart data');
+  // Ensure vault sheet exists for PII isolation
+  setupSurveyVaultSheet();
+
+  Logger.log('Member Satisfaction sheet created — PII stored in _Survey_Vault (protected)');
 
   // Set tab color
   sheet.setTabColor(COLORS.UNION_GREEN);
@@ -1035,6 +1000,9 @@ function createFunctionChecklistSheet_() {
     ['1️⃣7️⃣ Survey', 'Survey Tracking', '📧 Send Reminders', 'sendSurveyCompletionReminders', 'Emails non-respondents with 7-day cooldown. Uses survey URL from Config (col AR)'],
     ['1️⃣7️⃣ Survey', 'Survey Tracking', '📊 Get Stats', 'getSurveyCompletionStats', 'Returns { total, completed, notCompleted, rate } for current round'],
     ['1️⃣7️⃣ Survey', 'Hidden Sheet Setup', '🔧 Setup Tracking Sheet', 'setupSurveyTrackingSheet', 'Creates hidden _Survey_Tracking with 10-column structure (called by setupHiddenSheets)'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Setup Vault Sheet', 'setupSurveyVaultSheet', 'Creates hidden + protected _Survey_Vault with 8-column PII store. Only script owner can access.'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔍 Get Vault Map (No PII)', 'getVaultDataMap_', 'Returns row→{verified,isLatest,quarter} map for dashboard filtering. Never exposes email/member ID.'],
+    ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Write Vault Entry', 'writeVaultEntry_', 'Appends email/member ID to vault for a new survey response. Called by onSatisfactionFormSubmit.'],
 
     // ═══ PHASE 18: Navigation & Views (v4.1) ═══
     ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
@@ -1613,7 +1581,7 @@ function createFAQSheet(ss) {
     ['Q: How does the survey response rate work?',
      'A: Survey response rate = (number of satisfaction survey responses / total members) × 100. This measures how engaged members are with providing feedback.'],
     ['Q: Are survey results anonymous?',
-     'A: Yes — all dashboards, reports, and Looker exports show ONLY aggregate data (averages by section, breakdowns by worksite/role). No individual responses are ever displayed. The system does collect email to verify that respondents are actual members, but these verification columns (CE-CK) are grouped, collapsed, and hidden by default with a red "Admin Only" warning. For external reporting, always use _Looker_Anon_Satisfaction which contains zero PII.']
+     'A: Yes — strong anonymity is enforced via a vault architecture. The Satisfaction sheet contains ZERO identifying data (no emails, no member IDs, no names). All identity linkage is stored in a separate hidden, sheet-protected vault (_Survey_Vault) that only the script owner can access. Dashboards show only aggregate data. Looker exports use anonymized hashes. Even users with full edit access to the spreadsheet cannot link any survey answer to a specific person.']
   ];
 
   for (var eng = 0; eng < engagementFAQs.length; eng++) {
@@ -1639,7 +1607,7 @@ function createFAQSheet(ss) {
 
   var surveyTrackingFAQs = [
     ['Q: What is the Survey Completion Tracker?',
-     'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks ONLY completion status — not what they answered. No individual survey responses are stored or accessible through the tracker. It records: completion status, dates, cumulative history, and reminder emails.'],
+     'A: It\'s a hidden sheet (_Survey_Tracking) that monitors which members have completed the satisfaction survey in the current round. It tracks ONLY completion status — not what they answered. No individual survey responses are stored or accessible through the tracker. It records: completion status, dates, cumulative history, and reminder emails. The email-to-response linkage is in a separate protected vault (_Survey_Vault) that only the script owner can access.'],
     ['Q: How does the system know when a member completes the survey?',
      'A: When a member submits the Google Form satisfaction survey, the system extracts their email from the form response, matches it against the Member Directory (case-insensitive email comparison), and if a match is found, automatically marks that member as "Completed" in the tracking sheet with a timestamp.'],
     ['Q: What if a member\'s email doesn\'t match?',
@@ -1651,7 +1619,7 @@ function createFAQSheet(ss) {
     ['Q: How do I populate the tracker for the first time?',
      'A: Click "Refresh Member List" in the Survey Completion Tracker dialog, or run populateSurveyTrackingFromMembers(). This copies all members from the Member Directory into the tracking sheet with initial status "Not Completed". Safe to re-run — it rebuilds from the directory.'],
     ['Q: Where is the survey tracking data stored?',
-     'A: In the hidden _Survey_Tracking sheet (10 columns: Member ID, Name, Email, Location, Steward, Current Status, Completed Date, Total Missed, Total Completed, Last Reminder Sent). It\'s created automatically during dashboard setup. Important: this sheet tracks who completed the survey, NOT what they answered — individual survey responses cannot be linked back to members through the tracker.']
+     'A: Completion tracking lives in the hidden _Survey_Tracking sheet (10 columns: Member ID, Name, Email, Location, Steward, Current Status, Completed Date, Total Missed, Total Completed, Last Reminder Sent). The email-to-response linkage is in the protected _Survey_Vault sheet (only the script owner can access). The actual survey answers are in the Satisfaction sheet with NO identifying data. This three-sheet architecture ensures no one can link answers to people.']
   ];
 
   for (var st = 0; st < surveyTrackingFAQs.length; st++) {
@@ -1901,7 +1869,7 @@ function createFeaturesReferenceSheet(ss) {
 
     // Survey Completion Tracking
     ['Survey Tracking', 'Survey Completion Tracker', 'Management dialog showing completion stats (total, completed, not completed, rate %) with action buttons.', 'showSurveyTrackingDialog()', 'survey, tracking, completion, stats'],
-    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory.', 'Automatic via form trigger', 'auto, detect, email, form, trigger'],
+    ['Survey Tracking', 'Auto Completion Detection', 'Automatically marks members as "Completed" when they submit the satisfaction Google Form. Uses email matching against Member Directory. PII stored in protected _Survey_Vault only.', 'Automatic via form trigger', 'auto, detect, email, form, trigger, vault'],
     ['Survey Tracking', 'Populate Tracking', 'Syncs all members from Member Directory into the tracking sheet with initial "Not Completed" status. Safe to re-run.', 'Survey Tracker > Refresh Member List', 'populate, sync, members, refresh'],
     ['Survey Tracking', 'Start New Round', 'Resets all members to "Not Completed", increments Total Missed for non-respondents from previous round.', 'Survey Tracker > Start New Round', 'round, reset, new, missed'],
     ['Survey Tracking', 'Send Reminders', 'Emails non-respondents with survey link from Config. 7-day cooldown between reminders per member.', 'Survey Tracker > Send Reminders', 'reminder, email, cooldown, notify'],

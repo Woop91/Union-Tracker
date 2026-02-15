@@ -2955,7 +2955,9 @@ function refreshLookerSatisfaction_() {
 
   const now = new Date();
   const exportData = [];
-  const cols = typeof SATISFACTION_COLS !== 'undefined' ? SATISFACTION_COLS : {};
+
+  // Load vault data for verification status (PII stays in vault)
+  const vaultMap = typeof getVaultDataMap_ === 'function' ? getVaultDataMap_() : {};
 
   for (let i = 1; i < sourceData.length; i++) {
     const row = sourceData[i];
@@ -2964,6 +2966,7 @@ function refreshLookerSatisfaction_() {
 
     // Generate response ID
     const responseId = 'SR' + String(i).padStart(5, '0');
+    const satRow = i + 1; // 1-indexed sheet row
 
     // Date dimensions
     const respMonth = timestamp instanceof Date ? Utilities.formatDate(timestamp, Session.getScriptTimeZone(), 'yyyy-MM') : '';
@@ -2995,9 +2998,10 @@ function refreshLookerSatisfaction_() {
     const wouldRecommend = row[9] || '';
     const filedGrievance = row[36] || '';
 
-    // Verification columns (if they exist) — anonymized: boolean only, no member ID
-    const isVerified = cols.VERIFIED ? (row[cols.VERIFIED - 1] === 'Yes' ? 'Yes' : 'No') : '';
-    const quarterPeriod = cols.QUARTER ? (row[cols.QUARTER - 1] || '') : respQuarter;
+    // Verification from vault — boolean only, no PII exposed
+    const vEntry = vaultMap[satRow] || {};
+    const isVerified = vEntry.verified === 'Yes' ? 'Yes' : 'No';
+    const quarterPeriod = vEntry.quarter || respQuarter;
 
     exportData.push([
       responseId,

@@ -754,6 +754,9 @@ var SHEETS = {
   //   -> updateSurveyTrackingOnSubmit_() marks member "Completed" in this sheet.
   // Management: showSurveyTrackingDialog() in 08c_FormsAndNotifications.gs
   SURVEY_TRACKING: '_Survey_Tracking',
+  // Survey Vault (hidden + protected) — stores email/member ID linkage
+  // for survey responses. Separated from Satisfaction sheet for anonymity.
+  SURVEY_VAULT: '_Survey_Vault',
   // Satisfaction & Feedback sheets
   // @deprecated v4.3.8 - Satisfaction sheet is now hidden. Use showSatisfactionDashboard() modal instead.
   // Data is preserved for modal access. Use removeDeprecatedTabs() to hide.
@@ -792,7 +795,8 @@ var HIDDEN_SHEETS = {
   STEWARD_PERFORMANCE_CALC: '_Steward_Performance_Calc',
   AUDIT_LOG: '_Audit_Log',
   CHECKLIST_CALC: '_Checklist_Calc',
-  SURVEY_TRACKING: '_Survey_Tracking'
+  SURVEY_TRACKING: '_Survey_Tracking',
+  SURVEY_VAULT: '_Survey_Vault'
 };
 
 // ============================================================================
@@ -1571,14 +1575,60 @@ var SATISFACTION_COLS = {
   AVG_VALUE_ACTION: 81,           // CC - Avg of Q51-Q55
   AVG_SCHEDULING: 82,             // CD - Avg of Q56-Q62
 
-  // ── VERIFICATION & TRACKING COLUMNS (CE onwards) ──
-  EMAIL: 83,                      // CE - Email address from form submission
-  VERIFIED: 84,                   // CF - Yes / Pending Review / Rejected
-  MATCHED_MEMBER_ID: 85,          // CG - Member ID if email matched
-  QUARTER: 86,                    // CH - Quarter string (e.g., "2026-Q1")
-  IS_LATEST: 87,                  // CI - Yes/No - Is this the latest for this member this quarter?
-  SUPERSEDED_BY: 88,              // CJ - Row number of newer response (if superseded)
-  REVIEWER_NOTES: 89              // CK - Notes from reviewer
+  // ── VERIFICATION COLUMNS — MOVED TO _Survey_Vault (v4.8) ──
+  // These constants are DEPRECATED. All PII is now stored in the
+  // _Survey_Vault hidden sheet (SURVEY_VAULT_COLS) to ensure survey
+  // anonymity. The Satisfaction sheet no longer contains any data that
+  // can link a response to a specific member.
+  // @deprecated v4.8 — use SURVEY_VAULT_COLS instead
+  EMAIL: -1,
+  VERIFIED: -1,
+  MATCHED_MEMBER_ID: -1,
+  QUARTER: -1,
+  IS_LATEST: -1,
+  SUPERSEDED_BY: -1,
+  REVIEWER_NOTES: -1
+};
+
+// ============================================================================
+// SURVEY VAULT COLUMNS (8 columns: A-H) — Isolated PII store
+// ============================================================================
+
+/**
+ * Survey Vault column positions (1-indexed)
+ * Hidden + protected sheet: _Survey_Vault
+ *
+ * PURPOSE:
+ *   Stores the ONLY linkage between survey responses and member identity.
+ *   Completely separated from the Satisfaction sheet to ensure that no one
+ *   with spreadsheet access can connect a survey answer to a person.
+ *
+ * SECURITY MODEL:
+ *   - Sheet is hidden (prefixed with _)
+ *   - Sheet is protected: only the script owner can edit
+ *   - Other editors get a warning if they try to unhide/access it
+ *   - Dashboard/analytics code reads from the vault via getVaultDataMap_()
+ *     which returns only non-PII flags (verified, isLatest) keyed by row
+ *
+ * DATA FLOW:
+ *   1. onSatisfactionFormSubmit() writes survey answers to Satisfaction sheet
+ *      (anonymous — no email, no member ID)
+ *   2. Same function writes email + member ID to _Survey_Vault at the
+ *      matching row number
+ *   3. Dashboard queries call getVaultDataMap_() which returns a row→flags
+ *      map without exposing email or member ID
+ *
+ * @const {Object}
+ */
+var SURVEY_VAULT_COLS = {
+  RESPONSE_ROW: 1,          // A - Row number in Satisfaction sheet
+  EMAIL: 2,                 // B - Email address from form submission
+  VERIFIED: 3,              // C - Yes / Pending Review / Rejected
+  MATCHED_MEMBER_ID: 4,     // D - Member ID if email matched
+  QUARTER: 5,               // E - Quarter string (e.g., "2026-Q1")
+  IS_LATEST: 6,             // F - Yes/No - Is this the latest for this member?
+  SUPERSEDED_BY: 7,         // G - Vault row number of newer response
+  REVIEWER_NOTES: 8         // H - Notes from reviewer
 };
 
 /**

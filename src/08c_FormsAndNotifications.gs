@@ -758,7 +758,10 @@ function onSatisfactionFormSubmit(e) {
     newRow[SATISFACTION_COLS.Q67_ADDITIONAL - 1] = getFormValue_(responses, 'Additional comments (no names)');
 
     // ========================================================================
-    // EMAIL VERIFICATION & QUARTERLY TRACKING
+    // EMAIL VERIFICATION & VAULT STORAGE
+    // Survey answers go to the Satisfaction sheet (anonymous).
+    // Email + Member ID go to _Survey_Vault (protected, hidden).
+    // No PII is ever written to the Satisfaction sheet.
     // ========================================================================
 
     // Get email from form (try multiple common field names)
@@ -768,62 +771,31 @@ function onSatisfactionFormSubmit(e) {
                 (e.response ? e.response.getRespondentEmail() : '') || '';
     email = email.toString().toLowerCase().trim();
 
-    newRow[SATISFACTION_COLS.EMAIL - 1] = email;
-
-    // Get current quarter
+    // NOTE: email is NOT written to newRow — it goes to the vault only
     var currentQuarter = getCurrentQuarter();
-    newRow[SATISFACTION_COLS.QUARTER - 1] = currentQuarter;
-
-    // Validate email against Member Directory
     var memberMatch = validateMemberEmail(email);
+    var verified = memberMatch ? 'Yes' : 'Pending Review';
+    var memberId = memberMatch ? memberMatch.memberId : '';
 
-    if (memberMatch) {
-      // Email matches a member - mark as verified
-      newRow[SATISFACTION_COLS.VERIFIED - 1] = 'Yes';
-      newRow[SATISFACTION_COLS.MATCHED_MEMBER_ID - 1] = memberMatch.memberId;
-      newRow[SATISFACTION_COLS.IS_LATEST - 1] = 'Yes';
-
-      // Check for existing responses from this member in same quarter
-      var existingData = satSheet.getDataRange().getValues();
-      for (var i = 1; i < existingData.length; i++) {
-        var rowEmail = (existingData[i][SATISFACTION_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
-        var rowQuarter = existingData[i][SATISFACTION_COLS.QUARTER - 1];
-        var rowIsLatest = existingData[i][SATISFACTION_COLS.IS_LATEST - 1];
-
-        // If same email, same quarter, and currently marked as latest
-        if (rowEmail === email && rowQuarter === currentQuarter && rowIsLatest === 'Yes') {
-          // Mark the old row as superseded (row index is i+1 because of 0-indexing and header)
-          var oldRowNum = i + 1;
-          satSheet.getRange(oldRowNum, SATISFACTION_COLS.IS_LATEST).setValue('No');
-          satSheet.getRange(oldRowNum, SATISFACTION_COLS.SUPERSEDED_BY).setValue(satSheet.getLastRow() + 1);
-          Logger.log('Marked row ' + oldRowNum + ' as superseded by new submission');
-        }
-      }
-    } else {
-      // Email doesn't match - flag for review
-      newRow[SATISFACTION_COLS.VERIFIED - 1] = 'Pending Review';
-      newRow[SATISFACTION_COLS.MATCHED_MEMBER_ID - 1] = '';
-      newRow[SATISFACTION_COLS.IS_LATEST - 1] = 'Yes';
-    }
-
-    newRow[SATISFACTION_COLS.REVIEWER_NOTES - 1] = '';
-
-    // Append row to satisfaction sheet
+    // ── Append ANONYMOUS response to Satisfaction sheet ──
     satSheet.appendRow(newRow);
-
-    // Compute section averages for the new row (no formulas in visible sheet)
     var newRowNum = satSheet.getLastRow();
+
+    // ── Write PII to vault (separate protected sheet) ──
+    // Supersede any previous entry from same email+quarter
+    if (memberMatch) {
+      supersedePreviousVaultEntry_(email, currentQuarter, newRowNum);
+    }
+    writeVaultEntry_(newRowNum, email, verified, memberId, currentQuarter);
+
+    // Compute section averages for the new row
     computeSatisfactionRowAverages(newRowNum);
 
     // Update dashboard summary values
     syncSatisfactionValues();
 
     // Update survey completion tracking if member was matched.
-    // This is the hook that marks the member as "Completed" in _Survey_Tracking.
-    // Flow: email extracted above -> validateMemberEmail() returned memberMatch ->
-    //   updateSurveyTrackingOnSubmit_() sets Current Status = "Completed",
-    //   Completed Date = now, and increments Total Completed counter.
-    // See "SURVEY COMPLETION TRACKING" section below for full documentation.
+    // This marks the member as "Completed" in _Survey_Tracking.
     if (memberMatch && memberMatch.memberId) {
       try {
         updateSurveyTrackingOnSubmit_(memberMatch.memberId);
@@ -832,7 +804,7 @@ function onSatisfactionFormSubmit(e) {
       }
     }
 
-    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + newRow[SATISFACTION_COLS.VERIFIED - 1]);
+    Logger.log('Satisfaction survey response recorded at ' + new Date() + ' | Verified: ' + verified + ' | PII stored in vault');
 
     // Send thank-you email if respondent email available
     if (email) {

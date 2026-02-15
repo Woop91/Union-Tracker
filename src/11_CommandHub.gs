@@ -2198,19 +2198,21 @@ function getRecentSurveyAverage(unitName) {
   }
 
   var lastRow = satSheet.getLastRow();
-  var data = satSheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.REVIEWER_NOTES).getValues();
+  var data = satSheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.AVG_SCHEDULING || 82).getValues();
+
+  // Load vault data to check verified/isLatest status (PII stays in vault)
+  var vaultMap = getVaultDataMap_();
 
   var scores = [];
   var unitLower = unitName.toString().trim().toLowerCase();
 
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
+    var satRow = i + 2; // 1-indexed sheet row
 
-    // Only include verified, latest responses
-    var verified = row[SATISFACTION_COLS.VERIFIED - 1];
-    var isLatest = row[SATISFACTION_COLS.IS_LATEST - 1];
-
-    if (!isTruthyValue(verified) || !isTruthyValue(isLatest)) continue;
+    // Only include verified, latest responses (checked via vault)
+    var vEntry = vaultMap[satRow];
+    if (!vEntry || !isTruthyValue(vEntry.verified) || !isTruthyValue(vEntry.isLatest)) continue;
 
     // Check if worksite matches unit (partial match for flexibility)
     var worksite = (row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '').toString().trim().toLowerCase();

@@ -1532,3 +1532,218 @@ function setupSurveyTrackingSheet(sheet) {
 
   Logger.log('Survey Tracking hidden sheet set up');
 }
+
+// ============================================================================
+// SURVEY VAULT — ISOLATED PII STORE
+// ============================================================================
+// The _Survey_Vault sheet stores the ONLY linkage between survey responses
+// and member identity (email, Member ID). It is hidden and sheet-protected
+// so that no one with spreadsheet edit access can read or modify it.
+// All survey anonymity depends on this isolation.
+
+/**
+ * Creates and protects the _Survey_Vault hidden sheet.
+ * Called by setupHiddenSheets().
+ *
+ * Structure (8 columns):
+ *   A: Response Row (row number in Satisfaction sheet)
+ *   B: Email
+ *   C: Verified (Yes / Pending Review / Rejected)
+ *   D: Matched Member ID
+ *   E: Quarter
+ *   F: Is Latest (Yes/No)
+ *   G: Superseded By (vault row of newer response)
+ *   H: Reviewer Notes
+ */
+function setupSurveyVaultSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault';
+
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+  }
+
+  // Only set up headers if sheet is empty
+  if (sheet.getLastRow() < 1) {
+    var headers = [
+      'Response Row', 'Email', 'Verified', 'Matched Member ID',
+      'Quarter', 'Is Latest', 'Superseded By', 'Reviewer Notes'
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+      .setFontWeight('bold')
+      .setBackground('#7F1D1D')
+      .setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+  }
+
+  // Column widths
+  sheet.setColumnWidth(1, 100);  // Response Row
+  sheet.setColumnWidth(2, 220);  // Email
+  sheet.setColumnWidth(3, 110);  // Verified
+  sheet.setColumnWidth(4, 140);  // Matched Member ID
+  sheet.setColumnWidth(5, 90);   // Quarter
+  sheet.setColumnWidth(6, 80);   // Is Latest
+  sheet.setColumnWidth(7, 100);  // Superseded By
+  sheet.setColumnWidth(8, 200);  // Reviewer Notes
+
+  // Delete excess columns
+  var maxCols = sheet.getMaxColumns();
+  if (maxCols > 8) {
+    sheet.deleteColumns(9, maxCols - 8);
+  }
+
+  // Hide the sheet
+  sheet.hideSheet();
+
+  // ═══ SHEET PROTECTION ═══
+  // Only the script owner (installer) can edit this sheet.
+  // All other editors get a warning.
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  var alreadyProtected = false;
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === 'Survey Vault — Anonymity Protection') {
+      alreadyProtected = true;
+      break;
+    }
+  }
+
+  if (!alreadyProtected) {
+    var protection = sheet.protect()
+      .setDescription('Survey Vault — Anonymity Protection')
+      .setWarningOnly(false);
+
+    // Remove all editors except the owner
+    var me = Session.getEffectiveUser();
+    protection.addEditor(me);
+    // Remove everyone else
+    var editors = protection.getEditors();
+    for (var j = 0; j < editors.length; j++) {
+      if (editors[j].getEmail() !== me.getEmail()) {
+        protection.removeEditor(editors[j]);
+      }
+    }
+  }
+
+  Logger.log('Survey Vault hidden sheet set up with protection');
+}
+
+/**
+ * Reads the _Survey_Vault and returns a map of Satisfaction-sheet row numbers
+ * to their vault metadata. DOES NOT expose email or member ID — only returns
+ * non-PII flags needed for dashboard filtering.
+ *
+ * @returns {Object} Map of { responseRow: { verified, isLatest, quarter } }
+ * @private
+ */
+function getVaultDataMap_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault || vault.getLastRow() < 2) return {};
+
+  var data = vault.getDataRange().getValues();
+  var map = {};
+  for (var i = 1; i < data.length; i++) {
+    var responseRow = data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1];
+    if (!responseRow) continue;
+    map[responseRow] = {
+      verified: data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '',
+      isLatest: data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '',
+      quarter: data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '',
+      vaultRow: i + 1  // 1-indexed sheet row for updates
+    };
+  }
+  return map;
+}
+
+/**
+ * Reads the full vault data including PII. ONLY used internally by
+ * onSatisfactionFormSubmit() for superseding logic and by Looker export.
+ * Never expose this to UI/dashboard code.
+ *
+ * @returns {Array} Array of vault row objects with all fields
+ * @private
+ */
+function getVaultDataFull_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault || vault.getLastRow() < 2) return [];
+
+  var data = vault.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    rows.push({
+      vaultRow: i + 1,
+      responseRow: data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1],
+      email: data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '',
+      verified: data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '',
+      memberId: data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '',
+      quarter: data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '',
+      isLatest: data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '',
+      supersededBy: data[i][SURVEY_VAULT_COLS.SUPERSEDED_BY - 1] || '',
+      reviewerNotes: data[i][SURVEY_VAULT_COLS.REVIEWER_NOTES - 1] || ''
+    });
+  }
+  return rows;
+}
+
+/**
+ * Writes a new vault entry for a survey response.
+ * Called by onSatisfactionFormSubmit() after appending the anonymous
+ * response to the Satisfaction sheet.
+ *
+ * @param {number} responseRow - Row number in Satisfaction sheet
+ * @param {string} email - Respondent email
+ * @param {string} verified - 'Yes' | 'Pending Review'
+ * @param {string} memberId - Matched member ID or ''
+ * @param {string} quarter - Quarter string e.g. '2026-Q1'
+ * @private
+ */
+function writeVaultEntry_(responseRow, email, verified, memberId, quarter) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault) {
+    setupSurveyVaultSheet();
+    vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  }
+
+  vault.appendRow([
+    responseRow,
+    email,
+    verified,
+    memberId,
+    quarter,
+    'Yes',   // Is Latest
+    '',      // Superseded By
+    ''       // Reviewer Notes
+  ]);
+}
+
+/**
+ * Marks an existing vault entry as superseded by a newer response.
+ * Used when the same member submits again in the same quarter.
+ *
+ * @param {string} email - Email to match
+ * @param {string} quarter - Quarter to match
+ * @param {number} newVaultRow - Row of the new entry that supersedes
+ * @private
+ */
+function supersedePreviousVaultEntry_(email, quarter, newVaultRow) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
+  if (!vault || vault.getLastRow() < 2) return;
+
+  var data = vault.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = (data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+    var rowQuarter = data[i][SURVEY_VAULT_COLS.QUARTER - 1];
+    var rowIsLatest = data[i][SURVEY_VAULT_COLS.IS_LATEST - 1];
+
+    if (rowEmail === email && rowQuarter === quarter && rowIsLatest === 'Yes') {
+      var sheetRow = i + 1;
+      vault.getRange(sheetRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
+      vault.getRange(sheetRow, SURVEY_VAULT_COLS.SUPERSEDED_BY).setValue(newVaultRow);
+      Logger.log('Vault: superseded row ' + sheetRow + ' by row ' + newVaultRow);
+    }
+  }
+}
