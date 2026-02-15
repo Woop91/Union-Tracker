@@ -4286,7 +4286,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2490 lines)
+// SOURCE: 02_DataManagers.gs (2663 lines)
 // ============================================================================
 
 /**
@@ -5153,6 +5153,11 @@ function getImportMembersHtml_() {
     '.status.success { background: rgba(16,185,129,0.2); border: 1px solid #10B981; }' +
     '.status.error { background: rgba(239,68,68,0.2); border: 1px solid #EF4444; }' +
     '.help { font-size: 12px; color: #64748B; margin-top: 8px; }' +
+    '.progress-section { margin-top: 16px; }' +
+    '.progress-container { width: 100%; background: #0F172A; border-radius: 8px; border: 1px solid #334155; overflow: hidden; height: 32px; }' +
+    '.progress-bar { height: 100%; background: linear-gradient(90deg, #7C3AED, #A78BFA); border-radius: 8px; transition: width 0.3s ease; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: white; min-width: 0; }' +
+    '.progress-text { text-align: center; font-size: 12px; color: #94A3B8; margin-top: 8px; }' +
+    '.progress-stats { display: flex; justify-content: space-between; font-size: 11px; color: #64748B; margin-top: 4px; }' +
     '</style>' +
     '</head><body>' +
     '<h3>📥 Import Members from CSV</h3>' +
@@ -5177,9 +5182,25 @@ function getImportMembersHtml_() {
     '' +
     '<div id="statusArea"></div>' +
     '' +
+    '<div id="progressSection" class="progress-section" style="display:none;">' +
+    '  <div class="progress-container">' +
+    '    <div class="progress-bar" id="progressBar" style="width:0%">0%</div>' +
+    '  </div>' +
+    '  <div class="progress-text" id="progressText">Preparing import...</div>' +
+    '  <div class="progress-stats">' +
+    '    <span id="progressImported">Imported: 0</span>' +
+    '    <span id="progressSkipped">Skipped: 0</span>' +
+    '  </div>' +
+    '</div>' +
+    '' +
     '<script>' +
     'var parsedData = [];' +
     'var csvHeaders = [];' +
+    'var BATCH_SIZE = 25;' +
+    'var currentMapping = {};' +
+    'var totalImported = 0;' +
+    'var totalSkipped = 0;' +
+    'var importStartTime = 0;' +
     'var targetFields = [' +
     '  {key: "firstName", label: "First Name", required: true},' +
     '  {key: "lastName", label: "Last Name", required: true},' +
@@ -5275,32 +5296,74 @@ function getImportMembersHtml_() {
     '    var sel = document.getElementById("map_" + field.key);' +
     '    if (sel.value !== "") mapping[field.key] = parseInt(sel.value);' +
     '  });' +
-    '  ' +
     '  if (mapping.firstName === undefined || mapping.lastName === undefined) {' +
     '    showStatus("First Name and Last Name are required mappings", true);' +
     '    return;' +
     '  }' +
-    '  ' +
+    '  currentMapping = mapping;' +
+    '  totalImported = 0;' +
+    '  totalSkipped = 0;' +
+    '  importStartTime = Date.now();' +
     '  document.getElementById("importBtn").disabled = true;' +
     '  document.getElementById("importBtn").textContent = "Importing...";' +
-    '  ' +
+    '  document.getElementById("parseBtn").disabled = true;' +
+    '  document.getElementById("statusArea").innerHTML = "";' +
+    '  document.getElementById("progressSection").style.display = "block";' +
+    '  updateProgress(0, parsedData.length, 0, 0);' +
+    '  processBatch(0);' +
+    '}' +
+    '' +
+    'function processBatch(startIndex) {' +
+    '  var batch = parsedData.slice(startIndex, startIndex + BATCH_SIZE);' +
+    '  if (batch.length === 0) { finishImport(); return; }' +
+    '  var processed = Math.min(startIndex + batch.length, parsedData.length);' +
+    '  document.getElementById("progressText").textContent = "Processing rows " + (startIndex + 1) + " \\u2013 " + processed + " of " + parsedData.length + "...";' +
     '  google.script.run' +
     '    .withSuccessHandler(function(result) {' +
     '      if (result.success) {' +
-    '        showStatus("Successfully imported " + result.imported + " members! " + (result.skipped > 0 ? "(" + result.skipped + " skipped as duplicates)" : ""), false);' +
-    '        document.getElementById("importBtn").textContent = "Done!";' +
+    '        totalImported += result.imported;' +
+    '        totalSkipped += result.skipped;' +
+    '        var nextStart = startIndex + BATCH_SIZE;' +
+    '        updateProgress(Math.min(nextStart, parsedData.length), parsedData.length, totalImported, totalSkipped);' +
+    '        processBatch(nextStart);' +
     '      } else {' +
-    '        showStatus("Import failed: " + result.message, true);' +
-    '        document.getElementById("importBtn").disabled = false;' +
-    '        document.getElementById("importBtn").textContent = "Import Members";' +
+    '        showStatus("Import failed at row " + (startIndex + 1) + ": " + (result.error || result.message), true);' +
+    '        showPartialResults();' +
     '      }' +
     '    })' +
     '    .withFailureHandler(function(e) {' +
-    '      showStatus("Error: " + e.message, true);' +
-    '      document.getElementById("importBtn").disabled = false;' +
-    '      document.getElementById("importBtn").textContent = "Import Members";' +
+    '      showStatus("Error at row " + (startIndex + 1) + ": " + e.message, true);' +
+    '      showPartialResults();' +
     '    })' +
-    '    .importMembersFromData(parsedData, mapping);' +
+    '    .importMembersBatch(batch, currentMapping);' +
+    '}' +
+    '' +
+    'function updateProgress(current, total, imported, skipped) {' +
+    '  var pct = total > 0 ? Math.round((current / total) * 100) : 0;' +
+    '  var bar = document.getElementById("progressBar");' +
+    '  bar.style.width = pct + "%";' +
+    '  bar.textContent = pct + "%";' +
+    '  document.getElementById("progressImported").textContent = "Imported: " + imported;' +
+    '  document.getElementById("progressSkipped").textContent = "Skipped: " + skipped;' +
+    '}' +
+    '' +
+    'function finishImport() {' +
+    '  updateProgress(parsedData.length, parsedData.length, totalImported, totalSkipped);' +
+    '  var elapsed = ((Date.now() - importStartTime) / 1000).toFixed(1);' +
+    '  document.getElementById("progressText").textContent = "Complete! Processed " + parsedData.length + " rows in " + elapsed + "s";' +
+    '  document.getElementById("importBtn").textContent = "Done!";' +
+    '  var msg = "Successfully imported " + totalImported + " members!";' +
+    '  if (totalSkipped > 0) msg += " (" + totalSkipped + " skipped as duplicates)";' +
+    '  showStatus(msg, false);' +
+    '}' +
+    '' +
+    'function showPartialResults() {' +
+    '  document.getElementById("importBtn").disabled = false;' +
+    '  document.getElementById("importBtn").textContent = "Retry Import";' +
+    '  document.getElementById("parseBtn").disabled = false;' +
+    '  if (totalImported > 0) {' +
+    '    showStatus("Partially imported " + totalImported + " members before error. " + totalSkipped + " skipped.", true);' +
+    '  }' +
     '}' +
     '' +
     ' + getClientSideEscapeHtml() + ' +
@@ -5417,6 +5480,116 @@ function importMembersFromData(data, mapping) {
   } catch (e) {
     console.error('Import error: ' + e.message);
     return errorResponse(e.message, 'bulkImportMembers');
+  }
+}
+
+/**
+ * Imports a batch of members from parsed CSV data (called by progress bar UI)
+ * @param {Array<Array>} batchData - 2D array of CSV data for this batch
+ * @param {Object} mapping - Column mapping object {fieldName: columnIndex}
+ * @returns {Object} Result with imported/skipped counts for this batch
+ */
+function importMembersBatch(batchData, mapping) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+    if (!sheet) {
+      return errorResponse('Member Directory sheet not found', 'importMembersBatch');
+    }
+
+    // Get existing data for duplicate checking
+    var existingData = sheet.getDataRange().getValues();
+    var existingEmails = {};
+    var existingNames = {};
+
+    for (var i = 1; i < existingData.length; i++) {
+      var existEmail = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+      var existName = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
+      if (existEmail) existingEmails[existEmail] = true;
+      if (existName) existingNames[existName] = true;
+    }
+
+    var imported = 0;
+    var skipped = 0;
+    var newRows = [];
+
+    for (var j = 0; j < batchData.length; j++) {
+      var row = batchData[j];
+
+      var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
+      var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
+      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+
+      // Skip if no name
+      if (!firstName && !lastName) {
+        skipped++;
+        continue;
+      }
+
+      // Check for duplicates
+      var emailLower = email.toLowerCase();
+      var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
+
+      if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
+        skipped++;
+        continue;
+      }
+
+      // Mark as existing to prevent duplicates within batch
+      if (emailLower) existingEmails[emailLower] = true;
+      existingNames[nameLower] = true;
+
+      // Generate Member ID
+      var memberId = generateMemberID_(firstName, lastName);
+
+      // Build new row
+      var newRow = new Array(MEMBER_COLS.STATE).fill('');
+      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
+      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+
+      if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
+      if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
+      if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
+      if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
+      if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
+      if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
+      if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
+
+      // Default Is Steward to No
+      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+
+      newRows.push(newRow);
+      imported++;
+    }
+
+    // Batch write new rows
+    if (newRows.length > 0) {
+      var lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+    }
+
+    // Log the batch import (only if rows were actually imported)
+    if (imported > 0) {
+      logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
+        action: 'BATCH_IMPORT',
+        importedCount: imported,
+        skippedCount: skipped,
+        importedBy: Session.getActiveUser().getEmail()
+      });
+    }
+
+    return {
+      success: true,
+      imported: imported,
+      skipped: skipped,
+      message: 'Batch import completed'
+    };
+
+  } catch (e) {
+    console.error('Batch import error: ' + e.message);
+    return errorResponse(e.message, 'importMembersBatch');
   }
 }
 
