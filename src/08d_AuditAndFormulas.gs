@@ -24,19 +24,8 @@ function setupAuditLogSheet() {
     return;
   }
 
-  // Headers
-  var headers = [
-    'Timestamp',
-    'User Email',
-    'Sheet',
-    'Row',
-    'Column',
-    'Field Name',
-    'Old Value',
-    'New Value',
-    'Record ID',
-    'Action Type'
-  ];
+  // Headers — auto-derived from AUDIT_LOG_HEADER_MAP_
+  var headers = getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
@@ -48,16 +37,16 @@ function setupAuditLogSheet() {
   sheet.setFrozenRows(1);
 
   // Set column widths
-  sheet.setColumnWidth(1, 160); // Timestamp
-  sheet.setColumnWidth(2, 200); // User Email
-  sheet.setColumnWidth(3, 120); // Sheet
-  sheet.setColumnWidth(4, 50);  // Row
-  sheet.setColumnWidth(5, 50);  // Column
-  sheet.setColumnWidth(6, 150); // Field Name
-  sheet.setColumnWidth(7, 200); // Old Value
-  sheet.setColumnWidth(8, 200); // New Value
-  sheet.setColumnWidth(9, 100); // Record ID
-  sheet.setColumnWidth(10, 100); // Action Type
+  sheet.setColumnWidth(AUDIT_LOG_COLS.TIMESTAMP, 160);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.USER_EMAIL, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.SHEET, 120);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.ROW, 50);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.COLUMN, 50);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.FIELD_NAME, 150);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.OLD_VALUE, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.NEW_VALUE, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.RECORD_ID, 100);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.ACTION_TYPE, 100);
 
   // Hide the sheet
   sheet.hideSheet();
@@ -273,7 +262,7 @@ function clearOldAuditEntries() {
 
   // Find rows older than 30 days (skip header)
   for (var i = data.length - 1; i >= 1; i--) {
-    var timestamp = data[i][0];
+    var timestamp = data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1];
     if (timestamp instanceof Date && timestamp < cutoffDate) {
       rowsToDelete.push(i + 1); // +1 for 1-indexed rows
     }
@@ -311,14 +300,14 @@ function getAuditHistory(recordId) {
   var history = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][8] === recordId) { // Column I is Record ID
+    if (data[i][AUDIT_LOG_COLS.RECORD_ID - 1] === recordId) {
       history.push({
-        timestamp: data[i][0],
-        user: data[i][1],
-        field: data[i][5],
-        oldValue: data[i][6],
-        newValue: data[i][7],
-        action: data[i][9]
+        timestamp: data[i][AUDIT_LOG_COLS.TIMESTAMP - 1],
+        user: data[i][AUDIT_LOG_COLS.USER_EMAIL - 1],
+        field: data[i][AUDIT_LOG_COLS.FIELD_NAME - 1],
+        oldValue: data[i][AUDIT_LOG_COLS.OLD_VALUE - 1],
+        newValue: data[i][AUDIT_LOG_COLS.NEW_VALUE - 1],
+        action: data[i][AUDIT_LOG_COLS.ACTION_TYPE - 1]
       });
     }
   }
@@ -891,8 +880,8 @@ function setupStewardPerformanceCalcSheet() {
 
   sheet.clear();
 
-  // Headers
-  var headers = ['Steward', 'Total Cases', 'Active', 'Closed', 'Won', 'Win Rate %', 'Avg Days', 'Overdue', 'Due This Week', 'Performance Score'];
+  // Headers — auto-derived from STEWARD_PERF_HEADER_MAP_
+  var headers = getHeadersFromMap_(STEWARD_PERF_HEADER_MAP_);
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
     .setBackground(COLORS.LIGHT_GRAY);
@@ -1529,18 +1518,8 @@ function setupCalcFormulasSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupSurveyTrackingSheet(sheet) {
-  var headers = [
-    'Member ID',          // A
-    'Member Name',        // B
-    'Email',              // C
-    'Work Location',      // D
-    'Assigned Steward',   // E
-    'Current Status',     // F
-    'Completed Date',     // G
-    'Total Missed',       // H
-    'Total Completed',    // I
-    'Last Reminder Sent'  // J
-  ];
+  // Headers — auto-derived from SURVEY_TRACKING_HEADER_MAP_
+  var headers = getHeadersFromMap_(SURVEY_TRACKING_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
@@ -1613,10 +1592,8 @@ function setupSurveyVaultSheet() {
 
   // Only set up headers if sheet is empty
   if (sheet.getLastRow() < 1) {
-    var headers = [
-      'Response Row', 'Email Hash', 'Verified', 'Member ID Hash',
-      'Quarter', 'Is Latest', 'Superseded By', 'Reviewer Notes'
-    ];
+    // Headers — auto-derived from SURVEY_VAULT_HEADER_MAP_
+    var headers = getHeadersFromMap_(SURVEY_VAULT_HEADER_MAP_);
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setFontWeight('bold')
       .setBackground('#7F1D1D')
@@ -2007,11 +1984,11 @@ function verifyAuditLogIntegrity() {
     var storedHash = String(data[i][integrityCol] || '');
     var computed = computeAuditRowHash_(
       previousHash,
-      data[i][0],  // Timestamp
-      data[i][1],  // Event Type
-      data[i][2],  // User
-      data[i][3],  // Details
-      data[i][4]   // Session ID
+      data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1],
+      data[i][EVENT_AUDIT_COLS.EVENT_TYPE - 1],
+      data[i][EVENT_AUDIT_COLS.USER - 1],
+      data[i][EVENT_AUDIT_COLS.DETAILS - 1],
+      data[i][EVENT_AUDIT_COLS.SESSION_ID - 1]
     );
 
     if (storedHash && storedHash !== computed) {
@@ -2087,12 +2064,12 @@ function verifySurveyVaultIntegrity() {
   for (var i = 1; i < data.length; i++) {
     totalEntries++;
     var rowNum = i + 1;
-    var responseRow = data[i][0];
-    var emailHash = String(data[i][1] || '');
-    var verified = String(data[i][2] || '');
-    var memberIdHash = String(data[i][3] || '');
-    var quarter = String(data[i][4] || '');
-    var isLatest = String(data[i][5] || '');
+    var responseRow = data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1];
+    var emailHash = String(data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '');
+    var verified = String(data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '');
+    var memberIdHash = String(data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '');
+    var quarter = String(data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '');
+    var isLatest = String(data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '');
 
     // Check for missing response row
     if (!responseRow) {

@@ -3234,7 +3234,7 @@ function getContractPdfUrl_() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
-      var url = configSheet.getRange(3, CONFIG_COLS.CONTRACT_URL).getValue();
+      var url = configSheet.getRange(3, CONFIG_COLS.ORG_WEBSITE).getValue();
       if (url) return url;
     }
   } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }

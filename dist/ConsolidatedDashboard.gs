@@ -1839,7 +1839,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2855 lines)
+// SOURCE: 01_Core.gs (2829 lines)
 // ============================================================================
 
 /**
@@ -2811,118 +2811,84 @@ var MENU_ICONS = {
 };
 
 // ============================================================================
-// MEMBER DIRECTORY COLUMNS (40 columns total: A-AN)
+// MEMBER DIRECTORY COLUMNS — Auto-derived from header map
+// To add/remove/reorder columns, edit this array. Everything else follows.
 // ============================================================================
 
-/**
- * Member Directory column positions (1-indexed)
- * CRITICAL: ALL column references must use these constants
- * @const {Object}
- */
-var MEMBER_COLS = {
-  // Section 1: Identity & Core Info (A-D)
-  MEMBER_ID: 1,                    // A
-  FIRST_NAME: 2,                   // B
-  LAST_NAME: 3,                    // C
-  JOB_TITLE: 4,                    // D
+var MEMBER_HEADER_MAP_ = [
+  { key: 'MEMBER_ID',          header: 'Member ID' },
+  { key: 'FIRST_NAME',         header: 'First Name' },
+  { key: 'LAST_NAME',          header: 'Last Name' },
+  { key: 'JOB_TITLE',          header: 'Job Title' },
+  { key: 'WORK_LOCATION',      header: 'Work Location' },
+  { key: 'UNIT',               header: 'Unit' },
+  { key: 'CUBICLE',            header: 'Cubicle' },
+  { key: 'OFFICE_DAYS',        header: 'Office Days' },
+  { key: 'EMAIL',              header: 'Email' },
+  { key: 'PHONE',              header: 'Phone' },
+  { key: 'PREFERRED_COMM',     header: 'Preferred Communication' },
+  { key: 'BEST_TIME',          header: 'Best Time to Contact' },
+  { key: 'SUPERVISOR',         header: 'Supervisor' },
+  { key: 'MANAGER',            header: 'Manager' },
+  { key: 'IS_STEWARD',         header: 'Is Steward' },
+  { key: 'COMMITTEES',         header: 'Committees' },
+  { key: 'ASSIGNED_STEWARD',   header: 'Assigned Steward' },
+  { key: 'LAST_VIRTUAL_MTG',   header: 'Last Virtual Mtg' },
+  { key: 'LAST_INPERSON_MTG',  header: 'Last In-Person Mtg' },
+  { key: 'OPEN_RATE',          header: 'Open Rate %' },
+  { key: 'VOLUNTEER_HOURS',    header: 'Volunteer Hours' },
+  { key: 'INTEREST_LOCAL',     header: 'Interest: Local' },
+  { key: 'INTEREST_CHAPTER',   header: 'Interest: Chapter' },
+  { key: 'INTEREST_ALLIED',    header: 'Interest: Allied' },
+  { key: 'RECENT_CONTACT_DATE', header: 'Recent Contact Date' },
+  { key: 'CONTACT_STEWARD',    header: 'Contact Steward' },
+  { key: 'CONTACT_NOTES',      header: 'Contact Notes' },
+  { key: 'HAS_OPEN_GRIEVANCE', header: 'Has Open Grievance?' },
+  { key: 'GRIEVANCE_STATUS',   header: 'Grievance Status' },
+  { key: 'NEXT_DEADLINE',      header: 'Days to Deadline' },
+  { key: 'START_GRIEVANCE',    header: 'Start Grievance' },
+  { key: 'QUICK_ACTIONS',      header: '\u26A1 Actions' },
+  { key: 'PIN_HASH',           header: 'PIN Hash' },
+  { key: 'EMPLOYEE_ID',        header: 'Employee ID' },
+  { key: 'DEPARTMENT',         header: 'Department' },
+  { key: 'HIRE_DATE',          header: 'Hire Date' },
+  { key: 'STREET_ADDRESS',     header: 'Street Address' },
+  { key: 'CITY',               header: 'City' },
+  { key: 'STATE',              header: 'State' }
+];
 
-  // Section 2: Location & Work (E-H)
-  WORK_LOCATION: 5,                // E
-  UNIT: 6,                         // F
-  CUBICLE: 7,                      // G - Cubicle / workspace ID (hidden by default)
-  OFFICE_DAYS: 8,                  // H - Multi-select: days member works in office
+var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
+  LOCATION: 'WORK_LOCATION',
+  DAYS_TO_DEADLINE: 'NEXT_DEADLINE'
+});
 
-  // Section 3: Contact Information (I-L)
-  EMAIL: 9,                        // I
-  PHONE: 10,                       // J
-  PREFERRED_COMM: 11,              // K - Multi-select: preferred communication methods
-  BEST_TIME: 12,                   // L - Multi-select: best times to reach member
-
-  // Section 4: Organizational Structure (M-Q)
-  SUPERVISOR: 13,                  // M
-  MANAGER: 14,                     // N
-  IS_STEWARD: 15,                  // O
-  COMMITTEES: 16,                  // P - Multi-select: which committees steward is in
-  ASSIGNED_STEWARD: 17,            // Q - Multi-select: assigned steward(s)
-
-  // Section 5: Engagement Metrics (R-U) - Hidden by default
-  LAST_VIRTUAL_MTG: 18,            // R
-  LAST_INPERSON_MTG: 19,           // S
-  OPEN_RATE: 20,                   // T
-  VOLUNTEER_HOURS: 21,             // U
-
-  // Section 6: Member Interests (V-X) - Hidden by default
-  INTEREST_LOCAL: 22,              // V
-  INTEREST_CHAPTER: 23,            // W
-  INTEREST_ALLIED: 24,             // X
-
-  // Section 7: Steward Contact Tracking (Y-AA)
-  RECENT_CONTACT_DATE: 25,         // Y
-  CONTACT_STEWARD: 26,             // Z
-  CONTACT_NOTES: 27,               // AA
-
-  // Section 8: Grievance Management (AB-AE)
-  HAS_OPEN_GRIEVANCE: 28,          // AB - Script-calculated (static value)
-  GRIEVANCE_STATUS: 29,            // AC - Script-calculated (static value)
-  NEXT_DEADLINE: 30,               // AD - Script-calculated (static value)
-  START_GRIEVANCE: 31,             // AE - Checkbox to start grievance
-
-  // Section 9: Quick Actions (AF)
-  QUICK_ACTIONS: 32,               // AF - Checkbox to open Quick Actions dialog
-
-  // Section 10: Member Authentication (AG)
-  PIN_HASH: 33,                    // AG - Hashed PIN for member self-service portal
-
-  // Section 11: Employment Details (AH-AJ) - Added for Add Member form parity
-  EMPLOYEE_ID: 34,                 // AH - Employee ID (e.g., XX000000)
-  DEPARTMENT: 35,                  // AI - Department / work unit category
-  HIRE_DATE: 36,                   // AJ - Hire date (date format)
-
-  // Section 12: Mailing Address / PII (AK-AM) - Hidden by default, PII
-  STREET_ADDRESS: 37,              // AK - Street address (PII)
-  CITY: 38,                        // AL - City (PII)
-  STATE: 39,                       // AM - State (PII)
-
-  // ALIASES - For backward compatibility
-  LOCATION: 5,                     // Alias for WORK_LOCATION
-  DAYS_TO_DEADLINE: 30             // Alias for NEXT_DEADLINE
-};
-
-/**
- * Member Directory columns considered PII (Personally Identifiable Information)
- * These columns are hidden by default and MUST NOT appear in any modals or exports
- * unless explicitly authorized. Includes mailing address fields.
- * @const {Array<number>}
- */
-var PII_MEMBER_COLS = [37, 38, 39]; // STREET_ADDRESS, CITY, STATE
+/** PII columns — auto-derived from MEMBER_COLS */
+var PII_MEMBER_COLS = [MEMBER_COLS.STREET_ADDRESS, MEMBER_COLS.CITY, MEMBER_COLS.STATE];
 
 // ============================================================================
-// MEETING CHECK-IN LOG COLUMNS (16 columns: A-P)
+// MEETING CHECK-IN LOG COLUMNS — Auto-derived from header map
 // ============================================================================
 
-/**
- * Meeting Check-In Log column positions (1-indexed)
- * Columns A-H are original; I-M added for event scheduling
- * @const {Object}
- */
-var MEETING_CHECKIN_COLS = {
-  MEETING_ID: 1,         // A - Meeting ID (steward-created)
-  MEETING_NAME: 2,       // B - Meeting name/topic
-  MEETING_DATE: 3,       // C - Date of meeting
-  MEETING_TYPE: 4,       // D - Virtual or In-Person
-  MEMBER_ID: 5,          // E - Checked-in member ID
-  MEMBER_NAME: 6,        // F - Member first + last name
-  CHECKIN_TIME: 7,       // G - Timestamp of check-in
-  EMAIL: 8,              // H - Member email (for lookup)
-  MEETING_TIME: 9,       // I - Start time (HH:mm)
-  MEETING_DURATION: 10,  // J - Duration in hours
-  EVENT_STATUS: 11,      // K - Scheduled / Active / Completed
-  NOTIFY_STEWARDS: 12,   // L - Steward email(s) for attendance report
-  CALENDAR_EVENT_ID: 13, // M - Google Calendar event ID
-  NOTES_DOC_URL: 14,     // N - Meeting Notes Google Doc URL
-  AGENDA_DOC_URL: 15,    // O - Meeting Agenda Google Doc URL
-  AGENDA_STEWARDS: 16    // P - Steward emails for early agenda sharing (3 days prior)
-};
+var MEETING_CHECKIN_HEADER_MAP_ = [
+  { key: 'MEETING_ID',       header: 'Meeting ID' },
+  { key: 'MEETING_NAME',     header: 'Meeting Name' },
+  { key: 'MEETING_DATE',     header: 'Meeting Date' },
+  { key: 'MEETING_TYPE',     header: 'Meeting Type' },
+  { key: 'MEMBER_ID',        header: 'Member ID' },
+  { key: 'MEMBER_NAME',      header: 'Member Name' },
+  { key: 'CHECKIN_TIME',     header: 'Check-In Time' },
+  { key: 'EMAIL',            header: 'Email' },
+  { key: 'MEETING_TIME',     header: 'Meeting Time' },
+  { key: 'MEETING_DURATION', header: 'Duration' },
+  { key: 'EVENT_STATUS',     header: 'Event Status' },
+  { key: 'NOTIFY_STEWARDS',  header: 'Notify Stewards' },
+  { key: 'CALENDAR_EVENT_ID', header: 'Calendar Event ID' },
+  { key: 'NOTES_DOC_URL',    header: 'Notes Doc URL' },
+  { key: 'AGENDA_DOC_URL',   header: 'Agenda Doc URL' },
+  { key: 'AGENDA_STEWARDS',  header: 'Agenda Stewards' }
+];
+
+var MEETING_CHECKIN_COLS = buildColsFromMap_(MEETING_CHECKIN_HEADER_MAP_);
 
 /**
  * Meeting event statuses
@@ -2935,360 +2901,211 @@ var MEETING_STATUS = {
 };
 
 // ============================================================================
-// GRIEVANCE LOG COLUMNS (41 columns total: A-AO)
+// GRIEVANCE LOG COLUMNS — Auto-derived from header map
+// To add/remove/reorder columns, edit this array. Everything else follows.
 // ============================================================================
 
-/**
- * Grievance Log column positions (1-indexed)
- * CRITICAL: ALL column references must use these constants
- * @const {Object}
- */
-var GRIEVANCE_COLS = {
-  // Section 1: Identity (A-D)
-  GRIEVANCE_ID: 1,        // A - Grievance ID
-  MEMBER_ID: 2,           // B - Member ID
-  FIRST_NAME: 3,          // C - First Name
-  LAST_NAME: 4,           // D - Last Name
+var GRIEVANCE_HEADER_MAP_ = [
+  { key: 'GRIEVANCE_ID',       header: 'Grievance ID' },
+  { key: 'MEMBER_ID',          header: 'Member ID' },
+  { key: 'FIRST_NAME',         header: 'First Name' },
+  { key: 'LAST_NAME',          header: 'Last Name' },
+  { key: 'STATUS',             header: 'Status' },
+  { key: 'CURRENT_STEP',       header: 'Current Step' },
+  { key: 'INCIDENT_DATE',      header: 'Incident Date' },
+  { key: 'FILING_DEADLINE',    header: 'Filing Deadline' },
+  { key: 'DATE_FILED',         header: 'Date Filed' },
+  { key: 'STEP1_DUE',          header: 'Step I Due' },
+  { key: 'STEP1_RCVD',         header: 'Step I Rcvd' },
+  { key: 'STEP2_APPEAL_DUE',   header: 'Step II Appeal Due' },
+  { key: 'STEP2_APPEAL_FILED', header: 'Step II Appeal Filed' },
+  { key: 'STEP2_DUE',          header: 'Step II Due' },
+  { key: 'STEP2_RCVD',         header: 'Step II Rcvd' },
+  { key: 'STEP3_APPEAL_DUE',   header: 'Step III Appeal Due' },
+  { key: 'STEP3_APPEAL_FILED', header: 'Step III Appeal Filed' },
+  { key: 'DATE_CLOSED',        header: 'Date Closed' },
+  { key: 'DAYS_OPEN',          header: 'Days Open' },
+  { key: 'NEXT_ACTION_DUE',    header: 'Next Action Due' },
+  { key: 'DAYS_TO_DEADLINE',   header: 'Days to Deadline' },
+  { key: 'ARTICLES',           header: 'Articles Violated' },
+  { key: 'ISSUE_CATEGORY',     header: 'Issue Category' },
+  { key: 'MEMBER_EMAIL',       header: 'Member Email' },
+  { key: 'LOCATION',           header: 'Work Location' },
+  { key: 'STEWARD',            header: 'Assigned Steward' },
+  { key: 'RESOLUTION',         header: 'Resolution' },
+  { key: 'MESSAGE_ALERT',      header: 'Message Alert' },
+  { key: 'COORDINATOR_MESSAGE', header: 'Coordinator Message' },
+  { key: 'ACKNOWLEDGED_BY',    header: 'Acknowledged By' },
+  { key: 'ACKNOWLEDGED_DATE',  header: 'Acknowledged Date' },
+  { key: 'DRIVE_FOLDER_ID',    header: 'Drive Folder ID' },
+  { key: 'DRIVE_FOLDER_URL',   header: 'Drive Folder URL' },
+  { key: 'QUICK_ACTIONS',      header: '\u26A1 Actions' },
+  { key: 'ACTION_TYPE',        header: 'Action Type' },
+  { key: 'CHECKLIST_PROGRESS', header: 'Checklist Progress' },
+  { key: 'REMINDER_1_DATE',    header: 'Reminder 1 Date' },
+  { key: 'REMINDER_1_NOTE',    header: 'Reminder 1 Note' },
+  { key: 'REMINDER_2_DATE',    header: 'Reminder 2 Date' },
+  { key: 'REMINDER_2_NOTE',    header: 'Reminder 2 Note' },
+  { key: 'LAST_UPDATED',       header: 'Last Updated' }
+];
 
-  // Section 2: Status & Assignment (E-F)
-  STATUS: 5,              // E - Status
-  CURRENT_STEP: 6,        // F - Current Step
-
-  // Section 3: Timeline - Filing (G-I)
-  INCIDENT_DATE: 7,       // G - Incident Date
-  FILING_DEADLINE: 8,     // H - Filing Deadline (21d) (auto-calc)
-  DATE_FILED: 9,          // I - Date Filed (Step I)
-
-  // Section 4: Timeline - Step I (J-K)
-  STEP1_DUE: 10,          // J - Step I Decision Due (30d) (auto-calc)
-  STEP1_RCVD: 11,         // K - Step I Decision Rcvd
-
-  // Section 5: Timeline - Step II (L-O)
-  STEP2_APPEAL_DUE: 12,   // L - Step II Appeal Due (10d) (auto-calc)
-  STEP2_APPEAL_FILED: 13, // M - Step II Appeal Filed
-  STEP2_DUE: 14,          // N - Step II Decision Due (30d) (auto-calc)
-  STEP2_RCVD: 15,         // O - Step II Decision Rcvd
-
-  // Section 6: Timeline - Step III (P-R)
-  STEP3_APPEAL_DUE: 16,   // P - Step III Appeal Due (30d) (auto-calc)
-  STEP3_APPEAL_FILED: 17, // Q - Step III Appeal Filed
-  DATE_CLOSED: 18,        // R - Date Closed
-
-  // Section 7: Calculated Metrics (S-U)
-  DAYS_OPEN: 19,          // S - Days Open (auto-calc)
-  NEXT_ACTION_DUE: 20,    // T - Next Action Due (auto-calc)
-  DAYS_TO_DEADLINE: 21,   // U - Days to Deadline (auto-calc)
-
-  // Section 8: Case Details (V-W)
-  ARTICLES: 22,           // V - Articles Violated
-  ISSUE_CATEGORY: 23,     // W - Issue Category
-
-  // Section 9: Contact & Location (X-Z)
-  MEMBER_EMAIL: 24,       // X - Member Email
-  LOCATION: 25,           // Y - Work Location (Site)
-  STEWARD: 26,            // Z - Assigned Steward (Name)
-
-  // Section 10: Resolution (AA)
-  RESOLUTION: 27,         // AA - Resolution Summary
-
-  // Section 11: Coordinator Notifications (AB-AE)
-  MESSAGE_ALERT: 28,      // AB - Message Alert checkbox
-  COORDINATOR_MESSAGE: 29,// AC - Coordinator's message text
-  ACKNOWLEDGED_BY: 30,    // AD - Steward who acknowledged
-  ACKNOWLEDGED_DATE: 31,  // AE - When steward acknowledged
-
-  // Section 12: Drive Integration (AF-AG)
-  DRIVE_FOLDER_ID: 32,    // AF - Google Drive folder ID
-  DRIVE_FOLDER_URL: 33,   // AG - Google Drive folder URL
-
-  // Section 13: Quick Actions (AH)
-  QUICK_ACTIONS: 34,      // AH - Checkbox to open Quick Actions dialog
-
-  // Section 14: Action Type & Checklist (AI-AJ)
-  ACTION_TYPE: 35,        // AI - Action Type (Grievance, Records Request, etc.)
-  CHECKLIST_PROGRESS: 36, // AJ - Checklist Progress (e.g., "5/8" or "62%")
-
-  // Section 15: Reminders (AK-AN) - For scheduling meetings/follow-ups
-  REMINDER_1_DATE: 37,    // AK - First reminder date
-  REMINDER_1_NOTE: 38,    // AL - First reminder note (e.g., "Schedule Step II meeting")
-  REMINDER_2_DATE: 39,    // AM - Second reminder date
-  REMINDER_2_NOTE: 40,    // AN - Second reminder note
-
-  // Section 16: Record Tracking (AO)
-  LAST_UPDATED: 41        // AO - Last Updated timestamp (auto-set on edit)
-};
+var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_);
 
 // ============================================================================
 // BACKWARD COMPATIBILITY ALIASES (0-indexed for array access)
+// Auto-derived from 1-indexed *_COLS — stays in sync automatically.
 // ============================================================================
 
-/**
- * GRIEVANCE_COLUMNS - 0-indexed alias for legacy code
- * Legacy code uses these as array indices (0-indexed)
- * Modern GRIEVANCE_COLS is 1-indexed for getRange() calls
- * @const {Object}
- */
-var GRIEVANCE_COLUMNS = {
-  // Core fields (0-indexed)
-  GRIEVANCE_ID: 0,         // A - Grievance ID
-  MEMBER_ID: 1,            // B - Member ID
-  FIRST_NAME: 2,           // C - First Name
-  LAST_NAME: 3,            // D - Last Name
-  MEMBER_NAME: 2,          // Alias - uses FIRST_NAME column
-  STATUS: 4,               // E - Status
-  CURRENT_STEP: 5,         // F - Current Step
-
-  // Dates and deadlines (0-indexed)
-  INCIDENT_DATE: 6,        // G - Incident Date
-  FILING_DEADLINE: 7,      // H - Filing Deadline
-  FILING_DATE: 8,          // I - Date Filed (alias for DATE_FILED)
-  DATE_FILED: 8,           // I - Date Filed
-
-  // Step I (0-indexed)
-  STEP1_DUE: 9,            // J - Step I Decision Due
-  STEP_1_DUE: 9,           // Alias with underscore
-  STEP1_RCVD: 10,          // K - Step I Decision Received
-  STEP_1_DATE: 10,         // Alias
-  STEP_1_STATUS: 4,        // Uses STATUS column for step status
-
-  // Step II (0-indexed)
-  STEP2_APPEAL_DUE: 11,    // L - Step II Appeal Due
-  STEP2_APPEAL_FILED: 12,  // M - Step II Appeal Filed
-  STEP_2_DATE: 12,         // Alias
-  STEP2_DUE: 13,           // N - Step II Decision Due
-  STEP_2_DUE: 13,          // Alias with underscore
-  STEP2_RCVD: 14,          // O - Step II Decision Received
-  STEP_2_STATUS: 4,        // Uses STATUS column
-
-  // Step III (0-indexed)
-  STEP3_APPEAL_DUE: 15,    // P - Step III Appeal Due
-  STEP3_APPEAL_FILED: 16,  // Q - Step III Appeal Filed
-  STEP_3_DATE: 16,         // Alias
-  STEP3_DUE: 15,           // Same as appeal due
-  STEP_3_DUE: 15,          // Alias with underscore
-  STEP_3_STATUS: 4,        // Uses STATUS column
-  DATE_CLOSED: 17,         // R - Date Closed
-  ARBITRATION_DATE: 17,    // Alias for DATE_CLOSED
-
-  // Calculated metrics (0-indexed)
-  DAYS_OPEN: 18,           // S - Days Open
-  NEXT_ACTION_DUE: 19,     // T - Next Action Due
-  LAST_UPDATED: 40,        // Alias for RECORD_LAST_UPDATED (AO)
-  DAYS_TO_DEADLINE: 20,    // U - Days to Deadline
-
-  // Case details (0-indexed)
-  ARTICLES: 21,            // V - Articles Violated
-  ISSUE_CATEGORY: 22,      // W - Issue Category
-  GRIEVANCE_TYPE: 22,      // Alias for ISSUE_CATEGORY
-  DESCRIPTION: 22,         // Alias - uses ISSUE_CATEGORY
-
-  // Contact & Location (0-indexed)
-  MEMBER_EMAIL: 23,        // X - Member Email
-  LOCATION: 24,            // Y - Work Location
-  STEWARD: 25,             // Z - Assigned Steward
-
-  // Resolution (0-indexed)
-  RESOLUTION: 26,          // AA - Resolution Summary
-  OUTCOME: 26,             // Alias for RESOLUTION
-  NOTES: 26,               // Alias for RESOLUTION (used for notes)
-
-  // Coordinator (0-indexed)
-  MESSAGE_ALERT: 27,       // AB - Message Alert
-  COORDINATOR_MESSAGE: 28, // AC - Coordinator Message
-  ACKNOWLEDGED_BY: 29,     // AD - Acknowledged By
-  ACKNOWLEDGED_DATE: 30,   // AE - Acknowledged Date
-
-  // Drive (0-indexed)
-  DRIVE_FOLDER_ID: 31,     // AF - Drive Folder ID
-  DRIVE_FOLDER_URL: 32,    // AG - Drive Folder URL
-  DRIVE_FOLDER: 32,        // Alias for DRIVE_FOLDER_URL
-
-  // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 33,       // AH - Quick Actions
-
-  // Action Type & Checklist (0-indexed)
-  ACTION_TYPE: 34,         // AI - Action Type
-  CHECKLIST_PROGRESS: 35,  // AJ - Checklist Progress
-
-  // Reminders (0-indexed)
-  REMINDER_1_DATE: 36,     // AK - First reminder date
-  REMINDER_1_NOTE: 37,     // AL - First reminder note
-  REMINDER_2_DATE: 38,     // AM - Second reminder date
-  REMINDER_2_NOTE: 39,     // AN - Second reminder note
-
-  // Record Tracking (0-indexed)
-  RECORD_LAST_UPDATED: 40  // AO - Last Updated timestamp
+/** Legacy-only aliases for GRIEVANCE_COLUMNS (keys not in GRIEVANCE_COLS) */
+var GRIEVANCE_LEGACY_ALIASES_ = {
+  MEMBER_NAME: 'FIRST_NAME',
+  FILING_DATE: 'DATE_FILED',
+  STEP_1_DUE: 'STEP1_DUE',
+  STEP_1_DATE: 'STEP1_RCVD',
+  STEP_1_STATUS: 'STATUS',
+  STEP_2_DATE: 'STEP2_APPEAL_FILED',
+  STEP_2_DUE: 'STEP2_DUE',
+  STEP_2_STATUS: 'STATUS',
+  STEP_3_DATE: 'STEP3_APPEAL_FILED',
+  STEP3_DUE: 'STEP3_APPEAL_DUE',
+  STEP_3_DUE: 'STEP3_APPEAL_DUE',
+  STEP_3_STATUS: 'STATUS',
+  ARBITRATION_DATE: 'DATE_CLOSED',
+  RECORD_LAST_UPDATED: 'LAST_UPDATED',
+  GRIEVANCE_TYPE: 'ISSUE_CATEGORY',
+  DESCRIPTION: 'ISSUE_CATEGORY',
+  OUTCOME: 'RESOLUTION',
+  NOTES: 'RESOLUTION',
+  DRIVE_FOLDER: 'DRIVE_FOLDER_URL'
 };
 
-/**
- * MEMBER_COLUMNS - 0-indexed alias for legacy code
- * Legacy code uses these as array indices (0-indexed)
- * Modern MEMBER_COLS is 1-indexed for getRange() calls
- * @const {Object}
- */
-var MEMBER_COLUMNS = {
-  // Core fields (0-indexed)
-  ID: 0,                   // A - Member ID
-  MEMBER_ID: 0,            // Alias
-  FIRST_NAME: 1,           // B - First Name
-  LAST_NAME: 2,            // C - Last Name
-  JOB_TITLE: 3,            // D - Job Title
-  JOB_DEPT: 3,             // Legacy alias for JOB_TITLE (DEPARTMENT now at index 34)
+var GRIEVANCE_COLUMNS = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
 
-  // Location & Work (0-indexed)
-  WORK_LOCATION: 4,        // E - Work Location
-  LOCATION: 4,             // Alias
-  UNIT: 5,                 // F - Unit
-  CUBICLE: 6,              // G - Cubicle (hidden)
-  OFFICE_DAYS: 7,          // H - Office Days
-
-  // Contact (0-indexed)
-  EMAIL: 8,                // I - Email
-  PHONE: 9,                // J - Phone
-  PREFERRED_COMM: 10,      // K - Preferred Communication
-  BEST_TIME: 11,           // L - Best Time to Contact
-
-  // Organization (0-indexed)
-  SUPERVISOR: 12,          // M - Supervisor
-  MANAGER: 13,             // N - Manager
-  IS_STEWARD: 14,          // O - Is Steward
-  COMMITTEES: 15,          // P - Committees
-  ASSIGNED_STEWARD: 16,    // Q - Assigned Steward
-
-  // Engagement (0-indexed)
-  LAST_VIRTUAL_MTG: 17,    // R - Last Virtual Meeting
-  LAST_INPERSON_MTG: 18,   // S - Last In-Person Meeting
-  OPEN_RATE: 19,           // T - Open Rate
-  VOLUNTEER_HOURS: 20,     // U - Volunteer Hours
-
-  // Interests (0-indexed)
-  INTEREST_LOCAL: 21,      // V - Interest in Local
-  INTEREST_CHAPTER: 22,    // W - Interest in Chapter
-  INTEREST_ALLIED: 23,     // X - Interest in Allied
-
-  // Contact Tracking (0-indexed)
-  RECENT_CONTACT_DATE: 24, // Y - Recent Contact Date
-  LAST_UPDATED: 24,        // Alias for tracking last update
-  CONTACT_STEWARD: 25,     // Z - Contact Steward
-  CONTACT_NOTES: 26,       // AA - Contact Notes
-
-  // Grievance fields (0-indexed)
-  HAS_OPEN_GRIEVANCE: 27,  // AB - Has Open Grievance
-  GRIEVANCE_STATUS: 28,    // AC - Grievance Status
-  STATUS: 28,              // Alias for member status
-  NEXT_DEADLINE: 29,       // AD - Next Deadline
-  START_GRIEVANCE: 30,     // AE - Start Grievance
-
-  // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 31,       // AF - Quick Actions
-
-  // Member Authentication (0-indexed)
-  PIN_HASH: 32,            // AG - PIN Hash
-
-  // Employment Details (0-indexed)
-  EMPLOYEE_ID: 33,         // AH - Employee ID
-  DEPARTMENT: 34,          // AI - Department
-  HIRE_DATE: 35,           // AJ - Hire Date
-
-  // Mailing Address / PII (0-indexed) - Hidden by default
-  STREET_ADDRESS: 36,      // AK - Street Address (PII)
-  CITY: 37,                // AL - City (PII)
-  STATE: 38                // AM - State (PII)
+/** Legacy-only aliases for MEMBER_COLUMNS (keys not in MEMBER_COLS) */
+var MEMBER_LEGACY_ALIASES_ = {
+  ID: 'MEMBER_ID',
+  JOB_DEPT: 'JOB_TITLE',
+  STATUS: 'GRIEVANCE_STATUS',
+  LAST_UPDATED: 'RECENT_CONTACT_DATE'
 };
+
+var MEMBER_COLUMNS = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
 
 // ============================================================================
-// CONFIG COLUMN MAPPING
+// CONFIG COLUMN MAPPING — Auto-derived from header map
+// Config sheet uses row 2 for headers (row 1 is section headers).
 // ============================================================================
 
-/**
- * Config sheet column positions for dropdown sources
- * @const {Object}
- */
-var CONFIG_COLS = {
-  // ── EMPLOYMENT INFO ── (A-E)
-  JOB_TITLES: 1,              // A
-  OFFICE_LOCATIONS: 2,        // B
-  UNITS: 3,                   // C
-  OFFICE_DAYS: 4,             // D
-  YES_NO: 5,                  // E
+var CONFIG_HEADER_MAP_ = [
+  { key: 'JOB_TITLES',            header: 'Job Titles' },
+  { key: 'OFFICE_LOCATIONS',      header: 'Office Locations' },
+  { key: 'UNITS',                 header: 'Units' },
+  { key: 'OFFICE_DAYS',           header: 'Office Days' },
+  { key: 'YES_NO',                header: 'Yes/No (Dropdowns)' },
+  { key: 'SUPERVISORS',           header: 'Supervisors' },
+  { key: 'MANAGERS',              header: 'Managers' },
+  { key: 'STEWARDS',              header: 'Stewards' },
+  { key: 'STEWARD_COMMITTEES',    header: 'Steward Committees' },
+  { key: 'GRIEVANCE_STATUS',      header: 'Grievance Status' },
+  { key: 'GRIEVANCE_STEP',        header: 'Grievance Step' },
+  { key: 'ISSUE_CATEGORY',        header: 'Issue Category' },
+  { key: 'ARTICLES',              header: 'Articles Violated' },
+  { key: 'COMM_METHODS',          header: 'Communication Methods' },
+  { key: 'GRIEVANCE_COORDINATORS', header: 'Grievance Coordinators' },
+  { key: 'GRIEVANCE_FORM_URL',    header: 'Grievance Form URL' },
+  { key: 'CONTACT_FORM_URL',      header: 'Contact Form URL' },
+  { key: 'ADMIN_EMAILS',          header: 'Admin Emails' },
+  { key: 'ALERT_DAYS',            header: 'Alert Days Before Deadline' },
+  { key: 'NOTIFICATION_RECIPIENTS', header: 'Notification Recipients' },
+  { key: 'ORG_NAME',              header: 'Organization Name' },
+  { key: 'LOCAL_NUMBER',          header: 'Local Number' },
+  { key: 'MAIN_ADDRESS',          header: 'Main Office Address' },
+  { key: 'MAIN_PHONE',            header: 'Main Phone' },
+  { key: 'DRIVE_FOLDER_ID',       header: 'Google Drive Folder ID' },
+  { key: 'CALENDAR_ID',           header: 'Google Calendar ID' },
+  { key: 'FILING_DEADLINE_DAYS',  header: 'Filing Deadline Days' },
+  { key: 'STEP1_RESPONSE_DAYS',   header: 'Step I Response Days' },
+  { key: 'STEP2_APPEAL_DAYS',     header: 'Step II Appeal Days' },
+  { key: 'STEP2_RESPONSE_DAYS',   header: 'Step II Response Days' },
+  { key: 'BEST_TIMES',            header: 'Best Times to Contact' },
+  { key: 'HOME_TOWNS',            header: 'Home Towns' },
+  { key: 'CONTRACT_GRIEVANCE',    header: 'Contract Article (Grievance)' },
+  { key: 'CONTRACT_DISCIPLINE',   header: 'Contract Article (Discipline)' },
+  { key: 'CONTRACT_WORKLOAD',     header: 'Contract Article (Workload)' },
+  { key: 'CONTRACT_NAME',         header: 'Contract Name' },
+  { key: 'UNION_PARENT',          header: 'Union Parent' },
+  { key: 'STATE_REGION',          header: 'State/Region' },
+  { key: 'ORG_WEBSITE',           header: 'Organization Website' },
+  { key: 'OFFICE_ADDRESSES',      header: 'Office Addresses' },
+  { key: 'MAIN_FAX',              header: 'Main Fax' },
+  { key: 'MAIN_CONTACT_NAME',     header: 'Main Contact Name' },
+  { key: 'MAIN_CONTACT_EMAIL',    header: 'Main Contact Email' },
+  { key: 'SATISFACTION_FORM_URL', header: 'Satisfaction Survey URL' },
+  { key: 'CHIEF_STEWARD_EMAIL',   header: 'Chief Steward Email' },
+  { key: 'UNIT_CODES',            header: 'Unit Codes' },
+  { key: 'ARCHIVE_FOLDER_ID',     header: 'Archive Folder ID' },
+  { key: 'ESCALATION_STATUSES',   header: 'Escalation Statuses' },
+  { key: 'ESCALATION_STEPS',      header: 'Escalation Steps' },
+  { key: 'TEMPLATE_ID',           header: 'Template ID' },
+  { key: 'PDF_FOLDER_ID',         header: 'PDF Folder ID' },
+  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' }
+];
 
-  // ── SUPERVISION ── (F-G)
-  SUPERVISORS: 6,             // F
-  MANAGERS: 7,                // G
+var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
 
-  // ── STEWARD INFO ── (H-I)
-  STEWARDS: 8,                // H
-  STEWARD_COMMITTEES: 9,      // I
+// ============================================================================
+// STEWARD PERFORMANCE CALC COLUMNS — Auto-derived from header map
+// ============================================================================
 
-  // ── GRIEVANCE SETTINGS ── (J-M)
-  GRIEVANCE_STATUS: 10,       // J
-  GRIEVANCE_STEP: 11,         // K
-  ISSUE_CATEGORY: 12,         // L
-  ARTICLES: 13,               // M
+var STEWARD_PERF_HEADER_MAP_ = [
+  { key: 'STEWARD',           header: 'Steward' },
+  { key: 'TOTAL_CASES',       header: 'Total Cases' },
+  { key: 'ACTIVE',            header: 'Active' },
+  { key: 'CLOSED',            header: 'Closed' },
+  { key: 'WON',               header: 'Won' },
+  { key: 'WIN_RATE',          header: 'Win Rate %' },
+  { key: 'AVG_DAYS',          header: 'Avg Days' },
+  { key: 'OVERDUE',           header: 'Overdue' },
+  { key: 'DUE_THIS_WEEK',     header: 'Due This Week' },
+  { key: 'PERFORMANCE_SCORE', header: 'Performance Score' }
+];
 
-  // ── LINKS & COORDINATORS ── (N-Q)
-  COMM_METHODS: 14,           // N
-  GRIEVANCE_COORDINATORS: 15, // O
-  GRIEVANCE_FORM_URL: 16,     // P
-  CONTACT_FORM_URL: 17,       // Q
+var STEWARD_PERF_COLS = buildColsFromMap_(STEWARD_PERF_HEADER_MAP_);
 
-  // ── NOTIFICATIONS ── (R-S)
-  ADMIN_EMAILS: 18,           // R
-  ALERT_DAYS: 19,             // S
-  NOTIFICATION_RECIPIENTS: 20, // T
+// ============================================================================
+// AUDIT LOG COLUMNS — Auto-derived from header map
+// ============================================================================
 
-  // ── ORGANIZATION ── (U-X)
-  ORG_NAME: 21,               // U
-  LOCAL_NUMBER: 22,           // V
-  MAIN_ADDRESS: 23,           // W
-  MAIN_PHONE: 24,             // X
+var AUDIT_LOG_HEADER_MAP_ = [
+  { key: 'TIMESTAMP',   header: 'Timestamp' },
+  { key: 'USER_EMAIL',  header: 'User Email' },
+  { key: 'SHEET',       header: 'Sheet' },
+  { key: 'ROW',         header: 'Row' },
+  { key: 'COLUMN',      header: 'Column' },
+  { key: 'FIELD_NAME',  header: 'Field Name' },
+  { key: 'OLD_VALUE',   header: 'Old Value' },
+  { key: 'NEW_VALUE',   header: 'New Value' },
+  { key: 'RECORD_ID',   header: 'Record ID' },
+  { key: 'ACTION_TYPE', header: 'Action Type' }
+];
 
-  // ── INTEGRATION ── (Y-Z)
-  DRIVE_FOLDER_ID: 25,        // Y
-  CALENDAR_ID: 26,            // Z
+var AUDIT_LOG_COLS = buildColsFromMap_(AUDIT_LOG_HEADER_MAP_);
 
-  // ── DEADLINES ── (AA-AD)
-  FILING_DEADLINE_DAYS: 27,   // AA
-  STEP1_RESPONSE_DAYS: 28,    // AB
-  STEP2_APPEAL_DAYS: 29,      // AC
-  STEP2_RESPONSE_DAYS: 30,    // AD
+// ============================================================================
+// EVENT AUDIT LOG COLUMNS — used by logAuditEvent() in 06_Maintenance.gs
+// Same sheet, different schema from the edit-level AUDIT_LOG_COLS.
+// ============================================================================
 
-  // ── MULTI-SELECT OPTIONS ── (AE-AF)
-  BEST_TIMES: 31,             // AE
-  HOME_TOWNS: 32,             // AF
+var EVENT_AUDIT_HEADER_MAP_ = [
+  { key: 'TIMESTAMP',      header: 'Timestamp' },
+  { key: 'EVENT_TYPE',     header: 'Event Type' },
+  { key: 'USER',           header: 'User' },
+  { key: 'DETAILS',        header: 'Details' },
+  { key: 'SESSION_ID',     header: 'Session ID' },
+  { key: 'INTEGRITY_HASH', header: 'Integrity Hash' }
+];
 
-  // ── CONTRACT & LEGAL ── (AG-AJ)
-  CONTRACT_GRIEVANCE: 33,     // AG
-  CONTRACT_DISCIPLINE: 34,    // AH
-  CONTRACT_WORKLOAD: 35,      // AI
-  CONTRACT_NAME: 36,          // AJ
-
-  // ── ORG IDENTITY ── (AK-AM)
-  UNION_PARENT: 37,           // AK
-  STATE_REGION: 38,           // AL
-  ORG_WEBSITE: 39,            // AM
-
-  // ── EXTENDED CONTACT ── (AN-AQ)
-  OFFICE_ADDRESSES: 40,       // AN
-  MAIN_FAX: 41,               // AO
-  MAIN_CONTACT_NAME: 42,      // AP
-  MAIN_CONTACT_EMAIL: 43,     // AQ
-
-  // ── FORM LINKS ── (AR)
-  SATISFACTION_FORM_URL: 44,  // AR - Member Satisfaction Survey form URL
-
-  // ── STRATEGIC COMMAND CENTER ── (AS-AY)
-  CHIEF_STEWARD_EMAIL: 45,    // AS - Email for escalation alerts
-  UNIT_CODES: 46,             // AT - Unit code prefixes (format: "Unit Name:CODE,Unit2:CODE2")
-  ARCHIVE_FOLDER_ID: 47,      // AU - Drive folder ID for archives
-  ESCALATION_STATUSES: 48,    // AV - Status values that trigger alerts (comma-separated)
-  ESCALATION_STEPS: 49,       // AW - Step values that trigger alerts (comma-separated)
-  TEMPLATE_ID: 50,            // AX - Google Doc template ID for grievance PDFs
-  PDF_FOLDER_ID: 51,          // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
-
-  // ── MOBILE DASHBOARD ── (AZ)
-  MOBILE_DASHBOARD_URL: 52    // AZ - Mobile Dashboard URL (auto-generated by addMobileDashboardLinkToConfig) - LAST COLUMN
-};
+var EVENT_AUDIT_COLS = buildColsFromMap_(EVENT_AUDIT_HEADER_MAP_);
 
 // ============================================================================
 // SATISFACTION SURVEY COLUMNS (Google Form Response + Summary)
@@ -3464,16 +3281,18 @@ var SATISFACTION_COLS = {
  *
  * @const {Object}
  */
-var SURVEY_VAULT_COLS = {
-  RESPONSE_ROW: 1,          // A - Row number in Satisfaction sheet
-  EMAIL: 2,                 // B - SHA-256 hash of email (non-reversible)
-  VERIFIED: 3,              // C - Yes / Pending Review / Rejected
-  MATCHED_MEMBER_ID: 4,     // D - SHA-256 hash of member ID (non-reversible)
-  QUARTER: 5,               // E - Quarter string (e.g., "2026-Q1")
-  IS_LATEST: 6,             // F - Yes/No - Is this the latest for this member?
-  SUPERSEDED_BY: 7,         // G - Vault row number of newer response
-  REVIEWER_NOTES: 8         // H - Notes from reviewer
-};
+var SURVEY_VAULT_HEADER_MAP_ = [
+  { key: 'RESPONSE_ROW',     header: 'Response Row' },
+  { key: 'EMAIL',            header: 'Email Hash' },
+  { key: 'VERIFIED',         header: 'Verified' },
+  { key: 'MATCHED_MEMBER_ID', header: 'Member ID Hash' },
+  { key: 'QUARTER',          header: 'Quarter' },
+  { key: 'IS_LATEST',        header: 'Is Latest' },
+  { key: 'SUPERSEDED_BY',    header: 'Superseded By' },
+  { key: 'REVIEWER_NOTES',   header: 'Reviewer Notes' }
+];
+
+var SURVEY_VAULT_COLS = buildColsFromMap_(SURVEY_VAULT_HEADER_MAP_);
 
 /**
  * Survey section definitions for grouping and analysis
@@ -3539,18 +3358,20 @@ var SATISFACTION_SECTIONS = {
  *
  * @const {Object}
  */
-var SURVEY_TRACKING_COLS = {
-  MEMBER_ID: 1,              // A - Member ID (linked to Member Directory)
-  MEMBER_NAME: 2,            // B - Full name (cached for display)
-  EMAIL: 3,                  // C - Member email
-  WORK_LOCATION: 4,          // D - Work location
-  ASSIGNED_STEWARD: 5,       // E - Assigned steward name(s)
-  CURRENT_STATUS: 6,         // F - Current round: Completed / Not Completed
-  COMPLETED_DATE: 7,         // G - Date completed (blank if not completed)
-  TOTAL_MISSED: 8,           // H - Cumulative surveys missed
-  TOTAL_COMPLETED: 9,        // I - Cumulative surveys completed
-  LAST_REMINDER_SENT: 10     // J - Date of last reminder email sent
-};
+var SURVEY_TRACKING_HEADER_MAP_ = [
+  { key: 'MEMBER_ID',        header: 'Member ID' },
+  { key: 'MEMBER_NAME',      header: 'Member Name' },
+  { key: 'EMAIL',            header: 'Email' },
+  { key: 'WORK_LOCATION',    header: 'Work Location' },
+  { key: 'ASSIGNED_STEWARD', header: 'Assigned Steward' },
+  { key: 'CURRENT_STATUS',   header: 'Current Status' },
+  { key: 'COMPLETED_DATE',   header: 'Completed Date' },
+  { key: 'TOTAL_MISSED',     header: 'Total Missed' },
+  { key: 'TOTAL_COMPLETED',  header: 'Total Completed' },
+  { key: 'LAST_REMINDER_SENT', header: 'Last Reminder Sent' }
+];
+
+var SURVEY_TRACKING_COLS = buildColsFromMap_(SURVEY_TRACKING_HEADER_MAP_);
 
 // ============================================================================
 // FEEDBACK & DEVELOPMENT COLUMNS (11 columns: A-K)
@@ -3560,19 +3381,200 @@ var SURVEY_TRACKING_COLS = {
  * Feedback & Development column positions (1-indexed)
  * @const {Object}
  */
-var FEEDBACK_COLS = {
-  TIMESTAMP: 1,                // A - Auto-generated timestamp
-  SUBMITTED_BY: 2,             // B - Who submitted the feedback
-  CATEGORY: 3,                 // C - Area of the system
-  TYPE: 4,                     // D - Bug, Feature Request, Improvement
-  PRIORITY: 5,                 // E - Low, Medium, High, Critical
-  TITLE: 6,                    // F - Short title
-  DESCRIPTION: 7,              // G - Detailed description
-  STATUS: 8,                   // H - New, In Progress, Resolved, Won't Fix
-  ASSIGNED_TO: 9,              // I - Who is working on it
-  RESOLUTION: 10,              // J - How it was resolved
-  NOTES: 11                    // K - Additional notes
-};
+var FEEDBACK_HEADER_MAP_ = [
+  { key: 'TIMESTAMP',    header: 'Timestamp' },
+  { key: 'SUBMITTED_BY', header: 'Submitted By' },
+  { key: 'CATEGORY',     header: 'Category' },
+  { key: 'TYPE',         header: 'Type' },
+  { key: 'PRIORITY',     header: 'Priority' },
+  { key: 'TITLE',        header: 'Title' },
+  { key: 'DESCRIPTION',  header: 'Description' },
+  { key: 'STATUS',       header: 'Status' },
+  { key: 'ASSIGNED_TO',  header: 'Assigned To' },
+  { key: 'RESOLUTION',   header: 'Resolution' },
+  { key: 'NOTES',        header: 'Notes' }
+];
+
+var FEEDBACK_COLS = buildColsFromMap_(FEEDBACK_HEADER_MAP_);
+
+// ============================================================================
+// COLUMN AUTO-DISCOVERY SYSTEM
+// ============================================================================
+// Header maps are the single source of truth for each sheet's column layout.
+// Column constants (MEMBER_COLS, etc.) and header arrays (getMemberHeaders())
+// are both auto-derived from these maps.
+//
+// To add/remove/reorder columns: edit the header map array.
+// Column numbers, header arrays, and legacy compat objects all update automatically.
+//
+// For runtime adaptation (someone manually reorders columns in the spreadsheet),
+// call syncColumnMaps() — it reads actual headers and auto-updates all constants.
+// ============================================================================
+
+/**
+ * Build column constant object from a header map array.
+ * Position is determined by array order (1-indexed) unless entry has explicit 'pos'.
+ * @param {Array<{key: string, header: string, pos?: number}>} headerMap
+ * @param {Object} [aliases] - { aliasKey: 'existingKey' } for backward compat
+ * @returns {Object} Column constants object (1-indexed)
+ */
+function buildColsFromMap_(headerMap, aliases) {
+  var cols = {};
+  for (var i = 0; i < headerMap.length; i++) {
+    cols[headerMap[i].key] = headerMap[i].pos !== undefined ? headerMap[i].pos : (i + 1);
+  }
+  if (aliases) {
+    for (var alias in aliases) {
+      if (aliases.hasOwnProperty(alias)) {
+        cols[alias] = cols[aliases[alias]];
+      }
+    }
+  }
+  return cols;
+}
+
+/**
+ * Extract ordered header text array from a header map.
+ * Used for sheet creation (writing row 1 headers).
+ * @param {Array<{key: string, header: string}>} headerMap
+ * @returns {Array<string>} Ordered header labels
+ */
+function getHeadersFromMap_(headerMap) {
+  var headers = [];
+  for (var i = 0; i < headerMap.length; i++) {
+    headers.push(headerMap[i].header);
+  }
+  return headers;
+}
+
+/**
+ * Build a 0-indexed legacy column map from a 1-indexed COLS object.
+ * @param {Object} colsObj - 1-indexed column constants
+ * @param {Object} [extraAliases] - { 'LEGACY_KEY': 'PRIMARY_KEY' } for legacy-only aliases
+ * @returns {Object} 0-indexed column constants
+ */
+function buildLegacyCols_(colsObj, extraAliases) {
+  var legacy = {};
+  for (var key in colsObj) {
+    if (colsObj.hasOwnProperty(key)) {
+      legacy[key] = colsObj[key] - 1;
+    }
+  }
+  if (extraAliases) {
+    for (var alias in extraAliases) {
+      if (extraAliases.hasOwnProperty(alias)) {
+        var target = extraAliases[alias];
+        legacy[alias] = colsObj[target] !== undefined ? colsObj[target] - 1 : legacy[target];
+      }
+    }
+  }
+  return legacy;
+}
+
+/**
+ * Resolve column positions by reading actual sheet headers at runtime.
+ * @param {string} sheetName - Sheet name to read
+ * @param {Array<{key: string, header: string}>} headerMap - Expected headers
+ * @param {Object} [options] - { headerRow: number } (default: 1)
+ * @returns {Object|null} Resolved column map, or null if sheet doesn't exist
+ */
+function resolveColumnsFromSheet_(sheetName, headerMap, options) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastColumn() < 1) return null;
+
+    var headerRow = (options && options.headerRow) || 1;
+    var actualHeaders = sheet.getRange(headerRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    var headerToKey = {};
+    for (var i = 0; i < headerMap.length; i++) {
+      headerToKey[headerMap[i].header] = headerMap[i].key;
+    }
+
+    var cols = {};
+    for (var j = 0; j < actualHeaders.length; j++) {
+      var text = String(actualHeaders[j]).trim();
+      if (headerToKey[text]) {
+        cols[headerToKey[text]] = j + 1;
+      }
+    }
+
+    return cols;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Sync all column maps with actual sheet headers at runtime.
+ * Auto-updates global *_COLS objects if columns have been moved.
+ * Call during onOpen or after sheet restructuring.
+ * @returns {Object} { warnings: string[], synced: string[] }
+ */
+function syncColumnMaps() {
+  var result = { warnings: [], synced: [] };
+
+  var maps = [
+    { name: 'MEMBER_COLS', sheet: SHEETS.MEMBER_DIR, map: MEMBER_HEADER_MAP_, target: MEMBER_COLS,
+      aliases: { LOCATION: 'WORK_LOCATION', DAYS_TO_DEADLINE: 'NEXT_DEADLINE' } },
+    { name: 'GRIEVANCE_COLS', sheet: SHEETS.GRIEVANCE_LOG, map: GRIEVANCE_HEADER_MAP_, target: GRIEVANCE_COLS },
+    { name: 'CONFIG_COLS', sheet: SHEETS.CONFIG, map: CONFIG_HEADER_MAP_, target: CONFIG_COLS,
+      opts: { headerRow: 2 } },
+    { name: 'MEETING_CHECKIN_COLS', sheet: SHEETS.MEETING_CHECKIN_LOG, map: MEETING_CHECKIN_HEADER_MAP_, target: MEETING_CHECKIN_COLS },
+    { name: 'STEWARD_PERF_COLS', sheet: SHEETS.STEWARD_PERFORMANCE_CALC, map: STEWARD_PERF_HEADER_MAP_, target: STEWARD_PERF_COLS },
+    { name: 'AUDIT_LOG_COLS', sheet: SHEETS.AUDIT_LOG, map: AUDIT_LOG_HEADER_MAP_, target: AUDIT_LOG_COLS },
+    { name: 'SURVEY_VAULT_COLS', sheet: SHEETS.SURVEY_VAULT, map: SURVEY_VAULT_HEADER_MAP_, target: SURVEY_VAULT_COLS },
+    { name: 'SURVEY_TRACKING_COLS', sheet: SHEETS.SURVEY_TRACKING, map: SURVEY_TRACKING_HEADER_MAP_, target: SURVEY_TRACKING_COLS },
+    { name: 'FEEDBACK_COLS', sheet: SHEETS.FEEDBACK, map: FEEDBACK_HEADER_MAP_, target: FEEDBACK_COLS },
+    { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS }
+  ];
+
+  for (var m = 0; m < maps.length; m++) {
+    var entry = maps[m];
+    var resolved = resolveColumnsFromSheet_(entry.sheet, entry.map, entry.opts);
+    if (!resolved) continue;
+
+    var moved = false;
+    for (var key in resolved) {
+      if (resolved.hasOwnProperty(key) && entry.target[key] !== resolved[key]) {
+        result.warnings.push(entry.name + '.' + key + ': expected col ' + entry.target[key] + ', found col ' + resolved[key]);
+        entry.target[key] = resolved[key];
+        moved = true;
+      }
+    }
+
+    // Re-apply aliases after sync
+    if (entry.aliases) {
+      for (var alias in entry.aliases) {
+        if (entry.aliases.hasOwnProperty(alias)) {
+          entry.target[alias] = entry.target[entry.aliases[alias]];
+        }
+      }
+    }
+
+    if (moved) result.synced.push(entry.name);
+  }
+
+  // Rebuild legacy compat objects if primary maps changed
+  if (result.synced.indexOf('MEMBER_COLS') >= 0) {
+    var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
+    for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
+  }
+  if (result.synced.indexOf('GRIEVANCE_COLS') >= 0) {
+    var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
+    for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
+  }
+
+  if (result.synced.length > 0) {
+    Logger.log('syncColumnMaps: Updated ' + result.synced.join(', '));
+    if (result.warnings.length > 0) {
+      Logger.log('Column changes detected:\n  ' + result.warnings.join('\n  '));
+    }
+  }
+
+  return result;
+}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -3699,49 +3701,19 @@ function mapGrievanceRow(row) {
 }
 
 /**
- * Get all member header labels in order
- * @returns {Array} Array of header labels for Member Directory
+ * Get all member header labels in order — auto-derived from MEMBER_HEADER_MAP_
+ * @returns {Array<string>} Ordered header labels for Member Directory
  */
 function getMemberHeaders() {
-  return [
-    'Member ID', 'First Name', 'Last Name', 'Job Title',
-    'Work Location', 'Unit', 'Cubicle', 'Office Days',
-    'Email', 'Phone', 'Preferred Communication', 'Best Time to Contact',
-    'Supervisor', 'Manager', 'Is Steward', 'Committees', 'Assigned Steward',
-    'Last Virtual Mtg', 'Last In-Person Mtg', 'Open Rate %', 'Volunteer Hours',
-    'Interest: Local', 'Interest: Chapter', 'Interest: Allied',
-    'Recent Contact Date', 'Contact Steward', 'Contact Notes',
-    'Has Open Grievance?', 'Grievance Status', 'Days to Deadline', 'Start Grievance',
-    '⚡ Actions',
-    'PIN Hash',
-    'Employee ID', 'Department', 'Hire Date',
-    'Street Address', 'City', 'State'
-  ];
+  return getHeadersFromMap_(MEMBER_HEADER_MAP_);
 }
 
 /**
- * Get all grievance header labels in order
- * @returns {Array} Array of header labels for Grievance Log
+ * Get all grievance header labels in order — auto-derived from GRIEVANCE_HEADER_MAP_
+ * @returns {Array<string>} Ordered header labels for Grievance Log
  */
 function getGrievanceHeaders() {
-  return [
-    'Grievance ID', 'Member ID', 'First Name', 'Last Name',
-    'Status', 'Current Step',
-    'Incident Date', 'Filing Deadline', 'Date Filed',
-    'Step I Due', 'Step I Rcvd',
-    'Step II Appeal Due', 'Step II Appeal Filed', 'Step II Due', 'Step II Rcvd',
-    'Step III Appeal Due', 'Step III Appeal Filed', 'Date Closed',
-    'Days Open', 'Next Action Due', 'Days to Deadline',
-    'Articles Violated', 'Issue Category',
-    'Member Email', 'Work Location', 'Assigned Steward',
-    'Resolution',
-    'Message Alert', 'Coordinator Message', 'Acknowledged By', 'Acknowledged Date',
-    'Drive Folder ID', 'Drive Folder URL',
-    '⚡ Actions',
-    'Action Type', 'Checklist Progress',
-    'Reminder 1 Date', 'Reminder 1 Note', 'Reminder 2 Date', 'Reminder 2 Note',
-    'Last Updated'
-  ];
+  return getHeadersFromMap_(GRIEVANCE_HEADER_MAP_);
 }
 
 // ============================================================================
@@ -4188,20 +4160,22 @@ var CHECKLIST_SHEET_NAME = 'Case Checklist';
  * Checklist column positions (1-indexed)
  * @const {Object}
  */
-var CHECKLIST_COLS = {
-  CHECKLIST_ID: 1,       // A - Unique checklist item ID
-  CASE_ID: 2,            // B - Links to Grievance ID or Action ID
-  ACTION_TYPE: 3,        // C - Type of case (Grievance, Records Request, etc.)
-  ITEM_TEXT: 4,          // D - Description of checklist item
-  CATEGORY: 5,           // E - Document, Meeting, Deadline, Evidence, Communication
-  REQUIRED: 6,           // F - Yes/No - Is this item required?
-  COMPLETED: 7,          // G - Checkbox - Has item been completed?
-  COMPLETED_BY: 8,       // H - Who completed this item
-  COMPLETED_DATE: 9,     // I - When item was completed
-  DUE_DATE: 10,          // J - Optional due date for time-sensitive items
-  NOTES: 11,             // K - Additional notes
-  SORT_ORDER: 12         // L - For custom ordering of items
-};
+var CHECKLIST_HEADER_MAP_ = [
+  { key: 'CHECKLIST_ID',   header: 'Checklist ID' },
+  { key: 'CASE_ID',        header: 'Case ID' },
+  { key: 'ACTION_TYPE',    header: 'Action Type' },
+  { key: 'ITEM_TEXT',      header: 'Item Text' },
+  { key: 'CATEGORY',       header: 'Category' },
+  { key: 'REQUIRED',       header: 'Required' },
+  { key: 'COMPLETED',      header: 'Completed' },
+  { key: 'COMPLETED_BY',   header: 'Completed By' },
+  { key: 'COMPLETED_DATE', header: 'Completed Date' },
+  { key: 'DUE_DATE',       header: 'Due Date' },
+  { key: 'NOTES',          header: 'Notes' },
+  { key: 'SORT_ORDER',     header: 'Sort Order' }
+];
+
+var CHECKLIST_COLS = buildColsFromMap_(CHECKLIST_HEADER_MAP_);
 
 /**
  * Checklist item categories
@@ -12313,7 +12287,7 @@ function getSmartDashboardHtml() {
 
 
 // ============================================================================
-// SOURCE: 04c_InteractiveDashboard.gs (1718 lines)
+// SOURCE: 04c_InteractiveDashboard.gs (1719 lines)
 // ============================================================================
 
 // ============================================================================
@@ -13745,19 +13719,19 @@ function getInteractiveAnalyticsData() {
   var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
   if (perfSheet && perfSheet.getLastRow() > 1) {
     try {
-      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), 10).getValues();
+      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), STEWARD_PERF_COLS.PERFORMANCE_SCORE).getValues();
       data.stewardPerformance.topPerformers = perfData
-        .filter(function(row) { return row[0] && row[9]; }) // Has name and score
+        .filter(function(row) { return row[STEWARD_PERF_COLS.STEWARD - 1] && row[STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]; })
         .map(function(row) {
           return {
-            name: row[0],
-            totalCases: row[1] || 0,
-            active: row[2] || 0,
-            closed: row[3] || 0,
-            won: row[4] || 0,
-            winRate: row[5] || 0,
-            avgDays: row[6] || 0,
-            score: row[9] || 0
+            name: row[STEWARD_PERF_COLS.STEWARD - 1],
+            totalCases: row[STEWARD_PERF_COLS.TOTAL_CASES - 1] || 0,
+            active: row[STEWARD_PERF_COLS.ACTIVE - 1] || 0,
+            closed: row[STEWARD_PERF_COLS.CLOSED - 1] || 0,
+            won: row[STEWARD_PERF_COLS.WON - 1] || 0,
+            winRate: row[STEWARD_PERF_COLS.WIN_RATE - 1] || 0,
+            avgDays: row[STEWARD_PERF_COLS.AVG_DAYS - 1] || 0,
+            score: row[STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1] || 0
           };
         })
         .sort(function(a, b) { return b.score - a.score; })
@@ -13854,8 +13828,8 @@ function getInteractiveResourceLinks() {
 
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
-      // Get URLs from Config sheet row 2
-      var row = configSheet.getRange(2, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      // Get URLs from Config sheet row 3 (data row; rows 1-2 are headers)
+      var row = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
       links.grievanceForm = row[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
       links.contactForm = row[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
       links.satisfactionForm = row[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
@@ -13884,7 +13858,8 @@ function getInteractiveMemberFilters() {
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
       var lastRow = configSheet.getLastRow();
-      var data = configSheet.getRange(2, 1, lastRow - 1, CONFIG_COLS.OFFICE_DAYS).getValues();
+      if (lastRow < 3) return filters;
+      var data = configSheet.getRange(3, 1, lastRow - 2, CONFIG_COLS.OFFICE_DAYS).getValues();
 
       // Get unique values from config
       data.forEach(function(row) {
@@ -15811,19 +15786,19 @@ function getUnifiedDashboardData(includePII) {
   var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
   if (perfSheet && perfSheet.getLastRow() > 1) {
     try {
-      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), 10).getValues();
+      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), STEWARD_PERF_COLS.PERFORMANCE_SCORE).getValues();
       data.topPerformers = perfData
-        .filter(function(row) { return row[0] && row[9]; })
+        .filter(function(row) { return row[STEWARD_PERF_COLS.STEWARD - 1] && row[STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]; })
         .map(function(row) {
           return {
-            name: row[0],  // Steward names always shown (public union reps)
-            totalCases: row[1] || 0,
-            active: row[2] || 0,
-            closed: row[3] || 0,
-            won: row[4] || 0,
-            winRate: row[5] || 0,
-            avgDays: row[6] || 0,
-            score: row[9] || 0
+            name: row[STEWARD_PERF_COLS.STEWARD - 1],
+            totalCases: row[STEWARD_PERF_COLS.TOTAL_CASES - 1] || 0,
+            active: row[STEWARD_PERF_COLS.ACTIVE - 1] || 0,
+            closed: row[STEWARD_PERF_COLS.CLOSED - 1] || 0,
+            won: row[STEWARD_PERF_COLS.WON - 1] || 0,
+            winRate: row[STEWARD_PERF_COLS.WIN_RATE - 1] || 0,
+            avgDays: row[STEWARD_PERF_COLS.AVG_DAYS - 1] || 0,
+            score: row[STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1] || 0
           };
         })
         .sort(function(a, b) { return b.score - a.score; })
@@ -17643,7 +17618,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (2986 lines)
+// SOURCE: 05_Integrations.gs (2977 lines)
 // ============================================================================
 
 /**
@@ -20451,23 +20426,14 @@ function getWebAppResourceLinks() {
     githubRepo: ''  // Set via Config sheet ORG_WEBSITE or manually
   };
 
-  // Try to get form URLs from Config sheet
-  if (configSheet) {
+  // Get form URLs from Config sheet using CONFIG_COLS constants (data in row 3)
+  if (configSheet && configSheet.getLastRow() >= 3) {
     try {
-      var configData = configSheet.getDataRange().getValues();
-      for (var i = 0; i < configData.length; i++) {
-        var row = configData[i];
-        for (var j = 0; j < row.length; j++) {
-          var val = String(row[j] || '').toLowerCase();
-          if (val.indexOf('grievance') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.grievanceForm = String(row[j + 1]);
-          } else if (val.indexOf('contact') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.contactForm = String(row[j + 1]);
-          } else if (val.indexOf('satisfaction') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.satisfactionForm = String(row[j + 1]);
-          }
-        }
-      }
+      var configRow = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      links.grievanceForm = configRow[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
+      links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
+      links.satisfactionForm = configRow[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
+      links.orgWebsite = configRow[CONFIG_COLS.ORG_WEBSITE - 1] || '';
     } catch (_e) {
       // Ignore errors reading config
     }
@@ -22169,14 +22135,14 @@ function getRecentAuditLogs(count) {
 
   if (numRows <= 0) return [];
 
-  const data = auditSheet.getRange(startRow, 1, numRows, 5).getValues();
+  const data = auditSheet.getRange(startRow, 1, numRows, EVENT_AUDIT_COLS.SESSION_ID).getValues();
 
   return data.map(row => ({
-    timestamp: row[0],
-    eventType: row[1],
-    user: row[2],
-    details: row[3],
-    sessionId: row[4]
+    timestamp: row[EVENT_AUDIT_COLS.TIMESTAMP - 1],
+    eventType: row[EVENT_AUDIT_COLS.EVENT_TYPE - 1],
+    user: row[EVENT_AUDIT_COLS.USER - 1],
+    details: row[EVENT_AUDIT_COLS.DETAILS - 1],
+    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1]
   })).reverse();
 }
 
@@ -23532,10 +23498,10 @@ function showAuditLogViewer() {
 
   // Reverse to show most recent first
   data.reverse().forEach(function(row) {
-    var timestamp = row[0] instanceof Date ? row[0].toLocaleString() : row[0];
-    var user = row[1] ? row[1].split('@')[0] : 'Unknown';
-    var eventType = row[2] || '';
-    var details = row[3] || '';
+    var timestamp = row[EVENT_AUDIT_COLS.TIMESTAMP - 1] instanceof Date ? row[EVENT_AUDIT_COLS.TIMESTAMP - 1].toLocaleString() : row[EVENT_AUDIT_COLS.TIMESTAMP - 1];
+    var user = row[EVENT_AUDIT_COLS.USER - 1] ? row[EVENT_AUDIT_COLS.USER - 1].split('@')[0] : 'Unknown';
+    var eventType = row[EVENT_AUDIT_COLS.EVENT_TYPE - 1] || '';
+    var details = row[EVENT_AUDIT_COLS.DETAILS - 1] || '';
 
     var eventClass = eventType.indexOf('STATUS') !== -1 ? 'status' :
                      (eventType.indexOf('STEWARD') !== -1 ? 'steward' :
@@ -28616,7 +28582,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1969 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (1966 lines)
 // ============================================================================
 
 
@@ -29789,17 +29755,17 @@ function sendStewardDeadlineAlerts() {
     });
   }
 
-  // Get steward emails from Config sheet
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  // Get steward emails from Member Directory (stewards are members with IS_STEWARD = Yes)
   var stewardEmails = {};
-  if (configSheet) {
-    var configData = configSheet.getDataRange().getValues();
-    // Look for Steward Emails column (assume it's after Stewards column)
-    for (var c = 1; c < configData.length; c++) {
-      var stewardName = configData[c][CONFIG_COLS.STEWARDS - 1];
-      var stewardEmail = configData[c][CONFIG_COLS.STEWARDS]; // Next column
-      if (stewardName && stewardEmail && stewardEmail.indexOf('@') !== -1) {
-        stewardEmails[stewardName] = stewardEmail;
+  for (var s = 1; s < memberData.length; s++) {
+    var isSteward = memberData[s][MEMBER_COLS.IS_STEWARD - 1];
+    if (isTruthyValue(isSteward)) {
+      var sFirstName = memberData[s][MEMBER_COLS.FIRST_NAME - 1] || '';
+      var sLastName = memberData[s][MEMBER_COLS.LAST_NAME - 1] || '';
+      var sFullName = (sFirstName + ' ' + sLastName).trim();
+      var sEmail = memberData[s][MEMBER_COLS.EMAIL - 1] || '';
+      if (sFullName && sEmail && sEmail.indexOf('@') !== -1) {
+        stewardEmails[sFullName] = sEmail;
       }
     }
   }
@@ -30276,7 +30242,7 @@ function populateSurveyTrackingFromMembers() {
 
   // Clear existing data (preserve header)
   if (trackingSheet.getLastRow() > 1) {
-    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, 10).clear();
+    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).clear();
   }
 
   var rows = [];
@@ -30302,7 +30268,7 @@ function populateSurveyTrackingFromMembers() {
   }
 
   if (rows.length > 0) {
-    trackingSheet.getRange(2, 1, rows.length, 10).setValues(rows);
+    trackingSheet.getRange(2, 1, rows.length, SURVEY_TRACKING_HEADER_MAP_.length).setValues(rows);
   }
 
   Logger.log('populateSurveyTracking: Populated ' + rows.length + ' member rows');
@@ -30402,14 +30368,11 @@ function sendSurveyCompletionReminders() {
     return 'No survey tracking data found.';
   }
 
-  // Get survey URL from Config
+  // Get survey URL from Config using CONFIG_COLS constant (data in row 3)
   var surveyUrl = '';
-  if (configSheet) {
+  if (configSheet && configSheet.getLastRow() >= 3) {
     try {
-      var configData = configSheet.getDataRange().getValues();
-      if (configData.length > 2 && configData[0].length >= 44) {
-        surveyUrl = configData[2][43] || ''; // Column AR (Satisfaction Survey URL)
-      }
+      surveyUrl = configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '';
     } catch (_e) { /* no survey URL configured */ }
   }
 
@@ -30421,7 +30384,7 @@ function sendSurveyCompletionReminders() {
 
   var orgName = '';
   try {
-    orgName = configSheet.getRange(3, 21).getValue() || 'Your Union';
+    orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue() || 'Your Union';
   } catch (_e) {
     orgName = 'Your Union';
   }
@@ -30590,7 +30553,7 @@ function showSurveyTrackingDialog() {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (2177 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (2154 lines)
 // ============================================================================
 
 // ============================================================================
@@ -30619,19 +30582,8 @@ function setupAuditLogSheet() {
     return;
   }
 
-  // Headers
-  var headers = [
-    'Timestamp',
-    'User Email',
-    'Sheet',
-    'Row',
-    'Column',
-    'Field Name',
-    'Old Value',
-    'New Value',
-    'Record ID',
-    'Action Type'
-  ];
+  // Headers — auto-derived from AUDIT_LOG_HEADER_MAP_
+  var headers = getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
@@ -30643,16 +30595,16 @@ function setupAuditLogSheet() {
   sheet.setFrozenRows(1);
 
   // Set column widths
-  sheet.setColumnWidth(1, 160); // Timestamp
-  sheet.setColumnWidth(2, 200); // User Email
-  sheet.setColumnWidth(3, 120); // Sheet
-  sheet.setColumnWidth(4, 50);  // Row
-  sheet.setColumnWidth(5, 50);  // Column
-  sheet.setColumnWidth(6, 150); // Field Name
-  sheet.setColumnWidth(7, 200); // Old Value
-  sheet.setColumnWidth(8, 200); // New Value
-  sheet.setColumnWidth(9, 100); // Record ID
-  sheet.setColumnWidth(10, 100); // Action Type
+  sheet.setColumnWidth(AUDIT_LOG_COLS.TIMESTAMP, 160);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.USER_EMAIL, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.SHEET, 120);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.ROW, 50);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.COLUMN, 50);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.FIELD_NAME, 150);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.OLD_VALUE, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.NEW_VALUE, 200);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.RECORD_ID, 100);
+  sheet.setColumnWidth(AUDIT_LOG_COLS.ACTION_TYPE, 100);
 
   // Hide the sheet
   sheet.hideSheet();
@@ -30868,7 +30820,7 @@ function clearOldAuditEntries() {
 
   // Find rows older than 30 days (skip header)
   for (var i = data.length - 1; i >= 1; i--) {
-    var timestamp = data[i][0];
+    var timestamp = data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1];
     if (timestamp instanceof Date && timestamp < cutoffDate) {
       rowsToDelete.push(i + 1); // +1 for 1-indexed rows
     }
@@ -30906,14 +30858,14 @@ function getAuditHistory(recordId) {
   var history = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][8] === recordId) { // Column I is Record ID
+    if (data[i][AUDIT_LOG_COLS.RECORD_ID - 1] === recordId) {
       history.push({
-        timestamp: data[i][0],
-        user: data[i][1],
-        field: data[i][5],
-        oldValue: data[i][6],
-        newValue: data[i][7],
-        action: data[i][9]
+        timestamp: data[i][AUDIT_LOG_COLS.TIMESTAMP - 1],
+        user: data[i][AUDIT_LOG_COLS.USER_EMAIL - 1],
+        field: data[i][AUDIT_LOG_COLS.FIELD_NAME - 1],
+        oldValue: data[i][AUDIT_LOG_COLS.OLD_VALUE - 1],
+        newValue: data[i][AUDIT_LOG_COLS.NEW_VALUE - 1],
+        action: data[i][AUDIT_LOG_COLS.ACTION_TYPE - 1]
       });
     }
   }
@@ -31486,8 +31438,8 @@ function setupStewardPerformanceCalcSheet() {
 
   sheet.clear();
 
-  // Headers
-  var headers = ['Steward', 'Total Cases', 'Active', 'Closed', 'Won', 'Win Rate %', 'Avg Days', 'Overdue', 'Due This Week', 'Performance Score'];
+  // Headers — auto-derived from STEWARD_PERF_HEADER_MAP_
+  var headers = getHeadersFromMap_(STEWARD_PERF_HEADER_MAP_);
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
     .setBackground(COLORS.LIGHT_GRAY);
@@ -32124,18 +32076,8 @@ function setupCalcFormulasSheet(sheet) {
  * @param {Sheet} sheet - The sheet to set up
  */
 function setupSurveyTrackingSheet(sheet) {
-  var headers = [
-    'Member ID',          // A
-    'Member Name',        // B
-    'Email',              // C
-    'Work Location',      // D
-    'Assigned Steward',   // E
-    'Current Status',     // F
-    'Completed Date',     // G
-    'Total Missed',       // H
-    'Total Completed',    // I
-    'Last Reminder Sent'  // J
-  ];
+  // Headers — auto-derived from SURVEY_TRACKING_HEADER_MAP_
+  var headers = getHeadersFromMap_(SURVEY_TRACKING_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
@@ -32208,10 +32150,8 @@ function setupSurveyVaultSheet() {
 
   // Only set up headers if sheet is empty
   if (sheet.getLastRow() < 1) {
-    var headers = [
-      'Response Row', 'Email Hash', 'Verified', 'Member ID Hash',
-      'Quarter', 'Is Latest', 'Superseded By', 'Reviewer Notes'
-    ];
+    // Headers — auto-derived from SURVEY_VAULT_HEADER_MAP_
+    var headers = getHeadersFromMap_(SURVEY_VAULT_HEADER_MAP_);
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
       .setFontWeight('bold')
       .setBackground('#7F1D1D')
@@ -32602,11 +32542,11 @@ function verifyAuditLogIntegrity() {
     var storedHash = String(data[i][integrityCol] || '');
     var computed = computeAuditRowHash_(
       previousHash,
-      data[i][0],  // Timestamp
-      data[i][1],  // Event Type
-      data[i][2],  // User
-      data[i][3],  // Details
-      data[i][4]   // Session ID
+      data[i][EVENT_AUDIT_COLS.TIMESTAMP - 1],
+      data[i][EVENT_AUDIT_COLS.EVENT_TYPE - 1],
+      data[i][EVENT_AUDIT_COLS.USER - 1],
+      data[i][EVENT_AUDIT_COLS.DETAILS - 1],
+      data[i][EVENT_AUDIT_COLS.SESSION_ID - 1]
     );
 
     if (storedHash && storedHash !== computed) {
@@ -32682,12 +32622,12 @@ function verifySurveyVaultIntegrity() {
   for (var i = 1; i < data.length; i++) {
     totalEntries++;
     var rowNum = i + 1;
-    var responseRow = data[i][0];
-    var emailHash = String(data[i][1] || '');
-    var verified = String(data[i][2] || '');
-    var memberIdHash = String(data[i][3] || '');
-    var quarter = String(data[i][4] || '');
-    var isLatest = String(data[i][5] || '');
+    var responseRow = data[i][SURVEY_VAULT_COLS.RESPONSE_ROW - 1];
+    var emailHash = String(data[i][SURVEY_VAULT_COLS.EMAIL - 1] || '');
+    var verified = String(data[i][SURVEY_VAULT_COLS.VERIFIED - 1] || '');
+    var memberIdHash = String(data[i][SURVEY_VAULT_COLS.MATCHED_MEMBER_ID - 1] || '');
+    var quarter = String(data[i][SURVEY_VAULT_COLS.QUARTER - 1] || '');
+    var isLatest = String(data[i][SURVEY_VAULT_COLS.IS_LATEST - 1] || '');
 
     // Check for missing response row
     if (!responseRow) {
@@ -32772,7 +32712,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4036 lines)
+// SOURCE: 09_Dashboards.gs (4044 lines)
 // ============================================================================
 
 /**
@@ -33323,18 +33263,20 @@ function getSatisfactionOverviewData() {
 
   data.totalResponses = lastRow - 1;
 
-  // Get satisfaction scores (Q6-Q9 are columns G-J, 1-indexed as 7-10)
-  var satisfactionRange = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, data.totalResponses, 4).getValues();
+  // Get satisfaction scores (Q6-Q9) — dynamic range from SATISFACTION_COLS
+  var satRangeStart = SATISFACTION_COLS.Q6_SATISFIED_REP;
+  var satRangeCount = SATISFACTION_COLS.Q9_RECOMMEND - satRangeStart + 1;
+  var satisfactionRange = sheet.getRange(2, satRangeStart, data.totalResponses, satRangeCount).getValues();
 
   var sumOverall = 0, sumTrust = 0, sumProtected = 0, sumRecommend = 0;
   var promoters = 0, detractors = 0;
   var validCount = 0;
 
   satisfactionRange.forEach(function(row) {
-    var satisfied = parseFloat(row[0]) || 0;
-    var trust = parseFloat(row[1]) || 0;
-    var protected_ = parseFloat(row[2]) || 0;
-    var recommend = parseFloat(row[3]) || 0;
+    var satisfied = parseFloat(row[SATISFACTION_COLS.Q6_SATISFIED_REP - satRangeStart]) || 0;
+    var trust = parseFloat(row[SATISFACTION_COLS.Q7_TRUST_UNION - satRangeStart]) || 0;
+    var protected_ = parseFloat(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - satRangeStart]) || 0;
+    var recommend = parseFloat(row[SATISFACTION_COLS.Q9_RECOMMEND - satRangeStart]) || 0;
 
     if (satisfied > 0) {
       sumOverall += satisfied;
@@ -34198,15 +34140,18 @@ function syncSatisfactionValues() {
     return;
   }
 
-  // Get all response data (columns A-BK, 1-63)
-  var responseData = sheet.getRange(2, 1, lastRow - 1, 63).getValues();
+  // Get all response data (up to last scale question column)
+  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS; // last Likert-scale question
+  var responseData = sheet.getRange(2, 1, lastRow - 1, lastResponseCol).getValues();
 
   // Calculate section averages for each row
   var sectionAverages = computeSectionAverages_(responseData);
 
-  // Write section averages to columns BT-CD (72-82)
+  // Write section averages to summary area
+  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
   if (sectionAverages.length > 0) {
-    sheet.getRange(2, 72, sectionAverages.length, 11).setValues(sectionAverages);
+    sheet.getRange(2, summaryStart, sectionAverages.length, summaryCols).setValues(sectionAverages);
   }
 
   // Calculate and write dashboard metrics
@@ -34230,38 +34175,39 @@ function computeSectionAverages_(responseData) {
 
     var averages = [];
 
-    // Overall Satisfaction (Q6-9: columns G-J, indices 6-9)
-    averages.push(computeAverage_(row, 6, 9));
+    // Derive indices from SATISFACTION_COLS (1-indexed, used as 0-indexed array indices)
+    // Overall Satisfaction (Q6-9)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
 
-    // Steward Rating (Q10-16: columns K-Q, indices 10-16)
-    averages.push(computeAverage_(row, 10, 16));
+    // Steward Rating (Q10-16)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
 
-    // Steward Access (Q18-20: columns S-U, indices 18-20)
-    averages.push(computeAverage_(row, 18, 20));
+    // Steward Access (Q18-20)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
 
-    // Chapter (Q21-25: columns V-Z, indices 21-25)
-    averages.push(computeAverage_(row, 21, 25));
+    // Chapter (Q21-25)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
 
-    // Leadership (Q26-31: columns AA-AF, indices 26-31)
-    averages.push(computeAverage_(row, 26, 31));
+    // Leadership (Q26-31)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
 
-    // Contract (Q32-35: columns AG-AJ, indices 32-35)
-    averages.push(computeAverage_(row, 32, 35));
+    // Contract (Q32-35)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
 
-    // Representation (Q37-40: columns AL-AO, indices 37-40)
-    averages.push(computeAverage_(row, 37, 40));
+    // Representation (Q37-40)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
 
-    // Communication (Q41-45: columns AP-AT, indices 41-45)
-    averages.push(computeAverage_(row, 41, 45));
+    // Communication (Q41-45)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1));
 
-    // Member Voice (Q46-50: columns AU-AY, indices 46-50)
-    averages.push(computeAverage_(row, 46, 50));
+    // Member Voice (Q46-50)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1));
 
-    // Value/Action (Q51-55: columns AZ-BD, indices 51-55)
-    averages.push(computeAverage_(row, 51, 55));
+    // Value/Action (Q51-55)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
 
-    // Scheduling (Q56-62: columns BE-BK, indices 56-62)
-    averages.push(computeAverage_(row, 56, 62));
+    // Scheduling (Q56-62)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
     results.push(averages);
   }
@@ -34308,7 +34254,7 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
   var totalResponses = responseData.length;
   var responsePeriod = 'No data';
   if (totalResponses > 0) {
-    var timestamps = responseData.map(function(r) { return r[0]; }).filter(function(t) { return t instanceof Date; });
+    var timestamps = responseData.map(function(r) { return r[SATISFACTION_COLS.TIMESTAMP - 1]; }).filter(function(t) { return t instanceof Date; });
     if (timestamps.length > 0) {
       var minDate = new Date(Math.min.apply(null, timestamps));
       var maxDate = new Date(Math.max.apply(null, timestamps));
@@ -34351,28 +34297,28 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
   for (var d = 0; d < responseData.length; d++) {
     var row = responseData[d];
 
-    // Shift (column D, index 3)
-    var shift = row[3];
+    // Shift (Q3)
+    var shift = row[SATISFACTION_COLS.Q3_SHIFT - 1];
     if (shift === 'Day') shifts.Day++;
     else if (shift === 'Evening') shifts.Evening++;
     else if (shift === 'Night') shifts.Night++;
     else if (shift === 'Rotating') shifts.Rotating++;
 
-    // Tenure (column E, index 4)
-    var ten = String(row[4] || '');
+    // Tenure (Q4)
+    var ten = String(row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] || '');
     if (ten.indexOf('<1') >= 0) tenure['<1']++;
     else if (ten.indexOf('1-3') >= 0) tenure['1-3']++;
     else if (ten.indexOf('4-7') >= 0) tenure['4-7']++;
     else if (ten.indexOf('8-15') >= 0) tenure['8-15']++;
     else if (ten.indexOf('15+') >= 0) tenure['15+']++;
 
-    // Steward contact (column F, index 5)
-    if (row[5] === 'Yes') stewardContact.Yes++;
-    else if (row[5] === 'No') stewardContact.No++;
+    // Steward contact (Q5)
+    if (row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] === 'Yes') stewardContact.Yes++;
+    else if (row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] === 'No') stewardContact.No++;
 
-    // Filed grievance (column AK, index 36)
-    if (row[36] === 'Yes') filedGrievance.Yes++;
-    else if (row[36] === 'No') filedGrievance.No++;
+    // Filed grievance (Q36)
+    if (row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] === 'Yes') filedGrievance.Yes++;
+    else if (row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] === 'No') filedGrievance.No++;
   }
 
   // Write Demographics (rows 4-23, columns CH-CI)
@@ -34423,38 +34369,30 @@ function computeSatisfactionRowAverages(row) {
 
   if (!sheet || row < 2) return;
 
-  // Get the response data for this row (columns A-BK, 1-63)
-  var rowData = sheet.getRange(row, 1, 1, 63).getValues()[0];
+  // Get the response data for this row
+  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS;
+  var rowData = sheet.getRange(row, 1, 1, lastResponseCol).getValues()[0];
 
-  if (!rowData[0]) return; // Skip if no timestamp
+  if (!rowData[SATISFACTION_COLS.TIMESTAMP - 1]) return; // Skip if no timestamp
 
   var averages = [];
 
-  // Overall Satisfaction (Q6-9: indices 6-9)
-  averages.push(computeAverage_(rowData, 6, 9));
-  // Steward Rating (Q10-16: indices 10-16)
-  averages.push(computeAverage_(rowData, 10, 16));
-  // Steward Access (Q18-20: indices 18-20)
-  averages.push(computeAverage_(rowData, 18, 20));
-  // Chapter (Q21-25: indices 21-25)
-  averages.push(computeAverage_(rowData, 21, 25));
-  // Leadership (Q26-31: indices 26-31)
-  averages.push(computeAverage_(rowData, 26, 31));
-  // Contract (Q32-35: indices 32-35)
-  averages.push(computeAverage_(rowData, 32, 35));
-  // Representation (Q37-40: indices 37-40)
-  averages.push(computeAverage_(rowData, 37, 40));
-  // Communication (Q41-45: indices 41-45)
-  averages.push(computeAverage_(rowData, 41, 45));
-  // Member Voice (Q46-50: indices 46-50)
-  averages.push(computeAverage_(rowData, 46, 50));
-  // Value/Action (Q51-55: indices 51-55)
-  averages.push(computeAverage_(rowData, 51, 55));
-  // Scheduling (Q56-62: indices 56-62)
-  averages.push(computeAverage_(rowData, 56, 62));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
-  // Write section averages to this row (columns BT-CD, 72-82)
-  sheet.getRange(row, 72, 1, 11).setValues([averages]);
+  // Write section averages to summary area
+  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
+  sheet.getRange(row, summaryStart, 1, summaryCols).setValues([averages]);
 }
 
 // ============================================================================
@@ -35589,23 +35527,33 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     }
   }
 
-  // Get top 5 locations from Config
-  for (var l = 0; l < 5; l++) {
-    var locName = configData[2 + l] ? configData[2 + l][CONFIG_COLS.OFFICE_LOCATIONS - 1] : '';
-    if (locName) {
-      var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
-      locData.members = memberLocations[locName] || 0;
-      var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
-
-      metrics.locations.push({
-        name: locName,
-        members: locData.members,
-        grievances: locData.grievances,
-        open: locData.open,
-        winRate: locWinRate,
-        satisfaction: '-'
-      });
+  // Get locations dynamically from Config column (skip header rows 0-1, data starts at index 2)
+  var configLocations = [];
+  for (var cl = 2; cl < configData.length; cl++) {
+    var configLoc = configData[cl] ? configData[cl][CONFIG_COLS.OFFICE_LOCATIONS - 1] : '';
+    if (configLoc && String(configLoc).trim() !== '') {
+      configLocations.push(String(configLoc).trim());
     }
+  }
+  // Use top 5 locations by member count
+  configLocations.sort(function(a, b) {
+    return (memberLocations[b] || 0) - (memberLocations[a] || 0);
+  });
+  var topLocations = configLocations.slice(0, 5);
+  for (var l = 0; l < topLocations.length; l++) {
+    var locName = topLocations[l];
+    var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
+    locData.members = memberLocations[locName] || 0;
+    var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
+
+    metrics.locations.push({
+      name: locName,
+      members: locData.members,
+      grievances: locData.grievances,
+      open: locData.open,
+      winRate: locWinRate,
+      satisfaction: '-'
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -36813,7 +36761,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1788 lines)
+// SOURCE: 10a_SheetCreation.gs (1768 lines)
 // ============================================================================
 
 /**
@@ -36885,24 +36833,8 @@ function createConfigSheet(ss) {
     '── MOBILE DASHBOARD ──'                            // AZ (1 col) - LAST COLUMN
   ];
 
-  // Row 2: Column Headers (A-AZ = 52 columns total)
-  var columnHeaders = [
-    'Job Titles', 'Office Locations', 'Units', 'Office Days', 'Yes/No (Dropdowns)',       // A-E
-    'Supervisors', 'Managers',                                                             // F-G
-    'Stewards', 'Steward Committees',                                                      // H-I
-    'Grievance Status', 'Grievance Step', 'Issue Category', 'Articles Violated',          // J-M
-    'Communication Methods', 'Grievance Coordinators', 'Grievance Form URL', 'Contact Form URL', // N-Q
-    'Admin Emails', 'Alert Days Before Deadline', 'Notification Recipients',              // R-T
-    'Organization Name', 'Local Number', 'Main Office Address', 'Main Phone',             // U-X
-    'Google Drive Folder ID', 'Google Calendar ID',                                       // Y-Z
-    'Filing Deadline Days', 'Step I Response Days', 'Step II Appeal Days', 'Step II Response Days', // AA-AD
-    'Best Times to Contact', 'Home Towns',                                                // AE-AF
-    'Contract Article (Grievance)', 'Contract Article (Discipline)', 'Contract Article (Workload)', 'Contract Name', // AG-AJ
-    'Union Parent', 'State/Region', 'Organization Website',                               // AK-AM
-    'Office Addresses', 'Main Fax', 'Main Contact Name', 'Main Contact Email', 'Satisfaction Survey URL', // AN-AR
-    'Chief Steward Email', 'Unit Codes', 'Archive Folder ID', 'Escalation Statuses', 'Escalation Steps', 'Template ID', 'PDF Folder ID', // AS-AY
-    '📱 Mobile Dashboard URL'                                                              // AZ - LAST COLUMN
-  ];
+  // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
+  var columnHeaders = getHeadersFromMap_(CONFIG_HEADER_MAP_);
 
   // Apply section headers (Row 1)
   sheet.getRange(1, 1, 1, sectionHeaders.length).setValues([sectionHeaders])
@@ -37478,28 +37410,34 @@ function createMemberDirectory(ss) {
   var emailRange = sheet.getRange(2, MEMBER_COLS.EMAIL, 4999, 1);
   var phoneRange = sheet.getRange(2, MEMBER_COLS.PHONE, 4999, 1);
 
-  // Rule: Red background for empty Email (column I = $I2)
+  // Dynamic column letters from constants
+  var colId = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var colEmail = getColumnLetter(MEMBER_COLS.EMAIL);
+  var colPhone = getColumnLetter(MEMBER_COLS.PHONE);
+  var colDeadline = getColumnLetter(MEMBER_COLS.NEXT_DEADLINE);
+
+  // Rule: Red background for empty Email
   var emptyEmailRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($I2))')
-    .setBackground('#ffcdd2')  // Red background for missing email
+    .whenFormulaSatisfied('=AND($' + colId + '2<>"",ISBLANK($' + colEmail + '2))')
+    .setBackground('#ffcdd2')
     .setRanges([emailRange])
     .build();
 
-  // Rule: Red background for empty Phone (column J = $J2)
+  // Rule: Red background for empty Phone
   var emptyPhoneRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($J2))')
-    .setBackground('#ffcdd2')  // Red background for missing phone
+    .whenFormulaSatisfied('=AND($' + colId + '2<>"",ISBLANK($' + colPhone + '2))')
+    .setBackground('#ffcdd2')
     .setRanges([phoneRange])
     .build();
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DEADLINE HEATMAP: Color-coded Days to Deadline (Column AD)
+  // DEADLINE HEATMAP: Color-coded Days to Deadline
   // ═══════════════════════════════════════════════════════════════════════════
   var daysDeadlineRange = sheet.getRange(2, MEMBER_COLS.NEXT_DEADLINE, 4999, 1);
 
   // Rule: Red - Overdue (shows "Overdue" or negative/0 days)
   var deadlineOverdueRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($AD2="Overdue",AND(ISNUMBER($AD2),$AD2<=0))')
+    .whenFormulaSatisfied('=OR($' + colDeadline + '2="Overdue",AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2<=0))')
     .setBackground('#ffebee')
     .setFontColor('#c62828')
     .setBold(true)
@@ -37508,7 +37446,7 @@ function createMemberDirectory(ss) {
 
   // Rule: Orange - Due in 1-3 days
   var deadline1to3Rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($AD2),$AD2>=1,$AD2<=3)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>=1,$' + colDeadline + '2<=3)')
     .setBackground('#fff3e0')
     .setFontColor('#e65100')
     .setBold(true)
@@ -37517,7 +37455,7 @@ function createMemberDirectory(ss) {
 
   // Rule: Yellow - Due in 4-7 days
   var deadline4to7Rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($AD2),$AD2>=4,$AD2<=7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>=4,$' + colDeadline + '2<=7)')
     .setBackground('#fffde7')
     .setFontColor('#f57f17')
     .setRanges([daysDeadlineRange])
@@ -37525,7 +37463,7 @@ function createMemberDirectory(ss) {
 
   // Rule: Green - On Track (more than 7 days remaining)
   var deadlineOnTrackRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($AD2),$AD2>7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>7)')
     .setBackground('#e8f5e9')
     .setFontColor('#2e7d32')
     .setRanges([daysDeadlineRange])
@@ -37652,13 +37590,19 @@ function createGrievanceLog(ss) {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DAYS TO DEADLINE HEATMAP (Column U)
+  // DAYS TO DEADLINE HEATMAP
   // ═══════════════════════════════════════════════════════════════════════════
   var daysDeadlineRange = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, 4999, 1);
 
+  // Dynamic column letters from constants
+  var grColId = getColumnLetter(GRIEVANCE_COLS.GRIEVANCE_ID);
+  var grColStatus = getColumnLetter(GRIEVANCE_COLS.STATUS);
+  var grColStep = getColumnLetter(GRIEVANCE_COLS.CURRENT_STEP);
+  var grColDaysDeadline = getColumnLetter(GRIEVANCE_COLS.DAYS_TO_DEADLINE);
+
   // Rule: Red - Overdue (shows "Overdue" or negative/0 days)
   var deadlineOverdueRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($U2="Overdue",AND(ISNUMBER($U2),$U2<=0))')
+    .whenFormulaSatisfied('=OR($' + grColDaysDeadline + '2="Overdue",AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2<=0))')
     .setBackground('#ffebee')
     .setFontColor('#c62828')
     .setBold(true)
@@ -37667,7 +37611,7 @@ function createGrievanceLog(ss) {
 
   // Rule: Orange - Due in 1-3 days
   var deadline1to3Rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>=1,$U2<=3)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=1,$' + grColDaysDeadline + '2<=3)')
     .setBackground('#fff3e0')
     .setFontColor('#e65100')
     .setBold(true)
@@ -37676,7 +37620,7 @@ function createGrievanceLog(ss) {
 
   // Rule: Yellow - Due in 4-7 days
   var deadline4to7Rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>=4,$U2<=7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=4,$' + grColDaysDeadline + '2<=7)')
     .setBackground('#fffde7')
     .setFontColor('#f57f17')
     .setRanges([daysDeadlineRange])
@@ -37684,55 +37628,55 @@ function createGrievanceLog(ss) {
 
   // Rule: Green - On Track (more than 7 days remaining)
   var deadlineOnTrackRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>7)')
     .setBackground('#e8f5e9')
     .setFontColor('#2e7d32')
     .setRanges([daysDeadlineRange])
     .build();
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PROGRESS BAR: Colored backgrounds showing grievance stage (Columns J-R)
-  // Based on Current Step (Column F), highlights completed stages
+  // PROGRESS BAR: Colored backgrounds showing grievance stage
+  // Based on Current Step, highlights completed stages
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Progress bar spans: Step I (J-K), Step II (L-O), Step III (P-Q), Date Closed (R)
-  var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 2);         // J-K
-  var allStepsRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 9);      // J-R (all 9 columns)
+  // Progress bar spans: Step I, Step II, Step III, Date Closed
+  var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 2);
+  var allStepsRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 9);
 
   // Completed cases: All columns green (Closed, Won, Denied, Settled, Withdrawn)
   var completedRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($E2="Closed",$E2="Won",$E2="Denied",$E2="Settled",$E2="Withdrawn")')
-    .setBackground('#e8f5e9')  // Soft green
+    .whenFormulaSatisfied('=OR($' + grColStatus + '2="Closed",$' + grColStatus + '2="Won",$' + grColStatus + '2="Denied",$' + grColStatus + '2="Settled",$' + grColStatus + '2="Withdrawn")')
+    .setBackground('#e8f5e9')
     .setRanges([allStepsRange])
     .build();
 
-  // Step III in progress: J-Q highlighted (all except Date Closed)
-  var step3ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 8);  // J-Q
+  // Step III in progress
+  var step3ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 8);
   var step3ProgressRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$F2="Step III"')
-    .setBackground('#e3f2fd')  // Soft blue
+    .whenFormulaSatisfied('=$' + grColStep + '2="Step III"')
+    .setBackground('#e3f2fd')
     .setRanges([step3ProgressRange])
     .build();
 
-  // Step II in progress: J-O highlighted
-  var step2ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 6);  // J-O
+  // Step II in progress
+  var step2ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 6);
   var step2ProgressRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$F2="Step II"')
-    .setBackground('#e3f2fd')  // Soft blue
+    .whenFormulaSatisfied('=$' + grColStep + '2="Step II"')
+    .setBackground('#e3f2fd')
     .setRanges([step2ProgressRange])
     .build();
 
-  // Step I in progress: J-K highlighted
+  // Step I in progress
   var step1ProgressRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$F2="Step I"')
-    .setBackground('#e3f2fd')  // Soft blue
+    .whenFormulaSatisfied('=$' + grColStep + '2="Step I"')
+    .setBackground('#e3f2fd')
     .setRanges([step1Range])
     .build();
 
-  // Gray out columns not yet reached (applies to all step columns by default)
+  // Gray out columns not yet reached
   var notReachedRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",$F2<>"")')
-    .setBackground('#fafafa')  // Very light gray (default for uncolored)
+    .whenFormulaSatisfied('=AND($' + grColId + '2<>"",$' + grColStep + '2<>"")')
+    .setBackground('#fafafa')
     .setRanges([allStepsRange])
     .build();
 
@@ -38536,24 +38480,8 @@ function createMeetingAttendanceSheet(ss) {
 function createMeetingCheckInLogSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEETING_CHECKIN_LOG);
 
-  var headers = [
-    'Meeting ID',       // A - Unique meeting identifier (steward sets)
-    'Meeting Name',     // B - Meeting name/topic
-    'Meeting Date',     // C - Date of meeting
-    'Meeting Type',     // D - Virtual or In-Person
-    'Member ID',        // E - Checked-in member
-    'Member Name',      // F - First + Last name
-    'Check-In Time',    // G - Timestamp when member checked in
-    'Email',            // H - Member email used for check-in
-    'Start Time',       // I - Meeting start time (HH:mm)
-    'Duration (hrs)',   // J - Meeting duration in hours
-    'Event Status',     // K - Scheduled / Active / Completed
-    'Notify Stewards',  // L - Steward email(s) for attendance report
-    'Calendar Event ID',// M - Google Calendar event ID
-    'Notes Doc URL',    // N - Meeting Notes Google Doc URL
-    'Agenda Doc URL',   // O - Meeting Agenda Google Doc URL
-    'Agenda Stewards'   // P - Steward emails for early agenda sharing
-  ];
+  // Headers — auto-derived from MEETING_CHECKIN_HEADER_MAP_
+  var headers = getHeadersFromMap_(MEETING_CHECKIN_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
@@ -38581,10 +38509,10 @@ function createMeetingCheckInLogSheet(ss) {
   sheet.setColumnWidth(15, 250); // O - Agenda Doc URL
   sheet.setColumnWidth(16, 250); // P - Agenda Stewards
 
-  // Format date columns
-  sheet.getRange(2, 3, 999, 1).setNumberFormat('MM/DD/YYYY');   // C - Meeting Date
-  sheet.getRange(2, 7, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss'); // G - Check-In Time
-  sheet.getRange(2, 9, 999, 1).setNumberFormat('HH:mm');        // I - Start Time
+  // Format date columns — column numbers from MEETING_CHECKIN_COLS
+  sheet.getRange(2, MEETING_CHECKIN_COLS.MEETING_DATE, 999, 1).setNumberFormat('MM/DD/YYYY');
+  sheet.getRange(2, MEETING_CHECKIN_COLS.CHECKIN_TIME, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss');
+  sheet.getRange(2, MEETING_CHECKIN_COLS.MEETING_TIME, 999, 1).setNumberFormat('HH:mm');
 
   // Freeze header row
   sheet.setFrozenRows(1);
@@ -38606,7 +38534,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1946 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1934 lines)
 // ============================================================================
 
 // ============================================================================
@@ -39097,20 +39025,8 @@ function createFeedbackSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.FEEDBACK);
   sheet.clear();
 
-  // Headers
-  var headers = [
-    'Timestamp',       // A - Auto-generated
-    'Submitted By',    // B
-    'Category',        // C
-    'Type',            // D
-    'Priority',        // E
-    'Title',           // F
-    'Description',     // G
-    'Status',          // H
-    'Assigned To',     // I
-    'Resolution',      // J
-    'Notes'            // K
-  ];
+  // Headers — auto-derived from FEEDBACK_HEADER_MAP_
+  var headers = getHeadersFromMap_(FEEDBACK_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
@@ -41070,73 +40986,73 @@ function applyStepHighlighting() {
   var lastRow = Math.max(sheet.getLastRow(), 2);
   var rules = sheet.getConditionalFormatRules();
 
-  // Colors
-  var _grayText = SpreadsheetApp.newColor().setRgbColor('#9e9e9e').build();
-  var _greenBg = SpreadsheetApp.newColor().setRgbColor('#e8f5e9').build();
-  var _currentStepCol = GRIEVANCE_COLS.CURRENT_STEP; // Column F
+  // Dynamic column letters from constants
+  var grColStep = getColumnLetter(GRIEVANCE_COLS.CURRENT_STEP);
+  var grColDaysDeadline = getColumnLetter(GRIEVANCE_COLS.DAYS_TO_DEADLINE);
+  var grColNextDue = getColumnLetter(GRIEVANCE_COLS.NEXT_ACTION_DUE);
 
-  // Rule 1: Gray out Step I columns (J-K) if current step is Informal
+  // Rule 1: Gray out Step I columns if current step is Informal
   var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, lastRow - 1, 2);
   var rule1 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$F2="Informal"')
+    .whenFormulaSatisfied('=$' + grColStep + '2="Informal"')
     .setFontColor('#9e9e9e')
     .setRanges([step1Range])
     .build();
 
-  // Rule 2: Gray out Step II columns (L-O) if current step is Informal or Step I
+  // Rule 2: Gray out Step II columns if current step is Informal or Step I
   var step2Range = sheet.getRange(2, GRIEVANCE_COLS.STEP2_APPEAL_DUE, lastRow - 1, 4);
   var rule2 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($F2="Informal",$F2="Step I")')
+    .whenFormulaSatisfied('=OR($' + grColStep + '2="Informal",$' + grColStep + '2="Step I")')
     .setFontColor('#9e9e9e')
     .setRanges([step2Range])
     .build();
 
-  // Rule 3: Gray out Step III columns (P-Q) if not at Step III or beyond
+  // Rule 3: Gray out Step III columns if not at Step III or beyond
   var step3Range = sheet.getRange(2, GRIEVANCE_COLS.STEP3_APPEAL_DUE, lastRow - 1, 2);
   var rule3 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($F2="Informal",$F2="Step I",$F2="Step II")')
+    .whenFormulaSatisfied('=OR($' + grColStep + '2="Informal",$' + grColStep + '2="Step I",$' + grColStep + '2="Step II")')
     .setFontColor('#9e9e9e')
     .setRanges([step3Range])
     .build();
 
   // -------------------------------------------------------------------------
-  // DEADLINE STATUS RULES (Days to Deadline column U)
+  // DEADLINE STATUS RULES
   // Order matters: more specific rules first, then broader ones
   // -------------------------------------------------------------------------
 
   var daysDeadlineRange = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, lastRow - 1, 1);
   var nextDueRange = sheet.getRange(2, GRIEVANCE_COLS.NEXT_ACTION_DUE, lastRow - 1, 1);
 
-  // Rule 4: 🔴 Red - Overdue (Days to Deadline shows "Overdue" or negative/0)
+  // Rule 4: Red - Overdue (Days to Deadline shows "Overdue" or negative/0)
   var rule4 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($U2="Overdue",AND(ISNUMBER($U2),$U2<=0))')
+    .whenFormulaSatisfied('=OR($' + grColDaysDeadline + '2="Overdue",AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2<=0))')
     .setBackground('#ffebee')
     .setFontColor('#c62828')
     .setBold(true)
     .setRanges([daysDeadlineRange])
     .build();
 
-  // Rule 5: 🟠 Orange - Due in 1-3 days
+  // Rule 5: Orange - Due in 1-3 days
   var rule5 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>=1,$U2<=3)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=1,$' + grColDaysDeadline + '2<=3)')
     .setBackground('#fff3e0')
     .setFontColor('#e65100')
     .setBold(true)
     .setRanges([daysDeadlineRange])
     .build();
 
-  // Rule 6: 🟡 Yellow - Due in 4-7 days
+  // Rule 6: Yellow - Due in 4-7 days
   var rule6 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>=4,$U2<=7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=4,$' + grColDaysDeadline + '2<=7)')
     .setBackground('#fffde7')
     .setFontColor('#f57f17')
     .setBold(false)
     .setRanges([daysDeadlineRange])
     .build();
 
-  // Rule 7: 🟢 Green - On Track (more than 7 days remaining)
+  // Rule 7: Green - On Track (more than 7 days remaining)
   var rule7 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>7)')
     .setBackground('#e8f5e9')
     .setFontColor('#2e7d32')
     .setBold(false)
@@ -41145,7 +41061,7 @@ function applyStepHighlighting() {
 
   // Rule 8: Red highlight for Next Action Due if overdue
   var rule8 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($T2<>"",$T2<TODAY())')
+    .whenFormulaSatisfied('=AND($' + grColNextDue + '2<>"",$' + grColNextDue + '2<TODAY())')
     .setBackground('#ffebee')
     .setFontColor('#c62828')
     .setBold(true)
@@ -41154,7 +41070,7 @@ function applyStepHighlighting() {
 
   // Rule 9: Orange for Next Action Due within 3 days
   var rule9 = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($T2<>"",($T2-TODAY())>=0,($T2-TODAY())<=3)')
+    .whenFormulaSatisfied('=AND($' + grColNextDue + '2<>"",($' + grColNextDue + '2-TODAY())>=0,($' + grColNextDue + '2-TODAY())<=3)')
     .setBackground('#fff3e0')
     .setFontColor('#e65100')
     .setBold(true)
@@ -42100,8 +42016,8 @@ function syncVolunteerHoursToMemberDirectory() {
 
   for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
     var row = volunteerData[i];
-    var memberId = row[1];  // Column B - Member ID
-    var hours = row[5];     // Column F - Hours
+    var memberId = row[1];  // Column B - Member ID (Volunteer Hours sheet - no shared constant)
+    var hours = row[5];     // Column F - Hours (Volunteer Hours sheet - no shared constant)
 
     if (!memberId) continue;
 
@@ -42162,10 +42078,10 @@ function syncMeetingAttendanceToMemberDirectory() {
 
   for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
     var row = attendanceData[i];
-    var meetingDate = row[1];     // Column B - Meeting Date
-    var meetingType = row[2];     // Column C - Meeting Type
-    var memberId = row[4];        // Column E - Member ID
-    var attended = row[6];        // Column G - Attended (checkbox)
+    var meetingDate = row[1];     // Column B - Meeting Date (Meeting Attendance sheet - no shared constant)
+    var meetingType = row[2];     // Column C - Meeting Type (Meeting Attendance sheet - no shared constant)
+    var memberId = row[4];        // Column E - Member ID (Meeting Attendance sheet - no shared constant)
+    var attended = row[6];        // Column G - Attended (Meeting Attendance sheet - no shared constant)
 
     if (!memberId || !attended || !meetingDate) continue;
 
@@ -47710,7 +47626,7 @@ function getContractPdfUrl_() {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
-      var url = configSheet.getRange(3, CONFIG_COLS.CONTRACT_URL).getValue();
+      var url = configSheet.getRange(3, CONFIG_COLS.ORG_WEBSITE).getValue();
       if (url) return url;
     }
   } catch (_e) { /* Config sheet may not exist yet; fall back to '#' */ }
@@ -48157,7 +48073,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4028 lines)
+// SOURCE: 12_Features.gs (4015 lines)
 // ============================================================================
 
 /**
@@ -48198,21 +48114,8 @@ function getOrCreateChecklistSheet() {
 function createChecklistSheet_(ss) {
   var sheet = ss.insertSheet(CHECKLIST_SHEET_NAME);
 
-  // Set up headers
-  var headers = [
-    'Checklist ID',
-    'Case ID',
-    'Action Type',
-    'Item',
-    'Category',
-    'Required',
-    'Completed',
-    'Completed By',
-    'Completed Date',
-    'Due Date',
-    'Notes',
-    'Sort Order'
-  ];
+  // Headers — auto-derived from CHECKLIST_HEADER_MAP_
+  var headers = getHeadersFromMap_(CHECKLIST_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
@@ -48374,7 +48277,7 @@ function createChecklistFromTemplate(caseId, actionType, issueCategory) {
   if (rows.length > 0) {
     var lastRow = sheet.getLastRow();
     var startRow = lastRow + 1;
-    sheet.getRange(startRow, 1, rows.length, 12).setValues(rows);
+    sheet.getRange(startRow, 1, rows.length, CHECKLIST_HEADER_MAP_.length).setValues(rows);
 
     // Add checkboxes to the new rows
     sheet.getRange(startRow, CHECKLIST_COLS.COMPLETED, rows.length, 1).insertCheckboxes();
@@ -48416,7 +48319,7 @@ function getChecklistItems(caseId) {
     return [];
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, CHECKLIST_HEADER_MAP_.length).getValues();
   var items = [];
 
   for (var i = 0; i < data.length; i++) {
@@ -48542,7 +48445,7 @@ function setChecklistItemCompleted(checklistId, completed, completedBy) {
     return errorResponse('Checklist item not found');
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, CHECKLIST_HEADER_MAP_.length).getValues();
 
   for (var i = 0; i < data.length; i++) {
     if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
@@ -48703,7 +48606,7 @@ function updateChecklistItem(checklistId, updates) {
     return errorResponse('Checklist item not found');
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
+  var data = sheet.getRange(2, 1, lastRow - 1, CHECKLIST_HEADER_MAP_.length).getValues();
 
   for (var i = 0; i < data.length; i++) {
     if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
@@ -49436,10 +49339,10 @@ function setupChecklistCalcSheet() {
   // Get the checklist sheet name for formula references
   var clSheet = "'" + (CHECKLIST_SHEET_NAME || 'Case Checklist') + "'";
 
-  // Column letters for checklist columns
-  var caseIdCol = 'B';      // CHECKLIST_COLS.CASE_ID = 2
-  var completedCol = 'G';   // CHECKLIST_COLS.COMPLETED = 7
-  var requiredCol = 'F';    // CHECKLIST_COLS.REQUIRED = 6
+  // Column letters for checklist columns — auto-derived from constants
+  var caseIdCol = getColumnLetter(CHECKLIST_COLS.CASE_ID);
+  var completedCol = getColumnLetter(CHECKLIST_COLS.COMPLETED);
+  var requiredCol = getColumnLetter(CHECKLIST_COLS.REQUIRED);
 
   // Column A: Unique Case IDs from checklist
   // ARRAYFORMULA with UNIQUE to get all case IDs
@@ -51134,30 +51037,30 @@ function refreshLookerSatisfaction_() {
     const respQuarter = timestamp instanceof Date ? getQuarter_(timestamp) : '';
     const respYear = timestamp instanceof Date ? timestamp.getFullYear() : '';
 
-    // Calculate section averages using SATISFACTION_COLS if available
-    const overallSatAvg = calculateSectionAvg_(row, [6, 7, 8, 9]); // Q6-Q9
-    const stewardRatingAvg = calculateSectionAvg_(row, [10, 11, 12, 13, 14, 15, 16]); // Q10-Q16
-    const stewardAccessAvg = calculateSectionAvg_(row, [18, 19, 20]); // Q18-Q20
-    const chapterAvg = calculateSectionAvg_(row, [21, 22, 23, 24, 25]); // Q21-Q25
-    const leadershipAvg = calculateSectionAvg_(row, [26, 27, 28, 29, 30, 31]); // Q26-Q31
-    const contractAvg = calculateSectionAvg_(row, [32, 33, 34, 35]); // Q32-Q35
-    const commAvg = calculateSectionAvg_(row, [41, 42, 43, 44, 45]); // Q41-Q45
-    const voiceAvg = calculateSectionAvg_(row, [46, 47, 48, 49, 50]); // Q46-Q50
-    const valueAvg = calculateSectionAvg_(row, [51, 52, 53, 54, 55]); // Q51-Q55
-    const schedAvg = calculateSectionAvg_(row, [56, 57, 58, 59, 60, 61, 62]); // Q56-Q62
-    const repAvg = calculateSectionAvg_(row, [37, 38, 39, 40]); // Q37-Q40
+    // Calculate section averages using SATISFACTION_COLS (0-indexed for row access)
+    const overallSatAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q7_TRUST_UNION - 1, SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1]);
+    const stewardRatingAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q11_TREATED_RESPECT - 1, SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS - 1, SATISFACTION_COLS.Q13_FOLLOWED_THROUGH - 1, SATISFACTION_COLS.Q14_ADVOCATED - 1, SATISFACTION_COLS.Q15_SAFE_CONCERNS - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1]);
+    const stewardAccessAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q19_CONFIDENT_HELP - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1]);
+    const chapterAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q22_CHAPTER_COMM - 1, SATISFACTION_COLS.Q23_ORGANIZES - 1, SATISFACTION_COLS.Q24_REACH_CHAPTER - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1]);
+    const leadershipAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS - 1, SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE - 1, SATISFACTION_COLS.Q29_ACCOUNTABLE - 1, SATISFACTION_COLS.Q30_FAIR_PROCESSES - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1]);
+    const contractAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q33_REALISTIC_TIMELINES - 1, SATISFACTION_COLS.Q34_CLEAR_UPDATES - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1]);
+    const commAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q42_ENOUGH_INFO - 1, SATISFACTION_COLS.Q43_FIND_EASILY - 1, SATISFACTION_COLS.Q44_ALL_SHIFTS - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1]);
+    const voiceAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q47_SEEKS_INPUT - 1, SATISFACTION_COLS.Q48_DIGNITY - 1, SATISFACTION_COLS.Q49_NEWER_SUPPORTED - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1]);
+    const valueAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q52_PRIORITIES_NEEDS - 1, SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1, SATISFACTION_COLS.Q54_HOW_INVOLVED - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1]);
+    const schedAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED - 1, SATISFACTION_COLS.Q58_CLEAR_CRITERIA - 1, SATISFACTION_COLS.Q59_WORK_EXPECTATIONS - 1, SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES - 1, SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1]);
+    const repAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q38_FELT_SUPPORTED - 1, SATISFACTION_COLS.Q39_UPDATES_OFTEN - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1]);
 
-    // Get individual key questions (0-indexed)
-    const worksite = row[1] || '';
-    const role = row[2] || '';
-    const shift = row[3] || '';
-    const timeInRole = row[4] || '';
-    const hasStewardContact = row[5] || '';
-    const satisfiedRep = row[6] || '';
-    const trustUnion = row[7] || '';
-    const feelProtected = row[8] || '';
-    const wouldRecommend = row[9] || '';
-    const filedGrievance = row[36] || '';
+    // Get individual key questions (0-indexed from SATISFACTION_COLS)
+    const worksite = row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '';
+    const role = row[SATISFACTION_COLS.Q2_ROLE - 1] || '';
+    const shift = row[SATISFACTION_COLS.Q3_SHIFT - 1] || '';
+    const timeInRole = row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] || '';
+    const hasStewardContact = row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] || '';
+    const satisfiedRep = row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1] || '';
+    const trustUnion = row[SATISFACTION_COLS.Q7_TRUST_UNION - 1] || '';
+    const feelProtected = row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1] || '';
+    const wouldRecommend = row[SATISFACTION_COLS.Q9_RECOMMEND - 1] || '';
+    const filedGrievance = row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] || '';
 
     // Verification from vault — boolean only, no PII exposed
     const vEntry = vaultMap[satRow] || {};
@@ -51636,32 +51539,32 @@ function refreshLookerAnonSatisfaction_() {
     const respQuarter = timestamp instanceof Date ? getQuarter_(timestamp) : '';
     const respYear = timestamp instanceof Date ? timestamp.getFullYear() : '';
 
-    // Calculate section averages
-    const overallSatAvg = calculateSectionAvg_(row, [6, 7, 8, 9]);
-    const stewardRatingAvg = calculateSectionAvg_(row, [10, 11, 12, 13, 14, 15, 16]);
-    const stewardAccessAvg = calculateSectionAvg_(row, [18, 19, 20]);
-    const chapterAvg = calculateSectionAvg_(row, [21, 22, 23, 24, 25]);
-    const leadershipAvg = calculateSectionAvg_(row, [26, 27, 28, 29, 30, 31]);
-    const contractAvg = calculateSectionAvg_(row, [32, 33, 34, 35]);
-    const commAvg = calculateSectionAvg_(row, [41, 42, 43, 44, 45]);
-    const voiceAvg = calculateSectionAvg_(row, [46, 47, 48, 49, 50]);
-    const valueAvg = calculateSectionAvg_(row, [51, 52, 53, 54, 55]);
-    const schedAvg = calculateSectionAvg_(row, [56, 57, 58, 59, 60, 61, 62]);
-    const repAvg = calculateSectionAvg_(row, [37, 38, 39, 40]);
+    // Calculate section averages using SATISFACTION_COLS (0-indexed for row access)
+    const overallSatAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q7_TRUST_UNION - 1, SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1]);
+    const stewardRatingAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q11_TREATED_RESPECT - 1, SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS - 1, SATISFACTION_COLS.Q13_FOLLOWED_THROUGH - 1, SATISFACTION_COLS.Q14_ADVOCATED - 1, SATISFACTION_COLS.Q15_SAFE_CONCERNS - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1]);
+    const stewardAccessAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q19_CONFIDENT_HELP - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1]);
+    const chapterAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q22_CHAPTER_COMM - 1, SATISFACTION_COLS.Q23_ORGANIZES - 1, SATISFACTION_COLS.Q24_REACH_CHAPTER - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1]);
+    const leadershipAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS - 1, SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE - 1, SATISFACTION_COLS.Q29_ACCOUNTABLE - 1, SATISFACTION_COLS.Q30_FAIR_PROCESSES - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1]);
+    const contractAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q33_REALISTIC_TIMELINES - 1, SATISFACTION_COLS.Q34_CLEAR_UPDATES - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1]);
+    const commAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q42_ENOUGH_INFO - 1, SATISFACTION_COLS.Q43_FIND_EASILY - 1, SATISFACTION_COLS.Q44_ALL_SHIFTS - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1]);
+    const voiceAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q47_SEEKS_INPUT - 1, SATISFACTION_COLS.Q48_DIGNITY - 1, SATISFACTION_COLS.Q49_NEWER_SUPPORTED - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1]);
+    const valueAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q52_PRIORITIES_NEEDS - 1, SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1, SATISFACTION_COLS.Q54_HOW_INVOLVED - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1]);
+    const schedAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q57_ADEQUATELY_INFORMED - 1, SATISFACTION_COLS.Q58_CLEAR_CRITERIA - 1, SATISFACTION_COLS.Q59_WORK_EXPECTATIONS - 1, SATISFACTION_COLS.Q60_EFFECTIVE_OUTCOMES - 1, SATISFACTION_COLS.Q61_SUPPORTS_WELLBEING - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1]);
+    const repAvg = calculateSectionAvg_(row, [SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q38_FELT_SUPPORTED - 1, SATISFACTION_COLS.Q39_UPDATES_OFTEN - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1]);
 
-    // Get individual questions - BUCKETED for aggregation
-    const worksite = row[1] || '';
-    const role = categorizeRole_(row[2] || '');
-    const shift = row[3] || '';
-    const timeInRole = categorizeTenure_(row[4] || '');
-    const hasStewardContact = row[5] || '';
-    const filedGrievance = row[36] || '';
+    // Get individual questions - BUCKETED for aggregation (0-indexed from SATISFACTION_COLS)
+    const worksite = row[SATISFACTION_COLS.Q1_WORKSITE - 1] || '';
+    const role = categorizeRole_(row[SATISFACTION_COLS.Q2_ROLE - 1] || '');
+    const shift = row[SATISFACTION_COLS.Q3_SHIFT - 1] || '';
+    const timeInRole = categorizeTenure_(row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] || '');
+    const hasStewardContact = row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] || '';
+    const filedGrievance = row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] || '';
 
     // Bucket satisfaction scores (1-10 → Low/Medium/High)
-    const satisfiedBucket = getScoreBucket_(row[6]);
-    const trustBucket = getScoreBucket_(row[7]);
-    const protectedBucket = getScoreBucket_(row[8]);
-    const recommendBucket = getScoreBucket_(row[9]);
+    const satisfiedBucket = getScoreBucket_(row[SATISFACTION_COLS.Q6_SATISFIED_REP - 1]);
+    const trustBucket = getScoreBucket_(row[SATISFACTION_COLS.Q7_TRUST_UNION - 1]);
+    const protectedBucket = getScoreBucket_(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]);
+    const recommendBucket = getScoreBucket_(row[SATISFACTION_COLS.Q9_RECOMMEND - 1]);
 
     exportData.push([
       responseHash,

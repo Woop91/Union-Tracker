@@ -967,118 +967,84 @@ var MENU_ICONS = {
 };
 
 // ============================================================================
-// MEMBER DIRECTORY COLUMNS (40 columns total: A-AN)
+// MEMBER DIRECTORY COLUMNS — Auto-derived from header map
+// To add/remove/reorder columns, edit this array. Everything else follows.
 // ============================================================================
 
-/**
- * Member Directory column positions (1-indexed)
- * CRITICAL: ALL column references must use these constants
- * @const {Object}
- */
-var MEMBER_COLS = {
-  // Section 1: Identity & Core Info (A-D)
-  MEMBER_ID: 1,                    // A
-  FIRST_NAME: 2,                   // B
-  LAST_NAME: 3,                    // C
-  JOB_TITLE: 4,                    // D
+var MEMBER_HEADER_MAP_ = [
+  { key: 'MEMBER_ID',          header: 'Member ID' },
+  { key: 'FIRST_NAME',         header: 'First Name' },
+  { key: 'LAST_NAME',          header: 'Last Name' },
+  { key: 'JOB_TITLE',          header: 'Job Title' },
+  { key: 'WORK_LOCATION',      header: 'Work Location' },
+  { key: 'UNIT',               header: 'Unit' },
+  { key: 'CUBICLE',            header: 'Cubicle' },
+  { key: 'OFFICE_DAYS',        header: 'Office Days' },
+  { key: 'EMAIL',              header: 'Email' },
+  { key: 'PHONE',              header: 'Phone' },
+  { key: 'PREFERRED_COMM',     header: 'Preferred Communication' },
+  { key: 'BEST_TIME',          header: 'Best Time to Contact' },
+  { key: 'SUPERVISOR',         header: 'Supervisor' },
+  { key: 'MANAGER',            header: 'Manager' },
+  { key: 'IS_STEWARD',         header: 'Is Steward' },
+  { key: 'COMMITTEES',         header: 'Committees' },
+  { key: 'ASSIGNED_STEWARD',   header: 'Assigned Steward' },
+  { key: 'LAST_VIRTUAL_MTG',   header: 'Last Virtual Mtg' },
+  { key: 'LAST_INPERSON_MTG',  header: 'Last In-Person Mtg' },
+  { key: 'OPEN_RATE',          header: 'Open Rate %' },
+  { key: 'VOLUNTEER_HOURS',    header: 'Volunteer Hours' },
+  { key: 'INTEREST_LOCAL',     header: 'Interest: Local' },
+  { key: 'INTEREST_CHAPTER',   header: 'Interest: Chapter' },
+  { key: 'INTEREST_ALLIED',    header: 'Interest: Allied' },
+  { key: 'RECENT_CONTACT_DATE', header: 'Recent Contact Date' },
+  { key: 'CONTACT_STEWARD',    header: 'Contact Steward' },
+  { key: 'CONTACT_NOTES',      header: 'Contact Notes' },
+  { key: 'HAS_OPEN_GRIEVANCE', header: 'Has Open Grievance?' },
+  { key: 'GRIEVANCE_STATUS',   header: 'Grievance Status' },
+  { key: 'NEXT_DEADLINE',      header: 'Days to Deadline' },
+  { key: 'START_GRIEVANCE',    header: 'Start Grievance' },
+  { key: 'QUICK_ACTIONS',      header: '\u26A1 Actions' },
+  { key: 'PIN_HASH',           header: 'PIN Hash' },
+  { key: 'EMPLOYEE_ID',        header: 'Employee ID' },
+  { key: 'DEPARTMENT',         header: 'Department' },
+  { key: 'HIRE_DATE',          header: 'Hire Date' },
+  { key: 'STREET_ADDRESS',     header: 'Street Address' },
+  { key: 'CITY',               header: 'City' },
+  { key: 'STATE',              header: 'State' }
+];
 
-  // Section 2: Location & Work (E-H)
-  WORK_LOCATION: 5,                // E
-  UNIT: 6,                         // F
-  CUBICLE: 7,                      // G - Cubicle / workspace ID (hidden by default)
-  OFFICE_DAYS: 8,                  // H - Multi-select: days member works in office
+var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
+  LOCATION: 'WORK_LOCATION',
+  DAYS_TO_DEADLINE: 'NEXT_DEADLINE'
+});
 
-  // Section 3: Contact Information (I-L)
-  EMAIL: 9,                        // I
-  PHONE: 10,                       // J
-  PREFERRED_COMM: 11,              // K - Multi-select: preferred communication methods
-  BEST_TIME: 12,                   // L - Multi-select: best times to reach member
-
-  // Section 4: Organizational Structure (M-Q)
-  SUPERVISOR: 13,                  // M
-  MANAGER: 14,                     // N
-  IS_STEWARD: 15,                  // O
-  COMMITTEES: 16,                  // P - Multi-select: which committees steward is in
-  ASSIGNED_STEWARD: 17,            // Q - Multi-select: assigned steward(s)
-
-  // Section 5: Engagement Metrics (R-U) - Hidden by default
-  LAST_VIRTUAL_MTG: 18,            // R
-  LAST_INPERSON_MTG: 19,           // S
-  OPEN_RATE: 20,                   // T
-  VOLUNTEER_HOURS: 21,             // U
-
-  // Section 6: Member Interests (V-X) - Hidden by default
-  INTEREST_LOCAL: 22,              // V
-  INTEREST_CHAPTER: 23,            // W
-  INTEREST_ALLIED: 24,             // X
-
-  // Section 7: Steward Contact Tracking (Y-AA)
-  RECENT_CONTACT_DATE: 25,         // Y
-  CONTACT_STEWARD: 26,             // Z
-  CONTACT_NOTES: 27,               // AA
-
-  // Section 8: Grievance Management (AB-AE)
-  HAS_OPEN_GRIEVANCE: 28,          // AB - Script-calculated (static value)
-  GRIEVANCE_STATUS: 29,            // AC - Script-calculated (static value)
-  NEXT_DEADLINE: 30,               // AD - Script-calculated (static value)
-  START_GRIEVANCE: 31,             // AE - Checkbox to start grievance
-
-  // Section 9: Quick Actions (AF)
-  QUICK_ACTIONS: 32,               // AF - Checkbox to open Quick Actions dialog
-
-  // Section 10: Member Authentication (AG)
-  PIN_HASH: 33,                    // AG - Hashed PIN for member self-service portal
-
-  // Section 11: Employment Details (AH-AJ) - Added for Add Member form parity
-  EMPLOYEE_ID: 34,                 // AH - Employee ID (e.g., XX000000)
-  DEPARTMENT: 35,                  // AI - Department / work unit category
-  HIRE_DATE: 36,                   // AJ - Hire date (date format)
-
-  // Section 12: Mailing Address / PII (AK-AM) - Hidden by default, PII
-  STREET_ADDRESS: 37,              // AK - Street address (PII)
-  CITY: 38,                        // AL - City (PII)
-  STATE: 39,                       // AM - State (PII)
-
-  // ALIASES - For backward compatibility
-  LOCATION: 5,                     // Alias for WORK_LOCATION
-  DAYS_TO_DEADLINE: 30             // Alias for NEXT_DEADLINE
-};
-
-/**
- * Member Directory columns considered PII (Personally Identifiable Information)
- * These columns are hidden by default and MUST NOT appear in any modals or exports
- * unless explicitly authorized. Includes mailing address fields.
- * @const {Array<number>}
- */
-var PII_MEMBER_COLS = [37, 38, 39]; // STREET_ADDRESS, CITY, STATE
+/** PII columns — auto-derived from MEMBER_COLS */
+var PII_MEMBER_COLS = [MEMBER_COLS.STREET_ADDRESS, MEMBER_COLS.CITY, MEMBER_COLS.STATE];
 
 // ============================================================================
-// MEETING CHECK-IN LOG COLUMNS (16 columns: A-P)
+// MEETING CHECK-IN LOG COLUMNS — Auto-derived from header map
 // ============================================================================
 
-/**
- * Meeting Check-In Log column positions (1-indexed)
- * Columns A-H are original; I-M added for event scheduling
- * @const {Object}
- */
-var MEETING_CHECKIN_COLS = {
-  MEETING_ID: 1,         // A - Meeting ID (steward-created)
-  MEETING_NAME: 2,       // B - Meeting name/topic
-  MEETING_DATE: 3,       // C - Date of meeting
-  MEETING_TYPE: 4,       // D - Virtual or In-Person
-  MEMBER_ID: 5,          // E - Checked-in member ID
-  MEMBER_NAME: 6,        // F - Member first + last name
-  CHECKIN_TIME: 7,       // G - Timestamp of check-in
-  EMAIL: 8,              // H - Member email (for lookup)
-  MEETING_TIME: 9,       // I - Start time (HH:mm)
-  MEETING_DURATION: 10,  // J - Duration in hours
-  EVENT_STATUS: 11,      // K - Scheduled / Active / Completed
-  NOTIFY_STEWARDS: 12,   // L - Steward email(s) for attendance report
-  CALENDAR_EVENT_ID: 13, // M - Google Calendar event ID
-  NOTES_DOC_URL: 14,     // N - Meeting Notes Google Doc URL
-  AGENDA_DOC_URL: 15,    // O - Meeting Agenda Google Doc URL
-  AGENDA_STEWARDS: 16    // P - Steward emails for early agenda sharing (3 days prior)
-};
+var MEETING_CHECKIN_HEADER_MAP_ = [
+  { key: 'MEETING_ID',       header: 'Meeting ID' },
+  { key: 'MEETING_NAME',     header: 'Meeting Name' },
+  { key: 'MEETING_DATE',     header: 'Meeting Date' },
+  { key: 'MEETING_TYPE',     header: 'Meeting Type' },
+  { key: 'MEMBER_ID',        header: 'Member ID' },
+  { key: 'MEMBER_NAME',      header: 'Member Name' },
+  { key: 'CHECKIN_TIME',     header: 'Check-In Time' },
+  { key: 'EMAIL',            header: 'Email' },
+  { key: 'MEETING_TIME',     header: 'Meeting Time' },
+  { key: 'MEETING_DURATION', header: 'Duration' },
+  { key: 'EVENT_STATUS',     header: 'Event Status' },
+  { key: 'NOTIFY_STEWARDS',  header: 'Notify Stewards' },
+  { key: 'CALENDAR_EVENT_ID', header: 'Calendar Event ID' },
+  { key: 'NOTES_DOC_URL',    header: 'Notes Doc URL' },
+  { key: 'AGENDA_DOC_URL',   header: 'Agenda Doc URL' },
+  { key: 'AGENDA_STEWARDS',  header: 'Agenda Stewards' }
+];
+
+var MEETING_CHECKIN_COLS = buildColsFromMap_(MEETING_CHECKIN_HEADER_MAP_);
 
 /**
  * Meeting event statuses
@@ -1091,360 +1057,211 @@ var MEETING_STATUS = {
 };
 
 // ============================================================================
-// GRIEVANCE LOG COLUMNS (41 columns total: A-AO)
+// GRIEVANCE LOG COLUMNS — Auto-derived from header map
+// To add/remove/reorder columns, edit this array. Everything else follows.
 // ============================================================================
 
-/**
- * Grievance Log column positions (1-indexed)
- * CRITICAL: ALL column references must use these constants
- * @const {Object}
- */
-var GRIEVANCE_COLS = {
-  // Section 1: Identity (A-D)
-  GRIEVANCE_ID: 1,        // A - Grievance ID
-  MEMBER_ID: 2,           // B - Member ID
-  FIRST_NAME: 3,          // C - First Name
-  LAST_NAME: 4,           // D - Last Name
+var GRIEVANCE_HEADER_MAP_ = [
+  { key: 'GRIEVANCE_ID',       header: 'Grievance ID' },
+  { key: 'MEMBER_ID',          header: 'Member ID' },
+  { key: 'FIRST_NAME',         header: 'First Name' },
+  { key: 'LAST_NAME',          header: 'Last Name' },
+  { key: 'STATUS',             header: 'Status' },
+  { key: 'CURRENT_STEP',       header: 'Current Step' },
+  { key: 'INCIDENT_DATE',      header: 'Incident Date' },
+  { key: 'FILING_DEADLINE',    header: 'Filing Deadline' },
+  { key: 'DATE_FILED',         header: 'Date Filed' },
+  { key: 'STEP1_DUE',          header: 'Step I Due' },
+  { key: 'STEP1_RCVD',         header: 'Step I Rcvd' },
+  { key: 'STEP2_APPEAL_DUE',   header: 'Step II Appeal Due' },
+  { key: 'STEP2_APPEAL_FILED', header: 'Step II Appeal Filed' },
+  { key: 'STEP2_DUE',          header: 'Step II Due' },
+  { key: 'STEP2_RCVD',         header: 'Step II Rcvd' },
+  { key: 'STEP3_APPEAL_DUE',   header: 'Step III Appeal Due' },
+  { key: 'STEP3_APPEAL_FILED', header: 'Step III Appeal Filed' },
+  { key: 'DATE_CLOSED',        header: 'Date Closed' },
+  { key: 'DAYS_OPEN',          header: 'Days Open' },
+  { key: 'NEXT_ACTION_DUE',    header: 'Next Action Due' },
+  { key: 'DAYS_TO_DEADLINE',   header: 'Days to Deadline' },
+  { key: 'ARTICLES',           header: 'Articles Violated' },
+  { key: 'ISSUE_CATEGORY',     header: 'Issue Category' },
+  { key: 'MEMBER_EMAIL',       header: 'Member Email' },
+  { key: 'LOCATION',           header: 'Work Location' },
+  { key: 'STEWARD',            header: 'Assigned Steward' },
+  { key: 'RESOLUTION',         header: 'Resolution' },
+  { key: 'MESSAGE_ALERT',      header: 'Message Alert' },
+  { key: 'COORDINATOR_MESSAGE', header: 'Coordinator Message' },
+  { key: 'ACKNOWLEDGED_BY',    header: 'Acknowledged By' },
+  { key: 'ACKNOWLEDGED_DATE',  header: 'Acknowledged Date' },
+  { key: 'DRIVE_FOLDER_ID',    header: 'Drive Folder ID' },
+  { key: 'DRIVE_FOLDER_URL',   header: 'Drive Folder URL' },
+  { key: 'QUICK_ACTIONS',      header: '\u26A1 Actions' },
+  { key: 'ACTION_TYPE',        header: 'Action Type' },
+  { key: 'CHECKLIST_PROGRESS', header: 'Checklist Progress' },
+  { key: 'REMINDER_1_DATE',    header: 'Reminder 1 Date' },
+  { key: 'REMINDER_1_NOTE',    header: 'Reminder 1 Note' },
+  { key: 'REMINDER_2_DATE',    header: 'Reminder 2 Date' },
+  { key: 'REMINDER_2_NOTE',    header: 'Reminder 2 Note' },
+  { key: 'LAST_UPDATED',       header: 'Last Updated' }
+];
 
-  // Section 2: Status & Assignment (E-F)
-  STATUS: 5,              // E - Status
-  CURRENT_STEP: 6,        // F - Current Step
-
-  // Section 3: Timeline - Filing (G-I)
-  INCIDENT_DATE: 7,       // G - Incident Date
-  FILING_DEADLINE: 8,     // H - Filing Deadline (21d) (auto-calc)
-  DATE_FILED: 9,          // I - Date Filed (Step I)
-
-  // Section 4: Timeline - Step I (J-K)
-  STEP1_DUE: 10,          // J - Step I Decision Due (30d) (auto-calc)
-  STEP1_RCVD: 11,         // K - Step I Decision Rcvd
-
-  // Section 5: Timeline - Step II (L-O)
-  STEP2_APPEAL_DUE: 12,   // L - Step II Appeal Due (10d) (auto-calc)
-  STEP2_APPEAL_FILED: 13, // M - Step II Appeal Filed
-  STEP2_DUE: 14,          // N - Step II Decision Due (30d) (auto-calc)
-  STEP2_RCVD: 15,         // O - Step II Decision Rcvd
-
-  // Section 6: Timeline - Step III (P-R)
-  STEP3_APPEAL_DUE: 16,   // P - Step III Appeal Due (30d) (auto-calc)
-  STEP3_APPEAL_FILED: 17, // Q - Step III Appeal Filed
-  DATE_CLOSED: 18,        // R - Date Closed
-
-  // Section 7: Calculated Metrics (S-U)
-  DAYS_OPEN: 19,          // S - Days Open (auto-calc)
-  NEXT_ACTION_DUE: 20,    // T - Next Action Due (auto-calc)
-  DAYS_TO_DEADLINE: 21,   // U - Days to Deadline (auto-calc)
-
-  // Section 8: Case Details (V-W)
-  ARTICLES: 22,           // V - Articles Violated
-  ISSUE_CATEGORY: 23,     // W - Issue Category
-
-  // Section 9: Contact & Location (X-Z)
-  MEMBER_EMAIL: 24,       // X - Member Email
-  LOCATION: 25,           // Y - Work Location (Site)
-  STEWARD: 26,            // Z - Assigned Steward (Name)
-
-  // Section 10: Resolution (AA)
-  RESOLUTION: 27,         // AA - Resolution Summary
-
-  // Section 11: Coordinator Notifications (AB-AE)
-  MESSAGE_ALERT: 28,      // AB - Message Alert checkbox
-  COORDINATOR_MESSAGE: 29,// AC - Coordinator's message text
-  ACKNOWLEDGED_BY: 30,    // AD - Steward who acknowledged
-  ACKNOWLEDGED_DATE: 31,  // AE - When steward acknowledged
-
-  // Section 12: Drive Integration (AF-AG)
-  DRIVE_FOLDER_ID: 32,    // AF - Google Drive folder ID
-  DRIVE_FOLDER_URL: 33,   // AG - Google Drive folder URL
-
-  // Section 13: Quick Actions (AH)
-  QUICK_ACTIONS: 34,      // AH - Checkbox to open Quick Actions dialog
-
-  // Section 14: Action Type & Checklist (AI-AJ)
-  ACTION_TYPE: 35,        // AI - Action Type (Grievance, Records Request, etc.)
-  CHECKLIST_PROGRESS: 36, // AJ - Checklist Progress (e.g., "5/8" or "62%")
-
-  // Section 15: Reminders (AK-AN) - For scheduling meetings/follow-ups
-  REMINDER_1_DATE: 37,    // AK - First reminder date
-  REMINDER_1_NOTE: 38,    // AL - First reminder note (e.g., "Schedule Step II meeting")
-  REMINDER_2_DATE: 39,    // AM - Second reminder date
-  REMINDER_2_NOTE: 40,    // AN - Second reminder note
-
-  // Section 16: Record Tracking (AO)
-  LAST_UPDATED: 41        // AO - Last Updated timestamp (auto-set on edit)
-};
+var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_);
 
 // ============================================================================
 // BACKWARD COMPATIBILITY ALIASES (0-indexed for array access)
+// Auto-derived from 1-indexed *_COLS — stays in sync automatically.
 // ============================================================================
 
-/**
- * GRIEVANCE_COLUMNS - 0-indexed alias for legacy code
- * Legacy code uses these as array indices (0-indexed)
- * Modern GRIEVANCE_COLS is 1-indexed for getRange() calls
- * @const {Object}
- */
-var GRIEVANCE_COLUMNS = {
-  // Core fields (0-indexed)
-  GRIEVANCE_ID: 0,         // A - Grievance ID
-  MEMBER_ID: 1,            // B - Member ID
-  FIRST_NAME: 2,           // C - First Name
-  LAST_NAME: 3,            // D - Last Name
-  MEMBER_NAME: 2,          // Alias - uses FIRST_NAME column
-  STATUS: 4,               // E - Status
-  CURRENT_STEP: 5,         // F - Current Step
-
-  // Dates and deadlines (0-indexed)
-  INCIDENT_DATE: 6,        // G - Incident Date
-  FILING_DEADLINE: 7,      // H - Filing Deadline
-  FILING_DATE: 8,          // I - Date Filed (alias for DATE_FILED)
-  DATE_FILED: 8,           // I - Date Filed
-
-  // Step I (0-indexed)
-  STEP1_DUE: 9,            // J - Step I Decision Due
-  STEP_1_DUE: 9,           // Alias with underscore
-  STEP1_RCVD: 10,          // K - Step I Decision Received
-  STEP_1_DATE: 10,         // Alias
-  STEP_1_STATUS: 4,        // Uses STATUS column for step status
-
-  // Step II (0-indexed)
-  STEP2_APPEAL_DUE: 11,    // L - Step II Appeal Due
-  STEP2_APPEAL_FILED: 12,  // M - Step II Appeal Filed
-  STEP_2_DATE: 12,         // Alias
-  STEP2_DUE: 13,           // N - Step II Decision Due
-  STEP_2_DUE: 13,          // Alias with underscore
-  STEP2_RCVD: 14,          // O - Step II Decision Received
-  STEP_2_STATUS: 4,        // Uses STATUS column
-
-  // Step III (0-indexed)
-  STEP3_APPEAL_DUE: 15,    // P - Step III Appeal Due
-  STEP3_APPEAL_FILED: 16,  // Q - Step III Appeal Filed
-  STEP_3_DATE: 16,         // Alias
-  STEP3_DUE: 15,           // Same as appeal due
-  STEP_3_DUE: 15,          // Alias with underscore
-  STEP_3_STATUS: 4,        // Uses STATUS column
-  DATE_CLOSED: 17,         // R - Date Closed
-  ARBITRATION_DATE: 17,    // Alias for DATE_CLOSED
-
-  // Calculated metrics (0-indexed)
-  DAYS_OPEN: 18,           // S - Days Open
-  NEXT_ACTION_DUE: 19,     // T - Next Action Due
-  LAST_UPDATED: 40,        // Alias for RECORD_LAST_UPDATED (AO)
-  DAYS_TO_DEADLINE: 20,    // U - Days to Deadline
-
-  // Case details (0-indexed)
-  ARTICLES: 21,            // V - Articles Violated
-  ISSUE_CATEGORY: 22,      // W - Issue Category
-  GRIEVANCE_TYPE: 22,      // Alias for ISSUE_CATEGORY
-  DESCRIPTION: 22,         // Alias - uses ISSUE_CATEGORY
-
-  // Contact & Location (0-indexed)
-  MEMBER_EMAIL: 23,        // X - Member Email
-  LOCATION: 24,            // Y - Work Location
-  STEWARD: 25,             // Z - Assigned Steward
-
-  // Resolution (0-indexed)
-  RESOLUTION: 26,          // AA - Resolution Summary
-  OUTCOME: 26,             // Alias for RESOLUTION
-  NOTES: 26,               // Alias for RESOLUTION (used for notes)
-
-  // Coordinator (0-indexed)
-  MESSAGE_ALERT: 27,       // AB - Message Alert
-  COORDINATOR_MESSAGE: 28, // AC - Coordinator Message
-  ACKNOWLEDGED_BY: 29,     // AD - Acknowledged By
-  ACKNOWLEDGED_DATE: 30,   // AE - Acknowledged Date
-
-  // Drive (0-indexed)
-  DRIVE_FOLDER_ID: 31,     // AF - Drive Folder ID
-  DRIVE_FOLDER_URL: 32,    // AG - Drive Folder URL
-  DRIVE_FOLDER: 32,        // Alias for DRIVE_FOLDER_URL
-
-  // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 33,       // AH - Quick Actions
-
-  // Action Type & Checklist (0-indexed)
-  ACTION_TYPE: 34,         // AI - Action Type
-  CHECKLIST_PROGRESS: 35,  // AJ - Checklist Progress
-
-  // Reminders (0-indexed)
-  REMINDER_1_DATE: 36,     // AK - First reminder date
-  REMINDER_1_NOTE: 37,     // AL - First reminder note
-  REMINDER_2_DATE: 38,     // AM - Second reminder date
-  REMINDER_2_NOTE: 39,     // AN - Second reminder note
-
-  // Record Tracking (0-indexed)
-  RECORD_LAST_UPDATED: 40  // AO - Last Updated timestamp
+/** Legacy-only aliases for GRIEVANCE_COLUMNS (keys not in GRIEVANCE_COLS) */
+var GRIEVANCE_LEGACY_ALIASES_ = {
+  MEMBER_NAME: 'FIRST_NAME',
+  FILING_DATE: 'DATE_FILED',
+  STEP_1_DUE: 'STEP1_DUE',
+  STEP_1_DATE: 'STEP1_RCVD',
+  STEP_1_STATUS: 'STATUS',
+  STEP_2_DATE: 'STEP2_APPEAL_FILED',
+  STEP_2_DUE: 'STEP2_DUE',
+  STEP_2_STATUS: 'STATUS',
+  STEP_3_DATE: 'STEP3_APPEAL_FILED',
+  STEP3_DUE: 'STEP3_APPEAL_DUE',
+  STEP_3_DUE: 'STEP3_APPEAL_DUE',
+  STEP_3_STATUS: 'STATUS',
+  ARBITRATION_DATE: 'DATE_CLOSED',
+  RECORD_LAST_UPDATED: 'LAST_UPDATED',
+  GRIEVANCE_TYPE: 'ISSUE_CATEGORY',
+  DESCRIPTION: 'ISSUE_CATEGORY',
+  OUTCOME: 'RESOLUTION',
+  NOTES: 'RESOLUTION',
+  DRIVE_FOLDER: 'DRIVE_FOLDER_URL'
 };
 
-/**
- * MEMBER_COLUMNS - 0-indexed alias for legacy code
- * Legacy code uses these as array indices (0-indexed)
- * Modern MEMBER_COLS is 1-indexed for getRange() calls
- * @const {Object}
- */
-var MEMBER_COLUMNS = {
-  // Core fields (0-indexed)
-  ID: 0,                   // A - Member ID
-  MEMBER_ID: 0,            // Alias
-  FIRST_NAME: 1,           // B - First Name
-  LAST_NAME: 2,            // C - Last Name
-  JOB_TITLE: 3,            // D - Job Title
-  JOB_DEPT: 3,             // Legacy alias for JOB_TITLE (DEPARTMENT now at index 34)
+var GRIEVANCE_COLUMNS = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
 
-  // Location & Work (0-indexed)
-  WORK_LOCATION: 4,        // E - Work Location
-  LOCATION: 4,             // Alias
-  UNIT: 5,                 // F - Unit
-  CUBICLE: 6,              // G - Cubicle (hidden)
-  OFFICE_DAYS: 7,          // H - Office Days
-
-  // Contact (0-indexed)
-  EMAIL: 8,                // I - Email
-  PHONE: 9,                // J - Phone
-  PREFERRED_COMM: 10,      // K - Preferred Communication
-  BEST_TIME: 11,           // L - Best Time to Contact
-
-  // Organization (0-indexed)
-  SUPERVISOR: 12,          // M - Supervisor
-  MANAGER: 13,             // N - Manager
-  IS_STEWARD: 14,          // O - Is Steward
-  COMMITTEES: 15,          // P - Committees
-  ASSIGNED_STEWARD: 16,    // Q - Assigned Steward
-
-  // Engagement (0-indexed)
-  LAST_VIRTUAL_MTG: 17,    // R - Last Virtual Meeting
-  LAST_INPERSON_MTG: 18,   // S - Last In-Person Meeting
-  OPEN_RATE: 19,           // T - Open Rate
-  VOLUNTEER_HOURS: 20,     // U - Volunteer Hours
-
-  // Interests (0-indexed)
-  INTEREST_LOCAL: 21,      // V - Interest in Local
-  INTEREST_CHAPTER: 22,    // W - Interest in Chapter
-  INTEREST_ALLIED: 23,     // X - Interest in Allied
-
-  // Contact Tracking (0-indexed)
-  RECENT_CONTACT_DATE: 24, // Y - Recent Contact Date
-  LAST_UPDATED: 24,        // Alias for tracking last update
-  CONTACT_STEWARD: 25,     // Z - Contact Steward
-  CONTACT_NOTES: 26,       // AA - Contact Notes
-
-  // Grievance fields (0-indexed)
-  HAS_OPEN_GRIEVANCE: 27,  // AB - Has Open Grievance
-  GRIEVANCE_STATUS: 28,    // AC - Grievance Status
-  STATUS: 28,              // Alias for member status
-  NEXT_DEADLINE: 29,       // AD - Next Deadline
-  START_GRIEVANCE: 30,     // AE - Start Grievance
-
-  // Quick Actions (0-indexed)
-  QUICK_ACTIONS: 31,       // AF - Quick Actions
-
-  // Member Authentication (0-indexed)
-  PIN_HASH: 32,            // AG - PIN Hash
-
-  // Employment Details (0-indexed)
-  EMPLOYEE_ID: 33,         // AH - Employee ID
-  DEPARTMENT: 34,          // AI - Department
-  HIRE_DATE: 35,           // AJ - Hire Date
-
-  // Mailing Address / PII (0-indexed) - Hidden by default
-  STREET_ADDRESS: 36,      // AK - Street Address (PII)
-  CITY: 37,                // AL - City (PII)
-  STATE: 38                // AM - State (PII)
+/** Legacy-only aliases for MEMBER_COLUMNS (keys not in MEMBER_COLS) */
+var MEMBER_LEGACY_ALIASES_ = {
+  ID: 'MEMBER_ID',
+  JOB_DEPT: 'JOB_TITLE',
+  STATUS: 'GRIEVANCE_STATUS',
+  LAST_UPDATED: 'RECENT_CONTACT_DATE'
 };
+
+var MEMBER_COLUMNS = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
 
 // ============================================================================
-// CONFIG COLUMN MAPPING
+// CONFIG COLUMN MAPPING — Auto-derived from header map
+// Config sheet uses row 2 for headers (row 1 is section headers).
 // ============================================================================
 
-/**
- * Config sheet column positions for dropdown sources
- * @const {Object}
- */
-var CONFIG_COLS = {
-  // ── EMPLOYMENT INFO ── (A-E)
-  JOB_TITLES: 1,              // A
-  OFFICE_LOCATIONS: 2,        // B
-  UNITS: 3,                   // C
-  OFFICE_DAYS: 4,             // D
-  YES_NO: 5,                  // E
+var CONFIG_HEADER_MAP_ = [
+  { key: 'JOB_TITLES',            header: 'Job Titles' },
+  { key: 'OFFICE_LOCATIONS',      header: 'Office Locations' },
+  { key: 'UNITS',                 header: 'Units' },
+  { key: 'OFFICE_DAYS',           header: 'Office Days' },
+  { key: 'YES_NO',                header: 'Yes/No (Dropdowns)' },
+  { key: 'SUPERVISORS',           header: 'Supervisors' },
+  { key: 'MANAGERS',              header: 'Managers' },
+  { key: 'STEWARDS',              header: 'Stewards' },
+  { key: 'STEWARD_COMMITTEES',    header: 'Steward Committees' },
+  { key: 'GRIEVANCE_STATUS',      header: 'Grievance Status' },
+  { key: 'GRIEVANCE_STEP',        header: 'Grievance Step' },
+  { key: 'ISSUE_CATEGORY',        header: 'Issue Category' },
+  { key: 'ARTICLES',              header: 'Articles Violated' },
+  { key: 'COMM_METHODS',          header: 'Communication Methods' },
+  { key: 'GRIEVANCE_COORDINATORS', header: 'Grievance Coordinators' },
+  { key: 'GRIEVANCE_FORM_URL',    header: 'Grievance Form URL' },
+  { key: 'CONTACT_FORM_URL',      header: 'Contact Form URL' },
+  { key: 'ADMIN_EMAILS',          header: 'Admin Emails' },
+  { key: 'ALERT_DAYS',            header: 'Alert Days Before Deadline' },
+  { key: 'NOTIFICATION_RECIPIENTS', header: 'Notification Recipients' },
+  { key: 'ORG_NAME',              header: 'Organization Name' },
+  { key: 'LOCAL_NUMBER',          header: 'Local Number' },
+  { key: 'MAIN_ADDRESS',          header: 'Main Office Address' },
+  { key: 'MAIN_PHONE',            header: 'Main Phone' },
+  { key: 'DRIVE_FOLDER_ID',       header: 'Google Drive Folder ID' },
+  { key: 'CALENDAR_ID',           header: 'Google Calendar ID' },
+  { key: 'FILING_DEADLINE_DAYS',  header: 'Filing Deadline Days' },
+  { key: 'STEP1_RESPONSE_DAYS',   header: 'Step I Response Days' },
+  { key: 'STEP2_APPEAL_DAYS',     header: 'Step II Appeal Days' },
+  { key: 'STEP2_RESPONSE_DAYS',   header: 'Step II Response Days' },
+  { key: 'BEST_TIMES',            header: 'Best Times to Contact' },
+  { key: 'HOME_TOWNS',            header: 'Home Towns' },
+  { key: 'CONTRACT_GRIEVANCE',    header: 'Contract Article (Grievance)' },
+  { key: 'CONTRACT_DISCIPLINE',   header: 'Contract Article (Discipline)' },
+  { key: 'CONTRACT_WORKLOAD',     header: 'Contract Article (Workload)' },
+  { key: 'CONTRACT_NAME',         header: 'Contract Name' },
+  { key: 'UNION_PARENT',          header: 'Union Parent' },
+  { key: 'STATE_REGION',          header: 'State/Region' },
+  { key: 'ORG_WEBSITE',           header: 'Organization Website' },
+  { key: 'OFFICE_ADDRESSES',      header: 'Office Addresses' },
+  { key: 'MAIN_FAX',              header: 'Main Fax' },
+  { key: 'MAIN_CONTACT_NAME',     header: 'Main Contact Name' },
+  { key: 'MAIN_CONTACT_EMAIL',    header: 'Main Contact Email' },
+  { key: 'SATISFACTION_FORM_URL', header: 'Satisfaction Survey URL' },
+  { key: 'CHIEF_STEWARD_EMAIL',   header: 'Chief Steward Email' },
+  { key: 'UNIT_CODES',            header: 'Unit Codes' },
+  { key: 'ARCHIVE_FOLDER_ID',     header: 'Archive Folder ID' },
+  { key: 'ESCALATION_STATUSES',   header: 'Escalation Statuses' },
+  { key: 'ESCALATION_STEPS',      header: 'Escalation Steps' },
+  { key: 'TEMPLATE_ID',           header: 'Template ID' },
+  { key: 'PDF_FOLDER_ID',         header: 'PDF Folder ID' },
+  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' }
+];
 
-  // ── SUPERVISION ── (F-G)
-  SUPERVISORS: 6,             // F
-  MANAGERS: 7,                // G
+var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
 
-  // ── STEWARD INFO ── (H-I)
-  STEWARDS: 8,                // H
-  STEWARD_COMMITTEES: 9,      // I
+// ============================================================================
+// STEWARD PERFORMANCE CALC COLUMNS — Auto-derived from header map
+// ============================================================================
 
-  // ── GRIEVANCE SETTINGS ── (J-M)
-  GRIEVANCE_STATUS: 10,       // J
-  GRIEVANCE_STEP: 11,         // K
-  ISSUE_CATEGORY: 12,         // L
-  ARTICLES: 13,               // M
+var STEWARD_PERF_HEADER_MAP_ = [
+  { key: 'STEWARD',           header: 'Steward' },
+  { key: 'TOTAL_CASES',       header: 'Total Cases' },
+  { key: 'ACTIVE',            header: 'Active' },
+  { key: 'CLOSED',            header: 'Closed' },
+  { key: 'WON',               header: 'Won' },
+  { key: 'WIN_RATE',          header: 'Win Rate %' },
+  { key: 'AVG_DAYS',          header: 'Avg Days' },
+  { key: 'OVERDUE',           header: 'Overdue' },
+  { key: 'DUE_THIS_WEEK',     header: 'Due This Week' },
+  { key: 'PERFORMANCE_SCORE', header: 'Performance Score' }
+];
 
-  // ── LINKS & COORDINATORS ── (N-Q)
-  COMM_METHODS: 14,           // N
-  GRIEVANCE_COORDINATORS: 15, // O
-  GRIEVANCE_FORM_URL: 16,     // P
-  CONTACT_FORM_URL: 17,       // Q
+var STEWARD_PERF_COLS = buildColsFromMap_(STEWARD_PERF_HEADER_MAP_);
 
-  // ── NOTIFICATIONS ── (R-S)
-  ADMIN_EMAILS: 18,           // R
-  ALERT_DAYS: 19,             // S
-  NOTIFICATION_RECIPIENTS: 20, // T
+// ============================================================================
+// AUDIT LOG COLUMNS — Auto-derived from header map
+// ============================================================================
 
-  // ── ORGANIZATION ── (U-X)
-  ORG_NAME: 21,               // U
-  LOCAL_NUMBER: 22,           // V
-  MAIN_ADDRESS: 23,           // W
-  MAIN_PHONE: 24,             // X
+var AUDIT_LOG_HEADER_MAP_ = [
+  { key: 'TIMESTAMP',   header: 'Timestamp' },
+  { key: 'USER_EMAIL',  header: 'User Email' },
+  { key: 'SHEET',       header: 'Sheet' },
+  { key: 'ROW',         header: 'Row' },
+  { key: 'COLUMN',      header: 'Column' },
+  { key: 'FIELD_NAME',  header: 'Field Name' },
+  { key: 'OLD_VALUE',   header: 'Old Value' },
+  { key: 'NEW_VALUE',   header: 'New Value' },
+  { key: 'RECORD_ID',   header: 'Record ID' },
+  { key: 'ACTION_TYPE', header: 'Action Type' }
+];
 
-  // ── INTEGRATION ── (Y-Z)
-  DRIVE_FOLDER_ID: 25,        // Y
-  CALENDAR_ID: 26,            // Z
+var AUDIT_LOG_COLS = buildColsFromMap_(AUDIT_LOG_HEADER_MAP_);
 
-  // ── DEADLINES ── (AA-AD)
-  FILING_DEADLINE_DAYS: 27,   // AA
-  STEP1_RESPONSE_DAYS: 28,    // AB
-  STEP2_APPEAL_DAYS: 29,      // AC
-  STEP2_RESPONSE_DAYS: 30,    // AD
+// ============================================================================
+// EVENT AUDIT LOG COLUMNS — used by logAuditEvent() in 06_Maintenance.gs
+// Same sheet, different schema from the edit-level AUDIT_LOG_COLS.
+// ============================================================================
 
-  // ── MULTI-SELECT OPTIONS ── (AE-AF)
-  BEST_TIMES: 31,             // AE
-  HOME_TOWNS: 32,             // AF
+var EVENT_AUDIT_HEADER_MAP_ = [
+  { key: 'TIMESTAMP',      header: 'Timestamp' },
+  { key: 'EVENT_TYPE',     header: 'Event Type' },
+  { key: 'USER',           header: 'User' },
+  { key: 'DETAILS',        header: 'Details' },
+  { key: 'SESSION_ID',     header: 'Session ID' },
+  { key: 'INTEGRITY_HASH', header: 'Integrity Hash' }
+];
 
-  // ── CONTRACT & LEGAL ── (AG-AJ)
-  CONTRACT_GRIEVANCE: 33,     // AG
-  CONTRACT_DISCIPLINE: 34,    // AH
-  CONTRACT_WORKLOAD: 35,      // AI
-  CONTRACT_NAME: 36,          // AJ
-
-  // ── ORG IDENTITY ── (AK-AM)
-  UNION_PARENT: 37,           // AK
-  STATE_REGION: 38,           // AL
-  ORG_WEBSITE: 39,            // AM
-
-  // ── EXTENDED CONTACT ── (AN-AQ)
-  OFFICE_ADDRESSES: 40,       // AN
-  MAIN_FAX: 41,               // AO
-  MAIN_CONTACT_NAME: 42,      // AP
-  MAIN_CONTACT_EMAIL: 43,     // AQ
-
-  // ── FORM LINKS ── (AR)
-  SATISFACTION_FORM_URL: 44,  // AR - Member Satisfaction Survey form URL
-
-  // ── STRATEGIC COMMAND CENTER ── (AS-AY)
-  CHIEF_STEWARD_EMAIL: 45,    // AS - Email for escalation alerts
-  UNIT_CODES: 46,             // AT - Unit code prefixes (format: "Unit Name:CODE,Unit2:CODE2")
-  ARCHIVE_FOLDER_ID: 47,      // AU - Drive folder ID for archives
-  ESCALATION_STATUSES: 48,    // AV - Status values that trigger alerts (comma-separated)
-  ESCALATION_STEPS: 49,       // AW - Step values that trigger alerts (comma-separated)
-  TEMPLATE_ID: 50,            // AX - Google Doc template ID for grievance PDFs
-  PDF_FOLDER_ID: 51,          // AY - Drive folder for generated PDFs (optional, uses ARCHIVE_FOLDER_ID if not set)
-
-  // ── MOBILE DASHBOARD ── (AZ)
-  MOBILE_DASHBOARD_URL: 52    // AZ - Mobile Dashboard URL (auto-generated by addMobileDashboardLinkToConfig) - LAST COLUMN
-};
+var EVENT_AUDIT_COLS = buildColsFromMap_(EVENT_AUDIT_HEADER_MAP_);
 
 // ============================================================================
 // SATISFACTION SURVEY COLUMNS (Google Form Response + Summary)
@@ -1620,16 +1437,18 @@ var SATISFACTION_COLS = {
  *
  * @const {Object}
  */
-var SURVEY_VAULT_COLS = {
-  RESPONSE_ROW: 1,          // A - Row number in Satisfaction sheet
-  EMAIL: 2,                 // B - SHA-256 hash of email (non-reversible)
-  VERIFIED: 3,              // C - Yes / Pending Review / Rejected
-  MATCHED_MEMBER_ID: 4,     // D - SHA-256 hash of member ID (non-reversible)
-  QUARTER: 5,               // E - Quarter string (e.g., "2026-Q1")
-  IS_LATEST: 6,             // F - Yes/No - Is this the latest for this member?
-  SUPERSEDED_BY: 7,         // G - Vault row number of newer response
-  REVIEWER_NOTES: 8         // H - Notes from reviewer
-};
+var SURVEY_VAULT_HEADER_MAP_ = [
+  { key: 'RESPONSE_ROW',     header: 'Response Row' },
+  { key: 'EMAIL',            header: 'Email Hash' },
+  { key: 'VERIFIED',         header: 'Verified' },
+  { key: 'MATCHED_MEMBER_ID', header: 'Member ID Hash' },
+  { key: 'QUARTER',          header: 'Quarter' },
+  { key: 'IS_LATEST',        header: 'Is Latest' },
+  { key: 'SUPERSEDED_BY',    header: 'Superseded By' },
+  { key: 'REVIEWER_NOTES',   header: 'Reviewer Notes' }
+];
+
+var SURVEY_VAULT_COLS = buildColsFromMap_(SURVEY_VAULT_HEADER_MAP_);
 
 /**
  * Survey section definitions for grouping and analysis
@@ -1695,18 +1514,20 @@ var SATISFACTION_SECTIONS = {
  *
  * @const {Object}
  */
-var SURVEY_TRACKING_COLS = {
-  MEMBER_ID: 1,              // A - Member ID (linked to Member Directory)
-  MEMBER_NAME: 2,            // B - Full name (cached for display)
-  EMAIL: 3,                  // C - Member email
-  WORK_LOCATION: 4,          // D - Work location
-  ASSIGNED_STEWARD: 5,       // E - Assigned steward name(s)
-  CURRENT_STATUS: 6,         // F - Current round: Completed / Not Completed
-  COMPLETED_DATE: 7,         // G - Date completed (blank if not completed)
-  TOTAL_MISSED: 8,           // H - Cumulative surveys missed
-  TOTAL_COMPLETED: 9,        // I - Cumulative surveys completed
-  LAST_REMINDER_SENT: 10     // J - Date of last reminder email sent
-};
+var SURVEY_TRACKING_HEADER_MAP_ = [
+  { key: 'MEMBER_ID',        header: 'Member ID' },
+  { key: 'MEMBER_NAME',      header: 'Member Name' },
+  { key: 'EMAIL',            header: 'Email' },
+  { key: 'WORK_LOCATION',    header: 'Work Location' },
+  { key: 'ASSIGNED_STEWARD', header: 'Assigned Steward' },
+  { key: 'CURRENT_STATUS',   header: 'Current Status' },
+  { key: 'COMPLETED_DATE',   header: 'Completed Date' },
+  { key: 'TOTAL_MISSED',     header: 'Total Missed' },
+  { key: 'TOTAL_COMPLETED',  header: 'Total Completed' },
+  { key: 'LAST_REMINDER_SENT', header: 'Last Reminder Sent' }
+];
+
+var SURVEY_TRACKING_COLS = buildColsFromMap_(SURVEY_TRACKING_HEADER_MAP_);
 
 // ============================================================================
 // FEEDBACK & DEVELOPMENT COLUMNS (11 columns: A-K)
@@ -1716,19 +1537,200 @@ var SURVEY_TRACKING_COLS = {
  * Feedback & Development column positions (1-indexed)
  * @const {Object}
  */
-var FEEDBACK_COLS = {
-  TIMESTAMP: 1,                // A - Auto-generated timestamp
-  SUBMITTED_BY: 2,             // B - Who submitted the feedback
-  CATEGORY: 3,                 // C - Area of the system
-  TYPE: 4,                     // D - Bug, Feature Request, Improvement
-  PRIORITY: 5,                 // E - Low, Medium, High, Critical
-  TITLE: 6,                    // F - Short title
-  DESCRIPTION: 7,              // G - Detailed description
-  STATUS: 8,                   // H - New, In Progress, Resolved, Won't Fix
-  ASSIGNED_TO: 9,              // I - Who is working on it
-  RESOLUTION: 10,              // J - How it was resolved
-  NOTES: 11                    // K - Additional notes
-};
+var FEEDBACK_HEADER_MAP_ = [
+  { key: 'TIMESTAMP',    header: 'Timestamp' },
+  { key: 'SUBMITTED_BY', header: 'Submitted By' },
+  { key: 'CATEGORY',     header: 'Category' },
+  { key: 'TYPE',         header: 'Type' },
+  { key: 'PRIORITY',     header: 'Priority' },
+  { key: 'TITLE',        header: 'Title' },
+  { key: 'DESCRIPTION',  header: 'Description' },
+  { key: 'STATUS',       header: 'Status' },
+  { key: 'ASSIGNED_TO',  header: 'Assigned To' },
+  { key: 'RESOLUTION',   header: 'Resolution' },
+  { key: 'NOTES',        header: 'Notes' }
+];
+
+var FEEDBACK_COLS = buildColsFromMap_(FEEDBACK_HEADER_MAP_);
+
+// ============================================================================
+// COLUMN AUTO-DISCOVERY SYSTEM
+// ============================================================================
+// Header maps are the single source of truth for each sheet's column layout.
+// Column constants (MEMBER_COLS, etc.) and header arrays (getMemberHeaders())
+// are both auto-derived from these maps.
+//
+// To add/remove/reorder columns: edit the header map array.
+// Column numbers, header arrays, and legacy compat objects all update automatically.
+//
+// For runtime adaptation (someone manually reorders columns in the spreadsheet),
+// call syncColumnMaps() — it reads actual headers and auto-updates all constants.
+// ============================================================================
+
+/**
+ * Build column constant object from a header map array.
+ * Position is determined by array order (1-indexed) unless entry has explicit 'pos'.
+ * @param {Array<{key: string, header: string, pos?: number}>} headerMap
+ * @param {Object} [aliases] - { aliasKey: 'existingKey' } for backward compat
+ * @returns {Object} Column constants object (1-indexed)
+ */
+function buildColsFromMap_(headerMap, aliases) {
+  var cols = {};
+  for (var i = 0; i < headerMap.length; i++) {
+    cols[headerMap[i].key] = headerMap[i].pos !== undefined ? headerMap[i].pos : (i + 1);
+  }
+  if (aliases) {
+    for (var alias in aliases) {
+      if (aliases.hasOwnProperty(alias)) {
+        cols[alias] = cols[aliases[alias]];
+      }
+    }
+  }
+  return cols;
+}
+
+/**
+ * Extract ordered header text array from a header map.
+ * Used for sheet creation (writing row 1 headers).
+ * @param {Array<{key: string, header: string}>} headerMap
+ * @returns {Array<string>} Ordered header labels
+ */
+function getHeadersFromMap_(headerMap) {
+  var headers = [];
+  for (var i = 0; i < headerMap.length; i++) {
+    headers.push(headerMap[i].header);
+  }
+  return headers;
+}
+
+/**
+ * Build a 0-indexed legacy column map from a 1-indexed COLS object.
+ * @param {Object} colsObj - 1-indexed column constants
+ * @param {Object} [extraAliases] - { 'LEGACY_KEY': 'PRIMARY_KEY' } for legacy-only aliases
+ * @returns {Object} 0-indexed column constants
+ */
+function buildLegacyCols_(colsObj, extraAliases) {
+  var legacy = {};
+  for (var key in colsObj) {
+    if (colsObj.hasOwnProperty(key)) {
+      legacy[key] = colsObj[key] - 1;
+    }
+  }
+  if (extraAliases) {
+    for (var alias in extraAliases) {
+      if (extraAliases.hasOwnProperty(alias)) {
+        var target = extraAliases[alias];
+        legacy[alias] = colsObj[target] !== undefined ? colsObj[target] - 1 : legacy[target];
+      }
+    }
+  }
+  return legacy;
+}
+
+/**
+ * Resolve column positions by reading actual sheet headers at runtime.
+ * @param {string} sheetName - Sheet name to read
+ * @param {Array<{key: string, header: string}>} headerMap - Expected headers
+ * @param {Object} [options] - { headerRow: number } (default: 1)
+ * @returns {Object|null} Resolved column map, or null if sheet doesn't exist
+ */
+function resolveColumnsFromSheet_(sheetName, headerMap, options) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastColumn() < 1) return null;
+
+    var headerRow = (options && options.headerRow) || 1;
+    var actualHeaders = sheet.getRange(headerRow, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    var headerToKey = {};
+    for (var i = 0; i < headerMap.length; i++) {
+      headerToKey[headerMap[i].header] = headerMap[i].key;
+    }
+
+    var cols = {};
+    for (var j = 0; j < actualHeaders.length; j++) {
+      var text = String(actualHeaders[j]).trim();
+      if (headerToKey[text]) {
+        cols[headerToKey[text]] = j + 1;
+      }
+    }
+
+    return cols;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Sync all column maps with actual sheet headers at runtime.
+ * Auto-updates global *_COLS objects if columns have been moved.
+ * Call during onOpen or after sheet restructuring.
+ * @returns {Object} { warnings: string[], synced: string[] }
+ */
+function syncColumnMaps() {
+  var result = { warnings: [], synced: [] };
+
+  var maps = [
+    { name: 'MEMBER_COLS', sheet: SHEETS.MEMBER_DIR, map: MEMBER_HEADER_MAP_, target: MEMBER_COLS,
+      aliases: { LOCATION: 'WORK_LOCATION', DAYS_TO_DEADLINE: 'NEXT_DEADLINE' } },
+    { name: 'GRIEVANCE_COLS', sheet: SHEETS.GRIEVANCE_LOG, map: GRIEVANCE_HEADER_MAP_, target: GRIEVANCE_COLS },
+    { name: 'CONFIG_COLS', sheet: SHEETS.CONFIG, map: CONFIG_HEADER_MAP_, target: CONFIG_COLS,
+      opts: { headerRow: 2 } },
+    { name: 'MEETING_CHECKIN_COLS', sheet: SHEETS.MEETING_CHECKIN_LOG, map: MEETING_CHECKIN_HEADER_MAP_, target: MEETING_CHECKIN_COLS },
+    { name: 'STEWARD_PERF_COLS', sheet: SHEETS.STEWARD_PERFORMANCE_CALC, map: STEWARD_PERF_HEADER_MAP_, target: STEWARD_PERF_COLS },
+    { name: 'AUDIT_LOG_COLS', sheet: SHEETS.AUDIT_LOG, map: AUDIT_LOG_HEADER_MAP_, target: AUDIT_LOG_COLS },
+    { name: 'SURVEY_VAULT_COLS', sheet: SHEETS.SURVEY_VAULT, map: SURVEY_VAULT_HEADER_MAP_, target: SURVEY_VAULT_COLS },
+    { name: 'SURVEY_TRACKING_COLS', sheet: SHEETS.SURVEY_TRACKING, map: SURVEY_TRACKING_HEADER_MAP_, target: SURVEY_TRACKING_COLS },
+    { name: 'FEEDBACK_COLS', sheet: SHEETS.FEEDBACK, map: FEEDBACK_HEADER_MAP_, target: FEEDBACK_COLS },
+    { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS }
+  ];
+
+  for (var m = 0; m < maps.length; m++) {
+    var entry = maps[m];
+    var resolved = resolveColumnsFromSheet_(entry.sheet, entry.map, entry.opts);
+    if (!resolved) continue;
+
+    var moved = false;
+    for (var key in resolved) {
+      if (resolved.hasOwnProperty(key) && entry.target[key] !== resolved[key]) {
+        result.warnings.push(entry.name + '.' + key + ': expected col ' + entry.target[key] + ', found col ' + resolved[key]);
+        entry.target[key] = resolved[key];
+        moved = true;
+      }
+    }
+
+    // Re-apply aliases after sync
+    if (entry.aliases) {
+      for (var alias in entry.aliases) {
+        if (entry.aliases.hasOwnProperty(alias)) {
+          entry.target[alias] = entry.target[entry.aliases[alias]];
+        }
+      }
+    }
+
+    if (moved) result.synced.push(entry.name);
+  }
+
+  // Rebuild legacy compat objects if primary maps changed
+  if (result.synced.indexOf('MEMBER_COLS') >= 0) {
+    var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
+    for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
+  }
+  if (result.synced.indexOf('GRIEVANCE_COLS') >= 0) {
+    var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
+    for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
+  }
+
+  if (result.synced.length > 0) {
+    Logger.log('syncColumnMaps: Updated ' + result.synced.join(', '));
+    if (result.warnings.length > 0) {
+      Logger.log('Column changes detected:\n  ' + result.warnings.join('\n  '));
+    }
+  }
+
+  return result;
+}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -1855,49 +1857,19 @@ function mapGrievanceRow(row) {
 }
 
 /**
- * Get all member header labels in order
- * @returns {Array} Array of header labels for Member Directory
+ * Get all member header labels in order — auto-derived from MEMBER_HEADER_MAP_
+ * @returns {Array<string>} Ordered header labels for Member Directory
  */
 function getMemberHeaders() {
-  return [
-    'Member ID', 'First Name', 'Last Name', 'Job Title',
-    'Work Location', 'Unit', 'Cubicle', 'Office Days',
-    'Email', 'Phone', 'Preferred Communication', 'Best Time to Contact',
-    'Supervisor', 'Manager', 'Is Steward', 'Committees', 'Assigned Steward',
-    'Last Virtual Mtg', 'Last In-Person Mtg', 'Open Rate %', 'Volunteer Hours',
-    'Interest: Local', 'Interest: Chapter', 'Interest: Allied',
-    'Recent Contact Date', 'Contact Steward', 'Contact Notes',
-    'Has Open Grievance?', 'Grievance Status', 'Days to Deadline', 'Start Grievance',
-    '⚡ Actions',
-    'PIN Hash',
-    'Employee ID', 'Department', 'Hire Date',
-    'Street Address', 'City', 'State'
-  ];
+  return getHeadersFromMap_(MEMBER_HEADER_MAP_);
 }
 
 /**
- * Get all grievance header labels in order
- * @returns {Array} Array of header labels for Grievance Log
+ * Get all grievance header labels in order — auto-derived from GRIEVANCE_HEADER_MAP_
+ * @returns {Array<string>} Ordered header labels for Grievance Log
  */
 function getGrievanceHeaders() {
-  return [
-    'Grievance ID', 'Member ID', 'First Name', 'Last Name',
-    'Status', 'Current Step',
-    'Incident Date', 'Filing Deadline', 'Date Filed',
-    'Step I Due', 'Step I Rcvd',
-    'Step II Appeal Due', 'Step II Appeal Filed', 'Step II Due', 'Step II Rcvd',
-    'Step III Appeal Due', 'Step III Appeal Filed', 'Date Closed',
-    'Days Open', 'Next Action Due', 'Days to Deadline',
-    'Articles Violated', 'Issue Category',
-    'Member Email', 'Work Location', 'Assigned Steward',
-    'Resolution',
-    'Message Alert', 'Coordinator Message', 'Acknowledged By', 'Acknowledged Date',
-    'Drive Folder ID', 'Drive Folder URL',
-    '⚡ Actions',
-    'Action Type', 'Checklist Progress',
-    'Reminder 1 Date', 'Reminder 1 Note', 'Reminder 2 Date', 'Reminder 2 Note',
-    'Last Updated'
-  ];
+  return getHeadersFromMap_(GRIEVANCE_HEADER_MAP_);
 }
 
 // ============================================================================
@@ -2344,20 +2316,22 @@ var CHECKLIST_SHEET_NAME = 'Case Checklist';
  * Checklist column positions (1-indexed)
  * @const {Object}
  */
-var CHECKLIST_COLS = {
-  CHECKLIST_ID: 1,       // A - Unique checklist item ID
-  CASE_ID: 2,            // B - Links to Grievance ID or Action ID
-  ACTION_TYPE: 3,        // C - Type of case (Grievance, Records Request, etc.)
-  ITEM_TEXT: 4,          // D - Description of checklist item
-  CATEGORY: 5,           // E - Document, Meeting, Deadline, Evidence, Communication
-  REQUIRED: 6,           // F - Yes/No - Is this item required?
-  COMPLETED: 7,          // G - Checkbox - Has item been completed?
-  COMPLETED_BY: 8,       // H - Who completed this item
-  COMPLETED_DATE: 9,     // I - When item was completed
-  DUE_DATE: 10,          // J - Optional due date for time-sensitive items
-  NOTES: 11,             // K - Additional notes
-  SORT_ORDER: 12         // L - For custom ordering of items
-};
+var CHECKLIST_HEADER_MAP_ = [
+  { key: 'CHECKLIST_ID',   header: 'Checklist ID' },
+  { key: 'CASE_ID',        header: 'Case ID' },
+  { key: 'ACTION_TYPE',    header: 'Action Type' },
+  { key: 'ITEM_TEXT',      header: 'Item Text' },
+  { key: 'CATEGORY',       header: 'Category' },
+  { key: 'REQUIRED',       header: 'Required' },
+  { key: 'COMPLETED',      header: 'Completed' },
+  { key: 'COMPLETED_BY',   header: 'Completed By' },
+  { key: 'COMPLETED_DATE', header: 'Completed Date' },
+  { key: 'DUE_DATE',       header: 'Due Date' },
+  { key: 'NOTES',          header: 'Notes' },
+  { key: 'SORT_ORDER',     header: 'Sort Order' }
+];
+
+var CHECKLIST_COLS = buildColsFromMap_(CHECKLIST_HEADER_MAP_);
 
 /**
  * Checklist item categories

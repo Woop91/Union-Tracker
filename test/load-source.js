@@ -16,12 +16,63 @@ const path = require('path');
  * `function X(` to `global.X = function X(` so that
  * all declarations become globally accessible in Jest's sandbox.
  *
+ * Google Apps Script hoists function declarations so they are available
+ * anywhere in the file, regardless of definition order. To simulate this
+ * in Node.js, we extract top-level function definitions, evaluate them
+ * first, then evaluate the full code.
+ *
  * @param {string} filename - Filename relative to src/, e.g. '00_Security.gs'
  */
 function loadSource(filename) {
   const filePath = path.resolve(__dirname, '..', 'src', filename);
   let code = fs.readFileSync(filePath, 'utf8');
 
+  // --- Phase 1: Hoist function declarations ---
+  // In GAS, `function foo()` is hoisted to the top of the script scope.
+  // Extract top-level function declarations and evaluate them first so
+  // they are available when var/const/let assignments run.
+  const fnPattern = /^function\s+(\w+)\s*\(/gm;
+  let match;
+  const functionNames = [];
+  while ((match = fnPattern.exec(code)) !== null) {
+    functionNames.push(match[1]);
+  }
+
+  if (functionNames.length > 0) {
+    // Build a hoisted-only version: just the function declarations rewritten as global assignments
+    let hoisted = code.replace(/^function\s+(\w+)\s*\(/gm, 'global.$1 = function $1(');
+    // Remove everything that isn't a global.FUNCNAME assignment (var, const, let, other statements)
+    // by only keeping lines that are part of function expressions
+    // Simpler approach: eval the full rewritten code but skip non-function top-level statements
+    // Actually simplest: just eval function assignments extracted via a second pass
+
+    // Extract complete function bodies for hoisting
+    const fnBodies = [];
+    for (const name of functionNames) {
+      const fnRegex = new RegExp('^function\\s+' + name + '\\s*\\(', 'm');
+      const fnMatch = fnRegex.exec(code);
+      if (fnMatch) {
+        // Find the matching closing brace by counting braces
+        let braceCount = 0;
+        let started = false;
+        let endIdx = fnMatch.index;
+        for (let i = fnMatch.index; i < code.length; i++) {
+          if (code[i] === '{') { braceCount++; started = true; }
+          if (code[i] === '}') { braceCount--; }
+          if (started && braceCount === 0) { endIdx = i + 1; break; }
+        }
+        const fnCode = code.substring(fnMatch.index, endIdx);
+        fnBodies.push('global.' + name + ' = ' + fnCode.replace(/^function/, 'function'));
+      }
+    }
+
+    if (fnBodies.length > 0) {
+      // eslint-disable-next-line no-eval
+      (0, eval)(fnBodies.join('\n'));
+    }
+  }
+
+  // --- Phase 2: Evaluate the full file ---
   // Rewrite top-level var declarations to global assignments
   // Match lines starting with `var IDENTIFIER =` (possibly with leading whitespace at indent 0)
   code = code.replace(/^var\s+(\w+)\s*=/gm, 'global.$1 =');

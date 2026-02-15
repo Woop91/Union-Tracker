@@ -1427,19 +1427,19 @@ function getInteractiveAnalyticsData() {
   var perfSheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
   if (perfSheet && perfSheet.getLastRow() > 1) {
     try {
-      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), 10).getValues();
+      var perfData = perfSheet.getRange(2, 1, Math.min(perfSheet.getLastRow() - 1, 20), STEWARD_PERF_COLS.PERFORMANCE_SCORE).getValues();
       data.stewardPerformance.topPerformers = perfData
-        .filter(function(row) { return row[0] && row[9]; }) // Has name and score
+        .filter(function(row) { return row[STEWARD_PERF_COLS.STEWARD - 1] && row[STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]; })
         .map(function(row) {
           return {
-            name: row[0],
-            totalCases: row[1] || 0,
-            active: row[2] || 0,
-            closed: row[3] || 0,
-            won: row[4] || 0,
-            winRate: row[5] || 0,
-            avgDays: row[6] || 0,
-            score: row[9] || 0
+            name: row[STEWARD_PERF_COLS.STEWARD - 1],
+            totalCases: row[STEWARD_PERF_COLS.TOTAL_CASES - 1] || 0,
+            active: row[STEWARD_PERF_COLS.ACTIVE - 1] || 0,
+            closed: row[STEWARD_PERF_COLS.CLOSED - 1] || 0,
+            won: row[STEWARD_PERF_COLS.WON - 1] || 0,
+            winRate: row[STEWARD_PERF_COLS.WIN_RATE - 1] || 0,
+            avgDays: row[STEWARD_PERF_COLS.AVG_DAYS - 1] || 0,
+            score: row[STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1] || 0
           };
         })
         .sort(function(a, b) { return b.score - a.score; })
@@ -1536,8 +1536,8 @@ function getInteractiveResourceLinks() {
 
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
-      // Get URLs from Config sheet row 2
-      var row = configSheet.getRange(2, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      // Get URLs from Config sheet row 3 (data row; rows 1-2 are headers)
+      var row = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
       links.grievanceForm = row[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
       links.contactForm = row[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
       links.satisfactionForm = row[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
@@ -1566,7 +1566,8 @@ function getInteractiveMemberFilters() {
   if (configSheet && configSheet.getLastRow() > 1) {
     try {
       var lastRow = configSheet.getLastRow();
-      var data = configSheet.getRange(2, 1, lastRow - 1, CONFIG_COLS.OFFICE_DAYS).getValues();
+      if (lastRow < 3) return filters;
+      var data = configSheet.getRange(3, 1, lastRow - 2, CONFIG_COLS.OFFICE_DAYS).getValues();
 
       // Get unique values from config
       data.forEach(function(row) {

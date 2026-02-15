@@ -546,18 +546,20 @@ function getSatisfactionOverviewData() {
 
   data.totalResponses = lastRow - 1;
 
-  // Get satisfaction scores (Q6-Q9 are columns G-J, 1-indexed as 7-10)
-  var satisfactionRange = sheet.getRange(2, SATISFACTION_COLS.Q6_SATISFIED_REP, data.totalResponses, 4).getValues();
+  // Get satisfaction scores (Q6-Q9) — dynamic range from SATISFACTION_COLS
+  var satRangeStart = SATISFACTION_COLS.Q6_SATISFIED_REP;
+  var satRangeCount = SATISFACTION_COLS.Q9_RECOMMEND - satRangeStart + 1;
+  var satisfactionRange = sheet.getRange(2, satRangeStart, data.totalResponses, satRangeCount).getValues();
 
   var sumOverall = 0, sumTrust = 0, sumProtected = 0, sumRecommend = 0;
   var promoters = 0, detractors = 0;
   var validCount = 0;
 
   satisfactionRange.forEach(function(row) {
-    var satisfied = parseFloat(row[0]) || 0;
-    var trust = parseFloat(row[1]) || 0;
-    var protected_ = parseFloat(row[2]) || 0;
-    var recommend = parseFloat(row[3]) || 0;
+    var satisfied = parseFloat(row[SATISFACTION_COLS.Q6_SATISFIED_REP - satRangeStart]) || 0;
+    var trust = parseFloat(row[SATISFACTION_COLS.Q7_TRUST_UNION - satRangeStart]) || 0;
+    var protected_ = parseFloat(row[SATISFACTION_COLS.Q8_FEEL_PROTECTED - satRangeStart]) || 0;
+    var recommend = parseFloat(row[SATISFACTION_COLS.Q9_RECOMMEND - satRangeStart]) || 0;
 
     if (satisfied > 0) {
       sumOverall += satisfied;
@@ -1421,15 +1423,18 @@ function syncSatisfactionValues() {
     return;
   }
 
-  // Get all response data (columns A-BK, 1-63)
-  var responseData = sheet.getRange(2, 1, lastRow - 1, 63).getValues();
+  // Get all response data (up to last scale question column)
+  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS; // last Likert-scale question
+  var responseData = sheet.getRange(2, 1, lastRow - 1, lastResponseCol).getValues();
 
   // Calculate section averages for each row
   var sectionAverages = computeSectionAverages_(responseData);
 
-  // Write section averages to columns BT-CD (72-82)
+  // Write section averages to summary area
+  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
   if (sectionAverages.length > 0) {
-    sheet.getRange(2, 72, sectionAverages.length, 11).setValues(sectionAverages);
+    sheet.getRange(2, summaryStart, sectionAverages.length, summaryCols).setValues(sectionAverages);
   }
 
   // Calculate and write dashboard metrics
@@ -1453,38 +1458,39 @@ function computeSectionAverages_(responseData) {
 
     var averages = [];
 
-    // Overall Satisfaction (Q6-9: columns G-J, indices 6-9)
-    averages.push(computeAverage_(row, 6, 9));
+    // Derive indices from SATISFACTION_COLS (1-indexed, used as 0-indexed array indices)
+    // Overall Satisfaction (Q6-9)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
 
-    // Steward Rating (Q10-16: columns K-Q, indices 10-16)
-    averages.push(computeAverage_(row, 10, 16));
+    // Steward Rating (Q10-16)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
 
-    // Steward Access (Q18-20: columns S-U, indices 18-20)
-    averages.push(computeAverage_(row, 18, 20));
+    // Steward Access (Q18-20)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
 
-    // Chapter (Q21-25: columns V-Z, indices 21-25)
-    averages.push(computeAverage_(row, 21, 25));
+    // Chapter (Q21-25)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
 
-    // Leadership (Q26-31: columns AA-AF, indices 26-31)
-    averages.push(computeAverage_(row, 26, 31));
+    // Leadership (Q26-31)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
 
-    // Contract (Q32-35: columns AG-AJ, indices 32-35)
-    averages.push(computeAverage_(row, 32, 35));
+    // Contract (Q32-35)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
 
-    // Representation (Q37-40: columns AL-AO, indices 37-40)
-    averages.push(computeAverage_(row, 37, 40));
+    // Representation (Q37-40)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
 
-    // Communication (Q41-45: columns AP-AT, indices 41-45)
-    averages.push(computeAverage_(row, 41, 45));
+    // Communication (Q41-45)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1));
 
-    // Member Voice (Q46-50: columns AU-AY, indices 46-50)
-    averages.push(computeAverage_(row, 46, 50));
+    // Member Voice (Q46-50)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1));
 
-    // Value/Action (Q51-55: columns AZ-BD, indices 51-55)
-    averages.push(computeAverage_(row, 51, 55));
+    // Value/Action (Q51-55)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
 
-    // Scheduling (Q56-62: columns BE-BK, indices 56-62)
-    averages.push(computeAverage_(row, 56, 62));
+    // Scheduling (Q56-62)
+    averages.push(computeAverage_(row, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
     results.push(averages);
   }
@@ -1531,7 +1537,7 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
   var totalResponses = responseData.length;
   var responsePeriod = 'No data';
   if (totalResponses > 0) {
-    var timestamps = responseData.map(function(r) { return r[0]; }).filter(function(t) { return t instanceof Date; });
+    var timestamps = responseData.map(function(r) { return r[SATISFACTION_COLS.TIMESTAMP - 1]; }).filter(function(t) { return t instanceof Date; });
     if (timestamps.length > 0) {
       var minDate = new Date(Math.min.apply(null, timestamps));
       var maxDate = new Date(Math.max.apply(null, timestamps));
@@ -1574,28 +1580,28 @@ function writeSatisfactionDashboard_(sheet, responseData, sectionAverages) {
   for (var d = 0; d < responseData.length; d++) {
     var row = responseData[d];
 
-    // Shift (column D, index 3)
-    var shift = row[3];
+    // Shift (Q3)
+    var shift = row[SATISFACTION_COLS.Q3_SHIFT - 1];
     if (shift === 'Day') shifts.Day++;
     else if (shift === 'Evening') shifts.Evening++;
     else if (shift === 'Night') shifts.Night++;
     else if (shift === 'Rotating') shifts.Rotating++;
 
-    // Tenure (column E, index 4)
-    var ten = String(row[4] || '');
+    // Tenure (Q4)
+    var ten = String(row[SATISFACTION_COLS.Q4_TIME_IN_ROLE - 1] || '');
     if (ten.indexOf('<1') >= 0) tenure['<1']++;
     else if (ten.indexOf('1-3') >= 0) tenure['1-3']++;
     else if (ten.indexOf('4-7') >= 0) tenure['4-7']++;
     else if (ten.indexOf('8-15') >= 0) tenure['8-15']++;
     else if (ten.indexOf('15+') >= 0) tenure['15+']++;
 
-    // Steward contact (column F, index 5)
-    if (row[5] === 'Yes') stewardContact.Yes++;
-    else if (row[5] === 'No') stewardContact.No++;
+    // Steward contact (Q5)
+    if (row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] === 'Yes') stewardContact.Yes++;
+    else if (row[SATISFACTION_COLS.Q5_STEWARD_CONTACT - 1] === 'No') stewardContact.No++;
 
-    // Filed grievance (column AK, index 36)
-    if (row[36] === 'Yes') filedGrievance.Yes++;
-    else if (row[36] === 'No') filedGrievance.No++;
+    // Filed grievance (Q36)
+    if (row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] === 'Yes') filedGrievance.Yes++;
+    else if (row[SATISFACTION_COLS.Q36_FILED_GRIEVANCE - 1] === 'No') filedGrievance.No++;
   }
 
   // Write Demographics (rows 4-23, columns CH-CI)
@@ -1646,38 +1652,30 @@ function computeSatisfactionRowAverages(row) {
 
   if (!sheet || row < 2) return;
 
-  // Get the response data for this row (columns A-BK, 1-63)
-  var rowData = sheet.getRange(row, 1, 1, 63).getValues()[0];
+  // Get the response data for this row
+  var lastResponseCol = SATISFACTION_COLS.Q62_CONCERNS_SERIOUS;
+  var rowData = sheet.getRange(row, 1, 1, lastResponseCol).getValues()[0];
 
-  if (!rowData[0]) return; // Skip if no timestamp
+  if (!rowData[SATISFACTION_COLS.TIMESTAMP - 1]) return; // Skip if no timestamp
 
   var averages = [];
 
-  // Overall Satisfaction (Q6-9: indices 6-9)
-  averages.push(computeAverage_(rowData, 6, 9));
-  // Steward Rating (Q10-16: indices 10-16)
-  averages.push(computeAverage_(rowData, 10, 16));
-  // Steward Access (Q18-20: indices 18-20)
-  averages.push(computeAverage_(rowData, 18, 20));
-  // Chapter (Q21-25: indices 21-25)
-  averages.push(computeAverage_(rowData, 21, 25));
-  // Leadership (Q26-31: indices 26-31)
-  averages.push(computeAverage_(rowData, 26, 31));
-  // Contract (Q32-35: indices 32-35)
-  averages.push(computeAverage_(rowData, 32, 35));
-  // Representation (Q37-40: indices 37-40)
-  averages.push(computeAverage_(rowData, 37, 40));
-  // Communication (Q41-45: indices 41-45)
-  averages.push(computeAverage_(rowData, 41, 45));
-  // Member Voice (Q46-50: indices 46-50)
-  averages.push(computeAverage_(rowData, 46, 50));
-  // Value/Action (Q51-55: indices 51-55)
-  averages.push(computeAverage_(rowData, 51, 55));
-  // Scheduling (Q56-62: indices 56-62)
-  averages.push(computeAverage_(rowData, 56, 62));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q6_SATISFIED_REP - 1, SATISFACTION_COLS.Q9_RECOMMEND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1, SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q18_KNOW_CONTACT - 1, SATISFACTION_COLS.Q20_EASY_FIND - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1, SATISFACTION_COLS.Q25_FAIR_REP - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1, SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1, SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q37_UNDERSTOOD_STEPS - 1, SATISFACTION_COLS.Q40_OUTCOME_JUSTIFIED - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1, SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q46_VOICE_MATTERS - 1, SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q51_GOOD_VALUE - 1, SATISFACTION_COLS.Q55_WIN_TOGETHER - 1));
+  averages.push(computeAverage_(rowData, SATISFACTION_COLS.Q56_UNDERSTAND_CHANGES - 1, SATISFACTION_COLS.Q62_CONCERNS_SERIOUS - 1));
 
-  // Write section averages to this row (columns BT-CD, 72-82)
-  sheet.getRange(row, 72, 1, 11).setValues([averages]);
+  // Write section averages to summary area
+  var summaryStart = SATISFACTION_COLS.SUMMARY_START;
+  var summaryCols = SATISFACTION_COLS.AVG_SCHEDULING - SATISFACTION_COLS.AVG_OVERALL_SAT + 1;
+  sheet.getRange(row, summaryStart, 1, summaryCols).setValues([averages]);
 }
 
 // ============================================================================
@@ -2812,23 +2810,33 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     }
   }
 
-  // Get top 5 locations from Config
-  for (var l = 0; l < 5; l++) {
-    var locName = configData[2 + l] ? configData[2 + l][CONFIG_COLS.OFFICE_LOCATIONS - 1] : '';
-    if (locName) {
-      var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
-      locData.members = memberLocations[locName] || 0;
-      var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
-
-      metrics.locations.push({
-        name: locName,
-        members: locData.members,
-        grievances: locData.grievances,
-        open: locData.open,
-        winRate: locWinRate,
-        satisfaction: '-'
-      });
+  // Get locations dynamically from Config column (skip header rows 0-1, data starts at index 2)
+  var configLocations = [];
+  for (var cl = 2; cl < configData.length; cl++) {
+    var configLoc = configData[cl] ? configData[cl][CONFIG_COLS.OFFICE_LOCATIONS - 1] : '';
+    if (configLoc && String(configLoc).trim() !== '') {
+      configLocations.push(String(configLoc).trim());
     }
+  }
+  // Use top 5 locations by member count
+  configLocations.sort(function(a, b) {
+    return (memberLocations[b] || 0) - (memberLocations[a] || 0);
+  });
+  var topLocations = configLocations.slice(0, 5);
+  for (var l = 0; l < topLocations.length; l++) {
+    var locName = topLocations[l];
+    var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
+    locData.members = memberLocations[locName] || 0;
+    var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
+
+    metrics.locations.push({
+      name: locName,
+      members: locData.members,
+      grievances: locData.grievances,
+      open: locData.open,
+      winRate: locWinRate,
+      satisfaction: '-'
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════

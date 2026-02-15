@@ -1168,17 +1168,17 @@ function sendStewardDeadlineAlerts() {
     });
   }
 
-  // Get steward emails from Config sheet
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  // Get steward emails from Member Directory (stewards are members with IS_STEWARD = Yes)
   var stewardEmails = {};
-  if (configSheet) {
-    var configData = configSheet.getDataRange().getValues();
-    // Look for Steward Emails column (assume it's after Stewards column)
-    for (var c = 1; c < configData.length; c++) {
-      var stewardName = configData[c][CONFIG_COLS.STEWARDS - 1];
-      var stewardEmail = configData[c][CONFIG_COLS.STEWARDS]; // Next column
-      if (stewardName && stewardEmail && stewardEmail.indexOf('@') !== -1) {
-        stewardEmails[stewardName] = stewardEmail;
+  for (var s = 1; s < memberData.length; s++) {
+    var isSteward = memberData[s][MEMBER_COLS.IS_STEWARD - 1];
+    if (isTruthyValue(isSteward)) {
+      var sFirstName = memberData[s][MEMBER_COLS.FIRST_NAME - 1] || '';
+      var sLastName = memberData[s][MEMBER_COLS.LAST_NAME - 1] || '';
+      var sFullName = (sFirstName + ' ' + sLastName).trim();
+      var sEmail = memberData[s][MEMBER_COLS.EMAIL - 1] || '';
+      if (sFullName && sEmail && sEmail.indexOf('@') !== -1) {
+        stewardEmails[sFullName] = sEmail;
       }
     }
   }
@@ -1655,7 +1655,7 @@ function populateSurveyTrackingFromMembers() {
 
   // Clear existing data (preserve header)
   if (trackingSheet.getLastRow() > 1) {
-    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, 10).clear();
+    trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).clear();
   }
 
   var rows = [];
@@ -1681,7 +1681,7 @@ function populateSurveyTrackingFromMembers() {
   }
 
   if (rows.length > 0) {
-    trackingSheet.getRange(2, 1, rows.length, 10).setValues(rows);
+    trackingSheet.getRange(2, 1, rows.length, SURVEY_TRACKING_HEADER_MAP_.length).setValues(rows);
   }
 
   Logger.log('populateSurveyTracking: Populated ' + rows.length + ' member rows');
@@ -1781,14 +1781,11 @@ function sendSurveyCompletionReminders() {
     return 'No survey tracking data found.';
   }
 
-  // Get survey URL from Config
+  // Get survey URL from Config using CONFIG_COLS constant (data in row 3)
   var surveyUrl = '';
-  if (configSheet) {
+  if (configSheet && configSheet.getLastRow() >= 3) {
     try {
-      var configData = configSheet.getDataRange().getValues();
-      if (configData.length > 2 && configData[0].length >= 44) {
-        surveyUrl = configData[2][43] || ''; // Column AR (Satisfaction Survey URL)
-      }
+      surveyUrl = configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '';
     } catch (_e) { /* no survey URL configured */ }
   }
 
@@ -1800,7 +1797,7 @@ function sendSurveyCompletionReminders() {
 
   var orgName = '';
   try {
-    orgName = configSheet.getRange(3, 21).getValue() || 'Your Union';
+    orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue() || 'Your Union';
   } catch (_e) {
     orgName = 'Your Union';
   }

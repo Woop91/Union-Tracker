@@ -2803,23 +2803,14 @@ function getWebAppResourceLinks() {
     githubRepo: ''  // Set via Config sheet ORG_WEBSITE or manually
   };
 
-  // Try to get form URLs from Config sheet
-  if (configSheet) {
+  // Get form URLs from Config sheet using CONFIG_COLS constants (data in row 3)
+  if (configSheet && configSheet.getLastRow() >= 3) {
     try {
-      var configData = configSheet.getDataRange().getValues();
-      for (var i = 0; i < configData.length; i++) {
-        var row = configData[i];
-        for (var j = 0; j < row.length; j++) {
-          var val = String(row[j] || '').toLowerCase();
-          if (val.indexOf('grievance') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.grievanceForm = String(row[j + 1]);
-          } else if (val.indexOf('contact') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.contactForm = String(row[j + 1]);
-          } else if (val.indexOf('satisfaction') >= 0 && val.indexOf('form') >= 0 && row[j + 1]) {
-            links.satisfactionForm = String(row[j + 1]);
-          }
-        }
-      }
+      var configRow = configSheet.getRange(3, 1, 1, CONFIG_COLS.SATISFACTION_FORM_URL).getValues()[0];
+      links.grievanceForm = configRow[CONFIG_COLS.GRIEVANCE_FORM_URL - 1] || '';
+      links.contactForm = configRow[CONFIG_COLS.CONTACT_FORM_URL - 1] || '';
+      links.satisfactionForm = configRow[CONFIG_COLS.SATISFACTION_FORM_URL - 1] || '';
+      links.orgWebsite = configRow[CONFIG_COLS.ORG_WEBSITE - 1] || '';
     } catch (_e) {
       // Ignore errors reading config
     }

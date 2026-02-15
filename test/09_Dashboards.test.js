@@ -384,29 +384,37 @@ describe('computeSectionAverages_', () => {
   });
 
   test('skips rows with empty first column (timestamp)', () => {
-    const row = new Array(63).fill('');
-    row[0] = ''; // no timestamp
+    const row = new Array(SATISFACTION_COLS.Q62_CONCERNS_SERIOUS).fill('');
+    row[SATISFACTION_COLS.TIMESTAMP - 1] = ''; // no timestamp
     const result = computeSectionAverages_([row]);
     expect(result).toEqual([]);
   });
 
   test('returns 11 section averages per valid row', () => {
-    const row = new Array(63).fill(5); // all 5s
-    row[0] = new Date(); // timestamp
+    const row = new Array(SATISFACTION_COLS.Q62_CONCERNS_SERIOUS).fill(5); // all 5s
+    row[SATISFACTION_COLS.TIMESTAMP - 1] = new Date(); // timestamp
     const result = computeSectionAverages_([row]);
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveLength(11);
   });
 
   test('computes correct section averages for known values', () => {
-    const row = new Array(63).fill('');
-    row[0] = new Date(); // timestamp
+    const row = new Array(SATISFACTION_COLS.Q62_CONCERNS_SERIOUS).fill('');
+    row[SATISFACTION_COLS.TIMESTAMP - 1] = new Date(); // timestamp
 
-    // Overall Satisfaction (indices 6-9): set to 4
-    for (let i = 6; i <= 9; i++) row[i] = 4;
+    // Overall Satisfaction (Q6-Q9): set to 4
+    [SATISFACTION_COLS.Q6_SATISFIED_REP, SATISFACTION_COLS.Q7_TRUST_UNION,
+     SATISFACTION_COLS.Q8_FEEL_PROTECTED, SATISFACTION_COLS.Q9_RECOMMEND].forEach(col => {
+      row[col - 1] = 4;
+    });
 
-    // Steward Rating (indices 10-16): set to 3
-    for (let i = 10; i <= 16; i++) row[i] = 3;
+    // Steward Rating (Q10-Q16): set to 3
+    [SATISFACTION_COLS.Q10_TIMELY_RESPONSE, SATISFACTION_COLS.Q11_TREATED_RESPECT,
+     SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS, SATISFACTION_COLS.Q13_FOLLOWED_THROUGH,
+     SATISFACTION_COLS.Q14_ADVOCATED, SATISFACTION_COLS.Q15_SAFE_CONCERNS,
+     SATISFACTION_COLS.Q16_CONFIDENTIALITY].forEach(col => {
+      row[col - 1] = 3;
+    });
 
     const result = computeSectionAverages_([row]);
     expect(result[0][0]).toBe(4);   // Overall Satisfaction avg

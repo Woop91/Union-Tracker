@@ -67,24 +67,8 @@ function createConfigSheet(ss) {
     '── MOBILE DASHBOARD ──'                            // AZ (1 col) - LAST COLUMN
   ];
 
-  // Row 2: Column Headers (A-AZ = 52 columns total)
-  var columnHeaders = [
-    'Job Titles', 'Office Locations', 'Units', 'Office Days', 'Yes/No (Dropdowns)',       // A-E
-    'Supervisors', 'Managers',                                                             // F-G
-    'Stewards', 'Steward Committees',                                                      // H-I
-    'Grievance Status', 'Grievance Step', 'Issue Category', 'Articles Violated',          // J-M
-    'Communication Methods', 'Grievance Coordinators', 'Grievance Form URL', 'Contact Form URL', // N-Q
-    'Admin Emails', 'Alert Days Before Deadline', 'Notification Recipients',              // R-T
-    'Organization Name', 'Local Number', 'Main Office Address', 'Main Phone',             // U-X
-    'Google Drive Folder ID', 'Google Calendar ID',                                       // Y-Z
-    'Filing Deadline Days', 'Step I Response Days', 'Step II Appeal Days', 'Step II Response Days', // AA-AD
-    'Best Times to Contact', 'Home Towns',                                                // AE-AF
-    'Contract Article (Grievance)', 'Contract Article (Discipline)', 'Contract Article (Workload)', 'Contract Name', // AG-AJ
-    'Union Parent', 'State/Region', 'Organization Website',                               // AK-AM
-    'Office Addresses', 'Main Fax', 'Main Contact Name', 'Main Contact Email', 'Satisfaction Survey URL', // AN-AR
-    'Chief Steward Email', 'Unit Codes', 'Archive Folder ID', 'Escalation Statuses', 'Escalation Steps', 'Template ID', 'PDF Folder ID', // AS-AY
-    '📱 Mobile Dashboard URL'                                                              // AZ - LAST COLUMN
-  ];
+  // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
+  var columnHeaders = getHeadersFromMap_(CONFIG_HEADER_MAP_);
 
   // Apply section headers (Row 1)
   sheet.getRange(1, 1, 1, sectionHeaders.length).setValues([sectionHeaders])
@@ -660,28 +644,34 @@ function createMemberDirectory(ss) {
   var emailRange = sheet.getRange(2, MEMBER_COLS.EMAIL, 4999, 1);
   var phoneRange = sheet.getRange(2, MEMBER_COLS.PHONE, 4999, 1);
 
-  // Rule: Red background for empty Email (column I = $I2)
+  // Dynamic column letters from constants
+  var colId = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var colEmail = getColumnLetter(MEMBER_COLS.EMAIL);
+  var colPhone = getColumnLetter(MEMBER_COLS.PHONE);
+  var colDeadline = getColumnLetter(MEMBER_COLS.NEXT_DEADLINE);
+
+  // Rule: Red background for empty Email
   var emptyEmailRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($I2))')
-    .setBackground('#ffcdd2')  // Red background for missing email
+    .whenFormulaSatisfied('=AND($' + colId + '2<>"",ISBLANK($' + colEmail + '2))')
+    .setBackground('#ffcdd2')
     .setRanges([emailRange])
     .build();
 
-  // Rule: Red background for empty Phone (column J = $J2)
+  // Rule: Red background for empty Phone
   var emptyPhoneRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",ISBLANK($J2))')
-    .setBackground('#ffcdd2')  // Red background for missing phone
+    .whenFormulaSatisfied('=AND($' + colId + '2<>"",ISBLANK($' + colPhone + '2))')
+    .setBackground('#ffcdd2')
     .setRanges([phoneRange])
     .build();
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DEADLINE HEATMAP: Color-coded Days to Deadline (Column AD)
+  // DEADLINE HEATMAP: Color-coded Days to Deadline
   // ═══════════════════════════════════════════════════════════════════════════
   var daysDeadlineRange = sheet.getRange(2, MEMBER_COLS.NEXT_DEADLINE, 4999, 1);
 
   // Rule: Red - Overdue (shows "Overdue" or negative/0 days)
   var deadlineOverdueRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($AD2="Overdue",AND(ISNUMBER($AD2),$AD2<=0))')
+    .whenFormulaSatisfied('=OR($' + colDeadline + '2="Overdue",AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2<=0))')
     .setBackground('#ffebee')
     .setFontColor('#c62828')
     .setBold(true)
@@ -690,7 +680,7 @@ function createMemberDirectory(ss) {
 
   // Rule: Orange - Due in 1-3 days
   var deadline1to3Rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($AD2),$AD2>=1,$AD2<=3)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>=1,$' + colDeadline + '2<=3)')
     .setBackground('#fff3e0')
     .setFontColor('#e65100')
     .setBold(true)
@@ -699,7 +689,7 @@ function createMemberDirectory(ss) {
 
   // Rule: Yellow - Due in 4-7 days
   var deadline4to7Rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($AD2),$AD2>=4,$AD2<=7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>=4,$' + colDeadline + '2<=7)')
     .setBackground('#fffde7')
     .setFontColor('#f57f17')
     .setRanges([daysDeadlineRange])
@@ -707,7 +697,7 @@ function createMemberDirectory(ss) {
 
   // Rule: Green - On Track (more than 7 days remaining)
   var deadlineOnTrackRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($AD2),$AD2>7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + colDeadline + '2),$' + colDeadline + '2>7)')
     .setBackground('#e8f5e9')
     .setFontColor('#2e7d32')
     .setRanges([daysDeadlineRange])
@@ -834,13 +824,19 @@ function createGrievanceLog(ss) {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DAYS TO DEADLINE HEATMAP (Column U)
+  // DAYS TO DEADLINE HEATMAP
   // ═══════════════════════════════════════════════════════════════════════════
   var daysDeadlineRange = sheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, 4999, 1);
 
+  // Dynamic column letters from constants
+  var grColId = getColumnLetter(GRIEVANCE_COLS.GRIEVANCE_ID);
+  var grColStatus = getColumnLetter(GRIEVANCE_COLS.STATUS);
+  var grColStep = getColumnLetter(GRIEVANCE_COLS.CURRENT_STEP);
+  var grColDaysDeadline = getColumnLetter(GRIEVANCE_COLS.DAYS_TO_DEADLINE);
+
   // Rule: Red - Overdue (shows "Overdue" or negative/0 days)
   var deadlineOverdueRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($U2="Overdue",AND(ISNUMBER($U2),$U2<=0))')
+    .whenFormulaSatisfied('=OR($' + grColDaysDeadline + '2="Overdue",AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2<=0))')
     .setBackground('#ffebee')
     .setFontColor('#c62828')
     .setBold(true)
@@ -849,7 +845,7 @@ function createGrievanceLog(ss) {
 
   // Rule: Orange - Due in 1-3 days
   var deadline1to3Rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>=1,$U2<=3)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=1,$' + grColDaysDeadline + '2<=3)')
     .setBackground('#fff3e0')
     .setFontColor('#e65100')
     .setBold(true)
@@ -858,7 +854,7 @@ function createGrievanceLog(ss) {
 
   // Rule: Yellow - Due in 4-7 days
   var deadline4to7Rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>=4,$U2<=7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>=4,$' + grColDaysDeadline + '2<=7)')
     .setBackground('#fffde7')
     .setFontColor('#f57f17')
     .setRanges([daysDeadlineRange])
@@ -866,55 +862,55 @@ function createGrievanceLog(ss) {
 
   // Rule: Green - On Track (more than 7 days remaining)
   var deadlineOnTrackRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND(ISNUMBER($U2),$U2>7)')
+    .whenFormulaSatisfied('=AND(ISNUMBER($' + grColDaysDeadline + '2),$' + grColDaysDeadline + '2>7)')
     .setBackground('#e8f5e9')
     .setFontColor('#2e7d32')
     .setRanges([daysDeadlineRange])
     .build();
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PROGRESS BAR: Colored backgrounds showing grievance stage (Columns J-R)
-  // Based on Current Step (Column F), highlights completed stages
+  // PROGRESS BAR: Colored backgrounds showing grievance stage
+  // Based on Current Step, highlights completed stages
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // Progress bar spans: Step I (J-K), Step II (L-O), Step III (P-Q), Date Closed (R)
-  var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 2);         // J-K
-  var allStepsRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 9);      // J-R (all 9 columns)
+  // Progress bar spans: Step I, Step II, Step III, Date Closed
+  var step1Range = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 2);
+  var allStepsRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 9);
 
   // Completed cases: All columns green (Closed, Won, Denied, Settled, Withdrawn)
   var completedRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=OR($E2="Closed",$E2="Won",$E2="Denied",$E2="Settled",$E2="Withdrawn")')
-    .setBackground('#e8f5e9')  // Soft green
+    .whenFormulaSatisfied('=OR($' + grColStatus + '2="Closed",$' + grColStatus + '2="Won",$' + grColStatus + '2="Denied",$' + grColStatus + '2="Settled",$' + grColStatus + '2="Withdrawn")')
+    .setBackground('#e8f5e9')
     .setRanges([allStepsRange])
     .build();
 
-  // Step III in progress: J-Q highlighted (all except Date Closed)
-  var step3ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 8);  // J-Q
+  // Step III in progress
+  var step3ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 8);
   var step3ProgressRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$F2="Step III"')
-    .setBackground('#e3f2fd')  // Soft blue
+    .whenFormulaSatisfied('=$' + grColStep + '2="Step III"')
+    .setBackground('#e3f2fd')
     .setRanges([step3ProgressRange])
     .build();
 
-  // Step II in progress: J-O highlighted
-  var step2ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 6);  // J-O
+  // Step II in progress
+  var step2ProgressRange = sheet.getRange(2, GRIEVANCE_COLS.STEP1_DUE, 4999, 6);
   var step2ProgressRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$F2="Step II"')
-    .setBackground('#e3f2fd')  // Soft blue
+    .whenFormulaSatisfied('=$' + grColStep + '2="Step II"')
+    .setBackground('#e3f2fd')
     .setRanges([step2ProgressRange])
     .build();
 
-  // Step I in progress: J-K highlighted
+  // Step I in progress
   var step1ProgressRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=$F2="Step I"')
-    .setBackground('#e3f2fd')  // Soft blue
+    .whenFormulaSatisfied('=$' + grColStep + '2="Step I"')
+    .setBackground('#e3f2fd')
     .setRanges([step1Range])
     .build();
 
-  // Gray out columns not yet reached (applies to all step columns by default)
+  // Gray out columns not yet reached
   var notReachedRule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied('=AND($A2<>"",$F2<>"")')
-    .setBackground('#fafafa')  // Very light gray (default for uncolored)
+    .whenFormulaSatisfied('=AND($' + grColId + '2<>"",$' + grColStep + '2<>"")')
+    .setBackground('#fafafa')
     .setRanges([allStepsRange])
     .build();
 
@@ -1718,24 +1714,8 @@ function createMeetingAttendanceSheet(ss) {
 function createMeetingCheckInLogSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEETING_CHECKIN_LOG);
 
-  var headers = [
-    'Meeting ID',       // A - Unique meeting identifier (steward sets)
-    'Meeting Name',     // B - Meeting name/topic
-    'Meeting Date',     // C - Date of meeting
-    'Meeting Type',     // D - Virtual or In-Person
-    'Member ID',        // E - Checked-in member
-    'Member Name',      // F - First + Last name
-    'Check-In Time',    // G - Timestamp when member checked in
-    'Email',            // H - Member email used for check-in
-    'Start Time',       // I - Meeting start time (HH:mm)
-    'Duration (hrs)',   // J - Meeting duration in hours
-    'Event Status',     // K - Scheduled / Active / Completed
-    'Notify Stewards',  // L - Steward email(s) for attendance report
-    'Calendar Event ID',// M - Google Calendar event ID
-    'Notes Doc URL',    // N - Meeting Notes Google Doc URL
-    'Agenda Doc URL',   // O - Meeting Agenda Google Doc URL
-    'Agenda Stewards'   // P - Steward emails for early agenda sharing
-  ];
+  // Headers — auto-derived from MEETING_CHECKIN_HEADER_MAP_
+  var headers = getHeadersFromMap_(MEETING_CHECKIN_HEADER_MAP_);
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers])
     .setFontWeight('bold')
@@ -1763,10 +1743,10 @@ function createMeetingCheckInLogSheet(ss) {
   sheet.setColumnWidth(15, 250); // O - Agenda Doc URL
   sheet.setColumnWidth(16, 250); // P - Agenda Stewards
 
-  // Format date columns
-  sheet.getRange(2, 3, 999, 1).setNumberFormat('MM/DD/YYYY');   // C - Meeting Date
-  sheet.getRange(2, 7, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss'); // G - Check-In Time
-  sheet.getRange(2, 9, 999, 1).setNumberFormat('HH:mm');        // I - Start Time
+  // Format date columns — column numbers from MEETING_CHECKIN_COLS
+  sheet.getRange(2, MEETING_CHECKIN_COLS.MEETING_DATE, 999, 1).setNumberFormat('MM/DD/YYYY');
+  sheet.getRange(2, MEETING_CHECKIN_COLS.CHECKIN_TIME, 999, 1).setNumberFormat('MM/DD/YYYY HH:mm:ss');
+  sheet.getRange(2, MEETING_CHECKIN_COLS.MEETING_TIME, 999, 1).setNumberFormat('HH:mm');
 
   // Freeze header row
   sheet.setFrozenRows(1);
