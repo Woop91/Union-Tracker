@@ -446,17 +446,19 @@ function applyMultiSelectValue(value) {
   var props = PropertiesService.getUserProperties();
   var row = parseInt(props.getProperty('multiSelectRow'), 10);
   var col = parseInt(props.getProperty('multiSelectCol'), 10);
+  var sheetName = props.getProperty('multiSelectSheet') || SHEETS.MEMBER_DIR;
 
   if (!row || !col) {
     throw new Error('Target cell not found. Please try again.');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var sheet = ss.getSheetByName(sheetName);
   sheet.getRange(row, col).setValue(value);
 
   props.deleteProperty('multiSelectRow');
   props.deleteProperty('multiSelectCol');
+  props.deleteProperty('multiSelectSheet');
 }
 
 /**
@@ -470,14 +472,14 @@ function onEditMultiSelect(e) {
   var sheet = e.range.getSheet();
   var sheetName = sheet.getName();
 
-  if (sheetName !== SHEETS.MEMBER_DIR) return;
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
   var col = e.range.getColumn();
   var row = e.range.getRow();
 
   if (row < 2) return;
 
-  var config = getMultiSelectConfig(col);
+  var config = getMultiSelectConfig(col, sheetName);
   if (!config) return;
 
   var newValue = e.value || '';
@@ -485,7 +487,7 @@ function onEditMultiSelect(e) {
   if (newValue === '' || newValue.indexOf(',') !== -1) return;
 
   SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Tip: Use Dashboard menu > "Multi-Select Editor" for easier selection of multiple values.',
+    'Tip: Use Tools menu > "Multi-Select Editor" for easier selection of multiple values.',
     config.label,
     5
   );
@@ -502,7 +504,7 @@ function onSelectionChangeMultiSelect(e) {
   var sheet = e.range.getSheet();
   var sheetName = sheet.getName();
 
-  if (sheetName !== SHEETS.MEMBER_DIR) return;
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
   var col = e.range.getColumn();
   var row = e.range.getRow();
@@ -510,7 +512,7 @@ function onSelectionChangeMultiSelect(e) {
   if (row < 2) return;
   if (e.range.getNumRows() > 1 || e.range.getNumColumns() > 1) return;
 
-  var config = getMultiSelectConfig(col);
+  var config = getMultiSelectConfig(col, sheetName);
   if (!config) return;
 
   var props = PropertiesService.getUserProperties();

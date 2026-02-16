@@ -2179,18 +2179,30 @@ var MULTI_SELECT_COLS = {
     { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
     { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
     { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
+  ],
+  // Grievance Log multi-select columns
+  GRIEVANCE_LOG: [
+    { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
+    { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
   ]
 };
 
 /**
- * Check if a column in Member Directory is a multi-select column
+ * Check if a column is a multi-select column for the given sheet
  * @param {number} col - Column number (1-indexed)
+ * @param {string} sheetName - Sheet name (defaults to Member Directory)
  * @returns {Object|null} Multi-select config if found, null otherwise
  */
-function getMultiSelectConfig(col) {
-  for (var i = 0; i < MULTI_SELECT_COLS.MEMBER_DIR.length; i++) {
-    if (MULTI_SELECT_COLS.MEMBER_DIR[i].col === col) {
-      return MULTI_SELECT_COLS.MEMBER_DIR[i];
+function getMultiSelectConfig(col, sheetName) {
+  var configs;
+  if (sheetName === SHEETS.GRIEVANCE_LOG) {
+    configs = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+  } else {
+    configs = MULTI_SELECT_COLS.MEMBER_DIR;
+  }
+  for (var i = 0; i < configs.length; i++) {
+    if (configs[i].col === col) {
+      return configs[i];
     }
   }
   return null;
