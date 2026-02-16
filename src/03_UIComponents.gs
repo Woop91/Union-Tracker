@@ -22,7 +22,7 @@
 /**
  * Creates the custom menu when the spreadsheet opens
  * Consolidated menu structure (v4.4.0):
- * - 📊 509 Union Hub: Primary operations (dashboards, search, members, cases)
+ * - 📊 Union Hub: Primary operations (dashboards, search, members, cases)
  * - 🔧 Tools: Supporting features (calendar, drive, notifications, etc.)
  * - 🛠️ Admin: System administration
  * @returns {void}
@@ -1173,7 +1173,7 @@ function showMobileDashboard() {
     '.fab{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));right:20px;width:56px;height:56px;background:#1a73e8;color:white;border:none;border-radius:50%;font-size:24px;box-shadow:0 4px 12px rgba(0,0,0,0.3);cursor:pointer;z-index:100}' +
     '@media(max-width:360px){.stats{grid-template-columns:1fr 1fr;gap:6px}.stat-card{padding:10px}.container{padding:8px;padding-bottom:80px}}' +
     '</style></head><body>' +
-    '<div class="header"><h1>📱 509 Dashboard</h1><div class="subtitle">Mobile View</div></div>' +
+    '<div class="header"><h1>📱 Dashboard</h1><div class="subtitle">Mobile View</div></div>' +
     '<div class="container"><div class="stats"><div class="stat-card"><div class="stat-value">' + stats.totalGrievances + '</div><div class="stat-label">Total</div></div><div class="stat-card"><div class="stat-value">' + stats.activeGrievances + '</div><div class="stat-label">Active</div></div><div class="stat-card"><div class="stat-value">' + stats.pendingGrievances + '</div><div class="stat-label">Pending</div></div><div class="stat-card"><div class="stat-value">' + stats.overdueGrievances + '</div><div class="stat-label">Overdue</div></div></div><div class="section-title">⚡ Quick Actions</div><button class="action-btn" onclick="google.script.run.showMobileGrievanceList()"><div class="action-icon">📋</div><div><div class="action-label">View Grievances</div><div class="action-desc">Browse all grievances</div></div></button><button class="action-btn" onclick="google.script.run.showMobileUnifiedSearch()"><div class="action-icon">🔍</div><div><div class="action-label">Search</div><div class="action-desc">Find grievances or members</div></div></button><button class="action-btn" onclick="google.script.run.showMyAssignedGrievances()"><div class="action-icon">👤</div><div><div class="action-label">My Cases</div><div class="action-desc">View assigned grievances</div></div></button></div><button class="fab" onclick="location.reload()">🔄</button></body></html>'
   ).setWidth(400).setHeight(700);
   SpreadsheetApp.getUi().showModalDialog(html, '📱 Mobile Dashboard');
@@ -1990,7 +1990,7 @@ function sendMemberDashboardLink() {
       "Access your Union Member Dashboard:\n" + url + "\n\n" +
       "HOW TO ACCESS:\n" +
       "1. Open the spreadsheet using the link above\n" +
-      "2. Go to: 509 Command > Command Center > Member Dashboard (No PII)\n" +
+      "2. Go to: Command > Command Center > Member Dashboard (No PII)\n" +
       "3. The dashboard shows aggregate union metrics (no personal info visible)\n\n" +
       "WHAT YOU'LL SEE:\n" +
       "- Morale & Trust Scores\n" +
@@ -2038,7 +2038,7 @@ function emailDashboardLink_UIService_() {
   }
 
   // Get organization name from config if available
-  var orgName = '509';
+  var orgName = '';
   try {
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {

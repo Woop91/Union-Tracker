@@ -32,7 +32,7 @@ When you execute the **Nuke Seed Data** function, the system will:
    - Home Towns (Column AF)
    - Office Addresses (Column AN)
 
-   > **NOTE (v3.11+):** These fields are now LEFT EMPTY during CREATE_509_DASHBOARD. Users populate them with their own data. If no user data was added, there's nothing to clear.
+   > **NOTE (v3.11+):** These fields are now LEFT EMPTY during CREATE_DASHBOARD. Users populate them with their own data. If no user data was added, there's nothing to clear.
 
 ### Documentation Cleanup (v4.3.5+)
 10. **Clean Documentation Tabs**: Removes seed/nuke/demo references from:
@@ -424,7 +424,7 @@ Once `07_DevTools.gs` is deleted:
 
 ## 🎉 Welcome to Production!
 
-After nuking seed data, you're ready to use the 509 Dashboard with real member and grievance data.
+After nuking seed data, you're ready to use the Dashboard with real member and grievance data.
 
 The system is now configured for:
 - **Real member tracking**

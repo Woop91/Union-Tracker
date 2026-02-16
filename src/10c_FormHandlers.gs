@@ -68,7 +68,8 @@ var CONTACT_FORM_CONFIG = {
     EMPLOYEE_ID: 'entry.PLACEHOLDER_EMP_ID',   // Employee ID — update entry ID after form creation
     STREET_ADDRESS: 'entry.PLACEHOLDER_STREET', // Mailing Address: Street
     CITY: 'entry.PLACEHOLDER_CITY',            // Mailing Address: City
-    ZIP_CODE: 'entry.PLACEHOLDER_ZIP'          // Mailing Address: Zip Code
+    ZIP_CODE: 'entry.PLACEHOLDER_ZIP',          // Mailing Address: Zip Code
+    STATE: 'entry.PLACEHOLDER_STATE'             // Mailing Address: State — update entry ID after form creation
   }
 };
 

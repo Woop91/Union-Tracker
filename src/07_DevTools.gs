@@ -221,7 +221,7 @@ function seedConfigData() {
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
 
   if (!sheet) {
-    SpreadsheetApp.getUi().alert('Error: Config sheet not found. Please run CREATE_509_DASHBOARD first.');
+    SpreadsheetApp.getUi().alert('Error: Config sheet not found. Please run CREATE_DASHBOARD first.');
     return;
   }
 
@@ -2316,7 +2316,7 @@ function onEditValidation(e) {
  * TestFramework.gs - Comprehensive Unit Testing Framework
  * ============================================================================
  *
- * This module provides a comprehensive testing framework for the 509 Dashboard.
+ * This module provides a comprehensive testing framework for the Dashboard.
  * Includes:
  * - Test runner with suite management
  * - Rich assertion helpers

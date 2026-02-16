@@ -2,7 +2,7 @@
  * Tests for 08_SheetUtils (split into 08a-08d modules)
  *
  * Covers: padRight, getCurrentQuarter, getQuarterFromDate, validateMemberEmail,
- * getConfigValues, setupAuditLogSheet, getAuditHistory, CREATE_509_DASHBOARD,
+ * getConfigValues, setupAuditLogSheet, getAuditHistory, CREATE_DASHBOARD,
  * getOrCreateSheet, and related utilities.
  */
 
@@ -378,12 +378,12 @@ describe('getAuditHistory', () => {
 });
 
 // ============================================================================
-// CREATE_509_DASHBOARD - smoke test
+// CREATE_DASHBOARD - smoke test
 // ============================================================================
 
-describe('CREATE_509_DASHBOARD', () => {
+describe('CREATE_DASHBOARD', () => {
   test('is defined as a function', () => {
-    expect(typeof CREATE_509_DASHBOARD).toBe('function');
+    expect(typeof CREATE_DASHBOARD).toBe('function');
   });
 
   test('does not throw when UI cancels', () => {
@@ -392,7 +392,7 @@ describe('CREATE_509_DASHBOARD', () => {
     const mockSS = createMockSpreadsheet([]);
     SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(mockSS);
 
-    expect(() => CREATE_509_DASHBOARD()).not.toThrow();
+    expect(() => CREATE_DASHBOARD()).not.toThrow();
   });
 });
 

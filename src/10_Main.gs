@@ -919,9 +919,9 @@ function dailyTrigger() {
  * Creates all required sheets and configurations
  */
 function initializeDashboard() {
-  // Delegate to CREATE_509_DASHBOARD which properly creates all sheets
+  // Delegate to CREATE_DASHBOARD which properly creates all sheets
   // with headers, formatting, validations, and hidden calculation sheets
-  CREATE_509_DASHBOARD();
+  CREATE_DASHBOARD();
 }
 
 /**
@@ -1361,7 +1361,7 @@ function showHelpDialog() {
         </div>
 
         <div class="version">
-          509 Dashboard v${VERSION_INFO.CURRENT} (${VERSION_INFO.BUILD_DATE}) | ${VERSION_INFO.CODENAME}
+          Dashboard v${VERSION_INFO.CURRENT} (${VERSION_INFO.BUILD_DATE}) | ${VERSION_INFO.CODENAME}
         </div>
       </div>
 
@@ -1411,7 +1411,7 @@ function showHelpDialog() {
     </html>
   `).setWidth(700).setHeight(750);
 
-  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - 509 Dashboard v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')');
+  SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - Dashboard v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')');
 }
 
 // ============================================================================
@@ -2031,7 +2031,7 @@ function exportMemberDirectory(format) {
     case 'email':
       // Send email with summary
       const email = Session.getActiveUser().getEmail();
-      const subject = '509 Member Directory Export - ' + new Date().toLocaleDateString();
+      const subject = 'Member Directory Export - ' + new Date().toLocaleDateString();
       let body = 'Member Directory Export\\n\\n';
       body += 'Total Members: ' + (data.length - 1) + '\\n\\n';
       body += 'Spreadsheet: ' + ss.getUrl();

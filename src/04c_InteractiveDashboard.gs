@@ -1778,7 +1778,7 @@ function saveInteractiveMember(memberData, mode) {
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 /**
  * ============================================================================
- * 509 DASHBOARD - STRATEGIC COMMAND CENTER MASTER ENGINE (V 3.6.0)
+ * DASHBOARD - STRATEGIC COMMAND CENTER MASTER ENGINE (V 3.6.0)
  * ============================================================================
  * CORE FEATURES:
  * 1. Dual-Dashboard Architecture:
@@ -1796,8 +1796,8 @@ function saveInteractiveMember(memberData, mode) {
  * ============================================================================
  *
  * OFFICIAL BRANDING PATHS:
- * - All automated emails use: "[509 Strategic Command Center] Status Update"
- * - All PDF metadata lists "509 Strategic Command Center" as the Author
+ * - All automated emails use: "[Strategic Command Center] Status Update"
+ * - All PDF metadata lists "Strategic Command Center" as the Author
  * ============================================================================
  */
 

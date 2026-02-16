@@ -1,4 +1,4 @@
-# Code Review: 509 Strategic Command Center
+# Code Review: Strategic Command Center
 
 **Date:** 2026-02-14
 **Reviewer:** Claude Code (Opus 4.6)
@@ -91,9 +91,9 @@ HIDDEN_SHEETS.CALC_SYNC       → undefined
 HIDDEN_SHEETS.CALC_FORMULAS   → '_Grievance_Formulas'   OK
 ```
 
-When `name` is `undefined`, `ss.getSheetByName(undefined)` returns `null`, then `ss.insertSheet(undefined)` either crashes or creates auto-named sheets. The main setup function `CREATE_509_DASHBOARD()` will fail or produce broken hidden sheets.
+When `name` is `undefined`, `ss.getSheetByName(undefined)` returns `null`, then `ss.insertSheet(undefined)` either crashes or creates auto-named sheets. The main setup function `CREATE_DASHBOARD()` will fail or produce broken hidden sheets.
 
-**Fix:** Add the missing properties to `HIDDEN_SHEETS`, or call `setupAllHiddenSheets()` (which works correctly) from `CREATE_509_DASHBOARD()`.
+**Fix:** Add the missing properties to `HIDDEN_SHEETS`, or call `setupAllHiddenSheets()` (which works correctly) from `CREATE_DASHBOARD()`.
 
 ---
 
@@ -367,7 +367,7 @@ Undo history stored in `ScriptProperties` is shared across all users. One user c
 
 **File:** `src/12_Features.gs:3542-3558`
 
-DJB2-like hash with hardcoded salt `'anon509data'`. 32-bit hash space with high collision risk, easily brute-forced for sequential member IDs.
+DJB2-like hash with hardcoded salt `'anondata'`. 32-bit hash space with high collision risk, easily brute-forced for sequential member IDs.
 
 **Fix:** Use `Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, salt + id)`.
 

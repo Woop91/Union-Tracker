@@ -1,4 +1,4 @@
-# 509 Dashboard Developer Guide
+# Dashboard Developer Guide
 
 This guide provides an overview of the codebase architecture, development workflow, and best practices for contributing to the Union Steward Dashboard.
 
@@ -19,7 +19,7 @@ This guide provides an overview of the codebase architecture, development workfl
 
 ## Project Overview
 
-The 509 Dashboard is a Google Apps Script (GAS) application for managing union steward activities, grievances, and member information within Google Sheets.
+The Dashboard is a Google Apps Script (GAS) application for managing union steward activities, grievances, and member information within Google Sheets.
 
 **Key Technologies:**
 - Google Apps Script (V8 Runtime with ES2020 support)
@@ -451,7 +451,7 @@ showTestDashboard();
 function getUserById(userId) { }
 
 // Menu-callable functions: UPPER_SNAKE_CASE
-function CREATE_509_DASHBOARD() { }
+function CREATE_DASHBOARD() { }
 
 // Private functions: camelCase with trailing underscore
 function helperFunction_() { }

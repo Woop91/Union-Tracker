@@ -65,7 +65,7 @@ describe('A1: Cross-file dependencies', () => {
       'onEdit',
       'createDashboardMenu',
       'doGet',
-      'CREATE_509_DASHBOARD'
+      'CREATE_DASHBOARD'
     ];
 
     entryPoints.forEach(fn => {

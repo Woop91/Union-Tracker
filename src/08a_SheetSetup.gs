@@ -4,7 +4,7 @@
  * ============================================================================
  *
  * This module handles all sheet creation functions including:
- * - Main dashboard setup (CREATE_509_DASHBOARD)
+ * - Main dashboard setup (CREATE_DASHBOARD)
  * - Individual sheet creation (Config, Member Directory, Grievance Log, etc.)
  * - Sheet ordering and organization
  * - Hidden sheet setup
@@ -21,11 +21,11 @@
 // ============================================================================
 
 /**
- * Main setup function - creates the complete 509 Dashboard
+ * Main setup function - creates the complete Dashboard
  * Creates the core sheets with proper structure and formatting
  * @returns {void}
  */
-function CREATE_509_DASHBOARD() {
+function CREATE_DASHBOARD() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = null;
 
@@ -37,8 +37,8 @@ function CREATE_509_DASHBOARD() {
 
   if (ui) {
     var response = ui.alert(
-      '🏗️ Create 509 Dashboard',
-      'This will create the 509 Dashboard with:\n\n' +
+      '🏗️ Create Dashboard',
+      'This will create the Dashboard with:\n\n' +
       '• Config (dropdown sources)\n' +
       '• Member Directory\n' +
       '• Grievance Log (with Action Type dropdown)\n' +
@@ -129,7 +129,7 @@ function CREATE_509_DASHBOARD() {
 
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
-      ui.alert('✅ Success', '509 Dashboard has been created successfully!\n\n' +
+      ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
         '14 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
@@ -147,7 +147,7 @@ function CREATE_509_DASHBOARD() {
     }
 
   } catch (error) {
-    Logger.log('Error in CREATE_509_DASHBOARD: ' + error.message);
+    Logger.log('Error in CREATE_DASHBOARD: ' + error.message);
     if (ui) {
       ui.alert('❌ Error', 'An error occurred: ' + error.message, ui.ButtonSet.OK);
     }
@@ -297,7 +297,7 @@ function setupDataValidations() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!configSheet || !memberSheet || !grievanceSheet) {
-    SpreadsheetApp.getUi().alert('Error: Required sheets not found. Please run CREATE_509_DASHBOARD first.');
+    SpreadsheetApp.getUi().alert('Error: Required sheets not found. Please run CREATE_DASHBOARD first.');
     return;
   }
 

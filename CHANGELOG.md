@@ -1,9 +1,23 @@
 # Changelog
 
-All notable changes to the 509 Union Dashboard project will be documented in this file.
+All notable changes to the Union Dashboard project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [4.8.2] - 2026-02-16
+
+### Added
+- **State field** — added to member contact update across all surfaces:
+  - Member self-service portal: profile display, edit form (2-char uppercase input), and save handler
+  - `updateMemberContact()` — `state` added to allowed fields and field mapping
+  - `getMemberProfileBySession()` — returns `state` in profile data
+  - `onContactFormSubmit()` — extracts and stores State for both new and existing members
+  - `CONTACT_FORM_CONFIG.FIELD_IDS` — `STATE` entry added (placeholder ID, update after form creation)
+
+### Changed
+- `CONTACT_FORM_CONFIG.FIELD_IDS` — expanded from 20 to 21 entries
+- Member self-service portal edit form now has 5 fields (Email, Phone, Preferred Contact, Best Time, State)
 
 ## [4.8.1] - 2026-02-15
 
@@ -164,7 +178,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `API_VERSION` - synced with VERSION_INFO (4.5.0)
 - `CALENDAR_CONFIG` - re-added missing config to Integrations module
 - `MEMBER_COLUMNS.PIN_HASH` - added missing column constant and header
-- `initializeDashboard()` - fixed dead stub, now delegates to CREATE_509_DASHBOARD()
+- `initializeDashboard()` - fixed dead stub, now delegates to CREATE_DASHBOARD()
 - `COMMAND_CONFIG.VERSION` - synced with VERSION_INFO.CURRENT
 
 ### Removed

@@ -683,12 +683,12 @@ function populateRoadmapItems(sheet) {
      'Advanced Precedent Search with AI',
      'Enhance Search Precedents to use AI/ML for semantic matching of grievance outcomes. Would allow natural language queries like "overtime disputes in warehouse" to find relevant past practice examples.',
      'New', '', '', 'Requires: Google Vertex AI or similar ML API'],
-    // Row 6 - Secure Export via Email (seiu509.org only)
+    // Row 6 - Secure Export via Email (org email only)
     [timestamp, 'System', 'Member Directory', 'Feature Request', 'High',
-     'Secure Export via Email (seiu509.org only)',
+     'Secure Export via Email (org email only)',
      'Add an export feature that allows exporting a list of all selectable Member Directory items via email. ' +
-     'Export emails MUST only be sent to addresses ending in @seiu509.org. ' +
-     'Any attempt to mass-export or email data to a non-seiu509.org address must be prohibited, ' +
+     'Export emails MUST only be sent to addresses ending in @org email. ' +
+     'Any attempt to mass-export or email data to a non-org email address must be prohibited, ' +
      'and an automatic alert must be sent to senior leadership (Chief Steward and Admin Emails in Config). ' +
      'The export should support column selection so stewards can choose which fields to include. ' +
      'PII columns (Street Address, City, State) require explicit opt-in and are excluded by default.',
@@ -943,31 +943,31 @@ function createFunctionChecklistSheet_() {
     ['1️⃣3️⃣ Test', '🧪 Testing', '⚡ Run Quick Tests', 'runQuickTests', 'Runs essential tests only (30 seconds)'],
     ['1️⃣3️⃣ Test', '🧪 Testing', '📊 View Test Results', 'viewTestResults', 'Shows results from last test run with pass/fail details'],
 
-    // ═══ PHASE 14: Strategic Command Center (509 Command Menu) - Modal Architecture ═══
-    ['1️⃣4️⃣ Command', '📊 509 Command', '👁️ Executive Command (PII)', 'rebuildExecutiveDashboard', 'MODAL: Internal dashboard with KPIs, steward workload, Chart.js visuals'],
-    ['1️⃣4️⃣ Command', '📊 509 Command', '🫂 Member Analytics (No PII)', 'rebuildMemberAnalytics', 'MODAL: PII-safe dashboard with morale gauge, pipeline, sentiment trends'],
-    ['1️⃣4️⃣ Command', '📊 509 Command', '📩 Send Member Dashboard Link', 'sendMemberDashboardLink', 'Emails member portal access instructions to specified recipient'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'MODAL: Identifies locations with 3+ active grievances'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '🌟 Identify Rising Stars', 'identifyRisingStars', 'MODAL: Shows top steward performers by score and win rate'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📉 Management Hostility Report', 'renderHostilityFunnel', 'MODAL: Analyzes denial rates across grievance steps'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'MODAL: Strategic data for contract negotiations'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates name-based Member IDs (e.g., MJASM472)'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs', 'Finds and highlights duplicate Member IDs'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '📄 Create PDF for Grievance', 'createPDFForSelectedGrievance', 'Generates PDF with signature blocks for selected grievance'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Steward', '⬆️ Promote to Steward', 'promoteSelectedMemberToSteward', 'Promotes member to steward and sends toolkit email'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Steward', '⬇️ Demote Steward', 'demoteSelectedSteward', 'Removes steward status from selected member'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Styling', '🎨 Apply Global Styling', 'applyGlobalStyling', 'Applies Roboto theme, zebra stripes, and status colors'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '🔄 Force Global Refresh', 'refreshAllVisuals', 'Refreshes all dashboards and checks alerts immediately'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger', 'Creates daily 12AM trigger for dashboard refresh and overdue alerts'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger', 'Removes the midnight auto-refresh trigger'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers', 'Creates daily 1AM trigger for visual refresh'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > Automation', '📑 Email Weekly PDF Snapshot', 'emailExecutivePDF', 'Sends spreadsheet as PDF to your email'],
+    // ═══ PHASE 14: Strategic Command Center (Command Menu) - Modal Architecture ═══
+    ['1️⃣4️⃣ Command', '📊 Command', '👁️ Executive Command (PII)', 'rebuildExecutiveDashboard', 'MODAL: Internal dashboard with KPIs, steward workload, Chart.js visuals'],
+    ['1️⃣4️⃣ Command', '📊 Command', '🫂 Member Analytics (No PII)', 'rebuildMemberAnalytics', 'MODAL: PII-safe dashboard with morale gauge, pipeline, sentiment trends'],
+    ['1️⃣4️⃣ Command', '📊 Command', '📩 Send Member Dashboard Link', 'sendMemberDashboardLink', 'Emails member portal access instructions to specified recipient'],
+    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'MODAL: Identifies locations with 3+ active grievances'],
+    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '🌟 Identify Rising Stars', 'identifyRisingStars', 'MODAL: Shows top steward performers by score and win rate'],
+    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '📉 Management Hostility Report', 'renderHostilityFunnel', 'MODAL: Analyzes denial rates across grievance steps'],
+    ['1️⃣4️⃣ Command', '📊 Command > Strategic', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'MODAL: Strategic data for contract negotiations'],
+    ['1️⃣4️⃣ Command', '📊 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates name-based Member IDs (e.g., MJASM472)'],
+    ['1️⃣4️⃣ Command', '📊 Command > ID Engine', '🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs', 'Finds and highlights duplicate Member IDs'],
+    ['1️⃣4️⃣ Command', '📊 Command > ID Engine', '📄 Create PDF for Grievance', 'createPDFForSelectedGrievance', 'Generates PDF with signature blocks for selected grievance'],
+    ['1️⃣4️⃣ Command', '📊 Command > Steward', '⬆️ Promote to Steward', 'promoteSelectedMemberToSteward', 'Promotes member to steward and sends toolkit email'],
+    ['1️⃣4️⃣ Command', '📊 Command > Steward', '⬇️ Demote Steward', 'demoteSelectedSteward', 'Removes steward status from selected member'],
+    ['1️⃣4️⃣ Command', '📊 Command > Styling', '🎨 Apply Global Styling', 'applyGlobalStyling', 'Applies Roboto theme, zebra stripes, and status colors'],
+    ['1️⃣4️⃣ Command', '📊 Command > Automation', '🔄 Force Global Refresh', 'refreshAllVisuals', 'Refreshes all dashboards and checks alerts immediately'],
+    ['1️⃣4️⃣ Command', '📊 Command > Automation', '🌙 Enable Midnight Auto-Refresh', 'setupMidnightTrigger', 'Creates daily 12AM trigger for dashboard refresh and overdue alerts'],
+    ['1️⃣4️⃣ Command', '📊 Command > Automation', '❌ Disable Midnight Auto-Refresh', 'removeMidnightTrigger', 'Removes the midnight auto-refresh trigger'],
+    ['1️⃣4️⃣ Command', '📊 Command > Automation', '🔔 Enable 1AM Dashboard Refresh', 'createAutomationTriggers', 'Creates daily 1AM trigger for visual refresh'],
+    ['1️⃣4️⃣ Command', '📊 Command > Automation', '📑 Email Weekly PDF Snapshot', 'emailExecutivePDF', 'Sends spreadsheet as PDF to your email'],
 
     // ═══ PHASE 15: Analytics & Insights (v4.1) ═══
-    ['1️⃣5️⃣ Analytics', '📊 509 Command > Analytics', '🏥 Unit Health Report', 'showUnitHealthReport', 'Sentiment analysis correlating grievance counts with survey scores'],
-    ['1️⃣5️⃣ Analytics', '📊 509 Command > Analytics', '📊 Grievance Trends', 'showGrievanceTrends', 'Monthly grievance trend analysis with up/down indicators'],
-    ['1️⃣5️⃣ Analytics', '📊 509 Command > Analytics', '📚 Search Precedents', 'showSearchPrecedents', 'Search historical grievance outcomes for past practice citations'],
-    ['1️⃣5️⃣ Analytics', '📊 509 Command > Analytics', '📝 OCR Transcribe Form', 'showOCRDialog', 'Cloud Vision API placeholder for handwritten form transcription'],
+    ['1️⃣5️⃣ Analytics', '📊 Command > Analytics', '🏥 Unit Health Report', 'showUnitHealthReport', 'Sentiment analysis correlating grievance counts with survey scores'],
+    ['1️⃣5️⃣ Analytics', '📊 Command > Analytics', '📊 Grievance Trends', 'showGrievanceTrends', 'Monthly grievance trend analysis with up/down indicators'],
+    ['1️⃣5️⃣ Analytics', '📊 Command > Analytics', '📚 Search Precedents', 'showSearchPrecedents', 'Search historical grievance outcomes for past practice citations'],
+    ['1️⃣5️⃣ Analytics', '📊 Command > Analytics', '📝 OCR Transcribe Form', 'showOCRDialog', 'Cloud Vision API placeholder for handwritten form transcription'],
 
     // ═══ PHASE 16: Member Management (v4.1) ═══
     ['1️⃣6️⃣ Members', '👤 Member Tools', '➕ Add New Member', 'addMember', 'Adds a new member to the Member Directory'],
@@ -993,10 +993,10 @@ function createFunctionChecklistSheet_() {
     ['1️⃣7️⃣ Survey', 'Survey Vault', '🔒 Write Vault Entry', 'writeVaultEntry_', 'Hashes email/member ID (SHA-256) and appends to vault for a new survey response. Called by onSatisfactionFormSubmit.'],
 
     // ═══ PHASE 18: Navigation & Views (v4.1) ═══
-    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
-    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '🖥️ Show All Columns', 'showAllMemberColumns', 'Restores all columns after mobile view'],
-    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '📊 Go to Dashboard', 'navigateToDashboard', 'Navigate to Executive Dashboard'],
-    ['1️⃣8️⃣ Navigation', '📊 509 Command > View', '🎯 Go to Custom View', 'navigateToCustomView', 'Navigate to Custom View sheet'],
+    ['1️⃣8️⃣ Navigation', '📊 Command > View', '📱 Mobile View', 'navToMobile', 'Optimizes Member Directory for smartphone viewing'],
+    ['1️⃣8️⃣ Navigation', '📊 Command > View', '🖥️ Show All Columns', 'showAllMemberColumns', 'Restores all columns after mobile view'],
+    ['1️⃣8️⃣ Navigation', '📊 Command > View', '📊 Go to Dashboard', 'navigateToDashboard', 'Navigate to Executive Dashboard'],
+    ['1️⃣8️⃣ Navigation', '📊 Command > View', '🎯 Go to Custom View', 'navigateToCustomView', 'Navigate to Custom View sheet'],
 
     // ═══ PHASE 19: Web App & Member Portal (v4.2) ═══
     ['1️⃣9️⃣ Web App', '🌐 Web App', '🚀 doGet Entry Point', 'doGet', 'Web app entry point - handles ?id= parameter for member portal'],
@@ -1051,28 +1051,28 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Setup', '🎨 Setup Comfort View Defaults', 'setupADHDDefaults', 'Configures accessibility settings'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard', '⚡ Quick Actions', 'showQuickActionsMenu', 'Popup menu for common actions'],
 
-    // 509 Command Menu - New Items
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Command Center', '👁️ Executive Command (PII)', 'rebuildExecutiveDashboard', 'Internal dashboard with KPIs'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Command Center', '👥 Member Analytics (No PII)', 'rebuildMemberAnalytics', 'PII-safe dashboard with charts'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Command Center', '📩 Send Member Dashboard Link', 'sendMemberDashboardLink', 'Emails member portal access'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Strategic Intelligence', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'Identifies locations with 3+ grievances'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Strategic Intelligence', '🌟 Identify Rising Stars', 'identifyRisingStars', 'Shows top steward performers'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Strategic Intelligence', '📉 Management Hostility Report', 'renderHostilityFunnel', 'Analyzes denial rates'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Strategic Intelligence', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'Strategic data for negotiations'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Steward Management', '📧 Send Contact Form', 'sendContactInfoForm', 'Sends contact info update form'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 Command > Steward Management', '📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink', 'Gets link to member satisfaction survey'],
+    // Command Menu - New Items
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Command Center', '👁️ Executive Command (PII)', 'rebuildExecutiveDashboard', 'Internal dashboard with KPIs'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Command Center', '👥 Member Analytics (No PII)', 'rebuildMemberAnalytics', 'PII-safe dashboard with charts'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Command Center', '📩 Send Member Dashboard Link', 'sendMemberDashboardLink', 'Emails member portal access'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'Identifies locations with 3+ grievances'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '🌟 Identify Rising Stars', 'identifyRisingStars', 'Shows top steward performers'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '📉 Management Hostility Report', 'renderHostilityFunnel', 'Analyzes denial rates'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Strategic Intelligence', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'Strategic data for negotiations'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Steward Management', '📧 Send Contact Form', 'sendContactInfoForm', 'Sends contact info update form'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Command > Steward Management', '📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink', 'Gets link to member satisfaction survey'],
 
-    // 509 COMMAND CENTER Menu - New Items
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Field Accessibility', '📱 Get Mobile App URL', 'showWebAppUrl', 'Displays web app URL for mobile'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Strategic Intelligence', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'Identifies locations with 3+ grievances'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Strategic Intelligence', '🌟 Identify Rising Stars', 'identifyRisingStars', 'Shows top steward performers'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Strategic Intelligence', '📉 Management Hostility Report', 'renderHostilityFunnel', 'Analyzes denial rates'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Strategic Intelligence', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'Strategic data for negotiations'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Web App & Portal', '👤 Build Member Portal', 'buildMemberPortal', 'Creates personalized member portal'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Web App & Portal', '📊 Build Public Portal', 'buildPublicPortal', 'Creates PII-free public portal'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Web App & Portal', '📧 Send Portal Email', 'sendMemberDashboardEmail', 'Emails personalized portal link'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Web App & Portal', '📈 Get Dashboard Stats (JSON)', 'getDashboardStats', 'Server-side JSON for dashboards'],
-    ['2️⃣0️⃣ v4.2.1', '📊 509 COMMAND CENTER > Web App & Portal', '📊 Get Analytics Stats (JSON)', 'getMemberAnalyticsStats', 'Server-side JSON for analytics']
+    // COMMAND CENTER Menu - New Items
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Field Accessibility', '📱 Get Mobile App URL', 'showWebAppUrl', 'Displays web app URL for mobile'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'Identifies locations with 3+ grievances'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '🌟 Identify Rising Stars', 'identifyRisingStars', 'Shows top steward performers'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '📉 Management Hostility Report', 'renderHostilityFunnel', 'Analyzes denial rates'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'Strategic data for negotiations'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Web App & Portal', '👤 Build Member Portal', 'buildMemberPortal', 'Creates personalized member portal'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Web App & Portal', '📊 Build Public Portal', 'buildPublicPortal', 'Creates PII-free public portal'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Web App & Portal', '📧 Send Portal Email', 'sendMemberDashboardEmail', 'Emails personalized portal link'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Web App & Portal', '📈 Get Dashboard Stats (JSON)', 'getDashboardStats', 'Server-side JSON for dashboards'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Web App & Portal', '📊 Get Analytics Stats (JSON)', 'getMemberAnalyticsStats', 'Server-side JSON for analytics']
   ];
 
   // Build rows with header (7 columns: checkbox, Menu, Item, Function, Description, Notes, Notes 2)
@@ -1161,7 +1161,7 @@ function createGettingStartedSheet(ss) {
 
   // ═══ MAIN HEADER ═══
   sheet.getRange(row, 1, 1, 6).merge()
-    .setValue('📚 GETTING STARTED WITH 509 DASHBOARD')
+    .setValue('📚 GETTING STARTED WITH DASHBOARD')
     .setBackground(headerBg)
     .setFontColor(white)
     .setFontWeight('bold')
@@ -1172,7 +1172,7 @@ function createGettingStartedSheet(ss) {
 
   row += 2;
   sheet.getRange(row, 1, 1, 6).merge()
-    .setValue('Welcome! This guide will help you set up and use the 509 Dashboard effectively.')
+    .setValue('Welcome! This guide will help you set up and use the Dashboard effectively.')
     .setFontSize(12)
     .setFontColor('#6B7280')
     .setHorizontalAlignment('center');
@@ -1302,7 +1302,7 @@ function createGettingStartedSheet(ss) {
   sheet.setRowHeight(row, 35);
 
   var menuInfo = [
-    ['📊 509 Dashboard', 'Main dashboards, search, quick actions, mobile access'],
+    ['📊 Dashboard', 'Main dashboards, search, quick actions, mobile access'],
     ['📋 Grievances', 'New grievances, folder management, calendar, notifications'],
     ['👁️ View', 'Comfort View settings, themes, timeline options'],
     ['⚙️ Settings', 'Repair dashboard, validations, triggers, formulas'],
@@ -1332,7 +1332,7 @@ function createGettingStartedSheet(ss) {
   var tips = [
     '✓ Always use dropdowns instead of typing - this ensures consistency',
     '✓ Check the Dashboard daily to monitor deadlines and overdue items',
-    '✓ Use the Search function (509 Dashboard menu) to quickly find members or grievances',
+    '✓ Use the Search function (Dashboard menu) to quickly find members or grievances',
     '✓ Run DIAGNOSE SETUP (Admin menu) if something seems wrong',
     '✓ Back up your data regularly (File → Download → Excel)',
     '✓ Use the Message Alert checkbox to flag urgent grievances (they\'ll move to top)'
@@ -1408,7 +1408,7 @@ function createFAQSheet(ss) {
 
   row += 2;
   sheet.getRange(row, 1, 1, 5).merge()
-    .setValue('Find answers to common questions about using the 509 Dashboard')
+    .setValue('Find answers to common questions about using the Dashboard')
     .setFontSize(12)
     .setFontColor('#6B7280')
     .setHorizontalAlignment('center');
@@ -1745,7 +1745,7 @@ function createFeaturesReferenceSheet(ss) {
 
   // ═══ MAIN HEADER ═══
   sheet.getRange(row, 1, 1, 5).merge()
-    .setValue('📋 FEATURES REFERENCE - 509 Strategic Command Center v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')')
+    .setValue('📋 FEATURES REFERENCE - Strategic Command Center v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')')
     .setBackground(headerBg)
     .setFontColor(white)
     .setFontWeight('bold')
@@ -1823,7 +1823,7 @@ function createFeaturesReferenceSheet(ss) {
     ['Accessibility', 'Zebra Stripes', 'Alternating row colors for easier reading.', 'Union Hub > Comfort View > Zebra Stripes', 'zebra, stripes, alternating'],
     ['Accessibility', 'High Contrast', 'Enhanced contrast for visibility.', 'Union Hub > Comfort View > High Contrast', 'contrast, visibility, accessibility'],
     ['Accessibility', 'Dark Mode', 'Dark gradient backgrounds across all modals.', 'Union Hub > View > Dark Mode', 'dark, theme, night'],
-    ['Accessibility', 'Global Styling', 'Applies Roboto font and zebra stripes to all rows.', '509 Dashboard > Styling > Apply Global', 'styling, font, Roboto'],
+    ['Accessibility', 'Global Styling', 'Applies Roboto font and zebra stripes to all rows.', 'Dashboard > Styling > Apply Global', 'styling, font, Roboto'],
 
     // Strategic Intelligence
     ['Strategic Intelligence', 'Unit Hot Zones', 'Identifies locations with 3+ active grievances.', 'Strategic Ops > Strategic Intelligence > Hot Zones', 'hot zones, problem, locations'],
@@ -1840,7 +1840,7 @@ function createFeaturesReferenceSheet(ss) {
     ['Administration', 'Setup Hidden Sheets', 'Initialize all 6 calculation sheets.', 'Admin > Setup > Hidden Sheets', 'hidden, setup, initialize'],
 
     // Mobile & Web
-    ['Mobile & Web', 'Pocket/Mobile View', 'Hides non-essential columns for phone access.', '509 Dashboard > Field Access > Mobile View', 'mobile, pocket, phone'],
+    ['Mobile & Web', 'Pocket/Mobile View', 'Hides non-essential columns for phone access.', 'Dashboard > Field Access > Mobile View', 'mobile, pocket, phone'],
     ['Mobile & Web', 'Web App Deploy', 'Create standalone web application from dashboard.', 'Field Portal > Web App > Deploy', 'deploy, web app, standalone'],
     ['Mobile & Web', 'Member Portal', 'Personalized member view via URL (?member=ID).', 'Via Web App URL', 'portal, personal, member'],
     ['Mobile & Web', 'Email Portal Links', 'Send personalized dashboard URLs to members.', 'Field Portal > Web App > Email Links', 'email, portal, personalized'],

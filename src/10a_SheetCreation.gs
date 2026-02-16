@@ -26,7 +26,7 @@
 // ============================================================================
 
 /**
- * Main setup function - creates the complete 509 Dashboard
+ * Main setup function - creates the complete Dashboard
  * Creates the core sheets with proper structure and formatting
  */
 
@@ -581,7 +581,7 @@ function createMemberDirectory(ss) {
     var memberGroupRanges = [
       sheet.getRange(1, MEMBER_COLS.LAST_VIRTUAL_MTG, maxRows, 4),
       sheet.getRange(1, MEMBER_COLS.INTEREST_LOCAL, maxRows, 4),
-      sheet.getRange(1, MEMBER_COLS.STREET_ADDRESS, maxRows, 3)
+      sheet.getRange(1, MEMBER_COLS.STREET_ADDRESS, maxRows, 4)
     ];
 
     // Clear any existing column groups first to prevent duplicates on re-run
@@ -599,7 +599,7 @@ function createMemberDirectory(ss) {
     memberGroupRanges[1].shiftColumnGroupDepth(1);
     sheet.collapseAllColumnGroups();
 
-    // Group 3: Mailing Address / PII (AK-AM, columns 37-39) - Hidden by default, PII
+    // Group 3: Mailing Address / PII (AK-AN, columns 37-40) - Hidden by default, PII
     memberGroupRanges[2].shiftColumnGroupDepth(1);
     sheet.collapseAllColumnGroups();
 

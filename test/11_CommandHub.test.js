@@ -30,7 +30,7 @@ describe('COMMAND_CENTER_CONFIG', () => {
   });
 
   test('has SYSTEM_NAME', () => {
-    expect(COMMAND_CENTER_CONFIG.SYSTEM_NAME).toBe('509 Strategic Command Center');
+    expect(COMMAND_CENTER_CONFIG.SYSTEM_NAME).toBe('Strategic Command Center');
   });
 
   test('has LOG_SHEET_NAME', () => {
@@ -273,7 +273,7 @@ describe('getCommandCenterConfig', () => {
 
   test('has SYSTEM_NAME matching COMMAND_CENTER_CONFIG', () => {
     const config = getCommandCenterConfig();
-    expect(config.SYSTEM_NAME).toBe('509 Strategic Command Center');
+    expect(config.SYSTEM_NAME).toBe('Strategic Command Center');
   });
 
   test('has LOG_SHEET_NAME', () => {

@@ -24,7 +24,7 @@ function launchExecutiveDashboard() {
     .setWidth(1000)
     .setHeight(750);
 
-  SpreadsheetApp.getUi().showModalDialog(html, '509 STRATEGIC COMMAND CENTER');
+  SpreadsheetApp.getUi().showModalDialog(html, 'STRATEGIC COMMAND CENTER');
 }
 
 /**
@@ -190,7 +190,7 @@ function getExecutiveDashboardHtml_() {
     '</head>' +
     '<body>' +
     '  <div class="header">' +
-    '    <h1>509 EXECUTIVE COMMAND CENTER</h1>' +
+    '    <h1>EXECUTIVE COMMAND CENTER</h1>' +
     '    <div class="status-badge" id="statusBadge">Loading...</div>' +
     '  </div>' +
     '  <div id="content"><div class="loading">Loading dashboard data...</div></div>' +
@@ -382,7 +382,7 @@ function checkDashboardAlerts() {
     try {
       MailApp.sendEmail(
         Session.getEffectiveUser().getEmail(),
-        "509 DASHBOARD ALERT",
+        "DASHBOARD ALERT",
         "The following alerts require attention:\n\n" + alerts.join("\n")
       );
       SpreadsheetApp.getActiveSpreadsheet().toast("Alert email sent", "Notification");
@@ -710,7 +710,7 @@ function emailExecutivePDF() {
   try {
     var date = new Date();
     var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
-    var blob = ss.getAs('application/pdf').setName("509_Health_Report_" + dateStr + ".pdf");
+    var blob = ss.getAs('application/pdf').setName("Health_Report_" + dateStr + ".pdf");
 
     MailApp.sendEmail({
       to: Session.getEffectiveUser().getEmail(),
@@ -800,12 +800,12 @@ function createGrievancePDF_UIService_(data) {
     try {
       folder = DriveApp.getFolderById(COMMAND_CONFIG.ARCHIVE_FOLDER_ID);
     } catch (_e) {
-      folder = DriveApp.createFolder('509 Grievance Archive');
+      folder = DriveApp.createFolder('Grievance Archive');
     }
   } else {
     // Create folder in root if not configured
-    var folders = DriveApp.getFoldersByName('509 Grievance Archive');
-    folder = folders.hasNext() ? folders.next() : DriveApp.createFolder('509 Grievance Archive');
+    var folders = DriveApp.getFoldersByName('Grievance Archive');
+    folder = folders.hasNext() ? folders.next() : DriveApp.createFolder('Grievance Archive');
   }
 
   var dateStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
@@ -916,14 +916,14 @@ function createPDFForSelectedGrievance_UIService_() {
   };
 
   // Get or create the grievance archive folder
-  var archiveFolderName = COMMAND_CONFIG.ARCHIVE_FOLDER_NAME || '509 Grievance Archive';
+  var archiveFolderName = COMMAND_CONFIG.ARCHIVE_FOLDER_NAME || 'Grievance Archive';
   var folders = DriveApp.getFoldersByName(archiveFolderName);
   var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(archiveFolderName);
 
   var pdf = createGrievancePDF(folder, grievanceData);
 
   SpreadsheetApp.getUi().alert('PDF created successfully!\n\nFile: ' + pdf.getName() +
-    '\n\nYou can find it in your 509 Grievance Archive folder.');
+    '\n\nYou can find it in your Grievance Archive folder.');
 }
 
 // ============================================================================

@@ -35,7 +35,7 @@ describe('CALENDAR_CONFIG', () => {
   });
 
   test('has CALENDAR_NAME', () => {
-    expect(CALENDAR_CONFIG.CALENDAR_NAME).toBe('509 Grievance Deadlines');
+    expect(CALENDAR_CONFIG.CALENDAR_NAME).toBe('Grievance Deadlines');
   });
 
   test('has REMINDER_DAYS array', () => {

@@ -341,7 +341,7 @@ function getAuditHistory(recordId) {
  * - _CalcSync: Cross-sheet synchronization
  * - _CalcFormulas: Named formula references
  *
- * @fileoverview Hidden sheet and formula management for 509 Dashboard
+ * @fileoverview Hidden sheet and formula management for Dashboard
  * @version 1.0.0
  * @license Free for use by non-profit collective bargaining groups and unions
  */
@@ -1488,10 +1488,10 @@ function setupCalcFormulasSheet(sheet) {
 //
 // This function creates the hidden _Survey_Tracking sheet structure.
 // It is called by setupHiddenSheets() in 08a_SheetSetup.gs during
-// CREATE_509_DASHBOARD(). The sheet is hidden from users automatically.
+// CREATE_DASHBOARD(). The sheet is hidden from users automatically.
 //
 // SURVEY TRACKER FLOW OVERVIEW:
-//   1. CREATE_509_DASHBOARD() -> setupHiddenSheets() -> setupSurveyTrackingSheet()
+//   1. CREATE_DASHBOARD() -> setupHiddenSheets() -> setupSurveyTrackingSheet()
 //      Creates the hidden sheet with 10 columns (A-J per SURVEY_TRACKING_COLS).
 //   2. populateSurveyTrackingFromMembers() copies all members from Member Directory.
 //   3. When a member submits the Google Form satisfaction survey:

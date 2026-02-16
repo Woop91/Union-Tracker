@@ -5,7 +5,7 @@
 ## Quick Setup (Do This First!)
 
 ### One-Click Setup
-1. Open your 509 Dashboard
+1. Open your Dashboard
 2. Click **📊 Union Hub** → **♿ Comfort View** → **♿ Comfort View Panel**
 3. Use the panel to enable your preferred settings
 4. Done! Your dashboard is now optimized for visual comfort
@@ -345,7 +345,7 @@ When you open the tab, you'll see:
 
 ### Quick Check on Phone
 1. Open Google Sheets app
-2. Open 509 Dashboard
+2. Open Dashboard
 3. Tap **📊 Union Hub > 📊 Dashboard**
 4. Pinch to zoom on big numbers
 5. Glance at colors
@@ -447,7 +447,7 @@ When you open the tab, you'll see:
 ### Copy This to Your Desk
 
 ```
-509 DASHBOARD CHEAT SHEET
+DASHBOARD CHEAT SHEET
 
 MORNING:
 - Open Dashboard via menu

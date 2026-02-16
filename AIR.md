@@ -1,4 +1,4 @@
-# 509 Dashboard - Architecture & Implementation Reference
+# Dashboard - Architecture & Implementation Reference
 
 **Version:** 4.7.0 (Security Hardening, Code Quality, 1090+ Tests)
 **Last Updated:** 2026-02-14
@@ -20,7 +20,7 @@
 ## Quick Start
 
 1. Copy all 27 files from `src/` to Google Apps Script (create each as a separate script file)
-2. Run `CREATE_509_DASHBOARD()` to create sheets + 6 hidden calculation sheets
+2. Run `CREATE_DASHBOARD()` to create sheets + 6 hidden calculation sheets
 3. Use `Dashboard > Admin > Demo Data > Seed All Sample Data` to populate test data
 4. Customize Config sheet with your organization's values
 
@@ -188,7 +188,7 @@ MULTIPLE-SCRIPS-REPO/
 │   ├── 10b_SurveyDocSheets.gs  # Survey and documentation sheet creation
 │   ├── 10c_FormHandlers.gs     # Form submission handlers
 │   ├── 10d_SyncAndMaintenance.gs  # Data sync and maintenance operations
-│   ├── 11_CommandHub.gs        # 509 Strategic Command Center features
+│   ├── 11_CommandHub.gs        # Strategic Command Center features
 │   ├── 12_Features.gs          # Additional feature modules
 │   ├── 13_MemberSelfService.gs # Material Design member portal, analytics, PII scrubbing
 │   ├── 14_MeetingCheckIn.gs    # Meeting check-in and attendance tracking
@@ -390,7 +390,7 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
 
 - Menu Consolidation **(v4.4.0)**:
   - Consolidated from 4 menus to 3 menus for cleaner navigation
-  - **509 Union Hub:** All strategic operations, dashboards, and member tools
+  - **Union Hub:** All strategic operations, dashboards, and member tools
   - **Tools:** Grievance management, member actions, calendar sync, PDF generation
   - **Admin:** Setup, diagnostics, seeding, admin functions
   - `createCommandCenterMenu()` deprecated - functionality merged into `createDashboardMenu()`
@@ -498,7 +498,7 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
 *Consolidated from: Code, HiddenSheets, FormulaService*
 
 - Main Setup:
-  - `CREATE_509_DASHBOARD()` - Main setup function (creates sheets + hidden)
+  - `CREATE_DASHBOARD()` - Main setup function (creates sheets + hidden)
   - `setupDataValidations()` - Apply dropdown validations
   - `setDropdownValidation()`, `setMultiSelectValidation()` - Validation helpers
   - `showMultiSelectDialog()`, `applyMultiSelectValue()` - Multi-select UI
@@ -570,10 +570,10 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
   - `getAggregateSatisfactionStats()` - Aggregate survey data (trust, steward ratings, leadership, communication) without PII
   - `getStewardCoverageStats()` - Steward-to-member coverage ratio and percentage for progress bars
 
-**10_CommandCenter.gs** (~1489 lines) - 509 Strategic Command Center Unified Master Engine **(v4.0)**
+**10_CommandCenter.gs** (~1489 lines) - Strategic Command Center Unified Master Engine **(v4.0)**
 
 - Menu System:
-  - `createCommandCenterMenu()` - Create 509 Command menu with v4.0 submenus (Field Accessibility, Personnel Management, Grievance Tools, System Security, Styling & Theme, Analytics & Insights, Demo Data)
+  - `createCommandCenterMenu()` - Create Command menu with v4.0 submenus (Field Accessibility, Personnel Management, Grievance Tools, System Security, Styling & Theme, Analytics & Insights, Demo Data)
 
 - Configuration **(v4.0.1)**:
   - `COMMAND_CENTER_CONFIG` - Global config object with hardcoded sheet names (avoids load-order issues)
@@ -651,7 +651,7 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
 
 **09_Main.gs** (~1093 lines) - Entry Point & Triggers
 - Menu System:
-  - `onOpen()` - Create 6 menus (509 Dashboard, Grievances, View, Settings, Admin, 509 Command)
+  - `onOpen()` - Create 6 menus (Dashboard, Grievances, View, Settings, Admin, Command)
 - Edit Handlers:
   - `onEdit()` - Handle cell edit events with stage-gate workflow
   - `handleStageGateWorkflow_()` - Automatic escalation alerts on step changes
@@ -1358,8 +1358,8 @@ NOTE: Delete 07_DevTools.gs before production to remove all demo functions
 ### Organization (U-X)
 | Column | Name | Content |
 |--------|------|---------|
-| U | Organization Name | SEIU Local 509 (default) |
-| V | Local Number | 509 (default) |
+| U | Organization Name | SEIU Local (default) |
+| V | Local Number | User populates |
 | W | Main Office Address | User populates |
 | X | Main Phone | User populates |
 
@@ -1396,7 +1396,7 @@ NOTE: Delete 07_DevTools.gs before production to remove all demo functions
 |--------|------|---------|
 | AK | Union Parent | SEIU (default) |
 | AL | State/Region | Massachusetts (default) |
-| AM | Organization Website | https://www.seiu509.org/ (default) |
+| AM | Organization Website | User populates |
 
 ### Extended Contact (AN-AR)
 | Column | Name | Content |
@@ -1676,7 +1676,7 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 **Menu Reference Tab:**
 - Comprehensive breakdown of all menus
 - Each menu item shows: path, name, and description
-- Covers Union Hub, Strategic Ops, Admin, and 509 Dashboard menus
+- Covers Union Hub, Strategic Ops, Admin, and Dashboard menus
 
 **FAQ Section:**
 - 9 frequently asked questions with detailed answers
@@ -1740,7 +1740,7 @@ Changed `syncGrievanceFormulasToLog()` in `HiddenSheets.gs` to calculate Days Op
 **Demo Data Menu Fix:**
 - Fixed Demo Data menu showing after NUKE in Admin menu (UIService.gs)
 - Added `isProductionMode()` check to Admin menu before showing Demo Data submenu
-- Both 509 Command menu and Admin menu now respect production mode
+- Both Command menu and Admin menu now respect production mode
 
 **NUKE Enhancements:**
 - NUKE now cleans up seed/nuke/demo references from documentation tabs (FAQ, Config Guide, Getting Started)
@@ -1858,7 +1858,7 @@ Completed removal of deprecated Custom View (🎯 Interactive Dashboard) sheet f
    - Updated function count: Sheet Creation now 10 functions (was 11)
    - Removed `createInteractiveDashboard()` from function registry
    - Updated INTERACTIVE_DASHBOARD_GUIDE.md to reflect sheet-based dashboard deprecation
-   - Modal popup dashboard (`📊 509 Dashboard > 📊 Dashboard`) remains the primary dashboard
+   - Modal popup dashboard (`📊 Dashboard > 📊 Dashboard`) remains the primary dashboard
 
 **Background:**
 The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-based Interactive Dashboard popup, which provides a better mobile experience and doesn't create additional sheet tabs. The `SHEETS.INTERACTIVE` constant and `createInteractiveDashboard()` function were removed, but the call in `rebuildDashboard()` was accidentally retained.
@@ -2002,7 +2002,7 @@ The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-base
 
 **Menu Updates (04_UIService.gs):**
 
-- Added new "Command Center" submenu to 509 Command menu:
+- Added new "Command Center" submenu to Command menu:
   - Member Dashboard (No PII)
   - Steward Performance
   - Email Dashboard to Selected
@@ -2024,8 +2024,8 @@ The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-base
    - **Root Cause:** `COMMAND_CENTER_CONFIG` global variable referenced `SHEETS` constants at initialization time, but `01_Constants.gs` wasn't always loaded first
    - **Fix:** Hardcoded sheet name strings in `COMMAND_CENTER_CONFIG` global variable; added `getCommandCenterConfig()` function for lazy loading when runtime access to `SHEETS`/`COMMAND_CONFIG` is needed
 
-2. **SpreadsheetApp.getUi() Context Error (08_Code.gs - CREATE_509_DASHBOARD)**
-   - **Issue:** `Exception: Cannot call SpreadsheetApp.getUi() from this context` when `CREATE_509_DASHBOARD()` called from triggers or API
+2. **SpreadsheetApp.getUi() Context Error (08_Code.gs - CREATE_DASHBOARD)**
+   - **Issue:** `Exception: Cannot call SpreadsheetApp.getUi() from this context` when `CREATE_DASHBOARD()` called from triggers or API
    - **Root Cause:** `SpreadsheetApp.getUi()` only works when invoked directly from spreadsheet UI menu
    - **Fix:** Wrapped `getUi()` in try-catch block; added null checks for all `ui.alert()` calls; function now proceeds without confirmation dialog when UI unavailable
 
@@ -2114,7 +2114,7 @@ The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-base
 ### Version 3.6.5 (2026-01-15) - Strategic Command Center Master Engine
 
 **10-File Modular Architecture:**
-- Added new `10_CommandCenter.gs` (~628 lines) - Consolidated 509 Strategic Command Center module
+- Added new `10_CommandCenter.gs` (~628 lines) - Consolidated Strategic Command Center module
 - Updated `build.js` to include 10th file in build order (before 09_Main.gs)
 - System now uses 10-file architecture instead of 9-file
 
@@ -2220,7 +2220,7 @@ The sheet-based `🎯 Custom View` tab was deprecated in favor of the modal-base
 - Toggle in Member Dashboard to include/exclude historical responses from statistics
 
 **Flagged Submissions Review Interface:**
-- Menu: 509 Dashboard > Survey Tools > Review Flagged Submissions
+- Menu: Dashboard > Survey Tools > Review Flagged Submissions
 - Shows count of pending review submissions
 - Displays "Anonymous submission #N" (email is hashed — never shown to reviewer)
 - One-click Approve or Reject actions for administrators
@@ -2335,7 +2335,7 @@ If neither is configured, all submissions will be marked as "Pending Review" and
 - Updated menu items, dialog titles, and HTML headers across ConsolidatedDashboard.gs
 
 **Removed Quick Actions Menu:**
-- Removed "Quick Actions" menu item from 509 Dashboard menu (Quick Actions checkboxes in sheets still work)
+- Removed "Quick Actions" menu item from Dashboard menu (Quick Actions checkboxes in sheets still work)
 
 **New My Cases Tab (for Stewards):**
 - Added "My Cases" tab to the Dashboard modal popup
@@ -2390,7 +2390,7 @@ style="width:"+pct+"%;background:#059669"
   - Satisfaction by Worksite
   - Satisfaction by Role
   - Top Member Priorities
-- Smart Dashboard / Mobile Dashboard (📊 509 Dashboard modal)
+- Smart Dashboard / Mobile Dashboard (📊 Dashboard modal)
   - Members by Location
   - Members by Unit
   - Grievance Status Distribution
@@ -2926,7 +2926,7 @@ Grievance Log entries automatically sort by status priority (active cases first)
 - Updates Member Directory grievance status
 
 **9. Automatic Drive Folder Creation**
-- Creates folder in "509 Dashboard - Grievance Files" root folder
+- Creates folder in "Dashboard - Grievance Files" root folder
 - Folder name format: `GXXXX123 - FirstName LastName (MemberID)`
 - Creates subfolders: 📄 Documents, 📧 Correspondence, 📝 Notes
 - Automatically shares with Grievance Coordinators from Config (column O)
@@ -3006,7 +3006,7 @@ Grievance Log entries automatically sort by status priority (active cases first)
 - Lines 3787-3813: `testGrievanceFormSubmission()` - test function
 
 *Contact Info Form Workflow (Code.gs):*
-- `CONTACT_FORM_CONFIG` with form URL and 15 field entry IDs
+- `CONTACT_FORM_CONFIG` with form URL and 21 field entry IDs
 - `sendContactInfoForm()` - shows blank form link (open or copy)
 - `onContactFormSubmit(e)` - form submission handler (creates new or updates existing member)
 - `getFormMultiValue_()` - helper for checkbox responses
@@ -3221,7 +3221,7 @@ Added standalone web app deployment that can be accessed via URL on any mobile b
 **Major Updates:**
 
 - Enhanced 💼 Dashboard from 4 sections to 9 comprehensive analytics sections
-- Added Operations Analytics-style metrics inspired by 509-dashboard
+- Added Operations Analytics-style metrics inspired by dashboard
 - All sections now use live auto-updating formulas (no manual refresh needed)
 
 **New Dashboard Sections (5 added):**
@@ -3381,7 +3381,7 @@ Grievance Log ──────────────┘
 
 **Major Updates:**
 
-- Re-added dashboard sheets from original 509dashboard project
+- Re-added dashboard sheets from original dashboard project
 - Created unified 💼 Dashboard (merged Executive Dashboard + Dashboard themes)
 - Added 🎯 Custom View with customizable metric selection
 - Added `_Dashboard_Calc` hidden sheet with 15 self-healing metric formulas
@@ -3415,7 +3415,7 @@ Grievance Log ──────────────┘
 - Constants.gs: Added DASHBOARD, DASHBOARD_CALC to SHEETS
 - Code.gs: Added `createDashboard()` (~300 lines)
 - HiddenSheets.gs: Added `setupDashboardCalcSheet()` (~70 lines)
-- Updated CREATE_509_DASHBOARD, DIAGNOSE_SETUP, REPAIR_DASHBOARD for 5 sheets
+- Updated CREATE_DASHBOARD, DIAGNOSE_SETUP, REPAIR_DASHBOARD for 5 sheets
 
 > **Note:** `createInteractiveDashboard()` and SHEETS.INTERACTIVE were later deprecated in v4.2.3.
 

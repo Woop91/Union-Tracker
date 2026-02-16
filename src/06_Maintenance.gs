@@ -276,7 +276,7 @@ function removeDeprecatedTabs() {
   }
 }
 
-// setupSheetStructure stub removed - initializeDashboard now delegates to CREATE_509_DASHBOARD()
+// setupSheetStructure stub removed - initializeDashboard now delegates to CREATE_DASHBOARD()
 
 /**
  * Shows the repair dialog
@@ -1673,11 +1673,11 @@ function createWeeklySnapshot() {
   if (!archiveFolderId) {
     // Auto-create archive folder if not configured
     try {
-      var folders = DriveApp.getFoldersByName('509 Dashboard Archive');
+      var folders = DriveApp.getFoldersByName('Dashboard Archive');
       if (folders.hasNext()) {
         folder = folders.next();
       } else {
-        folder = DriveApp.createFolder('509 Dashboard Archive');
+        folder = DriveApp.createFolder('Dashboard Archive');
       }
       archiveFolderId = folder.getId();
       // Save to Config sheet for future use
@@ -1704,7 +1704,7 @@ function createWeeklySnapshot() {
       folder = DriveApp.getFolderById(archiveFolderId);
     }
     var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd_HH-mm');
-    var snapshotName = '509_SNAPSHOT_' + date;
+    var snapshotName = 'SNAPSHOT_' + date;
 
     // Create the copy
     DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
@@ -1746,7 +1746,7 @@ function createAutomatedSnapshot() {
   try {
     var folder = DriveApp.getFolderById(archiveFolderId);
     var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
-    var snapshotName = '509_AUTO_SNAPSHOT_' + date;
+    var snapshotName = 'AUTO_SNAPSHOT_' + date;
 
     DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
 
@@ -1993,7 +1993,7 @@ function saveSettings(settings) {
 // Duplicate declarations removed to prevent silent overwrites.
 
 /**
- * 509 Dashboard - Data Integrity and Performance Enhancements
+ * Dashboard - Data Integrity and Performance Enhancements
  *
  * This module contains improvements for:
  * - Batch operations for optimized data writing

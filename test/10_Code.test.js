@@ -70,8 +70,8 @@ describe('CONTACT_FORM_CONFIG', () => {
     expect(typeof CONTACT_FORM_CONFIG.FORM_URL).toBe('string');
   });
 
-  test('FIELD_IDS has 20 entries', () => {
-    expect(Object.keys(CONTACT_FORM_CONFIG.FIELD_IDS).length).toBe(20);
+  test('FIELD_IDS has 21 entries', () => {
+    expect(Object.keys(CONTACT_FORM_CONFIG.FIELD_IDS).length).toBe(21);
   });
 
   test('FIELD_IDS includes FIRST_NAME, LAST_NAME, EMAIL, PHONE', () => {

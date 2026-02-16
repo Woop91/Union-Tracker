@@ -1,9 +1,9 @@
-# 509 Dashboard - User Tutorials
+# Dashboard - User Tutorials
 
 **Version:** 4.7.0
 **Last Updated:** 2026-02-14
 
-Quick, practical tutorials for common tasks in the 509 Dashboard.
+Quick, practical tutorials for common tasks in the Dashboard.
 
 ---
 
@@ -31,7 +31,7 @@ Quick, practical tutorials for common tasks in the 509 Dashboard.
 ### First-Time Setup (5 minutes)
 
 **Step 1: Open the Dashboard**
-1. Open your Google Sheet with the 509 Dashboard
+1. Open your Google Sheet with the Dashboard
 2. Wait for the menus to load (you should see 6 menus)
 
 **Step 2: Verify Setup**
@@ -282,7 +282,7 @@ After entering, these columns auto-populate:
 ```
 
 **If Issues Found:**
-- Missing sheets: Run CREATE_509_DASHBOARD()
+- Missing sheets: Run CREATE_DASHBOARD()
 - Wrong column counts: Check for manual edits
 - Errors: Review error messages
 
