@@ -1234,6 +1234,11 @@ function showHelpDialog() {
                 <div class="faq-a">Checking this opens a <strong>pre-filled grievance form</strong> for that member. The checkbox auto-resets after use.</div>
               </div>
 
+              <div class="faq-item">
+                <div class="faq-q">How does multi-select work in the Member Directory?</div>
+                <div class="faq-a">Five columns support multi-select: <strong>Office Days, Preferred Communication, Best Time to Contact, Committees, and Assigned Steward(s)</strong>. Click a cell in any of these columns and use <strong>Tools &gt; Multi-Select &gt; Open Editor</strong> to open a checkbox dialog. Select multiple values and click Save. Values are stored as comma-separated text.</div>
+              </div>
+
               <div class="faq-category">Grievances</div>
 
               <div class="faq-item">
@@ -1259,6 +1264,11 @@ function showHelpDialog() {
               <div class="faq-item">
                 <div class="faq-q">How do I create a folder for grievance documents?</div>
                 <div class="faq-a">Select the grievance row, then go to <strong>Union Hub > Drive > Setup Folder</strong>. This creates a Google Drive folder with subfolders for each step.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I select multiple articles violated or issue categories?</div>
+                <div class="faq-a">The <strong>Articles Violated</strong> (column V) and <strong>Issue Category</strong> (column W) columns support multi-select. Click the cell and use <strong>Tools &gt; Multi-Select &gt; Open Editor</strong> to pick multiple values from a checkbox dialog. Options come from the Config sheet and values are stored as comma-separated text.</div>
               </div>
 
               <div class="faq-category">Troubleshooting</div>

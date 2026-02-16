@@ -471,24 +471,28 @@ function refreshVisualsSimple_() {
 /**
  * Opens the multi-select editor for the currently selected cell
  * Called from menu: Tools > Multi-Select > Open Editor
- * Validates the cell is in Member Directory and is a multi-select column
+ * Supports Member Directory and Grievance Log multi-select columns
  */
 function openCellMultiSelectEditor() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
   var range = ss.getActiveRange();
+  var sheetName = sheet.getName();
 
-  // Validate we're in Member Directory
-  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+  // Validate we're in a supported sheet
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) {
     ui.alert('Multi-Select Editor',
-      'Please select a cell in the Member Directory sheet.\n\n' +
-      'Multi-select columns include:\n' +
+      'Please select a cell in the Member Directory or Grievance Log sheet.\n\n' +
+      'Member Directory columns:\n' +
       '• Office Days\n' +
       '• Preferred Communication\n' +
       '• Best Time to Contact\n' +
       '• Committees\n' +
-      '• Assigned Steward(s)',
+      '• Assigned Steward(s)\n\n' +
+      'Grievance Log columns:\n' +
+      '• Articles Violated\n' +
+      '• Issue Category',
       ui.ButtonSet.OK);
     return;
   }
@@ -512,25 +516,23 @@ function openCellMultiSelectEditor() {
     return;
   }
 
-  // Check if this is a multi-select column
-  var config = getMultiSelectConfig(col);
+  // Check if this is a multi-select column for the active sheet
+  var config = getMultiSelectConfig(col, sheetName);
   if (!config) {
+    var hint = (sheetName === SHEETS.GRIEVANCE_LOG)
+      ? 'Grievance Log multi-select columns:\n• Articles Violated\n• Issue Category'
+      : 'Member Directory multi-select columns:\n• Office Days\n• Preferred Communication\n• Best Time to Contact\n• Committees\n• Assigned Steward(s)';
     ui.alert('Multi-Select Editor',
-      'This column does not support multi-select.\n\n' +
-      'Multi-select columns include:\n' +
-      '• Office Days\n' +
-      '• Preferred Communication\n' +
-      '• Best Time to Contact\n' +
-      '• Committees\n' +
-      '• Assigned Steward(s)',
+      'This column does not support multi-select.\n\n' + hint,
       ui.ButtonSet.OK);
     return;
   }
 
-  // Store target cell coordinates for the callback (UserProperties to avoid multi-user conflicts)
+  // Store target cell coordinates and sheet for the callback
   var props = PropertiesService.getUserProperties();
   props.setProperty('multiSelectRow', row.toString());
   props.setProperty('multiSelectCol', col.toString());
+  props.setProperty('multiSelectSheet', sheetName);
 
   // Get current cell value to pre-select items
   var currentValue = range.getValue().toString();
