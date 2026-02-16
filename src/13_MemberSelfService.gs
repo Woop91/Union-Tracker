@@ -1070,6 +1070,7 @@ function getMemberProfileBySession(sessionToken) {
           phone: data[i][MEMBER_COLS.PHONE - 1] || '',
           preferredComm: data[i][MEMBER_COLS.PREFERRED_COMM - 1] || '',
           bestTime: data[i][MEMBER_COLS.BEST_TIME - 1] || '',
+          state: data[i][MEMBER_COLS.STATE - 1] || '',
           assignedSteward: data[i][MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',
           hasOpenGrievance: data[i][MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1] || 'No'
         }
@@ -1095,12 +1096,13 @@ function updateMemberContact(sessionToken, updates) {
   var memberId = session.memberId;
 
   // Validate updates - only allow contact fields
-  var allowedFields = ['email', 'phone', 'preferredComm', 'bestTime'];
+  var allowedFields = ['email', 'phone', 'preferredComm', 'bestTime', 'state'];
   var fieldMapping = {
     email: MEMBER_COLS.EMAIL,
     phone: MEMBER_COLS.PHONE,
     preferredComm: MEMBER_COLS.PREFERRED_COMM,
-    bestTime: MEMBER_COLS.BEST_TIME
+    bestTime: MEMBER_COLS.BEST_TIME,
+    state: MEMBER_COLS.STATE
   };
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1620,6 +1622,7 @@ function getMemberSelfServicePortalHtml() {
     '  html+="<div class=\\"profile-field\\"><span class=\\"profile-label\\">Phone</span><span class=\\"profile-value\\">"+escapeHtml(p.phone||"Not set")+"</span></div>";' +
     '  html+="<div class=\\"profile-field\\"><span class=\\"profile-label\\">Preferred Contact</span><span class=\\"profile-value\\">"+escapeHtml(p.preferredComm||"Not set")+"</span></div>";' +
     '  html+="<div class=\\"profile-field\\"><span class=\\"profile-label\\">Best Time</span><span class=\\"profile-value\\">"+escapeHtml(p.bestTime||"Not set")+"</span></div>";' +
+    '  html+="<div class=\\"profile-field\\"><span class=\\"profile-label\\">State</span><span class=\\"profile-value\\">"+escapeHtml(p.state||"Not set")+"</span></div>";' +
     '  html+="</div>";' +
     '  document.getElementById("profileContent").innerHTML=html;' +
     '}' +
@@ -1668,6 +1671,7 @@ function getMemberSelfServicePortalHtml() {
     '  html+="<div class=\\"edit-field\\"><label>Phone</label><input type=\\"tel\\" id=\\"editPhone\\" value=\\""+escapeHtml(p.phone||"")+"\\"></div>";' +
     '  html+="<div class=\\"edit-field\\"><label>Preferred Contact Method</label><select id=\\"editPreferred\\"><option value=\\"\\">Select...</option><option value=\\"Email\\"'+(p.preferredComm==="Email"?" selected":"")+'>Email</option><option value=\\"Phone\\"'+(p.preferredComm==="Phone"?" selected":"")+'>Phone</option><option value=\\"Text\\"'+(p.preferredComm==="Text"?" selected":"")+'>Text</option></select></div>";' +
     '  html+="<div class=\\"edit-field\\"><label>Best Time to Reach</label><select id=\\"editBestTime\\"><option value=\\"\\">Select...</option><option value=\\"Morning\\"'+(p.bestTime==="Morning"?" selected":"")+'>Morning</option><option value=\\"Afternoon\\"'+(p.bestTime==="Afternoon"?" selected":"")+'>Afternoon</option><option value=\\"Evening\\"'+(p.bestTime==="Evening"?" selected":"")+'>Evening</option></select></div>";' +
+    '  html+="<div class=\\"edit-field\\"><label>State</label><input type=\\"text\\" id=\\"editState\\" value=\\""+escapeHtml(p.state||"")+"\\" placeholder=\\"e.g. CT\\" maxlength=\\"2\\" style=\\"text-transform:uppercase\\"></div>";' +
     '  html+="<div class=\\"btn-row\\"><button class=\\"btn btn-primary btn-small\\" onclick=\\"saveChanges()\\">💾 Save Changes</button><button class=\\"btn btn-secondary btn-small\\" onclick=\\"loadEditForm()\\">↩️ Reset</button></div>";' +
     '  document.getElementById("editContent").innerHTML=html;' +
     '}' +
@@ -1677,7 +1681,8 @@ function getMemberSelfServicePortalHtml() {
     '    email:document.getElementById("editEmail").value,' +
     '    phone:document.getElementById("editPhone").value,' +
     '    preferredComm:document.getElementById("editPreferred").value,' +
-    '    bestTime:document.getElementById("editBestTime").value' +
+    '    bestTime:document.getElementById("editBestTime").value,' +
+    '    state:document.getElementById("editState").value.toUpperCase()' +
     '  };' +
     '  google.script.run' +
     '    .withSuccessHandler(function(result){' +
@@ -1687,6 +1692,7 @@ function getMemberSelfServicePortalHtml() {
     '        profileData.phone=updates.phone;' +
     '        profileData.preferredComm=updates.preferredComm;' +
     '        profileData.bestTime=updates.bestTime;' +
+    '        profileData.state=updates.state;' +
     '        setTimeout(function(){document.getElementById("updateSuccess").style.display="none"},3000);' +
     '      }else{alert("Error: "+result.error)}' +
     '    })' +

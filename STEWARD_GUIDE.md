@@ -93,6 +93,7 @@ The **Personal Contact Info Form** is a Google Form that members fill out to pro
 | | Personal Phone Number | |
 | **Mailing Address** | Street Address | Treated as PII |
 | | City | Treated as PII |
+| | State | Treated as PII (2-letter abbreviation) |
 | | Zip Code | Treated as PII |
 | **Preferences** | Work Schedule / Office Days | Multi-select |
 | | Preferred Communication Methods | Multi-select |

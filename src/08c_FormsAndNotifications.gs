@@ -277,6 +277,7 @@ function onContactFormSubmit(e) {
     var streetAddress = getFormValue_(responses, 'Street Address');
     var city = getFormValue_(responses, 'City');
     var zipCode = getFormValue_(responses, 'Zip Code');
+    var state = getFormValue_(responses, 'State');
 
     // Require at least first and last name
     if (!firstName || !lastName) {
@@ -338,6 +339,7 @@ function onContactFormSubmit(e) {
       newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = employeeId || '';
       newRow[MEMBER_COLS.STREET_ADDRESS - 1] = streetAddress || '';
       newRow[MEMBER_COLS.CITY - 1] = city || '';
+      newRow[MEMBER_COLS.STATE - 1] = state || '';
       newRow[MEMBER_COLS.ZIP_CODE - 1] = zipCode || '';
 
       // Append new member row
@@ -384,6 +386,7 @@ function onContactFormSubmit(e) {
       if (employeeId) updates.push({ col: MEMBER_COLS.EMPLOYEE_ID, value: employeeId });
       if (streetAddress) updates.push({ col: MEMBER_COLS.STREET_ADDRESS, value: streetAddress });
       if (city) updates.push({ col: MEMBER_COLS.CITY, value: city });
+      if (state) updates.push({ col: MEMBER_COLS.STATE, value: state });
       if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: zipCode });
 
       // Apply updates

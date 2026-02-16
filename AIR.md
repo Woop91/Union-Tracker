@@ -3006,7 +3006,7 @@ Grievance Log entries automatically sort by status priority (active cases first)
 - Lines 3787-3813: `testGrievanceFormSubmission()` - test function
 
 *Contact Info Form Workflow (Code.gs):*
-- `CONTACT_FORM_CONFIG` with form URL and 15 field entry IDs
+- `CONTACT_FORM_CONFIG` with form URL and 21 field entry IDs
 - `sendContactInfoForm()` - shows blank form link (open or copy)
 - `onContactFormSubmit(e)` - form submission handler (creates new or updates existing member)
 - `getFormMultiValue_()` - helper for checkbox responses

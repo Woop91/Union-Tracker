@@ -545,6 +545,7 @@ Provides PIN-based member authentication for self-service access to the dashboar
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
 | **Member Self-Service View** | PIN-authenticated portal for members to view their own data | `showMemberSelfService()` | portal, self-service, view |
+| **Member Contact Update** | Members can update Email, Phone, Preferred Contact, Best Time, and State from the portal | `updateMemberContact()` | contact, update, edit, state |
 | **PIN Entry Dialog** | Secure PIN entry interface for member authentication | `showPINEntryDialog()` | dialog, PIN, entry |
 
 ---
@@ -623,6 +624,7 @@ Quick Action to create or reuse a Google Drive folder for any member.
 
 | Version | Features Added |
 |---------|----------------|
+| **4.8.2** | State field added to member contact update (self-service portal, contact form, profile) |
 | **4.6.0** | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override |
 | **4.5.1** | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |
 | **4.5.0** | Security module, Data Access Layer, Member Self-Service PIN, consolidated architecture |
