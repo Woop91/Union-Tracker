@@ -1839,7 +1839,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2830 lines)
+// SOURCE: 01_Core.gs (2842 lines)
 // ============================================================================
 
 /**
@@ -4023,18 +4023,30 @@ var MULTI_SELECT_COLS = {
     { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
     { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
     { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
+  ],
+  // Grievance Log multi-select columns
+  GRIEVANCE_LOG: [
+    { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
+    { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
   ]
 };
 
 /**
- * Check if a column in Member Directory is a multi-select column
+ * Check if a column is a multi-select column for the given sheet
  * @param {number} col - Column number (1-indexed)
+ * @param {string} sheetName - Sheet name (defaults to Member Directory)
  * @returns {Object|null} Multi-select config if found, null otherwise
  */
-function getMultiSelectConfig(col) {
-  for (var i = 0; i < MULTI_SELECT_COLS.MEMBER_DIR.length; i++) {
-    if (MULTI_SELECT_COLS.MEMBER_DIR[i].col === col) {
-      return MULTI_SELECT_COLS.MEMBER_DIR[i];
+function getMultiSelectConfig(col, sheetName) {
+  var configs;
+  if (sheetName === SHEETS.GRIEVANCE_LOG) {
+    configs = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+  } else {
+    configs = MULTI_SELECT_COLS.MEMBER_DIR;
+  }
+  for (var i = 0; i < configs.length; i++) {
+    if (configs[i].col === col) {
+      return configs[i];
     }
   }
   return null;
@@ -10285,7 +10297,7 @@ function getAdvancedSearchHtml() {
 
 
 // ============================================================================
-// SOURCE: 04a_UIMenus.gs (912 lines)
+// SOURCE: 04a_UIMenus.gs (914 lines)
 // ============================================================================
 
 /**
@@ -10761,24 +10773,28 @@ function refreshVisualsSimple_() {
 /**
  * Opens the multi-select editor for the currently selected cell
  * Called from menu: Tools > Multi-Select > Open Editor
- * Validates the cell is in Member Directory and is a multi-select column
+ * Supports Member Directory and Grievance Log multi-select columns
  */
 function openCellMultiSelectEditor() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
   var range = ss.getActiveRange();
+  var sheetName = sheet.getName();
 
-  // Validate we're in Member Directory
-  if (sheet.getName() !== SHEETS.MEMBER_DIR) {
+  // Validate we're in a supported sheet
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) {
     ui.alert('Multi-Select Editor',
-      'Please select a cell in the Member Directory sheet.\n\n' +
-      'Multi-select columns include:\n' +
+      'Please select a cell in the Member Directory or Grievance Log sheet.\n\n' +
+      'Member Directory columns:\n' +
       '• Office Days\n' +
       '• Preferred Communication\n' +
       '• Best Time to Contact\n' +
       '• Committees\n' +
-      '• Assigned Steward(s)',
+      '• Assigned Steward(s)\n\n' +
+      'Grievance Log columns:\n' +
+      '• Articles Violated\n' +
+      '• Issue Category',
       ui.ButtonSet.OK);
     return;
   }
@@ -10802,25 +10818,23 @@ function openCellMultiSelectEditor() {
     return;
   }
 
-  // Check if this is a multi-select column
-  var config = getMultiSelectConfig(col);
+  // Check if this is a multi-select column for the active sheet
+  var config = getMultiSelectConfig(col, sheetName);
   if (!config) {
+    var hint = (sheetName === SHEETS.GRIEVANCE_LOG)
+      ? 'Grievance Log multi-select columns:\n• Articles Violated\n• Issue Category'
+      : 'Member Directory multi-select columns:\n• Office Days\n• Preferred Communication\n• Best Time to Contact\n• Committees\n• Assigned Steward(s)';
     ui.alert('Multi-Select Editor',
-      'This column does not support multi-select.\n\n' +
-      'Multi-select columns include:\n' +
-      '• Office Days\n' +
-      '• Preferred Communication\n' +
-      '• Best Time to Contact\n' +
-      '• Committees\n' +
-      '• Assigned Steward(s)',
+      'This column does not support multi-select.\n\n' + hint,
       ui.ButtonSet.OK);
     return;
   }
 
-  // Store target cell coordinates for the callback (UserProperties to avoid multi-user conflicts)
+  // Store target cell coordinates and sheet for the callback
   var props = PropertiesService.getUserProperties();
   props.setProperty('multiSelectRow', row.toString());
   props.setProperty('multiSelectCol', col.toString());
+  props.setProperty('multiSelectSheet', sheetName);
 
   // Get current cell value to pre-select items
   var currentValue = range.getValue().toString();
@@ -15027,7 +15041,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 04e_PublicDashboard.gs (2564 lines)
+// SOURCE: 04e_PublicDashboard.gs (2569 lines)
 // ============================================================================
 
 // ============================================================================
@@ -17054,6 +17068,7 @@ function getUnifiedDashboardHtml(isPII) {
     '{cat:"Analytics",q:"What are the engagement metrics?",a:"Email Open Rate = % who opened union emails. Meeting Attendance = % who attended meetings in last 6 months. Survey Response = % who completed satisfaction survey.",tutorial:false},' +
     '{cat:"Member Directory",q:"How do I find a specific member?",a:"Use the search field in the steward contact section or the filter in list views. Search works on names, locations, and units.",tutorial:false},' +
     '{cat:"Member Directory",q:"What do the participation heatmaps show?",a:"Heatmaps show engagement levels by unit or location. Green = high engagement (60%+), Yellow = moderate (40-60%), Red = low (<40%).",tutorial:true},' +
+    '{cat:"Member Directory",q:"How does multi-select work?",a:"Columns like Office Days, Preferred Communication, Best Time to Contact, Committees, and Assigned Steward(s) support multi-select. In the Grievance Log, Articles Violated and Issue Category also support multi-select. Click the cell and use Tools > Multi-Select > Open Editor to pick multiple values from a checkbox dialog. Values are stored as comma-separated text.",tutorial:true},' +
     '{cat:"Satisfaction",q:"How are satisfaction scores calculated?",a:"Each section score is the average of related survey questions (1-10 scale). Overall Score combines all sections weighted equally.",tutorial:false},' +
     '{cat:"Satisfaction",q:"What is the Key Insights section?",a:"Key Insights automatically identifies your strongest area, biggest opportunity, and suggests action items based on survey data.",tutorial:true},' +
     '{cat:"Comparison Tool",q:"How do I use the Compare tab?",a:"Select metrics you want to compare using checkboxes, then click Export to download a CSV file with your selected data.",tutorial:true},' +
@@ -17210,6 +17225,10 @@ function getUnifiedDashboardHtml(isPII) {
     '{q:"How do I file a new grievance?",a:"Go to Member Directory in the spreadsheet > check the Start Grievance box for a member."},' +
     '{q:"How do I get help?",a:"Use the Help menu in the spreadsheet or contact your chapter leadership."},' +
     '{q:"Can I export this data?",a:"Use your browser\\x27s print function or screenshot the dashboard."}' +
+    ']},' +
+    '{cat:"Multi-Select Columns",items:[' +
+    '{q:"Which columns support multi-select?",a:"Member Directory: Office Days, Preferred Communication, Best Time to Contact, Committees, Assigned Steward(s). Grievance Log: Articles Violated (column V), Issue Category (column W)."},' +
+    '{q:"How do I use multi-select?",a:"Click the cell, then go to Tools > Multi-Select > Open Editor. A checkbox dialog appears with all available options from the Config sheet. Check the items you want and click Save. Values are stored as comma-separated text."}' +
     ']}' +
     '];' +
     'var html="<div style=\\"max-height:400px;overflow-y:auto;padding:8px\\">";' +
@@ -27052,7 +27071,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (616 lines)
+// SOURCE: 08a_SheetSetup.gs (618 lines)
 // ============================================================================
 
 /**
@@ -27500,20 +27519,22 @@ function getConfigValues(configSheet, col) {
  * @returns {void}
  */
 function applyMultiSelectValue(value) {
-  var props = PropertiesService.getDocumentProperties();
+  var props = PropertiesService.getUserProperties();
   var row = parseInt(props.getProperty('multiSelectRow'), 10);
   var col = parseInt(props.getProperty('multiSelectCol'), 10);
+  var sheetName = props.getProperty('multiSelectSheet') || SHEETS.MEMBER_DIR;
 
   if (!row || !col) {
     throw new Error('Target cell not found. Please try again.');
   }
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var sheet = ss.getSheetByName(sheetName);
   sheet.getRange(row, col).setValue(value);
 
   props.deleteProperty('multiSelectRow');
   props.deleteProperty('multiSelectCol');
+  props.deleteProperty('multiSelectSheet');
 }
 
 /**
@@ -27527,14 +27548,14 @@ function onEditMultiSelect(e) {
   var sheet = e.range.getSheet();
   var sheetName = sheet.getName();
 
-  if (sheetName !== SHEETS.MEMBER_DIR) return;
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
   var col = e.range.getColumn();
   var row = e.range.getRow();
 
   if (row < 2) return;
 
-  var config = getMultiSelectConfig(col);
+  var config = getMultiSelectConfig(col, sheetName);
   if (!config) return;
 
   var newValue = e.value || '';
@@ -27542,7 +27563,7 @@ function onEditMultiSelect(e) {
   if (newValue === '' || newValue.indexOf(',') !== -1) return;
 
   SpreadsheetApp.getActiveSpreadsheet().toast(
-    'Tip: Use Dashboard menu > "Multi-Select Editor" for easier selection of multiple values.',
+    'Tip: Use Tools menu > "Multi-Select Editor" for easier selection of multiple values.',
     config.label,
     5
   );
@@ -27559,7 +27580,7 @@ function onSelectionChangeMultiSelect(e) {
   var sheet = e.range.getSheet();
   var sheetName = sheet.getName();
 
-  if (sheetName !== SHEETS.MEMBER_DIR) return;
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
   var col = e.range.getColumn();
   var row = e.range.getRow();
@@ -27567,10 +27588,10 @@ function onSelectionChangeMultiSelect(e) {
   if (row < 2) return;
   if (e.range.getNumRows() > 1 || e.range.getNumColumns() > 1) return;
 
-  var config = getMultiSelectConfig(col);
+  var config = getMultiSelectConfig(col, sheetName);
   if (!config) return;
 
-  var props = PropertiesService.getDocumentProperties();
+  var props = PropertiesService.getUserProperties();
   var lastCell = props.getProperty('lastMultiSelectCell');
   var currentCell = row + ',' + col;
 
@@ -38533,7 +38554,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1934 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1938 lines)
 // ============================================================================
 
 // ============================================================================
@@ -39999,7 +40020,9 @@ function createFAQSheet(ss) {
     ['Q: How do I assign a steward to multiple members?',
      'A: Use the Assigned Steward dropdown in column P. You can select multiple stewards using the multi-select editor.'],
     ['Q: What does the "Start Grievance" checkbox do?',
-     'A: Checking this opens a pre-filled grievance form for that member. The checkbox auto-resets after use.']
+     'A: Checking this opens a pre-filled grievance form for that member. The checkbox auto-resets after use.'],
+    ['Q: How does multi-select work for Member Directory columns?',
+     'A: Five columns support multi-select: Office Days, Preferred Communication, Best Time to Contact, Committees, and Assigned Steward(s). Click a cell in any of these columns and use Tools > Multi-Select > Open Editor to open a checkbox dialog where you can pick multiple values. Selected values are stored as comma-separated text. You can also type directly — a toast notification will remind you about the editor.']
   ];
 
   for (var j = 0; j < memberFAQs.length; j++) {
@@ -40033,7 +40056,9 @@ function createFAQSheet(ss) {
     ['Q: How do I create a folder for grievance documents?',
      'A: Select the grievance row, then go to Grievances → Drive Folders → Setup Folder. This creates a Google Drive folder with subfolders.'],
     ['Q: Can I sync deadlines to my calendar?',
-     'A: Yes! Go to Grievances → Calendar → Sync Deadlines to Calendar. You\'ll need to grant calendar access the first time.']
+     'A: Yes! Go to Grievances → Calendar → Sync Deadlines to Calendar. You\'ll need to grant calendar access the first time.'],
+    ['Q: How do I select multiple articles violated or issue categories for a grievance?',
+     'A: The Articles Violated (column V) and Issue Category (column W) columns now support multi-select. Click the cell and use Tools > Multi-Select > Open Editor to open a checkbox dialog listing all available options from the Config sheet. Check the items that apply and click Save. Values are stored as comma-separated text (e.g. "Art. 5 - Hours, Art. 12 - Overtime").']
   ];
 
   for (var k = 0; k < grievanceFAQs.length; k++) {
@@ -42193,7 +42218,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2194 lines)
+// SOURCE: 10_Main.gs (2204 lines)
 // ============================================================================
 
 /**
@@ -43432,6 +43457,11 @@ function showHelpDialog() {
                 <div class="faq-a">Checking this opens a <strong>pre-filled grievance form</strong> for that member. The checkbox auto-resets after use.</div>
               </div>
 
+              <div class="faq-item">
+                <div class="faq-q">How does multi-select work in the Member Directory?</div>
+                <div class="faq-a">Five columns support multi-select: <strong>Office Days, Preferred Communication, Best Time to Contact, Committees, and Assigned Steward(s)</strong>. Click a cell in any of these columns and use <strong>Tools &gt; Multi-Select &gt; Open Editor</strong> to open a checkbox dialog. Select multiple values and click Save. Values are stored as comma-separated text.</div>
+              </div>
+
               <div class="faq-category">Grievances</div>
 
               <div class="faq-item">
@@ -43457,6 +43487,11 @@ function showHelpDialog() {
               <div class="faq-item">
                 <div class="faq-q">How do I create a folder for grievance documents?</div>
                 <div class="faq-a">Select the grievance row, then go to <strong>Union Hub > Drive > Setup Folder</strong>. This creates a Google Drive folder with subfolders for each step.</div>
+              </div>
+
+              <div class="faq-item">
+                <div class="faq-q">How do I select multiple articles violated or issue categories?</div>
+                <div class="faq-a">The <strong>Articles Violated</strong> (column V) and <strong>Issue Category</strong> (column W) columns support multi-select. Click the cell and use <strong>Tools &gt; Multi-Select &gt; Open Editor</strong> to pick multiple values from a checkbox dialog. Options come from the Config sheet and values are stored as comma-separated text.</div>
               </div>
 
               <div class="faq-category">Troubleshooting</div>
