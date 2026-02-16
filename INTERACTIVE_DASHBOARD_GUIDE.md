@@ -11,7 +11,7 @@ The **Interactive Dashboard** system provides comprehensive views of your organi
 The system now provides **two unified web app dashboards** with the same professional dark theme, accessed via URL parameters:
 
 ### 🛡️ Steward Dashboard (Internal Use - Contains PII)
-**Menu:** `509 Union Hub > Steward Dashboard`
+**Menu:** `Union Hub > Steward Dashboard`
 **Web App URL:** `?mode=steward`
 
 A comprehensive dashboard for stewards and leadership with **12 tabs**:
@@ -42,7 +42,7 @@ A comprehensive dashboard for stewards and leadership with **12 tabs**:
 > **Contains PII:** This dashboard shows member names and steward details. For internal use only.
 
 ### 👥 Member Dashboard (Public/Member Use - No PII)
-**Menu:** `509 Union Hub > Member Dashboard`
+**Menu:** `Union Hub > Member Dashboard`
 **Web App URL:** `?mode=member`
 
 A PII-safe dashboard for sharing with members - **10 tabs** with anonymized data:
@@ -63,7 +63,7 @@ A PII-safe dashboard for sharing with members - **10 tabs** with anonymized data
 
 ### 📊 Legacy Dashboard Modal (⚠️ PROTECTED)
 
-**Menu:** `📊 509 Dashboard > 📊 Dashboard`
+**Menu:** `📊 Dashboard > 📊 Dashboard`
 
 A **popup modal dialog** with a tabbed interface featuring:
 - **Overview Tab** - Quick stats and metrics at a glance
@@ -82,17 +82,17 @@ A **popup modal dialog** with a tabbed interface featuring:
 ## 📊 Dashboard Features
 
 ### Steward Dashboard Access (v4.4.0)
-`509 Union Hub > Steward Dashboard` - Opens web app URL dialog with link to copy/bookmark
+`Union Hub > Steward Dashboard` - Opens web app URL dialog with link to copy/bookmark
 
 ### Member Dashboard Access (v4.4.0)
-`509 Union Hub > Member Dashboard` - Opens web app URL dialog with link to share with members
+`Union Hub > Member Dashboard` - Opens web app URL dialog with link to share with members
 
 ### Web App Direct URLs
 - **Steward:** `[YOUR_WEB_APP_URL]?mode=steward`
 - **Member:** `[YOUR_WEB_APP_URL]?mode=member`
 
 ### Legacy Dashboard Access
-`509 Union Hub > Legacy Dashboard` (5 tabs: Overview, My Cases, Grievances, Members, Analytics)
+`Union Hub > Legacy Dashboard` (5 tabs: Overview, My Cases, Grievances, Members, Analytics)
 
 ---
 
@@ -107,7 +107,7 @@ A **popup modal dialog** with a tabbed interface featuring:
 > - Touch-optimized interface
 >
 > If you have an existing `🎯 Custom View` tab, you can safely delete it.
-> Use `📊 509 Dashboard > 📊 Dashboard` for all dashboard functionality.
+> Use `📊 Dashboard > 📊 Dashboard` for all dashboard functionality.
 
 ---
 

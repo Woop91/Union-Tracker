@@ -209,7 +209,7 @@ describe('CONFIG_COLS', () => {
 
 describe('Production settings', () => {
   test('COMMAND_CONFIG exists and has system name', () => {
-    expect(COMMAND_CONFIG.SYSTEM_NAME).toContain('509');
+    expect(COMMAND_CONFIG.SYSTEM_NAME).toContain('Strategic');
   });
 
   test('ERROR_CONFIG.SHOW_STACK_TRACE is false by default', () => {

@@ -864,7 +864,7 @@ function padRight(str, len) {
  * 08e_FormHandlers.gs - Form Handlers Module
  * ============================================================================
  *
- * This module contains all form-related functions for the 509 Steward Dashboard:
+ * This module contains all form-related functions for the Steward Dashboard:
  * - Form submission handlers (Contact, Satisfaction, Grievance)
  * - Form trigger setup functions
  * - Form URL handling and configuration
@@ -879,6 +879,6 @@ function padRight(str, len) {
  *
  * Note: onGrievanceFormSubmit() is defined in 05_Integrations.gs
  *
- * @author SEIU Local 509 Development Team
+ * @author SEIU Local Development Team
  * @version 1.0.0
  */

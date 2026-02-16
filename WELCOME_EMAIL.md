@@ -1,4 +1,4 @@
-Subject: Welcome to the 509 Strategic Command Center - Your Digital Hub
+Subject: Welcome to the Strategic Command Center - Your Digital Hub
 
 ═══════════════════════════════════════════════════════════════════════════════
 

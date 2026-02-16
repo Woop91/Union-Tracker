@@ -1001,13 +1001,13 @@ describe('getUnifiedDashboardDataWithDateRange', () => {
 describe('getUnifiedDashboardHtml', () => {
   test('generates member mode HTML with member title', () => {
     var html = getUnifiedDashboardHtml(false);
-    expect(html).toContain('509 MEMBER DASHBOARD');
+    expect(html).toContain('MEMBER DASHBOARD');
     expect(html).toContain('MEMBER VIEW');
   });
 
   test('generates steward mode HTML with steward title', () => {
     var html = getUnifiedDashboardHtml(true);
-    expect(html).toContain('509 STEWARD COMMAND CENTER');
+    expect(html).toContain('STEWARD COMMAND CENTER');
     expect(html).toContain('INTERNAL USE - CONTAINS PII');
   });
 

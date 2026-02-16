@@ -100,7 +100,7 @@ function saveFormUrlsToConfig() {
 }
 
 /**
- * Silent version - used during CREATE_509_DASHBOARD setup
+ * Silent version - used during CREATE_DASHBOARD setup
  * @param {Spreadsheet} ss - The spreadsheet object
  * @private
  */
@@ -352,12 +352,12 @@ function onContactFormSubmit(e) {
         try {
           MailApp.sendEmail({
             to: email,
-            subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Welcome to WFSE Local 509',
+            subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Welcome to WFSE Local',
             body: 'Hello ' + firstName + ',\n\n' +
               'Thank you for submitting your contact information. ' +
               'Your Member ID is: ' + memberId + '\n\n' +
               'Your information has been recorded and a union steward will be in touch.\n\n' +
-              'Best regards,\nWFSE Local 509'
+              'Best regards,\nWFSE Local'
           });
         } catch (emailError) {
           Logger.log('Could not send welcome email: ' + emailError.message);
@@ -832,7 +832,7 @@ function onSatisfactionFormSubmit(e) {
           subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + 'Thank You for Your Feedback',
           body: 'Thank you for completing the member satisfaction survey.\n\n' +
             'Your feedback helps us improve our representation and services.\n\n' +
-            'Best regards,\nWFSE Local 509'
+            'Best regards,\nWFSE Local'
         });
       } catch (emailError) {
         Logger.log('Could not send survey thank-you email: ' + emailError.message);
@@ -936,7 +936,7 @@ function setupSatisfactionFormTrigger() {
  * ============================================================================
  *
  * This module handles all notification and alert functionality for the
- * SEIU Local 509 Dashboard including:
+ * SEIU Local Dashboard including:
  * - Deadline notification settings and triggers
  * - Steward deadline alerts
  * - Survey email distribution
@@ -950,7 +950,7 @@ function setupSatisfactionFormTrigger() {
  * - CONFIG_COLS constant (from 08_Code.gs)
  * - SATISFACTION_FORM_CONFIG constant (from 08_Code.gs)
  *
- * @author SEIU Local 509
+ * @author SEIU Local
  * @version 1.0.0
  */
 
@@ -1219,7 +1219,7 @@ function sendStewardDeadlineAlerts() {
     var urgent = grievances.filter(function(g) { return g.daysRemaining >= 0 && g.daysRemaining <= 3; });
     var upcoming = grievances.filter(function(g) { return g.daysRemaining > 3; });
 
-    var body = '509 GRIEVANCE DEADLINE ALERT\n';
+    var body = 'GRIEVANCE DEADLINE ALERT\n';
     body += '====================================\n\n';
     body += 'Steward: ' + stewardName + '\n';
     body += 'Date: ' + Utilities.formatDate(today, Session.getScriptTimeZone(), 'EEEE, MMMM d, yyyy') + '\n\n';
@@ -1377,7 +1377,7 @@ function sendRandomSurveyEmails() {
     '<select id="count"><option value="5">5 members</option><option value="10" selected>10 members</option>' +
     '<option value="20">20 members</option><option value="50">50 members</option><option value="100">100 members</option></select></div>' +
     '<div class="form-group"><label>Email Subject</label>' +
-    '<input type="text" id="subject" value="SEIU Local 509 - Member Satisfaction Survey"></div>' +
+    '<input type="text" id="subject" value="SEIU Local - Member Satisfaction Survey"></div>' +
     '<div class="form-group"><label>Exclude members emailed in last (days)</label>' +
     '<select id="excludeDays"><option value="0">No exclusion</option><option value="30" selected>30 days</option>' +
     '<option value="60">60 days</option><option value="90">90 days</option></select></div>' +

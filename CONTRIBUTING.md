@@ -1,6 +1,6 @@
-# Contributing to 509 Union Dashboard
+# Contributing to Union Dashboard
 
-Thank you for your interest in contributing to the 509 Union Dashboard! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to the Union Dashboard! This document provides guidelines and instructions for contributing.
 
 ## Table of Contents
 

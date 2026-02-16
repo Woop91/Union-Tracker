@@ -240,7 +240,7 @@ npx clasp open --addon
 
 ### First-time setup in the sheet
 
-1. In the Apps Script editor, select **`CREATE_509_DASHBOARD`** from the function dropdown (near the top)
+1. In the Apps Script editor, select **`CREATE_DASHBOARD`** from the function dropdown (near the top)
 2. Click the **Run** button (play icon)
 3. You'll be asked to authorize — click **Review permissions**, choose your account, click **Advanced > Go to Union Dashboard Scripts (unsafe) > Allow**
 4. The script will create all the dashboard sheets automatically
@@ -373,7 +373,7 @@ npm run build
 npx clasp push
 ```
 
-Then open the sheet, run `CREATE_509_DASHBOARD`, and refresh.
+Then open the sheet, run `CREATE_DASHBOARD`, and refresh.
 
 ---
 

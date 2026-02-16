@@ -511,7 +511,7 @@ function clearErrorLog() {
 
 
 /**
- * 509 Dashboard - Constants and Configuration
+ * Dashboard - Constants and Configuration
  *
  * Single source of truth for all configuration constants.
  * This file must be loaded first in the build order.
@@ -526,7 +526,7 @@ function clearErrorLog() {
 
 /**
  * Strategic Command Center configuration
- * Controls system-wide settings for the 509 Dashboard
+ * Controls system-wide settings for the Dashboard
  *
  * v4.0 UNIFIED MASTER ENGINE FEATURES:
  * - Security: Audit Log & Sabotage Protection (>15 cells)
@@ -600,7 +600,7 @@ var COMMAND_CONFIG = {
  * @const {Object}
  */
 var DRIVE_CONFIG = {
-  ROOT_FOLDER_NAME: '509 Dashboard - Grievance Files',
+  ROOT_FOLDER_NAME: 'Dashboard - Grievance Files',
   // Simplified template: Member Name and Date Filed
   // Template uses placeholders: {date}, {lastName}, {firstName}
   SUBFOLDER_TEMPLATE: '{lastName}, {firstName} - {date}',
@@ -612,7 +612,7 @@ var DRIVE_CONFIG = {
  * Get organization name from Config sheet, falling back to default.
  * Single source of truth for the org name used across the system.
  * @private
- * @returns {string} Organization name (e.g., "SEIU Local 509")
+ * @returns {string} Organization name (e.g., "SEIU Local")
  */
 function getOrgNameFromConfig_() {
   try {
@@ -625,7 +625,7 @@ function getOrgNameFromConfig_() {
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  return 'SEIU Local 509';
+  return 'SEIU Local';
 }
 
 /**
@@ -633,7 +633,7 @@ function getOrgNameFromConfig_() {
  * Derives the tool/system name from the org name for branding consistency.
  * Used by COMMAND_CONFIG.SYSTEM_NAME, EMAIL, and PDF getters.
  * @private
- * @returns {string} System name (e.g., "509 Strategic Command Center")
+ * @returns {string} System name (e.g., "Strategic Command Center")
  */
 function getSystemName_() {
   return getLocalNumberFromConfig_() + ' Strategic Command Center';
@@ -643,7 +643,7 @@ function getSystemName_() {
  * Get local number from Config sheet, falling back to default.
  * Used for UI elements like menu names.
  * @private
- * @returns {string} Local number (e.g., "509")
+ * @returns {string} Local number
  */
 function getLocalNumberFromConfig_() {
   try {
@@ -656,7 +656,7 @@ function getLocalNumberFromConfig_() {
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  return '509';
+  return '';
 }
 
 // ============================================================================
@@ -684,7 +684,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
-  { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling. Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (seiu509.org only) and Lockdown future feature roadmap items.' },
+  { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling. Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (org email only) and Lockdown future feature roadmap items.' },
   { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
   { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
   { version: '4.4.1', date: '2026-01-31', codename: 'Build System',                               changes: 'Initial build system with Node.js, source file concatenation' },

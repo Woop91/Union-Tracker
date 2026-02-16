@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the 509 Union Dashboard project will be documented in this file.
+All notable changes to the Union Dashboard project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -178,7 +178,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `API_VERSION` - synced with VERSION_INFO (4.5.0)
 - `CALENDAR_CONFIG` - re-added missing config to Integrations module
 - `MEMBER_COLUMNS.PIN_HASH` - added missing column constant and header
-- `initializeDashboard()` - fixed dead stub, now delegates to CREATE_509_DASHBOARD()
+- `initializeDashboard()` - fixed dead stub, now delegates to CREATE_DASHBOARD()
 - `COMMAND_CONFIG.VERSION` - synced with VERSION_INFO.CURRENT
 
 ### Removed

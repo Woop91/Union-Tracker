@@ -2447,7 +2447,7 @@ function getAutoSyncOptions() {
 /**
  * Sync computed values to Dashboard sheet (no formulas)
  * Replaces all Dashboard formulas with JavaScript-computed values
- * Called during CREATE_509_DASHBOARD and on data changes
+ * Called during CREATE_DASHBOARD and on data changes
  */
 function syncDashboardValues() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -3656,7 +3656,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '</script>' +
     '</head>' +
     '<body>' +
-    '<div class="header"><i class="material-icons">verified_user</i><h2>509 MEMBER PORTAL</h2></div>' +
+    '<div class="header"><i class="material-icons">verified_user</i><h2>MEMBER PORTAL</h2></div>' +
     // Stats Grid
     '<div class="stat-grid">' +
     '<div class="stat-card"><span class="stat-val">' + (stats.open || 0) + '</span><span class="stat-label">Active Cases</span></div>' +

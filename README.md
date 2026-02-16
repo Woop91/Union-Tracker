@@ -1,4 +1,4 @@
-# 509 Strategic Command Center
+# Strategic Command Center
 
 **Version 4.7.0** | Union Steward Dashboard for Google Sheets
 
@@ -28,7 +28,7 @@ A Google Sheets-based system for managing union grievances, tracking member reco
 
 ## What It Does
 
-The 509 Dashboard gives union stewards and leadership a centralized place to:
+The Dashboard gives union stewards and leadership a centralized place to:
 
 - **Track grievances** from filing through resolution with automatic deadline calculations
 - **Manage member records** with contact info, job metadata, and steward assignments
@@ -84,7 +84,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    - Repeat for all 27 `.gs` files and the `.html` file
 
 5. **Run the initial setup:**
-   - Select `CREATE_509_DASHBOARD` from the function dropdown
+   - Select `CREATE_DASHBOARD` from the function dropdown
    - Click **Run**
    - Authorize the script when prompted (Advanced > Go to project name > Allow)
 
@@ -114,7 +114,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    clasp push
    ```
 
-4. **Open the sheet and refresh** -- run `CREATE_509_DASHBOARD` from the Apps Script editor to initialize.
+4. **Open the sheet and refresh** -- run `CREATE_DASHBOARD` from the Apps Script editor to initialize.
 
 ### First-Time Configuration
 
@@ -403,7 +403,7 @@ The codebase uses a 27-file modular architecture with numbered prefixes that ind
 | Problem | Solution |
 |---------|----------|
 | Menus don't appear | Refresh the page (F5), or run `onOpen()` from the Apps Script editor |
-| Missing sheets | Run **Admin > Setup > Hidden Sheets** or `CREATE_509_DASHBOARD()` |
+| Missing sheets | Run **Admin > Setup > Hidden Sheets** or `CREATE_DASHBOARD()` |
 | Broken formulas | Run **Admin > Repair Dashboard** |
 | Calendar not syncing | Check Calendar permissions in Settings |
 | Columns not auto-updating | Run **Admin > Data Sync > Sync All Data** |

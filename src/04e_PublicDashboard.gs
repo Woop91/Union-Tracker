@@ -1176,7 +1176,7 @@ function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
  */
 function getUnifiedDashboardHtml(isPII) {
   var _mode = isPII ? 'steward' : 'member';
-  var title = isPII ? '509 STEWARD COMMAND CENTER' : '509 MEMBER DASHBOARD';
+  var title = isPII ? 'STEWARD COMMAND CENTER' : 'MEMBER DASHBOARD';
   var badge = isPII ? '<span class="pii-badge">INTERNAL USE - CONTAINS PII</span>' : '<span class="member-badge">MEMBER VIEW</span>';
 
   return '<!DOCTYPE html>' +
@@ -1589,7 +1589,7 @@ function getUnifiedDashboardHtml(isPII) {
 
     // Overview Tab with trend arrows, goal progress, pin buttons, and enhanced insights
     'if(tab==="overview"){' +
-    'var goals=JSON.parse(localStorage.getItem("509_goals")||"{}");' +
+    'var goals=JSON.parse(localStorage.getItem("dashboard_goals")||"{}");' +
     'var winTarget=goals.winRate||75,moraleTarget=goals.morale||8,responseTarget=goals.response||50;' +
     'var isPinned=function(k){return pinnedMetrics.some(function(p){return p.key===k})};' +
     // Primary KPIs
@@ -1681,7 +1681,7 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Won</div><div class=\\"kpi-value green\\">"+d.wins+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Denied</div><div class=\\"kpi-value red\\">"+d.losses+"</div></div>";' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Settled</div><div class=\\"kpi-value purple\\">"+d.settled+"</div></div>";' +
-    'var responseTarget=(JSON.parse(localStorage.getItem("509_goals")||"{}").response)||50;' +
+    'var responseTarget=(JSON.parse(localStorage.getItem("dashboard_goals")||"{}").response)||50;' +
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Survey Response <span style=\\"font-size:9px;color:#64748b\\">(Goal: "+responseTarget+"%)</span></div><div class=\\"kpi-value yellow\\">"+d.engagement.surveyResponseRate+"%</div>"+getGoalBar(d.engagement.surveyResponseRate,responseTarget)+"</div></div>";' +
     // Engagement Metrics Section
     'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:20px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">trending_up</i>Member Engagement Metrics</h3>";' +
@@ -2255,7 +2255,7 @@ function getUnifiedDashboardHtml(isPII) {
 
     // Save steward contact (v4.4.0)
     'function saveStewardContact(name,email,phone){' +
-    'var vcard="BEGIN:VCARD\\nVERSION:3.0\\nFN:"+name+"\\nORG:SEIU Local 509\\nTITLE:Union Steward\\n";' +
+    'var vcard="BEGIN:VCARD\\nVERSION:3.0\\nFN:"+name+"\\nORG:SEIU Local\\nTITLE:Union Steward\\n";' +
     'if(email)vcard+="EMAIL:"+email+"\\n";' +
     'if(phone)vcard+="TEL:"+phone+"\\n";' +
     'vcard+="END:VCARD";' +
@@ -2288,7 +2288,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var blob=new Blob([csv],{type:"text/csv"});' +
     'var url=URL.createObjectURL(blob);' +
     'var a=document.createElement("a");' +
-    'a.href=url;a.download="509_metrics_comparison_"+new Date().toISOString().split("T")[0]+".csv";' +
+    'a.href=url;a.download="metrics_comparison_"+new Date().toISOString().split("T")[0]+".csv";' +
     'document.body.appendChild(a);a.click();document.body.removeChild(a);' +
     'URL.revokeObjectURL(url)' +
     '}' +
@@ -2338,26 +2338,26 @@ function getUnifiedDashboardHtml(isPII) {
     'if(mode==="mobile"){document.body.classList.add("mobile-mode");document.getElementById("mobileViewBtn").classList.add("active")}' +
     'else if(mode==="desktop"){document.body.classList.add("desktop-mode");document.getElementById("desktopViewBtn").classList.add("active")}' +
     'else{document.getElementById("autoViewBtn").classList.add("active")}' +
-    'localStorage.setItem("509_viewMode",mode);' +
+    'localStorage.setItem("dashboard_viewMode",mode);' +
     'showHint(mode.charAt(0).toUpperCase()+mode.slice(1)+" view")' +
     '}' +
 
     'function toggleHighContrast(){' +
     'document.body.classList.toggle("high-contrast");' +
     'document.getElementById("highContrastToggle").classList.toggle("on");' +
-    'localStorage.setItem("509_highContrast",document.body.classList.contains("high-contrast"))' +
+    'localStorage.setItem("dashboard_highContrast",document.body.classList.contains("high-contrast"))' +
     '}' +
     'function toggleLargeText(){' +
     'document.body.classList.toggle("large-text");' +
     'document.getElementById("largeTextToggle").classList.toggle("on");' +
-    'localStorage.setItem("509_largeText",document.body.classList.contains("large-text"))' +
+    'localStorage.setItem("dashboard_largeText",document.body.classList.contains("large-text"))' +
     '}' +
     'var autoRefreshTimer=null;' +
     'function toggleAutoRefresh(){' +
     'var toggle=document.getElementById("autoRefreshToggle");' +
     'toggle.classList.toggle("on");' +
     'if(toggle.classList.contains("on")){startAutoRefresh()}else{stopAutoRefresh()}' +
-    'localStorage.setItem("509_autoRefresh",toggle.classList.contains("on"))' +
+    'localStorage.setItem("dashboard_autoRefresh",toggle.classList.contains("on"))' +
     '}' +
     'function startAutoRefresh(){' +
     'var interval=parseInt(document.getElementById("refreshInterval").value);' +
@@ -2367,11 +2367,11 @@ function getUnifiedDashboardHtml(isPII) {
     'function setRefreshInterval(){stopAutoRefresh();if(document.getElementById("autoRefreshToggle").classList.contains("on")){startAutoRefresh()}}' +
     'function saveGoals(){' +
     'var goals={winRate:parseInt(document.getElementById("goalWinRate").value),morale:parseFloat(document.getElementById("goalMorale").value),response:parseInt(document.getElementById("goalResponse").value)};' +
-    'localStorage.setItem("509_goals",JSON.stringify(goals));' +
+    'localStorage.setItem("dashboard_goals",JSON.stringify(goals));' +
     'if(typeof renderOverviewWithGoals==="function")renderOverviewWithGoals()' +
     '}' +
     'function loadGoals(){' +
-    'try{var g=JSON.parse(localStorage.getItem("509_goals")||"{}");' +
+    'try{var g=JSON.parse(localStorage.getItem("dashboard_goals")||"{}");' +
     'if(g.winRate)document.getElementById("goalWinRate").value=g.winRate;' +
     'if(g.morale)document.getElementById("goalMorale").value=g.morale;' +
     'if(g.response)document.getElementById("goalResponse").value=g.response}catch(e){}' +
@@ -2415,12 +2415,12 @@ function getUnifiedDashboardHtml(isPII) {
     '}' +
 
     // Pinned Metrics Functions
-    'var pinnedMetrics=JSON.parse(localStorage.getItem("509_pinned")||"[]");' +
+    'var pinnedMetrics=JSON.parse(localStorage.getItem("dashboard_pinned")||"[]");' +
     'function togglePin(metricKey,label,value,color){' +
     'var idx=pinnedMetrics.findIndex(function(p){return p.key===metricKey});' +
     'if(idx>=0){pinnedMetrics.splice(idx,1);showHint("Unpinned: "+label)}' +
     'else{pinnedMetrics.push({key:metricKey,label:label,value:value,color:color});showHint("Pinned: "+label)}' +
-    'localStorage.setItem("509_pinned",JSON.stringify(pinnedMetrics));' +
+    'localStorage.setItem("dashboard_pinned",JSON.stringify(pinnedMetrics));' +
     'renderPinnedSection()' +
     '}' +
     'function renderPinnedSection(){' +
@@ -2441,7 +2441,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var content=document.getElementById("main-content");' +
     'if(content)content.insertAdjacentHTML("afterbegin",html)' +
     '}' +
-    'function clearAllPinned(){pinnedMetrics=[];localStorage.removeItem("509_pinned");renderPinnedSection();showHint("All pins cleared")}' +
+    'function clearAllPinned(){pinnedMetrics=[];localStorage.removeItem("dashboard_pinned");renderPinnedSection();showHint("All pins cleared")}' +
 
     // Chart Drill-Down Functions
     'function showChartDrillDown(type,key,title){' +
@@ -2466,7 +2466,7 @@ function getUnifiedDashboardHtml(isPII) {
     'function printDashboard(){toggleSettings();setTimeout(function(){window.print()},300)}' +
     'function exportAllData(){' +
     'var d=dashData;if(!d){alert("No data available");return}' +
-    'var csv="509 Dashboard Full Export\\n\\n";' +
+    'var csv="Dashboard Full Export\\n\\n";' +
     'csv+="SUMMARY METRICS\\n";' +
     'csv+="Metric,Value\\n";' +
     'csv+="Total Members,"+d.totalMembers+"\\n";' +
@@ -2489,7 +2489,7 @@ function getUnifiedDashboardHtml(isPII) {
     'csv+="Unit,Count\\n";' +
     'Object.keys(d.unitBreakdown).forEach(function(u){csv+="\\""+u+"\\","+d.unitBreakdown[u]+"\\n"});' +
     'var blob=new Blob([csv],{type:"text/csv"});var url=URL.createObjectURL(blob);' +
-    'var a=document.createElement("a");a.href=url;a.download="509_full_export_"+new Date().toISOString().split("T")[0]+".csv";' +
+    'var a=document.createElement("a");a.href=url;a.download="full_export_"+new Date().toISOString().split("T")[0]+".csv";' +
     'document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);' +
     'toggleSettings()' +
     '}' +
@@ -2551,11 +2551,11 @@ function getUnifiedDashboardHtml(isPII) {
     'updateLastUpdated();' +
     'loadGoals();' +
     // Load saved view mode
-    'var savedView=localStorage.getItem("509_viewMode");' +
+    'var savedView=localStorage.getItem("dashboard_viewMode");' +
     'if(savedView&&savedView!=="auto"){setViewMode(savedView)}' +
-    'if(localStorage.getItem("509_highContrast")==="true"){document.body.classList.add("high-contrast");document.getElementById("highContrastToggle").classList.add("on")}' +
-    'if(localStorage.getItem("509_largeText")==="true"){document.body.classList.add("large-text");document.getElementById("largeTextToggle").classList.add("on")}' +
-    'if(localStorage.getItem("509_autoRefresh")==="true"){document.getElementById("autoRefreshToggle").classList.add("on");startAutoRefresh()}' +
+    'if(localStorage.getItem("dashboard_highContrast")==="true"){document.body.classList.add("high-contrast");document.getElementById("highContrastToggle").classList.add("on")}' +
+    'if(localStorage.getItem("dashboard_largeText")==="true"){document.body.classList.add("large-text");document.getElementById("largeTextToggle").classList.add("on")}' +
+    'if(localStorage.getItem("dashboard_autoRefresh")==="true"){document.getElementById("autoRefreshToggle").classList.add("on");startAutoRefresh()}' +
     'setTimeout(populateAlerts,1000)' +
     '});' +
 

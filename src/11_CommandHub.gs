@@ -40,7 +40,7 @@
  */
 function getCommandCenterConfig() {
   return {
-    SYSTEM_NAME: "509 Strategic Command Center",
+    SYSTEM_NAME: "Strategic Command Center",
     LOG_SHEET_NAME: SHEETS.GRIEVANCE_LOG,
     DIR_SHEET_NAME: SHEETS.MEMBER_DIR,
     AUDIT_SHEET_NAME: SHEETS.AUDIT_LOG,
@@ -55,7 +55,7 @@ function getCommandCenterConfig() {
 // Legacy COMMAND_CENTER_CONFIG variable for backward compatibility
 // Uses hardcoded values to avoid load-order issues with global initialization
 var COMMAND_CENTER_CONFIG = {
-  SYSTEM_NAME: "509 Strategic Command Center",
+  SYSTEM_NAME: "Strategic Command Center",
   LOG_SHEET_NAME: 'Grievance Log',           // Hardcoded to avoid load-order issues
   DIR_SHEET_NAME: 'Member Directory',        // Hardcoded to avoid load-order issues
   AUDIT_SHEET_NAME: '_Audit_Log',            // Hardcoded to avoid load-order issues
@@ -79,7 +79,7 @@ var COMMAND_CENTER_CONFIG = {
 /**
  * @deprecated v4.4.0 - Menu consolidated into createDashboardMenu() in UIService.gs
  * The Field Portal menu has been merged into:
- * - 📊 509 Union Hub (primary operations)
+ * - 📊 Union Hub (primary operations)
  * - 🔧 Tools (supporting features)
  * - 🛠️ Admin (system administration)
  *
@@ -474,7 +474,7 @@ function showV4StatusReport() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var report = '📊 509 STRATEGIC COMMAND CENTER\n';
+  var report = '📊 STRATEGIC COMMAND CENTER\n';
   report += 'v4.0 UNIFIED MASTER ENGINE STATUS\n';
   report += '=' .repeat(45) + '\n\n';
 
@@ -1001,7 +1001,7 @@ function showDiagnosticReport() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
 
-  var report = '🔍 509 COMMAND CENTER DIAGNOSTIC REPORT\n';
+  var report = '🔍 COMMAND CENTER DIAGNOSTIC REPORT\n';
   report += '=' .repeat(50) + '\n\n';
 
   // Check required sheets
@@ -1407,7 +1407,7 @@ function navigateToMember(memberId) {
  * maintaining compatibility with the modular SHEETS/COMMAND_CONFIG constants.
  */
 var GEMINI_CONFIG = {
-  SYSTEM_NAME: "509 Strategic Command Center",
+  SYSTEM_NAME: "Strategic Command Center",
   // Legacy emoji-prefixed sheet names (for standalone deployments)
   LOG_SHEET_NAME: "📋 Grievance Log",
   DIR_SHEET_NAME: "👤 Member Directory",
@@ -2963,12 +2963,12 @@ function searchPrecedentsData(query, outcomeFilter) {
 
 /**
  * ============================================================================
- * 509 STRATEGIC COMMAND CENTER - MEMBER PORTAL SERVICE (v4.5.0)
+ * STRATEGIC COMMAND CENTER - MEMBER PORTAL SERVICE (v4.5.0)
  * ============================================================================
  * Personalized member portal with Weingarten Rights and steward access.
  *
  * NOTE: The main dashboard functionality has been consolidated into
- * 04_UIService.gs (build509UnifiedDashboard). This file now focuses on:
+ * 04_UIService.gs (buildUnifiedDashboard). This file now focuses on:
  * - Personalized member portals (accessed via ?id=MEMBER_ID)
  * - Public portal without member ID
  * - PII safety utilities
@@ -3273,7 +3273,7 @@ function buildPortalForSelectedMember() {
   }
 
   var portal = buildMemberPortal(memberId);
-  ui.showModalDialog(portal, '509 Member Portal');
+  ui.showModalDialog(portal, 'Member Portal');
 }
 
 /**
@@ -3336,12 +3336,12 @@ function buildMemberPortal(memberId) {
 
   if (!profile) {
     return HtmlService.createHtmlOutput(getErrorPageHtml_('Member not found'))
-      .setTitle('509 Member Portal - Error');
+      .setTitle('Member Portal - Error');
   }
 
   var html = getMemberPortalHtml_(profile);
   return HtmlService.createHtmlOutput(html)
-    .setTitle('509 Member Portal - ' + profile.firstName)
+    .setTitle('Member Portal - ' + profile.firstName)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
 }
 
@@ -3356,7 +3356,7 @@ function buildPublicPortal() {
 
   var html = getPublicPortalHtml_(stats, stewards, satisfaction);
   return HtmlService.createHtmlOutput(html)
-    .setTitle('509 Union Member Portal')
+    .setTitle('Union Member Portal')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
 }
 
@@ -3436,7 +3436,7 @@ function sendMemberDashboardEmail(memberId) {
     '- Satisfaction survey link\n\n' +
     'Keep this link private - it is personalized for you.\n\n' +
     'In Solidarity,\n' +
-    '509 Strategic Command Center';
+    'Strategic Command Center';
 
   try {
     MailApp.sendEmail(member.email, subject, body);
@@ -3499,7 +3499,7 @@ function getMemberPortalHtml_(profile) {
     '<body>' +
     '  <div class="container">' +
     '    <div class="header">' +
-    '      <h1>509 MEMBER PORTAL</h1>' +
+    '      <h1>MEMBER PORTAL</h1>' +
     '      <div class="welcome">Welcome, ' + escapeHtml(profile.firstName) + '!</div>' +
     '      <div class="member-badge">' +
     '        <i class="material-icons" style="font-size:16px">' + (profile.isSteward ? 'verified' : 'person') + '</i>' +
@@ -3589,7 +3589,7 @@ function getPublicPortalHtml_(stats, stewards, satisfaction) {
     '</head>' +
     '<body>' +
     '  <div class="container">' +
-    '    <div class="header"><i class="material-icons">shield</i><h1>509 Union Member Portal</h1></div>' +
+    '    <div class="header"><i class="material-icons">shield</i><h1>Union Member Portal</h1></div>' +
     '    ' +
     '    <div class="rights-box">' +
     '      <div class="rights-header"><i class="material-icons">gavel</i> WEINGARTEN RIGHTS</div>' +

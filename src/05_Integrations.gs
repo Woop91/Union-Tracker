@@ -27,8 +27,8 @@
  * @const {Object}
  */
 var CALENDAR_CONFIG = {
-  CALENDAR_NAME: '509 Grievance Deadlines',
-  MEETING_CALENDAR_NAME: '509 Union Meetings',
+  CALENDAR_NAME: 'Grievance Deadlines',
+  MEETING_CALENDAR_NAME: 'Union Meetings',
   REMINDER_DAYS: [7, 3, 1],
   MEETING_DEACTIVATE_HOURS: 3  // Hours after meeting end to deactivate check-in
 };
@@ -1319,7 +1319,7 @@ function createSignatureReadyPDF(folder, data) {
 /**
  * Creates a PDF for the currently selected grievance
  * Saves to member's Drive folder and optionally emails to member
- * Accessible from the 509 Command menu
+ * Accessible from the Command menu
  */
 function createPDFForSelectedGrievance() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1704,7 +1704,7 @@ function doGet(e) {
       secureLog('doGet', 'Steward access granted', { email: authResult.email });
     }
 
-    var title = isPII ? '509 STEWARD COMMAND CENTER' : '509 MEMBER DASHBOARD';
+    var title = isPII ? 'STEWARD COMMAND CENTER' : 'MEMBER DASHBOARD';
     var html = getUnifiedDashboardHtml(isPII);
     return HtmlService.createHtmlOutput(html)
       .setTitle(title)
@@ -1745,7 +1745,7 @@ function doGet(e) {
       if (typeof getMemberSelfServicePortalHtml === 'function') {
         var authHtml = getMemberSelfServicePortalHtml();
         return HtmlService.createHtmlOutput(authHtml)
-          .setTitle('509 Member Login')
+          .setTitle('Member Login')
           .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
           .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
       }
@@ -1821,7 +1821,7 @@ function doGet(e) {
   }
 
   return HtmlService.createHtmlOutput(html)
-    .setTitle('509 Dashboard')
+    .setTitle('Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
 }
@@ -1840,7 +1840,7 @@ function getWebAppDashboardHtml() {
     '<meta name="apple-mobile-web-app-capable" content="yes">' +
     '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">' +
     '<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'><text y=\'.9em\' font-size=\'90\'>📊</text></svg>">' +
-    '<title>509 Dashboard</title>' +
+    '<title>Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +
@@ -1905,7 +1905,7 @@ function getWebAppDashboardHtml() {
     // Header
     '<div class="header">' +
     '<button class="refresh-btn" onclick="location.reload()">🔄</button>' +
-    '<h1>📊 509 Dashboard</h1>' +
+    '<h1>📊 Dashboard</h1>' +
     '<div class="subtitle">Union Grievance Management</div>' +
     '</div>' +
 
@@ -2007,7 +2007,7 @@ function getWebAppSearchHtml() {
     '<html><head>' +
     '<meta charset="UTF-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
-    '<title>Search - 509 Dashboard</title>' +
+    '<title>Search - Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +
@@ -2173,7 +2173,7 @@ function getWebAppGrievanceListHtml() {
     '<html><head>' +
     '<meta charset="UTF-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
-    '<title>Grievances - 509 Dashboard</title>' +
+    '<title>Grievances - Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +
@@ -2372,7 +2372,7 @@ function getWebAppMemberListHtml() {
     '<html><head>' +
     '<meta charset="UTF-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
-    '<title>Members - 509 Dashboard</title>' +
+    '<title>Members - Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +
@@ -2549,7 +2549,7 @@ function getWebAppLinksHtml() {
     '<html><head>' +
     '<meta charset="UTF-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
-    '<title>Links - 509 Dashboard</title>' +
+    '<title>Links - Dashboard</title>' +
     '<style>' +
     '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
     'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#f5f5f5;min-height:100vh;padding-bottom:80px}' +

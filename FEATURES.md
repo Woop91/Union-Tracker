@@ -1,11 +1,11 @@
-# 509 Strategic Command Center - Complete Features Reference
+# Strategic Command Center - Complete Features Reference
 
 **Version:** 4.7.0 | **Codename:** Security Hardening & Code Quality
 **Last Updated:** February 2026
 
 > **New in v4.6.0:** Meeting Notes & Agenda document automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override
 
-This document provides a comprehensive, searchable reference of all features in the 509 Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
+This document provides a comprehensive, searchable reference of all features in the Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
 ---
 
@@ -165,7 +165,7 @@ This document provides a comprehensive, searchable reference of all features in 
 | **Sync Deadlines to Calendar** | Creates Google Calendar events for all grievance deadlines. | Union Hub > Calendar > Sync Deadlines | sync, calendar, events |
 | **View Upcoming Deadlines** | Shows calendar of upcoming deadlines. | Union Hub > Calendar > View Upcoming | upcoming, calendar, view |
 | **Clear Calendar Events** | Remove previously synced calendar events. | Union Hub > Calendar > Clear Events | clear, remove, delete |
-| **Create Calendar Event** | Manually create calendar event for selected grievance. | 509 Dashboard > Calendar > Create Event | create, event, manual |
+| **Create Calendar Event** | Manually create calendar event for selected grievance. | Dashboard > Calendar > Create Event | create, event, manual |
 
 ---
 
@@ -211,7 +211,7 @@ This document provides a comprehensive, searchable reference of all features in 
 | **High Contrast Mode** | Enhanced contrast for visibility. | Union Hub > Comfort View > High Contrast | contrast, visibility, accessibility |
 | **Reduced Motion** | Minimizes animations for motion sensitivity. | Union Hub > Comfort View > Reduced Motion | motion, animation, sensitivity |
 | **Dark Mode** | Dark gradient backgrounds across all modals. | Union Hub > View > Dark Mode | dark, theme, night |
-| **Apply Global Styling** | Applies Roboto font and zebra stripes to all rows in data sheets. | 509 Dashboard > Styling > Apply Global | styling, font, Roboto |
+| **Apply Global Styling** | Applies Roboto font and zebra stripes to all rows in data sheets. | Dashboard > Styling > Apply Global | styling, font, Roboto |
 | **ADHD-Friendly Themes** | Color schemes designed for attention difficulties. | See COMFORT_VIEW_GUIDE.md | ADHD, theme, friendly |
 
 ---
@@ -283,7 +283,7 @@ This document provides a comprehensive, searchable reference of all features in 
 
 | Feature | Description | Menu Path | Keywords |
 |---------|-------------|-----------|----------|
-| **Pocket/Mobile View** | Hides non-essential columns for phone access. | 509 Dashboard > Field Access > Mobile View | mobile, pocket, phone |
+| **Pocket/Mobile View** | Hides non-essential columns for phone access. | Dashboard > Field Access > Mobile View | mobile, pocket, phone |
 | **Get Mobile URL** | Copy the spreadsheet URL for mobile access. | Field Portal > Field Accessibility > Get URL | URL, mobile, share |
 | **Mobile-Optimized Search** | Touch-friendly search interface. | Field Portal > Mobile Search | touch, mobile, search |
 | **Quick Actions** | Simplified actions for common field tasks. | Within Mobile View | quick, simple, field |
@@ -652,4 +652,4 @@ Quick Action to create or reuse a Google Drive folder for any member.
 
 ---
 
-*509 Strategic Command Center v4.7.0 - A personal project providing comprehensive tools for representatives*
+*Strategic Command Center v4.7.0 - A personal project providing comprehensive tools for representatives*

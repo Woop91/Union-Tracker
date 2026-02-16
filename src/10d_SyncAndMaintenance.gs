@@ -158,7 +158,7 @@ function viewTestResults() {
 // ============================================================================
 
 /**
- * Get or create the root 509 Dashboard folder in Drive
+ * Get or create the root Dashboard folder in Drive
  */
 function getOrCreateDashboardFolder_() {
   var folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;

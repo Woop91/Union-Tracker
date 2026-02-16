@@ -24,7 +24,7 @@
 /**
  * Creates the custom menu when the spreadsheet opens
  * Consolidated menu structure (v4.4.0):
- * - 📊 509 Union Hub: Primary operations (dashboards, search, members, cases)
+ * - 📊 Union Hub: Primary operations (dashboards, search, members, cases)
  * - 🔧 Tools: Supporting features (calendar, drive, notifications, etc.)
  * - 🛠️ Admin: System administration
  * Called automatically by onOpen trigger

@@ -32,7 +32,7 @@ Done. Here's what was added:
 
 The member receives:
 
-- **Subject:** `[509 Strategic Command Center] Grievance Form - GRV-2025-001`
+- **Subject:** `[Strategic Command Center] Grievance Form - GRV-2025-001`
 - **Body:** Greeting, grievance details summary, next steps (review, sign, return)
 - **Attachment:** The filled-out PDF
 

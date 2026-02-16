@@ -1,5 +1,5 @@
 /**
- * 509 Dashboard - Checklist Manager
+ * Dashboard - Checklist Manager
  *
  * Manages case checklists for grievances and other action types.
  * Provides functions for creating, updating, and tracking checklist items.
@@ -3888,7 +3888,7 @@ function installLookerRefreshTrigger() {
  */
 function getLookerConnectionUrl() {
   const ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
-  return 'https://lookerstudio.google.com/reporting/create?c.reportId=&r.reportName=509%20Dashboard%20Report&ds.connector=googleSheets&ds.spreadsheetId=' + ssId;
+  return 'https://lookerstudio.google.com/reporting/create?c.reportId=&r.reportName=Dashboard%20Report&ds.connector=googleSheets&ds.spreadsheetId=' + ssId;
 }
 
 /**

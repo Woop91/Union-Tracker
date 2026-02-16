@@ -1,5 +1,5 @@
 /**
- * Build Script for 509 Dashboard
+ * Build Script for Dashboard
  * Concatenates all source files into a single consolidated .gs file
  *
  * Usage:
@@ -73,7 +73,7 @@ function build() {
   // Add header
   output += `/**
  * ============================================================================
- * 509 DASHBOARD - CONSOLIDATED BUILD
+ * DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
  * Version: 4.6.0 (2026-02-12)

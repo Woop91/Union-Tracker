@@ -1,8 +1,8 @@
-# Quick Deploy - 509 Union Steward Dashboard
+# Quick Deploy - Union Steward Dashboard
 
 **Version:** 4.7.0 | **Architecture:** 27-File Modular
 
-Deploy the 509 Union Steward Dashboard to a Google Sheet using the source files in `src/`.
+Deploy the Union Steward Dashboard to a Google Sheet using the source files in `src/`.
 
 ---
 
@@ -86,7 +86,7 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 
 ### Step 5: Authorize the Script
 
-1. Select **`CREATE_509_DASHBOARD`** from the function dropdown
+1. Select **`CREATE_DASHBOARD`** from the function dropdown
 2. Click the **Run** button
 3. Click **"Review permissions"** > Choose your account
 4. Click **"Advanced"** > **"Go to Union Dashboard Scripts (unsafe)"**
@@ -145,7 +145,7 @@ clasp create --type sheets --title "Union Dashboard"
 clasp push
 ```
 
-Then open the sheet, run `CREATE_509_DASHBOARD`, and refresh.
+Then open the sheet, run `CREATE_DASHBOARD`, and refresh.
 
 ---
 

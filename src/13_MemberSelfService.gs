@@ -193,7 +193,7 @@ function assignMemberPIN(memberId, options) {
           'Your PIN is: ' + newPin + '\n\n' +
           'Please change your PIN after your first login for security.\n\n' +
           'If you did not expect this, please contact your union steward.\n\n' +
-          'Best regards,\nWFSE Local 509'
+          'Best regards,\nWFSE Local'
       });
     } catch (emailError) {
       Logger.log('Could not send PIN email to member: ' + emailError.message);
@@ -294,14 +294,14 @@ function requestPINReset(memberId) {
 
   // Send reset email
   try {
-    var subject = '509 Union - PIN Reset Request';
+    var subject = 'Union - PIN Reset Request';
     var body = 'Hello ' + memberName.trim() + ',\n\n' +
       'You requested a PIN reset for the Member Self-Service Portal.\n\n' +
       'Your reset code is: ' + resetToken + '\n\n' +
       'This code will expire in ' + PIN_CONFIG.RESET_TOKEN_EXPIRY_MINUTES + ' minutes.\n\n' +
       'If you did not request this reset, please ignore this email or contact your union steward.\n\n' +
       'Best regards,\n' +
-      'WFSE Local 509';
+      'WFSE Local';
 
     MailApp.sendEmail({
       to: memberEmail,
