@@ -63,7 +63,12 @@ var CONTACT_FORM_CONFIG = {
     PHONE: 'entry.1824028805',
     INTEREST_ALLIED: 'entry.919302622',        // Willing to support other chapters
     INTEREST_CHAPTER: 'entry.513494211',       // Willing to be active in sub-chapter
-    INTEREST_LOCAL: 'entry.1902862430'         // Willing to join direct actions
+    INTEREST_LOCAL: 'entry.1902862430',        // Willing to join direct actions
+    HIRE_DATE: 'entry.PLACEHOLDER_HIRE_DATE',  // Hire Date — update entry ID after form creation
+    EMPLOYEE_ID: 'entry.PLACEHOLDER_EMP_ID',   // Employee ID — update entry ID after form creation
+    STREET_ADDRESS: 'entry.PLACEHOLDER_STREET', // Mailing Address: Street
+    CITY: 'entry.PLACEHOLDER_CITY',            // Mailing Address: City
+    ZIP_CODE: 'entry.PLACEHOLDER_ZIP'          // Mailing Address: Zip Code
   }
 };
 

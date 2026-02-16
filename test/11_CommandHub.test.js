@@ -3,7 +3,7 @@
  *
  * Covers COMMAND_CENTER_CONFIG, GEMINI_CONFIG, darkenColor_,
  * safetyValveScrub, scrubObjectPII, isProductionMode,
- * getNextSequence, getCommandCenterConfig, and UI smoke tests.
+ * getCommandCenterConfig, and UI smoke tests.
  */
 
 require('./gas-mock');
@@ -252,26 +252,12 @@ describe('isProductionMode', () => {
 });
 
 // ============================================================================
-// getNextSequence
+// generateMissingMemberIDsBatch (name-based IDs)
 // ============================================================================
 
-describe('getNextSequence', () => {
-  test('returns 4-digit padded string starting at 0001', () => {
-    const result = getNextSequence('TEST_PREFIX_UNIQUE');
-    expect(result).toBe('0001');
-  });
-
-  test('increments on subsequent calls', () => {
-    const prefix = 'SEQ_INC_TEST';
-    const first = getNextSequence(prefix);
-    const second = getNextSequence(prefix);
-    expect(parseInt(second, 10)).toBe(parseInt(first, 10) + 1);
-  });
-
-  test('pads to at least 4 digits', () => {
-    const result = getNextSequence('PAD_TEST_UNIQUE');
-    expect(result.length).toBeGreaterThanOrEqual(4);
-    expect(result).toMatch(/^\d{4,}$/);
+describe('generateMissingMemberIDsBatch', () => {
+  test('is defined as a function', () => {
+    expect(typeof generateMissingMemberIDsBatch).toBe('function');
   });
 });
 

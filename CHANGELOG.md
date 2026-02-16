@@ -5,6 +5,32 @@ All notable changes to the 509 Union Dashboard project will be documented in thi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.1] - 2026-02-15
+
+### Added
+- **Contact form fields** — 5 new fields added to the member contact form:
+  - **Hire Date** — parsed as a date for proper date handling
+  - **Employee ID** — employer-assigned ID (distinct from Member ID)
+  - **Street Address** — mailing address street line
+  - **City** — mailing address city
+  - **Zip Code** — mailing address zip code (new Member Directory column)
+- `ZIP_CODE` added to `MEMBER_HEADER_MAP_` and `PII_MEMBER_COLS` (treated as PII)
+- New fields written for both new member creation and existing member updates on form submit
+- Form field entry IDs in `CONTACT_FORM_CONFIG` use placeholders — update after adding questions to the Google Form
+
+### Changed
+- `CONTACT_FORM_CONFIG.FIELD_IDS` — expanded from 15 to 20 entries
+- `onContactFormSubmit()` — now extracts and stores Hire Date, Employee ID, Street Address, City, and Zip Code
+- **Unified Member ID system** — all ID generation now uses `generateNameBasedId()` (format: `MJASM472`)
+- `generateMissingMemberIDs()` and `generateMissingMemberIDsBatch()` now produce name-based IDs instead of unit-code IDs
+- `verifyIDGenerationEngine()` updated to test and report on name-based format
+
+### Removed
+- `generateUniqueId_()` — legacy random unit-code ID generator (`MS-48271-H` format)
+- `getNextSequence_()` — legacy sequential counter for unit-code IDs
+- `getNextSequence()` — sequential ID counter using Script Properties
+- `getNextMemberSequence_()` — duplicate sequential counter in Executive Dashboard
+
 ## [4.8.0] - 2026-02-15
 
 ### Security

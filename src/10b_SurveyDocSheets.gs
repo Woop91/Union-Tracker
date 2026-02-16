@@ -951,7 +951,7 @@ function createFunctionChecklistSheet_() {
     ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '🌟 Identify Rising Stars', 'identifyRisingStars', 'MODAL: Shows top steward performers by score and win rate'],
     ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📉 Management Hostility Report', 'renderHostilityFunnel', 'MODAL: Analyzes denial rates across grievance steps'],
     ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'MODAL: Strategic data for contract negotiations'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates IDs using unit codes from Config sheet'],
+    ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates name-based Member IDs (e.g., MJASM472)'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs', 'Finds and highlights duplicate Member IDs'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '📄 Create PDF for Grievance', 'createPDFForSelectedGrievance', 'Generates PDF with signature blocks for selected grievance'],
     ['1️⃣4️⃣ Command', '📊 509 Command > Steward', '⬆️ Promote to Steward', 'promoteSelectedMemberToSteward', 'Promotes member to steward and sends toolkit email'],
@@ -1215,7 +1215,7 @@ function createGettingStartedSheet(ss) {
   var memberSteps = [
     ['2.1', 'Go to the Member Directory tab'],
     ['2.2', 'Click on the first empty row (row 2 if empty)'],
-    ['2.3', 'Enter a Member ID (format: MS-101-H) or leave blank to auto-generate via Strategic Ops > ID Engines'],
+    ['2.3', 'Enter a Member ID (format: MJASM472) or leave blank to auto-generate via Strategic Ops > ID Engines'],
     ['2.4', 'Fill in First Name, Last Name, and Email (required fields)'],
     ['2.5', 'Use the dropdowns for Job Title, Location, and other fields'],
     ['2.6', 'TIP: Columns AB-AD auto-populate from Grievance Log - don\'t edit them manually!']
@@ -1455,7 +1455,7 @@ function createFAQSheet(ss) {
 
   var memberFAQs = [
     ['Q: What format should Member IDs use?',
-     'A: Format is UNIT_CODE-SEQUENCE-H using unit codes from the Config sheet. Example: MS-101-H (Main Station, member 101). Use Strategic Ops > ID Engines > Generate Missing IDs to auto-fill.'],
+     'A: Format is M + first 2 letters of first name + first 2 letters of last name + 3 random digits. Example: MJASM472 (Jane Smith). IDs are auto-generated when members submit the contact form or via Strategic Ops > ID Engines > Generate Missing IDs.'],
     ['Q: Why are columns AB-AD not editable?',
      'A: These columns are auto-calculated from the Grievance Log. Has Open Grievance, Grievance Status, and Days to Deadline update automatically.'],
     ['Q: How do I assign a steward to multiple members?',
@@ -1802,7 +1802,7 @@ function createFeaturesReferenceSheet(ss) {
     ['Member Management', 'Find Member', 'Search for specific member by name, ID, or other criteria.', 'Union Hub > Members > Find Member', 'find, search, lookup'],
     ['Member Management', 'Import Members', 'Bulk import member data from external sources.', 'Union Hub > Members > Import Members', 'import, bulk, external'],
     ['Member Management', 'Export Members', 'Export member directory to CSV or other formats.', 'Union Hub > Members > Export Members', 'export, CSV, download'],
-    ['Member Management', 'Generate Member IDs', 'Creates sequential IDs using unit codes from Config sheet (e.g., MS-101-H).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
+    ['Member Management', 'Generate Member IDs', 'Creates name-based IDs from member names (e.g., MJASM472 for Jane Smith).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
     ['Member Management', 'Check Duplicate IDs', 'Finds and highlights duplicate Member IDs in the directory.', 'Strategic Ops > ID Engines > Check Duplicates', 'duplicate, check, validate'],
 
     // Steward Tools

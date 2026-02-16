@@ -1010,7 +1010,8 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'HIRE_DATE',          header: 'Hire Date' },
   { key: 'STREET_ADDRESS',     header: 'Street Address' },
   { key: 'CITY',               header: 'City' },
-  { key: 'STATE',              header: 'State' }
+  { key: 'STATE',              header: 'State' },
+  { key: 'ZIP_CODE',           header: 'Zip Code' }
 ];
 
 var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
@@ -1019,7 +1020,7 @@ var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
 });
 
 /** PII columns — auto-derived from MEMBER_COLS */
-var PII_MEMBER_COLS = [MEMBER_COLS.STREET_ADDRESS, MEMBER_COLS.CITY, MEMBER_COLS.STATE];
+var PII_MEMBER_COLS = [MEMBER_COLS.STREET_ADDRESS, MEMBER_COLS.CITY, MEMBER_COLS.STATE, MEMBER_COLS.ZIP_CODE];
 
 // ============================================================================
 // MEETING CHECK-IN LOG COLUMNS — Auto-derived from header map

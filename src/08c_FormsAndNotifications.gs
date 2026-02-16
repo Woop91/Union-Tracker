@@ -272,6 +272,11 @@ function onContactFormSubmit(e) {
     var interestAllied = getFormValue_(responses, 'Willing to support other chapters (DDS, DCF, Public Sector, etc.)?');
     var interestChapter = getFormValue_(responses, 'Willing to be active in sub-chapter (at other worksites within your agency of employment)?');
     var interestLocal = getFormValue_(responses, 'Willing to join direct actions (e.g., at your place of employment)?');
+    var hireDate = getFormValue_(responses, 'Hire Date');
+    var employeeId = getFormValue_(responses, 'Employee ID');
+    var streetAddress = getFormValue_(responses, 'Street Address');
+    var city = getFormValue_(responses, 'City');
+    var zipCode = getFormValue_(responses, 'Zip Code');
 
     // Require at least first and last name
     if (!firstName || !lastName) {
@@ -329,6 +334,11 @@ function onContactFormSubmit(e) {
       newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = interestLocal || '';
       newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = interestChapter || '';
       newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = interestAllied || '';
+      newRow[MEMBER_COLS.HIRE_DATE - 1] = hireDate ? parseFormDate_(hireDate) : '';
+      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = employeeId || '';
+      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = streetAddress || '';
+      newRow[MEMBER_COLS.CITY - 1] = city || '';
+      newRow[MEMBER_COLS.ZIP_CODE - 1] = zipCode || '';
 
       // Append new member row
       memberSheet.appendRow(newRow);
@@ -370,6 +380,11 @@ function onContactFormSubmit(e) {
       if (interestLocal) updates.push({ col: MEMBER_COLS.INTEREST_LOCAL, value: interestLocal });
       if (interestChapter) updates.push({ col: MEMBER_COLS.INTEREST_CHAPTER, value: interestChapter });
       if (interestAllied) updates.push({ col: MEMBER_COLS.INTEREST_ALLIED, value: interestAllied });
+      if (hireDate) updates.push({ col: MEMBER_COLS.HIRE_DATE, value: parseFormDate_(hireDate) });
+      if (employeeId) updates.push({ col: MEMBER_COLS.EMPLOYEE_ID, value: employeeId });
+      if (streetAddress) updates.push({ col: MEMBER_COLS.STREET_ADDRESS, value: streetAddress });
+      if (city) updates.push({ col: MEMBER_COLS.CITY, value: city });
+      if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: zipCode });
 
       // Apply updates
       for (var j = 0; j < updates.length; j++) {

@@ -328,13 +328,13 @@ function syncMemberGrievanceData() {
 }
 
 // ============================================================================
-// UNIT-BASED ID GENERATION (Strategic Command Center)
+// MEMBER ID GENERATION
 // ============================================================================
 
 /**
  * Generates missing Member IDs for all members without one
- * Uses unit-based prefixes from COMMAND_CONFIG or Config sheet
- * Format: UNIT_CODE-NNNNN-H (e.g., MS-48271-H) with unique random numbers
+ * Uses name-based format: M + first 2 letters of first name + first 2 letters of last name + 3 random digits
+ * Example: Jane Smith → MJASM472
  */
 function generateMissingMemberIDs() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -346,7 +346,6 @@ function generateMissingMemberIDs() {
   }
 
   var data = sheet.getDataRange().getValues();
-  var unitCodes = getUnitCodes_();
 
   // Collect all existing IDs into a set for uniqueness checks
   var existingIds = {};
@@ -359,12 +358,12 @@ function generateMissingMemberIDs() {
 
   for (var i = 1; i < data.length; i++) {
     var currentId = data[i][MEMBER_COLS.MEMBER_ID - 1];
-    var unit = data[i][MEMBER_COLS.UNIT - 1];
+    var firstName = data[i][MEMBER_COLS.FIRST_NAME - 1];
+    var lastName = data[i][MEMBER_COLS.LAST_NAME - 1];
 
     // If ID is blank but member has data
-    if (!currentId && (unit || data[i][MEMBER_COLS.FIRST_NAME - 1])) {
-      var prefix = unitCodes[unit] || 'GEN';
-      var newId = generateUniqueId_(prefix, existingIds);
+    if (!currentId && (firstName || lastName)) {
+      var newId = generateNameBasedId('M', firstName, lastName, existingIds);
 
       existingIds[newId] = true;
       sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
@@ -374,55 +373,6 @@ function generateMissingMemberIDs() {
 
   ss.toast('Generated ' + countAdded + ' new Member IDs', COMMAND_CONFIG.SYSTEM_NAME, 5);
   return countAdded;
-}
-
-/**
- * Generates a unique ID for a given prefix using random numbers
- * Ensures no collision with any existing IDs
- * @param {string} prefix - The unit code prefix (e.g., "MS")
- * @param {Object} existingIds - Map of existing IDs for uniqueness check
- * @returns {string} Unique member ID (e.g., "MS-48271-H")
- * @private
- */
-function generateUniqueId_(prefix, existingIds) {
-  var maxAttempts = 1000;
-  for (var attempt = 0; attempt < maxAttempts; attempt++) {
-    // Generate a random 5-digit number (10000-99999) for uniqueness
-    var randomNum = Math.floor(Math.random() * 90000) + 10000;
-    var candidateId = prefix + '-' + randomNum + '-H';
-    if (!existingIds[candidateId]) {
-      return candidateId;
-    }
-  }
-  // Fallback: use timestamp-based ID to guarantee uniqueness
-  return prefix + '-' + String(Date.now()).slice(-6) + '-H';
-}
-
-/**
- * Gets the next available sequence number for a given prefix
- * Scans existing IDs to find the highest number and increments
- * @param {string} prefix - The unit code prefix (e.g., "MS")
- * @param {Sheet} sheet - The Member Directory sheet
- * @returns {number} Next available sequence number
- * @private
- */
-function getNextSequence_(prefix, sheet) {
-  var ids = sheet.getRange(1, MEMBER_COLS.MEMBER_ID, sheet.getLastRow(), 1).getValues().flat();
-  var max = 100;
-
-  ids.forEach(function(id) {
-    if (typeof id === 'string' && id.startsWith(prefix + '-')) {
-      var parts = id.split('-');
-      if (parts.length >= 2) {
-        var n = parseInt(parts[1], 10);
-        if (!isNaN(n) && n > max) {
-          max = n;
-        }
-      }
-    }
-  });
-
-  return max + 1;
 }
 
 /**

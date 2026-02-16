@@ -1839,7 +1839,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2829 lines)
+// SOURCE: 01_Core.gs (2830 lines)
 // ============================================================================
 
 /**
@@ -2854,7 +2854,8 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'HIRE_DATE',          header: 'Hire Date' },
   { key: 'STREET_ADDRESS',     header: 'Street Address' },
   { key: 'CITY',               header: 'City' },
-  { key: 'STATE',              header: 'State' }
+  { key: 'STATE',              header: 'State' },
+  { key: 'ZIP_CODE',           header: 'Zip Code' }
 ];
 
 var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
@@ -2863,7 +2864,7 @@ var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
 });
 
 /** PII columns — auto-derived from MEMBER_COLS */
-var PII_MEMBER_COLS = [MEMBER_COLS.STREET_ADDRESS, MEMBER_COLS.CITY, MEMBER_COLS.STATE];
+var PII_MEMBER_COLS = [MEMBER_COLS.STREET_ADDRESS, MEMBER_COLS.CITY, MEMBER_COLS.STATE, MEMBER_COLS.ZIP_CODE];
 
 // ============================================================================
 // MEETING CHECK-IN LOG COLUMNS — Auto-derived from header map
@@ -4673,7 +4674,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2890 lines)
+// SOURCE: 02_DataManagers.gs (2840 lines)
 // ============================================================================
 
 /**
@@ -5006,13 +5007,13 @@ function syncMemberGrievanceData() {
 }
 
 // ============================================================================
-// UNIT-BASED ID GENERATION (Strategic Command Center)
+// MEMBER ID GENERATION
 // ============================================================================
 
 /**
  * Generates missing Member IDs for all members without one
- * Uses unit-based prefixes from COMMAND_CONFIG or Config sheet
- * Format: UNIT_CODE-NNNNN-H (e.g., MS-48271-H) with unique random numbers
+ * Uses name-based format: M + first 2 letters of first name + first 2 letters of last name + 3 random digits
+ * Example: Jane Smith → MJASM472
  */
 function generateMissingMemberIDs() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -5024,7 +5025,6 @@ function generateMissingMemberIDs() {
   }
 
   var data = sheet.getDataRange().getValues();
-  var unitCodes = getUnitCodes_();
 
   // Collect all existing IDs into a set for uniqueness checks
   var existingIds = {};
@@ -5037,12 +5037,12 @@ function generateMissingMemberIDs() {
 
   for (var i = 1; i < data.length; i++) {
     var currentId = data[i][MEMBER_COLS.MEMBER_ID - 1];
-    var unit = data[i][MEMBER_COLS.UNIT - 1];
+    var firstName = data[i][MEMBER_COLS.FIRST_NAME - 1];
+    var lastName = data[i][MEMBER_COLS.LAST_NAME - 1];
 
     // If ID is blank but member has data
-    if (!currentId && (unit || data[i][MEMBER_COLS.FIRST_NAME - 1])) {
-      var prefix = unitCodes[unit] || 'GEN';
-      var newId = generateUniqueId_(prefix, existingIds);
+    if (!currentId && (firstName || lastName)) {
+      var newId = generateNameBasedId('M', firstName, lastName, existingIds);
 
       existingIds[newId] = true;
       sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
@@ -5052,55 +5052,6 @@ function generateMissingMemberIDs() {
 
   ss.toast('Generated ' + countAdded + ' new Member IDs', COMMAND_CONFIG.SYSTEM_NAME, 5);
   return countAdded;
-}
-
-/**
- * Generates a unique ID for a given prefix using random numbers
- * Ensures no collision with any existing IDs
- * @param {string} prefix - The unit code prefix (e.g., "MS")
- * @param {Object} existingIds - Map of existing IDs for uniqueness check
- * @returns {string} Unique member ID (e.g., "MS-48271-H")
- * @private
- */
-function generateUniqueId_(prefix, existingIds) {
-  var maxAttempts = 1000;
-  for (var attempt = 0; attempt < maxAttempts; attempt++) {
-    // Generate a random 5-digit number (10000-99999) for uniqueness
-    var randomNum = Math.floor(Math.random() * 90000) + 10000;
-    var candidateId = prefix + '-' + randomNum + '-H';
-    if (!existingIds[candidateId]) {
-      return candidateId;
-    }
-  }
-  // Fallback: use timestamp-based ID to guarantee uniqueness
-  return prefix + '-' + String(Date.now()).slice(-6) + '-H';
-}
-
-/**
- * Gets the next available sequence number for a given prefix
- * Scans existing IDs to find the highest number and increments
- * @param {string} prefix - The unit code prefix (e.g., "MS")
- * @param {Sheet} sheet - The Member Directory sheet
- * @returns {number} Next available sequence number
- * @private
- */
-function getNextSequence_(prefix, sheet) {
-  var ids = sheet.getRange(1, MEMBER_COLS.MEMBER_ID, sheet.getLastRow(), 1).getValues().flat();
-  var max = 100;
-
-  ids.forEach(function(id) {
-    if (typeof id === 'string' && id.startsWith(prefix + '-')) {
-      var parts = id.split('-');
-      if (parts.length >= 2) {
-        var n = parseInt(parts[1], 10);
-        if (!isNaN(n) && n > max) {
-          max = n;
-        }
-      }
-    }
-  });
-
-  return max + 1;
 }
 
 /**
@@ -14011,7 +13962,7 @@ function saveInteractiveMember(memberData, mode) {
 
 
 // ============================================================================
-// SOURCE: 04d_ExecutiveDashboard.gs (1033 lines)
+// SOURCE: 04d_ExecutiveDashboard.gs (975 lines)
 // ============================================================================
 
 // ============================================================================
@@ -14747,68 +14698,10 @@ function emailExecutivePDF() {
 
 /**
  * Generates missing Member IDs - UI Service version (Legacy)
- * NOTE: Renamed to avoid duplicate. Use generateMissingMemberIDs() from 02_MemberManager.gs
- * @deprecated Use generateMissingMemberIDs() from 02_MemberManager.gs
+ * @deprecated Use generateMissingMemberIDs() from 02_DataManagers.gs
  */
 function generateMissingMemberIDs_UIService_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!sheet) {
-    SpreadsheetApp.getUi().alert('Member Directory sheet not found.');
-    return;
-  }
-
-  var data = sheet.getDataRange().getValues();
-  var countAdded = 0;
-
-  // Get unit codes from Config sheet (falls back to defaults if not configured)
-  var unitCodes = getUnitCodes_();
-
-  for (var i = 1; i < data.length; i++) {
-    var memberId = data[i][MEMBER_COLS.MEMBER_ID - 1];
-    var unit = data[i][MEMBER_COLS.UNIT - 1];
-
-    // ID is empty but Unit is present
-    if (!memberId && unit) {
-      var prefix = unitCodes[unit] || "GEN";
-      var nextNum = getNextMemberSequence_(prefix);
-      var newId = prefix + "-" + nextNum + "-H";
-
-      sheet.getRange(i + 1, MEMBER_COLS.MEMBER_ID).setValue(newId);
-      countAdded++;
-    }
-  }
-
-  ss.toast(countAdded + ' IDs generated for the 509 Command Center.', 'ID Engine', 5);
-}
-
-/**
- * Gets the next sequence number for a given prefix
- * @param {string} prefix - The unit code prefix (e.g., "MS")
- * @returns {number} The next sequence number
- * @private
- */
-function getNextMemberSequence_(prefix) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-  if (!sheet) return 100;
-
-  var ids = sheet.getRange(1, MEMBER_COLS.MEMBER_ID, sheet.getLastRow(), 1).getValues().flat();
-  var max = 100;
-
-  ids.forEach(function(id) {
-    if (typeof id === 'string' && id.startsWith(prefix + '-')) {
-      var parts = id.split('-');
-      if (parts.length >= 2) {
-        var n = parseInt(parts[1]);
-        if (!isNaN(n) && n > max) max = n;
-      }
-    }
-  });
-
-  return max + 1;
+  generateMissingMemberIDs();
 }
 
 /**
@@ -28582,7 +28475,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1966 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (1981 lines)
 // ============================================================================
 
 
@@ -28859,6 +28752,11 @@ function onContactFormSubmit(e) {
     var interestAllied = getFormValue_(responses, 'Willing to support other chapters (DDS, DCF, Public Sector, etc.)?');
     var interestChapter = getFormValue_(responses, 'Willing to be active in sub-chapter (at other worksites within your agency of employment)?');
     var interestLocal = getFormValue_(responses, 'Willing to join direct actions (e.g., at your place of employment)?');
+    var hireDate = getFormValue_(responses, 'Hire Date');
+    var employeeId = getFormValue_(responses, 'Employee ID');
+    var streetAddress = getFormValue_(responses, 'Street Address');
+    var city = getFormValue_(responses, 'City');
+    var zipCode = getFormValue_(responses, 'Zip Code');
 
     // Require at least first and last name
     if (!firstName || !lastName) {
@@ -28916,6 +28814,11 @@ function onContactFormSubmit(e) {
       newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = interestLocal || '';
       newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = interestChapter || '';
       newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = interestAllied || '';
+      newRow[MEMBER_COLS.HIRE_DATE - 1] = hireDate ? parseFormDate_(hireDate) : '';
+      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = employeeId || '';
+      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = streetAddress || '';
+      newRow[MEMBER_COLS.CITY - 1] = city || '';
+      newRow[MEMBER_COLS.ZIP_CODE - 1] = zipCode || '';
 
       // Append new member row
       memberSheet.appendRow(newRow);
@@ -28957,6 +28860,11 @@ function onContactFormSubmit(e) {
       if (interestLocal) updates.push({ col: MEMBER_COLS.INTEREST_LOCAL, value: interestLocal });
       if (interestChapter) updates.push({ col: MEMBER_COLS.INTEREST_CHAPTER, value: interestChapter });
       if (interestAllied) updates.push({ col: MEMBER_COLS.INTEREST_ALLIED, value: interestAllied });
+      if (hireDate) updates.push({ col: MEMBER_COLS.HIRE_DATE, value: parseFormDate_(hireDate) });
+      if (employeeId) updates.push({ col: MEMBER_COLS.EMPLOYEE_ID, value: employeeId });
+      if (streetAddress) updates.push({ col: MEMBER_COLS.STREET_ADDRESS, value: streetAddress });
+      if (city) updates.push({ col: MEMBER_COLS.CITY, value: city });
+      if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: zipCode });
 
       // Apply updates
       for (var j = 0; j < updates.length; j++) {
@@ -39490,7 +39398,7 @@ function createFunctionChecklistSheet_() {
     ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '🌟 Identify Rising Stars', 'identifyRisingStars', 'MODAL: Shows top steward performers by score and win rate'],
     ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📉 Management Hostility Report', 'renderHostilityFunnel', 'MODAL: Analyzes denial rates across grievance steps'],
     ['1️⃣4️⃣ Command', '📊 509 Command > Strategic', '📝 Bargaining Cheat Sheet', 'renderBargainingCheatSheet', 'MODAL: Strategic data for contract negotiations'],
-    ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates IDs using unit codes from Config sheet'],
+    ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🆔 Generate Missing Member IDs', 'generateMissingMemberIDs', 'Auto-generates name-based Member IDs (e.g., MJASM472)'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '🔍 Check Duplicate IDs', 'checkDuplicateMemberIDs', 'Finds and highlights duplicate Member IDs'],
     ['1️⃣4️⃣ Command', '📊 509 Command > ID Engine', '📄 Create PDF for Grievance', 'createPDFForSelectedGrievance', 'Generates PDF with signature blocks for selected grievance'],
     ['1️⃣4️⃣ Command', '📊 509 Command > Steward', '⬆️ Promote to Steward', 'promoteSelectedMemberToSteward', 'Promotes member to steward and sends toolkit email'],
@@ -39754,7 +39662,7 @@ function createGettingStartedSheet(ss) {
   var memberSteps = [
     ['2.1', 'Go to the Member Directory tab'],
     ['2.2', 'Click on the first empty row (row 2 if empty)'],
-    ['2.3', 'Enter a Member ID (format: MS-101-H) or leave blank to auto-generate via Strategic Ops > ID Engines'],
+    ['2.3', 'Enter a Member ID (format: MJASM472) or leave blank to auto-generate via Strategic Ops > ID Engines'],
     ['2.4', 'Fill in First Name, Last Name, and Email (required fields)'],
     ['2.5', 'Use the dropdowns for Job Title, Location, and other fields'],
     ['2.6', 'TIP: Columns AB-AD auto-populate from Grievance Log - don\'t edit them manually!']
@@ -39994,7 +39902,7 @@ function createFAQSheet(ss) {
 
   var memberFAQs = [
     ['Q: What format should Member IDs use?',
-     'A: Format is UNIT_CODE-SEQUENCE-H using unit codes from the Config sheet. Example: MS-101-H (Main Station, member 101). Use Strategic Ops > ID Engines > Generate Missing IDs to auto-fill.'],
+     'A: Format is M + first 2 letters of first name + first 2 letters of last name + 3 random digits. Example: MJASM472 (Jane Smith). IDs are auto-generated when members submit the contact form or via Strategic Ops > ID Engines > Generate Missing IDs.'],
     ['Q: Why are columns AB-AD not editable?',
      'A: These columns are auto-calculated from the Grievance Log. Has Open Grievance, Grievance Status, and Days to Deadline update automatically.'],
     ['Q: How do I assign a steward to multiple members?',
@@ -40341,7 +40249,7 @@ function createFeaturesReferenceSheet(ss) {
     ['Member Management', 'Find Member', 'Search for specific member by name, ID, or other criteria.', 'Union Hub > Members > Find Member', 'find, search, lookup'],
     ['Member Management', 'Import Members', 'Bulk import member data from external sources.', 'Union Hub > Members > Import Members', 'import, bulk, external'],
     ['Member Management', 'Export Members', 'Export member directory to CSV or other formats.', 'Union Hub > Members > Export Members', 'export, CSV, download'],
-    ['Member Management', 'Generate Member IDs', 'Creates sequential IDs using unit codes from Config sheet (e.g., MS-101-H).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
+    ['Member Management', 'Generate Member IDs', 'Creates name-based IDs from member names (e.g., MJASM472 for Jane Smith).', 'Strategic Ops > ID Engines > Generate Missing IDs', 'ID, generate, auto'],
     ['Member Management', 'Check Duplicate IDs', 'Finds and highlights duplicate Member IDs in the directory.', 'Strategic Ops > ID Engines > Check Duplicates', 'duplicate, check, validate'],
 
     // Steward Tools
@@ -40473,7 +40381,7 @@ function createFeaturesReferenceSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10c_FormHandlers.gs (682 lines)
+// SOURCE: 10c_FormHandlers.gs (687 lines)
 // ============================================================================
 
 // ============================================================================
@@ -40541,7 +40449,12 @@ var CONTACT_FORM_CONFIG = {
     PHONE: 'entry.1824028805',
     INTEREST_ALLIED: 'entry.919302622',        // Willing to support other chapters
     INTEREST_CHAPTER: 'entry.513494211',       // Willing to be active in sub-chapter
-    INTEREST_LOCAL: 'entry.1902862430'         // Willing to join direct actions
+    INTEREST_LOCAL: 'entry.1902862430',        // Willing to join direct actions
+    HIRE_DATE: 'entry.PLACEHOLDER_HIRE_DATE',  // Hire Date — update entry ID after form creation
+    EMPLOYEE_ID: 'entry.PLACEHOLDER_EMP_ID',   // Employee ID — update entry ID after form creation
+    STREET_ADDRESS: 'entry.PLACEHOLDER_STREET', // Mailing Address: Street
+    CITY: 'entry.PLACEHOLDER_CITY',            // Mailing Address: City
+    ZIP_CODE: 'entry.PLACEHOLDER_ZIP'          // Mailing Address: Zip Code
   }
 };
 
@@ -44387,7 +44300,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3681 lines)
+// SOURCE: 11_CommandHub.gs (3657 lines)
 // ============================================================================
 
 /**
@@ -44723,33 +44636,11 @@ function toggleMobileView() {
 // v4.0 HIGH-PERFORMANCE DATA ENGINE
 // ============================================================================
 
-/**
- * v4.0 Sequential ID Generator
- * Gets the next sequence number for a given prefix from stored properties.
- * Used for generating Member IDs with unit code prefixes.
- *
- * @param {string} prefix - The unit code prefix (e.g., "MS", "FO", "HC")
- * @returns {string} The next sequence number as a 4-digit padded string
- */
-function getNextSequence(prefix) {
-  var lock = LockService.getScriptLock();
-  try {
-    lock.waitLock(10000);
-    var props = PropertiesService.getScriptProperties();
-    var key = 'SEQUENCE_' + prefix;
-    var current = parseInt(props.getProperty(key) || '0', 10);
-    var next = current + 1;
-    props.setProperty(key, String(next));
-    return String(next).padStart(4, '0');
-  } finally {
-    lock.releaseLock();
-  }
-}
 
 /**
- * v4.0 Batch Member ID Generator (High-Performance)
+ * Batch Member ID Generator (High-Performance)
  * Uses batch array processing to generate IDs for up to 5,000 members without lag.
- * Reads unit codes from Config sheet or falls back to defaults.
+ * Format: M + first 2 letters of first name + first 2 letters of last name + 3 random digits
  */
 function generateMissingMemberIDsBatch() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -44762,17 +44653,25 @@ function generateMissingMemberIDsBatch() {
 
   // Batch read all data
   var data = sheet.getDataRange().getValues();
-  var unitCodes = getUnitCodes_();
   var countAdded = 0;
+
+  // Collect existing IDs for collision detection
+  var existingIds = {};
+  for (var j = 1; j < data.length; j++) {
+    var id = data[j][MEMBER_COLS.MEMBER_ID - 1];
+    if (id) existingIds[id] = true;
+  }
 
   // Process in memory (no individual cell writes)
   for (var i = 1; i < data.length; i++) {
-    // Check if Member ID is empty and Unit exists
-    if (!data[i][MEMBER_COLS.MEMBER_ID - 1] && data[i][MEMBER_COLS.UNIT - 1]) {
-      var unit = data[i][MEMBER_COLS.UNIT - 1];
-      var prefix = unitCodes[unit] || 'GEN';
-      var nextNum = getNextSequence(prefix);
-      data[i][MEMBER_COLS.MEMBER_ID - 1] = prefix + '-' + nextNum + '-H';
+    var firstName = data[i][MEMBER_COLS.FIRST_NAME - 1];
+    var lastName = data[i][MEMBER_COLS.LAST_NAME - 1];
+
+    // Check if Member ID is empty and member has name data
+    if (!data[i][MEMBER_COLS.MEMBER_ID - 1] && (firstName || lastName)) {
+      var newId = generateNameBasedId('M', firstName, lastName, existingIds);
+      data[i][MEMBER_COLS.MEMBER_ID - 1] = newId;
+      existingIds[newId] = true;
       countAdded++;
     }
   }
@@ -44782,7 +44681,7 @@ function generateMissingMemberIDsBatch() {
     sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
   }
 
-  ss.toast('✅ ' + countAdded + ' IDs generated.', COMMAND_CONFIG.SYSTEM_NAME, 3);
+  ss.toast(countAdded + ' IDs generated.', COMMAND_CONFIG.SYSTEM_NAME, 3);
 
   return {
     generated: countAdded,
@@ -44809,38 +44708,23 @@ function refreshMemberView() {
 }
 
 /**
- * v4.0 ID Generation Engine Verification
- * Tests the ID generation system to ensure proper sequencing and format.
+ * ID Generation Engine Verification
+ * Tests the name-based ID generation system and reports Member Directory statistics.
  */
 function verifyIDGenerationEngine() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var props = PropertiesService.getScriptProperties();
 
   var report = '🔍 ID GENERATION ENGINE VERIFICATION\n';
   report += '=' .repeat(45) + '\n\n';
 
-  // Check current sequences
-  report += '📊 CURRENT SEQUENCE COUNTERS:\n';
-  var unitCodes = getUnitCodes_();
-  var sequenceKeys = Object.keys(unitCodes).map(function(unit) {
-    return 'SEQUENCE_' + unitCodes[unit];
-  });
-
-  // Add GEN prefix for generic IDs
-  sequenceKeys.push('SEQUENCE_GEN');
-
-  sequenceKeys.forEach(function(key) {
-    var value = props.getProperty(key) || '0';
-    report += '  ' + key + ': ' + value + '\n';
-  });
-
-  // Test ID format generation
-  report += '\n🧪 TEST ID GENERATION:\n';
-  var testPrefix = 'TEST';
-  var testSeq = getNextSequence(testPrefix);
-  report += '  Generated: ' + testPrefix + '-' + testSeq + '-H\n';
-  report += '  Format Valid: ' + (testSeq.length === 4 ? '✅ Yes' : '❌ No') + '\n';
+  // Test name-based ID generation
+  report += '🧪 TEST ID GENERATION (Name-Based):\n';
+  report += '  Format: M + 2 chars first name + 2 chars last name + 3 digits\n';
+  var testId = generateNameBasedId('M', 'Jane', 'Smith', {});
+  report += '  Test (Jane Smith): ' + testId + '\n';
+  var formatValid = /^M[A-Z]{4}\d{3}$/.test(testId);
+  report += '  Format Valid: ' + (formatValid ? '✅ Yes' : '❌ No') + '\n';
 
   // Check Member Directory for ID statistics
   report += '\n📈 MEMBER ID STATISTICS:\n';
@@ -44849,13 +44733,18 @@ function verifyIDGenerationEngine() {
     var data = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1).getValues();
     var withID = 0;
     var withoutID = 0;
-    var idFormats = {};
+    var nameBasedCount = 0;
+    var legacyCount = 0;
 
     data.forEach(function(row) {
       if (row[0]) {
         withID++;
-        var prefix = String(row[0]).split('-')[0];
-        idFormats[prefix] = (idFormats[prefix] || 0) + 1;
+        var idStr = String(row[0]);
+        if (/^M[A-Z]{4}\d{3}/.test(idStr)) {
+          nameBasedCount++;
+        } else {
+          legacyCount++;
+        }
       } else {
         withoutID++;
       }
@@ -44863,10 +44752,10 @@ function verifyIDGenerationEngine() {
 
     report += '  Members with ID: ' + withID + '\n';
     report += '  Members without ID: ' + withoutID + '\n';
-    report += '\n  ID Prefix Distribution:\n';
-    Object.keys(idFormats).forEach(function(prefix) {
-      report += '    ' + prefix + ': ' + idFormats[prefix] + '\n';
-    });
+    report += '  Name-based IDs (current format): ' + nameBasedCount + '\n';
+    if (legacyCount > 0) {
+      report += '  Legacy IDs (old format): ' + legacyCount + '\n';
+    }
   } else {
     report += '  No member data found.\n';
   }
