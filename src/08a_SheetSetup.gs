@@ -443,7 +443,7 @@ function getConfigValues(configSheet, col) {
  * @returns {void}
  */
 function applyMultiSelectValue(value) {
-  var props = PropertiesService.getDocumentProperties();
+  var props = PropertiesService.getUserProperties();
   var row = parseInt(props.getProperty('multiSelectRow'), 10);
   var col = parseInt(props.getProperty('multiSelectCol'), 10);
 
@@ -513,7 +513,7 @@ function onSelectionChangeMultiSelect(e) {
   var config = getMultiSelectConfig(col);
   if (!config) return;
 
-  var props = PropertiesService.getDocumentProperties();
+  var props = PropertiesService.getUserProperties();
   var lastCell = props.getProperty('lastMultiSelectCell');
   var currentCell = row + ',' + col;
 
