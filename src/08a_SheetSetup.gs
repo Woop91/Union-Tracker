@@ -357,12 +357,23 @@ function setMemberIdValidation(grievanceSheet, memberSheet) {
  * @returns {void}
  */
 function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  // Use a large fixed range (500 rows) so Config values added later are always included
-  var rowCount = 500;
-  var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
+  // Get actual values from Config column (skip blanks) and use requireValueInList
+  // This avoids the 500-row fixed range issue that can cause empty entries in dropdowns
+  var lastRow = configSheet.getLastRow();
+  var values = [];
+  if (lastRow >= 3) {
+    var data = configSheet.getRange(3, sourceCol, lastRow - 2, 1).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString().trim() !== '') {
+        values.push(data[i][0].toString().trim());
+      }
+    }
+  }
+
+  if (values.length === 0) return; // No values to validate against
 
   var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(sourceRange, true)
+    .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
@@ -379,13 +390,23 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
  * @returns {void}
  */
 function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol) {
-  // Use a large fixed range (500 rows) so Config values added later are always included
-  var rowCount = 500;
-  var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
+  // Get actual values from Config column (skip blanks) and use requireValueInList
+  var lastRow = configSheet.getLastRow();
+  var values = [];
+  if (lastRow >= 3) {
+    var data = configSheet.getRange(3, sourceCol, lastRow - 2, 1).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString().trim() !== '') {
+        values.push(data[i][0].toString().trim());
+      }
+    }
+  }
+
+  if (values.length === 0) return;
 
   var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(true)  // Allow comma-separated values
+    .requireValueInList(values, true)
+    .setAllowInvalid(true)  // Allow comma-separated values from multi-select dialog
     .build();
 
   var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
@@ -555,17 +576,8 @@ function removeMultiSelectTrigger() {
  * @returns {void}
  */
 function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourceCol) {
-  // Use a large fixed range (500 rows) so Config values added later are always included
-  var rowCount = 500;
-  var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
-
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
-    .build();
-
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
-  targetRange.setDataValidation(rule);
+  // Delegate to the main function which now uses dynamic value lists
+  setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol);
 }
 
 /**
@@ -577,17 +589,8 @@ function setDropdownValidationDynamic(targetSheet, targetCol, configSheet, sourc
  * @returns {void}
  */
 function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, sourceCol) {
-  // Use a large fixed range (500 rows) so Config values added later are always included
-  var rowCount = 500;
-  var sourceRange = configSheet.getRange(3, sourceCol, rowCount, 1);
-
-  var rule = SpreadsheetApp.newDataValidation()
-    .requireValueInRange(sourceRange, true)
-    .setAllowInvalid(true)
-    .build();
-
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
-  targetRange.setDataValidation(rule);
+  // Delegate to the main function which now uses dynamic value lists
+  setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol);
 }
 
 
