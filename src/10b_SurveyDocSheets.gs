@@ -1461,7 +1461,9 @@ function createFAQSheet(ss) {
     ['Q: How do I assign a steward to multiple members?',
      'A: Use the Assigned Steward dropdown in column P. You can select multiple stewards using the multi-select editor.'],
     ['Q: What does the "Start Grievance" checkbox do?',
-     'A: Checking this opens a pre-filled grievance form for that member. The checkbox auto-resets after use.']
+     'A: Checking this opens a pre-filled grievance form for that member. The checkbox auto-resets after use.'],
+    ['Q: How does multi-select work for Member Directory columns?',
+     'A: Five columns support multi-select: Office Days, Preferred Communication, Best Time to Contact, Committees, and Assigned Steward(s). Click a cell in any of these columns and use Tools > Multi-Select > Open Editor to open a checkbox dialog where you can pick multiple values. Selected values are stored as comma-separated text. You can also type directly — a toast notification will remind you about the editor.']
   ];
 
   for (var j = 0; j < memberFAQs.length; j++) {
@@ -1495,7 +1497,9 @@ function createFAQSheet(ss) {
     ['Q: How do I create a folder for grievance documents?',
      'A: Select the grievance row, then go to Grievances → Drive Folders → Setup Folder. This creates a Google Drive folder with subfolders.'],
     ['Q: Can I sync deadlines to my calendar?',
-     'A: Yes! Go to Grievances → Calendar → Sync Deadlines to Calendar. You\'ll need to grant calendar access the first time.']
+     'A: Yes! Go to Grievances → Calendar → Sync Deadlines to Calendar. You\'ll need to grant calendar access the first time.'],
+    ['Q: How do I select multiple articles violated or issue categories for a grievance?',
+     'A: The Articles Violated (column V) and Issue Category (column W) columns now support multi-select. Click the cell and use Tools > Multi-Select > Open Editor to open a checkbox dialog listing all available options from the Config sheet. Check the items that apply and click Save. Values are stored as comma-separated text (e.g. "Art. 5 - Hours, Art. 12 - Overtime").']
   ];
 
   for (var k = 0; k < grievanceFAQs.length; k++) {

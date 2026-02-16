@@ -2022,6 +2022,7 @@ function getUnifiedDashboardHtml(isPII) {
     '{cat:"Analytics",q:"What are the engagement metrics?",a:"Email Open Rate = % who opened union emails. Meeting Attendance = % who attended meetings in last 6 months. Survey Response = % who completed satisfaction survey.",tutorial:false},' +
     '{cat:"Member Directory",q:"How do I find a specific member?",a:"Use the search field in the steward contact section or the filter in list views. Search works on names, locations, and units.",tutorial:false},' +
     '{cat:"Member Directory",q:"What do the participation heatmaps show?",a:"Heatmaps show engagement levels by unit or location. Green = high engagement (60%+), Yellow = moderate (40-60%), Red = low (<40%).",tutorial:true},' +
+    '{cat:"Member Directory",q:"How does multi-select work?",a:"Columns like Office Days, Preferred Communication, Best Time to Contact, Committees, and Assigned Steward(s) support multi-select. In the Grievance Log, Articles Violated and Issue Category also support multi-select. Click the cell and use Tools > Multi-Select > Open Editor to pick multiple values from a checkbox dialog. Values are stored as comma-separated text.",tutorial:true},' +
     '{cat:"Satisfaction",q:"How are satisfaction scores calculated?",a:"Each section score is the average of related survey questions (1-10 scale). Overall Score combines all sections weighted equally.",tutorial:false},' +
     '{cat:"Satisfaction",q:"What is the Key Insights section?",a:"Key Insights automatically identifies your strongest area, biggest opportunity, and suggests action items based on survey data.",tutorial:true},' +
     '{cat:"Comparison Tool",q:"How do I use the Compare tab?",a:"Select metrics you want to compare using checkboxes, then click Export to download a CSV file with your selected data.",tutorial:true},' +
@@ -2178,6 +2179,10 @@ function getUnifiedDashboardHtml(isPII) {
     '{q:"How do I file a new grievance?",a:"Go to Member Directory in the spreadsheet > check the Start Grievance box for a member."},' +
     '{q:"How do I get help?",a:"Use the Help menu in the spreadsheet or contact your chapter leadership."},' +
     '{q:"Can I export this data?",a:"Use your browser\\x27s print function or screenshot the dashboard."}' +
+    ']},' +
+    '{cat:"Multi-Select Columns",items:[' +
+    '{q:"Which columns support multi-select?",a:"Member Directory: Office Days, Preferred Communication, Best Time to Contact, Committees, Assigned Steward(s). Grievance Log: Articles Violated (column V), Issue Category (column W)."},' +
+    '{q:"How do I use multi-select?",a:"Click the cell, then go to Tools > Multi-Select > Open Editor. A checkbox dialog appears with all available options from the Config sheet. Check the items you want and click Save. Values are stored as comma-separated text."}' +
     ']}' +
     '];' +
     'var html="<div style=\\"max-height:400px;overflow-y:auto;padding:8px\\">";' +
