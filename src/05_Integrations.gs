@@ -2974,3 +2974,667 @@ function addMobileDashboardLinkToConfig() {
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
+
+// ============================================================================
+// CONSTANT CONTACT V3 API INTEGRATION — Read-Only Engagement Metrics
+// ============================================================================
+
+/**
+ * Constant Contact API configuration
+ * @const {Object}
+ */
+var CC_CONFIG = {
+  API_BASE: 'https://api.cc.email/v3',
+  AUTH_URL: 'https://authz.constantcontact.com/oauth2/default/v1/authorize',
+  TOKEN_URL: 'https://authz.constantcontact.com/oauth2/default/v1/token',
+  CONTACTS_ENDPOINT: '/contacts',
+  ACTIVITY_SUMMARY_ENDPOINT: '/reports/contact_reports/{contact_id}/activity_summary',
+  RATE_LIMIT_PER_SECOND: 4,
+  RATE_LIMIT_DELAY_MS: 300,
+  PAGE_LIMIT: 500,
+  ACTIVITY_LOOKBACK_DAYS: 365,
+  PROP_API_KEY: 'CC_API_KEY',
+  PROP_API_SECRET: 'CC_API_SECRET',
+  PROP_ACCESS_TOKEN: 'CC_ACCESS_TOKEN',
+  PROP_REFRESH_TOKEN: 'CC_REFRESH_TOKEN',
+  PROP_TOKEN_EXPIRY: 'CC_TOKEN_EXPIRY'
+};
+
+/**
+ * Shows dialog for entering Constant Contact API credentials.
+ * Stores API key and secret in Script Properties (encrypted at rest).
+ * One-time setup required before syncing engagement metrics.
+ */
+function showConstantContactSetup() {
+  var ui = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var existingKey = props.getProperty(CC_CONFIG.PROP_API_KEY);
+
+  var statusMsg = existingKey
+    ? 'Current status: API key is configured (ends in ...' + existingKey.slice(-4) + ')\n\n'
+    : 'Current status: Not configured\n\n';
+
+  var response = ui.prompt(
+    '📧 Constant Contact Setup',
+    statusMsg +
+    'Enter your Constant Contact API key (client ID).\n\n' +
+    'To get your API key:\n' +
+    '1. Go to app.constantcontact.com/pages/dma/portal\n' +
+    '2. Click "New Application"\n' +
+    '3. Copy your API Key (Client ID)\n\n' +
+    'API Key:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() !== ui.Button.OK || !response.getResponseText().trim()) {
+    return;
+  }
+
+  var apiKey = response.getResponseText().trim();
+
+  var secretResponse = ui.prompt(
+    '📧 Constant Contact Setup (Step 2)',
+    'Enter your Client Secret.\n\n' +
+    'Click "Generate Client Secret" in your CC app settings.\n' +
+    'Important: Copy it immediately — it only appears once.\n\n' +
+    'Client Secret:',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (secretResponse.getSelectedButton() !== ui.Button.OK || !secretResponse.getResponseText().trim()) {
+    return;
+  }
+
+  var apiSecret = secretResponse.getResponseText().trim();
+
+  props.setProperty(CC_CONFIG.PROP_API_KEY, apiKey);
+  props.setProperty(CC_CONFIG.PROP_API_SECRET, apiSecret);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'API credentials saved. Next step: authorize your account.',
+    '✅ Constant Contact Configured', 5
+  );
+
+  Logger.log('Constant Contact API credentials configured');
+}
+
+/**
+ * Initiates the OAuth2 authorization flow for Constant Contact.
+ * Opens a dialog with the authorization URL for the user to grant access.
+ * After granting access, the user pastes back the authorization code.
+ */
+function authorizeConstantContact() {
+  var ui = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = props.getProperty(CC_CONFIG.PROP_API_KEY);
+
+  if (!apiKey) {
+    ui.alert('⚠️ Setup Required',
+      'Please run "Setup API Credentials" first.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  // Check if already authorized
+  var existingToken = props.getProperty(CC_CONFIG.PROP_ACCESS_TOKEN);
+  var expiry = props.getProperty(CC_CONFIG.PROP_TOKEN_EXPIRY);
+  if (existingToken && expiry && new Date(expiry) > new Date()) {
+    var reauth = ui.alert('Already Authorized',
+      'You already have a valid access token.\nExpires: ' + new Date(expiry).toLocaleString() +
+      '\n\nRe-authorize?',
+      ui.ButtonSet.YES_NO);
+    if (reauth !== ui.Button.YES) return;
+  }
+
+  // Build authorization URL — using server flow (authorization code grant)
+  var redirectUri = 'https://localhost';
+  var scope = 'contact_data offline_access';
+  var state = Utilities.getUuid();
+
+  var authUrl = CC_CONFIG.AUTH_URL +
+    '?response_type=code' +
+    '&client_id=' + encodeURIComponent(apiKey) +
+    '&redirect_uri=' + encodeURIComponent(redirectUri) +
+    '&scope=' + encodeURIComponent(scope) +
+    '&state=' + encodeURIComponent(state);
+
+  // Show the URL for the user to visit
+  var html = HtmlService.createHtmlOutput(
+    '<style>' +
+    'body{font-family:Arial,sans-serif;padding:20px;background:#f5f5f5}' +
+    '.container{background:white;padding:25px;border-radius:8px;max-width:500px}' +
+    'h2{color:#1a73e8;margin-top:0}' +
+    '.step{background:#f0f7ff;padding:15px;margin:12px 0;border-radius:8px;border-left:4px solid #1a73e8}' +
+    '.step-num{font-weight:bold;color:#1a73e8}' +
+    'a{color:#1a73e8;word-break:break-all}' +
+    'input{width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;margin:8px 0;font-size:14px}' +
+    'button{padding:12px 24px;background:#1a73e8;color:white;border:none;border-radius:4px;cursor:pointer;font-size:14px}' +
+    'button:hover{background:#1557b0}' +
+    '.note{font-size:12px;color:#666;margin-top:12px}' +
+    '</style>' +
+    '<div class="container">' +
+    '<h2>Authorize Constant Contact</h2>' +
+    '<div class="step"><span class="step-num">Step 1:</span> Click the link below to authorize:<br><br>' +
+    '<a href="' + authUrl + '" target="_blank">Open Constant Contact Authorization</a></div>' +
+    '<div class="step"><span class="step-num">Step 2:</span> Log in and click "Allow"</div>' +
+    '<div class="step"><span class="step-num">Step 3:</span> You\'ll be redirected to a URL like:<br>' +
+    '<code>https://localhost?code=XXXX&state=...</code><br><br>' +
+    'Copy the entire URL from your browser address bar and paste it below:<br>' +
+    '<input type="text" id="callbackUrl" placeholder="Paste the full redirect URL here...">' +
+    '<button onclick="submitCode()">Submit</button></div>' +
+    '<div class="note">Your browser may show an error page — that\'s expected. ' +
+    'Just copy the URL from the address bar.</div>' +
+    '</div>' +
+    '<script>' +
+    'function submitCode(){' +
+    '  var url=document.getElementById("callbackUrl").value.trim();' +
+    '  if(!url){alert("Please paste the redirect URL");return;}' +
+    '  var match=url.match(/[?&]code=([^&]+)/);' +
+    '  if(!match){alert("Could not find authorization code in that URL. Make sure you copied the full URL.");return;}' +
+    '  google.script.run' +
+    '    .withSuccessHandler(function(msg){' +
+    '      document.querySelector(".container").innerHTML="<h2>✅ "+msg+"</h2><p>You can close this dialog.</p>";' +
+    '    })' +
+    '    .withFailureHandler(function(e){alert("Error: "+e.message);})' +
+    '    .exchangeConstantContactCode(match[1]);' +
+    '}' +
+    '</script>'
+  ).setWidth(550).setHeight(520);
+
+  ui.showModalDialog(html, '📧 Authorize Constant Contact');
+}
+
+/**
+ * Exchanges an authorization code for access and refresh tokens.
+ * Called from the authorization dialog after user grants access.
+ * @param {string} code - The authorization code from the OAuth callback
+ * @returns {string} Success message
+ */
+function exchangeConstantContactCode(code) {
+  var props = PropertiesService.getScriptProperties();
+  var apiKey = props.getProperty(CC_CONFIG.PROP_API_KEY);
+  var apiSecret = props.getProperty(CC_CONFIG.PROP_API_SECRET);
+
+  if (!apiKey || !apiSecret) {
+    throw new Error('API credentials not configured. Run setup first.');
+  }
+
+  var payload = {
+    grant_type: 'authorization_code',
+    code: code,
+    redirect_uri: 'https://localhost'
+  };
+
+  var options = {
+    method: 'post',
+    contentType: 'application/x-www-form-urlencoded',
+    headers: {
+      'Authorization': 'Basic ' + Utilities.base64Encode(apiKey + ':' + apiSecret)
+    },
+    payload: Object.keys(payload).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(payload[k]);
+    }).join('&'),
+    muteHttpExceptions: true
+  };
+
+  var response = UrlFetchApp.fetch(CC_CONFIG.TOKEN_URL, options);
+  var responseCode = response.getResponseCode();
+  var body = JSON.parse(response.getContentText());
+
+  if (responseCode !== 200) {
+    var errorMsg = body.error_description || body.error || 'Unknown error';
+    throw new Error('Token exchange failed (' + responseCode + '): ' + errorMsg);
+  }
+
+  // Store tokens
+  storeConstantContactTokens_(body);
+
+  Logger.log('Constant Contact authorized successfully');
+  return 'Authorized Successfully!';
+}
+
+/**
+ * Stores OAuth tokens from a token response.
+ * @param {Object} tokenResponse - The token endpoint response
+ * @private
+ */
+function storeConstantContactTokens_(tokenResponse) {
+  var props = PropertiesService.getScriptProperties();
+
+  props.setProperty(CC_CONFIG.PROP_ACCESS_TOKEN, tokenResponse.access_token);
+
+  if (tokenResponse.refresh_token) {
+    props.setProperty(CC_CONFIG.PROP_REFRESH_TOKEN, tokenResponse.refresh_token);
+  }
+
+  // Calculate expiry (tokens last ~2 hours; subtract 5 min buffer)
+  var expiresIn = (tokenResponse.expires_in || 7200) - 300;
+  var expiry = new Date(Date.now() + expiresIn * 1000).toISOString();
+  props.setProperty(CC_CONFIG.PROP_TOKEN_EXPIRY, expiry);
+}
+
+/**
+ * Gets a valid access token, refreshing if expired.
+ * @returns {string|null} The access token, or null if not authorized
+ * @private
+ */
+function getConstantContactToken_() {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty(CC_CONFIG.PROP_ACCESS_TOKEN);
+  var expiry = props.getProperty(CC_CONFIG.PROP_TOKEN_EXPIRY);
+  var refreshToken = props.getProperty(CC_CONFIG.PROP_REFRESH_TOKEN);
+
+  if (!token) return null;
+
+  // Check if token is still valid
+  if (expiry && new Date(expiry) > new Date()) {
+    return token;
+  }
+
+  // Token expired — try to refresh
+  if (!refreshToken) return null;
+
+  var apiKey = props.getProperty(CC_CONFIG.PROP_API_KEY);
+  var apiSecret = props.getProperty(CC_CONFIG.PROP_API_SECRET);
+
+  if (!apiKey || !apiSecret) return null;
+
+  var payload = {
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken
+  };
+
+  var options = {
+    method: 'post',
+    contentType: 'application/x-www-form-urlencoded',
+    headers: {
+      'Authorization': 'Basic ' + Utilities.base64Encode(apiKey + ':' + apiSecret)
+    },
+    payload: Object.keys(payload).map(function(k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(payload[k]);
+    }).join('&'),
+    muteHttpExceptions: true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(CC_CONFIG.TOKEN_URL, options);
+    if (response.getResponseCode() !== 200) {
+      Logger.log('CC token refresh failed: ' + response.getContentText());
+      return null;
+    }
+
+    var body = JSON.parse(response.getContentText());
+    storeConstantContactTokens_(body);
+    return body.access_token;
+  } catch (e) {
+    Logger.log('CC token refresh error: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Makes an authenticated GET request to the Constant Contact v3 API.
+ * Handles token refresh and rate limiting.
+ * @param {string} endpoint - The API endpoint path (e.g., '/contacts')
+ * @param {Object} [params] - Optional query parameters
+ * @returns {Object|null} Parsed JSON response, or null on failure
+ * @private
+ */
+function ccApiGet_(endpoint, params) {
+  var token = getConstantContactToken_();
+  if (!token) return null;
+
+  var url = CC_CONFIG.API_BASE + endpoint;
+
+  if (params) {
+    var queryParts = [];
+    for (var key in params) {
+      if (params.hasOwnProperty(key) && params[key] !== undefined && params[key] !== null) {
+        queryParts.push(encodeURIComponent(key) + '=' + encodeURIComponent(params[key]));
+      }
+    }
+    if (queryParts.length > 0) {
+      url += '?' + queryParts.join('&');
+    }
+  }
+
+  var options = {
+    method: 'get',
+    contentType: 'application/json',
+    headers: {
+      'Authorization': 'Bearer ' + token
+    },
+    muteHttpExceptions: true
+  };
+
+  try {
+    var response = UrlFetchApp.fetch(url, options);
+    var code = response.getResponseCode();
+
+    if (code === 401) {
+      // Token may have just expired — force refresh and retry once
+      var props = PropertiesService.getScriptProperties();
+      props.deleteProperty(CC_CONFIG.PROP_TOKEN_EXPIRY);
+      token = getConstantContactToken_();
+      if (!token) return null;
+
+      options.headers['Authorization'] = 'Bearer ' + token;
+      response = UrlFetchApp.fetch(url, options);
+      code = response.getResponseCode();
+    }
+
+    if (code === 429) {
+      // Rate limited — wait and retry once
+      Utilities.sleep(1000);
+      response = UrlFetchApp.fetch(url, options);
+      code = response.getResponseCode();
+    }
+
+    if (code !== 200) {
+      Logger.log('CC API error (' + code + '): ' + response.getContentText());
+      return null;
+    }
+
+    return JSON.parse(response.getContentText());
+  } catch (e) {
+    Logger.log('CC API request error: ' + e.message);
+    return null;
+  }
+}
+
+/**
+ * Fetches all contacts from Constant Contact, handling pagination.
+ * Returns a map of lowercase email -> contact_id for matching.
+ * @returns {Object} Map of email -> contact_id
+ * @private
+ */
+function fetchCCContacts_() {
+  var emailToContactId = {};
+  var endpoint = CC_CONFIG.CONTACTS_ENDPOINT;
+  var params = {
+    limit: CC_CONFIG.PAGE_LIMIT,
+    include: 'email_address'
+  };
+
+  var pageCount = 0;
+  var maxPages = 20; // Safety limit
+
+  while (pageCount < maxPages) {
+    var data = ccApiGet_(endpoint, params);
+    if (!data || !data.contacts) break;
+
+    for (var i = 0; i < data.contacts.length; i++) {
+      var contact = data.contacts[i];
+      var contactId = contact.contact_id;
+      var emailAddresses = contact.email_address;
+
+      if (emailAddresses && emailAddresses.address) {
+        emailToContactId[emailAddresses.address.toLowerCase()] = contactId;
+      }
+    }
+
+    // Check for next page
+    if (data._links && data._links.next && data._links.next.href) {
+      // The next link is a full path — extract just the path + query
+      var nextUrl = data._links.next.href;
+      // Parse the path portion
+      var pathMatch = nextUrl.match(/\/v3(\/contacts.*)/);
+      if (pathMatch) {
+        endpoint = pathMatch[1].split('?')[0];
+        // Parse query params from the next URL
+        var queryString = pathMatch[1].split('?')[1] || '';
+        params = {};
+        queryString.split('&').forEach(function(part) {
+          var kv = part.split('=');
+          if (kv.length === 2) {
+            params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+          }
+        });
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+
+    pageCount++;
+    Utilities.sleep(CC_CONFIG.RATE_LIMIT_DELAY_MS);
+  }
+
+  return emailToContactId;
+}
+
+/**
+ * Fetches engagement metrics (activity summary) for a single CC contact.
+ * @param {string} contactId - The CC contact UUID
+ * @returns {Object|null} Object with openRate and lastActivityDate, or null
+ * @private
+ */
+function fetchCCContactEngagement_(contactId) {
+  var now = new Date();
+  var start = new Date(now.getTime() - CC_CONFIG.ACTIVITY_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+
+  var endpoint = CC_CONFIG.ACTIVITY_SUMMARY_ENDPOINT.replace('{contact_id}', contactId);
+  var params = {
+    start: start.toISOString(),
+    end: now.toISOString()
+  };
+
+  var data = ccApiGet_(endpoint, params);
+  if (!data || !data.campaign_activities) {
+    return null;
+  }
+
+  var totalSends = 0;
+  var totalOpens = 0;
+  var lastActivityDate = null;
+
+  for (var i = 0; i < data.campaign_activities.length; i++) {
+    var activity = data.campaign_activities[i];
+
+    totalSends += (activity.em_sends || 0);
+    totalOpens += (activity.em_opens || 0);
+
+    // Track the most recent activity date
+    var dates = [activity.em_sends_date, activity.em_opens_date, activity.em_clicks_date]
+      .filter(function(d) { return d; });
+
+    for (var j = 0; j < dates.length; j++) {
+      var d = new Date(dates[j]);
+      if (!isNaN(d.getTime()) && (!lastActivityDate || d > lastActivityDate)) {
+        lastActivityDate = d;
+      }
+    }
+  }
+
+  var openRate = totalSends > 0 ? Math.round((totalOpens / totalSends) * 100) : 0;
+
+  return {
+    openRate: openRate,
+    lastActivityDate: lastActivityDate
+  };
+}
+
+/**
+ * Syncs Constant Contact email engagement metrics to the Member Directory.
+ * Read-only: pulls open rates and last activity dates from CC, never writes to CC.
+ *
+ * Matches CC contacts to members by email address (case-insensitive).
+ * Updates OPEN_RATE and RECENT_CONTACT_DATE columns.
+ *
+ * Call from menu: Admin > Data Sync > Sync CC Engagement
+ */
+function syncConstantContactEngagement() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ui = SpreadsheetApp.getUi();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+  if (!memberSheet) {
+    ui.alert('❌ Error', 'Member Directory sheet not found.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Check authorization
+  var token = getConstantContactToken_();
+  if (!token) {
+    ui.alert('⚠️ Not Authorized',
+      'Constant Contact is not connected.\n\n' +
+      'Go to Admin > Data Sync > Constant Contact Setup to configure your API credentials, ' +
+      'then use "Authorize Constant Contact" to connect your account.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  ss.toast('Fetching contacts from Constant Contact...', '📧 CC Sync', 10);
+
+  // Step 1: Fetch all CC contacts (email -> contact_id map)
+  var emailToContactId = fetchCCContacts_();
+  var ccContactCount = Object.keys(emailToContactId).length;
+
+  if (ccContactCount === 0) {
+    ui.alert('⚠️ No Contacts Found',
+      'No contacts were returned from Constant Contact.\n\n' +
+      'Make sure your CC account has contacts and your API key has the correct permissions.',
+      ui.ButtonSet.OK);
+    return;
+  }
+
+  ss.toast('Found ' + ccContactCount + ' CC contacts. Matching to members...', '📧 CC Sync', 10);
+
+  // Step 2: Read Member Directory emails
+  var lastRow = memberSheet.getLastRow();
+  if (lastRow < 2) {
+    ss.toast('No members found in Member Directory.', '⚠️ CC Sync', 3);
+    return;
+  }
+
+  var memberData = memberSheet.getRange(2, 1, lastRow - 1, MEMBER_COLS.RECENT_CONTACT_DATE).getValues();
+
+  // Step 3: Match members to CC contacts and fetch engagement
+  var openRateUpdates = [];
+  var contactDateUpdates = [];
+  var matchCount = 0;
+  var processedCount = 0;
+
+  for (var i = 0; i < memberData.length; i++) {
+    var memberEmail = (memberData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+    var contactId = memberEmail ? emailToContactId[memberEmail] : null;
+
+    if (contactId) {
+      matchCount++;
+
+      // Rate limit: pause between API calls
+      if (processedCount > 0 && processedCount % CC_CONFIG.RATE_LIMIT_PER_SECOND === 0) {
+        Utilities.sleep(1000);
+      }
+
+      var engagement = fetchCCContactEngagement_(contactId);
+      processedCount++;
+
+      if (engagement) {
+        openRateUpdates.push([engagement.openRate]);
+        contactDateUpdates.push([engagement.lastActivityDate || '']);
+      } else {
+        openRateUpdates.push([memberData[i][MEMBER_COLS.OPEN_RATE - 1] || '']);
+        contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
+      }
+
+      // Progress update every 25 contacts
+      if (processedCount % 25 === 0) {
+        ss.toast('Processing... ' + processedCount + '/' + matchCount + ' contacts', '📧 CC Sync', 5);
+      }
+    } else {
+      // No CC match — preserve existing values
+      openRateUpdates.push([memberData[i][MEMBER_COLS.OPEN_RATE - 1] || '']);
+      contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
+    }
+  }
+
+  // Step 4: Write updates to Member Directory
+  if (openRateUpdates.length > 0) {
+    memberSheet.getRange(2, MEMBER_COLS.OPEN_RATE, openRateUpdates.length, 1).setValues(openRateUpdates);
+    memberSheet.getRange(2, MEMBER_COLS.RECENT_CONTACT_DATE, contactDateUpdates.length, 1).setValues(contactDateUpdates);
+  }
+
+  // Step 5: Report results
+  var summary = 'Constant Contact Sync Complete!\n\n' +
+    '• CC contacts found: ' + ccContactCount + '\n' +
+    '• Members matched by email: ' + matchCount + '\n' +
+    '• Engagement data updated: ' + processedCount + '\n' +
+    '• Members without CC match: ' + (memberData.length - matchCount);
+
+  ui.alert('✅ CC Sync Complete', summary, ui.ButtonSet.OK);
+  Logger.log('CC sync: ' + matchCount + ' matches out of ' + memberData.length + ' members');
+}
+
+/**
+ * Shows the current Constant Contact connection status.
+ * Displays API key info, token status, and last sync details.
+ */
+function showConstantContactStatus() {
+  var ui = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+
+  var apiKey = props.getProperty(CC_CONFIG.PROP_API_KEY);
+  var token = props.getProperty(CC_CONFIG.PROP_ACCESS_TOKEN);
+  var expiry = props.getProperty(CC_CONFIG.PROP_TOKEN_EXPIRY);
+  var refreshToken = props.getProperty(CC_CONFIG.PROP_REFRESH_TOKEN);
+
+  var status = '📧 Constant Contact Connection Status\n\n';
+
+  if (!apiKey) {
+    status += '❌ API Key: Not configured\n';
+    status += '❌ Authorization: Not connected\n\n';
+    status += 'To get started:\n';
+    status += '1. Admin > Data Sync > CC Setup: API Credentials\n';
+    status += '2. Admin > Data Sync > CC Authorize Account';
+  } else {
+    status += '✅ API Key: Configured (ends in ...' + apiKey.slice(-4) + ')\n';
+
+    if (token && expiry) {
+      var expiryDate = new Date(expiry);
+      if (expiryDate > new Date()) {
+        status += '✅ Access Token: Valid (expires ' + expiryDate.toLocaleString() + ')\n';
+      } else {
+        status += '⚠️ Access Token: Expired\n';
+      }
+    } else {
+      status += '❌ Access Token: Not authorized\n';
+    }
+
+    status += refreshToken ? '✅ Refresh Token: Available\n' : '❌ Refresh Token: Missing\n';
+    status += '\nReady to sync: ' + (token && refreshToken ? 'Yes' : 'No — re-authorize');
+  }
+
+  ui.alert('Constant Contact Status', status, ui.ButtonSet.OK);
+}
+
+/**
+ * Removes all stored Constant Contact credentials and tokens.
+ * Use this to disconnect CC or before re-configuring with a different account.
+ */
+function disconnectConstantContact() {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert(
+    '⚠️ Disconnect Constant Contact',
+    'This will remove all stored API credentials and tokens.\n\n' +
+    'You will need to re-run the setup to reconnect.\n\n' +
+    'Continue?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (response !== ui.Button.YES) return;
+
+  var props = PropertiesService.getScriptProperties();
+  props.deleteProperty(CC_CONFIG.PROP_API_KEY);
+  props.deleteProperty(CC_CONFIG.PROP_API_SECRET);
+  props.deleteProperty(CC_CONFIG.PROP_ACCESS_TOKEN);
+  props.deleteProperty(CC_CONFIG.PROP_REFRESH_TOKEN);
+  props.deleteProperty(CC_CONFIG.PROP_TOKEN_EXPIRY);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(
+    'Constant Contact disconnected. All credentials removed.',
+    '🔌 Disconnected', 5
+  );
+  Logger.log('Constant Contact credentials removed');
+}

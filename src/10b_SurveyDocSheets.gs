@@ -666,8 +666,8 @@ function populateRoadmapItems(sheet) {
     // Row 2
     [timestamp, 'System', 'Integration', 'Feature Request', 'Medium',
      'Constant Contact / CRM Sync',
-     'REST API bridge to sync Member Directory with Constant Contact mailing lists. Ensures union-wide communications always use up-to-date contact info. Requires Constant Contact API key and OAuth setup.',
-     'New', '', '', 'External API: Constant Contact v3 API'],
+     'Read-only engagement metrics sync from Constant Contact v3 API. Pulls email open rates and last activity dates into Member Directory (OPEN_RATE, RECENT_CONTACT_DATE columns). Requires Constant Contact API key and OAuth setup. See Admin > Data Sync > CC menu.',
+     'Implemented', '', '', 'External API: Constant Contact v3 API'],
     // Row 3
     [timestamp, 'System', 'Integration', 'Feature Request', 'Low',
      'OCR Form Transcription (Cloud Vision)',

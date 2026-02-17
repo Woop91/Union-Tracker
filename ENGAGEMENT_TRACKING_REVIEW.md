@@ -507,3 +507,33 @@ test('syncVolunteerHoursToMemberDirectory correctly sums hours', () => {
 3. Improve user feedback
 4. Add performance optimizations
 5. Document assumptions and requirements
+
+---
+
+## Update: Constant Contact Integration (v4.9.0)
+
+**Date:** 2026-02-17
+
+The new **Constant Contact v3 API integration** addresses two of the previously-empty engagement columns that this review identified as lacking data sources:
+
+### Columns Now Populated
+
+| Column | Previously | Now (v4.9.0) |
+|--------|-----------|--------------|
+| **OPEN_RATE** (column T) | Defined but nothing wrote to it | Populated by `syncConstantContactEngagement()` — email open rate % from CC campaign activity data |
+| **RECENT_CONTACT_DATE** (column Y) | Defined but nothing wrote to it | Populated by `syncConstantContactEngagement()` — date of last email open/click/send from CC |
+
+### How the CC Integration Addresses Review Issues
+
+| Review Issue | CC Integration Response |
+|-------------|----------------------|
+| **Zero test coverage** for engagement sync | 30 new tests covering CC config, token management, API calls, data parsing, and disconnect |
+| **No error handling** | Token refresh failures, API errors (401, 429, 500), and missing data all handled gracefully with Logger output |
+| **No user feedback** | Toast notifications during sync, summary dialog on completion with match counts |
+| **Hardcoded column indices** | Uses `MEMBER_COLS.OPEN_RATE` and `MEMBER_COLS.RECENT_CONTACT_DATE` constants, not raw numbers |
+| **Case-sensitive matching** | Email matching is case-insensitive (`toLowerCase()` on both sides) |
+| **No data validation** | Open rate calculated as integer 0-100, dates validated via `isNaN(d.getTime())` check |
+
+### What's Still Not Addressed
+
+The original sync functions (`syncVolunteerHoursToMemberDirectory`, `syncMeetingAttendanceToMemberDirectory`, `syncEngagementToMemberDirectory`) still have the issues described in this review. The CC integration is a separate, parallel data source for engagement metrics.

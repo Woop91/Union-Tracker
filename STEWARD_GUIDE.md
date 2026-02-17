@@ -69,6 +69,30 @@ As a steward, you can now send satisfaction surveys directly to members:
 - Build engagement with periodic check-ins
 - Data helps improve union representation
 
+### 📧 Constant Contact Engagement Metrics
+
+**Access:** `Admin > Data Sync > Sync CC Engagement → Members`
+
+If your organization uses **Constant Contact** for email campaigns, the dashboard can pull engagement metrics directly into the Member Directory. This tells you **which members are opening your emails** and when they last engaged.
+
+📊 **What You'll See in the Member Directory:**
+- **Open Rate %** (column T) — What percentage of emails the member opened
+- **Recent Contact Date** (column Y) — When the member last opened or clicked an email
+
+🎯 **Why This Matters for Stewards:**
+- Identify **less-engaged members** who aren't reading emails — they may need a personal check-in
+- Spot **highly engaged members** who might be ready for leadership roles
+- Track whether your email campaigns are actually reaching people
+- Feeds into the **Hot Spots** detection (Low Engagement zones) on the Steward Dashboard
+
+💡 **How to Use It:**
+1. Ask your admin to set up the Constant Contact connection (one-time setup)
+2. Go to **Admin > Data Sync > Sync CC Engagement → Members**
+3. The system matches CC contacts to your Member Directory by email
+4. Open Rate and Recent Contact Date columns are updated automatically
+
+---
+
 ### 📋 Member Contact Form
 
 **Access:** Union Hub > Forms > Send Contact Info Form

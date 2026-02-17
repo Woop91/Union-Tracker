@@ -34,6 +34,7 @@ This document provides a comprehensive, searchable reference of all features in 
 21. [Member Self-Service & PIN Authentication](#21-member-self-service--pin-authentication)
 22. [Meeting Check-In & Document Automation](#22-meeting-check-in--document-automation)
 23. [Member Drive Folders](#23-member-drive-folders)
+24. [Constant Contact Integration](#24-constant-contact-integration)
 
 ---
 
@@ -620,10 +621,62 @@ Quick Action to create or reuse a Google Drive folder for any member.
 
 ---
 
+## 24. Constant Contact Integration
+
+> **File:** `05_Integrations.gs` | **Version:** 4.9.0 | **Type:** Read-Only External API
+
+Pulls email engagement metrics from Constant Contact v3 API into the Member Directory. Matches CC contacts to members by email address (case-insensitive) and populates the `OPEN_RATE` and `RECENT_CONTACT_DATE` columns.
+
+### Setup & Authorization
+
+| Feature | Description | Menu Path | Keywords |
+|---------|-------------|-----------|----------|
+| **API Credential Setup** | Store Constant Contact API key and client secret in Script Properties (encrypted at rest). One-time setup. | Admin > Data Sync > CC Setup: API Credentials | `showConstantContactSetup()`, API key, client secret, setup |
+| **OAuth2 Authorization** | Interactive dialog that walks through the CC OAuth2 flow. Opens auth URL, user grants access, pastes redirect URL to complete token exchange. | Admin > Data Sync > CC Authorize Account | `authorizeConstantContact()`, OAuth, token, authorize |
+| **Connection Status** | Shows current API key status, access token validity, expiry time, and refresh token availability. | Admin > Data Sync > CC Connection Status | `showConstantContactStatus()`, status, token, expiry |
+| **Disconnect** | Removes all stored CC credentials and tokens. Requires confirmation. | Admin > Data Sync > CC Disconnect | `disconnectConstantContact()`, remove, credentials, disconnect |
+
+### Engagement Sync
+
+| Feature | Description | Menu Path | Keywords |
+|---------|-------------|-----------|----------|
+| **Sync CC Engagement** | Fetches all CC contacts, matches by email to Member Directory, pulls per-contact activity summaries (open rate, last activity date), writes to `OPEN_RATE` and `RECENT_CONTACT_DATE` columns. Progress toasts during sync. | Admin > Data Sync > Sync CC Engagement → Members | `syncConstantContactEngagement()`, open rate, email, engagement, sync |
+| **Automatic Token Refresh** | Access tokens (2-hour lifetime) are automatically refreshed using the stored refresh token. No user action needed after initial authorization. | Automatic | `getConstantContactToken_()`, refresh, token, auto |
+| **Rate Limiting** | Respects CC API limits (4 requests/second, 10,000/day). Pauses between batches of API calls. | Automatic | rate limit, throttle, pause |
+| **Pagination** | Handles CC accounts with large contact lists (500+ contacts) via cursor-based pagination. | Automatic | pagination, cursor, large list |
+
+### Data Flow
+
+| Source (Constant Contact) | Calculation | Target (Member Directory) |
+|--------------------------|-------------|--------------------------|
+| `activity_summary.em_sends` + `em_opens` | `(opens / sends) × 100` | **OPEN_RATE** (column T) — Email open rate % |
+| `activity_summary.em_sends_date`, `em_opens_date`, `em_clicks_date` | Most recent date | **RECENT_CONTACT_DATE** (column Y) — Last email activity |
+
+### Technical Details
+
+| Property | Value |
+|----------|-------|
+| **API Base URL** | `https://api.cc.email/v3` |
+| **Auth Method** | OAuth 2.0 Authorization Code Grant |
+| **Token Storage** | Script Properties (encrypted at rest by Google) |
+| **Lookback Period** | 365 days of campaign activity |
+| **Matching Key** | Email address (case-insensitive) |
+| **Direction** | Read-only — never writes to Constant Contact |
+
+### Requirements
+
+- Constant Contact paid account (Lite $12/mo, Standard $35/mo, or Premium $80/mo)
+- CC API application created at the CC Developer Portal
+- API key (client ID) and client secret
+- One-time OAuth2 authorization via browser
+
+---
+
 ## Version History
 
 | Version | Features Added |
 |---------|----------------|
+| **4.9.0** | Constant Contact v3 API integration — read-only email engagement metrics sync (OPEN_RATE, RECENT_CONTACT_DATE) |
 | **4.8.2** | State field added to member contact update (self-service portal, contact form, profile) |
 | **4.6.0** | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override |
 | **4.5.1** | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |

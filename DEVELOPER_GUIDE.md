@@ -123,7 +123,7 @@ The codebase follows a layered architecture with 27 modules organized by numbere
 
 | File | Purpose | Key Functions |
 |------|---------|---------------|
-| `05_Integrations.gs` | Drive, Calendar, WebApp integration | `doGet`, `syncToCalendar`, `setupDriveFolder`, `createMeetingDocs` |
+| `05_Integrations.gs` | Drive, Calendar, WebApp, Constant Contact integration | `doGet`, `syncToCalendar`, `setupDriveFolder`, `createMeetingDocs`, `syncConstantContactEngagement` |
 | `06_Maintenance.gs` | Diagnostics, Cache, Undo | `DIAGNOSE_SETUP`, `getCachedData`, `undoLastAction` |
 | `09_Dashboards.gs` | Satisfaction, Sync, Public dashboards | `getSatisfactionData`, `onEditAutoSync`, `buildPublicPortal` |
 
@@ -545,6 +545,38 @@ function safeOperation() {
   }
 }
 ```
+
+### External API Integration (Constant Contact)
+
+The CC integration in `05_Integrations.gs` demonstrates the pattern for external REST API calls:
+
+```javascript
+// 1. Get a valid token (auto-refreshes if expired)
+var token = getConstantContactToken_();
+
+// 2. Make authenticated API calls via the helper
+var data = ccApiGet_('/contacts', { limit: 500, include: 'email_address' });
+
+// 3. The helper handles: Bearer auth, 401 retry with refresh, 429 rate limit retry
+```
+
+**Key patterns used:**
+- **Token storage**: `PropertiesService.getScriptProperties()` for encrypted-at-rest credential storage
+- **Token refresh**: Automatic refresh when `CC_TOKEN_EXPIRY` is past, using the stored refresh token
+- **Rate limiting**: `Utilities.sleep(CC_CONFIG.RATE_LIMIT_DELAY_MS)` between paginated API calls
+- **Error handling**: `muteHttpExceptions: true` + manual response code checking for graceful degradation
+
+**Testing external APIs:**
+```javascript
+// In beforeEach, clear mock and set up valid token
+UrlFetchApp.fetch.mockClear();
+UrlFetchApp.fetch.mockReturnValueOnce({
+  getResponseCode: jest.fn(() => 200),
+  getContentText: jest.fn(() => JSON.stringify({ contacts: [] }))
+});
+```
+
+The `UrlFetchApp` mock is defined in `test/gas-mock.js` and returns `200 + '{}'` by default. Override with `mockReturnValueOnce()` for specific test scenarios.
 
 ---
 
