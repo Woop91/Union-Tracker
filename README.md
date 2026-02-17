@@ -211,6 +211,14 @@ After that, you have **26 production files** and a clean system ready for real m
 - Non-reversible hashes, bucketed values, and engagement levels
 - Survey data uses zero-knowledge vault — `_Looker_Satisfaction` contains no member IDs or emails
 
+### Constant Contact Integration
+- **Read-only** engagement metrics sync from Constant Contact v3 API
+- Pulls email **open rates** and **last activity dates** into Member Directory
+- OAuth2 authorization with automatic token refresh
+- Case-insensitive email matching between CC contacts and members
+- Rate limiting and pagination for large contact lists
+- Setup, authorize, sync, status, and disconnect — all from the Admin menu
+
 ---
 
 ## Menu System

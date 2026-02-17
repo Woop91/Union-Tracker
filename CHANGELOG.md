@@ -5,6 +5,27 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.0] - 2026-02-17
+
+### Added
+- **Constant Contact v3 API integration** — read-only email engagement metrics sync:
+  - `showConstantContactSetup()` — store CC API key and client secret in Script Properties
+  - `authorizeConstantContact()` — OAuth2 authorization flow with interactive dialog
+  - `exchangeConstantContactCode(code)` — exchange auth code for access + refresh tokens
+  - `syncConstantContactEngagement()` — pull open rates and last activity dates into Member Directory
+  - `showConstantContactStatus()` — display connection status and token expiry
+  - `disconnectConstantContact()` — remove all stored credentials
+  - Auto token refresh when access tokens expire (2-hour CC token lifetime)
+  - Rate limiting (4 requests/second) and pagination for large contact lists
+  - Case-insensitive email matching between CC contacts and Member Directory
+  - Menu items under Admin > Data Sync for full CC workflow
+  - 30 new tests covering CC_CONFIG, token management, API calls, engagement parsing, and disconnect
+  - `UrlFetchApp` mock added to test infrastructure (`gas-mock.js`)
+  - Roadmap entry in Feedback & Development sheet updated from "New" to "Implemented"
+- **Member Directory columns now populated by CC sync:**
+  - `OPEN_RATE` (column T) — email open rate % calculated from CC campaign activity data
+  - `RECENT_CONTACT_DATE` (column Y) — date of last email open/click/send from CC
+
 ## [4.8.2] - 2026-02-16
 
 ### Added

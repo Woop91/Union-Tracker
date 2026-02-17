@@ -23,6 +23,7 @@ Quick, practical tutorials for common tasks in the Dashboard.
 12. [Setting Up a Meeting](#12-setting-up-a-meeting) ⭐ NEW
 13. [Managing Meeting Notes & Agenda](#13-managing-meeting-notes--agenda) ⭐ NEW
 14. [Creating a Member Drive Folder](#14-creating-a-member-drive-folder) ⭐ NEW
+15. [Syncing Constant Contact Engagement Metrics](#15-syncing-constant-contact-engagement-metrics) ⭐ NEW
 
 ---
 
@@ -574,6 +575,73 @@ The system automatically sends meeting documents to stewards on a schedule:
 - A Drive folder named after the member is created or found
 - You'll see a confirmation with the folder URL
 - Use this folder to store member-related documents
+
+---
+
+## 15. Syncing Constant Contact Engagement Metrics
+
+> **Requires:** A Constant Contact paid account ($12+/month) and an API application.
+
+This integration pulls email engagement data from Constant Contact into your Member Directory, filling in the **Open Rate %** and **Recent Contact Date** columns automatically.
+
+### Step 1: Get Your API Credentials (~5 minutes)
+
+1. Go to **app.constantcontact.com/pages/dma/portal** (Constant Contact Developer Portal)
+2. Click **"New Application"**
+3. Give it a name (e.g., "Union Dashboard")
+4. Copy your **API Key** (Client ID) — save it somewhere safe
+5. Click **"Generate Client Secret"** — copy it immediately (it only shows once)
+
+### Step 2: Enter Credentials in the Dashboard (~1 minute)
+
+1. Go to **Admin > Data Sync > CC Setup: API Credentials**
+2. Paste your **API Key** when prompted and click OK
+3. Paste your **Client Secret** when prompted and click OK
+4. You'll see a toast: "API credentials saved"
+
+### Step 3: Authorize Your Account (~2 minutes)
+
+1. Go to **Admin > Data Sync > CC Authorize Account**
+2. A dialog opens with a link — click it to open Constant Contact in a new tab
+3. Log in to your CC account and click **"Allow"**
+4. You'll be redirected to a URL that starts with `https://localhost?code=...`
+5. Your browser may show an error page — **that's expected**
+6. Copy the **entire URL** from your browser's address bar
+7. Paste it into the dialog box and click **Submit**
+8. You'll see "Authorized Successfully!" — close the dialog
+
+### Step 4: Sync Engagement Data (~1-5 minutes depending on list size)
+
+1. Go to **Admin > Data Sync > Sync CC Engagement → Members**
+2. The system will:
+   - Fetch all contacts from your CC account
+   - Match them to your Member Directory by email address
+   - Pull each member's email open rate and last activity date
+   - Write the data to the Member Directory
+3. You'll see progress toasts during the sync
+4. A summary dialog shows how many members were matched and updated
+
+### What Gets Updated
+
+| Column | What It Shows | Example |
+|--------|--------------|---------|
+| **Open Rate %** (column T) | Percentage of emails the member opened in the last year | `65` (meaning 65%) |
+| **Recent Contact Date** (column Y) | Date of the member's most recent email open, click, or receive | `2026-02-15` |
+
+### Checking Your Connection
+
+Go to **Admin > Data Sync > CC Connection Status** to see:
+- Whether your API key is configured
+- Whether your access token is valid and when it expires
+- Whether you have a refresh token (tokens auto-refresh, so you shouldn't need to re-authorize)
+
+### Tips
+
+- **Run sync periodically** — monthly is usually enough for engagement tracking
+- **Email matching is case-insensitive** — `john@union.org` matches `John@Union.org`
+- **Members without CC matches** keep their existing values (nothing is overwritten)
+- **Token refresh is automatic** — you only need to authorize once
+- **To disconnect**, go to Admin > Data Sync > CC Disconnect (removes all stored credentials)
 
 ---
 

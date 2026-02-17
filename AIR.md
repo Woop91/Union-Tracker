@@ -175,7 +175,7 @@ MULTIPLE-SCRIPS-REPO/
 │   ├── 04c_InteractiveDashboard.gs   # Interactive dashboard modal and tabs
 │   ├── 04d_ExecutiveDashboard.gs     # Executive dashboard with PII, analytics
 │   ├── 04e_PublicDashboard.gs        # Public/member dashboard (no PII), unified web app
-│   ├── 05_Integrations.gs      # Google Drive, Calendar, WebApp, email notifications, PDF engine
+│   ├── 05_Integrations.gs      # Google Drive, Calendar, WebApp, email, PDF, Constant Contact API
 │   ├── 06_Maintenance.gs       # Admin tools, diagnostics, caching, validation, snapshots
 │   ├── 07_DevTools.gs          # Demo data seeding - DELETE BEFORE PRODUCTION
 │   ├── 08a_SheetSetup.gs       # Core setup, sheet creation, data validations
@@ -423,6 +423,19 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
   - `showWebAppUrl()` - Display web app URL after deployment
   - **v4.4.0:** `?mode=steward` routes to unified steward dashboard (with PII)
   - **v4.4.0:** `?mode=member` routes to unified member dashboard (no PII)
+- Constant Contact v3 API Integration **(NEW v4.9.0)** — Read-only engagement metrics:
+  - `CC_CONFIG` - API endpoints, rate limits, property keys for credential storage
+  - `showConstantContactSetup()` - Store API key and client secret in Script Properties
+  - `authorizeConstantContact()` - Interactive OAuth2 authorization dialog
+  - `exchangeConstantContactCode(code)` - Exchange auth code for access + refresh tokens
+  - `storeConstantContactTokens_(response)` - Store tokens with expiry buffer (private)
+  - `getConstantContactToken_()` - Get valid token, auto-refresh if expired (private)
+  - `ccApiGet_(endpoint, params)` - Authenticated GET helper with retry on 401/429 (private)
+  - `fetchCCContacts_()` - Fetch all CC contacts, return email→contact_id map (private)
+  - `fetchCCContactEngagement_(contactId)` - Fetch per-contact open rate and last activity (private)
+  - `syncConstantContactEngagement()` - Main sync: CC contacts → Member Directory (OPEN_RATE, RECENT_CONTACT_DATE)
+  - `showConstantContactStatus()` - Show connection status dialog
+  - `disconnectConstantContact()` - Remove all stored CC credentials and tokens
 
 **06_Maintenance.gs** (~3145 lines) - Admin Tools, Diagnostics, Caching & Validation
 *Consolidated from: Maintenance, PerformanceUndo, DataIntegrity, TestingValidation*
@@ -736,10 +749,10 @@ var MEMBER_COLS = {
   ASSIGNED_STEWARD: 16,   // P - Multi-select
 
   // Section 5: Engagement Metrics (Q-T)
-  LAST_VIRTUAL_MTG: 17,   // Q
-  LAST_INPERSON_MTG: 18,  // R
-  OPEN_RATE: 19,          // S
-  VOLUNTEER_HOURS: 20,    // T
+  LAST_VIRTUAL_MTG: 17,   // Q - auto-sync: from Meeting Attendance sheet
+  LAST_INPERSON_MTG: 18,  // R - auto-sync: from Meeting Attendance sheet
+  OPEN_RATE: 19,          // S - auto-sync: from Constant Contact v3 API (email open rate %)
+  VOLUNTEER_HOURS: 20,    // T - auto-sync: from Volunteer Hours sheet
 
   // Section 6: Member Interests (U-X)
   INTEREST_LOCAL: 21,     // U
@@ -748,7 +761,7 @@ var MEMBER_COLS = {
   HOME_TOWN: 24,          // X
 
   // Section 7: Steward Contact Tracking (Y-AA)
-  RECENT_CONTACT_DATE: 25, // Y
+  RECENT_CONTACT_DATE: 25, // Y - auto-sync: from Constant Contact v3 API (last email activity date)
   CONTACT_STEWARD: 26,    // Z
   CONTACT_NOTES: 27,      // AA
 
