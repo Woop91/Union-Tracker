@@ -344,8 +344,6 @@ function getUserNotifications() {
  * @returns {Object} Push result
  */
 function pushNotification(userEmail, notification) {
-  var props = PropertiesService.getUserProperties();
-
   // For cross-user notifications, use ScriptProperties with user key
   var scriptProps = PropertiesService.getScriptProperties();
   var key = 'notifications_' + userEmail.replace(/[^a-zA-Z0-9]/g, '_');

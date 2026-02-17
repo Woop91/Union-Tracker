@@ -269,12 +269,12 @@ function registerEventBusSubscribers() {
   }, { priority: 80, id: 'grievance_stagegate_handler' });
 
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
-    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (err) { /* skip */ }
+    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { /* skip */ }
   }, { priority: 70, id: 'grievance_config_sync' });
 
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function() {
     if (typeof sortGrievanceLogByStatus === 'function') {
-      try { sortGrievanceLogByStatus(); } catch (err) { /* skip */ }
+      try { sortGrievanceLogByStatus(); } catch (_err) { /* skip */ }
     }
   }, { priority: 60, id: 'grievance_sort_handler' });
 
@@ -288,7 +288,7 @@ function registerEventBusSubscribers() {
   }, { priority: 90, id: 'member_style_handler' });
 
   EventBus.on('sheet:edit:MEMBER_DIR', function(e) {
-    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (err) { /* skip */ }
+    try { syncDropdownToConfig_(e, e.range.getSheet().getName()); } catch (_err) { /* skip */ }
   }, { priority: 70, id: 'member_config_sync' });
 
   // --- Checklist edit handler ---
@@ -299,14 +299,14 @@ function registerEventBusSubscribers() {
   // --- Volunteer Hours sync ---
   EventBus.on('sheet:edit:VOLUNTEER_HOURS', function() {
     if (typeof syncVolunteerHoursToMemberDirectory === 'function') {
-      try { syncVolunteerHoursToMemberDirectory(); } catch (err) { /* skip */ }
+      try { syncVolunteerHoursToMemberDirectory(); } catch (_err) { /* skip */ }
     }
   }, { priority: 100, id: 'volunteer_sync_handler' });
 
   // --- Meeting Attendance sync ---
   EventBus.on('sheet:edit:MEETING_ATTENDANCE', function() {
     if (typeof syncMeetingAttendanceToMemberDirectory === 'function') {
-      try { syncMeetingAttendanceToMemberDirectory(); } catch (err) { /* skip */ }
+      try { syncMeetingAttendanceToMemberDirectory(); } catch (_err) { /* skip */ }
     }
   }, { priority: 100, id: 'attendance_sync_handler' });
 
@@ -318,20 +318,20 @@ function registerEventBusSubscribers() {
   // --- Cross-cutting: Audit logging (high-value sheets) ---
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
     if (typeof onEditAudit === 'function') {
-      try { onEditAudit(e); } catch (err) { /* skip */ }
+      try { onEditAudit(e); } catch (_err) { /* skip */ }
     }
   }, { priority: 10, id: 'grievance_audit' });
 
   EventBus.on('sheet:edit:MEMBER_DIR', function(e) {
     if (typeof onEditAudit === 'function') {
-      try { onEditAudit(e); } catch (err) { /* skip */ }
+      try { onEditAudit(e); } catch (_err) { /* skip */ }
     }
   }, { priority: 10, id: 'member_audit' });
 
   // --- Auto-sync (debounced via onEditAutoSync) ---
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
     if (typeof onEditAutoSync === 'function') {
-      try { onEditAutoSync(e); } catch (err) { /* skip */ }
+      try { onEditAutoSync(e); } catch (_err) { /* skip */ }
     }
   }, { priority: 20, id: 'grievance_auto_sync' });
 

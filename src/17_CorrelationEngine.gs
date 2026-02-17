@@ -419,7 +419,6 @@ function correlateStewardWinVsEngagement_(data) {
  * Question: Which types of grievances take longest to resolve?
  */
 function correlateCategoryVsResolutionTime_(data) {
-  var categories = data.grievancesByCategory || {};
   var drillDown = (data.chartDrillDown && data.chartDrillDown.categoryByCase) || {};
 
   var catData = {};
