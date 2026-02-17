@@ -50,7 +50,9 @@ const BUILD_ORDER = [
   '11_CommandHub.gs',              // Command center + Secure dashboard
   '12_Features.gs',                // Checklist, Dynamic, Looker
   '13_MemberSelfService.gs',        // Member self-service portal with PIN auth
-  '14_MeetingCheckIn.gs'            // Meeting check-in system with email + PIN
+  '14_MeetingCheckIn.gs',           // Meeting check-in system with email + PIN
+  '15_EventBus.gs',                 // Event-driven pub/sub architecture
+  '16_DashboardEnhancements.gs'     // Dashboard features: filters, presets, export, collaboration
 ];
 
 const HTML_FILES = [
