@@ -25,6 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Member Directory columns now populated by CC sync:**
   - `OPEN_RATE` (column T) — email open rate % calculated from CC campaign activity data
   - `RECENT_CONTACT_DATE` (column Y) — date of last email open/click/send from CC
+- **Multi-select dropdown support for Grievance Log** — columns with predefined option lists now support multiple selections:
+  - Multi-select editor dialog with checkbox UI for selecting multiple values
+  - `UserProperties`-based storage for consistent multi-select behavior
+  - FAQ entries added across all help surfaces for multi-select usage
+- **Dropdown system overhaul** — dropdowns now use Config-driven values with dynamic ranges and missing field coverage
+- **Auto-discovery column system** — zero manual updates required on sheet restructure; all column references use dynamic constants
+- **151 column system tests** added to validate dynamic constant resolution
+
+### Changed
+- All remaining hardcoded column indices replaced with dynamic `CONFIG_COLS` and `MEMBER_COLS` constants
+- Removed all legacy 509 local number references from repository
 
 ## [4.8.2] - 2026-02-16
 
@@ -228,14 +239,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HTML sanitization for XSS prevention
 - Role-based access control
 
+## [4.3.8] - 2026-01-28
+
+### Added
+- Satisfaction modal dashboard with interactive charts
+- Features Reference sheet — searchable catalog of all dashboard capabilities
+- Hidden satisfaction calculation sheet for background formula processing
+
+## [4.3.7] - 2026-01-25
+
+### Added
+- Complete rewrite of help guide with real-time search
+- Menu reference tab with all menu items and descriptions
+- FAQ tab with categorized questions and answers
+
+## [4.3.2] - 2026-01-20
+
+### Changed
+- Deprecated visible Dashboard sheet — replaced with SPA-style modal dashboards
+- All dashboard views now load as in-app dialogs instead of sheet tabs
+
+## [4.3.0] - 2026-01-15
+
+### Added
+- Case Checklist system for grievance step tracking
+- Looker data integration for external reporting
+- Dynamic field expansion engine for flexible sheet schemas
+
+## [4.1.0] - 2026-01-10
+
+### Added
+- Strategic Command Center configuration sheet
+- Status color mapping for visual workflow indicators
+- PDF and email branding templates
+
+## [4.0.0] - 2026-01-05
+
+### Added
+- **Unified master engine** — single entry point for all dashboard operations
+- Audit logging with tamper-evident chain
+- Sabotage protection for critical sheets
+- Batch processing for bulk member operations
+- Mobile-responsive views for all web app pages
+
+## [3.6.0] - 2025-12-20
+
+### Changed
+- Member and Grievance data manager refactor
+- Improved validation across all data entry points
+
+## [2.0.0] - 2025-11-15
+
+### Changed
+- **Modular architecture** — split monolith into modular source files
+- Build system for concatenating source into deployable bundle
+- Separation of UI and business logic layers
+
 ---
 
 ## Version History Summary
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 4.6.0 | 2026-02-12 | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling |
+| 4.9.0 | 2026-02-17 | Constant Contact v3 API integration, multi-select Grievance Log dropdowns, auto-discovery column system |
+| 4.8.2 | 2026-02-16 | State field added to member contact update across all surfaces |
+| 4.8.1 | 2026-02-15 | Contact form fields (Hire Date, Employee ID, mailing address), unified name-based Member IDs |
+| 4.8.0 | 2026-02-15 | Security event alerting, zero-knowledge survey vault, sequential Member IDs, import dedup |
+| 4.7.0 | 2026-02-14 | 40+ code review fixes, XSS hardening, 1090 tests, data safety improvements |
+| 4.6.0 | 2026-02-12 | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, member Drive folders |
 | 4.5.1 | 2026-02-11 | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |
 | 4.5.0 | 2026-02-01 | Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files |
-| 4.4.1 | 2026-01-31 | Build system |
-| 4.4.0 | 2026-01-30 | Initial release |
+| 4.4.1 | 2026-01-31 | Build system with Node.js |
+| 4.4.0 | 2026-01-30 | Member/Steward dashboards, grievance tracking, satisfaction surveys, email notifications |
+| 4.3.8 | 2026-01-28 | Satisfaction modal dashboard, Features Reference sheet |
+| 4.3.7 | 2026-01-25 | Help guide rewrite with real-time search, menu reference, FAQ tabs |
+| 4.3.2 | 2026-01-20 | Deprecated visible Dashboard sheet, switched to SPA-style modal dashboards |
+| 4.3.0 | 2026-01-15 | Case Checklist system, Looker data integration, dynamic field expansion |
+| 4.1.0 | 2026-01-10 | Strategic Command Center config, status color mapping, PDF/email branding |
+| 4.0.0 | 2026-01-05 | Unified master engine, audit logging, sabotage protection, batch processing, mobile views |
+| 3.6.0 | 2025-12-20 | Member and Grievance data manager refactor, improved validation |
+| 2.0.0 | 2025-11-15 | Modular architecture, build system, UI/business logic separation |
