@@ -167,6 +167,12 @@ function createDashboardMenu() {
       .addItem('📅 Sync Meeting Attendance → Members', 'syncMeetingAttendanceToMemberDirectory')
       .addItem('📊 Sync All Engagement Data', 'syncEngagementToMemberDirectory')
       .addSeparator()
+      .addItem('📧 Sync CC Engagement → Members', 'syncConstantContactEngagement')
+      .addItem('📧 CC Setup: API Credentials', 'showConstantContactSetup')
+      .addItem('📧 CC Authorize Account', 'authorizeConstantContact')
+      .addItem('📧 CC Connection Status', 'showConstantContactStatus')
+      .addItem('🔌 CC Disconnect', 'disconnectConstantContact')
+      .addSeparator()
       .addItem('⚡ Install Auto-Sync Trigger', 'installAutoSyncTrigger')
       .addItem('🚫 Remove Auto-Sync Trigger', 'removeAutoSyncTrigger'))
 

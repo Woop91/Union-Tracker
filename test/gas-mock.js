@@ -250,4 +250,12 @@ global.LockService = {
   }))
 };
 
+// --- UrlFetchApp ---
+global.UrlFetchApp = {
+  fetch: jest.fn(() => ({
+    getResponseCode: jest.fn(() => 200),
+    getContentText: jest.fn(() => '{}')
+  }))
+};
+
 module.exports = { createMockRange, createMockSheet, createMockSpreadsheet, createMockProtection };
