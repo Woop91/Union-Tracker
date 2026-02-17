@@ -52,7 +52,8 @@ const BUILD_ORDER = [
   '13_MemberSelfService.gs',        // Member self-service portal with PIN auth
   '14_MeetingCheckIn.gs',           // Meeting check-in system with email + PIN
   '15_EventBus.gs',                 // Event-driven pub/sub architecture
-  '16_DashboardEnhancements.gs'     // Dashboard features: filters, presets, export, collaboration
+  '16_DashboardEnhancements.gs',    // Dashboard features: filters, presets, export, collaboration
+  '17_CorrelationEngine.gs'         // Cross-dimensional correlation engine with insights
 ];
 
 const HTML_FILES = [

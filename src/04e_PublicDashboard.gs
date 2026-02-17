@@ -1368,6 +1368,30 @@ function getUnifiedDashboardHtml(isPII) {
     // Notification Badge
     '.notif-badge{position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;min-width:16px;text-align:center;line-height:1.2}' +
 
+    // Correlation Insights
+    '.insight-card{background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px;margin-bottom:12px;transition:border-color 0.2s}' +
+    '.insight-card:hover{border-color:#334155}' +
+    '.insight-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}' +
+    '.insight-title{font-size:13px;font-weight:600;color:#e2e8f0}' +
+    '.insight-badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase}' +
+    '.badge-strong{background:rgba(34,197,94,0.2);color:#22c55e}' +
+    '.badge-moderate{background:rgba(59,130,246,0.2);color:#3b82f6}' +
+    '.badge-weak{background:rgba(148,163,184,0.2);color:#94a3b8}' +
+    '.badge-insufficient{background:rgba(100,116,139,0.2);color:#64748b}' +
+    '.insight-body{font-size:12px;color:#94a3b8;line-height:1.6;margin-bottom:10px}' +
+    '.insight-meta{display:flex;gap:16px;font-size:11px;color:#64748b}' +
+    '.insight-meta span{display:flex;align-items:center;gap:3px}' +
+    '.scatter-container{width:100%;height:200px;position:relative;margin:10px 0}' +
+    '.scatter-dot{position:absolute;width:8px;height:8px;border-radius:50%;background:#3b82f6;cursor:pointer;transition:transform 0.15s}' +
+    '.scatter-dot:hover{transform:scale(1.8);z-index:2}' +
+    '.scatter-axis-x{position:absolute;bottom:0;left:40px;right:0;height:1px;background:#334155}' +
+    '.scatter-axis-y{position:absolute;top:0;bottom:20px;left:40px;width:1px;background:#334155}' +
+    '.scatter-label{font-size:9px;color:#64748b;position:absolute}' +
+    '.correlation-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:20px}' +
+    '.corr-stat{background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:12px;text-align:center}' +
+    '.corr-stat-value{font-size:24px;font-weight:700;margin-bottom:2px}' +
+    '.corr-stat-label{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px}' +
+
     // Settings Panel
     '.settings-panel{position:fixed;right:-320px;top:0;bottom:0;width:320px;background:#1e293b;border-left:1px solid rgba(255,255,255,0.1);z-index:250;transition:right 0.3s;overflow-y:auto;padding:20px}' +
     '.settings-panel.open{right:0}' +
@@ -1590,6 +1614,7 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="tab" onclick="showTab(\'resources\')">Resources</div>' +
     '<div class="tab" onclick="showTab(\'meetingnotes\')">Meeting Notes</div>' +
     '<div class="tab" onclick="showTab(\'compare\')">Compare</div>' +
+    '<div class="tab" onclick="showTab(\'insights\')">Insights</div>' +
     (isPII ? '<div class="tab" onclick="showTab(\'help\')">Help</div>' : '') +
     '</div>' +
 
@@ -2080,6 +2105,16 @@ function getUnifiedDashboardHtml(isPII) {
     'document.querySelectorAll(".metric-check").forEach(function(cb){cb.addEventListener("change",updateComparisonPreview)})' +
     '}' +
 
+    // Insights Tab - Correlation Engine
+    'else if(tab==="insights"){' +
+    'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">insights</i>Cross-Dimensional Insights</div>";' +
+    'html+="<p style=\\"color:#94a3b8;font-size:12px;margin-bottom:16px\\">Statistical correlations between engagement, grievances, satisfaction, and organizational dimensions. Relationships are associations, not causes.</p>";' +
+    'html+="<div id=\\"insightsSummary\\"><div class=\\"loading\\"><div class=\\"spinner\\"></div>Analyzing correlations...</div></div>";' +
+    'html+="<div id=\\"insightsList\\"></div></div>";' +
+    'document.getElementById("main-content").innerHTML=html;' +
+    'loadCorrelationInsights()' +
+    '}' +
+
     // Help Tab - Comprehensive FAQ & Tutorials (Steward only)
     'else if(tab==="help"&&isPII){' +
     'var faqData=[' +
@@ -2471,6 +2506,15 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("alertList").innerHTML=html;' +
     'var badge=document.getElementById("alertBadge");var criticalCount=alerts.filter(function(a){return a.type==="critical"||a.type==="warning"}).length;' +
     'if(criticalCount>0){badge.textContent=criticalCount;badge.style.display="block"}else{badge.style.display="none"}' +
+    'google.script.run.withSuccessHandler(function(corrJson){' +
+    'var corrAlerts=JSON.parse(corrJson);if(corrAlerts.length===0)return;' +
+    'var corrHtml="";corrAlerts.forEach(function(ca){' +
+    'var type=ca.severity==="high"?"warning":"info";' +
+    'corrHtml+="<div class=\\"alert-item "+type+"\\"><div class=\\"alert-title\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:4px\\">insights</i>"+ca.title+"</div><div class=\\"alert-desc\\">"+ca.message.substring(0,120)+"</div><div class=\\"alert-time\\">r="+ca.r+" | n="+ca.sampleSize+"</div></div>"});' +
+    'document.getElementById("alertList").innerHTML+=corrHtml;' +
+    'var newCrit=corrAlerts.filter(function(a){return a.severity==="high"}).length;' +
+    'if(newCrit>0){var b=document.getElementById("alertBadge");b.textContent=parseInt(b.textContent||0)+newCrit;b.style.display="block"}' +
+    '}).getCorrelationAlerts(dashMode==="steward")' +
     '}' +
 
     // Date Range Functions
@@ -2822,6 +2866,68 @@ function getUnifiedDashboardHtml(isPII) {
     'function deleteView(viewId){' +
     'if(!confirm("Delete this shared view?"))return;' +
     'google.script.run.withSuccessHandler(function(){showSharedViews()}).deleteSharedView(viewId)' +
+    '}' +
+
+    // === CORRELATION INSIGHTS TAB ===
+    'function loadCorrelationInsights(){' +
+    'google.script.run.withSuccessHandler(function(summaryJson){' +
+    'var summary=JSON.parse(summaryJson);' +
+    'var el=document.getElementById("insightsSummary");' +
+    'var html="<div class=\\"correlation-summary\\">";' +
+    'html+="<div class=\\"corr-stat\\"><div class=\\"corr-stat-value\\" style=\\"color:#e2e8f0\\">"+summary.total+"</div><div class=\\"corr-stat-label\\">Correlations</div></div>";' +
+    'html+="<div class=\\"corr-stat\\"><div class=\\"corr-stat-value\\" style=\\"color:#22c55e\\">"+summary.strong+"</div><div class=\\"corr-stat-label\\">Strong</div></div>";' +
+    'html+="<div class=\\"corr-stat\\"><div class=\\"corr-stat-value\\" style=\\"color:#3b82f6\\">"+summary.moderate+"</div><div class=\\"corr-stat-label\\">Moderate</div></div>";' +
+    'html+="<div class=\\"corr-stat\\"><div class=\\"corr-stat-value\\" style=\\"color:#94a3b8\\">"+summary.weak+"</div><div class=\\"corr-stat-label\\">Weak</div></div>";' +
+    'html+="<div class=\\"corr-stat\\"><div class=\\"corr-stat-value\\" style=\\"color:#f59e0b\\">"+summary.actionableCount+"</div><div class=\\"corr-stat-label\\">Actionable</div></div>";' +
+    'html+="</div>";el.innerHTML=html;' +
+    '}).getCorrelationSummary(dashMode==="steward");' +
+
+    'google.script.run.withSuccessHandler(function(json){' +
+    'var insights=JSON.parse(json);' +
+    'var el=document.getElementById("insightsList");' +
+    'var html="";' +
+    'insights.forEach(function(ins,idx){' +
+    'var badgeClass="badge-"+ins.strength.replace(" ","");' +
+    'if(ins.strength==="insufficient data")badgeClass="badge-insufficient";' +
+    'html+="<div class=\\"insight-card\\">";' +
+    'html+="<div class=\\"insight-header\\"><div class=\\"insight-title\\">"+ins.title+"</div><span class=\\"insight-badge "+badgeClass+"\\">"+ins.strength+"</span></div>";' +
+    'html+="<div class=\\"insight-body\\">"+ins.insight+"</div>";' +
+    'if(ins.dataPoints&&ins.dataPoints.length>=3){' +
+    'html+="<div class=\\"scatter-container\\" id=\\"scatter-"+idx+"\\"></div>"' +
+    '}' +
+    'html+="<div class=\\"insight-meta\\">";' +
+    'html+="<span><i class=\\"material-icons\\" style=\\"font-size:12px\\">functions</i>r = "+ins.r+"</span>";' +
+    'html+="<span><i class=\\"material-icons\\" style=\\"font-size:12px\\">group</i>n = "+ins.sampleSize+"</span>";' +
+    'html+="<span><i class=\\"material-icons\\" style=\\"font-size:12px\\">verified</i>"+ins.confidence+" confidence</span>";' +
+    'html+="<span><i class=\\"material-icons\\" style=\\"font-size:12px\\">"+(ins.direction==="inverse"?"trending_down":"trending_up")+"</i>"+ins.direction+"</span>";' +
+    'html+="</div></div>"' +
+    '});' +
+    'el.innerHTML=html;' +
+    'insights.forEach(function(ins,idx){' +
+    'if(ins.dataPoints&&ins.dataPoints.length>=3){renderScatterPlot("scatter-"+idx,ins)}' +
+    '})' +
+    '}).getCorrelationInsights(dashMode==="steward")' +
+    '}' +
+
+    'function renderScatterPlot(containerId,insight){' +
+    'var el=document.getElementById(containerId);if(!el)return;' +
+    'var pts=insight.dataPoints;' +
+    'var minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;' +
+    'pts.forEach(function(p){if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y});' +
+    'var rangeX=maxX-minX||1;var rangeY=maxY-minY||1;' +
+    'var padL=45,padB=25,padR=10,padT=10;' +
+    'var w=el.offsetWidth-padL-padR;var h=el.offsetHeight-padT-padB;' +
+    'var html="<div class=\\"scatter-axis-x\\" style=\\"left:"+padL+"px;bottom:"+padB+"px\\"></div>";' +
+    'html+="<div class=\\"scatter-axis-y\\" style=\\"left:"+padL+"px;top:"+padT+"px;bottom:"+padB+"px\\"></div>";' +
+    'html+="<div class=\\"scatter-label\\" style=\\"bottom:2px;left:50%;transform:translateX(-50%)\\">"+insight.xLabel+"</div>";' +
+    'html+="<div class=\\"scatter-label\\" style=\\"left:2px;top:50%;transform:rotate(-90deg) translateX(-50%);transform-origin:left center\\">"+insight.yLabel+"</div>";' +
+    'pts.forEach(function(p){' +
+    'var px=padL+((p.x-minX)/rangeX)*w;' +
+    'var py=padT+h-((p.y-minY)/rangeY)*h;' +
+    'var color=insight.reliable?"#3b82f6":"#64748b";' +
+    'html+="<div class=\\"scatter-dot\\" style=\\"left:"+(px-4)+"px;top:"+(py-4)+"px;background:"+color+"\\" title=\\""+p.label+"\\n"+insight.xLabel+": "+p.x+"\\n"+insight.yLabel+": "+p.y+"\\"></div>"' +
+    '});' +
+    'el.innerHTML=html' +
     '}' +
 
     // === NOTIFICATIONS ===
