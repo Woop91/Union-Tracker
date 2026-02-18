@@ -40170,7 +40170,7 @@ function createSatisfactionSheet(ss) {
 function createFeedbackSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.FEEDBACK);
   sheet.clear();
-  sheet.clearDataValidations();
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
 
   // Headers — auto-derived from FEEDBACK_HEADER_MAP_
   var headers = getHeadersFromMap_(FEEDBACK_HEADER_MAP_);
