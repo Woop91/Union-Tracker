@@ -1158,6 +1158,7 @@ function getInteractiveMemberData() {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!sheet || sheet.getLastRow() <= 1) return [];
 
+  ensureMinimumColumns(sheet, getMemberHeaders().length);
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, MEMBER_COLS.QUICK_ACTIONS).getValues();
   return data.map(function(row) {
     var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
@@ -1194,6 +1195,7 @@ function getInteractiveGrievanceData() {
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet || sheet.getLastRow() <= 1) return [];
 
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.QUICK_ACTIONS).getValues();
   var tz = Session.getScriptTimeZone();
 
@@ -1239,6 +1241,7 @@ function getMyStewardCases() {
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet || sheet.getLastRow() <= 1) return [];
 
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.QUICK_ACTIONS).getValues();
   var tz = Session.getScriptTimeZone();
 

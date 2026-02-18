@@ -219,6 +219,9 @@ function setupFolderForSelectedGrievance() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
 
+  // Ensure sheet has enough columns for Drive folder columns
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   var range = ss.getActiveRange();
   var row = range.getRow();
 
@@ -284,6 +287,8 @@ function batchCreateAllMissingFolders() {
     ui.alert('Error', 'Grievance Log not found.', ui.ButtonSet.OK);
     return;
   }
+
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
 
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) {
@@ -1737,7 +1742,7 @@ function doGet(e) {
             return buildMemberPortal(dashLinkedId);
           }
         }
-      } catch (dashGoogleErr) {
+      } catch (_dashGoogleErr) {
         // Google auth not available - fall through to PIN login
       }
 
@@ -1797,7 +1802,7 @@ function doGet(e) {
             return buildMemberPortal(linkedMemberId);
           }
         }
-      } catch (googleAuthErr) {
+      } catch (_googleAuthErr) {
         // Google auth not available - fall through to PIN login
       }
       // No linked Google account found - show PIN login form
@@ -2684,6 +2689,8 @@ function getWebAppGrievanceList() {
       return [];
     }
 
+    ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
     var lastRow = sheet.getLastRow();
     if (lastRow <= 1) {
       Logger.log('getWebAppGrievanceList: No data rows in sheet');
@@ -2748,6 +2755,8 @@ function getWebAppMemberList() {
       Logger.log('getWebAppMemberList: Member Directory sheet not found');
       return [];
     }
+
+    ensureMinimumColumns(sheet, getMemberHeaders().length);
 
     var lastRow = sheet.getLastRow();
     if (lastRow <= 1) {

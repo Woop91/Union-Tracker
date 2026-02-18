@@ -525,6 +525,12 @@ function createConfigGuideSheet(ss) {
 function createMemberDirectory(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEMBER_DIR);
   var headers = getMemberHeaders();
+
+  // Ensure sheet has enough columns before any column operations.
+  // When an existing sheet has data, header writing is skipped (which would
+  // auto-expand columns), so the sheet may still have fewer columns than needed.
+  ensureMinimumColumns(sheet, headers.length);
+
   // getOrCreateSheet now preserves data - only set headers on empty sheets
   if (sheet.getLastRow() <= 1) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -587,7 +593,7 @@ function createMemberDirectory(ss) {
     // Clear any existing column groups first to prevent duplicates on re-run
     memberGroupRanges.forEach(function(range) {
       for (var d = 0; d < 8; d++) {
-        try { range.shiftColumnGroupDepth(-1); } catch(e) { break; }
+        try { range.shiftColumnGroupDepth(-1); } catch(_e) { break; }
       }
     });
 
@@ -737,6 +743,12 @@ function createMemberDirectory(ss) {
 function createGrievanceLog(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.GRIEVANCE_LOG);
   var headers = getGrievanceHeaders();
+
+  // Ensure sheet has enough columns before any column operations.
+  // When an existing sheet has data, header writing is skipped (which would
+  // auto-expand columns), so the sheet may still have fewer columns than needed.
+  ensureMinimumColumns(sheet, headers.length);
+
   // getOrCreateSheet now preserves data - only set headers on empty sheets
   if (sheet.getLastRow() <= 1) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -805,7 +817,7 @@ function createGrievanceLog(ss) {
     // Clear any existing column groups first to prevent duplicates on re-run
     grievanceGroupRanges.forEach(function(range) {
       for (var d = 0; d < 8; d++) {
-        try { range.shiftColumnGroupDepth(-1); } catch(e) { break; }
+        try { range.shiftColumnGroupDepth(-1); } catch(_e) { break; }
       }
     });
 

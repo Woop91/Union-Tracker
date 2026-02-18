@@ -398,6 +398,9 @@ function sortGrievanceLogByStatus() {
 
   if (!sheet) return;
 
+  // Ensure sheet has enough columns for checkbox re-application after sort
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   var lastRow = sheet.getLastRow();
   if (lastRow < 3) return; // Need at least 2 data rows to sort
 
@@ -778,6 +781,9 @@ function repairGrievanceCheckboxes() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) return;
+
+  // Ensure sheet has enough columns for checkbox columns
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   var lastRow = grievanceSheet.getLastRow();
   if (lastRow < 2) return;

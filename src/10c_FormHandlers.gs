@@ -461,6 +461,9 @@ function setupTimelineColumnGroups() {
     return;
   }
 
+  // Ensure sheet has enough columns for column group operations
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   ss.toast('Setting up column groups...', '👁️ View', 2);
 
   // Group Step I columns (J-K)

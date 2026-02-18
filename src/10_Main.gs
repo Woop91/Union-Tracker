@@ -39,6 +39,15 @@ function onOpen() {
     // Create the dashboard menu
     createDashboardMenu();
 
+    // Ensure all primary sheets have enough columns for current header maps.
+    // This prevents "columns are out of bounds" errors when sheets were
+    // created by an older version with fewer columns.
+    try {
+      ensureAllSheetColumns_();
+    } catch (colError) {
+      console.log('Column check skipped: ' + colError.message);
+    }
+
     // Apply tab colors automatically on open
     try {
       if (typeof applyTabColors_ === 'function') {

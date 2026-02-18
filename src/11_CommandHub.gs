@@ -2868,6 +2868,8 @@ function searchPrecedentsData(query, outcomeFilter) {
     return [];
   }
 
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   var lastRow = sheet.getLastRow();
   var data = sheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.QUICK_ACTIONS).getValues();
 
