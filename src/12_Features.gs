@@ -336,6 +336,9 @@ function updateChecklistProgress(caseId) {
     return;
   }
 
+  // Ensure sheet has enough columns for CHECKLIST_PROGRESS
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
+
   var lastRow = grievanceSheet.getLastRow();
   if (lastRow < 2) {
     return;
@@ -685,6 +688,8 @@ function createChecklistsForExistingCases() {
   if (!grievanceSheet) {
     return errorResponse('Grievance Log not found');
   }
+
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   var lastRow = grievanceSheet.getLastRow();
   if (lastRow < 2) {
@@ -1050,6 +1055,8 @@ function setupActionTypeColumn() {
     return errorResponse('Grievance Log not found');
   }
 
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
+
   // Check if Action Type header exists
   var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
   var actionTypeCol = headers.indexOf('Action Type') + 1;
@@ -1351,6 +1358,8 @@ function syncChecklistCalcToGrievanceLog() {
     Logger.log('Grievance Log not found');
     return errorResponse('Grievance Log not found');
   }
+
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   var grievanceLastRow = grievanceSheet.getLastRow();
   if (grievanceLastRow < 2) {

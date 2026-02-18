@@ -1641,6 +1641,7 @@ function handleGrievanceDialogSubmit(formData) {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
       if (grievanceSheet && GRIEVANCE_COLS.ACTION_TYPE) {
+        ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
         // Find the row with this grievance ID
         const lastRow = grievanceSheet.getLastRow();
         const grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
@@ -2054,6 +2055,7 @@ function recalcAllGrievancesBatched() {
 function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
   const data = sheet.getDataRange().getValues();
 
   let updatedCount = 0;
@@ -2314,6 +2316,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    ensureMinimumColumns(sheet, getGrievanceHeaders().length);
     const data = sheet.getDataRange().getValues();
 
     let rowIndex = -1;

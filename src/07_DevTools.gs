@@ -1138,17 +1138,7 @@ function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, locati
   return row;
 }
 
-/**
- * Ensure a sheet has at least the minimum required columns
- */
-function ensureMinimumColumns(sheet, requiredColumns) {
-  var currentColumns = sheet.getMaxColumns();
-  if (currentColumns < requiredColumns) {
-    var columnsToAdd = requiredColumns - currentColumns;
-    sheet.insertColumnsAfter(currentColumns, columnsToAdd);
-    Logger.log('Added ' + columnsToAdd + ' columns to ' + sheet.getName() + ' (now has ' + requiredColumns + ' columns)');
-  }
-}
+// ensureMinimumColumns has been moved to 01_Core.gs for load-order safety.
 
 /**
  * Seed N grievances

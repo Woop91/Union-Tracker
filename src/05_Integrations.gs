@@ -219,6 +219,9 @@ function setupFolderForSelectedGrievance() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
 
+  // Ensure sheet has enough columns for Drive folder columns
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   var range = ss.getActiveRange();
   var row = range.getRow();
 
@@ -284,6 +287,8 @@ function batchCreateAllMissingFolders() {
     ui.alert('Error', 'Grievance Log not found.', ui.ButtonSet.OK);
     return;
   }
+
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
 
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) {
@@ -2684,6 +2689,8 @@ function getWebAppGrievanceList() {
       return [];
     }
 
+    ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
     var lastRow = sheet.getLastRow();
     if (lastRow <= 1) {
       Logger.log('getWebAppGrievanceList: No data rows in sheet');
@@ -2748,6 +2755,8 @@ function getWebAppMemberList() {
       Logger.log('getWebAppMemberList: Member Directory sheet not found');
       return [];
     }
+
+    ensureMinimumColumns(sheet, getMemberHeaders().length);
 
     var lastRow = sheet.getLastRow();
     if (lastRow <= 1) {
