@@ -37849,7 +37849,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1768 lines)
+// SOURCE: 10a_SheetCreation.gs (1780 lines)
 // ============================================================================
 
 /**
@@ -38379,6 +38379,12 @@ function createConfigGuideSheet(ss) {
 function createMemberDirectory(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.MEMBER_DIR);
   var headers = getMemberHeaders();
+
+  // Ensure sheet has enough columns before any column operations.
+  // When an existing sheet has data, header writing is skipped (which would
+  // auto-expand columns), so the sheet may still have fewer columns than needed.
+  ensureMinimumColumns(sheet, headers.length);
+
   // getOrCreateSheet now preserves data - only set headers on empty sheets
   if (sheet.getLastRow() <= 1) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -38591,6 +38597,12 @@ function createMemberDirectory(ss) {
 function createGrievanceLog(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.GRIEVANCE_LOG);
   var headers = getGrievanceHeaders();
+
+  // Ensure sheet has enough columns before any column operations.
+  // When an existing sheet has data, header writing is skipped (which would
+  // auto-expand columns), so the sheet may still have fewer columns than needed.
+  ensureMinimumColumns(sheet, headers.length);
+
   // getOrCreateSheet now preserves data - only set headers on empty sheets
   if (sheet.getLastRow() <= 1) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers])
@@ -41565,7 +41577,7 @@ function createFeaturesReferenceSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10c_FormHandlers.gs (688 lines)
+// SOURCE: 10c_FormHandlers.gs (691 lines)
 // ============================================================================
 
 // ============================================================================
@@ -42031,6 +42043,9 @@ function setupTimelineColumnGroups() {
     return;
   }
 
+  // Ensure sheet has enough columns for column group operations
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   ss.toast('Setting up column groups...', '👁️ View', 2);
 
   // Group Step I columns (J-K)
@@ -42258,7 +42273,7 @@ function unfreezeAllColumns() {
 
 
 // ============================================================================
-// SOURCE: 10d_SyncAndMaintenance.gs (1023 lines)
+// SOURCE: 10d_SyncAndMaintenance.gs (1029 lines)
 // ============================================================================
 
 // ============================================================================
@@ -42661,6 +42676,9 @@ function sortGrievanceLogByStatus() {
 
   if (!sheet) return;
 
+  // Ensure sheet has enough columns for checkbox re-application after sort
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   var lastRow = sheet.getLastRow();
   if (lastRow < 3) return; // Need at least 2 data rows to sort
 
@@ -43041,6 +43059,9 @@ function repairGrievanceCheckboxes() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!grievanceSheet) return;
+
+  // Ensure sheet has enough columns for checkbox columns
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   var lastRow = grievanceSheet.getLastRow();
   if (lastRow < 2) return;
