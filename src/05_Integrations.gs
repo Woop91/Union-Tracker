@@ -1208,7 +1208,7 @@ function sendEmailToMember(memberId, subject, body) {
       return errorResponse('Member not found');
     }
 
-    const email = member['Email'] || member[Object.keys(member)[MEMBER_COLUMNS.EMAIL]];
+    const email = member['Email'] || member.email;
     if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
       return errorResponse('Invalid email address');
     }

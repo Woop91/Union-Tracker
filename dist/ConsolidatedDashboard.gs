@@ -1573,7 +1573,7 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
                     SHEETS.MEMBER_DIR : 'Member Directory';
 
-    var result = this.findRow(sheetName, 0, memberId);  // Column A (0-indexed)
+    var result = this.findRow(sheetName, MEMBER_COLUMNS.MEMBER_ID, memberId);
 
     if (!result) return null;
 
@@ -1660,7 +1660,7 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
                     SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
-    var result = this.findRow(sheetName, 0, grievanceId);  // Column A (0-indexed)
+    var result = this.findRow(sheetName, GRIEVANCE_COLUMNS.GRIEVANCE_ID, grievanceId);
 
     if (!result) return null;
 
@@ -1842,7 +1842,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3057 lines)
+// SOURCE: 01_Core.gs (3058 lines)
 // ============================================================================
 
 /**
@@ -3669,7 +3669,8 @@ function loadCachedColumnMaps_() {
     for (var name in targets) {
       if (data[name]) {
         for (var key in data[name]) {
-          if (data[name].hasOwnProperty(key) && targets[name][key] !== data[name][key]) {
+          if (data[name].hasOwnProperty(key) && targets[name].hasOwnProperty(key)
+              && targets[name][key] !== data[name][key]) {
             targets[name][key] = data[name][key];
             changed = true;
           }
@@ -19456,7 +19457,7 @@ function sendEmailToMember(memberId, subject, body) {
       return errorResponse('Member not found');
     }
 
-    const email = member['Email'] || member[Object.keys(member)[MEMBER_COLUMNS.EMAIL]];
+    const email = member['Email'] || member.email;
     if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
       return errorResponse('Invalid email address');
     }
@@ -21898,7 +21899,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3513 lines)
+// SOURCE: 06_Maintenance.gs (3515 lines)
 // ============================================================================
 
 /**
@@ -24228,7 +24229,9 @@ function findOrphanedGrievances() {
   });
 
   // Check grievance member IDs
-  var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, 4).getValues();
+  var lastCol = Math.max(GRIEVANCE_COLS.GRIEVANCE_ID, GRIEVANCE_COLS.MEMBER_ID,
+                         GRIEVANCE_COLS.FIRST_NAME, GRIEVANCE_COLS.LAST_NAME);
+  var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, lastCol).getValues();
   var orphaned = [];
 
   grievanceData.forEach(function(row, index) {
@@ -26979,14 +26982,14 @@ function NUKE_SEEDED_DATA() {
   var grievanceCount = 0;
 
   if (memberSheet && memberSheet.getLastRow() > 1) {
-    var memberIds = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, 1).getValues();
+    var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
     memberIds.forEach(function(row) {
       if (row[0] && seededIdPattern.test(String(row[0]))) memberCount++;
     });
   }
 
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-    var grievanceIds = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, 1).getValues();
+    var grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, grievanceSheet.getLastRow() - 1, 1).getValues();
     grievanceIds.forEach(function(row) {
       if (row[0] && seededIdPattern.test(String(row[0]))) grievanceCount++;
     });
@@ -49440,7 +49443,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4024 lines)
+// SOURCE: 12_Features.gs (4025 lines)
 // ============================================================================
 
 /**
@@ -49944,11 +49947,12 @@ function deleteChecklistItem(checklistId) {
     return errorResponse('Checklist item not found');
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  var numCols = Math.max(CHECKLIST_COLS.CHECKLIST_ID, CHECKLIST_COLS.CASE_ID);
+  var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
 
   for (var i = 0; i < data.length; i++) {
-    if (data[i][0] === checklistId) {
-      var caseId = data[i][1];
+    if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
+      var caseId = data[i][CHECKLIST_COLS.CASE_ID - 1];
       var row = i + 2;
       sheet.deleteRow(row);
 

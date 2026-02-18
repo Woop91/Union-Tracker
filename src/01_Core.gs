@@ -1822,7 +1822,8 @@ function loadCachedColumnMaps_() {
     for (var name in targets) {
       if (data[name]) {
         for (var key in data[name]) {
-          if (data[name].hasOwnProperty(key) && targets[name][key] !== data[name][key]) {
+          if (data[name].hasOwnProperty(key) && targets[name].hasOwnProperty(key)
+              && targets[name][key] !== data[name][key]) {
             targets[name][key] = data[name][key];
             changed = true;
           }

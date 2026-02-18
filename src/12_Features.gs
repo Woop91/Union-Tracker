@@ -499,11 +499,12 @@ function deleteChecklistItem(checklistId) {
     return errorResponse('Checklist item not found');
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  var numCols = Math.max(CHECKLIST_COLS.CHECKLIST_ID, CHECKLIST_COLS.CASE_ID);
+  var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
 
   for (var i = 0; i < data.length; i++) {
-    if (data[i][0] === checklistId) {
-      var caseId = data[i][1];
+    if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
+      var caseId = data[i][CHECKLIST_COLS.CASE_ID - 1];
       var row = i + 2;
       sheet.deleteRow(row);
 
