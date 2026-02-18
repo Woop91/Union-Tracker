@@ -39680,7 +39680,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1938 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1945 lines)
 // ============================================================================
 
 // ============================================================================
@@ -40170,6 +40170,7 @@ function createSatisfactionSheet(ss) {
 function createFeedbackSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.FEEDBACK);
   sheet.clear();
+  sheet.clearDataValidations();
 
   // Headers — auto-derived from FEEDBACK_HEADER_MAP_
   var headers = getHeadersFromMap_(FEEDBACK_HEADER_MAP_);
@@ -40191,38 +40192,6 @@ function createFeedbackSheet(ss) {
   sheet.setColumnWidth(FEEDBACK_COLS.ASSIGNED_TO, 120);
   sheet.setColumnWidth(FEEDBACK_COLS.RESOLUTION, 250);
   sheet.setColumnWidth(FEEDBACK_COLS.NOTES, 200);
-
-  // Category dropdown
-  var categoryOptions = ['Dashboard', 'Member Directory', 'Grievance Log', 'Config', 'Search', 'Mobile', 'Reports', 'Performance', 'UI/UX', 'Integration', 'Other'];
-  var categoryRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(categoryOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange(2, FEEDBACK_COLS.CATEGORY, 998, 1).setDataValidation(categoryRule);
-
-  // Type dropdown
-  var typeOptions = ['Bug', 'Feature Request', 'Improvement', 'Documentation', 'Question'];
-  var typeRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(typeOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange(2, FEEDBACK_COLS.TYPE, 998, 1).setDataValidation(typeRule);
-
-  // Priority dropdown with conditional formatting
-  var priorityOptions = ['Low', 'Medium', 'High', 'Critical'];
-  var priorityRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(priorityOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange(2, FEEDBACK_COLS.PRIORITY, 998, 1).setDataValidation(priorityRule);
-
-  // Status dropdown
-  var statusOptions = ['New', 'In Progress', 'On Hold', 'Resolved', 'Won\'t Fix', 'Duplicate'];
-  var statusRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(statusOptions, true)
-    .setAllowInvalid(false)
-    .build();
-  sheet.getRange(2, FEEDBACK_COLS.STATUS, 998, 1).setDataValidation(statusRule);
 
   // Conditional formatting for Priority
   var priorityRange = sheet.getRange(2, FEEDBACK_COLS.PRIORITY, 998, 1);
@@ -40325,11 +40294,49 @@ function createFeedbackSheet(ss) {
     sheet.deleteColumns(16, maxCols - 15);
   }
 
-  // Populate roadmap items (external API features requiring development)
+  // Populate roadmap items BEFORE applying data validation rules.
+  // setValues() with setAllowInvalid(false) enforces validation during batch writes,
+  // which can cause rejection errors. Populating data first avoids this conflict.
   populateRoadmapItems(sheet);
 
   // Populate computed values (no formulas in visible sheet)
   syncFeedbackValues();
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // DATA VALIDATION (applied after data population to prevent setValues errors)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // Category dropdown
+  var categoryOptions = ['Dashboard', 'Member Directory', 'Grievance Log', 'Config', 'Search', 'Mobile', 'Reports', 'Performance', 'UI/UX', 'Integration', 'Other'];
+  var categoryRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(categoryOptions, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, FEEDBACK_COLS.CATEGORY, 998, 1).setDataValidation(categoryRule);
+
+  // Type dropdown
+  var typeOptions = ['Bug', 'Feature Request', 'Improvement', 'Documentation', 'Question'];
+  var typeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(typeOptions, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, FEEDBACK_COLS.TYPE, 998, 1).setDataValidation(typeRule);
+
+  // Priority dropdown with conditional formatting
+  var priorityOptions = ['Low', 'Medium', 'High', 'Critical'];
+  var priorityRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(priorityOptions, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, FEEDBACK_COLS.PRIORITY, 998, 1).setDataValidation(priorityRule);
+
+  // Status dropdown
+  var statusOptions = ['New', 'In Progress', 'On Hold', 'Resolved', 'Won\'t Fix', 'Duplicate'];
+  var statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(statusOptions, true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, FEEDBACK_COLS.STATUS, 998, 1).setDataValidation(statusRule);
 
   Logger.log('Feedback & Development sheet created');
 
