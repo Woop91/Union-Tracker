@@ -1742,7 +1742,115 @@ function syncColumnMaps() {
     }
   }
 
+  // Persist resolved positions so other execution contexts (onEdit, etc.)
+  // pick them up without re-reading sheet headers every time.
+  persistColumnMaps_();
+
   return result;
+}
+
+// ============================================================================
+// COLUMN MAP PERSISTENCE
+// ============================================================================
+// In Google Apps Script, each trigger execution (onEdit, onOpen, menu click)
+// starts a brand-new V8 isolate.  Global column constants re-initialize to
+// their default (array-order) positions.  If a user manually reordered
+// columns, onEdit would silently use wrong positions until the next onOpen.
+//
+// Solution: syncColumnMaps() persists resolved positions to CacheService
+// (6-hour TTL).  loadCachedColumnMaps_() restores them cheaply in onEdit.
+// ============================================================================
+
+/** Cache key for persisted column maps */
+var COL_MAPS_CACHE_KEY_ = 'RESOLVED_COL_MAPS';
+
+/**
+ * Persist current column constant values to CacheService.
+ * Called at the end of syncColumnMaps().
+ * @private
+ */
+function persistColumnMaps_() {
+  try {
+    var data = {
+      MEMBER_COLS: MEMBER_COLS,
+      GRIEVANCE_COLS: GRIEVANCE_COLS,
+      CONFIG_COLS: CONFIG_COLS,
+      MEETING_CHECKIN_COLS: MEETING_CHECKIN_COLS,
+      AUDIT_LOG_COLS: AUDIT_LOG_COLS,
+      SURVEY_VAULT_COLS: SURVEY_VAULT_COLS,
+      SURVEY_TRACKING_COLS: SURVEY_TRACKING_COLS,
+      STEWARD_PERF_COLS: STEWARD_PERF_COLS,
+      FEEDBACK_COLS: FEEDBACK_COLS,
+      CHECKLIST_COLS: CHECKLIST_COLS
+    };
+    CacheService.getScriptCache().put(COL_MAPS_CACHE_KEY_, JSON.stringify(data), 21600); // 6 hours
+  } catch (_e) {
+    // CacheService unavailable — degrade silently; defaults are still valid
+    // for sheets created by this code.
+  }
+}
+
+/**
+ * Load persisted column positions from CacheService and apply to globals.
+ * Returns true if cache was found and applied, false otherwise.
+ * Call at the top of onEdit() to cheaply pick up any positions that
+ * syncColumnMaps() resolved in a prior execution.
+ * @returns {boolean} Whether cached positions were applied
+ * @private
+ */
+function loadCachedColumnMaps_() {
+  try {
+    var json = CacheService.getScriptCache().get(COL_MAPS_CACHE_KEY_);
+    if (!json) return false;
+    var data = JSON.parse(json);
+
+    // Apply to primary column constants
+    var targets = {
+      MEMBER_COLS: MEMBER_COLS,
+      GRIEVANCE_COLS: GRIEVANCE_COLS,
+      CONFIG_COLS: CONFIG_COLS,
+      MEETING_CHECKIN_COLS: MEETING_CHECKIN_COLS,
+      AUDIT_LOG_COLS: AUDIT_LOG_COLS,
+      SURVEY_VAULT_COLS: SURVEY_VAULT_COLS,
+      SURVEY_TRACKING_COLS: SURVEY_TRACKING_COLS,
+      STEWARD_PERF_COLS: STEWARD_PERF_COLS,
+      FEEDBACK_COLS: FEEDBACK_COLS,
+      CHECKLIST_COLS: CHECKLIST_COLS
+    };
+
+    var changed = false;
+    for (var name in targets) {
+      if (data[name]) {
+        for (var key in data[name]) {
+          if (data[name].hasOwnProperty(key) && targets[name][key] !== data[name][key]) {
+            targets[name][key] = data[name][key];
+            changed = true;
+          }
+        }
+      }
+    }
+
+    // Rebuild derived objects (legacy compat, dropdown map, multi-select)
+    // only if something actually changed.
+    if (changed) {
+      var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
+      for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
+      var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
+      for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
+
+      var freshMulti = buildMultiSelectCols_();
+      MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
+      MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+
+      var freshDD = buildDropdownMap_();
+      DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
+      DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+    }
+
+    return true;
+  } catch (_e) {
+    return false; // Cache unavailable — use defaults
+  }
 }
 
 // ============================================================================

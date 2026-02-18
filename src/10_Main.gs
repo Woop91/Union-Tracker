@@ -102,6 +102,11 @@ function onEdit(e) {
   if (!e || !e.range) return;
 
   try {
+    // Restore column positions that syncColumnMaps() resolved in onOpen().
+    // Without this, each onEdit execution would start with array-order defaults
+    // which are wrong if a user manually reordered columns.
+    try { loadCachedColumnMaps_(); } catch (_cacheErr) { /* use defaults */ }
+
     var sheet = e.range.getSheet();
     var sheetName = sheet.getName();
     var row = e.range.getRow();
