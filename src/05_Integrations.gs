@@ -1737,7 +1737,7 @@ function doGet(e) {
             return buildMemberPortal(dashLinkedId);
           }
         }
-      } catch (dashGoogleErr) {
+      } catch (_dashGoogleErr) {
         // Google auth not available - fall through to PIN login
       }
 
@@ -1797,7 +1797,7 @@ function doGet(e) {
             return buildMemberPortal(linkedMemberId);
           }
         }
-      } catch (googleAuthErr) {
+      } catch (_googleAuthErr) {
         // Google auth not available - fall through to PIN login
       }
       // No linked Google account found - show PIN login form

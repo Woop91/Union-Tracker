@@ -587,7 +587,7 @@ function createMemberDirectory(ss) {
     // Clear any existing column groups first to prevent duplicates on re-run
     memberGroupRanges.forEach(function(range) {
       for (var d = 0; d < 8; d++) {
-        try { range.shiftColumnGroupDepth(-1); } catch(e) { break; }
+        try { range.shiftColumnGroupDepth(-1); } catch(_e) { break; }
       }
     });
 
@@ -805,7 +805,7 @@ function createGrievanceLog(ss) {
     // Clear any existing column groups first to prevent duplicates on re-run
     grievanceGroupRanges.forEach(function(range) {
       for (var d = 0; d < 8; d++) {
-        try { range.shiftColumnGroupDepth(-1); } catch(e) { break; }
+        try { range.shiftColumnGroupDepth(-1); } catch(_e) { break; }
       }
     });
 

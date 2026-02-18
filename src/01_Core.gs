@@ -1658,7 +1658,7 @@ function resolveColumnsFromSheet_(sheetName, headerMap, options) {
     }
 
     return cols;
-  } catch (e) {
+  } catch (_e) {
     return null;
   }
 }
