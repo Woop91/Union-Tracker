@@ -50,7 +50,10 @@ loadSources([
   '11_CommandHub.gs',
   '12_Features.gs',
   '13_MemberSelfService.gs',
-  '14_MeetingCheckIn.gs'
+  '14_MeetingCheckIn.gs',
+  '15_EventBus.gs',
+  '16_DashboardEnhancements.gs',
+  '17_CorrelationEngine.gs'
 ]);
 
 // ============================================================================
@@ -188,7 +191,8 @@ describe('A1: Build order integrity', () => {
     '09_Dashboards.gs', '10a_SheetCreation.gs', '10b_SurveyDocSheets.gs',
     '10c_FormHandlers.gs', '10d_SyncAndMaintenance.gs', '10_Main.gs',
     '11_CommandHub.gs', '12_Features.gs', '13_MemberSelfService.gs',
-    '14_MeetingCheckIn.gs'
+    '14_MeetingCheckIn.gs', '15_EventBus.gs', '16_DashboardEnhancements.gs',
+    '17_CorrelationEngine.gs'
   ];
 
   test('all source files in BUILD_ORDER exist on disk', () => {
