@@ -8,210 +8,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [4.9.0] - 2026-02-17
 
 ### Added
-- **Constant Contact v3 API integration** — read-only email engagement metrics sync:
-  - `showConstantContactSetup()` — store CC API key and client secret in Script Properties
-  - `authorizeConstantContact()` — OAuth2 authorization flow with interactive dialog
-  - `exchangeConstantContactCode(code)` — exchange auth code for access + refresh tokens
-  - `syncConstantContactEngagement()` — pull open rates and last activity dates into Member Directory
-  - `showConstantContactStatus()` — display connection status and token expiry
-  - `disconnectConstantContact()` — remove all stored credentials
-  - Auto token refresh when access tokens expire (2-hour CC token lifetime)
-  - Rate limiting (4 requests/second) and pagination for large contact lists
-  - Case-insensitive email matching between CC contacts and Member Directory
-  - Menu items under Admin > Data Sync for full CC workflow
-  - 30 new tests covering CC_CONFIG, token management, API calls, engagement parsing, and disconnect
-  - `UrlFetchApp` mock added to test infrastructure (`gas-mock.js`)
-  - Roadmap entry in Feedback & Development sheet updated from "New" to "Implemented"
-- **Member Directory columns now populated by CC sync:**
-  - `OPEN_RATE` (column T) — email open rate % calculated from CC campaign activity data
-  - `RECENT_CONTACT_DATE` (column Y) — date of last email open/click/send from CC
+- **Constant Contact v3 API integration** — read-only email engagement metrics sync with OAuth2 authorization, auto token refresh, rate limiting, and pagination
+- Member Directory columns `OPEN_RATE` and `RECENT_CONTACT_DATE` now populated by CC sync
+- 30 new tests covering the Constant Contact integration
 
 ## [4.8.2] - 2026-02-16
 
 ### Added
-- **State field** — added to member contact update across all surfaces:
-  - Member self-service portal: profile display, edit form (2-char uppercase input), and save handler
-  - `updateMemberContact()` — `state` added to allowed fields and field mapping
-  - `getMemberProfileBySession()` — returns `state` in profile data
-  - `onContactFormSubmit()` — extracts and stores State for both new and existing members
-  - `CONTACT_FORM_CONFIG.FIELD_IDS` — `STATE` entry added (placeholder ID, update after form creation)
+- **State field** added to member contact update across all surfaces (self-service portal, contact form, profile data)
 
 ### Changed
-- `CONTACT_FORM_CONFIG.FIELD_IDS` — expanded from 20 to 21 entries
 - Member self-service portal edit form now has 5 fields (Email, Phone, Preferred Contact, Best Time, State)
 
 ## [4.8.1] - 2026-02-15
 
 ### Added
-- **Contact form fields** — 5 new fields added to the member contact form:
-  - **Hire Date** — parsed as a date for proper date handling
-  - **Employee ID** — employer-assigned ID (distinct from Member ID)
-  - **Street Address** — mailing address street line
-  - **City** — mailing address city
-  - **Zip Code** — mailing address zip code (new Member Directory column)
-- `ZIP_CODE` added to `MEMBER_HEADER_MAP_` and `PII_MEMBER_COLS` (treated as PII)
-- New fields written for both new member creation and existing member updates on form submit
-- Form field entry IDs in `CONTACT_FORM_CONFIG` use placeholders — update after adding questions to the Google Form
+- **5 new contact form fields** — Hire Date, Employee ID, Street Address, City, Zip Code
 
 ### Changed
-- `CONTACT_FORM_CONFIG.FIELD_IDS` — expanded from 15 to 20 entries
-- `onContactFormSubmit()` — now extracts and stores Hire Date, Employee ID, Street Address, City, and Zip Code
-- **Unified Member ID system** — all ID generation now uses `generateNameBasedId()` (format: `MJASM472`)
-- `generateMissingMemberIDs()` and `generateMissingMemberIDsBatch()` now produce name-based IDs instead of unit-code IDs
-- `verifyIDGenerationEngine()` updated to test and report on name-based format
+- **Unified Member ID system** — all ID generation now uses name-based format (`MJASM472`)
 
 ### Removed
-- `generateUniqueId_()` — legacy random unit-code ID generator (`MS-48271-H` format)
-- `getNextSequence_()` — legacy sequential counter for unit-code IDs
-- `getNextSequence()` — sequential ID counter using Script Properties
-- `getNextMemberSequence_()` — duplicate sequential counter in Executive Dashboard
+- Legacy random unit-code ID generators
 
 ## [4.8.0] - 2026-02-15
 
 ### Security
-- **Security event alerting system** — threat detection and notifications integrated at web app, edit trigger, and self-service auth entry points
-- **Zero-knowledge survey vault** — all survey verification data (email, member ID) stored as SHA-256 hashes only
-- No plaintext PII is ever written to any sheet — raw email exists in memory only during form submission
-- `_Survey_Vault` sheet is hidden and sheet-protected (script owner only)
-- Satisfaction sheet contains zero identifying data — cryptographically impossible to link answers to members
-- Flagged submissions review now shows "Anonymous submission #N" instead of email
-- `_Looker_Satisfaction` export no longer contains member IDs or verification status
+- **Security event alerting system** — threat detection and notifications at web app, edit trigger, and self-service entry points
+- **Zero-knowledge survey vault** — all survey verification data stored as SHA-256 hashes only; no plaintext PII written to any sheet
 
 ### Added
-- `hashForVault_(value)` — salted SHA-256 hash function for vault storage
-- `SURVEY_VAULT_COLS` constants for 8-column vault structure
 - Survey Completion Tracker with dialog, reminders, and round management
-- FAQ section for survey completion tracking (7 Q&As)
-- Features Reference entries for survey tracking (6 entries)
-- Function Checklist entries for vault functions
-- Security event alerting hooks in `05_Integrations.gs`, `10_Main.gs`, `13_MemberSelfService.gs`
 
 ### Changed
-- **Member ID format** — changed from random 5-digit (`MS-48271-H`) to sequential (`MS-101-H`) for import reliability
-- **Import dedup** — now happens once client-side instead of per-batch for faster processing
-- `generateUniqueId_()` replaced by `getNextSequence_()` for deterministic sequential IDs
-- **Is Steward / Best Time to Contact** columns now use dynamic constants directly, removing redundant fallback values
-- `onSatisfactionFormSubmit()` — writes anonymous answers to Satisfaction sheet, hashed PII to vault
-- `approveFlaggedSubmission()` / `rejectFlaggedSubmission()` — now write to vault, not Satisfaction sheet
-- `syncSatisfactionValues()`, `getPublicSurveyData()`, `getSatisfactionByUnit()` — read verification status from vault via `getVaultDataMap_()`
-- `SATISFACTION_COLS.EMAIL` through `REVIEWER_NOTES` deprecated (set to -1)
-- Verification columns (CE-CK) removed from Satisfaction sheet entirely
+- **Member ID format** changed from random 5-digit to sequential for import reliability
+- Import dedup now happens once client-side instead of per-batch
+- Satisfaction form submission and review functions now use vault storage
 
 ## [4.7.0] - 2026-02-14
 
 ### Fixed
-- **40+ code review issues resolved** across security, correctness, performance, and test quality
-- **XSS hardening** — all Critical security issues from comprehensive code review addressed
-- **onEdit optimization** — reduced redundant processing in edit trigger handlers
-- **DevTools guard** — added production environment check to prevent accidental DevTools execution
-- **Deduplicated `escapeHtml`** — consolidated duplicate implementations into single canonical function in `00_Security.gs`
-- **Removed empty stubs** — cleaned up placeholder functions that had no implementation (A3 architecture item)
-- **Broken `GRIEVANCE_COLS.UNIT` and `MEMBER_COLS.HOME_TOWN` references** — removed 9 references to non-existent column mappings
-- **Data safety improvements** — 14 critical corrections for data integrity, UX, and reliability
-- **Dashboard footer version** — updated from v4.4.0 to v4.7.0
-- **Unused variable lint warning** — removed unused `hiddenSheetNames` in `08d_AuditAndFormulas.gs`
+- **40+ code review issues** resolved across security, correctness, performance, and test quality
+- XSS hardening, onEdit optimization, DevTools guard, deduplicated `escapeHtml`
+- Removed broken column references and empty stubs
 
 ### Changed
-- Version bumped to 4.7.0 across all files (VERSION_INFO, package.json, API_VERSION)
-- Test suite expanded from 1016 to 1090 tests across 20 suites (was 19)
-- 74 new architecture and happy-path tests added
-- CODE_REVIEW.md updated with resolution status for all 69 identified issues
-- Updated README.md, SECURITY_REVIEW.md version references to 4.7.0
+- Version bumped to 4.7.0 across all files
+- Test suite expanded from 1016 to 1090 tests (74 new tests)
 
 ## [4.6.0] - 2026-02-12
 
 ### Added
-- **VERSION_HISTORY constant** (`01_Core.gs`) - Centralized array tracking every release with version number, date, codename, and key changes. Includes `getVersionDate(ver)` lookup function so any code can resolve a version string to its release date
-- **Features sheet now driven by VERSION_HISTORY** (`10b_SurveyDocSheets.gs`) - Replaced hardcoded version table with dynamic rendering from `VERSION_HISTORY`, ensuring dates are always present and consistent
-- **getVersionInfo() updated** (`10_Main.gs`) - Now returns current VERSION_INFO fields plus full VERSION_HISTORY instead of stale 2.0.0 data
-- **Meeting Notes & Agenda Document Automation** - When a meeting is created, Google Docs for Meeting Notes and Meeting Agenda are auto-generated in dedicated Drive folders (`Meeting Notes/`, `Meeting Agenda/`). URLs stored in Meeting Check-In Log columns N-O
-- **Two-Tier Agenda Steward Selection** - Meeting setup dialog lets the organizer select which stewards receive the agenda 3 days before the meeting; ALL stewards receive it at least 1 day before. Agenda is never shared with members
-- **Meeting Notes Dashboard Tab** - New "Meeting Notes" tab in Member Dashboard shows completed meetings chronologically with search and view-only Google Doc links. Notes auto-publish (view-only) 1 day after each meeting
-- **Scheduled Meeting Document Notifications** - `processMeetingDocNotifications()` runs in `dailyTrigger()`: agenda 3 days before (selected stewards), agenda 1 day before (all stewards), notes 1 day before (notification stewards), view-only publish 1 day after
-- **Member Drive Folder Quick Action** - "Create Member Folder" button in Member Quick Actions dialog creates/reuses a Google Drive folder for the member, checking for existing grievance folders first
-- **Meeting Event Scheduling** - Full calendar lifecycle for meetings: creates Google Calendar events, activates/deactivates check-in based on event status
-- **Grievance Date Override** - Stewards can overwrite grievance dates with downstream deadline recalculation
-- **Steward Checkboxes in Meeting Setup** - Dynamic steward list loaded from Member Directory with Select All / Clear All, separate "Email Attendance Report To" and "Send Agenda Early To" sections
-- Meeting Check-In Log expanded from 13 columns (A-M) to 16 columns (A-P): `NOTES_DOC_URL` (N), `AGENDA_DOC_URL` (O), `AGENDA_STEWARDS` (P)
+- **VERSION_HISTORY constant** — centralized release tracking with lookup function
+- **Meeting Notes & Agenda Document Automation** — auto-generated Google Docs, two-tier steward agenda sharing, scheduled notifications
+- **Meeting Notes Dashboard Tab** — completed meetings with search and view-only Doc links
+- **Member Drive Folder Quick Action** — creates/reuses Google Drive folder per member
+- **Meeting Event Scheduling** — full calendar lifecycle with check-in activation
+- **Grievance Date Override** — stewards can overwrite dates with downstream deadline recalculation
 
 ### Changed
-- Version bumped to 4.6.0 across all files (VERSION_INFO, COMMAND_CONFIG, API_VERSION)
-- Meeting setup dialog height increased from 580px to 720px to accommodate steward selection
-- `dailyTrigger()` now includes `processMeetingDocNotifications()` with audit logging for agenda sent, notes sent, and notes published counts
-
-### New Functions
-- `createMeetingDocs(meetingData)` - Creates Meeting Notes and Agenda Google Docs in dedicated folders
-- `getOrCreateMeetingNotesFolder()` / `getOrCreateMeetingAgendaFolder()` - Gets or creates Drive folders for meeting documents
-- `emailMeetingDocLink()` - Sends HTML email with meeting document link to stewards
-- `setDocViewOnlyByLink(docUrl)` - Sets a Google Doc to view-only sharing via link
-- `getAllStewardEmails_()` - Retrieves all steward emails from Member Directory
-- `processMeetingDocNotifications()` - Two-tier notification scheduler for meeting documents
-- `setupDriveFolderForMember(memberId)` - Creates/reuses Google Drive folder for a member
-- `getStewardEmailsForMeetingSetup()` - Returns steward names/emails for the meeting setup dialog
+- Meeting Check-In Log expanded from 13 to 16 columns
+- Meeting setup dialog updated with steward selection checkboxes
 
 ## [4.5.1] - 2026-02-11
 
 ### Fixed
-- **Engagement tracking: `MEMBER_COLS.FULL_NAME` undefined** - Member names in unified dashboard always showed "Unknown". Now builds name from `FIRST_NAME` + `LAST_NAME`
-- **Engagement tracking: `MEMBER_COLS.LAST_UPDATED` undefined** - Directory trends (recent updates, stale contacts) never tracked. Now uses `RECENT_CONTACT_DATE`
-- **Engagement tracking: `GRIEVANCE_COLS.CATEGORY` undefined** - Grievance categories always showed "Other". Now uses `ISSUE_CATEGORY`
-- **Engagement tracking: `GRIEVANCE_COLS.MEMBER_NAME` undefined** - Grievance member names always showed "Unknown". Now builds from `FIRST_NAME` + `LAST_NAME`
-- **Engagement tracking: step denial rates always 0%** - `STEP_1_DATE`/`STEP_2_DATE`/`STEP_3_DATE` were undefined. Now uses `STEP1_RCVD`, `STEP2_RCVD`, `STEP2_APPEAL_FILED`, `STEP3_APPEAL_FILED`
-- **Engagement tracking: openRate=0 excluded** - Members with 0% email open rate were skipped because `0` is falsy in JS. Now uses explicit empty checks
-- **Interest field comparison** - Added lowercase `'true'` to union interest value checks
-- **Version consistency** - Synced `API_VERSION` (4.5.0→4.5.1) and `COMMAND_CONFIG.VERSION` (4.5.0→4.5.1) to match `VERSION_INFO.CURRENT`
-- `GRIEVANCE_OUTCOMES` - added missing constant that caused "GRIEVANCE_OUTCOMES is not defined" runtime error, preventing tabs from populating
-- `generateGrievanceId()` - added missing function called by `getNextGrievanceId()`, which caused `startNewGrievance()` to silently fail
-- Sheet tab colors - added `.setTabColor()` to all 11 sheet creation functions
-- Hardcoded hex colors replaced with `COLORS` constants in Getting Started, FAQ, and Config Guide sheet creation
+- **Engagement tracking** — resolved 6 undefined column references causing incorrect dashboard data
+- **Version consistency** — synced API_VERSION and COMMAND_CONFIG.VERSION
+- Added missing `GRIEVANCE_OUTCOMES` constant and `generateGrievanceId()` function
+- Sheet tab colors added to all 11 sheet creation functions
 
 ### Added
-- 79 new engagement tracking tests (`test/04e_PublicDashboard.test.js`) covering: member counting, engagement metrics, participation rates, hot spot detection, PII handling, grievance processing, directory trends, satisfaction data, date range filtering, HTML generation, edge cases
-- Engagement Tracking FAQ category (7 questions) in FAQ sheet
-- Total: 950 tests across 18 suites (up from 871 across 17)
-- 33 new tests covering core grievance mutation paths:
-  - `startNewGrievance()` - validates row data includes `GRIEVANCE_OUTCOMES.PENDING`, audit logging, error handling
-  - `resolveGrievance()` - validates outcome/status updates, audit logging, timestamped notes
-  - `advanceGrievanceStep()` - validates step 1→2→3→arbitration transitions, status updates, boundary errors
-  - `setupCalcFormulasSheet()` - validates `GRIEVANCE_OUTCOMES` and `GRIEVANCE_STATUS` are written to formula sheet
-  - `GRIEVANCE_OUTCOMES` constant existence guard - asserts all expected keys are defined
+- 79 new engagement tracking tests, 33 new grievance mutation tests
+- Total: 950 tests across 18 suites
 
 ## [4.5.0] - 2026-02-01
 
 ### Added
-- Security module (`00_Security.gs`) - XSS prevention, HTML escaping, formula injection protection, PII masking, input validation, access control
-- Data Access Layer (`00_DataAccess.gs`) - Centralized sheet access with caching, TIME_CONSTANTS for deadline management, deadline urgency calculations
-- Member Self-Service (`13_MemberSelfService.gs`) - PIN-based member authentication with secure UUID-based PIN generation and hashed storage
+- Security module — XSS prevention, HTML escaping, formula injection protection, PII masking, input validation, access control
+- Data Access Layer — centralized sheet access with caching and deadline management
+- Member Self-Service — PIN-based authentication with secure UUID generation and hashed storage
 - Jest unit test suite with GAS environment mocking
-- jest.config.js and test infrastructure (gas-mock.js, load-source.js)
 
 ### Changed
 - Consolidated architecture from scattered modules to 16 focused source files
-- CI/CD pipeline with GitHub Actions
-- ESLint v9 flat config for code quality
-- Husky pre-commit hooks
-- Version bumped to 4.5.0 across all files (VERSION_INFO, COMMAND_CONFIG, API_VERSION, package.json)
+- CI/CD pipeline with GitHub Actions, ESLint v9, Husky pre-commit hooks
 
 ### Fixed
-- `escapeForFormula()` - was prefixing formula chars mid-string, now only at start
-- `generateMemberPIN()` - replaced insecure Math.random with Utilities.getUuid()
-- `TIME_CONSTANTS.DEADLINE_DAYS` - corrected values to match DEADLINE_RULES (7/7/14/10)
-- `API_VERSION` - synced with VERSION_INFO (4.5.0)
-- `CALENDAR_CONFIG` - re-added missing config to Integrations module
-- `MEMBER_COLUMNS.PIN_HASH` - added missing column constant and header
-- `initializeDashboard()` - fixed dead stub, now delegates to CREATE_DASHBOARD()
-- `COMMAND_CONFIG.VERSION` - synced with VERSION_INFO.CURRENT
+- 8 bug fixes including escapeForFormula, generateMemberPIN, TIME_CONSTANTS, and missing configs
 
 ### Removed
-- 138+ duplicate function definitions
-- Deprecated function stubs
+- 138+ duplicate function definitions and deprecated stubs
 
 ## [4.4.1] - 2026-01-31
 
 ### Added
-- Initial build system with Node.js
-- Source file concatenation for deployment
-- Basic project structure
+- Initial build system with Node.js and source file concatenation
 
 ## [4.4.0] - 2026-01-30
 
@@ -224,9 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Email notification system
 
 ### Security
-- Input validation for all user inputs
-- HTML sanitization for XSS prevention
-- Role-based access control
+- Input validation, HTML sanitization, role-based access control
 
 ---
 
@@ -234,8 +124,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 4.6.0 | 2026-02-12 | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling |
-| 4.5.1 | 2026-02-11 | Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes |
-| 4.5.0 | 2026-02-01 | Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files |
+| 4.9.0 | 2026-02-17 | Constant Contact v3 API engagement metrics integration |
+| 4.8.2 | 2026-02-16 | State field added to member contacts |
+| 4.8.1 | 2026-02-15 | 5 new contact form fields, unified name-based Member IDs |
+| 4.8.0 | 2026-02-15 | Security event alerting, zero-knowledge survey vault |
+| 4.7.0 | 2026-02-14 | 40+ code review fixes, 1090 tests |
+| 4.6.0 | 2026-02-12 | Meeting doc automation, steward agenda sharing, member Drive folders |
+| 4.5.1 | 2026-02-11 | Engagement tracking fixes, 950 tests |
+| 4.5.0 | 2026-02-01 | Security module, Data Access Layer, Member Self-Service |
 | 4.4.1 | 2026-01-31 | Build system |
 | 4.4.0 | 2026-01-30 | Initial release |
