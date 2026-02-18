@@ -1,8 +1,8 @@
 # Strategic Command Center
 
-**Version 4.7.0** | Union Steward Dashboard for Google Sheets
+**Version 4.9.0** | Union Steward Dashboard for Google Sheets
 
-A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 27-file modular architecture.
+A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 30-file modular architecture.
 
 ---
 
@@ -81,7 +81,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    - Click the **+** button next to "Files" to create a new script file
    - Name it to match the source file (without the `.gs` extension)
    - Paste the contents from the corresponding `src/` file
-   - Repeat for all 27 `.gs` files and the `.html` file
+   - Repeat for all 30 `.gs` files and the `.html` file
 
 5. **Run the initial setup:**
    - Select `CREATE_DASHBOARD` from the function dropdown
@@ -121,13 +121,27 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 After installation, configure the system for your organization:
 
 1. Open the **Config** sheet tab
-2. Fill in your organization's data:
-   - Column A: Job Titles
-   - Column B: Office Locations
-   - Column C: Units
-   - Column F: Supervisors
-   - Column G: Managers
-   - Column H: Stewards
+2. Fill in your organization's data (row 2 has headers, values start at row 3):
+
+   | Column | Header | What to Enter |
+   |--------|--------|---------------|
+   | A | Job Titles | One job title per row |
+   | B | Office Locations | One location per row |
+   | C | Units | Bargaining unit names |
+   | D | Office Days | Days of the week (pre-filled Mon-Sun) |
+   | E | Yes/No (Dropdowns) | Pre-filled Yes/No |
+   | F | Supervisors | Supervisor names |
+   | G | Managers | Manager names |
+   | H | Stewards | Steward names |
+   | I | Steward Committees | Committee names |
+   | J | Grievance Status | Pre-filled (Open, Pending Info, Won, etc.) |
+   | K | Grievance Step | Pre-filled (Informal, Step I-III, etc.) |
+   | L | Issue Category | Pre-filled (Discipline, Pay, Safety, etc.) |
+   | M | Articles Violated | Pre-filled (Art. 1-26) |
+   | N | Communication Methods | Pre-filled (Email, Phone, Text, In Person) |
+
+   Columns O+ contain system settings (org name, Drive/Calendar IDs, deadline days, etc.).
+
 3. Run **Admin > System Diagnostics** to verify everything is set up correctly
 
 See [USER_TUTORIALS.md](USER_TUTORIALS.md) for step-by-step walkthroughs.
@@ -142,7 +156,7 @@ When you're ready to move from testing to real data:
 2. Delete `07_DevTools.gs` from your Apps Script project (Extensions > Apps Script > right-click > Delete)
 3. Refresh the sheet -- the Demo menu disappears automatically
 
-After that, you have **26 production files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
+After that, you have **29 production files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
 
 ---
 
@@ -158,9 +172,10 @@ After that, you have **26 production files** and a clean system ready for real m
 ### Member Management
 - Centralized member directory with contact info and job metadata
 - Auto-generated Member IDs (format: M + name initials + 3 digits, e.g., MJASM472)
+- Expanded contact fields: Hire Date, Employee ID, Street Address, City, Zip Code, State
 - Steward assignments and workload tracking
 - Import/export capabilities
-- Self-service portal with PIN authentication
+- Self-service portal with PIN authentication (5 editable fields: Email, Phone, Preferred Contact, Best Time, State)
 
 ### Meeting Management (v4.6.0)
 - Auto-created Google Docs for Meeting Notes and Meeting Agenda
@@ -200,10 +215,35 @@ After that, you have **26 production files** and a clean system ready for real m
 - PII masking for public dashboards (phone numbers, SSNs auto-redacted)
 - Zero-knowledge survey vault: email and member ID stored as SHA-256 hashes only (non-reversible)
 - Survey responses are cryptographically anonymous — no one can link answers to members
+- Security event alerting with threat detection at web app, edit trigger, and self-service entry points
 - Formula injection protection
 - Input sanitization and validation
 - Audit logging of all changes
 - Sabotage detection (mass deletion alerts)
+
+### Event-Driven Architecture (v4.8.0)
+- Decoupled pub/sub event bus replacing direct function calls in trigger handlers
+- Named event channels (e.g., `sheet:edit`, `form:submit`, `sync:complete`)
+- Wildcard listeners and independent module reactions
+
+### Dashboard Enhancements (v4.9.0)
+- Custom date ranges for trend analysis
+- Export individual charts as images
+- Scheduled email reports with selected charts
+- Saved chart configurations (presets)
+- Advanced filtering options
+- Drill-down capabilities with multi-level hierarchy
+
+### Correlation Engine (v4.9.0)
+- Cross-dimensional statistical correlation analysis
+- Curated union-relevant correlation pairs (engagement vs. outcomes, satisfaction vs. grievance rates)
+- Confidence reporting alongside every coefficient
+- Plain-language insight strings for non-statistician users
+
+### Auto-Discovery Columns (v4.9.0)
+- Dynamic column resolution — zero manual updates on sheet restructure
+- All column references use dynamic `CONFIG_COLS` and `MEMBER_COLS` constants
+- Multi-select dropdown editor for Grievance Log with checkbox UI
 
 ### Looker Studio Integration
 - **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
@@ -290,9 +330,11 @@ Deadlines are calculated in business days (excluding weekends):
 |--------|-------|---------|
 | Open | Yellow | Active case |
 | Pending Info | Purple | Waiting on information |
-| Won | Green | Victory |
-| Denied | Red | Loss |
 | Settled | Blue | Negotiated resolution |
+| Withdrawn | Light Gray | Member withdrew the grievance |
+| Denied | Red | Loss |
+| Won | Green | Victory |
+| Appealed | Orange | Escalated to next step |
 | In Arbitration | Red | High stakes |
 | Closed | Gray | Complete |
 
@@ -305,8 +347,8 @@ Deadlines are calculated in business days (excluding weekends):
 | Sheet | Purpose |
 |-------|---------|
 | Config | Dropdown values and organization settings |
-| Member Directory | Union member records (34 columns) |
-| Grievance Log | Grievance tracking (34+ columns) |
+| Member Directory | Union member records (40 columns) |
+| Grievance Log | Grievance tracking (41 columns) |
 | Dashboard | Summary statistics and metrics |
 | Member Satisfaction | Survey response tracking |
 | Getting Started | Setup instructions |
@@ -347,7 +389,7 @@ npm run build          # Build consolidated file (dist/ConsolidatedDashboard.gs)
 npm run build --prod   # Production build (excludes DevTools)
 npm run lint           # ESLint code quality checks
 npm run lint:fix       # Auto-fix ESLint issues
-npm run test:unit      # Run 950+ Jest unit tests
+npm run test:unit      # Run 1300+ Jest unit tests
 npm test               # Full pipeline: lint + build + test
 npm run clean          # Clean dist directory
 npm run deploy         # Deploy to Google Apps Script (requires clasp)
@@ -367,7 +409,7 @@ See the [Developer Guide](DEVELOPER_GUIDE.md) for architecture details, code pat
 
 ## Architecture
 
-The codebase uses a 27-file modular architecture with numbered prefixes that indicate load order and purpose:
+The codebase uses a 30-file modular architecture with numbered prefixes that indicate load order and purpose:
 
 | Prefix | Layer | Files |
 |--------|-------|-------|
@@ -385,13 +427,16 @@ The codebase uses a 27-file modular architecture with numbered prefixes that ind
 | 12 | Features | `12_Features.gs` (Dynamic Engine, Looker) |
 | 13 | Self-Service | `13_MemberSelfService.gs` (PIN auth) |
 | 14 | Meetings | `14_MeetingCheckIn.gs` |
+| 15 | Event Bus | `15_EventBus.gs` (pub/sub event system) |
+| 16 | Enhancements | `16_DashboardEnhancements.gs` (date ranges, chart export, drill-down) |
+| 17 | Analytics | `17_CorrelationEngine.gs` (cross-dimensional correlation) |
 | -- | HTML | `MultiSelectDialog.html` |
 
 ### Design Principles
 
 - **Separation of Concerns**: Each file has one clear purpose
 - **Numbered Prefixes**: Show dependency order for build concatenation
-- **Production Ready**: Delete `07_DevTools.gs` for a 26-file production deployment
+- **Production Ready**: Delete `07_DevTools.gs` for a 29-file production deployment
 - **Failure Isolation**: A bug in Calendar sync won't break the Member Directory
 - **Self-Healing**: Hidden calculation sheets auto-repair their formulas
 - **Performance**: CacheService integration and batch operations handle 5,000+ members
@@ -488,10 +533,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| **4.7.0** | 2026-02-14 | Security hardening, 40+ code review fixes, 1090 tests across 20 suites, deduplicated escapeHtml, lint clean |
-| **4.6.0** | 2026-02-12 | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling |
+| **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 1300+ tests across 21 suites |
+| **4.8.2** | 2026-02-16 | State field added to member contact surfaces |
+| **4.8.1** | 2026-02-15 | 5 new contact form fields, unified name-based Member ID system |
+| **4.8.0** | 2026-02-15 | Security event alerting, zero-knowledge survey vault, event bus architecture |
+| **4.7.0** | 2026-02-14 | Security hardening, 40+ code review fixes, 1090 tests, deduplicated escapeHtml, lint clean |
+| **4.6.0** | 2026-02-12 | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, member Drive folders |
 | **4.5.1** | 2026-02-11 | Engagement tracking fixes, 950 Jest unit tests, critical bug fixes |
-| **4.5.0** | 2026-02-01 | Security module, Data Access Layer, Member Self-Service with PIN auth, consolidated 27-file architecture |
+| **4.5.0** | 2026-02-01 | Security module, Data Access Layer, Member Self-Service with PIN auth |
 | **4.4.1** | 2026-01-31 | Dynamic Engine, Looker Studio integration, Grievance Reminders |
 | **4.4.0** | 2026-01-30 | Grievance tracking, dashboards, satisfaction surveys, calendar integration |
 | **4.3.x** | 2026-01 | Searchable Help Guide, two-dashboard architecture, production polish |
