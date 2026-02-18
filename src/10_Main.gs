@@ -39,6 +39,15 @@ function onOpen() {
     // Create the dashboard menu
     createDashboardMenu();
 
+    // Sync column maps from actual sheet headers so that column constants
+    // (MEMBER_COLS, GRIEVANCE_COLS, CONFIG_COLS, etc.) reflect the real
+    // spreadsheet layout — even if columns were reordered manually.
+    try {
+      syncColumnMaps();
+    } catch (syncError) {
+      console.log('Column sync skipped: ' + syncError.message);
+    }
+
     // Ensure all primary sheets have enough columns for current header maps.
     // This prevents "columns are out of bounds" errors when sheets were
     // created by an older version with fewer columns.

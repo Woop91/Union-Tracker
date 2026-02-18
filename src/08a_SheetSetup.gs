@@ -291,6 +291,10 @@ function setupHiddenSheets(ss) {
  * @returns {void}
  */
 function setupDataValidations() {
+  // Re-sync column maps from actual sheet headers before applying validations.
+  // This guarantees dropdowns land on the correct columns even if the layout changed.
+  try { syncColumnMaps(); } catch (_e) { /* proceed with defaults */ }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);

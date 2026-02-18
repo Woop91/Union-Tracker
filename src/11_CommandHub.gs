@@ -3131,8 +3131,8 @@ function getSecureSatisfactionStats_() {
     var satScores = [];
 
     for (var i = 1; i < data.length; i++) {
-      var trustVal = parseFloat(data[i][7]); // SATISFACTION_COLS.Q7_TRUST_UNION - 1
-      var satVal = parseFloat(data[i][6]);   // SATISFACTION_COLS.Q6_SATISFIED_REP - 1
+      var trustVal = parseFloat(data[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]);
+      var satVal = parseFloat(data[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]);
 
       if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
         trustScores.push(trustVal);

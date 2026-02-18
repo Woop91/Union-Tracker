@@ -1723,6 +1723,14 @@ function syncColumnMaps() {
     for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
   }
 
+  // Rebuild multi-select column config so dropdown dialogs use the
+  // up-to-date column positions after any columns shifted.
+  if (result.synced.length > 0) {
+    var freshMulti = buildMultiSelectCols_();
+    MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
+    MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+  }
+
   if (result.synced.length > 0) {
     Logger.log('syncColumnMaps: Updated ' + result.synced.join(', '));
     if (result.warnings.length > 0) {
@@ -2209,27 +2217,36 @@ function getJobMetadataByMemberCol(memberCol) {
 // ============================================================================
 
 /**
- * Columns that support multiple selections (comma-separated values)
- * Maps column number to config source column for options
+ * Build multi-select column config from current *_COLS values.
+ * Returns fresh references every call so that syncColumnMaps() changes
+ * are reflected without a script reload.
+ * @returns {Object} { MEMBER_DIR: [...], GRIEVANCE_LOG: [...] }
  */
-var MULTI_SELECT_COLS = {
-  // Member Directory multi-select columns
-  MEMBER_DIR: [
-    { col: MEMBER_COLS.OFFICE_DAYS, configCol: CONFIG_COLS.OFFICE_DAYS, label: 'Office Days' },
-    { col: MEMBER_COLS.PREFERRED_COMM, configCol: CONFIG_COLS.COMM_METHODS, label: 'Preferred Communication' },
-    { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
-    { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
-    { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
-  ],
-  // Grievance Log multi-select columns
-  GRIEVANCE_LOG: [
-    { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
-    { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
-  ]
-};
+function buildMultiSelectCols_() {
+  return {
+    MEMBER_DIR: [
+      { col: MEMBER_COLS.OFFICE_DAYS, configCol: CONFIG_COLS.OFFICE_DAYS, label: 'Office Days' },
+      { col: MEMBER_COLS.PREFERRED_COMM, configCol: CONFIG_COLS.COMM_METHODS, label: 'Preferred Communication' },
+      { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
+      { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
+      { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
+    ],
+    GRIEVANCE_LOG: [
+      { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
+      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
+    ]
+  };
+}
 
 /**
- * Check if a column is a multi-select column for the given sheet
+ * Columns that support multiple selections (comma-separated values).
+ * Initialized at load time; refreshed by syncColumnMaps().
+ */
+var MULTI_SELECT_COLS = buildMultiSelectCols_();
+
+/**
+ * Check if a column is a multi-select column for the given sheet.
+ * Reads from the live MULTI_SELECT_COLS object (updated by syncColumnMaps).
  * @param {number} col - Column number (1-indexed)
  * @param {string} sheetName - Sheet name (defaults to Member Directory)
  * @returns {Object|null} Multi-select config if found, null otherwise

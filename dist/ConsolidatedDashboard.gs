@@ -1842,7 +1842,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2883 lines)
+// SOURCE: 01_Core.gs (2900 lines)
 // ============================================================================
 
 /**
@@ -3570,6 +3570,14 @@ function syncColumnMaps() {
     for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
   }
 
+  // Rebuild multi-select column config so dropdown dialogs use the
+  // up-to-date column positions after any columns shifted.
+  if (result.synced.length > 0) {
+    var freshMulti = buildMultiSelectCols_();
+    MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
+    MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+  }
+
   if (result.synced.length > 0) {
     Logger.log('syncColumnMaps: Updated ' + result.synced.join(', '));
     if (result.warnings.length > 0) {
@@ -4056,27 +4064,36 @@ function getJobMetadataByMemberCol(memberCol) {
 // ============================================================================
 
 /**
- * Columns that support multiple selections (comma-separated values)
- * Maps column number to config source column for options
+ * Build multi-select column config from current *_COLS values.
+ * Returns fresh references every call so that syncColumnMaps() changes
+ * are reflected without a script reload.
+ * @returns {Object} { MEMBER_DIR: [...], GRIEVANCE_LOG: [...] }
  */
-var MULTI_SELECT_COLS = {
-  // Member Directory multi-select columns
-  MEMBER_DIR: [
-    { col: MEMBER_COLS.OFFICE_DAYS, configCol: CONFIG_COLS.OFFICE_DAYS, label: 'Office Days' },
-    { col: MEMBER_COLS.PREFERRED_COMM, configCol: CONFIG_COLS.COMM_METHODS, label: 'Preferred Communication' },
-    { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
-    { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
-    { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
-  ],
-  // Grievance Log multi-select columns
-  GRIEVANCE_LOG: [
-    { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
-    { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
-  ]
-};
+function buildMultiSelectCols_() {
+  return {
+    MEMBER_DIR: [
+      { col: MEMBER_COLS.OFFICE_DAYS, configCol: CONFIG_COLS.OFFICE_DAYS, label: 'Office Days' },
+      { col: MEMBER_COLS.PREFERRED_COMM, configCol: CONFIG_COLS.COMM_METHODS, label: 'Preferred Communication' },
+      { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
+      { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
+      { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
+    ],
+    GRIEVANCE_LOG: [
+      { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
+      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
+    ]
+  };
+}
 
 /**
- * Check if a column is a multi-select column for the given sheet
+ * Columns that support multiple selections (comma-separated values).
+ * Initialized at load time; refreshed by syncColumnMaps().
+ */
+var MULTI_SELECT_COLS = buildMultiSelectCols_();
+
+/**
+ * Check if a column is a multi-select column for the given sheet.
+ * Reads from the live MULTI_SELECT_COLS object (updated by syncColumnMaps).
  * @param {number} col - Column number (1-indexed)
  * @param {string} sheetName - Sheet name (defaults to Member Directory)
  * @returns {Object|null} Multi-select config if found, null otherwise
@@ -28188,7 +28205,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (618 lines)
+// SOURCE: 08a_SheetSetup.gs (622 lines)
 // ============================================================================
 
 /**
@@ -28484,6 +28501,10 @@ function setupHiddenSheets(ss) {
  * @returns {void}
  */
 function setupDataValidations() {
+  // Re-sync column maps from actual sheet headers before applying validations.
+  // This guarantees dropdowns land on the correct columns even if the layout changed.
+  try { syncColumnMaps(); } catch (_e) { /* proceed with defaults */ }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
@@ -31690,7 +31711,7 @@ function showSurveyTrackingDialog() {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (2151 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (2153 lines)
 // ============================================================================
 
 // ============================================================================
@@ -32419,15 +32440,17 @@ function setupMemberLookupSheet() {
   var memberIdFormula = '=IFERROR(UNIQUE(FILTER(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + ',\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + '<>"Member ID",\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + '<>"")),"")';
   sheet.getRange('A2').setFormula(memberIdFormula);
 
-  // VLOOKUP formulas for member data
+  // VLOOKUP formulas for member data — indices computed dynamically from
+  // MEMBER_COLS so that column reordering doesn't break lookups.
   var vlookupBase = 'VLOOKUP(A2:A,\'' + SHEETS.MEMBER_DIR + '\'!' + mIdCol + ':' + mStewardCol + ',';
+  var mIdOffset = MEMBER_COLS.MEMBER_ID; // range starts at this column
 
-  sheet.getRange('B2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '2,FALSE),"")))'); // First Name
-  sheet.getRange('C2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '3,FALSE),"")))'); // Last Name
-  sheet.getRange('D2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '8,FALSE),"")))'); // Email
-  sheet.getRange('E2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '6,FALSE),"")))'); // Unit
-  sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '5,FALSE),"")))'); // Location
-  sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '16,FALSE),"")))'); // Steward
+  sheet.getRange('B2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.FIRST_NAME - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('C2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.LAST_NAME - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('D2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.EMAIL - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('E2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.UNIT - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.WORK_LOCATION - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.ASSIGNED_STEWARD - mIdOffset + 1) + ',FALSE),"")))');
 
   // Hide the sheet
   sheet.hideSheet();
@@ -37895,7 +37918,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1780 lines)
+// SOURCE: 10a_SheetCreation.gs (1792 lines)
 // ============================================================================
 
 /**
@@ -39530,7 +39553,13 @@ function createVolunteerHoursSheet(ss) {
   sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
   // Member Name lookup formula (column C) - VLOOKUP from Member Directory
-  var nameLookupFormula = '=IF(B3<>"", IFERROR(VLOOKUP(B3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(B3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  // Use dynamic column letters/indices so column reordering doesn't break lookups.
+  var mIdColLetter = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var mLastColLetter = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var mRange = "'" + SHEETS.MEMBER_DIR + "'!" + mIdColLetter + ":" + mLastColLetter;
+  var fnIdx = MEMBER_COLS.FIRST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var lnIdx = MEMBER_COLS.LAST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var nameLookupFormula = '=IF(B3<>"", IFERROR(VLOOKUP(B3, ' + mRange + ', ' + fnIdx + ', FALSE) & " " & VLOOKUP(B3, ' + mRange + ', ' + lnIdx + ', FALSE), "Not Found"), "")';
   sheet.getRange('C3').setFormula(nameLookupFormula);
   sheet.getRange('C3').copyTo(sheet.getRange('C3:C1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
@@ -39605,7 +39634,13 @@ function createMeetingAttendanceSheet(ss) {
   sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
   // Member Name lookup formula (column F) - VLOOKUP from Member Directory
-  var nameLookupFormula = '=IF(E3<>"", IFERROR(VLOOKUP(E3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(E3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  // Use dynamic column letters/indices so column reordering doesn't break lookups.
+  var mIdColLetter = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var mLastColLetter = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var mRange = "'" + SHEETS.MEMBER_DIR + "'!" + mIdColLetter + ":" + mLastColLetter;
+  var fnIdx = MEMBER_COLS.FIRST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var lnIdx = MEMBER_COLS.LAST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var nameLookupFormula = '=IF(E3<>"", IFERROR(VLOOKUP(E3, ' + mRange + ', ' + fnIdx + ', FALSE) & " " & VLOOKUP(E3, ' + mRange + ', ' + lnIdx + ', FALSE), "Not Found"), "")';
   sheet.getRange('F3').setFormula(nameLookupFormula);
   sheet.getRange('F3').copyTo(sheet.getRange('F3:F1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
@@ -43360,7 +43395,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2213 lines)
+// SOURCE: 10_Main.gs (2222 lines)
 // ============================================================================
 
 /**
@@ -43403,6 +43438,15 @@ function onOpen() {
 
     // Create the dashboard menu
     createDashboardMenu();
+
+    // Sync column maps from actual sheet headers so that column constants
+    // (MEMBER_COLS, GRIEVANCE_COLS, CONFIG_COLS, etc.) reflect the real
+    // spreadsheet layout — even if columns were reordered manually.
+    try {
+      syncColumnMaps();
+    } catch (syncError) {
+      console.log('Column sync skipped: ' + syncError.message);
+    }
 
     // Ensure all primary sheets have enough columns for current header maps.
     // This prevents "columns are out of bounds" errors when sheets were
@@ -48714,8 +48758,8 @@ function getSecureSatisfactionStats_() {
     var satScores = [];
 
     for (var i = 1; i < data.length; i++) {
-      var trustVal = parseFloat(data[i][7]); // SATISFACTION_COLS.Q7_TRUST_UNION - 1
-      var satVal = parseFloat(data[i][6]);   // SATISFACTION_COLS.Q6_SATISFIED_REP - 1
+      var trustVal = parseFloat(data[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]);
+      var satVal = parseFloat(data[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]);
 
       if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
         trustScores.push(trustVal);
