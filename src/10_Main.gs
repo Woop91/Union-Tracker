@@ -777,22 +777,15 @@ function syncDropdownToConfig_(e, sheetName) {
 
   var col = e.range.getColumn();
 
-  // Map sheet columns to their corresponding Config column
+  // Look up the Config column from the central DROPDOWN_MAP (single source of truth).
+  var entries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
+              : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
+              : null;
+  if (!entries) return;
+
   var configCol = null;
-  if (sheetName === SHEETS.MEMBER_DIR) {
-    var memberToConfig = {};
-    memberToConfig[MEMBER_COLS.JOB_TITLE] = CONFIG_COLS.JOB_TITLES;
-    memberToConfig[MEMBER_COLS.WORK_LOCATION] = CONFIG_COLS.OFFICE_LOCATIONS;
-    memberToConfig[MEMBER_COLS.UNIT] = CONFIG_COLS.UNITS;
-    memberToConfig[MEMBER_COLS.SUPERVISOR] = CONFIG_COLS.SUPERVISORS;
-    memberToConfig[MEMBER_COLS.MANAGER] = CONFIG_COLS.MANAGERS;
-    configCol = memberToConfig[col];
-  } else if (sheetName === SHEETS.GRIEVANCE_LOG) {
-    var grievanceToConfig = {};
-    grievanceToConfig[GRIEVANCE_COLS.STATUS] = CONFIG_COLS.GRIEVANCE_STATUS;
-    grievanceToConfig[GRIEVANCE_COLS.CURRENT_STEP] = CONFIG_COLS.GRIEVANCE_STEP;
-    grievanceToConfig[GRIEVANCE_COLS.ISSUE_CATEGORY] = CONFIG_COLS.ISSUE_CATEGORY;
-    configCol = grievanceToConfig[col];
+  for (var d = 0; d < entries.length; d++) {
+    if (entries[d].col === col) { configCol = entries[d].configCol; break; }
   }
 
   if (!configCol) return; // Not a synced dropdown column

@@ -1723,12 +1723,16 @@ function syncColumnMaps() {
     for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
   }
 
-  // Rebuild multi-select column config so dropdown dialogs use the
-  // up-to-date column positions after any columns shifted.
+  // Rebuild derived column configs so dropdown dialogs and bidirectional
+  // sync use the up-to-date column positions after any columns shifted.
   if (result.synced.length > 0) {
     var freshMulti = buildMultiSelectCols_();
     MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
     MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+
+    var freshDD = buildDropdownMap_();
+    DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
+    DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
   }
 
   if (result.synced.length > 0) {
@@ -2265,6 +2269,51 @@ function getMultiSelectConfig(col, sheetName) {
   }
   return null;
 }
+
+// ============================================================================
+// DROPDOWN COLUMN MAP — Single source of truth
+// ============================================================================
+// Both setupDataValidations() and syncDropdownToConfig_() derive their
+// column-to-config mappings from these arrays.  When you add a new dropdown
+// column, add it HERE and everything else follows.
+//
+// Each entry:  { col: <target sheet col>, configCol: <Config sheet col> }
+//   • 'multi' entries use multi-select validation (comma-separated values)
+//   • 'single' entries use normal dropdown validation
+// ============================================================================
+
+/**
+ * Build the single-select dropdown map from current *_COLS values.
+ * Returns fresh references so syncColumnMaps() changes are reflected.
+ * @returns {Object} { MEMBER_DIR: [...], GRIEVANCE_LOG: [...] }
+ */
+function buildDropdownMap_() {
+  return {
+    MEMBER_DIR: [
+      { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
+      { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
+      { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
+      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
+      { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
+      { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.INTEREST_CHAPTER,  configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
+    ],
+    GRIEVANCE_LOG: [
+      { col: GRIEVANCE_COLS.STATUS,         configCol: CONFIG_COLS.GRIEVANCE_STATUS },
+      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP },
+      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY },
+      { col: GRIEVANCE_COLS.ARTICLES,       configCol: CONFIG_COLS.ARTICLES }
+    ]
+  };
+}
+
+/**
+ * Single-select dropdown map.  Initialized at load; refreshed by syncColumnMaps().
+ */
+var DROPDOWN_MAP = buildDropdownMap_();
 
 // ============================================================================
 // ID GENERATION

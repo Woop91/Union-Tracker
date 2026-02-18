@@ -305,30 +305,29 @@ function setupDataValidations() {
     return;
   }
 
-  // Member Directory Validations - Single-select dropdowns
-  setDropdownValidation(memberSheet, MEMBER_COLS.JOB_TITLE, configSheet, CONFIG_COLS.JOB_TITLES);
-  setDropdownValidation(memberSheet, MEMBER_COLS.WORK_LOCATION, configSheet, CONFIG_COLS.OFFICE_LOCATIONS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.UNIT, configSheet, CONFIG_COLS.UNITS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.IS_STEWARD, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.SUPERVISOR, configSheet, CONFIG_COLS.SUPERVISORS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.MANAGER, configSheet, CONFIG_COLS.MANAGERS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_LOCAL, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_CHAPTER, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_ALLIED, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.CONTACT_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
+  // Member Directory Validations — driven by DROPDOWN_MAP (single-select)
+  var memberDD = DROPDOWN_MAP.MEMBER_DIR;
+  for (var m = 0; m < memberDD.length; m++) {
+    setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
+  }
 
-  // Member Directory Validations - Multi-select dropdowns
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.OFFICE_DAYS, configSheet, CONFIG_COLS.OFFICE_DAYS);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.PREFERRED_COMM, configSheet, CONFIG_COLS.COMM_METHODS);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.BEST_TIME, configSheet, CONFIG_COLS.BEST_TIMES);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.COMMITTEES, configSheet, CONFIG_COLS.STEWARD_COMMITTEES);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.ASSIGNED_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
+  // Member Directory Validations — driven by MULTI_SELECT_COLS
+  var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
+  for (var mm = 0; mm < memberMS.length; mm++) {
+    setMultiSelectValidation(memberSheet, memberMS[mm].col, configSheet, memberMS[mm].configCol);
+  }
 
-  // Grievance Log Validations
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.STATUS, configSheet, CONFIG_COLS.GRIEVANCE_STATUS);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.CURRENT_STEP, configSheet, CONFIG_COLS.GRIEVANCE_STEP);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.ISSUE_CATEGORY, configSheet, CONFIG_COLS.ISSUE_CATEGORY);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.ARTICLES, configSheet, CONFIG_COLS.ARTICLES);
+  // Grievance Log Validations — driven by DROPDOWN_MAP (single-select)
+  var grievDD = DROPDOWN_MAP.GRIEVANCE_LOG;
+  for (var g = 0; g < grievDD.length; g++) {
+    setDropdownValidation(grievanceSheet, grievDD[g].col, configSheet, grievDD[g].configCol);
+  }
+
+  // Grievance Log Validations — driven by MULTI_SELECT_COLS
+  var grievMS = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+  for (var gm = 0; gm < grievMS.length; gm++) {
+    setMultiSelectValidation(grievanceSheet, grievMS[gm].col, configSheet, grievMS[gm].configCol);
+  }
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Data validations applied successfully!', '✅ Success', 3);
 }

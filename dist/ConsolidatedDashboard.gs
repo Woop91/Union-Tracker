@@ -1842,7 +1842,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2900 lines)
+// SOURCE: 01_Core.gs (2949 lines)
 // ============================================================================
 
 /**
@@ -3570,12 +3570,16 @@ function syncColumnMaps() {
     for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
   }
 
-  // Rebuild multi-select column config so dropdown dialogs use the
-  // up-to-date column positions after any columns shifted.
+  // Rebuild derived column configs so dropdown dialogs and bidirectional
+  // sync use the up-to-date column positions after any columns shifted.
   if (result.synced.length > 0) {
     var freshMulti = buildMultiSelectCols_();
     MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
     MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+
+    var freshDD = buildDropdownMap_();
+    DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
+    DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
   }
 
   if (result.synced.length > 0) {
@@ -4112,6 +4116,51 @@ function getMultiSelectConfig(col, sheetName) {
   }
   return null;
 }
+
+// ============================================================================
+// DROPDOWN COLUMN MAP — Single source of truth
+// ============================================================================
+// Both setupDataValidations() and syncDropdownToConfig_() derive their
+// column-to-config mappings from these arrays.  When you add a new dropdown
+// column, add it HERE and everything else follows.
+//
+// Each entry:  { col: <target sheet col>, configCol: <Config sheet col> }
+//   • 'multi' entries use multi-select validation (comma-separated values)
+//   • 'single' entries use normal dropdown validation
+// ============================================================================
+
+/**
+ * Build the single-select dropdown map from current *_COLS values.
+ * Returns fresh references so syncColumnMaps() changes are reflected.
+ * @returns {Object} { MEMBER_DIR: [...], GRIEVANCE_LOG: [...] }
+ */
+function buildDropdownMap_() {
+  return {
+    MEMBER_DIR: [
+      { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
+      { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
+      { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
+      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
+      { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
+      { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.INTEREST_CHAPTER,  configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
+    ],
+    GRIEVANCE_LOG: [
+      { col: GRIEVANCE_COLS.STATUS,         configCol: CONFIG_COLS.GRIEVANCE_STATUS },
+      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP },
+      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY },
+      { col: GRIEVANCE_COLS.ARTICLES,       configCol: CONFIG_COLS.ARTICLES }
+    ]
+  };
+}
+
+/**
+ * Single-select dropdown map.  Initialized at load; refreshed by syncColumnMaps().
+ */
+var DROPDOWN_MAP = buildDropdownMap_();
 
 // ============================================================================
 // ID GENERATION
@@ -28205,7 +28254,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (622 lines)
+// SOURCE: 08a_SheetSetup.gs (621 lines)
 // ============================================================================
 
 /**
@@ -28515,30 +28564,29 @@ function setupDataValidations() {
     return;
   }
 
-  // Member Directory Validations - Single-select dropdowns
-  setDropdownValidation(memberSheet, MEMBER_COLS.JOB_TITLE, configSheet, CONFIG_COLS.JOB_TITLES);
-  setDropdownValidation(memberSheet, MEMBER_COLS.WORK_LOCATION, configSheet, CONFIG_COLS.OFFICE_LOCATIONS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.UNIT, configSheet, CONFIG_COLS.UNITS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.IS_STEWARD, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.SUPERVISOR, configSheet, CONFIG_COLS.SUPERVISORS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.MANAGER, configSheet, CONFIG_COLS.MANAGERS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_LOCAL, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_CHAPTER, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_ALLIED, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.CONTACT_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
+  // Member Directory Validations — driven by DROPDOWN_MAP (single-select)
+  var memberDD = DROPDOWN_MAP.MEMBER_DIR;
+  for (var m = 0; m < memberDD.length; m++) {
+    setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
+  }
 
-  // Member Directory Validations - Multi-select dropdowns
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.OFFICE_DAYS, configSheet, CONFIG_COLS.OFFICE_DAYS);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.PREFERRED_COMM, configSheet, CONFIG_COLS.COMM_METHODS);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.BEST_TIME, configSheet, CONFIG_COLS.BEST_TIMES);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.COMMITTEES, configSheet, CONFIG_COLS.STEWARD_COMMITTEES);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.ASSIGNED_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
+  // Member Directory Validations — driven by MULTI_SELECT_COLS
+  var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
+  for (var mm = 0; mm < memberMS.length; mm++) {
+    setMultiSelectValidation(memberSheet, memberMS[mm].col, configSheet, memberMS[mm].configCol);
+  }
 
-  // Grievance Log Validations
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.STATUS, configSheet, CONFIG_COLS.GRIEVANCE_STATUS);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.CURRENT_STEP, configSheet, CONFIG_COLS.GRIEVANCE_STEP);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.ISSUE_CATEGORY, configSheet, CONFIG_COLS.ISSUE_CATEGORY);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.ARTICLES, configSheet, CONFIG_COLS.ARTICLES);
+  // Grievance Log Validations — driven by DROPDOWN_MAP (single-select)
+  var grievDD = DROPDOWN_MAP.GRIEVANCE_LOG;
+  for (var g = 0; g < grievDD.length; g++) {
+    setDropdownValidation(grievanceSheet, grievDD[g].col, configSheet, grievDD[g].configCol);
+  }
+
+  // Grievance Log Validations — driven by MULTI_SELECT_COLS
+  var grievMS = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+  for (var gm = 0; gm < grievMS.length; gm++) {
+    setMultiSelectValidation(grievanceSheet, grievMS[gm].col, configSheet, grievMS[gm].configCol);
+  }
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Data validations applied successfully!', '✅ Success', 3);
 }
@@ -43395,7 +43443,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2222 lines)
+// SOURCE: 10_Main.gs (2215 lines)
 // ============================================================================
 
 /**
@@ -44177,22 +44225,15 @@ function syncDropdownToConfig_(e, sheetName) {
 
   var col = e.range.getColumn();
 
-  // Map sheet columns to their corresponding Config column
+  // Look up the Config column from the central DROPDOWN_MAP (single source of truth).
+  var entries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
+              : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
+              : null;
+  if (!entries) return;
+
   var configCol = null;
-  if (sheetName === SHEETS.MEMBER_DIR) {
-    var memberToConfig = {};
-    memberToConfig[MEMBER_COLS.JOB_TITLE] = CONFIG_COLS.JOB_TITLES;
-    memberToConfig[MEMBER_COLS.WORK_LOCATION] = CONFIG_COLS.OFFICE_LOCATIONS;
-    memberToConfig[MEMBER_COLS.UNIT] = CONFIG_COLS.UNITS;
-    memberToConfig[MEMBER_COLS.SUPERVISOR] = CONFIG_COLS.SUPERVISORS;
-    memberToConfig[MEMBER_COLS.MANAGER] = CONFIG_COLS.MANAGERS;
-    configCol = memberToConfig[col];
-  } else if (sheetName === SHEETS.GRIEVANCE_LOG) {
-    var grievanceToConfig = {};
-    grievanceToConfig[GRIEVANCE_COLS.STATUS] = CONFIG_COLS.GRIEVANCE_STATUS;
-    grievanceToConfig[GRIEVANCE_COLS.CURRENT_STEP] = CONFIG_COLS.GRIEVANCE_STEP;
-    grievanceToConfig[GRIEVANCE_COLS.ISSUE_CATEGORY] = CONFIG_COLS.ISSUE_CATEGORY;
-    configCol = grievanceToConfig[col];
+  for (var d = 0; d < entries.length; d++) {
+    if (entries[d].col === col) { configCol = entries[d].configCol; break; }
   }
 
   if (!configCol) return; // Not a synced dropdown column
