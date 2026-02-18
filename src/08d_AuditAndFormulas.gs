@@ -1888,9 +1888,6 @@ function computeHmacSha256_(key, message) {
   // Inner hash: H(ipadKey || message)
   var innerHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
     ipadKey + message, Utilities.Charset.UTF_8);
-  var innerHex = innerHash.map(function(b) {
-    return ('0' + (b & 0xFF).toString(16)).slice(-2);
-  }).join('');
 
   // Outer hash: H(opadKey || innerHash)
   // Convert innerHash bytes back to a string for the outer digest

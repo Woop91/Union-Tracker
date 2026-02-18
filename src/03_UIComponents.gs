@@ -962,7 +962,7 @@ function getCurrentTheme() {
   if (!stored) return 'default';
   try {
     return JSON.parse(stored);
-  } catch(e) {
+  } catch(_e) {
     return stored;
   }
 }

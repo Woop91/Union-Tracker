@@ -3505,7 +3505,7 @@ function resolveColumnsFromSheet_(sheetName, headerMap, options) {
     }
 
     return cols;
-  } catch (e) {
+  } catch (_e) {
     return null;
   }
 }
@@ -8501,7 +8501,7 @@ function getCurrentTheme() {
   if (!stored) return 'default';
   try {
     return JSON.parse(stored);
-  } catch(e) {
+  } catch(_e) {
     return stored;
   }
 }
@@ -19764,7 +19764,7 @@ function doGet(e) {
             return buildMemberPortal(dashLinkedId);
           }
         }
-      } catch (dashGoogleErr) {
+      } catch (_dashGoogleErr) {
         // Google auth not available - fall through to PIN login
       }
 
@@ -19824,7 +19824,7 @@ function doGet(e) {
             return buildMemberPortal(linkedMemberId);
           }
         }
-      } catch (googleAuthErr) {
+      } catch (_googleAuthErr) {
         // Google auth not available - fall through to PIN login
       }
       // No linked Google account found - show PIN login form
@@ -31644,7 +31644,7 @@ function showSurveyTrackingDialog() {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (2154 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (2151 lines)
 // ============================================================================
 
 // ============================================================================
@@ -33537,9 +33537,6 @@ function computeHmacSha256_(key, message) {
   // Inner hash: H(ipadKey || message)
   var innerHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
     ipadKey + message, Utilities.Charset.UTF_8);
-  var innerHex = innerHash.map(function(b) {
-    return ('0' + (b & 0xFF).toString(16)).slice(-2);
-  }).join('');
 
   // Outer hash: H(opadKey || innerHash)
   // Convert innerHash bytes back to a string for the outer digest
@@ -38444,7 +38441,7 @@ function createMemberDirectory(ss) {
     // Clear any existing column groups first to prevent duplicates on re-run
     memberGroupRanges.forEach(function(range) {
       for (var d = 0; d < 8; d++) {
-        try { range.shiftColumnGroupDepth(-1); } catch(e) { break; }
+        try { range.shiftColumnGroupDepth(-1); } catch(_e) { break; }
       }
     });
 
@@ -38662,7 +38659,7 @@ function createGrievanceLog(ss) {
     // Clear any existing column groups first to prevent duplicates on re-run
     grievanceGroupRanges.forEach(function(range) {
       for (var d = 0; d < 8; d++) {
-        try { range.shiftColumnGroupDepth(-1); } catch(e) { break; }
+        try { range.shiftColumnGroupDepth(-1); } catch(_e) { break; }
       }
     });
 
