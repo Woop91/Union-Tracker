@@ -121,13 +121,27 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 After installation, configure the system for your organization:
 
 1. Open the **Config** sheet tab
-2. Fill in your organization's data:
-   - Column A: Job Titles
-   - Column B: Office Locations
-   - Column C: Units
-   - Column F: Supervisors
-   - Column G: Managers
-   - Column H: Stewards
+2. Fill in your organization's data (row 2 has headers, values start at row 3):
+
+   | Column | Header | What to Enter |
+   |--------|--------|---------------|
+   | A | Job Titles | One job title per row |
+   | B | Office Locations | One location per row |
+   | C | Units | Bargaining unit names |
+   | D | Office Days | Days of the week (pre-filled Mon-Sun) |
+   | E | Yes/No (Dropdowns) | Pre-filled Yes/No |
+   | F | Supervisors | Supervisor names |
+   | G | Managers | Manager names |
+   | H | Stewards | Steward names |
+   | I | Steward Committees | Committee names |
+   | J | Grievance Status | Pre-filled (Open, Pending Info, Won, etc.) |
+   | K | Grievance Step | Pre-filled (Informal, Step I-III, etc.) |
+   | L | Issue Category | Pre-filled (Discipline, Pay, Safety, etc.) |
+   | M | Articles Violated | Pre-filled (Art. 1-26) |
+   | N | Communication Methods | Pre-filled (Email, Phone, Text, In Person) |
+
+   Columns O+ contain system settings (org name, Drive/Calendar IDs, deadline days, etc.).
+
 3. Run **Admin > System Diagnostics** to verify everything is set up correctly
 
 See [USER_TUTORIALS.md](USER_TUTORIALS.md) for step-by-step walkthroughs.
@@ -316,9 +330,11 @@ Deadlines are calculated in business days (excluding weekends):
 |--------|-------|---------|
 | Open | Yellow | Active case |
 | Pending Info | Purple | Waiting on information |
-| Won | Green | Victory |
-| Denied | Red | Loss |
 | Settled | Blue | Negotiated resolution |
+| Withdrawn | Light Gray | Member withdrew the grievance |
+| Denied | Red | Loss |
+| Won | Green | Victory |
+| Appealed | Orange | Escalated to next step |
 | In Arbitration | Red | High stakes |
 | Closed | Gray | Complete |
 
@@ -331,8 +347,8 @@ Deadlines are calculated in business days (excluding weekends):
 | Sheet | Purpose |
 |-------|---------|
 | Config | Dropdown values and organization settings |
-| Member Directory | Union member records (34 columns) |
-| Grievance Log | Grievance tracking (34+ columns) |
+| Member Directory | Union member records (40 columns) |
+| Grievance Log | Grievance tracking (41 columns) |
 | Dashboard | Summary statistics and metrics |
 | Member Satisfaction | Survey response tracking |
 | Getting Started | Setup instructions |
