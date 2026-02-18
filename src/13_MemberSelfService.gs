@@ -708,6 +708,8 @@ function generateMemberPINForSteward(memberId) {
     return errorResponse('Member directory not found');
   }
 
+  ensureMinimumColumns(sheet, getMemberHeaders().length);
+
   var data = sheet.getDataRange().getValues();
   var memberRow = -1;
   var memberName = '';

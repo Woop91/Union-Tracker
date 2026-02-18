@@ -139,6 +139,7 @@ function createMockSheet(name, data) {
     deleteRow: jest.fn(),
     deleteRows: jest.fn(),
     deleteColumns: jest.fn(),
+    insertColumnsAfter: jest.fn(),
     hideSheet: jest.fn(),
     showSheet: jest.fn(),
     setFrozenRows: jest.fn(),

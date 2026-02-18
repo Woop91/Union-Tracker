@@ -1734,6 +1734,47 @@ function syncColumnMaps() {
 }
 
 // ============================================================================
+// SHEET COLUMN GUARD
+// ============================================================================
+
+/**
+ * Ensure a sheet has at least the minimum required columns.
+ * Moved here (from 07_DevTools) so it is available to every source file
+ * regardless of load order.
+ */
+function ensureMinimumColumns(sheet, requiredColumns) {
+  var currentColumns = sheet.getMaxColumns();
+  if (currentColumns < requiredColumns) {
+    var columnsToAdd = requiredColumns - currentColumns;
+    sheet.insertColumnsAfter(currentColumns, columnsToAdd);
+    Logger.log('Added ' + columnsToAdd + ' columns to ' + sheet.getName() + ' (now has ' + requiredColumns + ' columns)');
+  }
+}
+
+/**
+ * Ensures the three primary sheets (Member Directory, Grievance Log, Config)
+ * have enough columns for all defined headers. Call from onOpen() or before
+ * any operation that accesses high column numbers.
+ *
+ * Safe to call multiple times — ensureMinimumColumns is a no-op when the
+ * sheet already has sufficient columns.
+ */
+function ensureAllSheetColumns_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var checks = [
+    { name: SHEETS.MEMBER_DIR,    count: getMemberHeaders().length },
+    { name: SHEETS.GRIEVANCE_LOG, count: getGrievanceHeaders().length },
+    { name: SHEETS.CONFIG,        count: getHeadersFromMap_(CONFIG_HEADER_MAP_).length }
+  ];
+  for (var i = 0; i < checks.length; i++) {
+    var sheet = ss.getSheetByName(checks[i].name);
+    if (sheet) {
+      ensureMinimumColumns(sheet, checks[i].count);
+    }
+  }
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 

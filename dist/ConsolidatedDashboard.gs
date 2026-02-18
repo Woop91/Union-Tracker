@@ -1842,7 +1842,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2842 lines)
+// SOURCE: 01_Core.gs (2883 lines)
 // ============================================================================
 
 /**
@@ -3581,6 +3581,47 @@ function syncColumnMaps() {
 }
 
 // ============================================================================
+// SHEET COLUMN GUARD
+// ============================================================================
+
+/**
+ * Ensure a sheet has at least the minimum required columns.
+ * Moved here (from 07_DevTools) so it is available to every source file
+ * regardless of load order.
+ */
+function ensureMinimumColumns(sheet, requiredColumns) {
+  var currentColumns = sheet.getMaxColumns();
+  if (currentColumns < requiredColumns) {
+    var columnsToAdd = requiredColumns - currentColumns;
+    sheet.insertColumnsAfter(currentColumns, columnsToAdd);
+    Logger.log('Added ' + columnsToAdd + ' columns to ' + sheet.getName() + ' (now has ' + requiredColumns + ' columns)');
+  }
+}
+
+/**
+ * Ensures the three primary sheets (Member Directory, Grievance Log, Config)
+ * have enough columns for all defined headers. Call from onOpen() or before
+ * any operation that accesses high column numbers.
+ *
+ * Safe to call multiple times — ensureMinimumColumns is a no-op when the
+ * sheet already has sufficient columns.
+ */
+function ensureAllSheetColumns_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var checks = [
+    { name: SHEETS.MEMBER_DIR,    count: getMemberHeaders().length },
+    { name: SHEETS.GRIEVANCE_LOG, count: getGrievanceHeaders().length },
+    { name: SHEETS.CONFIG,        count: getHeadersFromMap_(CONFIG_HEADER_MAP_).length }
+  ];
+  for (var i = 0; i < checks.length; i++) {
+    var sheet = ss.getSheetByName(checks[i].name);
+    if (sheet) {
+      ensureMinimumColumns(sheet, checks[i].count);
+    }
+  }
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
@@ -4689,7 +4730,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2840 lines)
+// SOURCE: 02_DataManagers.gs (2843 lines)
 // ============================================================================
 
 /**
@@ -6335,6 +6376,7 @@ function handleGrievanceDialogSubmit(formData) {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
       if (grievanceSheet && GRIEVANCE_COLS.ACTION_TYPE) {
+        ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
         // Find the row with this grievance ID
         const lastRow = grievanceSheet.getLastRow();
         const grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
@@ -6748,6 +6790,7 @@ function recalcAllGrievancesBatched() {
 function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
   const data = sheet.getDataRange().getValues();
 
   let updatedCount = 0;
@@ -7008,6 +7051,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    ensureMinimumColumns(sheet, getGrievanceHeaders().length);
     const data = sheet.getDataRange().getValues();
 
     let rowIndex = -1;
@@ -12261,7 +12305,7 @@ function getSmartDashboardHtml() {
 
 
 // ============================================================================
-// SOURCE: 04c_InteractiveDashboard.gs (1804 lines)
+// SOURCE: 04c_InteractiveDashboard.gs (1807 lines)
 // ============================================================================
 
 // ============================================================================
@@ -13424,6 +13468,7 @@ function getInteractiveMemberData() {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!sheet || sheet.getLastRow() <= 1) return [];
 
+  ensureMinimumColumns(sheet, getMemberHeaders().length);
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, MEMBER_COLS.QUICK_ACTIONS).getValues();
   return data.map(function(row) {
     var memberId = row[MEMBER_COLS.MEMBER_ID - 1] || '';
@@ -13460,6 +13505,7 @@ function getInteractiveGrievanceData() {
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet || sheet.getLastRow() <= 1) return [];
 
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.QUICK_ACTIONS).getValues();
   var tz = Session.getScriptTimeZone();
 
@@ -13505,6 +13551,7 @@ function getMyStewardCases() {
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet || sheet.getLastRow() <= 1) return [];
 
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.QUICK_ACTIONS).getValues();
   var tz = Session.getScriptTimeZone();
 
@@ -18022,7 +18069,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3641 lines)
+// SOURCE: 05_Integrations.gs (3650 lines)
 // ============================================================================
 
 /**
@@ -18246,6 +18293,9 @@ function setupFolderForSelectedGrievance() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getActiveSheet();
 
+  // Ensure sheet has enough columns for Drive folder columns
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   var range = ss.getActiveRange();
   var row = range.getRow();
 
@@ -18311,6 +18361,8 @@ function batchCreateAllMissingFolders() {
     ui.alert('Error', 'Grievance Log not found.', ui.ButtonSet.OK);
     return;
   }
+
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
 
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) {
@@ -20711,6 +20763,8 @@ function getWebAppGrievanceList() {
       return [];
     }
 
+    ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
     var lastRow = sheet.getLastRow();
     if (lastRow <= 1) {
       Logger.log('getWebAppGrievanceList: No data rows in sheet');
@@ -20775,6 +20829,8 @@ function getWebAppMemberList() {
       Logger.log('getWebAppMemberList: Member Directory sheet not found');
       return [];
     }
+
+    ensureMinimumColumns(sheet, getMemberHeaders().length);
 
     var lastRow = sheet.getLastRow();
     if (lastRow <= 1) {
@@ -25186,7 +25242,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2951 lines)
+// SOURCE: 07_DevTools.gs (2941 lines)
 // ============================================================================
 
 /**
@@ -26329,17 +26385,7 @@ function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, locati
   return row;
 }
 
-/**
- * Ensure a sheet has at least the minimum required columns
- */
-function ensureMinimumColumns(sheet, requiredColumns) {
-  var currentColumns = sheet.getMaxColumns();
-  if (currentColumns < requiredColumns) {
-    var columnsToAdd = requiredColumns - currentColumns;
-    sheet.insertColumnsAfter(currentColumns, columnsToAdd);
-    Logger.log('Added ' + columnsToAdd + ' columns to ' + sheet.getName() + ' (now has ' + requiredColumns + ' columns)');
-  }
-}
+// ensureMinimumColumns has been moved to 01_Core.gs for load-order safety.
 
 /**
  * Seed N grievances
@@ -40306,7 +40352,7 @@ function populateRoadmapItems(sheet) {
     [timestamp, 'System', 'Integration', 'Feature Request', 'Medium',
      'Constant Contact / CRM Sync',
      'Read-only engagement metrics sync from Constant Contact v3 API. Pulls email open rates and last activity dates into Member Directory (OPEN_RATE, RECENT_CONTACT_DATE columns). Requires Constant Contact API key and OAuth setup. See Admin > Data Sync > CC menu.',
-     'Implemented', '', '', 'External API: Constant Contact v3 API'],
+     'Resolved', '', '', 'External API: Constant Contact v3 API'],
     // Row 3
     [timestamp, 'System', 'Integration', 'Feature Request', 'Low',
      'OCR Form Transcription (Cloud Vision)',
@@ -43307,7 +43353,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2204 lines)
+// SOURCE: 10_Main.gs (2213 lines)
 // ============================================================================
 
 /**
@@ -43350,6 +43396,15 @@ function onOpen() {
 
     // Create the dashboard menu
     createDashboardMenu();
+
+    // Ensure all primary sheets have enough columns for current header maps.
+    // This prevents "columns are out of bounds" errors when sheets were
+    // created by an older version with fewer columns.
+    try {
+      ensureAllSheetColumns_();
+    } catch (colError) {
+      console.log('Column check skipped: ' + colError.message);
+    }
 
     // Apply tab colors automatically on open
     try {
@@ -45516,7 +45571,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3657 lines)
+// SOURCE: 11_CommandHub.gs (3659 lines)
 // ============================================================================
 
 /**
@@ -48389,6 +48444,8 @@ function searchPrecedentsData(query, outcomeFilter) {
     return [];
   }
 
+  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+
   var lastRow = sheet.getLastRow();
   var data = sheet.getRange(2, 1, lastRow - 1, GRIEVANCE_COLS.QUICK_ACTIONS).getValues();
 
@@ -49178,7 +49235,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4015 lines)
+// SOURCE: 12_Features.gs (4024 lines)
 // ============================================================================
 
 /**
@@ -49518,6 +49575,9 @@ function updateChecklistProgress(caseId) {
   if (!grievanceSheet) {
     return;
   }
+
+  // Ensure sheet has enough columns for CHECKLIST_PROGRESS
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   var lastRow = grievanceSheet.getLastRow();
   if (lastRow < 2) {
@@ -49868,6 +49928,8 @@ function createChecklistsForExistingCases() {
   if (!grievanceSheet) {
     return errorResponse('Grievance Log not found');
   }
+
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   var lastRow = grievanceSheet.getLastRow();
   if (lastRow < 2) {
@@ -50233,6 +50295,8 @@ function setupActionTypeColumn() {
     return errorResponse('Grievance Log not found');
   }
 
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
+
   // Check if Action Type header exists
   var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues()[0];
   var actionTypeCol = headers.indexOf('Action Type') + 1;
@@ -50534,6 +50598,8 @@ function syncChecklistCalcToGrievanceLog() {
     Logger.log('Grievance Log not found');
     return errorResponse('Grievance Log not found');
   }
+
+  ensureMinimumColumns(grievanceSheet, getGrievanceHeaders().length);
 
   var grievanceLastRow = grievanceSheet.getLastRow();
   if (grievanceLastRow < 2) {
@@ -53198,7 +53264,7 @@ function getLookerStatus() {
 
 
 // ============================================================================
-// SOURCE: 13_MemberSelfService.gs (1745 lines)
+// SOURCE: 13_MemberSelfService.gs (1747 lines)
 // ============================================================================
 
 /**
@@ -53910,6 +53976,8 @@ function generateMemberPINForSteward(memberId) {
   if (!sheet) {
     return errorResponse('Member directory not found');
   }
+
+  ensureMinimumColumns(sheet, getMemberHeaders().length);
 
   var data = sheet.getDataRange().getValues();
   var memberRow = -1;
