@@ -1723,6 +1723,18 @@ function syncColumnMaps() {
     for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
   }
 
+  // Rebuild derived column configs so dropdown dialogs and bidirectional
+  // sync use the up-to-date column positions after any columns shifted.
+  if (result.synced.length > 0) {
+    var freshMulti = buildMultiSelectCols_();
+    MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
+    MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+
+    var freshDD = buildDropdownMap_();
+    DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
+    DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+  }
+
   if (result.synced.length > 0) {
     Logger.log('syncColumnMaps: Updated ' + result.synced.join(', '));
     if (result.warnings.length > 0) {
@@ -1730,7 +1742,116 @@ function syncColumnMaps() {
     }
   }
 
+  // Persist resolved positions so other execution contexts (onEdit, etc.)
+  // pick them up without re-reading sheet headers every time.
+  persistColumnMaps_();
+
   return result;
+}
+
+// ============================================================================
+// COLUMN MAP PERSISTENCE
+// ============================================================================
+// In Google Apps Script, each trigger execution (onEdit, onOpen, menu click)
+// starts a brand-new V8 isolate.  Global column constants re-initialize to
+// their default (array-order) positions.  If a user manually reordered
+// columns, onEdit would silently use wrong positions until the next onOpen.
+//
+// Solution: syncColumnMaps() persists resolved positions to CacheService
+// (6-hour TTL).  loadCachedColumnMaps_() restores them cheaply in onEdit.
+// ============================================================================
+
+/** Cache key for persisted column maps */
+var COL_MAPS_CACHE_KEY_ = 'RESOLVED_COL_MAPS';
+
+/**
+ * Persist current column constant values to CacheService.
+ * Called at the end of syncColumnMaps().
+ * @private
+ */
+function persistColumnMaps_() {
+  try {
+    var data = {
+      MEMBER_COLS: MEMBER_COLS,
+      GRIEVANCE_COLS: GRIEVANCE_COLS,
+      CONFIG_COLS: CONFIG_COLS,
+      MEETING_CHECKIN_COLS: MEETING_CHECKIN_COLS,
+      AUDIT_LOG_COLS: AUDIT_LOG_COLS,
+      SURVEY_VAULT_COLS: SURVEY_VAULT_COLS,
+      SURVEY_TRACKING_COLS: SURVEY_TRACKING_COLS,
+      STEWARD_PERF_COLS: STEWARD_PERF_COLS,
+      FEEDBACK_COLS: FEEDBACK_COLS,
+      CHECKLIST_COLS: CHECKLIST_COLS
+    };
+    CacheService.getScriptCache().put(COL_MAPS_CACHE_KEY_, JSON.stringify(data), 21600); // 6 hours
+  } catch (_e) {
+    // CacheService unavailable — degrade silently; defaults are still valid
+    // for sheets created by this code.
+  }
+}
+
+/**
+ * Load persisted column positions from CacheService and apply to globals.
+ * Returns true if cache was found and applied, false otherwise.
+ * Call at the top of onEdit() to cheaply pick up any positions that
+ * syncColumnMaps() resolved in a prior execution.
+ * @returns {boolean} Whether cached positions were applied
+ * @private
+ */
+function loadCachedColumnMaps_() {
+  try {
+    var json = CacheService.getScriptCache().get(COL_MAPS_CACHE_KEY_);
+    if (!json) return false;
+    var data = JSON.parse(json);
+
+    // Apply to primary column constants
+    var targets = {
+      MEMBER_COLS: MEMBER_COLS,
+      GRIEVANCE_COLS: GRIEVANCE_COLS,
+      CONFIG_COLS: CONFIG_COLS,
+      MEETING_CHECKIN_COLS: MEETING_CHECKIN_COLS,
+      AUDIT_LOG_COLS: AUDIT_LOG_COLS,
+      SURVEY_VAULT_COLS: SURVEY_VAULT_COLS,
+      SURVEY_TRACKING_COLS: SURVEY_TRACKING_COLS,
+      STEWARD_PERF_COLS: STEWARD_PERF_COLS,
+      FEEDBACK_COLS: FEEDBACK_COLS,
+      CHECKLIST_COLS: CHECKLIST_COLS
+    };
+
+    var changed = false;
+    for (var name in targets) {
+      if (data[name]) {
+        for (var key in data[name]) {
+          if (data[name].hasOwnProperty(key) && targets[name].hasOwnProperty(key)
+              && targets[name][key] !== data[name][key]) {
+            targets[name][key] = data[name][key];
+            changed = true;
+          }
+        }
+      }
+    }
+
+    // Rebuild derived objects (legacy compat, dropdown map, multi-select)
+    // only if something actually changed.
+    if (changed) {
+      var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
+      for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
+      var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
+      for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
+
+      var freshMulti = buildMultiSelectCols_();
+      MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
+      MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+
+      var freshDD = buildDropdownMap_();
+      DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
+      DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+    }
+
+    return true;
+  } catch (_e) {
+    return false; // Cache unavailable — use defaults
+  }
 }
 
 // ============================================================================
@@ -2209,27 +2330,36 @@ function getJobMetadataByMemberCol(memberCol) {
 // ============================================================================
 
 /**
- * Columns that support multiple selections (comma-separated values)
- * Maps column number to config source column for options
+ * Build multi-select column config from current *_COLS values.
+ * Returns fresh references every call so that syncColumnMaps() changes
+ * are reflected without a script reload.
+ * @returns {Object} { MEMBER_DIR: [...], GRIEVANCE_LOG: [...] }
  */
-var MULTI_SELECT_COLS = {
-  // Member Directory multi-select columns
-  MEMBER_DIR: [
-    { col: MEMBER_COLS.OFFICE_DAYS, configCol: CONFIG_COLS.OFFICE_DAYS, label: 'Office Days' },
-    { col: MEMBER_COLS.PREFERRED_COMM, configCol: CONFIG_COLS.COMM_METHODS, label: 'Preferred Communication' },
-    { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
-    { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
-    { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
-  ],
-  // Grievance Log multi-select columns
-  GRIEVANCE_LOG: [
-    { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
-    { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
-  ]
-};
+function buildMultiSelectCols_() {
+  return {
+    MEMBER_DIR: [
+      { col: MEMBER_COLS.OFFICE_DAYS, configCol: CONFIG_COLS.OFFICE_DAYS, label: 'Office Days' },
+      { col: MEMBER_COLS.PREFERRED_COMM, configCol: CONFIG_COLS.COMM_METHODS, label: 'Preferred Communication' },
+      { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
+      { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
+      { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
+    ],
+    GRIEVANCE_LOG: [
+      { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
+      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
+    ]
+  };
+}
 
 /**
- * Check if a column is a multi-select column for the given sheet
+ * Columns that support multiple selections (comma-separated values).
+ * Initialized at load time; refreshed by syncColumnMaps().
+ */
+var MULTI_SELECT_COLS = buildMultiSelectCols_();
+
+/**
+ * Check if a column is a multi-select column for the given sheet.
+ * Reads from the live MULTI_SELECT_COLS object (updated by syncColumnMaps).
  * @param {number} col - Column number (1-indexed)
  * @param {string} sheetName - Sheet name (defaults to Member Directory)
  * @returns {Object|null} Multi-select config if found, null otherwise
@@ -2248,6 +2378,51 @@ function getMultiSelectConfig(col, sheetName) {
   }
   return null;
 }
+
+// ============================================================================
+// DROPDOWN COLUMN MAP — Single source of truth
+// ============================================================================
+// Both setupDataValidations() and syncDropdownToConfig_() derive their
+// column-to-config mappings from these arrays.  When you add a new dropdown
+// column, add it HERE and everything else follows.
+//
+// Each entry:  { col: <target sheet col>, configCol: <Config sheet col> }
+//   • 'multi' entries use multi-select validation (comma-separated values)
+//   • 'single' entries use normal dropdown validation
+// ============================================================================
+
+/**
+ * Build the single-select dropdown map from current *_COLS values.
+ * Returns fresh references so syncColumnMaps() changes are reflected.
+ * @returns {Object} { MEMBER_DIR: [...], GRIEVANCE_LOG: [...] }
+ */
+function buildDropdownMap_() {
+  return {
+    MEMBER_DIR: [
+      { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
+      { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
+      { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
+      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
+      { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
+      { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.INTEREST_CHAPTER,  configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
+    ],
+    GRIEVANCE_LOG: [
+      { col: GRIEVANCE_COLS.STATUS,         configCol: CONFIG_COLS.GRIEVANCE_STATUS },
+      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP },
+      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY },
+      { col: GRIEVANCE_COLS.ARTICLES,       configCol: CONFIG_COLS.ARTICLES }
+    ]
+  };
+}
+
+/**
+ * Single-select dropdown map.  Initialized at load; refreshed by syncColumnMaps().
+ */
+var DROPDOWN_MAP = buildDropdownMap_();
 
 // ============================================================================
 // ID GENERATION

@@ -2325,7 +2325,9 @@ function findOrphanedGrievances() {
   });
 
   // Check grievance member IDs
-  var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, 4).getValues();
+  var lastCol = Math.max(GRIEVANCE_COLS.GRIEVANCE_ID, GRIEVANCE_COLS.MEMBER_ID,
+                         GRIEVANCE_COLS.FIRST_NAME, GRIEVANCE_COLS.LAST_NAME);
+  var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, lastCol).getValues();
   var orphaned = [];
 
   grievanceData.forEach(function(row, index) {

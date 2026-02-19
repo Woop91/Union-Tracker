@@ -1558,14 +1558,14 @@ function NUKE_SEEDED_DATA() {
   var grievanceCount = 0;
 
   if (memberSheet && memberSheet.getLastRow() > 1) {
-    var memberIds = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, 1).getValues();
+    var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
     memberIds.forEach(function(row) {
       if (row[0] && seededIdPattern.test(String(row[0]))) memberCount++;
     });
   }
 
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-    var grievanceIds = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, 1).getValues();
+    var grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, grievanceSheet.getLastRow() - 1, 1).getValues();
     grievanceIds.forEach(function(row) {
       if (row[0] && seededIdPattern.test(String(row[0]))) grievanceCount++;
     });

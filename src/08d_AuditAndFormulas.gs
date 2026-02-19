@@ -724,15 +724,17 @@ function setupMemberLookupSheet() {
   var memberIdFormula = '=IFERROR(UNIQUE(FILTER(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + ',\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + '<>"Member ID",\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + '<>"")),"")';
   sheet.getRange('A2').setFormula(memberIdFormula);
 
-  // VLOOKUP formulas for member data
+  // VLOOKUP formulas for member data — indices computed dynamically from
+  // MEMBER_COLS so that column reordering doesn't break lookups.
   var vlookupBase = 'VLOOKUP(A2:A,\'' + SHEETS.MEMBER_DIR + '\'!' + mIdCol + ':' + mStewardCol + ',';
+  var mIdOffset = MEMBER_COLS.MEMBER_ID; // range starts at this column
 
-  sheet.getRange('B2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '2,FALSE),"")))'); // First Name
-  sheet.getRange('C2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '3,FALSE),"")))'); // Last Name
-  sheet.getRange('D2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '8,FALSE),"")))'); // Email
-  sheet.getRange('E2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '6,FALSE),"")))'); // Unit
-  sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '5,FALSE),"")))'); // Location
-  sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '16,FALSE),"")))'); // Steward
+  sheet.getRange('B2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.FIRST_NAME - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('C2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.LAST_NAME - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('D2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.EMAIL - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('E2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.UNIT - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.WORK_LOCATION - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.ASSIGNED_STEWARD - mIdOffset + 1) + ',FALSE),"")))');
 
   // Hide the sheet
   sheet.hideSheet();

@@ -1573,7 +1573,7 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
                     SHEETS.MEMBER_DIR : 'Member Directory';
 
-    var result = this.findRow(sheetName, 0, memberId);  // Column A (0-indexed)
+    var result = this.findRow(sheetName, MEMBER_COLUMNS.MEMBER_ID, memberId);
 
     if (!result) return null;
 
@@ -1660,7 +1660,7 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
                     SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
-    var result = this.findRow(sheetName, 0, grievanceId);  // Column A (0-indexed)
+    var result = this.findRow(sheetName, GRIEVANCE_COLUMNS.GRIEVANCE_ID, grievanceId);
 
     if (!result) return null;
 
@@ -1842,7 +1842,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (2883 lines)
+// SOURCE: 01_Core.gs (3058 lines)
 // ============================================================================
 
 /**
@@ -3570,6 +3570,18 @@ function syncColumnMaps() {
     for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
   }
 
+  // Rebuild derived column configs so dropdown dialogs and bidirectional
+  // sync use the up-to-date column positions after any columns shifted.
+  if (result.synced.length > 0) {
+    var freshMulti = buildMultiSelectCols_();
+    MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
+    MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+
+    var freshDD = buildDropdownMap_();
+    DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
+    DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+  }
+
   if (result.synced.length > 0) {
     Logger.log('syncColumnMaps: Updated ' + result.synced.join(', '));
     if (result.warnings.length > 0) {
@@ -3577,7 +3589,116 @@ function syncColumnMaps() {
     }
   }
 
+  // Persist resolved positions so other execution contexts (onEdit, etc.)
+  // pick them up without re-reading sheet headers every time.
+  persistColumnMaps_();
+
   return result;
+}
+
+// ============================================================================
+// COLUMN MAP PERSISTENCE
+// ============================================================================
+// In Google Apps Script, each trigger execution (onEdit, onOpen, menu click)
+// starts a brand-new V8 isolate.  Global column constants re-initialize to
+// their default (array-order) positions.  If a user manually reordered
+// columns, onEdit would silently use wrong positions until the next onOpen.
+//
+// Solution: syncColumnMaps() persists resolved positions to CacheService
+// (6-hour TTL).  loadCachedColumnMaps_() restores them cheaply in onEdit.
+// ============================================================================
+
+/** Cache key for persisted column maps */
+var COL_MAPS_CACHE_KEY_ = 'RESOLVED_COL_MAPS';
+
+/**
+ * Persist current column constant values to CacheService.
+ * Called at the end of syncColumnMaps().
+ * @private
+ */
+function persistColumnMaps_() {
+  try {
+    var data = {
+      MEMBER_COLS: MEMBER_COLS,
+      GRIEVANCE_COLS: GRIEVANCE_COLS,
+      CONFIG_COLS: CONFIG_COLS,
+      MEETING_CHECKIN_COLS: MEETING_CHECKIN_COLS,
+      AUDIT_LOG_COLS: AUDIT_LOG_COLS,
+      SURVEY_VAULT_COLS: SURVEY_VAULT_COLS,
+      SURVEY_TRACKING_COLS: SURVEY_TRACKING_COLS,
+      STEWARD_PERF_COLS: STEWARD_PERF_COLS,
+      FEEDBACK_COLS: FEEDBACK_COLS,
+      CHECKLIST_COLS: CHECKLIST_COLS
+    };
+    CacheService.getScriptCache().put(COL_MAPS_CACHE_KEY_, JSON.stringify(data), 21600); // 6 hours
+  } catch (_e) {
+    // CacheService unavailable — degrade silently; defaults are still valid
+    // for sheets created by this code.
+  }
+}
+
+/**
+ * Load persisted column positions from CacheService and apply to globals.
+ * Returns true if cache was found and applied, false otherwise.
+ * Call at the top of onEdit() to cheaply pick up any positions that
+ * syncColumnMaps() resolved in a prior execution.
+ * @returns {boolean} Whether cached positions were applied
+ * @private
+ */
+function loadCachedColumnMaps_() {
+  try {
+    var json = CacheService.getScriptCache().get(COL_MAPS_CACHE_KEY_);
+    if (!json) return false;
+    var data = JSON.parse(json);
+
+    // Apply to primary column constants
+    var targets = {
+      MEMBER_COLS: MEMBER_COLS,
+      GRIEVANCE_COLS: GRIEVANCE_COLS,
+      CONFIG_COLS: CONFIG_COLS,
+      MEETING_CHECKIN_COLS: MEETING_CHECKIN_COLS,
+      AUDIT_LOG_COLS: AUDIT_LOG_COLS,
+      SURVEY_VAULT_COLS: SURVEY_VAULT_COLS,
+      SURVEY_TRACKING_COLS: SURVEY_TRACKING_COLS,
+      STEWARD_PERF_COLS: STEWARD_PERF_COLS,
+      FEEDBACK_COLS: FEEDBACK_COLS,
+      CHECKLIST_COLS: CHECKLIST_COLS
+    };
+
+    var changed = false;
+    for (var name in targets) {
+      if (data[name]) {
+        for (var key in data[name]) {
+          if (data[name].hasOwnProperty(key) && targets[name].hasOwnProperty(key)
+              && targets[name][key] !== data[name][key]) {
+            targets[name][key] = data[name][key];
+            changed = true;
+          }
+        }
+      }
+    }
+
+    // Rebuild derived objects (legacy compat, dropdown map, multi-select)
+    // only if something actually changed.
+    if (changed) {
+      var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
+      for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
+      var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
+      for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
+
+      var freshMulti = buildMultiSelectCols_();
+      MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
+      MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
+
+      var freshDD = buildDropdownMap_();
+      DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
+      DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+    }
+
+    return true;
+  } catch (_e) {
+    return false; // Cache unavailable — use defaults
+  }
 }
 
 // ============================================================================
@@ -4056,27 +4177,36 @@ function getJobMetadataByMemberCol(memberCol) {
 // ============================================================================
 
 /**
- * Columns that support multiple selections (comma-separated values)
- * Maps column number to config source column for options
+ * Build multi-select column config from current *_COLS values.
+ * Returns fresh references every call so that syncColumnMaps() changes
+ * are reflected without a script reload.
+ * @returns {Object} { MEMBER_DIR: [...], GRIEVANCE_LOG: [...] }
  */
-var MULTI_SELECT_COLS = {
-  // Member Directory multi-select columns
-  MEMBER_DIR: [
-    { col: MEMBER_COLS.OFFICE_DAYS, configCol: CONFIG_COLS.OFFICE_DAYS, label: 'Office Days' },
-    { col: MEMBER_COLS.PREFERRED_COMM, configCol: CONFIG_COLS.COMM_METHODS, label: 'Preferred Communication' },
-    { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
-    { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
-    { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
-  ],
-  // Grievance Log multi-select columns
-  GRIEVANCE_LOG: [
-    { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
-    { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
-  ]
-};
+function buildMultiSelectCols_() {
+  return {
+    MEMBER_DIR: [
+      { col: MEMBER_COLS.OFFICE_DAYS, configCol: CONFIG_COLS.OFFICE_DAYS, label: 'Office Days' },
+      { col: MEMBER_COLS.PREFERRED_COMM, configCol: CONFIG_COLS.COMM_METHODS, label: 'Preferred Communication' },
+      { col: MEMBER_COLS.BEST_TIME, configCol: CONFIG_COLS.BEST_TIMES, label: 'Best Time to Contact' },
+      { col: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, label: 'Committees' },
+      { col: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, label: 'Assigned Steward(s)' }
+    ],
+    GRIEVANCE_LOG: [
+      { col: GRIEVANCE_COLS.ARTICLES, configCol: CONFIG_COLS.ARTICLES, label: 'Articles Violated' },
+      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY, label: 'Issue Category' }
+    ]
+  };
+}
 
 /**
- * Check if a column is a multi-select column for the given sheet
+ * Columns that support multiple selections (comma-separated values).
+ * Initialized at load time; refreshed by syncColumnMaps().
+ */
+var MULTI_SELECT_COLS = buildMultiSelectCols_();
+
+/**
+ * Check if a column is a multi-select column for the given sheet.
+ * Reads from the live MULTI_SELECT_COLS object (updated by syncColumnMaps).
  * @param {number} col - Column number (1-indexed)
  * @param {string} sheetName - Sheet name (defaults to Member Directory)
  * @returns {Object|null} Multi-select config if found, null otherwise
@@ -4095,6 +4225,51 @@ function getMultiSelectConfig(col, sheetName) {
   }
   return null;
 }
+
+// ============================================================================
+// DROPDOWN COLUMN MAP — Single source of truth
+// ============================================================================
+// Both setupDataValidations() and syncDropdownToConfig_() derive their
+// column-to-config mappings from these arrays.  When you add a new dropdown
+// column, add it HERE and everything else follows.
+//
+// Each entry:  { col: <target sheet col>, configCol: <Config sheet col> }
+//   • 'multi' entries use multi-select validation (comma-separated values)
+//   • 'single' entries use normal dropdown validation
+// ============================================================================
+
+/**
+ * Build the single-select dropdown map from current *_COLS values.
+ * Returns fresh references so syncColumnMaps() changes are reflected.
+ * @returns {Object} { MEMBER_DIR: [...], GRIEVANCE_LOG: [...] }
+ */
+function buildDropdownMap_() {
+  return {
+    MEMBER_DIR: [
+      { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
+      { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
+      { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
+      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
+      { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
+      { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.INTEREST_CHAPTER,  configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
+      { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
+    ],
+    GRIEVANCE_LOG: [
+      { col: GRIEVANCE_COLS.STATUS,         configCol: CONFIG_COLS.GRIEVANCE_STATUS },
+      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP },
+      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY },
+      { col: GRIEVANCE_COLS.ARTICLES,       configCol: CONFIG_COLS.ARTICLES }
+    ]
+  };
+}
+
+/**
+ * Single-select dropdown map.  Initialized at load; refreshed by syncColumnMaps().
+ */
+var DROPDOWN_MAP = buildDropdownMap_();
 
 // ============================================================================
 // ID GENERATION
@@ -19282,7 +19457,7 @@ function sendEmailToMember(memberId, subject, body) {
       return errorResponse('Member not found');
     }
 
-    const email = member['Email'] || member[Object.keys(member)[MEMBER_COLUMNS.EMAIL]];
+    const email = member['Email'] || member.email;
     if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
       return errorResponse('Invalid email address');
     }
@@ -21724,7 +21899,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3513 lines)
+// SOURCE: 06_Maintenance.gs (3515 lines)
 // ============================================================================
 
 /**
@@ -24054,7 +24229,9 @@ function findOrphanedGrievances() {
   });
 
   // Check grievance member IDs
-  var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, 4).getValues();
+  var lastCol = Math.max(GRIEVANCE_COLS.GRIEVANCE_ID, GRIEVANCE_COLS.MEMBER_ID,
+                         GRIEVANCE_COLS.FIRST_NAME, GRIEVANCE_COLS.LAST_NAME);
+  var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, lastCol).getValues();
   var orphaned = [];
 
   grievanceData.forEach(function(row, index) {
@@ -26805,14 +26982,14 @@ function NUKE_SEEDED_DATA() {
   var grievanceCount = 0;
 
   if (memberSheet && memberSheet.getLastRow() > 1) {
-    var memberIds = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, 1).getValues();
+    var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
     memberIds.forEach(function(row) {
       if (row[0] && seededIdPattern.test(String(row[0]))) memberCount++;
     });
   }
 
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
-    var grievanceIds = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, 1).getValues();
+    var grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, grievanceSheet.getLastRow() - 1, 1).getValues();
     grievanceIds.forEach(function(row) {
       if (row[0] && seededIdPattern.test(String(row[0]))) grievanceCount++;
     });
@@ -28188,7 +28365,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (618 lines)
+// SOURCE: 08a_SheetSetup.gs (621 lines)
 // ============================================================================
 
 /**
@@ -28484,6 +28661,10 @@ function setupHiddenSheets(ss) {
  * @returns {void}
  */
 function setupDataValidations() {
+  // Re-sync column maps from actual sheet headers before applying validations.
+  // This guarantees dropdowns land on the correct columns even if the layout changed.
+  try { syncColumnMaps(); } catch (_e) { /* proceed with defaults */ }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
@@ -28494,30 +28675,29 @@ function setupDataValidations() {
     return;
   }
 
-  // Member Directory Validations - Single-select dropdowns
-  setDropdownValidation(memberSheet, MEMBER_COLS.JOB_TITLE, configSheet, CONFIG_COLS.JOB_TITLES);
-  setDropdownValidation(memberSheet, MEMBER_COLS.WORK_LOCATION, configSheet, CONFIG_COLS.OFFICE_LOCATIONS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.UNIT, configSheet, CONFIG_COLS.UNITS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.IS_STEWARD, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.SUPERVISOR, configSheet, CONFIG_COLS.SUPERVISORS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.MANAGER, configSheet, CONFIG_COLS.MANAGERS);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_LOCAL, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_CHAPTER, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.INTEREST_ALLIED, configSheet, CONFIG_COLS.YES_NO);
-  setDropdownValidation(memberSheet, MEMBER_COLS.CONTACT_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
+  // Member Directory Validations — driven by DROPDOWN_MAP (single-select)
+  var memberDD = DROPDOWN_MAP.MEMBER_DIR;
+  for (var m = 0; m < memberDD.length; m++) {
+    setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
+  }
 
-  // Member Directory Validations - Multi-select dropdowns
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.OFFICE_DAYS, configSheet, CONFIG_COLS.OFFICE_DAYS);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.PREFERRED_COMM, configSheet, CONFIG_COLS.COMM_METHODS);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.BEST_TIME, configSheet, CONFIG_COLS.BEST_TIMES);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.COMMITTEES, configSheet, CONFIG_COLS.STEWARD_COMMITTEES);
-  setMultiSelectValidation(memberSheet, MEMBER_COLS.ASSIGNED_STEWARD, configSheet, CONFIG_COLS.STEWARDS);
+  // Member Directory Validations — driven by MULTI_SELECT_COLS
+  var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
+  for (var mm = 0; mm < memberMS.length; mm++) {
+    setMultiSelectValidation(memberSheet, memberMS[mm].col, configSheet, memberMS[mm].configCol);
+  }
 
-  // Grievance Log Validations
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.STATUS, configSheet, CONFIG_COLS.GRIEVANCE_STATUS);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.CURRENT_STEP, configSheet, CONFIG_COLS.GRIEVANCE_STEP);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.ISSUE_CATEGORY, configSheet, CONFIG_COLS.ISSUE_CATEGORY);
-  setDropdownValidation(grievanceSheet, GRIEVANCE_COLS.ARTICLES, configSheet, CONFIG_COLS.ARTICLES);
+  // Grievance Log Validations — driven by DROPDOWN_MAP (single-select)
+  var grievDD = DROPDOWN_MAP.GRIEVANCE_LOG;
+  for (var g = 0; g < grievDD.length; g++) {
+    setDropdownValidation(grievanceSheet, grievDD[g].col, configSheet, grievDD[g].configCol);
+  }
+
+  // Grievance Log Validations — driven by MULTI_SELECT_COLS
+  var grievMS = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+  for (var gm = 0; gm < grievMS.length; gm++) {
+    setMultiSelectValidation(grievanceSheet, grievMS[gm].col, configSheet, grievMS[gm].configCol);
+  }
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Data validations applied successfully!', '✅ Success', 3);
 }
@@ -31690,7 +31870,7 @@ function showSurveyTrackingDialog() {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (2151 lines)
+// SOURCE: 08d_AuditAndFormulas.gs (2153 lines)
 // ============================================================================
 
 // ============================================================================
@@ -32419,15 +32599,17 @@ function setupMemberLookupSheet() {
   var memberIdFormula = '=IFERROR(UNIQUE(FILTER(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + ',\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + '<>"Member ID",\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + '<>"")),"")';
   sheet.getRange('A2').setFormula(memberIdFormula);
 
-  // VLOOKUP formulas for member data
+  // VLOOKUP formulas for member data — indices computed dynamically from
+  // MEMBER_COLS so that column reordering doesn't break lookups.
   var vlookupBase = 'VLOOKUP(A2:A,\'' + SHEETS.MEMBER_DIR + '\'!' + mIdCol + ':' + mStewardCol + ',';
+  var mIdOffset = MEMBER_COLS.MEMBER_ID; // range starts at this column
 
-  sheet.getRange('B2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '2,FALSE),"")))'); // First Name
-  sheet.getRange('C2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '3,FALSE),"")))'); // Last Name
-  sheet.getRange('D2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '8,FALSE),"")))'); // Email
-  sheet.getRange('E2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '6,FALSE),"")))'); // Unit
-  sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '5,FALSE),"")))'); // Location
-  sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + '16,FALSE),"")))'); // Steward
+  sheet.getRange('B2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.FIRST_NAME - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('C2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.LAST_NAME - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('D2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.EMAIL - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('E2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.UNIT - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('F2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.WORK_LOCATION - mIdOffset + 1) + ',FALSE),"")))');
+  sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.ASSIGNED_STEWARD - mIdOffset + 1) + ',FALSE),"")))');
 
   // Hide the sheet
   sheet.hideSheet();
@@ -37895,7 +38077,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1780 lines)
+// SOURCE: 10a_SheetCreation.gs (1792 lines)
 // ============================================================================
 
 /**
@@ -39530,7 +39712,13 @@ function createVolunteerHoursSheet(ss) {
   sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
   // Member Name lookup formula (column C) - VLOOKUP from Member Directory
-  var nameLookupFormula = '=IF(B3<>"", IFERROR(VLOOKUP(B3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(B3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  // Use dynamic column letters/indices so column reordering doesn't break lookups.
+  var mIdColLetter = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var mLastColLetter = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var mRange = "'" + SHEETS.MEMBER_DIR + "'!" + mIdColLetter + ":" + mLastColLetter;
+  var fnIdx = MEMBER_COLS.FIRST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var lnIdx = MEMBER_COLS.LAST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var nameLookupFormula = '=IF(B3<>"", IFERROR(VLOOKUP(B3, ' + mRange + ', ' + fnIdx + ', FALSE) & " " & VLOOKUP(B3, ' + mRange + ', ' + lnIdx + ', FALSE), "Not Found"), "")';
   sheet.getRange('C3').setFormula(nameLookupFormula);
   sheet.getRange('C3').copyTo(sheet.getRange('C3:C1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
@@ -39605,7 +39793,13 @@ function createMeetingAttendanceSheet(ss) {
   sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
   // Member Name lookup formula (column F) - VLOOKUP from Member Directory
-  var nameLookupFormula = '=IF(E3<>"", IFERROR(VLOOKUP(E3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(E3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  // Use dynamic column letters/indices so column reordering doesn't break lookups.
+  var mIdColLetter = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var mLastColLetter = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var mRange = "'" + SHEETS.MEMBER_DIR + "'!" + mIdColLetter + ":" + mLastColLetter;
+  var fnIdx = MEMBER_COLS.FIRST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var lnIdx = MEMBER_COLS.LAST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var nameLookupFormula = '=IF(E3<>"", IFERROR(VLOOKUP(E3, ' + mRange + ', ' + fnIdx + ', FALSE) & " " & VLOOKUP(E3, ' + mRange + ', ' + lnIdx + ', FALSE), "Not Found"), "")';
   sheet.getRange('F3').setFormula(nameLookupFormula);
   sheet.getRange('F3').copyTo(sheet.getRange('F3:F1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
@@ -43360,7 +43554,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2213 lines)
+// SOURCE: 10_Main.gs (2220 lines)
 // ============================================================================
 
 /**
@@ -43403,6 +43597,15 @@ function onOpen() {
 
     // Create the dashboard menu
     createDashboardMenu();
+
+    // Sync column maps from actual sheet headers so that column constants
+    // (MEMBER_COLS, GRIEVANCE_COLS, CONFIG_COLS, etc.) reflect the real
+    // spreadsheet layout — even if columns were reordered manually.
+    try {
+      syncColumnMaps();
+    } catch (syncError) {
+      console.log('Column sync skipped: ' + syncError.message);
+    }
 
     // Ensure all primary sheets have enough columns for current header maps.
     // This prevents "columns are out of bounds" errors when sheets were
@@ -43458,6 +43661,11 @@ function onEdit(e) {
   if (!e || !e.range) return;
 
   try {
+    // Restore column positions that syncColumnMaps() resolved in onOpen().
+    // Without this, each onEdit execution would start with array-order defaults
+    // which are wrong if a user manually reordered columns.
+    try { loadCachedColumnMaps_(); } catch (_cacheErr) { /* use defaults */ }
+
     var sheet = e.range.getSheet();
     var sheetName = sheet.getName();
     var row = e.range.getRow();
@@ -44133,22 +44341,15 @@ function syncDropdownToConfig_(e, sheetName) {
 
   var col = e.range.getColumn();
 
-  // Map sheet columns to their corresponding Config column
+  // Look up the Config column from the central DROPDOWN_MAP (single source of truth).
+  var entries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
+              : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
+              : null;
+  if (!entries) return;
+
   var configCol = null;
-  if (sheetName === SHEETS.MEMBER_DIR) {
-    var memberToConfig = {};
-    memberToConfig[MEMBER_COLS.JOB_TITLE] = CONFIG_COLS.JOB_TITLES;
-    memberToConfig[MEMBER_COLS.WORK_LOCATION] = CONFIG_COLS.OFFICE_LOCATIONS;
-    memberToConfig[MEMBER_COLS.UNIT] = CONFIG_COLS.UNITS;
-    memberToConfig[MEMBER_COLS.SUPERVISOR] = CONFIG_COLS.SUPERVISORS;
-    memberToConfig[MEMBER_COLS.MANAGER] = CONFIG_COLS.MANAGERS;
-    configCol = memberToConfig[col];
-  } else if (sheetName === SHEETS.GRIEVANCE_LOG) {
-    var grievanceToConfig = {};
-    grievanceToConfig[GRIEVANCE_COLS.STATUS] = CONFIG_COLS.GRIEVANCE_STATUS;
-    grievanceToConfig[GRIEVANCE_COLS.CURRENT_STEP] = CONFIG_COLS.GRIEVANCE_STEP;
-    grievanceToConfig[GRIEVANCE_COLS.ISSUE_CATEGORY] = CONFIG_COLS.ISSUE_CATEGORY;
-    configCol = grievanceToConfig[col];
+  for (var d = 0; d < entries.length; d++) {
+    if (entries[d].col === col) { configCol = entries[d].configCol; break; }
   }
 
   if (!configCol) return; // Not a synced dropdown column
@@ -48714,8 +48915,8 @@ function getSecureSatisfactionStats_() {
     var satScores = [];
 
     for (var i = 1; i < data.length; i++) {
-      var trustVal = parseFloat(data[i][7]); // SATISFACTION_COLS.Q7_TRUST_UNION - 1
-      var satVal = parseFloat(data[i][6]);   // SATISFACTION_COLS.Q6_SATISFIED_REP - 1
+      var trustVal = parseFloat(data[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]);
+      var satVal = parseFloat(data[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]);
 
       if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
         trustScores.push(trustVal);
@@ -49242,7 +49443,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4024 lines)
+// SOURCE: 12_Features.gs (4025 lines)
 // ============================================================================
 
 /**
@@ -49746,11 +49947,12 @@ function deleteChecklistItem(checklistId) {
     return errorResponse('Checklist item not found');
   }
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+  var numCols = Math.max(CHECKLIST_COLS.CHECKLIST_ID, CHECKLIST_COLS.CASE_ID);
+  var data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
 
   for (var i = 0; i < data.length; i++) {
-    if (data[i][0] === checklistId) {
-      var caseId = data[i][1];
+    if (data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] === checklistId) {
+      var caseId = data[i][CHECKLIST_COLS.CASE_ID - 1];
       var row = i + 2;
       sheet.deleteRow(row);
 

@@ -1630,7 +1630,13 @@ function createVolunteerHoursSheet(ss) {
   sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
   // Member Name lookup formula (column C) - VLOOKUP from Member Directory
-  var nameLookupFormula = '=IF(B3<>"", IFERROR(VLOOKUP(B3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(B3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  // Use dynamic column letters/indices so column reordering doesn't break lookups.
+  var mIdColLetter = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var mLastColLetter = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var mRange = "'" + SHEETS.MEMBER_DIR + "'!" + mIdColLetter + ":" + mLastColLetter;
+  var fnIdx = MEMBER_COLS.FIRST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var lnIdx = MEMBER_COLS.LAST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var nameLookupFormula = '=IF(B3<>"", IFERROR(VLOOKUP(B3, ' + mRange + ', ' + fnIdx + ', FALSE) & " " & VLOOKUP(B3, ' + mRange + ', ' + lnIdx + ', FALSE), "Not Found"), "")';
   sheet.getRange('C3').setFormula(nameLookupFormula);
   sheet.getRange('C3').copyTo(sheet.getRange('C3:C1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
@@ -1705,7 +1711,13 @@ function createMeetingAttendanceSheet(ss) {
   sheet.getRange('A3').copyTo(sheet.getRange('A3:A1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 
   // Member Name lookup formula (column F) - VLOOKUP from Member Directory
-  var nameLookupFormula = '=IF(E3<>"", IFERROR(VLOOKUP(E3, \'Member Directory\'!A:C, 2, FALSE) & " " & VLOOKUP(E3, \'Member Directory\'!A:C, 3, FALSE), "Not Found"), "")';
+  // Use dynamic column letters/indices so column reordering doesn't break lookups.
+  var mIdColLetter = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var mLastColLetter = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var mRange = "'" + SHEETS.MEMBER_DIR + "'!" + mIdColLetter + ":" + mLastColLetter;
+  var fnIdx = MEMBER_COLS.FIRST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var lnIdx = MEMBER_COLS.LAST_NAME - MEMBER_COLS.MEMBER_ID + 1;
+  var nameLookupFormula = '=IF(E3<>"", IFERROR(VLOOKUP(E3, ' + mRange + ', ' + fnIdx + ', FALSE) & " " & VLOOKUP(E3, ' + mRange + ', ' + lnIdx + ', FALSE), "Not Found"), "")';
   sheet.getRange('F3').setFormula(nameLookupFormula);
   sheet.getRange('F3').copyTo(sheet.getRange('F3:F1000'), SpreadsheetApp.CopyPasteType.PASTE_FORMULA, false);
 

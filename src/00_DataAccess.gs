@@ -357,7 +357,7 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
                     SHEETS.MEMBER_DIR : 'Member Directory';
 
-    var result = this.findRow(sheetName, 0, memberId);  // Column A (0-indexed)
+    var result = this.findRow(sheetName, MEMBER_COLUMNS.MEMBER_ID, memberId);
 
     if (!result) return null;
 
@@ -444,7 +444,7 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
                     SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
-    var result = this.findRow(sheetName, 0, grievanceId);  // Column A (0-indexed)
+    var result = this.findRow(sheetName, GRIEVANCE_COLUMNS.GRIEVANCE_ID, grievanceId);
 
     if (!result) return null;
 
