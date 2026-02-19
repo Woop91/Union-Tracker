@@ -18244,7 +18244,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3650 lines)
+// SOURCE: 05_Integrations.gs (3658 lines)
 // ============================================================================
 
 /**
@@ -21122,24 +21122,32 @@ function getWebAppDashboardStats() {
 }
 
 /**
- * Menu function to show instructions for getting the mobile dashboard URL
+ * Menu function to show the deployed mobile dashboard URL
  */
 function showWebAppUrl() {
   var ui = SpreadsheetApp.getUi();
-  ui.alert(
-    '📱 Mobile Dashboard URL',
-    'To get your mobile dashboard URL:\n\n' +
-    '1. Go to Extensions → Apps Script\n' +
-    '2. Click "Deploy" → "Manage deployments"\n' +
-    '3. Copy the Web app URL\n\n' +
-    'If you haven\'t deployed yet:\n' +
-    '1. Click "Deploy" → "New deployment"\n' +
-    '2. Select type: "Web app"\n' +
-    '3. Set "Who has access" to your preference\n' +
-    '4. Click "Deploy" and copy the URL\n\n' +
-    'Open that URL on your phone and add it to your home screen for quick access!',
-    ui.ButtonSet.OK
-  );
+  var url = ScriptApp.getService().getUrl();
+
+  if (url) {
+    ui.alert(
+      '📱 Mobile Dashboard URL',
+      'Your mobile dashboard URL:\n\n' + url + '\n\n' +
+      'Open this URL on your phone and add it to your home screen for quick access!',
+      ui.ButtonSet.OK
+    );
+  } else {
+    ui.alert(
+      '📱 Mobile Dashboard URL',
+      'No web app deployment found.\n\n' +
+      'To deploy:\n' +
+      '1. Go to Extensions → Apps Script\n' +
+      '2. Click "Deploy" → "New deployment"\n' +
+      '3. Select type: "Web app"\n' +
+      '4. Set "Who has access" to your preference\n' +
+      '5. Click "Deploy" and copy the URL',
+      ui.ButtonSet.OK
+    );
+  }
 }
 
 /**
@@ -40770,7 +40778,7 @@ function createFunctionChecklistSheet_() {
     // ═══ PHASE 3: Core Dashboards ═══
     ['3️⃣ Dashboards', '👤 Dashboard', '📋 View Active Grievances', 'viewActiveGrievances', 'Shows filtered list of all open/pending grievances'],
     ['3️⃣ Dashboards', '👤 Dashboard', '📱 Mobile Dashboard', 'showMobileDashboard', 'Touch-friendly dashboard for phones and tablets'],
-    ['3️⃣ Dashboards', '👤 Dashboard', '📱 Get Mobile App URL', 'showWebAppUrl', 'Displays the web app URL for mobile bookmarking'],
+    ['3️⃣ Dashboards', '👤 Dashboard', '📱 Get Mobile App URL', 'showWebAppUrl', 'Retrieves and displays the deployed web app URL for mobile bookmarking'],
     ['3️⃣ Dashboards', '👤 Dashboard', '⚡ Quick Actions', 'showQuickActionsMenu', 'Popup menu for common actions (add member, new grievance, etc.)'],
     ['3️⃣ Dashboards', '👤 Dashboard', '📊 Member Satisfaction', 'showSatisfactionDashboard', 'Survey results dashboard with trends and insights'],
     ['3️⃣ Dashboards', '👤 Dashboard', '🔒 Secure Member Portal', 'showPublicMemberDashboard', 'PII-safe member dashboard with charts and stats'],
@@ -40814,7 +40822,7 @@ function createFunctionChecklistSheet_() {
 
     // ═══ PHASE 10: Productivity Tools ═══
     ['🔟 Tools', '🔧 Multi-Select', '📝 Open Editor', 'openCellMultiSelectEditor', 'Select multiple values for multi-select columns'],
-    ['🔟 Tools', '🔧 Multi-Select', '⚡ Enable Auto-Open', 'installMultiSelectTrigger', 'Auto-opens multi-select dialog when clicking multi-select cells'],
+    ['🔟 Tools', '🔧 Multi-Select', '⚡ Enable Auto-Open', 'installMultiSelectTrigger', 'Installs onChange trigger to auto-open multi-select dialog when clicking multi-select cells'],
     ['🔟 Tools', '🔧 Multi-Select', '🚫 Disable Auto-Open', 'removeMultiSelectTrigger', 'Stops auto-opening multi-select dialog'],
 
     // ═══ PHASE 11: Performance & Cache ═══
@@ -40909,7 +40917,7 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📁 Google Drive', '📁 Batch Create Folders', 'batchCreateGrievanceFolders', 'Creates folders for multiple grievances at once'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🔔 Notifications', '⚙️ Notification Settings', 'showNotificationSettings', 'Configure email notification preferences'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🔔 Notifications', '🧪 Test Notifications', 'testDeadlineNotifications', 'Sends test email to verify notification setup'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👁️ View', '📱 Get Mobile App URL', 'showWebAppUrl', 'Displays the web app URL for mobile bookmarking'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👁️ View', '📱 Get Mobile App URL', 'showWebAppUrl', 'Retrieves and displays the deployed web app URL for mobile bookmarking'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👁️ View', '📱 Mobile Dashboard', 'showMobileDashboard', 'Touch-friendly dashboard for phones and tablets'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👁️ View', '📊 Rebuild Dashboard', 'rebuildDashboard', 'Recreates the Dashboard sheet with fresh formulas'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 👁️ View', '🔄 Refresh All Formulas', 'refreshAllFormulas', 'Recalculates all formulas across all sheets'],
@@ -40920,7 +40928,7 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🎨 Theme Manager', 'showThemeManager', 'Choose from preset themes or customize colors'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > ♿ Comfort View', '🌙 Quick Toggle Dark Mode', 'quickToggleDarkMode', 'Switch between light and dark color schemes'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '📝 Open Editor', 'openCellMultiSelectEditor', 'Select multiple values for multi-select columns'],
-    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '⚡ Enable Auto-Open', 'installMultiSelectTrigger', 'Auto-opens multi-select dialog when clicking cells'],
+    ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '⚡ Enable Auto-Open', 'installMultiSelectTrigger', 'Installs onChange trigger to auto-open multi-select dialog when clicking cells'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 📝 Multi-Select', '🚫 Disable Auto-Open', 'removeMultiSelectTrigger', 'Stops auto-opening multi-select dialog'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Data Sync', '🔄 Sync All Data Now', 'syncAllData', 'Manually syncs all data between sheets'],
     ['2️⃣0️⃣ v4.2.1', '📊 Dashboard > 🛠️ Admin > Data Sync', '🔄 Sync Grievance → Members', 'syncGrievanceToMemberDirectory', 'Updates Member Directory with grievance data'],
@@ -40953,7 +40961,7 @@ function createFunctionChecklistSheet_() {
     ['2️⃣0️⃣ v4.2.1', '📊 Command > Steward Management', '📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink', 'Gets link to member satisfaction survey'],
 
     // COMMAND CENTER Menu - New Items
-    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Field Accessibility', '📱 Get Mobile App URL', 'showWebAppUrl', 'Displays web app URL for mobile'],
+    ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Field Accessibility', '📱 Get Mobile App URL', 'showWebAppUrl', 'Retrieves and displays deployed web app URL for mobile'],
     ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '🔥 Generate Unit Hot Zones', 'renderHotZones', 'Identifies locations with 3+ grievances'],
     ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '🌟 Identify Rising Stars', 'identifyRisingStars', 'Shows top steward performers'],
     ['2️⃣0️⃣ v4.2.1', '📊 COMMAND CENTER > Strategic Intelligence', '📉 Management Hostility Report', 'renderHostilityFunnel', 'Analyzes denial rates'],
