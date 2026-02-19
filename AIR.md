@@ -420,7 +420,7 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
   - `getWebAppGrievanceListHtml()` - Filterable grievance list
   - `getWebAppMemberListHtml()` - Member list page
   - `getWebAppLinksHtml()` - Forms and resources links page
-  - `showWebAppUrl()` - Display web app URL after deployment
+  - `showWebAppUrl()` - Retrieves and displays the deployed web app URL (falls back to deployment instructions if not yet deployed)
   - **v4.4.0:** `?mode=steward` routes to unified steward dashboard (with PII)
   - **v4.4.0:** `?mode=member` routes to unified member dashboard (no PII)
 - Constant Contact v3 API Integration **(NEW v4.9.0)** — Read-only engagement metrics:
@@ -1110,7 +1110,7 @@ var FEEDBACK_COLS = {
 Columns marked as **Multi-Select** support comma-separated values for multiple selections.
 
 **Auto-Open Mode (Recommended):**
-1. Go to **🔧 Tools > ☑️ Multi-Select > ⚡ Enable Auto-Open**
+1. Go to **🔧 Tools > ☑️ Multi-Select > ⚡ Enable Auto-Open** — this automatically installs the `onSelectionChangeMultiSelect` trigger
 2. Now clicking any multi-select cell automatically opens the dialog!
 3. To disable: **🔧 Tools > ☑️ Multi-Select > 🚫 Disable Auto-Open**
 
@@ -3215,17 +3215,17 @@ Added standalone web app deployment that can be accessed via URL on any mobile b
 - **iOS Home Screen Support**: apple-mobile-web-app meta tags for app-like experience
 
 **New Menu Item:**
-- Dashboard → 📱 Get Mobile App URL - Shows deployment URL after web app is deployed
+- Dashboard → 📱 Get Mobile App URL - Automatically retrieves and displays the deployed web app URL
 
 **Deployment Instructions:**
 1. Extensions → Apps Script → Deploy → New deployment
 2. Select "Web app"
 3. Set access permissions
-4. Copy URL and bookmark on mobile device
+4. Use **📱 Get Mobile App URL** to retrieve the URL and bookmark on mobile device
 
 **Code Changes:**
 - `WebApp.gs`: New file with doGet(), getWebAppDashboardHtml(), getWebAppSearchHtml(), getWebAppGrievanceListHtml(), getWebAppSearchResults(), getWebAppGrievanceList(), showWebAppUrl()
-- `Code.gs`: Added menu item "📱 Get Mobile App URL" calling showWebAppUrl()
+- `Code.gs`: Added menu item "📱 Get Mobile App URL" calling showWebAppUrl() (uses `ScriptApp.getService().getUrl()` to fetch URL programmatically)
 
 ---
 
