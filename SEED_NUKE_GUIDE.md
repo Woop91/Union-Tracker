@@ -61,9 +61,9 @@ When you execute the **Nuke Seed Data** function, the system will:
    - Main Fax, Toll Free numbers
    - All deadline and contract reference columns
 11. **Preserve Structure**: Keep all headers, formulas, and sheet structure intact
-12. **Preserve Manually Entered Data**: Only rows with seeded ID patterns (M/G + 4 letters + 3 digits) are deleted
+12. **Preserve Manually Entered Data**: Only rows with IDs that were explicitly tracked during seed operations are deleted — manually entered data is always safe, regardless of ID format
 
-> **🔴 IMPORTANT**: The nuke operation only deletes **seeded data rows** (matching the pattern `MJOSM123` or `GJOSM456`), clears **survey responses** from Member Satisfaction, and completely removes the **Feedback & Development** and **Menu Checklist** sheets. Manually entered data with different ID formats is preserved. The Demo menu is hidden but the seed functions remain in the code.
+> **🔴 IMPORTANT**: The nuke operation only deletes **seeded data rows** (IDs tracked in Script Properties during seed operations), clears **survey responses** from Member Satisfaction, and completely removes the **Feedback & Development** and **Menu Checklist** sheets. All manually entered data is preserved regardless of ID format. The Demo menu is hidden but the seed functions remain in the code.
 
 ---
 
@@ -438,15 +438,15 @@ Your dashboard is **production-ready**! 🚀
 
 ## See Also
 
-- **`NUKE_SEEDED_DATA()`** - Smart nuke that removes only seeded data (pattern-matched IDs)
+- **`NUKE_SEEDED_DATA()`** - Smart nuke that removes only seeded data (tracked IDs from seed operations)
   - Menu: `🔧 Admin > 🎭 Demo Data > ☢️ NUKE SEEDED DATA`
 - **`NUKE_CONFIG_DROPDOWNS()`** - Clears only Config dropdown values
   - Menu: `🔧 Admin > 🎭 Demo Data > 🧹 Clear Config Dropdowns Only`
 
 ---
 
-**Last Updated**: 2026-02-14
-**Version**: 4.7.0
+**Last Updated**: 2026-02-19
+**Version**: 4.7.1
 
 ---
 

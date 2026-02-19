@@ -1547,10 +1547,12 @@ function NUKE_SEEDED_DATA() {
     return;
   }
 
-  // Pattern for seeded IDs: M/G + 4 uppercase letters + 3 digits
-  var seededIdPattern = /^[MG][A-Z]{4}\d{3}$/;
+  // Use tracked seeded IDs from Script Properties (set during SEED operations)
+  // This ensures manually entered data is NEVER deleted, even if IDs share the same format
+  var seededMemberLookup = getSeededMemberIds();
+  var seededGrievanceLookup = getSeededGrievanceIds();
 
-  // Count seeded data by pattern
+  // Count seeded data by tracked IDs
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -1560,28 +1562,46 @@ function NUKE_SEEDED_DATA() {
   if (memberSheet && memberSheet.getLastRow() > 1) {
     var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
     memberIds.forEach(function(row) {
-      if (row[0] && seededIdPattern.test(String(row[0]))) memberCount++;
+      if (row[0] && seededMemberLookup[String(row[0])]) memberCount++;
     });
   }
 
   if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
     var grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, grievanceSheet.getLastRow() - 1, 1).getValues();
     grievanceIds.forEach(function(row) {
-      if (row[0] && seededIdPattern.test(String(row[0]))) grievanceCount++;
+      if (row[0] && seededGrievanceLookup[String(row[0])]) grievanceCount++;
     });
+  }
+
+  // Safety check: if no tracked IDs exist, warn user and abort
+  if (memberCount === 0 && grievanceCount === 0) {
+    var hasAnyMembers = memberSheet && memberSheet.getLastRow() > 1;
+    var hasAnyGrievances = grievanceSheet && grievanceSheet.getLastRow() > 1;
+    if (hasAnyMembers || hasAnyGrievances) {
+      ui.alert(
+        '⚠️ No Tracked Seeded Data Found',
+        'The system could not find any tracked seeded IDs in Script Properties.\n\n' +
+        'This means either:\n' +
+        '• Seed data was never created using the Demo menu, OR\n' +
+        '• Seed tracking data was cleared previously\n\n' +
+        'Existing member/grievance data will NOT be deleted to protect your manually entered records.\n\n' +
+        'The nuke will still clean up Config dropdowns, survey data, and demo sheets.',
+        ui.ButtonSet.OK
+      );
+    }
   }
 
   var response = ui.alert(
     '☢️ NUKE SEEDED DATA',
     '⚠️ This will permanently delete seeded/demo data:\n\n' +
-    '• ' + memberCount + ' seeded members (ID pattern: M****###)\n' +
-    '• ' + grievanceCount + ' seeded grievances (ID pattern: G****###)\n' +
+    '• ' + memberCount + ' seeded members (tracked from seed operation)\n' +
+    '• ' + grievanceCount + ' seeded grievances (tracked from seed operation)\n' +
     '• Config dropdown values\n' +
     '• Survey responses (Member Satisfaction data cleared)\n' +
     '• Feedback & Development sheet (entire sheet deleted)\n' +
     '• Function Checklist sheet (entire sheet deleted)\n' +
     '• _Audit_Log hidden sheet (entire sheet deleted)\n\n' +
-    '✅ Manually entered data with different ID formats will be PRESERVED.\n\n' +
+    '✅ ALL manually entered data will be PRESERVED.\n\n' +
     '⏱️ IMPORTANT: This process takes approximately 3-5 MINUTES.\n' +
     '⚠️ WAIT until the "Running script" dialog disappears!\n' +
     '⚠️ After nuke, the Demo menu will be permanently disabled.\n\n' +
@@ -1621,29 +1641,30 @@ function NUKE_SEEDED_DATA() {
     var deletedGrievances = 0;
 
     // Delete seeded grievances first (they reference members)
+    // Uses tracked IDs from Script Properties — only deletes IDs created by SEED functions
     if (grievanceSheet && grievanceSheet.getLastRow() > 1) {
       var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, 1).getValues();
       var totalGrievanceRows = grievanceData.length;
 
-      // Count how many rows match the seeded pattern
+      // Count how many rows are tracked seeded entries
       for (var gc = 0; gc < totalGrievanceRows; gc++) {
-        if (seededIdPattern.test(String(grievanceData[gc][0] || ''))) {
+        if (seededGrievanceLookup[String(grievanceData[gc][0] || '')]) {
           deletedGrievances++;
         }
       }
 
-      if (deletedGrievances === totalGrievanceRows) {
+      if (deletedGrievances > 0 && deletedGrievances === totalGrievanceRows) {
         // ALL rows are seeded — use clearContent to avoid "cannot delete all non-frozen rows" error
         grievanceSheet.getRange(2, 1, totalGrievanceRows, grievanceSheet.getLastColumn())
           .clearContent()
           .setBackground(null)
           .clearNote();
-      } else {
+      } else if (deletedGrievances > 0) {
         // Only some rows are seeded — delete individually bottom-up
         deletedGrievances = 0;
         for (var g = totalGrievanceRows - 1; g >= 0; g--) {
           var gId = String(grievanceData[g][0] || '');
-          if (seededIdPattern.test(gId)) {
+          if (seededGrievanceLookup[gId]) {
             grievanceSheet.deleteRow(g + 2);
             deletedGrievances++;
           }
@@ -1652,30 +1673,31 @@ function NUKE_SEEDED_DATA() {
     }
 
     // Delete seeded members
+    // Uses tracked IDs from Script Properties — only deletes IDs created by SEED functions
     if (memberSheet && memberSheet.getLastRow() > 1) {
       var memberData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, 1).getValues();
       var totalMemberRows = memberData.length;
 
-      // Count how many rows match the seeded pattern
+      // Count how many rows are tracked seeded entries
       var seededMemberCount = 0;
       for (var mc = 0; mc < totalMemberRows; mc++) {
-        if (seededIdPattern.test(String(memberData[mc][0] || ''))) {
+        if (seededMemberLookup[String(memberData[mc][0] || '')]) {
           seededMemberCount++;
         }
       }
 
-      if (seededMemberCount === totalMemberRows) {
+      if (seededMemberCount > 0 && seededMemberCount === totalMemberRows) {
         // ALL rows are seeded — use clearContent to avoid "cannot delete all non-frozen rows" error
         memberSheet.getRange(2, 1, totalMemberRows, memberSheet.getLastColumn())
           .clearContent()
           .setBackground(null)
           .clearNote();
         deletedMembers = seededMemberCount;
-      } else {
+      } else if (seededMemberCount > 0) {
         // Only some rows are seeded — delete individually bottom-up
         for (var m = totalMemberRows - 1; m >= 0; m--) {
           var mId = String(memberData[m][0] || '');
-          if (seededIdPattern.test(mId)) {
+          if (seededMemberLookup[mId]) {
             memberSheet.deleteRow(m + 2);
             deletedMembers++;
           }
