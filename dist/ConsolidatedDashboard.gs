@@ -18244,7 +18244,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3650 lines)
+// SOURCE: 05_Integrations.gs (3658 lines)
 // ============================================================================
 
 /**
@@ -21122,24 +21122,32 @@ function getWebAppDashboardStats() {
 }
 
 /**
- * Menu function to show instructions for getting the mobile dashboard URL
+ * Menu function to show the deployed mobile dashboard URL
  */
 function showWebAppUrl() {
   var ui = SpreadsheetApp.getUi();
-  ui.alert(
-    '📱 Mobile Dashboard URL',
-    'To get your mobile dashboard URL:\n\n' +
-    '1. Go to Extensions → Apps Script\n' +
-    '2. Click "Deploy" → "Manage deployments"\n' +
-    '3. Copy the Web app URL\n\n' +
-    'If you haven\'t deployed yet:\n' +
-    '1. Click "Deploy" → "New deployment"\n' +
-    '2. Select type: "Web app"\n' +
-    '3. Set "Who has access" to your preference\n' +
-    '4. Click "Deploy" and copy the URL\n\n' +
-    'Open that URL on your phone and add it to your home screen for quick access!',
-    ui.ButtonSet.OK
-  );
+  var url = ScriptApp.getService().getUrl();
+
+  if (url) {
+    ui.alert(
+      '📱 Mobile Dashboard URL',
+      'Your mobile dashboard URL:\n\n' + url + '\n\n' +
+      'Open this URL on your phone and add it to your home screen for quick access!',
+      ui.ButtonSet.OK
+    );
+  } else {
+    ui.alert(
+      '📱 Mobile Dashboard URL',
+      'No web app deployment found.\n\n' +
+      'To deploy:\n' +
+      '1. Go to Extensions → Apps Script\n' +
+      '2. Click "Deploy" → "New deployment"\n' +
+      '3. Select type: "Web app"\n' +
+      '4. Set "Who has access" to your preference\n' +
+      '5. Click "Deploy" and copy the URL',
+      ui.ButtonSet.OK
+    );
+  }
 }
 
 /**
