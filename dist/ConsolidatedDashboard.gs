@@ -21907,7 +21907,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3515 lines)
+// SOURCE: 06_Maintenance.gs (3531 lines)
 // ============================================================================
 
 /**
@@ -21949,11 +21949,27 @@ function DIAGNOSE_SETUP() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Check 1: Required sheets exist
+  // Skip hidden sheets (checked in Check 2), deprecated/test-only/alias entries
   results.checks.push('Checking required sheets...');
   var existingSheets = ss.getSheets().map(function(s) { return s.getName(); });
 
+  var skipKeys = {
+    DASHBOARD: true,           // @deprecated v4.3.2 - modal dashboards now
+    REPORTS: true,             // Backward-compat alias for DASHBOARD
+    TEST_RESULTS: true,        // Created on-demand by test framework only
+    GRIEVANCE_TRACKER: true,   // Backward-compat alias for GRIEVANCE_LOG
+    MEMBER_DIRECTORY: true     // Backward-compat alias for MEMBER_DIR
+  };
+
+  var checkedValues = {};
   for (var key in SHEET_NAMES) {
+    if (skipKeys[key]) continue;
     var sheetName = SHEET_NAMES[key];
+    // Hidden sheets (underscore prefix) are checked separately in Check 2
+    if (sheetName.charAt(0) === '_') continue;
+    // Avoid reporting the same sheet name twice (e.g. aliases)
+    if (checkedValues[sheetName]) continue;
+    checkedValues[sheetName] = true;
     if (existingSheets.indexOf(sheetName) === -1) {
       results.errors.push('Missing required sheet: ' + sheetName);
       results.status = 'ERROR';
@@ -28373,7 +28389,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (625 lines)
+// SOURCE: 08a_SheetSetup.gs (633 lines)
 // ============================================================================
 
 /**
@@ -28635,6 +28651,14 @@ function setupHiddenSheets(ss) {
     config.setup(sheet);
     sheet.hideSheet();
   });
+
+  // Self-contained hidden sheet setups (each creates/hides its own sheet)
+  setupGrievanceCalcSheet();
+  setupMemberLookupSheet();
+  setupStewardContactCalcSheet();
+  setupStewardPerformanceCalcSheet();
+  setupAuditLogSheet();
+  setupChecklistCalcSheet();
 
   // Survey Vault uses its own setup (includes sheet protection)
   setupSurveyVaultSheet();
