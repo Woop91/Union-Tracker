@@ -258,6 +258,14 @@ function setupHiddenSheets(ss) {
     sheet.hideSheet();
   });
 
+  // Self-contained hidden sheet setups (each creates/hides its own sheet)
+  setupGrievanceCalcSheet();
+  setupMemberLookupSheet();
+  setupStewardContactCalcSheet();
+  setupStewardPerformanceCalcSheet();
+  setupAuditLogSheet();
+  setupChecklistCalcSheet();
+
   // Survey Vault uses its own setup (includes sheet protection)
   setupSurveyVaultSheet();
 }
