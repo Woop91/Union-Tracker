@@ -533,20 +533,24 @@ function onSelectionChangeMultiSelect(e) {
  * @returns {void}
  */
 function installMultiSelectTrigger() {
-  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
 
-  ui.alert('☑️ Multi-Select Auto-Open Setup',
-    'To enable auto-open for multi-select cells:\n\n' +
-    '1. Go to Extensions → Apps Script\n' +
-    '2. Click the clock icon (Triggers) in the left sidebar\n' +
-    '3. Click "+ Add Trigger"\n' +
-    '4. Choose function: onSelectionChangeMultiSelect\n' +
-    '5. Select event type: "On change" or "On edit"\n' +
-    '6. Click Save\n\n' +
-    'Alternatively, use the manual method:\n' +
-    '• Select a multi-select cell\n' +
-    '• Go to Tools → Multi-Select → Open Editor',
-    ui.ButtonSet.OK);
+  // Check if trigger already exists
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'onSelectionChangeMultiSelect') {
+      SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled.');
+      return;
+    }
+  }
+
+  ScriptApp.newTrigger('onSelectionChangeMultiSelect')
+    .forSpreadsheet(ss)
+    .onChange()
+    .create();
+
+  SpreadsheetApp.getUi().alert('Multi-Select auto-open has been enabled!\n\n' +
+    'The multi-select dialog will now open automatically when you click a multi-select cell.');
 }
 
 /**
