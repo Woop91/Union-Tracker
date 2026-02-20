@@ -28643,7 +28643,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (637 lines)
+// SOURCE: 08a_SheetSetup.gs (653 lines)
 // ============================================================================
 
 /**
@@ -29106,6 +29106,13 @@ function getConfigValues(configSheet, col) {
  * @returns {void}
  */
 function applyMultiSelectValue(value) {
+  // The inline dialog (getMultiSelectHtml) passes an array of selected IDs,
+  // while MultiSelectDialog.html passes a pre-joined comma string.
+  // Normalise to a comma-separated string so all selections are saved.
+  if (Array.isArray(value)) {
+    value = value.join(', ');
+  }
+
   var props = PropertiesService.getUserProperties();
   var row = parseInt(props.getProperty('multiSelectRow'), 10);
   var col = parseInt(props.getProperty('multiSelectCol'), 10);
@@ -29189,50 +29196,59 @@ function onSelectionChangeMultiSelect(e) {
 }
 
 /**
- * Installs the multi-select auto-open trigger
+ * Enables the multi-select auto-open feature.
+ * Uses a user property flag checked by the simple onSelectionChange trigger.
+ * (onSelectionChange cannot be installed via ScriptApp.newTrigger; it only
+ * works as a simple trigger defined in code.)
  * @returns {void}
  */
 function installMultiSelectTrigger() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var triggers = ScriptApp.getUserTriggers(ss);
-
-  // Check if trigger already exists
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'onSelectionChangeMultiSelect') {
-      SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled.');
-      return;
-    }
+  var props = PropertiesService.getUserProperties();
+  if (props.getProperty('multiSelectAutoOpen') === 'true') {
+    SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled.');
+    return;
   }
 
-  ScriptApp.newTrigger('onSelectionChangeMultiSelect')
-    .forSpreadsheet(ss)
-    .onChange()
-    .create();
+  props.setProperty('multiSelectAutoOpen', 'true');
+
+  // Clean up any legacy .onChange() triggers that were incorrectly installed
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'onSelectionChangeMultiSelect') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
 
   SpreadsheetApp.getUi().alert('Multi-Select auto-open has been enabled!\n\n' +
     'The multi-select dialog will now open automatically when you click a multi-select cell.');
 }
 
 /**
- * Removes the multi-select auto-open trigger
+ * Disables the multi-select auto-open feature.
+ * Clears the user property flag and removes any legacy installable triggers.
  * @returns {void}
  */
 function removeMultiSelectTrigger() {
+  var props = PropertiesService.getUserProperties();
+  var wasEnabled = props.getProperty('multiSelectAutoOpen') === 'true';
+  props.deleteProperty('multiSelectAutoOpen');
+  props.deleteProperty('lastMultiSelectCell');
+
+  // Also clean up any legacy .onChange() triggers
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var triggers = ScriptApp.getUserTriggers(ss);
-  var removed = false;
-
   triggers.forEach(function(trigger) {
     if (trigger.getHandlerFunction() === 'onSelectionChangeMultiSelect') {
       ScriptApp.deleteTrigger(trigger);
-      removed = true;
+      wasEnabled = true;
     }
   });
 
-  if (removed) {
+  if (wasEnabled) {
     SpreadsheetApp.getUi().alert('Multi-Select auto-open has been disabled.');
   } else {
-    SpreadsheetApp.getUi().alert('No multi-select trigger was found.');
+    SpreadsheetApp.getUi().alert('Multi-Select auto-open was not enabled.');
   }
 }
 
@@ -43848,7 +43864,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2227 lines)
+// SOURCE: 10_Main.gs (2253 lines)
 // ============================================================================
 
 /**
@@ -44062,6 +44078,32 @@ function onEdit(e) {
 
   } catch (error) {
     console.error('Error in onEdit:', error);
+  }
+}
+
+/**
+ * Simple trigger: fires when the user changes cell selection.
+ * Delegates to the multi-select auto-open handler when the
+ * user has enabled it via Tools > Multi-Select > Enable Auto-Open.
+ *
+ * Note: onSelectionChange is only available as a simple trigger
+ * in Google Apps Script — it cannot be installed via ScriptApp.newTrigger().
+ *
+ * @param {Object} e - The selection change event object
+ */
+function onSelectionChange(e) {
+  if (!e || !e.range) return;
+
+  try {
+    var autoOpen = PropertiesService.getUserProperties()
+      .getProperty('multiSelectAutoOpen');
+    if (autoOpen !== 'true') return;
+
+    if (typeof onSelectionChangeMultiSelect === 'function') {
+      onSelectionChangeMultiSelect(e);
+    }
+  } catch (err) {
+    // Silent — selection-change triggers must not surface errors
   }
 }
 

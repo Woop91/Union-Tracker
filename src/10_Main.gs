@@ -213,6 +213,32 @@ function onEdit(e) {
 }
 
 /**
+ * Simple trigger: fires when the user changes cell selection.
+ * Delegates to the multi-select auto-open handler when the
+ * user has enabled it via Tools > Multi-Select > Enable Auto-Open.
+ *
+ * Note: onSelectionChange is only available as a simple trigger
+ * in Google Apps Script — it cannot be installed via ScriptApp.newTrigger().
+ *
+ * @param {Object} e - The selection change event object
+ */
+function onSelectionChange(e) {
+  if (!e || !e.range) return;
+
+  try {
+    var autoOpen = PropertiesService.getUserProperties()
+      .getProperty('multiSelectAutoOpen');
+    if (autoOpen !== 'true') return;
+
+    if (typeof onSelectionChangeMultiSelect === 'function') {
+      onSelectionChangeMultiSelect(e);
+    }
+  } catch (_err) {
+    // Silent — selection-change triggers must not surface errors
+  }
+}
+
+/**
  * Handles security audit logging for change tracking
  * Logs all edits to the Audit Log sheet for accountability
  * Includes sabotage protection for mass deletions (>15 cells)
