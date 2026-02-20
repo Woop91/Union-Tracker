@@ -162,8 +162,8 @@ describe('computeDashboardMetrics_', () => {
     row[GRIEVANCE_COLS.LOCATION - 1] = overrides.location || '';
     row[GRIEVANCE_COLS.DATE_FILED - 1] = overrides.dateFiled || '';
     row[GRIEVANCE_COLS.DATE_CLOSED - 1] = overrides.dateClosed || '';
-    row[GRIEVANCE_COLS.DAYS_OPEN - 1] = overrides.daysOpen || '';
-    row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] = overrides.daysToDeadline || '';
+    row[GRIEVANCE_COLS.DAYS_OPEN - 1] = overrides.daysOpen != null ? overrides.daysOpen : '';
+    row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] = overrides.daysToDeadline != null ? overrides.daysToDeadline : '';
     row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] = overrides.nextActionDue || '';
     row[GRIEVANCE_COLS.RESOLUTION - 1] = overrides.resolution || '';
     return row;

@@ -203,6 +203,48 @@ use `numericField_()` to safely preserve zero values.
 
 ---
 
+## Issue 6: mapGrievanceRow and export functions lose zero-value numeric fields
+
+**Commit:** _(included in this review cycle)_
+
+**Severity:** MEDIUM
+
+**Problem:**
+The same `|| ''` falsy bug fixed for `openRate` in Issue 5 also
+affected `daysOpen` and `daysToDeadline` in three locations:
+
+1. **`mapGrievanceRow()`** in `01_Core.gs` (lines 2011, 2013) —
+   `daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || ''` and
+   `daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] || ''`.
+   A grievance with 0 days open (filed today) or 0 days to deadline
+   (deadline is today) would lose its data.
+
+2. **Grievance export functions** in `12_Features.gs` (lines 2802–2803,
+   3313–3314) — `row[cols.DAYS_OPEN - 1] || ''` and
+   `daysToDeadline || ''` in export data arrays. Same zero-erasure bug
+   in exported data.
+
+3. **Test helper functions** in `09_Dashboards.test.js` (lines 165–166)
+   and `04e_PublicDashboard.test.js` (lines 95–96) — test row builders
+   used `overrides.daysOpen || ''` which would silently convert a `0`
+   test override to `''`.
+
+**Note:** Other files (e.g. `04c_InteractiveDashboard.gs`) already used
+the correct `|| 0` pattern for these same fields.
+
+**Files affected:**
+- `01_Core.gs` — `mapGrievanceRow()` now uses `numericField_()`
+- `12_Features.gs` — export functions now use `numericField_()`
+- `09_Dashboards.test.js` — test helper uses `!= null` ternary
+- `04e_PublicDashboard.test.js` — test helper uses `!= null` ternary
+- `dist/ConsolidatedDashboard.gs` — consolidated build reflecting all changes
+
+**Resolution:**
+All numeric fields in grievance data access now use `numericField_()`
+(production code) or null-safe ternaries (test code) to preserve `0`.
+
+---
+
 ## Items Confirmed Safe (not bugs)
 
 These were reviewed and determined to be acceptable:
@@ -211,6 +253,11 @@ These were reviewed and determined to be acceptable:
   `_Checklist_Calc`) — These sheets are code-generated with a fixed
   internal layout. Users never interact with them. Hardcoded references
   to their own internal columns are acceptable.
+- **Hidden calc sheet hardcoded indices** (`_Member_Lookup`,
+  `_Steward_Performance_Calc`) — Same as above. Code-generated hidden
+  sheets with fixed layouts. `STEWARD_PERF_COLS` constants exist and
+  are used elsewhere; the few hardcoded reads in `09_Dashboards.gs`
+  (lines 2070–2079, 2883–2889) are consistent with the sheet layout.
 - **Single-column `getRange()` reads with `row[0]`** — When reading a
   1-column-wide range, `row[0]` is the only element. This is correct.
 - **External integration sheets** (Volunteer Hours, Meeting Attendance)
@@ -218,6 +265,21 @@ These were reviewed and determined to be acceptable:
   comments are acceptable for now.
 - **`SATISFACTION_COLS.AVG_SCHEDULING || 82`** — Defensive fallback
   pattern, not a hardcoded value.
+- **Satisfaction survey hardcoded indices** in `04e_PublicDashboard.gs`
+  (lines 797–870) — ~50 hardcoded 0-indexed array accesses for survey
+  questions (e.g. `satData[i][6]` for Q6). Named constants
+  (`SATISFACTION_COLS`) exist and the values match. Not a bug today,
+  but a maintainability risk if survey columns are ever reordered.
+  Acceptable because survey column order is fixed by Google Forms.
+- **`GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1`** in `05_Integrations.gs`
+  (lines 352, 371, 380) — Uses 0-indexed legacy `GRIEVANCE_COLUMNS`
+  constant with `+ 1` to convert for 1-indexed `getRange()`. Math is
+  correct. Could be simplified to `GRIEVANCE_COLS.DRIVE_FOLDER_URL`
+  but not a bug.
+- **Audit log `getRange(row, 1)`** in `08d_AuditAndFormulas.gs`
+  (line 131) — Reads column A (record ID) for both Member Directory
+  and Grievance Log. Column A is the ID column in both sheets by
+  design, so the hardcoded `1` is correct.
 
 ---
 
