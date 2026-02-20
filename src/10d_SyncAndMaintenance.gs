@@ -876,7 +876,7 @@ function syncVolunteerHoursToMemberDirectory() {
   var memberData = memberSheet.getDataRange().getValues();
   if (memberData.length < 2) return;
 
-  // Update column S (VOLUNTEER_HOURS)
+  // Update VOLUNTEER_HOURS column (U)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
     var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
@@ -893,7 +893,7 @@ function syncVolunteerHoursToMemberDirectory() {
 
 /**
  * Syncs meeting attendance from Meeting Attendance sheet to Member Directory
- * Updates Last Virtual Mtg (column P) and Last In-Person Mtg (column Q)
+ * Updates Last Virtual Mtg (column R) and Last In-Person Mtg (column S)
  * @returns {void}
  */
 function syncMeetingAttendanceToMemberDirectory() {
