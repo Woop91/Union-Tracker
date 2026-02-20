@@ -66,6 +66,13 @@ function onOpen() {
       console.log('Tab colors not applied: ' + tabError.message);
     }
 
+    // Enforce hidden sheets on every open (prevents mobile visibility)
+    try {
+      enforceHiddenSheets();
+    } catch (hideError) {
+      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+    }
+
     // Show welcome toast
     ss.toast(
       'Dashboard loaded successfully',
@@ -222,7 +229,7 @@ function handleSecurityAudit_(e) {
       auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
       auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
       auditSheet.setFrozenRows(1);
-      auditSheet.hideSheet();
+      setSheetVeryHidden_(auditSheet);
     }
 
     var userEmail = '';

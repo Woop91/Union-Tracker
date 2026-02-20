@@ -127,6 +127,10 @@ function CREATE_DASHBOARD() {
     reorderSheetsToStandard(ss);
     ss.toast('Sheets reordered', '🏗️ Progress', 2);
 
+    // Install hourly trigger to keep hidden sheets hidden on mobile
+    installHiddenSheetEnforcerTrigger();
+    ss.toast('Hidden sheet enforcer installed', '🏗️ Progress', 2);
+
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
@@ -255,7 +259,7 @@ function setupHiddenSheets(ss) {
     }
     sheet.clear();
     config.setup(sheet);
-    sheet.hideSheet();
+    setSheetVeryHidden_(sheet);
   });
 
   // Self-contained hidden sheet setups (each creates/hides its own sheet)

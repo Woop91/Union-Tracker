@@ -1821,12 +1821,12 @@ function navigateToAuditLog() {
       .setFontWeight('bold')
       .setBackground(COLORS.CARD_DARK_BG)
       .setFontColor(COLORS.CARD_DARK_TEXT);
-    auditSheet.hideSheet();
+    setSheetVeryHidden_(auditSheet);
   }
 
   // Unhide temporarily and activate
   if (auditSheet.isSheetHidden()) {
-    auditSheet.showSheet();
+    setSheetVisible_(auditSheet);
   }
   auditSheet.activate();
 
@@ -2811,7 +2811,7 @@ function logIntegrityEvent(eventType, details, additionalInfo) {
   // Create audit log if it doesn't exist
   if (!auditSheet) {
     auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-    auditSheet.hideSheet();
+    setSheetVeryHidden_(auditSheet);
 
     // Set up headers
     var headers = ['Timestamp', 'User Email', 'Event Type', 'Details', 'Additional Info', 'Spreadsheet ID'];
@@ -2962,7 +2962,7 @@ function archiveClosedGrievances(daysOld) {
 
   if (!archiveSheet) {
     archiveSheet = ss.insertSheet(archiveSheetName);
-    archiveSheet.hideSheet();
+    setSheetVeryHidden_(archiveSheet);
 
     // Copy headers
     var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues();
