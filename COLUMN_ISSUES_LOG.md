@@ -147,6 +147,62 @@ width computed with `Math.max()` where a multi-column range is needed.
 
 ---
 
+## Issue 5: DROPDOWN_MAP / MULTI_SELECT_COLS overlap and Open Rate data loss
+
+**Commit:** `0e994f7` — _fix: correct Open Rate dropdown mapping and
+column references_
+
+**Severity:** MEDIUM
+
+**Problem:**
+Three interrelated issues found during Open Rate column investigation:
+
+1. **DROPDOWN_MAP / MULTI_SELECT_COLS overlap** — `ARTICLES` and
+   `ISSUE_CATEGORY` appeared in both `buildDropdownMap_()` (single-select)
+   and `buildMultiSelectCols_()` (multi-select). `setupDataValidations()`
+   applied single-select validation first, then multi-select overwrote it.
+   The duplicate entries risked the wrong validation type being applied
+   and caused `syncDropdownToConfig_()` to treat these columns as
+   single-select for bidirectional Config sync.
+
+2. **Multi-select columns excluded from Config sync** —
+   `syncDropdownToConfig_()` only iterated over `DROPDOWN_MAP`, not
+   `MULTI_SELECT_COLS`. After removing the duplicates from
+   `DROPDOWN_MAP` (fix #1), custom values typed into multi-select columns
+   would stop syncing back to Config. Updated the function to also
+   iterate over `MULTI_SELECT_COLS`.
+
+3. **Open Rate 0% data loss** — `mapMemberRow()` used
+   `openRate: row[MEMBER_COLS.OPEN_RATE - 1] || ''` which treats `0` as
+   falsy in JavaScript, converting a legitimate 0% open rate to an empty
+   string. Introduced `numericField_()` helper for null-safe numeric field
+   access that preserves `0` values.
+
+**Additional cleanup:**
+Corrected inline column letter comments across 5 files — Open Rate is
+column T (not S), Volunteer Hours is column U (not T), etc. These
+comments were wrong after a prior column insertion but had no functional
+impact since the code uses `*_COLS` constants.
+
+**Files affected:**
+- `01_Core.gs` — removed ARTICLES/ISSUE_CATEGORY from `buildDropdownMap_()`,
+  added `numericField_()`, fixed `mapMemberRow()`
+- `10_Main.gs` — updated `syncDropdownToConfig_()` to also sync
+  `MULTI_SELECT_COLS`
+- `10a_SheetCreation.gs` — corrected column letter comments
+- `10d_SyncAndMaintenance.gs` — corrected column letter comments
+- `04e_PublicDashboard.gs` — corrected column letter comments
+- `05_Integrations.gs` — corrected column letter comments
+- `10b_SurveyDocSheets.gs` — corrected column letter comments
+- `dist/ConsolidatedDashboard.gs` — consolidated build reflecting all changes
+
+**Resolution:**
+Single-select and multi-select dropdown mappings are now mutually
+exclusive. Both are synced bidirectionally with Config. Numeric fields
+use `numericField_()` to safely preserve zero values.
+
+---
+
 ## Items Confirmed Safe (not bugs)
 
 These were reviewed and determined to be acceptable:
