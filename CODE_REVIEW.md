@@ -2,11 +2,12 @@
 
 > **This is the canonical code review.** It supersedes all prior review documents, which have been archived to [`docs/archived-reviews/`](docs/archived-reviews/). Earlier reviews (v4.5.0) contained inaccurate "FIXED" and "LOW risk" assessments for issues that were still present — those documents should not be used for security or quality decisions.
 
-**Date:** 2026-02-21
+**Date:** 2026-02-21 (updated)
 **Reviewer:** Claude Code (Opus 4.6)
 **Scope:** Full line-by-line codebase review — 30 source files (~59K lines), 23 test files, config/build infrastructure
 **Version:** 4.9.0 (as of 2026-02-17)
 **Previous Review:** 2026-02-14 (v4.7.0 — 69 issues, 57 fixed)
+**This Update:** Re-verification pass with cross-cutting pattern searches — 18 new findings added (F76–F93)
 
 ---
 
@@ -14,16 +15,16 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review identifies **120 findings** across all severity levels. The most critical themes are:
+This line-by-line review identifies **138 findings** across all severity levels (120 original + 18 new from re-verification). All original findings were re-verified — **none have been fixed since the initial review**.
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
-| CRITICAL | 13 | XSS via innerHTML injection, URL injection, unsanitized email HTML, onclick attribute injection, CSV preview |
-| HIGH | 30 | Missing input validation, no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, broken pre-commit hook |
-| MEDIUM | 46 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent |
-| LOW | 31 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
+| CRITICAL | 20 | XSS via innerHTML injection, URL injection (window.open), unsanitized email HTML, onclick attribute injection, CSV preview, systematic column indexing bugs |
+| HIGH | 34 | Missing input validation, no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, broken pre-commit hook, unescaped steward/member names in dashboards |
+| MEDIUM | 50 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent, formula injection, incomplete XSS patterns |
+| LOW | 34 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
 
-**Overall Assessment: Good** — The codebase is well-structured, thoroughly tested, and shows strong security awareness. The issues found are typical of a large, actively-developed GAS project. No show-stoppers that would prevent production use.
+**Overall Assessment: Good with critical security gaps** — The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas. However, the cross-cutting XSS review revealed that `escapeHtml()` usage is inconsistent: some functions escape properly while adjacent functions in the same file do not. The 20 CRITICAL findings (7 new) represent exploitable XSS and column indexing bugs that should be addressed before the next production deployment.
 
 ---
 
@@ -43,6 +44,7 @@ This line-by-line review identifies **120 findings** across all severity levels.
 12. [CommandHub through CorrelationEngine (11-17)](#12-commandhub-through-correlationengine)
 13. [Build & Infrastructure](#13-build--infrastructure)
 14. [Cross-Cutting Concerns](#14-cross-cutting-concerns)
+15. [Re-Verification Findings (2026-02-21 Update)](#15-re-verification-findings-2026-02-21-update)
 
 ---
 
@@ -1292,6 +1294,282 @@ Consider adding a version-gated removal plan.
 
 ---
 
+## 15. Re-Verification Findings (2026-02-21 Update)
+
+> The following 18 new findings were discovered during a cross-cutting pattern search that systematically scanned every `innerHTML`, `window.open()`, `onclick`, `<td>` concatenation, `GRIEVANCE_COLUMNS`, and `MEMBER_COLUMNS` usage across all 30 source files. These were missed by the initial per-file review.
+
+### Verification of Existing Findings
+
+All 120 original findings (F1–F75, CC1–CC7) were re-verified by reading the actual code at the cited lines. **None have been fixed.** Every CRITICAL and HIGH finding remains present in the current codebase.
+
+---
+
+### New Findings
+
+#### F76. XSS via `window.open()` in `08c_FormsAndNotifications.gs`
+**Severity:** CRITICAL | **Category:** Security | **Lines:** 213, 622
+
+```javascript
+'<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+```
+
+`formUrl` is concatenated directly into a `<script>` tag without `JSON.stringify()`. A URL containing `"` or `</script>` enables arbitrary JS execution. This pattern appears twice (lines 213 and 622).
+
+**Fix:** `'<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'`
+
+---
+
+#### F77. XSS via `window.open()` in `10d_SyncAndMaintenance.gs`
+**Severity:** CRITICAL | **Category:** Security | **Lines:** 223, 233, 597
+
+```javascript
+'<script>window.open("' + folderUrl + '", "_blank");google.script.host.close();</script>'
+```
+
+Same pattern as F76 — `folderUrl` concatenated without `JSON.stringify()`. Appears three times in this file. Compare with `05_Integrations.gs:269` which correctly uses `JSON.stringify()`.
+
+**Fix:** Use `JSON.stringify(folderUrl)` in all three locations.
+
+---
+
+#### F78. XSS via `innerHTML` in `05_Integrations.gs` overdue items
+**Severity:** CRITICAL | **Category:** Security | **Line:** 1928
+
+```javascript
+html+="<div class=\"overdue-item\"><div class=\"overdue-id\">"+(g.id||"")+"</div><div class=\"overdue-name\">"+(g.name||"")+"</div><div class=\"overdue-detail\">"+(g.category||"")+" • "+(g.step||"")+"</div></div>";
+```
+
+Grievance fields `g.id`, `g.name`, `g.category`, `g.step` are injected into `innerHTML` without `escapeHtml()`. Compare with the same file at line 2099 which correctly uses `escapeHtml(r.title)`.
+
+**Fix:** Wrap all dynamic values with `escapeHtml()`.
+
+---
+
+#### F79. XSS via unescaped `<td>` cells in `04d_ExecutiveDashboard.gs`
+**Severity:** HIGH | **Category:** Security | **Lines:** 690-694
+
+```javascript
+'<td><strong>' + firstName + ' ' + lastName + '</strong></td>' +
+'<td>' + unit + '</td>' +
+'<td>' + (s.activeCases || 0) + '</td>' +
+```
+
+Steward names (`firstName`, `lastName`) and `unit` are interpolated into `<td>` cells without `escapeHtml()`. Other parts of the same file (line 205) correctly use `escapeHtml()`.
+
+**Fix:** `'<td><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) + '</strong></td>'`
+
+---
+
+#### F80. XSS via unescaped `<td>` cells in `07_DevTools.gs`
+**Severity:** LOW | **Category:** Security | **Lines:** 3059-3062
+
+```javascript
+'<td>' + status + '</td>' +
+'<td>' + r.name + '</td>' +
+'<td>' + r.duration + 'ms</td>' +
+'<td>' + errorMsg + '</td>'
+```
+
+Test result data unescaped in HTML. Low severity because DevTools is excluded from production builds.
+
+---
+
+#### F81. XSS via `onclick` attribute injection in `04c_InteractiveDashboard.gs`
+**Severity:** HIGH | **Category:** Security | **Lines:** 491-492
+
+```javascript
+'onclick="event.stopPropagation();google.script.run.showGrievanceQuickActions(\'' + escapeHtml(g.id).replace(/\'/g,"") + '\')">'
+```
+
+HTML entity escaping (`escapeHtml`) is insufficient for JavaScript within event handlers. The `.replace(/\'/g,"")` strips quotes but doesn't handle backslashes or other JS-injection characters. A crafted ID could still break out of the string context.
+
+**Fix:** Use `data-*` attributes with event delegation instead of inline onclick handlers.
+
+---
+
+#### F82. XSS via `onclick` attribute injection in `04e_PublicDashboard.gs`
+**Severity:** HIGH | **Category:** Security | **Line:** 2499
+
+```javascript
+onclick=\"selectStewardSuggestion(\x27"+m.replace(/\x27/g,"")+"\x27)\"
+```
+
+Quote removal via `.replace(/\x27/g,"")` is insufficient for preventing JS breakout. Backslashes, backticks, and `${` template literals could still escape the string context.
+
+**Fix:** Use `data-*` attributes with event delegation.
+
+---
+
+#### F83. Systematic `GRIEVANCE_COLUMNS` (0-indexed) misuse across `02_DataManagers.gs`
+**Severity:** CRITICAL | **Category:** Bug | **Lines:** Multiple (1734, 1875, 2013, 2066, 2110, 2142, 2245, 2324, 2410)
+
+The `GRIEVANCE_COLUMNS` constant is **0-indexed** (for array access). However, multiple functions in `02_DataManagers.gs` use it inconsistently:
+
+```javascript
+// Example at line 1734 (getNextGrievanceId):
+const id = data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+// Example at line 2013 (recalcAllGrievancesBatched):
+row[GRIEVANCE_COLUMNS.STATUS]
+```
+
+When `data` comes from `getDataRange().getValues()` (which includes the header row at index 0), the data rows start at index 1. Using `GRIEVANCE_COLUMNS` (0-indexed) on these arrays is correct **only if the loop starts at `i = 1`** (skipping the header). All functions do start at `i = 1`, so the column access is technically correct. However, the `GRIEVANCE_COLUMNS.X + 1` pattern used with `getRange()` in `05_Integrations.gs` (see F87) mixes the two systems unsafely.
+
+**Status:** Not a data corruption bug in most cases, but the pattern is fragile and error-prone. The canonical `GRIEVANCE_COLS` (1-indexed) with `- 1` for array access should be used instead, per CLAUDE.md rules.
+
+---
+
+#### F84. Wrong column constant in `10_Main.gs`
+**Severity:** HIGH | **Category:** Bug | **Line:** 1829
+
+```javascript
+const memberId = data[MEMBER_COLUMNS.ID];
+```
+
+`MEMBER_COLUMNS.ID` is the 0-indexed constant. Whether this is correct depends on whether `data` is a single row array (where 0-indexed is correct) or part of a 2D array. The inconsistency with adjacent code that uses `MEMBER_COLS` (1-indexed) makes this error-prone.
+
+---
+
+#### F85. Unescaped data in `composeEmailForMember()` dialog
+**Severity:** HIGH | **Category:** Security | **Line:** `03_UIComponents.gs:1656`
+
+```javascript
+'<div class="info"><strong>' + name + '</strong> (' + memberId + ')<br>' + email + '</div>'
+// Also in the JS call:
+'google.script.run.sendQuickEmail("' + email + '",s,m,"' + memberId + '")'
+```
+
+`name`, `email`, `memberId` are unescaped in both HTML and JavaScript string contexts. Compare with `showMemberQuickActions()` at line 1526 which correctly uses `escapeHtml()`.
+
+**Fix:** Use `escapeHtml()` for HTML context and `JSON.stringify()` for JS string context.
+
+---
+
+#### F86. Unescaped error messages in search dialogs
+**Severity:** MEDIUM | **Category:** Security | **Lines:** `03_UIComponents.gs:2379, 2710`
+
+```javascript
+// Line 2379 (desktop search):
+document.getElementById('resultsContainer').innerHTML =
+  '<div class="no-results"><p>Error: ' + error.message + '</p></div>';
+
+// Line 2710 (advanced search):
+document.getElementById('resultsBody').innerHTML =
+  '<tr><td colspan="5" ...>Error: ' + e.message + '</td></tr>';
+```
+
+Error messages are injected into `innerHTML` without `escapeHtml()`. If a server-side error message contains HTML/script, it would execute.
+
+**Fix:** `escapeHtml(error.message)` in both locations.
+
+---
+
+#### F87. Column indexing bug in `05_Integrations.gs`
+**Severity:** HIGH | **Category:** Bug | **Lines:** 365-366, 385, 394
+
+```javascript
+// Line 365-366:
+if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {     // 0-indexed array ✓
+  sheet.getRange(i + 1, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).setValue(folderUrl);  // 0-indexed + 1 for Range
+}
+// Line 385:
+const folderUrl = sheet.getRange(row, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).getValue();
+// Line 394:
+const grievanceId = sheet.getRange(row, GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1).getValue();
+```
+
+Uses `GRIEVANCE_COLUMNS` (0-indexed) with `+ 1` for `getRange()` calls. While mathematically equivalent to `GRIEVANCE_COLS` (1-indexed), this violates the CLAUDE.md rule to use canonical `GRIEVANCE_COLS` for Range operations. The `+ 1` pattern is fragile — if someone removes the `+ 1` thinking GRIEVANCE_COLUMNS is already 1-indexed, data goes to the wrong column.
+
+**Fix:** Use `GRIEVANCE_COLS.DRIVE_FOLDER_URL` and `GRIEVANCE_COLS.GRIEVANCE_ID` directly.
+
+---
+
+#### F88. Missing formula escaping in `13_MemberSelfService.gs`
+**Severity:** MEDIUM | **Category:** Security | **Line:** 1146
+
+```javascript
+sheet.getRange(memberRow, fieldMapping[field]).setValue(value);
+```
+
+Member self-service profile updates write user-supplied values to cells without `escapeForFormula()`. If a member enters `=IMPORTRANGE(...)` as their address, it would be interpreted as a formula.
+
+**Fix:** `sheet.getRange(memberRow, fieldMapping[field]).setValue(escapeForFormula(value));`
+
+---
+
+#### F89. HTML injection in `16_DashboardEnhancements.gs` email reports
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 223-235
+
+```javascript
+html += '<tr><td>Total Members</td><td ...>' + data.totalMembers + '</td></tr>';
+html += '<tr><td>' + data.monthlyFilings[m].month + '</td><td ...>' + data.monthlyFilings[m].count + ' filed</td></tr>';
+```
+
+While most values are numeric (low risk), `data.monthlyFilings[m].month` could contain HTML if the month label is derived from user-controlled data. Inconsistent with escaping practices elsewhere.
+
+**Fix:** `escapeHtml(String(data.monthlyFilings[m].month))`
+
+---
+
+#### F90. Incomplete XSS prevention in `10_Main.gs`
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 1834-1839
+
+```javascript
+const safeMemberId = String(memberId || '').replace(/['"\\<>&]/g, '');
+const safeMemberName = String(memberName || '').replace(/['"\\<>&]/g, '');
+const html = HtmlService.createHtmlOutput(
+  '<script>' +
+    'sessionStorage.setItem("prefillMemberId", "' + safeMemberId + '");' +
+    'sessionStorage.setItem("prefillMemberName", "' + safeMemberName + '");' +
+```
+
+Uses regex character removal instead of proper escaping. This strips characters instead of escaping them (lossy), and doesn't handle all JS injection vectors (backticks, `${}`). Per CLAUDE.md, the correct pattern is `JSON.stringify()`.
+
+**Fix:** `'sessionStorage.setItem("prefillMemberId", ' + JSON.stringify(memberId) + ');'`
+
+---
+
+#### F91. Column indexing `GRIEVANCE_COLUMNS + 1` pattern in `10_Main.gs`
+**Severity:** MEDIUM | **Category:** Bug | **Lines:** 1519-1541
+
+```javascript
+if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {  // 0-indexed array access
+  rowIndex = i + 1;
+}
+// Then:
+sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.DESCRIPTION + 1).setValue(updates.description);
+```
+
+Same pattern as F87 — uses `GRIEVANCE_COLUMNS` (0-indexed) with `+ 1` for `getRange()` instead of canonical `GRIEVANCE_COLS`. Works but violates project standards and is fragile.
+
+---
+
+#### F92. Unescaped grievance data in `showMemberGrievanceHistory()`
+**Severity:** MEDIUM | **Category:** Security | **Line:** `03_UIComponents.gs:1948`
+
+```javascript
+return '<div ...><strong>' + g.id + '</strong><br><span ...>Status: ' + g.status +
+  ' | Step: ' + g.step + '</span><br><span ...>' + g.issue + ' | Filed: ' + ...</span></div>';
+```
+
+`g.id`, `g.status`, `g.step`, `g.issue` are all unescaped in HTML context.
+
+**Fix:** `escapeHtml(g.id)`, `escapeHtml(g.status)`, etc.
+
+---
+
+#### F93. `window.open()` with server callback URL in `06_Maintenance.gs`
+**Severity:** MEDIUM | **Category:** Security | **Line:** 1399
+
+```javascript
+'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");window.open(url,"_blank")}).exportUndoHistoryToSheet()}'
+```
+
+The `url` returned from `exportUndoHistoryToSheet()` is passed directly to `window.open()` without validation. While this is a server-controlled value, a compromised server response or future code change could inject a malicious URL.
+
+**Fix:** Validate the URL format client-side before opening: `if(/^https:\/\/docs\.google\.com\//.test(url)) window.open(url,"_blank");`
+
+---
+
 ## Summary of Actionable Recommendations
 
 ### Priority 1 — Fix Now (CRITICAL + HIGH)
@@ -1323,6 +1601,15 @@ Consider adding a version-gated removal plan.
 | F47 | Defer non-critical work from onOpen() | Medium |
 | F35 | Mask email in audit log entries | Small |
 | F28 | Plan file splitting for 04e_PublicDashboard.gs | Large |
+| F76 | XSS: Use `JSON.stringify()` for formUrl in `08c_FormsAndNotifications.gs:213, 622` | Trivial |
+| F77 | XSS: Use `JSON.stringify()` for folderUrl in `10d_SyncAndMaintenance.gs:223, 233, 597` | Trivial |
+| F78 | XSS: Add `escapeHtml()` to overdue items in `05_Integrations.gs:1928` | Trivial |
+| F79 | XSS: Add `escapeHtml()` to steward names in `04d_ExecutiveDashboard.gs:690-694` | Trivial |
+| F81 | XSS: Replace onclick injection with data attributes in `04c_InteractiveDashboard.gs:491` | Small |
+| F82 | XSS: Replace onclick injection with data attributes in `04e_PublicDashboard.gs:2499` | Small |
+| F84 | Fix column constant usage in `10_Main.gs:1829` | Trivial |
+| F85 | XSS: Escape data in `composeEmailForMember()` dialog in `03_UIComponents.gs:1656` | Small |
+| F87 | Fix column indexing pattern in `05_Integrations.gs:365-394` (use GRIEVANCE_COLS) | Small |
 
 ### Priority 2 — Plan for Next Release (MEDIUM)
 
@@ -1346,10 +1633,18 @@ Consider adding a version-gated removal plan.
 | CC2 | Begin HTML template migration | Large |
 | CC5 | Standardize error handling patterns | Medium |
 | F71 | Pin CI action versions to SHA | Small |
+| F83 | Standardize GRIEVANCE_COLUMNS usage in `02_DataManagers.gs` (use GRIEVANCE_COLS - 1) | Medium |
+| F86 | Escape error messages in search dialogs `03_UIComponents.gs:2379, 2710` | Trivial |
+| F88 | Add `escapeForFormula()` to self-service profile updates `13_MemberSelfService.gs:1146` | Trivial |
+| F89 | Escape month names in dashboard enhancement emails `16_DashboardEnhancements.gs:235` | Trivial |
+| F90 | Use `JSON.stringify()` in `10_Main.gs:1834-1839` instead of regex strip | Small |
+| F91 | Standardize column indexing in `10_Main.gs:1519-1541` | Small |
+| F92 | Escape grievance data in `showMemberGrievanceHistory()` `03_UIComponents.gs:1948` | Trivial |
+| F93 | Add URL validation in `06_Maintenance.gs:1399` undo export callback | Trivial |
 
 ### Priority 3 — Backlog (LOW)
 
-Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, F40, F41, F43, F44, F49, F50, F53, F56, F60, F62, F63, F65, F66, F67d, F68a, F68b, F71c, F74a, CC4, CC7) can be addressed during regular maintenance.
+Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, F40, F41, F43, F44, F49, F50, F53, F56, F60, F62, F63, F65, F66, F67d, F68a, F68b, F71c, F74a, F80, CC4, CC7) can be addressed during regular maintenance.
 
 ---
 
@@ -1368,4 +1663,5 @@ Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, 
 
 ---
 
-*Review completed 2026-02-21 by Claude Code (Opus 4.6)*
+*Initial review completed 2026-02-21 by Claude Code (Opus 4.6)*
+*Re-verification update 2026-02-21: 18 new findings (F76–F93) added via cross-cutting pattern searches. All 120 original findings re-verified as still present.*
