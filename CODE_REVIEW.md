@@ -12,14 +12,14 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review identifies **97 findings** across all severity levels. The most critical themes are:
+This line-by-line review identifies **110 findings** across all severity levels. The most critical themes are:
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
-| CRITICAL | 6 | XSS in HTML string interpolation, unsanitized CSV preview, PII in audit logs |
-| HIGH | 22 | Performance N+1 patterns, missing locks, race conditions, disabled ESLint rules, broken pre-commit hook, Jest coverage non-functional |
-| MEDIUM | 39 | Missing input validation, dead code, inconsistent error handling, version mismatches, CI gaps |
-| LOW | 30 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
+| CRITICAL | 9 | XSS via URL injection, unsanitized email HTML, CSV preview injection, PII in audit logs |
+| HIGH | 27 | Performance N+1 patterns, missing locks, race conditions, disabled ESLint rules, broken pre-commit hook, XSS in dashboards |
+| MEDIUM | 43 | Missing input validation, dead code, inconsistent error handling, version mismatches, CI gaps |
+| LOW | 31 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
 
 **Overall Assessment: Good** — The codebase is well-structured, thoroughly tested, and shows strong security awareness. The issues found are typical of a large, actively-developed GAS project. No show-stoppers that would prevent production use.
 
@@ -460,6 +460,62 @@ Some email functions check the quota, others don't. When the 100 email/day limit
 
 ---
 
+#### F34a. XSS via URL injection in `setupFolderForSelectedGrievance()`
+**Severity:** CRITICAL | **Category:** Security | **Lines:** 254-257
+
+The `existingUrl` value is read from a cell and interpolated into a `<script>` tag without escaping:
+
+```javascript
+var html = HtmlService.createHtmlOutput(
+  '<script>window.open("' + existingUrl + '", "_blank"); ...'
+```
+
+A URL containing `"` or `</script>` enables arbitrary JS execution. Compare with `openGrievanceFolder()` at line 375 which correctly uses `JSON.stringify()`.
+
+**Fix:** `'<script>window.open(' + JSON.stringify(existingUrl) + ', "_blank");...'`
+
+---
+
+#### F34b. XSS via URL injection in `createPDFForSelectedGrievance()`
+**Severity:** CRITICAL | **Category:** Security | **Lines:** 1402-1404
+
+Same pattern — `folder.getUrl()` is interpolated into raw HTML without escaping.
+
+**Fix:** Use `JSON.stringify()` for the URL.
+
+---
+
+#### F34c. HTML injection in email bodies — member names unescaped
+**Severity:** CRITICAL | **Category:** Security | **Lines:** 520-546, 715-721
+
+In `emailMeetingAttendanceReport()` and `emailMeetingDocLink()`, member names, IDs, meeting names, and URLs are interpolated directly into HTML email bodies without `escapeHtml()`. A member name like `<img src=x onerror=alert(1)>` would execute in email clients that render HTML.
+
+**Fix:** Apply `escapeHtml()` to all dynamic values in email HTML bodies.
+
+---
+
+#### F34d. Race condition in `onGrievanceFormSubmit()` — uses `getLastRow()` instead of event range
+**Severity:** HIGH | **Category:** Bug | **Lines:** 1474-1483
+
+After a form submission, the code assumes the form response was appended at `sheet.getLastRow()`. If concurrent submissions arrive, this may reference the wrong row.
+
+**Fix:** Use `e.range` from the form submission event to identify the exact row.
+
+---
+
+#### F34e. Variable shadowing: `catch (e)` shadows form event parameter `e`
+**Severity:** MEDIUM | **Category:** Bug | **Lines:** 1458, 1490
+
+```javascript
+function onGrievanceFormSubmit(e) {
+  try { ... } catch (e) { /* shadows parameter 'e'! */ }
+}
+```
+
+**Fix:** Rename to `catch (err)`.
+
+---
+
 ## 7. Maintenance
 
 ### 06_Maintenance.gs (~3,200 lines)
@@ -475,12 +531,62 @@ Audit log entries contain the full user email address. This is PII and should be
 
 ---
 
+#### F35a. Undo system stores full row data in UserProperties (9KB limit)
+**Severity:** HIGH | **Category:** Bug | **Lines:** 968-978
+
+`saveUndoHistory()` stores `beforeState`/`afterState` (full row data arrays) in `UserProperties` which has a ~9KB per-property limit. With 50 actions, this easily exceeds the limit and silently fails.
+
+**Fix:** Limit data stored per action (only deltas), or use a hidden sheet for larger payloads.
+
+---
+
+#### F35b. Missing HTML escaping in audit log viewer
+**Severity:** HIGH | **Category:** Security | **Lines:** 2910-2928
+
+In `showAuditLogViewer()`, audit log details (which can contain user-supplied data) are rendered into HTML without escaping. If a field edit included `<script>` content, it would be logged and rendered unsafely.
+
+**Fix:** Use `escapeHtml()` on all dynamic values.
+
+---
+
+#### F35c. Steward workload dashboard missing XSS escaping
+**Severity:** HIGH | **Category:** Security | **Lines:** 2549-2569
+
+In `showStewardWorkloadDashboard()`, steward names are injected directly into HTML without `escapeHtml()`.
+
+---
+
 #### F36. Audit log integrity hash uses predictable algorithm
 **Severity:** MEDIUM | **Category:** Security | **Lines:** Various
 
 The integrity hash for audit entries is computed from row data. If the algorithm is known (it's in source code), an attacker with sheet access could modify entries and recompute valid hashes.
 
 **Fix:** Use an HMAC with a secret key stored in ScriptProperties.
+
+---
+
+#### F36a. Duplicate audit logging functions with conflicting schemas
+**Severity:** MEDIUM | **Category:** Quality | **Lines:** 1463-1530, 2807-2845
+
+`logAuditEvent()` and `logIntegrityEvent()` both create audit sheets, append rows, and trim entries — but with different schemas and trim limits (10,000 vs 5,000).
+
+**Fix:** Consolidate into a single audit function with a consistent schema.
+
+---
+
+#### F36b. `removeDeprecatedTabs()` prefix matching could delete valid sheets
+**Severity:** MEDIUM | **Category:** Bug | **Lines:** 259-293
+
+The `TEST_` prefix match would delete user-created sheets like `TEST_RESULTS`.
+
+**Fix:** Use exact matches or require confirmation for each sheet.
+
+---
+
+#### F36c. Hardcoded timezone `'America/New_York'` in `createWeeklySnapshot()`
+**Severity:** MEDIUM | **Category:** Maintainability | **Line:** 1722
+
+**Fix:** Use `Session.getScriptTimeZone()`.
 
 ---
 
@@ -1097,12 +1203,19 @@ Consider adding a version-gated removal plan.
 
 | ID | Summary | Effort |
 |----|---------|--------|
+| F34a | XSS: Use `JSON.stringify()` for URLs in `setupFolderForSelectedGrievance()` | Trivial |
+| F34b | XSS: Use `JSON.stringify()` for URLs in `createPDFForSelectedGrievance()` | Trivial |
+| F34c | XSS: Add `escapeHtml()` to email HTML bodies (meeting attendance, docs) | Small |
 | F10 | Update VERSION_INFO/API_VERSION to 4.9.0 | Trivial |
 | F68 | Update package.json version to 4.9.0 | Trivial |
 | F72 | `chmod +x .husky/pre-commit` (hook is silently not running!) | Trivial |
 | F14 | Fix array sizing with MEMBER_HEADER_MAP_.length | Trivial |
 | F19 | Sanitize CSV preview data with escapeHtml() | Small |
+| F35b | XSS: Escape data in audit log viewer HTML | Small |
+| F35c | XSS: Escape steward names in workload dashboard | Small |
+| F34d | Fix race condition: use `e.range` instead of `getLastRow()` in form handler | Small |
 | F15 | Batch setValue() calls in addMember() | Small |
+| F35a | Fix undo system UserProperties 9KB overflow | Medium |
 | F70 | Re-enable critical ESLint rules (no-undef, no-dupe-args, etc.) | Medium |
 | F69 | Fix Jest coverage collection for .gs files or remove misleading config | Small |
 | F57 | Add PIN brute-force rate limiting | Medium |
