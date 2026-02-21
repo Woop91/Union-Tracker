@@ -49,7 +49,7 @@ function setupAuditLogSheet() {
   sheet.setColumnWidth(AUDIT_LOG_COLS.ACTION_TYPE, 100);
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   // ═══ SHEET PROTECTION ═══
   // v4.8.1: Audit log now gets vault-style protection (owner-only editing)
@@ -216,7 +216,7 @@ function viewAuditLog() {
   }
 
   // Show the hidden sheet temporarily
-  sheet.showSheet();
+  setSheetVisible_(sheet);
   ss.setActiveSheet(sheet);
 
   // Sort by timestamp descending (newest first)
@@ -458,7 +458,7 @@ function setupGrievanceCalcSheet() {
   sheet.getRange('G2').setFormula(lastDateFormula);
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   Logger.log('_Grievance_Calc sheet setup complete');
 }
@@ -680,7 +680,7 @@ function setupGrievanceFormulasSheet() {
   sheet.getRange('S:S').setNumberFormat('MM/dd/yyyy');
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   Logger.log('_Grievance_Formulas sheet setup complete');
 }
@@ -737,7 +737,7 @@ function setupMemberLookupSheet() {
   sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.ASSIGNED_STEWARD - mIdOffset + 1) + ',FALSE),"")))');
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   Logger.log('_Member_Lookup sheet setup complete');
 }
@@ -789,7 +789,7 @@ function setupStewardContactCalcSheet() {
   // Auto-resize columns
   sheet.autoResizeColumns(1, headers.length);
 
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
   Logger.log('_Steward_Contact_Calc sheet setup complete with live formulas');
 }
 
@@ -859,7 +859,7 @@ function setupDashboardCalcSheet() {
   sheet.setColumnWidth(2, 100);
   sheet.setColumnWidth(3, 300);
 
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
   Logger.log('_Dashboard_Calc sheet setup complete');
 }
 
@@ -928,7 +928,7 @@ function setupStewardPerformanceCalcSheet() {
   // Performance Score (weighted: Win Rate * 0.4 + (100 - Overdue%) * 0.3 + (100 - AvgDays/60*100) * 0.3)
   sheet.getRange('J2').setFormula('=ARRAYFORMULA(IF(A2:A="","",ROUND(F2:F*0.4 + (100-IFERROR(H2:H/C2:C*100,0))*0.3 + MAX(0,100-G2:G/60*100)*0.3,1)))');
 
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
   Logger.log('_Steward_Performance_Calc sheet setup complete');
 }
 
@@ -1620,7 +1620,7 @@ function setupSurveyVaultSheet() {
   }
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   // ═══ SHEET PROTECTION ═══
   // Only the script owner (installer) can edit this sheet.

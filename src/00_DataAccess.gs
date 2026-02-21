@@ -123,7 +123,7 @@ var DataAccess = {
           sheet.getRange(1, 1, 1, options.headers.length).setFontWeight('bold');
         }
         if (options.hidden) {
-          sheet.hideSheet();
+          setSheetVeryHidden_(sheet);
         }
       }
     }

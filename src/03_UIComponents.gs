@@ -217,6 +217,7 @@ function createDashboardMenu() {
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
+      .addItem('🔒 Enforce Hidden Sheets (Mobile Fix)', 'enforceHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
       .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
       .addSeparator()

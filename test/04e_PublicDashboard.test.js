@@ -92,8 +92,8 @@ function buildGrievanceRow(overrides) {
   row[GRIEVANCE_COLS.LOCATION - 1] = overrides.location || '';
   row[GRIEVANCE_COLS.ARTICLES - 1] = overrides.articles || '';
   row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = overrides.category || '';
-  row[GRIEVANCE_COLS.DAYS_OPEN - 1] = overrides.daysOpen || '';
-  row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] = overrides.daysToDeadline || '';
+  row[GRIEVANCE_COLS.DAYS_OPEN - 1] = overrides.daysOpen != null ? overrides.daysOpen : '';
+  row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] = overrides.daysToDeadline != null ? overrides.daysToDeadline : '';
   row[GRIEVANCE_COLS.STEP1_DUE - 1] = overrides.step1Due || '';
   row[GRIEVANCE_COLS.STEP1_RCVD - 1] = overrides.step1Rcvd || '';
   row[GRIEVANCE_COLS.STEP2_APPEAL_FILED - 1] = overrides.step2AppealFiled || '';

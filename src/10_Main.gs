@@ -66,6 +66,13 @@ function onOpen() {
       console.log('Tab colors not applied: ' + tabError.message);
     }
 
+    // Enforce hidden sheets on every open (prevents mobile visibility)
+    try {
+      enforceHiddenSheets();
+    } catch (hideError) {
+      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+    }
+
     // Show welcome toast
     ss.toast(
       'Dashboard loaded successfully',
@@ -206,6 +213,32 @@ function onEdit(e) {
 }
 
 /**
+ * Simple trigger: fires when the user changes cell selection.
+ * Delegates to the multi-select auto-open handler when the
+ * user has enabled it via Tools > Multi-Select > Enable Auto-Open.
+ *
+ * Note: onSelectionChange is only available as a simple trigger
+ * in Google Apps Script — it cannot be installed via ScriptApp.newTrigger().
+ *
+ * @param {Object} e - The selection change event object
+ */
+function onSelectionChange(e) {
+  if (!e || !e.range) return;
+
+  try {
+    var autoOpen = PropertiesService.getUserProperties()
+      .getProperty('multiSelectAutoOpen');
+    if (autoOpen !== 'true') return;
+
+    if (typeof onSelectionChangeMultiSelect === 'function') {
+      onSelectionChangeMultiSelect(e);
+    }
+  } catch (_err) {
+    // Silent — selection-change triggers must not surface errors
+  }
+}
+
+/**
  * Handles security audit logging for change tracking
  * Logs all edits to the Audit Log sheet for accountability
  * Includes sabotage protection for mass deletions (>15 cells)
@@ -222,7 +255,7 @@ function handleSecurityAudit_(e) {
       auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
       auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
       auditSheet.setFrozenRows(1);
-      auditSheet.hideSheet();
+      setSheetVeryHidden_(auditSheet);
     }
 
     var userEmail = '';
@@ -782,18 +815,28 @@ function syncDropdownToConfig_(e, sheetName) {
 
   var col = e.range.getColumn();
 
-  // Look up the Config column from the central DROPDOWN_MAP (single source of truth).
-  var entries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
-              : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
-              : null;
-  if (!entries) return;
+  // Look up the Config column from DROPDOWN_MAP and MULTI_SELECT_COLS.
+  // Both maps are checked so that custom values typed into either single-select
+  // or multi-select columns get synced back to Config.
+  var ddEntries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
+                : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
+                : [];
+  var msEntries = (sheetName === SHEETS.MEMBER_DIR) ? MULTI_SELECT_COLS.MEMBER_DIR
+                : (sheetName === SHEETS.GRIEVANCE_LOG) ? MULTI_SELECT_COLS.GRIEVANCE_LOG
+                : [];
+  if (ddEntries.length === 0 && msEntries.length === 0) return;
 
   var configCol = null;
-  for (var d = 0; d < entries.length; d++) {
-    if (entries[d].col === col) { configCol = entries[d].configCol; break; }
+  for (var d = 0; d < ddEntries.length; d++) {
+    if (ddEntries[d].col === col) { configCol = ddEntries[d].configCol; break; }
+  }
+  if (!configCol) {
+    for (var ms = 0; ms < msEntries.length; ms++) {
+      if (msEntries[ms].col === col) { configCol = msEntries[ms].configCol; break; }
+    }
   }
 
-  if (!configCol) return; // Not a synced dropdown column
+  if (!configCol) return; // Not a synced dropdown or multi-select column
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);

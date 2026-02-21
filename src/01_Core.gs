@@ -154,9 +154,9 @@ function logErrorToSheet_(errorInfo) {
     // Create sheet if it doesn't exist
     if (!sheet) {
       sheet = ss.insertSheet(ERROR_CONFIG.LOG_SHEET_NAME);
-      sheet.hideSheet();
       sheet.appendRow(['Timestamp', 'Level', 'Context', 'Message', 'User', 'Stack']);
       sheet.getRange(1, 1, 1, 6).setFontWeight('bold');
+      setSheetVeryHidden_(sheet);
     }
 
     // Add error row
@@ -488,7 +488,7 @@ function showErrorLog() {
     return;
   }
 
-  sheet.showSheet();
+  setSheetVisible_(sheet);
   ss.setActiveSheet(sheet);
 }
 
@@ -798,6 +798,237 @@ var HIDDEN_SHEETS = {
   SURVEY_TRACKING: '_Survey_Tracking',
   SURVEY_VAULT: '_Survey_Vault'
 };
+
+// ============================================================================
+// HIDDEN SHEET ENFORCEMENT - Mobile-safe hiding via Sheets API
+// ============================================================================
+// Google Sheets mobile can display sheets hidden with hideSheet().
+// These helpers use the Sheets Advanced Service (API v4) to set hidden=true
+// at the API level AND apply sheet protection so the sheets stay invisible
+// and uneditable even on mobile devices.
+// Requires: Sheets Advanced Service enabled in appsscript.json
+
+/**
+ * Protection description used to identify auto-protections on hidden sheets.
+ * @const {string}
+ * @private
+ */
+var HIDDEN_SHEET_PROTECTION_DESC_ = 'Hidden Sheet — Auto Protected';
+
+/**
+ * Hides a sheet using the Sheets Advanced Service and applies protection.
+ * This is more robust than sheet.hideSheet() alone because:
+ *   1. The API-level hide is better enforced on Google Sheets mobile.
+ *   2. Sheet protection prevents editing even if a mobile user discovers the tab.
+ *
+ * Falls back to sheet.hideSheet() if the Advanced Service is unavailable.
+ *
+ * @param {Sheet} sheet - The sheet to hide
+ * @private
+ */
+function setSheetVeryHidden_(sheet) {
+  if (!sheet) return;
+
+  // 1. Hide via Sheets Advanced Service (API v4) for stronger mobile enforcement
+  try {
+    var ssId = sheet.getParent().getId();
+    Sheets.Spreadsheets.batchUpdate({
+      requests: [{
+        updateSheetProperties: {
+          properties: {
+            sheetId: sheet.getSheetId(),
+            hidden: true
+          },
+          fields: 'hidden'
+        }
+      }]
+    }, ssId);
+  } catch (_apiError) {
+    // Fallback: use standard hideSheet() if Advanced Service is not available
+    try {
+      sheet.hideSheet();
+    } catch (_hideError) {
+      Logger.log('Could not hide sheet "' + sheet.getName() + '": ' + _hideError.message);
+    }
+  }
+
+  // 2. Apply protection so the sheet cannot be edited even if visible on mobile
+  protectHiddenSheet_(sheet);
+}
+
+/**
+ * Shows a previously very-hidden sheet (for admin viewing).
+ * Removes the auto-protection so the admin can inspect the sheet.
+ *
+ * @param {Sheet} sheet - The sheet to show
+ * @private
+ */
+function setSheetVisible_(sheet) {
+  if (!sheet) return;
+
+  // 1. Show via Sheets Advanced Service
+  try {
+    var ssId = sheet.getParent().getId();
+    Sheets.Spreadsheets.batchUpdate({
+      requests: [{
+        updateSheetProperties: {
+          properties: {
+            sheetId: sheet.getSheetId(),
+            hidden: false
+          },
+          fields: 'hidden'
+        }
+      }]
+    }, ssId);
+  } catch (_apiError) {
+    // Fallback
+    try {
+      sheet.showSheet();
+    } catch (_showError) {
+      Logger.log('Could not show sheet "' + sheet.getName() + '": ' + _showError.message);
+    }
+  }
+
+  // 2. Remove the auto-protection so admin can inspect the data
+  removeHiddenSheetProtection_(sheet);
+}
+
+/**
+ * Applies sheet protection to a hidden sheet.
+ * Only the spreadsheet owner / script installer can edit.
+ * Skips if a protection with the same description already exists.
+ *
+ * @param {Sheet} sheet - The sheet to protect
+ * @private
+ */
+function protectHiddenSheet_(sheet) {
+  if (!sheet) return;
+
+  // Check for existing protection
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === HIDDEN_SHEET_PROTECTION_DESC_) {
+      return; // already protected
+    }
+  }
+
+  try {
+    var protection = sheet.protect().setDescription(HIDDEN_SHEET_PROTECTION_DESC_);
+    protection.setWarningOnly(false);
+
+    // Remove all editors except the owner (script installer)
+    var editors = protection.getEditors();
+    if (editors.length > 0) {
+      protection.removeEditors(editors);
+    }
+    // The owner is always retained by Google Sheets automatically
+  } catch (_e) {
+    Logger.log('Could not protect sheet "' + sheet.getName() + '": ' + _e.message);
+  }
+}
+
+/**
+ * Removes the auto-protection placed by setSheetVeryHidden_().
+ *
+ * @param {Sheet} sheet - The sheet to unprotect
+ * @private
+ */
+function removeHiddenSheetProtection_(sheet) {
+  if (!sheet) return;
+
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === HIDDEN_SHEET_PROTECTION_DESC_) {
+      protections[i].remove();
+    }
+  }
+}
+
+/**
+ * Enforces hidden state on ALL sheets that should be hidden.
+ * Checks every sheet whose name starts with '_' (the project convention for hidden sheets).
+ * Safe to call from onOpen() and from a time-driven trigger.
+ *
+ * @returns {Object} Result with counts of sheets checked and enforced
+ */
+function enforceHiddenSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var allSheets = ss.getSheets();
+  var enforced = 0;
+  var checked = 0;
+
+  // Collect all known hidden sheet names from both HIDDEN_SHEETS and SHEETS constants
+  var knownHiddenNames = {};
+  for (var key in HIDDEN_SHEETS) {
+    knownHiddenNames[HIDDEN_SHEETS[key]] = true;
+  }
+  // Also include the error log sheet
+  knownHiddenNames[ERROR_CONFIG.LOG_SHEET_NAME] = true;
+
+  for (var i = 0; i < allSheets.length; i++) {
+    var sheet = allSheets[i];
+    var name = sheet.getName();
+
+    // A sheet should be hidden if its name starts with '_' or is in the known list
+    if (name.charAt(0) === '_' || knownHiddenNames[name]) {
+      checked++;
+
+      if (!sheet.isSheetHidden()) {
+        // Sheet should be hidden but isn't — enforce
+        setSheetVeryHidden_(sheet);
+        enforced++;
+      } else {
+        // Already hidden — ensure protection is in place
+        protectHiddenSheet_(sheet);
+      }
+    }
+  }
+
+  if (enforced > 0) {
+    Logger.log('enforceHiddenSheets: re-hid ' + enforced + ' of ' + checked + ' hidden sheets');
+  }
+
+  return { checked: checked, enforced: enforced };
+}
+
+/**
+ * Installs a time-driven trigger that enforces hidden sheets every hour.
+ * Prevents mobile users from accessing hidden sheets between spreadsheet opens.
+ */
+function installHiddenSheetEnforcerTrigger() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
+
+  // Check if trigger already exists
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'enforceHiddenSheets') {
+      Logger.log('Hidden sheet enforcer trigger already installed');
+      return;
+    }
+  }
+
+  ScriptApp.newTrigger('enforceHiddenSheets')
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  Logger.log('Installed hourly hidden-sheet enforcer trigger');
+}
+
+/**
+ * Removes the hidden-sheet enforcer trigger.
+ */
+function removeHiddenSheetEnforcerTrigger() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
+
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'enforceHiddenSheets') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      Logger.log('Removed hidden-sheet enforcer trigger');
+    }
+  }
+}
 
 // ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System
@@ -1932,6 +2163,19 @@ function getColumnNumber(columnLetter) {
 }
 
 /**
+ * Safe accessor for numeric fields — returns the value as-is when it's a
+ * number (including 0), and '' for null/undefined/empty-string.
+ * Avoids the `value || ''` pitfall where 0 is treated as falsy.
+ * @param {*} value - Cell value
+ * @returns {number|string}
+ * @private
+ */
+function numericField_(value) {
+  if (value === null || value === undefined || value === '') return '';
+  return value;
+}
+
+/**
  * Map a Member Directory row array to a structured object
  * @param {Array} row - Row data array from Member Directory
  * @returns {Object} Structured member object
@@ -1958,8 +2202,8 @@ function mapMemberRow(row) {
     assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',
     lastVirtualMtg: row[MEMBER_COLS.LAST_VIRTUAL_MTG - 1] || '',
     lastInPersonMtg: row[MEMBER_COLS.LAST_INPERSON_MTG - 1] || '',
-    openRate: row[MEMBER_COLS.OPEN_RATE - 1] || '',
-    volunteerHours: row[MEMBER_COLS.VOLUNTEER_HOURS - 1] || '',
+    openRate: numericField_(row[MEMBER_COLS.OPEN_RATE - 1]),
+    volunteerHours: numericField_(row[MEMBER_COLS.VOLUNTEER_HOURS - 1]),
     interestLocal: row[MEMBER_COLS.INTEREST_LOCAL - 1] || '',
     interestChapter: row[MEMBER_COLS.INTEREST_CHAPTER - 1] || '',
     interestAllied: row[MEMBER_COLS.INTEREST_ALLIED - 1] || '',
@@ -1999,9 +2243,9 @@ function mapGrievanceRow(row) {
     step3AppealDue: row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1] || '',
     step3AppealFiled: row[GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1] || '',
     dateClosed: row[GRIEVANCE_COLS.DATE_CLOSED - 1] || '',
-    daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || '',
+    daysOpen: numericField_(row[GRIEVANCE_COLS.DAYS_OPEN - 1]),
     nextActionDue: row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] || '',
-    daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] || '',
+    daysToDeadline: numericField_(row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1]),
     articles: row[GRIEVANCE_COLS.ARTICLES - 1] || '',
     issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
     memberEmail: row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] || '',
@@ -2414,11 +2658,14 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
       { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
     ],
+    // ISSUE_CATEGORY and ARTICLES are multi-select columns (comma-separated values).
+    // They live in MULTI_SELECT_COLS.GRIEVANCE_LOG, NOT here.
+    // Keeping them here caused setupDataValidations() to apply single-select first,
+    // then multi-select would overwrite — wasting a sheet API call and risking the
+    // wrong validation type if execution order ever changed.
     GRIEVANCE_LOG: [
       { col: GRIEVANCE_COLS.STATUS,         configCol: CONFIG_COLS.GRIEVANCE_STATUS },
-      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP },
-      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY },
-      { col: GRIEVANCE_COLS.ARTICLES,       configCol: CONFIG_COLS.ARTICLES }
+      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP }
     ]
   };
 }

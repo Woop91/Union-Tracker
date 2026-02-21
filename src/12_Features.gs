@@ -1330,8 +1330,8 @@ function setupChecklistCalcSheet() {
   sheet.setColumnWidth(7, 100);  // All Required Done
   sheet.setColumnWidth(8, 120);  // Display String
 
-  // Hide the sheet
-  sheet.hideSheet();
+  // Hide the sheet (mobile-safe via Sheets API + protection)
+  setSheetVeryHidden_(sheet);
 
   Logger.log('_Checklist_Calc sheet setup complete with self-healing formulas');
   return sheet;
@@ -1676,7 +1676,7 @@ function repairDynamicFormulas() {
 
   if (!calcSheet) {
     calcSheet = ss.insertSheet(EXTENSION_CONFIG.HIDDEN_CALC_SHEET);
-    calcSheet.hideSheet();
+    setSheetVeryHidden_(calcSheet);
   }
 
   const startRow = EXTENSION_CONFIG.DYNAMIC_FORMULA_ROW;
@@ -2583,7 +2583,7 @@ function setupLookerIntegration() {
 
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      sheet.hideSheet();
+      setSheetVeryHidden_(sheet);
       created.push(sheetName);
     }
   }
@@ -2799,8 +2799,8 @@ function refreshLookerGrievances_() {
       row[cols.INCIDENT_DATE - 1] || '',
       dateFiled || '',
       dateClosed || '',
-      row[cols.DAYS_OPEN - 1] || '',
-      daysToDeadline || '',
+      numericField_(row[cols.DAYS_OPEN - 1]),
+      numericField_(daysToDeadline),
       isOverdue ? 'Yes' : 'No',
       row[cols.ISSUE_CATEGORY - 1] || '',
       row[cols.ARTICLES - 1] || '',
@@ -3083,7 +3083,7 @@ function setupLookerAnonIntegration() {
 
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      sheet.hideSheet();
+      setSheetVeryHidden_(sheet);
       created.push(sheetName);
     }
   }
@@ -3310,8 +3310,8 @@ function refreshLookerAnonGrievances_() {
       closedMonth,
       closedQuarter,
       closedYear,
-      row[cols.DAYS_OPEN - 1] || '',
-      daysToDeadline || '',
+      numericField_(row[cols.DAYS_OPEN - 1]),
+      numericField_(daysToDeadline),
       isOverdue ? 'Yes' : 'No',
       row[cols.ISSUE_CATEGORY - 1] || '',
       row[cols.ARTICLES - 1] || '',

@@ -3552,7 +3552,7 @@ function syncConstantContactEngagement() {
         openRateUpdates.push([engagement.openRate]);
         contactDateUpdates.push([engagement.lastActivityDate || '']);
       } else {
-        openRateUpdates.push([memberData[i][MEMBER_COLS.OPEN_RATE - 1] || '']);
+        openRateUpdates.push([numericField_(memberData[i][MEMBER_COLS.OPEN_RATE - 1])]);
         contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
       }
 
@@ -3562,7 +3562,7 @@ function syncConstantContactEngagement() {
       }
     } else {
       // No CC match — preserve existing values
-      openRateUpdates.push([memberData[i][MEMBER_COLS.OPEN_RATE - 1] || '']);
+      openRateUpdates.push([numericField_(memberData[i][MEMBER_COLS.OPEN_RATE - 1])]);
       contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
     }
   }

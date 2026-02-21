@@ -569,8 +569,8 @@ function createMemberDirectory(ss) {
   });
 
   // Format numeric columns with comma separators
-  sheet.getRange(2, MEMBER_COLS.OPEN_RATE, 998, 1).setNumberFormat('#,##0.0');       // S - Open Rate %
-  sheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, 998, 1).setNumberFormat('#,##0');  // T - Volunteer Hours
+  sheet.getRange(2, MEMBER_COLS.OPEN_RATE, 998, 1).setNumberFormat('#,##0.0');       // T - Open Rate %
+  sheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, 998, 1).setNumberFormat('#,##0');  // U - Volunteer Hours
 
   // Columns AB-AD (Has Open Grievance?, Grievance Status, Days to Deadline)
   // are populated by syncGrievanceToMemberDirectory() with STATIC values
