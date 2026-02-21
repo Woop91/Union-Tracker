@@ -25848,7 +25848,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2963 lines)
+// SOURCE: 07_DevTools.gs (3107 lines)
 // ============================================================================
 
 /**
@@ -26605,22 +26605,166 @@ function seedSatisfactionData() {
 
 /**
  * Restore Config dropdowns AND re-apply dropdown validations to Member Directory and Grievance Log
- * This is the full restore function for use after nuking or when dropdowns are missing
+ * This is the full restore function for use after nuking or when dropdowns are missing.
+ *
+ * Three-phase restore:
+ *   1. seedConfigData()              – populate empty Config columns with defaults
+ *   2. restoreConfigFromSheetData_() – scan Member Directory & Grievance Log for values
+ *                                      that exist in the data but are missing from Config
+ *   3. setupDataValidations()        – re-apply dropdown validations to both sheets
  */
 function restoreConfigAndDropdowns() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  ss.toast('Restoring Config values...', '🔄 Restoring', 2);
+  ss.toast('Seeding default Config values...', '🔄 Restoring', 2);
 
-  // First, seed the Config values
+  // Phase 1: seed empty Config columns with defaults
   seedConfigData();
+
+  ss.toast('Scanning sheets for missing Config entries...', '🔄 Restoring', 2);
+
+  // Phase 2: restore any values present in Member Directory / Grievance Log
+  // but missing from Config (e.g., deleted during a merge or nuke)
+  restoreConfigFromSheetData_();
 
   ss.toast('Applying dropdown validations...', '🔄 Restoring', 2);
 
-  // Then, re-apply dropdown validations to Member Directory and Grievance Log
+  // Phase 3: re-apply dropdown validations to Member Directory and Grievance Log
   setupDataValidations();
 
   ss.toast('Config and dropdowns restored!', '✅ Success', 3);
+}
+
+/**
+ * Scans Member Directory and Grievance Log for values currently in use in
+ * dropdown/multi-select columns and adds any that are missing from the Config
+ * sheet.  This is the reverse of the live bidirectional sync — it bulk-restores
+ * Config entries after they have been accidentally deleted.
+ * @private
+ */
+function restoreConfigFromSheetData_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!configSheet) {
+    Logger.log('restoreConfigFromSheetData_: Config sheet not found');
+    return;
+  }
+
+  // Build a combined mapping of { configCol -> [sheetRef, targetCol] } from both
+  // DROPDOWN_MAP and MULTI_SELECT_COLS so we cover every linked column.
+  var mappings = [];
+
+  // Member Directory — single-select dropdowns
+  var memberDD = DROPDOWN_MAP.MEMBER_DIR;
+  for (var i = 0; i < memberDD.length; i++) {
+    // Skip Yes/No columns — those are presets, not user data
+    if (memberDD[i].configCol === CONFIG_COLS.YES_NO) continue;
+    mappings.push({ sheet: memberSheet, col: memberDD[i].col, configCol: memberDD[i].configCol });
+  }
+
+  // Member Directory — multi-select columns
+  var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
+  for (var j = 0; j < memberMS.length; j++) {
+    mappings.push({ sheet: memberSheet, col: memberMS[j].col, configCol: memberMS[j].configCol, multi: true });
+  }
+
+  // Grievance Log — single-select dropdowns
+  var grievDD = DROPDOWN_MAP.GRIEVANCE_LOG;
+  for (var k = 0; k < grievDD.length; k++) {
+    if (grievanceSheet) {
+      mappings.push({ sheet: grievanceSheet, col: grievDD[k].col, configCol: grievDD[k].configCol });
+    }
+  }
+
+  // Grievance Log — multi-select columns
+  var grievMS = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+  for (var l = 0; l < grievMS.length; l++) {
+    if (grievanceSheet) {
+      mappings.push({ sheet: grievanceSheet, col: grievMS[l].col, configCol: grievMS[l].configCol, multi: true });
+    }
+  }
+
+  // Also include JOB_METADATA_FIELDS for any columns not already covered
+  // (e.g., Stewards from the Assigned Steward column)
+  for (var m = 0; m < JOB_METADATA_FIELDS.length; m++) {
+    var jm = JOB_METADATA_FIELDS[m];
+    if (memberSheet) {
+      var alreadyMapped = false;
+      for (var n = 0; n < mappings.length; n++) {
+        if (mappings[n].sheet === memberSheet && mappings[n].col === jm.memberCol && mappings[n].configCol === jm.configCol) {
+          alreadyMapped = true;
+          break;
+        }
+      }
+      if (!alreadyMapped) {
+        mappings.push({ sheet: memberSheet, col: jm.memberCol, configCol: jm.configCol });
+      }
+    }
+  }
+
+  var totalRestored = 0;
+
+  // Process each mapping: read unique values from the sheet column, compare
+  // with Config, and add any missing values.
+  for (var p = 0; p < mappings.length; p++) {
+    var map = mappings[p];
+    if (!map.sheet) continue;
+
+    var sheetLastRow = map.sheet.getLastRow();
+    if (sheetLastRow < 2) continue; // No data rows
+
+    // Collect unique non-empty values from the data sheet column
+    var sheetData = map.sheet.getRange(2, map.col, sheetLastRow - 1, 1).getValues();
+    var uniqueValues = {};
+    for (var q = 0; q < sheetData.length; q++) {
+      var cellVal = (sheetData[q][0] || '').toString().trim();
+      if (!cellVal) continue;
+
+      if (map.multi) {
+        // Multi-select columns store comma-separated values
+        var parts = cellVal.split(',');
+        for (var r = 0; r < parts.length; r++) {
+          var part = parts[r].trim();
+          if (part) uniqueValues[part] = true;
+        }
+      } else {
+        uniqueValues[cellVal] = true;
+      }
+    }
+
+    // Get current Config values for this column
+    var existingConfig = getConfigValues(configSheet, map.configCol);
+    var existingSet = {};
+    for (var s = 0; s < existingConfig.length; s++) {
+      existingSet[existingConfig[s].toString().trim()] = true;
+    }
+
+    // Add missing values to Config
+    var missing = [];
+    for (var val in uniqueValues) {
+      if (!existingSet[val]) {
+        missing.push(val);
+      }
+    }
+
+    for (var t = 0; t < missing.length; t++) {
+      addToConfigDropdown_(map.configCol, missing[t]);
+      totalRestored++;
+    }
+  }
+
+  if (totalRestored > 0) {
+    Logger.log('restoreConfigFromSheetData_: restored ' + totalRestored + ' missing Config entries');
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Restored ' + totalRestored + ' entries from sheet data',
+      '🔄 Config Restore', 3
+    );
+  } else {
+    Logger.log('restoreConfigFromSheetData_: no missing entries found');
+  }
 }
 
 /**
@@ -34511,7 +34655,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4044 lines)
+// SOURCE: 09_Dashboards.gs (4050 lines)
 // ============================================================================
 
 /**
@@ -36790,6 +36934,12 @@ function syncAllData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
   ss.toast('Syncing all data...', 'Sync', 3);
+
+  // Restore any Config entries that exist in Member Directory / Grievance Log
+  // but are missing from the Config sheet (self-healing bidirectional sync)
+  if (typeof restoreConfigFromSheetData_ === 'function') {
+    try { restoreConfigFromSheetData_(); } catch (_e) { Logger.log('Config restore skipped: ' + _e.message); }
+  }
 
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();

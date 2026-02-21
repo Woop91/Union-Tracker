@@ -2275,6 +2275,12 @@ function syncAllData() {
   var ui = SpreadsheetApp.getUi();
   ss.toast('Syncing all data...', 'Sync', 3);
 
+  // Restore any Config entries that exist in Member Directory / Grievance Log
+  // but are missing from the Config sheet (self-healing bidirectional sync)
+  if (typeof restoreConfigFromSheetData_ === 'function') {
+    try { restoreConfigFromSheetData_(); } catch (_e) { Logger.log('Config restore skipped: ' + _e.message); }
+  }
+
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();
   syncMemberToGrievanceLog();
