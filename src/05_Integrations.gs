@@ -1106,47 +1106,6 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
 
 // Note: syncSingleGrievanceToCalendar() is defined in MobileQuickActions.gs
 
-/**
- * Clears all calendar events created by the dashboard
- * @return {Object} Result with count of deleted events
- */
-function clearAllCalendarEvents() {
-  try {
-    const calendar = getOrCreateDeadlinesCalendar();
-
-    // Get all events from 1 year ago until 1 year from now
-    const startDate = new Date();
-    startDate.setFullYear(startDate.getFullYear() - 1);
-    const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1);
-
-    const events = calendar.getEvents(startDate, endDate, {
-      search: '[GRV]'
-    });
-
-    let deleted = 0;
-    for (const event of events) {
-      event.deleteEvent();
-      deleted++;
-
-      // Rate limiting
-      if (deleted % 50 === 0) {
-        Utilities.sleep(200);
-      }
-    }
-
-    return {
-      success: true,
-      deleted: deleted,
-      message: `Deleted ${deleted} calendar events`
-    };
-
-  } catch (error) {
-    console.error('Error clearing calendar:', error);
-    return errorResponse(error.message);
-  }
-}
-
 // ============================================================================
 // EMAIL NOTIFICATIONS
 // ============================================================================
@@ -1543,14 +1502,6 @@ function showCalendarSyncDialog() {
           </button>
         </div>
 
-        <div class="sync-option">
-          <h4>Clear All Events</h4>
-          <p>Removes all grievance-related events from the calendar</p>
-          <button class="btn btn-danger" onclick="clearAll()" style="margin-top: 10px;">
-            Clear Calendar
-          </button>
-        </div>
-
         <div id="status" class="status"></div>
 
         <div class="action-buttons">
@@ -1573,16 +1524,6 @@ function showCalendarSyncDialog() {
               showStatus(r.success ? r.message : 'Error: ' + r.error, !r.success);
             })
             .syncDeadlinesToCalendar();
-        }
-
-        function clearAll() {
-          if (!confirm('Are you sure you want to clear all grievance events from the calendar?')) return;
-          showStatus('Clearing...', false);
-          google.script.run
-            .withSuccessHandler(function(r) {
-              showStatus(r.success ? r.message : 'Error: ' + r.error, !r.success);
-            })
-            .clearAllCalendarEvents();
         }
       </script>
     </body>
@@ -1638,25 +1579,6 @@ function showUpcomingDeadlines() {
   `).setWidth(600).setHeight(400);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Upcoming Deadlines');
-}
-
-/**
- * Shows confirmation dialog for clearing calendar
- */
-function showClearCalendarConfirm() {
-  const result = showConfirmation(
-    'This will delete ALL grievance-related events from your calendar. This cannot be undone. Continue?',
-    'Clear Calendar Events'
-  );
-
-  if (result) {
-    const clearResult = clearAllCalendarEvents();
-    if (clearResult.success) {
-      showToast(clearResult.message, 'Calendar Cleared');
-    } else {
-      showAlert('Error: ' + clearResult.error, 'Error');
-    }
-  }
 }
 /**
  * ============================================================================

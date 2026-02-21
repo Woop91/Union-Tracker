@@ -97,8 +97,7 @@ function createDashboardMenu() {
       .addItem('✅ Open Meeting Check-In', 'showMeetingCheckInDialog')
       .addSeparator()
       .addItem('🔗 Sync Deadlines', 'syncDeadlinesToCalendar')
-      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar')
-      .addItem('🗑️ Clear Calendar Events', 'clearAllCalendarEvents'))
+      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar'))
 
     .addSubMenu(ui.createMenu('📁 Google Drive')
       .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
