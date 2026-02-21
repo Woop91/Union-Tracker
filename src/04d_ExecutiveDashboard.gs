@@ -687,8 +687,8 @@ function showStewardPerformanceModal_UIService_() {
     var winClass = s.winRate >= 70 ? 'win-high' : (s.winRate >= 40 ? 'win-med' : 'win-low');
 
     html += '<tr>' +
-      '<td><strong>' + firstName + ' ' + lastName + '</strong></td>' +
-      '<td>' + unit + '</td>' +
+      '<td><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) + '</strong></td>' +
+      '<td>' + escapeHtml(unit) + '</td>' +
       '<td>' + (s.activeCases || 0) + '</td>' +
       '<td>' + (s.totalCases || 0) + '</td>' +
       '<td><span class="win-rate ' + winClass + '">' + (s.winRate || 0) + '%</span></td>' +

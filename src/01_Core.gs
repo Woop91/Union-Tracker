@@ -445,7 +445,7 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 7,
+  minor: 9,
   patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
@@ -540,7 +540,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.7.0",
+  VERSION: "4.9.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -669,11 +669,11 @@ function getLocalNumberFromConfig_() {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 7,
+  MINOR: 9,
   PATCH: 0,
-  BUILD: 'v4.7.0',
-  CURRENT: '4.7.0',
-  BUILD_DATE: '2026-02-14',
+  BUILD: 'v4.9.0',
+  CURRENT: '4.9.0',
+  BUILD_DATE: '2026-02-17',
   CODENAME: 'Security Hardening & Code Quality'
 };
 

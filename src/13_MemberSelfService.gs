@@ -1143,7 +1143,7 @@ function updateMemberContact(sessionToken, updates) {
         value = formatPhoneNumber_(value);
       }
 
-      sheet.getRange(memberRow, fieldMapping[field]).setValue(value);
+      sheet.getRange(memberRow, fieldMapping[field]).setValue(escapeForFormula(value));
       updated.push(field);
     }
   }

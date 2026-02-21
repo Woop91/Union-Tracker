@@ -498,15 +498,16 @@ function getImportDialogHtml_() {
     '<button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
     '</div></div>' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'function previewData() {' +
     '  var csv = document.getElementById("csvData").value.trim();' +
     '  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }' +
     '  var rows = parseCSV(csv);' +
     '  if (rows.length < 2) { showStatus("Need at least a header row and one data row", "error"); return; }' +
     '  document.getElementById("rowCount").textContent = rows.length - 1;' +
-    '  var previewHtml = "<div class=\\"preview-row\\"><strong>" + rows[0].join(" | ") + "</strong></div>";' +
+    '  var previewHtml = "<div class=\\"preview-row\\"><strong>" + rows[0].map(function(c){return escapeHtml(c)}).join(" | ") + "</strong></div>";' +
     '  for (var i = 1; i < Math.min(rows.length, 6); i++) {' +
-    '    previewHtml += "<div class=\\"preview-row\\">" + rows[i].join(" | ") + "</div>";' +
+    '    previewHtml += "<div class=\\"preview-row\\">" + rows[i].map(function(c){return escapeHtml(c)}).join(" | ") + "</div>";' +
     '  }' +
     '  if (rows.length > 6) previewHtml += "<div class=\\"preview-row\\">... and " + (rows.length - 6) + " more rows</div>";' +
     '  document.getElementById("preview").innerHTML = previewHtml;' +

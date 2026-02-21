@@ -210,7 +210,7 @@ function sendContactInfoForm() {
   if (response === ui.Button.YES) {
     // Open form in new window
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
     ).setWidth(1).setHeight(1);
     ui.showModalDialog(html, 'Opening form...');
   } else if (response === ui.Button.NO) {
@@ -619,7 +619,7 @@ function getSatisfactionSurveyLink() {
   if (response === ui.Button.YES) {
     // Open form in new window
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
     ).setWidth(1).setHeight(1);
     ui.showModalDialog(html, 'Opening survey...');
   } else if (response === ui.Button.NO) {
@@ -1830,7 +1830,9 @@ function sendSurveyCompletionReminders() {
 
     // Skip if reminder was sent within cooldown period
     if (lastReminder) {
-      var daysSinceReminder = (now - new Date(lastReminder)) / (1000 * 60 * 60 * 24);
+      var reminderDate = new Date(lastReminder);
+      if (isNaN(reminderDate.getTime())) continue;
+      var daysSinceReminder = (now - reminderDate) / (1000 * 60 * 60 * 24);
       if (daysSinceReminder < cooldownDays) {
         skippedCount++;
         continue;

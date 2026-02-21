@@ -8,6 +8,7 @@
 **Version:** 4.9.0 (as of 2026-02-17)
 **Previous Review:** 2026-02-14 (v4.7.0 — 69 issues, 57 fixed)
 **This Update:** Re-verification pass with cross-cutting pattern searches — 33 new findings added (F76–F108), 1 false positive corrected (F94)
+**Fix Pass:** 2026-02-21 — 30 findings fixed across 16 files (see individual finding annotations below)
 
 ---
 
@@ -15,7 +16,7 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review identifies **152 active findings** across all severity levels (120 original + 33 new from re-verification − 1 false positive). All original findings were re-verified — **none have been fixed since the initial review**.
+This line-by-line review originally identified **152 active findings** across all severity levels. The 2026-02-21 fix pass addressed **30 findings** (8 CRITICAL, 8 HIGH, 11 MEDIUM, 3 infrastructure). **122 findings remain open**. Additionally, 5 findings (F34a, F34b, F34c, F35b, F35c, F96) were re-verified as **already fixed or false positives** — the original review incorrectly flagged code that was already using `escapeHtml()` or `JSON.stringify()`.
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
@@ -173,8 +174,9 @@ If this function fires before `COMMAND_CONFIG` is fully loaded (e.g., during ini
 
 ---
 
-#### F10. `VERSION_INFO` (4.7.0) disagrees with `package.json` and `CHANGELOG.md` (4.9.0)
+#### F10. ~~`VERSION_INFO` (4.7.0) disagrees with `package.json` and `CHANGELOG.md` (4.9.0)~~ **FIXED**
 **Severity:** HIGH | **Category:** Bug | **Lines:** 670-678
+**Fixed:** Updated `VERSION_INFO`, `API_VERSION`, and `COMMAND_CONFIG.VERSION` to 4.9.0 in `01_Core.gs`. Updated `package.json` to 4.9.0.
 
 ```javascript
 var VERSION_INFO = {
@@ -214,8 +216,9 @@ Marked `@deprecated v4.3.2` but the constant and its aliases (`REPORTS`) remain.
 
 ---
 
-#### F14. `MEMBER_COLS.STATE` used as array length in `importMembersFromData`
+#### F14. ~~`MEMBER_COLS.STATE` used as array length in `importMembersFromData`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Bug | **Lines (02_DataManagers.gs):** 1307, 1434
+**Fixed:** Both instances changed to `new Array(MEMBER_HEADER_MAP_.length).fill('')`.
 
 ```javascript
 var newRow = new Array(MEMBER_COLS.STATE).fill('');
@@ -293,8 +296,9 @@ The loop from 100 to 999 could be slow if many IDs with the same prefix exist. N
 
 ---
 
-#### F19. CSV import preview injects unsanitized data into HTML
+#### F19. ~~CSV import preview injects unsanitized data into HTML~~ **FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Lines (client-side JS):** 1115-1125
+**Fixed:** Added `getClientSideEscapeHtml()` to the CSV dialog script block and wrapped `h` and `cell` values with `escapeHtml()` in `showPreview()`.
 
 ```javascript
 '  csvHeaders.forEach(function(h) { html += "<th>" + h + "</th>"; });
@@ -328,8 +332,9 @@ The export function should verify the user has appropriate permissions before al
 
 **Findings:**
 
-#### F22. CRITICAL: XSS in mobile grievance list — `innerHTML` with unescaped data
+#### F22. ~~CRITICAL: XSS in mobile grievance list — `innerHTML` with unescaped data~~ **FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Line:** 1282
+**Fixed:** Added `getClientSideEscapeHtml()` and wrapped `g.id`, `g.status`, `g.memberName`, `g.issueType`, `g.filedDate` with `escapeHtml()`.
 
 The client-side `render()` function in `showMobileGrievanceList()` injects grievance data directly into `innerHTML` without escaping. Member names, issue types, and statuses from the spreadsheet are concatenated into HTML without `escapeHtml`:
 
@@ -343,8 +348,9 @@ c.innerHTML=data.map(function(g){
 
 ---
 
-#### F22a. CRITICAL: XSS in mobile unified search — `innerHTML` with unescaped data
+#### F22a. ~~CRITICAL: XSS in mobile unified search — `innerHTML` with unescaped data~~ **FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Line:** 1325
+**Fixed:** Added `getClientSideEscapeHtml()` and wrapped `r.title`, `r.subtitle`, `r.detail` with `escapeHtml()`.
 
 Same pattern — `r.title`, `r.subtitle`, `r.detail` from `getMobileSearchData()` (member names, emails, grievance IDs) injected into `innerHTML` without escaping.
 
@@ -352,8 +358,9 @@ Same pattern — `r.title`, `r.subtitle`, `r.detail` from `getMobileSearchData()
 
 ---
 
-#### F22b. CRITICAL: XSS in advanced search results — missing client-side escapeHtml
+#### F22b. ~~CRITICAL: XSS in advanced search results — missing client-side escapeHtml~~ **FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Lines:** 2725-2733
+**Fixed:** Added `getClientSideEscapeHtml()` to advanced search script block. Replaced inline onclick injection with `data-id`/`data-type` attributes and `this.dataset` access. Wrapped all `<td>` values with `escapeHtml()`.
 
 The advanced search results table injects `r.name`, `r.details`, `r.status` directly into `innerHTML`. While `getClientSideEscapeHtml()` is included in the desktop search dialog (line 2383), it is NOT included in the advanced search dialog script block, so `escapeHtml` would be undefined.
 
@@ -361,8 +368,9 @@ The advanced search results table injects `r.name`, `r.details`, `r.status` dire
 
 ---
 
-#### F22c. CRITICAL: XSS in desktop search via `onclick` attribute injection
+#### F22c. ~~CRITICAL: XSS in desktop search via `onclick` attribute injection~~ **FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Line:** 2363
+**Fixed:** Replaced inline onclick string concatenation with `data-id`/`data-type` attributes and `this.dataset.id`/`this.dataset.type` access pattern.
 
 `item.id` and `item.type` are injected into an `onclick` attribute via string concatenation. A crafted ID like `'); alert('xss` breaks out of the JS string context. HTML entity escaping is insufficient for JS within event handlers.
 
@@ -374,8 +382,9 @@ html += '<div onclick="selectResult(\'' + item.id + '\', \'' + item.type + '\')"
 
 ---
 
-#### F23. Unescaped grievance data in `showGrievanceQuickActions()`
+#### F23. ~~Unescaped grievance data in `showGrievanceQuickActions()`~~ **FIXED**
 **Severity:** HIGH | **Category:** Security | **Lines:** 1600-1611
+**Fixed:** Wrapped `grievanceId`, `name`, `memberId`, `memberEmail`, `status`, `step` with `escapeHtml()` for HTML context. Replaced onclick string concatenation with `JSON.stringify()` for JS context. Also fixed F23c (missing grievanceId argument to `setupDriveFolderForGrievance`).
 
 `grievanceId`, `name`, `memberId`, `memberEmail`, `status`, `step` are all interpolated directly into HTML without `escapeHtml()`. Compare to `showMemberQuickActions()` (line 1526) which correctly uses `escapeHtml()`.
 
@@ -557,8 +566,9 @@ Some email functions check the quota, others don't. When the 100 email/day limit
 
 ---
 
-#### F34a. XSS via URL injection in `setupFolderForSelectedGrievance()`
+#### F34a. ~~XSS via URL injection in `setupFolderForSelectedGrievance()`~~ **VERIFIED ALREADY FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Lines:** 254-257
+**Verified:** Code at line 269 already uses `JSON.stringify(existingUrl)`. This was a false positive in the original review.
 
 The `existingUrl` value is read from a cell and interpolated into a `<script>` tag without escaping:
 
@@ -573,8 +583,9 @@ A URL containing `"` or `</script>` enables arbitrary JS execution. Compare with
 
 ---
 
-#### F34b. XSS via URL injection in `createPDFForSelectedGrievance()`
+#### F34b. ~~XSS via URL injection in `createPDFForSelectedGrievance()`~~ **VERIFIED ALREADY FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Lines:** 1402-1404
+**Verified:** Code at line 1381 already uses `JSON.stringify(folder.getUrl())`. This was a false positive in the original review.
 
 Same pattern — `folder.getUrl()` is interpolated into raw HTML without escaping.
 
@@ -582,8 +593,9 @@ Same pattern — `folder.getUrl()` is interpolated into raw HTML without escapin
 
 ---
 
-#### F34c. HTML injection in email bodies — member names unescaped
+#### F34c. ~~HTML injection in email bodies — member names unescaped~~ **VERIFIED ALREADY FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Lines:** 520-546, 715-721
+**Verified:** Code at lines 539-542 and 559 already uses `escapeHtml()` for all dynamic values in email HTML. This was a false positive in the original review.
 
 In `emailMeetingAttendanceReport()` and `emailMeetingDocLink()`, member names, IDs, meeting names, and URLs are interpolated directly into HTML email bodies without `escapeHtml()`. A member name like `<img src=x onerror=alert(1)>` would execute in email clients that render HTML.
 
@@ -637,8 +649,9 @@ Audit log entries contain the full user email address. This is PII and should be
 
 ---
 
-#### F35b. Missing HTML escaping in audit log viewer
+#### F35b. ~~Missing HTML escaping in audit log viewer~~ **VERIFIED ALREADY FIXED**
 **Severity:** HIGH | **Category:** Security | **Lines:** 2910-2928
+**Verified:** Code at lines 2920-2923 already uses `escapeHtml(String(...))` for all dynamic values. This was a false positive in the original review.
 
 In `showAuditLogViewer()`, audit log details (which can contain user-supplied data) are rendered into HTML without escaping. If a field edit included `<script>` content, it would be logged and rendered unsafely.
 
@@ -646,8 +659,9 @@ In `showAuditLogViewer()`, audit log details (which can contain user-supplied da
 
 ---
 
-#### F35c. Steward workload dashboard missing XSS escaping
+#### F35c. ~~Steward workload dashboard missing XSS escaping~~ **VERIFIED ALREADY FIXED**
 **Severity:** HIGH | **Category:** Security | **Lines:** 2549-2569
+**Verified:** Code at lines 2556-2558 already uses `escapeHtml(String(...))` for steward names and counts. This was a false positive in the original review.
 
 In `showStewardWorkloadDashboard()`, steward names are injected directly into HTML without `escapeHtml()`.
 
@@ -1018,8 +1032,9 @@ The 2.5MB consolidated output has no way to trace errors back to source files. C
 
 ---
 
-#### F67a. Build header hardcodes version 4.6.0
+#### F67a. ~~Build header hardcodes version 4.6.0~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Bug | **Line:** 83
+**Fixed:** Version now reads dynamically from `require('./package.json').version`.
 
 The build header template embeds `Version: 4.6.0` as a hardcoded string, but `package.json` says `4.7.0` and the CHANGELOG says `4.9.0`. Three different version numbers.
 
@@ -1027,8 +1042,9 @@ The build header template embeds `Version: 4.6.0` as a hardcoded string, but `pa
 
 ---
 
-#### F67b. HTML embedding escapes ALL `$` characters, corrupting currency and CSS
+#### F67b. ~~HTML embedding escapes ALL `$` characters, corrupting currency and CSS~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Bug | **Line:** 146
+**Fixed:** Changed `replace(/\$/g, '\\$')` to `replace(/\$\{/g, '\\${')` — only escapes template literal interpolation, not plain `$`.
 
 The HTML embedding logic replaces all `$` with `\$` to prevent template literal interpolation. This corrupts `$100` to `\$100` and jQuery selectors like `$('.class')` to `\$('.class')`.
 
@@ -1036,8 +1052,9 @@ The HTML embedding logic replaces all `$` with `\$` to prevent template literal 
 
 ---
 
-#### F67c. `lint()` uses deprecated `--ext` flag for ESLint 9.x
+#### F67c. ~~`lint()` uses deprecated `--ext` flag for ESLint 9.x~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Bug | **Line:** 170
+**Fixed:** Removed `--ext .gs` flag from `lint()` in `build.js`.
 
 In ESLint 9 flat config, `--ext` is deprecated and ignored. File extensions are determined by `files` patterns in the config.
 
@@ -1045,8 +1062,9 @@ In ESLint 9 flat config, `--ext` is deprecated and ignored. File extensions are 
 
 ---
 
-#### F67d. `BUILD_ORDER` const array is mutated for production builds
+#### F67d. ~~`BUILD_ORDER` const array is mutated for production builds~~ **FIXED**
 **Severity:** LOW | **Category:** Quality | **Lines:** 219-220
+**Fixed:** Changed from `.length = 0; .push(...)` to `.splice(0, BUILD_ORDER.length, ...)` with comment about using filtered copy.
 
 `BUILD_ORDER` is `const` but contents are mutated via `.length = 0; .push(...)`. Create a filtered copy instead.
 
@@ -1056,8 +1074,9 @@ In ESLint 9 flat config, `--ext` is deprecated and ignored. File extensions are 
 
 **Findings:**
 
-#### F68. Version 4.7.0 in package.json doesn't match CHANGELOG 4.9.0
+#### F68. ~~Version 4.7.0 in package.json doesn't match CHANGELOG 4.9.0~~ **FIXED**
 **Severity:** HIGH | **Category:** Bug | **Line:** 3
+**Fixed:** Updated `package.json` version to `4.9.0`.
 
 ```json
 "version": "4.7.0",
@@ -1085,8 +1104,9 @@ Should be `"4.9.0"` per the CHANGELOG.
 
 **Findings:**
 
-#### F69. Jest coverage on `.gs` files is never actually collected
+#### F69. ~~Jest coverage on `.gs` files is never actually collected~~ **FIXED**
 **Severity:** HIGH | **Category:** Bug | **Lines:** 7-16
+**Fixed:** Removed misleading `collectCoverageFrom` and `coverageThreshold` settings from `jest.config.js`. Coverage is now reported only for files Jest actually instruments (test helpers).
 
 `collectCoverageFrom` targets `src/**/*.gs`, but there is no `transform` or `moduleFileExtensions` config to teach Jest to process `.gs` files. Source files are loaded via `eval()` in `test/load-source.js`, which bypasses Jest's instrumentation. The 100% line coverage threshold is never enforced — it passes trivially because there are zero covered files.
 
@@ -1126,8 +1146,9 @@ Using `actions/checkout@v4` instead of SHA pinning leaves CI vulnerable to suppl
 
 ---
 
-#### F71a. `npm audit` failure is silently swallowed
+#### F71a. ~~`npm audit` failure is silently swallowed~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Security | **Line:** 34
+**Fixed:** Replaced `|| true` with `continue-on-error: true` so audit failures are visible but non-blocking.
 
 `npm audit --audit-level=high || true` ensures exit code is always 0. Even high-severity vulnerabilities never fail the build.
 
@@ -1135,8 +1156,9 @@ Using `actions/checkout@v4` instead of SHA pinning leaves CI vulnerable to suppl
 
 ---
 
-#### F71b. No npm cache configured in CI
+#### F71b. ~~No npm cache configured in CI~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Performance | **Lines:** 18-24
+**Fixed:** Added `cache: 'npm'` to `actions/setup-node` in CI workflow.
 
 Every CI run downloads and installs all dependencies from scratch.
 
@@ -1144,8 +1166,9 @@ Every CI run downloads and installs all dependencies from scratch.
 
 ---
 
-#### F71c. CI uses EOL Node.js 18
+#### F71c. ~~CI uses EOL Node.js 18~~ **FIXED**
 **Severity:** LOW | **Category:** Quality | **Line:** 21
+**Fixed:** Updated Node.js version from 18 to 20 in CI workflow.
 
 Node.js 18 reached EOL in April 2025. Update to Node.js 20 or 22.
 
@@ -1155,8 +1178,9 @@ Node.js 18 reached EOL in April 2025. Update to Node.js 20 or 22.
 
 **Findings:**
 
-#### F72. Pre-commit hook lacks execute permission
+#### F72. ~~Pre-commit hook lacks execute permission~~ **FIXED**
 **Severity:** HIGH | **Category:** Bug
+**Fixed:** `chmod +x .husky/pre-commit`.
 
 The `pre-commit` hook has permissions `644` (rw-r--r--) while `commit-msg` has `755` (rwxr-xr-x). Without the execute bit, the pre-commit hook **silently fails to run** on Unix, meaning lint-staged and build verification are skipped on every commit.
 
@@ -1164,8 +1188,9 @@ The `pre-commit` hook has permissions `644` (rw-r--r--) while `commit-msg` has `
 
 ---
 
-#### F72a. Build errors in pre-commit are redirected to /dev/null
+#### F72a. ~~Build errors in pre-commit are redirected to /dev/null~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Maintainability | **Line:** 21
+**Fixed:** Changed `> /dev/null 2>&1` to `> /dev/null` — stderr now visible for debugging.
 
 Build output is suppressed with `> /dev/null 2>&1`. If the build fails, devs see only "Build failed" with no error details.
 
@@ -1300,14 +1325,15 @@ Consider adding a version-gated removal plan.
 
 ### Verification of Existing Findings
 
-All 120 original findings (F1–F75, CC1–CC7) were re-verified by reading the actual code at the cited lines. **None have been fixed.** Every CRITICAL and HIGH finding remains present in the current codebase.
+All 120 original findings (F1–F75, CC1–CC7) were re-verified by reading the actual code at the cited lines. The 2026-02-21 fix pass addressed 30 findings including all CRITICAL XSS vulnerabilities. See individual finding annotations for fix details.
 
 ---
 
 ### New Findings
 
-#### F76. XSS via `window.open()` in `08c_FormsAndNotifications.gs`
+#### F76. ~~XSS via `window.open()` in `08c_FormsAndNotifications.gs`~~ **FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Lines:** 213, 622
+**Fixed:** Both instances changed from string concatenation to `JSON.stringify(formUrl)`.
 
 ```javascript
 '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
@@ -1319,8 +1345,9 @@ All 120 original findings (F1–F75, CC1–CC7) were re-verified by reading the 
 
 ---
 
-#### F77. XSS via `window.open()` in `10d_SyncAndMaintenance.gs`
+#### F77. ~~XSS via `window.open()` in `10d_SyncAndMaintenance.gs`~~ **FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Lines:** 223, 233, 597
+**Fixed:** All three instances changed from string concatenation to `JSON.stringify(folderUrl)` / `JSON.stringify(formUrl)`.
 
 ```javascript
 '<script>window.open("' + folderUrl + '", "_blank");google.script.host.close();</script>'
@@ -1332,8 +1359,9 @@ Same pattern as F76 — `folderUrl` concatenated without `JSON.stringify()`. App
 
 ---
 
-#### F78. XSS via `innerHTML` in `05_Integrations.gs` overdue items
+#### F78. ~~XSS via `innerHTML` in `05_Integrations.gs` overdue items~~ **FIXED**
 **Severity:** CRITICAL | **Category:** Security | **Line:** 1928
+**Fixed:** Added `getClientSideEscapeHtml()` to script block. Wrapped `g.id`, `g.name`, `g.category`, `g.step` with `escapeHtml()`.
 
 ```javascript
 html+="<div class=\"overdue-item\"><div class=\"overdue-id\">"+(g.id||"")+"</div><div class=\"overdue-name\">"+(g.name||"")+"</div><div class=\"overdue-detail\">"+(g.category||"")+" • "+(g.step||"")+"</div></div>";
@@ -1345,8 +1373,9 @@ Grievance fields `g.id`, `g.name`, `g.category`, `g.step` are injected into `inn
 
 ---
 
-#### F79. XSS via unescaped `<td>` cells in `04d_ExecutiveDashboard.gs`
+#### F79. ~~XSS via unescaped `<td>` cells in `04d_ExecutiveDashboard.gs`~~ **FIXED**
 **Severity:** HIGH | **Category:** Security | **Lines:** 690-694
+**Fixed:** Wrapped `firstName`, `lastName`, `unit` with `escapeHtml()`.
 
 ```javascript
 '<td><strong>' + firstName + ' ' + lastName + '</strong></td>' +
@@ -1429,8 +1458,9 @@ const memberId = data[MEMBER_COLUMNS.ID];
 
 ---
 
-#### F85. Unescaped data in `composeEmailForMember()` dialog
+#### F85. ~~Unescaped data in `composeEmailForMember()` dialog~~ **FIXED**
 **Severity:** HIGH | **Category:** Security | **Line:** `03_UIComponents.gs:1656`
+**Fixed:** Wrapped `name`, `email`, `memberId` with `escapeHtml()` for HTML context. Replaced string concatenation with `JSON.stringify()` for JS `sendQuickEmail` call.
 
 ```javascript
 '<div class="info"><strong>' + name + '</strong> (' + memberId + ')<br>' + email + '</div>'
@@ -1444,8 +1474,9 @@ const memberId = data[MEMBER_COLUMNS.ID];
 
 ---
 
-#### F86. Unescaped error messages in search dialogs
+#### F86. ~~Unescaped error messages in search dialogs~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Security | **Lines:** `03_UIComponents.gs:2379, 2710`
+**Fixed:** Wrapped `error.message` and `e.message` with `escapeHtml()` in both locations.
 
 ```javascript
 // Line 2379 (desktop search):
@@ -1483,8 +1514,9 @@ Uses `GRIEVANCE_COLUMNS` (0-indexed) with `+ 1` for `getRange()` calls. While ma
 
 ---
 
-#### F88. Missing formula escaping in `13_MemberSelfService.gs`
+#### F88. ~~Missing formula escaping in `13_MemberSelfService.gs`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Security | **Line:** 1146
+**Fixed:** Added `escapeForFormula(value)` before `setValue()` call.
 
 ```javascript
 sheet.getRange(memberRow, fieldMapping[field]).setValue(value);
@@ -1510,8 +1542,9 @@ While most values are numeric (low risk), `data.monthlyFilings[m].month` could c
 
 ---
 
-#### F90. Incomplete XSS prevention in `10_Main.gs`
+#### F90. ~~Incomplete XSS prevention in `10_Main.gs`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Security | **Lines:** 1834-1839
+**Fixed:** Replaced regex character stripping with `JSON.stringify()` for both `memberId` and `memberName` in the `sessionStorage.setItem` script context.
 
 ```javascript
 const safeMemberId = String(memberId || '').replace(/['"\\<>&]/g, '');
@@ -1543,8 +1576,9 @@ Same pattern as F87 — uses `GRIEVANCE_COLUMNS` (0-indexed) with `+ 1` for `get
 
 ---
 
-#### F92. Unescaped grievance data in `showMemberGrievanceHistory()`
+#### F92. ~~Unescaped grievance data in `showMemberGrievanceHistory()`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Security | **Line:** `03_UIComponents.gs:1948`
+**Fixed:** Wrapped `g.id`, `g.status`, `g.step`, `g.issue` with `escapeHtml()`.
 
 ```javascript
 return '<div ...><strong>' + g.id + '</strong><br><span ...>Status: ' + g.status +
@@ -1583,8 +1617,9 @@ All `getLastRow() - 1` calls only execute when `getLastRow() >= 2`, so the resul
 
 ---
 
-#### F95. Unescaped CSV preview data in `04b_AccessibilityFeatures.gs`
+#### F95. ~~Unescaped CSV preview data in `04b_AccessibilityFeatures.gs`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Security | **Lines:** 505-515
+**Fixed:** Added `getClientSideEscapeHtml()` to script block. Wrapped CSV cell values with `.map(function(c){return escapeHtml(c)})` before `.join()`.
 
 ```javascript
 'previewHtml += "<div class=\\"preview-row\\">" + rows[i].join(" | ") + "</div>";'
@@ -1610,8 +1645,9 @@ Error messages from server responses are concatenated without escaping. If `show
 
 ---
 
-#### F97. Unescaped `data-search` attribute in `04e_PublicDashboard.gs`
+#### F97. ~~Unescaped `data-search` attribute in `04e_PublicDashboard.gs`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Security | **Line:** 2183
+**Fixed:** Wrapped the concatenated search string with `escapeHtml()` to prevent attribute breakout.
 
 ```javascript
 'data-search=\\""+((n.name||"")+" "+(n.date||"")+" "+(n.type||"")).toLowerCase()+"\\"'
@@ -1636,8 +1672,9 @@ Uses `MEMBER_COLUMNS` (0-indexed) with `+ 1` for `getRange()` instead of canonic
 
 ---
 
-#### F99. Hardcoded range limit `A2:A1000` in `08a_SheetSetup.gs`
+#### F99. ~~Hardcoded range limit `A2:A1000` in `08a_SheetSetup.gs`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Bug | **Line:** 354
+**Fixed:** Changed to `memberSheet.getLastRow()` dynamically with `Math.max(lastRow, 2)` guard.
 
 ```javascript
 var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + '1000');
@@ -1649,8 +1686,9 @@ Member ID validation dropdown is limited to 1000 rows. Unions with >1000 members
 
 ---
 
-#### F100. Division by zero risk in `08c_FormsAndNotifications.gs`
+#### F100. ~~Division by zero risk in `08c_FormsAndNotifications.gs`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Bug | **Line:** 1833
+**Fixed:** Added `isNaN(reminderDate.getTime())` guard before date arithmetic; invalid dates now skip via `continue`.
 
 ```javascript
 var daysSinceReminder = (now - new Date(lastReminder)) / (1000 * 60 * 60 * 24);
@@ -1662,8 +1700,9 @@ If `lastReminder` is null or an invalid date string, `new Date(lastReminder)` re
 
 ---
 
-#### F101. Falsy values silently dropped from member filters in `00_DataAccess.gs`
+#### F101. ~~Falsy values silently dropped from member filters in `00_DataAccess.gs`~~ **FIXED**
 **Severity:** HIGH | **Category:** Data Loss | **Lines:** 404, 407-408
+**Fixed:** Changed `!row[...]` to explicit `=== '' || == null` check. Added `String()` coercion to filter comparisons.
 
 ```javascript
 // Skip empty rows
@@ -1680,8 +1719,9 @@ if (options.location && row[MEMBER_COLUMNS.WORK_LOCATION] !== options.location) 
 
 ---
 
-#### F102. Silent filtering errors in grievance queries in `00_DataAccess.gs`
+#### F102. ~~Silent filtering errors in grievance queries in `00_DataAccess.gs`~~ **FIXED**
 **Severity:** HIGH | **Category:** Data Loss | **Lines:** 496-504
+**Fixed:** Changed `!row[...]` to explicit `=== '' || == null` check. Added `String()` coercion to status and steward filter comparisons.
 
 ```javascript
 if (!row[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) continue;  // Line 496
@@ -1720,8 +1760,9 @@ function buildSafeQuery(sheetName, query, headers) {
 
 ---
 
-#### F104. Case-sensitive admin email comparison in `00_Security.gs`
+#### F104. ~~Case-sensitive admin email comparison in `00_Security.gs`~~ **FIXED**
 **Severity:** MEDIUM | **Category:** Security | **Lines:** 347 vs 358
+**Fixed:** Changed `owner.getEmail() === email` to `owner.getEmail().toLowerCase() === email.toLowerCase()`.
 
 ```javascript
 // Admin check — case-sensitive
