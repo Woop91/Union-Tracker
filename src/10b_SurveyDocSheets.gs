@@ -1566,7 +1566,7 @@ function createFAQSheet(ss) {
 
   var engagementFAQs = [
     ['Q: What engagement metrics are tracked?',
-     'A: Email open rates (column S), virtual meeting attendance (Q), in-person meeting attendance (R), volunteer hours (T), and union interest in local/chapter/allied activities (U-W).'],
+     'A: Email open rates (column T), virtual meeting attendance (R), in-person meeting attendance (S), volunteer hours (U), and union interest in local/chapter/allied activities (V-X).'],
     ['Q: Where do engagement metrics appear?',
      'A: Engagement metrics appear in the Unified Web App Dashboard (both Steward and Member views), in the Engagement tab with email open rates, meeting attendance, volunteer hours, and union interest breakdowns.'],
     ['Q: What are low engagement hot spots?',

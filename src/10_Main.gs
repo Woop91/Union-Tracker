@@ -815,18 +815,28 @@ function syncDropdownToConfig_(e, sheetName) {
 
   var col = e.range.getColumn();
 
-  // Look up the Config column from the central DROPDOWN_MAP (single source of truth).
-  var entries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
-              : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
-              : null;
-  if (!entries) return;
+  // Look up the Config column from DROPDOWN_MAP and MULTI_SELECT_COLS.
+  // Both maps are checked so that custom values typed into either single-select
+  // or multi-select columns get synced back to Config.
+  var ddEntries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
+                : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
+                : [];
+  var msEntries = (sheetName === SHEETS.MEMBER_DIR) ? MULTI_SELECT_COLS.MEMBER_DIR
+                : (sheetName === SHEETS.GRIEVANCE_LOG) ? MULTI_SELECT_COLS.GRIEVANCE_LOG
+                : [];
+  if (ddEntries.length === 0 && msEntries.length === 0) return;
 
   var configCol = null;
-  for (var d = 0; d < entries.length; d++) {
-    if (entries[d].col === col) { configCol = entries[d].configCol; break; }
+  for (var d = 0; d < ddEntries.length; d++) {
+    if (ddEntries[d].col === col) { configCol = ddEntries[d].configCol; break; }
+  }
+  if (!configCol) {
+    for (var ms = 0; ms < msEntries.length; ms++) {
+      if (msEntries[ms].col === col) { configCol = msEntries[ms].configCol; break; }
+    }
   }
 
-  if (!configCol) return; // Not a synced dropdown column
+  if (!configCol) return; // Not a synced dropdown or multi-select column
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);

@@ -2159,6 +2159,19 @@ function getColumnNumber(columnLetter) {
 }
 
 /**
+ * Safe accessor for numeric fields — returns the value as-is when it's a
+ * number (including 0), and '' for null/undefined/empty-string.
+ * Avoids the `value || ''` pitfall where 0 is treated as falsy.
+ * @param {*} value - Cell value
+ * @returns {number|string}
+ * @private
+ */
+function numericField_(value) {
+  if (value === null || value === undefined || value === '') return '';
+  return value;
+}
+
+/**
  * Map a Member Directory row array to a structured object
  * @param {Array} row - Row data array from Member Directory
  * @returns {Object} Structured member object
@@ -2185,8 +2198,8 @@ function mapMemberRow(row) {
     assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',
     lastVirtualMtg: row[MEMBER_COLS.LAST_VIRTUAL_MTG - 1] || '',
     lastInPersonMtg: row[MEMBER_COLS.LAST_INPERSON_MTG - 1] || '',
-    openRate: row[MEMBER_COLS.OPEN_RATE - 1] || '',
-    volunteerHours: row[MEMBER_COLS.VOLUNTEER_HOURS - 1] || '',
+    openRate: numericField_(row[MEMBER_COLS.OPEN_RATE - 1]),
+    volunteerHours: numericField_(row[MEMBER_COLS.VOLUNTEER_HOURS - 1]),
     interestLocal: row[MEMBER_COLS.INTEREST_LOCAL - 1] || '',
     interestChapter: row[MEMBER_COLS.INTEREST_CHAPTER - 1] || '',
     interestAllied: row[MEMBER_COLS.INTEREST_ALLIED - 1] || '',
@@ -2226,9 +2239,9 @@ function mapGrievanceRow(row) {
     step3AppealDue: row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1] || '',
     step3AppealFiled: row[GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1] || '',
     dateClosed: row[GRIEVANCE_COLS.DATE_CLOSED - 1] || '',
-    daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || '',
+    daysOpen: numericField_(row[GRIEVANCE_COLS.DAYS_OPEN - 1]),
     nextActionDue: row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] || '',
-    daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] || '',
+    daysToDeadline: numericField_(row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1]),
     articles: row[GRIEVANCE_COLS.ARTICLES - 1] || '',
     issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
     memberEmail: row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] || '',
@@ -2641,11 +2654,14 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
       { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
     ],
+    // ISSUE_CATEGORY and ARTICLES are multi-select columns (comma-separated values).
+    // They live in MULTI_SELECT_COLS.GRIEVANCE_LOG, NOT here.
+    // Keeping them here caused setupDataValidations() to apply single-select first,
+    // then multi-select would overwrite — wasting a sheet API call and risking the
+    // wrong validation type if execution order ever changed.
     GRIEVANCE_LOG: [
       { col: GRIEVANCE_COLS.STATUS,         configCol: CONFIG_COLS.GRIEVANCE_STATUS },
-      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP },
-      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY },
-      { col: GRIEVANCE_COLS.ARTICLES,       configCol: CONFIG_COLS.ARTICLES }
+      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP }
     ]
   };
 }

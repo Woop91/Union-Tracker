@@ -110,11 +110,11 @@ function getUnifiedDashboardData(includePII) {
       totalWithPhone: 0
     },
 
-    // Engagement Metrics (from Member Directory columns Q-W)
+    // Engagement Metrics (from Member Directory columns R-X)
     engagement: {
-      emailOpenRate: 0,           // Average from OPEN_RATE column (S)
-      virtualMeetingRate: 0,      // % with recent virtual meeting (Q)
-      inPersonMeetingRate: 0,     // % with recent in-person meeting (R)
+      emailOpenRate: 0,           // Average from OPEN_RATE column (T)
+      virtualMeetingRate: 0,      // % with recent virtual meeting (R)
+      inPersonMeetingRate: 0,     // % with recent in-person meeting (S)
       totalVolunteerHours: 0,     // Sum from VOLUNTEER_HOURS column (T)
       unionInterestLocal: 0,      // % interested in local issues (U)
       unionInterestChapter: 0,    // % interested in chapter activities (V)
