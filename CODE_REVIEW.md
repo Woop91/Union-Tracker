@@ -12,14 +12,14 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review identifies **82 findings** across all severity levels. The most critical themes are:
+This line-by-line review identifies **97 findings** across all severity levels. The most critical themes are:
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
 | CRITICAL | 6 | XSS in HTML string interpolation, unsanitized CSV preview, PII in audit logs |
-| HIGH | 18 | Performance N+1 patterns, missing batch operations, race conditions, large file sizes |
-| MEDIUM | 31 | Missing input validation, dead code, inconsistent error handling, magic numbers |
-| LOW | 27 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
+| HIGH | 22 | Performance N+1 patterns, missing locks, race conditions, disabled ESLint rules, broken pre-commit hook, Jest coverage non-functional |
+| MEDIUM | 39 | Missing input validation, dead code, inconsistent error handling, version mismatches, CI gaps |
+| LOW | 30 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
 
 **Overall Assessment: Good** — The codebase is well-structured, thoroughly tested, and shows strong security awareness. The issues found are typical of a large, actively-developed GAS project. No show-stoppers that would prevent production use.
 
@@ -815,11 +815,45 @@ The 2.5MB consolidated output has no way to trace errors back to source files. C
 
 ---
 
+#### F67a. Build header hardcodes version 4.6.0
+**Severity:** MEDIUM | **Category:** Bug | **Line:** 83
+
+The build header template embeds `Version: 4.6.0` as a hardcoded string, but `package.json` says `4.7.0` and the CHANGELOG says `4.9.0`. Three different version numbers.
+
+**Fix:** Read version dynamically: `const pkg = require('./package.json'); // then use pkg.version`
+
+---
+
+#### F67b. HTML embedding escapes ALL `$` characters, corrupting currency and CSS
+**Severity:** MEDIUM | **Category:** Bug | **Line:** 146
+
+The HTML embedding logic replaces all `$` with `\$` to prevent template literal interpolation. This corrupts `$100` to `\$100` and jQuery selectors like `$('.class')` to `\$('.class')`.
+
+**Fix:** Only escape `${` sequences: `content.replace(/\`/g, '\\\`').replace(/\$\{/g, '\\${')`
+
+---
+
+#### F67c. `lint()` uses deprecated `--ext` flag for ESLint 9.x
+**Severity:** MEDIUM | **Category:** Bug | **Line:** 170
+
+In ESLint 9 flat config, `--ext` is deprecated and ignored. File extensions are determined by `files` patterns in the config.
+
+**Fix:** Remove `--ext .gs` flag.
+
+---
+
+#### F67d. `BUILD_ORDER` const array is mutated for production builds
+**Severity:** LOW | **Category:** Quality | **Lines:** 219-220
+
+`BUILD_ORDER` is `const` but contents are mutated via `.length = 0; .push(...)`. Create a filtered copy instead.
+
+---
+
 ### package.json
 
 **Findings:**
 
-#### F67. Version 4.7.0 in package.json doesn't match CHANGELOG 4.9.0
+#### F68. Version 4.7.0 in package.json doesn't match CHANGELOG 4.9.0
 **Severity:** HIGH | **Category:** Bug | **Line:** 3
 
 ```json
@@ -830,15 +864,49 @@ Should be `"4.9.0"` per the CHANGELOG.
 
 ---
 
+#### F68a. `--watch` script advertised but not implemented
+**Severity:** LOW | **Category:** Maintainability | **Line:** 15
+
+`npm run watch` calls `node build.js --watch` but watch mode is documented as "not implemented" in build.js. Running it silently does a normal build and exits.
+
+---
+
+#### F68b. `deploy` script depends on `.clasp.json` which is gitignored and absent
+**Severity:** MEDIUM | **Category:** Maintainability | **Line:** 17
+
+`npm run deploy` runs `clasp push` but `.clasp.json` doesn't exist. A developer cloning the repo gets a confusing error. Note: `.clasp.json.example` exists but isn't documented prominently.
+
+---
+
 ### jest.config.js
 
-No critical findings. Coverage thresholds are set to 100% which is aspirational.
+**Findings:**
+
+#### F69. Jest coverage on `.gs` files is never actually collected
+**Severity:** HIGH | **Category:** Bug | **Lines:** 7-16
+
+`collectCoverageFrom` targets `src/**/*.gs`, but there is no `transform` or `moduleFileExtensions` config to teach Jest to process `.gs` files. Source files are loaded via `eval()` in `test/load-source.js`, which bypasses Jest's instrumentation. The 100% line coverage threshold is never enforced — it passes trivially because there are zero covered files.
+
+**Fix:** Either add a transform for `.gs` files or remove the misleading `coverageThreshold` and `collectCoverageFrom` settings.
 
 ---
 
 ### eslint.config.js
 
-No critical findings. Uses flat config format with appropriate rules.
+**Findings:**
+
+#### F70. Critical ESLint safety rules are disabled
+**Severity:** HIGH | **Category:** Security/Quality | **Lines:** 134-174
+
+The following important rules are disabled "for legacy compatibility":
+- `no-undef: 'off'` — Masks typos in function/variable names
+- `no-debugger: 'off'` — Allows debugger statements in production
+- `no-dupe-args: 'off'` — Allows duplicate function parameters
+- `no-invalid-regexp: 'off'` — Allows broken regex patterns
+- `no-redeclare: 'off'` — Hides variable shadowing bugs
+- `no-loss-of-precision: 'off'` — Allows silently lossy numeric literals
+
+**Fix:** Re-enable at minimum: `no-undef` (with GAS globals declared), `no-dupe-args`, `no-invalid-regexp`, `no-debugger`, and `no-loss-of-precision`. These are low-noise, high-value rules.
 
 ---
 
@@ -846,18 +914,103 @@ No critical findings. Uses flat config format with appropriate rules.
 
 **Findings:**
 
-#### F68. CI doesn't pin action versions to SHA
+#### F71. CI doesn't pin action versions to SHA
 **Severity:** MEDIUM | **Category:** Security
 
-Using `actions/checkout@v4` instead of SHA pinning (`actions/checkout@abc123...`) leaves the CI vulnerable to supply-chain attacks if a tag is moved.
+Using `actions/checkout@v4` instead of SHA pinning leaves CI vulnerable to supply-chain attacks.
 
 **Fix:** Pin to full SHA: `actions/checkout@<commit-sha>`.
 
 ---
 
+#### F71a. `npm audit` failure is silently swallowed
+**Severity:** MEDIUM | **Category:** Security | **Line:** 34
+
+`npm audit --audit-level=high || true` ensures exit code is always 0. Even high-severity vulnerabilities never fail the build.
+
+**Fix:** Remove `|| true` to enforce audit.
+
+---
+
+#### F71b. No npm cache configured in CI
+**Severity:** MEDIUM | **Category:** Performance | **Lines:** 18-24
+
+Every CI run downloads and installs all dependencies from scratch.
+
+**Fix:** Add `cache: 'npm'` to `actions/setup-node`.
+
+---
+
+#### F71c. CI uses EOL Node.js 18
+**Severity:** LOW | **Category:** Quality | **Line:** 21
+
+Node.js 18 reached EOL in April 2025. Update to Node.js 20 or 22.
+
+---
+
 ### .husky/pre-commit
 
-No findings. Standard lint-staged integration.
+**Findings:**
+
+#### F72. Pre-commit hook lacks execute permission
+**Severity:** HIGH | **Category:** Bug
+
+The `pre-commit` hook has permissions `644` (rw-r--r--) while `commit-msg` has `755` (rwxr-xr-x). Without the execute bit, the pre-commit hook **silently fails to run** on Unix, meaning lint-staged and build verification are skipped on every commit.
+
+**Fix:** `chmod +x .husky/pre-commit`
+
+---
+
+#### F72a. Build errors in pre-commit are redirected to /dev/null
+**Severity:** MEDIUM | **Category:** Maintainability | **Line:** 21
+
+Build output is suppressed with `> /dev/null 2>&1`. If the build fails, devs see only "Build failed" with no error details.
+
+**Fix:** Only redirect stdout, keep stderr visible: `npm run build > /dev/null`
+
+---
+
+### appsscript.json
+
+**Findings:**
+
+#### F73. Overly broad OAuth scopes
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 14-24
+
+The manifest requests `https://www.googleapis.com/auth/drive` (full Drive access) when `auth/drive.file` (access only to files created by the app) may suffice. Combined with `gmail.send`, a vulnerability could be exploited to exfiltrate data via email.
+
+**Fix:** Evaluate whether `auth/drive.file` is sufficient.
+
+---
+
+### test/gas-mock.js
+
+**Findings:**
+
+#### F74. Missing mocks for actively-used GAS globals
+**Severity:** MEDIUM | **Category:** Bug
+
+`DocumentApp` (16 occurrences in source), `GmailApp`, `Browser`, and `ContentService` have no mocks despite being used in source code. Tests exercising these code paths will throw `ReferenceError`.
+
+**Fix:** Add basic mocks for these globals.
+
+---
+
+#### F74a. Mock timezone doesn't match appsscript.json
+**Severity:** LOW | **Category:** Bug | **Line:** 53
+
+Mock `Session.getScriptTimeZone()` returns `'America/Los_Angeles'` but `appsscript.json` configures `'America/New_York'`. Date-sensitive tests will produce different results than production.
+
+---
+
+### test/load-source.js
+
+**Findings:**
+
+#### F75. Regex rewrites match indented code, not just top-level
+**Severity:** MEDIUM | **Category:** Bug | **Lines:** 78, 82, 85
+
+The `^` anchor with `/gm` matches the start of *any* line, not just column-0 code. A `var` inside an `if` block or `for` loop at column 0 would incorrectly be rewritten to `global.X =`, changing scoping semantics.
 
 ---
 
@@ -945,10 +1098,13 @@ Consider adding a version-gated removal plan.
 | ID | Summary | Effort |
 |----|---------|--------|
 | F10 | Update VERSION_INFO/API_VERSION to 4.9.0 | Trivial |
-| F67 | Update package.json version to 4.9.0 | Trivial |
+| F68 | Update package.json version to 4.9.0 | Trivial |
+| F72 | `chmod +x .husky/pre-commit` (hook is silently not running!) | Trivial |
 | F14 | Fix array sizing with MEMBER_HEADER_MAP_.length | Trivial |
 | F19 | Sanitize CSV preview data with escapeHtml() | Small |
 | F15 | Batch setValue() calls in addMember() | Small |
+| F70 | Re-enable critical ESLint rules (no-undef, no-dupe-args, etc.) | Medium |
+| F69 | Fix Jest coverage collection for .gs files or remove misleading config | Small |
 | F57 | Add PIN brute-force rate limiting | Medium |
 | F52 | Add LockService to sync functions | Medium |
 | CC3 | Add LockService to all mutation paths | Medium |
@@ -968,13 +1124,20 @@ Consider adding a version-gated removal plan.
 | F17 | Fix updateMember() field clearing bug | Small |
 | F34 | Create safeSendEmail() wrapper | Medium |
 | F61 | Add error isolation to EventBus handlers | Small |
+| F67a | Read version dynamically in build.js | Small |
+| F67b | Fix HTML $ escaping to only escape `${` | Small |
+| F71a | Remove `\|\| true` from npm audit in CI | Trivial |
+| F71b | Add npm cache to CI workflow | Trivial |
+| F73 | Evaluate narrower OAuth scopes (drive.file) | Small |
+| F74 | Add missing GAS global mocks (DocumentApp, etc.) | Small |
+| F75 | Fix regex rewrites in test loader | Medium |
 | CC2 | Begin HTML template migration | Large |
 | CC5 | Standardize error handling patterns | Medium |
-| F68 | Pin CI action versions to SHA | Small |
+| F71 | Pin CI action versions to SHA | Small |
 
 ### Priority 3 — Backlog (LOW)
 
-Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, F40, F41, F43, F44, F49, F50, F53, F56, F60, F62, F63, F65, F66, CC4, CC7) can be addressed during regular maintenance.
+Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, F40, F41, F43, F44, F49, F50, F53, F56, F60, F62, F63, F65, F66, F67d, F68a, F68b, F71c, F74a, CC4, CC7) can be addressed during regular maintenance.
 
 ---
 
