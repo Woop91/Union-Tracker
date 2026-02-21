@@ -64,7 +64,7 @@ function createConfigSheet(ss) {
     '── ORG IDENTITY ──', '', '',                       // AK-AM (3 cols)
     '── EXTENDED CONTACT ──', '', '', '', '',           // AN-AR (5 cols)
     '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AS-AY (7 cols)
-    '── MOBILE DASHBOARD ──'                            // AZ (1 col) - LAST COLUMN
+    '── MOBILE DASHBOARD ──', '', '', '', '', '', ''     // AZ-BF (7 cols)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_

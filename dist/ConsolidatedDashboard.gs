@@ -1842,7 +1842,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3309 lines)
+// SOURCE: 01_Core.gs (3315 lines)
 // ============================================================================
 
 /**
@@ -3284,6 +3284,12 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'TEMPLATE_ID',           header: 'Template ID' },
   { key: 'PDF_FOLDER_ID',         header: 'PDF Folder ID' },
   { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' },
+  { key: 'ACCENT_HUE',            header: 'Accent Hue' },
+  { key: 'LOGO_INITIALS',         header: 'Logo Initials' },
+  { key: 'MAGIC_LINK_EXPIRY_DAYS', header: 'Magic Link Expiry Days' },
+  { key: 'COOKIE_DURATION_DAYS',  header: 'Cookie Duration Days' },
+  { key: 'STEWARD_LABEL',         header: 'Steward Label' },
+  { key: 'MEMBER_LABEL',          header: 'Member Label' },
   { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
   { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
   { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
@@ -38736,7 +38742,7 @@ function createConfigSheet(ss) {
     '── ORG IDENTITY ──', '', '',                       // AK-AM (3 cols)
     '── EXTENDED CONTACT ──', '', '', '', '',           // AN-AR (5 cols)
     '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AS-AY (7 cols)
-    '── MOBILE DASHBOARD ──'                            // AZ (1 col) - LAST COLUMN
+    '── MOBILE DASHBOARD ──', '', '', '', '', '', ''     // AZ-BF (7 cols)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
