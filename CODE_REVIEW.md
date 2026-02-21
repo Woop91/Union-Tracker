@@ -7,7 +7,7 @@
 **Scope:** Full line-by-line codebase review — 30 source files (~59K lines), 23 test files, config/build infrastructure
 **Version:** 4.9.0 (as of 2026-02-17)
 **Previous Review:** 2026-02-14 (v4.7.0 — 69 issues, 57 fixed)
-**This Update:** Re-verification pass with cross-cutting pattern searches — 22 new findings added (F76–F97)
+**This Update:** Re-verification pass with cross-cutting pattern searches — 25 new findings added (F76–F100)
 
 ---
 
@@ -15,13 +15,13 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review identifies **142 findings** across all severity levels (120 original + 22 new from re-verification). All original findings were re-verified — **none have been fixed since the initial review**.
+This line-by-line review identifies **145 findings** across all severity levels (120 original + 25 new from re-verification). All original findings were re-verified — **none have been fixed since the initial review**.
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
 | CRITICAL | 20 | XSS via innerHTML injection, URL injection (window.open), unsanitized email HTML, onclick attribute injection, CSV preview, systematic column indexing bugs |
 | HIGH | 35 | Missing input validation, no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, broken pre-commit hook, unescaped steward/member names in dashboards, empty-sheet crashes |
-| MEDIUM | 53 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent, formula injection, incomplete XSS patterns, unescaped CSV/error data |
+| MEDIUM | 56 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent, formula injection, incomplete XSS patterns, unescaped CSV/error data, hardcoded limits |
 | LOW | 34 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
 
 **Overall Assessment: Good with critical security gaps** — The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas. However, the cross-cutting XSS review revealed that `escapeHtml()` usage is inconsistent: some functions escape properly while adjacent functions in the same file do not. The 20 CRITICAL findings (7 new) represent exploitable XSS and column indexing bugs that should be addressed before the next production deployment. Additionally, 9 empty-sheet crash locations in `04c_InteractiveDashboard.gs` (F94) present a HIGH-severity data availability risk.
@@ -1296,7 +1296,7 @@ Consider adding a version-gated removal plan.
 
 ## 15. Re-Verification Findings (2026-02-21 Update)
 
-> The following 22 new findings were discovered during a cross-cutting pattern search that systematically scanned every `innerHTML`, `window.open()`, `onclick`, `<td>` concatenation, `GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`, and `getLastRow()` usage across all 30 source files. These were missed by the initial per-file review.
+> The following 25 new findings were discovered during a cross-cutting pattern search that systematically scanned every `innerHTML`, `window.open()`, `onclick`, `<td>` concatenation, `GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`, and `getLastRow()` usage across all 30 source files. These were missed by the initial per-file review.
 
 ### Verification of Existing Findings
 
@@ -1624,6 +1624,45 @@ Meeting names, dates, and types are concatenated into a `data-search` HTML attri
 
 ---
 
+#### F98. Column indexing `MEMBER_COLUMNS + 1` pattern in `08b_SearchAndCharts.gs`
+**Severity:** MEDIUM | **Category:** Bug | **Line:** 354
+
+```javascript
+var data = memberSheet.getRange(2, MEMBER_COLUMNS.JOB_TITLE + 1, ...);
+```
+
+Uses `MEMBER_COLUMNS` (0-indexed) with `+ 1` for `getRange()` instead of canonical `MEMBER_COLS.JOB_TITLE`. Same fragile pattern as F87 and F91. Lines 262-387 also use `MEMBER_COLUMNS` for array access (which is correct), but mixing the two patterns in the same function increases confusion.
+
+**Fix:** Use `MEMBER_COLS.JOB_TITLE` for Range operations.
+
+---
+
+#### F99. Hardcoded range limit `A2:A1000` in `08a_SheetSetup.gs`
+**Severity:** MEDIUM | **Category:** Bug | **Line:** 354
+
+```javascript
+var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + '1000');
+```
+
+Member ID validation dropdown is limited to 1000 rows. Unions with >1000 members will have incomplete dropdown validation.
+
+**Fix:** Use `memberSheet.getLastRow()` dynamically: `memberIdCol + '2:' + memberIdCol + memberSheet.getLastRow()`
+
+---
+
+#### F100. Division by zero risk in `08c_FormsAndNotifications.gs`
+**Severity:** MEDIUM | **Category:** Bug | **Line:** 1833
+
+```javascript
+var daysSinceReminder = (now - new Date(lastReminder)) / (1000 * 60 * 60 * 24);
+```
+
+If `lastReminder` is null or an invalid date string, `new Date(lastReminder)` returns `Invalid Date`, causing the subtraction to yield `NaN`. Subsequent comparisons (`daysSinceReminder < 7`) become false, silently disabling the cooldown.
+
+**Fix:** `if (!lastReminder || isNaN(new Date(lastReminder).getTime())) continue;`
+
+---
+
 ## Summary of Actionable Recommendations
 
 ### Priority 1 — Fix Now (CRITICAL + HIGH)
@@ -1699,6 +1738,9 @@ Meeting names, dates, and types are concatenated into a `data-search` HTML attri
 | F95 | Escape CSV preview data in `04b_AccessibilityFeatures.gs:505-515` | Trivial |
 | F96 | Escape error messages in `04b_AccessibilityFeatures.gs:539, 542` | Trivial |
 | F97 | Escape `data-search` attribute in `04e_PublicDashboard.gs:2183` | Trivial |
+| F98 | Standardize `MEMBER_COLUMNS + 1` in `08b_SearchAndCharts.gs:354` | Trivial |
+| F99 | Fix hardcoded `A2:A1000` range limit in `08a_SheetSetup.gs:354` | Trivial |
+| F100 | Fix division-by-zero risk in `08c_FormsAndNotifications.gs:1833` | Trivial |
 
 ### Priority 3 — Backlog (LOW)
 
@@ -1722,4 +1764,4 @@ Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, 
 ---
 
 *Initial review completed 2026-02-21 by Claude Code (Opus 4.6)*
-*Re-verification update 2026-02-21: 22 new findings (F76–F97) added via cross-cutting pattern searches. All 120 original findings re-verified as still present.*
+*Re-verification update 2026-02-21: 25 new findings (F76–F100) added via cross-cutting pattern searches. All 120 original findings re-verified as still present.*
