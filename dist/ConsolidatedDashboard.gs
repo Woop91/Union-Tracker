@@ -1842,7 +1842,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3305 lines)
+// SOURCE: 01_Core.gs (3309 lines)
 // ============================================================================
 
 /**
@@ -3283,7 +3283,11 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'ESCALATION_STEPS',      header: 'Escalation Steps' },
   { key: 'TEMPLATE_ID',           header: 'Template ID' },
   { key: 'PDF_FOLDER_ID',         header: 'PDF Folder ID' },
-  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' }
+  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' },
+  { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
+  { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
+  { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
+  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -15520,7 +15524,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 04e_PublicDashboard.gs (2967 lines)
+// SOURCE: 04e_PublicDashboard.gs (3120 lines)
 // ============================================================================
 
 // ============================================================================
@@ -15755,6 +15759,19 @@ function getUnifiedDashboardData(includePII) {
       folderId: '',
       folderUrl: '',
       recentFiles: []
+    },
+
+    // Upcoming Events (from Google Calendar)
+    upcomingEvents: [],
+
+    // Resource Links (from Config sheet)
+    resourceLinks: {
+      surveyUrl: '',
+      contactFormUrl: '',
+      customLink1Name: '',
+      customLink1Url: '',
+      customLink2Name: '',
+      customLink2Url: ''
     },
 
     // Meeting Notes (for member dashboard - completed meetings with published notes)
@@ -16575,6 +16592,79 @@ function getUnifiedDashboardData(includePII) {
     Logger.log('Error accessing Drive resources: ' + e.message);
   }
 
+  // Populate Upcoming Events from Google Calendars (Grievance Deadlines + Union Meetings)
+  try {
+    var upcomingEvents = [];
+    var eventStart = new Date();
+    var eventEnd = new Date(eventStart.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days ahead
+
+    // Fetch from Grievance Deadlines calendar
+    try {
+      var deadlineCal = getOrCreateDeadlinesCalendar();
+      var deadlineEvents = deadlineCal.getEvents(eventStart, eventEnd);
+      for (var dei = 0; dei < deadlineEvents.length && dei < 20; dei++) {
+        var de = deadlineEvents[dei];
+        upcomingEvents.push({
+          title: de.getTitle(),
+          date: Utilities.formatDate(de.getStartTime(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+          time: Utilities.formatDate(de.getStartTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          endTime: Utilities.formatDate(de.getEndTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          type: 'deadline',
+          description: de.getDescription() || '',
+          location: de.getLocation() || '',
+          allDay: de.isAllDayEvent()
+        });
+      }
+    } catch (calErr) {
+      Logger.log('Error fetching deadline events: ' + calErr.message);
+    }
+
+    // Fetch from Union Meetings calendar
+    try {
+      var meetingCal = getOrCreateMeetingsCalendar();
+      var meetingEvents = meetingCal.getEvents(eventStart, eventEnd);
+      for (var mei = 0; mei < meetingEvents.length && mei < 20; mei++) {
+        var me = meetingEvents[mei];
+        upcomingEvents.push({
+          title: me.getTitle(),
+          date: Utilities.formatDate(me.getStartTime(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+          time: Utilities.formatDate(me.getStartTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          endTime: Utilities.formatDate(me.getEndTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          type: 'meeting',
+          description: me.getDescription() || '',
+          location: me.getLocation() || '',
+          allDay: me.isAllDayEvent()
+        });
+      }
+    } catch (calErr) {
+      Logger.log('Error fetching meeting events: ' + calErr.message);
+    }
+
+    // Sort by date ascending
+    upcomingEvents.sort(function(a, b) {
+      return new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time);
+    });
+
+    data.upcomingEvents = upcomingEvents;
+  } catch (e) {
+    Logger.log('Error populating upcoming events: ' + e.message);
+  }
+
+  // Populate Resource Links from Config sheet
+  try {
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      data.resourceLinks.surveyUrl = String(configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '').trim();
+      data.resourceLinks.contactFormUrl = String(configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).getValue() || '').trim();
+      data.resourceLinks.customLink1Name = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_NAME).getValue() || '').trim();
+      data.resourceLinks.customLink1Url = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_URL).getValue() || '').trim();
+      data.resourceLinks.customLink2Name = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_2_NAME).getValue() || '').trim();
+      data.resourceLinks.customLink2Url = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_2_URL).getValue() || '').trim();
+    }
+  } catch (e) {
+    Logger.log('Error loading resource links: ' + e.message);
+  }
+
   // Populate Meeting Notes (completed meetings with notes docs, chronological order)
   try {
     var meetingSheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
@@ -17136,6 +17226,7 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="tab" onclick="showTab(\'hotspots\')">Hot Spots</div>' +
     '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
     '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
+    '<div class="tab" onclick="showTab(\'events\')">Events</div>' +
     '<div class="tab" onclick="showTab(\'resources\')">Resources</div>' +
     '<div class="tab" onclick="showTab(\'meetingnotes\')">Meeting Notes</div>' +
     '<div class="tab" onclick="showTab(\'compare\')">Compare</div>' +
@@ -17526,14 +17617,64 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("main-content").innerHTML=html;if(sat.sections&&sat.sections.length>0)renderSatisfactionChart()' +
     '}' +
 
+    // Events Tab - Upcoming events from Google Calendar
+    'else if(tab==="events"){' +
+    'var events=d.upcomingEvents||[];' +
+    'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">event</i>Upcoming Events</h2>";' +
+    // Filter buttons
+    'html+="<div style=\\"display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap\\">";' +
+    'html+="<button class=\\"btn btn-sm event-filter active\\" onclick=\\"filterEvents(\\x27all\\x27,this)\\">All</button>";' +
+    'html+="<button class=\\"btn btn-sm event-filter\\" onclick=\\"filterEvents(\\x27meeting\\x27,this)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">groups</i> Meetings</button>";' +
+    'html+="<button class=\\"btn btn-sm event-filter\\" onclick=\\"filterEvents(\\x27deadline\\x27,this)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">gavel</i> Deadlines</button>";' +
+    'html+="</div>";' +
+    'if(events.length===0){' +
+    'html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#64748b\\">event_busy</i><p style=\\"color:#94a3b8;margin-top:16px\\">No upcoming events in the next 30 days.</p></div>"' +
+    '}else{' +
+    // Group events by date
+    'var grouped={};events.forEach(function(ev){var dk=ev.date;if(!grouped[dk])grouped[dk]=[];grouped[dk].push(ev)});' +
+    'var dateKeys=Object.keys(grouped).sort();' +
+    'dateKeys.forEach(function(dk){' +
+    'var dateObj=new Date(dk+"T12:00:00");var dayName=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dateObj.getDay()];' +
+    'var monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];' +
+    'var dateLabel=dayName+", "+monthNames[dateObj.getMonth()]+" "+dateObj.getDate()+", "+dateObj.getFullYear();' +
+    'var today=new Date();today.setHours(0,0,0,0);var evDate=new Date(dk+"T00:00:00");var isToday=evDate.getTime()===today.getTime();' +
+    'var tomorrow=new Date(today.getTime()+86400000);var isTomorrow=evDate.getTime()===tomorrow.getTime();' +
+    'var prefix=isToday?"Today — ":isTomorrow?"Tomorrow — ":"";' +
+    'html+="<div class=\\"event-date-group\\" data-date=\\""+dk+"\\"><div style=\\"font-size:13px;font-weight:700;color:"+(isToday?"#60a5fa":isTomorrow?"#a78bfa":"#94a3b8")+";margin:20px 0 8px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">calendar_today</i>"+prefix+dateLabel+"</div>";' +
+    'grouped[dk].forEach(function(ev){' +
+    'var typeColor=ev.type==="meeting"?"#22c55e":"#f59e0b";' +
+    'var typeIcon=ev.type==="meeting"?"groups":"gavel";' +
+    'var typeLabel=ev.type==="meeting"?"Meeting":"Deadline";' +
+    'html+="<div class=\\"event-item chart-card\\" data-type=\\""+ev.type+"\\" style=\\"margin-bottom:8px;padding:14px;border-left:3px solid "+typeColor+"\\"><div style=\\"display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px\\"><div style=\\"flex:1;min-width:0\\"><div style=\\"display:flex;align-items:center;gap:8px;margin-bottom:6px\\"><span class=\\"badge\\" style=\\"background:"+typeColor+";color:#fff;font-size:10px;padding:2px 8px\\"><i class=\\"material-icons\\" style=\\"font-size:12px;vertical-align:middle\\">"+typeIcon+"</i> "+typeLabel+"</span></div><div style=\\"font-weight:600;color:#e2e8f0;font-size:14px\\">"+escapeHtml(ev.title)+"</div></div><div style=\\"text-align:right;white-space:nowrap\\"><div style=\\"font-size:12px;color:#60a5fa;font-weight:600\\">"+(ev.allDay?"All Day":ev.time)+"</div>";' +
+    'if(!ev.allDay&&ev.endTime){html+="<div style=\\"font-size:10px;color:#64748b\\">to "+ev.endTime+"</div>"}' +
+    'html+="</div></div>";' +
+    'if(ev.location){html+="<div style=\\"margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+escapeHtml(ev.location)+"</div>"}' +
+    'if(ev.description){html+="<div style=\\"margin-top:4px;font-size:11px;color:#64748b;white-space:pre-line\\">"+escapeHtml(ev.description).substring(0,200)+"</div>"}' +
+    'html+="</div>"});' +
+    'html+="</div>"});' +
+    // Summary card at bottom
+    'var meetingCount=events.filter(function(e){return e.type==="meeting"}).length;' +
+    'var deadlineCount=events.filter(function(e){return e.type==="deadline"}).length;' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">summarize</i>Summary</div><div style=\\"display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center\\"><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#60a5fa\\">"+events.length+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Total Events</div></div><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#22c55e\\">"+meetingCount+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Meetings</div></div><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#f59e0b\\">"+deadlineCount+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Deadlines</div></div></div></div>"' +
+    '}' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+
     // Resources Tab (Enhanced with Steward Directory)
     'else if(tab==="resources"){' +
     'var dr=d.driveResources;' +
+    'var rl=d.resourceLinks||{};' +
     'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">folder</i>Union Resources</h2>";' +
     'html+="<div class=\\"resource-grid\\">";' +
     'if(dr.folderUrl){html+="<a href=\\""+dr.folderUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contract PDF\\x27)\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Forms\\x27)\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
+    // Member Survey link
+    'if(rl.surveyUrl){html+="<a href=\\""+rl.surveyUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📊</div><div class=\\"resource-title\\">Member Survey</div><div class=\\"resource-desc\\">Complete the member satisfaction survey</div></a>"}' +
+    // Member Contact Update link
+    'if(rl.contactFormUrl){html+="<a href=\\""+rl.contactFormUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📋</div><div class=\\"resource-title\\">Contact Update</div><div class=\\"resource-desc\\">Update your personal contact information</div></a>"}' +
+    // Custom Link 1 (configurable from Config tab)
+    'if(rl.customLink1Url){html+="<a href=\\""+rl.customLink1Url+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+(rl.customLink1Name||"Custom Link 1")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}' +
+    // Custom Link 2 (configurable from Config tab)
+    'if(rl.customLink2Url){html+="<a href=\\""+rl.customLink2Url+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+(rl.customLink2Name||"Custom Link 2")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}' +
     'html+="</div>";' +
     // Steward Contact Directory with Smart Search
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">contacts</i>Steward Contact Directory</div>";' +
@@ -17676,7 +17817,8 @@ function getUnifiedDashboardHtml(isPII) {
     '{name:"Hot Spots Tab",desc:"Locations with high case concentrations. Heatmap colors show severity. Prioritize these areas.",icon:"whatshot"},' +
     '{name:"Bargaining Tab",desc:"Contract-related metrics for bargaining preparation. Category breakdowns and resolution patterns.",icon:"handshake"},' +
     '{name:"Satisfaction Tab",desc:"Member survey results with section scores, key insights, and actionable recommendations.",icon:"sentiment_satisfied"},' +
-    '{name:"Resources Tab",desc:"Quick links to contract, forms, and resources. Searchable steward contact directory.",icon:"folder"},' +
+    '{name:"Events Tab",desc:"Upcoming events from the union calendar including meetings and grievance deadlines. Filter by type.",icon:"event"},' +
+    '{name:"Resources Tab",desc:"Quick links to survey, contact update form, configurable links, and resources. Searchable steward contact directory.",icon:"folder"},' +
     '{name:"Compare Tab",desc:"Select multiple metrics to compare side-by-side. Export data as CSV for reporting.",icon:"compare"}' +
     '];' +
     'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">search</i>Search Help</div>";' +
@@ -17840,6 +17982,21 @@ function getUnifiedDashboardHtml(isPII) {
     '}' +
 
     // Filter Meeting Notes by search
+    // Filter events by type (Events tab)
+    'function filterEvents(type,btn){' +
+    'document.querySelectorAll(".event-filter").forEach(function(b){b.classList.remove("active")});' +
+    'if(btn)btn.classList.add("active");' +
+    'document.querySelectorAll(".event-item").forEach(function(el){' +
+    'if(type==="all")el.style.display="";' +
+    'else el.style.display=el.getAttribute("data-type")===type?"":"none"' +
+    '});' +
+    'document.querySelectorAll(".event-date-group").forEach(function(g){' +
+    'var visible=g.querySelectorAll(".event-item:not([style*=\\"display: none\\"]),.event-item:not([style*=\\"display:none\\"])");' +
+    'var hasVisible=false;g.querySelectorAll(".event-item").forEach(function(ei){if(ei.style.display!=="none")hasVisible=true});' +
+    'g.style.display=hasVisible?"":"none"' +
+    '})' +
+    '}' +
+
     'function filterMeetingNotes(){' +
     'var q=(document.getElementById("notesSearch")||{value:""}).value.toLowerCase();' +
     'document.querySelectorAll(".meeting-note-item").forEach(function(el){' +

@@ -1436,7 +1436,11 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'ESCALATION_STEPS',      header: 'Escalation Steps' },
   { key: 'TEMPLATE_ID',           header: 'Template ID' },
   { key: 'PDF_FOLDER_ID',         header: 'PDF Folder ID' },
-  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' }
+  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' },
+  { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
+  { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
+  { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
+  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
