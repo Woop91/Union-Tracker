@@ -23789,8 +23789,8 @@ function getRecentAuditLogs(count) {
 
   if (numRows <= 0) return [];
 
-  // Read all 6 columns including Integrity Hash
-  var numCols = Math.max(EVENT_AUDIT_COLS.SESSION_ID, 6);
+  // Read all columns including Integrity Hash
+  var numCols = EVENT_AUDIT_COLS.INTEGRITY_HASH;
   const data = auditSheet.getRange(startRow, 1, numRows, numCols).getValues();
 
   return data.map(row => ({
@@ -23799,7 +23799,7 @@ function getRecentAuditLogs(count) {
     user: row[EVENT_AUDIT_COLS.USER - 1],
     details: row[EVENT_AUDIT_COLS.DETAILS - 1],
     sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1],
-    integrityHash: row[5] || ''
+    integrityHash: row[EVENT_AUDIT_COLS.INTEGRITY_HASH - 1] || ''
   })).reverse();
 }
 
