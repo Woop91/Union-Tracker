@@ -1,3 +1,5 @@
+> **ARCHIVED** — This review is outdated and superseded by [`CODE_REVIEW.md`](../../CODE_REVIEW.md) (v4.9.0, 2026-02-21).
+
 # Engagement Tracking Implementation Review
 **Date:** 2026-02-11
 **Reviewer:** Claude Code
