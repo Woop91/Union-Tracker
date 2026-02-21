@@ -1,3 +1,5 @@
+> **ARCHIVED** — This review is outdated and superseded by [`CODE_REVIEW.md`](../../CODE_REVIEW.md) (v4.9.0, 2026-02-21). Scores in this document (Security 9/10, Testing 10/10) were overly optimistic — the v4.9.0 review found 13 CRITICAL and 30 HIGH issues still present. Do not rely on this document for current assessment.
+
 # Code Review Recommendations
 
 > **Note:** This code review was conducted at v4.5.0. The project is now at v4.8.0.

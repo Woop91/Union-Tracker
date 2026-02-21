@@ -1,5 +1,7 @@
 # Code Review: Strategic Command Center — Line-by-Line Analysis
 
+> **This is the canonical code review.** It supersedes all prior review documents, which have been archived to [`docs/archived-reviews/`](docs/archived-reviews/). Earlier reviews (v4.5.0) contained inaccurate "FIXED" and "LOW risk" assessments for issues that were still present — those documents should not be used for security or quality decisions.
+
 **Date:** 2026-02-21
 **Reviewer:** Claude Code (Opus 4.6)
 **Scope:** Full line-by-line codebase review — 30 source files (~59K lines), 23 test files, config/build infrastructure
