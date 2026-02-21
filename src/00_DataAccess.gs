@@ -401,11 +401,11 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (!row[MEMBER_COLUMNS.MEMBER_ID]) continue;
+      if (row[MEMBER_COLUMNS.MEMBER_ID] === '' || row[MEMBER_COLUMNS.MEMBER_ID] == null) continue;
 
-      // Apply filters
-      if (options.unit && row[MEMBER_COLUMNS.UNIT] !== options.unit) continue;
-      if (options.location && row[MEMBER_COLUMNS.WORK_LOCATION] !== options.location) continue;
+      // Apply filters (use String() coercion for type-safe comparison)
+      if (options.unit && String(row[MEMBER_COLUMNS.UNIT]) !== String(options.unit)) continue;
+      if (options.location && String(row[MEMBER_COLUMNS.WORK_LOCATION]) !== String(options.location)) continue;
       if (options.stewardsOnly) {
         var isSteward = row[MEMBER_COLUMNS.IS_STEWARD];
         if (!isTruthyValue(isSteward)) continue;
@@ -493,11 +493,11 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (!row[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) continue;
+      if (row[GRIEVANCE_COLUMNS.GRIEVANCE_ID] === '' || row[GRIEVANCE_COLUMNS.GRIEVANCE_ID] == null) continue;
 
-      // Apply filters
-      if (options.status && row[GRIEVANCE_COLUMNS.STATUS] !== options.status) continue;
-      if (options.steward && row[GRIEVANCE_COLUMNS.STEWARD] !== options.steward) continue;
+      // Apply filters (use String() coercion for type-safe comparison)
+      if (options.status && String(row[GRIEVANCE_COLUMNS.STATUS]) !== String(options.status)) continue;
+      if (options.steward && String(row[GRIEVANCE_COLUMNS.STEWARD]) !== String(options.steward)) continue;
       if (options.overdueOnly) {
         var daysToDeadline = row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE];
         if (typeof daysToDeadline !== 'number' || daysToDeadline >= 0) continue;

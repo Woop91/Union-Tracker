@@ -220,7 +220,7 @@ function showGrievanceFiles() {
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
         var html = HtmlService.createHtmlOutput(
-          '<script>window.open("' + folderUrl + '", "_blank");google.script.host.close();</script>'
+          '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
       }
@@ -230,7 +230,7 @@ function showGrievanceFiles() {
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
         var html = HtmlService.createHtmlOutput(
-          '<script>window.open("' + folderUrl + '", "_blank");google.script.host.close();</script>'
+          '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
       }
@@ -594,7 +594,7 @@ function openGrievanceFormForRow_(sheet, row) {
   // Open form in new window
   var ui = SpreadsheetApp.getUi();
   var html = HtmlService.createHtmlOutput(
-    '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+    '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
   ).setWidth(200).setHeight(50);
 
   ui.showModalDialog(html, 'Opening Grievance Form...');

@@ -344,7 +344,7 @@ function getUserRole_(email) {
 
     // Check if user is the spreadsheet owner (admin)
     var owner = ss.getOwner();
-    if (owner && owner.getEmail() === email) {
+    if (owner && owner.getEmail().toLowerCase() === email.toLowerCase()) {
       return 'admin';
     }
 

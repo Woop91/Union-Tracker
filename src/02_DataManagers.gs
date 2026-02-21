@@ -1027,6 +1027,7 @@ function getImportMembersHtml_() {
     '</div>' +
     '' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'var parsedData = [];' +
     'var csvHeaders = [];' +
     'var BATCH_SIZE = 25;' +
@@ -1113,11 +1114,11 @@ function getImportMembersHtml_() {
     '  var rows = parsedData.slice(0, 3);' +
     '  if (rows.length === 0) { preview.innerHTML = ""; return; }' +
     '  var html = "<strong>Preview (first " + rows.length + " rows):</strong><table class=\\"preview-table\\"><tr>";' +
-    '  csvHeaders.forEach(function(h) { html += "<th>" + h + "</th>"; });' +
+    '  csvHeaders.forEach(function(h) { html += "<th>" + escapeHtml(h) + "</th>"; });' +
     '  html += "</tr>";' +
     '  rows.forEach(function(row) {' +
     '    html += "<tr>";' +
-    '    row.forEach(function(cell) { html += "<td>" + (cell || "-") + "</td>"; });' +
+    '    row.forEach(function(cell) { html += "<td>" + escapeHtml(cell || "-") + "</td>"; });' +
     '    html += "</tr>";' +
     '  });' +
     '  html += "</table>";' +
@@ -1303,8 +1304,8 @@ function importMembersFromData(data, mapping) {
       // Generate Member ID
       var memberId = generateMemberID_(firstName, lastName);
 
-      // Build new row with empty values for all columns (up to last column: STATE)
-      var newRow = new Array(MEMBER_COLS.STATE).fill('');
+      // Build new row with empty values for all columns
+      var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
       newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
       newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
@@ -1431,7 +1432,7 @@ function importMembersBatch(batchData, mapping) {
       if (!memberId) memberId = namePrefix + String(Date.now()).slice(-3);
 
       // Build new row
-      var newRow = new Array(MEMBER_COLS.STATE).fill('');
+      var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
       newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
       newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;

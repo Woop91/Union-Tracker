@@ -352,7 +352,8 @@ function setupDataValidations() {
  */
 function setMemberIdValidation(grievanceSheet, memberSheet) {
   var memberIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + '1000');
+  var lastRow = Math.max(memberSheet.getLastRow(), 2);
+  var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + lastRow);
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInRange(sourceRange, true)

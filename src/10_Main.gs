@@ -1831,12 +1831,10 @@ function startGrievanceForMember() {
 
   // Open new grievance dialog pre-populated with member info
   // Sanitize values before embedding in script context
-  const safeMemberId = String(memberId || '').replace(/['"\\<>&]/g, '');
-  const safeMemberName = String(memberName || '').replace(/['"\\<>&]/g, '');
   const html = HtmlService.createHtmlOutput(
     '<script>' +
-      'sessionStorage.setItem("prefillMemberId", "' + safeMemberId + '");' +
-      'sessionStorage.setItem("prefillMemberName", "' + safeMemberName + '");' +
+      'sessionStorage.setItem("prefillMemberId", ' + JSON.stringify(String(memberId || '')) + ');' +
+      'sessionStorage.setItem("prefillMemberName", ' + JSON.stringify(String(memberName || '')) + ');' +
       'google.script.host.close();' +
       'google.script.run.showNewGrievanceDialog();' +
     '</script>'
