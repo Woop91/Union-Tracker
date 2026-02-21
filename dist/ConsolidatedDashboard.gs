@@ -18651,7 +18651,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3601 lines)
+// SOURCE: 05_Integrations.gs (3605 lines)
 // ============================================================================
 
 /**
@@ -20280,7 +20280,7 @@ function doGet(e) {
   }
 
   // Step 2: Check for unified dashboard mode parameter
-  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode);
+  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode) || '';
   if (mode === 'steward' || mode === 'member') {
     // v4.5.2: isPII is determined by auth result, NOT the URL parameter.
     // Default to false; only grant PII access after confirmed steward/admin authorization.
@@ -20420,6 +20420,10 @@ function doGet(e) {
       // v4.4.0: Default to unified member dashboard
       html = getUnifiedDashboardHtml(false);
       break;
+  }
+
+  if (!html) {
+    return getAccessDeniedPage('Unable to load the requested page');
   }
 
   return HtmlService.createHtmlOutput(html)
