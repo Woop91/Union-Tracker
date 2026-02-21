@@ -7,7 +7,7 @@
 **Scope:** Full line-by-line codebase review — 30 source files (~59K lines), 23 test files, config/build infrastructure
 **Version:** 4.9.0 (as of 2026-02-17)
 **Previous Review:** 2026-02-14 (v4.7.0 — 69 issues, 57 fixed)
-**This Update:** Re-verification pass with cross-cutting pattern searches — 18 new findings added (F76–F93)
+**This Update:** Re-verification pass with cross-cutting pattern searches — 22 new findings added (F76–F97)
 
 ---
 
@@ -15,16 +15,16 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review identifies **138 findings** across all severity levels (120 original + 18 new from re-verification). All original findings were re-verified — **none have been fixed since the initial review**.
+This line-by-line review identifies **142 findings** across all severity levels (120 original + 22 new from re-verification). All original findings were re-verified — **none have been fixed since the initial review**.
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
 | CRITICAL | 20 | XSS via innerHTML injection, URL injection (window.open), unsanitized email HTML, onclick attribute injection, CSV preview, systematic column indexing bugs |
-| HIGH | 34 | Missing input validation, no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, broken pre-commit hook, unescaped steward/member names in dashboards |
-| MEDIUM | 50 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent, formula injection, incomplete XSS patterns |
+| HIGH | 35 | Missing input validation, no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, broken pre-commit hook, unescaped steward/member names in dashboards, empty-sheet crashes |
+| MEDIUM | 53 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent, formula injection, incomplete XSS patterns, unescaped CSV/error data |
 | LOW | 34 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
 
-**Overall Assessment: Good with critical security gaps** — The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas. However, the cross-cutting XSS review revealed that `escapeHtml()` usage is inconsistent: some functions escape properly while adjacent functions in the same file do not. The 20 CRITICAL findings (7 new) represent exploitable XSS and column indexing bugs that should be addressed before the next production deployment.
+**Overall Assessment: Good with critical security gaps** — The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas. However, the cross-cutting XSS review revealed that `escapeHtml()` usage is inconsistent: some functions escape properly while adjacent functions in the same file do not. The 20 CRITICAL findings (7 new) represent exploitable XSS and column indexing bugs that should be addressed before the next production deployment. Additionally, 9 empty-sheet crash locations in `04c_InteractiveDashboard.gs` (F94) present a HIGH-severity data availability risk.
 
 ---
 
@@ -1296,7 +1296,7 @@ Consider adding a version-gated removal plan.
 
 ## 15. Re-Verification Findings (2026-02-21 Update)
 
-> The following 18 new findings were discovered during a cross-cutting pattern search that systematically scanned every `innerHTML`, `window.open()`, `onclick`, `<td>` concatenation, `GRIEVANCE_COLUMNS`, and `MEMBER_COLUMNS` usage across all 30 source files. These were missed by the initial per-file review.
+> The following 22 new findings were discovered during a cross-cutting pattern search that systematically scanned every `innerHTML`, `window.open()`, `onclick`, `<td>` concatenation, `GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`, and `getLastRow()` usage across all 30 source files. These were missed by the initial per-file review.
 
 ### Verification of Existing Findings
 
@@ -1570,6 +1570,60 @@ The `url` returned from `exportUndoHistoryToSheet()` is passed directly to `wind
 
 ---
 
+#### F94. Empty sheet crash risk — 9 instances of `getLastRow() - 1` without validation in `04c_InteractiveDashboard.gs`
+**Severity:** HIGH | **Category:** Bug | **Lines:** 1067, 1091, 1162, 1199, 1245, 1252, 1353, 1391, 1516
+
+```javascript
+var memberData = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, MEMBER_COLS.IS_STEWARD).getValues();
+var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.RESOLUTION).getValues();
+```
+
+If `getLastRow()` returns 1 (header only) or 0 (empty sheet), the row count becomes 0 or -1, causing `getRange()` to throw. This occurs in 9 separate locations throughout the interactive dashboard data-fetching logic.
+
+**Fix:** Add validation: `if (sheet.getLastRow() < 2) return [];` before each `getRange()` call.
+
+---
+
+#### F95. Unescaped CSV preview data in `04b_AccessibilityFeatures.gs`
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 505-515
+
+```javascript
+'previewHtml += "<div class=\\"preview-row\\">" + rows[i].join(" | ") + "</div>";'
+```
+
+CSV row data from user-uploaded files is joined and injected into `innerHTML` without `escapeHtml()`. A CSV file containing `<img src=x onerror=alert(1)>` as a cell value would execute.
+
+**Fix:** `rows[i].map(function(cell) { return escapeHtml(String(cell)); }).join(" | ")`
+
+---
+
+#### F96. Unescaped error messages in `04b_AccessibilityFeatures.gs`
+**Severity:** MEDIUM | **Category:** Security | **Lines:** 539, 542
+
+```javascript
+'showStatus("❌ " + result.error, "error");'
+'showStatus("❌ Error: " + err.message, "error");'
+```
+
+Error messages from server responses are concatenated without escaping. If `showStatus()` uses `innerHTML` (which it does), these become XSS vectors.
+
+**Fix:** `'showStatus("❌ " + escapeHtml(result.error), "error")'`
+
+---
+
+#### F97. Unescaped `data-search` attribute in `04e_PublicDashboard.gs`
+**Severity:** MEDIUM | **Category:** Security | **Line:** 2183
+
+```javascript
+'data-search=\\""+((n.name||"")+" "+(n.date||"")+" "+(n.type||"")).toLowerCase()+"\\"'
+```
+
+Meeting names, dates, and types are concatenated into a `data-search` HTML attribute without `escapeHtml()`. A meeting name containing a double-quote could break out of the attribute and inject arbitrary HTML attributes.
+
+**Fix:** `'data-search=\\""+escapeHtml((n.name||"")+" "+(n.date||"")+" "+(n.type||"")).toLowerCase()+"\\"'`
+
+---
+
 ## Summary of Actionable Recommendations
 
 ### Priority 1 — Fix Now (CRITICAL + HIGH)
@@ -1610,6 +1664,7 @@ The `url` returned from `exportUndoHistoryToSheet()` is passed directly to `wind
 | F84 | Fix column constant usage in `10_Main.gs:1829` | Trivial |
 | F85 | XSS: Escape data in `composeEmailForMember()` dialog in `03_UIComponents.gs:1656` | Small |
 | F87 | Fix column indexing pattern in `05_Integrations.gs:365-394` (use GRIEVANCE_COLS) | Small |
+| F94 | Fix 9 `getLastRow() - 1` empty-sheet crashes in `04c_InteractiveDashboard.gs` | Medium |
 
 ### Priority 2 — Plan for Next Release (MEDIUM)
 
@@ -1641,6 +1696,9 @@ The `url` returned from `exportUndoHistoryToSheet()` is passed directly to `wind
 | F91 | Standardize column indexing in `10_Main.gs:1519-1541` | Small |
 | F92 | Escape grievance data in `showMemberGrievanceHistory()` `03_UIComponents.gs:1948` | Trivial |
 | F93 | Add URL validation in `06_Maintenance.gs:1399` undo export callback | Trivial |
+| F95 | Escape CSV preview data in `04b_AccessibilityFeatures.gs:505-515` | Trivial |
+| F96 | Escape error messages in `04b_AccessibilityFeatures.gs:539, 542` | Trivial |
+| F97 | Escape `data-search` attribute in `04e_PublicDashboard.gs:2183` | Trivial |
 
 ### Priority 3 — Backlog (LOW)
 
@@ -1664,4 +1722,4 @@ Low-severity items (F2, F3, F4, F5, F7, F11, F13, F18, F20, F24, F25, F26, F37, 
 ---
 
 *Initial review completed 2026-02-21 by Claude Code (Opus 4.6)*
-*Re-verification update 2026-02-21: 18 new findings (F76–F93) added via cross-cutting pattern searches. All 120 original findings re-verified as still present.*
+*Re-verification update 2026-02-21: 22 new findings (F76–F97) added via cross-cutting pattern searches. All 120 original findings re-verified as still present.*
