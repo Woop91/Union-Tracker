@@ -8004,7 +8004,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2768 lines)
+// SOURCE: 03_UIComponents.gs (2767 lines)
 // ============================================================================
 
 /**
@@ -18648,7 +18648,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3658 lines)
+// SOURCE: 05_Integrations.gs (3600 lines)
 // ============================================================================
 
 /**
@@ -18695,15 +18695,29 @@ var CALENDAR_CONFIG = {
  * @return {Folder} The root grievance folder
  */
 function getOrCreateRootFolder() {
+  // Check for stored folder ID first to avoid global name-search ambiguity
+  var props = PropertiesService.getScriptProperties();
+  var storedFolderId = props.getProperty('GRIEVANCE_ROOT_FOLDER_ID');
+  if (storedFolderId) {
+    try {
+      return DriveApp.getFolderById(storedFolderId);
+    } catch (_e) {
+      // Stored ID invalid, fall through to name search
+    }
+  }
+
   const folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
   const folders = DriveApp.getFoldersByName(folderName);
 
   if (folders.hasNext()) {
-    return folders.next();
+    var existing = folders.next();
+    props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', existing.getId());
+    return existing;
   }
 
   // Create the root folder
   const newFolder = DriveApp.createFolder(folderName);
+  props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
 
   // Set folder color/description
   newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
@@ -18905,7 +18919,7 @@ function setupFolderForSelectedGrievance() {
 
     if (response === ui.Button.YES) {
       var html = HtmlService.createHtmlOutput(
-        '<script>window.open("' + existingUrl + '", "_blank"); google.script.host.close();</script>'
+        '<script>window.open(' + JSON.stringify(existingUrl) + ', "_blank"); google.script.host.close();</script>'
       ).setWidth(1).setHeight(1);
       ui.showModalDialog(html, 'Opening folder...');
     }
@@ -19050,6 +19064,7 @@ function openGrievanceFolder() {
 function sanitizeFolderName(name) {
   if (!name) return 'Unknown';
   return name
+    .trim()
     .replace(/[<>:"/\\|?*]/g, '')
     .replace(/\s+/g, '_')
     .substring(0, 50);
@@ -19085,6 +19100,8 @@ function createMeetingCalendarEvent(meetingData) {
   try {
     var calendar = getOrCreateMeetingsCalendar();
     var meetingDate = new Date(meetingData.date + 'T00:00:00');
+    // Note: Date parsing uses script timezone. For explicit control, consider
+    // Utilities.formatDate() with Session.getScriptTimeZone().
     var startTime = meetingData.time || '09:00';
     var durationHours = parseFloat(meetingData.duration) || 1;
     var timeParts = startTime.split(':');
@@ -19172,10 +19189,10 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Build email body
     var body = '<h2>Meeting Attendance Report</h2>' +
       '<table style="border-collapse:collapse;margin:10px 0">' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Meeting:</td><td style="padding:4px 12px">' + meetingName + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Date:</td><td style="padding:4px 12px">' + dateStr + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Type:</td><td style="padding:4px 12px">' + meetingType + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Total Attendees:</td><td style="padding:4px 12px">' + result.count + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Meeting:</td><td style="padding:4px 12px">' + escapeHtml(meetingName) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Date:</td><td style="padding:4px 12px">' + escapeHtml(dateStr) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Type:</td><td style="padding:4px 12px">' + escapeHtml(meetingType) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Total Attendees:</td><td style="padding:4px 12px">' + escapeHtml(String(result.count)) + '</td></tr>' +
       '</table>';
 
     if (result.attendees.length > 0) {
@@ -19192,9 +19209,9 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
         var a = result.attendees[j];
         body += '<tr>' +
           '<td style="padding:6px;border:1px solid #ddd">' + (j + 1) + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.memberId + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.name + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.time + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.memberId)) + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.name)) + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.time)) + '</td>' +
           '</tr>';
       }
       body += '</table>';
@@ -19365,12 +19382,13 @@ function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipien
   if (!recipientEmails || !docUrl) return;
   try {
     var typeLabel = docType === 'agenda' ? 'Meeting Agenda' : 'Meeting Notes';
-    var body = '<h2>' + typeLabel + '</h2>' +
-      '<p><strong>Meeting:</strong> ' + meetingName + '</p>' +
-      '<p><strong>Date:</strong> ' + meetingDate + '</p>' +
-      '<p>Click the link below to access the ' + typeLabel.toLowerCase() + ':</p>' +
-      '<p><a href="' + docUrl + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
-      'Open ' + typeLabel + '</a></p>' +
+    var safeDocUrl = /^https:\/\/docs\.google\.com\//.test(docUrl) ? docUrl : '';
+    var body = '<h2>' + escapeHtml(typeLabel) + '</h2>' +
+      '<p><strong>Meeting:</strong> ' + escapeHtml(meetingName) + '</p>' +
+      '<p><strong>Date:</strong> ' + escapeHtml(meetingDate) + '</p>' +
+      '<p>Click the link below to access the ' + escapeHtml(typeLabel.toLowerCase()) + ':</p>' +
+      (safeDocUrl ? '<p><a href="' + escapeHtml(safeDocUrl) + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
+      'Open ' + escapeHtml(typeLabel) + '</a></p>' : '<p><em>Document link unavailable.</em></p>') +
       '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
 
     MailApp.sendEmail({
@@ -20013,7 +20031,7 @@ function createPDFForSelectedGrievance() {
 
     // Open folder in new tab
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + folder.getUrl() + '", "_blank"); google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(folder.getUrl()) + ', "_blank"); google.script.host.close();</script>'
     ).setWidth(100).setHeight(50);
     ui.showModalDialog(html, 'Opening folder...');
 
@@ -20088,10 +20106,10 @@ function onGrievanceFormSubmit(e) {
     var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
     if (sheet) {
-      // Find the last row (where the form just added data) and add the PDF link
-      var lastRow = sheet.getLastRow();
+      // Use the event range to find the exact row the form submission added to
+      var targetRow = e.range ? e.range.getRow() : sheet.getLastRow();
       if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
-        sheet.getRange(lastRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+        sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
       }
     }
 
@@ -20100,8 +20118,8 @@ function onGrievanceFormSubmit(e) {
       secureLog('FormSubmission', 'Form submission processed - PDF created', {});
     }
 
-  } catch (e) {
-    Logger.log('Error processing form submission: ' + e.message);
+  } catch (err) {
+    Logger.log('Error processing form submission: ' + err.message);
   }
 }
 
@@ -20181,10 +20199,10 @@ function showUpcomingDeadlines() {
     deadlines.forEach(d => {
       const urgentStyle = d.daysLeft <= 3 ? 'background:#fee2e2;' : '';
       tableRows += `<tr style="${urgentStyle}">
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.grievanceId}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.memberName}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.step}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.date} (${d.daysLeft} days)</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.grievanceId))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.memberName))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.step))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.date))} (${escapeHtml(String(d.daysLeft))} days)</td>
       </tr>`;
     });
   }
@@ -21520,7 +21538,8 @@ function addMobileDashboardLinkToConfig() {
   // Find first empty row in column AZ (or create Mobile Dashboard URL section)
   var _lastRow = configSheet.getLastRow();
   var targetRow = 2;
-  var targetCol = 52; // Column AZ
+  var MOBILE_DASHBOARD_URL_COL = 52; // Column AZ
+  var targetCol = MOBILE_DASHBOARD_URL_COL;
 
   // Check if header exists
   var headerCell = configSheet.getRange(1, targetCol);
@@ -22234,7 +22253,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3531 lines)
+// SOURCE: 06_Maintenance.gs (3536 lines)
 // ============================================================================
 
 /**
@@ -22488,6 +22507,13 @@ function REPAIR_DASHBOARD() {
   } catch (error) {
     Logger.log('Error in REPAIR_DASHBOARD: ' + error.message);
     ui.alert('❌ Error', 'Repair failed: ' + error.message, ui.ButtonSet.OK);
+
+    logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
+      action: 'REPAIR_DASHBOARD',
+      status: 'FAILED',
+      error: error.message,
+      runBy: Session.getActiveUser().getEmail()
+    });
   }
 }
 
@@ -22500,8 +22526,8 @@ function removeDeprecatedTabs() {
   var deprecatedSheets = [
     'Dashboard_OLD',
     'Member List_OLD',
-    'BACKUP_',
-    'TEST_'
+    'DEPRECATED_BACKUP_',
+    'DEPRECATED_TEST_'
   ];
 
   var removed = [];
@@ -23213,7 +23239,15 @@ function saveUndoHistory(history) {
     history.currentIndex = Math.min(history.currentIndex, history.actions.length);
   }
 
-  props.setProperty(UNDO_CONFIG.STORAGE_KEY, JSON.stringify(history));
+  // UserProperties has a 9KB per-property limit; progressively trim if too large
+  var json = JSON.stringify(history);
+  while (json.length > 8000 && history.actions.length > 1) {
+    history.actions.shift();
+    history.currentIndex = Math.max(0, history.currentIndex - 1);
+    json = JSON.stringify(history);
+  }
+
+  props.setProperty(UNDO_CONFIG.STORAGE_KEY, json);
 }
 
 /**
@@ -23464,6 +23498,35 @@ function restoreFromSnapshot(snapshot) {
     throw new Error('Grievance Log not found');
   }
 
+  // Validate snapshot column structure matches current sheet
+  if (snapshot.data && snapshot.data.length > 0 && sheet.getLastColumn() > 0) {
+    if (snapshot.data[0].length !== sheet.getLastColumn()) {
+      throw new Error('Snapshot column count (' + snapshot.data[0].length +
+        ') does not match current sheet (' + sheet.getLastColumn() + ')');
+    }
+  }
+
+  // Confirm with user before proceeding
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert(
+    'Restore Snapshot',
+    'This will replace all current grievance data with the snapshot from ' +
+    snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
+    ui.ButtonSet.YES_NO
+  );
+  if (response !== ui.Button.YES) {
+    return;
+  }
+
+  // Create a backup of current data before restoring
+  try {
+    var preRestoreBackup = createGrievanceSnapshot();
+    preRestoreBackup.label = 'Pre-Restore Backup';
+    Logger.log('Pre-restore backup created at ' + preRestoreBackup.timestamp);
+  } catch (_backupErr) {
+    Logger.log('Warning: Could not create pre-restore backup: ' + _backupErr.message);
+  }
+
   // Clear existing data (keep header)
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
@@ -23540,9 +23603,9 @@ function showUndoRedoPanel() {
 
         return '<tr>' +
           '<td>' + idx + '</td>' +
-          '<td><span class="badge ' + a.type.toLowerCase() + '">' + a.type + '</span></td>' +
-          '<td>' + a.description + '</td>' +
-          '<td style="font-size:12px;color:#666">' + time + '</td>' +
+          '<td><span class="badge ' + escapeHtml(a.type.toLowerCase()) + '">' + escapeHtml(a.type) + '</span></td>' +
+          '<td>' + escapeHtml(a.description) + '</td>' +
+          '<td style="font-size:12px;color:#666">' + escapeHtml(time) + '</td>' +
           '<td>' + (canUndo ? '<button onclick="undo(' + (idx - 1) + ')">↩️</button>' : '') + '</td>' +
           '</tr>';
       }).join('');
@@ -23621,69 +23684,10 @@ function showUndoRedoPanel() {
  * @requires Constants.gs
  */
 
-// ============================================================================
-// SYSTEM DIAGNOSTICS
-// ============================================================================
-
-/**
- * Runs a complete diagnostic check on the dashboard setup
- * Checks all required sheets, columns, formulas, and configurations
- * @return {Object} Diagnostic results
- */
-
-// ============================================================================
-// MODAL DIAGNOSTICS (v4.2.2)
-// ============================================================================
-
-/**
- * Diagnoses why modals might not be loading data
- * Checks sheet names, structure, data, and simulates modal data loading
- * @return {Object} Diagnostic results
- */
-
-/**
- * Shows modal diagnostic results in a dialog
- */
-
-/**
- * Shows diagnostic results in a dialog
- */
-
-// ============================================================================
-// DASHBOARD REPAIR
-// ============================================================================
-
-/**
- * Repairs common dashboard issues
- * - Creates missing sheets
- * - Repairs hidden calculation sheets
- * - Fixes data quality issues
- * @return {Object} Repair results
- */
-
-/**
- * Removes deprecated tabs from the spreadsheet
- * Currently removes:
- * - 💼 Dashboard (deprecated in v4.3.2 - use modal dashboards instead)
- *
- * Run this function to clean up legacy tabs that are no longer needed.
- * @return {Object} Results with list of removed tabs
- */
-
-/**
- * Sets up basic structure for a sheet based on type
- * @param {Sheet} sheet - The sheet to set up
- * @param {string} sheetType - The type key from SHEET_NAMES
- */
-
-/**
- * Shows the repair dialog
- */
-
-// ============================================================================
-// Note: verifyHiddenSheets() and fixDataQualityIssues() are defined in
-// HiddenSheets.gs and DataIntegrity.gs which contain comprehensive implementations.
-// ============================================================================
+// Note: DIAGNOSE_SETUP(), REPAIR_DASHBOARD(), removeDeprecatedTabs(), and
+// showRepairDialog() implementations are defined earlier in this file.
+// verifyHiddenSheets() and fixDataQualityIssues() are in HiddenSheets.gs
+// and DataIntegrity.gs respectively.
 
 // ============================================================================
 // AUDIT LOGGING
@@ -23785,14 +23789,17 @@ function getRecentAuditLogs(count) {
 
   if (numRows <= 0) return [];
 
-  const data = auditSheet.getRange(startRow, 1, numRows, EVENT_AUDIT_COLS.SESSION_ID).getValues();
+  // Read all 6 columns including Integrity Hash
+  var numCols = Math.max(EVENT_AUDIT_COLS.SESSION_ID, 6);
+  const data = auditSheet.getRange(startRow, 1, numRows, numCols).getValues();
 
   return data.map(row => ({
     timestamp: row[EVENT_AUDIT_COLS.TIMESTAMP - 1],
     eventType: row[EVENT_AUDIT_COLS.EVENT_TYPE - 1],
     user: row[EVENT_AUDIT_COLS.USER - 1],
     details: row[EVENT_AUDIT_COLS.DETAILS - 1],
-    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1]
+    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1],
+    integrityHash: row[5] || ''
   })).reverse();
 }
 
@@ -23881,10 +23888,11 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  // Try canonical SHEETS.GRIEVANCE_LOG first, fall back to SHEET_NAMES.GRIEVANCE_TRACKER
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
 
   if (!sheet) {
-    return errorResponse('Grievance Tracker not found');
+    return errorResponse('Grievance Log/Tracker not found');
   }
 
   const lastRow = sheet.getLastRow();
@@ -23958,7 +23966,7 @@ function createWeeklySnapshot() {
     if (!folder) {
       folder = DriveApp.getFolderById(archiveFolderId);
     }
-    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd_HH-mm');
+    var date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HH-mm');
     var snapshotName = 'SNAPSHOT_' + date;
 
     // Create the copy
@@ -24000,7 +24008,7 @@ function createAutomatedSnapshot() {
 
   try {
     var folder = DriveApp.getFolderById(archiveFolderId);
-    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
+    var date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     var snapshotName = 'AUTO_SNAPSHOT_' + date;
 
     DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
@@ -24505,7 +24513,10 @@ function checkDuplicateMemberId(memberId) {
 
   if (!memberSheet) return { exists: false, row: null };
 
-  var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
+  var lastRow = memberSheet.getLastRow();
+  if (lastRow < 2) return { exists: false, row: null };
+
+  var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, lastRow - 1, 1).getValues();
 
   for (var i = 0; i < memberIds.length; i++) {
     if (memberIds[i][0] === memberId) {
@@ -24569,6 +24580,10 @@ function findOrphanedGrievances() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!memberSheet || !grievanceSheet) {
+    return [];
+  }
+
+  if (memberSheet.getLastRow() < 2 || grievanceSheet.getLastRow() < 2) {
     return [];
   }
 
@@ -24796,9 +24811,9 @@ function showStewardWorkloadDashboard() {
     var loadColor = statusClass === 'high' ? '#DC2626' : (statusClass === 'medium' ? '#F59E0B' : '#059669');
 
     html += '<tr class="' + statusClass + '">' +
-      '<td><strong>' + s.name + '</strong></td>' +
-      '<td>' + s.activeCount + '</td>' +
-      '<td>' + s.urgentCount + '</td>' +
+      '<td><strong>' + escapeHtml(String(s.name)) + '</strong></td>' +
+      '<td>' + escapeHtml(String(s.activeCount)) + '</td>' +
+      '<td>' + escapeHtml(String(s.urgentCount)) + '</td>' +
       '<td>' +
         '<div class="load-bar"><div class="load-fill" style="width: ' + loadPct + '%; background: ' + loadColor + ';"></div></div>' +
         '<small>' + s.loadScore + '</small>' +
@@ -24960,7 +24975,7 @@ function showConfigHealthCheck() {
   html += '<table><tr><th>Field</th><th>Missing Value</th><th>Example Row</th></tr>';
 
   report.missingValues.slice(0, 20).forEach(function(item) {
-    html += '<tr><td>' + item.field + '</td><td><strong>' + item.value + '</strong></td><td>' + item.exampleRow + '</td></tr>';
+    html += '<tr><td>' + escapeHtml(String(item.field)) + '</td><td><strong>' + escapeHtml(String(item.value)) + '</strong></td><td>' + escapeHtml(String(item.exampleRow)) + '</td></tr>';
   });
 
   if (report.missingValues.length > 20) {
@@ -25160,10 +25175,10 @@ function showAuditLogViewer() {
                      (eventType.indexOf('CONFIG') !== -1 ? 'config' : ''));
 
     html += '<tr>' +
-      '<td>' + timestamp + '</td>' +
-      '<td>' + user + '</td>' +
-      '<td><span class="' + eventClass + '">' + eventType + '</span></td>' +
-      '<td>' + details.substring(0, 100) + (details.length > 100 ? '...' : '') + '</td>' +
+      '<td>' + escapeHtml(String(timestamp)) + '</td>' +
+      '<td>' + escapeHtml(String(user)) + '</td>' +
+      '<td><span class="' + eventClass + '">' + escapeHtml(String(eventType)) + '</span></td>' +
+      '<td>' + escapeHtml(String(details).substring(0, 100)) + (details.length > 100 ? '...' : '') + '</td>' +
       '</tr>';
   });
 
@@ -25244,9 +25259,18 @@ function archiveClosedGrievances(daysOld) {
     .setValues(rowsToArchive);
 
   // Delete from main sheet (in reverse order to maintain row indices)
+  var failedDeletes = [];
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
-    grievanceSheet.deleteRow(rowIndex);
+    try {
+      grievanceSheet.deleteRow(rowIndex);
+    } catch (deleteErr) {
+      failedDeletes.push(rowIndex);
+      Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
+    }
   });
+  if (failedDeletes.length > 0) {
+    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedDeletes.join(', '));
+  }
 
   // Log the archive operation
   logIntegrityEvent('AUTO_ARCHIVE',
@@ -40279,7 +40303,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1945 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (1944 lines)
 // ============================================================================
 
 // ============================================================================
