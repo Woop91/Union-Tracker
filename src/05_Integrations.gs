@@ -42,15 +42,29 @@ var CALENDAR_CONFIG = {
  * @return {Folder} The root grievance folder
  */
 function getOrCreateRootFolder() {
+  // Check for stored folder ID first to avoid global name-search ambiguity
+  var props = PropertiesService.getScriptProperties();
+  var storedFolderId = props.getProperty('GRIEVANCE_ROOT_FOLDER_ID');
+  if (storedFolderId) {
+    try {
+      return DriveApp.getFolderById(storedFolderId);
+    } catch (_e) {
+      // Stored ID invalid, fall through to name search
+    }
+  }
+
   const folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
   const folders = DriveApp.getFoldersByName(folderName);
 
   if (folders.hasNext()) {
-    return folders.next();
+    var existing = folders.next();
+    props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', existing.getId());
+    return existing;
   }
 
   // Create the root folder
   const newFolder = DriveApp.createFolder(folderName);
+  props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
 
   // Set folder color/description
   newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
@@ -252,7 +266,7 @@ function setupFolderForSelectedGrievance() {
 
     if (response === ui.Button.YES) {
       var html = HtmlService.createHtmlOutput(
-        '<script>window.open("' + existingUrl + '", "_blank"); google.script.host.close();</script>'
+        '<script>window.open(' + JSON.stringify(existingUrl) + ', "_blank"); google.script.host.close();</script>'
       ).setWidth(1).setHeight(1);
       ui.showModalDialog(html, 'Opening folder...');
     }
@@ -397,6 +411,7 @@ function openGrievanceFolder() {
 function sanitizeFolderName(name) {
   if (!name) return 'Unknown';
   return name
+    .trim()
     .replace(/[<>:"/\\|?*]/g, '')
     .replace(/\s+/g, '_')
     .substring(0, 50);
@@ -432,6 +447,8 @@ function createMeetingCalendarEvent(meetingData) {
   try {
     var calendar = getOrCreateMeetingsCalendar();
     var meetingDate = new Date(meetingData.date + 'T00:00:00');
+    // Note: Date parsing uses script timezone. For explicit control, consider
+    // Utilities.formatDate() with Session.getScriptTimeZone().
     var startTime = meetingData.time || '09:00';
     var durationHours = parseFloat(meetingData.duration) || 1;
     var timeParts = startTime.split(':');
@@ -519,10 +536,10 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Build email body
     var body = '<h2>Meeting Attendance Report</h2>' +
       '<table style="border-collapse:collapse;margin:10px 0">' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Meeting:</td><td style="padding:4px 12px">' + meetingName + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Date:</td><td style="padding:4px 12px">' + dateStr + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Type:</td><td style="padding:4px 12px">' + meetingType + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Total Attendees:</td><td style="padding:4px 12px">' + result.count + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Meeting:</td><td style="padding:4px 12px">' + escapeHtml(meetingName) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Date:</td><td style="padding:4px 12px">' + escapeHtml(dateStr) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Type:</td><td style="padding:4px 12px">' + escapeHtml(meetingType) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Total Attendees:</td><td style="padding:4px 12px">' + escapeHtml(String(result.count)) + '</td></tr>' +
       '</table>';
 
     if (result.attendees.length > 0) {
@@ -539,9 +556,9 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
         var a = result.attendees[j];
         body += '<tr>' +
           '<td style="padding:6px;border:1px solid #ddd">' + (j + 1) + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.memberId + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.name + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.time + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.memberId)) + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.name)) + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.time)) + '</td>' +
           '</tr>';
       }
       body += '</table>';
@@ -712,12 +729,13 @@ function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipien
   if (!recipientEmails || !docUrl) return;
   try {
     var typeLabel = docType === 'agenda' ? 'Meeting Agenda' : 'Meeting Notes';
-    var body = '<h2>' + typeLabel + '</h2>' +
-      '<p><strong>Meeting:</strong> ' + meetingName + '</p>' +
-      '<p><strong>Date:</strong> ' + meetingDate + '</p>' +
-      '<p>Click the link below to access the ' + typeLabel.toLowerCase() + ':</p>' +
-      '<p><a href="' + docUrl + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
-      'Open ' + typeLabel + '</a></p>' +
+    var safeDocUrl = /^https:\/\/docs\.google\.com\//.test(docUrl) ? docUrl : '';
+    var body = '<h2>' + escapeHtml(typeLabel) + '</h2>' +
+      '<p><strong>Meeting:</strong> ' + escapeHtml(meetingName) + '</p>' +
+      '<p><strong>Date:</strong> ' + escapeHtml(meetingDate) + '</p>' +
+      '<p>Click the link below to access the ' + escapeHtml(typeLabel.toLowerCase()) + ':</p>' +
+      (safeDocUrl ? '<p><a href="' + escapeHtml(safeDocUrl) + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
+      'Open ' + escapeHtml(typeLabel) + '</a></p>' : '<p><em>Document link unavailable.</em></p>') +
       '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
 
     MailApp.sendEmail({
@@ -1088,46 +1106,6 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
 
 // Note: syncSingleGrievanceToCalendar() is defined in MobileQuickActions.gs
 
-/**
- * Clears all calendar events created by the dashboard
- * @return {Object} Result with count of deleted events
- */
-function clearAllCalendarEvents() {
-  try {
-    const calendar = getOrCreateDeadlinesCalendar();
-
-    // Get all events from now until 1 year from now
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1);
-
-    const events = calendar.getEvents(startDate, endDate, {
-      search: '[GRV]'
-    });
-
-    let deleted = 0;
-    for (const event of events) {
-      event.deleteEvent();
-      deleted++;
-
-      // Rate limiting
-      if (deleted % 50 === 0) {
-        Utilities.sleep(200);
-      }
-    }
-
-    return {
-      success: true,
-      deleted: deleted,
-      message: `Deleted ${deleted} calendar events`
-    };
-
-  } catch (error) {
-    console.error('Error clearing calendar:', error);
-    return errorResponse(error.message);
-  }
-}
-
 // ============================================================================
 // EMAIL NOTIFICATIONS
 // ============================================================================
@@ -1400,7 +1378,7 @@ function createPDFForSelectedGrievance() {
 
     // Open folder in new tab
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + folder.getUrl() + '", "_blank"); google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(folder.getUrl()) + ', "_blank"); google.script.host.close();</script>'
     ).setWidth(100).setHeight(50);
     ui.showModalDialog(html, 'Opening folder...');
 
@@ -1475,10 +1453,10 @@ function onGrievanceFormSubmit(e) {
     var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
     if (sheet) {
-      // Find the last row (where the form just added data) and add the PDF link
-      var lastRow = sheet.getLastRow();
+      // Use the event range to find the exact row the form submission added to
+      var targetRow = e.range ? e.range.getRow() : sheet.getLastRow();
       if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
-        sheet.getRange(lastRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+        sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
       }
     }
 
@@ -1487,8 +1465,8 @@ function onGrievanceFormSubmit(e) {
       secureLog('FormSubmission', 'Form submission processed - PDF created', {});
     }
 
-  } catch (e) {
-    Logger.log('Error processing form submission: ' + e.message);
+  } catch (err) {
+    Logger.log('Error processing form submission: ' + err.message);
   }
 }
 
@@ -1524,14 +1502,6 @@ function showCalendarSyncDialog() {
           </button>
         </div>
 
-        <div class="sync-option">
-          <h4>Clear All Events</h4>
-          <p>Removes all grievance-related events from the calendar</p>
-          <button class="btn btn-danger" onclick="clearAll()" style="margin-top: 10px;">
-            Clear Calendar
-          </button>
-        </div>
-
         <div id="status" class="status"></div>
 
         <div class="action-buttons">
@@ -1555,16 +1525,6 @@ function showCalendarSyncDialog() {
             })
             .syncDeadlinesToCalendar();
         }
-
-        function clearAll() {
-          if (!confirm('Are you sure you want to clear all grievance events from the calendar?')) return;
-          showStatus('Clearing...', false);
-          google.script.run
-            .withSuccessHandler(function(r) {
-              showStatus(r.success ? r.message : 'Error: ' + r.error, !r.success);
-            })
-            .clearAllCalendarEvents();
-        }
       </script>
     </body>
     </html>
@@ -1586,10 +1546,10 @@ function showUpcomingDeadlines() {
     deadlines.forEach(d => {
       const urgentStyle = d.daysLeft <= 3 ? 'background:#fee2e2;' : '';
       tableRows += `<tr style="${urgentStyle}">
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.grievanceId}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.memberName}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.step}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.date} (${d.daysLeft} days)</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.grievanceId))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.memberName))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.step))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.date))} (${escapeHtml(String(d.daysLeft))} days)</td>
       </tr>`;
     });
   }
@@ -1619,25 +1579,6 @@ function showUpcomingDeadlines() {
   `).setWidth(600).setHeight(400);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Upcoming Deadlines');
-}
-
-/**
- * Shows confirmation dialog for clearing calendar
- */
-function showClearCalendarConfirm() {
-  const result = showConfirmation(
-    'This will delete ALL grievance-related events from your calendar. This cannot be undone. Continue?',
-    'Clear Calendar Events'
-  );
-
-  if (result) {
-    const clearResult = clearAllCalendarEvents();
-    if (clearResult.success) {
-      showToast(clearResult.message, 'Calendar Cleared');
-    } else {
-      showAlert('Error: ' + clearResult.error, 'Error');
-    }
-  }
 }
 /**
  * ============================================================================
@@ -2944,7 +2885,8 @@ function addMobileDashboardLinkToConfig() {
   // Find first empty row in column AZ (or create Mobile Dashboard URL section)
   var _lastRow = configSheet.getLastRow();
   var targetRow = 2;
-  var targetCol = 52; // Column AZ
+  var MOBILE_DASHBOARD_URL_COL = 52; // Column AZ
+  var targetCol = MOBILE_DASHBOARD_URL_COL;
 
   // Check if header exists
   var headerCell = configSheet.getRange(1, targetCol);

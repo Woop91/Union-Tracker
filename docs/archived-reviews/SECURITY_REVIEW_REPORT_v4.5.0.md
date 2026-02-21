@@ -1,3 +1,5 @@
+> **ARCHIVED** — This review is outdated and superseded by [`CODE_REVIEW.md`](../../CODE_REVIEW.md) (v4.9.0, 2026-02-21). Many critical issues identified here were later marked as "fixed" in other review docs but were still present. Do not rely on this document for current security posture.
+
 # Security Review Report
 
 > **Note:** This security review was conducted at v4.5.0.

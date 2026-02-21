@@ -405,7 +405,6 @@ Copy all 27 files from `src/` to your Google Apps Script project. Each file shou
   - `getOrCreateMemberFolder(name, id)` **(NEW v3.6.5)** - Create member-specific archive folder
 - Calendar Integration:
   - `syncDeadlinesToCalendar()` - Sync all grievance deadlines
-  - `clearAllCalendarEvents()` - Clear dashboard events
 - Email Notifications:
   - `sendDeadlineReminders()` - Send upcoming deadline alerts
   - `sendEmailToMember()` - Send email to specific member

@@ -249,6 +249,13 @@ function REPAIR_DASHBOARD() {
   } catch (error) {
     Logger.log('Error in REPAIR_DASHBOARD: ' + error.message);
     ui.alert('❌ Error', 'Repair failed: ' + error.message, ui.ButtonSet.OK);
+
+    logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
+      action: 'REPAIR_DASHBOARD',
+      status: 'FAILED',
+      error: error.message,
+      runBy: Session.getActiveUser().getEmail()
+    });
   }
 }
 
@@ -261,8 +268,8 @@ function removeDeprecatedTabs() {
   var deprecatedSheets = [
     'Dashboard_OLD',
     'Member List_OLD',
-    'BACKUP_',
-    'TEST_'
+    'DEPRECATED_BACKUP_',
+    'DEPRECATED_TEST_'
   ];
 
   var removed = [];
@@ -974,7 +981,15 @@ function saveUndoHistory(history) {
     history.currentIndex = Math.min(history.currentIndex, history.actions.length);
   }
 
-  props.setProperty(UNDO_CONFIG.STORAGE_KEY, JSON.stringify(history));
+  // UserProperties has a 9KB per-property limit; progressively trim if too large
+  var json = JSON.stringify(history);
+  while (json.length > 8000 && history.actions.length > 1) {
+    history.actions.shift();
+    history.currentIndex = Math.max(0, history.currentIndex - 1);
+    json = JSON.stringify(history);
+  }
+
+  props.setProperty(UNDO_CONFIG.STORAGE_KEY, json);
 }
 
 /**
@@ -1225,6 +1240,35 @@ function restoreFromSnapshot(snapshot) {
     throw new Error('Grievance Log not found');
   }
 
+  // Validate snapshot column structure matches current sheet
+  if (snapshot.data && snapshot.data.length > 0 && sheet.getLastColumn() > 0) {
+    if (snapshot.data[0].length !== sheet.getLastColumn()) {
+      throw new Error('Snapshot column count (' + snapshot.data[0].length +
+        ') does not match current sheet (' + sheet.getLastColumn() + ')');
+    }
+  }
+
+  // Confirm with user before proceeding
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert(
+    'Restore Snapshot',
+    'This will replace all current grievance data with the snapshot from ' +
+    snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
+    ui.ButtonSet.YES_NO
+  );
+  if (response !== ui.Button.YES) {
+    return;
+  }
+
+  // Create a backup of current data before restoring
+  try {
+    var preRestoreBackup = createGrievanceSnapshot();
+    preRestoreBackup.label = 'Pre-Restore Backup';
+    Logger.log('Pre-restore backup created at ' + preRestoreBackup.timestamp);
+  } catch (_backupErr) {
+    Logger.log('Warning: Could not create pre-restore backup: ' + _backupErr.message);
+  }
+
   // Clear existing data (keep header)
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
@@ -1301,9 +1345,9 @@ function showUndoRedoPanel() {
 
         return '<tr>' +
           '<td>' + idx + '</td>' +
-          '<td><span class="badge ' + a.type.toLowerCase() + '">' + a.type + '</span></td>' +
-          '<td>' + a.description + '</td>' +
-          '<td style="font-size:12px;color:#666">' + time + '</td>' +
+          '<td><span class="badge ' + escapeHtml(a.type.toLowerCase()) + '">' + escapeHtml(a.type) + '</span></td>' +
+          '<td>' + escapeHtml(a.description) + '</td>' +
+          '<td style="font-size:12px;color:#666">' + escapeHtml(time) + '</td>' +
           '<td>' + (canUndo ? '<button onclick="undo(' + (idx - 1) + ')">↩️</button>' : '') + '</td>' +
           '</tr>';
       }).join('');
@@ -1382,69 +1426,10 @@ function showUndoRedoPanel() {
  * @requires Constants.gs
  */
 
-// ============================================================================
-// SYSTEM DIAGNOSTICS
-// ============================================================================
-
-/**
- * Runs a complete diagnostic check on the dashboard setup
- * Checks all required sheets, columns, formulas, and configurations
- * @return {Object} Diagnostic results
- */
-
-// ============================================================================
-// MODAL DIAGNOSTICS (v4.2.2)
-// ============================================================================
-
-/**
- * Diagnoses why modals might not be loading data
- * Checks sheet names, structure, data, and simulates modal data loading
- * @return {Object} Diagnostic results
- */
-
-/**
- * Shows modal diagnostic results in a dialog
- */
-
-/**
- * Shows diagnostic results in a dialog
- */
-
-// ============================================================================
-// DASHBOARD REPAIR
-// ============================================================================
-
-/**
- * Repairs common dashboard issues
- * - Creates missing sheets
- * - Repairs hidden calculation sheets
- * - Fixes data quality issues
- * @return {Object} Repair results
- */
-
-/**
- * Removes deprecated tabs from the spreadsheet
- * Currently removes:
- * - 💼 Dashboard (deprecated in v4.3.2 - use modal dashboards instead)
- *
- * Run this function to clean up legacy tabs that are no longer needed.
- * @return {Object} Results with list of removed tabs
- */
-
-/**
- * Sets up basic structure for a sheet based on type
- * @param {Sheet} sheet - The sheet to set up
- * @param {string} sheetType - The type key from SHEET_NAMES
- */
-
-/**
- * Shows the repair dialog
- */
-
-// ============================================================================
-// Note: verifyHiddenSheets() and fixDataQualityIssues() are defined in
-// HiddenSheets.gs and DataIntegrity.gs which contain comprehensive implementations.
-// ============================================================================
+// Note: DIAGNOSE_SETUP(), REPAIR_DASHBOARD(), removeDeprecatedTabs(), and
+// showRepairDialog() implementations are defined earlier in this file.
+// verifyHiddenSheets() and fixDataQualityIssues() are in HiddenSheets.gs
+// and DataIntegrity.gs respectively.
 
 // ============================================================================
 // AUDIT LOGGING
@@ -1546,14 +1531,17 @@ function getRecentAuditLogs(count) {
 
   if (numRows <= 0) return [];
 
-  const data = auditSheet.getRange(startRow, 1, numRows, EVENT_AUDIT_COLS.SESSION_ID).getValues();
+  // Read all 6 columns including Integrity Hash
+  var numCols = Math.max(EVENT_AUDIT_COLS.SESSION_ID, 6);
+  const data = auditSheet.getRange(startRow, 1, numRows, numCols).getValues();
 
   return data.map(row => ({
     timestamp: row[EVENT_AUDIT_COLS.TIMESTAMP - 1],
     eventType: row[EVENT_AUDIT_COLS.EVENT_TYPE - 1],
     user: row[EVENT_AUDIT_COLS.USER - 1],
     details: row[EVENT_AUDIT_COLS.DETAILS - 1],
-    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1]
+    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1],
+    integrityHash: row[5] || ''
   })).reverse();
 }
 
@@ -1642,10 +1630,11 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  // Try canonical SHEETS.GRIEVANCE_LOG first, fall back to SHEET_NAMES.GRIEVANCE_TRACKER
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
 
   if (!sheet) {
-    return errorResponse('Grievance Tracker not found');
+    return errorResponse('Grievance Log/Tracker not found');
   }
 
   const lastRow = sheet.getLastRow();
@@ -1719,7 +1708,7 @@ function createWeeklySnapshot() {
     if (!folder) {
       folder = DriveApp.getFolderById(archiveFolderId);
     }
-    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd_HH-mm');
+    var date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HH-mm');
     var snapshotName = 'SNAPSHOT_' + date;
 
     // Create the copy
@@ -1761,7 +1750,7 @@ function createAutomatedSnapshot() {
 
   try {
     var folder = DriveApp.getFolderById(archiveFolderId);
-    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
+    var date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     var snapshotName = 'AUTO_SNAPSHOT_' + date;
 
     DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
@@ -2266,7 +2255,10 @@ function checkDuplicateMemberId(memberId) {
 
   if (!memberSheet) return { exists: false, row: null };
 
-  var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
+  var lastRow = memberSheet.getLastRow();
+  if (lastRow < 2) return { exists: false, row: null };
+
+  var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, lastRow - 1, 1).getValues();
 
   for (var i = 0; i < memberIds.length; i++) {
     if (memberIds[i][0] === memberId) {
@@ -2330,6 +2322,10 @@ function findOrphanedGrievances() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!memberSheet || !grievanceSheet) {
+    return [];
+  }
+
+  if (memberSheet.getLastRow() < 2 || grievanceSheet.getLastRow() < 2) {
     return [];
   }
 
@@ -2557,9 +2553,9 @@ function showStewardWorkloadDashboard() {
     var loadColor = statusClass === 'high' ? '#DC2626' : (statusClass === 'medium' ? '#F59E0B' : '#059669');
 
     html += '<tr class="' + statusClass + '">' +
-      '<td><strong>' + s.name + '</strong></td>' +
-      '<td>' + s.activeCount + '</td>' +
-      '<td>' + s.urgentCount + '</td>' +
+      '<td><strong>' + escapeHtml(String(s.name)) + '</strong></td>' +
+      '<td>' + escapeHtml(String(s.activeCount)) + '</td>' +
+      '<td>' + escapeHtml(String(s.urgentCount)) + '</td>' +
       '<td>' +
         '<div class="load-bar"><div class="load-fill" style="width: ' + loadPct + '%; background: ' + loadColor + ';"></div></div>' +
         '<small>' + s.loadScore + '</small>' +
@@ -2721,7 +2717,7 @@ function showConfigHealthCheck() {
   html += '<table><tr><th>Field</th><th>Missing Value</th><th>Example Row</th></tr>';
 
   report.missingValues.slice(0, 20).forEach(function(item) {
-    html += '<tr><td>' + item.field + '</td><td><strong>' + item.value + '</strong></td><td>' + item.exampleRow + '</td></tr>';
+    html += '<tr><td>' + escapeHtml(String(item.field)) + '</td><td><strong>' + escapeHtml(String(item.value)) + '</strong></td><td>' + escapeHtml(String(item.exampleRow)) + '</td></tr>';
   });
 
   if (report.missingValues.length > 20) {
@@ -2921,10 +2917,10 @@ function showAuditLogViewer() {
                      (eventType.indexOf('CONFIG') !== -1 ? 'config' : ''));
 
     html += '<tr>' +
-      '<td>' + timestamp + '</td>' +
-      '<td>' + user + '</td>' +
-      '<td><span class="' + eventClass + '">' + eventType + '</span></td>' +
-      '<td>' + details.substring(0, 100) + (details.length > 100 ? '...' : '') + '</td>' +
+      '<td>' + escapeHtml(String(timestamp)) + '</td>' +
+      '<td>' + escapeHtml(String(user)) + '</td>' +
+      '<td><span class="' + eventClass + '">' + escapeHtml(String(eventType)) + '</span></td>' +
+      '<td>' + escapeHtml(String(details).substring(0, 100)) + (details.length > 100 ? '...' : '') + '</td>' +
       '</tr>';
   });
 
@@ -3005,9 +3001,18 @@ function archiveClosedGrievances(daysOld) {
     .setValues(rowsToArchive);
 
   // Delete from main sheet (in reverse order to maintain row indices)
+  var failedDeletes = [];
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
-    grievanceSheet.deleteRow(rowIndex);
+    try {
+      grievanceSheet.deleteRow(rowIndex);
+    } catch (deleteErr) {
+      failedDeletes.push(rowIndex);
+      Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
+    }
   });
+  if (failedDeletes.length > 0) {
+    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedDeletes.join(', '));
+  }
 
   // Log the archive operation
   logIntegrityEvent('AUTO_ARCHIVE',
