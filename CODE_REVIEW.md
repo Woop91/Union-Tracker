@@ -12,13 +12,13 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review identifies **110 findings** across all severity levels. The most critical themes are:
+This line-by-line review identifies **120 findings** across all severity levels. The most critical themes are:
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
-| CRITICAL | 9 | XSS via URL injection, unsanitized email HTML, CSV preview injection, PII in audit logs |
-| HIGH | 27 | Performance N+1 patterns, missing locks, race conditions, disabled ESLint rules, broken pre-commit hook, XSS in dashboards |
-| MEDIUM | 43 | Missing input validation, dead code, inconsistent error handling, version mismatches, CI gaps |
+| CRITICAL | 13 | XSS via innerHTML injection, URL injection, unsanitized email HTML, onclick attribute injection, CSV preview |
+| HIGH | 30 | Missing input validation, no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, broken pre-commit hook |
+| MEDIUM | 46 | Dead code, inconsistent error handling, version mismatches, CI gaps, theme bugs, missing encodeURIComponent |
 | LOW | 31 | Code duplication, naming inconsistencies, documentation gaps, minor style issues |
 
 **Overall Assessment: Good** — The codebase is well-structured, thoroughly tested, and shows strong security awareness. The issues found are typical of a large, actively-developed GAS project. No show-stoppers that would prevent production use.
@@ -320,30 +320,123 @@ The export function should verify the user has appropriate permissions before al
 
 ## 4. UI Components
 
-### 03_UIComponents.gs (~3,000+ lines)
+### 03_UIComponents.gs (2,767 lines)
 
 **Findings:**
 
-#### F22. Large HTML string concatenation throughout the file
+#### F22. CRITICAL: XSS in mobile grievance list — `innerHTML` with unescaped data
+**Severity:** CRITICAL | **Category:** Security | **Line:** 1282
+
+The client-side `render()` function in `showMobileGrievanceList()` injects grievance data directly into `innerHTML` without escaping. Member names, issue types, and statuses from the spreadsheet are concatenated into HTML without `escapeHtml`:
+
+```javascript
+c.innerHTML=data.map(function(g){
+  return"..."+g.memberName+"...</div>..."+g.issueType+"..."
+}).join("")
+```
+
+**Fix:** Include `getClientSideEscapeHtml()` in the `<script>` block and wrap all data fields.
+
+---
+
+#### F22a. CRITICAL: XSS in mobile unified search — `innerHTML` with unescaped data
+**Severity:** CRITICAL | **Category:** Security | **Line:** 1325
+
+Same pattern — `r.title`, `r.subtitle`, `r.detail` from `getMobileSearchData()` (member names, emails, grievance IDs) injected into `innerHTML` without escaping.
+
+**Fix:** Include `getClientSideEscapeHtml()` and wrap all data interpolations.
+
+---
+
+#### F22b. CRITICAL: XSS in advanced search results — missing client-side escapeHtml
+**Severity:** CRITICAL | **Category:** Security | **Lines:** 2725-2733
+
+The advanced search results table injects `r.name`, `r.details`, `r.status` directly into `innerHTML`. While `getClientSideEscapeHtml()` is included in the desktop search dialog (line 2383), it is NOT included in the advanced search dialog script block, so `escapeHtml` would be undefined.
+
+**Fix:** Add `getClientSideEscapeHtml()` to the advanced search `<script>` tag.
+
+---
+
+#### F22c. CRITICAL: XSS in desktop search via `onclick` attribute injection
+**Severity:** CRITICAL | **Category:** Security | **Line:** 2363
+
+`item.id` and `item.type` are injected into an `onclick` attribute via string concatenation. A crafted ID like `'); alert('xss` breaks out of the JS string context. HTML entity escaping is insufficient for JS within event handlers.
+
+```javascript
+html += '<div onclick="selectResult(\'' + item.id + '\', \'' + item.type + '\')">';
+```
+
+**Fix:** Use `data-*` attributes with event delegation instead of inline onclick handlers.
+
+---
+
+#### F23. Unescaped grievance data in `showGrievanceQuickActions()`
+**Severity:** HIGH | **Category:** Security | **Lines:** 1600-1611
+
+`grievanceId`, `name`, `memberId`, `memberEmail`, `status`, `step` are all interpolated directly into HTML without `escapeHtml()`. Compare to `showMemberQuickActions()` (line 1526) which correctly uses `escapeHtml()`.
+
+**Fix:** Wrap all data values with `escapeHtml()`.
+
+---
+
+#### F23a. `quickUpdateGrievanceStatus()` — no validation of row or status
+**Severity:** HIGH | **Category:** Bug/Security | **Lines:** 1626-1636
+
+Receives `row` directly from the client-side dialog and writes without validating row bounds or that the status is in an allowed list. If the sheet was modified between dialog open and click, the wrong row gets updated.
+
+**Fix:** (1) Validate `2 <= row <= sheet.getLastRow()`. (2) Validate `newStatus` against allowlist. (3) Use grievanceId lookup instead of trusting row number.
+
+---
+
+#### F23b. `sendQuickEmail()` — no email validation or rate limiting
+**Severity:** HIGH | **Category:** Security | **Lines:** 1673-1678
+
+Callable from client-side HTML. Sends email to any address without format validation or confirming it matches the member's actual email. No rate limiting — could be abused to send spam.
+
+**Fix:** (1) Validate email format. (2) Verify `to` matches member's email on file. (3) Add rate limiting via CacheService.
+
+---
+
+#### F23c. `setupDriveFolderForGrievance()` called without required argument
+**Severity:** MEDIUM | **Category:** Bug | **Line:** 1610
+
+The quick actions button calls `google.script.run.setupDriveFolderForGrievance()` without passing `grievanceId`, but the server-side function requires it. This will silently fail with `undefined`.
+
+**Fix:** Pass the grievance ID (with proper escaping for JS context).
+
+---
+
+#### F23d. Row-by-row theme application — N+1 API pattern
+**Severity:** MEDIUM | **Category:** Performance | **Lines:** 514-521, 850-857
+
+Both `applyThemeToSheet_()` and `applyZebraStripes()` apply colors one row at a time. For 1,000 rows, that's 1,000 API calls.
+
+**Fix:** Build a 2D array and use a single `Range.setBackgrounds()` call.
+
+---
+
+#### F23e. `previewTheme()` passes argument that `applyThemeToSheet_()` ignores
+**Severity:** MEDIUM | **Category:** Bug | **Line:** 1007
+
+`previewTheme(themeKey)` calls `applyThemeToSheet_(sheet, themeKey)` but the function signature only accepts `sheet`. The theme key is silently ignored, so preview always uses the saved theme.
+
+**Fix:** Update `applyThemeToSheet_` to accept optional `themeKey` parameter.
+
+---
+
+#### F24. Large HTML string concatenation throughout the file
 **Severity:** MEDIUM | **Category:** Maintainability | **Lines:** Throughout
 
-All HTML dialogs are built via string concatenation in JavaScript. This makes the code very difficult to read, maintain, and audit for XSS issues. A single missing `escapeHtml()` call is easy to miss in 100+ lines of concatenated strings.
+All HTML dialogs are built via string concatenation. This makes XSS auditing nearly impossible. The file contains 5 originally-separate modules concatenated into 2,767 lines.
 
-**Suggestion:** Consider moving HTML templates to separate `.html` files using `HtmlService.createTemplateFromFile()`.
-
----
-
-#### F23. Missing `escapeHtml()` on user data in some dialog builders
-**Severity:** HIGH | **Category:** Security | **Lines:** Various
-
-Several dialog-building functions interpolate member names, grievance IDs, and other user-controlled data directly into HTML strings without calling `escapeHtml()`. While the previous review addressed many of these, the pattern of HTML string concatenation makes it easy for new instances to appear.
+**Suggestion:** Split into `03a_MenuNav.gs`, `03b_ThemeService.gs`, `03c_MobileInterface.gs`, `03d_QuickActions.gs`, `03e_SearchDialogs.gs`.
 
 ---
 
-#### F24. Multiple functions build identical CSS frameworks inline
+#### F24a. Multiple functions build identical CSS frameworks inline
 **Severity:** LOW | **Category:** Quality | **Lines:** Throughout
 
-The same CSS theme (dark mode, gradients, card layouts) is duplicated across dozens of dialog functions. The `getMobileOptimizedHead()` helper exists but not all functions use it.
+The same CSS theme (dark mode, gradients, card layouts) is duplicated across dozens of dialog functions.
 
 ---
 
@@ -1203,9 +1296,13 @@ Consider adding a version-gated removal plan.
 
 | ID | Summary | Effort |
 |----|---------|--------|
+| F22/a/b/c | XSS: Add client-side `escapeHtml()` to mobile search, grievance list, advanced search, onclick attrs | Small |
 | F34a | XSS: Use `JSON.stringify()` for URLs in `setupFolderForSelectedGrievance()` | Trivial |
 | F34b | XSS: Use `JSON.stringify()` for URLs in `createPDFForSelectedGrievance()` | Trivial |
 | F34c | XSS: Add `escapeHtml()` to email HTML bodies (meeting attendance, docs) | Small |
+| F23 | XSS: Escape data in grievance quick actions dialog | Small |
+| F23a | Validate row/status in `quickUpdateGrievanceStatus()` | Small |
+| F23b | Add email validation + rate limiting to `sendQuickEmail()` | Medium |
 | F10 | Update VERSION_INFO/API_VERSION to 4.9.0 | Trivial |
 | F68 | Update package.json version to 4.9.0 | Trivial |
 | F72 | `chmod +x .husky/pre-commit` (hook is silently not running!) | Trivial |
