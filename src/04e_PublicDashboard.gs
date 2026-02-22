@@ -1023,7 +1023,7 @@ function getUnifiedDashboardData(includePII) {
   }
   data.hotSpots.lowEngagement.sort(function(a,b){return a.engagement - b.engagement;});
 
-  // Get Google Drive resources folder from Config tab (column AU / 47)
+  // Get Google Drive resources folder from Config tab (column AS / CONFIG_COLS.ARCHIVE_FOLDER_ID)
   try {
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     var archiveFolderId = '';

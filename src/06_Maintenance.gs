@@ -1698,7 +1698,7 @@ function createWeeklySnapshot() {
     } catch (createErr) {
       ui.alert('Archive Folder Error',
         'Could not auto-create archive folder: ' + createErr.message + '\n\n' +
-        'You can manually set the Archive Folder ID in the Config sheet (column AU).',
+        'You can manually set the Archive Folder ID in the Config sheet (column AS).',
         ui.ButtonSet.OK);
       return;
     }

@@ -47,13 +47,18 @@ function createConfigSheet(ss) {
     sheet.clear();
   } else {
     Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
+
+    // Migration: remove orphaned "Yes/No (Dropdowns)" column (was column E).
+    // Deleting the column shifts all data to the right of it left by 1,
+    // keeping headers and data aligned.
+    migrateRemoveYesNoColumn_(sheet);
   }
 
   // Row 1: Section Headers (grouped categories)
   var sectionHeaders = [
-    '── EMPLOYMENT INFO ──', '', '', '', '',           // A-E (5 cols)
-    '── SUPERVISION ──', '',                            // F-G (2 cols)
-    '── STEWARD INFO ──', '',                           // H-I (2 cols)
+    '── EMPLOYMENT INFO ──', '', '', '',                // A-D (4 cols)
+    '── SUPERVISION ──', '',                            // E-F (2 cols)
+    '── STEWARD INFO ──', '',                           // G-H (2 cols)
     '── GRIEVANCE SETTINGS ──', '', '', '',             // J-M (4 cols)
     '── LINKS & COORDINATORS ──', '', '', '',           // N-Q (4 cols)
     '── NOTIFICATIONS ──', '', '',                      // R-T (3 cols)
@@ -66,7 +71,8 @@ function createConfigSheet(ss) {
     '── EXTENDED CONTACT ──', '', '', '', '',           // AM-AQ (5 cols)
     '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AR-AX (7 cols)
     '── MOBILE DASHBOARD ──', '', '', '', '', '', '',    // AY-BE (7 cols)
-    '── CUSTOM LINKS ──', '', '', ''                     // BF-BI (4 cols)
+    '── CUSTOM LINKS ──', '', '', '',                     // BE-BH (4 cols)
+    '── SURVEY LOG ──', ''                                // BI-BJ (2 cols)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -101,10 +107,7 @@ function createConfigSheet(ss) {
   // Office Days (D)
   seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, isExistingSheet);
 
-  // Yes/No (E)
-  seedConfigDefault_(sheet, CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO, isExistingSheet);
-
-  // Steward Committees (I)
+  // Steward Committees (H)
   var committees = ['Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
                     'Political Action Committee', 'Membership Committee', 'Executive Board'];
   seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_COMMITTEES, committees, isExistingSheet);
@@ -201,6 +204,28 @@ function createConfigSheet(ss) {
 }
 
 /**
+ * Migration: removes the orphaned "Yes/No (Dropdowns)" column from existing Config sheets.
+ * The column was removed from CONFIG_HEADER_MAP_ but existing sheets still have it.
+ * Deleting the physical column shifts all data right of it left by 1, keeping
+ * headers and data aligned when new headers are applied.
+ * @param {Sheet} sheet - The Config sheet
+ * @private
+ */
+function migrateRemoveYesNoColumn_(sheet) {
+  // Check row 2 for the old header — only migrate if it's still present
+  var maxCol = sheet.getMaxColumns();
+  if (maxCol < 5) return;
+  var row2 = sheet.getRange(2, 1, 1, Math.min(maxCol, 10)).getValues()[0];
+  for (var c = 0; c < row2.length; c++) {
+    if (String(row2[c]).trim() === 'Yes/No (Dropdowns)') {
+      sheet.deleteColumn(c + 1); // 1-indexed
+      Logger.log('migrateRemoveYesNoColumn_: deleted orphaned Yes/No column at position ' + (c + 1));
+      return;
+    }
+  }
+}
+
+/**
  * Seeds default values into a Config column only if the column is currently empty.
  * For new sheets (isExisting=false), always writes. For existing sheets,
  * checks whether the column already has data and skips if so.
@@ -262,9 +287,6 @@ function populateConfigFromSheetData() {
       var targetCol = mapping.col;       // column in source sheet (1-indexed)
       var configCol = mapping.configCol;  // column in Config (1-indexed)
 
-      // Skip Yes/No columns — those are static, not user-driven
-      if (configCol === CONFIG_COLS.YES_NO) continue;
-
       // Collect existing Config values for this column
       var existingSet = {};
       var configLastRow = configSheet.getLastRow();
@@ -297,7 +319,7 @@ function populateConfigFromSheetData() {
     }
   }
 
-  // Dedup and sort each Config dropdown column (except static columns like YES_NO)
+  // Dedup and sort each Config dropdown column
   deduplicateAndSortConfigColumns_(configSheet);
 
   ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
@@ -322,7 +344,7 @@ function deduplicateAndSortConfigColumns_(configSheet) {
   var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
   for (var i = 0; i < allMaps.length; i++) {
     var cc = allMaps[i].configCol;
-    if (cc && cc !== CONFIG_COLS.YES_NO) {
+    if (cc) {
       configColsToClean[cc] = true;
     }
   }

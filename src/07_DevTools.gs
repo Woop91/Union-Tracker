@@ -225,7 +225,7 @@ function seedConfigData() {
     return;
   }
 
-  // Ensure Config sheet has enough columns (AZ = column 52 is the last column)
+  // Ensure Config sheet has enough columns (AX = column 50 = MOBILE_DASHBOARD_URL)
   ensureMinimumColumns(sheet, CONFIG_COLS.MOBILE_DASHBOARD_URL);
 
   // Data row start (after section headers row 1 and column headers row 2)
@@ -251,10 +251,7 @@ function seedConfigData() {
   // Office Days (Column D) - PRESET
   if (seedIfEmpty(CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS)) seededAny = true;
 
-  // Yes/No (Column E) - PRESET
-  if (seedIfEmpty(CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO)) seededAny = true;
-
-  // Grievance Status (Column J) - PRESET
+  // Grievance Status (Column I) - PRESET
   if (seedIfEmpty(CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS)) seededAny = true;
 
   // Grievance Step (Column K) - PRESET
@@ -800,8 +797,6 @@ function restoreConfigFromSheetData_() {
   // Member Directory — single-select dropdowns
   var memberDD = DROPDOWN_MAP.MEMBER_DIR;
   for (var i = 0; i < memberDD.length; i++) {
-    // Skip Yes/No columns — those are presets, not user data
-    if (memberDD[i].configCol === CONFIG_COLS.YES_NO) continue;
     mappings.push({ sheet: memberSheet, col: memberDD[i].col, configCol: memberDD[i].configCol });
   }
 

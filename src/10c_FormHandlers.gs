@@ -4,11 +4,11 @@
 
 /**
  * Grievance Form Configuration
- * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column O), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only — update via Script Properties or Config sheet.
  */
 var GRIEVANCE_FORM_CONFIG = {
-  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('grievance')
+  // Form URL — set in Config sheet column O, read via getFormUrlFromConfig('grievance')
   FORM_URL: '',
 
   // Default form field entry IDs — overridden by Script Properties at runtime
@@ -40,11 +40,11 @@ var GRIEVANCE_FORM_CONFIG = {
  */
 /**
  * Contact Form Configuration
- * Form URL reads from Config sheet (column Q), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only.
  */
 var CONTACT_FORM_CONFIG = {
-  // Form URL — set in Config sheet column Q, read via getFormUrlFromConfig('contact')
+  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('contact')
   FORM_URL: '',
 
   // Form field entry IDs mapped to Member Directory columns
@@ -262,7 +262,7 @@ function shareWithCoordinators_(folder) {
 
     if (!configSheet) return;
 
-    // Get coordinator emails from Config (column O = GRIEVANCE_COORDINATORS)
+    // Get coordinator emails from Config (column N = GRIEVANCE_COORDINATORS)
     var coordData = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_COORDINATORS,
                                           configSheet.getLastRow() - 1, 1).getValues();
 
@@ -326,11 +326,11 @@ function testGrievanceFormSubmission() {
 
 /**
  * Satisfaction Survey Form Configuration
- * Form URL reads from Config sheet (column AR), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column AP), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only.
  */
 var SATISFACTION_FORM_CONFIG = {
-  // Form URLs — set in Config sheet column AR, read via getFormUrlFromConfig('satisfaction')
+  // Form URLs — set in Config sheet column AP, read via getFormUrlFromConfig('satisfaction')
   FORM_URL: '',
   EDIT_URL: '',
 

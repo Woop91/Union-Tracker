@@ -441,7 +441,7 @@ function handleStageGateWorkflow_(e) {
 
 /**
  * Sends escalation alert email to Chief Steward
- * Reads email from Config sheet (column AS)
+ * Reads email from Config sheet (column AQ)
  * @param {string} memberName - Name of the member
  * @param {string} caseID - Grievance case ID
  * @param {string} status - New status/step
@@ -452,7 +452,7 @@ function sendEscalationAlert_(memberName, caseID, status) {
   var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
 
   if (!chiefStewardEmail) {
-    console.log('Chief Steward email not configured in Config sheet (column AS) - skipping escalation alert');
+    console.log('Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
     return;
   }
 
@@ -852,10 +852,6 @@ function syncDropdownToConfig_(e, sheetName) {
   }
 
   if (!configCol) return; // Not a synced dropdown or multi-select column
-
-  // Skip YES_NO — those values are static seeds ("Yes"/"No"), never user-driven.
-  // populateConfigFromSheetData() has the same skip at its line 266.
-  if (configCol === CONFIG_COLS.YES_NO) return;
 
   // For multi-select columns, split comma-separated values and sync each individually
   var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];

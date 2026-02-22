@@ -1496,7 +1496,7 @@ function createGrievancePDF(folder, data) {
   var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID) || COMMAND_CONFIG.TEMPLATE_ID;
 
   if (!templateId) {
-    throw new Error('PDF Template ID not configured. Set it in Config sheet column AX.');
+    throw new Error('PDF Template ID not configured. Set it in Config sheet column AV.');
   }
 
   // Make a copy of the template
