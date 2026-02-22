@@ -59,12 +59,13 @@ function createConfigSheet(ss) {
     '── ORGANIZATION ──', '', '', '',                   // U-X (4 cols)
     '── INTEGRATION ──', '',                            // Y-Z (2 cols)
     '── DEADLINES ──', '', '', '',                      // AA-AD (4 cols)
-    '── MULTI-SELECT OPTIONS ──', '',                   // AE-AF (2 cols)
-    '── CONTRACT & LEGAL ──', '', '', '',               // AG-AJ (4 cols)
-    '── ORG IDENTITY ──', '', '',                       // AK-AM (3 cols)
-    '── EXTENDED CONTACT ──', '', '', '', '',           // AN-AR (5 cols)
-    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AS-AY (7 cols)
-    '── MOBILE DASHBOARD ──', '', '', '', '', '', ''     // AZ-BF (7 cols)
+    '── MULTI-SELECT OPTIONS ──',                        // AE (1 col)
+    '── CONTRACT & LEGAL ──', '', '', '',               // AF-AI (4 cols)
+    '── ORG IDENTITY ──', '', '',                       // AJ-AL (3 cols)
+    '── EXTENDED CONTACT ──', '', '', '', '',           // AM-AQ (5 cols)
+    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AR-AX (7 cols)
+    '── MOBILE DASHBOARD ──', '', '', '', '', '', '',    // AY-BE (7 cols)
+    '── CUSTOM LINKS ──', '', '', ''                     // BF-BI (4 cols)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -155,6 +156,29 @@ function createConfigSheet(ss) {
   sheet.getRange(3, CONFIG_COLS.MAIN_FAX, 1, 1).setValue('555-000-0001');
   sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_NAME, 1, 1).setValue('Contact Name');
   sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_EMAIL, 1, 1).setValue('contact@example.org');
+
+  // Escalation triggers (comma-separated values read at runtime)
+  var escalationStatuses = COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
+  sheet.getRange(3, CONFIG_COLS.ESCALATION_STATUSES, escalationStatuses.length, 1)
+    .setValues(escalationStatuses.map(function(v) { return [v]; }));
+
+  var escalationSteps = COMMAND_CONFIG.ESCALATION_STEPS || ['Step II', 'Step III', 'Arbitration'];
+  sheet.getRange(3, CONFIG_COLS.ESCALATION_STEPS, escalationSteps.length, 1)
+    .setValues(escalationSteps.map(function(v) { return [v]; }));
+
+  // Mobile Dashboard & branding defaults
+  sheet.getRange(3, CONFIG_COLS.ACCENT_HUE, 1, 1).setValue(250);
+  sheet.getRange(3, CONFIG_COLS.LOGO_INITIALS, 1, 1).setValue('UN');
+  sheet.getRange(3, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, 1, 1).setValue(7);
+  sheet.getRange(3, CONFIG_COLS.COOKIE_DURATION_DAYS, 1, 1).setValue(30);
+  sheet.getRange(3, CONFIG_COLS.STEWARD_LABEL, 1, 1).setValue('Steward');
+  sheet.getRange(3, CONFIG_COLS.MEMBER_LABEL, 1, 1).setValue('Member');
+
+  // Custom links (placeholders)
+  sheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_NAME, 1, 1).setValue('Resources');
+  sheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_URL, 1, 1).setValue('https://www.example.org/resources');
+  sheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_2_NAME, 1, 1).setValue('Help');
+  sheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_2_URL, 1, 1).setValue('https://www.example.org/help');
 
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
@@ -258,7 +282,7 @@ function applyConfigSheetStyling(sheet) {
  * @private
  */
 function applySectionColors_(sheet, lastCol) {
-  // Section color definitions (15 sections, columns A-AZ)
+  // Section color definitions (16 sections, columns A-BI)
   var SECTION_COLORS = {
     EMPLOYMENT: { bg: '#3b82f6', text: '#ffffff' },      // Blue - A-E
     SUPERVISION: { bg: '#8b5cf6', text: '#ffffff' },     // Violet - F-G
@@ -269,16 +293,17 @@ function applySectionColors_(sheet, lastCol) {
     ORGANIZATION: { bg: '#22c55e', text: '#ffffff' },    // Green - U-X
     INTEGRATION: { bg: '#14b8a6', text: '#ffffff' },     // Teal - Y-Z
     DEADLINES: { bg: '#ec4899', text: '#ffffff' },       // Pink - AA-AD
-    MULTISELECT: { bg: '#a855f7', text: '#ffffff' },     // Purple - AE-AF
-    CONTRACT: { bg: '#6366f1', text: '#ffffff' },        // Indigo - AG-AJ
-    IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AK-AM
-    EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AN-AR
-    COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AS-AY
-    MOBILE: { bg: '#10b981', text: '#ffffff' }           // Emerald - AZ (LAST COLUMN)
+    MULTISELECT: { bg: '#a855f7', text: '#ffffff' },     // Purple - AE
+    CONTRACT: { bg: '#6366f1', text: '#ffffff' },        // Indigo - AF-AI
+    IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AJ-AL
+    EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AM-AQ
+    COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AR-AX
+    MOBILE: { bg: '#10b981', text: '#ffffff' },          // Emerald - AY-BE
+    CUSTOM_LINKS: { bg: '#f59e0b', text: '#1e293b' }    // Amber - BF-BI
   };
 
   // Apply colors by column ranges (both row 1 section header and row 2 column header)
-  // Total: 52 columns (A-AZ)
+  // Total: 61 columns (A-BI)
   var sections = [
     { start: 1, end: 5, color: SECTION_COLORS.EMPLOYMENT },      // A-E
     { start: 6, end: 7, color: SECTION_COLORS.SUPERVISION },     // F-G
@@ -289,12 +314,13 @@ function applySectionColors_(sheet, lastCol) {
     { start: 21, end: 24, color: SECTION_COLORS.ORGANIZATION },  // U-X
     { start: 25, end: 26, color: SECTION_COLORS.INTEGRATION },   // Y-Z
     { start: 27, end: 30, color: SECTION_COLORS.DEADLINES },     // AA-AD
-    { start: 31, end: 32, color: SECTION_COLORS.MULTISELECT },   // AE-AF
-    { start: 33, end: 36, color: SECTION_COLORS.CONTRACT },      // AG-AJ
-    { start: 37, end: 39, color: SECTION_COLORS.IDENTITY },      // AK-AM
-    { start: 40, end: 44, color: SECTION_COLORS.EXTENDED },      // AN-AR
-    { start: 45, end: 51, color: SECTION_COLORS.COMMAND },       // AS-AY (Strategic Command Center)
-    { start: 52, end: 52, color: SECTION_COLORS.MOBILE }         // AZ (Mobile Dashboard - LAST COLUMN)
+    { start: 31, end: 31, color: SECTION_COLORS.MULTISELECT },   // AE
+    { start: 32, end: 35, color: SECTION_COLORS.CONTRACT },      // AF-AI
+    { start: 36, end: 38, color: SECTION_COLORS.IDENTITY },      // AJ-AL
+    { start: 39, end: 43, color: SECTION_COLORS.EXTENDED },      // AM-AQ
+    { start: 44, end: 50, color: SECTION_COLORS.COMMAND },       // AR-AX (Strategic Command Center)
+    { start: 51, end: 57, color: SECTION_COLORS.MOBILE },        // AY-BE (Mobile Dashboard)
+    { start: 58, end: 61, color: SECTION_COLORS.CUSTOM_LINKS }   // BF-BI (Custom Links)
   ];
 
   sections.forEach(function(section) {
@@ -725,7 +751,7 @@ function createMemberDirectory(ss) {
   // This enables sorting via dropdown on: Last Name, Job Title, Work Location, Unit,
   // Office Days, Preferred Communication, Best Time to Contact, Supervisor, Manager,
   // Committees, Assigned Steward, Last Virtual Mtg, Last In-Person Mtg, Open Rate %,
-  // Volunteer Hours, Interest: Local/Chapter/Allied, Home Town, Recent Contact Date,
+  // Volunteer Hours, Interest: Local/Chapter/Allied, Recent Contact Date,
   // Contact Steward, Contact Notes, Has Open Grievance?, Grievance Status, Days to Deadline
   var filterRange = sheet.getRange(1, 1, 5000, headers.length);
   filterRange.createFilter();

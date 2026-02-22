@@ -2127,7 +2127,7 @@ function syncNewValueToConfig(e) {
   // Skip if empty or header row
   if (!newValue || e.range.getRow() === 1) return;
 
-  // Check if this column is a job metadata field (includes Committees and Home Town)
+  // Check if this column is a job metadata field (includes Committees)
   var fieldConfig = getJobMetadataByMemberCol(col);
   if (!fieldConfig) return; // Not a synced column
 
