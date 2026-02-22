@@ -1840,7 +1840,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3235 lines)
+// SOURCE: 01_Core.gs (3261 lines)
 // ============================================================================
 
 /**
@@ -3744,6 +3744,11 @@ function syncColumnMaps() {
     var freshDD = buildDropdownMap_();
     DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
     DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+    // Rebuild JOB_METADATA_FIELDS so it reflects the resolved column positions.
+    // Without this, functions using getJobMetadataByMemberCol() would use stale
+    // column numbers captured at script load time.
+    rebuildJobMetadataFields_();
   }
 
   if (result.synced.length > 0) {
@@ -3842,7 +3847,7 @@ function loadCachedColumnMaps_() {
       }
     }
 
-    // Rebuild derived objects (dropdown map, multi-select)
+    // Rebuild derived objects (dropdown map, multi-select, job metadata)
     // only if something actually changed.
     if (changed) {
       var freshMulti = buildMultiSelectCols_();
@@ -3852,6 +3857,8 @@ function loadCachedColumnMaps_() {
       var freshDD = buildDropdownMap_();
       DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
       DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+      rebuildJobMetadataFields_();
     }
 
     return true;
@@ -4342,6 +4349,25 @@ function getJobMetadataByMemberCol(memberCol) {
     }
   }
   return null;
+}
+
+/**
+ * Rebuild JOB_METADATA_FIELDS from the current *_COLS values.
+ * Called by syncColumnMaps() and loadCachedColumnMaps_() so that
+ * JOB_METADATA_FIELDS stays in sync when columns shift at runtime.
+ * @private
+ */
+function rebuildJobMetadataFields_() {
+  JOB_METADATA_FIELDS.length = 0; // clear in-place to preserve the reference
+  JOB_METADATA_FIELDS.push(
+    { label: 'Job Title', memberCol: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, configName: 'Job Titles' },
+    { label: 'Work Location', memberCol: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, configName: 'Office Locations' },
+    { label: 'Unit', memberCol: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, configName: 'Units' },
+    { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
+    { label: 'Manager', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Managers' },
+    { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
+    { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
+  );
 }
 
 // ============================================================================
@@ -28801,7 +28827,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (654 lines)
+// SOURCE: 08a_SheetSetup.gs (664 lines)
 // ============================================================================
 
 /**
@@ -29192,14 +29218,19 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     }
   }
 
-  if (values.length === 0) return; // No values to validate against
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -29224,14 +29255,19 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     }
   }
 
-  if (values.length === 0) return;
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow comma-separated values from multi-select dialog
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -34499,7 +34535,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4050 lines)
+// SOURCE: 09_Dashboards.gs (4017 lines)
 // ============================================================================
 
 /**
@@ -36615,58 +36651,25 @@ function syncMemberToGrievanceLog() {
 // ============================================================================
 
 /**
- * Sync new values from Member Directory to Config (bidirectional sync)
- * When a user enters a new value in a job metadata field, add it to Config
+ * Sync new values from Member Directory to Config (bidirectional sync).
+ * When a user enters a new value in a dropdown/multi-select column, add it to Config.
+ *
+ * Delegates to syncDropdownToConfig_ which uses the dynamically-rebuilt
+ * DROPDOWN_MAP and MULTI_SELECT_COLS (kept current by syncColumnMaps).
+ *
  * @param {Object} e - The edit event object
  */
 function syncNewValueToConfig(e) {
   if (!e || !e.range) return;
 
   var sheet = e.range.getSheet();
-  if (sheet.getName() !== SHEETS.MEMBER_DIR) return;
+  var sheetName = sheet.getName();
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
-  var col = e.range.getColumn();
-  var newValue = e.range.getValue();
-
-  // Skip if empty or header row
-  if (!newValue || e.range.getRow() === 1) return;
-
-  // Check if this column is a job metadata field (includes Committees)
-  var fieldConfig = getJobMetadataByMemberCol(col);
-  if (!fieldConfig) return; // Not a synced column
-
-  // Get current Config values for this column
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!configSheet) return;
-
-  var existingValues = getConfigValues(configSheet, fieldConfig.configCol);
-
-  // Handle multi-value fields (comma-separated)
-  var valuesToCheck = newValue.toString().split(',').map(function(v) { return v.trim(); });
-
-  var valuesToAdd = [];
-  for (var j = 0; j < valuesToCheck.length; j++) {
-    var val = valuesToCheck[j];
-    if (val && existingValues.indexOf(val) === -1) {
-      valuesToAdd.push(val);
-    }
-  }
-
-  // Add new values to Config
-  if (valuesToAdd.length > 0) {
-    var lastRow = configSheet.getLastRow();
-    var dataStartRow = Math.max(lastRow + 1, 3); // Start at row 3 minimum
-
-    for (var k = 0; k < valuesToAdd.length; k++) {
-      configSheet.getRange(dataStartRow + k, fieldConfig.configCol).setValue(valuesToAdd[k]);
-    }
-
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Added "' + valuesToAdd.join(', ') + '" to ' + fieldConfig.configName,
-      'Config Updated', 3
-    );
-  }
+  // syncDropdownToConfig_ uses DROPDOWN_MAP + MULTI_SELECT_COLS (rebuilt by
+  // syncColumnMaps) and writes via addToConfigDropdown_ which correctly finds
+  // the first empty row in the target Config column.
+  syncDropdownToConfig_(e, sheetName);
 }
 
 // ============================================================================

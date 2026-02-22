@@ -2111,58 +2111,25 @@ function syncMemberToGrievanceLog() {
 // ============================================================================
 
 /**
- * Sync new values from Member Directory to Config (bidirectional sync)
- * When a user enters a new value in a job metadata field, add it to Config
+ * Sync new values from Member Directory to Config (bidirectional sync).
+ * When a user enters a new value in a dropdown/multi-select column, add it to Config.
+ *
+ * Delegates to syncDropdownToConfig_ which uses the dynamically-rebuilt
+ * DROPDOWN_MAP and MULTI_SELECT_COLS (kept current by syncColumnMaps).
+ *
  * @param {Object} e - The edit event object
  */
 function syncNewValueToConfig(e) {
   if (!e || !e.range) return;
 
   var sheet = e.range.getSheet();
-  if (sheet.getName() !== SHEETS.MEMBER_DIR) return;
+  var sheetName = sheet.getName();
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
-  var col = e.range.getColumn();
-  var newValue = e.range.getValue();
-
-  // Skip if empty or header row
-  if (!newValue || e.range.getRow() === 1) return;
-
-  // Check if this column is a job metadata field (includes Committees)
-  var fieldConfig = getJobMetadataByMemberCol(col);
-  if (!fieldConfig) return; // Not a synced column
-
-  // Get current Config values for this column
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!configSheet) return;
-
-  var existingValues = getConfigValues(configSheet, fieldConfig.configCol);
-
-  // Handle multi-value fields (comma-separated)
-  var valuesToCheck = newValue.toString().split(',').map(function(v) { return v.trim(); });
-
-  var valuesToAdd = [];
-  for (var j = 0; j < valuesToCheck.length; j++) {
-    var val = valuesToCheck[j];
-    if (val && existingValues.indexOf(val) === -1) {
-      valuesToAdd.push(val);
-    }
-  }
-
-  // Add new values to Config
-  if (valuesToAdd.length > 0) {
-    var lastRow = configSheet.getLastRow();
-    var dataStartRow = Math.max(lastRow + 1, 3); // Start at row 3 minimum
-
-    for (var k = 0; k < valuesToAdd.length; k++) {
-      configSheet.getRange(dataStartRow + k, fieldConfig.configCol).setValue(valuesToAdd[k]);
-    }
-
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Added "' + valuesToAdd.join(', ') + '" to ' + fieldConfig.configName,
-      'Config Updated', 3
-    );
-  }
+  // syncDropdownToConfig_ uses DROPDOWN_MAP + MULTI_SELECT_COLS (rebuilt by
+  // syncColumnMaps) and writes via addToConfigDropdown_ which correctly finds
+  // the first empty row in the target Config column.
+  syncDropdownToConfig_(e, sheetName);
 }
 
 // ============================================================================

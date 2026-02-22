@@ -386,14 +386,19 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     }
   }
 
-  if (values.length === 0) return; // No values to validate against
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -418,14 +423,19 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     }
   }
 
-  if (values.length === 0) return;
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow comma-separated values from multi-select dialog
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
