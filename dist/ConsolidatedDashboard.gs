@@ -407,9 +407,9 @@ function getUserRole_(email) {
       if (memberSheet) {
         var data = memberSheet.getDataRange().getValues();
         for (var i = 1; i < data.length; i++) {
-          var memberEmail = data[i][MEMBER_COLUMNS.EMAIL] || '';
+          var memberEmail = data[i][MEMBER_COLS.EMAIL - 1] || '';
           if (memberEmail.toLowerCase() === email.toLowerCase()) {
-            var isSteward = data[i][MEMBER_COLUMNS.IS_STEWARD];
+            var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
             if (isTruthyValue(isSteward)) {
               return 'steward';
             }
@@ -1211,7 +1211,7 @@ function showSecurityStatusDialog() {
 
 
 // ============================================================================
-// SOURCE: 00_DataAccess.gs (625 lines)
+// SOURCE: 00_DataAccess.gs (624 lines)
 // ============================================================================
 
 /**
@@ -1573,26 +1573,25 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
                     SHEETS.MEMBER_DIR : 'Member Directory';
 
-    var result = this.findRow(sheetName, MEMBER_COLUMNS.MEMBER_ID, memberId);
+    var result = this.findRow(sheetName, MEMBER_COLS.MEMBER_ID - 1, memberId);
 
     if (!result) return null;
 
-    // Map to object using MEMBER_COLUMNS
     var row = result.data;
     return {
       rowNumber: result.rowNumber,
-      memberId: row[MEMBER_COLUMNS.MEMBER_ID],
-      firstName: row[MEMBER_COLUMNS.FIRST_NAME],
-      lastName: row[MEMBER_COLUMNS.LAST_NAME],
-      jobTitle: row[MEMBER_COLUMNS.JOB_TITLE],
-      workLocation: row[MEMBER_COLUMNS.WORK_LOCATION],
-      unit: row[MEMBER_COLUMNS.UNIT],
-      email: row[MEMBER_COLUMNS.EMAIL],
-      phone: row[MEMBER_COLUMNS.PHONE],
-      isSteward: row[MEMBER_COLUMNS.IS_STEWARD],
-      assignedSteward: row[MEMBER_COLUMNS.ASSIGNED_STEWARD],
-      hasOpenGrievance: row[MEMBER_COLUMNS.HAS_OPEN_GRIEVANCE],
-      grievanceStatus: row[MEMBER_COLUMNS.GRIEVANCE_STATUS]
+      memberId: row[MEMBER_COLS.MEMBER_ID - 1],
+      firstName: row[MEMBER_COLS.FIRST_NAME - 1],
+      lastName: row[MEMBER_COLS.LAST_NAME - 1],
+      jobTitle: row[MEMBER_COLS.JOB_TITLE - 1],
+      workLocation: row[MEMBER_COLS.WORK_LOCATION - 1],
+      unit: row[MEMBER_COLS.UNIT - 1],
+      email: row[MEMBER_COLS.EMAIL - 1],
+      phone: row[MEMBER_COLS.PHONE - 1],
+      isSteward: row[MEMBER_COLS.IS_STEWARD - 1],
+      assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1],
+      hasOpenGrievance: row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1],
+      grievanceStatus: row[MEMBER_COLS.GRIEVANCE_STATUS - 1]
     };
   },
 
@@ -1617,28 +1616,28 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (row[MEMBER_COLUMNS.MEMBER_ID] === '' || row[MEMBER_COLUMNS.MEMBER_ID] == null) continue;
+      if (row[MEMBER_COLS.MEMBER_ID - 1] === '' || row[MEMBER_COLS.MEMBER_ID - 1] == null) continue;
 
       // Apply filters (use String() coercion for type-safe comparison)
-      if (options.unit && String(row[MEMBER_COLUMNS.UNIT]) !== String(options.unit)) continue;
-      if (options.location && String(row[MEMBER_COLUMNS.WORK_LOCATION]) !== String(options.location)) continue;
+      if (options.unit && String(row[MEMBER_COLS.UNIT - 1]) !== String(options.unit)) continue;
+      if (options.location && String(row[MEMBER_COLS.WORK_LOCATION - 1]) !== String(options.location)) continue;
       if (options.stewardsOnly) {
-        var isSteward = row[MEMBER_COLUMNS.IS_STEWARD];
+        var isSteward = row[MEMBER_COLS.IS_STEWARD - 1];
         if (!isTruthyValue(isSteward)) continue;
       }
 
       members.push({
         rowNumber: i + 2,  // Account for header and 0-index
-        memberId: row[MEMBER_COLUMNS.MEMBER_ID],
-        firstName: row[MEMBER_COLUMNS.FIRST_NAME],
-        lastName: row[MEMBER_COLUMNS.LAST_NAME],
-        jobTitle: row[MEMBER_COLUMNS.JOB_TITLE],
-        workLocation: row[MEMBER_COLUMNS.WORK_LOCATION],
-        unit: row[MEMBER_COLUMNS.UNIT],
-        email: row[MEMBER_COLUMNS.EMAIL],
-        phone: row[MEMBER_COLUMNS.PHONE],
-        isSteward: row[MEMBER_COLUMNS.IS_STEWARD],
-        assignedSteward: row[MEMBER_COLUMNS.ASSIGNED_STEWARD]
+        memberId: row[MEMBER_COLS.MEMBER_ID - 1],
+        firstName: row[MEMBER_COLS.FIRST_NAME - 1],
+        lastName: row[MEMBER_COLS.LAST_NAME - 1],
+        jobTitle: row[MEMBER_COLS.JOB_TITLE - 1],
+        workLocation: row[MEMBER_COLS.WORK_LOCATION - 1],
+        unit: row[MEMBER_COLS.UNIT - 1],
+        email: row[MEMBER_COLS.EMAIL - 1],
+        phone: row[MEMBER_COLS.PHONE - 1],
+        isSteward: row[MEMBER_COLS.IS_STEWARD - 1],
+        assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1]
       });
     }
 
@@ -1660,30 +1659,30 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
                     SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
-    var result = this.findRow(sheetName, GRIEVANCE_COLUMNS.GRIEVANCE_ID, grievanceId);
+    var result = this.findRow(sheetName, GRIEVANCE_COLS.GRIEVANCE_ID - 1, grievanceId);
 
     if (!result) return null;
 
     var row = result.data;
     return {
       rowNumber: result.rowNumber,
-      grievanceId: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-      memberId: row[GRIEVANCE_COLUMNS.MEMBER_ID],
-      firstName: row[GRIEVANCE_COLUMNS.FIRST_NAME],
-      lastName: row[GRIEVANCE_COLUMNS.LAST_NAME],
-      status: row[GRIEVANCE_COLUMNS.STATUS],
-      currentStep: row[GRIEVANCE_COLUMNS.CURRENT_STEP],
-      incidentDate: row[GRIEVANCE_COLUMNS.INCIDENT_DATE],
-      filingDeadline: row[GRIEVANCE_COLUMNS.FILING_DEADLINE],
-      dateFiled: row[GRIEVANCE_COLUMNS.DATE_FILED],
-      daysOpen: row[GRIEVANCE_COLUMNS.DAYS_OPEN],
-      nextActionDue: row[GRIEVANCE_COLUMNS.NEXT_ACTION_DUE],
-      daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
-      articles: row[GRIEVANCE_COLUMNS.ARTICLES],
-      issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
-      location: row[GRIEVANCE_COLUMNS.LOCATION],
-      steward: row[GRIEVANCE_COLUMNS.STEWARD],
-      resolution: row[GRIEVANCE_COLUMNS.RESOLUTION]
+      grievanceId: row[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+      memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1],
+      firstName: row[GRIEVANCE_COLS.FIRST_NAME - 1],
+      lastName: row[GRIEVANCE_COLS.LAST_NAME - 1],
+      status: row[GRIEVANCE_COLS.STATUS - 1],
+      currentStep: row[GRIEVANCE_COLS.CURRENT_STEP - 1],
+      incidentDate: row[GRIEVANCE_COLS.INCIDENT_DATE - 1],
+      filingDeadline: row[GRIEVANCE_COLS.FILING_DEADLINE - 1],
+      dateFiled: row[GRIEVANCE_COLS.DATE_FILED - 1],
+      daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1],
+      nextActionDue: row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1],
+      daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1],
+      articles: row[GRIEVANCE_COLS.ARTICLES - 1],
+      issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
+      location: row[GRIEVANCE_COLS.LOCATION - 1],
+      steward: row[GRIEVANCE_COLS.STEWARD - 1],
+      resolution: row[GRIEVANCE_COLS.RESOLUTION - 1]
     };
   },
 
@@ -1708,29 +1707,29 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (row[GRIEVANCE_COLUMNS.GRIEVANCE_ID] === '' || row[GRIEVANCE_COLUMNS.GRIEVANCE_ID] == null) continue;
+      if (row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] === '' || row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] == null) continue;
 
       // Apply filters (use String() coercion for type-safe comparison)
-      if (options.status && String(row[GRIEVANCE_COLUMNS.STATUS]) !== String(options.status)) continue;
-      if (options.steward && String(row[GRIEVANCE_COLUMNS.STEWARD]) !== String(options.steward)) continue;
+      if (options.status && String(row[GRIEVANCE_COLS.STATUS - 1]) !== String(options.status)) continue;
+      if (options.steward && String(row[GRIEVANCE_COLS.STEWARD - 1]) !== String(options.steward)) continue;
       if (options.overdueOnly) {
-        var daysToDeadline = row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE];
+        var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
         if (typeof daysToDeadline !== 'number' || daysToDeadline >= 0) continue;
       }
 
       grievances.push({
         rowNumber: i + 2,
-        grievanceId: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-        memberId: row[GRIEVANCE_COLUMNS.MEMBER_ID],
-        firstName: row[GRIEVANCE_COLUMNS.FIRST_NAME],
-        lastName: row[GRIEVANCE_COLUMNS.LAST_NAME],
-        status: row[GRIEVANCE_COLUMNS.STATUS],
-        currentStep: row[GRIEVANCE_COLUMNS.CURRENT_STEP],
-        incidentDate: row[GRIEVANCE_COLUMNS.INCIDENT_DATE],
-        daysOpen: row[GRIEVANCE_COLUMNS.DAYS_OPEN],
-        daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
-        issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
-        steward: row[GRIEVANCE_COLUMNS.STEWARD]
+        grievanceId: row[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+        memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1],
+        firstName: row[GRIEVANCE_COLS.FIRST_NAME - 1],
+        lastName: row[GRIEVANCE_COLS.LAST_NAME - 1],
+        status: row[GRIEVANCE_COLS.STATUS - 1],
+        currentStep: row[GRIEVANCE_COLS.CURRENT_STEP - 1],
+        incidentDate: row[GRIEVANCE_COLS.INCIDENT_DATE - 1],
+        daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1],
+        daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1],
+        issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
+        steward: row[GRIEVANCE_COLS.STEWARD - 1]
       });
     }
 
@@ -1841,7 +1840,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3314 lines)
+// SOURCE: 01_Core.gs (3235 lines)
 // ============================================================================
 
 /**
@@ -3186,46 +3185,6 @@ var GRIEVANCE_HEADER_MAP_ = [
 var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_);
 
 // ============================================================================
-// BACKWARD COMPATIBILITY ALIASES (0-indexed for array access)
-// Auto-derived from 1-indexed *_COLS — stays in sync automatically.
-// ============================================================================
-
-/** Legacy-only aliases for GRIEVANCE_COLUMNS (keys not in GRIEVANCE_COLS) */
-var GRIEVANCE_LEGACY_ALIASES_ = {
-  MEMBER_NAME: 'FIRST_NAME',
-  FILING_DATE: 'DATE_FILED',
-  STEP_1_DUE: 'STEP1_DUE',
-  STEP_1_DATE: 'STEP1_RCVD',
-  STEP_1_STATUS: 'STATUS',
-  STEP_2_DATE: 'STEP2_APPEAL_FILED',
-  STEP_2_DUE: 'STEP2_DUE',
-  STEP_2_STATUS: 'STATUS',
-  STEP_3_DATE: 'STEP3_APPEAL_FILED',
-  STEP3_DUE: 'STEP3_APPEAL_DUE',
-  STEP_3_DUE: 'STEP3_APPEAL_DUE',
-  STEP_3_STATUS: 'STATUS',
-  ARBITRATION_DATE: 'DATE_CLOSED',
-  RECORD_LAST_UPDATED: 'LAST_UPDATED',
-  GRIEVANCE_TYPE: 'ISSUE_CATEGORY',
-  DESCRIPTION: 'ISSUE_CATEGORY',
-  OUTCOME: 'RESOLUTION',
-  NOTES: 'RESOLUTION',
-  DRIVE_FOLDER: 'DRIVE_FOLDER_URL'
-};
-
-var GRIEVANCE_COLUMNS = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-
-/** Legacy-only aliases for MEMBER_COLUMNS (keys not in MEMBER_COLS) */
-var MEMBER_LEGACY_ALIASES_ = {
-  ID: 'MEMBER_ID',
-  JOB_DEPT: 'JOB_TITLE',
-  STATUS: 'GRIEVANCE_STATUS',
-  LAST_UPDATED: 'RECENT_CONTACT_DATE'
-};
-
-var MEMBER_COLUMNS = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-
-// ============================================================================
 // CONFIG COLUMN MAPPING — Auto-derived from header map
 // Config sheet uses row 2 for headers (row 1 is section headers).
 // ============================================================================
@@ -3691,30 +3650,6 @@ function getHeadersFromMap_(headerMap) {
 }
 
 /**
- * Build a 0-indexed legacy column map from a 1-indexed COLS object.
- * @param {Object} colsObj - 1-indexed column constants
- * @param {Object} [extraAliases] - { 'LEGACY_KEY': 'PRIMARY_KEY' } for legacy-only aliases
- * @returns {Object} 0-indexed column constants
- */
-function buildLegacyCols_(colsObj, extraAliases) {
-  var legacy = {};
-  for (var key in colsObj) {
-    if (colsObj.hasOwnProperty(key)) {
-      legacy[key] = colsObj[key] - 1;
-    }
-  }
-  if (extraAliases) {
-    for (var alias in extraAliases) {
-      if (extraAliases.hasOwnProperty(alias)) {
-        var target = extraAliases[alias];
-        legacy[alias] = colsObj[target] !== undefined ? colsObj[target] - 1 : legacy[target];
-      }
-    }
-  }
-  return legacy;
-}
-
-/**
  * Resolve column positions by reading actual sheet headers at runtime.
  * @param {string} sheetName - Sheet name to read
  * @param {Array<{key: string, header: string}>} headerMap - Expected headers
@@ -3797,16 +3732,6 @@ function syncColumnMaps() {
     }
 
     if (moved) result.synced.push(entry.name);
-  }
-
-  // Rebuild legacy compat objects if primary maps changed
-  if (result.synced.indexOf('MEMBER_COLS') >= 0) {
-    var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-    for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
-  }
-  if (result.synced.indexOf('GRIEVANCE_COLS') >= 0) {
-    var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-    for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
   }
 
   // Rebuild derived column configs so dropdown dialogs and bidirectional
@@ -3917,14 +3842,9 @@ function loadCachedColumnMaps_() {
       }
     }
 
-    // Rebuild derived objects (legacy compat, dropdown map, multi-select)
+    // Rebuild derived objects (dropdown map, multi-select)
     // only if something actually changed.
     if (changed) {
-      var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-      for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
-      var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-      for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
-
       var freshMulti = buildMultiSelectCols_();
       MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
       MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
@@ -5160,7 +5080,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2836 lines)
+// SOURCE: 02_DataManagers.gs (2819 lines)
 // ============================================================================
 
 /**
@@ -6897,7 +6817,7 @@ function getNextGrievanceId(sheet) {
 
   // Find highest sequence number for current year
   for (let i = 1; i < data.length; i++) {
-    const id = data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+    const id = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
     if (id && typeof id === 'string') {
       const match = id.match(/^GRV-(\d{4})-(\d{4})$/);
       if (match && parseInt(match[1]) === currentYear) {
@@ -7038,7 +6958,7 @@ function advanceGrievanceStep(grievanceId, options) {
     // Find the grievance row
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1; // 1-indexed for sheet operations
         break;
       }
@@ -7048,7 +6968,7 @@ function advanceGrievanceStep(grievanceId, options) {
       return errorResponse('Grievance not found', 'advanceGrievanceStep');
     }
 
-    const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP]);
+    const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLS.CURRENT_STEP - 1]);
     if (isNaN(currentStep) || currentStep < 1) {
       return errorResponse('Invalid current step value for this grievance', 'advanceGrievanceStep');
     }
@@ -7076,8 +6996,7 @@ function advanceGrievanceStep(grievanceId, options) {
       updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
 
-    // Add notes if provided (GRIEVANCE_COLUMNS.NOTES aliases to RESOLUTION
-    // column — use GRIEVANCE_COLS.RESOLUTION directly)
+    // Add notes if provided
     if (options.notes) {
       const existingResolution = data[rowIndex - 1][GRIEVANCE_COLS.RESOLUTION - 1] || '';
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
@@ -7119,23 +7038,9 @@ function advanceGrievanceStep(grievanceId, options) {
  */
 function getStepDateColumn(step) {
   switch (step) {
-    case 1: return GRIEVANCE_COLUMNS.STEP_1_DATE + 1;
-    case 2: return GRIEVANCE_COLUMNS.STEP_2_DATE + 1;
-    case 3: return GRIEVANCE_COLUMNS.STEP_3_DATE + 1;
-    default: return null;
-  }
-}
-
-/**
- * Gets column index for step status
- * @param {number} step - Step number
- * @return {number} 1-indexed column number
- */
-function getStepStatusColumn(step) {
-  switch (step) {
-    case 1: return GRIEVANCE_COLUMNS.STEP_1_STATUS + 1;
-    case 2: return GRIEVANCE_COLUMNS.STEP_2_STATUS + 1;
-    case 3: return GRIEVANCE_COLUMNS.STEP_3_STATUS + 1;
+    case 1: return GRIEVANCE_COLS.STEP1_RCVD;
+    case 2: return GRIEVANCE_COLS.STEP2_APPEAL_FILED;
+    case 3: return GRIEVANCE_COLS.STEP3_APPEAL_FILED;
     default: return null;
   }
 }
@@ -7173,14 +7078,14 @@ function recalcAllGrievancesBatched() {
     }
 
     const row = data[i];
-    const status = row[GRIEVANCE_COLUMNS.STATUS];
+    const status = row[GRIEVANCE_COLS.STATUS - 1];
 
     // Only recalculate open/pending grievances
     if (status === GRIEVANCE_STATUS.OPEN ||
         status === GRIEVANCE_STATUS.PENDING ||
         status === GRIEVANCE_STATUS.APPEALED) {
 
-      const currentStep = row[GRIEVANCE_COLUMNS.CURRENT_STEP];
+      const currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
       const stepDate = row[getStepDateColumn(currentStep) - 1]; // 0-indexed for data array
 
       if (stepDate instanceof Date) {
@@ -7226,7 +7131,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
   const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
   for (let i = 1; i < data.length; i++) {
-    const grievanceId = data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+    const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
 
     if (grievanceIds.includes(grievanceId)) {
       const rowIndex = i + 1;
@@ -7270,7 +7175,7 @@ function getGrievanceById(grievanceId) {
   const headers = data[0];
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
       const grievance = {};
       headers.forEach((header, index) => {
         grievance[header] = data[i][index];
@@ -7302,7 +7207,7 @@ function getOpenGrievances() {
   const results = [];
 
   for (let i = 1; i < data.length; i++) {
-    const status = data[i][GRIEVANCE_COLUMNS.STATUS];
+    const status = data[i][GRIEVANCE_COLS.STATUS - 1];
     if (openStatuses.includes(status)) {
       const grievance = {};
       headers.forEach((header, index) => {
@@ -7331,19 +7236,19 @@ function getUpcomingDeadlines(daysAhead) {
   const upcoming = [];
 
   openGrievances.forEach(g => {
-    const currentStep = g['Current Step'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
+    const currentStep = g['Current Step'];
     let deadline;
 
     // Get the due date for current step
     switch (currentStep) {
       case 1:
-        deadline = g['Step 1 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
+        deadline = g['Step 1 Due'];
         break;
       case 2:
-        deadline = g['Step 2 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
+        deadline = g['Step 2 Due'];
         break;
       case 3:
-        deadline = g['Step 3 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
+        deadline = g['Step 3 Due'];
         break;
     }
 
@@ -7354,8 +7259,8 @@ function getUpcomingDeadlines(daysAhead) {
       if (deadlineDate <= cutoffDate) {
         const daysLeft = Math.ceil((deadlineDate - today) / (1000 * 60 * 60 * 24));
         upcoming.push({
-          grievanceId: g['Grievance ID'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]],
-          memberName: g['Member Name'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.MEMBER_NAME]],
+          grievanceId: g['Grievance ID'],
+          memberName: g['Member Name'],
           step: `Step ${currentStep}`,
           deadline: deadline,
           date: Utilities.formatDate(deadline, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
@@ -7403,9 +7308,9 @@ function getGrievanceStats() {
   const categoryCounts = {};
 
   for (let i = 1; i < data.length; i++) {
-    const status = data[i][GRIEVANCE_COLUMNS.STATUS];
-    const lastUpdated = data[i][GRIEVANCE_COLUMNS.LAST_UPDATED];
-    const category = data[i][GRIEVANCE_COLUMNS.ISSUE_CATEGORY] || 'Other';
+    const status = data[i][GRIEVANCE_COLS.STATUS - 1];
+    const lastUpdated = data[i][GRIEVANCE_COLS.LAST_UPDATED - 1];
+    const category = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
 
     // Count by category
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
@@ -7484,7 +7389,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
 
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1;
         break;
       }
@@ -7497,9 +7402,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
     const today = new Date();
     const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
-    // Build combined resolution text (RESOLUTION/OUTCOME/NOTES all alias to
-    // the same RESOLUTION column in GRIEVANCE_COLUMNS — use GRIEVANCE_COLS
-    // directly to avoid the three aliases silently overwriting each other)
+    // Build combined resolution text
     var resolutionText = outcome || '';
     if (resolution) {
       resolutionText += (resolutionText ? ': ' : '') + resolution;
@@ -7565,7 +7468,7 @@ function showEditGrievanceDialog() {
   }
 
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const grievanceId = data[GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+  const grievanceId = data[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
 
   const html = HtmlService.createHtmlOutput(getEditGrievanceFormHtml(grievanceId))
     .setWidth(DIALOG_SIZES.LARGE.width)
@@ -7586,7 +7489,7 @@ function showBulkStatusUpdate() {
 
   const openGrievances = getOpenGrievances();
   const items = openGrievances.map(g => ({
-    id: g['Grievance ID'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]],
+    id: g['Grievance ID'],
     label: `${g['Grievance ID']} - ${g['Member Name']}`,
     selected: false
   }));
@@ -18647,7 +18550,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3605 lines)
+// SOURCE: 05_Integrations.gs (3599 lines)
 // ============================================================================
 
 /**
@@ -19014,8 +18917,8 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
-      sheet.getRange(i + 1, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).setValue(folderUrl);
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+      sheet.getRange(i + 1, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folderUrl);
       break;
     }
   }
@@ -19034,7 +18937,7 @@ function openGrievanceFolder() {
   const row = sheet.getActiveRange().getRow();
   if (row <= 1) return;
 
-  const folderUrl = sheet.getRange(row, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).getValue();
+  const folderUrl = sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
 
   if (folderUrl) {
     const html = HtmlService.createHtmlOutput(
@@ -19043,7 +18946,7 @@ function openGrievanceFolder() {
     SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
   } else {
     if (showConfirmation('No folder exists. Create one now?', 'Create Folder')) {
-      const grievanceId = sheet.getRange(row, GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1).getValue();
+      const grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
       const result = setupDriveFolderForGrievance(grievanceId);
       if (result.success) {
         const html = HtmlService.createHtmlOutput(
@@ -19686,29 +19589,23 @@ function syncDeadlinesToCalendar() {
  * @return {Object} Sync result
  */
 function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
-  const grievanceId = grievance['Grievance ID'] ||
-                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]];
-  const memberName = grievance['Member Name'] ||
-                     grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.MEMBER_NAME]];
-  const currentStep = grievance['Current Step'] ||
-                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
+  const grievanceId = grievance['Grievance ID'];
+  const memberName = grievance['Member Name'];
+  const currentStep = grievance['Current Step'];
 
   // Get the deadline for current step
   let deadline;
   switch (currentStep) {
     case 'Step I':
     case 'Informal':
-      deadline = grievance['Step 1 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
+      deadline = grievance['Step 1 Due'];
       break;
     case 'Step II':
-      deadline = grievance['Step 2 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
+      deadline = grievance['Step 2 Due'];
       break;
     case 'Step III':
     case 'Arbitration':
-      deadline = grievance['Step 3 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
+      deadline = grievance['Step 3 Due'];
       break;
     default:
       return { synced: false, reason: 'No applicable deadline' };
@@ -22385,10 +22282,10 @@ function DIAGNOSE_SETUP() {
     var invalidDates = 0;
 
     for (var i = 1; i < data.length; i++) {
-      var memberId = data[i][GRIEVANCE_COLUMNS.MEMBER_ID];
-      var filingDate = data[i][GRIEVANCE_COLUMNS.FILING_DATE];
+      var memberId = data[i][GRIEVANCE_COLS.MEMBER_ID - 1];
+      var filingDate = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
 
-      if (!memberId && data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID]) {
+      if (!memberId && data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) {
         orphanedGrievances++;
       }
 
@@ -29825,13 +29722,13 @@ function advancedSearch(filters) {
         var matches = true;
 
         // Apply department filter
-        if (filters.department && row[MEMBER_COLUMNS.JOB_TITLE] !== filters.department) {
+        if (filters.department && row[MEMBER_COLS.JOB_TITLE - 1] !== filters.department) {
           matches = false;
         }
 
         // Apply name filter
         if (filters.name && matches) {
-          var fullName = (row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME]).toLowerCase();
+          var fullName = (row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1]).toLowerCase();
           if (fullName.indexOf(filters.name.toLowerCase()) === -1) {
             matches = false;
           }
@@ -29839,17 +29736,17 @@ function advancedSearch(filters) {
 
         // Apply steward filter
         if (filters.stewardOnly && matches) {
-          if (!isTruthyValue(row[MEMBER_COLUMNS.IS_STEWARD])) {
+          if (!isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) {
             matches = false;
           }
         }
 
-        if (matches && row[MEMBER_COLUMNS.ID]) {
+        if (matches && row[MEMBER_COLS.MEMBER_ID - 1]) {
           results.push({
-            id: row[MEMBER_COLUMNS.ID],
+            id: row[MEMBER_COLS.MEMBER_ID - 1],
             type: 'member',
-            title: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-            subtitle: row[MEMBER_COLUMNS.JOB_TITLE],
+            title: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
+            subtitle: row[MEMBER_COLS.JOB_TITLE - 1],
             row: i + 1
           });
         }
@@ -29868,31 +29765,31 @@ function advancedSearch(filters) {
         var gMatches = true;
 
         // Apply status filter
-        if (filters.status && gRow[GRIEVANCE_COLUMNS.STATUS] !== filters.status) {
+        if (filters.status && gRow[GRIEVANCE_COLS.STATUS - 1] !== filters.status) {
           gMatches = false;
         }
 
         // Apply date range filter
         if (filters.startDate && gMatches) {
-          var filedDate = gRow[GRIEVANCE_COLUMNS.FILING_DATE];
+          var filedDate = gRow[GRIEVANCE_COLS.DATE_FILED - 1];
           if (filedDate && new Date(filedDate) < new Date(filters.startDate)) {
             gMatches = false;
           }
         }
 
         if (filters.endDate && gMatches) {
-          var endFiledDate = gRow[GRIEVANCE_COLUMNS.FILING_DATE];
+          var endFiledDate = gRow[GRIEVANCE_COLS.DATE_FILED - 1];
           if (endFiledDate && new Date(endFiledDate) > new Date(filters.endDate)) {
             gMatches = false;
           }
         }
 
-        if (gMatches && gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) {
+        if (gMatches && gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1]) {
           results.push({
-            id: gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
+            id: gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
             type: 'grievance',
-            title: gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-            subtitle: gRow[GRIEVANCE_COLUMNS.STATUS] + ' - ' + gRow[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
+            title: gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+            subtitle: gRow[GRIEVANCE_COLS.STATUS - 1] + ' - ' + gRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
             row: j + 1
           });
         }
@@ -29917,7 +29814,7 @@ function getDepartmentList() {
 
     if (!memberSheet) return [];
 
-    var data = memberSheet.getRange(2, MEMBER_COLUMNS.JOB_TITLE + 1,
+    var data = memberSheet.getRange(2, MEMBER_COLS.JOB_TITLE,
       memberSheet.getLastRow() - 1, 1).getValues();
 
     var depts = {};
@@ -29946,11 +29843,11 @@ function getMemberList() {
   var members = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLUMNS.ID]) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1]) {
       members.push({
-        id: data[i][MEMBER_COLUMNS.ID],
-        name: data[i][MEMBER_COLUMNS.FIRST_NAME] + ' ' + data[i][MEMBER_COLUMNS.LAST_NAME],
-        department: data[i][MEMBER_COLUMNS.JOB_TITLE]
+        id: data[i][MEMBER_COLS.MEMBER_ID - 1],
+        name: data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1],
+        department: data[i][MEMBER_COLS.JOB_TITLE - 1]
       });
     }
   }
@@ -45688,7 +45585,7 @@ function updateGrievance(grievanceId, updates) {
 
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1;
         break;
       }
@@ -45998,8 +45895,8 @@ function startGrievanceForMember() {
   }
 
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const memberId = data[MEMBER_COLUMNS.ID];
-  const memberName = `${data[MEMBER_COLUMNS.FIRST_NAME]} ${data[MEMBER_COLUMNS.LAST_NAME]}`;
+  const memberId = data[MEMBER_COLS.MEMBER_ID - 1];
+  const memberName = `${data[MEMBER_COLS.FIRST_NAME - 1]} ${data[MEMBER_COLS.LAST_NAME - 1]}`;
 
   // Open new grievance dialog pre-populated with member info
   // Sanitize values before embedding in script context
@@ -46393,10 +46290,10 @@ function searchMembersForDialog(term) {
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const firstName = (row[MEMBER_COLUMNS.FIRST_NAME] || '').toString().toLowerCase();
-    const lastName = (row[MEMBER_COLUMNS.LAST_NAME] || '').toString().toLowerCase();
-    const email = (row[MEMBER_COLUMNS.EMAIL] || '').toString().toLowerCase();
-    const memberId = (row[MEMBER_COLUMNS.ID] || '').toString().toLowerCase();
+    const firstName = (row[MEMBER_COLS.FIRST_NAME - 1] || '').toString().toLowerCase();
+    const lastName = (row[MEMBER_COLS.LAST_NAME - 1] || '').toString().toLowerCase();
+    const email = (row[MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase();
+    const memberId = (row[MEMBER_COLS.MEMBER_ID - 1] || '').toString().toLowerCase();
 
     if (firstName.includes(searchLower) ||
         lastName.includes(searchLower) ||
@@ -46404,9 +46301,9 @@ function searchMembersForDialog(term) {
         memberId.includes(searchLower)) {
       results.push({
         row: i + 1,
-        name: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-        email: row[MEMBER_COLUMNS.EMAIL],
-        id: row[MEMBER_COLUMNS.ID]
+        name: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
+        email: row[MEMBER_COLS.EMAIL - 1],
+        id: row[MEMBER_COLS.MEMBER_ID - 1]
       });
 
       if (results.length >= 10) break; // Limit results

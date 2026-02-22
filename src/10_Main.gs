@@ -1526,7 +1526,7 @@ function updateGrievance(grievanceId, updates) {
 
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1;
         break;
       }
@@ -1836,8 +1836,8 @@ function startGrievanceForMember() {
   }
 
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const memberId = data[MEMBER_COLUMNS.ID];
-  const memberName = `${data[MEMBER_COLUMNS.FIRST_NAME]} ${data[MEMBER_COLUMNS.LAST_NAME]}`;
+  const memberId = data[MEMBER_COLS.MEMBER_ID - 1];
+  const memberName = `${data[MEMBER_COLS.FIRST_NAME - 1]} ${data[MEMBER_COLS.LAST_NAME - 1]}`;
 
   // Open new grievance dialog pre-populated with member info
   // Sanitize values before embedding in script context
@@ -2231,10 +2231,10 @@ function searchMembersForDialog(term) {
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const firstName = (row[MEMBER_COLUMNS.FIRST_NAME] || '').toString().toLowerCase();
-    const lastName = (row[MEMBER_COLUMNS.LAST_NAME] || '').toString().toLowerCase();
-    const email = (row[MEMBER_COLUMNS.EMAIL] || '').toString().toLowerCase();
-    const memberId = (row[MEMBER_COLUMNS.ID] || '').toString().toLowerCase();
+    const firstName = (row[MEMBER_COLS.FIRST_NAME - 1] || '').toString().toLowerCase();
+    const lastName = (row[MEMBER_COLS.LAST_NAME - 1] || '').toString().toLowerCase();
+    const email = (row[MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase();
+    const memberId = (row[MEMBER_COLS.MEMBER_ID - 1] || '').toString().toLowerCase();
 
     if (firstName.includes(searchLower) ||
         lastName.includes(searchLower) ||
@@ -2242,9 +2242,9 @@ function searchMembersForDialog(term) {
         memberId.includes(searchLower)) {
       results.push({
         row: i + 1,
-        name: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-        email: row[MEMBER_COLUMNS.EMAIL],
-        id: row[MEMBER_COLUMNS.ID]
+        name: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
+        email: row[MEMBER_COLS.EMAIL - 1],
+        id: row[MEMBER_COLS.MEMBER_ID - 1]
       });
 
       if (results.length >= 10) break; // Limit results

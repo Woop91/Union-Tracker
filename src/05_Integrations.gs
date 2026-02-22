@@ -362,8 +362,8 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
-      sheet.getRange(i + 1, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).setValue(folderUrl);
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+      sheet.getRange(i + 1, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folderUrl);
       break;
     }
   }
@@ -382,7 +382,7 @@ function openGrievanceFolder() {
   const row = sheet.getActiveRange().getRow();
   if (row <= 1) return;
 
-  const folderUrl = sheet.getRange(row, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).getValue();
+  const folderUrl = sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
 
   if (folderUrl) {
     const html = HtmlService.createHtmlOutput(
@@ -391,7 +391,7 @@ function openGrievanceFolder() {
     SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
   } else {
     if (showConfirmation('No folder exists. Create one now?', 'Create Folder')) {
-      const grievanceId = sheet.getRange(row, GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1).getValue();
+      const grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
       const result = setupDriveFolderForGrievance(grievanceId);
       if (result.success) {
         const html = HtmlService.createHtmlOutput(
@@ -1034,29 +1034,23 @@ function syncDeadlinesToCalendar() {
  * @return {Object} Sync result
  */
 function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
-  const grievanceId = grievance['Grievance ID'] ||
-                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]];
-  const memberName = grievance['Member Name'] ||
-                     grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.MEMBER_NAME]];
-  const currentStep = grievance['Current Step'] ||
-                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
+  const grievanceId = grievance['Grievance ID'];
+  const memberName = grievance['Member Name'];
+  const currentStep = grievance['Current Step'];
 
   // Get the deadline for current step
   let deadline;
   switch (currentStep) {
     case 'Step I':
     case 'Informal':
-      deadline = grievance['Step 1 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
+      deadline = grievance['Step 1 Due'];
       break;
     case 'Step II':
-      deadline = grievance['Step 2 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
+      deadline = grievance['Step 2 Due'];
       break;
     case 'Step III':
     case 'Arbitration':
-      deadline = grievance['Step 3 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
+      deadline = grievance['Step 3 Due'];
       break;
     default:
       return { synced: false, reason: 'No applicable deadline' };

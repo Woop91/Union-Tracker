@@ -444,19 +444,18 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
   });
 
   test('counts open, pending, won, and resolved grievances correctly', () => {
-    // Build data matching GRIEVANCE_COLUMNS (0-indexed)
-    // STATUS is index 4, LAST_UPDATED varies, ISSUE_CATEGORY varies
+    // Build data using GRIEVANCE_COLS (1-indexed, subtract 1 for array access)
     const headerRow = new Array(30).fill('');
-    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
-    headerRow[GRIEVANCE_COLUMNS.STATUS] = 'Status';
-    headerRow[GRIEVANCE_COLUMNS.LAST_UPDATED] = 'Last Updated';
-    headerRow[GRIEVANCE_COLUMNS.ISSUE_CATEGORY] = 'Category';
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
+    headerRow[GRIEVANCE_COLS.LAST_UPDATED - 1] = 'Last Updated';
+    headerRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = 'Category';
 
     const makeRow = (status, category) => {
       const row = new Array(30).fill('');
-      row[GRIEVANCE_COLUMNS.STATUS] = status;
-      row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY] = category || 'General';
-      row[GRIEVANCE_COLUMNS.LAST_UPDATED] = new Date();
+      row[GRIEVANCE_COLS.STATUS - 1] = status;
+      row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = category || 'General';
+      row[GRIEVANCE_COLS.LAST_UPDATED - 1] = new Date();
       return row;
     };
 
@@ -490,14 +489,14 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
 
   test('categoryData includes header row and category entries', () => {
     const headerRow = new Array(30).fill('');
-    headerRow[GRIEVANCE_COLUMNS.STATUS] = 'Status';
-    headerRow[GRIEVANCE_COLUMNS.ISSUE_CATEGORY] = 'Category';
+    headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
+    headerRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = 'Category';
 
     const makeRow = (status, category) => {
       const row = new Array(30).fill('');
-      row[GRIEVANCE_COLUMNS.STATUS] = status;
-      row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY] = category;
-      row[GRIEVANCE_COLUMNS.LAST_UPDATED] = new Date();
+      row[GRIEVANCE_COLS.STATUS - 1] = status;
+      row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = category;
+      row[GRIEVANCE_COLS.LAST_UPDATED - 1] = new Date();
       return row;
     };
 
@@ -730,10 +729,10 @@ describe('startNewGrievance', () => {
 
   function setupGrievanceMock() {
     const headerRow = new Array(40).fill('');
-    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
 
     const existingRow = new Array(40).fill('');
-    existingRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'GRV-2026-0001';
+    existingRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-2026-0001';
 
     const data = [headerRow, existingRow];
 
@@ -849,14 +848,14 @@ describe('resolveGrievance', () => {
 
   function setupResolveMock(grievanceId, currentStep) {
     const headerRow = new Array(40).fill('');
-    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
-    headerRow[GRIEVANCE_COLUMNS.STATUS] = 'Status';
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
 
     const grievanceRow = new Array(40).fill('');
-    grievanceRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = grievanceId || 'GRV-2026-0001';
-    grievanceRow[GRIEVANCE_COLUMNS.STATUS] = GRIEVANCE_STATUS.OPEN;
-    grievanceRow[GRIEVANCE_COLUMNS.CURRENT_STEP] = currentStep || 1;
-    grievanceRow[GRIEVANCE_COLUMNS.NOTES] = '';
+    grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId || 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.OPEN;
+    grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = currentStep || 1;
+    grievanceRow[GRIEVANCE_COLS.RESOLUTION - 1] = '';
 
     const data = [headerRow, grievanceRow];
 
@@ -964,13 +963,13 @@ describe('advanceGrievanceStep', () => {
 
   function setupAdvanceMock(grievanceId, currentStep) {
     const headerRow = new Array(40).fill('');
-    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
 
     const grievanceRow = new Array(40).fill('');
-    grievanceRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = grievanceId || 'GRV-2026-0001';
-    grievanceRow[GRIEVANCE_COLUMNS.CURRENT_STEP] = currentStep || 1;
-    grievanceRow[GRIEVANCE_COLUMNS.STATUS] = GRIEVANCE_STATUS.OPEN;
-    grievanceRow[GRIEVANCE_COLUMNS.NOTES] = '';
+    grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId || 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = currentStep || 1;
+    grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.OPEN;
+    grievanceRow[GRIEVANCE_COLS.RESOLUTION - 1] = '';
 
     const data = [headerRow, grievanceRow];
 

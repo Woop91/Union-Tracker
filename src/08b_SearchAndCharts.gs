@@ -259,13 +259,13 @@ function advancedSearch(filters) {
         var matches = true;
 
         // Apply department filter
-        if (filters.department && row[MEMBER_COLUMNS.JOB_TITLE] !== filters.department) {
+        if (filters.department && row[MEMBER_COLS.JOB_TITLE - 1] !== filters.department) {
           matches = false;
         }
 
         // Apply name filter
         if (filters.name && matches) {
-          var fullName = (row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME]).toLowerCase();
+          var fullName = (row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1]).toLowerCase();
           if (fullName.indexOf(filters.name.toLowerCase()) === -1) {
             matches = false;
           }
@@ -273,17 +273,17 @@ function advancedSearch(filters) {
 
         // Apply steward filter
         if (filters.stewardOnly && matches) {
-          if (!isTruthyValue(row[MEMBER_COLUMNS.IS_STEWARD])) {
+          if (!isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) {
             matches = false;
           }
         }
 
-        if (matches && row[MEMBER_COLUMNS.ID]) {
+        if (matches && row[MEMBER_COLS.MEMBER_ID - 1]) {
           results.push({
-            id: row[MEMBER_COLUMNS.ID],
+            id: row[MEMBER_COLS.MEMBER_ID - 1],
             type: 'member',
-            title: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-            subtitle: row[MEMBER_COLUMNS.JOB_TITLE],
+            title: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
+            subtitle: row[MEMBER_COLS.JOB_TITLE - 1],
             row: i + 1
           });
         }
@@ -302,31 +302,31 @@ function advancedSearch(filters) {
         var gMatches = true;
 
         // Apply status filter
-        if (filters.status && gRow[GRIEVANCE_COLUMNS.STATUS] !== filters.status) {
+        if (filters.status && gRow[GRIEVANCE_COLS.STATUS - 1] !== filters.status) {
           gMatches = false;
         }
 
         // Apply date range filter
         if (filters.startDate && gMatches) {
-          var filedDate = gRow[GRIEVANCE_COLUMNS.FILING_DATE];
+          var filedDate = gRow[GRIEVANCE_COLS.DATE_FILED - 1];
           if (filedDate && new Date(filedDate) < new Date(filters.startDate)) {
             gMatches = false;
           }
         }
 
         if (filters.endDate && gMatches) {
-          var endFiledDate = gRow[GRIEVANCE_COLUMNS.FILING_DATE];
+          var endFiledDate = gRow[GRIEVANCE_COLS.DATE_FILED - 1];
           if (endFiledDate && new Date(endFiledDate) > new Date(filters.endDate)) {
             gMatches = false;
           }
         }
 
-        if (gMatches && gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) {
+        if (gMatches && gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1]) {
           results.push({
-            id: gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
+            id: gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
             type: 'grievance',
-            title: gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-            subtitle: gRow[GRIEVANCE_COLUMNS.STATUS] + ' - ' + gRow[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
+            title: gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+            subtitle: gRow[GRIEVANCE_COLS.STATUS - 1] + ' - ' + gRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
             row: j + 1
           });
         }
@@ -351,7 +351,7 @@ function getDepartmentList() {
 
     if (!memberSheet) return [];
 
-    var data = memberSheet.getRange(2, MEMBER_COLUMNS.JOB_TITLE + 1,
+    var data = memberSheet.getRange(2, MEMBER_COLS.JOB_TITLE,
       memberSheet.getLastRow() - 1, 1).getValues();
 
     var depts = {};
@@ -380,11 +380,11 @@ function getMemberList() {
   var members = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLUMNS.ID]) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1]) {
       members.push({
-        id: data[i][MEMBER_COLUMNS.ID],
-        name: data[i][MEMBER_COLUMNS.FIRST_NAME] + ' ' + data[i][MEMBER_COLUMNS.LAST_NAME],
-        department: data[i][MEMBER_COLUMNS.JOB_TITLE]
+        id: data[i][MEMBER_COLS.MEMBER_ID - 1],
+        name: data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1],
+        department: data[i][MEMBER_COLS.JOB_TITLE - 1]
       });
     }
   }

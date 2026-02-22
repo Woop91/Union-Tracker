@@ -1732,7 +1732,7 @@ function getNextGrievanceId(sheet) {
 
   // Find highest sequence number for current year
   for (let i = 1; i < data.length; i++) {
-    const id = data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+    const id = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
     if (id && typeof id === 'string') {
       const match = id.match(/^GRV-(\d{4})-(\d{4})$/);
       if (match && parseInt(match[1]) === currentYear) {
@@ -1873,7 +1873,7 @@ function advanceGrievanceStep(grievanceId, options) {
     // Find the grievance row
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1; // 1-indexed for sheet operations
         break;
       }
@@ -1883,7 +1883,7 @@ function advanceGrievanceStep(grievanceId, options) {
       return errorResponse('Grievance not found', 'advanceGrievanceStep');
     }
 
-    const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP]);
+    const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLS.CURRENT_STEP - 1]);
     if (isNaN(currentStep) || currentStep < 1) {
       return errorResponse('Invalid current step value for this grievance', 'advanceGrievanceStep');
     }
@@ -1911,8 +1911,7 @@ function advanceGrievanceStep(grievanceId, options) {
       updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
 
-    // Add notes if provided (GRIEVANCE_COLUMNS.NOTES aliases to RESOLUTION
-    // column — use GRIEVANCE_COLS.RESOLUTION directly)
+    // Add notes if provided
     if (options.notes) {
       const existingResolution = data[rowIndex - 1][GRIEVANCE_COLS.RESOLUTION - 1] || '';
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
@@ -1954,23 +1953,9 @@ function advanceGrievanceStep(grievanceId, options) {
  */
 function getStepDateColumn(step) {
   switch (step) {
-    case 1: return GRIEVANCE_COLUMNS.STEP_1_DATE + 1;
-    case 2: return GRIEVANCE_COLUMNS.STEP_2_DATE + 1;
-    case 3: return GRIEVANCE_COLUMNS.STEP_3_DATE + 1;
-    default: return null;
-  }
-}
-
-/**
- * Gets column index for step status
- * @param {number} step - Step number
- * @return {number} 1-indexed column number
- */
-function getStepStatusColumn(step) {
-  switch (step) {
-    case 1: return GRIEVANCE_COLUMNS.STEP_1_STATUS + 1;
-    case 2: return GRIEVANCE_COLUMNS.STEP_2_STATUS + 1;
-    case 3: return GRIEVANCE_COLUMNS.STEP_3_STATUS + 1;
+    case 1: return GRIEVANCE_COLS.STEP1_RCVD;
+    case 2: return GRIEVANCE_COLS.STEP2_APPEAL_FILED;
+    case 3: return GRIEVANCE_COLS.STEP3_APPEAL_FILED;
     default: return null;
   }
 }
@@ -2008,14 +1993,14 @@ function recalcAllGrievancesBatched() {
     }
 
     const row = data[i];
-    const status = row[GRIEVANCE_COLUMNS.STATUS];
+    const status = row[GRIEVANCE_COLS.STATUS - 1];
 
     // Only recalculate open/pending grievances
     if (status === GRIEVANCE_STATUS.OPEN ||
         status === GRIEVANCE_STATUS.PENDING ||
         status === GRIEVANCE_STATUS.APPEALED) {
 
-      const currentStep = row[GRIEVANCE_COLUMNS.CURRENT_STEP];
+      const currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
       const stepDate = row[getStepDateColumn(currentStep) - 1]; // 0-indexed for data array
 
       if (stepDate instanceof Date) {
@@ -2061,7 +2046,7 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
   const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
   for (let i = 1; i < data.length; i++) {
-    const grievanceId = data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+    const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
 
     if (grievanceIds.includes(grievanceId)) {
       const rowIndex = i + 1;
@@ -2105,7 +2090,7 @@ function getGrievanceById(grievanceId) {
   const headers = data[0];
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
       const grievance = {};
       headers.forEach((header, index) => {
         grievance[header] = data[i][index];
@@ -2137,7 +2122,7 @@ function getOpenGrievances() {
   const results = [];
 
   for (let i = 1; i < data.length; i++) {
-    const status = data[i][GRIEVANCE_COLUMNS.STATUS];
+    const status = data[i][GRIEVANCE_COLS.STATUS - 1];
     if (openStatuses.includes(status)) {
       const grievance = {};
       headers.forEach((header, index) => {
@@ -2166,19 +2151,19 @@ function getUpcomingDeadlines(daysAhead) {
   const upcoming = [];
 
   openGrievances.forEach(g => {
-    const currentStep = g['Current Step'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
+    const currentStep = g['Current Step'];
     let deadline;
 
     // Get the due date for current step
     switch (currentStep) {
       case 1:
-        deadline = g['Step 1 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
+        deadline = g['Step 1 Due'];
         break;
       case 2:
-        deadline = g['Step 2 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
+        deadline = g['Step 2 Due'];
         break;
       case 3:
-        deadline = g['Step 3 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
+        deadline = g['Step 3 Due'];
         break;
     }
 
@@ -2189,8 +2174,8 @@ function getUpcomingDeadlines(daysAhead) {
       if (deadlineDate <= cutoffDate) {
         const daysLeft = Math.ceil((deadlineDate - today) / (1000 * 60 * 60 * 24));
         upcoming.push({
-          grievanceId: g['Grievance ID'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]],
-          memberName: g['Member Name'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.MEMBER_NAME]],
+          grievanceId: g['Grievance ID'],
+          memberName: g['Member Name'],
           step: `Step ${currentStep}`,
           deadline: deadline,
           date: Utilities.formatDate(deadline, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
@@ -2238,9 +2223,9 @@ function getGrievanceStats() {
   const categoryCounts = {};
 
   for (let i = 1; i < data.length; i++) {
-    const status = data[i][GRIEVANCE_COLUMNS.STATUS];
-    const lastUpdated = data[i][GRIEVANCE_COLUMNS.LAST_UPDATED];
-    const category = data[i][GRIEVANCE_COLUMNS.ISSUE_CATEGORY] || 'Other';
+    const status = data[i][GRIEVANCE_COLS.STATUS - 1];
+    const lastUpdated = data[i][GRIEVANCE_COLS.LAST_UPDATED - 1];
+    const category = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
 
     // Count by category
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
@@ -2319,7 +2304,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
 
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1;
         break;
       }
@@ -2332,9 +2317,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
     const today = new Date();
     const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
-    // Build combined resolution text (RESOLUTION/OUTCOME/NOTES all alias to
-    // the same RESOLUTION column in GRIEVANCE_COLUMNS — use GRIEVANCE_COLS
-    // directly to avoid the three aliases silently overwriting each other)
+    // Build combined resolution text
     var resolutionText = outcome || '';
     if (resolution) {
       resolutionText += (resolutionText ? ': ' : '') + resolution;
@@ -2400,7 +2383,7 @@ function showEditGrievanceDialog() {
   }
 
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const grievanceId = data[GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+  const grievanceId = data[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
 
   const html = HtmlService.createHtmlOutput(getEditGrievanceFormHtml(grievanceId))
     .setWidth(DIALOG_SIZES.LARGE.width)
@@ -2421,7 +2404,7 @@ function showBulkStatusUpdate() {
 
   const openGrievances = getOpenGrievances();
   const items = openGrievances.map(g => ({
-    id: g['Grievance ID'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]],
+    id: g['Grievance ID'],
     label: `${g['Grievance ID']} - ${g['Member Name']}`,
     selected: false
   }));

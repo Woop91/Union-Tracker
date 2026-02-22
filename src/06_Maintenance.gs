@@ -123,10 +123,10 @@ function DIAGNOSE_SETUP() {
     var invalidDates = 0;
 
     for (var i = 1; i < data.length; i++) {
-      var memberId = data[i][GRIEVANCE_COLUMNS.MEMBER_ID];
-      var filingDate = data[i][GRIEVANCE_COLUMNS.FILING_DATE];
+      var memberId = data[i][GRIEVANCE_COLS.MEMBER_ID - 1];
+      var filingDate = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
 
-      if (!memberId && data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID]) {
+      if (!memberId && data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) {
         orphanedGrievances++;
       }
 

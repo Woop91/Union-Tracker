@@ -45,17 +45,17 @@ Files are numbered to control Google Apps Script's execution order:
 
 **Important:** When editing `src/` files, the `dist/` file must also be kept in sync. Either re-run `npm run build` or manually apply the same changes to both locations.
 
-### Constants — KNOWN DUAL SYSTEM
+### Column Constants
 
-Two parallel constant sets exist in `01_Core.gs`. This is technical debt, not a feature:
+All column constants are **1-indexed** (matching Google Sheets `getRange()` conventions):
 
-| Canonical (use these) | Legacy alias | Notes |
-|-----------------------|-------------|-------|
-| `SHEETS.GRIEVANCE_LOG` | `SHEET_NAMES` (alias of `SHEETS`, line 778) | `SHEET_NAMES = SHEETS` — identical |
-| `GRIEVANCE_COLS` (1-indexed) | `GRIEVANCE_COLUMNS` (0-indexed) | **NOT aliases. Different indexing.** |
-| `MEMBER_COLS` (1-indexed) | `MEMBER_COLUMNS` (0-indexed) | **NOT aliases. Different indexing.** |
+| Constant | Source | Notes |
+|----------|--------|-------|
+| `SHEETS` / `SHEET_NAMES` | `01_Core.gs` | `SHEET_NAMES = SHEETS` — identical alias |
+| `GRIEVANCE_COLS` | `buildColsFromMap_(GRIEVANCE_HEADER_MAP_)` | 1-indexed for `getRange()` |
+| `MEMBER_COLS` | `buildColsFromMap_(MEMBER_HEADER_MAP_)` | 1-indexed for `getRange()` |
 
-**Rule:** Always use `SHEETS`, `GRIEVANCE_COLS`, and `MEMBER_COLS` (1-indexed). When you see `GRIEVANCE_COLUMNS` or `MEMBER_COLUMNS` (0-indexed), you must add `+ 1` for `getRange()` calls or `- 1` for array indexing. Mixing these up causes silent wrong-column bugs.
+**Rule:** For `getRange()` calls, use `*_COLS` values directly. For array access on `getValues()` data, subtract 1: `row[GRIEVANCE_COLS.STATUS - 1]`. The legacy 0-indexed constants (`GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`) have been removed.
 
 ## Security Patterns
 

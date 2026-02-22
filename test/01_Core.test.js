@@ -1,9 +1,9 @@
 /**
  * Tests for 01_Core.gs
  *
- * Covers column constant validation (MEMBER_COLS ↔ MEMBER_COLUMNS,
- * GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS), version consistency,
- * DEADLINE_RULES, header arrays, sanitize functions, and error handling.
+ * Covers column constant validation (MEMBER_COLS, GRIEVANCE_COLS),
+ * version consistency, DEADLINE_RULES, header arrays, sanitize
+ * functions, and error handling.
  */
 
 require('./gas-mock');
@@ -38,11 +38,10 @@ describe('Version consistency', () => {
 });
 
 // ============================================================================
-// MEMBER_COLS ↔ MEMBER_COLUMNS offset validation
+// MEMBER_COLS validation (1-indexed)
 // ============================================================================
 
-describe('MEMBER_COLS ↔ MEMBER_COLUMNS (1-indexed vs 0-indexed)', () => {
-  // Core fields that MUST be exactly offset by 1
+describe('MEMBER_COLS (1-indexed)', () => {
   const fieldsToCheck = [
     'MEMBER_ID', 'FIRST_NAME', 'LAST_NAME', 'JOB_TITLE',
     'WORK_LOCATION', 'UNIT', 'OFFICE_DAYS',
@@ -56,17 +55,9 @@ describe('MEMBER_COLS ↔ MEMBER_COLUMNS (1-indexed vs 0-indexed)', () => {
   ];
 
   fieldsToCheck.forEach(field => {
-    test(`MEMBER_COLS.${field} - 1 === MEMBER_COLUMNS.${field}`, () => {
-      // MEMBER_COLUMNS uses different key for MEMBER_ID
-      const colsKey = field;
-      let columnsKey = field;
-      if (field === 'MEMBER_ID') columnsKey = 'MEMBER_ID';
-      if (field === 'NEXT_DEADLINE') columnsKey = 'NEXT_DEADLINE';
-
-      // Always assert — fields in the check list must exist
-      expect(MEMBER_COLS[colsKey]).toBeDefined();
-      expect(MEMBER_COLUMNS[columnsKey]).toBeDefined();
-      expect(MEMBER_COLS[colsKey] - 1).toBe(MEMBER_COLUMNS[columnsKey]);
+    test(`MEMBER_COLS.${field} is defined and positive`, () => {
+      expect(MEMBER_COLS[field]).toBeDefined();
+      expect(MEMBER_COLS[field]).toBeGreaterThan(0);
     });
   });
 
@@ -74,24 +65,16 @@ describe('MEMBER_COLS ↔ MEMBER_COLUMNS (1-indexed vs 0-indexed)', () => {
     expect(MEMBER_COLS.MEMBER_ID).toBe(1);
   });
 
-  test('MEMBER_COLUMNS starts at 0 (0-indexed)', () => {
-    expect(MEMBER_COLUMNS.MEMBER_ID).toBe(0);
-  });
-
   test('MEMBER_COLS.PIN_HASH is 33', () => {
     expect(MEMBER_COLS.PIN_HASH).toBe(33);
-  });
-
-  test('MEMBER_COLUMNS.PIN_HASH is 32', () => {
-    expect(MEMBER_COLUMNS.PIN_HASH).toBe(32);
   });
 });
 
 // ============================================================================
-// GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS offset validation
+// GRIEVANCE_COLS validation (1-indexed)
 // ============================================================================
 
-describe('GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS (1-indexed vs 0-indexed)', () => {
+describe('GRIEVANCE_COLS (1-indexed)', () => {
   const fieldsToCheck = [
     'GRIEVANCE_ID', 'MEMBER_ID', 'FIRST_NAME', 'LAST_NAME',
     'STATUS', 'CURRENT_STEP',
@@ -101,7 +84,7 @@ describe('GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS (1-indexed vs 0-indexed)', () => 
     'STEP3_APPEAL_DUE', 'STEP3_APPEAL_FILED', 'DATE_CLOSED',
     'DAYS_OPEN', 'NEXT_ACTION_DUE', 'DAYS_TO_DEADLINE',
     'ARTICLES', 'ISSUE_CATEGORY',
-    'MEMBER_EMAIL', 'UNIT', 'LOCATION', 'STEWARD',
+    'MEMBER_EMAIL', 'LOCATION', 'STEWARD',
     'RESOLUTION',
     'MESSAGE_ALERT', 'COORDINATOR_MESSAGE', 'ACKNOWLEDGED_BY', 'ACKNOWLEDGED_DATE',
     'DRIVE_FOLDER_ID', 'DRIVE_FOLDER_URL',
@@ -110,23 +93,14 @@ describe('GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS (1-indexed vs 0-indexed)', () => 
   ];
 
   fieldsToCheck.forEach(field => {
-    test(`GRIEVANCE_COLS.${field} - 1 === GRIEVANCE_COLUMNS.${field}`, () => {
-      if (GRIEVANCE_COLS[field] !== undefined && GRIEVANCE_COLUMNS[field] !== undefined) {
-        expect(GRIEVANCE_COLS[field] - 1).toBe(GRIEVANCE_COLUMNS[field]);
-      }
+    test(`GRIEVANCE_COLS.${field} is defined and positive`, () => {
+      expect(GRIEVANCE_COLS[field]).toBeDefined();
+      expect(GRIEVANCE_COLS[field]).toBeGreaterThan(0);
     });
   });
 
   test('GRIEVANCE_COLS starts at 1', () => {
     expect(GRIEVANCE_COLS.GRIEVANCE_ID).toBe(1);
-  });
-
-  test('GRIEVANCE_COLUMNS starts at 0', () => {
-    expect(GRIEVANCE_COLUMNS.GRIEVANCE_ID).toBe(0);
-  });
-
-  test('GRIEVANCE_COLUMNS.RESOLUTION and OUTCOME are same column', () => {
-    expect(GRIEVANCE_COLUMNS.RESOLUTION).toBe(GRIEVANCE_COLUMNS.OUTCOME);
   });
 });
 
