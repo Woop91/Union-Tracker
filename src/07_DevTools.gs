@@ -329,13 +329,6 @@ function seedConfigData() {
     'Political Action Committee', 'Membership Committee', 'Executive Board'
   ])) seededAny = true;
 
-  // Home Towns (Column AF)
-  if (seedIfEmpty(CONFIG_COLS.HOME_TOWNS, [
-    'Boston', 'Worcester', 'Springfield', 'Cambridge', 'Lowell', 'Brockton',
-    'Quincy', 'New Bedford', 'Fall River', 'Lawrence', 'Framingham', 'Somerville',
-    'Lynn', 'Haverhill', 'Malden', 'Medford', 'Waltham', 'Newton', 'Brookline'
-  ])) seededAny = true;
-
   if (seededAny) {
     SpreadsheetApp.getActiveSpreadsheet().toast('Config data seeded!', '✅ Success', 3);
   }
@@ -1953,8 +1946,7 @@ function NUKE_CONFIG_DROPDOWNS() {
     CONFIG_COLS.MANAGERS,
     CONFIG_COLS.STEWARDS,
     CONFIG_COLS.STEWARD_COMMITTEES,
-    CONFIG_COLS.GRIEVANCE_COORDINATORS,
-    CONFIG_COLS.HOME_TOWNS
+    CONFIG_COLS.GRIEVANCE_COORDINATORS
   ];
 
   userColumns.forEach(function(col) {
