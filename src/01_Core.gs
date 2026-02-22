@@ -1405,7 +1405,9 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
   { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
   { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
-  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' }
+  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' },
+  { key: 'SURVEY_LOG_IDS',       header: 'Survey Log (Member IDs)' },
+  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -2602,7 +2604,9 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
       { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
       { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
-      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      // IS_STEWARD deliberately excluded — it uses hardcoded validation ('Yes'/'No'),
+      // NOT Config column E.  Steward status sync is handled by handleMemberEdit()
+      // and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS (column H).
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
       { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },

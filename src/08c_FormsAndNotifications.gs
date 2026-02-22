@@ -1413,8 +1413,8 @@ function executeSendRandomSurveyEmails(opts) {
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;
   var lastNameCol = MEMBER_COLS.LAST_NAME - 1;
 
-  // Get survey email log from Config (if exists)
-  var surveyLogCol = 50; // Column AX for survey email log
+  // Get survey email log from Config (uses dedicated columns, not PDF_FOLDER_ID)
+  var surveyLogCol = CONFIG_COLS.SURVEY_LOG_IDS;
   var surveyLog = {};
   try {
     var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();

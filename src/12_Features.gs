@@ -1875,24 +1875,22 @@ function saveExpansionData(memberId, customData) {
  */
 function setupMemberLeaderRole() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const configSheetName = SHEETS.CONFIG;
-  const configSheet = ss.getSheetByName(configSheetName);
 
-  if (!configSheet) {
-    SpreadsheetApp.getUi().alert('Error: Config sheet not found');
-    return errorResponse('Config sheet not found');
+  // Add "Member Leader" directly to IS_STEWARD validation (not Config column E).
+  // IS_STEWARD uses hardcoded validation; Config column E is reserved for INTEREST_* columns.
+  const memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory not found. Run CREATE_DASHBOARD first.');
+    return errorResponse('Member Directory not found');
   }
 
-  const yesNoCol = CONFIG_COLS.YES_NO;
-  const existingValues = configSheet.getRange(3, yesNoCol, 10, 1).getValues().flat().filter(Boolean);
-
-  if (existingValues.indexOf(EXTENSION_CONFIG.LEADER_ROLE_NAME) !== -1) {
-    ss.toast('Member Leader role already configured', 'Setup Complete', 3);
-    return { success: true, alreadyExists: true };
-  }
-
-  const nextRow = existingValues.length + 3;
-  configSheet.getRange(nextRow, yesNoCol).setValue(EXTENSION_CONFIG.LEADER_ROLE_NAME);
+  const leaderValues = ['Yes', 'No', EXTENSION_CONFIG.LEADER_ROLE_NAME];
+  const isRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
+  const isRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(leaderValues, true)
+    .setAllowInvalid(true)
+    .build();
+  isRange.setDataValidation(isRule);
 
   if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
     logAuditEvent(AUDIT_EVENTS.SETTINGS_CHANGED, {
@@ -1902,8 +1900,8 @@ function setupMemberLeaderRole() {
     });
   }
 
-  ss.toast('Member Leader role added to Config.', 'Setup Complete', 5);
-  return { success: true, addedAt: nextRow };
+  ss.toast('Member Leader role added to IS_STEWARD validation.', 'Setup Complete', 5);
+  return { success: true };
 }
 
 /**

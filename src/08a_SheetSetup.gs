@@ -323,6 +323,17 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
+  // IS_STEWARD uses hardcoded validation — NOT Config column E (YES_NO).
+  // Config column E is shared by INTEREST_* columns and is a contamination risk.
+  // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
+  var isStewardValues = ['Yes', 'No'];
+  var isStewardRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
+  var isStewardRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(isStewardValues, true)
+    .setAllowInvalid(true)
+    .build();
+  isStewardRange.setDataValidation(isStewardRule);
+
   // Member Directory Validations — driven by MULTI_SELECT_COLS
   var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
   for (var mm = 0; mm < memberMS.length; mm++) {

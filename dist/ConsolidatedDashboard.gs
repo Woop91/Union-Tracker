@@ -1840,7 +1840,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3261 lines)
+// SOURCE: 01_Core.gs (3265 lines)
 // ============================================================================
 
 /**
@@ -3250,7 +3250,9 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
   { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
   { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
-  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' }
+  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' },
+  { key: 'SURVEY_LOG_IDS',       header: 'Survey Log (Member IDs)' },
+  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -4447,7 +4449,9 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
       { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
       { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
-      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      // IS_STEWARD deliberately excluded — it uses hardcoded validation ('Yes'/'No'),
+      // NOT Config column E.  Steward status sync is handled by handleMemberEdit()
+      // and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS (column H).
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
       { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
@@ -22171,7 +22175,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3536 lines)
+// SOURCE: 06_Maintenance.gs (3538 lines)
 // ============================================================================
 
 /**
@@ -24834,6 +24838,8 @@ function findMissingConfigValues() {
     var missing = {};
     dataValues.forEach(function(row, index) {
       var value = row[0];
+      // Skip pure-numeric values — they're data-entry errors, not text labels
+      if (value && /^\d+$/.test(String(value).trim())) return;
       if (value && !validSet[value] && !missing[value]) {
         missing[value] = {
           field: field.name,
@@ -28805,7 +28811,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (664 lines)
+// SOURCE: 08a_SheetSetup.gs (675 lines)
 // ============================================================================
 
 /**
@@ -29132,6 +29138,17 @@ function setupDataValidations() {
   for (var m = 0; m < memberDD.length; m++) {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
+
+  // IS_STEWARD uses hardcoded validation — NOT Config column E (YES_NO).
+  // Config column E is shared by INTEREST_* columns and is a contamination risk.
+  // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
+  var isStewardValues = ['Yes', 'No'];
+  var isStewardRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
+  var isStewardRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(isStewardValues, true)
+    .setAllowInvalid(true)
+    .build();
+  isStewardRange.setDataValidation(isStewardRule);
 
   // Member Directory Validations — driven by MULTI_SELECT_COLS
   var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
@@ -31782,8 +31799,8 @@ function executeSendRandomSurveyEmails(opts) {
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;
   var lastNameCol = MEMBER_COLS.LAST_NAME - 1;
 
-  // Get survey email log from Config (if exists)
-  var surveyLogCol = 50; // Column AX for survey email log
+  // Get survey email log from Config (uses dedicated columns, not PDF_FOLDER_ID)
+  var surveyLogCol = CONFIG_COLS.SURVEY_LOG_IDS;
   var surveyLog = {};
   try {
     var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
@@ -38535,7 +38552,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1916 lines)
+// SOURCE: 10a_SheetCreation.gs (1980 lines)
 // ============================================================================
 
 /**
@@ -38825,7 +38842,9 @@ function populateConfigFromSheetData() {
         var parts = cellVal.split(',');
         for (var p = 0; p < parts.length; p++) {
           var val = parts[p].trim();
-          if (val && !existingSet[val]) {
+          // Skip pure-numeric values — they're data-entry errors (index numbers
+          // instead of text labels). All dropdown Config columns expect text.
+          if (val && !existingSet[val] && !/^\d+$/.test(val)) {
             addToConfigDropdown_(configCol, val);
             existingSet[val] = true;
             added++;
@@ -38835,7 +38854,69 @@ function populateConfigFromSheetData() {
     }
   }
 
+  // Dedup and sort each Config dropdown column (except static columns like YES_NO)
+  deduplicateAndSortConfigColumns_(configSheet);
+
   ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
+}
+
+/**
+ * Deduplicates and alphabetically sorts all dropdown/multi-select Config columns.
+ * Preserves rows 1-2 (section/column headers). Only touches row 3+.
+ * @param {Sheet} configSheet - The Config sheet
+ * @private
+ */
+function deduplicateAndSortConfigColumns_(configSheet) {
+  if (!configSheet) return;
+
+  // Gather all Config columns that are populated by dropdown/multi-select sync
+  var configColsToClean = {};
+  var ddMember = DROPDOWN_MAP.MEMBER_DIR;
+  var ddGriev = DROPDOWN_MAP.GRIEVANCE_LOG;
+  var msMember = MULTI_SELECT_COLS.MEMBER_DIR;
+  var msGriev = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+
+  var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
+  for (var i = 0; i < allMaps.length; i++) {
+    var cc = allMaps[i].configCol;
+    if (cc && cc !== CONFIG_COLS.YES_NO) {
+      configColsToClean[cc] = true;
+    }
+  }
+
+  var lastRow = configSheet.getLastRow();
+  if (lastRow < 3) return;
+  var dataRows = lastRow - 2;
+
+  for (var colNum in configColsToClean) {
+    colNum = parseInt(colNum, 10);
+    var colData = configSheet.getRange(3, colNum, dataRows, 1).getValues();
+
+    // Collect unique non-empty values
+    var seen = {};
+    var unique = [];
+    for (var r = 0; r < colData.length; r++) {
+      var v = (colData[r][0] || '').toString().trim();
+      if (v && !seen[v]) {
+        // Also reject pure-numeric values during cleanup
+        if (/^\d+$/.test(v)) continue;
+        seen[v] = true;
+        unique.push(v);
+      }
+    }
+
+    // Sort alphabetically (case-insensitive)
+    unique.sort(function(a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    // Write back: sorted values + blank fill for remaining rows
+    var writeData = [];
+    for (var w = 0; w < dataRows; w++) {
+      writeData.push([w < unique.length ? unique[w] : '']);
+    }
+    configSheet.getRange(3, colNum, dataRows, 1).setValues(writeData);
+  }
 }
 
 /**
@@ -44135,7 +44216,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2285 lines)
+// SOURCE: 10_Main.gs (2302 lines)
 // ============================================================================
 
 /**
@@ -44993,8 +45074,25 @@ function syncDropdownToConfig_(e, sheetName) {
 
   if (!configCol) return; // Not a synced dropdown or multi-select column
 
+  // Skip YES_NO — those values are static seeds ("Yes"/"No"), never user-driven.
+  // populateConfigFromSheetData() has the same skip at its line 266.
+  if (configCol === CONFIG_COLS.YES_NO) return;
+
   // For multi-select columns, split comma-separated values and sync each individually
   var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];
+
+  // Filter out pure-numeric values — they're data-entry errors (e.g. index numbers
+  // typed instead of text labels like "Email", "Phone").  All dropdown/multi-select
+  // Config columns expect text labels, never bare integers.
+  var filteredValues = [];
+  for (var fv = 0; fv < valuesToSync.length; fv++) {
+    var candidate = valuesToSync[fv].trim();
+    if (candidate && !/^\d+$/.test(candidate)) {
+      filteredValues.push(candidate);
+    }
+  }
+  valuesToSync = filteredValues;
+  if (valuesToSync.length === 0) return;
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -50089,7 +50187,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4025 lines)
+// SOURCE: 12_Features.gs (4023 lines)
 // ============================================================================
 
 /**
@@ -51969,24 +52067,22 @@ function saveExpansionData(memberId, customData) {
  */
 function setupMemberLeaderRole() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const configSheetName = SHEETS.CONFIG;
-  const configSheet = ss.getSheetByName(configSheetName);
 
-  if (!configSheet) {
-    SpreadsheetApp.getUi().alert('Error: Config sheet not found');
-    return errorResponse('Config sheet not found');
+  // Add "Member Leader" directly to IS_STEWARD validation (not Config column E).
+  // IS_STEWARD uses hardcoded validation; Config column E is reserved for INTEREST_* columns.
+  const memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory not found. Run CREATE_DASHBOARD first.');
+    return errorResponse('Member Directory not found');
   }
 
-  const yesNoCol = CONFIG_COLS.YES_NO;
-  const existingValues = configSheet.getRange(3, yesNoCol, 10, 1).getValues().flat().filter(Boolean);
-
-  if (existingValues.indexOf(EXTENSION_CONFIG.LEADER_ROLE_NAME) !== -1) {
-    ss.toast('Member Leader role already configured', 'Setup Complete', 3);
-    return { success: true, alreadyExists: true };
-  }
-
-  const nextRow = existingValues.length + 3;
-  configSheet.getRange(nextRow, yesNoCol).setValue(EXTENSION_CONFIG.LEADER_ROLE_NAME);
+  const leaderValues = ['Yes', 'No', EXTENSION_CONFIG.LEADER_ROLE_NAME];
+  const isRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
+  const isRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(leaderValues, true)
+    .setAllowInvalid(true)
+    .build();
+  isRange.setDataValidation(isRule);
 
   if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
     logAuditEvent(AUDIT_EVENTS.SETTINGS_CHANGED, {
@@ -51996,8 +52092,8 @@ function setupMemberLeaderRole() {
     });
   }
 
-  ss.toast('Member Leader role added to Config.', 'Setup Complete', 5);
-  return { success: true, addedAt: nextRow };
+  ss.toast('Member Leader role added to IS_STEWARD validation.', 'Setup Complete', 5);
+  return { success: true };
 }
 
 /**
