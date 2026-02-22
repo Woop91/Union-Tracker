@@ -285,7 +285,9 @@ function populateConfigFromSheetData() {
         var parts = cellVal.split(',');
         for (var p = 0; p < parts.length; p++) {
           var val = parts[p].trim();
-          if (val && !existingSet[val]) {
+          // Skip pure-numeric values — they're data-entry errors (index numbers
+          // instead of text labels). All dropdown Config columns expect text.
+          if (val && !existingSet[val] && !/^\d+$/.test(val)) {
             addToConfigDropdown_(configCol, val);
             existingSet[val] = true;
             added++;
@@ -295,7 +297,69 @@ function populateConfigFromSheetData() {
     }
   }
 
+  // Dedup and sort each Config dropdown column (except static columns like YES_NO)
+  deduplicateAndSortConfigColumns_(configSheet);
+
   ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
+}
+
+/**
+ * Deduplicates and alphabetically sorts all dropdown/multi-select Config columns.
+ * Preserves rows 1-2 (section/column headers). Only touches row 3+.
+ * @param {Sheet} configSheet - The Config sheet
+ * @private
+ */
+function deduplicateAndSortConfigColumns_(configSheet) {
+  if (!configSheet) return;
+
+  // Gather all Config columns that are populated by dropdown/multi-select sync
+  var configColsToClean = {};
+  var ddMember = DROPDOWN_MAP.MEMBER_DIR;
+  var ddGriev = DROPDOWN_MAP.GRIEVANCE_LOG;
+  var msMember = MULTI_SELECT_COLS.MEMBER_DIR;
+  var msGriev = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+
+  var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
+  for (var i = 0; i < allMaps.length; i++) {
+    var cc = allMaps[i].configCol;
+    if (cc && cc !== CONFIG_COLS.YES_NO) {
+      configColsToClean[cc] = true;
+    }
+  }
+
+  var lastRow = configSheet.getLastRow();
+  if (lastRow < 3) return;
+  var dataRows = lastRow - 2;
+
+  for (var colNum in configColsToClean) {
+    colNum = parseInt(colNum, 10);
+    var colData = configSheet.getRange(3, colNum, dataRows, 1).getValues();
+
+    // Collect unique non-empty values
+    var seen = {};
+    var unique = [];
+    for (var r = 0; r < colData.length; r++) {
+      var v = (colData[r][0] || '').toString().trim();
+      if (v && !seen[v]) {
+        // Also reject pure-numeric values during cleanup
+        if (/^\d+$/.test(v)) continue;
+        seen[v] = true;
+        unique.push(v);
+      }
+    }
+
+    // Sort alphabetically (case-insensitive)
+    unique.sort(function(a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    // Write back: sorted values + blank fill for remaining rows
+    var writeData = [];
+    for (var w = 0; w < dataRows; w++) {
+      writeData.push([w < unique.length ? unique[w] : '']);
+    }
+    configSheet.getRange(3, colNum, dataRows, 1).setValues(writeData);
+  }
 }
 
 /**

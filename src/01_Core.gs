@@ -1405,7 +1405,9 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
   { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
   { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
-  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' }
+  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' },
+  { key: 'SURVEY_LOG_IDS',       header: 'Survey Log (Member IDs)' },
+  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -1899,6 +1901,11 @@ function syncColumnMaps() {
     var freshDD = buildDropdownMap_();
     DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
     DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+    // Rebuild JOB_METADATA_FIELDS so it reflects the resolved column positions.
+    // Without this, functions using getJobMetadataByMemberCol() would use stale
+    // column numbers captured at script load time.
+    rebuildJobMetadataFields_();
   }
 
   if (result.synced.length > 0) {
@@ -1997,7 +2004,7 @@ function loadCachedColumnMaps_() {
       }
     }
 
-    // Rebuild derived objects (dropdown map, multi-select)
+    // Rebuild derived objects (dropdown map, multi-select, job metadata)
     // only if something actually changed.
     if (changed) {
       var freshMulti = buildMultiSelectCols_();
@@ -2007,6 +2014,8 @@ function loadCachedColumnMaps_() {
       var freshDD = buildDropdownMap_();
       DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
       DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+      rebuildJobMetadataFields_();
     }
 
     return true;
@@ -2499,6 +2508,25 @@ function getJobMetadataByMemberCol(memberCol) {
   return null;
 }
 
+/**
+ * Rebuild JOB_METADATA_FIELDS from the current *_COLS values.
+ * Called by syncColumnMaps() and loadCachedColumnMaps_() so that
+ * JOB_METADATA_FIELDS stays in sync when columns shift at runtime.
+ * @private
+ */
+function rebuildJobMetadataFields_() {
+  JOB_METADATA_FIELDS.length = 0; // clear in-place to preserve the reference
+  JOB_METADATA_FIELDS.push(
+    { label: 'Job Title', memberCol: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, configName: 'Job Titles' },
+    { label: 'Work Location', memberCol: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, configName: 'Office Locations' },
+    { label: 'Unit', memberCol: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, configName: 'Units' },
+    { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
+    { label: 'Manager', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Managers' },
+    { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
+    { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
+  );
+}
+
 // ============================================================================
 // MULTI-SELECT COLUMN CONFIGURATION
 // ============================================================================
@@ -2576,7 +2604,9 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
       { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
       { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
-      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      // IS_STEWARD deliberately excluded — it uses hardcoded validation ('Yes'/'No'),
+      // NOT Config column E.  Steward status sync is handled by handleMemberEdit()
+      // and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS (column H).
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
       { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },

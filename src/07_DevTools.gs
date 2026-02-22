@@ -827,23 +827,12 @@ function restoreConfigFromSheetData_() {
     }
   }
 
-  // Also include JOB_METADATA_FIELDS for any columns not already covered
-  // (e.g., Stewards from the Assigned Steward column)
-  for (var m = 0; m < JOB_METADATA_FIELDS.length; m++) {
-    var jm = JOB_METADATA_FIELDS[m];
-    if (memberSheet) {
-      var alreadyMapped = false;
-      for (var n = 0; n < mappings.length; n++) {
-        if (mappings[n].sheet === memberSheet && mappings[n].col === jm.memberCol && mappings[n].configCol === jm.configCol) {
-          alreadyMapped = true;
-          break;
-        }
-      }
-      if (!alreadyMapped) {
-        mappings.push({ sheet: memberSheet, col: jm.memberCol, configCol: jm.configCol });
-      }
-    }
-  }
+  // NOTE: JOB_METADATA_FIELDS fallback was removed here.  Every column in
+  // JOB_METADATA_FIELDS is already covered by DROPDOWN_MAP or MULTI_SELECT_COLS.
+  // The old fallback used JOB_METADATA_FIELDS values that could go stale when
+  // syncColumnMaps() updated column positions, causing data to land in wrong
+  // Config columns.  DROPDOWN_MAP and MULTI_SELECT_COLS are dynamically rebuilt
+  // and are the single source of truth.  See: CLAUDE.md § Config Write Paths.
 
   var totalRestored = 0;
 

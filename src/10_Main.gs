@@ -853,8 +853,25 @@ function syncDropdownToConfig_(e, sheetName) {
 
   if (!configCol) return; // Not a synced dropdown or multi-select column
 
+  // Skip YES_NO — those values are static seeds ("Yes"/"No"), never user-driven.
+  // populateConfigFromSheetData() has the same skip at its line 266.
+  if (configCol === CONFIG_COLS.YES_NO) return;
+
   // For multi-select columns, split comma-separated values and sync each individually
   var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];
+
+  // Filter out pure-numeric values — they're data-entry errors (e.g. index numbers
+  // typed instead of text labels like "Email", "Phone").  All dropdown/multi-select
+  // Config columns expect text labels, never bare integers.
+  var filteredValues = [];
+  for (var fv = 0; fv < valuesToSync.length; fv++) {
+    var candidate = valuesToSync[fv].trim();
+    if (candidate && !/^\d+$/.test(candidate)) {
+      filteredValues.push(candidate);
+    }
+  }
+  valuesToSync = filteredValues;
+  if (valuesToSync.length === 0) return;
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);

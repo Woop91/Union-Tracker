@@ -2658,6 +2658,8 @@ function findMissingConfigValues() {
     var missing = {};
     dataValues.forEach(function(row, index) {
       var value = row[0];
+      // Skip pure-numeric values — they're data-entry errors, not text labels
+      if (value && /^\d+$/.test(String(value).trim())) return;
       if (value && !validSet[value] && !missing[value]) {
         missing[value] = {
           field: field.name,

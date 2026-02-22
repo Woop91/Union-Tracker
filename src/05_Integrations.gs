@@ -2881,37 +2881,26 @@ function addMobileDashboardLinkToConfig() {
     return;
   }
 
-  // Find first empty row in column AZ (or create Mobile Dashboard URL section)
-  var _lastRow = configSheet.getLastRow();
-  var targetRow = 2;
-  var MOBILE_DASHBOARD_URL_COL = 52; // Column AZ
-  var targetCol = MOBILE_DASHBOARD_URL_COL;
+  // Use the canonical column constant — never hardcode column numbers.
+  var targetCol = CONFIG_COLS.MOBILE_DASHBOARD_URL;
 
-  // Check if header exists
-  var headerCell = configSheet.getRange(1, targetCol);
-  if (!headerCell.getValue()) {
-    headerCell.setValue('📱 Mobile Dashboard URL');
-    headerCell.setFontWeight('bold');
-    headerCell.setBackground('#1a73e8');
-    headerCell.setFontColor('#ffffff');
-  }
-
-  // Add the hyperlink
-  var linkCell = configSheet.getRange(targetRow, targetCol);
-  linkCell.setFormula('=HYPERLINK("' + url + '", "📱 Tap to Open Dashboard")');
+  // Write data starting at row 3 (first data row).
+  // Rows 1-2 are section/column headers managed by createConfigSheet — don't touch them.
+  var linkCell = configSheet.getRange(3, targetCol);
+  linkCell.setFormula('=HYPERLINK(' + JSON.stringify(url) + ', "📱 Tap to Open Dashboard")');
   linkCell.setFontSize(14);
   linkCell.setFontWeight('bold');
   linkCell.setFontColor('#1a73e8');
   linkCell.setBackground('#e8f0fe');
 
   // Also add plain URL below for copying
-  var urlCell = configSheet.getRange(targetRow + 1, targetCol);
+  var urlCell = configSheet.getRange(4, targetCol);
   urlCell.setValue(url);
   urlCell.setFontSize(10);
   urlCell.setWrap(true);
 
   // Add instructions
-  var instructionCell = configSheet.getRange(targetRow + 2, targetCol);
+  var instructionCell = configSheet.getRange(5, targetCol);
   instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
   instructionCell.setFontSize(9);
   instructionCell.setFontColor('#666666');
@@ -2922,11 +2911,11 @@ function addMobileDashboardLinkToConfig() {
 
   SpreadsheetApp.getUi().alert(
     '📱 Mobile Dashboard Link Added!',
-    'A clickable link has been added to column AZ of the Config sheet.\n\n' +
+    'A clickable link has been added to the "📱 Mobile Dashboard URL" column of the Config sheet.\n\n' +
     'To access on mobile:\n' +
     '1. Open this spreadsheet in Google Sheets mobile app\n' +
     '2. Go to the Config tab\n' +
-    '3. Scroll to column AZ\n' +
+    '3. Scroll to the Mobile Dashboard section\n' +
     '4. Tap the blue "Tap to Open Dashboard" link\n\n' +
     'URL: ' + url,
     SpreadsheetApp.getUi().ButtonSet.OK

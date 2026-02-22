@@ -1840,7 +1840,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3235 lines)
+// SOURCE: 01_Core.gs (3265 lines)
 // ============================================================================
 
 /**
@@ -3250,7 +3250,9 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
   { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
   { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
-  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' }
+  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' },
+  { key: 'SURVEY_LOG_IDS',       header: 'Survey Log (Member IDs)' },
+  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -3744,6 +3746,11 @@ function syncColumnMaps() {
     var freshDD = buildDropdownMap_();
     DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
     DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+    // Rebuild JOB_METADATA_FIELDS so it reflects the resolved column positions.
+    // Without this, functions using getJobMetadataByMemberCol() would use stale
+    // column numbers captured at script load time.
+    rebuildJobMetadataFields_();
   }
 
   if (result.synced.length > 0) {
@@ -3842,7 +3849,7 @@ function loadCachedColumnMaps_() {
       }
     }
 
-    // Rebuild derived objects (dropdown map, multi-select)
+    // Rebuild derived objects (dropdown map, multi-select, job metadata)
     // only if something actually changed.
     if (changed) {
       var freshMulti = buildMultiSelectCols_();
@@ -3852,6 +3859,8 @@ function loadCachedColumnMaps_() {
       var freshDD = buildDropdownMap_();
       DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
       DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+      rebuildJobMetadataFields_();
     }
 
     return true;
@@ -4344,6 +4353,25 @@ function getJobMetadataByMemberCol(memberCol) {
   return null;
 }
 
+/**
+ * Rebuild JOB_METADATA_FIELDS from the current *_COLS values.
+ * Called by syncColumnMaps() and loadCachedColumnMaps_() so that
+ * JOB_METADATA_FIELDS stays in sync when columns shift at runtime.
+ * @private
+ */
+function rebuildJobMetadataFields_() {
+  JOB_METADATA_FIELDS.length = 0; // clear in-place to preserve the reference
+  JOB_METADATA_FIELDS.push(
+    { label: 'Job Title', memberCol: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, configName: 'Job Titles' },
+    { label: 'Work Location', memberCol: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, configName: 'Office Locations' },
+    { label: 'Unit', memberCol: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, configName: 'Units' },
+    { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
+    { label: 'Manager', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Managers' },
+    { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
+    { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
+  );
+}
+
 // ============================================================================
 // MULTI-SELECT COLUMN CONFIGURATION
 // ============================================================================
@@ -4421,7 +4449,9 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
       { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
       { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
-      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      // IS_STEWARD deliberately excluded — it uses hardcoded validation ('Yes'/'No'),
+      // NOT Config column E.  Steward status sync is handled by handleMemberEdit()
+      // and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS (column H).
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
       { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
@@ -18552,7 +18582,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3599 lines)
+// SOURCE: 05_Integrations.gs (3588 lines)
 // ============================================================================
 
 /**
@@ -21438,37 +21468,26 @@ function addMobileDashboardLinkToConfig() {
     return;
   }
 
-  // Find first empty row in column AZ (or create Mobile Dashboard URL section)
-  var _lastRow = configSheet.getLastRow();
-  var targetRow = 2;
-  var MOBILE_DASHBOARD_URL_COL = 52; // Column AZ
-  var targetCol = MOBILE_DASHBOARD_URL_COL;
+  // Use the canonical column constant — never hardcode column numbers.
+  var targetCol = CONFIG_COLS.MOBILE_DASHBOARD_URL;
 
-  // Check if header exists
-  var headerCell = configSheet.getRange(1, targetCol);
-  if (!headerCell.getValue()) {
-    headerCell.setValue('📱 Mobile Dashboard URL');
-    headerCell.setFontWeight('bold');
-    headerCell.setBackground('#1a73e8');
-    headerCell.setFontColor('#ffffff');
-  }
-
-  // Add the hyperlink
-  var linkCell = configSheet.getRange(targetRow, targetCol);
-  linkCell.setFormula('=HYPERLINK("' + url + '", "📱 Tap to Open Dashboard")');
+  // Write data starting at row 3 (first data row).
+  // Rows 1-2 are section/column headers managed by createConfigSheet — don't touch them.
+  var linkCell = configSheet.getRange(3, targetCol);
+  linkCell.setFormula('=HYPERLINK(' + JSON.stringify(url) + ', "📱 Tap to Open Dashboard")');
   linkCell.setFontSize(14);
   linkCell.setFontWeight('bold');
   linkCell.setFontColor('#1a73e8');
   linkCell.setBackground('#e8f0fe');
 
   // Also add plain URL below for copying
-  var urlCell = configSheet.getRange(targetRow + 1, targetCol);
+  var urlCell = configSheet.getRange(4, targetCol);
   urlCell.setValue(url);
   urlCell.setFontSize(10);
   urlCell.setWrap(true);
 
   // Add instructions
-  var instructionCell = configSheet.getRange(targetRow + 2, targetCol);
+  var instructionCell = configSheet.getRange(5, targetCol);
   instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
   instructionCell.setFontSize(9);
   instructionCell.setFontColor('#666666');
@@ -21479,11 +21498,11 @@ function addMobileDashboardLinkToConfig() {
 
   SpreadsheetApp.getUi().alert(
     '📱 Mobile Dashboard Link Added!',
-    'A clickable link has been added to column AZ of the Config sheet.\n\n' +
+    'A clickable link has been added to the "📱 Mobile Dashboard URL" column of the Config sheet.\n\n' +
     'To access on mobile:\n' +
     '1. Open this spreadsheet in Google Sheets mobile app\n' +
     '2. Go to the Config tab\n' +
-    '3. Scroll to column AZ\n' +
+    '3. Scroll to the Mobile Dashboard section\n' +
     '4. Tap the blue "Tap to Open Dashboard" link\n\n' +
     'URL: ' + url,
     SpreadsheetApp.getUi().ButtonSet.OK
@@ -22156,7 +22175,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3536 lines)
+// SOURCE: 06_Maintenance.gs (3538 lines)
 // ============================================================================
 
 /**
@@ -24819,6 +24838,8 @@ function findMissingConfigValues() {
     var missing = {};
     dataValues.forEach(function(row, index) {
       var value = row[0];
+      // Skip pure-numeric values — they're data-entry errors, not text labels
+      if (value && /^\d+$/.test(String(value).trim())) return;
       if (value && !validSet[value] && !missing[value]) {
         missing[value] = {
           field: field.name,
@@ -25697,7 +25718,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (3099 lines)
+// SOURCE: 07_DevTools.gs (3088 lines)
 // ============================================================================
 
 /**
@@ -26529,23 +26550,12 @@ function restoreConfigFromSheetData_() {
     }
   }
 
-  // Also include JOB_METADATA_FIELDS for any columns not already covered
-  // (e.g., Stewards from the Assigned Steward column)
-  for (var m = 0; m < JOB_METADATA_FIELDS.length; m++) {
-    var jm = JOB_METADATA_FIELDS[m];
-    if (memberSheet) {
-      var alreadyMapped = false;
-      for (var n = 0; n < mappings.length; n++) {
-        if (mappings[n].sheet === memberSheet && mappings[n].col === jm.memberCol && mappings[n].configCol === jm.configCol) {
-          alreadyMapped = true;
-          break;
-        }
-      }
-      if (!alreadyMapped) {
-        mappings.push({ sheet: memberSheet, col: jm.memberCol, configCol: jm.configCol });
-      }
-    }
-  }
+  // NOTE: JOB_METADATA_FIELDS fallback was removed here.  Every column in
+  // JOB_METADATA_FIELDS is already covered by DROPDOWN_MAP or MULTI_SELECT_COLS.
+  // The old fallback used JOB_METADATA_FIELDS values that could go stale when
+  // syncColumnMaps() updated column positions, causing data to land in wrong
+  // Config columns.  DROPDOWN_MAP and MULTI_SELECT_COLS are dynamically rebuilt
+  // and are the single source of truth.  See: CLAUDE.md § Config Write Paths.
 
   var totalRestored = 0;
 
@@ -28801,7 +28811,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (654 lines)
+// SOURCE: 08a_SheetSetup.gs (675 lines)
 // ============================================================================
 
 /**
@@ -29129,6 +29139,17 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
+  // IS_STEWARD uses hardcoded validation — NOT Config column E (YES_NO).
+  // Config column E is shared by INTEREST_* columns and is a contamination risk.
+  // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
+  var isStewardValues = ['Yes', 'No'];
+  var isStewardRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
+  var isStewardRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(isStewardValues, true)
+    .setAllowInvalid(true)
+    .build();
+  isStewardRange.setDataValidation(isStewardRule);
+
   // Member Directory Validations — driven by MULTI_SELECT_COLS
   var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
   for (var mm = 0; mm < memberMS.length; mm++) {
@@ -29192,14 +29213,19 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     }
   }
 
-  if (values.length === 0) return; // No values to validate against
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -29224,14 +29250,19 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     }
   }
 
-  if (values.length === 0) return;
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow comma-separated values from multi-select dialog
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -31768,8 +31799,8 @@ function executeSendRandomSurveyEmails(opts) {
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;
   var lastNameCol = MEMBER_COLS.LAST_NAME - 1;
 
-  // Get survey email log from Config (if exists)
-  var surveyLogCol = 50; // Column AX for survey email log
+  // Get survey email log from Config (uses dedicated columns, not PDF_FOLDER_ID)
+  var surveyLogCol = CONFIG_COLS.SURVEY_LOG_IDS;
   var surveyLog = {};
   try {
     var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
@@ -34499,7 +34530,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4050 lines)
+// SOURCE: 09_Dashboards.gs (4017 lines)
 // ============================================================================
 
 /**
@@ -36615,58 +36646,25 @@ function syncMemberToGrievanceLog() {
 // ============================================================================
 
 /**
- * Sync new values from Member Directory to Config (bidirectional sync)
- * When a user enters a new value in a job metadata field, add it to Config
+ * Sync new values from Member Directory to Config (bidirectional sync).
+ * When a user enters a new value in a dropdown/multi-select column, add it to Config.
+ *
+ * Delegates to syncDropdownToConfig_ which uses the dynamically-rebuilt
+ * DROPDOWN_MAP and MULTI_SELECT_COLS (kept current by syncColumnMaps).
+ *
  * @param {Object} e - The edit event object
  */
 function syncNewValueToConfig(e) {
   if (!e || !e.range) return;
 
   var sheet = e.range.getSheet();
-  if (sheet.getName() !== SHEETS.MEMBER_DIR) return;
+  var sheetName = sheet.getName();
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
-  var col = e.range.getColumn();
-  var newValue = e.range.getValue();
-
-  // Skip if empty or header row
-  if (!newValue || e.range.getRow() === 1) return;
-
-  // Check if this column is a job metadata field (includes Committees)
-  var fieldConfig = getJobMetadataByMemberCol(col);
-  if (!fieldConfig) return; // Not a synced column
-
-  // Get current Config values for this column
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!configSheet) return;
-
-  var existingValues = getConfigValues(configSheet, fieldConfig.configCol);
-
-  // Handle multi-value fields (comma-separated)
-  var valuesToCheck = newValue.toString().split(',').map(function(v) { return v.trim(); });
-
-  var valuesToAdd = [];
-  for (var j = 0; j < valuesToCheck.length; j++) {
-    var val = valuesToCheck[j];
-    if (val && existingValues.indexOf(val) === -1) {
-      valuesToAdd.push(val);
-    }
-  }
-
-  // Add new values to Config
-  if (valuesToAdd.length > 0) {
-    var lastRow = configSheet.getLastRow();
-    var dataStartRow = Math.max(lastRow + 1, 3); // Start at row 3 minimum
-
-    for (var k = 0; k < valuesToAdd.length; k++) {
-      configSheet.getRange(dataStartRow + k, fieldConfig.configCol).setValue(valuesToAdd[k]);
-    }
-
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Added "' + valuesToAdd.join(', ') + '" to ' + fieldConfig.configName,
-      'Config Updated', 3
-    );
-  }
+  // syncDropdownToConfig_ uses DROPDOWN_MAP + MULTI_SELECT_COLS (rebuilt by
+  // syncColumnMaps) and writes via addToConfigDropdown_ which correctly finds
+  // the first empty row in the target Config column.
+  syncDropdownToConfig_(e, sheetName);
 }
 
 // ============================================================================
@@ -38554,7 +38552,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1916 lines)
+// SOURCE: 10a_SheetCreation.gs (1980 lines)
 // ============================================================================
 
 /**
@@ -38844,7 +38842,9 @@ function populateConfigFromSheetData() {
         var parts = cellVal.split(',');
         for (var p = 0; p < parts.length; p++) {
           var val = parts[p].trim();
-          if (val && !existingSet[val]) {
+          // Skip pure-numeric values — they're data-entry errors (index numbers
+          // instead of text labels). All dropdown Config columns expect text.
+          if (val && !existingSet[val] && !/^\d+$/.test(val)) {
             addToConfigDropdown_(configCol, val);
             existingSet[val] = true;
             added++;
@@ -38854,7 +38854,69 @@ function populateConfigFromSheetData() {
     }
   }
 
+  // Dedup and sort each Config dropdown column (except static columns like YES_NO)
+  deduplicateAndSortConfigColumns_(configSheet);
+
   ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
+}
+
+/**
+ * Deduplicates and alphabetically sorts all dropdown/multi-select Config columns.
+ * Preserves rows 1-2 (section/column headers). Only touches row 3+.
+ * @param {Sheet} configSheet - The Config sheet
+ * @private
+ */
+function deduplicateAndSortConfigColumns_(configSheet) {
+  if (!configSheet) return;
+
+  // Gather all Config columns that are populated by dropdown/multi-select sync
+  var configColsToClean = {};
+  var ddMember = DROPDOWN_MAP.MEMBER_DIR;
+  var ddGriev = DROPDOWN_MAP.GRIEVANCE_LOG;
+  var msMember = MULTI_SELECT_COLS.MEMBER_DIR;
+  var msGriev = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+
+  var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
+  for (var i = 0; i < allMaps.length; i++) {
+    var cc = allMaps[i].configCol;
+    if (cc && cc !== CONFIG_COLS.YES_NO) {
+      configColsToClean[cc] = true;
+    }
+  }
+
+  var lastRow = configSheet.getLastRow();
+  if (lastRow < 3) return;
+  var dataRows = lastRow - 2;
+
+  for (var colNum in configColsToClean) {
+    colNum = parseInt(colNum, 10);
+    var colData = configSheet.getRange(3, colNum, dataRows, 1).getValues();
+
+    // Collect unique non-empty values
+    var seen = {};
+    var unique = [];
+    for (var r = 0; r < colData.length; r++) {
+      var v = (colData[r][0] || '').toString().trim();
+      if (v && !seen[v]) {
+        // Also reject pure-numeric values during cleanup
+        if (/^\d+$/.test(v)) continue;
+        seen[v] = true;
+        unique.push(v);
+      }
+    }
+
+    // Sort alphabetically (case-insensitive)
+    unique.sort(function(a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    // Write back: sorted values + blank fill for remaining rows
+    var writeData = [];
+    for (var w = 0; w < dataRows; w++) {
+      writeData.push([w < unique.length ? unique[w] : '']);
+    }
+    configSheet.getRange(3, colNum, dataRows, 1).setValues(writeData);
+  }
 }
 
 /**
@@ -44154,7 +44216,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2285 lines)
+// SOURCE: 10_Main.gs (2302 lines)
 // ============================================================================
 
 /**
@@ -45012,8 +45074,25 @@ function syncDropdownToConfig_(e, sheetName) {
 
   if (!configCol) return; // Not a synced dropdown or multi-select column
 
+  // Skip YES_NO — those values are static seeds ("Yes"/"No"), never user-driven.
+  // populateConfigFromSheetData() has the same skip at its line 266.
+  if (configCol === CONFIG_COLS.YES_NO) return;
+
   // For multi-select columns, split comma-separated values and sync each individually
   var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];
+
+  // Filter out pure-numeric values — they're data-entry errors (e.g. index numbers
+  // typed instead of text labels like "Email", "Phone").  All dropdown/multi-select
+  // Config columns expect text labels, never bare integers.
+  var filteredValues = [];
+  for (var fv = 0; fv < valuesToSync.length; fv++) {
+    var candidate = valuesToSync[fv].trim();
+    if (candidate && !/^\d+$/.test(candidate)) {
+      filteredValues.push(candidate);
+    }
+  }
+  valuesToSync = filteredValues;
+  if (valuesToSync.length === 0) return;
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -50108,7 +50187,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4025 lines)
+// SOURCE: 12_Features.gs (4023 lines)
 // ============================================================================
 
 /**
@@ -51988,24 +52067,22 @@ function saveExpansionData(memberId, customData) {
  */
 function setupMemberLeaderRole() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const configSheetName = SHEETS.CONFIG;
-  const configSheet = ss.getSheetByName(configSheetName);
 
-  if (!configSheet) {
-    SpreadsheetApp.getUi().alert('Error: Config sheet not found');
-    return errorResponse('Config sheet not found');
+  // Add "Member Leader" directly to IS_STEWARD validation (not Config column E).
+  // IS_STEWARD uses hardcoded validation; Config column E is reserved for INTEREST_* columns.
+  const memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory not found. Run CREATE_DASHBOARD first.');
+    return errorResponse('Member Directory not found');
   }
 
-  const yesNoCol = CONFIG_COLS.YES_NO;
-  const existingValues = configSheet.getRange(3, yesNoCol, 10, 1).getValues().flat().filter(Boolean);
-
-  if (existingValues.indexOf(EXTENSION_CONFIG.LEADER_ROLE_NAME) !== -1) {
-    ss.toast('Member Leader role already configured', 'Setup Complete', 3);
-    return { success: true, alreadyExists: true };
-  }
-
-  const nextRow = existingValues.length + 3;
-  configSheet.getRange(nextRow, yesNoCol).setValue(EXTENSION_CONFIG.LEADER_ROLE_NAME);
+  const leaderValues = ['Yes', 'No', EXTENSION_CONFIG.LEADER_ROLE_NAME];
+  const isRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
+  const isRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(leaderValues, true)
+    .setAllowInvalid(true)
+    .build();
+  isRange.setDataValidation(isRule);
 
   if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
     logAuditEvent(AUDIT_EVENTS.SETTINGS_CHANGED, {
@@ -52015,8 +52092,8 @@ function setupMemberLeaderRole() {
     });
   }
 
-  ss.toast('Member Leader role added to Config.', 'Setup Complete', 5);
-  return { success: true, addedAt: nextRow };
+  ss.toast('Member Leader role added to IS_STEWARD validation.', 'Setup Complete', 5);
+  return { success: true };
 }
 
 /**
