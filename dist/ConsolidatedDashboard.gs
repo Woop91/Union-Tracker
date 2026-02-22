@@ -3270,7 +3270,7 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'UNION_PARENT',          header: 'Union Parent' },
   { key: 'STATE_REGION',          header: 'State/Region' },
   { key: 'ORG_WEBSITE',           header: 'Organization Website' },
-  { key: 'WORK_LOCATIONS',        header: 'Work Locations' },
+  { key: 'OFFICE_ADDRESSES',      header: 'Office Addresses' },
   { key: 'MAIN_FAX',              header: 'Main Fax' },
   { key: 'MAIN_CONTACT_NAME',     header: 'Main Contact Name' },
   { key: 'MAIN_CONTACT_EMAIL',    header: 'Main Contact Email' },
