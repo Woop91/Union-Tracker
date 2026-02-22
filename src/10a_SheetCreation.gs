@@ -47,6 +47,11 @@ function createConfigSheet(ss) {
     sheet.clear();
   } else {
     Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
+
+    // Migration: remove orphaned "Yes/No (Dropdowns)" column (was column E).
+    // Deleting the column shifts all data to the right of it left by 1,
+    // keeping headers and data aligned.
+    migrateRemoveYesNoColumn_(sheet);
   }
 
   // Row 1: Section Headers (grouped categories)
@@ -66,7 +71,8 @@ function createConfigSheet(ss) {
     '── EXTENDED CONTACT ──', '', '', '', '',           // AM-AQ (5 cols)
     '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AR-AX (7 cols)
     '── MOBILE DASHBOARD ──', '', '', '', '', '', '',    // AY-BE (7 cols)
-    '── CUSTOM LINKS ──', '', '', ''                     // BF-BI (4 cols)
+    '── CUSTOM LINKS ──', '', '', '',                     // BE-BH (4 cols)
+    '── SURVEY LOG ──', ''                                // BI-BJ (2 cols)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -195,6 +201,28 @@ function createConfigSheet(ss) {
 
   // Set tab color
   sheet.setTabColor(COLORS.PRIMARY_PURPLE);
+}
+
+/**
+ * Migration: removes the orphaned "Yes/No (Dropdowns)" column from existing Config sheets.
+ * The column was removed from CONFIG_HEADER_MAP_ but existing sheets still have it.
+ * Deleting the physical column shifts all data right of it left by 1, keeping
+ * headers and data aligned when new headers are applied.
+ * @param {Sheet} sheet - The Config sheet
+ * @private
+ */
+function migrateRemoveYesNoColumn_(sheet) {
+  // Check row 2 for the old header — only migrate if it's still present
+  var maxCol = sheet.getMaxColumns();
+  if (maxCol < 5) return;
+  var row2 = sheet.getRange(2, 1, 1, Math.min(maxCol, 10)).getValues()[0];
+  for (var c = 0; c < row2.length; c++) {
+    if (String(row2[c]).trim() === 'Yes/No (Dropdowns)') {
+      sheet.deleteColumn(c + 1); // 1-indexed
+      Logger.log('migrateRemoveYesNoColumn_: deleted orphaned Yes/No column at position ' + (c + 1));
+      return;
+    }
+  }
 }
 
 /**

@@ -16481,7 +16481,7 @@ function getUnifiedDashboardData(includePII) {
   }
   data.hotSpots.lowEngagement.sort(function(a,b){return a.engagement - b.engagement;});
 
-  // Get Google Drive resources folder from Config tab (column AU / 47)
+  // Get Google Drive resources folder from Config tab (column AS / CONFIG_COLS.ARCHIVE_FOLDER_ID)
   try {
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     var archiveFolderId = '';
@@ -23874,7 +23874,7 @@ function createWeeklySnapshot() {
     } catch (createErr) {
       ui.alert('Archive Folder Error',
         'Could not auto-create archive folder: ' + createErr.message + '\n\n' +
-        'You can manually set the Archive Folder ID in the Config sheet (column AU).',
+        'You can manually set the Archive Folder ID in the Config sheet (column AS).',
         ui.ButtonSet.OK);
       return;
     }
@@ -25944,7 +25944,7 @@ function seedConfigData() {
     return;
   }
 
-  // Ensure Config sheet has enough columns (AZ = column 52 is the last column)
+  // Ensure Config sheet has enough columns (AX = column 50 = MOBILE_DASHBOARD_URL)
   ensureMinimumColumns(sheet, CONFIG_COLS.MOBILE_DASHBOARD_URL);
 
   // Data row start (after section headers row 1 and column headers row 2)
@@ -38547,7 +38547,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1974 lines)
+// SOURCE: 10a_SheetCreation.gs (2002 lines)
 // ============================================================================
 
 /**
@@ -38599,6 +38599,11 @@ function createConfigSheet(ss) {
     sheet.clear();
   } else {
     Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
+
+    // Migration: remove orphaned "Yes/No (Dropdowns)" column (was column E).
+    // Deleting the column shifts all data to the right of it left by 1,
+    // keeping headers and data aligned.
+    migrateRemoveYesNoColumn_(sheet);
   }
 
   // Row 1: Section Headers (grouped categories)
@@ -38618,7 +38623,8 @@ function createConfigSheet(ss) {
     '── EXTENDED CONTACT ──', '', '', '', '',           // AM-AQ (5 cols)
     '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AR-AX (7 cols)
     '── MOBILE DASHBOARD ──', '', '', '', '', '', '',    // AY-BE (7 cols)
-    '── CUSTOM LINKS ──', '', '', ''                     // BF-BI (4 cols)
+    '── CUSTOM LINKS ──', '', '', '',                     // BE-BH (4 cols)
+    '── SURVEY LOG ──', ''                                // BI-BJ (2 cols)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
@@ -38747,6 +38753,28 @@ function createConfigSheet(ss) {
 
   // Set tab color
   sheet.setTabColor(COLORS.PRIMARY_PURPLE);
+}
+
+/**
+ * Migration: removes the orphaned "Yes/No (Dropdowns)" column from existing Config sheets.
+ * The column was removed from CONFIG_HEADER_MAP_ but existing sheets still have it.
+ * Deleting the physical column shifts all data right of it left by 1, keeping
+ * headers and data aligned when new headers are applied.
+ * @param {Sheet} sheet - The Config sheet
+ * @private
+ */
+function migrateRemoveYesNoColumn_(sheet) {
+  // Check row 2 for the old header — only migrate if it's still present
+  var maxCol = sheet.getMaxColumns();
+  if (maxCol < 5) return;
+  var row2 = sheet.getRange(2, 1, 1, Math.min(maxCol, 10)).getValues()[0];
+  for (var c = 0; c < row2.length; c++) {
+    if (String(row2[c]).trim() === 'Yes/No (Dropdowns)') {
+      sheet.deleteColumn(c + 1); // 1-indexed
+      Logger.log('migrateRemoveYesNoColumn_: deleted orphaned Yes/No column at position ' + (c + 1));
+      return;
+    }
+  }
 }
 
 /**
@@ -42484,11 +42512,11 @@ function createFeaturesReferenceSheet(ss) {
 
 /**
  * Grievance Form Configuration
- * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column O), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only — update via Script Properties or Config sheet.
  */
 var GRIEVANCE_FORM_CONFIG = {
-  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('grievance')
+  // Form URL — set in Config sheet column O, read via getFormUrlFromConfig('grievance')
   FORM_URL: '',
 
   // Default form field entry IDs — overridden by Script Properties at runtime
@@ -42520,11 +42548,11 @@ var GRIEVANCE_FORM_CONFIG = {
  */
 /**
  * Contact Form Configuration
- * Form URL reads from Config sheet (column Q), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only.
  */
 var CONTACT_FORM_CONFIG = {
-  // Form URL — set in Config sheet column Q, read via getFormUrlFromConfig('contact')
+  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('contact')
   FORM_URL: '',
 
   // Form field entry IDs mapped to Member Directory columns
@@ -42742,7 +42770,7 @@ function shareWithCoordinators_(folder) {
 
     if (!configSheet) return;
 
-    // Get coordinator emails from Config (column O = GRIEVANCE_COORDINATORS)
+    // Get coordinator emails from Config (column N = GRIEVANCE_COORDINATORS)
     var coordData = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_COORDINATORS,
                                           configSheet.getLastRow() - 1, 1).getValues();
 
@@ -42806,11 +42834,11 @@ function testGrievanceFormSubmission() {
 
 /**
  * Satisfaction Survey Form Configuration
- * Form URL reads from Config sheet (column AR), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column AP), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only.
  */
 var SATISFACTION_FORM_CONFIG = {
-  // Form URLs — set in Config sheet column AR, read via getFormUrlFromConfig('satisfaction')
+  // Form URLs — set in Config sheet column AP, read via getFormUrlFromConfig('satisfaction')
   FORM_URL: '',
   EDIT_URL: '',
 
@@ -44651,7 +44679,7 @@ function handleStageGateWorkflow_(e) {
 
 /**
  * Sends escalation alert email to Chief Steward
- * Reads email from Config sheet (column AS)
+ * Reads email from Config sheet (column AQ)
  * @param {string} memberName - Name of the member
  * @param {string} caseID - Grievance case ID
  * @param {string} status - New status/step
@@ -44662,7 +44690,7 @@ function sendEscalationAlert_(memberName, caseID, status) {
   var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
 
   if (!chiefStewardEmail) {
-    console.log('Chief Steward email not configured in Config sheet (column AS) - skipping escalation alert');
+    console.log('Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
     return;
   }
 
@@ -48009,7 +48037,7 @@ function createGrievancePDF(folder, data) {
   var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID) || COMMAND_CONFIG.TEMPLATE_ID;
 
   if (!templateId) {
-    throw new Error('PDF Template ID not configured. Set it in Config sheet column AX.');
+    throw new Error('PDF Template ID not configured. Set it in Config sheet column AV.');
   }
 
   // Make a copy of the template

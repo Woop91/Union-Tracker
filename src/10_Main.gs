@@ -441,7 +441,7 @@ function handleStageGateWorkflow_(e) {
 
 /**
  * Sends escalation alert email to Chief Steward
- * Reads email from Config sheet (column AS)
+ * Reads email from Config sheet (column AQ)
  * @param {string} memberName - Name of the member
  * @param {string} caseID - Grievance case ID
  * @param {string} status - New status/step
@@ -452,7 +452,7 @@ function sendEscalationAlert_(memberName, caseID, status) {
   var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
 
   if (!chiefStewardEmail) {
-    console.log('Chief Steward email not configured in Config sheet (column AS) - skipping escalation alert');
+    console.log('Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
     return;
   }
 

@@ -225,7 +225,7 @@ function seedConfigData() {
     return;
   }
 
-  // Ensure Config sheet has enough columns (AZ = column 52 is the last column)
+  // Ensure Config sheet has enough columns (AX = column 50 = MOBILE_DASHBOARD_URL)
   ensureMinimumColumns(sheet, CONFIG_COLS.MOBILE_DASHBOARD_URL);
 
   // Data row start (after section headers row 1 and column headers row 2)
