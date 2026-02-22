@@ -1340,46 +1340,6 @@ var GRIEVANCE_HEADER_MAP_ = [
 var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_);
 
 // ============================================================================
-// BACKWARD COMPATIBILITY ALIASES (0-indexed for array access)
-// Auto-derived from 1-indexed *_COLS — stays in sync automatically.
-// ============================================================================
-
-/** Legacy-only aliases for GRIEVANCE_COLUMNS (keys not in GRIEVANCE_COLS) */
-var GRIEVANCE_LEGACY_ALIASES_ = {
-  MEMBER_NAME: 'FIRST_NAME',
-  FILING_DATE: 'DATE_FILED',
-  STEP_1_DUE: 'STEP1_DUE',
-  STEP_1_DATE: 'STEP1_RCVD',
-  STEP_1_STATUS: 'STATUS',
-  STEP_2_DATE: 'STEP2_APPEAL_FILED',
-  STEP_2_DUE: 'STEP2_DUE',
-  STEP_2_STATUS: 'STATUS',
-  STEP_3_DATE: 'STEP3_APPEAL_FILED',
-  STEP3_DUE: 'STEP3_APPEAL_DUE',
-  STEP_3_DUE: 'STEP3_APPEAL_DUE',
-  STEP_3_STATUS: 'STATUS',
-  ARBITRATION_DATE: 'DATE_CLOSED',
-  RECORD_LAST_UPDATED: 'LAST_UPDATED',
-  GRIEVANCE_TYPE: 'ISSUE_CATEGORY',
-  DESCRIPTION: 'ISSUE_CATEGORY',
-  OUTCOME: 'RESOLUTION',
-  NOTES: 'RESOLUTION',
-  DRIVE_FOLDER: 'DRIVE_FOLDER_URL'
-};
-
-var GRIEVANCE_COLUMNS = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-
-/** Legacy-only aliases for MEMBER_COLUMNS (keys not in MEMBER_COLS) */
-var MEMBER_LEGACY_ALIASES_ = {
-  ID: 'MEMBER_ID',
-  JOB_DEPT: 'JOB_TITLE',
-  STATUS: 'GRIEVANCE_STATUS',
-  LAST_UPDATED: 'RECENT_CONTACT_DATE'
-};
-
-var MEMBER_COLUMNS = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-
-// ============================================================================
 // CONFIG COLUMN MAPPING — Auto-derived from header map
 // Config sheet uses row 2 for headers (row 1 is section headers).
 // ============================================================================
@@ -1845,30 +1805,6 @@ function getHeadersFromMap_(headerMap) {
 }
 
 /**
- * Build a 0-indexed legacy column map from a 1-indexed COLS object.
- * @param {Object} colsObj - 1-indexed column constants
- * @param {Object} [extraAliases] - { 'LEGACY_KEY': 'PRIMARY_KEY' } for legacy-only aliases
- * @returns {Object} 0-indexed column constants
- */
-function buildLegacyCols_(colsObj, extraAliases) {
-  var legacy = {};
-  for (var key in colsObj) {
-    if (colsObj.hasOwnProperty(key)) {
-      legacy[key] = colsObj[key] - 1;
-    }
-  }
-  if (extraAliases) {
-    for (var alias in extraAliases) {
-      if (extraAliases.hasOwnProperty(alias)) {
-        var target = extraAliases[alias];
-        legacy[alias] = colsObj[target] !== undefined ? colsObj[target] - 1 : legacy[target];
-      }
-    }
-  }
-  return legacy;
-}
-
-/**
  * Resolve column positions by reading actual sheet headers at runtime.
  * @param {string} sheetName - Sheet name to read
  * @param {Array<{key: string, header: string}>} headerMap - Expected headers
@@ -1951,16 +1887,6 @@ function syncColumnMaps() {
     }
 
     if (moved) result.synced.push(entry.name);
-  }
-
-  // Rebuild legacy compat objects if primary maps changed
-  if (result.synced.indexOf('MEMBER_COLS') >= 0) {
-    var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-    for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
-  }
-  if (result.synced.indexOf('GRIEVANCE_COLS') >= 0) {
-    var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-    for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
   }
 
   // Rebuild derived column configs so dropdown dialogs and bidirectional
@@ -2071,14 +1997,9 @@ function loadCachedColumnMaps_() {
       }
     }
 
-    // Rebuild derived objects (legacy compat, dropdown map, multi-select)
+    // Rebuild derived objects (dropdown map, multi-select)
     // only if something actually changed.
     if (changed) {
-      var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-      for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
-      var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-      for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
-
       var freshMulti = buildMultiSelectCols_();
       MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
       MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;

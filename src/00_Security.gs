@@ -354,9 +354,9 @@ function getUserRole_(email) {
       if (memberSheet) {
         var data = memberSheet.getDataRange().getValues();
         for (var i = 1; i < data.length; i++) {
-          var memberEmail = data[i][MEMBER_COLUMNS.EMAIL] || '';
+          var memberEmail = data[i][MEMBER_COLS.EMAIL - 1] || '';
           if (memberEmail.toLowerCase() === email.toLowerCase()) {
-            var isSteward = data[i][MEMBER_COLUMNS.IS_STEWARD];
+            var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
             if (isTruthyValue(isSteward)) {
               return 'steward';
             }
