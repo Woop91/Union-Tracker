@@ -54,6 +54,7 @@ All column constants are **1-indexed** (matching Google Sheets `getRange()` conv
 | `SHEETS` / `SHEET_NAMES` | `01_Core.gs` | `SHEET_NAMES = SHEETS` — identical alias |
 | `GRIEVANCE_COLS` | `buildColsFromMap_(GRIEVANCE_HEADER_MAP_)` | 1-indexed for `getRange()` |
 | `MEMBER_COLS` | `buildColsFromMap_(MEMBER_HEADER_MAP_)` | 1-indexed for `getRange()` |
+| `CONFIG_COLS` | `buildColsFromMap_(CONFIG_HEADER_MAP_)` | 1-indexed for `getRange()` |
 
 **Rule:** For `getRange()` calls, use `*_COLS` values directly. For array access on `getValues()` data, subtract 1: `row[GRIEVANCE_COLS.STATUS - 1]`. The legacy 0-indexed constants (`GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`) have been removed.
 
@@ -120,6 +121,17 @@ The Config sheet has **multiple code paths** that write to it. This is a known s
 | `seedConfigDefault_()` | `10a_SheetCreation.gs` | Direct `CONFIG_COLS.*` param | Initial setup defaults |
 | `restoreConfigFromSheetData_()` | `07_DevTools.gs` | `DROPDOWN_MAP` + `MULTI_SELECT_COLS` | Restore after data loss |
 | `syncStewardStatus()` | `02_DataManagers.gs` | `CONFIG_COLS.STEWARDS` | Steward↔Member bidirectional |
+
+### Yes/No Validation — Hardcoded, Not Config-Driven
+
+The `YES_NO` Config column was **removed** to eliminate a contamination risk (multiple columns sharing one Config source). All Yes/No columns now use hardcoded `['Yes', 'No']` validation applied directly in `setupDataValidations()` (`08a_SheetSetup.gs`):
+
+- `MEMBER_COLS.IS_STEWARD`
+- `MEMBER_COLS.INTEREST_LOCAL`
+- `MEMBER_COLS.INTEREST_CHAPTER`
+- `MEMBER_COLS.INTEREST_ALLIED`
+
+These columns are **not** in `DROPDOWN_MAP` — they are deliberately excluded from bidirectional Config sync. `migrateRemoveYesNoColumn_()` in `10a_SheetCreation.gs` handles deleting the orphaned column on existing sheets when `CREATE_DASHBOARD` is re-run.
 
 ### Known Debt
 
