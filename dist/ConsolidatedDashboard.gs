@@ -1840,7 +1840,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3265 lines)
+// SOURCE: 01_Core.gs (3261 lines)
 // ============================================================================
 
 /**
@@ -3194,7 +3194,6 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'OFFICE_LOCATIONS',      header: 'Office Locations' },
   { key: 'UNITS',                 header: 'Units' },
   { key: 'OFFICE_DAYS',           header: 'Office Days' },
-  { key: 'YES_NO',                header: 'Yes/No (Dropdowns)' },
   { key: 'SUPERVISORS',           header: 'Supervisors' },
   { key: 'MANAGERS',              header: 'Managers' },
   { key: 'STEWARDS',              header: 'Stewards' },
@@ -4072,7 +4071,6 @@ function getGrievanceHeaders() {
  */
 var DEFAULT_CONFIG = {
   OFFICE_DAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-  YES_NO: ['Yes', 'No'],
   // Status includes both workflow states (Open, Pending, In Arbitration) AND outcomes (Won, Denied, Settled, Withdrawn)
   // This single-column design allows Dashboard metrics to count outcomes directly from STATUS column
   GRIEVANCE_STATUS: ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Denied', 'Won', 'Appealed', 'In Arbitration', 'Closed'],
@@ -4449,14 +4447,12 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
       { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
       { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
-      // IS_STEWARD deliberately excluded — it uses hardcoded validation ('Yes'/'No'),
-      // NOT Config column E.  Steward status sync is handled by handleMemberEdit()
-      // and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS (column H).
+      // IS_STEWARD and INTEREST_* columns deliberately excluded — they use hardcoded
+      // validation ('Yes'/'No'), not a Config column.  The YES_NO Config column was
+      // removed to eliminate contamination risk.  Steward status sync is handled by
+      // handleMemberEdit() and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS.
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
-      { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
-      { col: MEMBER_COLS.INTEREST_CHAPTER,  configCol: CONFIG_COLS.YES_NO },
-      { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
       { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
     ],
     // ISSUE_CATEGORY and ARTICLES are multi-select columns (comma-separated values).
@@ -25718,7 +25714,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (3088 lines)
+// SOURCE: 07_DevTools.gs (3083 lines)
 // ============================================================================
 
 /**
@@ -25974,10 +25970,7 @@ function seedConfigData() {
   // Office Days (Column D) - PRESET
   if (seedIfEmpty(CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS)) seededAny = true;
 
-  // Yes/No (Column E) - PRESET
-  if (seedIfEmpty(CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO)) seededAny = true;
-
-  // Grievance Status (Column J) - PRESET
+  // Grievance Status (Column I) - PRESET
   if (seedIfEmpty(CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS)) seededAny = true;
 
   // Grievance Step (Column K) - PRESET
@@ -26523,8 +26516,6 @@ function restoreConfigFromSheetData_() {
   // Member Directory — single-select dropdowns
   var memberDD = DROPDOWN_MAP.MEMBER_DIR;
   for (var i = 0; i < memberDD.length; i++) {
-    // Skip Yes/No columns — those are presets, not user data
-    if (memberDD[i].configCol === CONFIG_COLS.YES_NO) continue;
     mappings.push({ sheet: memberSheet, col: memberDD[i].col, configCol: memberDD[i].configCol });
   }
 
@@ -28811,7 +28802,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (675 lines)
+// SOURCE: 08a_SheetSetup.gs (679 lines)
 // ============================================================================
 
 /**
@@ -29139,16 +29130,20 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
-  // IS_STEWARD uses hardcoded validation — NOT Config column E (YES_NO).
-  // Config column E is shared by INTEREST_* columns and is a contamination risk.
+  // IS_STEWARD and INTEREST_* columns use hardcoded Yes/No validation.
+  // The YES_NO Config column was removed to eliminate contamination risk.
   // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
-  var isStewardValues = ['Yes', 'No'];
-  var isStewardRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
-  var isStewardRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(isStewardValues, true)
+  var yesNoValues = ['Yes', 'No'];
+  var yesNoCols = [MEMBER_COLS.IS_STEWARD, MEMBER_COLS.INTEREST_LOCAL,
+                   MEMBER_COLS.INTEREST_CHAPTER, MEMBER_COLS.INTEREST_ALLIED];
+  var yesNoRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(yesNoValues, true)
     .setAllowInvalid(true)
     .build();
-  isStewardRange.setDataValidation(isStewardRule);
+  for (var yn = 0; yn < yesNoCols.length; yn++) {
+    var ynRange = memberSheet.getRange(2, yesNoCols[yn], Math.max(1, memberSheet.getMaxRows() - 1), 1);
+    ynRange.setDataValidation(yesNoRule);
+  }
 
   // Member Directory Validations — driven by MULTI_SELECT_COLS
   var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
@@ -38552,7 +38547,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1980 lines)
+// SOURCE: 10a_SheetCreation.gs (1974 lines)
 // ============================================================================
 
 /**
@@ -38608,9 +38603,9 @@ function createConfigSheet(ss) {
 
   // Row 1: Section Headers (grouped categories)
   var sectionHeaders = [
-    '── EMPLOYMENT INFO ──', '', '', '', '',           // A-E (5 cols)
-    '── SUPERVISION ──', '',                            // F-G (2 cols)
-    '── STEWARD INFO ──', '',                           // H-I (2 cols)
+    '── EMPLOYMENT INFO ──', '', '', '',                // A-D (4 cols)
+    '── SUPERVISION ──', '',                            // E-F (2 cols)
+    '── STEWARD INFO ──', '',                           // G-H (2 cols)
     '── GRIEVANCE SETTINGS ──', '', '', '',             // J-M (4 cols)
     '── LINKS & COORDINATORS ──', '', '', '',           // N-Q (4 cols)
     '── NOTIFICATIONS ──', '', '',                      // R-T (3 cols)
@@ -38658,10 +38653,7 @@ function createConfigSheet(ss) {
   // Office Days (D)
   seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, isExistingSheet);
 
-  // Yes/No (E)
-  seedConfigDefault_(sheet, CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO, isExistingSheet);
-
-  // Steward Committees (I)
+  // Steward Committees (H)
   var committees = ['Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
                     'Political Action Committee', 'Membership Committee', 'Executive Board'];
   seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_COMMITTEES, committees, isExistingSheet);
@@ -38819,9 +38811,6 @@ function populateConfigFromSheetData() {
       var targetCol = mapping.col;       // column in source sheet (1-indexed)
       var configCol = mapping.configCol;  // column in Config (1-indexed)
 
-      // Skip Yes/No columns — those are static, not user-driven
-      if (configCol === CONFIG_COLS.YES_NO) continue;
-
       // Collect existing Config values for this column
       var existingSet = {};
       var configLastRow = configSheet.getLastRow();
@@ -38854,7 +38843,7 @@ function populateConfigFromSheetData() {
     }
   }
 
-  // Dedup and sort each Config dropdown column (except static columns like YES_NO)
+  // Dedup and sort each Config dropdown column
   deduplicateAndSortConfigColumns_(configSheet);
 
   ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
@@ -38879,7 +38868,7 @@ function deduplicateAndSortConfigColumns_(configSheet) {
   var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
   for (var i = 0; i < allMaps.length; i++) {
     var cc = allMaps[i].configCol;
-    if (cc && cc !== CONFIG_COLS.YES_NO) {
+    if (cc) {
       configColsToClean[cc] = true;
     }
   }
@@ -44216,7 +44205,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2302 lines)
+// SOURCE: 10_Main.gs (2298 lines)
 // ============================================================================
 
 /**
@@ -45073,10 +45062,6 @@ function syncDropdownToConfig_(e, sheetName) {
   }
 
   if (!configCol) return; // Not a synced dropdown or multi-select column
-
-  // Skip YES_NO — those values are static seeds ("Yes"/"No"), never user-driven.
-  // populateConfigFromSheetData() has the same skip at its line 266.
-  if (configCol === CONFIG_COLS.YES_NO) return;
 
   // For multi-select columns, split comma-separated values and sync each individually
   var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];

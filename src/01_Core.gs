@@ -1349,7 +1349,6 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'OFFICE_LOCATIONS',      header: 'Office Locations' },
   { key: 'UNITS',                 header: 'Units' },
   { key: 'OFFICE_DAYS',           header: 'Office Days' },
-  { key: 'YES_NO',                header: 'Yes/No (Dropdowns)' },
   { key: 'SUPERVISORS',           header: 'Supervisors' },
   { key: 'MANAGERS',              header: 'Managers' },
   { key: 'STEWARDS',              header: 'Stewards' },
@@ -2227,7 +2226,6 @@ function getGrievanceHeaders() {
  */
 var DEFAULT_CONFIG = {
   OFFICE_DAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-  YES_NO: ['Yes', 'No'],
   // Status includes both workflow states (Open, Pending, In Arbitration) AND outcomes (Won, Denied, Settled, Withdrawn)
   // This single-column design allows Dashboard metrics to count outcomes directly from STATUS column
   GRIEVANCE_STATUS: ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Denied', 'Won', 'Appealed', 'In Arbitration', 'Closed'],
@@ -2604,14 +2602,12 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
       { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
       { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
-      // IS_STEWARD deliberately excluded — it uses hardcoded validation ('Yes'/'No'),
-      // NOT Config column E.  Steward status sync is handled by handleMemberEdit()
-      // and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS (column H).
+      // IS_STEWARD and INTEREST_* columns deliberately excluded — they use hardcoded
+      // validation ('Yes'/'No'), not a Config column.  The YES_NO Config column was
+      // removed to eliminate contamination risk.  Steward status sync is handled by
+      // handleMemberEdit() and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS.
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
-      { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
-      { col: MEMBER_COLS.INTEREST_CHAPTER,  configCol: CONFIG_COLS.YES_NO },
-      { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
       { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
     ],
     // ISSUE_CATEGORY and ARTICLES are multi-select columns (comma-separated values).

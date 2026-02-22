@@ -853,10 +853,6 @@ function syncDropdownToConfig_(e, sheetName) {
 
   if (!configCol) return; // Not a synced dropdown or multi-select column
 
-  // Skip YES_NO — those values are static seeds ("Yes"/"No"), never user-driven.
-  // populateConfigFromSheetData() has the same skip at its line 266.
-  if (configCol === CONFIG_COLS.YES_NO) return;
-
   // For multi-select columns, split comma-separated values and sync each individually
   var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];
 

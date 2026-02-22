@@ -323,16 +323,20 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
-  // IS_STEWARD uses hardcoded validation — NOT Config column E (YES_NO).
-  // Config column E is shared by INTEREST_* columns and is a contamination risk.
+  // IS_STEWARD and INTEREST_* columns use hardcoded Yes/No validation.
+  // The YES_NO Config column was removed to eliminate contamination risk.
   // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
-  var isStewardValues = ['Yes', 'No'];
-  var isStewardRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
-  var isStewardRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(isStewardValues, true)
+  var yesNoValues = ['Yes', 'No'];
+  var yesNoCols = [MEMBER_COLS.IS_STEWARD, MEMBER_COLS.INTEREST_LOCAL,
+                   MEMBER_COLS.INTEREST_CHAPTER, MEMBER_COLS.INTEREST_ALLIED];
+  var yesNoRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(yesNoValues, true)
     .setAllowInvalid(true)
     .build();
-  isStewardRange.setDataValidation(isStewardRule);
+  for (var yn = 0; yn < yesNoCols.length; yn++) {
+    var ynRange = memberSheet.getRange(2, yesNoCols[yn], Math.max(1, memberSheet.getMaxRows() - 1), 1);
+    ynRange.setDataValidation(yesNoRule);
+  }
 
   // Member Directory Validations — driven by MULTI_SELECT_COLS
   var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;

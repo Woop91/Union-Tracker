@@ -51,9 +51,9 @@ function createConfigSheet(ss) {
 
   // Row 1: Section Headers (grouped categories)
   var sectionHeaders = [
-    '── EMPLOYMENT INFO ──', '', '', '', '',           // A-E (5 cols)
-    '── SUPERVISION ──', '',                            // F-G (2 cols)
-    '── STEWARD INFO ──', '',                           // H-I (2 cols)
+    '── EMPLOYMENT INFO ──', '', '', '',                // A-D (4 cols)
+    '── SUPERVISION ──', '',                            // E-F (2 cols)
+    '── STEWARD INFO ──', '',                           // G-H (2 cols)
     '── GRIEVANCE SETTINGS ──', '', '', '',             // J-M (4 cols)
     '── LINKS & COORDINATORS ──', '', '', '',           // N-Q (4 cols)
     '── NOTIFICATIONS ──', '', '',                      // R-T (3 cols)
@@ -101,10 +101,7 @@ function createConfigSheet(ss) {
   // Office Days (D)
   seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, isExistingSheet);
 
-  // Yes/No (E)
-  seedConfigDefault_(sheet, CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO, isExistingSheet);
-
-  // Steward Committees (I)
+  // Steward Committees (H)
   var committees = ['Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
                     'Political Action Committee', 'Membership Committee', 'Executive Board'];
   seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_COMMITTEES, committees, isExistingSheet);
@@ -262,9 +259,6 @@ function populateConfigFromSheetData() {
       var targetCol = mapping.col;       // column in source sheet (1-indexed)
       var configCol = mapping.configCol;  // column in Config (1-indexed)
 
-      // Skip Yes/No columns — those are static, not user-driven
-      if (configCol === CONFIG_COLS.YES_NO) continue;
-
       // Collect existing Config values for this column
       var existingSet = {};
       var configLastRow = configSheet.getLastRow();
@@ -297,7 +291,7 @@ function populateConfigFromSheetData() {
     }
   }
 
-  // Dedup and sort each Config dropdown column (except static columns like YES_NO)
+  // Dedup and sort each Config dropdown column
   deduplicateAndSortConfigColumns_(configSheet);
 
   ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
@@ -322,7 +316,7 @@ function deduplicateAndSortConfigColumns_(configSheet) {
   var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
   for (var i = 0; i < allMaps.length; i++) {
     var cc = allMaps[i].configCol;
-    if (cc && cc !== CONFIG_COLS.YES_NO) {
+    if (cc) {
       configColsToClean[cc] = true;
     }
   }
