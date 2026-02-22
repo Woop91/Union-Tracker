@@ -224,6 +224,7 @@ function createDashboardMenu() {
       .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+      .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
       .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet')
       .addSeparator()
@@ -238,6 +239,7 @@ function createDashboardMenu() {
         .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
         .addSeparator()
         .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+        .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
         .addSeparator()
         .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
   }

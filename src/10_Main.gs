@@ -818,8 +818,12 @@ function handleMemberEdit(e) {
  * @private
  */
 function syncDropdownToConfig_(e, sheetName) {
+  // Accept e.value (simple edits) or fall back to reading the cell directly
+  // (handles pastes, programmatic setValue, and multi-cell edits)
   var newValue = e.value;
-  // Only handle single-cell text edits with a non-empty value
+  if (!newValue && e.range && e.range.getNumRows() === 1 && e.range.getNumColumns() === 1) {
+    try { newValue = e.range.getValue(); } catch (_) { /* skip */ }
+  }
   if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') return;
   newValue = newValue.trim();
 
@@ -837,35 +841,45 @@ function syncDropdownToConfig_(e, sheetName) {
   if (ddEntries.length === 0 && msEntries.length === 0) return;
 
   var configCol = null;
+  var isMultiSelect = false;
   for (var d = 0; d < ddEntries.length; d++) {
     if (ddEntries[d].col === col) { configCol = ddEntries[d].configCol; break; }
   }
   if (!configCol) {
     for (var ms = 0; ms < msEntries.length; ms++) {
-      if (msEntries[ms].col === col) { configCol = msEntries[ms].configCol; break; }
+      if (msEntries[ms].col === col) { configCol = msEntries[ms].configCol; isMultiSelect = true; break; }
     }
   }
 
   if (!configCol) return; // Not a synced dropdown or multi-select column
 
+  // For multi-select columns, split comma-separated values and sync each individually
+  var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!configSheet) return;
 
-  // Check if the value already exists in Config
+  // Build set of existing Config values for this column
+  var existingSet = {};
   var lastRow = configSheet.getLastRow();
   var configRows = lastRow >= 3 ? lastRow - 2 : 0;
   if (configRows > 0) {
     var existingValues = configSheet.getRange(3, configCol, configRows, 1).getValues();
     for (var i = 0; i < existingValues.length; i++) {
-      if (existingValues[i][0] && existingValues[i][0].toString().trim() === newValue) {
-        return; // Already exists, no need to add
-      }
+      var ev = (existingValues[i][0] || '').toString().trim();
+      if (ev) existingSet[ev] = true;
     }
   }
 
-  // Add the new value to the first empty row in the Config column
-  addToConfigDropdown_(configCol, newValue);
+  // Add each value that doesn't already exist in Config
+  for (var v = 0; v < valuesToSync.length; v++) {
+    var val = valuesToSync[v].trim();
+    if (val && !existingSet[val]) {
+      addToConfigDropdown_(configCol, val);
+      existingSet[val] = true;
+    }
+  }
 }
 
 /**
