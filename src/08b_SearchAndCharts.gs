@@ -326,7 +326,7 @@ function advancedSearch(filters) {
             id: gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
             type: 'grievance',
             title: gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-            subtitle: gRow[GRIEVANCE_COLUMNS.STATUS] + ' - ' + gRow[GRIEVANCE_COLUMNS.TYPE],
+            subtitle: gRow[GRIEVANCE_COLUMNS.STATUS] + ' - ' + gRow[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
             row: j + 1
           });
         }

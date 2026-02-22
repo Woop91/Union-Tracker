@@ -465,7 +465,6 @@ var DataAccess = {
       daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
       articles: row[GRIEVANCE_COLUMNS.ARTICLES],
       issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
-      unit: row[GRIEVANCE_COLUMNS.UNIT],
       location: row[GRIEVANCE_COLUMNS.LOCATION],
       steward: row[GRIEVANCE_COLUMNS.STEWARD],
       resolution: row[GRIEVANCE_COLUMNS.RESOLUTION]

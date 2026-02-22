@@ -1896,15 +1896,11 @@ function advanceGrievanceStep(grievanceId, options) {
     const today = new Date();
     const responseDue = calculateResponseDeadline(nextStep, today);
 
-    // Batch all updates into a single row write where possible
-    const currentStepStatusCol = getStepStatusColumn(currentStep);
-    sheet.getRange(rowIndex, currentStepStatusCol).setValue(options.currentStepOutcome || 'Appealed');
-
-    // Collect column updates to batch write
+    // Collect column updates to batch write (use GRIEVANCE_COLS, 1-indexed)
     var updates = [];
-    updates.push({ col: GRIEVANCE_COLUMNS.CURRENT_STEP + 1, val: nextStep });
-    updates.push({ col: GRIEVANCE_COLUMNS.STATUS + 1, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
-    updates.push({ col: GRIEVANCE_COLUMNS.LAST_UPDATED + 1, val: today });
+    updates.push({ col: GRIEVANCE_COLS.CURRENT_STEP, val: nextStep });
+    updates.push({ col: GRIEVANCE_COLS.STATUS, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
+    updates.push({ col: GRIEVANCE_COLS.LAST_UPDATED, val: today });
 
     if (nextStep <= 3) {
       const nextStepDateCol = getStepDateColumn(nextStep);
@@ -1912,16 +1908,17 @@ function advanceGrievanceStep(grievanceId, options) {
       updates.push({ col: nextStepDateCol + 1, val: responseDue });
       updates.push({ col: nextStepDateCol + 2, val: 'Pending' });
     } else {
-      updates.push({ col: GRIEVANCE_COLUMNS.ARBITRATION_DATE + 1, val: today });
+      updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
 
-    // Add notes if provided
+    // Add notes if provided (GRIEVANCE_COLUMNS.NOTES aliases to RESOLUTION
+    // column — use GRIEVANCE_COLS.RESOLUTION directly)
     if (options.notes) {
-      const existingNotes = data[rowIndex - 1][GRIEVANCE_COLUMNS.NOTES] || '';
+      const existingResolution = data[rowIndex - 1][GRIEVANCE_COLS.RESOLUTION - 1] || '';
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
-      const newNotes = existingNotes + (existingNotes ? '\n' : '') +
+      const newResolution = existingResolution + (existingResolution ? '\n' : '') +
                        `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${options.notes}`;
-      updates.push({ col: GRIEVANCE_COLUMNS.NOTES + 1, val: newNotes });
+      updates.push({ col: GRIEVANCE_COLS.RESOLUTION, val: newResolution });
     }
 
     // Write all collected updates
@@ -2069,16 +2066,16 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
     if (grievanceIds.includes(grievanceId)) {
       const rowIndex = i + 1;
 
-      // Update status
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(newStatus);
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(today);
+      // Update status (use GRIEVANCE_COLS, 1-indexed)
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(newStatus);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
 
-      // Add notes if provided
+      // Add notes if provided (NOTES aliases to RESOLUTION — use directly)
       if (notes) {
-        const existingNotes = data[i][GRIEVANCE_COLUMNS.NOTES] || '';
-        const newNotes = existingNotes + (existingNotes ? '\n' : '') +
+        const existingResolution = data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '';
+        const newResolution = existingResolution + (existingResolution ? '\n' : '') +
                          `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
-        sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(newNotes);
+        sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(newResolution);
       }
 
       updatedCount++;
@@ -2335,26 +2332,21 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
     const today = new Date();
     const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
-    // Update resolution fields
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.RESOLUTION + 1).setValue(resolution);
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.OUTCOME + 1).setValue(outcome);
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(GRIEVANCE_STATUS.RESOLVED);
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(today);
-
-    // Mark current step as completed
-    const currentStep = data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP];
-    const stepStatusCol = getStepStatusColumn(currentStep);
-    if (stepStatusCol) {
-      sheet.getRange(rowIndex, stepStatusCol).setValue(outcome);
+    // Build combined resolution text (RESOLUTION/OUTCOME/NOTES all alias to
+    // the same RESOLUTION column in GRIEVANCE_COLUMNS — use GRIEVANCE_COLS
+    // directly to avoid the three aliases silently overwriting each other)
+    var resolutionText = outcome || '';
+    if (resolution) {
+      resolutionText += (resolutionText ? ': ' : '') + resolution;
     }
-
-    // Add resolution notes
     if (notes) {
-      const existingNotes = data[rowIndex - 1][GRIEVANCE_COLUMNS.NOTES] || '';
-      const newNotes = existingNotes + (existingNotes ? '\n' : '') +
-                       `[${timestamp}] RESOLVED - ${outcome}: ${notes}`;
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(newNotes);
+      resolutionText += (resolutionText ? '\n' : '') +
+                        '[' + timestamp + '] ' + notes;
     }
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(resolutionText);
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(GRIEVANCE_STATUS.RESOLVED);
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.DATE_CLOSED).setValue(today);
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
 
     // Log the resolution
     logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
@@ -2672,13 +2664,13 @@ function getEditGrievanceFormHtml(grievanceId) {
 
         <form id="editForm">
           <div class="form-group">
-            <label class="form-label">Description</label>
-            <textarea class="form-textarea" id="description">${grievance['Description'] || ''}</textarea>
+            <label class="form-label">Issue Category</label>
+            <textarea class="form-textarea" id="description">${escapeHtml(String(grievance['Issue Category'] || ''))}</textarea>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Notes</label>
-            <textarea class="form-textarea" id="notes">${grievance['Notes'] || ''}</textarea>
+            <label class="form-label">Resolution / Notes</label>
+            <textarea class="form-textarea" id="notes">${escapeHtml(String(grievance['Resolution'] || ''))}</textarea>
           </div>
 
           <div class="form-actions">

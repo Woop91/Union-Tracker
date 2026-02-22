@@ -911,8 +911,10 @@ describe('resolveGrievance', () => {
     resolveGrievance('GRV-2026-0001', 'Settled', 'Partial agreement reached', '');
 
     const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    expect(setValueArgs).toContain('Partial agreement reached'); // resolution
-    expect(setValueArgs).toContain('Settled');                    // outcome
+    // Outcome and resolution are combined into one RESOLUTION column write
+    const resolutionArg = setValueArgs.find(v => typeof v === 'string' && v.includes('Settled'));
+    expect(resolutionArg).toContain('Settled');
+    expect(resolutionArg).toContain('Partial agreement reached');
     expect(setValueArgs).toContain(GRIEVANCE_STATUS.RESOLVED);   // status
   });
 
@@ -946,9 +948,10 @@ describe('resolveGrievance', () => {
     resolveGrievance('GRV-2026-0001', 'Won', 'Full remedy', 'Victory!');
 
     const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    const notesArg = setValueArgs.find(v => typeof v === 'string' && v.includes('RESOLVED'));
-    expect(notesArg).toContain('Won');
-    expect(notesArg).toContain('Victory!');
+    // Outcome, resolution, and notes are combined into one RESOLUTION column write
+    const resolutionArg = setValueArgs.find(v => typeof v === 'string' && v.includes('Won'));
+    expect(resolutionArg).toContain('Won');
+    expect(resolutionArg).toContain('Victory!');
   });
 });
 

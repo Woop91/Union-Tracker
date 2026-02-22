@@ -1536,19 +1536,19 @@ function updateGrievance(grievanceId, updates) {
       return errorResponse('Grievance not found');
     }
 
-    // Update each provided field
+    // Update each provided field (use canonical GRIEVANCE_COLS, 1-indexed)
     if (updates.description !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.DESCRIPTION + 1).setValue(updates.description);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(updates.description);
     }
     if (updates.notes !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(updates.notes);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(updates.notes);
     }
     if (updates.status !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(updates.status);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(updates.status);
     }
 
     // Update timestamp
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(new Date());
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(new Date());
 
     logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
       grievanceId: grievanceId,

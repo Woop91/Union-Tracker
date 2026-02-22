@@ -620,3 +620,35 @@ describe('Audit log schemas', () => {
     expect(AUDIT_LOG_COLS.NEW_VALUE).toBeDefined();
   });
 });
+
+// ============================================================================
+// Regression: no undefined keys in legacy alias usage
+// ============================================================================
+
+describe('Legacy alias coverage (no undefined keys)', () => {
+  test('GRIEVANCE_COLUMNS has no UNIT key (grievance sheet has LOCATION instead)', () => {
+    expect(GRIEVANCE_COLUMNS.UNIT).toBeUndefined();
+    expect(GRIEVANCE_COLUMNS.LOCATION).toBeDefined();
+    expect(typeof GRIEVANCE_COLUMNS.LOCATION).toBe('number');
+  });
+
+  test('GRIEVANCE_COLUMNS has no TYPE key (use GRIEVANCE_TYPE or ISSUE_CATEGORY)', () => {
+    expect(GRIEVANCE_COLUMNS.TYPE).toBeUndefined();
+    expect(GRIEVANCE_COLUMNS.GRIEVANCE_TYPE).toBeDefined();
+    expect(GRIEVANCE_COLUMNS.ISSUE_CATEGORY).toBeDefined();
+  });
+
+  test('GRIEVANCE_COLUMNS.NOTES, OUTCOME, and RESOLUTION all resolve to same column', () => {
+    // These three legacy aliases all point to the RESOLUTION column.
+    // Code must not write them separately or later writes overwrite earlier ones.
+    expect(GRIEVANCE_COLUMNS.NOTES).toBe(GRIEVANCE_COLUMNS.RESOLUTION);
+    expect(GRIEVANCE_COLUMNS.OUTCOME).toBe(GRIEVANCE_COLUMNS.RESOLUTION);
+  });
+
+  test('GRIEVANCE_COLUMNS.STEP_X_STATUS aliases all resolve to STATUS', () => {
+    // All step-status aliases point to the main STATUS column.
+    expect(GRIEVANCE_COLUMNS.STEP_1_STATUS).toBe(GRIEVANCE_COLUMNS.STATUS);
+    expect(GRIEVANCE_COLUMNS.STEP_2_STATUS).toBe(GRIEVANCE_COLUMNS.STATUS);
+    expect(GRIEVANCE_COLUMNS.STEP_3_STATUS).toBe(GRIEVANCE_COLUMNS.STATUS);
+  });
+});
