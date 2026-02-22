@@ -44175,7 +44175,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2261 lines)
+// SOURCE: 10_Main.gs (2271 lines)
 // ============================================================================
 
 /**
@@ -44678,15 +44678,20 @@ function getConfigValue_(columnNum) {
 
 /**
  * Gets escalation status values from Config sheet or falls back to defaults
- * Config format: comma-separated values (e.g., "In Arbitration,Appealed")
+ * Reads all non-empty rows from the ESCALATION_STATUSES config column.
  * @returns {Array} Array of status values that trigger escalation alerts
  * @private
  */
 function getEscalationStatuses_() {
-  var configValue = getConfigValue_(CONFIG_COLS.ESCALATION_STATUSES);
-
-  if (configValue) {
-    return configValue.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var values = getConfigValues(configSheet, CONFIG_COLS.ESCALATION_STATUSES);
+      if (values.length > 0) return values;
+    }
+  } catch (e) {
+    console.log('Error reading escalation statuses: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -44695,15 +44700,20 @@ function getEscalationStatuses_() {
 
 /**
  * Gets escalation step values from Config sheet or falls back to defaults
- * Config format: comma-separated values (e.g., "Step II,Step III,Arbitration")
+ * Reads all non-empty rows from the ESCALATION_STEPS config column.
  * @returns {Array} Array of step values that trigger escalation alerts
  * @private
  */
 function getEscalationSteps_() {
-  var configValue = getConfigValue_(CONFIG_COLS.ESCALATION_STEPS);
-
-  if (configValue) {
-    return configValue.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var values = getConfigValues(configSheet, CONFIG_COLS.ESCALATION_STEPS);
+      if (values.length > 0) return values;
+    }
+  } catch (e) {
+    console.log('Error reading escalation steps: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
