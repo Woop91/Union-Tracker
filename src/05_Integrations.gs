@@ -1648,7 +1648,7 @@ function doGet(e) {
     var html = getUnifiedDashboardHtml(isPII);
     return HtmlService.createHtmlOutput(html)
       .setTitle(title)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
   }
 
@@ -1686,7 +1686,7 @@ function doGet(e) {
         var authHtml = getMemberSelfServicePortalHtml();
         return HtmlService.createHtmlOutput(authHtml)
           .setTitle('Member Login')
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
           .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
       }
     }
@@ -1766,7 +1766,7 @@ function doGet(e) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
 }
 
