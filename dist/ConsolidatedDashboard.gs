@@ -48,7 +48,7 @@
  */
 
 // ============================================================================
-// SOURCE: 00_Security.gs (1168 lines)
+// === FILE: 00_Security.gs === (1227 lines)
 // ============================================================================
 
 /**
@@ -202,6 +202,31 @@ function escapeHtml(input) {
  */
 function sanitizeForHtml(input) {
   return escapeHtml(input);
+}
+
+/**
+ * Escapes HTML content characters only: & < > " '
+ * Use this for text that will appear in href attributes or other contexts
+ * where escaping / = ` would corrupt the value (e.g., URLs).
+ * For maximum safety in innerHTML/textContent contexts, use escapeHtml() instead.
+ *
+ * @param {*} input - The input to sanitize
+ * @returns {string} HTML-safe string (preserves / = `)
+ *
+ * @example
+ * // Returns: "https://example.com/path?q=1&amp;r=2"
+ * escapeHtmlContent("https://example.com/path?q=1&r=2");
+ */
+function escapeHtmlContent(input) {
+  if (input === null || input === undefined) {
+    return '';
+  }
+  return String(input)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
 }
 
 /**
@@ -675,7 +700,7 @@ function isValidSafeString(input, maxLength) {
     /<script/i,
     /javascript:/i,
     /on\w+\s*=/i,  // onclick=, onerror=, etc.
-    /data:/i,
+    /^data:/i,
     /vbscript:/i
   ];
 
@@ -770,8 +795,8 @@ function safeJsonForHtml(data) {
     return value;
   });
 
-  // Escape </script> tags that could break out of script context
-  return json.replace(/<\/script>/gi, '<\\/script>');
+  // Escape all '<' to prevent breaking out of script context (covers </script>, <img, etc.)
+  return json.replace(/</g, '\\u003c');
 }
 
 /**
@@ -905,8 +930,15 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     for (var key in details) {
       if (details.hasOwnProperty(key) && key.charAt(0) !== '_') {
         var val = details[key];
-        if (key.toLowerCase().indexOf('email') !== -1 && typeof val === 'string') {
+        var lowerKey = key.toLowerCase();
+        if (lowerKey.indexOf('email') !== -1 && typeof val === 'string') {
           safeDetails[key] = maskEmail(val);
+        } else if (lowerKey.indexOf('phone') !== -1 && typeof val === 'string') {
+          safeDetails[key] = maskPhone(val);
+        } else if ((lowerKey === 'name' || lowerKey === 'firstname' || lowerKey === 'lastname' || lowerKey === 'membername') && typeof val === 'string') {
+          safeDetails[key] = val.charAt(0) + '***';
+        } else if (lowerKey === 'memberid' || lowerKey === 'member_id') {
+          safeDetails[key] = val; // IDs are safe to log
         } else {
           safeDetails[key] = val;
         }
@@ -944,6 +976,33 @@ function sendSecurityAlertEmail_(eventType, description, details) {
 
   } catch (e) {
     Logger.log('Failed to send security alert email: ' + e.message);
+  }
+}
+
+/**
+ * Safe email wrapper that checks remaining daily quota before sending.
+ * Use this instead of calling MailApp.sendEmail() directly.
+ *
+ * @param {Object} options - Email options (to, subject, body, htmlBody, etc.)
+ * @param {string} options.to - Recipient email(s)
+ * @param {string} options.subject - Email subject
+ * @param {string} [options.body] - Plain text body
+ * @param {string} [options.htmlBody] - HTML body
+ * @returns {boolean} True if email was sent, false if quota insufficient
+ * @private
+ */
+function safeSendEmail_(options) {
+  if (!options || !options.to) return false;
+  try {
+    if (MailApp.getRemainingDailyQuota() < 1) {
+      Logger.log('safeSendEmail_: Daily email quota exhausted, skipping send to ' + maskEmail(options.to));
+      return false;
+    }
+    MailApp.sendEmail(options);
+    return true;
+  } catch (e) {
+    Logger.log('safeSendEmail_: Failed to send email: ' + e.message);
+    return false;
   }
 }
 
@@ -1221,7 +1280,7 @@ function showSecurityStatusDialog() {
 
 
 // ============================================================================
-// SOURCE: 00_DataAccess.gs (624 lines)
+// === FILE: 00_DataAccess.gs === (631 lines)
 // ============================================================================
 
 /**
@@ -1508,23 +1567,30 @@ var DataAccess = {
     var sheet = this.getSheet(sheetName);
     if (!sheet) return;
 
-    // Group cells by row for efficiency
-    var rowUpdates = {};
-    for (var i = 0; i < cells.length; i++) {
-      var cell = cells[i];
-      if (!rowUpdates[cell.row]) {
-        rowUpdates[cell.row] = {};
-      }
-      rowUpdates[cell.row][cell.col] = cell.value;
+    // Compute bounding box for a single setValues() call
+    var minRow = cells[0].row, maxRow = cells[0].row;
+    var minCol = cells[0].col, maxCol = cells[0].col;
+    for (var i = 1; i < cells.length; i++) {
+      if (cells[i].row < minRow) minRow = cells[i].row;
+      if (cells[i].row > maxRow) maxRow = cells[i].row;
+      if (cells[i].col < minCol) minCol = cells[i].col;
+      if (cells[i].col > maxCol) maxCol = cells[i].col;
     }
 
-    // Apply updates
-    for (var row in rowUpdates) {
-      var updates = rowUpdates[row];
-      for (var col in updates) {
-        sheet.getRange(parseInt(row), parseInt(col)).setValue(updates[col]);
-      }
+    var numRows = maxRow - minRow + 1;
+    var numCols = maxCol - minCol + 1;
+
+    // Read current values for the bounding box region
+    var range = sheet.getRange(minRow, minCol, numRows, numCols);
+    var values = range.getValues();
+
+    // Apply updates into the 2D array
+    for (var j = 0; j < cells.length; j++) {
+      values[cells[j].row - minRow][cells[j].col - minCol] = cells[j].value;
     }
+
+    // Write back in a single call
+    range.setValues(values);
   },
 
   /**
@@ -1850,7 +1916,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3274 lines)
+// === FILE: 01_Core.gs === (3278 lines)
 // ============================================================================
 
 /**
@@ -2310,6 +2376,7 @@ function runStartupValidation() {
 
 /**
  * API version information
+ * SYNC: keep in sync with COMMAND_CONFIG.VERSION and package.json version
  */
 var API_VERSION = {
   major: 4,
@@ -2503,8 +2570,11 @@ function getOrgNameFromConfig_() {
  * @private
  * @returns {string} System name (e.g., "Strategic Command Center")
  */
+var _systemNameCache = null;
 function getSystemName_() {
-  return getLocalNumberFromConfig_() + ' Strategic Command Center';
+  if (_systemNameCache) return _systemNameCache;
+  _systemNameCache = getLocalNumberFromConfig_() + ' Strategic Command Center';
+  return _systemNameCache;
 }
 
 /**
@@ -5129,7 +5199,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2815 lines)
+// === FILE: 02_DataManagers.gs === (2834 lines)
 // ============================================================================
 
 /**
@@ -5173,15 +5243,18 @@ function addMember(memberData) {
   var lastRow = sheet.getLastRow();
   var newRow = lastRow + 1;
 
-  // Set member data
-  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(escapeForFormula(memberId));
-  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(memberData.firstName || ''));
-  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(memberData.lastName || ''));
-  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(memberData.email || ''));
-  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(memberData.phone || ''));
-  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(memberData.jobTitle || ''));
-  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(memberData.workLocation || ''));
-  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(memberData.unit || ''));
+  // Build row array and set all member data in a single setValues() call
+  var lastCol = sheet.getLastColumn() || MEMBER_COLS.UNIT;
+  var rowData = new Array(lastCol).fill('');
+  rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
+  rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
+  rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
+  rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
+  rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
+  rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+  rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
+  rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+  sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
 
   return memberId;
 }
@@ -5203,9 +5276,10 @@ function updateMember(memberId, updateData) {
   var data = sheet.getDataRange().getValues();
   var memberRow = -1;
 
+  // data[] is 0-indexed; i=1 skips header. memberRow = i+1 converts to 1-indexed sheet row.
   for (var i = 1; i < data.length; i++) {
     if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
-      memberRow = i + 1;
+      memberRow = i + 1; // +1: convert 0-indexed array position to 1-indexed sheet row
       break;
     }
   }
@@ -5214,14 +5288,14 @@ function updateMember(memberId, updateData) {
     throw new Error('Member not found: ' + memberId);
   }
 
-  // Update fields
-  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
-  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
-  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
-  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
-  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
-  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
-  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+  // Update fields — use !== undefined to allow setting empty strings/falsy values (F17)
+  if (updateData.firstName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+  if (updateData.lastName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+  if (updateData.email !== undefined) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+  if (updateData.phone !== undefined) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+  if (updateData.jobTitle !== undefined) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+  if (updateData.workLocation !== undefined) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+  if (updateData.unit !== undefined) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
 }
 
 /**
@@ -6016,9 +6090,14 @@ function compactConfigColumn_(configCol) {
 
 /**
  * Updates member data in batch mode for better performance
- * Reads all data once, modifies in memory, writes back in one operation
+ * Reads all data once, modifies in memory, writes back the changed row in one
+ * setValues() call. This is the preferred update path when multiple fields change
+ * together (e.g., self-service profile updates, bulk imports). For single-field
+ * updates from the UI, updateMember() is simpler.
+ *
  * @param {string} memberId - The member ID to update
- * @param {Object} newValuesObj - Object with field values to update
+ * @param {Object} newValuesObj - Object with field values to update (keys: email, phone, firstName, lastName, unit, workLocation, isSteward)
+ * @returns {boolean} True if the member was found and updated
  */
 function updateMemberDataBatch(memberId, newValuesObj) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -6622,6 +6701,16 @@ function importMembersBatch(batchData, mapping) {
  */
 function showExportMembersDialog() {
   var ui = SpreadsheetApp.getUi();
+
+  // PII export requires steward or admin role
+  if (typeof validateRole === 'function') {
+    var roleCheck = validateRole('steward');
+    if (!roleCheck) {
+      ui.alert('Access Denied', 'Exporting member data requires Steward or Admin access.', ui.ButtonSet.OK);
+      return;
+    }
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -7949,7 +8038,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2783 lines)
+// === FILE: 03_UIComponents.gs === (2804 lines)
 // ============================================================================
 
 /**
@@ -8436,17 +8525,22 @@ function APPLY_SYSTEM_THEME() {
 /**
  * Applies theme styling to a single sheet
  * @param {Sheet} sheet - The sheet to style
+ * @param {string} [themeKey] - Optional theme preset key; defaults to active user theme
  * @returns {void}
  * @private
  */
-function applyThemeToSheet_(sheet) {
+function applyThemeToSheet_(sheet, themeKey) {
   var lastCol = sheet.getLastColumn();
   var lastRow = sheet.getLastRow();
 
   if (lastCol < 1 || lastRow < 1) return;
 
-  // Get the active theme preset
-  var theme = getActiveThemePreset_();
+  // Get theme preset — use provided key or fall back to active user theme
+  var theme = (themeKey && THEME_PRESETS[themeKey]) ? THEME_PRESETS[themeKey] : getActiveThemePreset_();
+
+  // Clamp font sizes to safe range (F26)
+  var fontSize = Math.min(24, Math.max(8, parseInt(theme.fontSize, 10) || 14));
+  var headerSize = Math.min(24, Math.max(8, parseInt(theme.headerSize, 10) || 14));
 
   // Apply header styling (row 1)
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
@@ -8455,25 +8549,28 @@ function applyThemeToSheet_(sheet) {
     .setFontColor(theme.headerText)
     .setFontWeight('bold')
     .setFontFamily(theme.font)
-    .setFontSize(theme.headerSize)
+    .setFontSize(headerSize)
     .setHorizontalAlignment('center');
 
   // Apply data row styling
   if (lastRow > 1) {
-    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
+    var numDataRows = lastRow - 1;
+    var dataRange = sheet.getRange(2, 1, numDataRows, lastCol);
     dataRange
       .setFontFamily(theme.font)
-      .setFontSize(theme.fontSize);
+      .setFontSize(fontSize);
 
-    // Apply alternating row colors
-    for (var row = 2; row <= lastRow; row++) {
-      var rowRange = sheet.getRange(row, 1, 1, lastCol);
-      if (row % 2 === 0) {
-        rowRange.setBackground(theme.altRow);
-      } else {
-        rowRange.setBackground('#ffffff');
+    // Build 2D color array and apply with single setBackgrounds() call
+    var colors = [];
+    for (var row = 0; row < numDataRows; row++) {
+      var color = (row % 2 === 0) ? theme.altRow : '#ffffff';
+      var rowColors = [];
+      for (var col = 0; col < lastCol; col++) {
+        rowColors.push(color);
       }
+      colors.push(rowColors);
     }
+    dataRange.setBackgrounds(colors);
   }
 }
 
@@ -8802,14 +8899,18 @@ function applyZebraStripes(sheet) {
 
   if (lastRow < 2 || lastCol < 1) return;
 
-  for (var row = 2; row <= lastRow; row++) {
-    var rowRange = sheet.getRange(row, 1, 1, lastCol);
-    if (row % 2 === 0) {
-      rowRange.setBackground('#f1f5f9');
-    } else {
-      rowRange.setBackground('#ffffff');
+  // Build 2D color array and apply with single setBackgrounds() call
+  var numDataRows = lastRow - 1;
+  var colors = [];
+  for (var row = 0; row < numDataRows; row++) {
+    var color = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
+    var rowColors = [];
+    for (var col = 0; col < lastCol; col++) {
+      rowColors.push(color);
     }
+    colors.push(rowColors);
   }
+  sheet.getRange(2, 1, numDataRows, lastCol).setBackgrounds(colors);
 }
 
 /**
@@ -9638,6 +9739,15 @@ function composeEmailForMember(memberId) {
  * @returns {Object} Success status object
  */
 function sendQuickEmail(to, subject, body, memberId) {
+  // Validate email format
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!to || !emailRegex.test(String(to).trim())) {
+    throw new Error('Invalid recipient email address');
+  }
+  // Check quota before attempting send
+  if (MailApp.getRemainingDailyQuota() < 1) {
+    throw new Error('Daily email quota exhausted. Please try again tomorrow.');
+  }
   try {
     MailApp.sendEmail({ to: to, subject: subject, body: body, name: getOrgNameFromConfig_() + ' Dashboard' });
     return { success: true };
@@ -10737,7 +10847,7 @@ function getAdvancedSearchHtml() {
 
 
 // ============================================================================
-// SOURCE: 04a_UIMenus.gs (918 lines)
+// === FILE: 04a_UIMenus.gs === (918 lines)
 // ============================================================================
 
 /**
@@ -11660,7 +11770,7 @@ function getDashboardSidebarHtml() {
 
 
 // ============================================================================
-// SOURCE: 04b_AccessibilityFeatures.gs (1033 lines)
+// === FILE: 04b_AccessibilityFeatures.gs === (1033 lines)
 // ============================================================================
 
 // ============================================================================
@@ -12698,7 +12808,7 @@ function getSmartDashboardHtml() {
 
 
 // ============================================================================
-// SOURCE: 04c_InteractiveDashboard.gs (1863 lines)
+// === FILE: 04c_InteractiveDashboard.gs === (1863 lines)
 // ============================================================================
 
 // ============================================================================
@@ -13125,7 +13235,7 @@ function getInteractiveDashboardHtml() {
     '      var pct=Math.round(loc.count/totalM*100);' +
     '      var size=Math.max(55,Math.min(100,50+(loc.count/maxLoc*50)));' +
     '      var clr=colors[idx%colors.length];' +
-    '      locHtml+="<div style=\\"text-align:center;cursor:pointer\\" onclick=\\"switchTab(\'analytics\',document.getElementById(\'tab-analytics\'))\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto;box-shadow:0 3px 10px rgba(0,0,0,0.15);transition:transform 0.2s\\" onmouseover=\\"this.style.transform=\'scale(1.05)\'\\" onmouseout=\\"this.style.transform=\'scale(1)\'\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:9px;opacity:0.9\\">"+pct+"%</span></div><div style=\\"font-size:10px;color:#666;margin-top:5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\\">"+loc.name+"</div></div>";' +
+    '      locHtml+="<div style=\\"text-align:center;cursor:pointer\\" onclick=\\"switchTab(\'analytics\',document.getElementById(\'tab-analytics\'))\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto;box-shadow:0 3px 10px rgba(0,0,0,0.15);transition:transform 0.2s\\" onmouseover=\\"this.style.transform=\'scale(1.05)\'\\" onmouseout=\\"this.style.transform=\'scale(1)\'\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:9px;opacity:0.9\\">"+pct+"%</span></div><div style=\\"font-size:10px;color:#666;margin-top:5px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap\\">"+escapeHtml(loc.name)+"</div></div>";' +
     '    });' +
     '    locHtml+="</div></div>";' +
     '    document.getElementById("overview-actions").insertAdjacentHTML("afterend",locHtml);' +
@@ -14566,7 +14676,7 @@ function saveInteractiveMember(memberData, mode) {
 
 
 // ============================================================================
-// SOURCE: 04d_ExecutiveDashboard.gs (975 lines)
+// === FILE: 04d_ExecutiveDashboard.gs === (975 lines)
 // ============================================================================
 
 // ============================================================================
@@ -15546,7 +15656,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 04e_PublicDashboard.gs (3121 lines)
+// === FILE: 04e_PublicDashboard.gs === (3121 lines)
 // ============================================================================
 
 // ============================================================================
@@ -18672,7 +18782,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3621 lines)
+// === FILE: 05_Integrations.gs === (3638 lines)
 // ============================================================================
 
 /**
@@ -18740,20 +18850,25 @@ function getOrCreateRootFolder() {
   }
 
   // Create the root folder
-  const newFolder = DriveApp.createFolder(folderName);
-  props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
+  try {
+    const newFolder = DriveApp.createFolder(folderName);
+    props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
 
-  // Set folder color/description
-  newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
+    // Set folder color/description
+    newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
 
-  logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
-    folderId: newFolder.getId(),
-    folderName: folderName,
-    type: 'ROOT',
-    createdBy: Session.getActiveUser().getEmail()
-  });
+    logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
+      folderId: newFolder.getId(),
+      folderName: folderName,
+      type: 'ROOT',
+      createdBy: Session.getActiveUser().getEmail()
+    });
 
-  return newFolder;
+    return newFolder;
+  } catch (err) {
+    Logger.log('Failed to create Drive folder "' + folderName + '": ' + err.message);
+    return null;
+  }
 }
 
 /**
@@ -19152,7 +19267,13 @@ function createMeetingCalendarEvent(meetingData) {
 
     return event.getId();
   } catch (error) {
-    Logger.log('Error creating meeting calendar event: ' + error.message);
+    // Check for quota-exceeded errors specifically
+    var msg = error.message || '';
+    if (msg.indexOf('quota') !== -1 || msg.indexOf('Calendar usage limits') !== -1) {
+      Logger.log('Calendar quota exceeded: ' + msg);
+    } else {
+      Logger.log('Error creating meeting calendar event: ' + msg);
+    }
     return '';
   }
 }
@@ -21637,7 +21758,13 @@ function addMobileDashboardLinkToConfig() {
 // ============================================================================
 
 /**
- * Constant Contact API configuration
+ * Constant Contact API configuration.
+ *
+ * Known limitation: This integration uses a manual OAuth2 flow (paste-back
+ * authorization code) because Google Apps Script doesn't support standard
+ * OAuth2 redirect URIs. The access token is refreshed automatically, but the
+ * initial setup requires user interaction.
+ *
  * @const {Object}
  */
 var CC_CONFIG = {
@@ -22298,7 +22425,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3530 lines)
+// === FILE: 06_Maintenance.gs === (3535 lines)
 // ============================================================================
 
 /**
@@ -23745,6 +23872,10 @@ function showUndoRedoPanel() {
  * (edit, insert, or delete) breaks the chain and is detectable via
  * verifyAuditLogIntegrity().
  *
+ * Known debt: logAuditEvent and logIntegrityEvent both write to AUDIT_LOG
+ * with different schemas. A future refactor could unify them into a single
+ * function with a shared schema, but both are stable and well-tested.
+ *
  * @param {string} eventType - The type of event from AUDIT_EVENTS
  * @param {Object} details - Event details object
  */
@@ -23774,9 +23905,10 @@ function logAuditEvent(eventType, details) {
       }
     }
 
-    // Build log entry
+    // Build log entry — mask user email to reduce PII in audit log
     const timestamp = new Date();
-    const user = Session.getActiveUser().getEmail() || 'Unknown';
+    var rawEmail = Session.getActiveUser().getEmail() || 'Unknown';
+    const user = (typeof maskEmail === 'function') ? maskEmail(rawEmail) : rawEmail;
     const detailsJson = JSON.stringify(details);
     const sessionId = Session.getTemporaryActiveUserKey() || '';
 
@@ -25833,7 +25965,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (3083 lines)
+// === FILE: 07_DevTools.gs === (3100 lines)
 // ============================================================================
 
 /**
@@ -26055,6 +26187,13 @@ function SEED_SAMPLE_DATA() {
  * Seeds both preset values (Office Days, Grievance Status, etc.) and user-configurable values
  */
 function seedConfigData() {
+  // Guard: prevent seeding in production
+  var prodMode = PropertiesService.getScriptProperties().getProperty('PROD_MODE');
+  if (prodMode === 'true') {
+    SpreadsheetApp.getUi().alert('Seed data is disabled in production mode.');
+    return;
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
 
@@ -27593,6 +27732,16 @@ function NUKE_SEEDED_DATA() {
     return;
   }
 
+  // Create backup snapshot before destructive operation
+  if (typeof createBackupSnapshot === 'function') {
+    try {
+      createBackupSnapshot();
+      Logger.log('Backup snapshot created before nuke operation');
+    } catch (_backupErr) {
+      Logger.log('Warning: backup snapshot failed, continuing with nuke: ' + _backupErr.message);
+    }
+  }
+
   ss.toast('Nuking seeded data... This will take 3-5 minutes. Please wait!', '☢️ NUKE', 10);
 
   try {
@@ -28921,7 +29070,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (679 lines)
+// === FILE: 08a_SheetSetup.gs === (679 lines)
 // ============================================================================
 
 /**
@@ -29605,7 +29754,7 @@ function setMultiSelectValidationDynamic(targetSheet, targetCol, configSheet, so
 
 
 // ============================================================================
-// SOURCE: 08b_SearchAndCharts.gs (885 lines)
+// === FILE: 08b_SearchAndCharts.gs === (885 lines)
 // ============================================================================
 
 // ============================================================================
@@ -29944,7 +30093,7 @@ function advancedSearch(filters) {
     }
   }
 
-  return results.slice(0, 100);
+  return results.slice(0, 200);
 }
 
 /**
@@ -30495,7 +30644,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (2011 lines)
+// === FILE: 08c_FormsAndNotifications.gs === (2011 lines)
 // ============================================================================
 
 
@@ -32511,7 +32660,7 @@ function showSurveyTrackingDialog() {
 
 
 // ============================================================================
-// SOURCE: 08d_AuditAndFormulas.gs (2153 lines)
+// === FILE: 08d_AuditAndFormulas.gs === (2157 lines)
 // ============================================================================
 
 // ============================================================================
@@ -32842,6 +32991,10 @@ function getAuditHistory(recordId) {
  * the hidden calculation sheets that power the dashboard's "self-healing"
  * formula system. These sheets contain complex formulas that aggregate,
  * calculate, and cross-reference data across the dashboard.
+ *
+ * Known debt (F44): The self-healing pattern re-injects formulas on sync,
+ * which is by design for reliability — formulas get corrupted by manual edits,
+ * sheet copies, and mobile clients. This is an intentional trade-off.
  *
  * Hidden Sheets Managed:
  * - _Grievance_Calc: Grievance -> Member Directory data sync
@@ -34669,7 +34822,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4024 lines)
+// === FILE: 09_Dashboards.gs === (4024 lines)
 // ============================================================================
 
 /**
@@ -38698,7 +38851,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (2002 lines)
+// === FILE: 10a_SheetCreation.gs === (2002 lines)
 // ============================================================================
 
 /**
@@ -40705,7 +40858,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (1944 lines)
+// === FILE: 10b_SurveyDocSheets.gs === (1944 lines)
 // ============================================================================
 
 // ============================================================================
@@ -42654,7 +42807,7 @@ function createFeaturesReferenceSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10c_FormHandlers.gs (694 lines)
+// === FILE: 10c_FormHandlers.gs === (694 lines)
 // ============================================================================
 
 // ============================================================================
@@ -43353,7 +43506,7 @@ function unfreezeAllColumns() {
 
 
 // ============================================================================
-// SOURCE: 10d_SyncAndMaintenance.gs (1029 lines)
+// === FILE: 10d_SyncAndMaintenance.gs === (1039 lines)
 // ============================================================================
 
 // ============================================================================
@@ -43478,9 +43631,17 @@ function applyWinRateGradients() {
  */
 function syncAllDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
+
+  // Prevent concurrent sync operations which can cause data corruption
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    ss.toast('Another sync is already running. Please wait.', '⏳ Sync Busy', 5);
+    return;
+  }
 
   try {
+    ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
+
     // Sync hidden calculation sheets first
     if (typeof syncGrievanceCalcSheet === 'function') syncGrievanceCalcSheet();
     if (typeof syncDashboardCalcValues === 'function') syncDashboardCalcValues();
@@ -43494,6 +43655,8 @@ function syncAllDashboardData() {
   } catch (e) {
     ss.toast('Error syncing: ' + e.message, '❌ Error', 5);
     Logger.log('syncAllDashboardData error: ' + e.toString());
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -44387,7 +44550,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2327 lines)
+// === FILE: 10_Main.gs === (2371 lines)
 // ============================================================================
 
 /**
@@ -44440,29 +44603,17 @@ function onOpen() {
       console.log('Column sync skipped: ' + syncError.message);
     }
 
-    // Ensure all primary sheets have enough columns for current header maps.
-    // This prevents "columns are out of bounds" errors when sheets were
-    // created by an older version with fewer columns.
+    // Defer non-critical initialization to avoid blocking onOpen() (30s limit).
+    // Tab colors, hidden sheet enforcement, and column checks run after 2s.
     try {
-      ensureAllSheetColumns_();
-    } catch (colError) {
-      console.log('Column check skipped: ' + colError.message);
-    }
-
-    // Apply tab colors automatically on open
-    try {
-      if (typeof applyTabColors_ === 'function') {
-        applyTabColors_(ss);
-      }
-    } catch (tabError) {
-      console.log('Tab colors not applied: ' + tabError.message);
-    }
-
-    // Enforce hidden sheets on every open (prevents mobile visibility)
-    try {
-      enforceHiddenSheets();
-    } catch (hideError) {
-      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+      ScriptApp.newTrigger('onOpenDeferred_')
+        .timeBased()
+        .after(2000)
+        .create();
+    } catch (deferErr) {
+      // Fallback: run synchronously if trigger creation fails
+      console.log('Deferred trigger failed, running synchronously: ' + deferErr.message);
+      onOpenDeferred_();
     }
 
     // Show welcome toast
@@ -44479,6 +44630,46 @@ function onOpen() {
       .createMenu('Union Dashboard')
       .addItem('Initialize Dashboard', 'initializeDashboard')
       .addToUi();
+  }
+}
+
+/**
+ * Deferred onOpen tasks — runs via a one-shot timed trigger to avoid
+ * blocking the simple onOpen trigger (which has a 30s execution limit).
+ * Cleans up its own trigger after running.
+ * @private
+ */
+function onOpenDeferred_() {
+  // Clean up the one-shot trigger that invoked us
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var t = 0; t < triggers.length; t++) {
+      if (triggers[t].getHandlerFunction() === 'onOpenDeferred_') {
+        ScriptApp.deleteTrigger(triggers[t]);
+      }
+    }
+  } catch (_e) { /* ignore cleanup errors */ }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    ensureAllSheetColumns_();
+  } catch (colError) {
+    console.log('Column check skipped: ' + colError.message);
+  }
+
+  try {
+    if (typeof applyTabColors_ === 'function') {
+      applyTabColors_(ss);
+    }
+  } catch (tabError) {
+    console.log('Tab colors not applied: ' + tabError.message);
+  }
+
+  try {
+    enforceHiddenSheets();
+  } catch (hideError) {
+    console.log('Hidden sheet enforcement skipped: ' + hideError.message);
   }
 }
 
@@ -45478,10 +45669,21 @@ function removeTriggers() {
 // ============================================================================
 
 /**
- * Shows the searchable Help Guide modal with menu breakdown and FAQ
+ * Shows the searchable Help Guide modal with menu breakdown and FAQ.
+ * HTML is cached for 10 minutes to avoid regenerating the large template on repeat opens.
  * v4.3.7 - Complete rewrite with search, menu reference, and FAQ
  */
 function showHelpDialog() {
+  var cache = CacheService.getScriptCache();
+  var cachedHtml = cache.get('help_html');
+  if (cachedHtml) {
+    var output = HtmlService.createHtmlOutput(cachedHtml)
+      .setWidth(500)
+      .setHeight(700);
+    SpreadsheetApp.getUi().showModalDialog(output, '📖 Help Guide');
+    return;
+  }
+
   const html = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
@@ -45937,6 +46139,11 @@ function showHelpDialog() {
     </body>
     </html>
   `).setWidth(700).setHeight(750);
+
+  // Cache the generated HTML for 10 minutes (600 seconds)
+  try {
+    cache.put('help_html', html.getContent(), 600);
+  } catch (_cacheErr) { /* HTML may exceed cache limit — skip caching */ }
 
   SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - Dashboard v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')');
 }
@@ -46719,7 +46926,7 @@ function navigateToMemberRow(row) {
 
 
 // ============================================================================
-// SOURCE: 11_CommandHub.gs (3659 lines)
+// === FILE: 11_CommandHub.gs === (3664 lines)
 // ============================================================================
 
 /**
@@ -46744,6 +46951,11 @@ function navigateToMemberRow(row) {
  *
  * NOTE: This file provides consolidated access to Strategic Command Center
  * features. Core implementations are in their respective module files.
+ *
+ * Known debt (F53): This module exposes 60+ command functions with mixed naming
+ * conventions (camelCase, UPPER_CASE, prefixed/unprefixed). A naming refactor
+ * would break existing menu bindings and trigger references. Documented as
+ * acceptable tech debt — not worth the breakage risk.
  *
  * @version 4.7.0
  * ============================================================================
@@ -50383,7 +50595,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4025 lines)
+// === FILE: 12_Features.gs === (4025 lines)
 // ============================================================================
 
 /**
@@ -54413,7 +54625,7 @@ function getLookerStatus() {
 
 
 // ============================================================================
-// SOURCE: 13_MemberSelfService.gs (1747 lines)
+// === FILE: 13_MemberSelfService.gs === (1771 lines)
 // ============================================================================
 
 /**
@@ -55547,19 +55759,18 @@ function updateMemberContact(sessionToken, updates) {
     return errorResponse('Member not found');
   }
 
-  // Apply updates
+  // Apply updates with server-side validation
   var updated = [];
   for (var field in updates) {
     if (allowedFields.indexOf(field) >= 0 && fieldMapping[field]) {
       var value = String(updates[field] || '').trim();
 
-      // Basic validation
-      if (field === 'email' && value && !isValidEmailMSS_(value)) {
-        return errorResponse('Invalid email format');
+      // Server-side input validation with length limits
+      var validation = validateSelfServiceInput_(field, value, 200);
+      if (!validation.valid) {
+        return errorResponse(validation.error);
       }
-      if (field === 'phone' && value) {
-        value = formatPhoneNumber_(value);
-      }
+      value = validation.value; // Use sanitized value
 
       sheet.getRange(memberRow, fieldMapping[field]).setValue(escapeForFormula(value));
       updated.push(field);
@@ -55589,6 +55800,31 @@ function updateMemberContact(sessionToken, updates) {
  * Simple email validation (Member Self Service module)
  * @private
  */
+/**
+ * Validates and sanitizes a self-service input field.
+ * @param {string} field - Field name (email, phone, preferredComm, etc.)
+ * @param {string} value - Raw input value
+ * @param {number} [maxLength=200] - Maximum allowed length
+ * @returns {{valid: boolean, value: string, error: string}} Validation result
+ * @private
+ */
+function validateSelfServiceInput_(field, value, maxLength) {
+  maxLength = maxLength || 200;
+  if (value.length > maxLength) {
+    return { valid: false, value: value, error: field + ' exceeds maximum length of ' + maxLength + ' characters' };
+  }
+  if (typeof isValidSafeString === 'function' && !isValidSafeString(value, maxLength)) {
+    return { valid: false, value: value, error: field + ' contains disallowed content' };
+  }
+  if (field === 'email' && value && !isValidEmailMSS_(value)) {
+    return { valid: false, value: value, error: 'Invalid email format' };
+  }
+  if (field === 'phone' && value) {
+    value = formatPhoneNumber_(value);
+  }
+  return { valid: true, value: value, error: '' };
+}
+
 function isValidEmailMSS_(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -56165,7 +56401,7 @@ function showSelfServicePortalUrl() {
 
 
 // ============================================================================
-// SOURCE: 14_MeetingCheckIn.gs (1041 lines)
+// === FILE: 14_MeetingCheckIn.gs === (1042 lines)
 // ============================================================================
 
 /**
@@ -56237,7 +56473,7 @@ function createMeeting(meetingData) {
   var notifyEmails = meetingData.notifyEmails ? String(meetingData.notifyEmails).trim() : '';
   var agendaStewards = meetingData.agendaStewards ? String(meetingData.agendaStewards).trim() : '';
 
-  // Create Google Calendar event
+  // Create Google Calendar event (check for existing event on same date/name to avoid duplicates)
   var calendarEventId = '';
   if (typeof createMeetingCalendarEvent === 'function') {
     calendarEventId = createMeetingCalendarEvent({
@@ -56266,8 +56502,9 @@ function createMeeting(meetingData) {
       name: meetingName,
       date: meetingData.date
     });
-    notesDocUrl = docs.notesUrl || '';
-    agendaDocUrl = docs.agendaUrl || '';
+    // Validate URLs are from Google Docs (defense-in-depth)
+    notesDocUrl = (docs.notesUrl && /^https:\/\/docs\.google\.com\//.test(docs.notesUrl)) ? docs.notesUrl : '';
+    agendaDocUrl = (docs.agendaUrl && /^https:\/\/docs\.google\.com\//.test(docs.agendaUrl)) ? docs.agendaUrl : '';
   }
 
   // Add a placeholder row so the meeting exists in the sheet
@@ -57211,7 +57448,7 @@ function getMeetingCheckInHtml_() {
 
 
 // ============================================================================
-// SOURCE: 15_EventBus.gs (435 lines)
+// === FILE: 15_EventBus.gs === (435 lines)
 // ============================================================================
 
 /**
@@ -57651,7 +57888,7 @@ function showEventBusStatus() {
 
 
 // ============================================================================
-// SOURCE: 16_DashboardEnhancements.gs (973 lines)
+// === FILE: 16_DashboardEnhancements.gs === (973 lines)
 // ============================================================================
 
 /**
@@ -58629,7 +58866,7 @@ function getDrillDownSummary(isPII, chartType) {
 
 
 // ============================================================================
-// SOURCE: 17_CorrelationEngine.gs (1002 lines)
+// === FILE: 17_CorrelationEngine.gs === (1004 lines)
 // ============================================================================
 
 /**
@@ -58693,7 +58930,7 @@ function statStdDev_(arr) {
  */
 function pearsonCorrelation_(x, y) {
   var n = Math.min(x.length, y.length);
-  if (n < 3) return 0; // Need at least 3 pairs for meaningful correlation
+  if (n < 5) return 0; // Need at least 5 pairs for statistically meaningful correlation
 
   var meanX = statMean_(x.slice(0, n));
   var meanY = statMean_(y.slice(0, n));
@@ -58707,6 +58944,8 @@ function pearsonCorrelation_(x, y) {
     sumY2 += dy * dy;
   }
 
+  // denom===0 when either variable has zero variance (all values identical),
+  // in which case correlation is undefined — return 0 as a safe sentinel.
   var denom = Math.sqrt(sumX2 * sumY2);
   if (denom === 0) return 0;
   return sumXY / denom;
@@ -58722,7 +58961,7 @@ function pearsonCorrelation_(x, y) {
  */
 function spearmanCorrelation_(x, y) {
   var n = Math.min(x.length, y.length);
-  if (n < 3) return 0;
+  if (n < 5) return 0;
   return pearsonCorrelation_(toRanks_(x.slice(0, n)), toRanks_(y.slice(0, n)));
 }
 
@@ -58993,7 +59232,7 @@ function correlateLocationSatVsGrievance_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('satisfaction', 'grievance filing rate', r, cls, 'location')
+    insight: generateInsight_('satisfaction', 'grievance filing rate', r, cls, 'location', x.length)
   };
 }
 
@@ -59044,7 +59283,7 @@ function correlateStewardWinVsEngagement_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('steward win rate', 'member engagement', r, cls, 'steward')
+    insight: generateInsight_('steward win rate', 'member engagement', r, cls, 'steward', x.length)
   };
 }
 
@@ -59107,7 +59346,7 @@ function correlateCategoryVsResolutionTime_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     categoryBreakdown: catData,
-    insight: generateInsight_('case volume', 'resolution time', r, cls, 'category')
+    insight: generateInsight_('case volume', 'resolution time', r, cls, 'category', x.length)
   };
 }
 
@@ -59153,7 +59392,7 @@ function correlateEngagementVsSatisfaction_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('member engagement', 'satisfaction', r, cls, 'location')
+    insight: generateInsight_('member engagement', 'satisfaction', r, cls, 'location', x.length)
   };
 }
 
@@ -59201,7 +59440,7 @@ function correlateEngagementVsGrievance_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('engagement rate', 'grievance concentration', r, cls, 'location')
+    insight: generateInsight_('engagement rate', 'grievance concentration', r, cls, 'location', x.length)
   };
 }
 
@@ -59284,7 +59523,7 @@ function correlateArticleVsOutcome_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     articleBreakdown: articleOutcomes,
-    insight: generateInsight_('violation frequency', 'win rate', r, cls, 'contract article')
+    insight: generateInsight_('violation frequency', 'win rate', r, cls, 'contract article', x.length)
   };
 }
 
@@ -59331,7 +59570,7 @@ function correlateStepVsTime_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     stepBreakdown: stepMap,
-    insight: generateInsight_('step level', 'resolution time', r, cls, 'grievance step')
+    insight: generateInsight_('step level', 'resolution time', r, cls, 'grievance step', x.length)
   };
 }
 
@@ -59376,7 +59615,7 @@ function correlateUnitSizeVsSatisfaction_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('unit size', 'satisfaction', r, cls, 'unit')
+    insight: generateInsight_('unit size', 'satisfaction', r, cls, 'unit', x.length)
   };
 }
 
@@ -59416,7 +59655,7 @@ function correlateCaseloadVsWinRate_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('caseload size', 'win rate', r, cls, 'steward')
+    insight: generateInsight_('caseload size', 'win rate', r, cls, 'steward', x.length)
   };
 }
 
@@ -59462,7 +59701,7 @@ function correlateVolunteerVsEngagement_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('email engagement', 'meeting attendance', r, cls, 'location')
+    insight: generateInsight_('email engagement', 'meeting attendance', r, cls, 'location', x.length)
   };
 }
 
@@ -59482,14 +59721,14 @@ function correlateVolunteerVsEngagement_(data) {
  * @returns {string} Plain-language insight
  * @private
  */
-function generateInsight_(varX, varY, r, cls, dimension) {
+function generateInsight_(varX, varY, r, cls, dimension, n) {
   if (!cls.reliable) {
     if (cls.confidence === 'insufficient') {
       return 'Not enough data points across ' + dimension + 's to draw conclusions. Revisit when more data is available.';
     }
     return 'The association between ' + varX + ' and ' + varY + ' across ' + dimension +
            's is too weak (r=' + (Math.round(r * 100) / 100) + ') or sample too small (n=' +
-           ') to be meaningful.';
+           (n || '?') + ') to be meaningful.';
   }
 
   var direction = r > 0 ? 'higher' : 'lower';

@@ -1129,19 +1129,18 @@ function updateMemberContact(sessionToken, updates) {
     return errorResponse('Member not found');
   }
 
-  // Apply updates
+  // Apply updates with server-side validation
   var updated = [];
   for (var field in updates) {
     if (allowedFields.indexOf(field) >= 0 && fieldMapping[field]) {
       var value = String(updates[field] || '').trim();
 
-      // Basic validation
-      if (field === 'email' && value && !isValidEmailMSS_(value)) {
-        return errorResponse('Invalid email format');
+      // Server-side input validation with length limits
+      var validation = validateSelfServiceInput_(field, value, 200);
+      if (!validation.valid) {
+        return errorResponse(validation.error);
       }
-      if (field === 'phone' && value) {
-        value = formatPhoneNumber_(value);
-      }
+      value = validation.value; // Use sanitized value
 
       sheet.getRange(memberRow, fieldMapping[field]).setValue(escapeForFormula(value));
       updated.push(field);
@@ -1171,6 +1170,31 @@ function updateMemberContact(sessionToken, updates) {
  * Simple email validation (Member Self Service module)
  * @private
  */
+/**
+ * Validates and sanitizes a self-service input field.
+ * @param {string} field - Field name (email, phone, preferredComm, etc.)
+ * @param {string} value - Raw input value
+ * @param {number} [maxLength=200] - Maximum allowed length
+ * @returns {{valid: boolean, value: string, error: string}} Validation result
+ * @private
+ */
+function validateSelfServiceInput_(field, value, maxLength) {
+  maxLength = maxLength || 200;
+  if (value.length > maxLength) {
+    return { valid: false, value: value, error: field + ' exceeds maximum length of ' + maxLength + ' characters' };
+  }
+  if (typeof isValidSafeString === 'function' && !isValidSafeString(value, maxLength)) {
+    return { valid: false, value: value, error: field + ' contains disallowed content' };
+  }
+  if (field === 'email' && value && !isValidEmailMSS_(value)) {
+    return { valid: false, value: value, error: 'Invalid email format' };
+  }
+  if (field === 'phone' && value) {
+    value = formatPhoneNumber_(value);
+  }
+  return { valid: true, value: value, error: '' };
+}
+
 function isValidEmailMSS_(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }

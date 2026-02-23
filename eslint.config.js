@@ -79,6 +79,8 @@ module.exports = [
         isValidSafeString: 'readonly',
         isValidMemberId: 'readonly',
         isValidGrievanceId: 'readonly',
+        escapeHtmlContent: 'readonly',
+        safeSendEmail_: 'readonly',
 
         // Time utilities
         calculateDeadline: 'readonly',
@@ -151,11 +153,11 @@ module.exports = [
       'no-inner-declarations': 'off',
       'no-case-declarations': 'off',
       'no-prototype-builtins': 'off',
-      'getter-return': 'off',
+      'getter-return': 'warn',
       'no-constant-condition': 'off',
       'no-control-regex': 'off',
-      'no-debugger': 'off',
-      'no-dupe-args': 'off',
+      'no-debugger': 'error',
+      'no-dupe-args': 'error',
       'no-dupe-else-if': 'off',
       'no-empty-character-class': 'off',
       'no-ex-assign': 'off',

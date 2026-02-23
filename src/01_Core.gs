@@ -455,6 +455,7 @@ function runStartupValidation() {
 
 /**
  * API version information
+ * SYNC: keep in sync with COMMAND_CONFIG.VERSION and package.json version
  */
 var API_VERSION = {
   major: 4,
@@ -648,8 +649,11 @@ function getOrgNameFromConfig_() {
  * @private
  * @returns {string} System name (e.g., "Strategic Command Center")
  */
+var _systemNameCache = null;
 function getSystemName_() {
-  return getLocalNumberFromConfig_() + ' Strategic Command Center';
+  if (_systemNameCache) return _systemNameCache;
+  _systemNameCache = getLocalNumberFromConfig_() + ' Strategic Command Center';
+  return _systemNameCache;
 }
 
 /**

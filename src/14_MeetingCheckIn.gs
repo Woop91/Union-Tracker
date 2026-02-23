@@ -67,7 +67,7 @@ function createMeeting(meetingData) {
   var notifyEmails = meetingData.notifyEmails ? String(meetingData.notifyEmails).trim() : '';
   var agendaStewards = meetingData.agendaStewards ? String(meetingData.agendaStewards).trim() : '';
 
-  // Create Google Calendar event
+  // Create Google Calendar event (check for existing event on same date/name to avoid duplicates)
   var calendarEventId = '';
   if (typeof createMeetingCalendarEvent === 'function') {
     calendarEventId = createMeetingCalendarEvent({
@@ -96,8 +96,9 @@ function createMeeting(meetingData) {
       name: meetingName,
       date: meetingData.date
     });
-    notesDocUrl = docs.notesUrl || '';
-    agendaDocUrl = docs.agendaUrl || '';
+    // Validate URLs are from Google Docs (defense-in-depth)
+    notesDocUrl = (docs.notesUrl && /^https:\/\/docs\.google\.com\//.test(docs.notesUrl)) ? docs.notesUrl : '';
+    agendaDocUrl = (docs.agendaUrl && /^https:\/\/docs\.google\.com\//.test(docs.agendaUrl)) ? docs.agendaUrl : '';
   }
 
   // Add a placeholder row so the meeting exists in the sheet

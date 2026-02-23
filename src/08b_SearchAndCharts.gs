@@ -334,7 +334,7 @@ function advancedSearch(filters) {
     }
   }
 
-  return results.slice(0, 100);
+  return results.slice(0, 200);
 }
 
 /**

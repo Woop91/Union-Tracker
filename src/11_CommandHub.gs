@@ -21,6 +21,11 @@
  * NOTE: This file provides consolidated access to Strategic Command Center
  * features. Core implementations are in their respective module files.
  *
+ * Known debt (F53): This module exposes 60+ command functions with mixed naming
+ * conventions (camelCase, UPPER_CASE, prefixed/unprefixed). A naming refactor
+ * would break existing menu bindings and trigger references. Documented as
+ * acceptable tech debt — not worth the breakage risk.
+ *
  * @version 4.7.0
  * ============================================================================
  */

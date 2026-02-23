@@ -1442,6 +1442,10 @@ function showUndoRedoPanel() {
  * (edit, insert, or delete) breaks the chain and is detectable via
  * verifyAuditLogIntegrity().
  *
+ * Known debt: logAuditEvent and logIntegrityEvent both write to AUDIT_LOG
+ * with different schemas. A future refactor could unify them into a single
+ * function with a shared schema, but both are stable and well-tested.
+ *
  * @param {string} eventType - The type of event from AUDIT_EVENTS
  * @param {Object} details - Event details object
  */
@@ -1471,9 +1475,10 @@ function logAuditEvent(eventType, details) {
       }
     }
 
-    // Build log entry
+    // Build log entry — mask user email to reduce PII in audit log
     const timestamp = new Date();
-    const user = Session.getActiveUser().getEmail() || 'Unknown';
+    var rawEmail = Session.getActiveUser().getEmail() || 'Unknown';
+    const user = (typeof maskEmail === 'function') ? maskEmail(rawEmail) : rawEmail;
     const detailsJson = JSON.stringify(details);
     const sessionId = Session.getTemporaryActiveUserKey() || '';
 

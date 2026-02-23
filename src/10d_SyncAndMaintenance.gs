@@ -120,9 +120,17 @@ function applyWinRateGradients() {
  */
 function syncAllDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
+
+  // Prevent concurrent sync operations which can cause data corruption
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    ss.toast('Another sync is already running. Please wait.', '⏳ Sync Busy', 5);
+    return;
+  }
 
   try {
+    ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
+
     // Sync hidden calculation sheets first
     if (typeof syncGrievanceCalcSheet === 'function') syncGrievanceCalcSheet();
     if (typeof syncDashboardCalcValues === 'function') syncDashboardCalcValues();
@@ -136,6 +144,8 @@ function syncAllDashboardData() {
   } catch (e) {
     ss.toast('Error syncing: ' + e.message, '❌ Error', 5);
     Logger.log('syncAllDashboardData error: ' + e.toString());
+  } finally {
+    lock.releaseLock();
   }
 }
 
