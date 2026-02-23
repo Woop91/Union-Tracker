@@ -3344,7 +3344,7 @@ function buildMemberPortal(memberId) {
   var html = getMemberPortalHtml_(profile);
   return HtmlService.createHtmlOutput(html)
     .setTitle('Member Portal - ' + profile.firstName)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 /**
@@ -3359,7 +3359,7 @@ function buildPublicPortal() {
   var html = getPublicPortalHtml_(stats, stewards, satisfaction);
   return HtmlService.createHtmlOutput(html)
     .setTitle('Union Member Portal')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 /**
