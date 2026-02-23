@@ -88,7 +88,7 @@ The script finds columns by header name (case-insensitive). At minimum:
 ## Push to GitHub (via Claude Code CLI)
 
 ```bash
-cd /path/to/MULTIPLE-SCRIPS-REPO
+cd /path/to/DDS-Dashboard
 git checkout -b web-dashboard
 # Copy all files from this directory into the repo
 git add .
