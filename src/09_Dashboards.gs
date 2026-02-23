@@ -257,7 +257,7 @@ function getSatisfactionDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allResponses=[];var currentFilter="all";var analyticsLoaded=false;var sectionsLoaded=false;' +
 
     // Tab switching
@@ -3371,7 +3371,7 @@ function getFlaggedSubmissionsHtml() {
     '<div id="content"><div class="empty-state">Loading...</div></div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function load(){google.script.run.withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
@@ -3494,6 +3494,13 @@ function approveFlaggedSubmission(rowNum) {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function rejectFlaggedSubmission(rowNum) {
+  // Verify caller is an authorized steward
+  var callerEmail = '';
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  if (!callerEmail) {
+    throw new Error('Authorization required: unable to verify user identity');
+  }
+
   // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
@@ -3505,7 +3512,7 @@ function rejectFlaggedSubmission(rowNum) {
       var vaultRow = i + 1;
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Rejected');
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
-      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
       break;
     }
   }
@@ -3587,7 +3594,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '.trend-area { margin-top: 10px; }' +
     '</style>' +
     '<script type="text/javascript">' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'google.charts.load("current", {"packages":["corechart", "gauge"]});' +
     'google.charts.setOnLoadCallback(drawCharts);' +
     'function drawCharts() {' +

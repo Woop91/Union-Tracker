@@ -48,7 +48,7 @@
  */
 
 // ============================================================================
-// SOURCE: 00_Security.gs (1158 lines)
+// SOURCE: 00_Security.gs (1168 lines)
 // ============================================================================
 
 /**
@@ -297,6 +297,11 @@ function buildSafeQuery(sheetName, query, headers) {
     .replace(/'/g, "''")
     .replace(/"/g, '\\"');
 
+  // Reject queries that could break out of the QUERY string context
+  if (/["\)]\s*[\+\&,]/.test(safeQuery) || /IMPORTRANGE|IMPORTDATA|IMPORTFEED|IMPORTHTML|IMAGE/i.test(safeQuery)) {
+    throw new Error('Query contains disallowed patterns');
+  }
+
   return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
 }
 
@@ -435,12 +440,17 @@ function validateWebAppRequest(e) {
   var result = {
     isValid: true,
     params: {},
-    errors: []
+    errors: [],
+    hasParams: false
   };
 
   if (!e || !e.parameter) {
-    return result;  // No parameters is valid
+    // No parameters is structurally valid; callers must check result.hasParams
+    // independently if they require specific parameters to be present.
+    return result;
   }
+
+  result.hasParams = !!(e && e.parameter && Object.keys(e.parameter).length > 0);
 
   // Validate and sanitize 'mode' parameter
   if (e.parameter.mode) {
@@ -1008,7 +1018,7 @@ function sendDailySecurityDigest() {
 
     // Gather recipients
     var recipients = [];
-    if (typeof getConfigValue_ === 'function') {
+    if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined') {
       try {
         var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
         var adminEmails = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
@@ -1840,7 +1850,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3261 lines)
+// SOURCE: 01_Core.gs (3274 lines)
 // ============================================================================
 
 /**
@@ -2004,12 +2014,14 @@ function logErrorToSheet_(errorInfo) {
       setSheetVeryHidden_(sheet);
     }
 
-    // Add error row
+    // Add error row (formula-protect user-influenced fields)
+    var safeContext = typeof escapeForFormula === 'function' ? escapeForFormula(errorInfo.context) : errorInfo.context;
+    var safeMessage = typeof escapeForFormula === 'function' ? escapeForFormula(errorInfo.message) : errorInfo.message;
     sheet.appendRow([
       errorInfo.timestamp,
       errorInfo.level,
-      errorInfo.context,
-      errorInfo.message,
+      safeContext,
+      safeMessage,
       errorInfo.user,
       ERROR_CONFIG.SHOW_STACK_TRACE ? errorInfo.stack : ''
     ]);
@@ -2056,8 +2068,19 @@ function showErrorNotification_(errorInfo) {
 function sendCriticalErrorNotification_(errorInfo) {
   try {
     var adminEmail = Session.getEffectiveUser().getEmail();
-    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
-    var body = 'A critical error occurred in the ' + COMMAND_CONFIG.SYSTEM_NAME + ':\n\n' +
+    var subject;
+    try {
+      subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
+    } catch (e) {
+      subject = 'Critical Error: ' + (errorInfo.context || 'Unknown');
+    }
+    var systemName;
+    try {
+      systemName = COMMAND_CONFIG.SYSTEM_NAME;
+    } catch (e) {
+      systemName = 'Union Dashboard';
+    }
+    var body = 'A critical error occurred in the ' + systemName + ':\n\n' +
                'Time: ' + errorInfo.timestamp + '\n' +
                'Context: ' + errorInfo.context + '\n' +
                'Message: ' + errorInfo.message + '\n' +
@@ -4193,9 +4216,9 @@ function getDeadlineRules() {
       var s2Appeal = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS).getValue());
       var s2Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS).getValue());
       return {
-        FILING_DAYS: filing || DEADLINE_DEFAULTS.FILING_DAYS,
-        STEP_1: { DAYS_FOR_RESPONSE: s1Resp || DEADLINE_DEFAULTS.STEP_1_RESPONSE },
-        STEP_2: { DAYS_TO_APPEAL: s2Appeal || DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: s2Resp || DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+        FILING_DAYS: isNaN(filing) ? DEADLINE_DEFAULTS.FILING_DAYS : filing,
+        STEP_1: { DAYS_FOR_RESPONSE: isNaN(s1Resp) ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : s1Resp },
+        STEP_2: { DAYS_TO_APPEAL: isNaN(s2Appeal) ? DEADLINE_DEFAULTS.STEP_2_APPEAL : s2Appeal, DAYS_FOR_RESPONSE: isNaN(s2Resp) ? DEADLINE_DEFAULTS.STEP_2_RESPONSE : s2Resp },
         STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
         ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
       };
@@ -5106,7 +5129,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2819 lines)
+// SOURCE: 02_DataManagers.gs (2815 lines)
 // ============================================================================
 
 /**
@@ -5151,14 +5174,14 @@ function addMember(memberData) {
   var newRow = lastRow + 1;
 
   // Set member data
-  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(memberId);
-  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(memberData.firstName || '');
-  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(memberData.lastName || '');
-  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(memberData.email || '');
-  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(memberData.phone || '');
-  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(memberData.jobTitle || '');
-  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(memberData.workLocation || '');
-  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(memberData.unit || '');
+  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(escapeForFormula(memberId));
+  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(memberData.firstName || ''));
+  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(memberData.lastName || ''));
+  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(memberData.email || ''));
+  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(memberData.phone || ''));
+  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(memberData.jobTitle || ''));
+  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(memberData.workLocation || ''));
+  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(memberData.unit || ''));
 
   return memberId;
 }
@@ -5192,13 +5215,13 @@ function updateMember(memberId, updateData) {
   }
 
   // Update fields
-  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(updateData.firstName);
-  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(updateData.lastName);
-  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(updateData.email);
-  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(updateData.phone);
-  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(updateData.jobTitle);
-  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(updateData.workLocation);
-  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(updateData.unit);
+  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
 }
 
 /**
@@ -5839,6 +5862,8 @@ function removeFromConfigDropdown_(configCol, value) {
 
   if (!configSheet) return;
 
+  if (configSheet.getLastRow() < 3) return;
+
   var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
 
   for (var i = 0; i < colData.length; i++) {
@@ -6346,7 +6371,7 @@ function getImportMembersHtml_() {
     '  }' +
     '}' +
     '' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function showStatus(msg, isError) {' +
     '  var area = document.getElementById("statusArea");' +
     '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + escapeHtml(msg) + "</div>";' +
@@ -6676,33 +6701,21 @@ function startNewGrievance(grievanceData) {
     const filingDate = grievanceData.filingDate ? new Date(grievanceData.filingDate) : new Date();
     const deadlines = calculateInitialDeadlines(filingDate);
 
-    // Prepare row data
-    const rowData = [
-      grievanceId,                                    // Grievance ID
-      grievanceData.memberId || '',                   // Member ID
-      grievanceData.memberName || '',                 // Member Name
-      filingDate,                                     // Filing Date
-      grievanceData.grievanceType || '',              // Grievance Type
-      grievanceData.articleViolated || '',            // Article Violated
-      grievanceData.description || '',                // Description
-      1,                                              // Current Step (starts at 1)
-      filingDate,                                     // Step 1 Date
-      deadlines.step1Due,                             // Step 1 Due
-      'Pending',                                      // Step 1 Status
-      '',                                             // Step 2 Date
-      '',                                             // Step 2 Due
-      '',                                             // Step 2 Status
-      '',                                             // Step 3 Date
-      '',                                             // Step 3 Due
-      '',                                             // Step 3 Status
-      '',                                             // Arbitration Date
-      '',                                             // Resolution
-      GRIEVANCE_OUTCOMES.PENDING,                     // Outcome
-      '',                                             // Drive Folder
-      grievanceData.notes || '',                      // Notes
-      GRIEVANCE_STATUS.OPEN,                          // Status
-      new Date()                                      // Last Updated
-    ];
+    // Prepare row data using GRIEVANCE_COLS constants (1-indexed; subtract 1 for array)
+    const totalCols = getGrievanceHeaders().length;
+    const rowData = new Array(totalCols).fill('');
+
+    rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1]   = grievanceId;
+    rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = grievanceData.memberId || '';
+    rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = grievanceData.memberName || '';
+    rowData[GRIEVANCE_COLS.STATUS - 1]          = GRIEVANCE_STATUS.OPEN;
+    rowData[GRIEVANCE_COLS.CURRENT_STEP - 1]    = 1;
+    rowData[GRIEVANCE_COLS.DATE_FILED - 1]      = filingDate;
+    rowData[GRIEVANCE_COLS.STEP1_DUE - 1]       = deadlines.step1Due;
+    rowData[GRIEVANCE_COLS.ARTICLES - 1]        = grievanceData.articleViolated || '';
+    rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = grievanceData.grievanceType || '';
+    rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = grievanceData.notes || '';
+    rowData[GRIEVANCE_COLS.LAST_UPDATED - 1]    = new Date();
 
     // Append to sheet
     grievanceSheet.appendRow(rowData);
@@ -7147,6 +7160,12 @@ function recalcAllGrievancesBatched() {
  * @return {Object} Result object
  */
 function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
+  // Authorization check — only stewards and admins may bulk-update grievances
+  var authResult = checkWebAppAuthorization('steward');
+  if (!authResult.isAuthorized) {
+    return errorResponse(authResult.message || 'Unauthorized: steward access required', 'bulkUpdateGrievanceStatus');
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
   ensureMinimumColumns(sheet, getGrievanceHeaders().length);
@@ -7531,7 +7550,7 @@ function getNewGrievanceFormHtml() {
   // Get member list for dropdown
   const members = getMemberList();
   const memberOptions = members.map(m =>
-    `<option value="${m.id}">${m.name} (${m.department})</option>`
+    `<option value="${escapeHtml(String(m.id))}">${escapeHtml(String(m.name))} (${escapeHtml(String(m.department))})</option>`
   ).join('');
 
   return `
@@ -7750,10 +7769,10 @@ function getEditGrievanceFormHtml(grievanceId) {
     <body>
       <div class="form-container">
         <div class="info-box">
-          <strong>Grievance ID:</strong> ${grievanceId}<br>
-          <strong>Current Step:</strong> ${grievance['Current Step'] || 1}<br>
+          <strong>Grievance ID:</strong> ${escapeHtml(String(grievanceId))}<br>
+          <strong>Current Step:</strong> ${escapeHtml(String(grievance['Current Step'] || 1))}<br>
           <strong>Status:</strong> <span class="status-badge status-open">
-            ${grievance['Status'] || 'Open'}</span>
+            ${escapeHtml(String(grievance['Status'] || 'Open'))}</span>
         </div>
 
         <form id="editForm">
@@ -7780,7 +7799,7 @@ function getEditGrievanceFormHtml(grievanceId) {
       </div>
 
       <script>
-        const grievanceId = '${grievanceId}';
+        const grievanceId = ${JSON.stringify(grievanceId)};
 
         document.getElementById('editForm').addEventListener('submit', function(e) {
           e.preventDefault();
@@ -7930,7 +7949,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2770 lines)
+// SOURCE: 03_UIComponents.gs (2783 lines)
 // ============================================================================
 
 /**
@@ -9503,9 +9522,9 @@ function showGrievanceQuickActions(row) {
   if (memberEmail) {
     emailStatusBtn =
       '<div class="section-header">📨 Communication</div>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailGrievanceStatusToMember(\'' + grievanceId + '\');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Email Status to Member</div><div class="desc">Send grievance status update to ' + memberEmail + '</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>';
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailGrievanceStatusToMember(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Email Status to Member</div><div class="desc">Send grievance status update to ' + escapeHtml(String(memberEmail)) + '</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>';
   }
 
   var html = HtmlService.createHtmlOutput(
@@ -9563,6 +9582,18 @@ function quickUpdateGrievanceStatus(row, newStatus) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) throw new Error('Grievance Log not found');
+
+  // Validate row bounds
+  if (row < 2 || row > sheet.getLastRow()) {
+    throw new Error('Invalid row number: ' + row);
+  }
+
+  // Validate status against allowlist
+  var validStatuses = ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Won', 'Denied', 'Closed', 'In Arbitration', 'Appealed'];
+  if (validStatuses.indexOf(newStatus) === -1) {
+    throw new Error('Invalid status: ' + newStatus);
+  }
+
   sheet.getRange(row, GRIEVANCE_COLS.STATUS).setValue(newStatus);
   if (['Closed', 'Settled', 'Withdrawn'].indexOf(newStatus) >= 0) {
     var closeCol = GRIEVANCE_COLS.DATE_CLOSED;
@@ -9582,7 +9613,7 @@ function quickUpdateGrievanceStatus(row, newStatus) {
 function composeEmailForMember(memberId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (!sheet) return;
+  if (!sheet || sheet.getLastRow() <= 1) return;
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, MEMBER_COLS.EMAIL).getValues();
   for (var i = 0; i < data.length; i++) {
     if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
@@ -9707,7 +9738,7 @@ function emailDashboardLinkToMember(memberId) {
     SpreadsheetApp.getUi().alert('Web app is not deployed. Please deploy the web app first via Extensions > Apps Script > Deploy.');
     return;
   }
-  var portalUrl = webAppUrl + '?id=' + memberId;
+  var portalUrl = webAppUrl + '?id=' + encodeURIComponent(memberId);
   var orgName = getOrgNameFromConfig_();
 
   var subject = orgName + ' - Member Dashboard Access';
@@ -9745,7 +9776,7 @@ function emailGrievanceStatusToMember(grievanceId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
-  if (!grievanceSheet) {
+  if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) {
     SpreadsheetApp.getUi().alert('Grievance Log not found.');
     return;
   }
@@ -9842,7 +9873,7 @@ function emailGrievanceStatusToMember(grievanceId) {
 function getMemberDataById_(memberId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (!sheet) return null;
+  if (!sheet || sheet.getLastRow() <= 1) return null;
 
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, MEMBER_COLS.EMAIL).getValues();
   for (var i = 0; i < data.length; i++) {
@@ -9884,7 +9915,7 @@ function showMemberGrievanceHistory(memberId) {
     return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === 'Open' ? '#f44336' : '#4caf50') + '"><strong>' + escapeHtml(g.id) + '</strong><br><span style="color:#666">Status: ' + escapeHtml(g.status) + ' | Step: ' + escapeHtml(g.step) + '</span><br><span style="color:#888;font-size:12px">' + escapeHtml(g.issue) + ' | Filed: ' + (g.filed ? new Date(g.filed).toLocaleDateString() : 'N/A') + '</span></div>';
   }).join('');
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + memberId + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === 'Open'; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== 'Open'; }).length + '</div>' + list + '</body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + escapeHtml(memberId) + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === 'Open'; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== 'Open'; }).length + '</div>' + list + '</body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, 'Grievance History - ' + memberId);
 }
@@ -10388,6 +10419,7 @@ function getQuickSearchHtml() {
         <div class="quick-hint">Press Enter to select first result, Esc to close</div>
       </div>
       <script>
+        ${getClientSideEscapeHtml()}
         let debounceTimer;
         let results = [];
 
@@ -10705,7 +10737,7 @@ function getAdvancedSearchHtml() {
 
 
 // ============================================================================
-// SOURCE: 04a_UIMenus.gs (914 lines)
+// SOURCE: 04a_UIMenus.gs (918 lines)
 // ============================================================================
 
 /**
@@ -11298,6 +11330,10 @@ function showMultiSelectDialog(title, items, callback) {
  * @return {string} HTML content
  */
 function getMultiSelectHtml(items, callback) {
+  var allowedCallbacks = ['applyMultiSelectValue', 'handleBulkStatusSelection'];
+  if (allowedCallbacks.indexOf(callback) === -1) {
+    throw new Error('Invalid callback function name: ' + callback);
+  }
   const itemsJson = JSON.stringify(items);
 
   return `
@@ -11624,7 +11660,7 @@ function getDashboardSidebarHtml() {
 
 
 // ============================================================================
-// SOURCE: 04b_AccessibilityFeatures.gs (1032 lines)
+// SOURCE: 04b_AccessibilityFeatures.gs (1033 lines)
 // ============================================================================
 
 // ============================================================================
@@ -11999,6 +12035,7 @@ function showQuickCaptureNotepad() {
     '</div>' +
     '<div class="status" id="status"></div>' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'var notesEl = document.getElementById("notes");' +
     'var statusEl = document.getElementById("status");' +
     'var metaEl = document.getElementById("meta");' +
@@ -12025,7 +12062,7 @@ function showQuickCaptureNotepad() {
     '' +
     'function saveNotes() {' +
     '  google.script.run.withSuccessHandler(function(result) {' +
-    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + result.message, !result.success);' +
+    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + escapeHtml(result.message), !result.success);' +
     '  }).saveQuickCaptureNotes(notesEl.value);' +
     '}' +
     '' +
@@ -12041,7 +12078,7 @@ function showQuickCaptureNotepad() {
     '  if (confirm("Clear all notes? This cannot be undone.")) {' +
     '    notesEl.value = "";' +
     '    google.script.run.withSuccessHandler(function(result) {' +
-    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + result.message, !result.success);' +
+    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + escapeHtml(result.message), !result.success);' +
     '      updateMeta();' +
     '    }).clearQuickCaptureNotes();' +
     '  }' +
@@ -12166,10 +12203,10 @@ function getImportDialogHtml_() {
     '      showStatus("✅ Successfully imported " + result.count + " members!", "success");' +
     '      setTimeout(function() { google.script.host.close(); }, 2000);' +
     '    } else {' +
-    '      showStatus("❌ " + result.error, "error");' +
+    '      showStatus("❌ " + escapeHtml(result.error), "error");' +
     '    }' +
     '  }).withFailureHandler(function(err) {' +
-    '    showStatus("❌ Error: " + err.message, "error");' +
+    '    showStatus("❌ Error: " + escapeHtml(err.message), "error");' +
     '  }).processMemberImport(csv);' +
     '}' +
     'function showStatus(msg, type) {' +
@@ -12367,10 +12404,10 @@ function showExportDialog_UIService_() {
     '<h2>Export Ready!</h2>' +
     '<div class="info">' +
     '<strong>' + (lastRow - 1) + ' members</strong> exported to CSV<br>' +
-    'File: ' + fileName +
+    'File: ' + escapeHtml(fileName) +
     '</div>' +
-    '<a href="' + file.getDownloadUrl() + '" target="_blank" class="btn">📥 Download CSV</a>' +
-    '<a href="' + file.getUrl() + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
+    '<a href="' + escapeHtml(file.getDownloadUrl()) + '" target="_blank" class="btn">📥 Download CSV</a>' +
+    '<a href="' + escapeHtml(file.getUrl()) + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
     '<p class="note">File will be available in your Google Drive.<br>Link expires when you close this dialog.</p>' +
     '<script>setTimeout(function() { google.script.host.setHeight(350); }, 100);</script>'
   ).setWidth(450).setHeight(350);
@@ -12661,7 +12698,7 @@ function getSmartDashboardHtml() {
 
 
 // ============================================================================
-// SOURCE: 04c_InteractiveDashboard.gs (1807 lines)
+// SOURCE: 04c_InteractiveDashboard.gs (1863 lines)
 // ============================================================================
 
 // ============================================================================
@@ -12996,7 +13033,7 @@ function getInteractiveDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
     // Debug mode and error handler wrapper
@@ -13005,6 +13042,7 @@ function getInteractiveDashboardHtml() {
     'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+escapeHtml(e.message))}' +
     'function safeRun(fn,fallback){try{fn()}catch(e){console.error("[Dashboard]",e);if(fallback)fallback(e)}}' +
     'function showLoading(elementId,msg){var el=document.getElementById(elementId);if(el)el.innerHTML="<div class=\\"loading-state\\"><div class=\\"loading-spinner\\"></div><div>"+escapeHtml(msg||"Loading...")+"</div></div>"}' +
+    'function safeUrl(url){if(!url)return "#";var s=String(url).trim();return(/^https?:\\/\\//i.test(s))?escapeHtml(s):"#"}' +
 
     // Tab switching with error handling
     'function switchTab(tabName,btn){' +
@@ -13154,8 +13192,8 @@ function getInteractiveDashboardHtml() {
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+escapeHtml(g.location)+"</span></div>' +
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+escapeHtml(g.articles)+"</span></div>' +
     '        <div class=\\"detail-actions\\">' +
-    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">⚡ Quick Actions</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-primary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(this.dataset.gid)\\">⚡ Quick Actions</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(this.dataset.gid)\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +
@@ -13429,8 +13467,8 @@ function getInteractiveDashboardHtml() {
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+escapeHtml(g.steward)+"</span></div>' +
     '        "+(g.resolution?"<div class=\\"detail-row\\"><span class=\\"detail-label\\">✅ Resolution:</span><span class=\\"detail-value\\">"+escapeHtml(g.resolution)+"</span></div>":"")+"' +
     '        <div class=\\"detail-actions\\">' +
-    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">⚡ Quick Actions</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-primary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(this.dataset.gid)\\">⚡ Quick Actions</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(this.dataset.gid)\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +
@@ -13516,7 +13554,7 @@ function getInteractiveDashboardHtml() {
     '    var maxStatus=Math.max.apply(null,data.grievanceStats.byStatus.map(function(s){return s.count}))||1;' +
     '    data.grievanceStats.byStatus.forEach(function(status){' +
     '      var pct=(status.count/maxStatus*100);' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">"+status.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+status.color+"\\"></div></div><div class=\\"bar-value\\">"+status.count+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">"+escapeHtml(status.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+status.color+"\\"></div></div><div class=\\"bar-value\\">"+status.count+"</div></div>";' +
     '    });' +
     '  }else if(totalG>0){' +
     '    var maxS=Math.max(data.statusCounts.open,data.statusCounts.pending,data.statusCounts.closed)||1;' +
@@ -13534,7 +13572,7 @@ function getInteractiveDashboardHtml() {
     '    catData.forEach(function(cat,idx){' +
     '      var pct=(cat.count/maxCat*100);' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+cat.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+cat.count+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(cat.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+cat.count+"</div></div>";' +
     '    });' +
     '  }else{html+="<div class=\\"empty-state\\">No issue data</div>"}' +
     '  html+="</div></div>";' +
@@ -13546,7 +13584,7 @@ function getInteractiveDashboardHtml() {
     '    data.grievanceStats.byLocation.forEach(function(loc,idx){' +
     '      var pct=(loc.total/maxLoc*100);' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+loc.name+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div>"+(loc.open>0?"<div style=\\"position:absolute;right:8px;top:2px;font-size:9px;color:#dc2626\\">"+loc.open+" open</div>":"")+"</div><div class=\\"bar-value\\">"+loc.total+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(loc.name)+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div>"+(loc.open>0?"<div style=\\"position:absolute;right:8px;top:2px;font-size:9px;color:#dc2626\\">"+loc.open+" open</div>":"")+"</div><div class=\\"bar-value\\">"+loc.total+"</div></div>";' +
     '    });' +
     '  }else{html+="<div class=\\"empty-state\\">No location data</div>"}' +
     '  html+="</div></div>";' +
@@ -13575,7 +13613,7 @@ function getInteractiveDashboardHtml() {
     '    data.stewardPerformance.topPerformers.forEach(function(p,i){' +
     '      var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";' +
     '      var scoreColor=p.score>=70?"#059669":p.score>=50?"#F97316":"#DC2626";' +
-    '      html+="<tr style=\\"border-bottom:1px solid #e5e7eb\\"><td style=\\"padding:8px\\">"+medal+(i+1)+"</td><td style=\\"padding:8px\\">"+p.name+"</td><td style=\\"padding:8px;text-align:center;font-weight:bold;color:"+scoreColor+"\\">"+Math.round(p.score)+"</td><td style=\\"padding:8px;text-align:center\\">"+(p.winRate||0)+"%</td><td style=\\"padding:8px;text-align:center\\">"+(p.avgDays||0)+"</td></tr>";' +
+    '      html+="<tr style=\\"border-bottom:1px solid #e5e7eb\\"><td style=\\"padding:8px\\">"+medal+(i+1)+"</td><td style=\\"padding:8px\\">"+escapeHtml(p.name)+"</td><td style=\\"padding:8px;text-align:center;font-weight:bold;color:"+scoreColor+"\\">"+Math.round(p.score)+"</td><td style=\\"padding:8px;text-align:center\\">"+(p.winRate||0)+"%</td><td style=\\"padding:8px;text-align:center\\">"+(p.avgDays||0)+"</td></tr>";' +
     '    });' +
     '    html+="</table>";' +
     '  }else{html+="<div class=\\"empty-state\\">No performance data available.<br><small>Run Data Integrity Check to generate scores.</small></div>"}' +
@@ -13589,7 +13627,7 @@ function getInteractiveDashboardHtml() {
     '    data.stewardPerformance.busiestStewards.forEach(function(s,idx){' +
     '      var pct=(s.total/maxCases*100);' +
     '      var openPct=(s.open/s.total*100);' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:110px;font-size:11px\\">"+s.name+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:linear-gradient(90deg,#F97316 "+openPct+"%,#059669 "+openPct+"%)\\"></div></div><div class=\\"bar-value\\">"+s.total+" <small style=\\"color:#F97316\\">("+s.open+" open)</small></div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:110px;font-size:11px\\">"+escapeHtml(s.name)+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:linear-gradient(90deg,#F97316 "+openPct+"%,#059669 "+openPct+"%)\\"></div></div><div class=\\"bar-value\\">"+s.total+" <small style=\\"color:#F97316\\">("+s.open+" open)</small></div></div>";' +
     '    });' +
     '    html+="</div>";' +
     '  }else{html+="<div class=\\"empty-state\\">No steward case data</div>"}' +
@@ -13608,7 +13646,7 @@ function getInteractiveDashboardHtml() {
     '      data.surveyResults.bySection.forEach(function(sec,idx){' +
     '        var pct=(sec.avg/10*100);' +
     '        var clr=sec.avg>=7?"#059669":sec.avg>=5?"#F97316":"#DC2626";' +
-    '        html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+sec.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+sec.avg+"</div></div>";' +
+    '        html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(sec.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+sec.avg+"</div></div>";' +
     '      });' +
     '      html+="</div>";' +
     '    }else{html+="<div style=\\"color:#999;font-size:12px;text-align:center;padding:10px\\">No section data. Complete surveys to see breakdown.</div>"}' +
@@ -13643,7 +13681,7 @@ function getInteractiveDashboardHtml() {
     '      var pct=Math.round(loc.count/totalMembers*100);' +
     '      var size=Math.max(60,Math.min(120,60+(loc.count/maxLoc*60)));' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div style=\\"text-align:center;padding:10px\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:10px\\">"+pct+"%</span></div><div style=\\"font-size:11px;color:#666;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis\\">"+loc.name+"</div></div>";' +
+    '      html+="<div style=\\"text-align:center;padding:10px\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:10px\\">"+pct+"%</span></div><div style=\\"font-size:11px;color:#666;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis\\">"+escapeHtml(loc.name)+"</div></div>";' +
     '    });' +
     '    html+="</div>";' +
     '  }else{html+="<div class=\\"empty-state\\">No location data</div>"}' +
@@ -13679,20 +13717,20 @@ function getInteractiveDashboardHtml() {
     '  var c=document.getElementById("resources-content");' +
     '  var html="";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📝 Forms & Submissions</div><div class=\\"link-grid\\">";' +
-    '  if(data.grievanceForm)html+="<a href=\\""+data.grievanceForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">📋 Grievance Form</a>";' +
-    '  if(data.contactForm)html+="<a href=\\""+data.contactForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">✉️ Contact Form</a>";' +
-    '  if(data.satisfactionForm)html+="<a href=\\""+data.satisfactionForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Satisfaction Survey</a>";' +
+    '  if(data.grievanceForm)html+="<a href=\\""+safeUrl(data.grievanceForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📋 Grievance Form</a>";' +
+    '  if(data.contactForm)html+="<a href=\\""+safeUrl(data.contactForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">✉️ Contact Form</a>";' +
+    '  if(data.satisfactionForm)html+="<a href=\\""+safeUrl(data.satisfactionForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Satisfaction Survey</a>";' +
     '  if(!data.grievanceForm&&!data.contactForm&&!data.satisfactionForm)html+="<div class=\\"empty-state\\">No forms configured. Add URLs in Config sheet.</div>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📂 Data & Documents</div><div class=\\"link-grid\\">";' +
-    '  html+="<a href=\\""+data.spreadsheetUrl+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Open Full Spreadsheet</a>";' +
+    '  html+="<a href=\\""+safeUrl(data.spreadsheetUrl)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Open Full Spreadsheet</a>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showMemberDirectory()\\">👥 Member Directory</button>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showGrievanceLog()\\">📋 Grievance Log</button>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showConfigSheet()\\">⚙️ Configuration</button>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">🌐 External Links</div><div class=\\"link-grid\\">";' +
-    '  if(data.orgWebsite)html+="<a href=\\""+data.orgWebsite+"\\" target=\\"_blank\\" class=\\"resource-link\\">🏛️ Organization Website</a>";' +
-    '  if(data.githubRepo)html+="<a href=\\""+data.githubRepo+"\\" target=\\"_blank\\" class=\\"resource-link\\">📦 GitHub Repository</a>";' +
+    '  if(data.orgWebsite)html+="<a href=\\""+safeUrl(data.orgWebsite)+"\\" target=\\"_blank\\" class=\\"resource-link\\">🏛️ Organization Website</a>";' +
+    '  if(data.githubRepo)html+="<a href=\\""+safeUrl(data.githubRepo)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📦 GitHub Repository</a>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">⚡ Quick Actions</div><div class=\\"link-grid\\">";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showMobileUnifiedSearch()\\">🔍 Search All</button>";' +
@@ -14370,6 +14408,61 @@ function saveInteractiveMember(memberData, mode) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!sheet) throw new Error('Member Directory sheet not found');
 
+  // --- Input validation ---
+  var MAX_FIELD_LENGTH = 200;
+  var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var PHONE_REGEX = /^[\d\s\-\+\(\)\.ext]{0,30}$/;
+
+  // Required fields
+  if (!memberData.firstName || !String(memberData.firstName).trim()) {
+    throw new Error('First name is required');
+  }
+  if (!memberData.lastName || !String(memberData.lastName).trim()) {
+    throw new Error('Last name is required');
+  }
+
+  // Field length checks on all string fields
+  var fieldsToCheck = ['firstName', 'lastName', 'jobTitle', 'location', 'unit',
+    'officeDays', 'email', 'phone', 'supervisor', 'manager'];
+  for (var f = 0; f < fieldsToCheck.length; f++) {
+    var fieldName = fieldsToCheck[f];
+    if (memberData[fieldName] && String(memberData[fieldName]).length > MAX_FIELD_LENGTH) {
+      throw new Error(fieldName + ' exceeds maximum length of ' + MAX_FIELD_LENGTH + ' characters');
+    }
+  }
+
+  // Email format validation (if provided)
+  if (memberData.email && String(memberData.email).trim() !== '') {
+    if (!EMAIL_REGEX.test(String(memberData.email).trim())) {
+      throw new Error('Invalid email format');
+    }
+  }
+
+  // Phone format validation (if provided)
+  if (memberData.phone && String(memberData.phone).trim() !== '') {
+    if (!PHONE_REGEX.test(String(memberData.phone).trim())) {
+      throw new Error('Invalid phone format. Use digits, spaces, dashes, parentheses, or dots (max 30 chars)');
+    }
+  }
+
+  // isSteward must be Yes or No
+  if (memberData.isSteward && memberData.isSteward !== 'Yes' && memberData.isSteward !== 'No') {
+    throw new Error('isSteward must be "Yes" or "No"');
+  }
+
+  // Sanitize all string values with escapeForFormula to prevent formula injection
+  var safeFirstName = escapeForFormula(String(memberData.firstName || '').trim());
+  var safeLastName = escapeForFormula(String(memberData.lastName || '').trim());
+  var safeJobTitle = escapeForFormula(String(memberData.jobTitle || '').trim());
+  var safeLocation = escapeForFormula(String(memberData.location || '').trim());
+  var safeUnit = escapeForFormula(String(memberData.unit || '').trim());
+  var safeOfficeDays = escapeForFormula(String(memberData.officeDays || '').trim());
+  var safeEmail = escapeForFormula(String(memberData.email || '').trim());
+  var safePhone = escapeForFormula(String(memberData.phone || '').trim());
+  var safeSupervisor = escapeForFormula(String(memberData.supervisor || '').trim());
+  var safeManager = escapeForFormula(String(memberData.manager || '').trim());
+  var safeIsSteward = (memberData.isSteward === 'Yes') ? 'Yes' : 'No';
+
   if (mode === 'add') {
     // Generate a new member ID
     var existingIds = {};
@@ -14378,28 +14471,28 @@ function saveInteractiveMember(memberData, mode) {
       if (row[0]) existingIds[row[0]] = true;
     });
 
-    var newId = generateNameBasedId('M', memberData.firstName, memberData.lastName, existingIds);
+    var newId = generateNameBasedId('M', safeFirstName, safeLastName, existingIds);
 
     // Create new row array
     var newRow = [];
     for (var i = 0; i < MEMBER_COLS.QUICK_ACTIONS; i++) newRow.push('');
 
     newRow[MEMBER_COLS.MEMBER_ID - 1] = newId;
-    newRow[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName;
-    newRow[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName;
-    newRow[MEMBER_COLS.JOB_TITLE - 1] = memberData.jobTitle || '';
-    newRow[MEMBER_COLS.WORK_LOCATION - 1] = memberData.location || '';
-    newRow[MEMBER_COLS.UNIT - 1] = memberData.unit || '';
-    newRow[MEMBER_COLS.OFFICE_DAYS - 1] = memberData.officeDays || '';
-    newRow[MEMBER_COLS.EMAIL - 1] = memberData.email || '';
-    newRow[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
-    newRow[MEMBER_COLS.SUPERVISOR - 1] = memberData.supervisor || '';
-    newRow[MEMBER_COLS.MANAGER - 1] = memberData.manager || '';
-    newRow[MEMBER_COLS.IS_STEWARD - 1] = memberData.isSteward || 'No';
+    newRow[MEMBER_COLS.FIRST_NAME - 1] = safeFirstName;
+    newRow[MEMBER_COLS.LAST_NAME - 1] = safeLastName;
+    newRow[MEMBER_COLS.JOB_TITLE - 1] = safeJobTitle;
+    newRow[MEMBER_COLS.WORK_LOCATION - 1] = safeLocation;
+    newRow[MEMBER_COLS.UNIT - 1] = safeUnit;
+    newRow[MEMBER_COLS.OFFICE_DAYS - 1] = safeOfficeDays;
+    newRow[MEMBER_COLS.EMAIL - 1] = safeEmail;
+    newRow[MEMBER_COLS.PHONE - 1] = safePhone;
+    newRow[MEMBER_COLS.SUPERVISOR - 1] = safeSupervisor;
+    newRow[MEMBER_COLS.MANAGER - 1] = safeManager;
+    newRow[MEMBER_COLS.IS_STEWARD - 1] = safeIsSteward;
 
     // Append the new row
     sheet.appendRow(newRow);
-    ss.toast('New member added: ' + memberData.firstName + ' ' + memberData.lastName + ' (' + newId + ')', 'Member Added', 5);
+    ss.toast('New member added: ' + safeFirstName + ' ' + safeLastName + ' (' + newId + ')', 'Member Added', 5);
 
     return { success: true, memberId: newId, mode: 'add' };
 
@@ -14420,19 +14513,19 @@ function saveInteractiveMember(memberData, mode) {
     if (rowIndex === -1) throw new Error('Member not found: ' + memberId);
 
     // Update the member data
-    sheet.getRange(rowIndex, MEMBER_COLS.FIRST_NAME).setValue(memberData.firstName);
-    sheet.getRange(rowIndex, MEMBER_COLS.LAST_NAME).setValue(memberData.lastName);
-    sheet.getRange(rowIndex, MEMBER_COLS.JOB_TITLE).setValue(memberData.jobTitle || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.WORK_LOCATION).setValue(memberData.location || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.UNIT).setValue(memberData.unit || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.OFFICE_DAYS).setValue(memberData.officeDays || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.EMAIL).setValue(memberData.email || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.PHONE).setValue(memberData.phone || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.SUPERVISOR).setValue(memberData.supervisor || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.MANAGER).setValue(memberData.manager || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.IS_STEWARD).setValue(memberData.isSteward || 'No');
+    sheet.getRange(rowIndex, MEMBER_COLS.FIRST_NAME).setValue(safeFirstName);
+    sheet.getRange(rowIndex, MEMBER_COLS.LAST_NAME).setValue(safeLastName);
+    sheet.getRange(rowIndex, MEMBER_COLS.JOB_TITLE).setValue(safeJobTitle);
+    sheet.getRange(rowIndex, MEMBER_COLS.WORK_LOCATION).setValue(safeLocation);
+    sheet.getRange(rowIndex, MEMBER_COLS.UNIT).setValue(safeUnit);
+    sheet.getRange(rowIndex, MEMBER_COLS.OFFICE_DAYS).setValue(safeOfficeDays);
+    sheet.getRange(rowIndex, MEMBER_COLS.EMAIL).setValue(safeEmail);
+    sheet.getRange(rowIndex, MEMBER_COLS.PHONE).setValue(safePhone);
+    sheet.getRange(rowIndex, MEMBER_COLS.SUPERVISOR).setValue(safeSupervisor);
+    sheet.getRange(rowIndex, MEMBER_COLS.MANAGER).setValue(safeManager);
+    sheet.getRange(rowIndex, MEMBER_COLS.IS_STEWARD).setValue(safeIsSteward);
 
-    ss.toast('Member updated: ' + memberData.firstName + ' ' + memberData.lastName, 'Member Updated', 5);
+    ss.toast('Member updated: ' + safeFirstName + ' ' + safeLastName, 'Member Updated', 5);
 
     return { success: true, memberId: memberId, mode: 'edit' };
   }
@@ -14680,7 +14773,7 @@ function getExecutiveDashboardHtml_() {
     '    </div>' +
     '  </div>' +
     '  <script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     '    window.onload = function() {' +
     '      google.script.run.withSuccessHandler(renderDashboard).withFailureHandler(showError).getDashboardStats();' +
     '    };' +
@@ -14821,8 +14914,8 @@ function showStewardDashboard() {
     '</style></head><body><div class="icon">🛡️</div><h1>Steward Command Center</h1>' +
     '<div class="warning">INTERNAL USE ONLY - Contains PII</div>' +
     '<p>Open the Steward Dashboard web app. This version includes full member details and sensitive information.</p>' +
-    '<div class="url" id="url">' + url + '</div>' +
-    '<div class="btn-row"><a class="open-link" href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<div class="url" id="url">' + escapeHtml(url) + '</div>' +
+    '<div class="btn-row"><a class="open-link" href="' + escapeHtml(url) + '" target="_blank">Open Dashboard</a>' +
     '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
     '</body></html>'
   ).setWidth(500).setHeight(400);
@@ -15453,7 +15546,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 04e_PublicDashboard.gs (3120 lines)
+// SOURCE: 04e_PublicDashboard.gs (3121 lines)
 // ============================================================================
 
 // ============================================================================
@@ -17200,7 +17293,8 @@ function getUnifiedDashboardHtml(isPII) {
 
     // JavaScript
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
+    'function safeUrl(u){if(!u)return"";return/^https?:\\/\\//i.test(u)?u:""}' +
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+escapeHtml(e.message)+"</div>"}' +
@@ -17595,35 +17689,35 @@ function getUnifiedDashboardHtml(isPII) {
     'var rl=d.resourceLinks||{};' +
     'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">folder</i>Union Resources</h2>";' +
     'html+="<div class=\\"resource-grid\\">";' +
-    'if(dr.folderUrl){html+="<a href=\\""+dr.folderUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}' +
+    'if(dr.folderUrl){var sfu=safeUrl(dr.folderUrl);if(sfu){html+="<a href=\\""+escapeHtml(sfu)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}}' +
     // Member Survey link
-    'if(rl.surveyUrl){html+="<a href=\\""+rl.surveyUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📊</div><div class=\\"resource-title\\">Member Survey</div><div class=\\"resource-desc\\">Complete the member satisfaction survey</div></a>"}' +
+    'if(rl.surveyUrl){var ssu=safeUrl(rl.surveyUrl);if(ssu){html+="<a href=\\""+escapeHtml(ssu)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📊</div><div class=\\"resource-title\\">Member Survey</div><div class=\\"resource-desc\\">Complete the member satisfaction survey</div></a>"}}' +
     // Member Contact Update link
-    'if(rl.contactFormUrl){html+="<a href=\\""+rl.contactFormUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📋</div><div class=\\"resource-title\\">Contact Update</div><div class=\\"resource-desc\\">Update your personal contact information</div></a>"}' +
+    'if(rl.contactFormUrl){var scf=safeUrl(rl.contactFormUrl);if(scf){html+="<a href=\\""+escapeHtml(scf)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📋</div><div class=\\"resource-title\\">Contact Update</div><div class=\\"resource-desc\\">Update your personal contact information</div></a>"}}' +
     // Custom Link 1 (configurable from Config tab)
-    'if(rl.customLink1Url){html+="<a href=\\""+rl.customLink1Url+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+(rl.customLink1Name||"Custom Link 1")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}' +
+    'if(rl.customLink1Url){var sc1=safeUrl(rl.customLink1Url);if(sc1){html+="<a href=\\""+escapeHtml(sc1)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+escapeHtml(rl.customLink1Name||"Custom Link 1")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}}' +
     // Custom Link 2 (configurable from Config tab)
-    'if(rl.customLink2Url){html+="<a href=\\""+rl.customLink2Url+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+(rl.customLink2Name||"Custom Link 2")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}' +
+    'if(rl.customLink2Url){var sc2=safeUrl(rl.customLink2Url);if(sc2){html+="<a href=\\""+escapeHtml(sc2)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+escapeHtml(rl.customLink2Name||"Custom Link 2")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}}' +
     'html+="</div>";' +
     // Steward Contact Directory with Smart Search
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">contacts</i>Steward Contact Directory</div>";' +
     'html+="<div style=\\"position:relative\\"><input type=\\"text\\" id=\\"stewardSearch\\" placeholder=\\"Start typing to search stewards...\\" oninput=\\"smartFilterStewards()\\" onfocus=\\"showSearchSuggestions()\\" autocomplete=\\"off\\" style=\\"width:100%;padding:10px 10px 10px 36px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><i class=\\"material-icons\\" style=\\"position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#64748b;font-size:18px\\">search</i><div id=\\"searchSuggestions\\" style=\\"display:none;position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #475569;border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.3)\\"></div></div>";' +
     'html+="<div style=\\"display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap\\"><span style=\\"color:#64748b;font-size:11px\\">Quick filters:</span>";' +
     'var locations=[...new Set(d.stewardList.map(function(s){return s.location}))].filter(Boolean).slice(0,5);' +
-    'locations.forEach(function(loc){html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px\\" onclick=\\"quickFilterSteward(\\x27"+loc+"\\x27)\\">"+loc+"</button>"});' +
+    'locations.forEach(function(loc){html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px\\" data-loc=\\""+escapeHtml(loc)+"\\" onclick=\\"quickFilterSteward(this.dataset.loc)\\">"+escapeHtml(loc)+"</button>"});' +
     'html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px;background:#475569\\" onclick=\\"clearStewardFilter()\\">Clear</button></div>";' +
     'html+="<div id=\\"stewardList\\" class=\\"list-container\\" style=\\"max-height:300px\\">";' +
     'if(d.stewardList&&d.stewardList.length>0){d.stewardList.forEach(function(s){' +
-    'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase()+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+s.name+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" onclick=\\"saveStewardContact(\\x27"+s.name+"\\x27,\\x27"+(s.email||"")+"\\x27,\\x27"+(s.phone||"")+"\\x27)\\">Save Contact</button></div>";' +
-    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+s.location+" | "+s.unit+"</div>";' +
-    'if(s.email){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#60a5fa\\">email</i> <a href=\\"mailto:"+s.email+"\\" style=\\"color:#60a5fa\\">"+s.email+"</a></div>"}' +
-    'if(s.phone){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#22c55e\\">phone</i> <a href=\\"tel:"+s.phone+"\\" style=\\"color:#22c55e\\">"+s.phone+"</a></div>"}' +
+    'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+escapeHtml(((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase())+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+escapeHtml(s.name)+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" data-sname=\\""+escapeHtml(s.name)+"\\" data-semail=\\""+escapeHtml(s.email||"")+"\\" data-sphone=\\""+escapeHtml(s.phone||"")+"\\" onclick=\\"saveStewardContact(this.dataset.sname,this.dataset.semail,this.dataset.sphone)\\">Save Contact</button></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+escapeHtml(s.location)+" | "+escapeHtml(s.unit)+"</div>";' +
+    'if(s.email){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#60a5fa\\">email</i> <a href=\\"mailto:"+escapeHtml(s.email)+"\\" style=\\"color:#60a5fa\\">"+escapeHtml(s.email)+"</a></div>"}' +
+    'if(s.phone){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#22c55e\\">phone</i> <a href=\\"tel:"+escapeHtml(s.phone)+"\\" style=\\"color:#22c55e\\">"+escapeHtml(s.phone)+"</a></div>"}' +
     'html+="</div>"})}' +
     'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">No steward contacts available</p>"}' +
     'html+="</div></div>";' +
     'if(dr.recentFiles&&dr.recentFiles.length>0){' +
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">description</i>Recent Files</div><div class=\\"list-container\\">";' +
-    'dr.recentFiles.forEach(function(f){html+="<a href=\\""+f.url+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+f.name+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"});' +
+    'dr.recentFiles.forEach(function(f){var srf=safeUrl(f.url);if(srf){html+="<a href=\\""+escapeHtml(srf)+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+escapeHtml(f.name)+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"}});' +
     'html+="</div></div>"}' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
@@ -17639,7 +17733,7 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div id=\\"notesList\\" class=\\"list-container\\" style=\\"max-height:500px\\">";' +
     'notes.forEach(function(n){' +
     'html+="<div class=\\"meeting-note-item list-item\\" data-search=\\""+escapeHtml(((n.name||"")+" "+(n.date||"")+" "+(n.type||"")).toLowerCase())+"\\" style=\\"flex-wrap:wrap;padding:16px\\"><div style=\\"display:flex;justify-content:space-between;width:100%;align-items:center\\"><div><span style=\\"font-weight:600;color:#e2e8f0;font-size:14px\\">"+escapeHtml(n.name)+"</span></div><span class=\\"badge\\" style=\\"background:#475569;color:#e2e8f0\\">"+escapeHtml(n.type)+"</span></div>";' +
-    'html+="<div style=\\"width:100%;margin-top:8px;display:flex;justify-content:space-between;align-items:center\\"><span style=\\"font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">event</i> "+escapeHtml(n.date)+"</span><a href=\\""+n.notesUrl+"\\" target=\\"_blank\\" class=\\"btn btn-sm\\" style=\\"background:#3b82f6;color:white;text-decoration:none;display:flex;align-items:center;gap:4px\\"><i class=\\"material-icons\\" style=\\"font-size:14px\\">open_in_new</i>View Notes</a></div></div>"});' +
+    'var snu=safeUrl(n.notesUrl);html+="<div style=\\"width:100%;margin-top:8px;display:flex;justify-content:space-between;align-items:center\\"><span style=\\"font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">event</i> "+escapeHtml(n.date)+"</span>"+(snu?"<a href=\\""+escapeHtml(snu)+"\\" target=\\"_blank\\" class=\\"btn btn-sm\\" style=\\"background:#3b82f6;color:white;text-decoration:none;display:flex;align-items:center;gap:4px\\"><i class=\\"material-icons\\" style=\\"font-size:14px\\">open_in_new</i>View Notes</a>":"")+"</div></div>"});' +
     'html+="</div></div>"}' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
@@ -17954,7 +18048,7 @@ function getUnifiedDashboardHtml(isPII) {
     'if(name)matches.push(name.textContent)}' +
     '});' +
     'if(matches.length>0&&matches.length<10){' +
-    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+escapeHtml(m)+"</div>"}).join("");' +
+    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" data-name=\\""+escapeHtml(m)+"\\" onclick=\\"selectStewardSuggestion(this.dataset.name)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+escapeHtml(m)+"</div>"}).join("");' +
     'suggestions.style.display="block"}else{suggestions.style.display="none"}' +
     '}' +
     'function selectStewardSuggestion(name){' +
@@ -18170,7 +18264,7 @@ function getUnifiedDashboardHtml(isPII) {
     'else if(p.key==="overdue")val=dashData.overdueCount;' +
     'else if(p.key==="morale")val=dashData.moraleScore;' +
     '}' +
-    'html+="<div class=\\"pinned-metric\\"><button class=\\"unpin-btn\\" onclick=\\"togglePin(\\x27"+p.key+"\\x27,\\x27"+p.label+"\\x27)\\"><i class=\\"material-icons\\">close</i></button><div style=\\"font-size:10px;color:#94a3b8\\">"+p.label+"</div><div style=\\"font-size:24px;font-weight:700;color:"+p.color+"\\">"+val+"</div></div>"});' +
+    'html+="<div class=\\"pinned-metric\\"><button class=\\"unpin-btn\\" data-key=\\""+escapeHtml(p.key)+"\\" data-label=\\""+escapeHtml(p.label)+"\\" onclick=\\"togglePin(this.dataset.key,this.dataset.label)\\"><i class=\\"material-icons\\">close</i></button><div style=\\"font-size:10px;color:#94a3b8\\">"+escapeHtml(p.label)+"</div><div style=\\"font-size:24px;font-weight:700;color:"+p.color+"\\">"+val+"</div></div>"});' +
     'html+="</div></div>";' +
     'var content=document.getElementById("main-content");' +
     'if(content)content.insertAdjacentHTML("afterbegin",html)' +
@@ -18183,21 +18277,21 @@ function getUnifiedDashboardHtml(isPII) {
     'var result=JSON.parse(json);' +
     'var html="<div class=\\"drill-breadcrumbs\\">";' +
     'result.breadcrumbs.forEach(function(bc,idx){' +
-    'if(idx<result.breadcrumbs.length-1){html+="<a onclick=\\"showChartDrillDown(\\x27"+type+"\\x27,\\x27"+(bc.key||"")+"\\x27,\\x27"+title+"\\x27)\\">"+bc.label+"</a><span> / </span>"}' +
-    'else{html+="<span style=\\"color:#e2e8f0\\">"+bc.label+"</span>"}' +
+    'if(idx<result.breadcrumbs.length-1){html+="<a data-type=\\""+escapeHtml(type)+"\\" data-key=\\""+escapeHtml(bc.key||"")+"\\" data-title=\\""+escapeHtml(title)+"\\" onclick=\\"showChartDrillDown(this.dataset.type,this.dataset.key,this.dataset.title)\\">"+escapeHtml(bc.label)+"</a><span> / </span>"}' +
+    'else{html+="<span style=\\"color:#e2e8f0\\">"+escapeHtml(bc.label)+"</span>"}' +
     '});html+="</div>";' +
     'if(result.subGroups&&!secondaryKey){' +
     'var sgKeys=Object.keys(result.subGroups);' +
     'if(sgKeys.length>0){html+="<div style=\\"font-size:11px;color:#94a3b8;margin-bottom:6px\\">Drill deeper:</div><div class=\\"drill-sub-groups\\">";' +
     'sgKeys.forEach(function(dim){' +
     'var entries=Object.keys(result.subGroups[dim]);' +
-    'entries.forEach(function(ek){html+="<button class=\\"drill-sub-btn\\" onclick=\\"showChartDrillDown(\\x27"+type+"\\x27,\\x27"+key+"\\x27,\\x27"+title+"\\x27,\\x27"+ek+"\\x27)\\">"+ek+" ("+result.subGroups[dim][ek]+")</button>"});' +
+    'entries.forEach(function(ek){html+="<button class=\\"drill-sub-btn\\" data-type=\\""+escapeHtml(type)+"\\" data-key=\\""+escapeHtml(key)+"\\" data-title=\\""+escapeHtml(title)+"\\" data-ek=\\""+escapeHtml(ek)+"\\" onclick=\\"showChartDrillDown(this.dataset.type,this.dataset.key,this.dataset.title,this.dataset.ek)\\">"+escapeHtml(ek)+" ("+result.subGroups[dim][ek]+")</button>"});' +
     '});html+="</div>"}}' +
     'html+="<div class=\\"drill-down-list\\" style=\\"margin-top:8px\\">";' +
     'result.items.forEach(function(item){' +
-    'if(item.id&&item.member){html+="<div class=\\"drill-down-item\\"><span><strong>"+item.id+"</strong> - "+item.member+"</span><span style=\\"color:#94a3b8\\">"+(item.steward||"")+" | "+(item.location||"")+"</span></div>"}' +
-    'else if(item.id&&item.name){html+="<div class=\\"drill-down-item\\"><span>"+item.name+"</span><span style=\\"color:#94a3b8\\">"+(item.location||"")+(item.isSteward?" (Steward)":"")+"</span></div>"}' +
-    'else if(item.name){html+="<div class=\\"drill-down-item\\"><span>"+item.name+"</span><span style=\\"color:#94a3b8\\">"+(item.location||"")+"</span></div>"}' +
+    'if(item.id&&item.member){html+="<div class=\\"drill-down-item\\"><span><strong>"+escapeHtml(item.id)+"</strong> - "+escapeHtml(item.member)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.steward||"")+" | "+escapeHtml(item.location||"")+"</span></div>"}' +
+    'else if(item.id&&item.name){html+="<div class=\\"drill-down-item\\"><span>"+escapeHtml(item.name)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.location||"")+(item.isSteward?" (Steward)":"")+"</span></div>"}' +
+    'else if(item.name){html+="<div class=\\"drill-down-item\\"><span>"+escapeHtml(item.name)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.location||"")+"</span></div>"}' +
     '});html+="</div>";' +
     'openModal(title+" ("+result.totalCount+")",html)' +
     '}).getMultiLevelDrillDown(dashMode==="steward",type,key,secondaryKey||null)' +
@@ -18266,7 +18360,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var list=JSON.parse(json);var el=document.getElementById("rptScheduleList");if(!el)return;' +
     'if(list.length===0){el.innerHTML="<p style=\\"color:#64748b;font-size:11px\\">No scheduled reports</p>";return}' +
     'var html="<div style=\\"font-size:11px;color:#94a3b8;margin-top:8px\\"><strong>Active Schedules:</strong></div>";' +
-    'list.forEach(function(s){html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span style=\\"font-size:11px;color:#e2e8f0\\">"+s.email+" ("+s.frequency+")</span><button onclick=\\"removeReport(\\x27"+s.id+"\\x27)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px\\">Remove</button></div>"});' +
+    'list.forEach(function(s){html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span style=\\"font-size:11px;color:#e2e8f0\\">"+escapeHtml(s.email)+" ("+escapeHtml(s.frequency)+")</span><button data-id=\\""+escapeHtml(s.id)+"\\" onclick=\\"removeReport(this.dataset.id)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px\\">Remove</button></div>"});' +
     'el.innerHTML=html' +
     '}).getScheduledReports()' +
     '}' +
@@ -18437,7 +18531,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var el=document.getElementById("presetManagerList");if(!el)return;' +
     'if(chartPresets.length===0){el.innerHTML="<p style=\\"color:#64748b\\">No saved presets</p>";return}' +
     'var html="";chartPresets.forEach(function(p){' +
-    'html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span>"+p.name+"</span><button onclick=\\"deletePreset(\\x27"+p.id+"\\x27)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:10px\\">Delete</button></div>"' +
+    'html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span>"+escapeHtml(p.name)+"</span><button data-id=\\""+escapeHtml(p.id)+"\\" onclick=\\"deletePreset(this.dataset.id)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:10px\\">Delete</button></div>"' +
     '});el.innerHTML=html' +
     '}' +
 
@@ -18459,11 +18553,11 @@ function getUnifiedDashboardHtml(isPII) {
     'var html="<div style=\\"padding:4px\\">";' +
     'if(views.length===0){html+="<p style=\\"color:#94a3b8\\">No shared views yet</p>"}' +
     'views.forEach(function(v){' +
-    'html+="<div style=\\"background:#0f172a;padding:12px;border-radius:8px;margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;align-items:center\\"><strong style=\\"color:#e2e8f0\\">"+v.name+"</strong><span style=\\"font-size:10px;color:#64748b\\">by "+v.createdBy+"</span></div>";' +
-    'html+="<div style=\\"font-size:11px;color:#94a3b8;margin-top:4px\\">Shared with: "+(v.sharedWith.join(", ")||"No one")+"</div>";' +
+    'html+="<div style=\\"background:#0f172a;padding:12px;border-radius:8px;margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;align-items:center\\"><strong style=\\"color:#e2e8f0\\">"+escapeHtml(v.name)+"</strong><span style=\\"font-size:10px;color:#64748b\\">by "+escapeHtml(v.createdBy)+"</span></div>";' +
+    'html+="<div style=\\"font-size:11px;color:#94a3b8;margin-top:4px\\">Shared with: "+escapeHtml(v.sharedWith.join(", ")||"No one")+"</div>";' +
     'if(v.comments&&v.comments.length>0){html+="<div style=\\"margin-top:8px;font-size:11px;color:#94a3b8\\">Comments ("+v.comments.length+"):</div>";' +
-    'v.comments.slice(-3).forEach(function(c){html+="<div style=\\"padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.05)\\"><strong>"+c.author+":</strong> "+c.text+"</div>"})}' +
-    'html+="<div style=\\"margin-top:8px;display:flex;gap:6px\\"><button onclick=\\"addCommentToView(\\x27"+v.id+"\\x27)\\" style=\\"font-size:11px;background:none;border:1px solid #334155;color:#94a3b8;padding:4px 8px;border-radius:4px;cursor:pointer\\">Comment</button><button onclick=\\"deleteView(\\x27"+v.id+"\\x27)\\" style=\\"font-size:11px;background:none;border:1px solid #ef4444;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer\\">Delete</button></div>";' +
+    'v.comments.slice(-3).forEach(function(c){html+="<div style=\\"padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.05)\\"><strong>"+escapeHtml(c.author)+":</strong> "+escapeHtml(c.text)+"</div>"})}' +
+    'html+="<div style=\\"margin-top:8px;display:flex;gap:6px\\"><button data-id=\\""+escapeHtml(v.id)+"\\" onclick=\\"addCommentToView(this.dataset.id)\\" style=\\"font-size:11px;background:none;border:1px solid #334155;color:#94a3b8;padding:4px 8px;border-radius:4px;cursor:pointer\\">Comment</button><button data-id=\\""+escapeHtml(v.id)+"\\" onclick=\\"deleteView(this.dataset.id)\\" style=\\"font-size:11px;background:none;border:1px solid #ef4444;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer\\">Delete</button></div>";' +
     'html+="</div>"' +
     '});html+="</div>";' +
     'openModal("Shared Views",html)' +
@@ -18549,7 +18643,7 @@ function getUnifiedDashboardHtml(isPII) {
     'if(notifs.length===0){el.innerHTML="<p>No notifications</p>";return}' +
     'var html="";notifs.slice(0,5).forEach(function(n){' +
     'var style=n.read?"color:#64748b":"color:#e2e8f0;font-weight:500";' +
-    'html+="<div style=\\"padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"+style+"\\" onclick=\\"markNotifRead(\\x27"+n.id+"\\x27)\\">"+n.title+"<br><span style=\\"font-size:10px;color:#64748b\\">"+new Date(n.timestamp).toLocaleString()+"</span></div>"' +
+    'html+="<div style=\\"padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"+style+"\\" data-id=\\""+escapeHtml(n.id)+"\\" onclick=\\"markNotifRead(this.dataset.id)\\">"+escapeHtml(n.title)+"<br><span style=\\"font-size:10px;color:#64748b\\">"+new Date(n.timestamp).toLocaleString()+"</span></div>"' +
     '});el.innerHTML=html;' +
     'var unread=notifs.filter(function(n){return!n.read}).length;' +
     'var badge=document.getElementById("alertBadge");if(badge&&unread>0){badge.textContent=unread;badge.style.display="inline"}' +
@@ -18578,7 +18672,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (3588 lines)
+// SOURCE: 05_Integrations.gs (3621 lines)
 // ============================================================================
 
 /**
@@ -19091,6 +19185,15 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     return errorResponse('Meeting ID and recipient emails are required');
   }
 
+  // Validate all recipient email addresses
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emails = String(recipientEmails).split(',');
+  for (var e = 0; e < emails.length; e++) {
+    if (!emailRegex.test(emails[e].trim())) {
+      return errorResponse('Invalid email address: ' + emails[e].trim());
+    }
+  }
+
   try {
     var result = getMeetingAttendees(meetingId);
     if (!result.success) {
@@ -19100,6 +19203,9 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Find meeting details from the check-in log
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return errorResponse('No meeting check-in data found');
+    }
     var data = sheet.getDataRange().getValues();
     var meetingName = '';
     var meetingDate = '';
@@ -19310,6 +19416,17 @@ function setDocViewOnlyByLink(docUrl) {
  */
 function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipientEmails) {
   if (!recipientEmails || !docUrl) return;
+
+  // Validate all recipient email addresses
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emails = String(recipientEmails).split(',');
+  for (var e = 0; e < emails.length; e++) {
+    if (!emailRegex.test(emails[e].trim())) {
+      Logger.log('Invalid email address in recipient list: ' + emails[e].trim());
+      return;
+    }
+  }
+
   try {
     var typeLabel = docType === 'agenda' ? 'Meeting Agenda' : 'Meeting Notes';
     var safeDocUrl = /^https:\/\/docs\.google\.com\//.test(docUrl) ? docUrl : '';
@@ -19697,6 +19814,10 @@ function sendDeadlineReminders(daysAhead) {
     const deadlines = getUpcomingDeadlines(daysAhead || 7);
     const userEmail = Session.getActiveUser().getEmail();
 
+    if (!userEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      return errorResponse('Could not determine a valid email address for the current user');
+    }
+
     if (deadlines.length === 0) {
       return { success: true, sent: false, message: 'No upcoming deadlines' };
     }
@@ -19764,7 +19885,7 @@ function sendEmailToMember(memberId, subject, body) {
     }
 
     const email = member['Email'] || member.email;
-    if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
       return errorResponse('Invalid email address');
     }
 
@@ -19971,6 +20092,10 @@ function createPDFForSelectedGrievance() {
  * @private
  */
 function sendGrievancePdfEmail_(data, pdf) {
+  if (!data.memberEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.memberEmail).trim())) {
+    throw new Error('Invalid or missing member email address');
+  }
+
   var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Grievance Form - ' + data.grievanceId;
 
   var body = 'Dear ' + data.name + ',\n\n' +
@@ -20495,7 +20620,7 @@ function getWebAppDashboardHtml() {
     // Script to load overdue preview
     '<script>' +
     getClientSideEscapeHtml() +
-    'var baseUrl="' + baseUrl + '";' +
+    'var baseUrl=' + JSON.stringify(baseUrl) + ';' +
     'var retryCount=0;' +
     'function loadOverdue(){' +
     '  if(!navigator.onLine){document.getElementById("overdue-preview").innerHTML="<div style=\\"padding:15px;text-align:center;color:#666\\">📡 Offline</div>";return}' +
@@ -20616,7 +20741,7 @@ function getWebAppSearchHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var currentTab="all";' +
     'var searchTimeout=null;' +
     'var lastQuery="";' +
@@ -20793,7 +20918,7 @@ function getWebAppGrievanceListHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -20993,7 +21118,7 @@ function getWebAppMemberListHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -21148,6 +21273,8 @@ function getWebAppLinksHtml() {
     '</nav>' +
 
     '<script>' +
+    getClientSideEscapeHtml() +
+    'function safeUrl(u){if(!u)return"#";u=String(u);return/^https?:\\/\\//i.test(u)?u:"#";}' +
     'function loadLinks(){' +
     '  google.script.run.withSuccessHandler(function(links){' +
     '    renderLinks(links);' +
@@ -21162,17 +21289,17 @@ function getWebAppLinksHtml() {
     '  // Forms section' +
     '  html+="<div class=\\"section-title\\">📝 Forms</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+links.grievanceForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
-    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+links.contactForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
-    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+links.satisfactionForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
+    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.grievanceForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
+    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.contactForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
+    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.satisfactionForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
     '  if(!links.grievanceForm&&!links.contactForm&&!links.satisfactionForm){html+="<div class=\\"link-card full\\"><span class=\\"link-icon\\">ℹ️</span><div class=\\"link-content\\"><span class=\\"link-label\\">No Forms Configured</span><span class=\\"link-desc\\">Add form URLs to Config sheet</span></div></div>";}' +
     '  html+="</div>";' +
 
     '  // Resources section' +
     '  html+="<div class=\\"section-title\\">🔧 Resources</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  html+="<a class=\\"link-card\\" href=\\""+links.spreadsheetUrl+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
-    '  html+="<a class=\\"link-card github\\" href=\\""+links.githubRepo+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
+    '  html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.spreadsheetUrl))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
+    '  html+="<a class=\\"link-card github\\" href=\\""+escapeHtml(safeUrl(links.githubRepo))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
     '  html+="</div>";' +
 
     '  document.getElementById("linksContent").innerHTML=html;' +
@@ -21663,7 +21790,7 @@ function authorizeConstantContact() {
     '  if(!match){alert("Could not find authorization code in that URL. Make sure you copied the full URL.");return;}' +
     '  google.script.run' +
     '    .withSuccessHandler(function(msg){' +
-    '      document.querySelector(".container").innerHTML="<h2>✅ "+msg+"</h2><p>You can close this dialog.</p>";' +
+    '      var c=document.querySelector(".container");c.innerHTML="";var h=document.createElement("h2");h.textContent="\\u2705 "+msg;var p=document.createElement("p");p.textContent="You can close this dialog.";c.appendChild(h);c.appendChild(p);' +
     '    })' +
     '    .withFailureHandler(function(e){alert("Error: "+e.message);})' +
     '    .exchangeConstantContactCode(match[1]);' +
@@ -22171,7 +22298,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3538 lines)
+// SOURCE: 06_Maintenance.gs (3530 lines)
 // ============================================================================
 
 /**
@@ -23572,7 +23699,7 @@ function showUndoRedoPanel() {
     'function performRedo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).redoLastAction()}' +
     'function undo(i){google.script.run.withSuccessHandler(function(){location.reload()}).undoToIndex(i)}' +
     'function clearHistory(){if(confirm("Clear all history?")){google.script.run.withSuccessHandler(function(){location.reload()}).clearUndoHistory()}}' +
-    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");window.open(url,"_blank")}).exportUndoHistoryToSheet()}' +
+    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");if(/^https:\\/\\/docs\\.google\\.com\\//.test(url))window.open(url,"_blank");else alert("Invalid URL")}).exportUndoHistoryToSheet()}' +
     '</script></body></html>'
   ).setWidth(800).setHeight(600);
 
@@ -24628,7 +24755,7 @@ function calculateStewardWorkload() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
-  if (!grievanceSheet) return [];
+  if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) return [];
 
   var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.STEWARD).getValues();
 
@@ -24761,6 +24888,7 @@ function getStewardWithLowestWorkload() {
   // Also get all stewards from Config (some may have 0 cases)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet || configSheet.getLastRow() <= 1) return null;
   var stewardList = configSheet.getRange(3, CONFIG_COLS.STEWARDS, 50, 1).getValues()
     .filter(function(row) { return row[0] !== ''; })
     .map(function(row) { return row[0]; });
@@ -24924,9 +25052,6 @@ function autoFixMissingConfigValues() {
     return;
   }
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-
   // Group by config column
   var byColumn = {};
   report.autoFixable.forEach(function(item) {
@@ -24936,23 +25061,13 @@ function autoFixMissingConfigValues() {
     byColumn[item.configCol].push(item.value);
   });
 
-  // Add values to each column
+  // Add values to each column using the canonical write path
   Object.keys(byColumn).forEach(function(colStr) {
     var col = parseInt(colStr);
     var values = byColumn[col];
 
-    // Find next empty row in this column
-    var colData = configSheet.getRange(3, col, 100, 1).getValues();
-    var nextRow = 3;
-    for (var i = 0; i < colData.length; i++) {
-      if (colData[i][0] !== '') {
-        nextRow = i + 4;
-      }
-    }
-
-    // Add values
-    values.forEach(function(value, index) {
-      configSheet.getRange(nextRow + index, col).setValue(value);
+    values.forEach(function(value) {
+      addToConfigDropdown_(col, value);
     });
   });
 
@@ -25259,6 +25374,10 @@ function restoreFromArchive(grievanceIds) {
 
   if (!archiveSheet || !grievanceSheet) {
     return { restored: 0, error: 'Required sheets not found' };
+  }
+
+  if (archiveSheet.getLastRow() <= 1) {
+    return { restored: 0 };
   }
 
   var archiveData = archiveSheet.getRange(2, 1, archiveSheet.getLastRow() - 1, archiveSheet.getLastColumn()).getValues();
@@ -29840,7 +29959,7 @@ function getDepartmentList() {
     var memberSheet = SpreadsheetApp.getActiveSpreadsheet()
       .getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
-    if (!memberSheet) return [];
+    if (!memberSheet || memberSheet.getLastRow() <= 1) return [];
 
     var data = memberSheet.getRange(2, MEMBER_COLS.JOB_TITLE,
       memberSheet.getLastRow() - 1, 1).getValues();
@@ -30376,7 +30495,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1986 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (2011 lines)
 // ============================================================================
 
 
@@ -30600,7 +30719,7 @@ function sendContactInfoForm() {
       '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
       '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
       '<p>Copy this link and share with members:</p>' +
-      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + formUrl + '</textarea>' +
+      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + escapeHtml(formUrl) + '</textarea>' +
       '<br><br>' +
       '<button onclick="copyLink()" style="padding: 8px 16px; cursor: pointer;">Copy to Clipboard</button>' +
       '<span id="copied" style="color: green; margin-left: 10px; display: none;">Copied!</span>' +
@@ -30697,31 +30816,31 @@ function onContactFormSubmit(e) {
       }
       var memberId = generateNameBasedId('M', firstName, lastName, existingIds);
 
-      // Build new row array
+      // Build new row array (escapeForFormula on all user-supplied strings to prevent formula injection)
       var newRow = [];
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
-      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
-      newRow[MEMBER_COLS.JOB_TITLE - 1] = jobTitle || '';
-      newRow[MEMBER_COLS.WORK_LOCATION - 1] = workLocation || '';
-      newRow[MEMBER_COLS.UNIT - 1] = unit || '';
-      newRow[MEMBER_COLS.OFFICE_DAYS - 1] = officeDays || '';
-      newRow[MEMBER_COLS.EMAIL - 1] = email || '';
-      newRow[MEMBER_COLS.PHONE - 1] = phone || '';
-      newRow[MEMBER_COLS.PREFERRED_COMM - 1] = preferredComm || '';
-      newRow[MEMBER_COLS.BEST_TIME - 1] = bestTime || '';
-      newRow[MEMBER_COLS.SUPERVISOR - 1] = supervisor || '';
-      newRow[MEMBER_COLS.MANAGER - 1] = manager || '';
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(firstName);
+      newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(lastName);
+      newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(jobTitle || '');
+      newRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(workLocation || '');
+      newRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(unit || '');
+      newRow[MEMBER_COLS.OFFICE_DAYS - 1] = escapeForFormula(officeDays || '');
+      newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(email || '');
+      newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(phone || '');
+      newRow[MEMBER_COLS.PREFERRED_COMM - 1] = escapeForFormula(preferredComm || '');
+      newRow[MEMBER_COLS.BEST_TIME - 1] = escapeForFormula(bestTime || '');
+      newRow[MEMBER_COLS.SUPERVISOR - 1] = escapeForFormula(supervisor || '');
+      newRow[MEMBER_COLS.MANAGER - 1] = escapeForFormula(manager || '');
       newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-      newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = interestLocal || '';
-      newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = interestChapter || '';
-      newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = interestAllied || '';
+      newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = escapeForFormula(interestLocal || '');
+      newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = escapeForFormula(interestChapter || '');
+      newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = escapeForFormula(interestAllied || '');
       newRow[MEMBER_COLS.HIRE_DATE - 1] = hireDate ? parseFormDate_(hireDate) : '';
-      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = employeeId || '';
-      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = streetAddress || '';
-      newRow[MEMBER_COLS.CITY - 1] = city || '';
-      newRow[MEMBER_COLS.STATE - 1] = state || '';
-      newRow[MEMBER_COLS.ZIP_CODE - 1] = zipCode || '';
+      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(employeeId || '');
+      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = escapeForFormula(streetAddress || '');
+      newRow[MEMBER_COLS.CITY - 1] = escapeForFormula(city || '');
+      newRow[MEMBER_COLS.STATE - 1] = escapeForFormula(state || '');
+      newRow[MEMBER_COLS.ZIP_CODE - 1] = escapeForFormula(zipCode || '');
 
       // Append new member row
       memberSheet.appendRow(newRow);
@@ -31009,7 +31128,7 @@ function getSatisfactionSurveyLink() {
       '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
       '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
       '<p>Copy this link and share with members:</p>' +
-      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + formUrl + '</textarea>' +
+      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + escapeHtml(formUrl) + '</textarea>' +
       '<br><br>' +
       '<button onclick="copyLink()" style="padding: 8px 16px; cursor: pointer;">Copy to Clipboard</button>' +
       '<span id="copied" style="color: green; margin-left: 10px; display: none;">Copied!</span>' +
@@ -31175,6 +31294,13 @@ function onSatisfactionFormSubmit(e) {
     var memberMatch = validateMemberEmail(email);
     var verified = memberMatch ? 'Yes' : 'Pending Review';
     var memberId = memberMatch ? memberMatch.memberId : '';
+
+    // ── Sanitize all user-supplied values to prevent formula injection ──
+    for (var fi = 0; fi < newRow.length; fi++) {
+      if (typeof newRow[fi] === 'string') {
+        newRow[fi] = escapeForFormula(newRow[fi]);
+      }
+    }
 
     // ── Append ANONYMOUS response to Satisfaction sheet ──
     satSheet.appendRow(newRow);
@@ -31780,6 +31906,20 @@ function sendRandomSurveyEmails() {
  * @returns {string} Result message
  */
 function executeSendRandomSurveyEmails(opts) {
+  // Validate parameters from client-side input
+  opts = opts || {};
+  if (typeof opts.subject !== 'string' || opts.subject.length === 0 || opts.subject.length > 200) {
+    throw new Error('Invalid subject: must be a non-empty string of 200 characters or fewer.');
+  }
+  opts.count = parseInt(opts.count, 10);
+  if (isNaN(opts.count) || opts.count < 1 || opts.count > 1000) {
+    throw new Error('Invalid count: must be a positive integer up to 1000.');
+  }
+  opts.excludeDays = parseInt(opts.excludeDays, 10);
+  if (isNaN(opts.excludeDays) || opts.excludeDays < 0) {
+    throw new Error('Invalid excludeDays: must be a non-negative integer.');
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -31798,10 +31938,12 @@ function executeSendRandomSurveyEmails(opts) {
   var surveyLogCol = CONFIG_COLS.SURVEY_LOG_IDS;
   var surveyLog = {};
   try {
-    var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
-    logData.forEach(function(row) {
-      if (row[0]) surveyLog[row[0]] = new Date(row[1]);
-    });
+    if (configSheet && configSheet.getLastRow() > 1) {
+      var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
+      logData.forEach(function(row) {
+        if (row[0]) surveyLog[row[0]] = new Date(row[1]);
+      });
+    }
   } catch(_e) { /* No log yet */ }
 
   var cutoffDate = new Date();
@@ -31875,11 +32017,13 @@ function executeSendRandomSurveyEmails(opts) {
   });
 
   // Update survey email log - find actual last row in log column to avoid overwriting
-  if (newLogEntries.length > 0) {
-    var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow(), 1).getValues();
+  if (newLogEntries.length > 0 && configSheet) {
     var nextRow = 2;
-    for (var lr = logValues.length - 1; lr >= 0; lr--) {
-      if (logValues[lr][0]) { nextRow = lr + 3; break; }
+    if (configSheet.getLastRow() > 1) {
+      var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 1).getValues();
+      for (var lr = logValues.length - 1; lr >= 0; lr--) {
+        if (logValues[lr][0]) { nextRow = lr + 3; break; }
+      }
     }
     configSheet.getRange(nextRow, surveyLogCol, newLogEntries.length, 2).setValues(newLogEntries);
   }
@@ -34525,7 +34669,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4017 lines)
+// SOURCE: 09_Dashboards.gs (4024 lines)
 // ============================================================================
 
 /**
@@ -34787,7 +34931,7 @@ function getSatisfactionDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allResponses=[];var currentFilter="all";var analyticsLoaded=false;var sectionsLoaded=false;' +
 
     // Tab switching
@@ -37901,7 +38045,7 @@ function getFlaggedSubmissionsHtml() {
     '<div id="content"><div class="empty-state">Loading...</div></div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function load(){google.script.run.withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
@@ -38024,6 +38168,13 @@ function approveFlaggedSubmission(rowNum) {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function rejectFlaggedSubmission(rowNum) {
+  // Verify caller is an authorized steward
+  var callerEmail = '';
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  if (!callerEmail) {
+    throw new Error('Authorization required: unable to verify user identity');
+  }
+
   // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
@@ -38035,7 +38186,7 @@ function rejectFlaggedSubmission(rowNum) {
       var vaultRow = i + 1;
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Rejected');
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
-      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
       break;
     }
   }
@@ -38117,7 +38268,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '.trend-area { margin-top: 10px; }' +
     '</style>' +
     '<script type="text/javascript">' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'google.charts.load("current", {"packages":["corechart", "gauge"]});' +
     'google.charts.setOnLoadCallback(drawCharts);' +
     'function drawCharts() {' +
@@ -42503,7 +42654,7 @@ function createFeaturesReferenceSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10c_FormHandlers.gs (691 lines)
+// SOURCE: 10c_FormHandlers.gs (694 lines)
 // ============================================================================
 
 // ============================================================================
@@ -42771,8 +42922,11 @@ function shareWithCoordinators_(folder) {
     if (!configSheet) return;
 
     // Get coordinator emails from Config (column N = GRIEVANCE_COORDINATORS)
-    var coordData = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_COORDINATORS,
-                                          configSheet.getLastRow() - 1, 1).getValues();
+    // Config data starts at row 3 (row 1 = section headers, row 2 = column headers)
+    var lastRow = configSheet.getLastRow();
+    if (lastRow < 3) return; // No data rows
+    var coordData = configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_COORDINATORS,
+                                          lastRow - 2, 1).getValues();
 
     for (var i = 0; i < coordData.length; i++) {
       var email = coordData[i][0];
@@ -43898,7 +44052,7 @@ function fixDataQualityIssues() {
     '</style></head><body><div class="container">' +
     '<h2>⚠️ Data Quality Issues</h2>' +
     '<p>The following issues were found:</p>' +
-    issues.map(function(i) { return '<div class="issue">' + i + '</div>'; }).join('') +
+    issues.map(function(i) { return '<div class="issue">' + escapeHtml(String(i)) + '</div>'; }).join('') +
     '<h3>How to Fix:</h3>' +
     '<div class="fix-option"><strong>Option 1:</strong> Manually update Member IDs in Grievance Log</div>' +
     '<div class="fix-option"><strong>Option 2:</strong> Add missing members to Member Directory first</div>' +
@@ -44061,8 +44215,8 @@ function syncVolunteerHoursToMemberDirectory() {
 
   for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
     var row = volunteerData[i];
-    var memberId = row[1];  // Column B - Member ID (Volunteer Hours sheet - no shared constant)
-    var hours = row[5];     // Column F - Hours (Volunteer Hours sheet - no shared constant)
+    var memberId = row[1];  // Column B = Member ID (Volunteer Hours: A=Title, B=MemberID, C=Name, D=Date, E=Activity, F=Hours)
+    var hours = row[5];     // Column F = Hours (see column layout above)
 
     if (!memberId) continue;
 
@@ -44123,10 +44277,10 @@ function syncMeetingAttendanceToMemberDirectory() {
 
   for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
     var row = attendanceData[i];
-    var meetingDate = row[1];     // Column B - Meeting Date (Meeting Attendance sheet - no shared constant)
-    var meetingType = row[2];     // Column C - Meeting Type (Meeting Attendance sheet - no shared constant)
-    var memberId = row[4];        // Column E - Member ID (Meeting Attendance sheet - no shared constant)
-    var attended = row[6];        // Column G - Attended (Meeting Attendance sheet - no shared constant)
+    var meetingDate = row[1];     // Column B = Meeting Date (Meeting Attendance: A=MeetingID, B=Date, C=Type, D=Name, E=MemberID, F=Email, G=Attended)
+    var meetingType = row[2];     // Column C = Meeting Type (see column layout above)
+    var memberId = row[4];        // Column E = Member ID (see column layout above)
+    var attended = row[6];        // Column G = Attended (see column layout above)
 
     if (!memberId || !attended || !meetingDate) continue;
 
@@ -44233,7 +44387,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2298 lines)
+// SOURCE: 10_Main.gs (2327 lines)
 // ============================================================================
 
 /**
@@ -44838,7 +44992,36 @@ function handleGrievanceEdit(e) {
     GRIEVANCE_COLS.STEP3_APPEAL_FILED, GRIEVANCE_COLS.DATE_CLOSED
   ];
   if (statusAndDateCols.indexOf(col) !== -1) {
-    sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(new Date());
+    // Compute the actual next deadline based on current step, matching the logic
+    // in recalculateDownstreamDeadlines_. Only set to a real deadline date, not now().
+    var currentStep = sheet.getRange(row, GRIEVANCE_COLS.CURRENT_STEP).getValue();
+    var status = sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue();
+    var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
+
+    if (closedStatuses.indexOf(status) === -1 && currentStep) {
+      var nextActionDate = '';
+      if (currentStep === 'Informal') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.FILING_DEADLINE).getValue();
+      } else if (currentStep === 'Step I') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP1_DUE).getValue();
+      } else if (currentStep === 'Step II') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP2_DUE).getValue();
+      } else if (currentStep === 'Step III') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP3_APPEAL_DUE).getValue();
+      }
+
+      if (nextActionDate instanceof Date) {
+        sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(nextActionDate);
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        var daysTo = Math.floor((nextActionDate - today) / (1000 * 60 * 60 * 24));
+        sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue(daysTo);
+      }
+    } else if (closedStatuses.indexOf(status) !== -1) {
+      // Clear deadline for closed grievances
+      sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue('');
+      sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue('');
+    }
   }
 
   // If status changed, check for auto-actions
@@ -47885,7 +48068,7 @@ function getSearchDialogHtml_() {
             var name = escapeHtml((member['First Name'] || '') + ' ' + (member['Last Name'] || ''));
             var id = escapeHtml(member['Member ID'] || 'N/A');
             var email = escapeHtml(member['Email'] || '');
-            html += '<div class="result-item" onclick="selectMember(\\'' + id.replace(/'/g,"") + '\\')">';
+            html += '<div class="result-item" data-id="' + id + '" onclick="selectMember(this.dataset.id)">';
             html += '<strong>' + name + '</strong> (' + id + ')';
             if (email) html += '<br><small>' + email + '</small>';
             html += '</div>';
@@ -48552,9 +48735,9 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     if (text.length > 500) ocrNote += '...';
 
     if (existingResolution) {
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(existingResolution + '\n\n' + ocrNote);
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(existingResolution + '\n\n' + ocrNote));
     } else {
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(ocrNote);
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(ocrNote));
     }
     fieldsPopulated.push('Resolution Notes (OCR text)');
 
@@ -49044,7 +49227,7 @@ function showOCRDialog() {
     '    "</div>";' +
     '  }' +
     '}' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'document.getElementById("fileId").addEventListener("keypress", function(e) {' +
     '  if (e.key === "Enter") runOCR();' +
     '});' +
@@ -49349,7 +49532,7 @@ function showSearchPrecedents() {
     '  <div class="empty">Enter search terms to find historical grievances</div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function searchPrecedents() {' +
     '  var query = document.getElementById("searchQuery").value;' +
     '  var outcomeFilter = document.getElementById("filterOutcome").value;' +
@@ -50056,8 +50239,8 @@ function getMemberPortalHtml_(profile) {
     '    </div>' +
     '    ' +
     '    <div class="btn-grid">' +
-    '      <a href="' + CONTRACT_PDF_URL + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
-    '      <a href="' + RESOURCE_DRIVE_URL + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
+    '      <a href="' + (/^https:\/\//.test(CONTRACT_PDF_URL) ? escapeHtml(CONTRACT_PDF_URL) : '#') + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
+    '      <a href="' + (/^https:\/\//.test(RESOURCE_DRIVE_URL) ? escapeHtml(RESOURCE_DRIVE_URL) : '#') + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
     '    </div>' +
     '    ' +
     '    <div class="card">' +
@@ -50077,7 +50260,7 @@ function getMemberPortalHtml_(profile) {
     '    ' +
     '    <div class="footer">' +
     '      <i class="material-icons" style="font-size:12px;vertical-align:middle">lock</i> ' +
-    '      Secure Member Portal | Member ID: ' + profile.memberId +
+    '      Secure Member Portal | Member ID: ' + escapeHtml(profile.memberId) +
     '    </div>' +
     '  </div>' +
     '</body>' +
@@ -50140,8 +50323,8 @@ function getPublicPortalHtml_(stats, stewards, satisfaction) {
     '    </div>' +
     '    ' +
     '    <div class="btn-grid">' +
-    '      <a href="' + CONTRACT_PDF_URL + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
-    '      <a href="' + RESOURCE_DRIVE_URL + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
+    '      <a href="' + (/^https:\/\//.test(CONTRACT_PDF_URL) ? escapeHtml(CONTRACT_PDF_URL) : '#') + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
+    '      <a href="' + (/^https:\/\//.test(RESOURCE_DRIVE_URL) ? escapeHtml(RESOURCE_DRIVE_URL) : '#') + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
     '    </div>' +
     '    ' +
     '    <div class="card">' +
@@ -50200,7 +50383,7 @@ function getErrorPageHtml_(message) {
 
 
 // ============================================================================
-// SOURCE: 12_Features.gs (4023 lines)
+// SOURCE: 12_Features.gs (4025 lines)
 // ============================================================================
 
 /**
@@ -52041,7 +52224,9 @@ function saveExpansionData(memberId, customData) {
     const fieldName = fieldNames[i];
     const col = headerMap[fieldName];
     if (col && col > coreCount) {
-      updates.push({ col: col, value: customData[fieldName] });
+      var rawValue = customData[fieldName];
+      var safeValue = typeof rawValue === 'string' ? escapeForFormula(rawValue) : rawValue;
+      updates.push({ col: col, value: safeValue });
     }
   }
 
@@ -52512,8 +52697,8 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
 </head>
 <body>
   <div class="header">
-    <h2>Grievance ${grievanceId}</h2>
-    <div class="member">${reminders.memberName} • ${reminders.status}</div>
+    <h2>Grievance ${escapeHtml(grievanceId)}</h2>
+    <div class="member">${escapeHtml(reminders.memberName)} • ${escapeHtml(reminders.status)}</div>
   </div>
 
   <div class="reminder-card">
@@ -52524,7 +52709,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
     </div>
     <div class="form-group">
       <label class="form-label">Note (e.g., "Schedule Step II meeting")</label>
-      <input type="text" class="form-input" id="r1Note" value="${reminders.reminder1.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
+      <input type="text" class="form-input" id="r1Note" value="${escapeHtml(reminders.reminder1.note)}" placeholder="Brief description...">
     </div>
     <div class="btn-row">
       <button class="btn btn-clear" onclick="clearReminder(1)">Clear</button>
@@ -52539,7 +52724,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
     </div>
     <div class="form-group">
       <label class="form-label">Note</label>
-      <input type="text" class="form-input" id="r2Note" value="${reminders.reminder2.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
+      <input type="text" class="form-input" id="r2Note" value="${escapeHtml(reminders.reminder2.note)}" placeholder="Brief description...">
     </div>
     <div class="btn-row">
       <button class="btn btn-clear" onclick="clearReminder(2)">Clear</button>
@@ -52554,7 +52739,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
   </div>
 
   <script>
-    var grievanceId = '${grievanceId}';
+    var grievanceId = ${JSON.stringify(grievanceId)};
 
     function saveReminders() {
       var r1Date = document.getElementById('r1Date').value;
@@ -55681,7 +55866,7 @@ function getMemberSelfServicePortalHtml() {
     '</div>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var sessionToken=null;' +
     'var profileData=null;' +
 
@@ -56447,9 +56632,9 @@ function processMeetingCheckIn(meetingId, email, pin) {
     meetingDate,
     meetingType,
     memberId,
-    memberName.trim(),
+    escapeForFormula(memberName.trim()),
     new Date(),
-    email
+    escapeForFormula(email)
   ]);
 
   // If this is a Scheduled meeting getting its first check-in, mark as Active
@@ -56753,7 +56938,7 @@ function getSetupMeetingHtml_() {
     '<div id="success" class="success"></div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
     'var stewardData=[];' +
     // Load stewards on dialog open
@@ -56916,7 +57101,7 @@ function getMeetingCheckInHtml_() {
     '</div>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
 
     // Load only today's eligible meetings for check-in
     'google.script.run' +
@@ -57448,13 +57633,13 @@ function showEventBusStatus() {
     '<h4>Registered Events (' + events.length + '):</h4><ul>';
 
   events.forEach(function(name) {
-    html += '<li>' + name + ' (' + EventBus.listenerCount(name) + ' listeners)</li>';
+    html += '<li>' + escapeHtml(name) + ' (' + EventBus.listenerCount(name) + ' listeners)</li>';
   });
   html += '</ul>';
 
   html += '<h4>Recent Events (' + log.length + '):</h4><ul>';
   log.forEach(function(entry) {
-    html += '<li>' + entry.timestamp.substr(11, 8) + ' - ' + entry.event + '</li>';
+    html += '<li>' + escapeHtml(entry.timestamp.substr(11, 8)) + ' - ' + escapeHtml(entry.event) + '</li>';
   });
   html += '</ul>';
 
@@ -57691,10 +57876,10 @@ function sendDashboardReportEmail_(schedule) {
     html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Summary Metrics</h2>';
     html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
-    html += '<tr><td>Total Members</td><td style="text-align:right;font-weight:bold">' + data.totalMembers + '</td></tr>';
-    html += '<tr><td>Open Cases</td><td style="text-align:right;font-weight:bold">' + data.openCases + '</td></tr>';
-    html += '<tr><td>Win Rate</td><td style="text-align:right;font-weight:bold">' + data.winRate + '%</td></tr>';
-    html += '<tr><td>Morale Score</td><td style="text-align:right;font-weight:bold">' + data.moraleScore + '/10</td></tr>';
+    html += '<tr><td>Total Members</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.totalMembers)) + '</td></tr>';
+    html += '<tr><td>Open Cases</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.openCases)) + '</td></tr>';
+    html += '<tr><td>Win Rate</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.winRate)) + '%</td></tr>';
+    html += '<tr><td>Morale Score</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.moraleScore)) + '/10</td></tr>';
     html += '</table></div>';
   }
 
@@ -57703,7 +57888,7 @@ function sendDashboardReportEmail_(schedule) {
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Monthly Filings Trend</h2>';
     html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
     for (var m = 0; m < data.monthlyFilings.length; m++) {
-      html += '<tr><td>' + data.monthlyFilings[m].month + '</td><td style="text-align:right">' + data.monthlyFilings[m].count + ' filed</td></tr>';
+      html += '<tr><td>' + escapeHtml(String(data.monthlyFilings[m].month)) + '</td><td style="text-align:right">' + escapeHtml(String(data.monthlyFilings[m].count)) + ' filed</td></tr>';
     }
     html += '</table></div>';
   }
@@ -57711,7 +57896,7 @@ function sendDashboardReportEmail_(schedule) {
   if (sections.indexOf('satisfaction') >= 0) {
     html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Satisfaction</h2>';
-    html += '<p style="color:#e2e8f0">Overall Morale: <strong>' + data.moraleScore + '/10</strong></p>';
+    html += '<p style="color:#e2e8f0">Overall Morale: <strong>' + escapeHtml(String(data.moraleScore)) + '/10</strong></p>';
     html += '</div>';
   }
 

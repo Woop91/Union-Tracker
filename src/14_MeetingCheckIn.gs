@@ -462,9 +462,9 @@ function processMeetingCheckIn(meetingId, email, pin) {
     meetingDate,
     meetingType,
     memberId,
-    memberName.trim(),
+    escapeForFormula(memberName.trim()),
     new Date(),
-    email
+    escapeForFormula(email)
   ]);
 
   // If this is a Scheduled meeting getting its first check-in, mark as Active
@@ -768,7 +768,7 @@ function getSetupMeetingHtml_() {
     '<div id="success" class="success"></div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
     'var stewardData=[];' +
     // Load stewards on dialog open
@@ -931,7 +931,7 @@ function getMeetingCheckInHtml_() {
     '</div>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
 
     // Load only today's eligible meetings for check-in
     'google.script.run' +

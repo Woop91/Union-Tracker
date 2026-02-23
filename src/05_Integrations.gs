@@ -508,6 +508,15 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     return errorResponse('Meeting ID and recipient emails are required');
   }
 
+  // Validate all recipient email addresses
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emails = String(recipientEmails).split(',');
+  for (var e = 0; e < emails.length; e++) {
+    if (!emailRegex.test(emails[e].trim())) {
+      return errorResponse('Invalid email address: ' + emails[e].trim());
+    }
+  }
+
   try {
     var result = getMeetingAttendees(meetingId);
     if (!result.success) {
@@ -517,6 +526,9 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Find meeting details from the check-in log
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return errorResponse('No meeting check-in data found');
+    }
     var data = sheet.getDataRange().getValues();
     var meetingName = '';
     var meetingDate = '';
@@ -727,6 +739,17 @@ function setDocViewOnlyByLink(docUrl) {
  */
 function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipientEmails) {
   if (!recipientEmails || !docUrl) return;
+
+  // Validate all recipient email addresses
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emails = String(recipientEmails).split(',');
+  for (var e = 0; e < emails.length; e++) {
+    if (!emailRegex.test(emails[e].trim())) {
+      Logger.log('Invalid email address in recipient list: ' + emails[e].trim());
+      return;
+    }
+  }
+
   try {
     var typeLabel = docType === 'agenda' ? 'Meeting Agenda' : 'Meeting Notes';
     var safeDocUrl = /^https:\/\/docs\.google\.com\//.test(docUrl) ? docUrl : '';
@@ -1114,6 +1137,10 @@ function sendDeadlineReminders(daysAhead) {
     const deadlines = getUpcomingDeadlines(daysAhead || 7);
     const userEmail = Session.getActiveUser().getEmail();
 
+    if (!userEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      return errorResponse('Could not determine a valid email address for the current user');
+    }
+
     if (deadlines.length === 0) {
       return { success: true, sent: false, message: 'No upcoming deadlines' };
     }
@@ -1181,7 +1208,7 @@ function sendEmailToMember(memberId, subject, body) {
     }
 
     const email = member['Email'] || member.email;
-    if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
       return errorResponse('Invalid email address');
     }
 
@@ -1388,6 +1415,10 @@ function createPDFForSelectedGrievance() {
  * @private
  */
 function sendGrievancePdfEmail_(data, pdf) {
+  if (!data.memberEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.memberEmail).trim())) {
+    throw new Error('Invalid or missing member email address');
+  }
+
   var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Grievance Form - ' + data.grievanceId;
 
   var body = 'Dear ' + data.name + ',\n\n' +
@@ -1912,7 +1943,7 @@ function getWebAppDashboardHtml() {
     // Script to load overdue preview
     '<script>' +
     getClientSideEscapeHtml() +
-    'var baseUrl="' + baseUrl + '";' +
+    'var baseUrl=' + JSON.stringify(baseUrl) + ';' +
     'var retryCount=0;' +
     'function loadOverdue(){' +
     '  if(!navigator.onLine){document.getElementById("overdue-preview").innerHTML="<div style=\\"padding:15px;text-align:center;color:#666\\">📡 Offline</div>";return}' +
@@ -2033,7 +2064,7 @@ function getWebAppSearchHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var currentTab="all";' +
     'var searchTimeout=null;' +
     'var lastQuery="";' +
@@ -2210,7 +2241,7 @@ function getWebAppGrievanceListHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -2410,7 +2441,7 @@ function getWebAppMemberListHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -2565,6 +2596,8 @@ function getWebAppLinksHtml() {
     '</nav>' +
 
     '<script>' +
+    getClientSideEscapeHtml() +
+    'function safeUrl(u){if(!u)return"#";u=String(u);return/^https?:\\/\\//i.test(u)?u:"#";}' +
     'function loadLinks(){' +
     '  google.script.run.withSuccessHandler(function(links){' +
     '    renderLinks(links);' +
@@ -2579,17 +2612,17 @@ function getWebAppLinksHtml() {
     '  // Forms section' +
     '  html+="<div class=\\"section-title\\">📝 Forms</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+links.grievanceForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
-    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+links.contactForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
-    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+links.satisfactionForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
+    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.grievanceForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
+    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.contactForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
+    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.satisfactionForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
     '  if(!links.grievanceForm&&!links.contactForm&&!links.satisfactionForm){html+="<div class=\\"link-card full\\"><span class=\\"link-icon\\">ℹ️</span><div class=\\"link-content\\"><span class=\\"link-label\\">No Forms Configured</span><span class=\\"link-desc\\">Add form URLs to Config sheet</span></div></div>";}' +
     '  html+="</div>";' +
 
     '  // Resources section' +
     '  html+="<div class=\\"section-title\\">🔧 Resources</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  html+="<a class=\\"link-card\\" href=\\""+links.spreadsheetUrl+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
-    '  html+="<a class=\\"link-card github\\" href=\\""+links.githubRepo+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
+    '  html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.spreadsheetUrl))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
+    '  html+="<a class=\\"link-card github\\" href=\\""+escapeHtml(safeUrl(links.githubRepo))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
     '  html+="</div>";' +
 
     '  document.getElementById("linksContent").innerHTML=html;' +
@@ -3080,7 +3113,7 @@ function authorizeConstantContact() {
     '  if(!match){alert("Could not find authorization code in that URL. Make sure you copied the full URL.");return;}' +
     '  google.script.run' +
     '    .withSuccessHandler(function(msg){' +
-    '      document.querySelector(".container").innerHTML="<h2>✅ "+msg+"</h2><p>You can close this dialog.</p>";' +
+    '      var c=document.querySelector(".container");c.innerHTML="";var h=document.createElement("h2");h.textContent="\\u2705 "+msg;var p=document.createElement("p");p.textContent="You can close this dialog.";c.appendChild(h);c.appendChild(p);' +
     '    })' +
     '    .withFailureHandler(function(e){alert("Error: "+e.message);})' +
     '    .exchangeConstantContactCode(match[1]);' +

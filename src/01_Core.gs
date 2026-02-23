@@ -159,12 +159,14 @@ function logErrorToSheet_(errorInfo) {
       setSheetVeryHidden_(sheet);
     }
 
-    // Add error row
+    // Add error row (formula-protect user-influenced fields)
+    var safeContext = typeof escapeForFormula === 'function' ? escapeForFormula(errorInfo.context) : errorInfo.context;
+    var safeMessage = typeof escapeForFormula === 'function' ? escapeForFormula(errorInfo.message) : errorInfo.message;
     sheet.appendRow([
       errorInfo.timestamp,
       errorInfo.level,
-      errorInfo.context,
-      errorInfo.message,
+      safeContext,
+      safeMessage,
       errorInfo.user,
       ERROR_CONFIG.SHOW_STACK_TRACE ? errorInfo.stack : ''
     ]);
@@ -211,8 +213,19 @@ function showErrorNotification_(errorInfo) {
 function sendCriticalErrorNotification_(errorInfo) {
   try {
     var adminEmail = Session.getEffectiveUser().getEmail();
-    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
-    var body = 'A critical error occurred in the ' + COMMAND_CONFIG.SYSTEM_NAME + ':\n\n' +
+    var subject;
+    try {
+      subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
+    } catch (e) {
+      subject = 'Critical Error: ' + (errorInfo.context || 'Unknown');
+    }
+    var systemName;
+    try {
+      systemName = COMMAND_CONFIG.SYSTEM_NAME;
+    } catch (e) {
+      systemName = 'Union Dashboard';
+    }
+    var body = 'A critical error occurred in the ' + systemName + ':\n\n' +
                'Time: ' + errorInfo.timestamp + '\n' +
                'Context: ' + errorInfo.context + '\n' +
                'Message: ' + errorInfo.message + '\n' +
@@ -2348,9 +2361,9 @@ function getDeadlineRules() {
       var s2Appeal = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS).getValue());
       var s2Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS).getValue());
       return {
-        FILING_DAYS: filing || DEADLINE_DEFAULTS.FILING_DAYS,
-        STEP_1: { DAYS_FOR_RESPONSE: s1Resp || DEADLINE_DEFAULTS.STEP_1_RESPONSE },
-        STEP_2: { DAYS_TO_APPEAL: s2Appeal || DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: s2Resp || DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+        FILING_DAYS: isNaN(filing) ? DEADLINE_DEFAULTS.FILING_DAYS : filing,
+        STEP_1: { DAYS_FOR_RESPONSE: isNaN(s1Resp) ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : s1Resp },
+        STEP_2: { DAYS_TO_APPEAL: isNaN(s2Appeal) ? DEADLINE_DEFAULTS.STEP_2_APPEAL : s2Appeal, DAYS_FOR_RESPONSE: isNaN(s2Resp) ? DEADLINE_DEFAULTS.STEP_2_RESPONSE : s2Resp },
         STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
         ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
       };

@@ -775,7 +775,7 @@ describe('startNewGrievance', () => {
     expect(sheet.appendRow).toHaveBeenCalledTimes(1);
   });
 
-  test('row data includes GRIEVANCE_OUTCOMES.PENDING as outcome', () => {
+  test('row data uses GRIEVANCE_COLS positions and includes correct status', () => {
     const { sheet } = setupGrievanceMock();
 
     startNewGrievance({
@@ -786,9 +786,12 @@ describe('startNewGrievance', () => {
     });
 
     const appendedRow = sheet.appendRow.mock.calls[0][0];
-    // The outcome should be GRIEVANCE_OUTCOMES.PENDING (not undefined)
-    expect(appendedRow).toContain(GRIEVANCE_OUTCOMES.PENDING);
-    expect(appendedRow).toContain(GRIEVANCE_STATUS.OPEN);
+    // Status should be set at the correct GRIEVANCE_COLS position
+    expect(appendedRow[GRIEVANCE_COLS.STATUS - 1]).toBe(GRIEVANCE_STATUS.OPEN);
+    expect(appendedRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1]).toMatch(/^GRV-/);
+    expect(appendedRow[GRIEVANCE_COLS.MEMBER_ID - 1]).toBe('MS-101-H');
+    expect(appendedRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]).toBe('Discipline');
+    expect(appendedRow[GRIEVANCE_COLS.CURRENT_STEP - 1]).toBe(1);
   });
 
   test('returns error for invalid grievance data', () => {

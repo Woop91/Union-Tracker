@@ -349,7 +349,7 @@ function getDepartmentList() {
     var memberSheet = SpreadsheetApp.getActiveSpreadsheet()
       .getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
-    if (!memberSheet) return [];
+    if (!memberSheet || memberSheet.getLastRow() <= 1) return [];
 
     var data = memberSheet.getRange(2, MEMBER_COLS.JOB_TITLE,
       memberSheet.getLastRow() - 1, 1).getValues();

@@ -600,7 +600,36 @@ function handleGrievanceEdit(e) {
     GRIEVANCE_COLS.STEP3_APPEAL_FILED, GRIEVANCE_COLS.DATE_CLOSED
   ];
   if (statusAndDateCols.indexOf(col) !== -1) {
-    sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(new Date());
+    // Compute the actual next deadline based on current step, matching the logic
+    // in recalculateDownstreamDeadlines_. Only set to a real deadline date, not now().
+    var currentStep = sheet.getRange(row, GRIEVANCE_COLS.CURRENT_STEP).getValue();
+    var status = sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue();
+    var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
+
+    if (closedStatuses.indexOf(status) === -1 && currentStep) {
+      var nextActionDate = '';
+      if (currentStep === 'Informal') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.FILING_DEADLINE).getValue();
+      } else if (currentStep === 'Step I') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP1_DUE).getValue();
+      } else if (currentStep === 'Step II') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP2_DUE).getValue();
+      } else if (currentStep === 'Step III') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP3_APPEAL_DUE).getValue();
+      }
+
+      if (nextActionDate instanceof Date) {
+        sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(nextActionDate);
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        var daysTo = Math.floor((nextActionDate - today) / (1000 * 60 * 60 * 24));
+        sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue(daysTo);
+      }
+    } else if (closedStatuses.indexOf(status) !== -1) {
+      // Clear deadline for closed grievances
+      sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue('');
+      sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue('');
+    }
   }
 
   // If status changed, check for auto-actions

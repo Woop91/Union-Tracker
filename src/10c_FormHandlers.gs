@@ -263,8 +263,11 @@ function shareWithCoordinators_(folder) {
     if (!configSheet) return;
 
     // Get coordinator emails from Config (column N = GRIEVANCE_COORDINATORS)
-    var coordData = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_COORDINATORS,
-                                          configSheet.getLastRow() - 1, 1).getValues();
+    // Config data starts at row 3 (row 1 = section headers, row 2 = column headers)
+    var lastRow = configSheet.getLastRow();
+    if (lastRow < 3) return; // No data rows
+    var coordData = configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_COORDINATORS,
+                                          lastRow - 2, 1).getValues();
 
     for (var i = 0; i < coordData.length; i++) {
       var email = coordData[i][0];

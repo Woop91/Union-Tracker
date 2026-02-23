@@ -370,6 +370,7 @@ function showQuickCaptureNotepad() {
     '</div>' +
     '<div class="status" id="status"></div>' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'var notesEl = document.getElementById("notes");' +
     'var statusEl = document.getElementById("status");' +
     'var metaEl = document.getElementById("meta");' +
@@ -396,7 +397,7 @@ function showQuickCaptureNotepad() {
     '' +
     'function saveNotes() {' +
     '  google.script.run.withSuccessHandler(function(result) {' +
-    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + result.message, !result.success);' +
+    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + escapeHtml(result.message), !result.success);' +
     '  }).saveQuickCaptureNotes(notesEl.value);' +
     '}' +
     '' +
@@ -412,7 +413,7 @@ function showQuickCaptureNotepad() {
     '  if (confirm("Clear all notes? This cannot be undone.")) {' +
     '    notesEl.value = "";' +
     '    google.script.run.withSuccessHandler(function(result) {' +
-    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + result.message, !result.success);' +
+    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + escapeHtml(result.message), !result.success);' +
     '      updateMeta();' +
     '    }).clearQuickCaptureNotes();' +
     '  }' +
@@ -537,10 +538,10 @@ function getImportDialogHtml_() {
     '      showStatus("✅ Successfully imported " + result.count + " members!", "success");' +
     '      setTimeout(function() { google.script.host.close(); }, 2000);' +
     '    } else {' +
-    '      showStatus("❌ " + result.error, "error");' +
+    '      showStatus("❌ " + escapeHtml(result.error), "error");' +
     '    }' +
     '  }).withFailureHandler(function(err) {' +
-    '    showStatus("❌ Error: " + err.message, "error");' +
+    '    showStatus("❌ Error: " + escapeHtml(err.message), "error");' +
     '  }).processMemberImport(csv);' +
     '}' +
     'function showStatus(msg, type) {' +
@@ -738,10 +739,10 @@ function showExportDialog_UIService_() {
     '<h2>Export Ready!</h2>' +
     '<div class="info">' +
     '<strong>' + (lastRow - 1) + ' members</strong> exported to CSV<br>' +
-    'File: ' + fileName +
+    'File: ' + escapeHtml(fileName) +
     '</div>' +
-    '<a href="' + file.getDownloadUrl() + '" target="_blank" class="btn">📥 Download CSV</a>' +
-    '<a href="' + file.getUrl() + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
+    '<a href="' + escapeHtml(file.getDownloadUrl()) + '" target="_blank" class="btn">📥 Download CSV</a>' +
+    '<a href="' + escapeHtml(file.getUrl()) + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
     '<p class="note">File will be available in your Google Drive.<br>Link expires when you close this dialog.</p>' +
     '<script>setTimeout(function() { google.script.host.setHeight(350); }, 100);</script>'
   ).setWidth(450).setHeight(350);
