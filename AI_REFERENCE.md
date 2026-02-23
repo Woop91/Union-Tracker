@@ -100,21 +100,23 @@ The consolidated file uses `HtmlService.createHtmlOutput()` with **inline HTML s
 ## 🔄 CHANGE LOG
 
 ### 2026-02-23 — Deployment Audit & Fixes (by Claude, claude.ai)
-**Issues Found:**
-1. ❌ GitHub token in user preferences was expired/invalid → User generated new token
-2. ❌ Second token lacked `repo` scope → User generated third token with correct scope
-3. ❌ CI workflow triggers on `main` (lowercase) but branch is `Main` (uppercase) → **FIXED**: Updated `.github/workflows/build.yml` to include `Main`
-4. ⚠️ `web-dashboard/` folder contains orphaned code from a different architecture (template-based) that is NOT deployed and conflicts conceptually with the consolidated inline-HTML approach → **Documented** as legacy, not removed (preserving history)
-5. ✅ `doGet()` exists in `ConsolidatedDashboard.gs` at line 20313 with full routing
-6. ✅ All `doGet()` dependencies exist: `checkWebAppAuthorization`, `validateWebAppRequest`, `getAccessDeniedPage`, `getUnifiedDashboardHtml`, `buildMemberPortal`, `buildPublicPortal`, `getMemberIdByEmail`, `getMemberSelfServicePortalHtml`
-7. ✅ `appsscript.json` manifest matches between root and `dist/`
-8. ✅ OAuth scopes include `userinfo.email` (needed for `Session.getEffectiveUser()`)
-9. ✅ All branches (Main, staging, dev) are in sync
-10. ✅ Build file size (2.4MB) is under the ~6MB GAS limit
+**Issues Found & Fixed:**
+1. ❌ GitHub token `ghp_FTE8...` in user preferences was expired → User generated new token `ghp_xlP7...`
+2. ❌ Second token `ghp_q3Zd...` lacked `repo` scope → User generated third token with correct scope
+3. ❌ CI workflow triggers on `main` (lowercase) but branch is `Main` (uppercase) → **FIXED**: Updated `.github/workflows/build.yml`
+4. ⚠️ `web-dashboard/` folder contains orphaned code from deleted branch → **FIXED**: Added deprecation banner to `web-dashboard/AI_REFERENCE.md`
+5. ✅ `doGet()` exists in `ConsolidatedDashboard.gs` at line 20313 with full routing — verified all 8 dependencies present
+6. ✅ `appsscript.json` manifest identical between root and `dist/`
+7. ✅ OAuth scopes correct including `userinfo.email`
+8. ✅ All branches (Main, staging, dev) synced to same commit
+9. ✅ Build is clean — `npm run build` produces identical `dist/` output
+10. ✅ All 1295 tests pass (21 suites)
+11. ✅ File size 2.4MB / 6MB GAS limit — healthy headroom
 
 **Files Changed:**
-- `.github/workflows/build.yml` — Added `Main`, `staging`, `dev` to trigger branches
+- `.github/workflows/build.yml` — Added `Main`, `staging`, `dev` to CI trigger branches
 - `AI_REFERENCE.md` — Created (this file)
+- `web-dashboard/AI_REFERENCE.md` — Added deprecation notice (folder is orphaned legacy code)
 
 ---
 

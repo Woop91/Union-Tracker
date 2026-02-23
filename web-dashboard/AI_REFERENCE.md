@@ -1,16 +1,33 @@
 # AI REFERENCE DOCUMENT — Grievance Dashboard Web App
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
-# Last updated: 2026-02-21
+# Last updated: 2026-02-23
 
 ---
 
-## 🏗️ PROJECT OVERVIEW
+## 🔴🔴🔴 DEPRECATION NOTICE (2026-02-23) 🔴🔴🔴
+##
+## THIS ENTIRE `web-dashboard/` FOLDER IS ORPHANED LEGACY CODE.
+## It is NOT deployed. It is NOT used. The `web-dashboard` branch was deleted.
+##
+## The LIVE web app is served by `dist/ConsolidatedDashboard.gs` which contains
+## its own `doGet()` function with inline HTML (not template files).
+##
+## DO NOT try to deploy, integrate, or reference this folder's code.
+## The canonical AI reference is `/AI_REFERENCE.md` in the repo root.
+##
+## This folder is preserved only for historical reference.
+##
+## 🔴🔴🔴 END DEPRECATION NOTICE 🔴🔴🔴
+
+---
+
+## 🏗️ PROJECT OVERVIEW (DEPRECATED — see above)
 
 **What:** Mobile-optimized web app dashboard for workplace organization grievance tracking & member management.
 **Served by:** Google Apps Script `doGet()` → HtmlService, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users).
-**Repo:** `Woop91/DDS-Dashboard` → branch: `web-dashboard`
+**Repo:** `Woop91/DDS-Dashboard` → branch: `web-dashboard` **(BRANCH DELETED)**
 **All other repos are DEPRECATED** (509-dashboard, union-steward-app — do not reference).
 
 ---
