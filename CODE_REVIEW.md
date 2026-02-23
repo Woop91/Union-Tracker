@@ -9,7 +9,7 @@
 **Previous Review:** 2026-02-14 (v4.7.0 — 69 issues, 57 fixed)
 **2026-02-21 Update:** Re-verification pass — 33 new findings added (F76–F108), 1 false positive corrected (F94)
 **Fix Pass:** 2026-02-21 — 30 findings fixed across 16 files (see individual finding annotations below)
-**2026-02-23 Update:** In-depth line-by-line review of files 11_-17_ and 04e_ -- 8 new findings added (F109-F116), 2 existing findings verified as already fixed (F61, F62), F57 partially fixed (rate limiting present in MeetingCheckIn but needs verification in SelfService)
+**2026-02-23 Update:** In-depth line-by-line review of all 30 source files using parallel agents — 42 new findings added (F109-F150), 2 existing findings verified as already fixed (F61, F62), F57 partially fixed (rate limiting present in MeetingCheckIn but needs verification in SelfService)
 
 ---
 
@@ -17,16 +17,16 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review originally identified **152 active findings** across all severity levels. The 2026-02-21 fix pass addressed **30 findings** (8 CRITICAL, 8 HIGH, 11 MEDIUM, 3 infrastructure). The 2026-02-23 in-depth review of files 11_-17_ and 04e_ added **8 new findings** (F109-F116) and verified 2 existing findings as already fixed (F61, F62). **128 findings remain open**. Additionally, 7 findings (F34a, F34b, F34c, F35b, F35c, F61, F62) were verified as **already fixed or false positives**.
+This line-by-line review originally identified **152 active findings** across all severity levels. The 2026-02-21 fix pass addressed **30 findings** (8 CRITICAL, 8 HIGH, 11 MEDIUM, 3 infrastructure). The 2026-02-23 thorough re-review using parallel agents across all 30 source files added **44 new findings** (F109-F152) and verified 2 existing findings as already fixed (F61, F62). **153 findings remain open** (23 CRITICAL, 44 HIGH, 78 MEDIUM, 40 LOW). Additionally, 7 findings (F34a, F34b, F34c, F35b, F35c, F61, F62) were verified as **already fixed or false positives**.
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
-| CRITICAL | 20 | XSS via innerHTML injection, URL injection (window.open), unsanitized email HTML, onclick attribute injection, CSV preview, systematic column indexing bugs |
-| HIGH | 38 | Missing input validation, unescaped URLs in portal href attributes (F109), XSS in reminder dialog template literals (F112), no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, unescaped steward/member names in dashboards |
-| MEDIUM | 67 | Dead code, inconsistent error handling, version mismatches, CI gaps, formula injection in expansion data and meeting check-in (F114, F115), incomplete attribute escaping (F113), unescaped member IDs in portal footer (F110), EventBus diagnostic innerHTML (F111) |
-| LOW | 35 | Code duplication, naming inconsistencies, documentation gaps, missing correlation sample size (F116) |
+| CRITICAL | 23 | XSS via innerHTML injection, URL injection (window.open), unsanitized email HTML, onclick attribute injection, CSV preview, systematic column indexing bugs, **unescaped form HTML templates** (F128, F129), **Config URLs in web app href** (F130) |
+| HIGH | 44 | Missing input validation, unescaped URLs in portal href attributes (F109), XSS in reminder dialog template literals (F112), no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, **empty-sheet crashes** (F131, F132, F134), **no email validation** (F135), **OAuth innerHTML** (F133), **form handler formula injection** (F151) |
+| MEDIUM | 78 | Dead code, inconsistent error handling, version mismatches, CI gaps, formula injection, **hardcoded column positions** (F136, F137, F143), **missing authorization** (F138), **NEXT_ACTION_DUE logic bug** (F139), **Config write path violation** (F140), **archive partial failure** (F141), **survey email validation** (F152) |
+| LOW | 40 | Code duplication, naming inconsistencies, documentation gaps, **dead backup code** (F149), **Nuclear Reset in settings** (F150), **email body newlines** (F148) |
 
-**Overall Assessment: Good architecture with targeted security gaps** -- The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas. The 2026-02-23 in-depth review of files 11_-17_ and 04e_ found that **13_MemberSelfService.gs** has exemplary XSS prevention (100% escapeHtml coverage on all dynamic fields), and **15_EventBus.gs** has proper error isolation and unsubscribe mechanisms (F61, F62 already fixed). The remaining gaps are: unescaped template literal injection in the reminder dialog (F112, HIGH), unvalidated Config-sourced URLs in portal href attributes (F109, HIGH), and several formula injection paths (F114, F115). The `04e_PublicDashboard.gs` drill-down modal (F82, previously documented) and the alert center populate unescaped data into innerHTML -- these remain the highest-priority XSS items for the public-facing dashboard.
+**Overall Assessment: Good architecture with systematic security gaps** — The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas (PII masking, audit logging, access control framework). However, the 2026-02-23 thorough agent review revealed deeper systemic issues: (1) **15 of 21 `getClientSideEscapeHtml()` sites are broken** (F109), meaning client-side XSS protection is non-functional in most dialogs and web app pages; (2) **Grievance form HTML templates** have CRITICAL XSS in both new and edit forms (F128, F129); (3) **Empty-sheet crashes** affect 10+ functions across Integrations, Maintenance, and Features layers (F131, F132, F134); (4) **Config write path violations** and **hardcoded column arithmetic** create data corruption risks (F136, F137, F140, F143); (5) **`escapeForFormula()`** is used in only 1 of 40+ write paths (F118, F144). The highest-priority fix remains F109 (broken `getClientSideEscapeHtml()`), followed by F128/F129 (form XSS) and F130 (web app Links page URLs).
 
 ---
 
@@ -2415,6 +2415,310 @@ Only `generateChecklistId_()` (`12_Features.gs:114`) uses script locks. Confirms
 
 ---
 
+### Agent-Verified Findings (2026-02-23 Continued)
+
+> The following findings were discovered by parallel review agents covering Core/Data (01-02), Integrations/Maintenance (05-06), Business Logic (10-10d), and Features (11-17) layers. Each finding was verified against the source code.
+
+---
+
+#### F128. CRITICAL: XSS in `getNewGrievanceFormHtml()` — unescaped member data in `<option>`
+**Severity:** CRITICAL | **Category:** XSS | **File:** `02_DataManagers.gs` | **Lines:** 2422-2424
+
+```javascript
+const memberOptions = members.map(m =>
+  `<option value="${m.id}">${m.name} (${m.department})</option>`
+).join('');
+```
+
+`m.id`, `m.name`, and `m.department` come from the Member Directory sheet and are injected raw into HTML. A member name like `"><img src=x onerror=alert(1)>` executes JavaScript when the dialog opens.
+
+**Fix:** `escapeHtml()` all three values. For `value` attribute context, also use attribute-safe escaping.
+
+---
+
+#### F129. CRITICAL: XSS in `getEditGrievanceFormHtml()` — grievanceId/status in HTML and JS
+**Severity:** CRITICAL | **Category:** XSS | **File:** `02_DataManagers.gs` | **Lines:** 2642-2672
+
+Four unescaped injections:
+- **Line 2642:** `${grievanceId}` raw in HTML text
+- **Line 2643:** `${grievance['Current Step']}` raw in HTML
+- **Line 2645:** `${grievance['Status']}` raw in `<span>`
+- **Line 2672:** `'${grievanceId}'` in a JS string literal — a single quote in the ID breaks out of the string
+
+Lines 2651 and 2656 (textarea content) correctly use `escapeHtml()`, showing the developer was aware.
+
+**Fix:** Use `escapeHtml()` for HTML contexts and `JSON.stringify()` for the JS string literal.
+
+---
+
+#### F130. CRITICAL: XSS in web app Links page — Config URLs in `href` without validation
+**Severity:** CRITICAL | **Category:** XSS | **File:** `05_Integrations.gs` | **Lines:** 2582-2592
+
+```javascript
+'if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+links.grievanceForm+"\\"...'
+'html+="<a class=\\"link-card\\" href=\\""+links.spreadsheetUrl+"\\"...'
+'html+="<a class=\\"link-card github\\" href=\\""+links.githubRepo+"\\"...'
+```
+
+Config values (`grievanceForm`, `contactForm`, `satisfactionForm`, `spreadsheetUrl`, `githubRepo`) injected directly into `href`. A `javascript:alert(document.cookie)` value in Config executes on click. The Links page also does not load `getClientSideEscapeHtml()` at all.
+
+**Fix:** Validate URL scheme (must match `^https?://`) + `escapeHtml()` for attribute context.
+
+---
+
+#### F131. HIGH: `removeFromConfigDropdown_()` crashes on empty Config column
+**Severity:** HIGH | **Category:** Empty-sheet crash | **File:** `02_DataManagers.gs` | **Line:** 731
+
+```javascript
+var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
+```
+
+If `getLastRow()` is 2 (only headers), `getLastRow() - 2 = 0`, and `getRange(3, col, 0, 1)` throws an error. The sibling `addToConfigDropdown_()` at line 697 correctly guards with `var rowCount = lastRow >= 3 ? lastRow - 2 : 0; if (rowCount > 0)`.
+
+**Fix:** Add the same guard: `if (configSheet.getLastRow() < 3) return;`
+
+---
+
+#### F132. HIGH: `shareWithCoordinators_()` reads Config from row 2 instead of row 3
+**Severity:** HIGH | **Category:** Off-by-one / Empty-sheet crash | **File:** `10c_FormHandlers.gs` | **Lines:** 266-267
+
+```javascript
+var coordData = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_COORDINATORS,
+                                      configSheet.getLastRow() - 1, 1).getValues();
+```
+
+Two bugs: (1) Reads from row 2, but Config data starts at row 3 (row 1 = section headers, row 2 = column headers). The column header text (e.g., "Grievance Coordinators") is read as an email and passed to `folder.addEditor()`. (2) If `getLastRow() === 1`, `getLastRow() - 1 = 0` causes a crash.
+
+**Fix:** Change to `getRange(3, ..., configSheet.getLastRow() - 2, 1)` with a `getLastRow() < 3` guard.
+
+---
+
+#### F133. HIGH: Constant Contact OAuth dialog reflects response via `innerHTML`
+**Severity:** HIGH | **Category:** XSS | **File:** `05_Integrations.gs` | **Line:** 3083
+
+```javascript
+document.querySelector(".container").innerHTML="<h2>"+msg+"</h2>"
+```
+
+The success handler injects `msg` from the server response directly into `innerHTML` without escaping.
+
+**Fix:** Use `textContent` instead of `innerHTML`, or escape `msg`.
+
+---
+
+#### F134. HIGH: 10 new empty-sheet crash instances across Integrations, Maintenance, and Features
+**Severity:** HIGH | **Category:** Empty-sheet crash | **Scope:** 10 instances across 3 files
+
+All use `getLastRow() - 1` without checking `getLastRow() > 1`:
+
+| File | Line | Function |
+|------|------|----------|
+| `05_Integrations.gs` | 519 | `emailMeetingAttendanceReport` — null sheet + empty sheet |
+| `06_Maintenance.gs` | 2457 | `calculateStewardWorkload` |
+| `06_Maintenance.gs` | 3088 | `restoreFromArchive` |
+| `06_Maintenance.gs` | 2588 | `getStewardWithLowestWorkload` — null sheet |
+| `12_Features.gs` | 2829 | `importDataToSheet` |
+| `12_Features.gs` | 2925 | `importDataToSheet` (2nd instance) |
+| `12_Features.gs` | 3035 | `importDataToSheet` (3rd instance) |
+| `12_Features.gs` | 3329 | `clearAndImportSheet` |
+| `12_Features.gs` | 3431 | `clearAndImportSheet` (2nd instance) |
+| `12_Features.gs` | 3531 | `clearAndImportSheet` (3rd instance) |
+| `08b_SearchAndCharts.gs` | 15, 46, 88, 355 | Various search/chart functions |
+| `08c_FormsAndNotifications.gs` | 1420 | `executeSendRandomSurveyEmails` |
+| `08d_AuditAndFormulas.gs` | 224 | `clearOldAuditEntries` |
+
+**Fix:** Add `if (sheet.getLastRow() <= 1) return;` guard before each `getRange(2, ..., getLastRow() - 1, ...)` call.
+
+---
+
+#### F135. HIGH: No email format validation on email send functions
+**Severity:** HIGH | **Category:** Input validation | **File:** `05_Integrations.gs` | **Lines:** 506-507, 571-572, 728, 1176-1203
+
+`emailMeetingAttendanceReport` passes `recipientEmails` to `MailApp.sendEmail()` without format validation. `sendEmailToMember` (line 1176) accepts a raw `body` parameter from client-side via `google.script.run` and passes it directly to `htmlBody`.
+
+**Fix:** Validate email format with regex before sending. For `sendEmailToMember`, sanitize or template the HTML body server-side.
+
+---
+
+#### F136. MEDIUM: `startNewGrievance()` hardcoded array positions do not match column schema
+**Severity:** MEDIUM | **Category:** Data corruption | **File:** `02_DataManagers.gs` | **Lines:** 1569-1594
+
+Builds `rowData` as a positional array for `appendRow()`. Positions are based on comments but may not match `GRIEVANCE_HEADER_MAP_` ordering, particularly for Member Name (combined vs separate First/Last) and Current Step position.
+
+**Fix:** Build row data using `GRIEVANCE_COLS` constants: create a sparse array where `rowData[GRIEVANCE_COLS.X - 1] = value`.
+
+---
+
+#### F137. MEDIUM: Fragile `+1`/`+2` column arithmetic in grievance date calculations
+**Severity:** MEDIUM | **Category:** Data corruption risk | **File:** `02_DataManagers.gs` | **Lines:** 1906-1909, 2003-2010
+
+`advanceGrievanceStep()` and `recalcAllGrievancesBatched()` use `getStepDateColumn(step) + 1` for due date and `+ 2` for status, assuming columns are adjacent. If columns are reordered via `syncColumnMaps()`, this writes to wrong columns. Also, `getStepDateColumn()` returns `null` for invalid steps, and `null + 1` = `1`, writing to column A.
+
+**Fix:** Use explicit column constants for each date/due-date/status column instead of arithmetic.
+
+---
+
+#### F138. MEDIUM: `bulkUpdateGrievanceStatus()` has no authorization check
+**Severity:** MEDIUM | **Category:** Authorization | **File:** `02_DataManagers.gs` | **Lines:** 2038-2075
+
+Updates multiple grievance statuses at once without calling `validateRole()`. Any user with sheet access who calls this from client-side JavaScript can bulk-update statuses.
+
+**Fix:** Add `validateRole(Session.getActiveUser().getEmail(), 'steward')` at function entry.
+
+---
+
+#### F139. MEDIUM: `NEXT_ACTION_DUE` set to current timestamp instead of computed deadline
+**Severity:** MEDIUM | **Category:** Logic bug | **File:** `10_Main.gs` | **Line:** 603
+
+```javascript
+sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(new Date());
+```
+
+When any status/date column is edited, `NEXT_ACTION_DUE` is set to `new Date()` (the edit time). It should be the next deadline date. The correct computation exists in `recalculateDownstreamDeadlines_()` (lines 728-744) but only runs for calculated-date column overrides.
+
+**Fix:** Call the deadline computation logic instead of using `new Date()`.
+
+---
+
+#### F140. MEDIUM: `autoFixMissingConfigValues()` bypasses `addToConfigDropdown_()`
+**Severity:** MEDIUM | **Category:** Config write path violation | **File:** `06_Maintenance.gs` | **Lines:** 2764-2781
+
+```javascript
+configSheet.getRange(nextRow + index, col).setValue(value);
+```
+
+Per CLAUDE.md, all Config dropdown writes must go through `addToConfigDropdown_()`. This function writes directly, which can scatter data past the end of other columns.
+
+**Fix:** Replace with `addToConfigDropdown_(col, value)` calls.
+
+---
+
+#### F141. MEDIUM: `archiveClosedGrievances()` partial failure leaves row duplicates
+**Severity:** MEDIUM | **Category:** Data integrity | **File:** `06_Maintenance.gs` | **Lines:** 3000-3017
+
+Copies all rows to archive first, then deletes them individually. If a delete fails (caught in try/catch), the row exists in both the archive and main sheet with no rollback or user notification.
+
+**Fix:** Use a transaction pattern — delete first then append to archive, or track failures and report to user.
+
+---
+
+#### F142. MEDIUM: `baseUrl` injected into JS variable without `JSON.stringify()`
+**Severity:** MEDIUM | **Category:** XSS | **File:** `05_Integrations.gs` | **Line:** 1915
+
+```javascript
+'var baseUrl="' + baseUrl + '";'
+```
+
+Per CLAUDE.md rules, URLs in JavaScript contexts must use `JSON.stringify()`.
+
+**Fix:** `'var baseUrl=' + JSON.stringify(baseUrl) + ';'`
+
+---
+
+#### F143. MEDIUM: Hardcoded column indices in volunteer/meeting sync functions
+**Severity:** MEDIUM | **Category:** Data corruption risk | **File:** `10d_SyncAndMaintenance.gs` | **Lines:** 860-861, 922-925
+
+`syncVolunteerHoursToMemberDirectory()` uses `row[1]` (Member ID) and `row[5]` (Hours). `syncMeetingAttendanceToMemberDirectory()` uses `row[1]`, `row[2]`, `row[4]`, `row[6]`. If columns are reordered, data silently corrupts.
+
+**Fix:** Define column constants for Volunteer Hours and Meeting Attendance sheets.
+
+---
+
+#### F144. MEDIUM: Formula injection in OCR text and error log
+**Severity:** MEDIUM | **Category:** Formula injection | **Files:** `11_CommandHub.gs:2014-2016`, `01_Core.gs:163-170`
+
+OCR-extracted text is stored in the Resolution field without `escapeForFormula()`. Error log writes `errorInfo.message` and `errorInfo.context` via `appendRow()` without formula protection. If content starts with `=`, `+`, `-`, or `@`, it executes as a formula.
+
+**Fix:** Wrap in `escapeForFormula()` before `setValue()`/`appendRow()`.
+
+---
+
+#### F145. MEDIUM: XSS in `fixDataQualityIssues()` HTML dialog
+**Severity:** MEDIUM | **Category:** XSS | **File:** `10d_SyncAndMaintenance.gs` | **Line:** 697
+
+```javascript
+issues.map(function(i) { return '<div class="issue">' + i + '</div>'; }).join('')
+```
+
+Issue strings derived from sheet data are injected into HTML without `escapeHtml()`. Currently static prefixes with counts, but would become exploitable if extended to include data values.
+
+**Fix:** Wrap `i` in `escapeHtml()`.
+
+---
+
+#### F151. HIGH: Formula injection in form submission handlers (`onContactFormSubmit`, satisfaction survey)
+**Severity:** HIGH | **Category:** Formula injection | **File:** `08c_FormsAndNotifications.gs` | **Lines:** 346, 799
+
+```javascript
+// Line 346: onContactFormSubmit
+newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;  // No escapeForFormula()
+newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+memberSheet.appendRow(newRow);
+
+// Line 799: satisfaction survey
+satSheet.appendRow(newRow);  // No escapeForFormula()
+```
+
+Form submissions from Google Forms are written to sheets via `appendRow()` without `escapeForFormula()`. A form submitter providing `=IMPORTRANGE("attacker_sheet","A1")` as their first name would execute a formula.
+
+**Fix:** Wrap all form field values in `escapeForFormula()` before `appendRow()`.
+
+---
+
+#### F152. MEDIUM: `executeSendRandomSurveyEmails()` lacks parameter validation
+**Severity:** MEDIUM | **Category:** Input validation | **File:** `08c_FormsAndNotifications.gs` | **Lines:** 1401-1487
+
+Called from client-side via `google.script.run` with `opts` parameter. `opts.subject` is passed directly to `MailApp.sendEmail()` without length or content validation. `opts.excludeDays` could be negative. `opts.count` has no upper bound check.
+
+**Fix:** Validate `opts.subject` (string, max 200 chars), `opts.count` (positive integer, max 1000), `opts.excludeDays` (non-negative integer).
+
+---
+
+#### F146. LOW: Stack trace email ignores `SHOW_STACK_TRACE` setting
+**Severity:** LOW | **Category:** Consistency | **File:** `01_Core.gs` | **Lines:** 163-170 vs 220
+
+The error log sheet respects `SHOW_STACK_TRACE` (writes empty string when false), but `sendCriticalErrorNotification_()` always includes the full stack trace in the email body.
+
+**Fix:** Check `SHOW_STACK_TRACE` before including trace in email.
+
+---
+
+#### F147. LOW: `getDeadlineRules()` treats `0` as invalid due to falsy check
+**Severity:** LOW | **Category:** Logic bug | **File:** `01_Core.gs` | **Lines:** 2346-2349
+
+Uses `filing || DEADLINE_DEFAULTS.FILING_DAYS` where `filing` is `Number(...)`. If the Config cell contains `0`, `||` treats it as falsy and substitutes the default. While a 0-day deadline is unlikely, the pattern is incorrect.
+
+**Fix:** Use `isNaN(filing) ? DEADLINE_DEFAULTS.FILING_DAYS : filing`.
+
+---
+
+#### F148. LOW: Escaped newlines in export email body
+**Severity:** LOW | **Category:** String bug | **File:** `10_Main.gs` | **Lines:** 2139-2141
+
+Uses `\\n` (double-escaped) in template literal, producing literal `\n` characters instead of newlines.
+
+**Fix:** Use single `\n` in template literals.
+
+---
+
+#### F149. LOW: `restoreFromSnapshot()` creates backup object that is never persisted
+**Severity:** LOW | **Category:** Dead code | **File:** `06_Maintenance.gs` | **Lines:** 1264-1270
+
+`preRestoreBackup` object is created in memory but never stored. It is discarded when the function returns, providing no actual backup protection.
+
+**Fix:** Persist via `PropertiesService.getScriptProperties().setProperty()` or remove dead code.
+
+---
+
+#### F150. LOW: Nuclear Reset button exposed in regular Settings dialog
+**Severity:** LOW | **Category:** UX / Safety | **File:** `06_Maintenance.gs` | **Lines:** 1905-1907, 1943-1947
+
+The settings dialog includes a "Nuclear Reset" button calling `NUCLEAR_RESET_HIDDEN_SHEETS()`. While double-confirmation exists, exposing it in everyday settings UI increases accidental invocation risk.
+
+**Fix:** Move to a separate admin-only dialog or require typing a confirmation phrase.
+
+---
+
 ### Cross-Cutting Verification Notes (2026-02-23)
 
 **`getClientSideEscapeHtml()` — CRITICAL SYSTEMATIC BUG:** 15 of 21 non-comment inclusions use the broken string-literal pattern. **Highest priority fix.**
@@ -2431,9 +2735,11 @@ Only `generateChecklistId_()` (`12_Features.gs:114`) uses script locks. Confirms
 
 **Existing Verified as Fixed:** F61 (EventBus error isolation), F62 (unsubscribe), F57 (partially — rate limiting present in MeetingCheckIn but needs SelfService verification).
 
+**Agent Review Coverage (2026-02-23):** Five parallel agents reviewed all 30 source files. Agent findings cross-referenced against F1-F127 to eliminate duplicates. 25 new unique findings identified (F128-F152).
+
 ---
 
-### Updated Priority 1 — Fix Now (2026-02-23 New Findings)
+### Updated Priority 1 — Fix Now (2026-02-23 All New Findings)
 
 | ID | Summary | Effort |
 |----|---------|--------|
@@ -2449,7 +2755,32 @@ Only `generateChecklistId_()` (`12_Features.gs:114`) uses script locks. Confirms
 | F119 | Add server-side validation to `saveInteractiveMember()` | Small |
 | F120 | Validate row/status in `quickUpdateGrievanceStatus()` | Small |
 | F126 | Add `LockService` to critical mutation paths | Medium |
+| **F128** | **XSS: Escape member names in `getNewGrievanceFormHtml()` `<option>` elements** | **Trivial** |
+| **F129** | **XSS: Escape grievanceId/status in `getEditGrievanceFormHtml()` HTML + JS** | **Small** |
+| **F130** | **XSS: Validate URL scheme + escape Config URLs in web app Links page** | **Small** |
+| F131 | Fix `removeFromConfigDropdown_()` empty-column crash | Trivial |
+| F132 | Fix `shareWithCoordinators_()` wrong start row (2→3) + empty-sheet guard | Trivial |
+| F133 | Escape innerHTML in Constant Contact OAuth dialog | Trivial |
+| F134 | Add empty-sheet guards to 10 `getLastRow() - 1` instances | Small |
+| F135 | Add email validation + sanitize HTML body in email functions | Small |
+| F151 | Add `escapeForFormula()` to form submission handlers (`onContactFormSubmit`, satisfaction survey) | Small |
+
+### Updated Priority 2 — Plan for Next Release (2026-02-23 New Findings)
+
+| ID | Summary | Effort |
+|----|---------|--------|
+| F136 | Fix `startNewGrievance()` hardcoded array positions | Small |
+| F137 | Replace `+1`/`+2` column arithmetic with explicit constants | Medium |
+| F138 | Add `validateRole()` to `bulkUpdateGrievanceStatus()` | Trivial |
+| F139 | Fix `NEXT_ACTION_DUE` to compute deadline instead of `new Date()` | Small |
+| F140 | Route `autoFixMissingConfigValues()` through `addToConfigDropdown_()` | Small |
+| F141 | Add transaction pattern to `archiveClosedGrievances()` | Medium |
+| F142 | Use `JSON.stringify()` for `baseUrl` in JS context | Trivial |
+| F143 | Define column constants for Volunteer/Meeting sync functions | Small |
+| F144 | Add `escapeForFormula()` to OCR text + error log writes | Trivial |
+| F145 | Escape issue strings in `fixDataQualityIssues()` dialog | Trivial |
+| F152 | Add parameter validation to `executeSendRandomSurveyEmails()` | Trivial |
 
 ---
 
-*Updated 2026-02-23 by Claude Code (Opus 4.6) — thorough re-review with parallel agents and cross-cutting verification*
+*Updated 2026-02-23 by Claude Code (Opus 4.6) — thorough re-review with parallel agents and cross-cutting verification. 25 additional findings (F128-F152) from agent-verified line-by-line review of all 30 source files.*
