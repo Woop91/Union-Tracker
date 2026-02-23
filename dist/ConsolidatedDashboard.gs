@@ -5199,7 +5199,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// === FILE: 02_DataManagers.gs === (2834 lines)
+// === FILE: 02_DataManagers.gs === (2876 lines)
 // ============================================================================
 
 /**
@@ -5229,34 +5229,40 @@ function getMobileOptimizedHead() {
  * @returns {string} The generated Member ID
  */
 function addMember(memberData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
+    if (!sheet) {
+      throw new Error('Member Directory sheet not found');
+    }
+
+    // Generate Member ID if not provided
+    var memberId = memberData.memberId || generateMemberID_(memberData.firstName, memberData.lastName);
+
+    // Find next empty row
+    var lastRow = sheet.getLastRow();
+    var newRow = lastRow + 1;
+
+    // Build row array and set all member data in a single setValues() call
+    var lastCol = sheet.getLastColumn() || MEMBER_COLS.UNIT;
+    var rowData = new Array(lastCol).fill('');
+    rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
+    rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
+    rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
+    rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
+    rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
+    rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+    rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
+    rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+    sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+
+    return memberId;
+  } finally {
+    lock.releaseLock();
   }
-
-  // Generate Member ID if not provided
-  var memberId = memberData.memberId || generateMemberID_(memberData.firstName, memberData.lastName);
-
-  // Find next empty row
-  var lastRow = sheet.getLastRow();
-  var newRow = lastRow + 1;
-
-  // Build row array and set all member data in a single setValues() call
-  var lastCol = sheet.getLastColumn() || MEMBER_COLS.UNIT;
-  var rowData = new Array(lastCol).fill('');
-  rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
-  rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
-  rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
-  rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
-  rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
-  rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
-  rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
-  rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
-  sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
-
-  return memberId;
 }
 
 /**
@@ -5265,37 +5271,43 @@ function addMember(memberData) {
  * @param {Object} updateData - Fields to update
  */
 function updateMember(memberId, updateData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
-  }
-
-  // Find the member row
-  var data = sheet.getDataRange().getValues();
-  var memberRow = -1;
-
-  // data[] is 0-indexed; i=1 skips header. memberRow = i+1 converts to 1-indexed sheet row.
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
-      memberRow = i + 1; // +1: convert 0-indexed array position to 1-indexed sheet row
-      break;
+    if (!sheet) {
+      throw new Error('Member Directory sheet not found');
     }
-  }
 
-  if (memberRow === -1) {
-    throw new Error('Member not found: ' + memberId);
-  }
+    // Find the member row
+    var data = sheet.getDataRange().getValues();
+    var memberRow = -1;
 
-  // Update fields — use !== undefined to allow setting empty strings/falsy values (F17)
-  if (updateData.firstName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
-  if (updateData.lastName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
-  if (updateData.email !== undefined) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
-  if (updateData.phone !== undefined) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
-  if (updateData.jobTitle !== undefined) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
-  if (updateData.workLocation !== undefined) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
-  if (updateData.unit !== undefined) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+    // data[] is 0-indexed; i=1 skips header. memberRow = i+1 converts to 1-indexed sheet row.
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+        memberRow = i + 1; // +1: convert 0-indexed array position to 1-indexed sheet row
+        break;
+      }
+    }
+
+    if (memberRow === -1) {
+      throw new Error('Member not found: ' + memberId);
+    }
+
+    // Update fields — use !== undefined to allow setting empty strings/falsy values (F17)
+    if (updateData.firstName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+    if (updateData.lastName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+    if (updateData.email !== undefined) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+    if (updateData.phone !== undefined) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+    if (updateData.jobTitle !== undefined) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+    if (updateData.workLocation !== undefined) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+    if (updateData.unit !== undefined) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -5525,7 +5537,7 @@ function syncMemberGrievanceData() {
   // Update member rows (if grievance count columns exist)
   if (MEMBER_COLS.TOTAL_GRIEVANCES && MEMBER_COLS.ACTIVE_GRIEVANCES) {
     for (var j = 1; j < members.length; j++) {
-      var memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
+      memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
       var counts = grievanceCounts[memberId] || { total: 0, active: 0 };
       memberSheet.getRange(j + 1, MEMBER_COLS.TOTAL_GRIEVANCES).setValue(counts.total);
       memberSheet.getRange(j + 1, MEMBER_COLS.ACTIVE_GRIEVANCES).setValue(counts.active);
@@ -6023,7 +6035,7 @@ function syncStewardStatus() {
   }
 
   // If IS_STEWARD != Yes but name IS in Config, remove from Config
-  for (var name in configNameSet) {
+  for (name in configNameSet) {
     if (memberMap[name] && !memberMap[name].isSteward) {
       configSheet.getRange(configNameSet[name], CONFIG_COLS.STEWARDS).clearContent();
       changes++;
@@ -6495,7 +6507,7 @@ function importMembersFromData(data, mapping) {
 
       var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
       var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
-      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+      email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
 
       // Skip if no name
       if (!firstName && !lastName) {
@@ -6769,6 +6781,8 @@ function showExportMembersDialog() {
  * @return {Object} Result with grievance ID or error
  */
 function startNewGrievance(grievanceData) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
@@ -6825,6 +6839,8 @@ function startNewGrievance(grievanceData) {
   } catch (error) {
     console.error('Error creating grievance:', error);
     return errorResponse(error.message, 'createGrievance');
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -7078,6 +7094,8 @@ function getDaysUntilDeadline(deadline) {
  * @return {Object} Result object
  */
 function advanceGrievanceStep(grievanceId, options) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
@@ -7115,11 +7133,18 @@ function advanceGrievanceStep(grievanceId, options) {
     updates.push({ col: GRIEVANCE_COLS.STATUS, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
     updates.push({ col: GRIEVANCE_COLS.LAST_UPDATED, val: today });
 
-    if (nextStep <= 3) {
-      const nextStepDateCol = getStepDateColumn(nextStep);
-      updates.push({ col: nextStepDateCol, val: today });
-      updates.push({ col: nextStepDateCol + 1, val: responseDue });
-      updates.push({ col: nextStepDateCol + 2, val: 'Pending' });
+    // Explicit column map — avoids fragile +1/+2 arithmetic that corrupts wrong columns
+    // when syncColumnMaps() reorders headers (F137). Step 3 has no management-response-due column.
+    var ADVANCE_STEP_COLS_ = {
+      2: { filed: GRIEVANCE_COLS.STEP2_APPEAL_FILED, due: GRIEVANCE_COLS.STEP2_DUE },
+      3: { filed: GRIEVANCE_COLS.STEP3_APPEAL_FILED, due: null }
+    };
+    var stepCols = ADVANCE_STEP_COLS_[nextStep];
+    if (stepCols) {
+      updates.push({ col: stepCols.filed, val: today });
+      if (stepCols.due !== null) {
+        updates.push({ col: stepCols.due, val: responseDue });
+      }
     } else {
       updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
@@ -7156,6 +7181,8 @@ function advanceGrievanceStep(grievanceId, options) {
   } catch (error) {
     console.error('Error advancing grievance:', error);
     return errorResponse(error.message, 'advanceGrievanceStep');
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -7213,14 +7240,21 @@ function recalcAllGrievancesBatched() {
         status === GRIEVANCE_STATUS.PENDING ||
         status === GRIEVANCE_STATUS.APPEALED) {
 
+      // Explicit column map — avoids fragile +1 arithmetic that writes DATE_CLOSED for step 3 (F137).
+      // Step 3 has no management-response-due column; skip recalculation for it.
+      var RECALC_STEP_COLS_ = {
+        1: { filed: GRIEVANCE_COLS.STEP1_RCVD,         due: GRIEVANCE_COLS.STEP2_APPEAL_DUE },
+        2: { filed: GRIEVANCE_COLS.STEP2_APPEAL_FILED,  due: GRIEVANCE_COLS.STEP2_DUE },
+        3: { filed: GRIEVANCE_COLS.STEP3_APPEAL_FILED,  due: null }
+      };
       const currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
-      const stepDate = row[getStepDateColumn(currentStep) - 1]; // 0-indexed for data array
+      const recalcCols = RECALC_STEP_COLS_[currentStep];
+      if (!recalcCols || recalcCols.due === null) continue;
+      const stepDate = row[recalcCols.filed - 1]; // 0-indexed for data array
 
       if (stepDate instanceof Date) {
         const newDue = calculateResponseDeadline(currentStep, stepDate);
-        const dueColumn = getStepDateColumn(currentStep) + 1; // Due is next column after date
-
-        sheet.getRange(i + 1, dueColumn).setValue(newDue);
+        sheet.getRange(i + 1, recalcCols.due).setValue(newDue);
         updatedCount++;
       }
     }
@@ -7255,42 +7289,50 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
     return errorResponse(authResult.message || 'Unauthorized: steward access required', 'bulkUpdateGrievanceStatus');
   }
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
-  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
-  const data = sheet.getDataRange().getValues();
-
-  let updatedCount = 0;
-  const today = new Date();
-  const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
-
-  for (let i = 1; i < data.length; i++) {
-    const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-
-    if (grievanceIds.includes(grievanceId)) {
-      const rowIndex = i + 1;
-
-      // Update status (use GRIEVANCE_COLS, 1-indexed)
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(newStatus);
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
-
-      // Add notes if provided (NOTES aliases to RESOLUTION — use directly)
-      if (notes) {
-        const existingResolution = data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '';
-        const newResolution = existingResolution + (existingResolution ? '\n' : '') +
-                         `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
-        sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(newResolution);
-      }
-
-      updatedCount++;
-    }
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    return errorResponse('Unable to acquire lock. Another operation is in progress. Please try again.', 'bulkUpdateGrievanceStatus');
   }
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+    const data = sheet.getDataRange().getValues();
 
-  return {
-    success: true,
-    updatedCount: updatedCount,
-    message: `Updated status for ${updatedCount} grievances`
-  };
+    let updatedCount = 0;
+    const today = new Date();
+    const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
+
+    for (let i = 1; i < data.length; i++) {
+      const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+
+      if (grievanceIds.includes(grievanceId)) {
+        const rowIndex = i + 1;
+
+        // Update status (use GRIEVANCE_COLS, 1-indexed)
+        sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(newStatus);
+        sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
+
+        // Add notes if provided (NOTES aliases to RESOLUTION — use directly)
+        if (notes) {
+          const existingResolution = data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '';
+          const newResolution = existingResolution + (existingResolution ? '\n' : '') +
+                           `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
+          sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(newResolution);
+        }
+
+        updatedCount++;
+      }
+    }
+
+    return {
+      success: true,
+      updatedCount: updatedCount,
+      message: `Updated status for ${updatedCount} grievances`
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
@@ -15523,8 +15565,8 @@ function createGrievancePDF_UIService_(data) {
   }
 
   // Create document from scratch if no template
-  var doc = DocumentApp.create('SIGNATURE_REQUIRED_' + data.name + '_' + dateStr);
-  var body = doc.getBody();
+  doc = DocumentApp.create('SIGNATURE_REQUIRED_' + data.name + '_' + dateStr);
+  body = doc.getBody();
 
   // Header
   body.appendParagraph(COMMAND_CONFIG.SYSTEM_NAME)
@@ -15554,7 +15596,7 @@ function createGrievancePDF_UIService_(data) {
 
   // Move to archive folder and convert to PDF
   var docFile = DriveApp.getFileById(doc.getId());
-  var pdf = folder.createFile(docFile.getAs(MimeType.PDF))
+  pdf = folder.createFile(docFile.getAs(MimeType.PDF))
     .setName('Grievance_UNSIGNED_' + data.name + '_' + dateStr + '.pdf');
 
   docFile.setTrashed(true);
@@ -16311,7 +16353,7 @@ function getUnifiedDashboardData(includePII) {
 
       // Settlement time
       if (dateFiled instanceof Date && dateClosed instanceof Date) {
-        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
+        days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
         if (days > 0) settlementDays.push(days);
       }
 
@@ -16377,7 +16419,7 @@ function getUnifiedDashboardData(includePII) {
   data.stewardWorkload.sort(function(a,b){return b.count - a.count;});
 
   // Build hot zones (locations with 3+ active cases)
-  for (var loc in locationCases) {
+  for (loc in locationCases) {
     if (locationCases[loc] >= 3) {
       data.hotZones.push({ location: loc, count: locationCases[loc] });
       data.hotSpots.grievance.push({ name: loc, type: 'location', count: locationCases[loc], reason: 'High grievance activity' });
@@ -16475,7 +16517,7 @@ function getUnifiedDashboardData(includePII) {
         trustScores.push(trustVal);
         if (timestamp) {
           var date = new Date(timestamp);
-          var monthKey = date.toLocaleString('default', { month: 'short' });
+          monthKey = date.toLocaleString('default', { month: 'short' });
           if (!monthlyTrust[monthKey]) monthlyTrust[monthKey] = { sum: 0, count: 0 };
           monthlyTrust[monthKey].sum += trustVal;
           monthlyTrust[monthKey].count++;
@@ -16784,7 +16826,7 @@ function getUnifiedDashboardData(includePII) {
 
   // Populate Resource Links from Config sheet
   try {
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       data.resourceLinks.surveyUrl = String(configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '').trim();
       data.resourceLinks.contactFormUrl = String(configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).getValue() || '').trim();
@@ -20052,14 +20094,14 @@ function getOrCreateMemberFolder(name, id) {
 
   try {
     var parentFolder = DriveApp.getFolderById(archiveFolderId);
-    var folderName = name + ' (' + id + ')';
-    var folders = parentFolder.getFoldersByName(folderName);
+    folderName = name + ' (' + id + ')';
+    folders = parentFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
   } catch (e) {
     Logger.log('Archive folder not found, using root: ' + e.message);
-    var rootFolder = getOrCreateRootFolder();
-    var folderName = name + ' (' + id + ')';
-    var folders = rootFolder.getFoldersByName(folderName);
+    rootFolder = getOrCreateRootFolder();
+    folderName = name + ' (' + id + ')';
+    folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
 }
@@ -20540,7 +20582,7 @@ function doGet(e) {
     secureLog('doGet', 'Authorized access to ' + page + ' page', { email: pageAuthResult.email });
   }
 
-  var html;
+  html = undefined;
   switch (page) {
     case 'search':
       html = getWebAppSearchHtml();
@@ -22425,7 +22467,7 @@ function disconnectConstantContact() {
 
 
 // ============================================================================
-// === FILE: 06_Maintenance.gs === (3535 lines)
+// === FILE: 06_Maintenance.gs === (3553 lines)
 // ============================================================================
 
 /**
@@ -25427,25 +25469,36 @@ function archiveClosedGrievances(daysOld) {
 
   // Delete from main sheet (in reverse order to maintain row indices)
   var failedDeletes = [];
+  var failedGrievanceIds = [];
+  // Build a map from row index → grievanceId before reversing the delete order
+  var rowIndexToGrievanceId = {};
+  rowsToArchive.forEach(function(row, i) {
+    rowIndexToGrievanceId[rowIndicesToDelete[i]] = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+  });
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
     try {
       grievanceSheet.deleteRow(rowIndex);
     } catch (deleteErr) {
       failedDeletes.push(rowIndex);
+      failedGrievanceIds.push(rowIndexToGrievanceId[rowIndex]);
       Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
     }
   });
   if (failedDeletes.length > 0) {
-    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedDeletes.join(', '));
+    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedGrievanceIds.join(', '));
   }
 
   // Log the archive operation
   logIntegrityEvent('AUTO_ARCHIVE',
     'Archived ' + rowsToArchive.length + ' closed grievances older than ' + daysOld + ' days',
-    { count: rowsToArchive.length, daysOld: daysOld }
+    { count: rowsToArchive.length, daysOld: daysOld, failed: failedDeletes.length }
   );
 
-  return { archived: rowsToArchive.length };
+  return {
+    archived: rowsToArchive.length - failedDeletes.length,
+    failed: failedDeletes.length,
+    failedIds: failedGrievanceIds
+  };
 }
 
 /**
@@ -25482,7 +25535,14 @@ function showArchiveDialog() {
     'function runArchive() {' +
     '  var days = document.getElementById("daysOld").value;' +
     '  google.script.run.withSuccessHandler(function(result) {' +
-    '    alert("Archived " + result.archived + " grievances.");' +
+    '    if (result.failed > 0) {' +
+    '      alert("Archived " + result.archived + " grievances.\\n\\n" +' +
+    '        "WARNING: " + result.failed + " row(s) could not be deleted from the main sheet " +' +
+    '        "and may now exist in both places. Manual cleanup required for grievance ID(s): " +' +
+    '        result.failedIds.join(", "));' +
+    '    } else {' +
+    '      alert("Archived " + result.archived + " grievances.");' +
+    '    }' +
     '    google.script.host.close();' +
     '  }).archiveClosedGrievances(parseInt(days));' +
     '}' +
@@ -26582,7 +26642,7 @@ function seedSatisfactionData() {
 
   var maxCol = SATISFACTION_COLS.Q67_ADDITIONAL; // last seeded column
 
-  for (var i = 0; i < 50; i++) {
+  for (i = 0; i < 50; i++) {
     // Spread responses over last 60 days
     var daysAgo = Math.floor(Math.random() * 60);
     var timestamp = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
@@ -28421,7 +28481,7 @@ function onEditValidation(e) {
       else { e.range.clearNote(); e.range.setBackground(null); }
     }
     if (col === MEMBER_COLS.PHONE) {
-      var r = validatePhoneNumber(val);
+      r = validatePhoneNumber(val);
       if (!r.valid) { e.range.setNote('⚠️ ' + r.message); e.range.setBackground('#fff3e0'); }
       else { e.range.clearNote(); e.range.setBackground(null); if (r.formatted !== val) e.range.setValue(r.formatted); }
     }
@@ -29017,11 +29077,11 @@ function showTestDashboard() {
 
   var testRows = results.results.map(function(r) {
     var status = r.passed ? '✅' : '❌';
-    var errorMsg = r.error ? '<span style="color:#ef4444">' + r.error + '</span>' : '-';
+    var errorMsg = r.error ? '<span style="color:#ef4444">' + escapeHtml(String(r.error)) + '</span>' : '-';
     return '<tr>' +
       '<td>' + status + '</td>' +
-      '<td>' + r.name + '</td>' +
-      '<td>' + r.duration + 'ms</td>' +
+      '<td>' + escapeHtml(String(r.name)) + '</td>' +
+      '<td>' + escapeHtml(String(r.duration)) + 'ms</td>' +
       '<td>' + errorMsg + '</td>' +
       '</tr>';
   }).join('');
@@ -30963,7 +31023,7 @@ function onContactFormSubmit(e) {
         var id = data[k][MEMBER_COLS.MEMBER_ID - 1];
         if (id) existingIds[id] = true;
       }
-      var memberId = generateNameBasedId('M', firstName, lastName, existingIds);
+      memberId = generateNameBasedId('M', firstName, lastName, existingIds);
 
       // Build new row array (escapeForFormula on all user-supplied strings to prevent formula injection)
       var newRow = [];
@@ -31200,7 +31260,7 @@ function setupGrievanceFormTrigger() {
     } else {
       // Use configured form
       var configFormUrl = GRIEVANCE_FORM_CONFIG.FORM_URL;
-      var match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+      match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
       if (!match) {
         ui.alert('No Form Configured',
           'No form URL provided and could not extract ID from config.\n\n' +
@@ -31801,7 +31861,7 @@ function sendStewardDeadlineAlerts() {
   for (var i = 1; i < grievanceData.length; i++) {
     var row = grievanceData[i];
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
     var status = row[GRIEVANCE_COLS.STATUS - 1];
     var currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
     var nextDue = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
@@ -35860,8 +35920,8 @@ function getSatisfactionTrendData(period) {
   try {
     var prioritiesData = sheet.getRange(2, SATISFACTION_COLS.Q64_TOP_PRIORITIES, numRows, 1).getValues();
     var issueMap = {};
-    for (var i = 0; i < numRows; i++) {
-      var ts = timestamps[i][0];
+    for (i = 0; i < numRows; i++) {
+      ts = timestamps[i][0];
       if (!(ts instanceof Date)) continue;
       if (cutoff && ts < cutoff) continue;
 
@@ -36081,7 +36141,7 @@ function getSatisfactionAnalyticsData() {
 
   // By Worksite analysis
   var worksiteMap = {};
-  for (var i = 0; i < numRows; i++) {
+  for (i = 0; i < numRows; i++) {
     var ws = worksiteData[i][0] || 'Unknown';
     if (!worksiteMap[ws]) worksiteMap[ws] = { sum: 0, count: 0 };
     if (scores[i] > 0) {
@@ -36090,7 +36150,7 @@ function getSatisfactionAnalyticsData() {
     }
   }
 
-  for (var ws in worksiteMap) {
+  for (ws in worksiteMap) {
     if (worksiteMap[ws].count > 0) {
       result.byWorksite.push({
         name: ws,
@@ -36103,7 +36163,7 @@ function getSatisfactionAnalyticsData() {
 
   // By Role analysis
   var roleMap = {};
-  for (var i = 0; i < numRows; i++) {
+  for (i = 0; i < numRows; i++) {
     var role = roleData[i][0] || 'Unknown';
     if (!roleMap[role]) roleMap[role] = { sum: 0, count: 0 };
     if (scores[i] > 0) {
@@ -36112,7 +36172,7 @@ function getSatisfactionAnalyticsData() {
     }
   }
 
-  for (var role in roleMap) {
+  for (role in roleMap) {
     if (roleMap[role].count > 0) {
       result.byRole.push({
         name: role,
@@ -36127,7 +36187,7 @@ function getSatisfactionAnalyticsData() {
   var withContactSum = 0, withContactCount = 0;
   var withoutContactSum = 0, withoutContactCount = 0;
 
-  for (var i = 0; i < numRows; i++) {
+  for (i = 0; i < numRows; i++) {
     var contact = String(stewardContactData[i][0]).toLowerCase();
     if (scores[i] > 0) {
       if (contact === 'yes') {
@@ -36151,7 +36211,7 @@ function getSatisfactionAnalyticsData() {
 
   // Top priorities analysis
   var priorityMap = {};
-  for (var i = 0; i < numRows; i++) {
+  for (i = 0; i < numRows; i++) {
     var priorities = String(prioritiesData[i][0] || '');
     if (priorities) {
       // Split by comma and count each priority
@@ -36630,7 +36690,7 @@ function syncGrievanceToMemberDirectory() {
   // Update columns AB-AD (Has Open Grievance?, Grievance Status, Days to Deadline)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var memberInfo = lookup[memberId] || {hasOpen: 'No', status: '', deadline: ''};
     updates.push([memberInfo.hasOpen, memberInfo.status, memberInfo.deadline]);
   }
@@ -36696,7 +36756,7 @@ function syncGrievanceFormulasToLog() {
 
   for (var j = 1; j < grievanceData.length; j++) {
     var row = grievanceData[j];
-    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || ('Row ' + (j + 1));
 
     // Track data quality issues
@@ -36917,7 +36977,7 @@ function syncMemberToGrievanceLog() {
   var infoUpdates = [];
 
   for (var j = 1; j < grievanceData.length; j++) {
-    var memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
+    memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
     var data = lookup[memberId] || {firstName: '', lastName: '', email: '', unit: '', location: '', steward: ''};
     nameUpdates.push([data.firstName, data.lastName]);
     infoUpdates.push([data.email, data.unit, data.location, data.steward]);
@@ -40235,7 +40295,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Location values - alternate row coloring
-  for (var r = 35; r <= 39; r++) {
+  for (r = 35; r <= 39; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_BLUE);
@@ -40357,7 +40417,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Busiest stewards values - alternate row coloring with gradient effect
-  for (var r = 59; r <= 88; r++) {
+  for (r = 59; r <= 88; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);
@@ -40386,7 +40446,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Top performers values - gradient green rows
-  for (var r = 93; r <= 102; r++) {
+  for (r = 93; r <= 102; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_GREEN);
@@ -40420,7 +40480,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Stewards needing support - gradient red rows
-  for (var r = 107; r <= 116; r++) {
+  for (r = 107; r <= 116; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);
@@ -42917,7 +42977,7 @@ function getFormFieldIds_(formType) {
       for (var key in defaultFields) {
         result[key] = defaultFields[key];
       }
-      for (var key in parsed) {
+      for (key in parsed) {
         result[key] = parsed[key];
       }
       return result;
@@ -43736,7 +43796,7 @@ function showGrievanceFiles() {
     }
 
     if (fileList.length === 0) {
-      var response = ui.alert('📁 ' + grievanceId + ' Files',
+      response = ui.alert('📁 ' + grievanceId + ' Files',
         'Folder is empty.\n\nWould you like to open the folder to add files?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
@@ -43746,11 +43806,11 @@ function showGrievanceFiles() {
         ui.showModalDialog(html, 'Opening folder...');
       }
     } else {
-      var response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
+      response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
         fileList.join('\n') + '\n\nOpen folder in Drive?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
-        var html = HtmlService.createHtmlOutput(
+        html = HtmlService.createHtmlOutput(
           '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
@@ -44400,7 +44460,7 @@ function syncVolunteerHoursToMemberDirectory() {
   // Update VOLUNTEER_HOURS column (U)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var totalHours = hoursLookup[memberId] || 0;
     updates.push([totalHours]);
   }
@@ -44477,7 +44537,7 @@ function syncMeetingAttendanceToMemberDirectory() {
   // Update columns P (LAST_VIRTUAL_MTG) and Q (LAST_INPERSON_MTG)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var memberAttendance = attendanceLookup[memberId] || {lastVirtual: '', lastInPerson: ''};
     updates.push([
       memberAttendance.lastVirtual || '',

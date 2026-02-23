@@ -650,7 +650,7 @@ function getUnifiedDashboardData(includePII) {
 
       // Settlement time
       if (dateFiled instanceof Date && dateClosed instanceof Date) {
-        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
+        days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
         if (days > 0) settlementDays.push(days);
       }
 
@@ -716,7 +716,7 @@ function getUnifiedDashboardData(includePII) {
   data.stewardWorkload.sort(function(a,b){return b.count - a.count;});
 
   // Build hot zones (locations with 3+ active cases)
-  for (var loc in locationCases) {
+  for (loc in locationCases) {
     if (locationCases[loc] >= 3) {
       data.hotZones.push({ location: loc, count: locationCases[loc] });
       data.hotSpots.grievance.push({ name: loc, type: 'location', count: locationCases[loc], reason: 'High grievance activity' });
@@ -814,7 +814,7 @@ function getUnifiedDashboardData(includePII) {
         trustScores.push(trustVal);
         if (timestamp) {
           var date = new Date(timestamp);
-          var monthKey = date.toLocaleString('default', { month: 'short' });
+          monthKey = date.toLocaleString('default', { month: 'short' });
           if (!monthlyTrust[monthKey]) monthlyTrust[monthKey] = { sum: 0, count: 0 };
           monthlyTrust[monthKey].sum += trustVal;
           monthlyTrust[monthKey].count++;
@@ -1123,7 +1123,7 @@ function getUnifiedDashboardData(includePII) {
 
   // Populate Resource Links from Config sheet
   try {
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       data.resourceLinks.surveyUrl = String(configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '').trim();
       data.resourceLinks.contactFormUrl = String(configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).getValue() || '').trim();

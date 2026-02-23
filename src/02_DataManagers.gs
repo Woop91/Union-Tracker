@@ -25,34 +25,40 @@
  * @returns {string} The generated Member ID
  */
 function addMember(memberData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
+    if (!sheet) {
+      throw new Error('Member Directory sheet not found');
+    }
+
+    // Generate Member ID if not provided
+    var memberId = memberData.memberId || generateMemberID_(memberData.firstName, memberData.lastName);
+
+    // Find next empty row
+    var lastRow = sheet.getLastRow();
+    var newRow = lastRow + 1;
+
+    // Build row array and set all member data in a single setValues() call
+    var lastCol = sheet.getLastColumn() || MEMBER_COLS.UNIT;
+    var rowData = new Array(lastCol).fill('');
+    rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
+    rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
+    rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
+    rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
+    rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
+    rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+    rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
+    rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+    sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+
+    return memberId;
+  } finally {
+    lock.releaseLock();
   }
-
-  // Generate Member ID if not provided
-  var memberId = memberData.memberId || generateMemberID_(memberData.firstName, memberData.lastName);
-
-  // Find next empty row
-  var lastRow = sheet.getLastRow();
-  var newRow = lastRow + 1;
-
-  // Build row array and set all member data in a single setValues() call
-  var lastCol = sheet.getLastColumn() || MEMBER_COLS.UNIT;
-  var rowData = new Array(lastCol).fill('');
-  rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
-  rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
-  rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
-  rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
-  rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
-  rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
-  rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
-  rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
-  sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
-
-  return memberId;
 }
 
 /**
@@ -61,37 +67,43 @@ function addMember(memberData) {
  * @param {Object} updateData - Fields to update
  */
 function updateMember(memberId, updateData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
-  }
-
-  // Find the member row
-  var data = sheet.getDataRange().getValues();
-  var memberRow = -1;
-
-  // data[] is 0-indexed; i=1 skips header. memberRow = i+1 converts to 1-indexed sheet row.
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
-      memberRow = i + 1; // +1: convert 0-indexed array position to 1-indexed sheet row
-      break;
+    if (!sheet) {
+      throw new Error('Member Directory sheet not found');
     }
-  }
 
-  if (memberRow === -1) {
-    throw new Error('Member not found: ' + memberId);
-  }
+    // Find the member row
+    var data = sheet.getDataRange().getValues();
+    var memberRow = -1;
 
-  // Update fields — use !== undefined to allow setting empty strings/falsy values (F17)
-  if (updateData.firstName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
-  if (updateData.lastName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
-  if (updateData.email !== undefined) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
-  if (updateData.phone !== undefined) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
-  if (updateData.jobTitle !== undefined) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
-  if (updateData.workLocation !== undefined) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
-  if (updateData.unit !== undefined) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+    // data[] is 0-indexed; i=1 skips header. memberRow = i+1 converts to 1-indexed sheet row.
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+        memberRow = i + 1; // +1: convert 0-indexed array position to 1-indexed sheet row
+        break;
+      }
+    }
+
+    if (memberRow === -1) {
+      throw new Error('Member not found: ' + memberId);
+    }
+
+    // Update fields — use !== undefined to allow setting empty strings/falsy values (F17)
+    if (updateData.firstName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+    if (updateData.lastName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+    if (updateData.email !== undefined) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+    if (updateData.phone !== undefined) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+    if (updateData.jobTitle !== undefined) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+    if (updateData.workLocation !== undefined) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+    if (updateData.unit !== undefined) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -321,7 +333,7 @@ function syncMemberGrievanceData() {
   // Update member rows (if grievance count columns exist)
   if (MEMBER_COLS.TOTAL_GRIEVANCES && MEMBER_COLS.ACTIVE_GRIEVANCES) {
     for (var j = 1; j < members.length; j++) {
-      var memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
+      memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
       var counts = grievanceCounts[memberId] || { total: 0, active: 0 };
       memberSheet.getRange(j + 1, MEMBER_COLS.TOTAL_GRIEVANCES).setValue(counts.total);
       memberSheet.getRange(j + 1, MEMBER_COLS.ACTIVE_GRIEVANCES).setValue(counts.active);
@@ -819,7 +831,7 @@ function syncStewardStatus() {
   }
 
   // If IS_STEWARD != Yes but name IS in Config, remove from Config
-  for (var name in configNameSet) {
+  for (name in configNameSet) {
     if (memberMap[name] && !memberMap[name].isSteward) {
       configSheet.getRange(configNameSet[name], CONFIG_COLS.STEWARDS).clearContent();
       changes++;
@@ -1291,7 +1303,7 @@ function importMembersFromData(data, mapping) {
 
       var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
       var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
-      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+      email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
 
       // Skip if no name
       if (!firstName && !lastName) {
@@ -1565,6 +1577,8 @@ function showExportMembersDialog() {
  * @return {Object} Result with grievance ID or error
  */
 function startNewGrievance(grievanceData) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
@@ -1621,6 +1635,8 @@ function startNewGrievance(grievanceData) {
   } catch (error) {
     console.error('Error creating grievance:', error);
     return errorResponse(error.message, 'createGrievance');
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1874,6 +1890,8 @@ function getDaysUntilDeadline(deadline) {
  * @return {Object} Result object
  */
 function advanceGrievanceStep(grievanceId, options) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
@@ -1911,11 +1929,18 @@ function advanceGrievanceStep(grievanceId, options) {
     updates.push({ col: GRIEVANCE_COLS.STATUS, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
     updates.push({ col: GRIEVANCE_COLS.LAST_UPDATED, val: today });
 
-    if (nextStep <= 3) {
-      const nextStepDateCol = getStepDateColumn(nextStep);
-      updates.push({ col: nextStepDateCol, val: today });
-      updates.push({ col: nextStepDateCol + 1, val: responseDue });
-      updates.push({ col: nextStepDateCol + 2, val: 'Pending' });
+    // Explicit column map — avoids fragile +1/+2 arithmetic that corrupts wrong columns
+    // when syncColumnMaps() reorders headers (F137). Step 3 has no management-response-due column.
+    var ADVANCE_STEP_COLS_ = {
+      2: { filed: GRIEVANCE_COLS.STEP2_APPEAL_FILED, due: GRIEVANCE_COLS.STEP2_DUE },
+      3: { filed: GRIEVANCE_COLS.STEP3_APPEAL_FILED, due: null }
+    };
+    var stepCols = ADVANCE_STEP_COLS_[nextStep];
+    if (stepCols) {
+      updates.push({ col: stepCols.filed, val: today });
+      if (stepCols.due !== null) {
+        updates.push({ col: stepCols.due, val: responseDue });
+      }
     } else {
       updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
@@ -1952,6 +1977,8 @@ function advanceGrievanceStep(grievanceId, options) {
   } catch (error) {
     console.error('Error advancing grievance:', error);
     return errorResponse(error.message, 'advanceGrievanceStep');
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -2009,14 +2036,21 @@ function recalcAllGrievancesBatched() {
         status === GRIEVANCE_STATUS.PENDING ||
         status === GRIEVANCE_STATUS.APPEALED) {
 
+      // Explicit column map — avoids fragile +1 arithmetic that writes DATE_CLOSED for step 3 (F137).
+      // Step 3 has no management-response-due column; skip recalculation for it.
+      var RECALC_STEP_COLS_ = {
+        1: { filed: GRIEVANCE_COLS.STEP1_RCVD,         due: GRIEVANCE_COLS.STEP2_APPEAL_DUE },
+        2: { filed: GRIEVANCE_COLS.STEP2_APPEAL_FILED,  due: GRIEVANCE_COLS.STEP2_DUE },
+        3: { filed: GRIEVANCE_COLS.STEP3_APPEAL_FILED,  due: null }
+      };
       const currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
-      const stepDate = row[getStepDateColumn(currentStep) - 1]; // 0-indexed for data array
+      const recalcCols = RECALC_STEP_COLS_[currentStep];
+      if (!recalcCols || recalcCols.due === null) continue;
+      const stepDate = row[recalcCols.filed - 1]; // 0-indexed for data array
 
       if (stepDate instanceof Date) {
         const newDue = calculateResponseDeadline(currentStep, stepDate);
-        const dueColumn = getStepDateColumn(currentStep) + 1; // Due is next column after date
-
-        sheet.getRange(i + 1, dueColumn).setValue(newDue);
+        sheet.getRange(i + 1, recalcCols.due).setValue(newDue);
         updatedCount++;
       }
     }
@@ -2051,42 +2085,50 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
     return errorResponse(authResult.message || 'Unauthorized: steward access required', 'bulkUpdateGrievanceStatus');
   }
 
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
-  ensureMinimumColumns(sheet, getGrievanceHeaders().length);
-  const data = sheet.getDataRange().getValues();
-
-  let updatedCount = 0;
-  const today = new Date();
-  const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
-
-  for (let i = 1; i < data.length; i++) {
-    const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-
-    if (grievanceIds.includes(grievanceId)) {
-      const rowIndex = i + 1;
-
-      // Update status (use GRIEVANCE_COLS, 1-indexed)
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(newStatus);
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
-
-      // Add notes if provided (NOTES aliases to RESOLUTION — use directly)
-      if (notes) {
-        const existingResolution = data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '';
-        const newResolution = existingResolution + (existingResolution ? '\n' : '') +
-                         `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
-        sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(newResolution);
-      }
-
-      updatedCount++;
-    }
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    return errorResponse('Unable to acquire lock. Another operation is in progress. Please try again.', 'bulkUpdateGrievanceStatus');
   }
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+    ensureMinimumColumns(sheet, getGrievanceHeaders().length);
+    const data = sheet.getDataRange().getValues();
 
-  return {
-    success: true,
-    updatedCount: updatedCount,
-    message: `Updated status for ${updatedCount} grievances`
-  };
+    let updatedCount = 0;
+    const today = new Date();
+    const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
+
+    for (let i = 1; i < data.length; i++) {
+      const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+
+      if (grievanceIds.includes(grievanceId)) {
+        const rowIndex = i + 1;
+
+        // Update status (use GRIEVANCE_COLS, 1-indexed)
+        sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(newStatus);
+        sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
+
+        // Add notes if provided (NOTES aliases to RESOLUTION — use directly)
+        if (notes) {
+          const existingResolution = data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '';
+          const newResolution = existingResolution + (existingResolution ? '\n' : '') +
+                           `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
+          sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(newResolution);
+        }
+
+        updatedCount++;
+      }
+    }
+
+    return {
+      success: true,
+      updatedCount: updatedCount,
+      message: `Updated status for ${updatedCount} grievances`
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
