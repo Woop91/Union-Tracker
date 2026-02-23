@@ -3,7 +3,7 @@
  * DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
- * Version: 4.9.0 (2026-02-23)
+ * Version: 4.9.1 (2026-02-23)
  * Build Date: 2026-02-23
  *
  * This file is auto-generated from the src/ directory.
@@ -2314,7 +2314,7 @@ function runStartupValidation() {
 var API_VERSION = {
   major: 4,
   minor: 9,
-  patch: 0,
+  patch: 1,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -2408,7 +2408,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.9.0",
+  VERSION: "4.9.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -2538,11 +2538,11 @@ function getLocalNumberFromConfig_() {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 9,
-  PATCH: 0,
-  BUILD: 'v4.9.0',
-  CURRENT: '4.9.0',
-  BUILD_DATE: '2026-02-17',
-  CODENAME: 'Security Hardening & Code Quality'
+  PATCH: 1,
+  BUILD: 'v4.9.1',
+  CURRENT: '4.9.1',
+  BUILD_DATE: '2026-02-23',
+  CODENAME: 'Security Vulnerability Fix Pass'
 };
 
 /**
