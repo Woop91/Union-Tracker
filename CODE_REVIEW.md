@@ -17,13 +17,13 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review originally identified **152 active findings** across all severity levels. The 2026-02-21 fix pass addressed **30 findings** (8 CRITICAL, 8 HIGH, 11 MEDIUM, 3 infrastructure). The 2026-02-23 thorough re-review using parallel agents across all 30 source files added **44 new findings** (F109-F152) and verified 2 existing findings as already fixed (F61, F62). **153 findings remain open** (23 CRITICAL, 44 HIGH, 78 MEDIUM, 40 LOW). Additionally, 7 findings (F34a, F34b, F34c, F35b, F35c, F61, F62) were verified as **already fixed or false positives**.
+This line-by-line review originally identified **152 active findings** across all severity levels. The 2026-02-21 fix pass addressed **30 findings** (8 CRITICAL, 8 HIGH, 11 MEDIUM, 3 infrastructure). The 2026-02-23 thorough re-review using parallel agents across all 30 source files added **47 new findings** (F109-F155) and verified 2 existing findings as already fixed (F61, F62). **156 findings remain open** (23 CRITICAL, 46 HIGH, 79 MEDIUM, 40 LOW). Additionally, 7 findings (F34a, F34b, F34c, F35b, F35c, F61, F62) were verified as **already fixed or false positives**.
 
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
 | CRITICAL | 23 | XSS via innerHTML injection, URL injection (window.open), unsanitized email HTML, onclick attribute injection, CSV preview, systematic column indexing bugs, **unescaped form HTML templates** (F128, F129), **Config URLs in web app href** (F130) |
-| HIGH | 44 | Missing input validation, unescaped URLs in portal href attributes (F109), XSS in reminder dialog template literals (F112), no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, **empty-sheet crashes** (F131, F132, F134), **no email validation** (F135), **OAuth innerHTML** (F133), **form handler formula injection** (F151) |
-| MEDIUM | 78 | Dead code, inconsistent error handling, version mismatches, CI gaps, formula injection, **hardcoded column positions** (F136, F137, F143), **missing authorization** (F138), **NEXT_ACTION_DUE logic bug** (F139), **Config write path violation** (F140), **archive partial failure** (F141), **survey email validation** (F152) |
+| HIGH | 46 | Missing input validation, unescaped URLs in portal href attributes (F109), XSS in reminder dialog template literals (F112), no rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules, **empty-sheet crashes** (F131, F132, F134), **no email validation** (F135), **OAuth innerHTML** (F133), **form handler formula injection** (F151), **auth bypass in rejectFlaggedSubmission** (F153), **textarea XSS** (F154) |
+| MEDIUM | 79 | Dead code, inconsistent error handling, version mismatches, CI gaps, formula injection, **hardcoded column positions** (F136, F137, F143, F155), **missing authorization** (F138), **NEXT_ACTION_DUE logic bug** (F139), **Config write path violation** (F140), **archive partial failure** (F141), **survey email validation** (F152) |
 | LOW | 40 | Code duplication, naming inconsistencies, documentation gaps, **dead backup code** (F149), **Nuclear Reset in settings** (F150), **email body newlines** (F148) |
 
 **Overall Assessment: Good architecture with systematic security gaps** — The codebase is well-structured, thoroughly tested, and shows strong security awareness in many areas (PII masking, audit logging, access control framework). However, the 2026-02-23 thorough agent review revealed deeper systemic issues: (1) **15 of 21 `getClientSideEscapeHtml()` sites are broken** (F109), meaning client-side XSS protection is non-functional in most dialogs and web app pages; (2) **Grievance form HTML templates** have CRITICAL XSS in both new and edit forms (F128, F129); (3) **Empty-sheet crashes** affect 10+ functions across Integrations, Maintenance, and Features layers (F131, F132, F134); (4) **Config write path violations** and **hardcoded column arithmetic** create data corruption risks (F136, F137, F140, F143); (5) **`escapeForFormula()`** is used in only 1 of 40+ write paths (F118, F144). The highest-priority fix remains F109 (broken `getClientSideEscapeHtml()`), followed by F128/F129 (form XSS) and F130 (web app Links page URLs).
@@ -2646,6 +2646,37 @@ Issue strings derived from sheet data are injected into HTML without `escapeHtml
 
 ---
 
+#### F153. HIGH: Missing authorization check in `rejectFlaggedSubmission()`
+**Severity:** HIGH | **Category:** Authorization bypass | **File:** `09_Dashboards.gs` | **Line:** 3496
+
+`approveFlaggedSubmission()` (line 3465) verifies caller identity with `Session.getActiveUser().getEmail()` and throws if empty. `rejectFlaggedSubmission()` has NO authorization check — it directly modifies vault data. Callable from client-side via `google.script.run`, allowing any dialog user to reject submissions.
+
+**Fix:** Add the same authorization check as `approveFlaggedSubmission()`.
+
+---
+
+#### F154. HIGH: XSS via Config URL in textarea element
+**Severity:** HIGH | **Category:** XSS | **File:** `08c_FormsAndNotifications.gs` | **Line:** 631
+
+```javascript
+'<textarea id="link" ...>' + formUrl + '</textarea>'
+```
+
+`formUrl` from Config placed inside `<textarea>` without `escapeHtml()`. A value like `http://x"></textarea><script>alert(1)</script>` breaks out and injects script. URL validation (`url.indexOf('http') === 0`) doesn't prevent this.
+
+**Fix:** `escapeHtml(formUrl)` before inserting.
+
+---
+
+#### F155. MEDIUM: Hardcoded column letters in hidden sheet formula setup
+**Severity:** MEDIUM | **Category:** Hardcoded columns | **File:** `08d_AuditAndFormulas.gs` | **Lines:** 1098-1387
+
+Four `setupCalc*Sheet` functions use hardcoded column letters (`K:K`, `W:W`, `E:E`, `H:H`, `D:D`, `T:T`, `X:X`, `J:J`, `L:L`) in COUNTIF/SUMIF formulas instead of deriving from column constants. If columns are reordered, formulas silently reference wrong data.
+
+**Fix:** Use `getColumnLetter(GRIEVANCE_COLS.X)` to derive letters dynamically.
+
+---
+
 #### F151. HIGH: Formula injection in form submission handlers (`onContactFormSubmit`, satisfaction survey)
 **Severity:** HIGH | **Category:** Formula injection | **File:** `08c_FormsAndNotifications.gs` | **Lines:** 346, 799
 
@@ -2735,7 +2766,7 @@ The settings dialog includes a "Nuclear Reset" button calling `NUCLEAR_RESET_HID
 
 **Existing Verified as Fixed:** F61 (EventBus error isolation), F62 (unsubscribe), F57 (partially — rate limiting present in MeetingCheckIn but needs SelfService verification).
 
-**Agent Review Coverage (2026-02-23):** Five parallel agents reviewed all 30 source files. Agent findings cross-referenced against F1-F127 to eliminate duplicates. 25 new unique findings identified (F128-F152).
+**Agent Review Coverage (2026-02-23):** Five parallel agents reviewed all 30 source files. Agent findings cross-referenced against F1-F127 to eliminate duplicates. 28 new unique findings identified (F128-F155).
 
 ---
 
@@ -2764,6 +2795,8 @@ The settings dialog includes a "Nuclear Reset" button calling `NUCLEAR_RESET_HID
 | F134 | Add empty-sheet guards to 10 `getLastRow() - 1` instances | Small |
 | F135 | Add email validation + sanitize HTML body in email functions | Small |
 | F151 | Add `escapeForFormula()` to form submission handlers (`onContactFormSubmit`, satisfaction survey) | Small |
+| F153 | Add authorization check to `rejectFlaggedSubmission()` (match `approveFlaggedSubmission()`) | Trivial |
+| F154 | Escape `formUrl` in satisfaction survey link dialog textarea | Trivial |
 
 ### Updated Priority 2 — Plan for Next Release (2026-02-23 New Findings)
 
@@ -2780,7 +2813,8 @@ The settings dialog includes a "Nuclear Reset" button calling `NUCLEAR_RESET_HID
 | F144 | Add `escapeForFormula()` to OCR text + error log writes | Trivial |
 | F145 | Escape issue strings in `fixDataQualityIssues()` dialog | Trivial |
 | F152 | Add parameter validation to `executeSendRandomSurveyEmails()` | Trivial |
+| F155 | Derive column letters from constants in `setupCalc*Sheet` formula functions | Medium |
 
 ---
 
-*Updated 2026-02-23 by Claude Code (Opus 4.6) — thorough re-review with parallel agents and cross-cutting verification. 25 additional findings (F128-F152) from agent-verified line-by-line review of all 30 source files.*
+*Updated 2026-02-23 by Claude Code (Opus 4.6) — thorough re-review with parallel agents and cross-cutting verification. 28 additional findings (F128-F155) from agent-verified line-by-line review of all 30 source files.*
