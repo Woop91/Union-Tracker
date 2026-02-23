@@ -1379,7 +1379,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Location values - alternate row coloring
-  for (var r = 35; r <= 39; r++) {
+  for (r = 35; r <= 39; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_BLUE);
@@ -1501,7 +1501,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Busiest stewards values - alternate row coloring with gradient effect
-  for (var r = 59; r <= 88; r++) {
+  for (r = 59; r <= 88; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);
@@ -1530,7 +1530,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Top performers values - gradient green rows
-  for (var r = 93; r <= 102; r++) {
+  for (r = 93; r <= 102; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_GREEN);
@@ -1564,7 +1564,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Stewards needing support - gradient red rows
-  for (var r = 107; r <= 116; r++) {
+  for (r = 107; r <= 116; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);

@@ -225,7 +225,7 @@ function showGrievanceFiles() {
     }
 
     if (fileList.length === 0) {
-      var response = ui.alert('📁 ' + grievanceId + ' Files',
+      response = ui.alert('📁 ' + grievanceId + ' Files',
         'Folder is empty.\n\nWould you like to open the folder to add files?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
@@ -235,11 +235,11 @@ function showGrievanceFiles() {
         ui.showModalDialog(html, 'Opening folder...');
       }
     } else {
-      var response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
+      response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
         fileList.join('\n') + '\n\nOpen folder in Drive?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
-        var html = HtmlService.createHtmlOutput(
+        html = HtmlService.createHtmlOutput(
           '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
@@ -889,7 +889,7 @@ function syncVolunteerHoursToMemberDirectory() {
   // Update VOLUNTEER_HOURS column (U)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var totalHours = hoursLookup[memberId] || 0;
     updates.push([totalHours]);
   }
@@ -966,7 +966,7 @@ function syncMeetingAttendanceToMemberDirectory() {
   // Update columns P (LAST_VIRTUAL_MTG) and Q (LAST_INPERSON_MTG)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var memberAttendance = attendanceLookup[memberId] || {lastVirtual: '', lastInPerson: ''};
     updates.push([
       memberAttendance.lastVirtual || '',

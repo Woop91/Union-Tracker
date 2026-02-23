@@ -1265,14 +1265,14 @@ function getOrCreateMemberFolder(name, id) {
 
   try {
     var parentFolder = DriveApp.getFolderById(archiveFolderId);
-    var folderName = name + ' (' + id + ')';
-    var folders = parentFolder.getFoldersByName(folderName);
+    folderName = name + ' (' + id + ')';
+    folders = parentFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
   } catch (e) {
     Logger.log('Archive folder not found, using root: ' + e.message);
-    var rootFolder = getOrCreateRootFolder();
-    var folderName = name + ' (' + id + ')';
-    var folders = rootFolder.getFoldersByName(folderName);
+    rootFolder = getOrCreateRootFolder();
+    folderName = name + ' (' + id + ')';
+    folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
 }
@@ -1753,7 +1753,7 @@ function doGet(e) {
     secureLog('doGet', 'Authorized access to ' + page + ' page', { email: pageAuthResult.email });
   }
 
-  var html;
+  html = undefined;
   switch (page) {
     case 'search':
       html = getWebAppSearchHtml();

@@ -15,6 +15,7 @@
 - **~55 directly fixed:** F1, F5, F6, F11, F12, F15, F16, F17, F20, F21, F23b, F23d, F23e, F26, F27, F31, F32, F33, F34, F34e, F35, F36a, F38, F39, F41, F44, F47, F52, F53, F54, F58, F59, F60, F63, F65, F66, F70, F105, F107, F116, F137
 - **~12 confirmed already fixed/NA:** F13, F23a, F30, F34d, F36, F36b, F36c, F48, F64, F80, F83, F113
 - **~20 documented as known debt:** F24, F28, F29, F36a (dup audit fns), F42, F44 (self-healing), F45, F46, F49, F50, F51, F66 (no source maps), F71, F73, F74, F74a, F75, F146, F148, F149, F150, F155
+**2026-02-23 Fix Pass 3** (branch `claude/fix-findings-all-severities`) — Resolved 5 verified-open findings that survived the previous two passes: F70, F80, F126, F137, F141. Also enabled `no-redeclare` (with `builtinGlobals: false`) and fixed 42 actual redeclaration bugs across 10 files.
 
 ---
 
@@ -27,11 +28,11 @@ This line-by-line review originally identified **152 active findings** across al
 | Severity | Count | Key Themes |
 |----------|------:|-----------|
 | CRITICAL | 15 | XSS via innerHTML injection, URL injection (window.open), unsanitized email HTML, systematic column indexing bugs *(F109, F128, F129, F130, F109a, F111 analytics, F112 URLs, F113 steward now fixed)* |
-| HIGH | 26 | No rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules *(F81, F82, F84, F87, F110, F112, F114, F115, F116, F119, F120, F131, F132, F133, F134, F135, F151, F153, F154 now fixed)* |
-| MEDIUM | 50 | Dead code, inconsistent error handling, version mismatches, CI gaps, formula injection, **archive partial failure** (F141), **fragile column arithmetic** (F137), hardcoded columns (F155) *(F89, F91, F93, F96, F98, F103, F106, F108, F111, F114, F115, F117, F118 partial, F121, F122, F123, F124, F125, F127, F136, F138, F139, F140, F142, F143, F144, F145, F152 now fixed)* |
+| HIGH | 26 | No rate limiting on email/PIN, N+1 patterns, missing locks, disabled ESLint rules *(F81, F82, F84, F87, F110, F112, F114, F115, F116, F119, F120, F131, F132, F133, F134, F135, F151, F153, F154 now fixed; F70 LockService/ESLint, F126 mutations now fixed in fix pass 3)* |
+| MEDIUM | 50 | Dead code, inconsistent error handling, version mismatches, CI gaps, formula injection, hardcoded columns (F155) *(F89, F91, F93, F96, F98, F103, F106, F108, F111, F114, F115, F117, F118 partial, F121, F122, F123, F124, F125, F127, F136, F138, F139, F140, F142, F143, F144, F145, F152 now fixed; F137 column arithmetic, F141 archive failure now fixed in fix pass 3)* |
 | LOW | 39 | Code duplication, naming inconsistencies, documentation gaps, **dead backup code** (F149), **Nuclear Reset in settings** (F150), **email body newlines** (F148) *(F147 now fixed)* |
 
-**Overall Assessment: Good architecture with significant security improvements** — The codebase is well-structured, thoroughly tested, and shows strong security awareness (PII masking, audit logging, access control framework). The 2026-02-23 fix pass (commit `218abac`) resolved the most critical systemic issues: (1) **`getClientSideEscapeHtml()` broken pattern fixed** across all 15 sites (F109); (2) **Grievance form XSS fixed** in both new and edit forms (F128, F129); (3) **Empty-sheet crashes resolved** across all affected functions (F131, F132, F134); (4) **Config write path violations fixed** (F136, F140, F143); (5) **`escapeForFormula()` coverage expanded** to addMember/updateMember, form submissions, meeting check-in, and expansion data (F118 partial, F144, F151, F114, F115). Remaining work includes: fragile `+1`/`+2` column arithmetic (F137), archive partial failure (F141), LockService coverage (F126), and remaining `escapeForFormula()` write paths (F118 continuation).
+**Overall Assessment: Good architecture with significant security improvements** — The codebase is well-structured, thoroughly tested, and shows strong security awareness (PII masking, audit logging, access control framework). The 2026-02-23 fix pass (commit `218abac`) resolved the most critical systemic issues: (1) **`getClientSideEscapeHtml()` broken pattern fixed** across all 15 sites (F109); (2) **Grievance form XSS fixed** in both new and edit forms (F128, F129); (3) **Empty-sheet crashes resolved** across all affected functions (F131, F132, F134); (4) **Config write path violations fixed** (F136, F140, F143); (5) **`escapeForFormula()` coverage expanded** to addMember/updateMember, form submissions, meeting check-in, and expansion data (F118 partial, F144, F151, F114, F115). Fix pass 3 (2026-02-23, branch `claude/fix-findings-all-severities`) resolved the 5 remaining verified-open findings: **(6) LockService added** to all critical mutation paths — `addMember`, `updateMember`, `startNewGrievance`, `advanceGrievanceStep`, `bulkUpdateGrievanceStatus` (F126); **(7) Column arithmetic replaced** with explicit per-step lookup maps, fixing active data corruption for step 3 grievance advancement (F137); **(8) Archive partial failure** now reported to user with affected grievance IDs (F141); **(9) ESLint safety rules** `no-invalid-regexp`, `no-loss-of-precision`, `no-redeclare` re-enabled — 42 real redeclarations found and fixed across 10 files (F70); **(10) DevTools XSS** in `showTestDashboard()` fixed with `escapeHtml()` (F80). Remaining work: remaining `escapeForFormula()` write paths (F118 continuation), hardcoded column letters in formula functions (F155).
 
 ---
 
@@ -1331,8 +1332,9 @@ Should be `"4.9.0"` per the CHANGELOG.
 
 **Findings:**
 
-#### F70. Critical ESLint safety rules are disabled
+#### ~~F70. Critical ESLint safety rules are disabled~~ **FIXED (fix pass 3, 2026-02-23)**
 **Severity:** HIGH | **Category:** Security/Quality | **Lines:** 134-174
+**Fixed (fix pass 3, 2026-02-23):** Re-enabled `no-invalid-regexp`, `no-loss-of-precision`, and `no-redeclare` (with `{ builtinGlobals: false }` to avoid false positives from GAS globals) in `eslint.config.js`. Running lint after enabling `no-redeclare` revealed 42 genuine variable redeclarations across 10 files — all fixed. `no-undef`, `no-debugger`, and `no-dupe-args` remain off (known debt: `no-undef` would require a complete GAS globals config; `no-debugger` and `no-dupe-args` have no existing violations and are low priority).
 
 The following important rules are disabled "for legacy compatibility":
 - `no-undef: 'off'` — Masks typos in function/variable names
@@ -1602,8 +1604,9 @@ Steward names (`firstName`, `lastName`) and `unit` are interpolated into `<td>` 
 
 ---
 
-#### F80. XSS via unescaped `<td>` cells in `07_DevTools.gs`
+#### ~~F80. XSS via unescaped `<td>` cells in `07_DevTools.gs`~~ **FIXED (fix pass 3, 2026-02-23)**
 **Severity:** LOW | **Category:** Security | **Lines:** 3059-3062
+**Fixed (fix pass 3, 2026-02-23):** Wrapped `r.name`, `r.duration`, and `r.error` with `escapeHtml(String(...))` in `showTestDashboard()`. Note: this was previously listed as "Confirmed Already Fixed" in error — the fix was applied in fix pass 3.
 
 ```javascript
 '<td>' + status + '</td>' +
@@ -2123,7 +2126,7 @@ function validateWebAppRequest(e) {
 | F34d | Fix race condition: use `e.range` instead of `getLastRow()` in form handler | Small |
 | F15 | Batch setValue() calls in addMember() | Small |
 | F35a | Fix undo system UserProperties 9KB overflow | Medium |
-| F70 | Re-enable critical ESLint rules (no-undef, no-dupe-args, etc.) | Medium |
+| ~~F70~~ | ~~Re-enable critical ESLint rules (no-undef, no-dupe-args, etc.)~~ | **FIXED (fix pass 3, 2026-02-23)** |
 | F69 | Fix Jest coverage collection for .gs files or remove misleading config | Small |
 | F57 | Add PIN brute-force rate limiting | Medium |
 | F52 | Add LockService to sync functions | Medium |
@@ -2439,8 +2442,9 @@ Error messages concatenated into `showStatus()` (which uses `innerHTML`) without
 
 ---
 
-### F126. LockService confirmed in only 1 of 500+ mutations
+### ~~F126. LockService confirmed in only 1 of 500+ mutations~~ **FIXED (fix pass 3, 2026-02-23)**
 **Severity:** HIGH | **Category:** Data Integrity | **Scope:** Cross-cutting
+**Fixed (fix pass 3, 2026-02-23):** Added `LockService.getScriptLock()` with `waitLock(10000)` + try/finally to `addMember()`, `updateMember()`, `startNewGrievance()`, and `advanceGrievanceStep()` in `02_DataManagers.gs`. `bulkUpdateGrievanceStatus()` uses `tryLock(10000)` with `errorResponse()` on failure (matching its existing error-response return pattern). All locks released unconditionally in `finally` blocks.
 
 Only `generateChecklistId_()` (`12_Features.gs:114`) uses script locks. Confirms CC3 and F52.
 
@@ -2601,8 +2605,9 @@ Builds `rowData` as a positional array for `appendRow()`. Positions are based on
 
 ---
 
-#### F137. MEDIUM: Fragile `+1`/`+2` column arithmetic in grievance date calculations
+#### ~~F137. MEDIUM: Fragile `+1`/`+2` column arithmetic in grievance date calculations~~ **FIXED (fix pass 3, 2026-02-23)**
 **Severity:** MEDIUM | **Category:** Data corruption risk | **File:** `02_DataManagers.gs` | **Lines:** 1906-1909, 2003-2010
+**Fixed (fix pass 3, 2026-02-23):** Replaced arithmetic with explicit `ADVANCE_STEP_COLS_` and `RECALC_STEP_COLS_` lookup maps in both `advanceGrievanceStep()` and `recalcAllGrievancesBatched()`. Analysis revealed the `+1`/`+2` arithmetic was causing active data corruption for step 3 (writing to `DATE_CLOSED` and `DAYS_OPEN`). Step 3 has no management-response-due column in the header map, so its `due` entry is `null` — both functions now skip the due-date write for step 3. Null guards added throughout.
 
 `advanceGrievanceStep()` and `recalcAllGrievancesBatched()` use `getStepDateColumn(step) + 1` for due date and `+ 2` for status, assuming columns are adjacent. If columns are reordered via `syncColumnMaps()`, this writes to wrong columns. Also, `getStepDateColumn()` returns `null` for invalid steps, and `null + 1` = `1`, writing to column A.
 
@@ -2648,8 +2653,9 @@ Per CLAUDE.md, all Config dropdown writes must go through `addToConfigDropdown_(
 
 ---
 
-#### F141. MEDIUM: `archiveClosedGrievances()` partial failure leaves row duplicates
+#### ~~F141. MEDIUM: `archiveClosedGrievances()` partial failure leaves row duplicates~~ **FIXED (fix pass 3, 2026-02-23)**
 **Severity:** MEDIUM | **Category:** Data integrity | **File:** `06_Maintenance.gs` | **Lines:** 3000-3017
+**Fixed (fix pass 3, 2026-02-23):** `archiveClosedGrievances()` now builds a `rowIndexToGrievanceId` map before deletion, collects `failedGrievanceIds` for each failed delete, and returns `{ archived: N, failed: M, failedIds: [...] }`. The `showArchiveDialog()` JS success callback branches on `result.failed > 0` to show a warning alert listing the grievance IDs requiring manual cleanup (rows that exist in both sheets).
 
 Copies all rows to archive first, then deletes them individually. If a delete fails (caught in try/catch), the row exists in both the archive and main sheet with no rollback or user notification.
 
@@ -2849,7 +2855,7 @@ The settings dialog includes a "Nuclear Reset" button calling `NUCLEAR_RESET_HID
 | ~~F116~~ | ~~Escape resource URLs in PublicDashboard~~ | **FIXED** (verified) |
 | ~~F119~~ | ~~Add server-side validation to `saveInteractiveMember()`~~ | **FIXED** `218abac` |
 | ~~F120~~ | ~~Validate row/status in `quickUpdateGrievanceStatus()`~~ | **FIXED** (verified) |
-| F126 | Add `LockService` to critical mutation paths | OPEN |
+| ~~F126~~ | ~~Add `LockService` to critical mutation paths~~ | **FIXED (fix pass 3, 2026-02-23)** |
 | ~~**F128**~~ | ~~**XSS: Escape member names in `getNewGrievanceFormHtml()` `<option>` elements**~~ | **FIXED** (verified) |
 | ~~**F129**~~ | ~~**XSS: Escape grievanceId/status in `getEditGrievanceFormHtml()` HTML + JS**~~ | **FIXED** (verified) |
 | ~~**F130**~~ | ~~**XSS: Validate URL scheme + escape Config URLs in web app Links page**~~ | **FIXED** (verified) |
@@ -2867,11 +2873,11 @@ The settings dialog includes a "Nuclear Reset" button calling `NUCLEAR_RESET_HID
 | ID | Summary | Status |
 |----|---------|--------|
 | ~~F136~~ | ~~Fix `startNewGrievance()` hardcoded array positions~~ | **FIXED** `218abac` |
-| F137 | Replace `+1`/`+2` column arithmetic with explicit constants | OPEN |
+| ~~F137~~ | ~~Replace `+1`/`+2` column arithmetic with explicit constants~~ | **FIXED (fix pass 3, 2026-02-23)** |
 | ~~F138~~ | ~~Add `validateRole()` to `bulkUpdateGrievanceStatus()`~~ | **FIXED** `218abac` |
 | ~~F139~~ | ~~Fix `NEXT_ACTION_DUE` to compute deadline instead of `new Date()`~~ | **FIXED** (verified) |
 | ~~F140~~ | ~~Route `autoFixMissingConfigValues()` through `addToConfigDropdown_()`~~ | **FIXED** (verified) |
-| F141 | Add transaction pattern to `archiveClosedGrievances()` | OPEN |
+| ~~F141~~ | ~~Add transaction pattern to `archiveClosedGrievances()`~~ | **FIXED (fix pass 3, 2026-02-23)** |
 | ~~F142~~ | ~~Use `JSON.stringify()` for `baseUrl` in JS context~~ | **FIXED** `218abac` |
 | ~~F143~~ | ~~Define column constants for Volunteer/Meeting sync functions~~ | **FIXED** (verified — documented column comments) |
 | ~~F144~~ | ~~Add `escapeForFormula()` to OCR text + error log writes~~ | **FIXED** (verified) |
@@ -2926,8 +2932,10 @@ The following findings have been reviewed and documented as acceptable technical
 | F36c | Hardcoded timezone — not found in codebase |
 | F48 | `onEdit` early exit — already present at line 1 |
 | F64 | MultiSelectDialog — uses safe DOM APIs (textContent, not innerHTML) |
-| F80 | DevTools XSS — excluded from prod build via `--prod` flag |
+| ~~F80~~ | ~~DevTools XSS — excluded from prod build via `--prod` flag~~ **FIXED (fix pass 3, 2026-02-23)** — `escapeHtml()` now applied to all test result values in `showTestDashboard()` |
 | F83 | `GRIEVANCE_COLUMNS` — codebase uses canonical `GRIEVANCE_COLS` |
 | F113 | Reminder note escaping — already uses `escapeHtml()` |
 
 *Updated 2026-02-23 by Claude Code (Opus 4.6) — Full fix pass on branch `claude/fix-findings-all-severities`: ~55 findings directly fixed, ~12 confirmed fixed/NA, ~20 documented as known debt. All 130 remaining findings addressed.*
+
+*Updated 2026-02-23 by Claude Code (Sonnet 4.6) — Fix pass 3 on branch `claude/fix-findings-all-severities`: 5 verified-open findings fixed (F70, F80, F126, F137, F141). Also enabled `no-redeclare` ESLint rule and fixed 42 actual redeclaration bugs across 10 files.*

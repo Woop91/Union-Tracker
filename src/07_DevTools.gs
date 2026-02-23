@@ -612,7 +612,7 @@ function seedSatisfactionData() {
 
   var maxCol = SATISFACTION_COLS.Q67_ADDITIONAL; // last seeded column
 
-  for (var i = 0; i < 50; i++) {
+  for (i = 0; i < 50; i++) {
     // Spread responses over last 60 days
     var daysAgo = Math.floor(Math.random() * 60);
     var timestamp = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
@@ -2451,7 +2451,7 @@ function onEditValidation(e) {
       else { e.range.clearNote(); e.range.setBackground(null); }
     }
     if (col === MEMBER_COLS.PHONE) {
-      var r = validatePhoneNumber(val);
+      r = validatePhoneNumber(val);
       if (!r.valid) { e.range.setNote('⚠️ ' + r.message); e.range.setBackground('#fff3e0'); }
       else { e.range.clearNote(); e.range.setBackground(null); if (r.formatted !== val) e.range.setValue(r.formatted); }
     }
@@ -3047,11 +3047,11 @@ function showTestDashboard() {
 
   var testRows = results.results.map(function(r) {
     var status = r.passed ? '✅' : '❌';
-    var errorMsg = r.error ? '<span style="color:#ef4444">' + r.error + '</span>' : '-';
+    var errorMsg = r.error ? '<span style="color:#ef4444">' + escapeHtml(String(r.error)) + '</span>' : '-';
     return '<tr>' +
       '<td>' + status + '</td>' +
-      '<td>' + r.name + '</td>' +
-      '<td>' + r.duration + 'ms</td>' +
+      '<td>' + escapeHtml(String(r.name)) + '</td>' +
+      '<td>' + escapeHtml(String(r.duration)) + 'ms</td>' +
       '<td>' + errorMsg + '</td>' +
       '</tr>';
   }).join('');
