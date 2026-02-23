@@ -1344,7 +1344,7 @@ function getSearchDialogHtml_() {
             var name = escapeHtml((member['First Name'] || '') + ' ' + (member['Last Name'] || ''));
             var id = escapeHtml(member['Member ID'] || 'N/A');
             var email = escapeHtml(member['Email'] || '');
-            html += '<div class="result-item" onclick="selectMember(\\'' + id.replace(/'/g,"") + '\\')">';
+            html += '<div class="result-item" data-id="' + id + '" onclick="selectMember(this.dataset.id)">';
             html += '<strong>' + name + '</strong> (' + id + ')';
             if (email) html += '<br><small>' + email + '</small>';
             html += '</div>';
@@ -2011,9 +2011,9 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     if (text.length > 500) ocrNote += '...';
 
     if (existingResolution) {
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(existingResolution + '\n\n' + ocrNote);
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(existingResolution + '\n\n' + ocrNote));
     } else {
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(ocrNote);
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(ocrNote));
     }
     fieldsPopulated.push('Resolution Notes (OCR text)');
 
@@ -2503,7 +2503,7 @@ function showOCRDialog() {
     '    "</div>";' +
     '  }' +
     '}' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'document.getElementById("fileId").addEventListener("keypress", function(e) {' +
     '  if (e.key === "Enter") runOCR();' +
     '});' +
@@ -2808,7 +2808,7 @@ function showSearchPrecedents() {
     '  <div class="empty">Enter search terms to find historical grievances</div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function searchPrecedents() {' +
     '  var query = document.getElementById("searchQuery").value;' +
     '  var outcomeFilter = document.getElementById("filterOutcome").value;' +
@@ -3515,8 +3515,8 @@ function getMemberPortalHtml_(profile) {
     '    </div>' +
     '    ' +
     '    <div class="btn-grid">' +
-    '      <a href="' + CONTRACT_PDF_URL + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
-    '      <a href="' + RESOURCE_DRIVE_URL + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
+    '      <a href="' + (/^https:\/\//.test(CONTRACT_PDF_URL) ? escapeHtml(CONTRACT_PDF_URL) : '#') + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
+    '      <a href="' + (/^https:\/\//.test(RESOURCE_DRIVE_URL) ? escapeHtml(RESOURCE_DRIVE_URL) : '#') + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
     '    </div>' +
     '    ' +
     '    <div class="card">' +
@@ -3536,7 +3536,7 @@ function getMemberPortalHtml_(profile) {
     '    ' +
     '    <div class="footer">' +
     '      <i class="material-icons" style="font-size:12px;vertical-align:middle">lock</i> ' +
-    '      Secure Member Portal | Member ID: ' + profile.memberId +
+    '      Secure Member Portal | Member ID: ' + escapeHtml(profile.memberId) +
     '    </div>' +
     '  </div>' +
     '</body>' +
@@ -3599,8 +3599,8 @@ function getPublicPortalHtml_(stats, stewards, satisfaction) {
     '    </div>' +
     '    ' +
     '    <div class="btn-grid">' +
-    '      <a href="' + CONTRACT_PDF_URL + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
-    '      <a href="' + RESOURCE_DRIVE_URL + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
+    '      <a href="' + (/^https:\/\//.test(CONTRACT_PDF_URL) ? escapeHtml(CONTRACT_PDF_URL) : '#') + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
+    '      <a href="' + (/^https:\/\//.test(RESOURCE_DRIVE_URL) ? escapeHtml(RESOURCE_DRIVE_URL) : '#') + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
     '    </div>' +
     '    ' +
     '    <div class="card">' +

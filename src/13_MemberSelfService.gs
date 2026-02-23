@@ -1448,7 +1448,7 @@ function getMemberSelfServicePortalHtml() {
     '</div>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var sessionToken=null;' +
     'var profileData=null;' +
 

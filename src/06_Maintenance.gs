@@ -1396,7 +1396,7 @@ function showUndoRedoPanel() {
     'function performRedo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).redoLastAction()}' +
     'function undo(i){google.script.run.withSuccessHandler(function(){location.reload()}).undoToIndex(i)}' +
     'function clearHistory(){if(confirm("Clear all history?")){google.script.run.withSuccessHandler(function(){location.reload()}).clearUndoHistory()}}' +
-    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");window.open(url,"_blank")}).exportUndoHistoryToSheet()}' +
+    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");if(/^https:\\/\\/docs\\.google\\.com\\//.test(url))window.open(url,"_blank");else alert("Invalid URL")}).exportUndoHistoryToSheet()}' +
     '</script></body></html>'
   ).setWidth(800).setHeight(600);
 
@@ -2452,7 +2452,7 @@ function calculateStewardWorkload() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
-  if (!grievanceSheet) return [];
+  if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) return [];
 
   var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.STEWARD).getValues();
 
@@ -2585,6 +2585,7 @@ function getStewardWithLowestWorkload() {
   // Also get all stewards from Config (some may have 0 cases)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet || configSheet.getLastRow() <= 1) return null;
   var stewardList = configSheet.getRange(3, CONFIG_COLS.STEWARDS, 50, 1).getValues()
     .filter(function(row) { return row[0] !== ''; })
     .map(function(row) { return row[0]; });
@@ -2748,9 +2749,6 @@ function autoFixMissingConfigValues() {
     return;
   }
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-
   // Group by config column
   var byColumn = {};
   report.autoFixable.forEach(function(item) {
@@ -2760,23 +2758,13 @@ function autoFixMissingConfigValues() {
     byColumn[item.configCol].push(item.value);
   });
 
-  // Add values to each column
+  // Add values to each column using the canonical write path
   Object.keys(byColumn).forEach(function(colStr) {
     var col = parseInt(colStr);
     var values = byColumn[col];
 
-    // Find next empty row in this column
-    var colData = configSheet.getRange(3, col, 100, 1).getValues();
-    var nextRow = 3;
-    for (var i = 0; i < colData.length; i++) {
-      if (colData[i][0] !== '') {
-        nextRow = i + 4;
-      }
-    }
-
-    // Add values
-    values.forEach(function(value, index) {
-      configSheet.getRange(nextRow + index, col).setValue(value);
+    values.forEach(function(value) {
+      addToConfigDropdown_(col, value);
     });
   });
 
@@ -3083,6 +3071,10 @@ function restoreFromArchive(grievanceIds) {
 
   if (!archiveSheet || !grievanceSheet) {
     return { restored: 0, error: 'Required sheets not found' };
+  }
+
+  if (archiveSheet.getLastRow() <= 1) {
+    return { restored: 0 };
   }
 
   var archiveData = archiveSheet.getRange(2, 1, archiveSheet.getLastRow() - 1, archiveSheet.getLastColumn()).getValues();

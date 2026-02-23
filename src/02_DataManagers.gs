@@ -40,14 +40,14 @@ function addMember(memberData) {
   var newRow = lastRow + 1;
 
   // Set member data
-  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(memberId);
-  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(memberData.firstName || '');
-  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(memberData.lastName || '');
-  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(memberData.email || '');
-  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(memberData.phone || '');
-  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(memberData.jobTitle || '');
-  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(memberData.workLocation || '');
-  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(memberData.unit || '');
+  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(escapeForFormula(memberId));
+  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(memberData.firstName || ''));
+  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(memberData.lastName || ''));
+  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(memberData.email || ''));
+  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(memberData.phone || ''));
+  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(memberData.jobTitle || ''));
+  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(memberData.workLocation || ''));
+  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(memberData.unit || ''));
 
   return memberId;
 }
@@ -81,13 +81,13 @@ function updateMember(memberId, updateData) {
   }
 
   // Update fields
-  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(updateData.firstName);
-  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(updateData.lastName);
-  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(updateData.email);
-  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(updateData.phone);
-  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(updateData.jobTitle);
-  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(updateData.workLocation);
-  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(updateData.unit);
+  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
 }
 
 /**
@@ -728,6 +728,8 @@ function removeFromConfigDropdown_(configCol, value) {
 
   if (!configSheet) return;
 
+  if (configSheet.getLastRow() < 3) return;
+
   var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
 
   for (var i = 0; i < colData.length; i++) {
@@ -1235,7 +1237,7 @@ function getImportMembersHtml_() {
     '  }' +
     '}' +
     '' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function showStatus(msg, isError) {' +
     '  var area = document.getElementById("statusArea");' +
     '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + escapeHtml(msg) + "</div>";' +
@@ -1565,33 +1567,21 @@ function startNewGrievance(grievanceData) {
     const filingDate = grievanceData.filingDate ? new Date(grievanceData.filingDate) : new Date();
     const deadlines = calculateInitialDeadlines(filingDate);
 
-    // Prepare row data
-    const rowData = [
-      grievanceId,                                    // Grievance ID
-      grievanceData.memberId || '',                   // Member ID
-      grievanceData.memberName || '',                 // Member Name
-      filingDate,                                     // Filing Date
-      grievanceData.grievanceType || '',              // Grievance Type
-      grievanceData.articleViolated || '',            // Article Violated
-      grievanceData.description || '',                // Description
-      1,                                              // Current Step (starts at 1)
-      filingDate,                                     // Step 1 Date
-      deadlines.step1Due,                             // Step 1 Due
-      'Pending',                                      // Step 1 Status
-      '',                                             // Step 2 Date
-      '',                                             // Step 2 Due
-      '',                                             // Step 2 Status
-      '',                                             // Step 3 Date
-      '',                                             // Step 3 Due
-      '',                                             // Step 3 Status
-      '',                                             // Arbitration Date
-      '',                                             // Resolution
-      GRIEVANCE_OUTCOMES.PENDING,                     // Outcome
-      '',                                             // Drive Folder
-      grievanceData.notes || '',                      // Notes
-      GRIEVANCE_STATUS.OPEN,                          // Status
-      new Date()                                      // Last Updated
-    ];
+    // Prepare row data using GRIEVANCE_COLS constants (1-indexed; subtract 1 for array)
+    const totalCols = getGrievanceHeaders().length;
+    const rowData = new Array(totalCols).fill('');
+
+    rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1]   = grievanceId;
+    rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = grievanceData.memberId || '';
+    rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = grievanceData.memberName || '';
+    rowData[GRIEVANCE_COLS.STATUS - 1]          = GRIEVANCE_STATUS.OPEN;
+    rowData[GRIEVANCE_COLS.CURRENT_STEP - 1]    = 1;
+    rowData[GRIEVANCE_COLS.DATE_FILED - 1]      = filingDate;
+    rowData[GRIEVANCE_COLS.STEP1_DUE - 1]       = deadlines.step1Due;
+    rowData[GRIEVANCE_COLS.ARTICLES - 1]        = grievanceData.articleViolated || '';
+    rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = grievanceData.grievanceType || '';
+    rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = grievanceData.notes || '';
+    rowData[GRIEVANCE_COLS.LAST_UPDATED - 1]    = new Date();
 
     // Append to sheet
     grievanceSheet.appendRow(rowData);
@@ -2036,6 +2026,12 @@ function recalcAllGrievancesBatched() {
  * @return {Object} Result object
  */
 function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
+  // Authorization check — only stewards and admins may bulk-update grievances
+  var authResult = checkWebAppAuthorization('steward');
+  if (!authResult.isAuthorized) {
+    return errorResponse(authResult.message || 'Unauthorized: steward access required', 'bulkUpdateGrievanceStatus');
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
   ensureMinimumColumns(sheet, getGrievanceHeaders().length);
@@ -2420,7 +2416,7 @@ function getNewGrievanceFormHtml() {
   // Get member list for dropdown
   const members = getMemberList();
   const memberOptions = members.map(m =>
-    `<option value="${m.id}">${m.name} (${m.department})</option>`
+    `<option value="${escapeHtml(String(m.id))}">${escapeHtml(String(m.name))} (${escapeHtml(String(m.department))})</option>`
   ).join('');
 
   return `
@@ -2639,10 +2635,10 @@ function getEditGrievanceFormHtml(grievanceId) {
     <body>
       <div class="form-container">
         <div class="info-box">
-          <strong>Grievance ID:</strong> ${grievanceId}<br>
-          <strong>Current Step:</strong> ${grievance['Current Step'] || 1}<br>
+          <strong>Grievance ID:</strong> ${escapeHtml(String(grievanceId))}<br>
+          <strong>Current Step:</strong> ${escapeHtml(String(grievance['Current Step'] || 1))}<br>
           <strong>Status:</strong> <span class="status-badge status-open">
-            ${grievance['Status'] || 'Open'}</span>
+            ${escapeHtml(String(grievance['Status'] || 'Open'))}</span>
         </div>
 
         <form id="editForm">
@@ -2669,7 +2665,7 @@ function getEditGrievanceFormHtml(grievanceId) {
       </div>
 
       <script>
-        const grievanceId = '${grievanceId}';
+        const grievanceId = ${JSON.stringify(grievanceId)};
 
         document.getElementById('editForm').addEventListener('submit', function(e) {
           e.preventDefault();

@@ -1836,7 +1836,9 @@ function saveExpansionData(memberId, customData) {
     const fieldName = fieldNames[i];
     const col = headerMap[fieldName];
     if (col && col > coreCount) {
-      updates.push({ col: col, value: customData[fieldName] });
+      var rawValue = customData[fieldName];
+      var safeValue = typeof rawValue === 'string' ? escapeForFormula(rawValue) : rawValue;
+      updates.push({ col: col, value: safeValue });
     }
   }
 
@@ -2307,8 +2309,8 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
 </head>
 <body>
   <div class="header">
-    <h2>Grievance ${grievanceId}</h2>
-    <div class="member">${reminders.memberName} • ${reminders.status}</div>
+    <h2>Grievance ${escapeHtml(grievanceId)}</h2>
+    <div class="member">${escapeHtml(reminders.memberName)} • ${escapeHtml(reminders.status)}</div>
   </div>
 
   <div class="reminder-card">
@@ -2319,7 +2321,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
     </div>
     <div class="form-group">
       <label class="form-label">Note (e.g., "Schedule Step II meeting")</label>
-      <input type="text" class="form-input" id="r1Note" value="${reminders.reminder1.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
+      <input type="text" class="form-input" id="r1Note" value="${escapeHtml(reminders.reminder1.note)}" placeholder="Brief description...">
     </div>
     <div class="btn-row">
       <button class="btn btn-clear" onclick="clearReminder(1)">Clear</button>
@@ -2334,7 +2336,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
     </div>
     <div class="form-group">
       <label class="form-label">Note</label>
-      <input type="text" class="form-input" id="r2Note" value="${reminders.reminder2.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
+      <input type="text" class="form-input" id="r2Note" value="${escapeHtml(reminders.reminder2.note)}" placeholder="Brief description...">
     </div>
     <div class="btn-row">
       <button class="btn btn-clear" onclick="clearReminder(2)">Clear</button>
@@ -2349,7 +2351,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
   </div>
 
   <script>
-    var grievanceId = '${grievanceId}';
+    var grievanceId = ${JSON.stringify(grievanceId)};
 
     function saveReminders() {
       var r1Date = document.getElementById('r1Date').value;
