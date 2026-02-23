@@ -110,7 +110,7 @@ function build() {
     totalLines += lineCount;
 
     output += `// ============================================================================\n`;
-    output += `// SOURCE: ${file} (${lineCount} lines)\n`;
+    output += `// === FILE: ${file} === (${lineCount} lines)\n`;
     output += `// ============================================================================\n\n`;
     output += content;
     output += '\n\n';

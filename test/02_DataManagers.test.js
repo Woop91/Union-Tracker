@@ -536,6 +536,7 @@ describe('addMember (mock spreadsheet)', () => {
 
     const mockRange = {
       setValue: jest.fn(),
+      setValues: jest.fn(),
       getValue: jest.fn(),
       getValues: jest.fn(() => [['']]),
       getRow: jest.fn(() => 2),
@@ -548,6 +549,7 @@ describe('addMember (mock spreadsheet)', () => {
 
     const sheet = createMockSheet(SHEETS.MEMBER_DIR, memberDirData);
     sheet.getLastRow.mockReturnValue(2);
+    sheet.getLastColumn.mockReturnValue(8);
     sheet.getRange.mockReturnValue(mockRange);
 
     const mockSS = createMockSpreadsheet([sheet]);
@@ -562,7 +564,7 @@ describe('addMember (mock spreadsheet)', () => {
 
     expect(memberId).toBe('MS-200-H');
     expect(sheet.getRange).toHaveBeenCalled();
-    expect(mockRange.setValue).toHaveBeenCalledWith('MS-200-H');
+    expect(mockRange.setValues).toHaveBeenCalled();
   });
 
   test('throws error when Member Directory sheet is not found', () => {

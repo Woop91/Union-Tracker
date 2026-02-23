@@ -217,6 +217,13 @@ function SEED_SAMPLE_DATA() {
  * Seeds both preset values (Office Days, Grievance Status, etc.) and user-configurable values
  */
 function seedConfigData() {
+  // Guard: prevent seeding in production
+  var prodMode = PropertiesService.getScriptProperties().getProperty('PROD_MODE');
+  if (prodMode === 'true') {
+    SpreadsheetApp.getUi().alert('Seed data is disabled in production mode.');
+    return;
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
 
@@ -1753,6 +1760,16 @@ function NUKE_SEEDED_DATA() {
 
   if (response2 !== ui.Button.YES) {
     return;
+  }
+
+  // Create backup snapshot before destructive operation
+  if (typeof createBackupSnapshot === 'function') {
+    try {
+      createBackupSnapshot();
+      Logger.log('Backup snapshot created before nuke operation');
+    } catch (_backupErr) {
+      Logger.log('Warning: backup snapshot failed, continuing with nuke: ' + _backupErr.message);
+    }
   }
 
   ss.toast('Nuking seeded data... This will take 3-5 minutes. Please wait!', '☢️ NUKE', 10);

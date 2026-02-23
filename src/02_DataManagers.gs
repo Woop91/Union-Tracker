@@ -39,15 +39,18 @@ function addMember(memberData) {
   var lastRow = sheet.getLastRow();
   var newRow = lastRow + 1;
 
-  // Set member data
-  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(escapeForFormula(memberId));
-  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(memberData.firstName || ''));
-  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(memberData.lastName || ''));
-  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(memberData.email || ''));
-  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(memberData.phone || ''));
-  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(memberData.jobTitle || ''));
-  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(memberData.workLocation || ''));
-  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(memberData.unit || ''));
+  // Build row array and set all member data in a single setValues() call
+  var lastCol = sheet.getLastColumn() || MEMBER_COLS.UNIT;
+  var rowData = new Array(lastCol).fill('');
+  rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
+  rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
+  rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
+  rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
+  rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
+  rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+  rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
+  rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+  sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
 
   return memberId;
 }
@@ -69,9 +72,10 @@ function updateMember(memberId, updateData) {
   var data = sheet.getDataRange().getValues();
   var memberRow = -1;
 
+  // data[] is 0-indexed; i=1 skips header. memberRow = i+1 converts to 1-indexed sheet row.
   for (var i = 1; i < data.length; i++) {
     if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
-      memberRow = i + 1;
+      memberRow = i + 1; // +1: convert 0-indexed array position to 1-indexed sheet row
       break;
     }
   }
@@ -80,14 +84,14 @@ function updateMember(memberId, updateData) {
     throw new Error('Member not found: ' + memberId);
   }
 
-  // Update fields
-  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
-  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
-  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
-  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
-  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
-  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
-  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+  // Update fields — use !== undefined to allow setting empty strings/falsy values (F17)
+  if (updateData.firstName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+  if (updateData.lastName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+  if (updateData.email !== undefined) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+  if (updateData.phone !== undefined) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+  if (updateData.jobTitle !== undefined) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+  if (updateData.workLocation !== undefined) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+  if (updateData.unit !== undefined) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
 }
 
 /**
@@ -882,9 +886,14 @@ function compactConfigColumn_(configCol) {
 
 /**
  * Updates member data in batch mode for better performance
- * Reads all data once, modifies in memory, writes back in one operation
+ * Reads all data once, modifies in memory, writes back the changed row in one
+ * setValues() call. This is the preferred update path when multiple fields change
+ * together (e.g., self-service profile updates, bulk imports). For single-field
+ * updates from the UI, updateMember() is simpler.
+ *
  * @param {string} memberId - The member ID to update
- * @param {Object} newValuesObj - Object with field values to update
+ * @param {Object} newValuesObj - Object with field values to update (keys: email, phone, firstName, lastName, unit, workLocation, isSteward)
+ * @returns {boolean} True if the member was found and updated
  */
 function updateMemberDataBatch(memberId, newValuesObj) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1488,6 +1497,16 @@ function importMembersBatch(batchData, mapping) {
  */
 function showExportMembersDialog() {
   var ui = SpreadsheetApp.getUi();
+
+  // PII export requires steward or admin role
+  if (typeof validateRole === 'function') {
+    var roleCheck = validateRole('steward');
+    if (!roleCheck) {
+      ui.alert('Access Denied', 'Exporting member data requires Steward or Admin access.', ui.ButtonSet.OK);
+      return;
+    }
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 

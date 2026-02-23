@@ -48,29 +48,17 @@ function onOpen() {
       console.log('Column sync skipped: ' + syncError.message);
     }
 
-    // Ensure all primary sheets have enough columns for current header maps.
-    // This prevents "columns are out of bounds" errors when sheets were
-    // created by an older version with fewer columns.
+    // Defer non-critical initialization to avoid blocking onOpen() (30s limit).
+    // Tab colors, hidden sheet enforcement, and column checks run after 2s.
     try {
-      ensureAllSheetColumns_();
-    } catch (colError) {
-      console.log('Column check skipped: ' + colError.message);
-    }
-
-    // Apply tab colors automatically on open
-    try {
-      if (typeof applyTabColors_ === 'function') {
-        applyTabColors_(ss);
-      }
-    } catch (tabError) {
-      console.log('Tab colors not applied: ' + tabError.message);
-    }
-
-    // Enforce hidden sheets on every open (prevents mobile visibility)
-    try {
-      enforceHiddenSheets();
-    } catch (hideError) {
-      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+      ScriptApp.newTrigger('onOpenDeferred_')
+        .timeBased()
+        .after(2000)
+        .create();
+    } catch (deferErr) {
+      // Fallback: run synchronously if trigger creation fails
+      console.log('Deferred trigger failed, running synchronously: ' + deferErr.message);
+      onOpenDeferred_();
     }
 
     // Show welcome toast
@@ -87,6 +75,46 @@ function onOpen() {
       .createMenu('Union Dashboard')
       .addItem('Initialize Dashboard', 'initializeDashboard')
       .addToUi();
+  }
+}
+
+/**
+ * Deferred onOpen tasks — runs via a one-shot timed trigger to avoid
+ * blocking the simple onOpen trigger (which has a 30s execution limit).
+ * Cleans up its own trigger after running.
+ * @private
+ */
+function onOpenDeferred_() {
+  // Clean up the one-shot trigger that invoked us
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var t = 0; t < triggers.length; t++) {
+      if (triggers[t].getHandlerFunction() === 'onOpenDeferred_') {
+        ScriptApp.deleteTrigger(triggers[t]);
+      }
+    }
+  } catch (_e) { /* ignore cleanup errors */ }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    ensureAllSheetColumns_();
+  } catch (colError) {
+    console.log('Column check skipped: ' + colError.message);
+  }
+
+  try {
+    if (typeof applyTabColors_ === 'function') {
+      applyTabColors_(ss);
+    }
+  } catch (tabError) {
+    console.log('Tab colors not applied: ' + tabError.message);
+  }
+
+  try {
+    enforceHiddenSheets();
+  } catch (hideError) {
+    console.log('Hidden sheet enforcement skipped: ' + hideError.message);
   }
 }
 
@@ -1086,10 +1114,21 @@ function removeTriggers() {
 // ============================================================================
 
 /**
- * Shows the searchable Help Guide modal with menu breakdown and FAQ
+ * Shows the searchable Help Guide modal with menu breakdown and FAQ.
+ * HTML is cached for 10 minutes to avoid regenerating the large template on repeat opens.
  * v4.3.7 - Complete rewrite with search, menu reference, and FAQ
  */
 function showHelpDialog() {
+  var cache = CacheService.getScriptCache();
+  var cachedHtml = cache.get('help_html');
+  if (cachedHtml) {
+    var output = HtmlService.createHtmlOutput(cachedHtml)
+      .setWidth(500)
+      .setHeight(700);
+    SpreadsheetApp.getUi().showModalDialog(output, '📖 Help Guide');
+    return;
+  }
+
   const html = HtmlService.createHtmlOutput(`
     <!DOCTYPE html>
     <html>
@@ -1545,6 +1584,11 @@ function showHelpDialog() {
     </body>
     </html>
   `).setWidth(700).setHeight(750);
+
+  // Cache the generated HTML for 10 minutes (600 seconds)
+  try {
+    cache.put('help_html', html.getContent(), 600);
+  } catch (_cacheErr) { /* HTML may exceed cache limit — skip caching */ }
 
   SpreadsheetApp.getUi().showModalDialog(html, '📖 Help & Features Guide - Dashboard v' + VERSION_INFO.CURRENT + ' (' + VERSION_INFO.BUILD_DATE + ')');
 }

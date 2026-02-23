@@ -63,20 +63,25 @@ function getOrCreateRootFolder() {
   }
 
   // Create the root folder
-  const newFolder = DriveApp.createFolder(folderName);
-  props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
+  try {
+    const newFolder = DriveApp.createFolder(folderName);
+    props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
 
-  // Set folder color/description
-  newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
+    // Set folder color/description
+    newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
 
-  logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
-    folderId: newFolder.getId(),
-    folderName: folderName,
-    type: 'ROOT',
-    createdBy: Session.getActiveUser().getEmail()
-  });
+    logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
+      folderId: newFolder.getId(),
+      folderName: folderName,
+      type: 'ROOT',
+      createdBy: Session.getActiveUser().getEmail()
+    });
 
-  return newFolder;
+    return newFolder;
+  } catch (err) {
+    Logger.log('Failed to create Drive folder "' + folderName + '": ' + err.message);
+    return null;
+  }
 }
 
 /**
@@ -475,7 +480,13 @@ function createMeetingCalendarEvent(meetingData) {
 
     return event.getId();
   } catch (error) {
-    Logger.log('Error creating meeting calendar event: ' + error.message);
+    // Check for quota-exceeded errors specifically
+    var msg = error.message || '';
+    if (msg.indexOf('quota') !== -1 || msg.indexOf('Calendar usage limits') !== -1) {
+      Logger.log('Calendar quota exceeded: ' + msg);
+    } else {
+      Logger.log('Error creating meeting calendar event: ' + msg);
+    }
     return '';
   }
 }
@@ -2960,7 +2971,13 @@ function addMobileDashboardLinkToConfig() {
 // ============================================================================
 
 /**
- * Constant Contact API configuration
+ * Constant Contact API configuration.
+ *
+ * Known limitation: This integration uses a manual OAuth2 flow (paste-back
+ * authorization code) because Google Apps Script doesn't support standard
+ * OAuth2 redirect URIs. The access token is refreshed automatically, but the
+ * initial setup requires user interaction.
+ *
  * @const {Object}
  */
 var CC_CONFIG = {
