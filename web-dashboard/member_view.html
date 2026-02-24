@@ -98,11 +98,13 @@ function renderMemberHome(container) {
   var res = el('div', { className: 'content' });
   res.appendChild(el('h3', { className: 'section-title' }, 'Resources'));
   [
-    { icon: '\u{1F4D6}', label: 'Know Your Rights', sub: 'Contract highlights' },
-    { icon: '\u{1F4DD}', label: 'File a Grievance', sub: 'Start a new case' },
-    { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
+    { icon: '\u{1F4D6}', label: 'Know Your Rights', sub: 'Contract highlights', url: null },
+    { icon: '\u{1F4DD}', label: 'File a Grievance', sub: 'Start a new case', url: CONFIG.grievanceFormUrl || null },
+    { icon: '\u2753', label: 'FAQ', sub: 'Common questions', url: null },
   ].forEach(function(r) {
-    var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' } });
+    var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
+      onClick: r.url ? function() { window.open(r.url, '_blank'); } : null
+    });
     item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
     var tg = el('div', { style: { flex: '1' } });
     tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));

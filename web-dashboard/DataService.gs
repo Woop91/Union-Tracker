@@ -1,415 +1,412 @@
 /**
  * DataService.gs
- * Data access layer for the web app dashboard.
+ * Data access layer matching the ACTUAL sheet schema.
  * 
- * Reads from:
- *   - Member Directory sheet
- *   - Grievance Log sheet
+ * MEMBER DIRECTORY COLUMNS:
+ *   Member ID, First Name, Last Name, Job Title, Work Location, Unit,
+ *   Cubicle, Office Days, Email, Phone, Open Rate %, Preferred Communication,
+ *   Best Time to Contact, Supervisor, Manager, Is Steward (Yes/No),
+ *   Committees, Assigned Steward, Last Virtual Mtg, Last In-Person Mtg,
+ *   Volunteer Hours, Interest: Local/Chapter/Allied, Recent Contact Date,
+ *   Contact Steward, Contact Notes, Has Open Grievance?, Grievance Status,
+ *   Days to Deadline, Start Grievance, Actions, PIN Hash, Employee ID,
+ *   Department, Hire Date
  * 
- * All column positions are resolved dynamically by header name.
- * NEVER hardcode column indices.
+ * GRIEVANCE LOG COLUMNS:
+ *   Grievance ID, Member ID, First Name, Last Name, Status, Current Step,
+ *   Incident Date, Filing Deadline, Date Filed, Step I Due, Step I Rcvd,
+ *   Step II Appeal Due, Step II Appeal Filed, Step II Due, Step II Rcvd,
+ *   Step III Appeal Due, Step III Appeal Filed, Date Closed, Days Open,
+ *   Next Action Due, Days to Deadline, Articles Violated, Issue Category,
+ *   Member Email, Work Location, Assigned Steward, Resolution,
+ *   Message Alert, Coordinator Message, Acknowledged By, Acknowledged Date,
+ *   Drive Folder ID, Drive Folder URL, Actions, Action Type,
+ *   Checklist Progress, Reminder 1/2 Date/Note, Last Updated
  * 
- * Access control:
- *   - Stewards see all cases assigned to them
- *   - Members see only their own grievances
- *   - No member PII is exposed to other members
+ * ALL COLUMN LOOKUPS BY HEADER NAME — NEVER BY INDEX.
  */
 
 var DataService = (function () {
   
-  // Sheet names — read from Config if available, fallback to defaults
   var MEMBER_SHEET = 'Member Directory';
   var GRIEVANCE_SHEET = 'Grievance Log';
   
-  // Header name mappings — these are the expected header labels
-  // If your sheet uses different labels, update these OR add aliases
-  var HEADERS = {
-    // Member Directory
-    memberEmail:     ['email', 'email address', 'member email'],
-    memberName:      ['name', 'full name', 'member name'],
-    memberFirstName: ['first name', 'first'],
-    memberLastName:  ['last name', 'last'],
-    memberRole:      ['role', 'member role', 'type'],
-    memberUnit:      ['unit', 'workplace unit', 'department'],
-    memberPhone:     ['phone', 'phone number', 'cell', 'mobile'],
-    memberJoined:    ['joined', 'join date', 'member since', 'date joined'],
-    memberDuesStatus:['dues status', 'dues', 'status'],
-    memberId:        ['member id', 'id', 'member number'],
-    
-    // Grievance Log
-    grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
-    grievanceMemberEmail: ['member email', 'email', 'filed by email', 'grievant email'],
-    grievanceStatus: ['status', 'grievance status', 'case status'],
-    grievanceStep:   ['step', 'current step', 'grievance step'],
-    grievanceDeadline: ['deadline', 'next deadline', 'due date'],
-    grievanceFiled:  ['filed', 'filed date', 'date filed', 'created'],
-    grievanceSteward:['steward', 'assigned steward', 'steward email', 'assigned to'],
-    grievanceUnit:   ['unit', 'workplace unit'],
-    grievancePriority: ['priority', 'urgency'],
-    grievanceNotes:  ['notes', 'description', 'summary'],
+  // Header aliases — first match wins
+  var MH = {
+    memberId:      ['member id'],
+    firstName:     ['first name'],
+    lastName:      ['last name'],
+    jobTitle:      ['job title'],
+    workLocation:  ['work location'],
+    unit:          ['unit'],
+    cubicle:       ['cubicle'],
+    officeDays:    ['office days'],
+    email:         ['email'],
+    phone:         ['phone'],
+    openRate:      ['open rate %', 'open rate'],
+    prefComm:      ['preferred communication'],
+    bestTime:      ['best time to contact'],
+    supervisor:    ['supervisor'],
+    manager:       ['manager'],
+    isSteward:     ['is steward'],
+    committees:    ['committees'],
+    assignedSteward: ['assigned steward'],
+    lastVirtual:   ['last virtual mtg'],
+    lastInPerson:  ['last in-person mtg'],
+    volunteerHrs:  ['volunteer hours'],
+    intLocal:      ['interest: local'],
+    intChapter:    ['interest: chapter'],
+    intAllied:     ['interest: allied'],
+    recentContact: ['recent contact date'],
+    contactSteward:['contact steward'],
+    contactNotes:  ['contact notes'],
+    hasOpenGrievance: ['has open grievance?', 'has open grievance'],
+    grievanceStatus:  ['grievance status'],
+    daysToDeadline:   ['days to deadline'],
+    pinHash:       ['pin hash'],
+    employeeId:    ['employee id'],
+    department:    ['department'],
+    hireDate:      ['hire date'],
+  };
+  
+  var GH = {
+    grievanceId:   ['grievance id'],
+    memberId:      ['member id'],
+    firstName:     ['first name'],
+    lastName:      ['last name'],
+    status:        ['status'],
+    currentStep:   ['current step'],
+    incidentDate:  ['incident date'],
+    filingDeadline:['filing deadline'],
+    dateFiled:     ['date filed'],
+    stepIDue:      ['step i due'],
+    stepIRcvd:     ['step i rcvd'],
+    stepIIAppealDue:  ['step ii appeal due'],
+    stepIIAppealFiled:['step ii appeal filed'],
+    stepIIDue:     ['step ii due'],
+    stepIIRcvd:    ['step ii rcvd'],
+    stepIIIAppealDue: ['step iii appeal due'],
+    stepIIIAppealFiled:['step iii appeal filed'],
+    dateClosed:    ['date closed'],
+    daysOpen:      ['days open'],
+    nextActionDue: ['next action due'],
+    daysToDeadline:['days to deadline'],
+    articlesViolated:['articles violated'],
+    issueCategory: ['issue category'],
+    memberEmail:   ['member email'],
+    workLocation:  ['work location'],
+    assignedSteward:['assigned steward'],
+    resolution:    ['resolution'],
+    messageAlert:  ['message alert'],
+    coordMessage:  ['coordinator message'],
+    ackedBy:       ['acknowledged by'],
+    ackedDate:     ['acknowledged date'],
+    driveFolderId: ['drive folder id'],
+    driveFolderUrl:['drive folder url'],
+    actionType:    ['action type'],
+    checklistProgress:['checklist progress'],
+    reminder1Date: ['reminder 1 date'],
+    reminder1Note: ['reminder 1 note'],
+    reminder2Date: ['reminder 2 date'],
+    reminder2Note: ['reminder 2 note', 'eminder 2 note'], // handles typo in sheet
+    lastUpdated:   ['last updated'],
   };
   
   // ═══════════════════════════════════════
-  // PUBLIC: User Lookup
+  // COLUMN HELPERS
   // ═══════════════════════════════════════
   
-  /**
-   * Finds a user in the Member Directory by email.
-   * Returns sanitized user record or null.
-   * @param {string} email
-   * @returns {Object|null}
-   */
+  function _colMap(headers) {
+    var m = {};
+    for (var i = 0; i < headers.length; i++) {
+      var h = String(headers[i]).trim().toLowerCase();
+      if (h) m[h] = i;
+    }
+    return m;
+  }
+  
+  function _col(cm, aliases) {
+    for (var i = 0; i < aliases.length; i++) {
+      var k = aliases[i].toLowerCase();
+      if (cm.hasOwnProperty(k)) return cm[k];
+    }
+    return -1;
+  }
+  
+  function _val(row, cm, aliases, def) {
+    var c = _col(cm, aliases);
+    if (c === -1 || c >= row.length) return def !== undefined ? def : '';
+    var v = row[c];
+    return (v === null || v === undefined) ? (def !== undefined ? def : '') : v;
+  }
+  
+  function _str(row, cm, aliases, def) { return String(_val(row, cm, aliases, def || '')).trim(); }
+  function _date(row, cm, aliases) {
+    var v = _val(row, cm, aliases, null);
+    if (!v) return null;
+    if (v instanceof Date) return v;
+    var d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function _fmtDate(d) {
+    if (!d) return '';
+    var m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return m[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+  function _daysUntil(d) {
+    if (!d) return null;
+    return Math.ceil((d.getTime() - Date.now()) / 86400000);
+  }
+  
+  // ═══════════════════════════════════════
+  // USER LOOKUP
+  // ═══════════════════════════════════════
+  
   function findUserByEmail(email) {
     if (!email) return null;
     email = String(email).trim().toLowerCase();
-    
-    var sheet = _getSheet(MEMBER_SHEET);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MEMBER_SHEET);
     if (!sheet) return null;
-    
     var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var colMap = _buildColumnMap(headers);
-    
-    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
-    if (emailCol === -1) return null;
+    var cm = _colMap(data[0]);
+    var ec = _col(cm, MH.email);
+    if (ec === -1) return null;
     
     for (var i = 1; i < data.length; i++) {
-      var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
-      if (rowEmail === email) {
-        return _buildUserRecord(data[i], colMap);
+      if (String(data[i][ec]).trim().toLowerCase() === email) {
+        return _buildUser(data[i], cm);
       }
     }
-    
     return null;
   }
   
-  /**
-   * Returns the role for a given email.
-   * @param {string} email
-   * @returns {string|null} 'steward', 'member', 'both', or null
-   */
   function getUserRole(email) {
-    var user = findUserByEmail(email);
-    if (!user) return null;
-    return user.role;
+    var u = findUserByEmail(email);
+    if (!u) return null;
+    // "Is Steward" is Yes/No. Stewards are always also members.
+    return u.isSteward ? 'both' : 'member';
+  }
+  
+  function _buildUser(row, cm) {
+    var isStewardVal = _str(row, cm, MH.isSteward, 'no').toLowerCase();
+    var isSteward = (isStewardVal === 'yes' || isStewardVal === 'true' || isStewardVal === '1');
+    
+    return {
+      memberId:      _str(row, cm, MH.memberId),
+      firstName:     _str(row, cm, MH.firstName),
+      lastName:      _str(row, cm, MH.lastName),
+      name:          (_str(row, cm, MH.firstName) + ' ' + _str(row, cm, MH.lastName)).trim(),
+      email:         _str(row, cm, MH.email).toLowerCase(),
+      phone:         _str(row, cm, MH.phone) || null,
+      jobTitle:      _str(row, cm, MH.jobTitle),
+      workLocation:  _str(row, cm, MH.workLocation),
+      unit:          _str(row, cm, MH.unit),
+      department:    _str(row, cm, MH.department),
+      officeDays:    _str(row, cm, MH.officeDays),
+      supervisor:    _str(row, cm, MH.supervisor),
+      manager:       _str(row, cm, MH.manager),
+      isSteward:     isSteward,
+      committees:    _str(row, cm, MH.committees),
+      assignedSteward: _str(row, cm, MH.assignedSteward),
+      hireDate:      _str(row, cm, MH.hireDate),
+      employeeId:    _str(row, cm, MH.employeeId),
+      duesStatus:    'Current', // Not in your schema — placeholder
+      hasOpenGrievance: _str(row, cm, MH.hasOpenGrievance).toLowerCase() === 'yes',
+      grievanceStatus: _str(row, cm, MH.grievanceStatus),
+      prefComm:      _str(row, cm, MH.prefComm),
+    };
   }
   
   // ═══════════════════════════════════════
-  // PUBLIC: Steward Data
+  // STEWARD: CASES
   // ═══════════════════════════════════════
   
-  /**
-   * Returns all grievances assigned to a steward.
-   * @param {string} stewardEmail
-   * @returns {Object[]} Array of grievance records
-   */
-  function getStewardCases(stewardEmail) {
-    stewardEmail = String(stewardEmail).trim().toLowerCase();
-    
-    var sheet = _getSheet(GRIEVANCE_SHEET);
+  function getStewardCases(stewardIdentifier) {
+    // "Assigned Steward" in grievance log could be name or email
+    var id = String(stewardIdentifier).trim().toLowerCase();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(GRIEVANCE_SHEET);
     if (!sheet) return [];
-    
     var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var colMap = _buildColumnMap(headers);
-    
-    var stewardCol = _findColumn(colMap, HEADERS.grievanceSteward);
-    if (stewardCol === -1) {
-      Logger.log('DataService: Steward column not found in Grievance Log');
-      return [];
-    }
+    var cm = _colMap(data[0]);
+    var sc = _col(cm, GH.assignedSteward);
+    if (sc === -1) return [];
     
     var cases = [];
     for (var i = 1; i < data.length; i++) {
-      var assignedTo = String(data[i][stewardCol]).trim().toLowerCase();
-      if (assignedTo === stewardEmail) {
-        cases.push(_buildGrievanceRecord(data[i], colMap));
+      var assigned = String(data[i][sc]).trim().toLowerCase();
+      // Match on email OR name (in case column stores names)
+      if (assigned === id || assigned.indexOf(id.split('@')[0]) > -1) {
+        cases.push(_buildGrievance(data[i], cm));
       }
     }
     
-    // Sort: overdue first, then by deadline ascending
-    cases.sort(function (a, b) {
+    cases.sort(function(a, b) {
       if (a.status === 'overdue' && b.status !== 'overdue') return -1;
       if (b.status === 'overdue' && a.status !== 'overdue') return 1;
-      return (a.deadlineDays || 999) - (b.deadlineDays || 999);
+      return (a.daysToDeadline || 999) - (b.daysToDeadline || 999);
     });
     
     return cases;
   }
   
-  /**
-   * Returns KPIs for a steward's personal caseload.
-   * @param {string} stewardEmail
-   * @returns {Object} { totalCases, overdue, dueSoon, resolved }
-   */
-  function getStewardKPIs(stewardEmail) {
-    var cases = getStewardCases(stewardEmail);
-    
-    var now = new Date();
-    var sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    
-    var total = cases.length;
-    var overdue = 0;
-    var dueSoon = 0;
-    var resolved = 0;
-    var active = 0;
-    
-    for (var i = 0; i < cases.length; i++) {
-      var c = cases[i];
-      var status = String(c.status).toLowerCase();
-      
-      if (status === 'resolved') {
-        resolved++;
-      } else if (status === 'overdue') {
-        overdue++;
-      } else {
-        active++;
-        if (c.deadlineDays !== null && c.deadlineDays <= 7 && c.deadlineDays > 0) {
-          dueSoon++;
-        }
+  function getStewardKPIs(stewardIdentifier) {
+    var cases = getStewardCases(stewardIdentifier);
+    var r = { totalCases: cases.length, activeCases: 0, overdue: 0, dueSoon: 0, resolved: 0 };
+    cases.forEach(function(c) {
+      var s = c.status.toLowerCase();
+      if (s === 'resolved' || s === 'closed') r.resolved++;
+      else if (s === 'overdue') r.overdue++;
+      else {
+        r.activeCases++;
+        if (c.daysToDeadline !== null && c.daysToDeadline <= 7 && c.daysToDeadline > 0) r.dueSoon++;
       }
-    }
-    
-    return {
-      totalCases: total,
-      activeCases: active,
-      overdue: overdue,
-      dueSoon: dueSoon,
-      resolved: resolved,
-    };
-  }
-  
-  // ═══════════════════════════════════════
-  // PUBLIC: Member Data
-  // ═══════════════════════════════════════
-  
-  /**
-   * Returns grievances for a specific member (their own only).
-   * @param {string} memberEmail
-   * @returns {Object[]} Array of grievance records
-   */
-  function getMemberGrievances(memberEmail) {
-    memberEmail = String(memberEmail).trim().toLowerCase();
-    
-    var sheet = _getSheet(GRIEVANCE_SHEET);
-    if (!sheet) return [];
-    
-    var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var colMap = _buildColumnMap(headers);
-    
-    var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
-    if (memberCol === -1) return [];
-    
-    var grievances = [];
-    for (var i = 1; i < data.length; i++) {
-      var rowEmail = String(data[i][memberCol]).trim().toLowerCase();
-      if (rowEmail === memberEmail) {
-        grievances.push(_buildGrievanceRecord(data[i], colMap));
-      }
-    }
-    
-    // Sort by filed date, most recent first
-    grievances.sort(function (a, b) {
-      return (b.filedTimestamp || 0) - (a.filedTimestamp || 0);
     });
-    
-    return grievances;
-  }
-  
-  /**
-   * Returns steward contact info for a member.
-   * Only returns email (always) and phone (if listed).
-   * @param {string} stewardEmail
-   * @returns {Object|null} { name, email, phone }
-   */
-  function getStewardContact(stewardEmail) {
-    if (!stewardEmail) return null;
-    var user = findUserByEmail(stewardEmail);
-    if (!user) return null;
-    
-    return {
-      name: user.name || user.firstName + ' ' + user.lastName,
-      email: user.email,
-      phone: user.phone || null, // Only if listed
-    };
+    return r;
   }
   
   // ═══════════════════════════════════════
-  // PUBLIC: Shared Data (non-PII)
+  // MEMBER: GRIEVANCES
   // ═══════════════════════════════════════
   
-  /**
-   * Returns the list of units from the directory (no PII).
-   * Useful for filter dropdowns.
-   * @returns {string[]} Unique unit names
-   */
-  function getUnits() {
-    var sheet = _getSheet(MEMBER_SHEET);
+  function getMemberGrievances(memberEmail) {
+    var email = String(memberEmail).trim().toLowerCase();
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(GRIEVANCE_SHEET);
     if (!sheet) return [];
-    
     var data = sheet.getDataRange().getValues();
-    var colMap = _buildColumnMap(data[0]);
-    var unitCol = _findColumn(colMap, HEADERS.memberUnit);
-    if (unitCol === -1) return [];
+    var cm = _colMap(data[0]);
+    var ec = _col(cm, GH.memberEmail);
+    if (ec === -1) return [];
     
-    var units = {};
+    var out = [];
     for (var i = 1; i < data.length; i++) {
-      var unit = String(data[i][unitCol]).trim();
-      if (unit) units[unit] = true;
+      if (String(data[i][ec]).trim().toLowerCase() === email) {
+        out.push(_buildGrievance(data[i], cm));
+      }
     }
-    
-    return Object.keys(units).sort();
+    out.sort(function(a, b) { return (b.dateFiledTs || 0) - (a.dateFiledTs || 0); });
+    return out;
   }
   
   // ═══════════════════════════════════════
-  // PRIVATE: Sheet & Column Helpers
+  // STEWARD CONTACT
   // ═══════════════════════════════════════
   
-  function _getSheet(name) {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(name);
-    if (!sheet) {
-      Logger.log('DataService: Sheet "' + name + '" not found.');
-    }
-    return sheet;
-  }
-  
-  /**
-   * Builds a map of normalized header names to column indices.
-   * @param {Array} headerRow
-   * @returns {Object} { normalizedName: columnIndex }
-   */
-  function _buildColumnMap(headerRow) {
-    var map = {};
-    for (var i = 0; i < headerRow.length; i++) {
-      var normalized = String(headerRow[i]).trim().toLowerCase();
-      if (normalized) {
-        map[normalized] = i;
+  function getStewardContact(stewardIdentifier) {
+    if (!stewardIdentifier) return null;
+    var id = String(stewardIdentifier).trim().toLowerCase();
+    
+    // Try email lookup first
+    var user = findUserByEmail(id);
+    if (user) return { name: user.name, email: user.email, phone: user.phone };
+    
+    // If not email, search by name
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MEMBER_SHEET);
+    if (!sheet) return null;
+    var data = sheet.getDataRange().getValues();
+    var cm = _colMap(data[0]);
+    var fnCol = _col(cm, MH.firstName);
+    var lnCol = _col(cm, MH.lastName);
+    
+    for (var i = 1; i < data.length; i++) {
+      var fullName = (String(data[i][fnCol] || '') + ' ' + String(data[i][lnCol] || '')).trim().toLowerCase();
+      if (fullName === id) {
+        var u = _buildUser(data[i], cm);
+        return { name: u.name, email: u.email, phone: u.phone };
       }
     }
-    return map;
+    return null;
   }
   
-  /**
-   * Finds a column index given an array of possible header names.
-   * Returns the index of the first match, or -1 if none found.
-   * @param {Object} colMap - from _buildColumnMap
-   * @param {string[]} aliases - possible header names
-   * @returns {number} Column index or -1
-   */
-  function _findColumn(colMap, aliases) {
-    for (var i = 0; i < aliases.length; i++) {
-      var key = aliases[i].toLowerCase();
-      if (colMap.hasOwnProperty(key)) {
-        return colMap[key];
-      }
-    }
-    return -1;
-  }
+  // ═══════════════════════════════════════
+  // BUILD GRIEVANCE RECORD
+  // ═══════════════════════════════════════
   
-  /**
-   * Safe getter — returns cell value or default
-   */
-  function _getVal(row, colMap, aliases, defaultVal) {
-    var col = _findColumn(colMap, aliases);
-    if (col === -1 || col >= row.length) return defaultVal !== undefined ? defaultVal : '';
-    var val = row[col];
-    return (val === null || val === undefined) ? (defaultVal !== undefined ? defaultVal : '') : val;
-  }
-  
-  function _buildUserRecord(row, colMap) {
-    var firstName = String(_getVal(row, colMap, HEADERS.memberFirstName, '')).trim();
-    var lastName = String(_getVal(row, colMap, HEADERS.memberLastName, '')).trim();
-    var fullName = String(_getVal(row, colMap, HEADERS.memberName, '')).trim();
+  function _buildGrievance(row, cm) {
+    var nextActionDue = _date(row, cm, GH.nextActionDue);
+    var dtd = _val(row, cm, GH.daysToDeadline, null);
+    var daysToDeadline = (dtd !== null && dtd !== '') ? parseInt(dtd, 10) : _daysUntil(nextActionDue);
     
-    if (!fullName && (firstName || lastName)) {
-      fullName = (firstName + ' ' + lastName).trim();
-    }
-    
-    var roleRaw = String(_getVal(row, colMap, HEADERS.memberRole, 'member')).trim().toLowerCase();
-    // Normalize role
-    var role = 'member';
-    if (roleRaw === 'steward' || roleRaw === 'rep' || roleRaw === 'representative') role = 'steward';
-    if (roleRaw === 'both' || roleRaw === 'steward/member') role = 'both';
-    
-    return {
-      email: String(_getVal(row, colMap, HEADERS.memberEmail, '')).trim().toLowerCase(),
-      name: fullName,
-      firstName: firstName,
-      lastName: lastName,
-      role: role,
-      unit: String(_getVal(row, colMap, HEADERS.memberUnit, '')).trim(),
-      phone: String(_getVal(row, colMap, HEADERS.memberPhone, '')).trim() || null,
-      joined: _getVal(row, colMap, HEADERS.memberJoined, ''),
-      duesStatus: String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim(),
-      memberId: String(_getVal(row, colMap, HEADERS.memberId, '')).trim(),
-    };
-  }
-  
-  function _buildGrievanceRecord(row, colMap) {
-    var deadlineRaw = _getVal(row, colMap, HEADERS.grievanceDeadline, null);
-    var deadlineDays = null;
-    var deadlineFormatted = '—';
-    
-    if (deadlineRaw && deadlineRaw instanceof Date) {
-      var now = new Date();
-      var diff = deadlineRaw.getTime() - now.getTime();
-      deadlineDays = Math.ceil(diff / (24 * 60 * 60 * 1000));
-      deadlineFormatted = _formatDate(deadlineRaw);
-    } else if (deadlineRaw) {
-      var parsed = new Date(deadlineRaw);
-      if (!isNaN(parsed.getTime())) {
-        var now = new Date();
-        var diff = parsed.getTime() - now.getTime();
-        deadlineDays = Math.ceil(diff / (24 * 60 * 60 * 1000));
-        deadlineFormatted = _formatDate(parsed);
-      }
-    }
-    
-    var filedRaw = _getVal(row, colMap, HEADERS.grievanceFiled, null);
-    var filedFormatted = '';
-    var filedTimestamp = 0;
-    if (filedRaw && filedRaw instanceof Date) {
-      filedFormatted = _formatDate(filedRaw);
-      filedTimestamp = filedRaw.getTime();
-    } else if (filedRaw) {
-      var parsed = new Date(filedRaw);
-      if (!isNaN(parsed.getTime())) {
-        filedFormatted = _formatDate(parsed);
-        filedTimestamp = parsed.getTime();
-      }
-    }
-    
-    var status = String(_getVal(row, colMap, HEADERS.grievanceStatus, 'new')).trim().toLowerCase();
-    
-    // Auto-detect overdue if deadline is past and status is active
-    if (deadlineDays !== null && deadlineDays < 0 && status !== 'resolved') {
+    var status = _str(row, cm, GH.status, 'new').toLowerCase();
+    if (daysToDeadline !== null && daysToDeadline < 0 && status !== 'resolved' && status !== 'closed') {
       status = 'overdue';
     }
     
+    var dateFiled = _date(row, cm, GH.dateFiled);
+    
+    // Build timeline from actual step dates
+    var timeline = [];
+    
+    if (dateFiled) timeline.push({ date: _fmtDate(dateFiled), event: 'Grievance filed', done: true });
+    
+    var s1Due = _date(row, cm, GH.stepIDue);
+    var s1Rcvd = _date(row, cm, GH.stepIRcvd);
+    if (s1Due) timeline.push({ date: _fmtDate(s1Due), event: 'Step I response due', done: !!s1Rcvd });
+    if (s1Rcvd) timeline.push({ date: _fmtDate(s1Rcvd), event: 'Step I response received', done: true });
+    
+    var s2AppDue = _date(row, cm, GH.stepIIAppealDue);
+    var s2AppFiled = _date(row, cm, GH.stepIIAppealFiled);
+    if (s2AppDue) timeline.push({ date: _fmtDate(s2AppDue), event: 'Step II appeal due', done: !!s2AppFiled });
+    if (s2AppFiled) timeline.push({ date: _fmtDate(s2AppFiled), event: 'Step II appeal filed', done: true });
+    
+    var s2Due = _date(row, cm, GH.stepIIDue);
+    var s2Rcvd = _date(row, cm, GH.stepIIRcvd);
+    if (s2Due) timeline.push({ date: _fmtDate(s2Due), event: 'Step II response due', done: !!s2Rcvd });
+    if (s2Rcvd) timeline.push({ date: _fmtDate(s2Rcvd), event: 'Step II response received', done: true });
+    
+    var s3AppDue = _date(row, cm, GH.stepIIIAppealDue);
+    var s3AppFiled = _date(row, cm, GH.stepIIIAppealFiled);
+    if (s3AppDue) timeline.push({ date: _fmtDate(s3AppDue), event: 'Step III appeal due', done: !!s3AppFiled });
+    if (s3AppFiled) timeline.push({ date: _fmtDate(s3AppFiled), event: 'Step III appeal filed', done: true });
+    
+    var closed = _date(row, cm, GH.dateClosed);
+    if (closed) timeline.push({ date: _fmtDate(closed), event: 'Case closed', done: true });
+    
+    // Next action
+    if (nextActionDue && !closed) {
+      var exists = timeline.some(function(t) { return t.date === _fmtDate(nextActionDue) && !t.done; });
+      if (!exists) {
+        timeline.push({ date: _fmtDate(nextActionDue), event: 'Next action due', done: false });
+      }
+    }
+    
     return {
-      id: String(_getVal(row, colMap, HEADERS.grievanceId, '')).trim(),
-      memberEmail: String(_getVal(row, colMap, HEADERS.grievanceMemberEmail, '')).trim().toLowerCase(),
-      status: status,
-      step: String(_getVal(row, colMap, HEADERS.grievanceStep, '')).trim(),
-      deadline: deadlineFormatted,
-      deadlineDays: deadlineDays,
-      filed: filedFormatted,
-      filedTimestamp: filedTimestamp,
-      steward: String(_getVal(row, colMap, HEADERS.grievanceSteward, '')).trim().toLowerCase(),
-      unit: String(_getVal(row, colMap, HEADERS.grievanceUnit, '')).trim(),
-      priority: String(_getVal(row, colMap, HEADERS.grievancePriority, 'medium')).trim().toLowerCase(),
-      notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
+      id:             _str(row, cm, GH.grievanceId),
+      memberId:       _str(row, cm, GH.memberId),
+      memberName:     (_str(row, cm, GH.firstName) + ' ' + _str(row, cm, GH.lastName)).trim(),
+      memberEmail:    _str(row, cm, GH.memberEmail).toLowerCase(),
+      status:         status,
+      step:           _str(row, cm, GH.currentStep),
+      incidentDate:   _fmtDate(_date(row, cm, GH.incidentDate)),
+      filingDeadline: _fmtDate(_date(row, cm, GH.filingDeadline)),
+      filed:          _fmtDate(dateFiled),
+      dateFiledTs:    dateFiled ? dateFiled.getTime() : 0,
+      nextActionDue:  _fmtDate(nextActionDue),
+      daysToDeadline: isNaN(daysToDeadline) ? null : daysToDeadline,
+      daysOpen:       _val(row, cm, GH.daysOpen, ''),
+      articlesViolated: _str(row, cm, GH.articlesViolated),
+      issueCategory:  _str(row, cm, GH.issueCategory),
+      workLocation:   _str(row, cm, GH.workLocation),
+      steward:        _str(row, cm, GH.assignedSteward),
+      resolution:     _str(row, cm, GH.resolution),
+      dateClosed:     _fmtDate(closed),
+      checklistProgress: _str(row, cm, GH.checklistProgress),
+      driveFolderUrl: _str(row, cm, GH.driveFolderUrl),
+      timeline:       timeline,
     };
   }
   
-  function _formatDate(date) {
-    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+  function getUnits() {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(MEMBER_SHEET);
+    if (!sheet) return [];
+    var data = sheet.getDataRange().getValues();
+    var cm = _colMap(data[0]);
+    var uc = _col(cm, MH.unit);
+    if (uc === -1) return [];
+    var u = {};
+    for (var i = 1; i < data.length; i++) { var v = String(data[i][uc]).trim(); if (v) u[v] = true; }
+    return Object.keys(u).sort();
   }
   
-  // Public API
   return {
     findUserByEmail: findUserByEmail,
     getUserRole: getUserRole,
@@ -419,18 +416,13 @@ var DataService = (function () {
     getStewardContact: getStewardContact,
     getUnits: getUnits,
   };
-  
 })();
 
-
-// ═══════════════════════════════════════
-// GLOBAL FUNCTIONS (callable from client via google.script.run)
-// ═══════════════════════════════════════
-
+// Global functions (callable from client)
 function dataGetStewardCases(email) { return DataService.getStewardCases(email); }
 function dataGetStewardKPIs(email) { return DataService.getStewardKPIs(email); }
 function dataGetMemberGrievances(email) { return DataService.getMemberGrievances(email); }
-function dataGetStewardContact(email) { return DataService.getStewardContact(email); }
+function dataGetStewardContact(id) { return DataService.getStewardContact(id); }
 function dataGetUserRole(email) { return DataService.getUserRole(email); }
 function dataGetUserProfile(email) { return DataService.findUserByEmail(email); }
 function dataGetUnits() { return DataService.getUnits(); }

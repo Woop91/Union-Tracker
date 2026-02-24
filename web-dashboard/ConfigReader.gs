@@ -1,170 +1,168 @@
 /**
  * ConfigReader.gs
- * Reads org-specific configuration from the "Config" tab.
- * Caches in CacheService to avoid repeated sheet reads.
- *
- * Config Tab Layout (column-based):
- *   Row 1: Section headers (grouped categories)
- *   Row 2: Column headers (e.g., "Organization Name", "Accent Hue", etc.)
- *   Row 3+: Data values (row 3 = primary value for single-value settings)
- *
- * This reader maps row 2 headers to their row 3 values.
+ * Reads the Config tab (HORIZONTAL layout: headers in Row 1, values in Row 2+).
+ * Some columns are single-value (Organization Name), some are lists (Job Titles).
+ * All lookups by header name — never by column index.
  */
 
 var ConfigReader = (function () {
-
+  
   var CACHE_KEY = 'ORG_CONFIG';
-  var CACHE_TTL = 21600; // 6 hours in seconds
+  var CACHE_TTL = 21600;
   var CONFIG_SHEET_NAME = 'Config';
-
-  // Header names must match CONFIG_HEADER_MAP_ in 01_Core.gs
-  var HEADER_KEYS = {
-    'organization name':       'orgName',
-    'logo initials':           'logoInitials',
-    'accent hue':              'accentHue',
-    'magic link expiry days':  'magicLinkExpiryDays',
-    'cookie duration days':    'cookieDurationDays',
-    'steward label':           'stewardLabel',
-    'member label':            'memberLabel',
-    'custom link 1 name':      'customLink1Name',
-    'custom link 1 url':       'customLink1URL',
-    'custom link 2 name':      'customLink2Name',
-    'custom link 2 url':       'customLink2URL'
+  
+  var SINGLE_KEYS = {
+    orgName:              ['organization name'],
+    localNumber:          ['local number'],
+    mainOfficeAddress:    ['main office address'],
+    mainPhone:            ['main phone'],
+    mainFax:              ['main fax'],
+    mainContactName:      ['main contact name'],
+    mainContactEmail:     ['main contact email'],
+    chiefStewardEmail:    ['chief steward email'],
+    googleDriveFolderId:  ['google drive folder id'],
+    googleCalendarId:     ['google calendar id'],
+    grievanceFormUrl:     ['grievance form url'],
+    contactFormUrl:       ['contact form url'],
+    satisfactionSurveyUrl:['satisfaction survey url'],
+    mobileDashboardUrl:   ['\u{1F4F1} mobile dashboard url', 'mobile dashboard url'],
+    contractName:         ['contract name'],
+    unionParent:          ['union parent'],
+    stateRegion:          ['state/region'],
+    orgWebsite:           ['organization website'],
+    archiveFolderId:      ['archive folder id'],
+    templateId:           ['template id'],
+    pdfFolderId:          ['pdf folder id'],
+    filingDeadlineDays:   ['filing deadline days'],
+    stepIResponseDays:    ['step i response days'],
+    stepIIAppealDays:     ['step ii appeal days'],
+    stepIIResponseDays:   ['step ii response days'],
+    alertDaysBeforeDeadline: ['alert days before deadline'],
   };
-
-  /**
-   * Reads the Config tab and returns a settings object.
-   * Uses CacheService for performance.
-   * @param {boolean} [forceRefresh=false] - Bypass cache
-   * @returns {Object} Config settings
-   */
+  
+  var LIST_KEYS = {
+    jobTitles:            ['job titles'],
+    officeLocations:      ['office locations'],
+    units:                ['units'],
+    officeDays:           ['office days'],
+    supervisors:          ['supervisors'],
+    managers:             ['managers'],
+    stewards:             ['stewards'],
+    stewardCommittees:    ['steward committees'],
+    grievanceStatuses:    ['grievance status'],
+    grievanceSteps:       ['grievance step'],
+    issueCategories:      ['issue category'],
+    articlesViolated:     ['articles violated'],
+    communicationMethods: ['communication methods'],
+    grievanceCoordinators:['grievance coordinators'],
+    adminEmails:          ['admin emails'],
+    notificationRecipients:['notification recipients'],
+    bestTimesToContact:   ['best times to contact'],
+    homeTowns:            ['home towns'],
+    officeAddresses:      ['office addresses'],
+    unitCodes:            ['unit codes'],
+    escalationStatuses:   ['escalation statuses'],
+    escalationSteps:      ['escalation steps'],
+  };
+  
+  // Dashboard-specific (may need adding to Config tab)
+  var DASH_KEYS = {
+    accentHue:           ['accent hue', 'dashboard accent hue'],
+    logoInitials:        ['logo initials'],
+    magicLinkExpiryDays: ['magic link expiry days', 'magic link expiry'],
+    cookieDurationDays:  ['cookie duration days', 'cookie duration'],
+    stewardLabel:        ['steward label'],
+    memberLabel:         ['member label'],
+  };
+  
   function getConfig(forceRefresh) {
-    // Try cache first
     if (!forceRefresh) {
-      var cache = CacheService.getScriptCache();
-      var cached = cache.get(CACHE_KEY);
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch (e) {
-          // Cache corrupted, fall through to read from sheet
-        }
-      }
+      try {
+        var cached = CacheService.getScriptCache().get(CACHE_KEY);
+        if (cached) return JSON.parse(cached);
+      } catch (e) {}
     }
-
-    // Read from sheet
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(CONFIG_SHEET_NAME);
-
-    if (!sheet) {
-      throw new Error('Config tab "' + CONFIG_SHEET_NAME + '" not found. Please create it.');
+    
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG_SHEET_NAME);
+    if (!sheet) throw new Error('Config tab not found.');
+    
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) throw new Error('Config tab empty.');
+    
+    var colMap = {};
+    for (var i = 0; i < data[0].length; i++) {
+      var h = String(data[0][i]).trim().toLowerCase();
+      if (h) colMap[h] = i;
     }
-
-    var lastCol = sheet.getLastColumn();
-    if (lastCol < 1) {
-      throw new Error('Config tab is empty. Please run Setup from the menu.');
+    
+    var config = {};
+    
+    // Single values
+    for (var key in SINGLE_KEYS) {
+      config[key] = _single(data, colMap, SINGLE_KEYS[key]);
     }
-
-    // Row 2 = column headers, Row 3 = primary data values
-    var headers = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
-    var values = sheet.getRange(3, 1, 1, lastCol).getValues()[0];
-
-    // Build header-to-value map
-    var configMap = {};
-    for (var i = 0; i < headers.length; i++) {
-      var headerKey = String(headers[i]).trim().toLowerCase();
-      if (headerKey && HEADER_KEYS[headerKey]) {
-        configMap[HEADER_KEYS[headerKey]] = values[i];
-      }
+    
+    // List values
+    for (var key in LIST_KEYS) {
+      config[key] = _list(data, colMap, LIST_KEYS[key]);
     }
-
-    // Build config object with defaults
-    var config = {
-      orgName:             configMap.orgName ? String(configMap.orgName).trim() : 'My Organization',
-      logoInitials:        configMap.logoInitials ? String(configMap.logoInitials).trim() : _deriveInitials(configMap.orgName || 'MO'),
-      accentHue:           _parseInt(configMap.accentHue, 250),
-      magicLinkExpiryDays: _parseInt(configMap.magicLinkExpiryDays, 7),
-      cookieDurationDays:  _parseInt(configMap.cookieDurationDays, 30),
-      stewardLabel:        configMap.stewardLabel ? String(configMap.stewardLabel).trim() : 'Steward',
-      memberLabel:         configMap.memberLabel ? String(configMap.memberLabel).trim() : 'Member',
-      customLink1Name:     configMap.customLink1Name ? String(configMap.customLink1Name).trim() : '',
-      customLink1URL:      configMap.customLink1URL ? String(configMap.customLink1URL).trim() : '',
-      customLink2Name:     configMap.customLink2Name ? String(configMap.customLink2Name).trim() : '',
-      customLink2URL:      configMap.customLink2URL ? String(configMap.customLink2URL).trim() : '',
-      // Derived
-      magicLinkExpiryMs:   0,
-      cookieDurationMs:    0,
-    };
-
-    config.magicLinkExpiryMs = config.magicLinkExpiryDays * 24 * 60 * 60 * 1000;
-    config.cookieDurationMs = config.cookieDurationDays * 24 * 60 * 60 * 1000;
-
-    // Cache it
-    try {
-      var cache = CacheService.getScriptCache();
-      cache.put(CACHE_KEY, JSON.stringify(config), CACHE_TTL);
-    } catch (e) {
-      // Cache write failed — non-fatal, will just re-read next time
-      Logger.log('ConfigReader: Cache write failed: ' + e.message);
-    }
-
+    
+    // Dashboard settings with defaults
+    config.accentHue = _int(_single(data, colMap, DASH_KEYS.accentHue), 250);
+    config.logoInitials = _single(data, colMap, DASH_KEYS.logoInitials) || _initials(config.orgName);
+    config.magicLinkExpiryDays = _int(_single(data, colMap, DASH_KEYS.magicLinkExpiryDays), 7);
+    config.cookieDurationDays = _int(_single(data, colMap, DASH_KEYS.cookieDurationDays), 30);
+    config.stewardLabel = _single(data, colMap, DASH_KEYS.stewardLabel) || 'Steward';
+    config.memberLabel = _single(data, colMap, DASH_KEYS.memberLabel) || 'Member';
+    
+    // Derived
+    config.magicLinkExpiryMs = config.magicLinkExpiryDays * 86400000;
+    config.cookieDurationMs = config.cookieDurationDays * 86400000;
+    config.orgAbbrev = config.localNumber || _initials(config.orgName);
+    config.filingDeadlineDays = _int(config.filingDeadlineDays, 15);
+    config.stepIResponseDays = _int(config.stepIResponseDays, 10);
+    config.stepIIAppealDays = _int(config.stepIIAppealDays, 10);
+    config.stepIIResponseDays = _int(config.stepIIResponseDays, 10);
+    config.alertDaysBeforeDeadline = _int(config.alertDaysBeforeDeadline, 3);
+    
+    try { CacheService.getScriptCache().put(CACHE_KEY, JSON.stringify(config), CACHE_TTL); } catch (e) {}
     return config;
   }
-
-  /**
-   * Returns config as JSON string (for injecting into HTML templates)
-   * @returns {string} JSON string
-   */
-  function getConfigJSON() {
-    return JSON.stringify(getConfig());
-  }
-
-  /**
-   * Forces a cache refresh and returns fresh config
-   * @returns {Object} Fresh config
-   */
-  function refreshConfig() {
-    return getConfig(true);
-  }
-
-  /**
-   * Validates that all required config fields are present
-   * @returns {Object} { valid: boolean, missing: string[] }
-   */
-  function validateConfig() {
-    var config = getConfig(true);
-    var missing = [];
-
-    if (!config.orgName || config.orgName === 'My Organization') missing.push('Organization Name');
-    if (config.accentHue < 0 || config.accentHue > 360) missing.push('Accent Hue (must be 0-360)');
-
+  
+  function getConfigJSON() { return JSON.stringify(getSafeConfig()); }
+  
+  function getSafeConfig() {
+    var c = getConfig();
     return {
-      valid: missing.length === 0,
-      missing: missing,
-      config: config
+      orgName: c.orgName, orgAbbrev: c.orgAbbrev, localNumber: c.localNumber || '',
+      logoInitials: c.logoInitials, accentHue: c.accentHue,
+      stewardLabel: c.stewardLabel, memberLabel: c.memberLabel,
+      magicLinkExpiryDays: c.magicLinkExpiryDays, cookieDurationDays: c.cookieDurationDays,
+      grievanceFormUrl: c.grievanceFormUrl || '', contactFormUrl: c.contactFormUrl || '',
+      orgWebsite: c.orgWebsite || '', contractName: c.contractName || '',
+      mainPhone: c.mainPhone || '', unionParent: c.unionParent || '',
     };
   }
-
-  // --- Helpers ---
-
-  function _parseInt(val, defaultVal) {
-    var parsed = parseInt(val, 10);
-    return isNaN(parsed) ? defaultVal : parsed;
+  
+  function refreshConfig() { return getConfig(true); }
+  
+  function _findCol(colMap, aliases) {
+    for (var i = 0; i < aliases.length; i++) { if (colMap.hasOwnProperty(aliases[i].toLowerCase())) return colMap[aliases[i].toLowerCase()]; }
+    return -1;
   }
-
-  function _deriveInitials(name) {
-    if (!name) return 'ORG';
-    var words = String(name).trim().split(/\s+/);
-    if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
-    return words.map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
+  function _single(data, colMap, aliases) {
+    var c = _findCol(colMap, aliases); if (c === -1) return '';
+    for (var r = 1; r < data.length; r++) { var v = data[r][c]; if (v !== null && v !== undefined && String(v).trim()) return String(v).trim(); }
+    return '';
   }
-
-  // Public API
-  return {
-    getConfig: getConfig,
-    getConfigJSON: getConfigJSON,
-    refreshConfig: refreshConfig,
-    validateConfig: validateConfig,
-  };
-
+  function _list(data, colMap, aliases) {
+    var c = _findCol(colMap, aliases); if (c === -1) return [];
+    var out = [];
+    for (var r = 1; r < data.length; r++) { var v = data[r][c]; if (v !== null && v !== undefined && String(v).trim()) out.push(String(v).trim()); }
+    return out;
+  }
+  function _int(v, d) { var p = parseInt(v, 10); return isNaN(p) ? d : p; }
+  function _initials(n) { if (!n) return 'ORG'; return String(n).trim().split(/\s+/).map(function(w){return w[0];}).join('').substring(0,3).toUpperCase(); }
+  
+  return { getConfig: getConfig, getConfigJSON: getConfigJSON, getSafeConfig: getSafeConfig, refreshConfig: refreshConfig };
 })();
