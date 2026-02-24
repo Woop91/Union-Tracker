@@ -225,7 +225,7 @@ function seedConfigData() {
     return;
   }
 
-  // Ensure Config sheet has enough columns (AZ = column 52 is the last column)
+  // Ensure Config sheet has enough columns (AX = column 50 = MOBILE_DASHBOARD_URL)
   ensureMinimumColumns(sheet, CONFIG_COLS.MOBILE_DASHBOARD_URL);
 
   // Data row start (after section headers row 1 and column headers row 2)
@@ -251,10 +251,7 @@ function seedConfigData() {
   // Office Days (Column D) - PRESET
   if (seedIfEmpty(CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS)) seededAny = true;
 
-  // Yes/No (Column E) - PRESET
-  if (seedIfEmpty(CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO)) seededAny = true;
-
-  // Grievance Status (Column J) - PRESET
+  // Grievance Status (Column I) - PRESET
   if (seedIfEmpty(CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS)) seededAny = true;
 
   // Grievance Step (Column K) - PRESET
@@ -327,13 +324,6 @@ function seedConfigData() {
   if (seedIfEmpty(CONFIG_COLS.STEWARD_COMMITTEES, [
     'Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
     'Political Action Committee', 'Membership Committee', 'Executive Board'
-  ])) seededAny = true;
-
-  // Home Towns (Column AF)
-  if (seedIfEmpty(CONFIG_COLS.HOME_TOWNS, [
-    'Boston', 'Worcester', 'Springfield', 'Cambridge', 'Lowell', 'Brockton',
-    'Quincy', 'New Bedford', 'Fall River', 'Lawrence', 'Framingham', 'Somerville',
-    'Lynn', 'Haverhill', 'Malden', 'Medford', 'Waltham', 'Newton', 'Brookline'
   ])) seededAny = true;
 
   if (seededAny) {
@@ -807,8 +797,6 @@ function restoreConfigFromSheetData_() {
   // Member Directory — single-select dropdowns
   var memberDD = DROPDOWN_MAP.MEMBER_DIR;
   for (var i = 0; i < memberDD.length; i++) {
-    // Skip Yes/No columns — those are presets, not user data
-    if (memberDD[i].configCol === CONFIG_COLS.YES_NO) continue;
     mappings.push({ sheet: memberSheet, col: memberDD[i].col, configCol: memberDD[i].configCol });
   }
 
@@ -834,23 +822,12 @@ function restoreConfigFromSheetData_() {
     }
   }
 
-  // Also include JOB_METADATA_FIELDS for any columns not already covered
-  // (e.g., Stewards from the Assigned Steward column)
-  for (var m = 0; m < JOB_METADATA_FIELDS.length; m++) {
-    var jm = JOB_METADATA_FIELDS[m];
-    if (memberSheet) {
-      var alreadyMapped = false;
-      for (var n = 0; n < mappings.length; n++) {
-        if (mappings[n].sheet === memberSheet && mappings[n].col === jm.memberCol && mappings[n].configCol === jm.configCol) {
-          alreadyMapped = true;
-          break;
-        }
-      }
-      if (!alreadyMapped) {
-        mappings.push({ sheet: memberSheet, col: jm.memberCol, configCol: jm.configCol });
-      }
-    }
-  }
+  // NOTE: JOB_METADATA_FIELDS fallback was removed here.  Every column in
+  // JOB_METADATA_FIELDS is already covered by DROPDOWN_MAP or MULTI_SELECT_COLS.
+  // The old fallback used JOB_METADATA_FIELDS values that could go stale when
+  // syncColumnMaps() updated column positions, causing data to land in wrong
+  // Config columns.  DROPDOWN_MAP and MULTI_SELECT_COLS are dynamically rebuilt
+  // and are the single source of truth.  See: CLAUDE.md § Config Write Paths.
 
   var totalRestored = 0;
 
@@ -1953,8 +1930,7 @@ function NUKE_CONFIG_DROPDOWNS() {
     CONFIG_COLS.MANAGERS,
     CONFIG_COLS.STEWARDS,
     CONFIG_COLS.STEWARD_COMMITTEES,
-    CONFIG_COLS.GRIEVANCE_COORDINATORS,
-    CONFIG_COLS.HOME_TOWNS
+    CONFIG_COLS.GRIEVANCE_COORDINATORS
   ];
 
   userColumns.forEach(function(col) {
