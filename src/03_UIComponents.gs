@@ -141,6 +141,18 @@ function createDashboardMenu() {
       .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
       .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'))
 
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('📊 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'archiveWorkloadData')
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
+      .addSeparator()
+      .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem')
+      .addItem('🔗 Show Portal URL', 'showWorkloadPortalUrl')
+      .addItem('📋 Save Portal Link', 'shareWorkloadPortalLink')
+      .addSeparator()
+      .addItem('⚙️ Initialize Sheets', 'initWorkloadTrackerSheets'))
+
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
       .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')

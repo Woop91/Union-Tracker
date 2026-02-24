@@ -53,11 +53,13 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',           // Meeting check-in system with email + PIN
   '15_EventBus.gs',                 // Event-driven pub/sub architecture
   '16_DashboardEnhancements.gs',    // Dashboard features: filters, presets, export, collaboration
-  '17_CorrelationEngine.gs'         // Cross-dimensional correlation engine with insights
+  '17_CorrelationEngine.gs',        // Cross-dimensional correlation engine with insights
+  '18_WorkloadTracker.gs'           // Workload Tracker module
 ];
 
 const HTML_FILES = [
-  'MultiSelectDialog.html'
+  'MultiSelectDialog.html',
+  'WorkloadTracker.html'
 ];
 
 function build() {

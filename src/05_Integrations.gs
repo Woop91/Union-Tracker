@@ -1644,8 +1644,9 @@ function showUpcomingDeadlines() {
  * - page=search|grievances|members|links|dashboard|portal - Returns specific page
  * - (no params) - Returns default dashboard
  */
-function doGet(e) {
+function doGetLegacy(e) {
   // v4.5.0: Add access control and input validation
+  // NOTE: Renamed from doGet → doGetLegacy. The web-dashboard WebApp.gs now owns doGet().
 
   // Step 1: Validate request parameters (prevents injection attacks)
   var validation = validateWebAppRequest(e);

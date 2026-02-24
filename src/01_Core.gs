@@ -787,7 +787,13 @@ var SHEETS = {
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
-  REPORTS: '💼 Dashboard'
+  REPORTS: '💼 Dashboard',
+  // Workload Tracker sheets
+  WORKLOAD_VAULT:     '_Workload_Vault',
+  WORKLOAD_REPORTING: 'Workload Reporting',
+  WORKLOAD_REMINDERS: '_Workload_Reminders',
+  WORKLOAD_USERMETA:  '_Workload_UserMeta',
+  WORKLOAD_ARCHIVE:   '_Workload_Archive'
 };
 
 // SHEET_NAMES alias for backward compatibility

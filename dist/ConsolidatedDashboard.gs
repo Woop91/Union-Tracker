@@ -40,9 +40,11 @@
  *   - 15_EventBus.gs
  *   - 16_DashboardEnhancements.gs
  *   - 17_CorrelationEngine.gs
+ *   - 18_WorkloadTracker.gs
  *
  * HTML Files (embedded):
  *  *   - MultiSelectDialog.html
+ *   - WorkloadTracker.html
  *
  * ============================================================================
  */
@@ -1916,7 +1918,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// === FILE: 01_Core.gs === (3278 lines)
+// === FILE: 01_Core.gs === (3284 lines)
 // ============================================================================
 
 /**
@@ -2708,7 +2710,13 @@ var SHEETS = {
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
-  REPORTS: '💼 Dashboard'
+  REPORTS: '💼 Dashboard',
+  // Workload Tracker sheets
+  WORKLOAD_VAULT:     '_Workload_Vault',
+  WORKLOAD_REPORTING: 'Workload Reporting',
+  WORKLOAD_REMINDERS: '_Workload_Reminders',
+  WORKLOAD_USERMETA:  '_Workload_UserMeta',
+  WORKLOAD_ARCHIVE:   '_Workload_Archive'
 };
 
 // SHEET_NAMES alias for backward compatibility
@@ -8080,7 +8088,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// === FILE: 03_UIComponents.gs === (2804 lines)
+// === FILE: 03_UIComponents.gs === (2816 lines)
 // ============================================================================
 
 /**
@@ -8225,6 +8233,18 @@ function createDashboardMenu() {
       .addItem('🔑 Generate Member PIN', 'showGeneratePINDialog')
       .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
       .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'))
+
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('📊 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'archiveWorkloadData')
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
+      .addSeparator()
+      .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem')
+      .addItem('🔗 Show Portal URL', 'showWorkloadPortalUrl')
+      .addItem('📋 Save Portal Link', 'shareWorkloadPortalLink')
+      .addSeparator()
+      .addItem('⚙️ Initialize Sheets', 'initWorkloadTrackerSheets'))
 
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
@@ -18824,7 +18844,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// === FILE: 05_Integrations.gs === (3638 lines)
+// === FILE: 05_Integrations.gs === (3639 lines)
 // ============================================================================
 
 /**
@@ -20473,8 +20493,9 @@ function showUpcomingDeadlines() {
  * - page=search|grievances|members|links|dashboard|portal - Returns specific page
  * - (no params) - Returns default dashboard
  */
-function doGet(e) {
+function doGetLegacy(e) {
   // v4.5.0: Add access control and input validation
+  // NOTE: Renamed from doGet → doGetLegacy. The web-dashboard WebApp.gs now owns doGet().
 
   // Step 1: Validate request parameters (prevents injection attacks)
   var validation = validateWebAppRequest(e);
@@ -59935,6 +59956,1098 @@ function getCorrelationSummary(isPII) {
 
 
 // ============================================================================
+// === FILE: 18_WorkloadTracker.gs === (1087 lines)
+// ============================================================================
+
+/**
+ * ============================================================================
+ * 18_WorkloadTracker.gs - Member Workload Tracking Module
+ * ============================================================================
+ *
+ * Secure, anonymized workload tracking integrated with the DDS Dashboard.
+ * Members submit weekly caseload data via the web portal (?page=workload).
+ * Authentication uses the existing DDS member PIN system (13_MemberSelfService.gs).
+ *
+ * Sheet Structure:
+ *   "Workload Vault"     (hidden)  — raw data with member email + PIN hash
+ *   "Workload Reporting" (visible) — anonymized ledger (identity → REDACTED)
+ *   "Workload Reminders"           — email reminder preferences
+ *   "Workload UserMeta"  (hidden)  — sharing start dates for reciprocity
+ *   "Workload Archive"   (hidden)  — data older than retention period
+ *
+ * Auth: email + DDS member PIN → verifyPIN(pin, memberId, storedHash)
+ *
+ * @version 4.10.0
+ * @requires 01_Core.gs (SHEETS, MEMBER_COLS)
+ * @requires 13_MemberSelfService.gs (verifyPIN, hashPIN, getPINSalt_)
+ * @requires 06_Maintenance.gs (logAuditEvent)
+ * @requires 00_Security.gs (escapeHtml)
+ */
+
+// ============================================================================
+// WORKLOAD TRACKER CONFIGURATION
+// ============================================================================
+
+/** @const {Object} Workload tracker app configuration */
+var WT_APP_CONFIG = {
+  version: '4.10.0',
+  name: 'Workload Tracker',
+  maxStringLength: 255,
+  dataRetentionMonths: 24,
+  lockTimeoutMs: 30000
+};
+
+/** @const {Object} Workload tracker security / rate-limit settings */
+var WT_SECURITY_CONFIG = {
+  maxPinAttempts: 5,
+  pinLockoutMinutes: 15,
+  maxSubmissionsPerHour: 10,
+  maxHistoryRequestsPerHour: 20,
+  maxDashboardRequestsPerHour: 30
+};
+
+// ============================================================================
+// COLUMN CONSTANTS (0-indexed for array access)
+// ============================================================================
+
+/** @const {Object} Workload Vault column indices (0-indexed) */
+var WT_VAULT_COLS = {
+  TIMESTAMP: 0,
+  EMAIL: 1,
+  PRIORITY_CASES: 2,
+  PENDING_CASES: 3,
+  UNREAD_DOCS: 4,
+  TODO_ITEMS: 5,
+  SENT_REFERRALS: 6,
+  CE_ACTIVITIES: 7,
+  ASSISTANCE_REQUESTS: 8,
+  AGED_CASES: 9,
+  WEEKLY_CASES: 10,
+  SUB_CATEGORIES: 11,
+  EMPLOYMENT_TYPE: 12,
+  PT_HOURS: 13,
+  LEAVE_TYPE: 14,
+  LEAVE_PLANNED: 15,
+  LEAVE_START: 16,
+  LEAVE_END: 17,
+  NO_INTAKE_CHOICE: 18,
+  NOTICE_TIME: 19,
+  HALF_DAY: 20,
+  PRIVACY: 21,
+  ON_PLAN: 22,
+  OVERTIME_HOURS: 23
+};
+
+/** @const {Object} Workload UserMeta column indices (0-indexed) */
+var WT_USERMETA_COLS = {
+  EMAIL: 0,
+  SHARING_START_DATE: 1,
+  CREATED_DATE: 2
+};
+
+/** @const {Object} Workload Reminders column indices (0-indexed) */
+var WT_REMINDERS_COLS = {
+  EMAIL: 0,
+  ENABLED: 1,
+  FREQUENCY: 2,
+  DAY: 3,
+  TIME: 4,
+  LAST_SENT: 5
+};
+
+// ============================================================================
+// SUB-CATEGORY DEFINITIONS
+// ============================================================================
+
+/** @const {Object} Sub-category names for each workload category */
+var WT_SUB_CATEGORIES = {
+  priority: ['QDD', 'CAL', 'TERI', 'Aged Case', 'Congressional', 'Dire Need', 'Homeless',
+             'Presumptive Disability', 'COBRA', 'DDS Aged', 'SOAR Involvement',
+             'MC/WW', '100% P&T', 'Public Inquiry', 'DDS Important (High)', 'DDS Important (Medium)'],
+  pending:  ['New Cases', 'Immediate Action', 'No Activity 15+ Days',
+             'No Activity 30+ Days', 'Internal QA Returns', 'Federal QA Returns', 'Approval Returns'],
+  unread:   ['All Unread Documents', 'MER', 'CE Reports', 'Trailer Mail'],
+  todo:     ['Follow-Ups Due', 'Unread Case Notes', 'Delivery Failures', 'Updates'],
+  referrals:['MC/PC', 'General'],
+  ce:       ['All CE Activities', 'Scheduled', 'Not Kept', 'Under Review'],
+  assistance:['Outbound'],
+  aged:     ['60-89 Days', '90-119 Days', '120-179 Days', '180+ Days']
+};
+
+// ============================================================================
+// INPUT SANITIZATION
+// ============================================================================
+
+/**
+ * Sanitizes a string input: trims, limits length, strips control characters.
+ * @param {string} input
+ * @param {number} [maxLength]
+ * @returns {string}
+ */
+function sanitizeString(input, maxLength) {
+  maxLength = maxLength || WT_APP_CONFIG.maxStringLength;
+  if (!input || typeof input !== 'string') return '';
+  var sanitized = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
+  return sanitized.length > maxLength ? sanitized.substring(0, maxLength) : sanitized;
+}
+
+// ============================================================================
+// RATE LIMITING
+// ============================================================================
+
+/**
+ * Checks if an action is rate-limited using CacheService.
+ * @param {string} key
+ * @param {number} maxAttempts
+ * @param {number} windowMinutes
+ * @returns {{allowed:boolean, attemptsRemaining:number, waitMinutes:number}}
+ */
+function wtCheckRateLimit_(key, maxAttempts, windowMinutes) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'WT_RATE_' + key;
+  var cached = cache.get(cacheKey);
+  var attempts = cached ? (parseInt(cached, 10) || 0) : 0;
+  if (attempts >= maxAttempts) {
+    return { allowed: false, attemptsRemaining: 0, waitMinutes: windowMinutes };
+  }
+  return { allowed: true, attemptsRemaining: maxAttempts - attempts, waitMinutes: 0 };
+}
+
+/**
+ * Records an attempt for rate limiting.
+ * @param {string} key
+ * @param {number} windowMinutes
+ */
+function wtRecordRateLimitAttempt_(key, windowMinutes) {
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'WT_RATE_' + key;
+  var cached = cache.get(cacheKey);
+  var attempts = (cached ? (parseInt(cached, 10) || 0) : 0) + 1;
+  cache.put(cacheKey, String(attempts), windowMinutes * 60);
+}
+
+/** Clears rate limit for a key. @param {string} key */
+function wtClearRateLimit_(key) {
+  CacheService.getScriptCache().remove('WT_RATE_' + key);
+}
+
+/** @param {string} email @returns {object} */
+function wtCheckPinRateLimit_(email) {
+  return wtCheckRateLimit_('PIN_' + email.toLowerCase().trim(),
+    WT_SECURITY_CONFIG.maxPinAttempts, WT_SECURITY_CONFIG.pinLockoutMinutes);
+}
+
+/** @param {string} email */
+function wtRecordFailedPinAttempt_(email) {
+  wtRecordRateLimitAttempt_('PIN_' + email.toLowerCase().trim(), WT_SECURITY_CONFIG.pinLockoutMinutes);
+}
+
+/** @param {string} email */
+function wtClearPinRateLimit_(email) {
+  wtClearRateLimit_('PIN_' + email.toLowerCase().trim());
+}
+
+/** @param {string} email @returns {object} */
+function wtCheckSubmissionRateLimit_(email) {
+  return wtCheckRateLimit_('SUBMIT_' + email.toLowerCase().trim(),
+    WT_SECURITY_CONFIG.maxSubmissionsPerHour, 60);
+}
+
+/** @param {string} email */
+function wtRecordSubmission_(email) {
+  wtRecordRateLimitAttempt_('SUBMIT_' + email.toLowerCase().trim(), 60);
+}
+
+// ============================================================================
+// LOCK SERVICE
+// ============================================================================
+
+/**
+ * Executes a function with a script lock to prevent concurrent writes.
+ * @param {Function} fn
+ * @param {string} [lockName]
+ * @returns {*}
+ */
+function withLock(fn, lockName) {
+  lockName = lockName || 'operation';
+  var lock = LockService.getScriptLock();
+  try {
+    if (!lock.tryLock(WT_APP_CONFIG.lockTimeoutMs)) {
+      throw new Error('System busy. Please try again in a moment.');
+    }
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ============================================================================
+// AUTHENTICATION (uses DDS member PIN system)
+// ============================================================================
+
+/**
+ * Authenticates a member for workload submission using their DDS member PIN.
+ * Looks up the member by email in the Member Directory, then verifies the PIN
+ * using verifyPIN() from 13_MemberSelfService.gs.
+ *
+ * @param {string} email - Member's email address
+ * @param {string} pin   - Member's 6-digit DDS PIN
+ * @returns {{success:boolean, memberId:string|null, message:string}}
+ */
+function authenticateWorkloadMember_(email, pin) {
+  if (!email || !pin) {
+    return { success: false, memberId: null, message: 'Email and PIN are required.' };
+  }
+
+  var emailLower = email.toLowerCase().trim();
+
+  // PIN rate-limit check
+  var rateLimit = wtCheckPinRateLimit_(emailLower);
+  if (!rateLimit.allowed) {
+    return {
+      success: false,
+      memberId: null,
+      message: 'Too many failed attempts. Please wait ' + rateLimit.waitMinutes + ' minutes.'
+    };
+  }
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!memberSheet) {
+      return { success: false, memberId: null, message: 'System error: member directory unavailable.' };
+    }
+
+    var data = memberSheet.getDataRange().getValues();
+    var emailCol = (MEMBER_COLS.EMAIL || 9) - 1;      // 0-indexed
+    var idCol    = (MEMBER_COLS.MEMBER_ID || 1) - 1;  // 0-indexed
+    var pinCol   = (MEMBER_COLS.PIN_HASH || 33) - 1;  // 0-indexed (column AG)
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = data[i][emailCol];
+      if (!rowEmail) continue;
+      if (rowEmail.toString().toLowerCase().trim() !== emailLower) continue;
+
+      var memberId   = data[i][idCol] ? data[i][idCol].toString().trim() : '';
+      var storedHash = data[i][pinCol] ? data[i][pinCol].toString().trim() : '';
+
+      if (!storedHash) {
+        return {
+          success: false,
+          memberId: null,
+          message: 'No PIN is set for this account. Please ask your steward to generate a PIN for you.'
+        };
+      }
+
+      if (!memberId) {
+        return { success: false, memberId: null, message: 'Member ID not found. Contact your steward.' };
+      }
+
+      // Use DDS's constant-time PIN verification
+      if (verifyPIN(pin, memberId, storedHash)) {
+        wtClearPinRateLimit_(emailLower);
+        return { success: true, memberId: memberId, message: '' };
+      } else {
+        wtRecordFailedPinAttempt_(emailLower);
+        return { success: false, memberId: null, message: 'Invalid PIN. Please try again.' };
+      }
+    }
+
+    // Email not in directory (use generic message to prevent enumeration)
+    wtRecordFailedPinAttempt_(emailLower);
+    return { success: false, memberId: null, message: 'Invalid credentials. Please try again.' };
+
+  } catch (err) {
+    console.error('authenticateWorkloadMember_ error:', err);
+    return { success: false, memberId: null, message: 'Authentication error. Please try again.' };
+  }
+}
+
+// ============================================================================
+// SHEET INITIALIZATION
+// ============================================================================
+
+/**
+ * Creates all Workload Tracker sheets if they don't already exist.
+ * Called from CREATE_DASHBOARD() in 08a_SheetSetup.gs.
+ */
+function initWorkloadTrackerSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // --- Workload Vault (hidden raw data) ---
+  var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
+  if (!vault) {
+    vault = ss.insertSheet(SHEETS.WORKLOAD_VAULT);
+    vault.appendRow([
+      'Timestamp', 'Email',
+      'Priority Cases', 'Pending Cases', 'Unread Documents', 'To-Do Items',
+      'Sent Referrals', 'CE Activities', 'Assistance Requests', 'Aged Cases',
+      'Weekly Cases', 'Sub-Categories (JSON)',
+      'Employment Type', 'PT Hours',
+      'Leave Type', 'Leave Planned', 'Leave Start', 'Leave End',
+      'No Intake Choice', 'Notice Time', 'Half Day',
+      'Privacy', 'On Plan', 'Overtime Hours'
+    ]);
+    vault.getRange(1, 1, 1, 24)
+      .setFontWeight('bold')
+      .setBackground('#1a1a2e')
+      .setFontColor('#ffffff');
+    vault.setFrozenRows(1);
+  }
+  vault.hideSheet();
+
+  // --- Workload Reporting (anonymized, visible) ---
+  var report = ss.getSheetByName(SHEETS.WORKLOAD_REPORTING);
+  if (!report) {
+    report = ss.insertSheet(SHEETS.WORKLOAD_REPORTING);
+    report.appendRow([
+      'Date', 'Identity',
+      'Priority Cases', 'Pending Cases', 'Unread Documents', 'To-Do Items',
+      'Sent Referrals', 'CE Activities', 'Assistance Requests', 'Aged Cases',
+      'Weekly Cases', 'Employment Type', 'Privacy', 'On Plan', 'Overtime Hours'
+    ]);
+    report.getRange(1, 1, 1, 15)
+      .setFontWeight('bold')
+      .setBackground('#0d47a1')
+      .setFontColor('#ffffff');
+    report.setFrozenRows(1);
+    report.setHiddenGridlines(true);
+  }
+
+  // --- Workload Reminders ---
+  var reminders = ss.getSheetByName(SHEETS.WORKLOAD_REMINDERS);
+  if (!reminders) {
+    reminders = ss.insertSheet(SHEETS.WORKLOAD_REMINDERS);
+    reminders.appendRow(['Email', 'Enabled', 'Frequency', 'Day', 'Time', 'Last Sent']);
+    reminders.getRange(1, 1, 1, 6)
+      .setFontWeight('bold')
+      .setBackground('#1a1a2e')
+      .setFontColor('#ffffff');
+    reminders.setFrozenRows(1);
+    reminders.hideSheet();
+  }
+
+  // --- Workload UserMeta (hidden) ---
+  var userMeta = ss.getSheetByName(SHEETS.WORKLOAD_USERMETA);
+  if (!userMeta) {
+    userMeta = ss.insertSheet(SHEETS.WORKLOAD_USERMETA);
+    userMeta.appendRow(['Email', 'Sharing Start Date', 'Created Date']);
+    userMeta.getRange(1, 1, 1, 3)
+      .setFontWeight('bold')
+      .setBackground('#1a1a2e')
+      .setFontColor('#ffffff');
+    userMeta.setFrozenRows(1);
+    userMeta.hideSheet();
+  }
+
+  Logger.log('Workload Tracker sheets initialized.');
+}
+
+// ============================================================================
+// SHARING START DATE (reciprocity)
+// ============================================================================
+
+/**
+ * @param {string} email
+ * @returns {Date|null}
+ */
+function wtGetUserSharingStartDate_(email) {
+  if (!email) return null;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_USERMETA);
+  if (!sheet) return null;
+  var emailLower = email.toLowerCase().trim();
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][WT_USERMETA_COLS.EMAIL] &&
+        data[i][WT_USERMETA_COLS.EMAIL].toString().toLowerCase().trim() === emailLower) {
+      return data[i][WT_USERMETA_COLS.SHARING_START_DATE] ?
+        new Date(data[i][WT_USERMETA_COLS.SHARING_START_DATE]) : null;
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {string} email
+ * @param {Date} startDate
+ */
+function wtSetUserSharingStartDate_(email, startDate) {
+  if (!email) return;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_USERMETA);
+  if (!sheet) return;
+  var emailLower = email.toLowerCase().trim();
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][WT_USERMETA_COLS.EMAIL] &&
+        data[i][WT_USERMETA_COLS.EMAIL].toString().toLowerCase().trim() === emailLower) {
+      sheet.getRange(i + 1, WT_USERMETA_COLS.SHARING_START_DATE + 1).setValue(startDate);
+      return;
+    }
+  }
+  sheet.appendRow([emailLower, startDate, new Date()]);
+}
+
+// ============================================================================
+// FORM SUBMISSION
+// ============================================================================
+
+/**
+ * Processes a workload form submission from the web portal.
+ * Called client-side via google.script.run.processWorkloadForm(formObj).
+ *
+ * @param {Object} formObj - Form fields (email, pin, t1-t8, privacy, etc.)
+ * @returns {string} "Success: ..." or "Error: ..."
+ */
+function processWorkloadForm(formObj) {
+  var email = formObj.email ? sanitizeString(formObj.email.trim().toLowerCase(), 100) : '';
+
+  try {
+    var pin = formObj.pin ? formObj.pin.toString().trim() : '';
+
+    if (!email || !pin) {
+      return 'Error: Please provide your email and PIN.';
+    }
+
+    // Validate email format
+    var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(email)) {
+      return 'Error: Please enter a valid email address.';
+    }
+
+    // Submission rate limit
+    var submitLimit = wtCheckSubmissionRateLimit_(email);
+    if (!submitLimit.allowed) {
+      return 'Error: Submission limit reached. Please wait before submitting again.';
+    }
+
+    // Authenticate using DDS member PIN
+    var auth = authenticateWorkloadMember_(email, pin);
+    if (!auth.success) {
+      return 'Error: ' + auth.message;
+    }
+
+    // Validate numeric fields (t1–t8, 0–999)
+    var numFields = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8'];
+    for (var n = 0; n < numFields.length; n++) {
+      var val = Number(formObj[numFields[n]]) || 0;
+      if (val < 0 || val > 999 || !Number.isInteger(val)) {
+        return 'Error: Workload values must be whole numbers between 0 and 999.';
+      }
+    }
+
+    // Validate part-time hours if applicable
+    if (formObj.employment_type === 'Part-time') {
+      var ptHours = Number(formObj.part_time_hours);
+      if (isNaN(ptHours) || ptHours < 1 || ptHours > 40 || !Number.isInteger(ptHours)) {
+        return 'Error: Part-time hours must be a whole number between 1 and 40.';
+      }
+    }
+
+    // Use lock service for thread-safe write
+    return withLock(function() {
+      var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+      if (!vault) {
+        return 'Error: Workload sheets not initialized. Run Setup > Initialize Dashboard first.';
+      }
+
+      var sanitizeNum = function(v) { return Math.min(999, Math.max(0, Math.floor(Number(v) || 0))); };
+
+      // Build sub-category JSON
+      var subCatData = { priority: {}, pending: {}, unread: {}, todo: {},
+                         referrals: {}, ce: {}, assistance: {}, aged: {} };
+      var catKeys = ['priority', 'pending', 'unread', 'todo', 'referrals', 'ce', 'assistance', 'aged'];
+      for (var ci = 0; ci < catKeys.length; ci++) {
+        var catKey = catKeys[ci];
+        var subNames = WT_SUB_CATEGORIES[catKey];
+        for (var si = 0; si < subNames.length; si++) {
+          var fieldName = 'sub_' + (ci + 1) + '_' + si;
+          var subVal = sanitizeNum(formObj[fieldName]);
+          if (subVal > 0) { subCatData[catKey][subNames[si]] = subVal; }
+        }
+      }
+
+      // Weekly cases
+      var weeklyCases = sanitizeNum(formObj.weekly_cases || 15);
+      if (formObj.weekly_cases_option === 'manual' && formObj.weekly_cases_manual) {
+        weeklyCases = sanitizeNum(formObj.weekly_cases_manual);
+      }
+
+      // Leave dates
+      var tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+      var leaveStart = '', leaveEnd = '';
+      if (formObj.leave_start) {
+        leaveStart = Utilities.formatDate(new Date(formObj.leave_start), tz, 'MM/dd/yyyy');
+      }
+      if (formObj.leave_end) {
+        leaveEnd = Utilities.formatDate(new Date(formObj.leave_end), tz, 'MM/dd/yyyy');
+      }
+
+      vault.appendRow([
+        new Date(),                                                      // Timestamp
+        email,                                                           // Email
+        sanitizeNum(formObj.t1),                                         // Priority Cases
+        sanitizeNum(formObj.t2),                                         // Pending Cases
+        sanitizeNum(formObj.t3),                                         // Unread Documents
+        sanitizeNum(formObj.t4),                                         // To-Do Items
+        sanitizeNum(formObj.t5),                                         // Sent Referrals
+        sanitizeNum(formObj.t6),                                         // CE Activities
+        sanitizeNum(formObj.t7),                                         // Assistance Requests
+        sanitizeNum(formObj.t8),                                         // Aged Cases
+        weeklyCases,                                                     // Weekly Cases
+        JSON.stringify(subCatData),                                      // Sub-Categories JSON
+        sanitizeString(formObj.employment_type || 'Full-time', 20),     // Employment Type
+        formObj.employment_type === 'Part-time' ? (Number(formObj.part_time_hours) || '') : '',
+        sanitizeString(formObj.leave_type || '', 20),                   // Leave Type
+        sanitizeString(formObj.leave_planned || '', 20),                // Leave Planned
+        leaveStart,                                                      // Leave Start
+        leaveEnd,                                                        // Leave End
+        sanitizeString(formObj.no_intake_choice || '', 20),             // No Intake Choice
+        sanitizeString(formObj.notice_time || '', 20),                  // Notice Time
+        formObj.half_day_leave ? 'Yes' : '',                            // Half Day
+        sanitizeString(formObj.privacy || 'Unit', 20),                  // Privacy
+        formObj.on_plan ? 'Yes' : 'No',                                 // On Plan
+        formObj.overtime_enabled ? (Number(formObj.overtime_hours) || 0) : ''  // Overtime Hours
+      ]);
+
+      // Audit log via DDS's system
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('WORKLOAD_SUBMIT',
+          'Member ' + auth.memberId + ' submitted workload data. Privacy: ' +
+          (formObj.privacy || 'Unit'));
+      }
+
+      // Handle sharing start date for reciprocity
+      var privacySetting = sanitizeString(formObj.privacy || 'Unit', 20);
+      if (privacySetting !== 'Private') {
+        var existingStartDate = wtGetUserSharingStartDate_(email);
+        if (!existingStartDate) {
+          wtSetUserSharingStartDate_(email, new Date());
+        }
+      }
+
+      // Record submission for rate limiting
+      wtRecordSubmission_(email);
+
+      // Save reminder preferences
+      if (formObj.reminder_enabled !== undefined) {
+        wtSaveReminderPreference_({
+          email: email,
+          enabled: formObj.reminder_enabled === 'on' || formObj.reminder_enabled === true,
+          frequency: formObj.reminder_frequency || 'weekly',
+          day: formObj.reminder_day || 'monday',
+          time: formObj.reminder_time || '09:00'
+        });
+      }
+
+      // Refresh anonymized reporting sheet
+      refreshWorkloadReportingData();
+
+      return 'Success! Your workload data has been securely recorded.';
+    }, 'processWorkloadForm');
+
+  } catch (err) {
+    console.error('processWorkloadForm error:', err);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('WORKLOAD_SUBMIT_ERROR', 'Error for ' + email + ': ' + err.message);
+    }
+    return 'Error: Unable to process submission. Please try again.';
+  }
+}
+
+// ============================================================================
+// REMINDER PREFERENCES
+// ============================================================================
+
+/**
+ * @param {{email,enabled,frequency,day,time}} prefs
+ */
+function wtSaveReminderPreference_(prefs) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_REMINDERS);
+  if (!sheet) return;
+  var emailLower = prefs.email.toLowerCase().trim();
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][WT_REMINDERS_COLS.EMAIL] &&
+        data[i][WT_REMINDERS_COLS.EMAIL].toString().toLowerCase().trim() === emailLower) {
+      sheet.getRange(i + 1, 1, 1, 5).setValues([[
+        emailLower, prefs.enabled ? 'Yes' : 'No',
+        prefs.frequency, prefs.day, prefs.time
+      ]]);
+      return;
+    }
+  }
+  sheet.appendRow([emailLower, prefs.enabled ? 'Yes' : 'No', prefs.frequency, prefs.day, prefs.time, '']);
+}
+
+// ============================================================================
+// REPORTING REFRESH
+// ============================================================================
+
+/**
+ * Rebuilds the Workload Reporting sheet with anonymized data.
+ * Private users and their submissions are excluded. Identities → REDACTED.
+ */
+function refreshWorkloadReportingData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault   = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
+  var report  = ss.getSheetByName(SHEETS.WORKLOAD_REPORTING);
+  if (!vault || !report) return;
+
+  var vaultData = vault.getDataRange().getValues();
+  if (vaultData.length <= 1) return;
+
+  // Build set of emails that have ever chosen "Private" as their MOST RECENT privacy
+  var latestPrivacy = {};
+  for (var i = 1; i < vaultData.length; i++) {
+    var rowEmail = vaultData[i][WT_VAULT_COLS.EMAIL];
+    if (rowEmail) {
+      latestPrivacy[rowEmail.toString().toLowerCase().trim()] = vaultData[i][WT_VAULT_COLS.PRIVACY];
+    }
+  }
+
+  // Rebuild reporting rows
+  var rows = [];
+  for (var j = 1; j < vaultData.length; j++) {
+    var rowE = vaultData[j][WT_VAULT_COLS.EMAIL];
+    if (!rowE) continue;
+    var emailKey = rowE.toString().toLowerCase().trim();
+    var rowPrivacy = vaultData[j][WT_VAULT_COLS.PRIVACY];
+    if (rowPrivacy === 'Private') continue;              // skip private rows
+    if (latestPrivacy[emailKey] === 'Private') continue; // skip if user is now private
+
+    rows.push([
+      vaultData[j][WT_VAULT_COLS.TIMESTAMP],
+      'REDACTED',
+      vaultData[j][WT_VAULT_COLS.PRIORITY_CASES],
+      vaultData[j][WT_VAULT_COLS.PENDING_CASES],
+      vaultData[j][WT_VAULT_COLS.UNREAD_DOCS],
+      vaultData[j][WT_VAULT_COLS.TODO_ITEMS],
+      vaultData[j][WT_VAULT_COLS.SENT_REFERRALS],
+      vaultData[j][WT_VAULT_COLS.CE_ACTIVITIES],
+      vaultData[j][WT_VAULT_COLS.ASSISTANCE_REQUESTS],
+      vaultData[j][WT_VAULT_COLS.AGED_CASES],
+      vaultData[j][WT_VAULT_COLS.WEEKLY_CASES],
+      vaultData[j][WT_VAULT_COLS.EMPLOYMENT_TYPE],
+      rowPrivacy,
+      vaultData[j][WT_VAULT_COLS.ON_PLAN],
+      vaultData[j][WT_VAULT_COLS.OVERTIME_HOURS]
+    ]);
+  }
+
+  // Write back
+  report.clearContents();
+  report.appendRow(['Date', 'Identity', 'Priority Cases', 'Pending Cases', 'Unread Documents',
+    'To-Do Items', 'Sent Referrals', 'CE Activities', 'Assistance Requests', 'Aged Cases',
+    'Weekly Cases', 'Employment Type', 'Privacy', 'On Plan', 'Overtime Hours']);
+  report.getRange(1, 1, 1, 15).setFontWeight('bold').setBackground('#0d47a1').setFontColor('#ffffff');
+  if (rows.length > 0) {
+    report.getRange(2, 1, rows.length, 15).setValues(rows);
+  }
+}
+
+/** Public alias for menu item */
+function refreshWorkloadLedger() {
+  refreshWorkloadReportingData();
+  SpreadsheetApp.getUi().alert('Workload ledger refreshed successfully.');
+}
+
+// ============================================================================
+// DASHBOARD DATA (for web portal analytics)
+// ============================================================================
+
+/**
+ * Returns collective workload stats after PIN authentication.
+ * @param {string} email
+ * @param {string} pin
+ * @returns {Object} { success, data, message }
+ */
+function getWorkloadDashboardData(email, pin) {
+  if (!email || !pin) {
+    return { success: false, data: null, message: 'Credentials required.' };
+  }
+  var auth = authenticateWorkloadMember_(email, pin);
+  if (!auth.success) {
+    return { success: false, data: null, message: auth.message };
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
+  if (!vault || vault.getLastRow() <= 1) {
+    return { success: true, data: { totalSubmissions: 0, members: 0, categories: {} }, message: '' };
+  }
+
+  var data = vault.getDataRange().getValues();
+  var userSharingStart = wtGetUserSharingStartDate_(email.toLowerCase().trim());
+
+  // Aggregate stats from non-private rows within sharing window
+  var totals = { t1: 0, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: 0, t8: 0 };
+  var members = new Set ? new Set() : {};
+  var submissionCount = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][WT_VAULT_COLS.PRIVACY] === 'Private') continue;
+    var ts = new Date(data[i][WT_VAULT_COLS.TIMESTAMP]);
+    if (userSharingStart && ts < userSharingStart) continue;
+
+    submissionCount++;
+    var rowEmail = data[i][WT_VAULT_COLS.EMAIL];
+    if (rowEmail) {
+      if (typeof Set !== 'undefined') { members.add(rowEmail.toString().toLowerCase()); }
+      else { members[rowEmail.toString().toLowerCase()] = true; }
+    }
+    totals.t1 += Number(data[i][WT_VAULT_COLS.PRIORITY_CASES]) || 0;
+    totals.t2 += Number(data[i][WT_VAULT_COLS.PENDING_CASES])  || 0;
+    totals.t3 += Number(data[i][WT_VAULT_COLS.UNREAD_DOCS])    || 0;
+    totals.t4 += Number(data[i][WT_VAULT_COLS.TODO_ITEMS])     || 0;
+    totals.t5 += Number(data[i][WT_VAULT_COLS.SENT_REFERRALS]) || 0;
+    totals.t6 += Number(data[i][WT_VAULT_COLS.CE_ACTIVITIES])  || 0;
+    totals.t7 += Number(data[i][WT_VAULT_COLS.ASSISTANCE_REQUESTS]) || 0;
+    totals.t8 += Number(data[i][WT_VAULT_COLS.AGED_CASES])     || 0;
+  }
+
+  var memberCount = typeof Set !== 'undefined' ? members.size : Object.keys(members).length;
+
+  return {
+    success: true,
+    message: '',
+    data: {
+      totalSubmissions: submissionCount,
+      members: memberCount,
+      categories: {
+        'Priority Cases':      totals.t1,
+        'Pending Cases':       totals.t2,
+        'Unread Documents':    totals.t3,
+        'To-Do Items':         totals.t4,
+        'Sent Referrals':      totals.t5,
+        'CE Activities':       totals.t6,
+        'Assistance Requests': totals.t7,
+        'Aged Cases':          totals.t8
+      },
+      averages: submissionCount > 0 ? {
+        'Priority Cases':      (totals.t1 / submissionCount).toFixed(1),
+        'Pending Cases':       (totals.t2 / submissionCount).toFixed(1),
+        'Unread Documents':    (totals.t3 / submissionCount).toFixed(1),
+        'To-Do Items':         (totals.t4 / submissionCount).toFixed(1),
+        'Sent Referrals':      (totals.t5 / submissionCount).toFixed(1),
+        'CE Activities':       (totals.t6 / submissionCount).toFixed(1),
+        'Assistance Requests': (totals.t7 / submissionCount).toFixed(1),
+        'Aged Cases':          (totals.t8 / submissionCount).toFixed(1)
+      } : {}
+    }
+  };
+}
+
+// ============================================================================
+// USER HISTORY (for web portal)
+// ============================================================================
+
+/**
+ * Returns the authenticated member's personal submission history.
+ * @param {string} email
+ * @param {string} pin
+ * @returns {Object} { success, history:Array, message }
+ */
+function getWorkloadUserHistory(email, pin) {
+  if (!email || !pin) {
+    return { success: false, history: [], message: 'Credentials required.' };
+  }
+  var auth = authenticateWorkloadMember_(email, pin);
+  if (!auth.success) {
+    return { success: false, history: [], message: auth.message };
+  }
+
+  var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+  if (!vault || vault.getLastRow() <= 1) {
+    return { success: true, history: [], message: '' };
+  }
+
+  var emailLower = email.toLowerCase().trim();
+  var data = vault.getDataRange().getValues();
+  var history = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = data[i][WT_VAULT_COLS.EMAIL];
+    if (!rowEmail || rowEmail.toString().toLowerCase().trim() !== emailLower) continue;
+    history.push({
+      date:       data[i][WT_VAULT_COLS.TIMESTAMP],
+      t1:         data[i][WT_VAULT_COLS.PRIORITY_CASES],
+      t2:         data[i][WT_VAULT_COLS.PENDING_CASES],
+      t3:         data[i][WT_VAULT_COLS.UNREAD_DOCS],
+      t4:         data[i][WT_VAULT_COLS.TODO_ITEMS],
+      t5:         data[i][WT_VAULT_COLS.SENT_REFERRALS],
+      t6:         data[i][WT_VAULT_COLS.CE_ACTIVITIES],
+      t7:         data[i][WT_VAULT_COLS.ASSISTANCE_REQUESTS],
+      t8:         data[i][WT_VAULT_COLS.AGED_CASES],
+      weeklyCases: data[i][WT_VAULT_COLS.WEEKLY_CASES],
+      employment: data[i][WT_VAULT_COLS.EMPLOYMENT_TYPE],
+      privacy:    data[i][WT_VAULT_COLS.PRIVACY],
+      onPlan:     data[i][WT_VAULT_COLS.ON_PLAN],
+      overtime:   data[i][WT_VAULT_COLS.OVERTIME_HOURS]
+    });
+  }
+
+  // Newest first
+  history.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+  return { success: true, history: history, message: '' };
+}
+
+// ============================================================================
+// WEB PORTAL HTML
+// ============================================================================
+
+/**
+ * Returns the Workload Tracker portal HTML for serving via doGet (?page=workload).
+ * The HTML is embedded by build.js from src/WorkloadTracker.html.
+ * @returns {string} Full HTML string
+ */
+function getWorkloadTrackerPortalHtml() {
+  try {
+    // After build, getWorkloadTracker_HTML() is auto-generated by build.js from WorkloadTracker.html
+    if (typeof getWorkloadTracker_HTML === 'function') {
+      return getWorkloadTracker_HTML();
+    }
+    // Fallback for development (before build)
+    return HtmlService.createHtmlOutputFromFile('WorkloadTracker').getContent();
+  } catch (err) {
+    return '<html><body style="font-family:sans-serif;padding:2rem;">' +
+      '<h2>Workload Tracker</h2>' +
+      '<p>Portal not yet configured. Please run <strong>Initialize Dashboard</strong> first.</p>' +
+      '</body></html>';
+  }
+}
+
+// ============================================================================
+// BACKUP & ARCHIVE
+// ============================================================================
+
+/**
+ * Creates a CSV backup of the Workload Vault to Google Drive.
+ * Menu item: 📊 Workload Tracker > 💾 Create Backup
+ */
+function createWorkloadBackup() {
+  var ui = SpreadsheetApp.getUi();
+  try {
+    var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+    if (!vault) { ui.alert('Workload Vault sheet not found.'); return; }
+
+    var data = vault.getDataRange().getValues();
+    var tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    var timestamp = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd_HHmm');
+    var fileName = 'WorkloadVault_Backup_' + timestamp + '.csv';
+
+    var csv = data.map(function(row) {
+      return row.map(function(cell) {
+        var str = String(cell);
+        return (str.indexOf(',') >= 0 || str.indexOf('"') >= 0 || str.indexOf('\n') >= 0)
+          ? '"' + str.replace(/"/g, '""') + '"' : str;
+      }).join(',');
+    }).join('\n');
+
+    var props = PropertiesService.getScriptProperties();
+    var backupFolderId = props.getProperty('WT_BACKUP_FOLDER_ID');
+    var folder;
+    if (backupFolderId) {
+      try { folder = DriveApp.getFolderById(backupFolderId); }
+      catch (e) {
+        folder = DriveApp.createFolder('WorkloadVault_Backups');
+        props.setProperty('WT_BACKUP_FOLDER_ID', folder.getId());
+      }
+    } else {
+      folder = DriveApp.createFolder('WorkloadVault_Backups');
+      props.setProperty('WT_BACKUP_FOLDER_ID', folder.getId());
+    }
+
+    folder.createFile(fileName, csv, MimeType.CSV);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('WORKLOAD_BACKUP', 'Backup created: ' + fileName);
+    }
+    ui.alert('Backup Created', 'Saved to Google Drive:\n' + fileName, ui.ButtonSet.OK);
+  } catch (err) {
+    console.error('createWorkloadBackup error:', err);
+    ui.alert('Backup Failed', 'Error: ' + err.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * Archives Workload Vault data older than the retention period.
+ * Menu item: 📊 Workload Tracker > 🗄️ Archive Old Data
+ */
+function wtArchiveOldData_() {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert('Archive Old Workload Data',
+    'Move workload data older than ' + WT_APP_CONFIG.dataRetentionMonths +
+    ' months to the Archive sheet?', ui.ButtonSet.YES_NO);
+  if (response !== ui.Button.YES) return;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
+  if (!vault) { ui.alert('Workload Vault not found.'); return; }
+
+  var data = vault.getDataRange().getValues();
+  if (data.length <= 1) { ui.alert('No data to archive.'); return; }
+
+  var cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - WT_APP_CONFIG.dataRetentionMonths);
+
+  var header = data[0];
+  var current = [header];
+  var archive = [];
+  for (var i = 1; i < data.length; i++) {
+    if (new Date(data[i][WT_VAULT_COLS.TIMESTAMP]) < cutoff) { archive.push(data[i]); }
+    else { current.push(data[i]); }
+  }
+  if (archive.length === 0) { ui.alert('No data old enough to archive.'); return; }
+
+  var archSheet = ss.getSheetByName(SHEETS.WORKLOAD_ARCHIVE);
+  if (!archSheet) {
+    archSheet = ss.insertSheet(SHEETS.WORKLOAD_ARCHIVE);
+    archSheet.appendRow(header);
+    archSheet.setFrozenRows(1);
+    archSheet.hideSheet();
+  }
+  archSheet.getRange(archSheet.getLastRow() + 1, 1, archive.length, header.length).setValues(archive);
+
+  vault.clear();
+  vault.getRange(1, 1, current.length, header.length).setValues(current);
+  refreshWorkloadReportingData();
+
+  if (typeof logAuditEvent === 'function') {
+    logAuditEvent('WORKLOAD_ARCHIVE', 'Archived ' + archive.length + ' workload records.');
+  }
+  ui.alert('Archived ' + archive.length + ' records.', '', ui.ButtonSet.OK);
+}
+
+// ============================================================================
+// HEALTH STATUS
+// ============================================================================
+
+/**
+ * Shows Workload Tracker system health in a dialog.
+ * Menu item: 📊 Workload Tracker > 🩺 Health Status
+ */
+function showWorkloadHealthStatus() {
+  var ui = SpreadsheetApp.getUi();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var checks = {};
+
+  var sheetNames = [
+    SHEETS.WORKLOAD_VAULT, SHEETS.WORKLOAD_REPORTING,
+    SHEETS.WORKLOAD_REMINDERS, SHEETS.WORKLOAD_USERMETA
+  ];
+  sheetNames.forEach(function(name) {
+    var s = ss.getSheetByName(name);
+    checks[name] = { exists: !!s, rows: s ? Math.max(0, s.getLastRow() - 1) : 0 };
+  });
+
+  var lines = ['Workload Tracker v' + WT_APP_CONFIG.version + '\n'];
+  sheetNames.forEach(function(name) {
+    var c = checks[name];
+    lines.push((c.exists ? '✓ ' : '✗ ') + name + (c.exists ? ' (' + c.rows + ' records)' : ' — missing'));
+  });
+  lines.push('\nSetup: Admin > Setup > Initialize Dashboard to create missing sheets.');
+  ui.alert('Workload Tracker Health', lines.join('\n'), ui.ButtonSet.OK);
+}
+
+// ============================================================================
+// REMINDER SYSTEM SETUP
+// ============================================================================
+
+/**
+ * Sets up the email reminder trigger for workload submissions.
+ * Menu item: 📊 Workload Tracker > 🔔 Setup Reminders
+ */
+function setupWorkloadReminderSystem() {
+  // Remove existing workload reminder triggers
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) {
+    if (t.getHandlerFunction() === 'processWorkloadReminders') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  // Daily trigger at 8 AM
+  ScriptApp.newTrigger('processWorkloadReminders')
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .create();
+
+  SpreadsheetApp.getUi().alert('Workload reminder system activated (daily at 8 AM).');
+}
+
+/**
+ * Processes email reminders for members who opted in.
+ * Called by daily trigger from setupWorkloadReminderSystem().
+ */
+function processWorkloadReminders() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_REMINDERS);
+  if (!sheet || sheet.getLastRow() <= 1) return;
+
+  var data = sheet.getDataRange().getValues();
+  var now = new Date();
+  var dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  var todayName = dayNames[now.getDay()];
+
+  var portalUrl = PropertiesService.getScriptProperties().getProperty('WT_PORTAL_URL') || '';
+
+  for (var i = 1; i < data.length; i++) {
+    try {
+      var email   = data[i][WT_REMINDERS_COLS.EMAIL];
+      var enabled = data[i][WT_REMINDERS_COLS.ENABLED];
+      var freq    = data[i][WT_REMINDERS_COLS.FREQUENCY] || 'weekly';
+      var day     = (data[i][WT_REMINDERS_COLS.DAY] || 'monday').toLowerCase();
+
+      if (!email || enabled !== 'Yes') continue;
+      if (freq === 'weekly' && day !== todayName) continue;
+
+      var subject = 'Reminder: Submit Your Workload Data';
+      var body = 'Hello,\n\nThis is your scheduled reminder to submit your workload data for the week.\n\n' +
+        (portalUrl ? 'Access the portal here:\n' + portalUrl + '?page=workload\n\n' : '') +
+        'Thank you,\nSEIU 509 DDS Dashboard';
+
+      MailApp.sendEmail({ to: email, subject: subject, body: body });
+      sheet.getRange(i + 1, WT_REMINDERS_COLS.LAST_SENT + 1).setValue(now);
+    } catch (err) {
+      console.error('Reminder error for row ' + i + ': ' + err.message);
+    }
+  }
+}
+
+// ============================================================================
+// PORTAL URL HELPERS (menu items)
+// ============================================================================
+
+/** Shows the Workload Portal URL. */
+function showWorkloadPortalUrl() {
+  var baseUrl = PropertiesService.getScriptProperties().getProperty('WT_PORTAL_URL') || '';
+  var ui = SpreadsheetApp.getUi();
+  if (baseUrl) {
+    ui.alert('Workload Portal URL', baseUrl + '?page=workload\n\nShare this link with members to submit workload data.', ui.ButtonSet.OK);
+  } else {
+    ui.alert('Not configured', 'Deploy the web app, then use "Share Portal Link" to save its URL.', ui.ButtonSet.OK);
+  }
+}
+
+/** Saves the web app URL for use in reminders and portal sharing. */
+function shareWorkloadPortalLink() {
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.prompt('Save Workload Portal URL',
+    'Paste the deployed Web App URL (the ?page=workload suffix will be added automatically):',
+    ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() === ui.Button.OK) {
+    var url = response.getResponseText().trim().replace(/[?&]page=workload.*$/, '');
+    if (url) {
+      PropertiesService.getScriptProperties().setProperty('WT_PORTAL_URL', url);
+      ui.alert('Portal URL saved. Members can now access workload tracking at:\n' + url + '?page=workload');
+    }
+  }
+}
+
+/** Public menu alias for wtArchiveOldData_ (private functions cannot be bound to menu items). */
+function archiveWorkloadData() { wtArchiveOldData_(); }
+
+
+// ============================================================================
 // EMBEDDED HTML TEMPLATES
 // ============================================================================
 
@@ -60215,6 +61328,737 @@ function getMultiSelectDialog_HTML() {
       }, { passive: true });
     })();
   </script>
+</body>
+</html>
+`;
+}
+
+/**
+ * Embedded HTML: WorkloadTracker.html
+ * @returns {string} HTML content
+ */
+function getWorkloadTracker_HTML() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Workload Tracker | SEIU 509 DDS Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #141414;
+      --surface: #1e1e1e;
+      --raised: #262626;
+      --border: #2a2a2a;
+      --text: #e0e0e0;
+      --muted: #6b6b6b;
+      --accent: #4285f4;
+      --accent-hover: #5a95f5;
+      --danger: #ef4444;
+      --success: #4ade80;
+      --warning: #facc15;
+      --radius: 10px;
+      --font: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .container { max-width: 680px; margin: 0 auto; }
+
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 24px 0 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .header h1 { font-size: 1.4rem; color: var(--text); letter-spacing: -0.3px; font-family: 'Space Grotesk', sans-serif; }
+    .header p  { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 0.95rem; color: var(--muted); text-transform: uppercase;
+               letter-spacing: 0.5px; margin-bottom: 14px; }
+
+    /* Inputs */
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; margin-top: 12px; }
+    label:first-child { margin-top: 0; }
+    input[type="text"], input[type="email"], input[type="password"],
+    input[type="number"], select {
+      width: 100%;
+      background: var(--raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 9px 12px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+      font-size: 16px; /* Prevents iOS zoom */
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    /* Workload category grid */
+    .category-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 480px) { .category-grid { grid-template-columns: 1fr; } }
+
+    .category-item {
+      background: var(--raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+    .category-item .cat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .category-item .cat-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .category-item .expand-btn {
+      font-size: 0.7rem;
+      color: var(--accent);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .category-item .expand-btn:hover { background: var(--border); }
+    .category-item input[type="number"] {
+      font-size: 1.1rem;
+      font-weight: 600;
+      text-align: center;
+      padding: 6px;
+    }
+
+    /* Sub-category modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      width: 100%;
+      max-width: 420px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal h3 { font-size: 1rem; margin-bottom: 14px; color: var(--text); }
+    .sub-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    .sub-row:last-child { border-bottom: none; }
+    .sub-row input { width: 60px; text-align: center; padding: 4px 6px; }
+    .modal-total {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      color: var(--accent);
+    }
+    .modal-footer { display: flex; gap: 8px; margin-top: 16px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+    .btn:active { opacity: 0.8; }
+    .btn-primary { background: var(--accent); color: #fff; width: 100%; text-align: center; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--raised); color: var(--text); border: 1px solid var(--border); }
+    .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Privacy toggle */
+    .privacy-options { display: flex; gap: 8px; flex-wrap: wrap; }
+    .privacy-option {
+      flex: 1; min-width: 90px;
+      padding: 10px 8px;
+      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      background: var(--raised);
+      cursor: pointer;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+    .privacy-option.selected { border-color: var(--accent); color: var(--text); background: #1c2a3a; }
+    .privacy-option .privacy-icon { font-size: 1.2rem; display: block; margin-bottom: 4px; }
+
+    /* Tabs */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+    .tab-btn {
+      padding: 10px 16px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Alert */
+    .alert {
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert-error   { background: #2a1215; border: 1px solid var(--danger);  color: var(--danger);  }
+    .alert-success { background: #122116; border: 1px solid var(--success); color: var(--success); }
+    .alert-info    { background: #111c2a; border: 1px solid var(--accent);  color: var(--accent);  }
+
+    /* History item */
+    .history-item {
+      background: var(--raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+    }
+    .history-date { color: var(--muted); font-size: 0.8rem; margin-bottom: 8px; }
+    .history-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .history-stat { text-align: center; }
+    .history-stat .val { font-size: 1.1rem; font-weight: 600; color: var(--accent); }
+    .history-stat .key { font-size: 0.7rem; color: var(--muted); }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .stat-card {
+      background: var(--raised);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      text-align: center;
+    }
+    .stat-card .stat-val { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+    .stat-card .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+    .mt-8 { margin-top: 8px; }
+    .text-muted { color: var(--muted); font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <h1>📊 Workload Tracker</h1>
+    <p>SEIU 509 DDS &mdash; Secure, anonymized caseload tracking</p>
+  </div>
+
+  <!-- Auth Section (shown until logged in) -->
+  <div id="authSection" class="card">
+    <h2>Sign In</h2>
+    <div id="authAlert" class="alert"></div>
+    <label for="authEmail">Work Email</label>
+    <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+    <label for="authPin">DDS Member PIN (6 digits)</label>
+    <input type="password" id="authPin" placeholder="••••••" maxlength="6" inputmode="numeric">
+    <p class="text-muted mt-8">Use the PIN generated by your steward. Don't have one? Contact your steward.</p>
+    <br>
+    <button class="btn btn-primary" onclick="doAuth()" id="authBtn">Sign In</button>
+  </div>
+
+  <!-- Main App (hidden until logged in) -->
+  <div id="mainApp" class="hidden">
+    <!-- Tab nav -->
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('entry',this)">📋 Submit</button>
+      <button class="tab-btn" onclick="switchTab('history',this)">📜 My History</button>
+      <button class="tab-btn" onclick="switchTab('stats',this)">📈 Collective Stats</button>
+    </div>
+
+    <!-- SUBMIT TAB -->
+    <div id="tab-entry" class="tab-content active">
+      <div id="submitAlert" class="alert"></div>
+      <div class="card">
+        <h2>This Week's Caseload</h2>
+        <div class="category-grid" id="categoryGrid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Employment & Availability</h2>
+        <label for="employmentType">Employment Type</label>
+        <select id="employmentType" onchange="togglePtHours()">
+          <option value="Full-time">Full-time</option>
+          <option value="Part-time">Part-time</option>
+        </select>
+        <div id="ptHoursRow" class="hidden">
+          <label for="ptHours">Part-Time Hours / Week</label>
+          <input type="number" id="ptHours" min="1" max="40" placeholder="e.g. 20">
+        </div>
+        <label>
+          <input type="checkbox" id="overtimeEnabled" onchange="toggleOvertime()" style="width:auto;margin-right:6px">
+          Tracking Overtime This Week
+        </label>
+        <div id="overtimeRow" class="hidden">
+          <label for="overtimeHours">Overtime Hours</label>
+          <input type="number" id="overtimeHours" min="0" max="99" placeholder="hours">
+        </div>
+        <label>
+          <input type="checkbox" id="onPlan" style="width:auto;margin-right:6px">
+          Currently on Performance Plan
+        </label>
+      </div>
+
+      <div class="card">
+        <h2>Privacy</h2>
+        <div class="privacy-options">
+          <div class="privacy-option selected" data-val="Unit" onclick="selectPrivacy(this)">
+            <span class="privacy-icon">🏢</span>Unit Anonymous
+          </div>
+          <div class="privacy-option" data-val="Agency" onclick="selectPrivacy(this)">
+            <span class="privacy-icon">🌐</span>Agency Anonymous
+          </div>
+          <div class="privacy-option" data-val="Private" onclick="selectPrivacy(this)">
+            <span class="privacy-icon">🔒</span>Private
+          </div>
+        </div>
+        <p class="text-muted mt-8">Private submissions are excluded from collective stats. Unit/Agency submissions use REDACTED identity.</p>
+      </div>
+
+      <button class="btn btn-primary" onclick="submitWorkload()" id="submitBtn">Submit Workload Data</button>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" class="tab-content">
+      <div id="historyAlert" class="alert alert-info show">Loading your history...</div>
+      <div id="historyList"></div>
+    </div>
+
+    <!-- STATS TAB -->
+    <div id="tab-stats" class="tab-content">
+      <div id="statsAlert" class="alert alert-info show">Loading collective stats...</div>
+      <div id="statsGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Sub-category modal -->
+<div class="modal-overlay" id="subModal">
+  <div class="modal">
+    <h3 id="modalTitle">Sub-categories</h3>
+    <div id="modalBody"></div>
+    <div class="modal-total">
+      <span>Total</span>
+      <span id="modalTotal">0</span>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="applySubModal()">Apply</button>
+      <button class="btn btn-ghost" onclick="closeSubModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Category definitions ──────────────────────────────────────────────────
+  var CATEGORIES = [
+    { key: 'priority',   label: 'Priority Cases',      icon: '🔴', t: 't1' },
+    { key: 'pending',    label: 'Pending Cases',        icon: '🟡', t: 't2' },
+    { key: 'unread',     label: 'Unread Documents',     icon: '📄', t: 't3' },
+    { key: 'todo',       label: 'To-Do Items',          icon: '✅', t: 't4' },
+    { key: 'referrals',  label: 'Sent Referrals',       icon: '📤', t: 't5' },
+    { key: 'ce',         label: 'CE Activities',        icon: '📚', t: 't6' },
+    { key: 'assistance', label: 'Assistance Requests',  icon: '🤝', t: 't7' },
+    { key: 'aged',       label: 'Aged Cases',           icon: '⏳', t: 't8' }
+  ];
+
+  var SUB_CATS = {
+    priority:   ['QDD','CAL','TERI','Aged Case','Congressional','Dire Need','Homeless',
+                 'Presumptive Disability','COBRA','DDS Aged','SOAR Involvement',
+                 'MC/WW','100% P&T','Public Inquiry','DDS Important (High)','DDS Important (Medium)'],
+    pending:    ['New Cases','Immediate Action','No Activity 15+ Days',
+                 'No Activity 30+ Days','Internal QA Returns','Federal QA Returns','Approval Returns'],
+    unread:     ['All Unread Documents','MER','CE Reports','Trailer Mail'],
+    todo:       ['Follow-Ups Due','Unread Case Notes','Delivery Failures','Updates'],
+    referrals:  ['MC/PC','General'],
+    ce:         ['All CE Activities','Scheduled','Not Kept','Under Review'],
+    assistance: ['Outbound'],
+    aged:       ['60-89 Days','90-119 Days','120-179 Days','180+ Days']
+  };
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  var authedEmail = '';
+  var authedPin   = '';
+  var selectedPrivacy = 'Unit';
+  var subData = {};  // { priority: { 'QDD': 0 }, ... }
+  var activeModalCatIdx = -1;
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  function doAuth() {
+    var email = document.getElementById('authEmail').value.trim();
+    var pin   = document.getElementById('authPin').value.trim();
+    if (!email || !pin) { showAlert('authAlert','error','Please enter your email and PIN.'); return; }
+
+    var btn = document.getElementById('authBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Signing in...';
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+        // Test auth: call getWorkloadUserHistory to confirm creds work
+        if (!email || !pin) { showAlert('authAlert','error','Invalid response.'); return; }
+        authedEmail = email;
+        authedPin   = pin;
+        document.getElementById('authSection').classList.add('hidden');
+        document.getElementById('mainApp').classList.remove('hidden');
+        buildCategoryGrid();
+        loadHistory();
+        loadStats();
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+        showAlert('authAlert','error', err.message || 'Sign-in failed. Please try again.');
+      })
+      .getWorkloadUserHistory(email, pin);
+  }
+
+  // ── Category grid ─────────────────────────────────────────────────────────
+  function buildCategoryGrid() {
+    var grid = document.getElementById('categoryGrid');
+    grid.innerHTML = '';
+    CATEGORIES.forEach(function(cat, idx) {
+      var item = document.createElement('div');
+      item.className = 'category-item';
+      item.innerHTML =
+        '<div class="cat-header">' +
+          '<span class="cat-label">' + cat.icon + ' ' + cat.label + '</span>' +
+          '<button class="expand-btn" onclick="openSubModal(' + idx + ')">+ detail</button>' +
+        '</div>' +
+        '<input type="number" id="' + cat.t + '" min="0" max="999" value="0" ' +
+          'onchange="syncSubTotal(' + idx + ')" oninput="syncSubTotal(' + idx + ')">';
+      grid.appendChild(item);
+    });
+  }
+
+  // ── Privacy ───────────────────────────────────────────────────────────────
+  function selectPrivacy(el) {
+    document.querySelectorAll('.privacy-option').forEach(function(o) { o.classList.remove('selected'); });
+    el.classList.add('selected');
+    selectedPrivacy = el.dataset.val;
+  }
+
+  // ── Employment toggles ────────────────────────────────────────────────────
+  function togglePtHours() {
+    var v = document.getElementById('employmentType').value;
+    document.getElementById('ptHoursRow').classList.toggle('hidden', v !== 'Part-time');
+  }
+  function toggleOvertime() {
+    var checked = document.getElementById('overtimeEnabled').checked;
+    document.getElementById('overtimeRow').classList.toggle('hidden', !checked);
+  }
+
+  // ── Sub-category modal ────────────────────────────────────────────────────
+  function openSubModal(catIdx) {
+    activeModalCatIdx = catIdx;
+    var cat = CATEGORIES[catIdx];
+    var subs = SUB_CATS[cat.key] || [];
+    var existing = subData[cat.key] || {};
+
+    document.getElementById('modalTitle').textContent = cat.icon + ' ' + cat.label + ' — Sub-categories';
+    var body = document.getElementById('modalBody');
+    body.innerHTML = '';
+    subs.forEach(function(name, si) {
+      var val = existing[name] || 0;
+      var row = document.createElement('div');
+      row.className = 'sub-row';
+      row.innerHTML = '<span>' + name + '</span>' +
+        '<input type="number" id="sub_' + (catIdx+1) + '_' + si + '" min="0" max="999" value="' + val + '" ' +
+        'onchange="updateModalTotal()" oninput="updateModalTotal()">';
+      body.appendChild(row);
+    });
+    updateModalTotal();
+    document.getElementById('subModal').classList.add('active');
+  }
+
+  function updateModalTotal() {
+    var cat = CATEGORIES[activeModalCatIdx];
+    var subs = SUB_CATS[cat.key] || [];
+    var total = 0;
+    subs.forEach(function(name, si) {
+      var el = document.getElementById('sub_' + (activeModalCatIdx+1) + '_' + si);
+      if (el) total += parseInt(el.value, 10) || 0;
+    });
+    document.getElementById('modalTotal').textContent = total;
+  }
+
+  function applySubModal() {
+    var cat = CATEGORIES[activeModalCatIdx];
+    var subs = SUB_CATS[cat.key] || [];
+    var total = 0;
+    subData[cat.key] = {};
+    subs.forEach(function(name, si) {
+      var el = document.getElementById('sub_' + (activeModalCatIdx+1) + '_' + si);
+      var val = el ? (parseInt(el.value, 10) || 0) : 0;
+      if (val > 0) { subData[cat.key][name] = val; }
+      total += val;
+    });
+    // Update main category total input
+    var mainInput = document.getElementById(cat.t);
+    if (mainInput && total > 0) { mainInput.value = total; }
+    closeSubModal();
+  }
+
+  function closeSubModal() {
+    document.getElementById('subModal').classList.remove('active');
+    activeModalCatIdx = -1;
+  }
+
+  function syncSubTotal(catIdx) { /* main input is source of truth */ }
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  function submitWorkload() {
+    var btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Submitting...';
+
+    var formObj = {
+      email: authedEmail,
+      pin:   authedPin,
+      privacy: selectedPrivacy,
+      employment_type: document.getElementById('employmentType').value,
+      on_plan: document.getElementById('onPlan').checked,
+      overtime_enabled: document.getElementById('overtimeEnabled').checked,
+      overtime_hours:  document.getElementById('overtimeHours').value || 0,
+      weekly_cases: 15
+    };
+
+    if (formObj.employment_type === 'Part-time') {
+      formObj.part_time_hours = document.getElementById('ptHours').value;
+    }
+
+    // Map category totals
+    CATEGORIES.forEach(function(cat) {
+      formObj[cat.t] = parseInt(document.getElementById(cat.t).value, 10) || 0;
+    });
+
+    // Map sub-category fields
+    CATEGORIES.forEach(function(cat, catIdx) {
+      var subs = SUB_CATS[cat.key] || [];
+      subs.forEach(function(name, si) {
+        var el = document.getElementById('sub_' + (catIdx+1) + '_' + si);
+        formObj['sub_' + (catIdx+1) + '_' + si] = el ? (parseInt(el.value, 10) || 0) : 0;
+      });
+    });
+
+    google.script.run
+      .withSuccessHandler(function(msg) {
+        btn.disabled = false;
+        btn.textContent = 'Submit Workload Data';
+        if (msg.indexOf('Success') === 0) {
+          showAlert('submitAlert', 'success', msg);
+          loadHistory();
+          loadStats();
+        } else {
+          showAlert('submitAlert', 'error', msg);
+        }
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'Submit Workload Data';
+        showAlert('submitAlert', 'error', err.message || 'Submission failed.');
+      })
+      .processWorkloadForm(formObj);
+  }
+
+  // ── History tab ───────────────────────────────────────────────────────────
+  function loadHistory() {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        var el = document.getElementById('historyAlert');
+        var list = document.getElementById('historyList');
+        if (!result.success) {
+          el.className = 'alert alert-error show';
+          el.textContent = result.message || 'Failed to load history.';
+          return;
+        }
+        el.className = 'alert hidden';
+        list.innerHTML = '';
+        if (!result.history || result.history.length === 0) {
+          list.innerHTML = '<p class="text-muted" style="padding:12px">No submissions yet.</p>';
+          return;
+        }
+        result.history.slice(0, 10).forEach(function(h) {
+          var d = new Date(h.date);
+          var dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+          var div = document.createElement('div');
+          div.className = 'history-item';
+          div.innerHTML = '<div class="history-date">' + dateStr + ' &mdash; ' + (h.privacy || 'Unit') + '</div>' +
+            '<div class="history-grid">' +
+              stat('Priority', h.t1) + stat('Pending', h.t2) +
+              stat('Unread', h.t3) + stat('To-Do', h.t4) +
+              stat('Referrals', h.t5) + stat('CE', h.t6) +
+              stat('Assist.', h.t7) + stat('Aged', h.t8) +
+            '</div>';
+          list.appendChild(div);
+        });
+      })
+      .withFailureHandler(function() {
+        document.getElementById('historyAlert').className = 'alert alert-error show';
+        document.getElementById('historyAlert').textContent = 'Failed to load history.';
+      })
+      .getWorkloadUserHistory(authedEmail, authedPin);
+  }
+
+  function stat(label, val) {
+    return '<div class="history-stat"><div class="val">' + (val || 0) + '</div><div class="key">' + label + '</div></div>';
+  }
+
+  // ── Stats tab ─────────────────────────────────────────────────────────────
+  function loadStats() {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        var el = document.getElementById('statsAlert');
+        var grid = document.getElementById('statsGrid');
+        if (!result.success) {
+          el.className = 'alert alert-error show';
+          el.textContent = result.message || 'Failed to load stats.';
+          return;
+        }
+        el.className = 'alert hidden';
+        var d = result.data || {};
+        var cats = d.categories || {};
+        var avgs = d.averages || {};
+        var html = '<div class="stats-grid">' +
+          statCard(d.totalSubmissions || 0, 'Total Submissions') +
+          statCard(d.members || 0, 'Members Contributing') +
+          '</div>' +
+          '<div class="card" style="margin-top:12px"><h2>Category Averages (per submission)</h2>' +
+          '<div class="category-grid">';
+        Object.keys(cats).forEach(function(key) {
+          html += '<div class="stat-card"><div class="stat-val">' + (avgs[key] || '0') +
+            '</div><div class="stat-label">' + key + '</div></div>';
+        });
+        html += '</div></div>';
+        grid.innerHTML = html;
+      })
+      .withFailureHandler(function() {
+        document.getElementById('statsAlert').className = 'alert alert-error show';
+        document.getElementById('statsAlert').textContent = 'Failed to load collective stats.';
+      })
+      .getWorkloadDashboardData(authedEmail, authedPin);
+  }
+
+  function statCard(val, label) {
+    return '<div class="stat-card"><div class="stat-val">' + val + '</div><div class="stat-label">' + label + '</div></div>';
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'history') loadHistory();
+    if (name === 'stats') loadStats();
+  }
+
+  // ── Alert helper ──────────────────────────────────────────────────────────
+  function showAlert(id, type, msg) {
+    var el = document.getElementById(id);
+    el.className = 'alert alert-' + type + ' show';
+    el.textContent = msg;
+    if (type === 'success') {
+      setTimeout(function() { el.className = 'alert'; }, 4000);
+    }
+  }
+
+  // ── Keyboard: Enter to sign in ────────────────────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !document.getElementById('authSection').classList.contains('hidden')) {
+      doAuth();
+    }
+  });
+
+  // ── iOS zoom prevention ───────────────────────────────────────────────────
+  document.addEventListener('focusin', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+      document.querySelector('meta[name="viewport"]').setAttribute('content',
+        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+    }
+  });
+</script>
 </body>
 </html>
 `;
