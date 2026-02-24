@@ -35,6 +35,28 @@ function doGetWebDashboard(e) {
     var userRecord = DataService.findUserByEmail(user.email);
     
     if (!userRecord) {
+      // Check if the visitor is the script owner — grant bootstrap access
+      // so the app is usable before the Member Directory is populated.
+      try {
+        var ownerEmail = Session.getEffectiveUser().getEmail().toLowerCase();
+        if (user.email && user.email.toLowerCase() === ownerEmail) {
+          userRecord = {
+            email: user.email,
+            name: 'Admin',
+            firstName: 'Admin',
+            lastName: '',
+            role: 'both',
+            unit: 'Admin',
+            joined: '',
+            duesStatus: 'Active',
+            phone: '',
+            isBootstrapAdmin: true,
+          };
+        }
+      } catch (ownerErr) { /* SSO not available — fall through */ }
+    }
+
+    if (!userRecord) {
       // Email not in directory
       return _serveError(config, 'not_found', user.email);
     }
