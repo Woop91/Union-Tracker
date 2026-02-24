@@ -59,7 +59,7 @@ function statStdDev_(arr) {
  */
 function pearsonCorrelation_(x, y) {
   var n = Math.min(x.length, y.length);
-  if (n < 5) return 0; // Need at least 5 pairs for statistically meaningful correlation
+  if (n < 3) return 0; // Need at least 3 pairs for meaningful correlation
 
   var meanX = statMean_(x.slice(0, n));
   var meanY = statMean_(y.slice(0, n));
@@ -73,8 +73,6 @@ function pearsonCorrelation_(x, y) {
     sumY2 += dy * dy;
   }
 
-  // denom===0 when either variable has zero variance (all values identical),
-  // in which case correlation is undefined — return 0 as a safe sentinel.
   var denom = Math.sqrt(sumX2 * sumY2);
   if (denom === 0) return 0;
   return sumXY / denom;
@@ -90,7 +88,7 @@ function pearsonCorrelation_(x, y) {
  */
 function spearmanCorrelation_(x, y) {
   var n = Math.min(x.length, y.length);
-  if (n < 5) return 0;
+  if (n < 3) return 0;
   return pearsonCorrelation_(toRanks_(x.slice(0, n)), toRanks_(y.slice(0, n)));
 }
 
@@ -361,7 +359,7 @@ function correlateLocationSatVsGrievance_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('satisfaction', 'grievance filing rate', r, cls, 'location', x.length)
+    insight: generateInsight_('satisfaction', 'grievance filing rate', r, cls, 'location')
   };
 }
 
@@ -412,7 +410,7 @@ function correlateStewardWinVsEngagement_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('steward win rate', 'member engagement', r, cls, 'steward', x.length)
+    insight: generateInsight_('steward win rate', 'member engagement', r, cls, 'steward')
   };
 }
 
@@ -475,7 +473,7 @@ function correlateCategoryVsResolutionTime_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     categoryBreakdown: catData,
-    insight: generateInsight_('case volume', 'resolution time', r, cls, 'category', x.length)
+    insight: generateInsight_('case volume', 'resolution time', r, cls, 'category')
   };
 }
 
@@ -521,7 +519,7 @@ function correlateEngagementVsSatisfaction_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('member engagement', 'satisfaction', r, cls, 'location', x.length)
+    insight: generateInsight_('member engagement', 'satisfaction', r, cls, 'location')
   };
 }
 
@@ -569,7 +567,7 @@ function correlateEngagementVsGrievance_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('engagement rate', 'grievance concentration', r, cls, 'location', x.length)
+    insight: generateInsight_('engagement rate', 'grievance concentration', r, cls, 'location')
   };
 }
 
@@ -652,7 +650,7 @@ function correlateArticleVsOutcome_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     articleBreakdown: articleOutcomes,
-    insight: generateInsight_('violation frequency', 'win rate', r, cls, 'contract article', x.length)
+    insight: generateInsight_('violation frequency', 'win rate', r, cls, 'contract article')
   };
 }
 
@@ -699,7 +697,7 @@ function correlateStepVsTime_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     stepBreakdown: stepMap,
-    insight: generateInsight_('step level', 'resolution time', r, cls, 'grievance step', x.length)
+    insight: generateInsight_('step level', 'resolution time', r, cls, 'grievance step')
   };
 }
 
@@ -744,7 +742,7 @@ function correlateUnitSizeVsSatisfaction_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('unit size', 'satisfaction', r, cls, 'unit', x.length)
+    insight: generateInsight_('unit size', 'satisfaction', r, cls, 'unit')
   };
 }
 
@@ -784,7 +782,7 @@ function correlateCaseloadVsWinRate_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('caseload size', 'win rate', r, cls, 'steward', x.length)
+    insight: generateInsight_('caseload size', 'win rate', r, cls, 'steward')
   };
 }
 
@@ -830,7 +828,7 @@ function correlateVolunteerVsEngagement_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('email engagement', 'meeting attendance', r, cls, 'location', x.length)
+    insight: generateInsight_('email engagement', 'meeting attendance', r, cls, 'location')
   };
 }
 
@@ -850,14 +848,14 @@ function correlateVolunteerVsEngagement_(data) {
  * @returns {string} Plain-language insight
  * @private
  */
-function generateInsight_(varX, varY, r, cls, dimension, n) {
+function generateInsight_(varX, varY, r, cls, dimension) {
   if (!cls.reliable) {
     if (cls.confidence === 'insufficient') {
       return 'Not enough data points across ' + dimension + 's to draw conclusions. Revisit when more data is available.';
     }
     return 'The association between ' + varX + ' and ' + varY + ' across ' + dimension +
            's is too weak (r=' + (Math.round(r * 100) / 100) + ') or sample too small (n=' +
-           (n || '?') + ') to be meaningful.';
+           ') to be meaningful.';
   }
 
   var direction = r > 0 ? 'higher' : 'lower';

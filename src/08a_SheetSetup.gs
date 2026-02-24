@@ -127,10 +127,6 @@ function CREATE_DASHBOARD() {
     reorderSheetsToStandard(ss);
     ss.toast('Sheets reordered', '🏗️ Progress', 2);
 
-    // Install hourly trigger to keep hidden sheets hidden on mobile
-    installHiddenSheetEnforcerTrigger();
-    ss.toast('Hidden sheet enforcer installed', '🏗️ Progress', 2);
-
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
@@ -259,7 +255,7 @@ function setupHiddenSheets(ss) {
     }
     sheet.clear();
     config.setup(sheet);
-    setSheetVeryHidden_(sheet);
+    sheet.hideSheet();
   });
 
   // Self-contained hidden sheet setups (each creates/hides its own sheet)
@@ -323,21 +319,6 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
-  // IS_STEWARD and INTEREST_* columns use hardcoded Yes/No validation.
-  // The YES_NO Config column was removed to eliminate contamination risk.
-  // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
-  var yesNoValues = ['Yes', 'No'];
-  var yesNoCols = [MEMBER_COLS.IS_STEWARD, MEMBER_COLS.INTEREST_LOCAL,
-                   MEMBER_COLS.INTEREST_CHAPTER, MEMBER_COLS.INTEREST_ALLIED];
-  var yesNoRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(yesNoValues, true)
-    .setAllowInvalid(true)
-    .build();
-  for (var yn = 0; yn < yesNoCols.length; yn++) {
-    var ynRange = memberSheet.getRange(2, yesNoCols[yn], Math.max(1, memberSheet.getMaxRows() - 1), 1);
-    ynRange.setDataValidation(yesNoRule);
-  }
-
   // Member Directory Validations — driven by MULTI_SELECT_COLS
   var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
   for (var mm = 0; mm < memberMS.length; mm++) {
@@ -367,8 +348,7 @@ function setupDataValidations() {
  */
 function setMemberIdValidation(grievanceSheet, memberSheet) {
   var memberIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var lastRow = Math.max(memberSheet.getLastRow(), 2);
-  var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + lastRow);
+  var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + '1000');
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInRange(sourceRange, true)
@@ -401,19 +381,14 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     }
   }
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
-
-  if (values.length === 0) {
-    // Clear any stale validation so cells don't show errors against an old list
-    targetRange.clearDataValidations();
-    return;
-  }
+  if (values.length === 0) return; // No values to validate against
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -438,19 +413,14 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     }
   }
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
-
-  if (values.length === 0) {
-    // Clear any stale validation so cells don't show errors against an old list
-    targetRange.clearDataValidations();
-    return;
-  }
+  if (values.length === 0) return;
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow comma-separated values from multi-select dialog
     .build();
 
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -484,13 +454,6 @@ function getConfigValues(configSheet, col) {
  * @returns {void}
  */
 function applyMultiSelectValue(value) {
-  // The inline dialog (getMultiSelectHtml) passes an array of selected IDs,
-  // while MultiSelectDialog.html passes a pre-joined comma string.
-  // Normalise to a comma-separated string so all selections are saved.
-  if (Array.isArray(value)) {
-    value = value.join(', ');
-  }
-
   var props = PropertiesService.getUserProperties();
   var row = parseInt(props.getProperty('multiSelectRow'), 10);
   var col = parseInt(props.getProperty('multiSelectCol'), 10);
@@ -574,59 +537,50 @@ function onSelectionChangeMultiSelect(e) {
 }
 
 /**
- * Enables the multi-select auto-open feature.
- * Uses a user property flag checked by the simple onSelectionChange trigger.
- * (onSelectionChange cannot be installed via ScriptApp.newTrigger; it only
- * works as a simple trigger defined in code.)
+ * Installs the multi-select auto-open trigger
  * @returns {void}
  */
 function installMultiSelectTrigger() {
-  var props = PropertiesService.getUserProperties();
-  if (props.getProperty('multiSelectAutoOpen') === 'true') {
-    SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled.');
-    return;
-  }
-
-  props.setProperty('multiSelectAutoOpen', 'true');
-
-  // Clean up any legacy .onChange() triggers that were incorrectly installed
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var triggers = ScriptApp.getUserTriggers(ss);
-  triggers.forEach(function(trigger) {
-    if (trigger.getHandlerFunction() === 'onSelectionChangeMultiSelect') {
-      ScriptApp.deleteTrigger(trigger);
+
+  // Check if trigger already exists
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'onSelectionChangeMultiSelect') {
+      SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled.');
+      return;
     }
-  });
+  }
+
+  ScriptApp.newTrigger('onSelectionChangeMultiSelect')
+    .forSpreadsheet(ss)
+    .onChange()
+    .create();
 
   SpreadsheetApp.getUi().alert('Multi-Select auto-open has been enabled!\n\n' +
     'The multi-select dialog will now open automatically when you click a multi-select cell.');
 }
 
 /**
- * Disables the multi-select auto-open feature.
- * Clears the user property flag and removes any legacy installable triggers.
+ * Removes the multi-select auto-open trigger
  * @returns {void}
  */
 function removeMultiSelectTrigger() {
-  var props = PropertiesService.getUserProperties();
-  var wasEnabled = props.getProperty('multiSelectAutoOpen') === 'true';
-  props.deleteProperty('multiSelectAutoOpen');
-  props.deleteProperty('lastMultiSelectCell');
-
-  // Also clean up any legacy .onChange() triggers
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var triggers = ScriptApp.getUserTriggers(ss);
+  var removed = false;
+
   triggers.forEach(function(trigger) {
     if (trigger.getHandlerFunction() === 'onSelectionChangeMultiSelect') {
       ScriptApp.deleteTrigger(trigger);
-      wasEnabled = true;
+      removed = true;
     }
   });
 
-  if (wasEnabled) {
+  if (removed) {
     SpreadsheetApp.getUi().alert('Multi-Select auto-open has been disabled.');
   } else {
-    SpreadsheetApp.getUi().alert('Multi-Select auto-open was not enabled.');
+    SpreadsheetApp.getUi().alert('No multi-select trigger was found.');
   }
 }
 

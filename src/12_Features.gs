@@ -1330,8 +1330,8 @@ function setupChecklistCalcSheet() {
   sheet.setColumnWidth(7, 100);  // All Required Done
   sheet.setColumnWidth(8, 120);  // Display String
 
-  // Hide the sheet (mobile-safe via Sheets API + protection)
-  setSheetVeryHidden_(sheet);
+  // Hide the sheet
+  sheet.hideSheet();
 
   Logger.log('_Checklist_Calc sheet setup complete with self-healing formulas');
   return sheet;
@@ -1676,7 +1676,7 @@ function repairDynamicFormulas() {
 
   if (!calcSheet) {
     calcSheet = ss.insertSheet(EXTENSION_CONFIG.HIDDEN_CALC_SHEET);
-    setSheetVeryHidden_(calcSheet);
+    calcSheet.hideSheet();
   }
 
   const startRow = EXTENSION_CONFIG.DYNAMIC_FORMULA_ROW;
@@ -1836,9 +1836,7 @@ function saveExpansionData(memberId, customData) {
     const fieldName = fieldNames[i];
     const col = headerMap[fieldName];
     if (col && col > coreCount) {
-      var rawValue = customData[fieldName];
-      var safeValue = typeof rawValue === 'string' ? escapeForFormula(rawValue) : rawValue;
-      updates.push({ col: col, value: safeValue });
+      updates.push({ col: col, value: customData[fieldName] });
     }
   }
 
@@ -1877,22 +1875,24 @@ function saveExpansionData(memberId, customData) {
  */
 function setupMemberLeaderRole() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const configSheetName = SHEETS.CONFIG;
+  const configSheet = ss.getSheetByName(configSheetName);
 
-  // Add "Member Leader" directly to IS_STEWARD validation (not Config column E).
-  // IS_STEWARD uses hardcoded validation; Config column E is reserved for INTEREST_* columns.
-  const memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (!memberSheet) {
-    SpreadsheetApp.getUi().alert('Error: Member Directory not found. Run CREATE_DASHBOARD first.');
-    return errorResponse('Member Directory not found');
+  if (!configSheet) {
+    SpreadsheetApp.getUi().alert('Error: Config sheet not found');
+    return errorResponse('Config sheet not found');
   }
 
-  const leaderValues = ['Yes', 'No', EXTENSION_CONFIG.LEADER_ROLE_NAME];
-  const isRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
-  const isRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(leaderValues, true)
-    .setAllowInvalid(true)
-    .build();
-  isRange.setDataValidation(isRule);
+  const yesNoCol = CONFIG_COLS.YES_NO;
+  const existingValues = configSheet.getRange(3, yesNoCol, 10, 1).getValues().flat().filter(Boolean);
+
+  if (existingValues.indexOf(EXTENSION_CONFIG.LEADER_ROLE_NAME) !== -1) {
+    ss.toast('Member Leader role already configured', 'Setup Complete', 3);
+    return { success: true, alreadyExists: true };
+  }
+
+  const nextRow = existingValues.length + 3;
+  configSheet.getRange(nextRow, yesNoCol).setValue(EXTENSION_CONFIG.LEADER_ROLE_NAME);
 
   if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
     logAuditEvent(AUDIT_EVENTS.SETTINGS_CHANGED, {
@@ -1902,8 +1902,8 @@ function setupMemberLeaderRole() {
     });
   }
 
-  ss.toast('Member Leader role added to IS_STEWARD validation.', 'Setup Complete', 5);
-  return { success: true };
+  ss.toast('Member Leader role added to Config.', 'Setup Complete', 5);
+  return { success: true, addedAt: nextRow };
 }
 
 /**
@@ -2309,8 +2309,8 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
 </head>
 <body>
   <div class="header">
-    <h2>Grievance ${escapeHtml(grievanceId)}</h2>
-    <div class="member">${escapeHtml(reminders.memberName)} • ${escapeHtml(reminders.status)}</div>
+    <h2>Grievance ${grievanceId}</h2>
+    <div class="member">${reminders.memberName} • ${reminders.status}</div>
   </div>
 
   <div class="reminder-card">
@@ -2321,7 +2321,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
     </div>
     <div class="form-group">
       <label class="form-label">Note (e.g., "Schedule Step II meeting")</label>
-      <input type="text" class="form-input" id="r1Note" value="${escapeHtml(reminders.reminder1.note)}" placeholder="Brief description...">
+      <input type="text" class="form-input" id="r1Note" value="${reminders.reminder1.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
     </div>
     <div class="btn-row">
       <button class="btn btn-clear" onclick="clearReminder(1)">Clear</button>
@@ -2336,7 +2336,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
     </div>
     <div class="form-group">
       <label class="form-label">Note</label>
-      <input type="text" class="form-input" id="r2Note" value="${escapeHtml(reminders.reminder2.note)}" placeholder="Brief description...">
+      <input type="text" class="form-input" id="r2Note" value="${reminders.reminder2.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
     </div>
     <div class="btn-row">
       <button class="btn btn-clear" onclick="clearReminder(2)">Clear</button>
@@ -2351,7 +2351,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
   </div>
 
   <script>
-    var grievanceId = ${JSON.stringify(grievanceId)};
+    var grievanceId = '${grievanceId}';
 
     function saveReminders() {
       var r1Date = document.getElementById('r1Date').value;
@@ -2583,7 +2583,7 @@ function setupLookerIntegration() {
 
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      setSheetVeryHidden_(sheet);
+      sheet.hideSheet();
       created.push(sheetName);
     }
   }
@@ -2799,8 +2799,8 @@ function refreshLookerGrievances_() {
       row[cols.INCIDENT_DATE - 1] || '',
       dateFiled || '',
       dateClosed || '',
-      numericField_(row[cols.DAYS_OPEN - 1]),
-      numericField_(daysToDeadline),
+      row[cols.DAYS_OPEN - 1] || '',
+      daysToDeadline || '',
       isOverdue ? 'Yes' : 'No',
       row[cols.ISSUE_CATEGORY - 1] || '',
       row[cols.ARTICLES - 1] || '',
@@ -3083,7 +3083,7 @@ function setupLookerAnonIntegration() {
 
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      setSheetVeryHidden_(sheet);
+      sheet.hideSheet();
       created.push(sheetName);
     }
   }
@@ -3310,8 +3310,8 @@ function refreshLookerAnonGrievances_() {
       closedMonth,
       closedQuarter,
       closedYear,
-      numericField_(row[cols.DAYS_OPEN - 1]),
-      numericField_(daysToDeadline),
+      row[cols.DAYS_OPEN - 1] || '',
+      daysToDeadline || '',
       isOverdue ? 'Yes' : 'No',
       row[cols.ISSUE_CATEGORY - 1] || '',
       row[cols.ARTICLES - 1] || '',

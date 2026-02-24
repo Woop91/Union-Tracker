@@ -152,31 +152,6 @@ function sanitizeForHtml(input) {
 }
 
 /**
- * Escapes HTML content characters only: & < > " '
- * Use this for text that will appear in href attributes or other contexts
- * where escaping / = ` would corrupt the value (e.g., URLs).
- * For maximum safety in innerHTML/textContent contexts, use escapeHtml() instead.
- *
- * @param {*} input - The input to sanitize
- * @returns {string} HTML-safe string (preserves / = `)
- *
- * @example
- * // Returns: "https://example.com/path?q=1&amp;r=2"
- * escapeHtmlContent("https://example.com/path?q=1&r=2");
- */
-function escapeHtmlContent(input) {
-  if (input === null || input === undefined) {
-    return '';
-  }
-  return String(input)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
-/**
  * Sanitizes an object's string values for HTML output
  * @param {Object} obj - Object with string values to sanitize
  * @returns {Object} New object with sanitized values
@@ -268,11 +243,6 @@ function buildSafeQuery(sheetName, query, headers) {
   var safeQuery = String(query)
     .replace(/'/g, "''")
     .replace(/"/g, '\\"');
-
-  // Reject queries that could break out of the QUERY string context
-  if (/["\)]\s*[\+\&,]/.test(safeQuery) || /IMPORTRANGE|IMPORTDATA|IMPORTFEED|IMPORTHTML|IMAGE/i.test(safeQuery)) {
-    throw new Error('Query contains disallowed patterns');
-  }
 
   return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
 }
@@ -374,7 +344,7 @@ function getUserRole_(email) {
 
     // Check if user is the spreadsheet owner (admin)
     var owner = ss.getOwner();
-    if (owner && owner.getEmail().toLowerCase() === email.toLowerCase()) {
+    if (owner && owner.getEmail() === email) {
       return 'admin';
     }
 
@@ -384,9 +354,9 @@ function getUserRole_(email) {
       if (memberSheet) {
         var data = memberSheet.getDataRange().getValues();
         for (var i = 1; i < data.length; i++) {
-          var memberEmail = data[i][MEMBER_COLS.EMAIL - 1] || '';
+          var memberEmail = data[i][MEMBER_COLUMNS.EMAIL] || '';
           if (memberEmail.toLowerCase() === email.toLowerCase()) {
-            var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
+            var isSteward = data[i][MEMBER_COLUMNS.IS_STEWARD];
             if (isTruthyValue(isSteward)) {
               return 'steward';
             }
@@ -412,17 +382,12 @@ function validateWebAppRequest(e) {
   var result = {
     isValid: true,
     params: {},
-    errors: [],
-    hasParams: false
+    errors: []
   };
 
   if (!e || !e.parameter) {
-    // No parameters is structurally valid; callers must check result.hasParams
-    // independently if they require specific parameters to be present.
-    return result;
+    return result;  // No parameters is valid
   }
-
-  result.hasParams = !!(e && e.parameter && Object.keys(e.parameter).length > 0);
 
   // Validate and sanitize 'mode' parameter
   if (e.parameter.mode) {
@@ -499,7 +464,7 @@ function getAccessDeniedPage(message) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Access Denied')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
 }
 
 // ============================================================================
@@ -647,7 +612,7 @@ function isValidSafeString(input, maxLength) {
     /<script/i,
     /javascript:/i,
     /on\w+\s*=/i,  // onclick=, onerror=, etc.
-    /^data:/i,
+    /data:/i,
     /vbscript:/i
   ];
 
@@ -742,8 +707,8 @@ function safeJsonForHtml(data) {
     return value;
   });
 
-  // Escape all '<' to prevent breaking out of script context (covers </script>, <img, etc.)
-  return json.replace(/</g, '\\u003c');
+  // Escape </script> tags that could break out of script context
+  return json.replace(/<\/script>/gi, '<\\/script>');
 }
 
 /**
@@ -877,15 +842,8 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     for (var key in details) {
       if (details.hasOwnProperty(key) && key.charAt(0) !== '_') {
         var val = details[key];
-        var lowerKey = key.toLowerCase();
-        if (lowerKey.indexOf('email') !== -1 && typeof val === 'string') {
+        if (key.toLowerCase().indexOf('email') !== -1 && typeof val === 'string') {
           safeDetails[key] = maskEmail(val);
-        } else if (lowerKey.indexOf('phone') !== -1 && typeof val === 'string') {
-          safeDetails[key] = maskPhone(val);
-        } else if ((lowerKey === 'name' || lowerKey === 'firstname' || lowerKey === 'lastname' || lowerKey === 'membername') && typeof val === 'string') {
-          safeDetails[key] = val.charAt(0) + '***';
-        } else if (lowerKey === 'memberid' || lowerKey === 'member_id') {
-          safeDetails[key] = val; // IDs are safe to log
         } else {
           safeDetails[key] = val;
         }
@@ -923,33 +881,6 @@ function sendSecurityAlertEmail_(eventType, description, details) {
 
   } catch (e) {
     Logger.log('Failed to send security alert email: ' + e.message);
-  }
-}
-
-/**
- * Safe email wrapper that checks remaining daily quota before sending.
- * Use this instead of calling MailApp.sendEmail() directly.
- *
- * @param {Object} options - Email options (to, subject, body, htmlBody, etc.)
- * @param {string} options.to - Recipient email(s)
- * @param {string} options.subject - Email subject
- * @param {string} [options.body] - Plain text body
- * @param {string} [options.htmlBody] - HTML body
- * @returns {boolean} True if email was sent, false if quota insufficient
- * @private
- */
-function safeSendEmail_(options) {
-  if (!options || !options.to) return false;
-  try {
-    if (MailApp.getRemainingDailyQuota() < 1) {
-      Logger.log('safeSendEmail_: Daily email quota exhausted, skipping send to ' + maskEmail(options.to));
-      return false;
-    }
-    MailApp.sendEmail(options);
-    return true;
-  } catch (e) {
-    Logger.log('safeSendEmail_: Failed to send email: ' + e.message);
-    return false;
   }
 }
 
@@ -1024,7 +955,7 @@ function sendDailySecurityDigest() {
 
     // Gather recipients
     var recipients = [];
-    if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined') {
+    if (typeof getConfigValue_ === 'function') {
       try {
         var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
         var adminEmails = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);

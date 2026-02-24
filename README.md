@@ -69,8 +69,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
+   cd MULTIPLE-SCRIPS-REPO
    ```
 
 2. **Create a new Google Sheet** at [sheets.google.com](https://sheets.google.com)
@@ -95,8 +95,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone and install:**
 
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
+   cd MULTIPLE-SCRIPS-REPO
    npm install
    ```
 
@@ -377,8 +377,8 @@ These sheets power the auto-updating columns. You don't need to edit them.
 ### Setup
 
 ```bash
-git clone https://github.com/Woop91/DDS-Dashboard.git
-cd DDS-Dashboard
+git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
+cd MULTIPLE-SCRIPS-REPO
 npm install
 ```
 

@@ -79,7 +79,7 @@ function build() {
  * DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
- * Version: ${require('./package.json').version} (${new Date().toISOString().split('T')[0]})
+ * Version: 4.6.0 (2026-02-12)
  * Build Date: ${new Date().toISOString().split('T')[0]}
  *
  * This file is auto-generated from the src/ directory.
@@ -110,7 +110,7 @@ function build() {
     totalLines += lineCount;
 
     output += `// ============================================================================\n`;
-    output += `// === FILE: ${file} === (${lineCount} lines)\n`;
+    output += `// SOURCE: ${file} (${lineCount} lines)\n`;
     output += `// ============================================================================\n\n`;
     output += content;
     output += '\n\n';
@@ -143,7 +143,7 @@ function build() {
     output += ` * @returns {string} HTML content\n`;
     output += ` */\n`;
     output += `function get${funcName}() {\n`;
-    output += `  return \`${content.replace(/`/g, '\\`').replace(/\$\{/g, '\\${')}\`;\n`;
+    output += `  return \`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;\n`;
     output += `}\n\n`;
 
     console.log(`  Embedded: ${htmlFile} (${lineCount} lines)`);
@@ -167,7 +167,7 @@ function lint() {
   console.log('Running ESLint on source files...\n');
 
   try {
-    execSync('npx eslint src/**/*.gs', {
+    execSync('npx eslint src/**/*.gs --ext .gs', {
       stdio: 'inherit',
       cwd: __dirname
     });
@@ -216,8 +216,8 @@ if (shouldClean) {
   if (isProd) {
     console.log('Production build: Excluding DevTools...\n');
     const filteredOrder = BUILD_ORDER.filter(f => !PROD_EXCLUDE.includes(f));
-    // Use a filtered copy instead of mutating the const BUILD_ORDER array
-    BUILD_ORDER.splice(0, BUILD_ORDER.length, ...filteredOrder);
+    BUILD_ORDER.length = 0;
+    BUILD_ORDER.push(...filteredOrder);
   }
 
   build();

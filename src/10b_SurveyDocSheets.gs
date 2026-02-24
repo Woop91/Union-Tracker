@@ -914,6 +914,7 @@ function createFunctionChecklistSheet_() {
     // ═══ PHASE 7: Calendar ═══
     ['7️⃣ Calendar', '📊 Calendar', '📅 Sync Deadlines to Calendar', 'syncDeadlinesToCalendar', 'Adds grievance deadlines to Google Calendar with reminders'],
     ['7️⃣ Calendar', '📊 Calendar', '📅 View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar', 'Shows next 30 days of deadlines from calendar'],
+    ['7️⃣ Calendar', '📊 Calendar', '🗑️ Clear Calendar Events', 'clearAllCalendarEvents', 'Removes all grievance events from calendar (use with caution)'],
 
     // ═══ PHASE 8: Notifications ═══
     ['8️⃣ Notify', '📊 Notifications', '⚙️ Notification Settings', 'showNotificationSettings', 'Configure email notification preferences and timing'],
@@ -1565,7 +1566,7 @@ function createFAQSheet(ss) {
 
   var engagementFAQs = [
     ['Q: What engagement metrics are tracked?',
-     'A: Email open rates (column T), virtual meeting attendance (R), in-person meeting attendance (S), volunteer hours (U), and union interest in local/chapter/allied activities (V-X).'],
+     'A: Email open rates (column S), virtual meeting attendance (Q), in-person meeting attendance (R), volunteer hours (T), and union interest in local/chapter/allied activities (U-W).'],
     ['Q: Where do engagement metrics appear?',
      'A: Engagement metrics appear in the Unified Web App Dashboard (both Steward and Member views), in the Engagement tab with email open rates, meeting attendance, volunteer hours, and union interest breakdowns.'],
     ['Q: What are low engagement hot spots?',

@@ -120,17 +120,9 @@ function applyWinRateGradients() {
  */
 function syncAllDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  // Prevent concurrent sync operations which can cause data corruption
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(10000)) {
-    ss.toast('Another sync is already running. Please wait.', '⏳ Sync Busy', 5);
-    return;
-  }
+  ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
 
   try {
-    ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
-
     // Sync hidden calculation sheets first
     if (typeof syncGrievanceCalcSheet === 'function') syncGrievanceCalcSheet();
     if (typeof syncDashboardCalcValues === 'function') syncDashboardCalcValues();
@@ -144,8 +136,6 @@ function syncAllDashboardData() {
   } catch (e) {
     ss.toast('Error syncing: ' + e.message, '❌ Error', 5);
     Logger.log('syncAllDashboardData error: ' + e.toString());
-  } finally {
-    lock.releaseLock();
   }
 }
 
@@ -225,22 +215,22 @@ function showGrievanceFiles() {
     }
 
     if (fileList.length === 0) {
-      response = ui.alert('📁 ' + grievanceId + ' Files',
+      var response = ui.alert('📁 ' + grievanceId + ' Files',
         'Folder is empty.\n\nWould you like to open the folder to add files?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
         var html = HtmlService.createHtmlOutput(
-          '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
+          '<script>window.open("' + folderUrl + '", "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
       }
     } else {
-      response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
+      var response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
         fileList.join('\n') + '\n\nOpen folder in Drive?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
-        html = HtmlService.createHtmlOutput(
-          '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
+        var html = HtmlService.createHtmlOutput(
+          '<script>window.open("' + folderUrl + '", "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
       }
@@ -604,7 +594,7 @@ function openGrievanceFormForRow_(sheet, row) {
   // Open form in new window
   var ui = SpreadsheetApp.getUi();
   var html = HtmlService.createHtmlOutput(
-    '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
+    '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
   ).setWidth(200).setHeight(50);
 
   ui.showModalDialog(html, 'Opening Grievance Form...');
@@ -704,7 +694,7 @@ function fixDataQualityIssues() {
     '</style></head><body><div class="container">' +
     '<h2>⚠️ Data Quality Issues</h2>' +
     '<p>The following issues were found:</p>' +
-    issues.map(function(i) { return '<div class="issue">' + escapeHtml(String(i)) + '</div>'; }).join('') +
+    issues.map(function(i) { return '<div class="issue">' + i + '</div>'; }).join('') +
     '<h3>How to Fix:</h3>' +
     '<div class="fix-option"><strong>Option 1:</strong> Manually update Member IDs in Grievance Log</div>' +
     '<div class="fix-option"><strong>Option 2:</strong> Add missing members to Member Directory first</div>' +
@@ -867,8 +857,8 @@ function syncVolunteerHoursToMemberDirectory() {
 
   for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
     var row = volunteerData[i];
-    var memberId = row[1];  // Column B = Member ID (Volunteer Hours: A=Title, B=MemberID, C=Name, D=Date, E=Activity, F=Hours)
-    var hours = row[5];     // Column F = Hours (see column layout above)
+    var memberId = row[1];  // Column B - Member ID (Volunteer Hours sheet - no shared constant)
+    var hours = row[5];     // Column F - Hours (Volunteer Hours sheet - no shared constant)
 
     if (!memberId) continue;
 
@@ -886,10 +876,10 @@ function syncVolunteerHoursToMemberDirectory() {
   var memberData = memberSheet.getDataRange().getValues();
   if (memberData.length < 2) return;
 
-  // Update VOLUNTEER_HOURS column (U)
+  // Update column S (VOLUNTEER_HOURS)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var totalHours = hoursLookup[memberId] || 0;
     updates.push([totalHours]);
   }
@@ -903,7 +893,7 @@ function syncVolunteerHoursToMemberDirectory() {
 
 /**
  * Syncs meeting attendance from Meeting Attendance sheet to Member Directory
- * Updates Last Virtual Mtg (column R) and Last In-Person Mtg (column S)
+ * Updates Last Virtual Mtg (column P) and Last In-Person Mtg (column Q)
  * @returns {void}
  */
 function syncMeetingAttendanceToMemberDirectory() {
@@ -929,10 +919,10 @@ function syncMeetingAttendanceToMemberDirectory() {
 
   for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
     var row = attendanceData[i];
-    var meetingDate = row[1];     // Column B = Meeting Date (Meeting Attendance: A=MeetingID, B=Date, C=Type, D=Name, E=MemberID, F=Email, G=Attended)
-    var meetingType = row[2];     // Column C = Meeting Type (see column layout above)
-    var memberId = row[4];        // Column E = Member ID (see column layout above)
-    var attended = row[6];        // Column G = Attended (see column layout above)
+    var meetingDate = row[1];     // Column B - Meeting Date (Meeting Attendance sheet - no shared constant)
+    var meetingType = row[2];     // Column C - Meeting Type (Meeting Attendance sheet - no shared constant)
+    var memberId = row[4];        // Column E - Member ID (Meeting Attendance sheet - no shared constant)
+    var attended = row[6];        // Column G - Attended (Meeting Attendance sheet - no shared constant)
 
     if (!memberId || !attended || !meetingDate) continue;
 
@@ -966,7 +956,7 @@ function syncMeetingAttendanceToMemberDirectory() {
   // Update columns P (LAST_VIRTUAL_MTG) and Q (LAST_INPERSON_MTG)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var memberAttendance = attendanceLookup[memberId] || {lastVirtual: '', lastInPerson: ''};
     updates.push([
       memberAttendance.lastVirtual || '',

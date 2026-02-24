@@ -42,46 +42,27 @@ var CALENDAR_CONFIG = {
  * @return {Folder} The root grievance folder
  */
 function getOrCreateRootFolder() {
-  // Check for stored folder ID first to avoid global name-search ambiguity
-  var props = PropertiesService.getScriptProperties();
-  var storedFolderId = props.getProperty('GRIEVANCE_ROOT_FOLDER_ID');
-  if (storedFolderId) {
-    try {
-      return DriveApp.getFolderById(storedFolderId);
-    } catch (_e) {
-      // Stored ID invalid, fall through to name search
-    }
-  }
-
   const folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
   const folders = DriveApp.getFoldersByName(folderName);
 
   if (folders.hasNext()) {
-    var existing = folders.next();
-    props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', existing.getId());
-    return existing;
+    return folders.next();
   }
 
   // Create the root folder
-  try {
-    const newFolder = DriveApp.createFolder(folderName);
-    props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
+  const newFolder = DriveApp.createFolder(folderName);
 
-    // Set folder color/description
-    newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
+  // Set folder color/description
+  newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
 
-    logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
-      folderId: newFolder.getId(),
-      folderName: folderName,
-      type: 'ROOT',
-      createdBy: Session.getActiveUser().getEmail()
-    });
+  logAuditEvent(AUDIT_EVENTS.FOLDER_CREATED, {
+    folderId: newFolder.getId(),
+    folderName: folderName,
+    type: 'ROOT',
+    createdBy: Session.getActiveUser().getEmail()
+  });
 
-    return newFolder;
-  } catch (err) {
-    Logger.log('Failed to create Drive folder "' + folderName + '": ' + err.message);
-    return null;
-  }
+  return newFolder;
 }
 
 /**
@@ -271,7 +252,7 @@ function setupFolderForSelectedGrievance() {
 
     if (response === ui.Button.YES) {
       var html = HtmlService.createHtmlOutput(
-        '<script>window.open(' + JSON.stringify(existingUrl) + ', "_blank"); google.script.host.close();</script>'
+        '<script>window.open("' + existingUrl + '", "_blank"); google.script.host.close();</script>'
       ).setWidth(1).setHeight(1);
       ui.showModalDialog(html, 'Opening folder...');
     }
@@ -367,8 +348,8 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
-      sheet.getRange(i + 1, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folderUrl);
+    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      sheet.getRange(i + 1, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).setValue(folderUrl);
       break;
     }
   }
@@ -387,7 +368,7 @@ function openGrievanceFolder() {
   const row = sheet.getActiveRange().getRow();
   if (row <= 1) return;
 
-  const folderUrl = sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
+  const folderUrl = sheet.getRange(row, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).getValue();
 
   if (folderUrl) {
     const html = HtmlService.createHtmlOutput(
@@ -396,7 +377,7 @@ function openGrievanceFolder() {
     SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
   } else {
     if (showConfirmation('No folder exists. Create one now?', 'Create Folder')) {
-      const grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
+      const grievanceId = sheet.getRange(row, GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1).getValue();
       const result = setupDriveFolderForGrievance(grievanceId);
       if (result.success) {
         const html = HtmlService.createHtmlOutput(
@@ -416,7 +397,6 @@ function openGrievanceFolder() {
 function sanitizeFolderName(name) {
   if (!name) return 'Unknown';
   return name
-    .trim()
     .replace(/[<>:"/\\|?*]/g, '')
     .replace(/\s+/g, '_')
     .substring(0, 50);
@@ -452,8 +432,6 @@ function createMeetingCalendarEvent(meetingData) {
   try {
     var calendar = getOrCreateMeetingsCalendar();
     var meetingDate = new Date(meetingData.date + 'T00:00:00');
-    // Note: Date parsing uses script timezone. For explicit control, consider
-    // Utilities.formatDate() with Session.getScriptTimeZone().
     var startTime = meetingData.time || '09:00';
     var durationHours = parseFloat(meetingData.duration) || 1;
     var timeParts = startTime.split(':');
@@ -480,13 +458,7 @@ function createMeetingCalendarEvent(meetingData) {
 
     return event.getId();
   } catch (error) {
-    // Check for quota-exceeded errors specifically
-    var msg = error.message || '';
-    if (msg.indexOf('quota') !== -1 || msg.indexOf('Calendar usage limits') !== -1) {
-      Logger.log('Calendar quota exceeded: ' + msg);
-    } else {
-      Logger.log('Error creating meeting calendar event: ' + msg);
-    }
+    Logger.log('Error creating meeting calendar event: ' + error.message);
     return '';
   }
 }
@@ -519,15 +491,6 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     return errorResponse('Meeting ID and recipient emails are required');
   }
 
-  // Validate all recipient email addresses
-  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  var emails = String(recipientEmails).split(',');
-  for (var e = 0; e < emails.length; e++) {
-    if (!emailRegex.test(emails[e].trim())) {
-      return errorResponse('Invalid email address: ' + emails[e].trim());
-    }
-  }
-
   try {
     var result = getMeetingAttendees(meetingId);
     if (!result.success) {
@@ -537,9 +500,6 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Find meeting details from the check-in log
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
-    if (!sheet || sheet.getLastRow() <= 1) {
-      return errorResponse('No meeting check-in data found');
-    }
     var data = sheet.getDataRange().getValues();
     var meetingName = '';
     var meetingDate = '';
@@ -559,10 +519,10 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Build email body
     var body = '<h2>Meeting Attendance Report</h2>' +
       '<table style="border-collapse:collapse;margin:10px 0">' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Meeting:</td><td style="padding:4px 12px">' + escapeHtml(meetingName) + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Date:</td><td style="padding:4px 12px">' + escapeHtml(dateStr) + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Type:</td><td style="padding:4px 12px">' + escapeHtml(meetingType) + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Total Attendees:</td><td style="padding:4px 12px">' + escapeHtml(String(result.count)) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Meeting:</td><td style="padding:4px 12px">' + meetingName + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Date:</td><td style="padding:4px 12px">' + dateStr + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Type:</td><td style="padding:4px 12px">' + meetingType + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Total Attendees:</td><td style="padding:4px 12px">' + result.count + '</td></tr>' +
       '</table>';
 
     if (result.attendees.length > 0) {
@@ -579,9 +539,9 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
         var a = result.attendees[j];
         body += '<tr>' +
           '<td style="padding:6px;border:1px solid #ddd">' + (j + 1) + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.memberId)) + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.name)) + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.time)) + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + a.memberId + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + a.name + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + a.time + '</td>' +
           '</tr>';
       }
       body += '</table>';
@@ -750,26 +710,14 @@ function setDocViewOnlyByLink(docUrl) {
  */
 function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipientEmails) {
   if (!recipientEmails || !docUrl) return;
-
-  // Validate all recipient email addresses
-  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  var emails = String(recipientEmails).split(',');
-  for (var e = 0; e < emails.length; e++) {
-    if (!emailRegex.test(emails[e].trim())) {
-      Logger.log('Invalid email address in recipient list: ' + emails[e].trim());
-      return;
-    }
-  }
-
   try {
     var typeLabel = docType === 'agenda' ? 'Meeting Agenda' : 'Meeting Notes';
-    var safeDocUrl = /^https:\/\/docs\.google\.com\//.test(docUrl) ? docUrl : '';
-    var body = '<h2>' + escapeHtml(typeLabel) + '</h2>' +
-      '<p><strong>Meeting:</strong> ' + escapeHtml(meetingName) + '</p>' +
-      '<p><strong>Date:</strong> ' + escapeHtml(meetingDate) + '</p>' +
-      '<p>Click the link below to access the ' + escapeHtml(typeLabel.toLowerCase()) + ':</p>' +
-      (safeDocUrl ? '<p><a href="' + escapeHtml(safeDocUrl) + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
-      'Open ' + escapeHtml(typeLabel) + '</a></p>' : '<p><em>Document link unavailable.</em></p>') +
+    var body = '<h2>' + typeLabel + '</h2>' +
+      '<p><strong>Meeting:</strong> ' + meetingName + '</p>' +
+      '<p><strong>Date:</strong> ' + meetingDate + '</p>' +
+      '<p>Click the link below to access the ' + typeLabel.toLowerCase() + ':</p>' +
+      '<p><a href="' + docUrl + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
+      'Open ' + typeLabel + '</a></p>' +
       '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
 
     MailApp.sendEmail({
@@ -1068,23 +1016,29 @@ function syncDeadlinesToCalendar() {
  * @return {Object} Sync result
  */
 function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
-  const grievanceId = grievance['Grievance ID'];
-  const memberName = grievance['Member Name'];
-  const currentStep = grievance['Current Step'];
+  const grievanceId = grievance['Grievance ID'] ||
+                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]];
+  const memberName = grievance['Member Name'] ||
+                     grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.MEMBER_NAME]];
+  const currentStep = grievance['Current Step'] ||
+                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
 
   // Get the deadline for current step
   let deadline;
   switch (currentStep) {
     case 'Step I':
     case 'Informal':
-      deadline = grievance['Step 1 Due'];
+      deadline = grievance['Step 1 Due'] ||
+                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
       break;
     case 'Step II':
-      deadline = grievance['Step 2 Due'];
+      deadline = grievance['Step 2 Due'] ||
+                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
       break;
     case 'Step III':
     case 'Arbitration':
-      deadline = grievance['Step 3 Due'];
+      deadline = grievance['Step 3 Due'] ||
+                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
       break;
     default:
       return { synced: false, reason: 'No applicable deadline' };
@@ -1134,6 +1088,46 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
 
 // Note: syncSingleGrievanceToCalendar() is defined in MobileQuickActions.gs
 
+/**
+ * Clears all calendar events created by the dashboard
+ * @return {Object} Result with count of deleted events
+ */
+function clearAllCalendarEvents() {
+  try {
+    const calendar = getOrCreateDeadlinesCalendar();
+
+    // Get all events from now until 1 year from now
+    const startDate = new Date();
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + 1);
+
+    const events = calendar.getEvents(startDate, endDate, {
+      search: '[GRV]'
+    });
+
+    let deleted = 0;
+    for (const event of events) {
+      event.deleteEvent();
+      deleted++;
+
+      // Rate limiting
+      if (deleted % 50 === 0) {
+        Utilities.sleep(200);
+      }
+    }
+
+    return {
+      success: true,
+      deleted: deleted,
+      message: `Deleted ${deleted} calendar events`
+    };
+
+  } catch (error) {
+    console.error('Error clearing calendar:', error);
+    return errorResponse(error.message);
+  }
+}
+
 // ============================================================================
 // EMAIL NOTIFICATIONS
 // ============================================================================
@@ -1147,10 +1141,6 @@ function sendDeadlineReminders(daysAhead) {
   try {
     const deadlines = getUpcomingDeadlines(daysAhead || 7);
     const userEmail = Session.getActiveUser().getEmail();
-
-    if (!userEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
-      return errorResponse('Could not determine a valid email address for the current user');
-    }
 
     if (deadlines.length === 0) {
       return { success: true, sent: false, message: 'No upcoming deadlines' };
@@ -1219,7 +1209,7 @@ function sendEmailToMember(memberId, subject, body) {
     }
 
     const email = member['Email'] || member.email;
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+    if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
       return errorResponse('Invalid email address');
     }
 
@@ -1265,14 +1255,14 @@ function getOrCreateMemberFolder(name, id) {
 
   try {
     var parentFolder = DriveApp.getFolderById(archiveFolderId);
-    folderName = name + ' (' + id + ')';
-    folders = parentFolder.getFoldersByName(folderName);
+    var folderName = name + ' (' + id + ')';
+    var folders = parentFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
   } catch (e) {
     Logger.log('Archive folder not found, using root: ' + e.message);
-    rootFolder = getOrCreateRootFolder();
-    folderName = name + ' (' + id + ')';
-    folders = rootFolder.getFoldersByName(folderName);
+    var rootFolder = getOrCreateRootFolder();
+    var folderName = name + ' (' + id + ')';
+    var folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
 }
@@ -1410,7 +1400,7 @@ function createPDFForSelectedGrievance() {
 
     // Open folder in new tab
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open(' + JSON.stringify(folder.getUrl()) + ', "_blank"); google.script.host.close();</script>'
+      '<script>window.open("' + folder.getUrl() + '", "_blank"); google.script.host.close();</script>'
     ).setWidth(100).setHeight(50);
     ui.showModalDialog(html, 'Opening folder...');
 
@@ -1426,10 +1416,6 @@ function createPDFForSelectedGrievance() {
  * @private
  */
 function sendGrievancePdfEmail_(data, pdf) {
-  if (!data.memberEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.memberEmail).trim())) {
-    throw new Error('Invalid or missing member email address');
-  }
-
   var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Grievance Form - ' + data.grievanceId;
 
   var body = 'Dear ' + data.name + ',\n\n' +
@@ -1489,10 +1475,10 @@ function onGrievanceFormSubmit(e) {
     var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
     if (sheet) {
-      // Use the event range to find the exact row the form submission added to
-      var targetRow = e.range ? e.range.getRow() : sheet.getLastRow();
+      // Find the last row (where the form just added data) and add the PDF link
+      var lastRow = sheet.getLastRow();
       if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
-        sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+        sheet.getRange(lastRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
       }
     }
 
@@ -1501,8 +1487,8 @@ function onGrievanceFormSubmit(e) {
       secureLog('FormSubmission', 'Form submission processed - PDF created', {});
     }
 
-  } catch (err) {
-    Logger.log('Error processing form submission: ' + err.message);
+  } catch (e) {
+    Logger.log('Error processing form submission: ' + e.message);
   }
 }
 
@@ -1538,6 +1524,14 @@ function showCalendarSyncDialog() {
           </button>
         </div>
 
+        <div class="sync-option">
+          <h4>Clear All Events</h4>
+          <p>Removes all grievance-related events from the calendar</p>
+          <button class="btn btn-danger" onclick="clearAll()" style="margin-top: 10px;">
+            Clear Calendar
+          </button>
+        </div>
+
         <div id="status" class="status"></div>
 
         <div class="action-buttons">
@@ -1561,6 +1555,16 @@ function showCalendarSyncDialog() {
             })
             .syncDeadlinesToCalendar();
         }
+
+        function clearAll() {
+          if (!confirm('Are you sure you want to clear all grievance events from the calendar?')) return;
+          showStatus('Clearing...', false);
+          google.script.run
+            .withSuccessHandler(function(r) {
+              showStatus(r.success ? r.message : 'Error: ' + r.error, !r.success);
+            })
+            .clearAllCalendarEvents();
+        }
       </script>
     </body>
     </html>
@@ -1582,10 +1586,10 @@ function showUpcomingDeadlines() {
     deadlines.forEach(d => {
       const urgentStyle = d.daysLeft <= 3 ? 'background:#fee2e2;' : '';
       tableRows += `<tr style="${urgentStyle}">
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.grievanceId))}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.memberName))}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.step))}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.date))} (${escapeHtml(String(d.daysLeft))} days)</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.grievanceId}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.memberName}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.step}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.date} (${d.daysLeft} days)</td>
       </tr>`;
     });
   }
@@ -1615,6 +1619,25 @@ function showUpcomingDeadlines() {
   `).setWidth(600).setHeight(400);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Upcoming Deadlines');
+}
+
+/**
+ * Shows confirmation dialog for clearing calendar
+ */
+function showClearCalendarConfirm() {
+  const result = showConfirmation(
+    'This will delete ALL grievance-related events from your calendar. This cannot be undone. Continue?',
+    'Clear Calendar Events'
+  );
+
+  if (result) {
+    const clearResult = clearAllCalendarEvents();
+    if (clearResult.success) {
+      showToast(clearResult.message, 'Calendar Cleared');
+    } else {
+      showAlert('Error: ' + clearResult.error, 'Error');
+    }
+  }
 }
 /**
  * ============================================================================
@@ -1660,7 +1683,7 @@ function doGet(e) {
   }
 
   // Step 2: Check for unified dashboard mode parameter
-  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode) || '';
+  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode);
   if (mode === 'steward' || mode === 'member') {
     // v4.5.2: isPII is determined by auth result, NOT the URL parameter.
     // Default to false; only grant PII access after confirmed steward/admin authorization.
@@ -1690,7 +1713,7 @@ function doGet(e) {
     var html = getUnifiedDashboardHtml(isPII);
     return HtmlService.createHtmlOutput(html)
       .setTitle(title)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
   }
 
@@ -1728,7 +1751,7 @@ function doGet(e) {
         var authHtml = getMemberSelfServicePortalHtml();
         return HtmlService.createHtmlOutput(authHtml)
           .setTitle('Member Login')
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
           .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
       }
     }
@@ -1753,7 +1776,7 @@ function doGet(e) {
     secureLog('doGet', 'Authorized access to ' + page + ' page', { email: pageAuthResult.email });
   }
 
-  html = undefined;
+  var html;
   switch (page) {
     case 'search':
       html = getWebAppSearchHtml();
@@ -1802,13 +1825,9 @@ function doGet(e) {
       break;
   }
 
-  if (!html) {
-    return getAccessDeniedPage('Unable to load the requested page');
-  }
-
   return HtmlService.createHtmlOutput(html)
     .setTitle('Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
 }
 
@@ -1953,8 +1972,7 @@ function getWebAppDashboardHtml() {
 
     // Script to load overdue preview
     '<script>' +
-    getClientSideEscapeHtml() +
-    'var baseUrl=' + JSON.stringify(baseUrl) + ';' +
+    'var baseUrl="' + baseUrl + '";' +
     'var retryCount=0;' +
     'function loadOverdue(){' +
     '  if(!navigator.onLine){document.getElementById("overdue-preview").innerHTML="<div style=\\"padding:15px;text-align:center;color:#666\\">📡 Offline</div>";return}' +
@@ -1966,7 +1984,7 @@ function getWebAppDashboardHtml() {
     '    if(overdue.length===0){document.getElementById("overdue-preview").innerHTML="<div style=\\"padding:15px;text-align:center;color:#10B981\\">✅ No overdue cases - great job!</div>";return}' +
     '    var html="<div class=\\"overdue-section\\"><div class=\\"overdue-title\\">⚠️ Overdue Cases ("+overdue.length+")</div>";' +
     '    overdue.slice(0,3).forEach(function(g){' +
-    '      html+="<div class=\\"overdue-item\\"><div class=\\"overdue-id\\">"+escapeHtml(g.id||"")+"</div><div class=\\"overdue-name\\">"+escapeHtml(g.name||"")+"</div><div class=\\"overdue-detail\\">"+escapeHtml(g.category||"")+" • "+escapeHtml(g.step||"")+"</div></div>";' +
+    '      html+="<div class=\\"overdue-item\\"><div class=\\"overdue-id\\">"+(g.id||"")+"</div><div class=\\"overdue-name\\">"+(g.name||"")+"</div><div class=\\"overdue-detail\\">"+(g.category||"")+" • "+(g.step||"")+"</div></div>";' +
     '    });' +
     '    if(overdue.length>3)html+="<button class=\\"view-all-btn\\" onclick=\\"location.href=baseUrl+\'?page=grievances&filter=overdue\'\\">View All "+overdue.length+" Overdue Cases</button>";' +
     '    html+="</div>";' +
@@ -2075,7 +2093,7 @@ function getWebAppSearchHtml() {
     '</nav>' +
 
     '<script>' +
-    getClientSideEscapeHtml() +
+    ' + getClientSideEscapeHtml() + ' +
     'var currentTab="all";' +
     'var searchTimeout=null;' +
     'var lastQuery="";' +
@@ -2252,7 +2270,7 @@ function getWebAppGrievanceListHtml() {
     '</nav>' +
 
     '<script>' +
-    getClientSideEscapeHtml() +
+    ' + getClientSideEscapeHtml() + ' +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -2452,7 +2470,7 @@ function getWebAppMemberListHtml() {
     '</nav>' +
 
     '<script>' +
-    getClientSideEscapeHtml() +
+    ' + getClientSideEscapeHtml() + ' +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -2607,8 +2625,6 @@ function getWebAppLinksHtml() {
     '</nav>' +
 
     '<script>' +
-    getClientSideEscapeHtml() +
-    'function safeUrl(u){if(!u)return"#";u=String(u);return/^https?:\\/\\//i.test(u)?u:"#";}' +
     'function loadLinks(){' +
     '  google.script.run.withSuccessHandler(function(links){' +
     '    renderLinks(links);' +
@@ -2623,17 +2639,17 @@ function getWebAppLinksHtml() {
     '  // Forms section' +
     '  html+="<div class=\\"section-title\\">📝 Forms</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.grievanceForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
-    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.contactForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
-    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.satisfactionForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
+    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+links.grievanceForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
+    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+links.contactForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
+    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+links.satisfactionForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
     '  if(!links.grievanceForm&&!links.contactForm&&!links.satisfactionForm){html+="<div class=\\"link-card full\\"><span class=\\"link-icon\\">ℹ️</span><div class=\\"link-content\\"><span class=\\"link-label\\">No Forms Configured</span><span class=\\"link-desc\\">Add form URLs to Config sheet</span></div></div>";}' +
     '  html+="</div>";' +
 
     '  // Resources section' +
     '  html+="<div class=\\"section-title\\">🔧 Resources</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.spreadsheetUrl))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
-    '  html+="<a class=\\"link-card github\\" href=\\""+escapeHtml(safeUrl(links.githubRepo))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
+    '  html+="<a class=\\"link-card\\" href=\\""+links.spreadsheetUrl+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
+    '  html+="<a class=\\"link-card github\\" href=\\""+links.githubRepo+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
     '  html+="</div>";' +
 
     '  document.getElementById("linksContent").innerHTML=html;' +
@@ -2925,26 +2941,36 @@ function addMobileDashboardLinkToConfig() {
     return;
   }
 
-  // Use the canonical column constant — never hardcode column numbers.
-  var targetCol = CONFIG_COLS.MOBILE_DASHBOARD_URL;
+  // Find first empty row in column AZ (or create Mobile Dashboard URL section)
+  var _lastRow = configSheet.getLastRow();
+  var targetRow = 2;
+  var targetCol = 52; // Column AZ
 
-  // Write data starting at row 3 (first data row).
-  // Rows 1-2 are section/column headers managed by createConfigSheet — don't touch them.
-  var linkCell = configSheet.getRange(3, targetCol);
-  linkCell.setFormula('=HYPERLINK(' + JSON.stringify(url) + ', "📱 Tap to Open Dashboard")');
+  // Check if header exists
+  var headerCell = configSheet.getRange(1, targetCol);
+  if (!headerCell.getValue()) {
+    headerCell.setValue('📱 Mobile Dashboard URL');
+    headerCell.setFontWeight('bold');
+    headerCell.setBackground('#1a73e8');
+    headerCell.setFontColor('#ffffff');
+  }
+
+  // Add the hyperlink
+  var linkCell = configSheet.getRange(targetRow, targetCol);
+  linkCell.setFormula('=HYPERLINK("' + url + '", "📱 Tap to Open Dashboard")');
   linkCell.setFontSize(14);
   linkCell.setFontWeight('bold');
   linkCell.setFontColor('#1a73e8');
   linkCell.setBackground('#e8f0fe');
 
   // Also add plain URL below for copying
-  var urlCell = configSheet.getRange(4, targetCol);
+  var urlCell = configSheet.getRange(targetRow + 1, targetCol);
   urlCell.setValue(url);
   urlCell.setFontSize(10);
   urlCell.setWrap(true);
 
   // Add instructions
-  var instructionCell = configSheet.getRange(5, targetCol);
+  var instructionCell = configSheet.getRange(targetRow + 2, targetCol);
   instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
   instructionCell.setFontSize(9);
   instructionCell.setFontColor('#666666');
@@ -2955,11 +2981,11 @@ function addMobileDashboardLinkToConfig() {
 
   SpreadsheetApp.getUi().alert(
     '📱 Mobile Dashboard Link Added!',
-    'A clickable link has been added to the "📱 Mobile Dashboard URL" column of the Config sheet.\n\n' +
+    'A clickable link has been added to column AZ of the Config sheet.\n\n' +
     'To access on mobile:\n' +
     '1. Open this spreadsheet in Google Sheets mobile app\n' +
     '2. Go to the Config tab\n' +
-    '3. Scroll to the Mobile Dashboard section\n' +
+    '3. Scroll to column AZ\n' +
     '4. Tap the blue "Tap to Open Dashboard" link\n\n' +
     'URL: ' + url,
     SpreadsheetApp.getUi().ButtonSet.OK
@@ -2971,13 +2997,7 @@ function addMobileDashboardLinkToConfig() {
 // ============================================================================
 
 /**
- * Constant Contact API configuration.
- *
- * Known limitation: This integration uses a manual OAuth2 flow (paste-back
- * authorization code) because Google Apps Script doesn't support standard
- * OAuth2 redirect URIs. The access token is refreshed automatically, but the
- * initial setup requires user interaction.
- *
+ * Constant Contact API configuration
  * @const {Object}
  */
 var CC_CONFIG = {
@@ -3130,7 +3150,7 @@ function authorizeConstantContact() {
     '  if(!match){alert("Could not find authorization code in that URL. Make sure you copied the full URL.");return;}' +
     '  google.script.run' +
     '    .withSuccessHandler(function(msg){' +
-    '      var c=document.querySelector(".container");c.innerHTML="";var h=document.createElement("h2");h.textContent="\\u2705 "+msg;var p=document.createElement("p");p.textContent="You can close this dialog.";c.appendChild(h);c.appendChild(p);' +
+    '      document.querySelector(".container").innerHTML="<h2>✅ "+msg+"</h2><p>You can close this dialog.</p>";' +
     '    })' +
     '    .withFailureHandler(function(e){alert("Error: "+e.message);})' +
     '    .exchangeConstantContactCode(match[1]);' +
@@ -3532,7 +3552,7 @@ function syncConstantContactEngagement() {
         openRateUpdates.push([engagement.openRate]);
         contactDateUpdates.push([engagement.lastActivityDate || '']);
       } else {
-        openRateUpdates.push([numericField_(memberData[i][MEMBER_COLS.OPEN_RATE - 1])]);
+        openRateUpdates.push([memberData[i][MEMBER_COLS.OPEN_RATE - 1] || '']);
         contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
       }
 
@@ -3542,7 +3562,7 @@ function syncConstantContactEngagement() {
       }
     } else {
       // No CC match — preserve existing values
-      openRateUpdates.push([numericField_(memberData[i][MEMBER_COLS.OPEN_RATE - 1])]);
+      openRateUpdates.push([memberData[i][MEMBER_COLS.OPEN_RATE - 1] || '']);
       contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
     }
   }

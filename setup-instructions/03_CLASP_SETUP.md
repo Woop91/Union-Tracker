@@ -27,7 +27,7 @@ This guide assumes you have **zero command-line experience**. Every step is expl
 Before starting, make sure you have:
 
 - A **Google account** (the one you want the dashboard attached to)
-- This repository cloned to your computer (you should already have the `DDS-Dashboard` folder)
+- This repository cloned to your computer (you should already have the `MULTIPLE-SCRIPS-REPO` folder)
 - An internet connection
 
 ---
@@ -80,13 +80,13 @@ The terminal is where you type commands. Here's how to open it on each operating
 Once your terminal is open, you need to navigate to the repository folder. Type:
 
 ```bash
-cd path/to/DDS-Dashboard
+cd path/to/MULTIPLE-SCRIPS-REPO
 ```
 
 Replace `path/to/` with the actual location. For example:
 
-- **macOS/Linux:** `cd ~/Documents/DDS-Dashboard`
-- **Windows:** `cd C:\Users\YourName\Documents\DDS-Dashboard`
+- **macOS/Linux:** `cd ~/Documents/MULTIPLE-SCRIPS-REPO`
+- **Windows:** `cd C:\Users\YourName\Documents\MULTIPLE-SCRIPS-REPO`
 
 > **Tip:** You can type `cd ` (with a space after it) and then drag the folder from your file explorer into the terminal window. It will paste the full path for you.
 
@@ -355,7 +355,7 @@ The complete setup from scratch in six commands:
 
 ```bash
 # 1. Navigate to the project
-cd path/to/DDS-Dashboard
+cd path/to/MULTIPLE-SCRIPS-REPO
 
 # 2. Install dependencies (includes clasp)
 npm install

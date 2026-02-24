@@ -425,7 +425,7 @@ describe('HTML generator functions (smoke tests)', () => {
   test('getMultiSelectHtml returns HTML string', () => {
     if (typeof getMultiSelectHtml === 'function') {
       const items = [{ id: 'a', label: 'Item A', selected: false }];
-      const html = getMultiSelectHtml(items, 'applyMultiSelectValue');
+      const html = getMultiSelectHtml(items, 'testCallback');
       expect(typeof html).toBe('string');
       expect(html).toContain('<!DOCTYPE html>');
     }
