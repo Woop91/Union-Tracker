@@ -789,7 +789,9 @@ var SHEETS = {
   WORKLOAD_REPORTING: 'Workload Reporting',  // visible — anonymized ledger
   WORKLOAD_REMINDERS: 'Workload Reminders',  // hidden — email reminder prefs
   WORKLOAD_USERMETA:  'Workload UserMeta',   // hidden — sharing start dates
-  WORKLOAD_ARCHIVE:   'Workload Archive'     // hidden — data older than 24 months
+  WORKLOAD_ARCHIVE:   'Workload Archive',     // hidden — data older than 24 months
+  // Resources & Education (v4.11.0 — content management for educational hub)
+  RESOURCES:          '📚 Resources'          // steward-managed educational content
 };
 
 // SHEET_NAMES alias for backward compatibility
@@ -1774,6 +1776,24 @@ var FEEDBACK_HEADER_MAP_ = [
 
 var FEEDBACK_COLS = buildColsFromMap_(FEEDBACK_HEADER_MAP_);
 
+// Resources sheet — educational content management (v4.11.0)
+var RESOURCES_HEADER_MAP_ = [
+  { key: 'RESOURCE_ID',  header: 'Resource ID' },
+  { key: 'TITLE',        header: 'Title' },
+  { key: 'CATEGORY',     header: 'Category' },
+  { key: 'SUMMARY',      header: 'Summary' },
+  { key: 'CONTENT',      header: 'Content' },
+  { key: 'URL',          header: 'URL' },
+  { key: 'ICON',         header: 'Icon' },
+  { key: 'SORT_ORDER',   header: 'Sort Order' },
+  { key: 'VISIBLE',      header: 'Visible' },
+  { key: 'AUDIENCE',     header: 'Audience' },
+  { key: 'DATE_ADDED',   header: 'Date Added' },
+  { key: 'ADDED_BY',     header: 'Added By' }
+];
+
+var RESOURCES_COLS = buildColsFromMap_(RESOURCES_HEADER_MAP_);
+
 // ============================================================================
 // COLUMN AUTO-DISCOVERY SYSTEM
 // ============================================================================
@@ -1880,7 +1900,8 @@ function syncColumnMaps() {
     { name: 'SURVEY_VAULT_COLS', sheet: SHEETS.SURVEY_VAULT, map: SURVEY_VAULT_HEADER_MAP_, target: SURVEY_VAULT_COLS },
     { name: 'SURVEY_TRACKING_COLS', sheet: SHEETS.SURVEY_TRACKING, map: SURVEY_TRACKING_HEADER_MAP_, target: SURVEY_TRACKING_COLS },
     { name: 'FEEDBACK_COLS', sheet: SHEETS.FEEDBACK, map: FEEDBACK_HEADER_MAP_, target: FEEDBACK_COLS },
-    { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS }
+    { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS },
+    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS }
   ];
 
   for (var m = 0; m < maps.length; m++) {

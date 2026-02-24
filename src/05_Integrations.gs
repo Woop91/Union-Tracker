@@ -1788,6 +1788,14 @@ function doGet(e) {
       }
       html = getUnifiedDashboardHtml(false);
       break;
+    case 'checkin':
+      // v4.11.0: Meeting check-in as standalone web page (mobile-friendly kiosk)
+      html = getWebAppCheckInHtml();
+      break;
+    case 'resources':
+      // v4.11.0: Educational content hub — contract articles, rights, FAQ, guides
+      html = getWebAppResourcesHtml();
+      break;
     case 'portal':
       // Public portal without member ID
       if (typeof buildPublicPortal === 'function') {
@@ -3627,4 +3635,426 @@ function disconnectConstantContact() {
     '🔌 Disconnected', 5
   );
   Logger.log('Constant Contact credentials removed');
+}
+
+// ============================================================================
+// v4.11.0: EDUCATIONAL RESOURCES HUB
+// ============================================================================
+
+/**
+ * API function to get resources list for web app.
+ * Reads from the 📚 Resources sheet, returns visible items sorted by Sort Order.
+ * @param {string} [audience] - Filter by audience: 'All', 'Members', 'Stewards'. Defaults to 'All'.
+ * @returns {Array} Resource objects
+ */
+function getWebAppResourcesList(audience) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+
+    // Auto-create if missing
+    if (!sheet) {
+      if (typeof createResourcesSheet === 'function') {
+        sheet = createResourcesSheet(ss);
+      }
+      if (!sheet) return [];
+    }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return [];
+
+    var data = sheet.getRange(2, 1, lastRow - 1, RESOURCES_COLS.ADDED_BY).getValues();
+    var tz = Session.getScriptTimeZone();
+
+    var result = data.map(function(row) {
+      var visible = String(row[RESOURCES_COLS.VISIBLE - 1] || '').toLowerCase();
+      if (visible !== 'yes') return null;
+
+      var rowAudience = row[RESOURCES_COLS.AUDIENCE - 1] || 'All';
+      if (audience && audience !== 'All' && rowAudience !== 'All' && rowAudience !== audience) return null;
+
+      var dateAdded = row[RESOURCES_COLS.DATE_ADDED - 1];
+
+      return {
+        id: row[RESOURCES_COLS.RESOURCE_ID - 1] || '',
+        title: row[RESOURCES_COLS.TITLE - 1] || '',
+        category: row[RESOURCES_COLS.CATEGORY - 1] || 'General',
+        summary: row[RESOURCES_COLS.SUMMARY - 1] || '',
+        content: row[RESOURCES_COLS.CONTENT - 1] || '',
+        url: row[RESOURCES_COLS.URL - 1] || '',
+        icon: row[RESOURCES_COLS.ICON - 1] || '📄',
+        sortOrder: row[RESOURCES_COLS.SORT_ORDER - 1] || 999,
+        audience: rowAudience,
+        dateAdded: dateAdded instanceof Date ? Utilities.formatDate(dateAdded, tz, 'MMM d, yyyy') : (dateAdded || '')
+      };
+    }).filter(function(r) { return r !== null; });
+
+    // Sort by sortOrder
+    result.sort(function(a, b) { return (a.sortOrder || 999) - (b.sortOrder || 999); });
+
+    return result;
+  } catch (e) {
+    Logger.log('getWebAppResourcesList error: ' + e.toString());
+    return [];
+  }
+}
+
+/**
+ * Returns the educational resources hub HTML page.
+ * Warm, welcoming design with categorized content cards.
+ * Content is fully dynamic — reads from 📚 Resources sheet.
+ */
+function getWebAppResourcesHtml() {
+  var baseUrl = ScriptApp.getService().getUrl();
+
+  // Read org name from config
+  var orgName = '';
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet && configSheet.getLastRow() >= 3) {
+      orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue() || '';
+    }
+  } catch (_e) { /* ignore */ }
+
+  return '<!DOCTYPE html>' +
+    '<html lang="en"><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<title>Know Your Rights</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@600;700;800&display=swap" rel="stylesheet">' +
+    '<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">' +
+    '<style>' +
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+    'body{font-family:"DM Sans",sans-serif;background:#fafaf9;color:#1c1917;min-height:100vh;padding-bottom:80px}' +
+
+    // Header — warm gradient, not cold purple
+    '.header{background:linear-gradient(135deg,#1e3a5f 0%,#2d5a87 100%);color:white;padding:24px 20px 28px;position:relative;overflow:hidden}' +
+    '.header::after{content:"";position:absolute;bottom:-20px;left:-20px;right:-20px;height:40px;background:#fafaf9;border-radius:50% 50% 0 0}' +
+    '.header h1{font-family:"Fraunces",serif;font-size:clamp(22px,5vw,28px);font-weight:700;margin-bottom:6px;letter-spacing:-0.02em}' +
+    '.header .subtitle{font-size:14px;opacity:0.85;line-height:1.4}' +
+
+    // Search
+    '.search-wrap{padding:0 16px;margin-top:-16px;position:relative;z-index:2}' +
+    '.search-bar{width:100%;padding:14px 14px 14px 44px;border:2px solid #e7e5e4;border-radius:14px;font-size:15px;font-family:"DM Sans",sans-serif;background:white;box-shadow:0 2px 8px rgba(0,0,0,0.06);transition:border-color 0.2s}' +
+    '.search-bar:focus{outline:none;border-color:#2d5a87;box-shadow:0 2px 12px rgba(45,90,135,0.15)}' +
+    '.search-icon{position:absolute;left:30px;top:50%;transform:translateY(-50%);color:#a8a29e;font-size:20px}' +
+
+    // Category pills
+    '.cat-pills{display:flex;gap:8px;overflow-x:auto;padding:20px 16px 8px;-webkit-overflow-scrolling:touch}' +
+    '.cat-pill{flex-shrink:0;padding:8px 16px;border-radius:24px;font-size:13px;font-weight:600;border:2px solid #e7e5e4;cursor:pointer;background:white;color:#57534e;transition:all 0.2s;white-space:nowrap}' +
+    '.cat-pill.active{background:#1e3a5f;color:white;border-color:#1e3a5f}' +
+    '.cat-pill:hover{border-color:#1e3a5f}' +
+
+    // Resource cards
+    '.resources-list{padding:12px 16px}' +
+    '.res-card{background:white;border-radius:16px;padding:20px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f5f5f4;cursor:pointer;transition:all 0.25s}' +
+    '.res-card:active{transform:scale(0.99)}' +
+    '.res-card.expanded{box-shadow:0 4px 16px rgba(0,0,0,0.1)}' +
+    '.res-icon{font-size:28px;margin-bottom:10px;display:block}' +
+    '.res-title{font-family:"Fraunces",serif;font-size:17px;font-weight:700;color:#1c1917;margin-bottom:4px;line-height:1.3}' +
+    '.res-category{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#2d5a87;margin-bottom:8px}' +
+    '.res-summary{font-size:14px;color:#57534e;line-height:1.5}' +
+    '.res-content{display:none;margin-top:16px;padding-top:16px;border-top:1px solid #f5f5f4;font-size:14px;color:#44403c;line-height:1.7;white-space:pre-line}' +
+    '.res-card.expanded .res-content{display:block}' +
+    '.res-link{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:8px 16px;background:#eff6ff;color:#1e3a5f;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;transition:background 0.2s}' +
+    '.res-link:hover{background:#dbeafe}' +
+    '.res-meta{font-size:11px;color:#a8a29e;margin-top:8px}' +
+    '.expand-hint{font-size:12px;color:#a8a29e;display:flex;align-items:center;gap:4px;margin-top:8px}' +
+    '.expand-hint i{font-size:16px;transition:transform 0.2s}' +
+    '.res-card.expanded .expand-hint i{transform:rotate(180deg)}' +
+
+    // Empty state
+    '.empty-state{text-align:center;padding:60px 24px}' +
+    '.empty-icon{font-size:56px;margin-bottom:16px;opacity:0.6}' +
+    '.empty-text{font-size:16px;color:#78716c;line-height:1.5}' +
+    '.empty-sub{font-size:13px;color:#a8a29e;margin-top:8px}' +
+
+    // Loading
+    '.loading{text-align:center;padding:40px;color:#78716c}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.spinner{display:inline-block;width:28px;height:28px;border:3px solid #e7e5e4;border-top-color:#1e3a5f;border-radius:50%;animation:spin 0.8s linear infinite}' +
+
+    // Bottom nav
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.08);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#a8a29e;font-size:10px;font-weight:500;min-width:60px;transition:color 0.2s}' +
+    '.nav-item.active{color:#1e3a5f}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+
+    '</style></head><body>' +
+
+    '<div class="header">' +
+    '<h1>📚 Know Your Rights</h1>' +
+    '<div class="subtitle">Your guide to the union contract, grievance process, and workplace protections' + (orgName ? ' at ' + escapeHtml(orgName) : '') + '</div>' +
+    '</div>' +
+
+    '<div class="search-wrap">' +
+    '<i class="material-icons search-icon">search</i>' +
+    '<input type="text" class="search-bar" id="searchInput" placeholder="Search articles, rights, FAQ..." oninput="filterResources()">' +
+    '</div>' +
+
+    '<div class="cat-pills" id="catPills"></div>' +
+
+    '<div class="resources-list" id="resourcesList">' +
+    '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">Loading resources...</div></div>' +
+    '</div>' +
+
+    '<nav class="bottom-nav">' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
+    '<span class="nav-icon">📊</span>Home</a>' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=checkin">' +
+    '<span class="nav-icon">✅</span>Check In</a>' +
+    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=resources">' +
+    '<span class="nav-icon">📚</span>Learn</a>' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=selfservice">' +
+    '<span class="nav-icon">👤</span>My Info</a>' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
+    '<span class="nav-icon">🔗</span>Links</a>' +
+    '</nav>' +
+
+    '<script>' +
+    getClientSideEscapeHtml() +
+    'var allResources=[];var currentCat="all";' +
+
+    'function toggleCard(el){el.classList.toggle("expanded")}' +
+
+    'function filterResources(){' +
+    '  var q=(document.getElementById("searchInput").value||"").toLowerCase();' +
+    '  var filtered=allResources.filter(function(r){' +
+    '    var matchesCat=currentCat==="all"||r.category===currentCat;' +
+    '    var matchesQ=!q||q.length<2||r.title.toLowerCase().indexOf(q)>=0||r.summary.toLowerCase().indexOf(q)>=0||(r.content||"").toLowerCase().indexOf(q)>=0||r.category.toLowerCase().indexOf(q)>=0;' +
+    '    return matchesCat&&matchesQ;' +
+    '  });' +
+    '  renderList(filtered);' +
+    '}' +
+
+    'function setCat(cat,btn){' +
+    '  currentCat=cat;' +
+    '  document.querySelectorAll(".cat-pill").forEach(function(p){p.classList.remove("active")});' +
+    '  btn.classList.add("active");' +
+    '  filterResources();' +
+    '}' +
+
+    'function renderList(items){' +
+    '  var c=document.getElementById("resourcesList");' +
+    '  if(!items||items.length===0){' +
+    '    c.innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">📖</div><div class=\\"empty-text\\">No resources found</div><div class=\\"empty-sub\\">Try a different search or category</div></div>";' +
+    '    return;' +
+    '  }' +
+    '  c.innerHTML=items.map(function(r){' +
+    '    var hasContent=r.content&&r.content.trim().length>0;' +
+    '    var hasUrl=r.url&&r.url.trim().length>0;' +
+    '    return "<div class=\\"res-card\\"' + ('" onclick=\\"toggleCard(this)\\"') + '>"' +
+    '      +"<span class=\\"res-icon\\">"+escapeHtml(r.icon)+"</span>"' +
+    '      +"<div class=\\"res-category\\">"+escapeHtml(r.category)+"</div>"' +
+    '      +"<div class=\\"res-title\\">"+escapeHtml(r.title)+"</div>"' +
+    '      +"<div class=\\"res-summary\\">"+escapeHtml(r.summary)+"</div>"' +
+    '      +(hasContent?"<div class=\\"expand-hint\\"><i class=\\"material-icons\\">expand_more</i>Tap to read more</div>":"")' +
+    '      +(hasContent?"<div class=\\"res-content\\">"+escapeHtml(r.content).replace(/\\\\n/g,"\\n")+"</div>":"")' +
+    '      +(hasUrl?"<a class=\\"res-link\\" href=\\""+escapeHtml(r.url)+"\\" target=\\"_blank\\" onclick=\\"event.stopPropagation()\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">open_in_new</i>Open Resource</a>":"")' +
+    '      +(r.dateAdded?"<div class=\\"res-meta\\">Added "+escapeHtml(r.dateAdded)+"</div>":"")' +
+    '      +"</div>";' +
+    '  }).join("");' +
+    '}' +
+
+    'function buildCatPills(items){' +
+    '  var cats={};items.forEach(function(r){cats[r.category]=(cats[r.category]||0)+1});' +
+    '  var el=document.getElementById("catPills");' +
+    '  var html="<button class=\\"cat-pill active\\" onclick=\\"setCat(\\x27all\\x27,this)\\">All ("+items.length+")</button>";' +
+    '  Object.keys(cats).sort().forEach(function(c){' +
+    '    html+="<button class=\\"cat-pill\\" onclick=\\"setCat(\\x27"+c+"\\x27,this)\\">"+escapeHtml(c)+" ("+cats[c]+")</button>";' +
+    '  });' +
+    '  el.innerHTML=html;' +
+    '}' +
+
+    'google.script.run.withSuccessHandler(function(data){' +
+    '  allResources=data||[];' +
+    '  buildCatPills(allResources);' +
+    '  renderList(allResources);' +
+    '}).withFailureHandler(function(err){' +
+    '  document.getElementById("resourcesList").innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-icon\\">⚠️</div><div class=\\"empty-text\\">Error loading resources</div><div class=\\"empty-sub\\">"+String(err||"")+"</div></div>";' +
+    '}).getWebAppResourcesList();' +
+    '</script>' +
+
+    '</body></html>';
+}
+
+// ============================================================================
+// v4.11.0: MEETING CHECK-IN WEB ROUTE
+// ============================================================================
+
+/**
+ * Returns a standalone web page for meeting check-in.
+ * Reuses the existing check-in logic from 14_MeetingCheckIn.gs.
+ * Mobile-optimized for kiosk mode (shared device) or individual phone check-in.
+ */
+function getWebAppCheckInHtml() {
+  var baseUrl = ScriptApp.getService().getUrl();
+
+  return '<!DOCTYPE html>' +
+    '<html lang="en"><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<title>Meeting Check-In</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@600;700&display=swap" rel="stylesheet">' +
+    '<style>' +
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+    'body{font-family:"DM Sans",sans-serif;background:#fafaf9;min-height:100vh;padding-bottom:80px}' +
+
+    '.header{background:linear-gradient(135deg,#065f46 0%,#047857 100%);color:white;padding:24px 20px 28px;text-align:center;position:relative;overflow:hidden}' +
+    '.header::after{content:"";position:absolute;bottom:-20px;left:-20px;right:-20px;height:40px;background:#fafaf9;border-radius:50% 50% 0 0}' +
+    '.header h1{font-family:"Fraunces",serif;font-size:clamp(22px,5vw,28px);font-weight:700;margin-bottom:4px}' +
+    '.header .subtitle{font-size:14px;opacity:0.85}' +
+
+    '.container{max-width:480px;margin:0 auto;padding:20px 16px}' +
+
+    '.card{background:white;border-radius:16px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f5f5f4;margin-bottom:16px}' +
+    '.card h2{font-family:"Fraunces",serif;font-size:18px;color:#065f46;margin-bottom:16px;text-align:center}' +
+
+    '.field{margin-bottom:18px}' +
+    '.field label{display:block;margin-bottom:8px;font-weight:600;color:#1c1917;font-size:14px}' +
+    '.field input,.field select{width:100%;padding:14px;border:2px solid #e7e5e4;border-radius:12px;font-size:16px;font-family:"DM Sans",sans-serif;transition:border-color 0.2s}' +
+    '.field input:focus,.field select:focus{outline:none;border-color:#047857;box-shadow:0 0 0 3px rgba(4,120,87,0.1)}' +
+
+    '.btn{width:100%;padding:16px;border:none;border-radius:12px;font-size:17px;font-weight:700;font-family:"DM Sans",sans-serif;cursor:pointer;transition:all 0.2s}' +
+    '.btn-checkin{background:#047857;color:white}' +
+    '.btn-checkin:hover{background:#065f46}' +
+    '.btn-checkin:disabled{background:#d6d3d1;cursor:not-allowed}' +
+
+    '.error-msg{color:#dc2626;font-size:14px;text-align:center;padding:12px;background:#fef2f2;border-radius:10px;margin-top:12px;display:none}' +
+
+    '.success-banner{text-align:center;padding:28px;background:#d1fae5;border-radius:16px;margin-bottom:16px;display:none}' +
+    '.success-banner .checkmark{font-size:56px;margin-bottom:8px}' +
+    '.success-banner .name{font-family:"Fraunces",serif;font-size:22px;font-weight:700;color:#065f46;margin-bottom:4px}' +
+    '.success-banner .msg{color:#047857;font-size:14px}' +
+
+    '.attendee-count{text-align:center;padding:14px;background:#ecfdf5;border-radius:12px;color:#047857;font-weight:600;margin-top:12px;font-size:14px}' +
+
+    '.no-meetings{text-align:center;padding:40px 20px;color:#78716c}' +
+    '.no-meetings-icon{font-size:48px;margin-bottom:12px;opacity:0.5}' +
+
+    '.meeting-option{padding:14px;border:2px solid #e7e5e4;border-radius:12px;margin-bottom:10px;cursor:pointer;transition:all 0.2s}' +
+    '.meeting-option:hover{border-color:#047857}' +
+    '.meeting-option.selected{border-color:#047857;background:#ecfdf5}' +
+    '.meeting-name{font-weight:600;color:#1c1917;margin-bottom:2px}' +
+    '.meeting-time{font-size:13px;color:#78716c}' +
+
+    '.loading{text-align:center;padding:40px;color:#78716c}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.spinner{display:inline-block;width:28px;height:28px;border:3px solid #e7e5e4;border-top-color:#047857;border-radius:50%;animation:spin 0.8s linear infinite}' +
+
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.08);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#a8a29e;font-size:10px;font-weight:500;min-width:60px;transition:color 0.2s}' +
+    '.nav-item.active{color:#065f46}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+
+    '</style></head><body>' +
+
+    '<div class="header">' +
+    '<h1>✅ Meeting Check-In</h1>' +
+    '<div class="subtitle">Enter your email and PIN to check in</div>' +
+    '</div>' +
+
+    '<div class="container">' +
+
+    '<div id="successBanner" class="success-banner">' +
+    '<div class="checkmark">✓</div>' +
+    '<div class="name" id="successName"></div>' +
+    '<div class="msg">Checked in successfully!</div>' +
+    '</div>' +
+
+    '<div class="card" id="meetingCard">' +
+    '<h2>Today\'s Meetings</h2>' +
+    '<div id="meetingList"><div class="loading"><div class="spinner"></div><div style="margin-top:12px">Loading meetings...</div></div></div>' +
+    '</div>' +
+
+    '<div class="card" id="checkinForm" style="display:none">' +
+    '<h2>Check In</h2>' +
+    '<div class="field"><label>Email Address</label>' +
+    '<input type="email" id="email" placeholder="your.email@example.com" autocomplete="email"></div>' +
+    '<div class="field"><label>PIN</label>' +
+    '<input type="password" id="pin" inputmode="numeric" maxlength="8" placeholder="Enter your PIN"></div>' +
+    '<button class="btn btn-checkin" id="checkinBtn" onclick="doCheckIn()">Check In</button>' +
+    '<div class="error-msg" id="errorMsg"></div>' +
+    '<div class="attendee-count" id="attendeeCount" style="display:none"></div>' +
+    '</div>' +
+
+    '</div>' +
+
+    '<nav class="bottom-nav">' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
+    '<span class="nav-icon">📊</span>Home</a>' +
+    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=checkin">' +
+    '<span class="nav-icon">✅</span>Check In</a>' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=resources">' +
+    '<span class="nav-icon">📚</span>Learn</a>' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=selfservice">' +
+    '<span class="nav-icon">👤</span>My Info</a>' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
+    '<span class="nav-icon">🔗</span>Links</a>' +
+    '</nav>' +
+
+    '<script>' +
+    'var selectedMeetingId=null;' +
+
+    'google.script.run.withSuccessHandler(function(meetings){' +
+    '  var el=document.getElementById("meetingList");' +
+    '  if(!meetings||meetings.length===0){' +
+    '    el.innerHTML="<div class=\\"no-meetings\\"><div class=\\"no-meetings-icon\\">📅</div><div>No active meetings right now</div><div style=\\"font-size:13px;margin-top:8px\\">Check-in opens on the day of a scheduled meeting</div></div>";' +
+    '    return;' +
+    '  }' +
+    '  if(meetings.length===1){' +
+    '    selectedMeetingId=meetings[0].id;' +
+    '    el.innerHTML="<div class=\\"meeting-option selected\\"><div class=\\"meeting-name\\">"+meetings[0].name+"</div><div class=\\"meeting-time\\">"+meetings[0].time+"</div></div>";' +
+    '    document.getElementById("checkinForm").style.display="block";' +
+    '  }else{' +
+    '    var html="<div style=\\"font-size:14px;color:#78716c;margin-bottom:12px\\">Select your meeting:</div>";' +
+    '    meetings.forEach(function(m){' +
+    '      html+="<div class=\\"meeting-option\\" onclick=\\"selectMeeting(\\x27"+m.id+"\\x27,this)\\"><div class=\\"meeting-name\\">"+m.name+"</div><div class=\\"meeting-time\\">"+m.time+"</div></div>";' +
+    '    });' +
+    '    el.innerHTML=html;' +
+    '  }' +
+    '}).withFailureHandler(function(err){' +
+    '  document.getElementById("meetingList").innerHTML="<div class=\\"no-meetings\\"><div class=\\"no-meetings-icon\\">⚠️</div><div>Error loading meetings</div></div>";' +
+    '}).getCheckInEligibleMeetings();' +
+
+    'function selectMeeting(id,el){' +
+    '  selectedMeetingId=id;' +
+    '  document.querySelectorAll(".meeting-option").forEach(function(o){o.classList.remove("selected")});' +
+    '  el.classList.add("selected");' +
+    '  document.getElementById("checkinForm").style.display="block";' +
+    '  document.getElementById("email").focus();' +
+    '}' +
+
+    'function doCheckIn(){' +
+    '  var email=document.getElementById("email").value.trim();' +
+    '  var pin=document.getElementById("pin").value.trim();' +
+    '  var errEl=document.getElementById("errorMsg");' +
+    '  errEl.style.display="none";' +
+    '  if(!selectedMeetingId){errEl.textContent="Please select a meeting";errEl.style.display="block";return}' +
+    '  if(!email){errEl.textContent="Please enter your email";errEl.style.display="block";return}' +
+    '  if(!pin||pin.length<4){errEl.textContent="Please enter your PIN (4-8 digits)";errEl.style.display="block";return}' +
+    '  var btn=document.getElementById("checkinBtn");' +
+    '  btn.disabled=true;btn.textContent="Checking in...";' +
+    '  google.script.run.withSuccessHandler(function(result){' +
+    '    btn.disabled=false;btn.textContent="Check In";' +
+    '    if(result&&result.success){' +
+    '      document.getElementById("successName").textContent=result.memberName||"Member";' +
+    '      document.getElementById("successBanner").style.display="block";' +
+    '      if(result.attendeeCount){var ac=document.getElementById("attendeeCount");ac.textContent="✓ "+result.attendeeCount+" checked in so far";ac.style.display="block"}' +
+    '      document.getElementById("email").value="";document.getElementById("pin").value="";' +
+    '      setTimeout(function(){document.getElementById("successBanner").style.display="none"},4000);' +
+    '    }else{' +
+    '      errEl.textContent=(result&&result.message)||"Check-in failed. Verify your email and PIN.";errEl.style.display="block";' +
+    '    }' +
+    '  }).withFailureHandler(function(err){' +
+    '    btn.disabled=false;btn.textContent="Check In";' +
+    '    errEl.textContent="Error: "+String(err||"Unknown");errEl.style.display="block";' +
+    '  }).processMeetingCheckIn(selectedMeetingId,email,pin);' +
+    '}' +
+
+    'document.getElementById("pin").addEventListener("keypress",function(e){if(e.key==="Enter")doCheckIn()});' +
+    '</script>' +
+
+    '</body></html>';
 }
