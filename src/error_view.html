@@ -23,11 +23,19 @@ function renderError(container, error) {
   wrapper.appendChild(el('div', { className: 'error-title' }, titles[error.type] || 'Error'));
   wrapper.appendChild(el('div', { className: 'error-message' }, error.message));
   
+  var retryLabel = (error.type === 'not_found' || error.type === 'expired') ? 'Back to Sign In' : 'Try Again';
   wrapper.appendChild(el('button', {
     className: 'btn btn-primary',
     style: { marginTop: '24px', maxWidth: '280px' },
-    onClick: function() { window.top.location.reload(); }
-  }, 'Try Again'));
+    onClick: function() {
+      if (error.type === 'not_found' || error.type === 'expired') {
+        // Re-render the auth screen client-side — no server round-trip needed
+        renderAuth(document.getElementById('app'));
+      } else {
+        window.location.reload();
+      }
+    }
+  }, retryLabel));
   
   container.appendChild(wrapper);
 }
