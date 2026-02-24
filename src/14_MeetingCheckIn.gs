@@ -67,7 +67,7 @@ function createMeeting(meetingData) {
   var notifyEmails = meetingData.notifyEmails ? String(meetingData.notifyEmails).trim() : '';
   var agendaStewards = meetingData.agendaStewards ? String(meetingData.agendaStewards).trim() : '';
 
-  // Create Google Calendar event (check for existing event on same date/name to avoid duplicates)
+  // Create Google Calendar event
   var calendarEventId = '';
   if (typeof createMeetingCalendarEvent === 'function') {
     calendarEventId = createMeetingCalendarEvent({
@@ -96,9 +96,8 @@ function createMeeting(meetingData) {
       name: meetingName,
       date: meetingData.date
     });
-    // Validate URLs are from Google Docs (defense-in-depth)
-    notesDocUrl = (docs.notesUrl && /^https:\/\/docs\.google\.com\//.test(docs.notesUrl)) ? docs.notesUrl : '';
-    agendaDocUrl = (docs.agendaUrl && /^https:\/\/docs\.google\.com\//.test(docs.agendaUrl)) ? docs.agendaUrl : '';
+    notesDocUrl = docs.notesUrl || '';
+    agendaDocUrl = docs.agendaUrl || '';
   }
 
   // Add a placeholder row so the meeting exists in the sheet
@@ -463,9 +462,9 @@ function processMeetingCheckIn(meetingId, email, pin) {
     meetingDate,
     meetingType,
     memberId,
-    escapeForFormula(memberName.trim()),
+    memberName.trim(),
     new Date(),
-    escapeForFormula(email)
+    email
   ]);
 
   // If this is a Scheduled meeting getting its first check-in, mark as Active
@@ -769,7 +768,7 @@ function getSetupMeetingHtml_() {
     '<div id="success" class="success"></div>' +
     '</div>' +
     '<script>' +
-    getClientSideEscapeHtml() +
+    ' + getClientSideEscapeHtml() + ' +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
     'var stewardData=[];' +
     // Load stewards on dialog open
@@ -932,7 +931,7 @@ function getMeetingCheckInHtml_() {
     '</div>' +
 
     '<script>' +
-    getClientSideEscapeHtml() +
+    ' + getClientSideEscapeHtml() + ' +
 
     // Load only today's eligible meetings for check-in
     'google.script.run' +

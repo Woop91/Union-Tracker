@@ -257,7 +257,7 @@ function getSatisfactionDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    getClientSideEscapeHtml() +
+    ' + getClientSideEscapeHtml() + ' +
     'var allResponses=[];var currentFilter="all";var analyticsLoaded=false;var sectionsLoaded=false;' +
 
     // Tab switching
@@ -1033,8 +1033,8 @@ function getSatisfactionTrendData(period) {
   try {
     var prioritiesData = sheet.getRange(2, SATISFACTION_COLS.Q64_TOP_PRIORITIES, numRows, 1).getValues();
     var issueMap = {};
-    for (i = 0; i < numRows; i++) {
-      ts = timestamps[i][0];
+    for (var i = 0; i < numRows; i++) {
+      var ts = timestamps[i][0];
       if (!(ts instanceof Date)) continue;
       if (cutoff && ts < cutoff) continue;
 
@@ -1254,7 +1254,7 @@ function getSatisfactionAnalyticsData() {
 
   // By Worksite analysis
   var worksiteMap = {};
-  for (i = 0; i < numRows; i++) {
+  for (var i = 0; i < numRows; i++) {
     var ws = worksiteData[i][0] || 'Unknown';
     if (!worksiteMap[ws]) worksiteMap[ws] = { sum: 0, count: 0 };
     if (scores[i] > 0) {
@@ -1263,7 +1263,7 @@ function getSatisfactionAnalyticsData() {
     }
   }
 
-  for (ws in worksiteMap) {
+  for (var ws in worksiteMap) {
     if (worksiteMap[ws].count > 0) {
       result.byWorksite.push({
         name: ws,
@@ -1276,7 +1276,7 @@ function getSatisfactionAnalyticsData() {
 
   // By Role analysis
   var roleMap = {};
-  for (i = 0; i < numRows; i++) {
+  for (var i = 0; i < numRows; i++) {
     var role = roleData[i][0] || 'Unknown';
     if (!roleMap[role]) roleMap[role] = { sum: 0, count: 0 };
     if (scores[i] > 0) {
@@ -1285,7 +1285,7 @@ function getSatisfactionAnalyticsData() {
     }
   }
 
-  for (role in roleMap) {
+  for (var role in roleMap) {
     if (roleMap[role].count > 0) {
       result.byRole.push({
         name: role,
@@ -1300,7 +1300,7 @@ function getSatisfactionAnalyticsData() {
   var withContactSum = 0, withContactCount = 0;
   var withoutContactSum = 0, withoutContactCount = 0;
 
-  for (i = 0; i < numRows; i++) {
+  for (var i = 0; i < numRows; i++) {
     var contact = String(stewardContactData[i][0]).toLowerCase();
     if (scores[i] > 0) {
       if (contact === 'yes') {
@@ -1324,7 +1324,7 @@ function getSatisfactionAnalyticsData() {
 
   // Top priorities analysis
   var priorityMap = {};
-  for (i = 0; i < numRows; i++) {
+  for (var i = 0; i < numRows; i++) {
     var priorities = String(prioritiesData[i][0] || '');
     if (priorities) {
       // Split by comma and count each priority
@@ -1803,7 +1803,7 @@ function syncGrievanceToMemberDirectory() {
   // Update columns AB-AD (Has Open Grievance?, Grievance Status, Days to Deadline)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var memberInfo = lookup[memberId] || {hasOpen: 'No', status: '', deadline: ''};
     updates.push([memberInfo.hasOpen, memberInfo.status, memberInfo.deadline]);
   }
@@ -1869,7 +1869,7 @@ function syncGrievanceFormulasToLog() {
 
   for (var j = 1; j < grievanceData.length; j++) {
     var row = grievanceData[j];
-    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || ('Row ' + (j + 1));
 
     // Track data quality issues
@@ -2090,7 +2090,7 @@ function syncMemberToGrievanceLog() {
   var infoUpdates = [];
 
   for (var j = 1; j < grievanceData.length; j++) {
-    memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
+    var memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
     var data = lookup[memberId] || {firstName: '', lastName: '', email: '', unit: '', location: '', steward: ''};
     nameUpdates.push([data.firstName, data.lastName]);
     infoUpdates.push([data.email, data.unit, data.location, data.steward]);
@@ -2111,25 +2111,58 @@ function syncMemberToGrievanceLog() {
 // ============================================================================
 
 /**
- * Sync new values from Member Directory to Config (bidirectional sync).
- * When a user enters a new value in a dropdown/multi-select column, add it to Config.
- *
- * Delegates to syncDropdownToConfig_ which uses the dynamically-rebuilt
- * DROPDOWN_MAP and MULTI_SELECT_COLS (kept current by syncColumnMaps).
- *
+ * Sync new values from Member Directory to Config (bidirectional sync)
+ * When a user enters a new value in a job metadata field, add it to Config
  * @param {Object} e - The edit event object
  */
 function syncNewValueToConfig(e) {
   if (!e || !e.range) return;
 
   var sheet = e.range.getSheet();
-  var sheetName = sheet.getName();
-  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
+  if (sheet.getName() !== SHEETS.MEMBER_DIR) return;
 
-  // syncDropdownToConfig_ uses DROPDOWN_MAP + MULTI_SELECT_COLS (rebuilt by
-  // syncColumnMaps) and writes via addToConfigDropdown_ which correctly finds
-  // the first empty row in the target Config column.
-  syncDropdownToConfig_(e, sheetName);
+  var col = e.range.getColumn();
+  var newValue = e.range.getValue();
+
+  // Skip if empty or header row
+  if (!newValue || e.range.getRow() === 1) return;
+
+  // Check if this column is a job metadata field (includes Committees and Home Town)
+  var fieldConfig = getJobMetadataByMemberCol(col);
+  if (!fieldConfig) return; // Not a synced column
+
+  // Get current Config values for this column
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) return;
+
+  var existingValues = getConfigValues(configSheet, fieldConfig.configCol);
+
+  // Handle multi-value fields (comma-separated)
+  var valuesToCheck = newValue.toString().split(',').map(function(v) { return v.trim(); });
+
+  var valuesToAdd = [];
+  for (var j = 0; j < valuesToCheck.length; j++) {
+    var val = valuesToCheck[j];
+    if (val && existingValues.indexOf(val) === -1) {
+      valuesToAdd.push(val);
+    }
+  }
+
+  // Add new values to Config
+  if (valuesToAdd.length > 0) {
+    var lastRow = configSheet.getLastRow();
+    var dataStartRow = Math.max(lastRow + 1, 3); // Start at row 3 minimum
+
+    for (var k = 0; k < valuesToAdd.length; k++) {
+      configSheet.getRange(dataStartRow + k, fieldConfig.configCol).setValue(valuesToAdd[k]);
+    }
+
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Added "' + valuesToAdd.join(', ') + '" to ' + fieldConfig.configName,
+      'Config Updated', 3
+    );
+  }
 }
 
 // ============================================================================
@@ -2241,12 +2274,6 @@ function syncAllData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
   ss.toast('Syncing all data...', 'Sync', 3);
-
-  // Restore any Config entries that exist in Member Directory / Grievance Log
-  // but are missing from the Config sheet (self-healing bidirectional sync)
-  if (typeof restoreConfigFromSheetData_ === 'function') {
-    try { restoreConfigFromSheetData_(); } catch (_e) { Logger.log('Config restore skipped: ' + _e.message); }
-  }
 
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();
@@ -3371,7 +3398,7 @@ function getFlaggedSubmissionsHtml() {
     '<div id="content"><div class="empty-state">Loading...</div></div>' +
     '</div>' +
     '<script>' +
-    getClientSideEscapeHtml() +
+    ' + getClientSideEscapeHtml() + ' +
     'function load(){google.script.run.withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
@@ -3494,13 +3521,6 @@ function approveFlaggedSubmission(rowNum) {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function rejectFlaggedSubmission(rowNum) {
-  // Verify caller is an authorized steward
-  var callerEmail = '';
-  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
-  if (!callerEmail) {
-    throw new Error('Authorization required: unable to verify user identity');
-  }
-
   // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
@@ -3512,7 +3532,7 @@ function rejectFlaggedSubmission(rowNum) {
       var vaultRow = i + 1;
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Rejected');
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
-      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
       break;
     }
   }
@@ -3594,7 +3614,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '.trend-area { margin-top: 10px; }' +
     '</style>' +
     '<script type="text/javascript">' +
-    getClientSideEscapeHtml() +
+    ' + getClientSideEscapeHtml() + ' +
     'google.charts.load("current", {"packages":["corechart", "gauge"]});' +
     'google.charts.setOnLoadCallback(drawCharts);' +
     'function drawCharts() {' +

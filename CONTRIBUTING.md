@@ -30,8 +30,8 @@ Please be respectful and constructive in all interactions. We're all working tow
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Woop91/DDS-Dashboard.git
-   cd DDS-Dashboard
+   git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
+   cd MULTIPLE-SCRIPS-REPO
    ```
 
 2. **Install dependencies**
