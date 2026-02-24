@@ -244,6 +244,11 @@ function buildSafeQuery(sheetName, query, headers) {
     .replace(/'/g, "''")
     .replace(/"/g, '\\"');
 
+  // Reject queries that could break out of the QUERY string context
+  if (/["\)]\s*[\+\&,]/.test(safeQuery) || /IMPORTRANGE|IMPORTDATA|IMPORTFEED|IMPORTHTML|IMAGE/i.test(safeQuery)) {
+    throw new Error('Query contains disallowed patterns');
+  }
+
   return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
 }
 
@@ -354,9 +359,9 @@ function getUserRole_(email) {
       if (memberSheet) {
         var data = memberSheet.getDataRange().getValues();
         for (var i = 1; i < data.length; i++) {
-          var memberEmail = data[i][MEMBER_COLUMNS.EMAIL] || '';
+          var memberEmail = data[i][MEMBER_COLS.EMAIL - 1] || '';
           if (memberEmail.toLowerCase() === email.toLowerCase()) {
-            var isSteward = data[i][MEMBER_COLUMNS.IS_STEWARD];
+            var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
             if (isTruthyValue(isSteward)) {
               return 'steward';
             }
@@ -382,12 +387,17 @@ function validateWebAppRequest(e) {
   var result = {
     isValid: true,
     params: {},
-    errors: []
+    errors: [],
+    hasParams: false
   };
 
   if (!e || !e.parameter) {
-    return result;  // No parameters is valid
+    // No parameters is structurally valid; callers must check result.hasParams
+    // independently if they require specific parameters to be present.
+    return result;
   }
+
+  result.hasParams = !!(e && e.parameter && Object.keys(e.parameter).length > 0);
 
   // Validate and sanitize 'mode' parameter
   if (e.parameter.mode) {
@@ -464,7 +474,7 @@ function getAccessDeniedPage(message) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Access Denied')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 // ============================================================================
@@ -955,7 +965,7 @@ function sendDailySecurityDigest() {
 
     // Gather recipients
     var recipients = [];
-    if (typeof getConfigValue_ === 'function') {
+    if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined') {
       try {
         var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
         var adminEmails = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);

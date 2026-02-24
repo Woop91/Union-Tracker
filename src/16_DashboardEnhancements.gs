@@ -220,10 +220,10 @@ function sendDashboardReportEmail_(schedule) {
     html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Summary Metrics</h2>';
     html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
-    html += '<tr><td>Total Members</td><td style="text-align:right;font-weight:bold">' + data.totalMembers + '</td></tr>';
-    html += '<tr><td>Open Cases</td><td style="text-align:right;font-weight:bold">' + data.openCases + '</td></tr>';
-    html += '<tr><td>Win Rate</td><td style="text-align:right;font-weight:bold">' + data.winRate + '%</td></tr>';
-    html += '<tr><td>Morale Score</td><td style="text-align:right;font-weight:bold">' + data.moraleScore + '/10</td></tr>';
+    html += '<tr><td>Total Members</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.totalMembers)) + '</td></tr>';
+    html += '<tr><td>Open Cases</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.openCases)) + '</td></tr>';
+    html += '<tr><td>Win Rate</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.winRate)) + '%</td></tr>';
+    html += '<tr><td>Morale Score</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.moraleScore)) + '/10</td></tr>';
     html += '</table></div>';
   }
 
@@ -232,7 +232,7 @@ function sendDashboardReportEmail_(schedule) {
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Monthly Filings Trend</h2>';
     html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
     for (var m = 0; m < data.monthlyFilings.length; m++) {
-      html += '<tr><td>' + data.monthlyFilings[m].month + '</td><td style="text-align:right">' + data.monthlyFilings[m].count + ' filed</td></tr>';
+      html += '<tr><td>' + escapeHtml(String(data.monthlyFilings[m].month)) + '</td><td style="text-align:right">' + escapeHtml(String(data.monthlyFilings[m].count)) + ' filed</td></tr>';
     }
     html += '</table></div>';
   }
@@ -240,7 +240,7 @@ function sendDashboardReportEmail_(schedule) {
   if (sections.indexOf('satisfaction') >= 0) {
     html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Satisfaction</h2>';
-    html += '<p style="color:#e2e8f0">Overall Morale: <strong>' + data.moraleScore + '/10</strong></p>';
+    html += '<p style="color:#e2e8f0">Overall Morale: <strong>' + escapeHtml(String(data.moraleScore)) + '/10</strong></p>';
     html += '</div>';
   }
 

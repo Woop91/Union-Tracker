@@ -22,7 +22,7 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order - 27 modules
+// Files in build order - 28 modules
 const BUILD_ORDER = [
   '00_Security.gs',                // Security utilities, XSS prevention, access control
   '00_DataAccess.gs',              // Data Access Layer, time constants
@@ -53,11 +53,13 @@ const BUILD_ORDER = [
   '14_MeetingCheckIn.gs',           // Meeting check-in system with email + PIN
   '15_EventBus.gs',                 // Event-driven pub/sub architecture
   '16_DashboardEnhancements.gs',    // Dashboard features: filters, presets, export, collaboration
-  '17_CorrelationEngine.gs'         // Cross-dimensional correlation engine with insights
+  '17_CorrelationEngine.gs',        // Cross-dimensional correlation engine with insights
+  '18_WorkloadTracker.gs'           // Member workload tracking, anonymized reporting
 ];
 
 const HTML_FILES = [
-  'MultiSelectDialog.html'
+  'MultiSelectDialog.html',
+  'WorkloadTracker.html'
 ];
 
 function build() {

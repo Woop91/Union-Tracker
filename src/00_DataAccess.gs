@@ -357,26 +357,25 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
                     SHEETS.MEMBER_DIR : 'Member Directory';
 
-    var result = this.findRow(sheetName, MEMBER_COLUMNS.MEMBER_ID, memberId);
+    var result = this.findRow(sheetName, MEMBER_COLS.MEMBER_ID - 1, memberId);
 
     if (!result) return null;
 
-    // Map to object using MEMBER_COLUMNS
     var row = result.data;
     return {
       rowNumber: result.rowNumber,
-      memberId: row[MEMBER_COLUMNS.MEMBER_ID],
-      firstName: row[MEMBER_COLUMNS.FIRST_NAME],
-      lastName: row[MEMBER_COLUMNS.LAST_NAME],
-      jobTitle: row[MEMBER_COLUMNS.JOB_TITLE],
-      workLocation: row[MEMBER_COLUMNS.WORK_LOCATION],
-      unit: row[MEMBER_COLUMNS.UNIT],
-      email: row[MEMBER_COLUMNS.EMAIL],
-      phone: row[MEMBER_COLUMNS.PHONE],
-      isSteward: row[MEMBER_COLUMNS.IS_STEWARD],
-      assignedSteward: row[MEMBER_COLUMNS.ASSIGNED_STEWARD],
-      hasOpenGrievance: row[MEMBER_COLUMNS.HAS_OPEN_GRIEVANCE],
-      grievanceStatus: row[MEMBER_COLUMNS.GRIEVANCE_STATUS]
+      memberId: row[MEMBER_COLS.MEMBER_ID - 1],
+      firstName: row[MEMBER_COLS.FIRST_NAME - 1],
+      lastName: row[MEMBER_COLS.LAST_NAME - 1],
+      jobTitle: row[MEMBER_COLS.JOB_TITLE - 1],
+      workLocation: row[MEMBER_COLS.WORK_LOCATION - 1],
+      unit: row[MEMBER_COLS.UNIT - 1],
+      email: row[MEMBER_COLS.EMAIL - 1],
+      phone: row[MEMBER_COLS.PHONE - 1],
+      isSteward: row[MEMBER_COLS.IS_STEWARD - 1],
+      assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1],
+      hasOpenGrievance: row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1],
+      grievanceStatus: row[MEMBER_COLS.GRIEVANCE_STATUS - 1]
     };
   },
 
@@ -401,28 +400,28 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (row[MEMBER_COLUMNS.MEMBER_ID] === '' || row[MEMBER_COLUMNS.MEMBER_ID] == null) continue;
+      if (row[MEMBER_COLS.MEMBER_ID - 1] === '' || row[MEMBER_COLS.MEMBER_ID - 1] == null) continue;
 
       // Apply filters (use String() coercion for type-safe comparison)
-      if (options.unit && String(row[MEMBER_COLUMNS.UNIT]) !== String(options.unit)) continue;
-      if (options.location && String(row[MEMBER_COLUMNS.WORK_LOCATION]) !== String(options.location)) continue;
+      if (options.unit && String(row[MEMBER_COLS.UNIT - 1]) !== String(options.unit)) continue;
+      if (options.location && String(row[MEMBER_COLS.WORK_LOCATION - 1]) !== String(options.location)) continue;
       if (options.stewardsOnly) {
-        var isSteward = row[MEMBER_COLUMNS.IS_STEWARD];
+        var isSteward = row[MEMBER_COLS.IS_STEWARD - 1];
         if (!isTruthyValue(isSteward)) continue;
       }
 
       members.push({
         rowNumber: i + 2,  // Account for header and 0-index
-        memberId: row[MEMBER_COLUMNS.MEMBER_ID],
-        firstName: row[MEMBER_COLUMNS.FIRST_NAME],
-        lastName: row[MEMBER_COLUMNS.LAST_NAME],
-        jobTitle: row[MEMBER_COLUMNS.JOB_TITLE],
-        workLocation: row[MEMBER_COLUMNS.WORK_LOCATION],
-        unit: row[MEMBER_COLUMNS.UNIT],
-        email: row[MEMBER_COLUMNS.EMAIL],
-        phone: row[MEMBER_COLUMNS.PHONE],
-        isSteward: row[MEMBER_COLUMNS.IS_STEWARD],
-        assignedSteward: row[MEMBER_COLUMNS.ASSIGNED_STEWARD]
+        memberId: row[MEMBER_COLS.MEMBER_ID - 1],
+        firstName: row[MEMBER_COLS.FIRST_NAME - 1],
+        lastName: row[MEMBER_COLS.LAST_NAME - 1],
+        jobTitle: row[MEMBER_COLS.JOB_TITLE - 1],
+        workLocation: row[MEMBER_COLS.WORK_LOCATION - 1],
+        unit: row[MEMBER_COLS.UNIT - 1],
+        email: row[MEMBER_COLS.EMAIL - 1],
+        phone: row[MEMBER_COLS.PHONE - 1],
+        isSteward: row[MEMBER_COLS.IS_STEWARD - 1],
+        assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1]
       });
     }
 
@@ -444,31 +443,30 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
                     SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
-    var result = this.findRow(sheetName, GRIEVANCE_COLUMNS.GRIEVANCE_ID, grievanceId);
+    var result = this.findRow(sheetName, GRIEVANCE_COLS.GRIEVANCE_ID - 1, grievanceId);
 
     if (!result) return null;
 
     var row = result.data;
     return {
       rowNumber: result.rowNumber,
-      grievanceId: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-      memberId: row[GRIEVANCE_COLUMNS.MEMBER_ID],
-      firstName: row[GRIEVANCE_COLUMNS.FIRST_NAME],
-      lastName: row[GRIEVANCE_COLUMNS.LAST_NAME],
-      status: row[GRIEVANCE_COLUMNS.STATUS],
-      currentStep: row[GRIEVANCE_COLUMNS.CURRENT_STEP],
-      incidentDate: row[GRIEVANCE_COLUMNS.INCIDENT_DATE],
-      filingDeadline: row[GRIEVANCE_COLUMNS.FILING_DEADLINE],
-      dateFiled: row[GRIEVANCE_COLUMNS.DATE_FILED],
-      daysOpen: row[GRIEVANCE_COLUMNS.DAYS_OPEN],
-      nextActionDue: row[GRIEVANCE_COLUMNS.NEXT_ACTION_DUE],
-      daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
-      articles: row[GRIEVANCE_COLUMNS.ARTICLES],
-      issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
-      unit: row[GRIEVANCE_COLUMNS.UNIT],
-      location: row[GRIEVANCE_COLUMNS.LOCATION],
-      steward: row[GRIEVANCE_COLUMNS.STEWARD],
-      resolution: row[GRIEVANCE_COLUMNS.RESOLUTION]
+      grievanceId: row[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+      memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1],
+      firstName: row[GRIEVANCE_COLS.FIRST_NAME - 1],
+      lastName: row[GRIEVANCE_COLS.LAST_NAME - 1],
+      status: row[GRIEVANCE_COLS.STATUS - 1],
+      currentStep: row[GRIEVANCE_COLS.CURRENT_STEP - 1],
+      incidentDate: row[GRIEVANCE_COLS.INCIDENT_DATE - 1],
+      filingDeadline: row[GRIEVANCE_COLS.FILING_DEADLINE - 1],
+      dateFiled: row[GRIEVANCE_COLS.DATE_FILED - 1],
+      daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1],
+      nextActionDue: row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1],
+      daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1],
+      articles: row[GRIEVANCE_COLS.ARTICLES - 1],
+      issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
+      location: row[GRIEVANCE_COLS.LOCATION - 1],
+      steward: row[GRIEVANCE_COLS.STEWARD - 1],
+      resolution: row[GRIEVANCE_COLS.RESOLUTION - 1]
     };
   },
 
@@ -493,29 +491,29 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (row[GRIEVANCE_COLUMNS.GRIEVANCE_ID] === '' || row[GRIEVANCE_COLUMNS.GRIEVANCE_ID] == null) continue;
+      if (row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] === '' || row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] == null) continue;
 
       // Apply filters (use String() coercion for type-safe comparison)
-      if (options.status && String(row[GRIEVANCE_COLUMNS.STATUS]) !== String(options.status)) continue;
-      if (options.steward && String(row[GRIEVANCE_COLUMNS.STEWARD]) !== String(options.steward)) continue;
+      if (options.status && String(row[GRIEVANCE_COLS.STATUS - 1]) !== String(options.status)) continue;
+      if (options.steward && String(row[GRIEVANCE_COLS.STEWARD - 1]) !== String(options.steward)) continue;
       if (options.overdueOnly) {
-        var daysToDeadline = row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE];
+        var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
         if (typeof daysToDeadline !== 'number' || daysToDeadline >= 0) continue;
       }
 
       grievances.push({
         rowNumber: i + 2,
-        grievanceId: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-        memberId: row[GRIEVANCE_COLUMNS.MEMBER_ID],
-        firstName: row[GRIEVANCE_COLUMNS.FIRST_NAME],
-        lastName: row[GRIEVANCE_COLUMNS.LAST_NAME],
-        status: row[GRIEVANCE_COLUMNS.STATUS],
-        currentStep: row[GRIEVANCE_COLUMNS.CURRENT_STEP],
-        incidentDate: row[GRIEVANCE_COLUMNS.INCIDENT_DATE],
-        daysOpen: row[GRIEVANCE_COLUMNS.DAYS_OPEN],
-        daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
-        issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
-        steward: row[GRIEVANCE_COLUMNS.STEWARD]
+        grievanceId: row[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+        memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1],
+        firstName: row[GRIEVANCE_COLS.FIRST_NAME - 1],
+        lastName: row[GRIEVANCE_COLS.LAST_NAME - 1],
+        status: row[GRIEVANCE_COLS.STATUS - 1],
+        currentStep: row[GRIEVANCE_COLS.CURRENT_STEP - 1],
+        incidentDate: row[GRIEVANCE_COLS.INCIDENT_DATE - 1],
+        daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1],
+        daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1],
+        issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
+        steward: row[GRIEVANCE_COLS.STEWARD - 1]
       });
     }
 

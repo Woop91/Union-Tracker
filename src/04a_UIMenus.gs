@@ -588,6 +588,10 @@ function showMultiSelectDialog(title, items, callback) {
  * @return {string} HTML content
  */
 function getMultiSelectHtml(items, callback) {
+  var allowedCallbacks = ['applyMultiSelectValue', 'handleBulkStatusSelection'];
+  if (allowedCallbacks.indexOf(callback) === -1) {
+    throw new Error('Invalid callback function name: ' + callback);
+  }
   const itemsJson = JSON.stringify(items);
 
   return `

@@ -417,13 +417,13 @@ function showEventBusStatus() {
     '<h4>Registered Events (' + events.length + '):</h4><ul>';
 
   events.forEach(function(name) {
-    html += '<li>' + name + ' (' + EventBus.listenerCount(name) + ' listeners)</li>';
+    html += '<li>' + escapeHtml(name) + ' (' + EventBus.listenerCount(name) + ' listeners)</li>';
   });
   html += '</ul>';
 
   html += '<h4>Recent Events (' + log.length + '):</h4><ul>';
   log.forEach(function(entry) {
-    html += '<li>' + entry.timestamp.substr(11, 8) + ' - ' + entry.event + '</li>';
+    html += '<li>' + escapeHtml(entry.timestamp.substr(11, 8)) + ' - ' + escapeHtml(entry.event) + '</li>';
   });
   html += '</ul>';
 

@@ -52,7 +52,8 @@ function CREATE_DASHBOARD() {
       '• 📋 Features Reference (complete feature list)\n' +
       '• 📚 Getting Started (setup instructions)\n' +
       '• ❓ FAQ (common questions)\n' +
-      '• 📖 Config Guide (how to use Config tab)\n\n' +
+      '• 📖 Config Guide (how to use Config tab)\n' +
+      '• 📊 Workload Tracker (member caseload tracking)\n\n' +
       'Note: All dashboards are now modal-based (popup windows).\n' +
       'Access them via: Union Hub > Dashboards menu.\n\n' +
       'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
@@ -131,19 +132,32 @@ function CREATE_DASHBOARD() {
     installHiddenSheetEnforcerTrigger();
     ss.toast('Hidden sheet enforcer installed', '🏗️ Progress', 2);
 
+    // Initialize Workload Tracker sheets (18_WorkloadTracker.gs)
+    if (typeof initWorkloadTrackerSheets === 'function') {
+      try {
+        initWorkloadTrackerSheets();
+        ss.toast('Workload Tracker sheets created', '🏗️ Progress', 2);
+      } catch (wtError) {
+        Logger.log('Workload tracker sheets skipped: ' + wtError.message);
+      }
+    }
+
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
-        '14 sheets created:\n' +
+        '15 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
         '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
-        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
+        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
+        '• 📊 Workload Reporting (member caseload tracking)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
         'Access via: Union Hub > Dashboards menu.\n\n' +
+        'Workload Tracker: Union Hub > 📊 Workload Tracker\n' +
+        'Members submit via: [web app URL]?page=workload\n\n' +
         'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
         '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
         'update automatically when you edit the sheets.\n\n' +
@@ -323,6 +337,21 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
+  // IS_STEWARD and INTEREST_* columns use hardcoded Yes/No validation.
+  // The YES_NO Config column was removed to eliminate contamination risk.
+  // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
+  var yesNoValues = ['Yes', 'No'];
+  var yesNoCols = [MEMBER_COLS.IS_STEWARD, MEMBER_COLS.INTEREST_LOCAL,
+                   MEMBER_COLS.INTEREST_CHAPTER, MEMBER_COLS.INTEREST_ALLIED];
+  var yesNoRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(yesNoValues, true)
+    .setAllowInvalid(true)
+    .build();
+  for (var yn = 0; yn < yesNoCols.length; yn++) {
+    var ynRange = memberSheet.getRange(2, yesNoCols[yn], Math.max(1, memberSheet.getMaxRows() - 1), 1);
+    ynRange.setDataValidation(yesNoRule);
+  }
+
   // Member Directory Validations — driven by MULTI_SELECT_COLS
   var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
   for (var mm = 0; mm < memberMS.length; mm++) {
@@ -386,14 +415,19 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     }
   }
 
-  if (values.length === 0) return; // No values to validate against
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -418,14 +452,19 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     }
   }
 
-  if (values.length === 0) return;
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow comma-separated values from multi-select dialog
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 

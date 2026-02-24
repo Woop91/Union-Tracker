@@ -362,8 +362,8 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
-      sheet.getRange(i + 1, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).setValue(folderUrl);
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+      sheet.getRange(i + 1, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folderUrl);
       break;
     }
   }
@@ -382,7 +382,7 @@ function openGrievanceFolder() {
   const row = sheet.getActiveRange().getRow();
   if (row <= 1) return;
 
-  const folderUrl = sheet.getRange(row, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).getValue();
+  const folderUrl = sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
 
   if (folderUrl) {
     const html = HtmlService.createHtmlOutput(
@@ -391,7 +391,7 @@ function openGrievanceFolder() {
     SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
   } else {
     if (showConfirmation('No folder exists. Create one now?', 'Create Folder')) {
-      const grievanceId = sheet.getRange(row, GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1).getValue();
+      const grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
       const result = setupDriveFolderForGrievance(grievanceId);
       if (result.success) {
         const html = HtmlService.createHtmlOutput(
@@ -508,6 +508,15 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     return errorResponse('Meeting ID and recipient emails are required');
   }
 
+  // Validate all recipient email addresses
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emails = String(recipientEmails).split(',');
+  for (var e = 0; e < emails.length; e++) {
+    if (!emailRegex.test(emails[e].trim())) {
+      return errorResponse('Invalid email address: ' + emails[e].trim());
+    }
+  }
+
   try {
     var result = getMeetingAttendees(meetingId);
     if (!result.success) {
@@ -517,6 +526,9 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Find meeting details from the check-in log
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return errorResponse('No meeting check-in data found');
+    }
     var data = sheet.getDataRange().getValues();
     var meetingName = '';
     var meetingDate = '';
@@ -727,6 +739,17 @@ function setDocViewOnlyByLink(docUrl) {
  */
 function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipientEmails) {
   if (!recipientEmails || !docUrl) return;
+
+  // Validate all recipient email addresses
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emails = String(recipientEmails).split(',');
+  for (var e = 0; e < emails.length; e++) {
+    if (!emailRegex.test(emails[e].trim())) {
+      Logger.log('Invalid email address in recipient list: ' + emails[e].trim());
+      return;
+    }
+  }
+
   try {
     var typeLabel = docType === 'agenda' ? 'Meeting Agenda' : 'Meeting Notes';
     var safeDocUrl = /^https:\/\/docs\.google\.com\//.test(docUrl) ? docUrl : '';
@@ -1034,29 +1057,23 @@ function syncDeadlinesToCalendar() {
  * @return {Object} Sync result
  */
 function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
-  const grievanceId = grievance['Grievance ID'] ||
-                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]];
-  const memberName = grievance['Member Name'] ||
-                     grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.MEMBER_NAME]];
-  const currentStep = grievance['Current Step'] ||
-                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
+  const grievanceId = grievance['Grievance ID'];
+  const memberName = grievance['Member Name'];
+  const currentStep = grievance['Current Step'];
 
   // Get the deadline for current step
   let deadline;
   switch (currentStep) {
     case 'Step I':
     case 'Informal':
-      deadline = grievance['Step 1 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
+      deadline = grievance['Step 1 Due'];
       break;
     case 'Step II':
-      deadline = grievance['Step 2 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
+      deadline = grievance['Step 2 Due'];
       break;
     case 'Step III':
     case 'Arbitration':
-      deadline = grievance['Step 3 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
+      deadline = grievance['Step 3 Due'];
       break;
     default:
       return { synced: false, reason: 'No applicable deadline' };
@@ -1119,6 +1136,10 @@ function sendDeadlineReminders(daysAhead) {
   try {
     const deadlines = getUpcomingDeadlines(daysAhead || 7);
     const userEmail = Session.getActiveUser().getEmail();
+
+    if (!userEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      return errorResponse('Could not determine a valid email address for the current user');
+    }
 
     if (deadlines.length === 0) {
       return { success: true, sent: false, message: 'No upcoming deadlines' };
@@ -1187,7 +1208,7 @@ function sendEmailToMember(memberId, subject, body) {
     }
 
     const email = member['Email'] || member.email;
-    if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
       return errorResponse('Invalid email address');
     }
 
@@ -1394,6 +1415,10 @@ function createPDFForSelectedGrievance() {
  * @private
  */
 function sendGrievancePdfEmail_(data, pdf) {
+  if (!data.memberEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.memberEmail).trim())) {
+    throw new Error('Invalid or missing member email address');
+  }
+
   var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Grievance Form - ' + data.grievanceId;
 
   var body = 'Dear ' + data.name + ',\n\n' +
@@ -1654,7 +1679,7 @@ function doGet(e) {
     var html = getUnifiedDashboardHtml(isPII);
     return HtmlService.createHtmlOutput(html)
       .setTitle(title)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
   }
 
@@ -1692,7 +1717,7 @@ function doGet(e) {
         var authHtml = getMemberSelfServicePortalHtml();
         return HtmlService.createHtmlOutput(authHtml)
           .setTitle('Member Login')
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
           .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
       }
     }
@@ -1753,6 +1778,16 @@ function doGet(e) {
         return getAccessDeniedPage('Member self-service portal not available');
       }
       break;
+    case 'workload':
+      // Workload Tracker portal — member PIN auth handled client-side
+      if (typeof getWorkloadTrackerPortalHtml === 'function') {
+        return HtmlService.createHtmlOutput(getWorkloadTrackerPortalHtml())
+          .setTitle('Workload Tracker | SEIU 509')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+      html = getUnifiedDashboardHtml(false);
+      break;
     case 'portal':
       // Public portal without member ID
       if (typeof buildPublicPortal === 'function') {
@@ -1772,7 +1807,7 @@ function doGet(e) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
 }
 
@@ -1918,7 +1953,7 @@ function getWebAppDashboardHtml() {
     // Script to load overdue preview
     '<script>' +
     getClientSideEscapeHtml() +
-    'var baseUrl="' + baseUrl + '";' +
+    'var baseUrl=' + JSON.stringify(baseUrl) + ';' +
     'var retryCount=0;' +
     'function loadOverdue(){' +
     '  if(!navigator.onLine){document.getElementById("overdue-preview").innerHTML="<div style=\\"padding:15px;text-align:center;color:#666\\">📡 Offline</div>";return}' +
@@ -2039,7 +2074,7 @@ function getWebAppSearchHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var currentTab="all";' +
     'var searchTimeout=null;' +
     'var lastQuery="";' +
@@ -2216,7 +2251,7 @@ function getWebAppGrievanceListHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -2416,7 +2451,7 @@ function getWebAppMemberListHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -2571,6 +2606,8 @@ function getWebAppLinksHtml() {
     '</nav>' +
 
     '<script>' +
+    getClientSideEscapeHtml() +
+    'function safeUrl(u){if(!u)return"#";u=String(u);return/^https?:\\/\\//i.test(u)?u:"#";}' +
     'function loadLinks(){' +
     '  google.script.run.withSuccessHandler(function(links){' +
     '    renderLinks(links);' +
@@ -2585,17 +2622,17 @@ function getWebAppLinksHtml() {
     '  // Forms section' +
     '  html+="<div class=\\"section-title\\">📝 Forms</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+links.grievanceForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
-    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+links.contactForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
-    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+links.satisfactionForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
+    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.grievanceForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
+    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.contactForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
+    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.satisfactionForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
     '  if(!links.grievanceForm&&!links.contactForm&&!links.satisfactionForm){html+="<div class=\\"link-card full\\"><span class=\\"link-icon\\">ℹ️</span><div class=\\"link-content\\"><span class=\\"link-label\\">No Forms Configured</span><span class=\\"link-desc\\">Add form URLs to Config sheet</span></div></div>";}' +
     '  html+="</div>";' +
 
     '  // Resources section' +
     '  html+="<div class=\\"section-title\\">🔧 Resources</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  html+="<a class=\\"link-card\\" href=\\""+links.spreadsheetUrl+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
-    '  html+="<a class=\\"link-card github\\" href=\\""+links.githubRepo+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
+    '  html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.spreadsheetUrl))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
+    '  html+="<a class=\\"link-card github\\" href=\\""+escapeHtml(safeUrl(links.githubRepo))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
     '  html+="</div>";' +
 
     '  document.getElementById("linksContent").innerHTML=html;' +
@@ -2887,37 +2924,26 @@ function addMobileDashboardLinkToConfig() {
     return;
   }
 
-  // Find first empty row in column AZ (or create Mobile Dashboard URL section)
-  var _lastRow = configSheet.getLastRow();
-  var targetRow = 2;
-  var MOBILE_DASHBOARD_URL_COL = 52; // Column AZ
-  var targetCol = MOBILE_DASHBOARD_URL_COL;
+  // Use the canonical column constant — never hardcode column numbers.
+  var targetCol = CONFIG_COLS.MOBILE_DASHBOARD_URL;
 
-  // Check if header exists
-  var headerCell = configSheet.getRange(1, targetCol);
-  if (!headerCell.getValue()) {
-    headerCell.setValue('📱 Mobile Dashboard URL');
-    headerCell.setFontWeight('bold');
-    headerCell.setBackground('#1a73e8');
-    headerCell.setFontColor('#ffffff');
-  }
-
-  // Add the hyperlink
-  var linkCell = configSheet.getRange(targetRow, targetCol);
-  linkCell.setFormula('=HYPERLINK("' + url + '", "📱 Tap to Open Dashboard")');
+  // Write data starting at row 3 (first data row).
+  // Rows 1-2 are section/column headers managed by createConfigSheet — don't touch them.
+  var linkCell = configSheet.getRange(3, targetCol);
+  linkCell.setFormula('=HYPERLINK(' + JSON.stringify(url) + ', "📱 Tap to Open Dashboard")');
   linkCell.setFontSize(14);
   linkCell.setFontWeight('bold');
   linkCell.setFontColor('#1a73e8');
   linkCell.setBackground('#e8f0fe');
 
   // Also add plain URL below for copying
-  var urlCell = configSheet.getRange(targetRow + 1, targetCol);
+  var urlCell = configSheet.getRange(4, targetCol);
   urlCell.setValue(url);
   urlCell.setFontSize(10);
   urlCell.setWrap(true);
 
   // Add instructions
-  var instructionCell = configSheet.getRange(targetRow + 2, targetCol);
+  var instructionCell = configSheet.getRange(5, targetCol);
   instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
   instructionCell.setFontSize(9);
   instructionCell.setFontColor('#666666');
@@ -2928,11 +2954,11 @@ function addMobileDashboardLinkToConfig() {
 
   SpreadsheetApp.getUi().alert(
     '📱 Mobile Dashboard Link Added!',
-    'A clickable link has been added to column AZ of the Config sheet.\n\n' +
+    'A clickable link has been added to the "📱 Mobile Dashboard URL" column of the Config sheet.\n\n' +
     'To access on mobile:\n' +
     '1. Open this spreadsheet in Google Sheets mobile app\n' +
     '2. Go to the Config tab\n' +
-    '3. Scroll to column AZ\n' +
+    '3. Scroll to the Mobile Dashboard section\n' +
     '4. Tap the blue "Tap to Open Dashboard" link\n\n' +
     'URL: ' + url,
     SpreadsheetApp.getUi().ButtonSet.OK
@@ -3097,7 +3123,7 @@ function authorizeConstantContact() {
     '  if(!match){alert("Could not find authorization code in that URL. Make sure you copied the full URL.");return;}' +
     '  google.script.run' +
     '    .withSuccessHandler(function(msg){' +
-    '      document.querySelector(".container").innerHTML="<h2>✅ "+msg+"</h2><p>You can close this dialog.</p>";' +
+    '      var c=document.querySelector(".container");c.innerHTML="";var h=document.createElement("h2");h.textContent="\\u2705 "+msg;var p=document.createElement("p");p.textContent="You can close this dialog.";c.appendChild(h);c.appendChild(p);' +
     '    })' +
     '    .withFailureHandler(function(e){alert("Error: "+e.message);})' +
     '    .exchangeConstantContactCode(match[1]);' +
