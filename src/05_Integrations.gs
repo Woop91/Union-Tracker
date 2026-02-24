@@ -1778,6 +1778,16 @@ function doGet(e) {
         return getAccessDeniedPage('Member self-service portal not available');
       }
       break;
+    case 'workload':
+      // Workload Tracker portal — member PIN auth handled client-side
+      if (typeof getWorkloadTrackerPortalHtml === 'function') {
+        return HtmlService.createHtmlOutput(getWorkloadTrackerPortalHtml())
+          .setTitle('Workload Tracker | SEIU 509')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+      html = getUnifiedDashboardHtml(false);
+      break;
     case 'portal':
       // Public portal without member ID
       if (typeof buildPublicPortal === 'function') {

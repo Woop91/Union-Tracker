@@ -553,7 +553,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.9.1",
+  VERSION: "4.10.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -783,7 +783,13 @@ var SHEETS = {
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
-  REPORTS: '💼 Dashboard'
+  REPORTS: '💼 Dashboard',
+  // Workload Tracker sheets (18_WorkloadTracker.gs)
+  WORKLOAD_VAULT:     'Workload Vault',      // hidden — raw submissions with email
+  WORKLOAD_REPORTING: 'Workload Reporting',  // visible — anonymized ledger
+  WORKLOAD_REMINDERS: 'Workload Reminders',  // hidden — email reminder prefs
+  WORKLOAD_USERMETA:  'Workload UserMeta',   // hidden — sharing start dates
+  WORKLOAD_ARCHIVE:   'Workload Archive'     // hidden — data older than 24 months
 };
 
 // SHEET_NAMES alias for backward compatibility

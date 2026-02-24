@@ -81,6 +81,17 @@ function createDashboardMenu() {
     .addItem('📅 Open Google Calendar', 'openGoogleCalendar')
     .addItem('📁 Open Google Drive', 'openGoogleDrive')
     .addItem('📖 Help & Documentation', 'showHelpDialog')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('📋 Open Workload Portal', 'showWorkloadPortalUrl')
+      .addItem('🔗 Save Portal Link', 'shareWorkloadPortalLink')
+      .addSeparator()
+      .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData_')
+      .addSeparator()
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
+      .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem'))
     .addToUi();
 
   // ============================================================================
