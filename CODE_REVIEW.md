@@ -6,6 +6,7 @@
 **Reviewer:** Claude Code (Opus 4.6)
 **Scope:** Full line-by-line codebase review — 30 source files (~59K lines), 23 test files, config/build infrastructure
 **Version:** 4.9.0 (as of 2026-02-17)
+**Note:** This review covers v4.9.0. The v4.10.0 release added `18_WorkloadTracker.gs` and `WorkloadTracker.html`, not yet in scope.
 **Previous Review:** 2026-02-14 (v4.7.0 — 69 issues, 57 fixed)
 **2026-02-21 Update:** Re-verification pass — 33 new findings added (F76–F108), 1 false positive corrected (F94)
 **Fix Pass:** 2026-02-21 — 30 findings fixed across 16 files (see individual finding annotations below)
