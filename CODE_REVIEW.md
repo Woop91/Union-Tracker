@@ -24,14 +24,14 @@
 
 This is a production-grade Google Apps Script application (Union Steward Dashboard) with a well-organized 30-file modular architecture, 1,300+ tests, comprehensive security features, and a full CI/CD pipeline. The codebase has matured significantly since the v4.7.0 review, with most previously-identified critical issues resolved.
 
-This line-by-line review originally identified **152 active findings** across all severity levels. Through four fix passes (2026-02-21 through 2026-02-24), **all CRITICAL and HIGH findings have been resolved**, and all but 1 MEDIUM finding is either fixed or documented as known debt. The 2026-02-24 re-verification confirmed the actual open count is **1 known-debt item** (F155 — hardcoded column letters in formula setup).
+This line-by-line review originally identified **152 active findings** across all severity levels. Through four fix passes (2026-02-21 through 2026-02-24), **all CRITICAL and HIGH findings have been resolved**. The 2026-02-24 re-verification confirmed the actual open count is **2 known-debt items**: F155 (MEDIUM — hardcoded column letters in formula setup) and F150 (LOW — Nuclear Reset button in Settings dialog, intentional design with double-confirmation guard). F146, F148, F149 were fixed in commit `2788ec7` — not known debt as previously stated in the Known Debt table.
 
 | Severity | Count | Status |
 |----------|------:|--------|
 | CRITICAL | 0 | All resolved across four fix passes |
 | HIGH | 0 | All resolved — LockService, rate limiting, ESLint rules, empty-sheet guards, auth |
 | MEDIUM | 1 | F155 only — hardcoded column letters in `08d_AuditAndFormulas.gs` formula functions (known debt) |
-| LOW | 0 | All resolved or documented as acceptable debt |
+| LOW | 1 | F150 — Nuclear Reset button exposed in Settings dialog (acceptable debt: requires double confirmation, intentional power-user escape hatch) |
 
 **Overall Assessment: Production-ready, all critical security issues resolved.** The 2026-02-24 verification pass confirmed that the codebase's actual state is significantly better than the CODE_REVIEW.md summary suggested — the previous "130 open" count included many findings that had already been fixed in the Full Fix Pass but whose individual annotations were not yet updated. Key resolved areas: (1) **XSS prevention** — `getClientSideEscapeHtml()` pattern fixed across 15 sites, grievance form XSS fixed, DevTools XSS fixed; (2) **Data integrity** — LockService on all mutation paths, column arithmetic replaced with explicit lookup maps; (3) **Security** — rate limiting on PIN/email, formula injection coverage expanded, `XFrameOptionsMode.DENY` bug fixed; (4) **Reliability** — empty-sheet crash guards, archive partial failure reporting; (5) **Code quality** — 42 redeclaration bugs fixed, ESLint safety rules re-enabled. **Web app note:** The `Argument cannot be null: mode` error (caused by `HtmlService.XFrameOptionsMode.DENY` — a non-existent enum value) was fixed in commit `896d6bb`. A `clasp push` / re-deployment is needed for the fix to take effect in the live web app.
 
@@ -2775,8 +2775,9 @@ Called from client-side via `google.script.run` with `opts` parameter. `opts.sub
 
 ---
 
-#### F146. LOW: Stack trace email ignores `SHOW_STACK_TRACE` setting
+#### ~~F146. LOW: Stack trace email ignores `SHOW_STACK_TRACE` setting~~ **FIXED (commit `2788ec7`, 2026-02-24)**
 **Severity:** LOW | **Category:** Consistency | **File:** `01_Core.gs` | **Lines:** 163-170 vs 220
+**Fixed:** `sendCriticalErrorNotification_()` now checks `ERROR_CONFIG.SHOW_STACK_TRACE` at line 233 before appending stack trace to email body. Matches the existing log-sheet guard.
 
 The error log sheet respects `SHOW_STACK_TRACE` (writes empty string when false), but `sendCriticalErrorNotification_()` always includes the full stack trace in the email body.
 
@@ -2794,8 +2795,9 @@ Uses `filing || DEADLINE_DEFAULTS.FILING_DAYS` where `filing` is `Number(...)`. 
 
 ---
 
-#### F148. LOW: Escaped newlines in export email body
-**Severity:** LOW | **Category:** String bug | **File:** `10_Main.gs` | **Lines:** 2139-2141
+#### ~~F148. LOW: Escaped newlines in export email body~~ **FIXED (commit `2788ec7`, 2026-02-24)**
+**Severity:** LOW | **Category:** String bug | **File:** `10_Main.gs` | **Lines:** 2212-2213
+**Fixed:** `\\n` changed to `\n` in `exportMemberDirectory()` email body string. Emails now contain real newlines.
 
 Uses `\\n` (double-escaped) in template literal, producing literal `\n` characters instead of newlines.
 
@@ -2803,8 +2805,9 @@ Uses `\\n` (double-escaped) in template literal, producing literal `\n` characte
 
 ---
 
-#### F149. LOW: `restoreFromSnapshot()` creates backup object that is never persisted
-**Severity:** LOW | **Category:** Dead code | **File:** `06_Maintenance.gs` | **Lines:** 1264-1270
+#### ~~F149. LOW: `restoreFromSnapshot()` creates backup object that is never persisted~~ **FIXED (commit `2788ec7`, 2026-02-24)**
+**Severity:** LOW | **Category:** Dead code | **File:** `06_Maintenance.gs` | **Lines:** 1264-1280
+**Fixed:** `restoreFromSnapshot()` now calls `createAutomatedSnapshot()` to persist a Drive backup before clearing data. Falls back to saving backup metadata to `ScriptProperties` if Drive is unavailable. Previous in-memory `preRestoreBackup` object discarded on return is replaced.
 
 `preRestoreBackup` object is created in memory but never stored. It is discarded when the function returns, providing no actual backup protection.
 
@@ -2914,9 +2917,9 @@ The following findings have been reviewed and documented as acceptable technical
 | F73 | OAuth scopes broader than necessary | GAS doesn't support conditional scope requests; all used somewhere |
 | F74/F74a | Test mock depth limitations | Full GAS mock coverage impractical; focused mocks are sufficient |
 | F75 | Complex regex patterns in validation | Regex rewrites risk breaking working validation; not worth the risk |
-| F146 | Stack trace setting always false | Production safety — stack traces leak implementation details |
-| F148 | Email body newlines in some templates | Minor formatting; doesn't affect functionality |
-| F149 | Backup not persisted to external storage | GAS storage options limited; spreadsheet backups are sufficient |
+| ~~F146~~ | ~~Stack trace setting always false~~ | **FIXED commit `2788ec7`** — now checks `ERROR_CONFIG.SHOW_STACK_TRACE` |
+| ~~F148~~ | ~~Email body newlines in some templates~~ | **FIXED commit `2788ec7`** — `\\n` → `\n` |
+| ~~F149~~ | ~~Backup not persisted to external storage~~ | **FIXED commit `2788ec7`** — Drive backup via `createAutomatedSnapshot()` |
 | F150 | Nuclear Reset available in Settings dialog | Requires double confirmation; intentional power-user escape hatch |
 | F155 | Hardcoded column letters in formula functions | Dashboard calc sheets use fixed layout; dynamic letters add fragility |
 
