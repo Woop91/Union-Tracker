@@ -33,7 +33,6 @@
 
     .container { max-width: 680px; margin: 0 auto; }
 
-    /* Header */
     .header {
       text-align: center;
       padding: 24px 0 20px;
@@ -43,7 +42,6 @@
     .header h1 { font-size: 1.4rem; color: var(--text); letter-spacing: -0.3px; }
     .header p  { color: var(--muted); font-size: 0.85rem; margin-top: 4px; }
 
-    /* Cards */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -51,29 +49,37 @@
       padding: 20px;
       margin-bottom: 16px;
     }
-    .card h2 { font-size: 0.95rem; color: var(--muted); text-transform: uppercase;
-               letter-spacing: 0.5px; margin-bottom: 14px; }
+    .card h2 {
+      font-size: 0.95rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 14px;
+    }
 
-    /* Inputs */
-    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; margin-top: 12px; }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+      margin-top: 12px;
+    }
     label:first-child { margin-top: 0; }
-    input[type="text"], input[type="email"], input[type="password"],
-    input[type="number"], select {
+
+    input[type="number"] {
       width: 100%;
       background: var(--raised);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       color: var(--text);
       padding: 9px 12px;
-      font-size: 0.9rem;
+      font-size: 16px;
       outline: none;
       transition: border-color 0.15s;
       -webkit-appearance: none;
-      font-size: 16px; /* Prevents iOS zoom */
     }
-    input:focus, select:focus { border-color: var(--accent); }
+    input:focus { border-color: var(--accent); }
 
-    /* Workload category grid */
     .category-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -86,19 +92,19 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 12px;
+      transition: border-color 0.15s;
     }
-    .category-item .cat-header {
+    .category-item.warn { border-color: var(--warning); }
+
+    .cat-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
     }
-    .category-item .cat-label {
-      font-size: 0.8rem;
-      color: var(--muted);
-      font-weight: 500;
-    }
-    .category-item .expand-btn {
+    .cat-label { font-size: 0.8rem; color: var(--muted); font-weight: 500; }
+
+    .expand-btn {
       font-size: 0.7rem;
       color: var(--accent);
       background: none;
@@ -107,13 +113,22 @@
       padding: 2px 6px;
       border-radius: 4px;
     }
-    .category-item .expand-btn:hover { background: var(--border); }
+    .expand-btn:hover { background: var(--border); }
+
     .category-item input[type="number"] {
       font-size: 1.1rem;
       font-weight: 600;
       text-align: center;
       padding: 6px;
     }
+
+    .warn-label {
+      font-size: 0.7rem;
+      color: var(--warning);
+      margin-top: 4px;
+      display: none;
+    }
+    .category-item.warn .warn-label { display: block; }
 
     /* Sub-category modal */
     .modal-overlay {
@@ -127,6 +142,7 @@
       padding: 16px;
     }
     .modal-overlay.active { display: flex; }
+
     .modal {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -138,6 +154,7 @@
       overflow-y: auto;
     }
     .modal h3 { font-size: 1rem; margin-bottom: 14px; color: var(--text); }
+
     .sub-row {
       display: flex;
       align-items: center;
@@ -149,6 +166,7 @@
     }
     .sub-row:last-child { border-bottom: none; }
     .sub-row input { width: 60px; text-align: center; padding: 4px 6px; }
+
     .modal-total {
       display: flex;
       justify-content: space-between;
@@ -175,82 +193,41 @@
     .btn:active { opacity: 0.8; }
     .btn-primary { background: var(--accent); color: #fff; width: 100%; text-align: center; }
     .btn-primary:hover { background: var(--accent-hover); }
-    .btn-secondary { background: var(--raised); color: var(--text); border: 1px solid var(--border); }
     .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Privacy toggle */
-    .privacy-options { display: flex; gap: 8px; flex-wrap: wrap; }
-    .privacy-option {
-      flex: 1; min-width: 90px;
-      padding: 10px 8px;
-      border-radius: var(--radius);
-      border: 2px solid var(--border);
-      background: var(--raised);
+    /* Checkboxes */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      font-size: 0.9rem;
+      color: var(--text);
       cursor: pointer;
-      text-align: center;
-      font-size: 0.8rem;
-      color: var(--muted);
-      transition: all 0.15s;
+      margin-top: 0;
     }
-    .privacy-option.selected { border-color: var(--accent); color: var(--text); background: #1c2a3a; }
-    .privacy-option .privacy-icon { font-size: 1.2rem; display: block; margin-bottom: 4px; }
-
-    /* Tabs */
-    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-    .tab-btn {
-      padding: 10px 16px;
-      font-size: 0.85rem;
-      color: var(--muted);
-      border: none;
-      background: none;
+    .checkbox-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
       cursor: pointer;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -1px;
+      flex-shrink: 0;
     }
-    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
 
-    /* Alert */
+    /* Alerts */
     .alert {
       padding: 12px 14px;
       border-radius: var(--radius);
       font-size: 0.85rem;
       margin-bottom: 12px;
       display: none;
+      line-height: 1.5;
     }
     .alert.show { display: block; }
     .alert-error   { background: #2a1215; border: 1px solid var(--danger);  color: var(--danger);  }
     .alert-success { background: #122116; border: 1px solid var(--success); color: var(--success); }
-    .alert-info    { background: #111c2a; border: 1px solid var(--accent);  color: var(--accent);  }
-
-    /* History item */
-    .history-item {
-      background: var(--raised);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px;
-      margin-bottom: 8px;
-      font-size: 0.85rem;
-    }
-    .history-date { color: var(--muted); font-size: 0.8rem; margin-bottom: 8px; }
-    .history-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    .history-stat { text-align: center; }
-    .history-stat .val { font-size: 1.1rem; font-weight: 600; color: var(--accent); }
-    .history-stat .key { font-size: 0.7rem; color: var(--muted); }
-
-    /* Stats grid */
-    .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .stat-card {
-      background: var(--raised);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px;
-      text-align: center;
-    }
-    .stat-card .stat-val { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
-    .stat-card .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .alert-warning { background: #2a1f0a; border: 1px solid var(--warning); color: var(--warning); }
 
     /* Spinner */
     .spinner {
@@ -267,105 +244,48 @@
 
     .hidden { display: none !important; }
     .mt-8 { margin-top: 8px; }
-    .text-muted { color: var(--muted); font-size: 0.82rem; }
   </style>
 </head>
 <body>
 <div class="container">
-  <!-- Header -->
+
   <div class="header">
-    <h1>📊 Workload Tracker</h1>
-    <p>SEIU 509 DDS &mdash; Secure, anonymized caseload tracking</p>
+    <h1>Workload Tracker</h1>
+    <p>SEIU 509 DDS &mdash; Weekly caseload entry</p>
   </div>
 
-  <!-- Auth Section (shown until logged in) -->
-  <div id="authSection" class="card">
-    <h2>Sign In</h2>
-    <div id="authAlert" class="alert"></div>
-    <label for="authEmail">Work Email</label>
-    <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
-    <label for="authPin">DDS Member PIN (6 digits)</label>
-    <input type="password" id="authPin" placeholder="••••••" maxlength="6" inputmode="numeric">
-    <p class="text-muted mt-8">Use the PIN generated by your steward. Don't have one? Contact your steward.</p>
-    <br>
-    <button class="btn btn-primary" onclick="doAuth()" id="authBtn">Sign In</button>
+  <div id="submitAlert" class="alert"></div>
+
+  <!-- Categories -->
+  <div class="card">
+    <h2>This Week's Caseload</h2>
+    <div class="category-grid" id="categoryGrid"></div>
   </div>
 
-  <!-- Main App (hidden until logged in) -->
-  <div id="mainApp" class="hidden">
-    <!-- Tab nav -->
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('entry',this)">📋 Submit</button>
-      <button class="tab-btn" onclick="switchTab('history',this)">📜 My History</button>
-      <button class="tab-btn" onclick="switchTab('stats',this)">📈 Collective Stats</button>
-    </div>
-
-    <!-- SUBMIT TAB -->
-    <div id="tab-entry" class="tab-content active">
-      <div id="submitAlert" class="alert"></div>
-      <div class="card">
-        <h2>This Week's Caseload</h2>
-        <div class="category-grid" id="categoryGrid">
-          <!-- Populated by JS -->
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Employment & Availability</h2>
-        <label for="employmentType">Employment Type</label>
-        <select id="employmentType" onchange="togglePtHours()">
-          <option value="Full-time">Full-time</option>
-          <option value="Part-time">Part-time</option>
-        </select>
-        <div id="ptHoursRow" class="hidden">
-          <label for="ptHours">Part-Time Hours / Week</label>
-          <input type="number" id="ptHours" min="1" max="40" placeholder="e.g. 20">
-        </div>
-        <label>
-          <input type="checkbox" id="overtimeEnabled" onchange="toggleOvertime()" style="width:auto;margin-right:6px">
-          Tracking Overtime This Week
-        </label>
-        <div id="overtimeRow" class="hidden">
-          <label for="overtimeHours">Overtime Hours</label>
-          <input type="number" id="overtimeHours" min="0" max="99" placeholder="hours">
-        </div>
-        <label>
-          <input type="checkbox" id="onPlan" style="width:auto;margin-right:6px">
-          Currently on Performance Plan
-        </label>
-      </div>
-
-      <div class="card">
-        <h2>Privacy</h2>
-        <div class="privacy-options">
-          <div class="privacy-option selected" data-val="Unit" onclick="selectPrivacy(this)">
-            <span class="privacy-icon">🏢</span>Unit Anonymous
-          </div>
-          <div class="privacy-option" data-val="Agency" onclick="selectPrivacy(this)">
-            <span class="privacy-icon">🌐</span>Agency Anonymous
-          </div>
-          <div class="privacy-option" data-val="Private" onclick="selectPrivacy(this)">
-            <span class="privacy-icon">🔒</span>Private
-          </div>
-        </div>
-        <p class="text-muted mt-8">Private submissions are excluded from collective stats. Unit/Agency submissions use REDACTED identity.</p>
-      </div>
-
-      <button class="btn btn-primary" onclick="submitWorkload()" id="submitBtn">Submit Workload Data</button>
-    </div>
-
-    <!-- HISTORY TAB -->
-    <div id="tab-history" class="tab-content">
-      <div id="historyAlert" class="alert alert-info show">Loading your history...</div>
-      <div id="historyList"></div>
-    </div>
-
-    <!-- STATS TAB -->
-    <div id="tab-stats" class="tab-content">
-      <div id="statsAlert" class="alert alert-info show">Loading collective stats...</div>
-      <div id="statsGrid"></div>
+  <!-- Checkboxes -->
+  <div class="card">
+    <h2>Status</h2>
+    <label class="checkbox-row">
+      <input type="checkbox" id="onPlan" onchange="checkWarnings()">
+      Currently on Performance Plan
+    </label>
+    <label class="checkbox-row" style="margin-top:4px">
+      <input type="checkbox" id="overtimeEnabled" onchange="toggleOvertime(); checkWarnings()">
+      Tracking Overtime This Week
+    </label>
+    <div id="overtimeRow" class="hidden" style="margin-top:10px">
+      <label for="overtimeHours">Overtime Hours</label>
+      <input type="number" id="overtimeHours" min="0" max="99" placeholder="hours" oninput="checkWarnings()">
     </div>
   </div>
+
+  <!-- Warnings -->
+  <div id="warningsCard" class="hidden">
+    <div id="warningsList" class="alert alert-warning show"></div>
+  </div>
+
+  <button class="btn btn-primary" onclick="submitWorkload()" id="submitBtn">Submit Workload Data</button>
+
 </div>
 
 <!-- Sub-category modal -->
@@ -385,16 +305,16 @@
 </div>
 
 <script>
-  // ── Category definitions ──────────────────────────────────────────────────
+  // -- Category definitions -------------------------------------------------
   var CATEGORIES = [
-    { key: 'priority',   label: 'Priority Cases',      icon: '🔴', t: 't1' },
-    { key: 'pending',    label: 'Pending Cases',        icon: '🟡', t: 't2' },
-    { key: 'unread',     label: 'Unread Documents',     icon: '📄', t: 't3' },
-    { key: 'todo',       label: 'To-Do Items',          icon: '✅', t: 't4' },
-    { key: 'referrals',  label: 'Sent Referrals',       icon: '📤', t: 't5' },
-    { key: 'ce',         label: 'CE Activities',        icon: '📚', t: 't6' },
-    { key: 'assistance', label: 'Assistance Requests',  icon: '🤝', t: 't7' },
-    { key: 'aged',       label: 'Aged Cases',           icon: '⏳', t: 't8' }
+    { key: 'priority',   label: 'Priority Cases',      icon: '🔴', t: 't1', warnAt: 50  },
+    { key: 'pending',    label: 'Pending Cases',        icon: '🟡', t: 't2', warnAt: 100 },
+    { key: 'unread',     label: 'Unread Documents',     icon: '📄', t: 't3', warnAt: 200 },
+    { key: 'todo',       label: 'To-Do Items',          icon: '✅', t: 't4', warnAt: 150 },
+    { key: 'referrals',  label: 'Sent Referrals',       icon: '📤', t: 't5', warnAt: 50  },
+    { key: 'ce',         label: 'CE Activities',        icon: '📚', t: 't6', warnAt: 50  },
+    { key: 'assistance', label: 'Assistance Requests',  icon: '🤝', t: 't7', warnAt: 50  },
+    { key: 'aged',       label: 'Aged Cases',           icon: '⏳', t: 't8', warnAt: 30  }
   ];
 
   var SUB_CATS = {
@@ -411,85 +331,76 @@
     aged:       ['60-89 Days','90-119 Days','120-179 Days','180+ Days']
   };
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  var authedEmail = '';
-  var authedPin   = '';
-  var selectedPrivacy = 'Unit';
-  var subData = {};  // { priority: { 'QDD': 0 }, ... }
+  // -- State ----------------------------------------------------------------
+  var subData = {};
   var activeModalCatIdx = -1;
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  function doAuth() {
-    var email = document.getElementById('authEmail').value.trim();
-    var pin   = document.getElementById('authPin').value.trim();
-    if (!email || !pin) { showAlert('authAlert','error','Please enter your email and PIN.'); return; }
-
-    var btn = document.getElementById('authBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Signing in...';
-
-    google.script.run
-      .withSuccessHandler(function(result) {
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-        // Test auth: call getWorkloadUserHistory to confirm creds work
-        if (!email || !pin) { showAlert('authAlert','error','Invalid response.'); return; }
-        authedEmail = email;
-        authedPin   = pin;
-        document.getElementById('authSection').classList.add('hidden');
-        document.getElementById('mainApp').classList.remove('hidden');
-        buildCategoryGrid();
-        loadHistory();
-        loadStats();
-      })
-      .withFailureHandler(function(err) {
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-        showAlert('authAlert','error', err.message || 'Sign-in failed. Please try again.');
-      })
-      .getWorkloadUserHistory(email, pin);
-  }
-
-  // ── Category grid ─────────────────────────────────────────────────────────
+  // -- Category grid --------------------------------------------------------
   function buildCategoryGrid() {
     var grid = document.getElementById('categoryGrid');
     grid.innerHTML = '';
     CATEGORIES.forEach(function(cat, idx) {
       var item = document.createElement('div');
       item.className = 'category-item';
+      item.id = 'cat-item-' + idx;
       item.innerHTML =
         '<div class="cat-header">' +
           '<span class="cat-label">' + cat.icon + ' ' + cat.label + '</span>' +
           '<button class="expand-btn" onclick="openSubModal(' + idx + ')">+ detail</button>' +
         '</div>' +
-        '<input type="number" id="' + cat.t + '" min="0" max="999" value="0" ' +
-          'onchange="syncSubTotal(' + idx + ')" oninput="syncSubTotal(' + idx + ')">';
+        '<input type="number" id="' + cat.t + '" min="0" max="999" value="0" oninput="checkWarnings()">' +
+        '<div class="warn-label" id="warn-' + idx + '">High — review with steward</div>';
       grid.appendChild(item);
     });
   }
 
-  // ── Privacy ───────────────────────────────────────────────────────────────
-  function selectPrivacy(el) {
-    document.querySelectorAll('.privacy-option').forEach(function(o) { o.classList.remove('selected'); });
-    el.classList.add('selected');
-    selectedPrivacy = el.dataset.val;
+  // -- Warnings ------------------------------------------------------------
+  function checkWarnings() {
+    var msgs = [];
+
+    CATEGORIES.forEach(function(cat, idx) {
+      var val = parseInt(document.getElementById(cat.t).value, 10) || 0;
+      var item = document.getElementById('cat-item-' + idx);
+      if (val > cat.warnAt) {
+        item.classList.add('warn');
+        msgs.push(cat.icon + ' ' + cat.label + ': ' + val + ' (flag threshold: ' + cat.warnAt + ')');
+      } else {
+        item.classList.remove('warn');
+      }
+    });
+
+    if (document.getElementById('onPlan').checked) {
+      msgs.push('📋 Performance Plan active — document all caseload decisions this week');
+    }
+
+    var otEnabled = document.getElementById('overtimeEnabled').checked;
+    var otHours   = parseInt(document.getElementById('overtimeHours').value, 10) || 0;
+    if (otEnabled && otHours > 20) {
+      msgs.push('⏱️ Overtime ' + otHours + 'h exceeds 20h — consider filing a grievance');
+    }
+
+    var card = document.getElementById('warningsCard');
+    var list = document.getElementById('warningsList');
+    if (msgs.length) {
+      list.innerHTML = '<strong>⚠️ Flags this week:</strong><br>' + msgs.join('<br>');
+      card.classList.remove('hidden');
+    } else {
+      card.classList.add('hidden');
+    }
   }
 
-  // ── Employment toggles ────────────────────────────────────────────────────
-  function togglePtHours() {
-    var v = document.getElementById('employmentType').value;
-    document.getElementById('ptHoursRow').classList.toggle('hidden', v !== 'Part-time');
-  }
+  // -- Overtime toggle ------------------------------------------------------
   function toggleOvertime() {
     var checked = document.getElementById('overtimeEnabled').checked;
     document.getElementById('overtimeRow').classList.toggle('hidden', !checked);
+    if (!checked) { document.getElementById('overtimeHours').value = ''; }
   }
 
-  // ── Sub-category modal ────────────────────────────────────────────────────
+  // -- Sub-category modal ---------------------------------------------------
   function openSubModal(catIdx) {
     activeModalCatIdx = catIdx;
-    var cat = CATEGORIES[catIdx];
-    var subs = SUB_CATS[cat.key] || [];
+    var cat      = CATEGORIES[catIdx];
+    var subs     = SUB_CATS[cat.key] || [];
     var existing = subData[cat.key] || {};
 
     document.getElementById('modalTitle').textContent = cat.icon + ' ' + cat.label + ' — Sub-categories';
@@ -499,9 +410,10 @@
       var val = existing[name] || 0;
       var row = document.createElement('div');
       row.className = 'sub-row';
-      row.innerHTML = '<span>' + name + '</span>' +
+      row.innerHTML =
+        '<span>' + name + '</span>' +
         '<input type="number" id="sub_' + (catIdx+1) + '_' + si + '" min="0" max="999" value="' + val + '" ' +
-        'onchange="updateModalTotal()" oninput="updateModalTotal()">';
+          'onchange="updateModalTotal()" oninput="updateModalTotal()">';
       body.appendChild(row);
     });
     updateModalTotal();
@@ -509,8 +421,8 @@
   }
 
   function updateModalTotal() {
-    var cat = CATEGORIES[activeModalCatIdx];
-    var subs = SUB_CATS[cat.key] || [];
+    var cat   = CATEGORIES[activeModalCatIdx];
+    var subs  = SUB_CATS[cat.key] || [];
     var total = 0;
     subs.forEach(function(name, si) {
       var el = document.getElementById('sub_' + (activeModalCatIdx+1) + '_' + si);
@@ -520,20 +432,20 @@
   }
 
   function applySubModal() {
-    var cat = CATEGORIES[activeModalCatIdx];
-    var subs = SUB_CATS[cat.key] || [];
+    var cat   = CATEGORIES[activeModalCatIdx];
+    var subs  = SUB_CATS[cat.key] || [];
     var total = 0;
     subData[cat.key] = {};
     subs.forEach(function(name, si) {
-      var el = document.getElementById('sub_' + (activeModalCatIdx+1) + '_' + si);
+      var el  = document.getElementById('sub_' + (activeModalCatIdx+1) + '_' + si);
       var val = el ? (parseInt(el.value, 10) || 0) : 0;
       if (val > 0) { subData[cat.key][name] = val; }
       total += val;
     });
-    // Update main category total input
     var mainInput = document.getElementById(cat.t);
     if (mainInput && total > 0) { mainInput.value = total; }
     closeSubModal();
+    checkWarnings();
   }
 
   function closeSubModal() {
@@ -541,35 +453,22 @@
     activeModalCatIdx = -1;
   }
 
-  function syncSubTotal(catIdx) { /* main input is source of truth */ }
-
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // -- Submit ---------------------------------------------------------------
   function submitWorkload() {
     var btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Submitting...';
 
     var formObj = {
-      email: authedEmail,
-      pin:   authedPin,
-      privacy: selectedPrivacy,
-      employment_type: document.getElementById('employmentType').value,
-      on_plan: document.getElementById('onPlan').checked,
+      on_plan:          document.getElementById('onPlan').checked,
       overtime_enabled: document.getElementById('overtimeEnabled').checked,
-      overtime_hours:  document.getElementById('overtimeHours').value || 0,
-      weekly_cases: 15
+      overtime_hours:   document.getElementById('overtimeHours').value || 0
     };
 
-    if (formObj.employment_type === 'Part-time') {
-      formObj.part_time_hours = document.getElementById('ptHours').value;
-    }
-
-    // Map category totals
     CATEGORIES.forEach(function(cat) {
       formObj[cat.t] = parseInt(document.getElementById(cat.t).value, 10) || 0;
     });
 
-    // Map sub-category fields
     CATEGORIES.forEach(function(cat, catIdx) {
       var subs = SUB_CATS[cat.key] || [];
       subs.forEach(function(name, si) {
@@ -582,13 +481,8 @@
       .withSuccessHandler(function(msg) {
         btn.disabled = false;
         btn.textContent = 'Submit Workload Data';
-        if (msg.indexOf('Success') === 0) {
-          showAlert('submitAlert', 'success', msg);
-          loadHistory();
-          loadStats();
-        } else {
-          showAlert('submitAlert', 'error', msg);
-        }
+        showAlert('submitAlert', msg && msg.indexOf('Success') === 0 ? 'success' : 'error',
+          msg || 'Submission failed.');
       })
       .withFailureHandler(function(err) {
         btn.disabled = false;
@@ -598,99 +492,7 @@
       .processWorkloadForm(formObj);
   }
 
-  // ── History tab ───────────────────────────────────────────────────────────
-  function loadHistory() {
-    google.script.run
-      .withSuccessHandler(function(result) {
-        var el = document.getElementById('historyAlert');
-        var list = document.getElementById('historyList');
-        if (!result.success) {
-          el.className = 'alert alert-error show';
-          el.textContent = result.message || 'Failed to load history.';
-          return;
-        }
-        el.className = 'alert hidden';
-        list.innerHTML = '';
-        if (!result.history || result.history.length === 0) {
-          list.innerHTML = '<p class="text-muted" style="padding:12px">No submissions yet.</p>';
-          return;
-        }
-        result.history.slice(0, 10).forEach(function(h) {
-          var d = new Date(h.date);
-          var dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
-          var div = document.createElement('div');
-          div.className = 'history-item';
-          div.innerHTML = '<div class="history-date">' + dateStr + ' &mdash; ' + (h.privacy || 'Unit') + '</div>' +
-            '<div class="history-grid">' +
-              stat('Priority', h.t1) + stat('Pending', h.t2) +
-              stat('Unread', h.t3) + stat('To-Do', h.t4) +
-              stat('Referrals', h.t5) + stat('CE', h.t6) +
-              stat('Assist.', h.t7) + stat('Aged', h.t8) +
-            '</div>';
-          list.appendChild(div);
-        });
-      })
-      .withFailureHandler(function() {
-        document.getElementById('historyAlert').className = 'alert alert-error show';
-        document.getElementById('historyAlert').textContent = 'Failed to load history.';
-      })
-      .getWorkloadUserHistory(authedEmail, authedPin);
-  }
-
-  function stat(label, val) {
-    return '<div class="history-stat"><div class="val">' + (val || 0) + '</div><div class="key">' + label + '</div></div>';
-  }
-
-  // ── Stats tab ─────────────────────────────────────────────────────────────
-  function loadStats() {
-    google.script.run
-      .withSuccessHandler(function(result) {
-        var el = document.getElementById('statsAlert');
-        var grid = document.getElementById('statsGrid');
-        if (!result.success) {
-          el.className = 'alert alert-error show';
-          el.textContent = result.message || 'Failed to load stats.';
-          return;
-        }
-        el.className = 'alert hidden';
-        var d = result.data || {};
-        var cats = d.categories || {};
-        var avgs = d.averages || {};
-        var html = '<div class="stats-grid">' +
-          statCard(d.totalSubmissions || 0, 'Total Submissions') +
-          statCard(d.members || 0, 'Members Contributing') +
-          '</div>' +
-          '<div class="card" style="margin-top:12px"><h2>Category Averages (per submission)</h2>' +
-          '<div class="category-grid">';
-        Object.keys(cats).forEach(function(key) {
-          html += '<div class="stat-card"><div class="stat-val">' + (avgs[key] || '0') +
-            '</div><div class="stat-label">' + key + '</div></div>';
-        });
-        html += '</div></div>';
-        grid.innerHTML = html;
-      })
-      .withFailureHandler(function() {
-        document.getElementById('statsAlert').className = 'alert alert-error show';
-        document.getElementById('statsAlert').textContent = 'Failed to load collective stats.';
-      })
-      .getWorkloadDashboardData(authedEmail, authedPin);
-  }
-
-  function statCard(val, label) {
-    return '<div class="stat-card"><div class="stat-val">' + val + '</div><div class="stat-label">' + label + '</div></div>';
-  }
-
-  // ── Tabs ──────────────────────────────────────────────────────────────────
-  function switchTab(name, btn) {
-    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-    document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
-    btn.classList.add('active');
-    document.getElementById('tab-' + name).classList.add('active');
-    if (name === 'history') loadHistory();
-    if (name === 'stats') loadStats();
-  }
-
-  // ── Alert helper ──────────────────────────────────────────────────────────
+  // -- Alert helper ---------------------------------------------------------
   function showAlert(id, type, msg) {
     var el = document.getElementById(id);
     el.className = 'alert alert-' + type + ' show';
@@ -700,20 +502,9 @@
     }
   }
 
-  // ── Keyboard: Enter to sign in ────────────────────────────────────────────
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !document.getElementById('authSection').classList.contains('hidden')) {
-      doAuth();
-    }
-  });
-
-  // ── iOS zoom prevention ───────────────────────────────────────────────────
-  document.addEventListener('focusin', function(e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
-      document.querySelector('meta[name="viewport"]').setAttribute('content',
-        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-    }
-  });
+  // -- Init -----------------------------------------------------------------
+  buildCategoryGrid();
 </script>
 </body>
 </html>
+
