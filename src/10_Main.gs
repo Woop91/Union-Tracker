@@ -2209,8 +2209,8 @@ function exportMemberDirectory(format) {
       // Send email with summary
       const email = Session.getActiveUser().getEmail();
       const subject = 'Member Directory Export - ' + new Date().toLocaleDateString();
-      let body = 'Member Directory Export\\n\\n';
-      body += 'Total Members: ' + (data.length - 1) + '\\n\\n';
+      let body = 'Member Directory Export\n\n';
+      body += 'Total Members: ' + (data.length - 1) + '\n\n';
       body += 'Spreadsheet: ' + ss.getUrl();
       GmailApp.sendEmail(email, subject, body);
       return { success: true, message: 'Report sent to ' + email };

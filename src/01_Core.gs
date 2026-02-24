@@ -229,8 +229,8 @@ function sendCriticalErrorNotification_(errorInfo) {
                'Time: ' + errorInfo.timestamp + '\n' +
                'Context: ' + errorInfo.context + '\n' +
                'Message: ' + errorInfo.message + '\n' +
-               'User: ' + errorInfo.user + '\n\n' +
-               'Stack Trace:\n' + errorInfo.stack;
+               'User: ' + errorInfo.user +
+               (ERROR_CONFIG.SHOW_STACK_TRACE ? '\n\nStack Trace:\n' + errorInfo.stack : '');
 
     MailApp.sendEmail(adminEmail, subject, body);
   } catch (e) {

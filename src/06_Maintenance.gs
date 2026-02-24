@@ -1260,11 +1260,21 @@ function restoreFromSnapshot(snapshot) {
     return;
   }
 
-  // Create a backup of current data before restoring
+  // Create a Drive backup of current data before restoring (F149: must persist, not in-memory only)
   try {
-    var preRestoreBackup = createGrievanceSnapshot();
-    preRestoreBackup.label = 'Pre-Restore Backup';
-    Logger.log('Pre-restore backup created at ' + preRestoreBackup.timestamp);
+    var backupResult = createAutomatedSnapshot();
+    if (backupResult && backupResult.success) {
+      Logger.log('Pre-restore Drive backup created: ' + backupResult.snapshotName);
+    } else {
+      // Fall back: log backup metadata to ScriptProperties for audit trail
+      var backupMeta = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        label: 'Pre-Restore Backup (Drive backup unavailable)',
+        grievanceRows: sheet.getLastRow()
+      });
+      PropertiesService.getScriptProperties().setProperty('LAST_PRE_RESTORE_BACKUP', backupMeta);
+      Logger.log('Warning: Drive backup unavailable; metadata saved to ScriptProperties.');
+    }
   } catch (_backupErr) {
     Logger.log('Warning: Could not create pre-restore backup: ' + _backupErr.message);
   }
