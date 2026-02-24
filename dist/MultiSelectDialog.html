@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0,user-scalable=yes">
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Google Sans', Arial, sans-serif;
+    }
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #fff;
+      overflow-x: hidden;
+    }
+    h3 {
+      margin: 0 0 12px 0;
+      color: #7C3AED;
+      font-size: clamp(15px, 4vw, 18px);
+    }
+    .options-container {
+      max-height: 250px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 16px;
+    }
+    .option-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      min-height: 44px;
+      margin: 2px 0;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .option-item:hover {
+      background: #f3f4f6;
+    }
+    .option-item:active {
+      background: #e5e7eb;
+      transform: scale(0.98);
+    }
+    .option-item.selected {
+      background: #ede9fe;
+    }
+    .option-item input[type="checkbox"] {
+      margin-right: 10px;
+      width: 22px;
+      height: 22px;
+      accent-color: #7C3AED;
+      flex-shrink: 0;
+    }
+    .option-item label {
+      flex: 1;
+      cursor: pointer;
+      font-size: clamp(13px, 3.5vw, 15px);
+      color: #1f2937;
+    }
+    .button-row {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    button {
+      padding: 12px 20px;
+      min-height: 44px;
+      border: none;
+      border-radius: 6px;
+      font-size: clamp(13px, 3.5vw, 15px);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:active {
+      transform: scale(0.97);
+      opacity: 0.85;
+    }
+    .btn-primary {
+      background: #7C3AED;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #6d28d9;
+    }
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .btn-secondary:hover {
+      background: #e5e7eb;
+    }
+    .btn-clear {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+    .btn-clear:hover {
+      background: #fee2e2;
+    }
+    .selected-count {
+      font-size: clamp(11px, 3vw, 13px);
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+    .quick-actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .quick-actions button {
+      padding: 8px 14px;
+      font-size: clamp(11px, 3vw, 13px);
+      min-height: 44px;
+    }
+
+    /* Mobile breakpoint */
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
+      .button-row {
+        flex-direction: column;
+      }
+      .button-row button {
+        width: 100%;
+      }
+      .quick-actions {
+        flex-wrap: wrap;
+      }
+      .options-container {
+        max-height: 40vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h3 id="dialogTitle">Select Options</h3>
+
+  <div class="quick-actions">
+    <button class="btn-secondary" onclick="selectAll()">Select All</button>
+    <button class="btn-clear" onclick="clearAll()">Clear All</button>
+  </div>
+
+  <div class="selected-count" id="selectedCount">0 selected</div>
+
+  <div class="options-container" id="optionsContainer">
+    <!-- Options will be inserted here -->
+  </div>
+
+  <div class="button-row">
+    <button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+    <button class="btn-primary" onclick="saveSelection()">Save</button>
+  </div>
+
+  <script>
+    var options = [];
+    var currentSelection = [];
+
+    // Initialize dialog with data from server
+    function initDialog(data) {
+      document.getElementById('dialogTitle').textContent = 'Select ' + data.label;
+      options = data.options;
+      currentSelection = data.currentValues || [];
+
+      renderOptions();
+      updateCount();
+    }
+
+    function renderOptions() {
+      var container = document.getElementById('optionsContainer');
+      container.innerHTML = '';
+
+      options.forEach(function(option, index) {
+        var isSelected = currentSelection.indexOf(option) !== -1;
+
+        var div = document.createElement('div');
+        div.className = 'option-item' + (isSelected ? ' selected' : '');
+        div.onclick = function() { toggleOption(index); };
+
+        var checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = 'opt_' + index;
+        checkbox.checked = isSelected;
+
+        var label = document.createElement('label');
+        label.htmlFor = 'opt_' + index;
+        label.textContent = option;
+
+        div.appendChild(checkbox);
+        div.appendChild(label);
+        container.appendChild(div);
+      });
+    }
+
+    function toggleOption(index) {
+      var option = options[index];
+      var pos = currentSelection.indexOf(option);
+
+      if (pos === -1) {
+        currentSelection.push(option);
+      } else {
+        currentSelection.splice(pos, 1);
+      }
+
+      renderOptions();
+      updateCount();
+    }
+
+    function selectAll() {
+      currentSelection = options.slice();
+      renderOptions();
+      updateCount();
+    }
+
+    function clearAll() {
+      currentSelection = [];
+      renderOptions();
+      updateCount();
+    }
+
+    function updateCount() {
+      var countEl = document.getElementById('selectedCount');
+      var count = currentSelection.length;
+      countEl.textContent = count + ' selected';
+    }
+
+    function saveSelection() {
+      // Join selections with comma and space
+      var value = currentSelection.join(', ');
+      google.script.run
+        .withSuccessHandler(function() {
+          google.script.host.close();
+        })
+        .withFailureHandler(function(error) {
+          alert('Error saving: ' + error.message);
+        })
+        .applyMultiSelectValue(value);
+    }
+
+    // Android haptic feedback
+    (function() {
+      var isAndroid = /android/i.test(navigator.userAgent || '');
+      var canVibrate = !!navigator.vibrate;
+      if (!isAndroid || !canVibrate) return;
+
+      function haptic(ms) {
+        try { navigator.vibrate(ms); } catch(e) {}
+      }
+
+      document.addEventListener('touchstart', function(e) {
+        var el = e.target;
+        if (el.tagName === 'BUTTON' || el.closest('button')) {
+          haptic(18);
+        } else if (el.closest('.option-item') || el.tagName === 'INPUT') {
+          haptic(10);
+        }
+      }, { passive: true });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<script>
+/**
+ * Steward View — "Mono Signal"
+ * Dense, monospace, dot-status, filterable case list
+ */
+function initStewardView(container) {
+  var t = ThemeEngine.getTheme('steward', AppState.isDark);
+  ThemeEngine.applyTheme(t);
+  showLoading(container);
+  
+  // Load data
+  google.script.run
+    .withSuccessHandler(function(cases) {
+      AppState.cases = cases || [];
+      google.script.run
+        .withSuccessHandler(function(kpis) {
+          AppState.kpis = kpis;
+          AppState.loading = false;
+          renderStewardDashboard(container);
+        })
+        .withFailureHandler(function() {
+          AppState.kpis = { totalCases: AppState.cases.length, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
+          AppState.loading = false;
+          renderStewardDashboard(container);
+        })
+        .dataGetStewardKPIs(CURRENT_USER.email);
+    })
+    .withFailureHandler(function(err) {
+      AppState.cases = [];
+      AppState.loading = false;
+      renderStewardDashboard(container);
+    })
+    .dataGetStewardCases(CURRENT_USER.email);
+}
+
+function renderStewardDashboard(container) {
+  container.innerHTML = '';
+  var filter = 'all';
+  
+  var t = ThemeEngine.getTheme('steward', AppState.isDark);
+  
+  // Header
+  var header = el('div', { className: 'page-header' });
+  var headerLeft = el('div', { className: 'page-header-left' });
+  headerLeft.appendChild(el('div', { className: 'page-title' }, 'Cases'));
+  headerLeft.appendChild(el('div', { className: 'page-subtitle' }, CURRENT_USER.name + ' · ' + CURRENT_USER.unit));
+  header.appendChild(headerLeft);
+  
+  var headerRight = el('div', { className: 'page-header-right' });
+  
+  // Dual role toggle
+  if (IS_DUAL_ROLE) {
+    var switchBtn = el('button', {
+      style: {
+        background: 'var(--accentBg)', border: '1px solid var(--accentBorder)',
+        borderRadius: '6px', padding: '4px 10px', fontSize: '10px',
+        color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)',
+      },
+      onClick: function() {
+        AppState.activeRole = 'member';
+        var memberTheme = ThemeEngine.getTheme('member', AppState.isDark);
+        ThemeEngine.applyTheme(memberTheme);
+        initMemberView(container);
+      }
+    }, '👤 ' + CONFIG.memberLabel);
+    headerRight.appendChild(switchBtn);
+  }
+  
+  // Dark/light toggle
+  headerRight.appendChild(el('button', {
+    className: 'icon-btn',
+    onClick: function() {
+      AppState.isDark = !AppState.isDark;
+      var newTheme = ThemeEngine.getTheme('steward', AppState.isDark);
+      ThemeEngine.applyTheme(newTheme);
+      renderStewardDashboard(container);
+    }
+  }, AppState.isDark ? '☀️' : '🌙'));
+  
+  // Logout
+  headerRight.appendChild(el('button', { className: 'icon-btn', onClick: handleLogout }, '↩'));
+  
+  header.appendChild(headerRight);
+  container.appendChild(header);
+  
+  // KPIs
+  var kpis = AppState.kpis || {};
+  var kpiGrid = el('div', { className: 'kpi-grid' });
+  var kpiItems = [
+    { label: 'My Cases', value: kpis.totalCases || 0 },
+    { label: 'Overdue', value: kpis.overdue || 0, color: kpis.overdue > 0 ? 'var(--danger)' : null },
+    { label: 'Due <7d', value: kpis.dueSoon || 0, color: kpis.dueSoon > 0 ? 'var(--warning)' : null },
+    { label: 'Resolved', value: kpis.resolved || 0, color: 'var(--success)' },
+  ];
+  kpiItems.forEach(function(kpi) {
+    var card = el('div', { className: 'kpi-card' });
+    card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+    var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+    if (kpi.color) val.style.color = kpi.color;
+    card.appendChild(val);
+    kpiGrid.appendChild(card);
+  });
+  container.appendChild(kpiGrid);
+  
+  // Filter bar
+  var filterBar = el('div', { className: 'filter-bar' });
+  var overdueCount = AppState.cases.filter(function(c) { return c.status === 'overdue'; }).length;
+  var filters = [
+    { key: 'all', label: 'All ' + AppState.cases.length },
+    { key: 'overdue', label: 'Overdue ' + overdueCount },
+    { key: 'active', label: 'Active' },
+  ];
+  
+  filters.forEach(function(f) {
+    var tab = el('button', {
+      className: 'filter-tab' + (filter === f.key ? ' active' : ''),
+      onClick: function() {
+        filter = f.key;
+        renderCaseList(caseListContainer, filter);
+        // Update active states
+        filterBar.querySelectorAll('.filter-tab').forEach(function(t, i) {
+          t.className = 'filter-tab' + (filters[i].key === filter ? ' active' : '');
+        });
+      }
+    }, f.label);
+    filterBar.appendChild(tab);
+  });
+  container.appendChild(filterBar);
+  
+  // Case list container
+  var caseListContainer = el('div', { className: 'content' });
+  renderCaseList(caseListContainer, filter);
+  container.appendChild(caseListContainer);
+  
+  // FAB
+  var fab = el('button', { className: 'fab' }, '+');
+  container.appendChild(fab);
+  
+  // Bottom nav
+  renderBottomNav(container, 'steward', 'cases');
+}
+
+function renderCaseList(container, filter) {
+  container.innerHTML = '';
+  
+  var cases = AppState.cases;
+  if (filter === 'overdue') cases = cases.filter(function(c) { return c.status === 'overdue'; });
+  if (filter === 'active') cases = cases.filter(function(c) { return c.status === 'active' || c.status === 'new'; });
+  
+  if (cases.length === 0) {
+    container.appendChild(el('div', {
+      style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' }
+    }, filter === 'all' ? 'No cases assigned.' : 'No ' + filter + ' cases.'));
+    return;
+  }
+  
+  cases.forEach(function(c) {
+    var isOverdue = c.status === 'overdue';
+    var statusClass = c.status || 'active';
+    
+    var card = el('div', {
+      className: 'card card-clickable',
+      style: {
+        padding: '11px 14px',
+        marginBottom: '6px',
+        borderLeftColor: isOverdue ? 'var(--danger)' : undefined,
+      }
+    });
+    
+    // Top row: dot + ID + deadline
+    var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
+    
+    var leftGroup = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+    leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
+    leftGroup.appendChild(el('span', {
+      style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' }
+    }, c.id));
+    
+    topRow.appendChild(leftGroup);
+    
+    var deadlineSpan = el('span', {
+      style: {
+        fontFamily: 'var(--fontBody)', fontSize: '11px',
+        color: isOverdue ? 'var(--danger)' : 'var(--muted)',
+        fontWeight: isOverdue ? '700' : '400',
+      }
+    });
+    if (c.deadlineDays !== null) {
+      deadlineSpan.textContent = c.deadlineDays < 0 ? c.deadlineDays + 'd' : c.deadlineDays + 'd';
+    } else {
+      deadlineSpan.textContent = '—';
+    }
+    topRow.appendChild(deadlineSpan);
+    card.appendChild(topRow);
+    
+    // Bottom row: name + step + unit
+    var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
+    
+    // We only have email, not member name in grievance record
+    // In production, you'd join with member directory
+    var memberDisplay = c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown';
+    bottomRow.appendChild(el('span', {
+      style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' }
+    }, memberDisplay + ' · ' + (c.step || '')));
+    bottomRow.appendChild(el('span', {
+      style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' }
+    }, c.unit || ''));
+    
+    card.appendChild(bottomRow);
+    container.appendChild(card);
+  });
+}
+
+function renderBottomNav(container, role, activeTab) {
+  var nav = el('div', { className: 'bottom-nav' });
+  
+  var tabs = role === 'steward' ? [
+    { id: 'cases', icon: '📋', label: 'Cases' },
+    { id: 'members', icon: '👥', label: 'Members' },
+    { id: 'deadlines', icon: '📅', label: 'Deadlines' },
+    { id: 'settings', icon: '⚙️', label: 'Settings' },
+  ] : [
+    { id: 'home', icon: '🏠', label: 'Home' },
+    { id: 'cases', icon: '📋', label: 'My Cases' },
+    { id: 'contact', icon: '💬', label: 'Contact' },
+    { id: 'more', icon: '☰', label: 'More' },
+  ];
+  
+  tabs.forEach(function(tab) {
+    var item = el('div', {
+      className: 'nav-item' + (tab.id === activeTab ? ' active' : ''),
+    });
+    item.appendChild(el('span', { className: 'nav-icon' }, tab.icon));
+    var label = el('span', { className: 'nav-label' }, tab.label);
+    if (tab.id === activeTab) label.style.color = 'var(--accent)';
+    item.appendChild(label);
+    nav.appendChild(item);
+  });
+  
+  container.appendChild(nav);
+}
+</script>
