@@ -66,6 +66,9 @@ doGet(e)
 ├── ?page=links    → Links page
 ├── ?page=selfservice → Member self-service (Google auth or PIN)
 ├── ?page=portal   → Public portal
+├── ?page=workload → Workload tracker
+├── ?page=checkin  → Meeting check-in (v4.11.0)
+├── ?page=resources → Educational content hub (v4.11.0)
 └── (default)      → Unified member dashboard
 ```
 
@@ -117,6 +120,37 @@ The consolidated file uses `HtmlService.createHtmlOutput()` with **inline HTML s
 - `.github/workflows/build.yml` — Added `Main`, `staging`, `dev` to CI trigger branches
 - `AI_REFERENCE.md` — Created (this file)
 - `web-dashboard/AI_REFERENCE.md` — Added deprecation notice (folder is orphaned legacy code)
+
+### 2026-02-24 — v4.11.0: Resources Hub + Meeting Check-In Web Route (by Claude, claude.ai)
+**New Features:**
+1. ✅ `?page=resources` — Educational content hub: Know Your Rights, Grievance Process, FAQ, Forms & Templates
+2. ✅ `?page=checkin` — Meeting check-in as standalone web page (reuses existing 14_MeetingCheckIn.gs logic)
+3. ✅ `📚 Resources` sheet — Steward-managed content with 12 columns, data validation, 8 starter articles
+4. ✅ `RESOURCES_HEADER_MAP_` + `RESOURCES_COLS` — Dynamic column system, registered in `syncColumnMaps()`
+5. ✅ `getWebAppResourcesList()` API — Returns visible resources with audience filtering
+6. ✅ Design refresh: DM Sans + Fraunces serif fonts, warm navy/earth tones (not generic purple)
+7. ✅ `PHASE2_PLAN.md` — Tracks parked features (bulk actions, deadline calendar, etc.)
+
+**Files Changed:**
+- `src/01_Core.gs` — Added `SHEETS.RESOURCES`, `RESOURCES_HEADER_MAP_`, `RESOURCES_COLS`, registered in syncColumnMaps
+- `src/05_Integrations.gs` — Added `case 'checkin'` and `case 'resources'` to doGet switch + 3 new functions: `getWebAppResourcesList()`, `getWebAppResourcesHtml()`, `getWebAppCheckInHtml()`
+- `src/10b_SurveyDocSheets.gs` — Added `createResourcesSheet()` with starter content and validation
+- `PHASE2_PLAN.md` — Created
+- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,121 lines / 2,569 KB)
+
+**Design Decisions:**
+- Resources page uses warm serif typography (Fraunces) to convey authority/trust — it's a union tool
+- Navy + earth tones (#1e3a5f, #fafaf9) instead of generic purple gradients
+- Check-in page uses green theme to differentiate from other pages
+- All existing routes, tabs, and pages completely untouched — additive only
+- Resources sheet auto-creates with starter content when first accessed
+
+**Parked for later (ranked):**
+1. Bulk actions (flag/email/export)
+2. Deadline calendar view
+3. Grievance history for members
+4. Welcome/landing page
+5. Events page with Join Virtual button
 
 ---
 
