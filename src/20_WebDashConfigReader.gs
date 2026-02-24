@@ -74,6 +74,11 @@ var ConfigReader = (function () {
       cookieDurationDays:  _parseInt(configMap['cookie duration'] || configMap['cookie duration days'], 30),
       stewardLabel:        configMap['steward label'] || 'Steward',
       memberLabel:         configMap['member label'] || 'Member',
+      // Org links
+      calendarId:          configMap['calendar id'] || configMap['google calendar id'] || '',
+      driveFolderId:       configMap['drive folder id'] || configMap['shared drive folder'] || '',
+      satisfactionFormUrl: configMap['satisfaction form url'] || configMap['survey form url'] || '',
+      orgWebsite:          configMap['org website'] || configMap['website'] || '',
       // Derived
       magicLinkExpiryMs:   0,
       cookieDurationMs:    0,

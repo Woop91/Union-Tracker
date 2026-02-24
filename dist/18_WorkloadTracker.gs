@@ -29,7 +29,7 @@
 
 /** @const {Object} Workload tracker app configuration */
 var WT_APP_CONFIG = {
-  version: '4.10.0',
+  version: '4.11.0',
   name: 'Workload Tracker',
   maxStringLength: 255,
   dataRetentionMonths: 24,
@@ -1080,4 +1080,196 @@ function shareWorkloadPortalLink() {
       ui.alert('Portal URL saved. Members can now access workload tracking at:\n' + url + '?page=workload');
     }
   }
+}
+
+// ============================================================================
+// SSO WRAPPERS (v4.11.0) — called from web dashboard SPA
+// Skip PIN authentication; rely on existing SSO session identity.
+// ============================================================================
+
+/**
+ * Processes a workload form submission using SSO session identity (no PIN).
+ * Called from the embedded workload tracker in the member dashboard.
+ * @param {string} email — verified by SSO session
+ * @param {Object} formData — { t1..t8, employment_type, part_time_hours, ... }
+ * @returns {string} Success/error message
+ */
+function processWorkloadFormSSO(email, formData) {
+  if (!email || !formData) return 'Error: Missing data.';
+  var emailLower = email.toLowerCase().trim();
+
+  // Submission rate limit
+  var submitLimit = wtCheckSubmissionRateLimit_(emailLower);
+  if (!submitLimit.allowed) {
+    return 'Error: Submission limit reached. Please wait before submitting again.';
+  }
+
+  // Validate numeric fields
+  var numFields = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8'];
+  for (var n = 0; n < numFields.length; n++) {
+    var val = Number(formData[numFields[n]]) || 0;
+    if (val < 0 || val > 999 || !Number.isInteger(val)) {
+      return 'Error: Workload values must be whole numbers between 0 and 999.';
+    }
+  }
+
+  return withLock(function() {
+    var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+    if (!vault) {
+      return 'Error: Workload sheets not initialized. Run Setup > Initialize Dashboard first.';
+    }
+
+    var sanitizeNum = function(v) { return Math.min(999, Math.max(0, Math.floor(Number(v) || 0))); };
+
+    var row = [
+      new Date(),                               // Timestamp
+      emailLower,                               // Email
+      sanitizeNum(formData.t1),                 // Priority Cases
+      sanitizeNum(formData.t2),                 // Pending Cases
+      sanitizeNum(formData.t3),                 // Unread Docs
+      sanitizeNum(formData.t4),                 // To-Do Items
+      sanitizeNum(formData.t5),                 // Sent Referrals
+      sanitizeNum(formData.t6),                 // CE Activities
+      sanitizeNum(formData.t7),                 // Assistance Requests
+      sanitizeNum(formData.t8),                 // Aged Cases
+      sanitizeNum(formData.weekly_cases),        // Weekly Cases
+      formData.sub_categories || '',             // Sub-categories JSON
+      formData.employment_type || 'Full-time',   // Employment type
+      formData.part_time_hours || '',            // PT hours
+      formData.leave_type || '',                 // Leave type
+      formData.leave_planned || '',              // Leave planned
+      formData.leave_start || '',                // Leave start
+      formData.leave_end || '',                  // Leave end
+      formData.no_intake_choice || '',           // No-intake choice
+      formData.notice_time || '',                // Notice time
+      formData.half_day || '',                   // Half day
+      formData.privacy || 'Shared',              // Privacy
+      formData.on_plan || '',                    // On plan
+      formData.overtime_hours || ''              // Overtime hours
+    ];
+
+    vault.appendRow(row);
+    wtRecordSubmission_(emailLower);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('WT_SSO_SUBMIT', { email: emailLower });
+    }
+
+    return 'Workload data submitted successfully!';
+  }, 'workload_sso_submit');
+}
+
+/**
+ * Returns the authenticated member's submission history using SSO (no PIN).
+ * @param {string} email — verified by SSO session
+ * @returns {Object} { success, history:Array, message }
+ */
+function getWorkloadHistorySSO(email) {
+  if (!email) return { success: false, history: [], message: 'Email required.' };
+
+  var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+  if (!vault || vault.getLastRow() <= 1) {
+    return { success: true, history: [], message: '' };
+  }
+
+  var emailLower = email.toLowerCase().trim();
+  var data = vault.getDataRange().getValues();
+  var history = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = data[i][WT_VAULT_COLS.EMAIL];
+    if (!rowEmail || rowEmail.toString().toLowerCase().trim() !== emailLower) continue;
+    history.push({
+      date:       data[i][WT_VAULT_COLS.TIMESTAMP],
+      t1:         data[i][WT_VAULT_COLS.PRIORITY_CASES],
+      t2:         data[i][WT_VAULT_COLS.PENDING_CASES],
+      t3:         data[i][WT_VAULT_COLS.UNREAD_DOCS],
+      t4:         data[i][WT_VAULT_COLS.TODO_ITEMS],
+      t5:         data[i][WT_VAULT_COLS.SENT_REFERRALS],
+      t6:         data[i][WT_VAULT_COLS.CE_ACTIVITIES],
+      t7:         data[i][WT_VAULT_COLS.ASSISTANCE_REQUESTS],
+      t8:         data[i][WT_VAULT_COLS.AGED_CASES],
+      weeklyCases: data[i][WT_VAULT_COLS.WEEKLY_CASES],
+      employment: data[i][WT_VAULT_COLS.EMPLOYMENT_TYPE],
+      privacy:    data[i][WT_VAULT_COLS.PRIVACY],
+    });
+  }
+
+  history.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+  return { success: true, history: history, message: '' };
+}
+
+/**
+ * Returns collective workload stats using SSO (no PIN).
+ * Respects privacy settings and sharing start dates.
+ * @param {string} email — verified by SSO session
+ * @returns {Object} { success, data, message }
+ */
+function getWorkloadDashboardDataSSO(email) {
+  if (!email) return { success: false, data: null, message: 'Email required.' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
+  if (!vault || vault.getLastRow() <= 1) {
+    return { success: true, data: { totalSubmissions: 0, members: 0, categories: {} }, message: '' };
+  }
+
+  var data = vault.getDataRange().getValues();
+  var userSharingStart = typeof wtGetUserSharingStartDate_ === 'function'
+    ? wtGetUserSharingStartDate_(email.toLowerCase().trim())
+    : null;
+
+  var totals = { t1: 0, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: 0, t8: 0 };
+  var memberSet = {};
+  var submissionCount = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][WT_VAULT_COLS.PRIVACY] === 'Private') continue;
+    var ts = new Date(data[i][WT_VAULT_COLS.TIMESTAMP]);
+    if (userSharingStart && ts < userSharingStart) continue;
+
+    submissionCount++;
+    var rowEmail = data[i][WT_VAULT_COLS.EMAIL];
+    if (rowEmail) memberSet[rowEmail.toString().toLowerCase()] = true;
+
+    totals.t1 += Number(data[i][WT_VAULT_COLS.PRIORITY_CASES]) || 0;
+    totals.t2 += Number(data[i][WT_VAULT_COLS.PENDING_CASES])  || 0;
+    totals.t3 += Number(data[i][WT_VAULT_COLS.UNREAD_DOCS])    || 0;
+    totals.t4 += Number(data[i][WT_VAULT_COLS.TODO_ITEMS])     || 0;
+    totals.t5 += Number(data[i][WT_VAULT_COLS.SENT_REFERRALS]) || 0;
+    totals.t6 += Number(data[i][WT_VAULT_COLS.CE_ACTIVITIES])  || 0;
+    totals.t7 += Number(data[i][WT_VAULT_COLS.ASSISTANCE_REQUESTS]) || 0;
+    totals.t8 += Number(data[i][WT_VAULT_COLS.AGED_CASES])     || 0;
+  }
+
+  var memberCount = Object.keys(memberSet).length;
+
+  return {
+    success: true,
+    message: '',
+    data: {
+      totalSubmissions: submissionCount,
+      members: memberCount,
+      categories: {
+        'Priority Cases':      totals.t1,
+        'Pending Cases':       totals.t2,
+        'Unread Documents':    totals.t3,
+        'To-Do Items':         totals.t4,
+        'Sent Referrals':      totals.t5,
+        'CE Activities':       totals.t6,
+        'Assistance Requests': totals.t7,
+        'Aged Cases':          totals.t8
+      },
+      averages: submissionCount > 0 ? {
+        'Priority Cases':      (totals.t1 / submissionCount).toFixed(1),
+        'Pending Cases':       (totals.t2 / submissionCount).toFixed(1),
+        'Unread Documents':    (totals.t3 / submissionCount).toFixed(1),
+        'To-Do Items':         (totals.t4 / submissionCount).toFixed(1),
+        'Sent Referrals':      (totals.t5 / submissionCount).toFixed(1),
+        'CE Activities':       (totals.t6 / submissionCount).toFixed(1),
+        'Assistance Requests': (totals.t7 / submissionCount).toFixed(1),
+        'Aged Cases':          (totals.t8 / submissionCount).toFixed(1)
+      } : {}
+    }
+  };
 }

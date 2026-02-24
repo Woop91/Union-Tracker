@@ -1,12 +1,20 @@
 <script>
 /**
  * Member View — "Glass Depth"
+ * v4.11.0 — Full member dashboard with responsive layout,
+ * steward contact, profile editor, resources, survey, workload, weekly questions.
  */
+
+// ═══════════════════════════════════════
+// INIT & DATA LOADING
+// ═══════════════════════════════════════
+
 function initMemberView(container) {
   var t = ThemeEngine.getTheme('member', AppState.isDark);
   ThemeEngine.applyTheme(t);
+  AppState.activeRole = 'member';
   showLoading(container);
-  
+
   google.script.run
     .withSuccessHandler(function(grievances) {
       AppState.grievances = grievances || [];
@@ -21,115 +29,145 @@ function initMemberView(container) {
     .dataGetMemberGrievances(CURRENT_USER.email);
 }
 
-function renderMemberHome(container) {
-  container.innerHTML = '';
-  
+// ═══════════════════════════════════════
+// MEMBER HEADER (shared across all member pages)
+// ═══════════════════════════════════════
+
+function _memberHeader(container, title, subtitle) {
   var header = el('div', { className: 'page-header' });
   var headerLeft = el('div', { className: 'page-header-left' });
-  var firstName = CURRENT_USER.firstName || CURRENT_USER.name.split(' ')[0] || 'there';
-  headerLeft.appendChild(el('div', { className: 'page-title' }, 'Hi, ' + firstName + ' \u{1F44B}'));
-  headerLeft.appendChild(el('div', { className: 'page-subtitle' }, CURRENT_USER.unit + ' \u00B7 Since ' + (CURRENT_USER.joined || 'N/A')));
+  headerLeft.appendChild(el('div', { className: 'page-title' }, title));
+  if (subtitle) headerLeft.appendChild(el('div', { className: 'page-subtitle' }, subtitle));
   header.appendChild(headerLeft);
-  
+
   var headerRight = el('div', { className: 'page-header-right' });
-  if (IS_DUAL_ROLE) {
-    headerRight.appendChild(el('button', {
-      style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
-      onClick: function() { AppState.activeRole = 'steward'; initStewardView(container); }
-    }, '\u{1F527} ' + CONFIG.stewardLabel));
+  // Only show utility buttons on mobile (sidebar handles these on tablet+)
+  if (!isSidebarLayout()) {
+    if (IS_DUAL_ROLE) {
+      headerRight.appendChild(el('button', {
+        style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+        onClick: function() { AppState.activeRole = 'steward'; initStewardView(document.getElementById('app')); }
+      }, '\uD83D\uDD27 ' + CONFIG.stewardLabel));
+    }
+    headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
+      AppState.isDark = !AppState.isDark;
+      ThemeEngine.applyTheme(ThemeEngine.getTheme('member', AppState.isDark));
+      renderMemberHome(document.getElementById('app'));
+    }}, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));
+    headerRight.appendChild(el('button', { className: 'icon-btn', onClick: handleLogout }, '\u21A9'));
   }
-  headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
-    AppState.isDark = !AppState.isDark;
-    ThemeEngine.applyTheme(ThemeEngine.getTheme('member', AppState.isDark));
-    renderMemberHome(container);
-  }}, AppState.isDark ? '\u2600\uFE0F' : '\u{1F319}'));
-  headerRight.appendChild(el('button', { className: 'icon-btn', onClick: handleLogout }, '\u21A9'));
   header.appendChild(headerRight);
   container.appendChild(header);
-  
-  var activeG = AppState.grievances.find(function(g) { return g.status !== 'resolved'; });
-  
-  if (activeG) {
-    renderGrievanceCard(container, activeG);
-  } else {
-    var emptyCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '22px', textAlign: 'center' } });
-    var hasAny = AppState.grievances.length > 0;
-    emptyCard.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, hasAny ? '\u2705' : '\u{1F4CB}'));
-    emptyCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)' } }, hasAny ? 'All grievances resolved' : 'No active grievances'));
-    container.appendChild(emptyCard);
-  }
-  
-  // Info grid
-  var infoGrid = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '0 16px 14px' } });
-  
-  var stewardCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
-  stewardCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, CONFIG.stewardLabel));
-  var stewardName = el('div', { style: { fontSize: '13px', fontFamily: 'var(--fontDisplay)', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Loading...');
-  stewardCard.appendChild(stewardName);
-  var emailLink = el('div', { style: { fontSize: '10px', color: 'var(--accent)', fontWeight: '600', cursor: 'pointer' } }, '\u2709\uFE0F Email');
-  stewardCard.appendChild(emailLink);
-  infoGrid.appendChild(stewardCard);
-  
-  if (activeG && activeG.steward) {
-    google.script.run.withSuccessHandler(function(contact) {
-      if (contact) {
-        stewardName.textContent = contact.name || contact.email;
-        emailLink.onclick = function() { window.open('mailto:' + contact.email); };
+}
+
+// ═══════════════════════════════════════
+// HOME TAB
+// ═══════════════════════════════════════
+
+function renderMemberHome(appContainer) {
+  renderPageLayout(appContainer, 'member', 'home', function(container) {
+    var firstName = CURRENT_USER.firstName || CURRENT_USER.name.split(' ')[0] || 'there';
+    _memberHeader(container, 'Hi, ' + firstName + ' \uD83D\uDC4B', CURRENT_USER.unit + ' \u00B7 Since ' + (CURRENT_USER.joined || 'N/A'));
+
+    // Survey banner
+    google.script.run.withSuccessHandler(function(status) {
+      if (status && !status.hasCompleted && CONFIG.surveyFormUrl) {
+        var banner = el('div', { className: 'survey-banner fade-in' });
+        banner.appendChild(el('span', { className: 'survey-banner-text' }, 'Quarterly survey is open!'));
+        banner.appendChild(el('button', {
+          className: 'survey-banner-btn',
+          onClick: function() { window.open(CONFIG.surveyFormUrl, '_blank'); }
+        }, 'Take Survey'));
+        // Insert after header
+        var firstContent = container.querySelector('.content, .card');
+        if (firstContent) container.insertBefore(banner, firstContent);
+        else container.appendChild(banner);
+      }
+    }).dataGetSurveyStatus(CURRENT_USER.email);
+
+    // Active grievance card
+    var activeG = AppState.grievances.find(function(g) { return g.status !== 'resolved'; });
+    if (activeG) {
+      renderGrievanceCard(container, activeG);
+    } else {
+      var emptyCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '22px', textAlign: 'center' } });
+      var hasAny = AppState.grievances.length > 0;
+      emptyCard.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, hasAny ? '\u2705' : '\uD83D\uDCCB'));
+      emptyCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)' } }, hasAny ? 'All grievances resolved' : 'No active grievances'));
+      container.appendChild(emptyCard);
+    }
+
+    // Steward card (single card, no dues)
+    var stewardCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px' } });
+    stewardCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, 'Your ' + CONFIG.stewardLabel));
+    var stewardName = el('div', { style: { fontSize: '13px', fontFamily: 'var(--fontDisplay)', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Loading...');
+    stewardCard.appendChild(stewardName);
+    var stewardActions = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    stewardCard.appendChild(stewardActions);
+    container.appendChild(stewardCard);
+
+    google.script.run.withSuccessHandler(function(info) {
+      if (info) {
+        stewardName.textContent = info.name || info.email;
+        stewardActions.appendChild(el('a', {
+          href: 'mailto:' + info.email,
+          style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+        }, '\u2709\uFE0F ' + info.email));
+        if (info.phone) {
+          stewardActions.appendChild(el('a', {
+            href: 'tel:' + info.phone,
+            style: { background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+          }, '\uD83D\uDCDE ' + info.phone));
+        }
       } else {
         stewardName.textContent = 'Not assigned';
+        stewardActions.appendChild(el('button', {
+          style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+          onClick: function() { renderStewardContact(document.getElementById('app')); }
+        }, 'Find a ' + CONFIG.stewardLabel));
       }
-    }).dataGetStewardContact(activeG.steward);
-  } else {
-    stewardName.textContent = 'Not assigned';
-  }
-  
-  var duesCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
-  duesCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, 'Dues'));
-  var duesRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } });
-  var dStatus = (CURRENT_USER.duesStatus || 'Unknown').toLowerCase();
-  var dot = el('div', { className: 'status-dot ' + (dStatus === 'current' || dStatus === 'active' ? 'resolved' : 'active') });
-  duesRow.appendChild(dot);
-  duesRow.appendChild(el('span', { style: { fontSize: '13px', fontFamily: 'var(--fontDisplay)', fontWeight: '600', color: 'var(--text)' } }, CURRENT_USER.duesStatus || 'Unknown'));
-  duesCard.appendChild(duesRow);
-  infoGrid.appendChild(duesCard);
-  container.appendChild(infoGrid);
-  
-  // Resources
-  var res = el('div', { className: 'content' });
-  res.appendChild(el('h3', { className: 'section-title' }, 'Resources'));
-  [
-    { icon: '\u{1F4D6}', label: 'Know Your Rights', sub: 'Contract highlights' },
-    { icon: '\u{1F4DD}', label: 'File a Grievance', sub: 'Start a new case' },
-    { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
-  ].forEach(function(r) {
-    var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' } });
-    item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
-    var tg = el('div', { style: { flex: '1' } });
-    tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-    tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
-    item.appendChild(tg);
-    item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-    res.appendChild(item);
+    }).dataGetAssignedSteward(CURRENT_USER.email);
+
+    // Quick links
+    var res = el('div', { className: 'content' });
+    res.appendChild(el('h3', { className: 'section-title' }, 'Quick Links'));
+    var links = [
+      { icon: '\uD83D\uDCD6', label: 'Know Your Rights', sub: 'Contract highlights' },
+      { icon: '\uD83D\uDCDD', label: 'File a Grievance', sub: 'Start a new case' },
+      { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
+    ];
+    links.forEach(function(r) {
+      var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' } });
+      item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
+      var tg = el('div', { style: { flex: '1' } });
+      tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+      tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+      item.appendChild(tg);
+      item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+      res.appendChild(item);
+    });
+    container.appendChild(res);
   });
-  container.appendChild(res);
-  
-  renderBottomNav(container, 'member', 'home');
 }
+
+// ═══════════════════════════════════════
+// GRIEVANCE CARD & DETAIL (preserved from v4.10)
+// ═══════════════════════════════════════
 
 function renderGrievanceCard(parentContainer, g) {
   var dl = g.deadlineDays;
   var dc = dl !== null && dl < 0 ? 'var(--danger)' : dl !== null && dl <= 3 ? 'var(--warning)' : dl !== null && dl <= 7 ? 'var(--info)' : 'var(--success)';
-  
+
   var card = el('div', { className: 'card card-glass card-clickable', style: { margin: '0 16px 14px', padding: '22px', position: 'relative', overflow: 'hidden' },
-    onClick: function() { renderGrievanceDetail(parentContainer, g); }
+    onClick: function() { renderGrievanceDetail(document.getElementById('app'), g); }
   });
-  
+
   var sc = g.status === 'overdue' ? 'danger' : g.status === 'active' ? 'warning' : 'info';
   card.appendChild(el('div', { className: 'glow-bar ' + sc }));
   card.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' } }, 'Your Active Grievance'));
   card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, g.step || 'Grievance'));
   card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '14px' } }, g.id + ' \u00B7 Filed ' + (g.filed || 'N/A')));
-  
+
   if (dl !== null) {
     var cd = el('div', { style: { background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '11px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
     cd.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text)' } }, 'Next deadline'));
@@ -139,123 +177,645 @@ function renderGrievanceCard(parentContainer, g) {
     cd.appendChild(dg);
     card.appendChild(cd);
   }
-  
+
   card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', marginTop: '10px', fontWeight: '600' } }, 'View timeline \u2192'));
   parentContainer.appendChild(card);
 }
 
-function renderGrievanceDetail(container, g) {
-  container.innerHTML = '';
-  
-  // Back
-  container.appendChild(el('div', { style: { padding: '12px 20px' } },
-    el('button', { style: { color: 'var(--accent)', fontSize: '13px', fontFamily: 'var(--fontBody)' },
-      onClick: function() { renderMemberHome(container); }
-    }, '\u2190 Back')
-  ));
-  
-  // Detail card
-  var dl = g.deadlineDays;
-  var dc = dl !== null && dl < 0 ? 'var(--danger)' : dl !== null && dl <= 3 ? 'var(--warning)' : 'var(--info)';
-  
-  var detailCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '20px', position: 'relative', overflow: 'hidden' } });
-  var sc = g.status === 'overdue' ? 'danger' : g.status === 'active' ? 'warning' : 'info';
-  detailCard.appendChild(el('div', { className: 'glow-bar ' + sc, style: { top: '0', bottom: 'auto' } }));
-  
-  var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' } });
-  topRow.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontWeight: '700', fontSize: '17px', color: 'var(--text)' } }, g.id));
-  var badge = el('span', { className: 'status-badge', style: { color: 'var(--' + sc + ')', background: 'var(--' + sc + ')18' } });
-  badge.style.background = 'rgba(255,255,255,0.06)';
-  badge.textContent = g.status.charAt(0).toUpperCase() + g.status.slice(1);
-  topRow.appendChild(badge);
-  detailCard.appendChild(topRow);
-  
-  detailCard.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '13px', color: 'var(--text)', marginBottom: '12px' } }, g.step || ''));
-  
-  var infoRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '12px 0', borderTop: '1px solid var(--border)' } });
-  
-  var filed = el('div');
-  filed.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' } }, 'Filed'));
-  filed.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', marginTop: '2px' } }, g.filed || 'N/A'));
-  infoRow.appendChild(filed);
-  
-  var deadline = el('div');
-  deadline.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' } }, 'Deadline'));
-  deadline.appendChild(el('div', { style: { fontSize: '12px', color: dc, fontWeight: '600', marginTop: '2px' } }, g.deadline || 'N/A'));
-  infoRow.appendChild(deadline);
-  
-  detailCard.appendChild(infoRow);
-  container.appendChild(detailCard);
-  
-  // Timeline (static for now — would need timeline data from sheet)
-  var timelineSection = el('div', { style: { padding: '0 16px' } });
-  timelineSection.appendChild(el('h3', { className: 'section-title' }, 'Timeline'));
-  
-  // Build basic timeline from grievance data
-  var steps = [];
-  if (g.filed) steps.push({ date: g.filed, event: 'Grievance filed', done: true });
-  if (g.step) {
-    var currentStepNum = parseInt(g.step.replace(/\D/g, '')) || 1;
-    for (var s = 1; s <= currentStepNum; s++) {
-      if (s < currentStepNum) {
-        steps.push({ date: '', event: 'Step ' + s + ' completed', done: true });
-      } else {
-        steps.push({ date: g.deadline || '', event: g.step + ' — in progress', done: false });
+function renderGrievanceDetail(appContainer, g) {
+  renderPageLayout(appContainer, 'member', 'cases', function(container) {
+    // Back button
+    container.appendChild(el('div', { style: { padding: '12px 20px' } },
+      el('button', { style: { color: 'var(--accent)', fontSize: '13px', fontFamily: 'var(--fontBody)' },
+        onClick: function() { renderMyCases(document.getElementById('app')); }
+      }, '\u2190 Back')
+    ));
+
+    var dl = g.deadlineDays;
+    var dc = dl !== null && dl < 0 ? 'var(--danger)' : dl !== null && dl <= 3 ? 'var(--warning)' : 'var(--info)';
+
+    var detailCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '20px', position: 'relative', overflow: 'hidden' } });
+    var sc = g.status === 'overdue' ? 'danger' : g.status === 'active' ? 'warning' : 'info';
+    detailCard.appendChild(el('div', { className: 'glow-bar ' + sc, style: { top: '0', bottom: 'auto' } }));
+
+    var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' } });
+    topRow.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontWeight: '700', fontSize: '17px', color: 'var(--text)' } }, g.id));
+    var badge = el('span', { className: 'status-badge', style: { color: 'var(--' + sc + ')', background: 'rgba(255,255,255,0.06)' } });
+    badge.textContent = g.status.charAt(0).toUpperCase() + g.status.slice(1);
+    topRow.appendChild(badge);
+    detailCard.appendChild(topRow);
+
+    detailCard.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '13px', color: 'var(--text)', marginBottom: '12px' } }, g.step || ''));
+
+    var infoRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '12px 0', borderTop: '1px solid var(--border)' } });
+    var filed = el('div');
+    filed.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' } }, 'Filed'));
+    filed.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', marginTop: '2px' } }, g.filed || 'N/A'));
+    infoRow.appendChild(filed);
+    var deadline = el('div');
+    deadline.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' } }, 'Deadline'));
+    deadline.appendChild(el('div', { style: { fontSize: '12px', color: dc, fontWeight: '600', marginTop: '2px' } }, g.deadline || 'N/A'));
+    infoRow.appendChild(deadline);
+    detailCard.appendChild(infoRow);
+    container.appendChild(detailCard);
+
+    // Timeline
+    var timelineSection = el('div', { style: { padding: '0 16px' } });
+    timelineSection.appendChild(el('h3', { className: 'section-title' }, 'Timeline'));
+    var steps = [];
+    if (g.filed) steps.push({ date: g.filed, event: 'Grievance filed', done: true });
+    if (g.step) {
+      var currentStepNum = parseInt(g.step.replace(/\D/g, '')) || 1;
+      for (var s = 1; s <= currentStepNum; s++) {
+        if (s < currentStepNum) steps.push({ date: '', event: 'Step ' + s + ' completed', done: true });
+        else steps.push({ date: g.deadline || '', event: g.step + ' \u2014 in progress', done: false });
       }
     }
-  }
-  
-  steps.forEach(function(step, i) {
-    var item = el('div', { className: 'timeline-item' });
-    var track = el('div', { className: 'timeline-track' });
-    track.appendChild(el('div', { className: 'timeline-dot ' + (step.done ? 'done' : 'pending') }));
-    if (i < steps.length - 1) {
-      track.appendChild(el('div', { className: 'timeline-line ' + (step.done && steps[i + 1].done ? 'done' : 'pending') }));
+    steps.forEach(function(step, i) {
+      var item = el('div', { className: 'timeline-item' });
+      var track = el('div', { className: 'timeline-track' });
+      track.appendChild(el('div', { className: 'timeline-dot ' + (step.done ? 'done' : 'pending') }));
+      if (i < steps.length - 1) track.appendChild(el('div', { className: 'timeline-line ' + (step.done && steps[i + 1].done ? 'done' : 'pending') }));
+      item.appendChild(track);
+      var content = el('div', { className: 'timeline-content' });
+      content.appendChild(el('div', { className: 'timeline-event', style: { color: step.done ? 'var(--text)' : 'var(--muted)' } }, step.event));
+      if (step.date) content.appendChild(el('div', { className: 'timeline-date' }, step.date));
+      item.appendChild(content);
+      timelineSection.appendChild(item);
+    });
+    container.appendChild(timelineSection);
+
+    // Steward contact in detail view
+    if (g.steward) {
+      var contactSection = el('div', { style: { padding: '12px 16px' } });
+      var contactCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
+      contactCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, CONFIG.stewardLabel));
+      var cName = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, 'Loading...');
+      contactCard.appendChild(cName);
+      var contactBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+      contactCard.appendChild(contactBtns);
+      contactSection.appendChild(contactCard);
+      container.appendChild(contactSection);
+
+      google.script.run.withSuccessHandler(function(contact) {
+        if (!contact) { cName.textContent = 'Not available'; return; }
+        cName.textContent = contact.name || contact.email;
+        contactBtns.appendChild(el('a', {
+          href: 'mailto:' + contact.email,
+          style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+        }, '\u2709\uFE0F ' + contact.email));
+        if (contact.phone) {
+          contactBtns.appendChild(el('a', {
+            href: 'tel:' + contact.phone,
+            style: { background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+          }, '\uD83D\uDCDE ' + contact.phone));
+        }
+      }).dataGetStewardContact(g.steward);
     }
-    item.appendChild(track);
-    
-    var content = el('div', { className: 'timeline-content' });
-    content.appendChild(el('div', { className: 'timeline-event', style: { color: step.done ? 'var(--text)' : 'var(--muted)' } }, step.event));
-    if (step.date) content.appendChild(el('div', { className: 'timeline-date' }, step.date));
-    item.appendChild(content);
-    timelineSection.appendChild(item);
   });
-  
-  container.appendChild(timelineSection);
-  
-  // Steward contact
-  if (g.steward) {
-    var contactSection = el('div', { style: { padding: '12px 16px' } });
-    var contactCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
-    contactCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, CONFIG.stewardLabel));
-    var cName = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, 'Loading...');
-    contactCard.appendChild(cName);
-    
-    var contactBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
-    contactCard.appendChild(contactBtns);
-    contactSection.appendChild(contactCard);
-    container.appendChild(contactSection);
-    
-    google.script.run.withSuccessHandler(function(contact) {
-      if (!contact) { cName.textContent = 'Not available'; return; }
-      cName.textContent = contact.name || contact.email;
-      
-      var emailBtn = el('a', {
-        href: 'mailto:' + contact.email,
-        style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
-      }, '\u2709\uFE0F ' + contact.email);
-      contactBtns.appendChild(emailBtn);
-      
-      if (contact.phone) {
-        var phoneBtn = el('a', {
-          href: 'tel:' + contact.phone,
-          style: { background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
-        }, '\u{1F4DE} ' + contact.phone);
-        contactBtns.appendChild(phoneBtn);
+}
+
+// ═══════════════════════════════════════
+// MY CASES TAB
+// ═══════════════════════════════════════
+
+function renderMyCases(appContainer) {
+  renderPageLayout(appContainer, 'member', 'cases', function(container) {
+    _memberHeader(container, 'My Cases', AppState.grievances.length + ' total');
+
+    var content = el('div', { className: 'content' });
+    if (AppState.grievances.length === 0) {
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No grievances on file.'));
+    } else {
+      AppState.grievances.forEach(function(g) {
+        renderGrievanceCard(content, g);
+      });
+    }
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// CONTACT / STEWARD PICKER
+// ═══════════════════════════════════════
+
+function renderStewardContact(appContainer) {
+  renderPageLayout(appContainer, 'member', 'contact', function(container) {
+    _memberHeader(container, 'Contact ' + CONFIG.stewardLabel);
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(info) {
+      content.innerHTML = '';
+      if (info) {
+        // Has assigned steward — show full contact card
+        var card = el('div', { className: 'card card-glass', style: { padding: '18px' } });
+        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '17px', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, info.name || 'Your ' + CONFIG.stewardLabel));
+        var details = [
+          { label: 'Email', value: info.email, icon: '\u2709\uFE0F', href: 'mailto:' + info.email },
+          { label: 'Phone', value: info.phone, icon: '\uD83D\uDCDE', href: 'tel:' + info.phone },
+          { label: 'Location', value: info.workLocation, icon: '\uD83D\uDCCD' },
+          { label: 'Office Days', value: info.officeDays, icon: '\uD83D\uDCC5' },
+        ];
+        details.forEach(function(d) {
+          if (!d.value) return;
+          var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
+          row.appendChild(el('span', { style: { fontSize: '14px' } }, d.icon));
+          var info_ = el('div', { style: { flex: '1' } });
+          info_.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase' } }, d.label));
+          if (d.href) {
+            info_.appendChild(el('a', { href: d.href, style: { fontSize: '13px', color: 'var(--accent)', fontWeight: '600' } }, d.value));
+          } else {
+            info_.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)' } }, d.value));
+          }
+          row.appendChild(info_);
+          card.appendChild(row);
+        });
+        content.appendChild(card);
+
+        // Option to change steward
+        content.appendChild(el('button', {
+          className: 'btn btn-secondary', style: { marginTop: '14px' },
+          onClick: function() { _renderStewardPicker(content); }
+        }, 'Change ' + CONFIG.stewardLabel));
+      } else {
+        // No steward assigned — show picker
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0' } },
+          el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDC65')
+        ));
+        content.appendChild(el('div', { style: { textAlign: 'center', fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No ' + CONFIG.stewardLabel + ' Assigned'));
+        content.appendChild(el('div', { style: { textAlign: 'center', fontSize: '13px', color: 'var(--muted)', marginBottom: '16px' } }, 'Pick one from your location below.'));
+        _renderStewardPicker(content);
       }
-    }).dataGetStewardContact(g.steward);
-  }
-  
-  renderBottomNav(container, 'member', 'cases');
+    }).dataGetAssignedSteward(CURRENT_USER.email);
+  });
+}
+
+function _renderStewardPicker(content) {
+  var pickerArea = el('div');
+  pickerArea.innerHTML = '<div class="loading-spinner" style="min-height:100px"><div class="spinner"></div></div>';
+  content.appendChild(pickerArea);
+
+  google.script.run.withSuccessHandler(function(stewards) {
+    pickerArea.innerHTML = '';
+    if (!stewards || stewards.length === 0) {
+      pickerArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px', padding: '16px 0' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's available.'));
+      return;
+    }
+    pickerArea.appendChild(el('h3', { className: 'section-title' }, 'Available ' + CONFIG.stewardLabel + 's'));
+    stewards.forEach(function(s) {
+      var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 16px', marginBottom: '6px' } });
+      var avatar = el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase());
+      item.appendChild(avatar);
+      var info = el('div', { style: { flex: '1' } });
+      info.appendChild(el('div', { className: 'member-list-name' }, s.name || s.email));
+      var meta = s.workLocation || '';
+      if (s.officeDays) meta += (meta ? ' \u00B7 ' : '') + s.officeDays;
+      if (s.sameLocation) meta += ' \u2605';
+      info.appendChild(el('div', { className: 'member-list-meta' }, meta));
+      item.appendChild(info);
+      item.appendChild(el('button', {
+        style: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: '600' },
+        onClick: function(e) {
+          e.stopPropagation();
+          google.script.run.withSuccessHandler(function(result) {
+            if (result && result.success) {
+              renderStewardContact(document.getElementById('app'));
+            }
+          }).dataAssignSteward(CURRENT_USER.email, s.email);
+        }
+      }, 'Select'));
+      item.appendChild(item);
+      pickerArea.appendChild(item);
+    });
+  }).dataGetAvailableStewards(CURRENT_USER.email);
+}
+
+// ═══════════════════════════════════════
+// RESOURCES TAB
+// ═══════════════════════════════════════
+
+function renderMemberResources(appContainer) {
+  renderPageLayout(appContainer, 'member', 'resources', function(container) {
+    _memberHeader(container, 'Resources');
+    var content = el('div', { className: 'content' });
+
+    var items = [
+      { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
+      { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
+      { icon: '\uD83D\uDCD6', label: 'Know Your Rights', sub: 'Contract highlights' },
+      { icon: '\uD83D\uDCDD', label: 'File a Grievance', sub: 'Start a new case' },
+      { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
+    ];
+    if (CONFIG.orgWebsite) items.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+
+    items.forEach(function(r) {
+      var item = el('div', {
+        className: 'card card-glass card-clickable',
+        style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
+        onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
+      });
+      item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
+      var tg = el('div', { style: { flex: '1' } });
+      tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+      tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+      item.appendChild(tg);
+      item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+      content.appendChild(item);
+    });
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// UPDATE PROFILE
+// ═══════════════════════════════════════
+
+function renderUpdateProfile(appContainer) {
+  renderPageLayout(appContainer, 'member', 'profile', function(container) {
+    _memberHeader(container, 'Update Profile');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(profile) {
+      content.innerHTML = '';
+      if (!profile) {
+        content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0' } }, 'Unable to load profile.'));
+        return;
+      }
+
+      var fields = [
+        { key: 'street', label: 'Street Address', value: profile.street },
+        { key: 'city', label: 'City', value: profile.city },
+        { key: 'state', label: 'State', value: profile.state },
+        { key: 'zip', label: 'Zip Code', value: profile.zip },
+        { key: 'workLocation', label: 'Work Location', value: profile.workLocation },
+        { key: 'officeDays', label: 'Office Days', value: profile.officeDays },
+      ];
+
+      var form = el('div');
+      var inputs = {};
+      fields.forEach(function(f) {
+        var group = el('div', { className: 'form-group' });
+        group.appendChild(el('label', { className: 'form-label' }, f.label));
+        var input = el('input', { className: 'form-input', value: f.value || '', placeholder: f.label });
+        inputs[f.key] = input;
+        group.appendChild(input);
+        form.appendChild(group);
+      });
+
+      var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', minHeight: '20px' } });
+      form.appendChild(statusMsg);
+
+      var saveBtn = el('button', { className: 'btn btn-primary', onClick: function() {
+        var updates = {};
+        for (var k in inputs) updates[k] = inputs[k].value;
+        saveBtn.textContent = 'Saving...';
+        saveBtn.disabled = true;
+        google.script.run.withSuccessHandler(function(result) {
+          saveBtn.textContent = 'Save Changes';
+          saveBtn.disabled = false;
+          statusMsg.textContent = result && result.success ? 'Profile updated!' : (result && result.message) || 'Error saving.';
+          statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+        }).withFailureHandler(function() {
+          saveBtn.textContent = 'Save Changes';
+          saveBtn.disabled = false;
+          statusMsg.textContent = 'Error saving. Please try again.';
+          statusMsg.style.color = 'var(--danger)';
+        }).dataUpdateProfile(CURRENT_USER.email, updates);
+      }}, 'Save Changes');
+      form.appendChild(saveBtn);
+
+      content.appendChild(form);
+    }).dataGetFullProfile(CURRENT_USER.email);
+  });
+}
+
+// ═══════════════════════════════════════
+// MORE MENU
+// ═══════════════════════════════════════
+
+function renderMemberMore(appContainer) {
+  renderPageLayout(appContainer, 'member', 'more', function(container) {
+    _memberHeader(container, 'More');
+    var content = el('div', { className: 'content' });
+    var menuItems = [
+      { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderMemberResources(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { renderWorkloadTracker(document.getElementById('app')); } },
+      { icon: '\u2753', label: 'Weekly Questions', desc: 'Vote on this week\'s questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'member'); } },
+      { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { renderSurveyResultsPage(document.getElementById('app')); } },
+    ];
+
+    menuItems.forEach(function(m) {
+      var item = el('div', { className: 'more-menu-item', onClick: m.action });
+      item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
+      var text = el('div');
+      text.appendChild(el('div', { className: 'more-menu-label' }, m.label));
+      text.appendChild(el('div', { className: 'more-menu-desc' }, m.desc));
+      item.appendChild(text);
+      content.appendChild(item);
+    });
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// SURVEY RESULTS
+// ═══════════════════════════════════════
+
+function renderSurveyResultsPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'survey', function(container) {
+    _memberHeader(container, 'Survey Results');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(data) {
+      content.innerHTML = '';
+      if (!data) {
+        content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Survey data unavailable.'));
+        return;
+      }
+
+      if (!data.available) {
+        // Below threshold
+        var pct = data.threshold > 0 ? Math.round((data.count / data.threshold) * 100) : 0;
+        var card = el('div', { className: 'card card-glass', style: { padding: '22px', textAlign: 'center' } });
+        card.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCCA'));
+        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Not enough responses yet'));
+        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.count + ' of ' + data.threshold + ' needed'));
+        var track = el('div', { className: 'bar-chart-track', style: { height: '10px', margin: '0 auto', maxWidth: '240px' } });
+        var fill = el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: 'var(--accent)' } });
+        track.appendChild(fill);
+        card.appendChild(track);
+        content.appendChild(card);
+        return;
+      }
+
+      // Render section bar charts
+      content.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.count + ' responses'));
+      (data.sections || []).forEach(function(sec) {
+        var secCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+        secCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, sec.name));
+        // Overall bar
+        var avg = sec.avg || 0;
+        var maxScore = 10;
+        var pct = Math.round((avg / maxScore) * 100);
+        var color = avg < 4 ? 'var(--danger)' : avg < 6 ? 'var(--warning)' : avg < 8 ? 'var(--success)' : '#22c55e';
+
+        var row = el('div', { className: 'bar-chart-row' });
+        row.appendChild(el('div', { className: 'bar-chart-label' }, 'Average'));
+        var track = el('div', { className: 'bar-chart-track' });
+        track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: color } }));
+        row.appendChild(track);
+        row.appendChild(el('div', { className: 'bar-chart-value', style: { color: color } }, avg.toFixed(1)));
+        secCard.appendChild(row);
+        content.appendChild(secCard);
+      });
+    }).dataGetSurveyResults();
+  });
+}
+
+// ═══════════════════════════════════════
+// WORKLOAD TRACKER (embedded, SSO)
+// ═══════════════════════════════════════
+
+function renderWorkloadTracker(appContainer) {
+  renderPageLayout(appContainer, 'member', 'workload', function(container) {
+    _memberHeader(container, 'Workload Tracker');
+    var content = el('div', { className: 'content' });
+
+    // Sub-tabs
+    var activeSubTab = 'submit';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['submit', 'history', 'stats'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'submit') _renderWTSubmit(subContent);
+      else if (activeSubTab === 'history') _renderWTHistory(subContent);
+      else _renderWTStats(subContent);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderWTSubmit(container) {
+  var categories = [
+    { id: 't1', label: 'Priority Cases' },
+    { id: 't2', label: 'Pending Cases' },
+    { id: 't3', label: 'Unread Documents' },
+    { id: 't4', label: 'To-Do Items' },
+    { id: 't5', label: 'Sent Referrals' },
+    { id: 't6', label: 'CE Activities' },
+    { id: 't7', label: 'Assistance Requests' },
+    { id: 't8', label: 'Aged Cases' },
+  ];
+
+  var inputs = {};
+  categories.forEach(function(cat) {
+    var row = el('div', { className: 'wt-category' });
+    row.appendChild(el('div', { className: 'wt-category-label' }, cat.label));
+    var input = el('input', { className: 'wt-category-input', type: 'number', min: '0', max: '999', value: '0' });
+    inputs[cat.id] = input;
+    row.appendChild(input);
+    container.appendChild(row);
+  });
+
+  var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '10px', minHeight: '20px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary', style: { marginTop: '14px' },
+    onClick: function() {
+      var formData = { email: CURRENT_USER.email };
+      for (var k in inputs) formData[k] = inputs[k].value;
+      statusMsg.textContent = 'Submitting...';
+      google.script.run.withSuccessHandler(function(result) {
+        statusMsg.textContent = typeof result === 'string' ? result : 'Submitted!';
+        statusMsg.style.color = (typeof result === 'string' && result.indexOf('Error') === 0) ? 'var(--danger)' : 'var(--success)';
+      }).withFailureHandler(function() {
+        statusMsg.textContent = 'Error submitting. Try again.';
+        statusMsg.style.color = 'var(--danger)';
+      }).processWorkloadFormSSO(CURRENT_USER.email, formData);
+    }
+  }, 'Submit Workload'));
+}
+
+function _renderWTHistory(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(result) {
+    container.innerHTML = '';
+    if (!result || !result.success || !result.history || result.history.length === 0) {
+      container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No submissions yet.'));
+      return;
+    }
+    result.history.forEach(function(entry) {
+      var card = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '8px' } });
+      card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' } }, entry.date ? new Date(entry.date).toLocaleDateString() : 'Unknown'));
+      var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' } });
+      var labels = ['Pri', 'Pend', 'Doc', 'ToDo', 'Ref', 'CE', 'Asst', 'Aged'];
+      for (var i = 0; i < 8; i++) {
+        var cell = el('div', { style: { textAlign: 'center' } });
+        cell.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)' } }, labels[i]));
+        cell.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, String(entry['t' + (i + 1)] || 0)));
+        grid.appendChild(cell);
+      }
+      card.appendChild(grid);
+      container.appendChild(card);
+    });
+  }).getWorkloadHistorySSO(CURRENT_USER.email);
+}
+
+function _renderWTStats(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(result) {
+    container.innerHTML = '';
+    if (!result || !result.success || !result.data) {
+      container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No data available.'));
+      return;
+    }
+    var d = result.data;
+    container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' } }, d.totalSubmissions + ' submissions from ' + d.members + ' members'));
+    var avgs = d.averages || {};
+    for (var cat in avgs) {
+      var row = el('div', { className: 'bar-chart-row' });
+      row.appendChild(el('div', { className: 'bar-chart-label' }, cat));
+      var val = parseFloat(avgs[cat]) || 0;
+      var maxVal = 100;
+      var pct = Math.min(100, Math.round((val / maxVal) * 100));
+      var track = el('div', { className: 'bar-chart-track' });
+      track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: Math.max(pct, 2) + '%', background: 'var(--accent)' } }));
+      row.appendChild(track);
+      row.appendChild(el('div', { className: 'bar-chart-value' }, avgs[cat]));
+      container.appendChild(row);
+    }
+  }).getWorkloadDashboardDataSSO(CURRENT_USER.email);
+}
+
+// ═══════════════════════════════════════
+// WEEKLY QUESTIONS (member side)
+// ═══════════════════════════════════════
+
+function renderWeeklyQuestionsPage(appContainer, role) {
+  var isMember = role === 'member';
+  renderPageLayout(appContainer, role, 'weeklyq', function(container) {
+    if (isMember) _memberHeader(container, 'Weekly Questions');
+    else container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title' }, 'Weekly Questions')));
+
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(data) {
+      content.innerHTML = '';
+      if (!data || !data.questions || data.questions.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No questions this week.'));
+        // Suggest submitting a question
+        content.appendChild(el('button', {
+          className: 'btn btn-secondary', style: { marginTop: '10px' },
+          onClick: function() { _renderQuestionSubmission(content); }
+        }, 'Suggest a Question'));
+        return;
+      }
+
+      data.questions.forEach(function(q) {
+        var qCard = el('div', { className: 'wq-card' });
+        qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+
+        if (q.hasResponded) {
+          // Show results
+          _renderQuestionResults(qCard, q);
+        } else {
+          // Show response options
+          var options = ['Strongly Agree', 'Agree', 'Neutral', 'Disagree', 'Strongly Disagree'];
+          options.forEach(function(opt) {
+            var optEl = el('div', { className: 'wq-option', onClick: function() {
+              google.script.run.withSuccessHandler(function(result) {
+                if (result && result.success) {
+                  q.hasResponded = true;
+                  q.stats = result.stats;
+                  qCard.innerHTML = '';
+                  qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+                  _renderQuestionResults(qCard, q);
+                }
+              }).wqSubmitResponse(CURRENT_USER.email, q.id, opt);
+            }}, opt);
+            qCard.appendChild(optEl);
+          });
+        }
+        content.appendChild(qCard);
+      });
+
+      // Submit question button
+      content.appendChild(el('div', { style: { marginTop: '16px' } }));
+      content.appendChild(el('button', {
+        className: 'btn btn-secondary',
+        onClick: function() { _renderQuestionSubmission(content); }
+      }, 'Suggest a Question'));
+    }).wqGetActiveQuestions(CURRENT_USER.email);
+  });
+}
+
+function _renderQuestionResults(container, q) {
+  var stats = q.stats || {};
+  var total = stats.total || 0;
+  var options = ['Strongly Agree', 'Agree', 'Neutral', 'Disagree', 'Strongly Disagree'];
+  options.forEach(function(opt) {
+    var count = (stats.counts && stats.counts[opt]) || 0;
+    var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+    var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } });
+    row.appendChild(el('div', { style: { width: '110px', fontSize: '11px', color: 'var(--muted)', textAlign: 'right', flexShrink: '0' } }, opt));
+    var bar = el('div', { className: 'wq-results-bar' });
+    bar.appendChild(el('div', { className: 'wq-results-fill', style: { width: pct + '%' } }));
+    row.appendChild(bar);
+    row.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text)', fontWeight: '600', width: '40px' } }, pct + '%'));
+    container.appendChild(row);
+  });
+  container.appendChild(el('div', { className: 'wq-stats' }, total + ' responses'));
+}
+
+function _renderQuestionSubmission(container) {
+  container.innerHTML = '';
+  container.appendChild(el('h3', { className: 'section-title' }, 'Suggest a Question'));
+  container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' } }, 'Your question will be reviewed and may appear in future weeks.'));
+  var textarea = el('textarea', { className: 'msg-textarea', placeholder: 'Type your question here...', style: { minHeight: '80px' } });
+  container.appendChild(textarea);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginTop: '6px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary', style: { marginTop: '10px' },
+    onClick: function() {
+      var text = textarea.value.trim();
+      if (!text) { statusMsg.textContent = 'Please enter a question.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Submitting...';
+      google.script.run.withSuccessHandler(function(result) {
+        statusMsg.textContent = result && result.success ? 'Question submitted! Thank you.' : 'Error submitting.';
+        statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+        if (result && result.success) textarea.value = '';
+      }).wqSubmitPoolQuestion(CURRENT_USER.email, text);
+    }
+  }, 'Submit Question'));
 }
 </script>

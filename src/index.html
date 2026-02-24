@@ -229,9 +229,190 @@
     }
     
     // ═══════════════════════════════════════
+    // LAYOUT DETECTION
+    // ═══════════════════════════════════════
+    var LayoutState = { mode: 'mobile', width: 0 };
+
+    function getLayoutMode() {
+      var w = window.innerWidth || document.documentElement.clientWidth;
+      LayoutState.width = w;
+      if (w >= 1024) { LayoutState.mode = 'desktop'; }
+      else if (w >= 640) { LayoutState.mode = 'tablet'; }
+      else { LayoutState.mode = 'mobile'; }
+      return LayoutState.mode;
+    }
+
+    function isSidebarLayout() {
+      return LayoutState.mode !== 'mobile';
+    }
+
+    /**
+     * Renders the page with sidebar nav on tablet+ or bottom nav on mobile.
+     * @param {Element} container - The #app element
+     * @param {string} role - 'member' or 'steward'
+     * @param {string} activeTab - The currently active tab id
+     * @param {Function} contentFn - Called with contentContainer to render page content
+     */
+    function renderPageLayout(container, role, activeTab, contentFn) {
+      container.innerHTML = '';
+      getLayoutMode();
+
+      if (isSidebarLayout()) {
+        var layout = el('div', { className: 'page-layout' });
+        var sidebar = el('nav', { className: 'sidebar-nav' });
+        renderSidebarItems(sidebar, role, activeTab);
+        layout.appendChild(sidebar);
+
+        var content = el('div', { className: 'page-layout-content' });
+        contentFn(content);
+        layout.appendChild(content);
+        container.appendChild(layout);
+      } else {
+        contentFn(container);
+        renderBottomNav(container, role, activeTab);
+      }
+    }
+
+    function renderSidebarItems(sidebar, role, activeTab) {
+      var header = el('div', { className: 'sidebar-header' });
+      header.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
+      if (CURRENT_USER) {
+        header.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
+      }
+      sidebar.appendChild(header);
+
+      var tabs = _getSidebarTabs(role);
+      tabs.forEach(function(tab) {
+        if (tab.divider) {
+          sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
+          return;
+        }
+        var item = el('div', {
+          className: 'sidebar-item' + (tab.id === activeTab ? ' active' : ''),
+          onClick: function() { _handleTabNav(role, tab.id); }
+        }, [
+          el('span', { className: 'sidebar-item-icon' }, tab.icon),
+          el('span', null, tab.label)
+        ]);
+        sidebar.appendChild(item);
+      });
+
+      // Bottom utility items
+      sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
+      if (IS_DUAL_ROLE) {
+        var switchRole = role === 'steward' ? 'member' : 'steward';
+        var switchLabel = role === 'steward' ? CONFIG.memberLabel : CONFIG.stewardLabel;
+        sidebar.appendChild(el('div', {
+          className: 'sidebar-item',
+          onClick: function() {
+            AppState.activeRole = switchRole;
+            var app = document.getElementById('app');
+            if (switchRole === 'steward') initStewardView(app);
+            else initMemberView(app);
+          }
+        }, [
+          el('span', { className: 'sidebar-item-icon' }, role === 'steward' ? '\uD83D\uDC64' : '\uD83D\uDD27'),
+          el('span', null, 'Switch to ' + switchLabel)
+        ]));
+      }
+      sidebar.appendChild(el('div', {
+        className: 'sidebar-item',
+        onClick: function() {
+          AppState.isDark = !AppState.isDark;
+          var t = ThemeEngine.getTheme(AppState.activeRole || 'member', AppState.isDark);
+          ThemeEngine.applyTheme(t);
+          _handleTabNav(role, activeTab);
+        }
+      }, [
+        el('span', { className: 'sidebar-item-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'),
+        el('span', null, AppState.isDark ? 'Light Mode' : 'Dark Mode')
+      ]));
+      sidebar.appendChild(el('div', {
+        className: 'sidebar-item',
+        onClick: handleLogout
+      }, [
+        el('span', { className: 'sidebar-item-icon' }, '\u21A9'),
+        el('span', null, 'Sign Out')
+      ]));
+    }
+
+    function _getSidebarTabs(role) {
+      if (role === 'steward') return [
+        { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
+        { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
+        { id: 'deadlines', icon: '\uD83D\uDCC5', label: 'Deadlines' },
+        { divider: true },
+        { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
+        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
+        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
+      ];
+      return [
+        { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
+        { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
+        { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
+        { divider: true },
+        { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
+        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
+        { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
+        { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
+      ];
+    }
+
+    function _handleTabNav(role, tabId) {
+      var app = document.getElementById('app');
+      if (role === 'member') {
+        switch(tabId) {
+          case 'home': renderMemberHome(app); break;
+          case 'cases': renderMyCases(app); break;
+          case 'contact': renderStewardContact(app); break;
+          case 'profile': renderUpdateProfile(app); break;
+          case 'resources': renderMemberResources(app); break;
+          case 'workload': renderWorkloadTracker(app); break;
+          case 'weeklyq': renderWeeklyQuestionsPage(app, 'member'); break;
+          case 'survey': renderSurveyResultsPage(app); break;
+          default: renderMemberHome(app);
+        }
+      } else {
+        switch(tabId) {
+          case 'cases': renderStewardDashboard(app); break;
+          case 'members': renderStewardMembers(app); break;
+          case 'deadlines': renderStewardDashboard(app); break;
+          case 'broadcast': renderBroadcast(app); break;
+          case 'resources': renderStewardResources(app); break;
+          case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); break;
+          case 'surveytrack': renderSurveyTracking(app); break;
+          default: renderStewardDashboard(app);
+        }
+      }
+    }
+
+    // Debounced resize handler — re-renders on breakpoint change
+    var _resizeTimer = null;
+    var _prevMode = '';
+    window.addEventListener('resize', function() {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(function() {
+        var newMode = getLayoutMode();
+        if (newMode !== _prevMode) {
+          _prevMode = newMode;
+          // Re-render current view
+          var app = document.getElementById('app');
+          if (AppState.activeRole === 'steward') renderStewardDashboard(app);
+          else if (AppState.activeRole === 'member') renderMemberHome(app);
+        }
+      }, 200);
+    });
+
+    // ═══════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════
-    document.addEventListener('DOMContentLoaded', initApp);
+    document.addEventListener('DOMContentLoaded', function() {
+      getLayoutMode();
+      _prevMode = LayoutState.mode;
+      initApp();
+    });
   </script>
   
   <?!= include('auth_view') ?>

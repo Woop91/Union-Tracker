@@ -35,6 +35,17 @@ var DataService = (function () {
     memberJoined:    ['joined', 'join date', 'member since', 'date joined'],
     memberDuesStatus:['dues status', 'dues', 'status'],
     memberId:        ['member id', 'id', 'member number'],
+    memberWorkLocation: ['work location', 'location', 'office location'],
+    memberOfficeDays:   ['office days', 'in-office days', 'days in office'],
+    memberAssignedSteward: ['assigned steward', 'steward assignment'],
+    memberIsSteward: ['is steward', 'steward'],
+    memberStreet:    ['street address', 'street', 'address'],
+    memberCity:      ['city'],
+    memberState:     ['state'],
+    memberZip:       ['zip code', 'zip', 'postal code'],
+    memberHasOpenGrievance: ['has open grievance?', 'has open grievance', 'open grievance'],
+    memberSupervisor: ['supervisor'],
+    memberJobTitle:  ['job title', 'title', 'position'],
     
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
@@ -236,6 +247,453 @@ var DataService = (function () {
   }
   
   // ═══════════════════════════════════════
+  // PUBLIC: Full Profile & Profile Updates
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns full member profile for self-service profile page.
+   * Only returns data for the authenticated user (email match).
+   * @param {string} email
+   * @returns {Object|null}
+   */
+  function getFullMemberProfile(email) {
+    var user = findUserByEmail(email);
+    if (!user) return null;
+    return {
+      email: user.email,
+      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      unit: user.unit,
+      workLocation: user.workLocation,
+      officeDays: user.officeDays,
+      street: user.street,
+      city: user.city,
+      state: user.state,
+      zip: user.zip,
+      phone: user.phone,
+      supervisor: user.supervisor,
+      jobTitle: user.jobTitle,
+      joined: user.joined,
+    };
+  }
+
+  /**
+   * Updates a member's self-service profile fields.
+   * Only allows editing specific fields: address, work location, office days.
+   * @param {string} email - The member's email (verified against session)
+   * @param {Object} updates - { street, city, state, zip, workLocation, officeDays }
+   * @returns {Object} { success: boolean, message: string }
+   */
+  function updateMemberProfile(email, updates) {
+    if (!email || !updates) return { success: false, message: 'Invalid request.' };
+    email = String(email).trim().toLowerCase();
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return { success: false, message: 'Member directory unavailable.' };
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
+    if (emailCol === -1) return { success: false, message: 'System configuration error.' };
+
+    // Editable field mappings
+    var editableFields = {
+      street:       HEADERS.memberStreet,
+      city:         HEADERS.memberCity,
+      state:        HEADERS.memberState,
+      zip:          HEADERS.memberZip,
+      workLocation: HEADERS.memberWorkLocation,
+      officeDays:   HEADERS.memberOfficeDays,
+    };
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
+      if (rowEmail !== email) continue;
+
+      var rowNum = i + 1; // 1-indexed for sheet ops
+      for (var field in updates) {
+        if (!editableFields[field]) continue;
+        var col = _findColumn(colMap, editableFields[field]);
+        if (col === -1) continue;
+        var val = String(updates[field] || '').trim().substring(0, 255);
+        sheet.getRange(rowNum, col + 1).setValue(val);
+      }
+
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('PROFILE_UPDATE', { email: email, fields: Object.keys(updates).join(',') });
+      }
+      return { success: true, message: 'Profile updated.' };
+    }
+
+    return { success: false, message: 'Member not found.' };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Assignment
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns the assigned steward info for a member.
+   * @param {string} email
+   * @returns {Object|null} { name, email, phone, workLocation, officeDays }
+   */
+  function getAssignedStewardInfo(email) {
+    var user = findUserByEmail(email);
+    if (!user || !user.assignedSteward) return null;
+    var steward = findUserByEmail(user.assignedSteward);
+    if (!steward) return null;
+    return {
+      name: steward.name,
+      email: steward.email,
+      phone: steward.phone,
+      workLocation: steward.workLocation,
+      officeDays: steward.officeDays,
+    };
+  }
+
+  /**
+   * Returns stewards at the same location as the member.
+   * Used for self-assign steward picker.
+   * @param {string} memberEmail
+   * @returns {Object[]} Array of { name, email, workLocation, officeDays }
+   */
+  function getAvailableStewards(memberEmail) {
+    var member = findUserByEmail(memberEmail);
+    if (!member) return [];
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var isStewardCol = _findColumn(colMap, HEADERS.memberIsSteward);
+    var roleCol = _findColumn(colMap, HEADERS.memberRole);
+    var locationCol = _findColumn(colMap, HEADERS.memberWorkLocation);
+
+    var stewards = [];
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildUserRecord(data[i], colMap);
+      if (!rec.isSteward) continue;
+      if (rec.email === memberEmail) continue;
+      // Prioritize same location, but include all stewards
+      stewards.push({
+        name: rec.name,
+        email: rec.email,
+        workLocation: rec.workLocation,
+        officeDays: rec.officeDays,
+        sameLocation: rec.workLocation && member.workLocation &&
+          rec.workLocation.toLowerCase() === member.workLocation.toLowerCase(),
+      });
+    }
+
+    // Sort: same location first, then alphabetical
+    stewards.sort(function(a, b) {
+      if (a.sameLocation && !b.sameLocation) return -1;
+      if (!a.sameLocation && b.sameLocation) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    return stewards;
+  }
+
+  /**
+   * Assigns a steward to a member (self-service).
+   * @param {string} memberEmail
+   * @param {string} stewardEmail
+   * @returns {Object} { success, message }
+   */
+  function assignStewardToMember(memberEmail, stewardEmail) {
+    if (!memberEmail || !stewardEmail) return { success: false, message: 'Invalid request.' };
+    memberEmail = String(memberEmail).trim().toLowerCase();
+    stewardEmail = String(stewardEmail).trim().toLowerCase();
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return { success: false, message: 'System error.' };
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
+    var stewardCol = _findColumn(colMap, HEADERS.memberAssignedSteward);
+    if (emailCol === -1 || stewardCol === -1) return { success: false, message: 'Configuration error.' };
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][emailCol]).trim().toLowerCase() === memberEmail) {
+        sheet.getRange(i + 1, stewardCol + 1).setValue(stewardEmail);
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('STEWARD_SELF_ASSIGN', { member: memberEmail, steward: stewardEmail });
+        }
+        return { success: true, message: 'Steward assigned.' };
+      }
+    }
+    return { success: false, message: 'Member not found.' };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Grievance Drive & Survey Status
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns the Google Drive folder URL for a member's grievance case files.
+   * @param {string} email
+   * @returns {string|null} Drive folder URL or null
+   */
+  function getMemberGrievanceDriveUrl(email) {
+    // Convention: folder named by grievance ID in the org shared drive
+    var grievances = getMemberGrievances(email);
+    if (!grievances || grievances.length === 0) return null;
+    var activeG = grievances.find(function(g) { return g.status !== 'resolved'; });
+    if (!activeG) return null;
+    // Drive URL would come from a column or Drive API lookup.
+    // For now, return null — steward can provide the link.
+    return null;
+  }
+
+  /**
+   * Returns survey completion status for a member.
+   * @param {string} email
+   * @returns {Object} { hasCompleted: boolean, lastCompleted: string|null }
+   */
+  function getMemberSurveyStatus(email) {
+    if (!email) return { hasCompleted: false, lastCompleted: null };
+    email = String(email).trim().toLowerCase();
+
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var trackSheet = ss.getSheetByName('_Survey_Tracking');
+      if (!trackSheet || trackSheet.getLastRow() <= 1) {
+        return { hasCompleted: false, lastCompleted: null };
+      }
+
+      var data = trackSheet.getDataRange().getValues();
+      var headers = data[0];
+      var colMap = _buildColumnMap(headers);
+      var emailCol = _findColumn(colMap, ['email', 'member email']);
+      var statusCol = _findColumn(colMap, ['status', 'completion status', 'completed']);
+      var dateCol = _findColumn(colMap, ['completed date', 'date completed', 'completion date']);
+
+      if (emailCol === -1) return { hasCompleted: false, lastCompleted: null };
+
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][emailCol]).trim().toLowerCase() !== email) continue;
+        var status = statusCol !== -1 ? String(data[i][statusCol]).trim().toLowerCase() : '';
+        var completed = status === 'completed' || status === 'yes' || status === 'true';
+        var dateVal = dateCol !== -1 ? data[i][dateCol] : null;
+        return {
+          hasCompleted: completed,
+          lastCompleted: dateVal instanceof Date ? _formatDate(dateVal) : (dateVal ? String(dateVal) : null),
+        };
+      }
+    } catch (e) {
+      Logger.log('DataService.getMemberSurveyStatus error: ' + e.message);
+    }
+    return { hasCompleted: false, lastCompleted: null };
+  }
+
+  /**
+   * Returns org-wide links (calendar, drive, survey form, etc.)
+   * @returns {Object}
+   */
+  function getOrgLinks() {
+    try {
+      var config = ConfigReader.getConfig();
+      return {
+        calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
+        driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
+        surveyFormUrl: config.satisfactionFormUrl || '',
+        orgWebsite: config.orgWebsite || '',
+      };
+    } catch (e) {
+      return { calendarUrl: '', driveFolderUrl: '', surveyFormUrl: '', orgWebsite: '' };
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward — Member Management
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns all members assigned to a steward with summary stats.
+   * @param {string} stewardEmail
+   * @returns {Object[]} Array of member summaries
+   */
+  function getStewardMembers(stewardEmail) {
+    if (!stewardEmail) return [];
+    stewardEmail = String(stewardEmail).trim().toLowerCase();
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var stewardCol = _findColumn(colMap, HEADERS.memberAssignedSteward);
+    if (stewardCol === -1) return [];
+
+    var members = [];
+    for (var i = 1; i < data.length; i++) {
+      var assigned = String(data[i][stewardCol]).trim().toLowerCase();
+      if (assigned !== stewardEmail) continue;
+      var rec = _buildUserRecord(data[i], colMap);
+      members.push({
+        name: rec.name,
+        email: rec.email,
+        workLocation: rec.workLocation,
+        officeDays: rec.officeDays,
+        hasOpenGrievance: rec.hasOpenGrievance,
+        duesStatus: rec.duesStatus,
+      });
+    }
+
+    members.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    return members;
+  }
+
+  /**
+   * Returns survey completion tracking for a steward's assigned members.
+   * Does NOT return actual survey responses — only completion status.
+   * @param {string} stewardEmail
+   * @returns {Object} { total, completed, members: [{name, email, completed}] }
+   */
+  function getStewardSurveyTracking(stewardEmail) {
+    var members = getStewardMembers(stewardEmail);
+    if (members.length === 0) return { total: 0, completed: 0, members: [] };
+
+    var tracking = [];
+    var completedCount = 0;
+
+    for (var i = 0; i < members.length; i++) {
+      var status = getMemberSurveyStatus(members[i].email);
+      tracking.push({
+        name: members[i].name,
+        email: members[i].email,
+        completed: status.hasCompleted,
+        lastCompleted: status.lastCompleted,
+      });
+      if (status.hasCompleted) completedCount++;
+    }
+
+    return { total: members.length, completed: completedCount, members: tracking };
+  }
+
+  /**
+   * Sends a broadcast email to filtered members assigned to a steward.
+   * @param {string} stewardEmail - The steward sending the broadcast
+   * @param {Object} filter - { location, officeDays }
+   * @param {string} message - The message body
+   * @returns {Object} { success, sentCount, message }
+   */
+  function sendBroadcastMessage(stewardEmail, filter, message) {
+    if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
+
+    var members = getStewardMembers(stewardEmail);
+    if (members.length === 0) return { success: false, sentCount: 0, message: 'No assigned members found.' };
+
+    // Apply filters
+    var filtered = members.filter(function(m) {
+      if (filter && filter.location && m.workLocation) {
+        if (m.workLocation.toLowerCase() !== filter.location.toLowerCase()) return false;
+      }
+      if (filter && filter.officeDays && m.officeDays) {
+        var filterDays = filter.officeDays.toLowerCase().split(',').map(function(d) { return d.trim(); });
+        var memberDays = m.officeDays.toLowerCase();
+        var hasMatch = filterDays.some(function(d) { return memberDays.indexOf(d) !== -1; });
+        if (!hasMatch) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) return { success: false, sentCount: 0, message: 'No members match the filter.' };
+
+    var sentCount = 0;
+    var config = ConfigReader.getConfig();
+    var subject = config.orgAbbrev + ' - Message from your ' + config.stewardLabel;
+
+    for (var i = 0; i < filtered.length; i++) {
+      try {
+        MailApp.sendEmail(filtered[i].email, subject, message);
+        sentCount++;
+      } catch (e) {
+        Logger.log('Broadcast send error for ' + filtered[i].email + ': ' + e.message);
+      }
+    }
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('BROADCAST_SENT', {
+        steward: stewardEmail,
+        recipientCount: sentCount,
+        filter: JSON.stringify(filter || {}),
+      });
+    }
+
+    return { success: true, sentCount: sentCount, message: 'Sent to ' + sentCount + ' member(s).' };
+  }
+
+  /**
+   * Returns aggregated quarterly survey results.
+   * Privacy threshold: only returns data if 30+ responses.
+   * @returns {Object} { available, count, threshold, sections }
+   */
+  function getSurveyResults() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+      if (!satSheet) return { available: false, count: 0, threshold: 30, sections: [] };
+
+      var data = satSheet.getDataRange().getValues();
+      if (data.length <= 1) return { available: false, count: 0, threshold: 30, sections: [] };
+
+      var responseCount = data.length - 1;
+      if (responseCount < 30) {
+        return { available: false, count: responseCount, threshold: 30, sections: [] };
+      }
+
+      // Use SATISFACTION_SECTIONS from 01_Core.gs to aggregate
+      var sections = [];
+      if (typeof SATISFACTION_SECTIONS !== 'undefined') {
+        for (var key in SATISFACTION_SECTIONS) {
+          var sec = SATISFACTION_SECTIONS[key];
+          if (!sec.scale) continue; // Skip non-scale sections
+
+          var qCols = sec.questions;
+          var totalScore = 0;
+          var totalCount = 0;
+          var questionAvgs = [];
+
+          for (var q = 0; q < qCols.length; q++) {
+            var colIdx = qCols[q] - 1; // 0-indexed
+            var qSum = 0;
+            var qCount = 0;
+            for (var r = 1; r < data.length; r++) {
+              var val = Number(data[r][colIdx]);
+              if (!isNaN(val) && val > 0) {
+                qSum += val;
+                qCount++;
+              }
+            }
+            var avg = qCount > 0 ? qSum / qCount : 0;
+            questionAvgs.push({ question: colIdx + 1, avg: Math.round(avg * 10) / 10 });
+            totalScore += qSum;
+            totalCount += qCount;
+          }
+
+          sections.push({
+            name: sec.name,
+            key: key,
+            avg: totalCount > 0 ? Math.round((totalScore / totalCount) * 10) / 10 : 0,
+            questions: questionAvgs,
+          });
+        }
+      }
+
+      return { available: true, count: responseCount, threshold: 30, sections: sections };
+    } catch (e) {
+      Logger.log('DataService.getSurveyResults error: ' + e.message);
+      return { available: false, count: 0, threshold: 30, sections: [], error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════
   // PUBLIC: Shared Data (non-PII)
   // ═══════════════════════════════════════
   
@@ -333,6 +791,8 @@ var DataService = (function () {
     if (roleRaw === 'steward' || roleRaw === 'rep' || roleRaw === 'representative') role = 'steward';
     if (roleRaw === 'both' || roleRaw === 'steward/member') role = 'both';
     
+    var hasGrievance = String(_getVal(row, colMap, HEADERS.memberHasOpenGrievance, '')).trim().toLowerCase();
+
     return {
       email: String(_getVal(row, colMap, HEADERS.memberEmail, '')).trim().toLowerCase(),
       name: fullName,
@@ -344,6 +804,17 @@ var DataService = (function () {
       joined: _getVal(row, colMap, HEADERS.memberJoined, ''),
       duesStatus: String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim(),
       memberId: String(_getVal(row, colMap, HEADERS.memberId, '')).trim(),
+      workLocation: String(_getVal(row, colMap, HEADERS.memberWorkLocation, '')).trim(),
+      officeDays: String(_getVal(row, colMap, HEADERS.memberOfficeDays, '')).trim(),
+      assignedSteward: String(_getVal(row, colMap, HEADERS.memberAssignedSteward, '')).trim().toLowerCase(),
+      isSteward: role === 'steward' || role === 'both',
+      hasOpenGrievance: hasGrievance === 'yes' || hasGrievance === 'true' || hasGrievance === '1',
+      street: String(_getVal(row, colMap, HEADERS.memberStreet, '')).trim(),
+      city: String(_getVal(row, colMap, HEADERS.memberCity, '')).trim(),
+      state: String(_getVal(row, colMap, HEADERS.memberState, '')).trim(),
+      zip: String(_getVal(row, colMap, HEADERS.memberZip, '')).trim(),
+      supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
+      jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
     };
   }
   
@@ -418,6 +889,18 @@ var DataService = (function () {
     getMemberGrievances: getMemberGrievances,
     getStewardContact: getStewardContact,
     getUnits: getUnits,
+    getFullMemberProfile: getFullMemberProfile,
+    updateMemberProfile: updateMemberProfile,
+    getAssignedStewardInfo: getAssignedStewardInfo,
+    getAvailableStewards: getAvailableStewards,
+    assignStewardToMember: assignStewardToMember,
+    getMemberGrievanceDriveUrl: getMemberGrievanceDriveUrl,
+    getMemberSurveyStatus: getMemberSurveyStatus,
+    getOrgLinks: getOrgLinks,
+    getStewardMembers: getStewardMembers,
+    getStewardSurveyTracking: getStewardSurveyTracking,
+    sendBroadcastMessage: sendBroadcastMessage,
+    getSurveyResults: getSurveyResults,
   };
   
 })();
@@ -434,3 +917,17 @@ function dataGetStewardContact(email) { return DataService.getStewardContact(ema
 function dataGetUserRole(email) { return DataService.getUserRole(email); }
 function dataGetUserProfile(email) { return DataService.findUserByEmail(email); }
 function dataGetUnits() { return DataService.getUnits(); }
+
+// v4.11.0 — new data service wrappers
+function dataGetFullProfile(email) { return DataService.getFullMemberProfile(email); }
+function dataUpdateProfile(email, updates) { return DataService.updateMemberProfile(email, updates); }
+function dataGetAssignedSteward(email) { return DataService.getAssignedStewardInfo(email); }
+function dataGetAvailableStewards(email) { return DataService.getAvailableStewards(email); }
+function dataAssignSteward(memberEmail, stewardEmail) { return DataService.assignStewardToMember(memberEmail, stewardEmail); }
+function dataGetGrievanceDriveUrl(email) { return DataService.getMemberGrievanceDriveUrl(email); }
+function dataGetSurveyStatus(email) { return DataService.getMemberSurveyStatus(email); }
+function dataGetOrgLinks() { return DataService.getOrgLinks(); }
+function dataGetStewardMembers(email) { return DataService.getStewardMembers(email); }
+function dataGetStewardSurveyTracking(email) { return DataService.getStewardSurveyTracking(email); }
+function dataSendBroadcast(email, filter, msg) { return DataService.sendBroadcastMessage(email, filter, msg); }
+function dataGetSurveyResults() { return DataService.getSurveyResults(); }
