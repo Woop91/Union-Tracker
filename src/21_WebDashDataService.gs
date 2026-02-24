@@ -25,11 +25,11 @@ var DataService = (function () {
   // If your sheet uses different labels, update these OR add aliases
   var HEADERS = {
     // Member Directory
-    memberEmail:     ['email', 'email address', 'member email'],
+    memberEmail:     ['email', 'email address', 'member email', 'e-mail', 'work email'],
     memberName:      ['name', 'full name', 'member name'],
     memberFirstName: ['first name', 'first'],
     memberLastName:  ['last name', 'last'],
-    memberRole:      ['role', 'member role', 'type'],
+    memberRole:      ['role', 'member role', 'type', 'member type', 'membership type'],
     memberUnit:      ['unit', 'workplace unit', 'department'],
     memberPhone:     ['phone', 'phone number', 'cell', 'mobile'],
     memberJoined:    ['joined', 'join date', 'member since', 'date joined'],
@@ -880,6 +880,307 @@ var DataService = (function () {
     return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
   }
   
+  // ═══════════════════════════════════════
+  // PUBLIC: Contact Log (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function _ensureContactLog() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.CONTACT_LOG);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEETS.CONTACT_LOG);
+      sheet.getRange(1, 1, 1, 8).setValues([['ID', 'Steward Email', 'Member Email', 'Contact Type', 'Date', 'Notes', 'Duration', 'Created']]);
+      sheet.hideSheet();
+    }
+    return sheet;
+  }
+
+  function logMemberContact(stewardEmail, memberEmail, contactType, notes, duration) {
+    if (!stewardEmail || !memberEmail || !contactType) return { success: false, message: 'Missing fields.' };
+    var sheet = _ensureContactLog();
+    var id = 'CL_' + Date.now().toString(36);
+    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), memberEmail.toLowerCase().trim(), contactType, new Date(), (notes || '').substring(0, 500), duration || '', new Date()]);
+    if (typeof logAuditEvent === 'function') logAuditEvent('CONTACT_LOG', { steward: stewardEmail, member: memberEmail, type: contactType });
+    return { success: true, message: 'Contact logged.' };
+  }
+
+  function getMemberContactHistory(stewardEmail, memberEmail) {
+    var sheet = _ensureContactLog();
+    if (sheet.getLastRow() <= 1) return [];
+    var data = sheet.getDataRange().getValues();
+    var results = [];
+    var sEmail = stewardEmail.toLowerCase().trim();
+    var mEmail = memberEmail.toLowerCase().trim();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase().trim() === sEmail && String(data[i][2]).toLowerCase().trim() === mEmail) {
+        results.push({ id: data[i][0], type: data[i][3], date: data[i][4] instanceof Date ? _formatDate(data[i][4]) : String(data[i][4]), notes: data[i][5], duration: data[i][6] });
+      }
+    }
+    results.sort(function(a, b) { return b.date > a.date ? 1 : -1; });
+    return results;
+  }
+
+  function getStewardContactLog(stewardEmail) {
+    var sheet = _ensureContactLog();
+    if (sheet.getLastRow() <= 1) return [];
+    var data = sheet.getDataRange().getValues();
+    var results = [];
+    var sEmail = stewardEmail.toLowerCase().trim();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase().trim() === sEmail) {
+        results.push({ id: data[i][0], memberEmail: data[i][2], type: data[i][3], date: data[i][4] instanceof Date ? _formatDate(data[i][4]) : String(data[i][4]), notes: data[i][5], duration: data[i][6] });
+      }
+    }
+    results.sort(function(a, b) { return b.date > a.date ? 1 : -1; });
+    return results.slice(0, 100);
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Tasks (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function _ensureStewardTasks() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEETS.STEWARD_TASKS);
+      sheet.getRange(1, 1, 1, 10).setValues([['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed']]);
+      sheet.hideSheet();
+    }
+    return sheet;
+  }
+
+  function createTask(stewardEmail, title, description, memberEmail, priority, dueDate) {
+    if (!stewardEmail || !title) return { success: false, message: 'Missing fields.' };
+    var sheet = _ensureStewardTasks();
+    var id = 'ST_' + Date.now().toString(36);
+    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
+    return { success: true, message: 'Task created.', taskId: id };
+  }
+
+  function getTasks(stewardEmail, statusFilter) {
+    var sheet = _ensureStewardTasks();
+    if (sheet.getLastRow() <= 1) return [];
+    var data = sheet.getDataRange().getValues();
+    var tasks = [];
+    var sEmail = stewardEmail.toLowerCase().trim();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase().trim() !== sEmail) continue;
+      var status = String(data[i][6]).toLowerCase().trim();
+      if (statusFilter && status !== statusFilter) continue;
+      var dueDateRaw = data[i][7];
+      var dueStr = dueDateRaw instanceof Date ? _formatDate(dueDateRaw) : String(dueDateRaw || '');
+      var dueDays = null;
+      if (dueDateRaw instanceof Date) {
+        dueDays = Math.ceil((dueDateRaw.getTime() - Date.now()) / (86400000));
+      }
+      tasks.push({ id: data[i][0], title: data[i][2], description: data[i][3], memberEmail: data[i][4], priority: data[i][5], status: status, dueDate: dueStr, dueDays: dueDays, created: data[i][8] instanceof Date ? _formatDate(data[i][8]) : '' });
+    }
+    tasks.sort(function(a, b) {
+      var pa = a.priority === 'high' ? 0 : a.priority === 'medium' ? 1 : 2;
+      var pb = b.priority === 'high' ? 0 : b.priority === 'medium' ? 1 : 2;
+      if (pa !== pb) return pa - pb;
+      return (a.dueDays || 999) - (b.dueDays || 999);
+    });
+    return tasks;
+  }
+
+  function updateTask(stewardEmail, taskId, updates) {
+    var sheet = _ensureStewardTasks();
+    if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === taskId && String(data[i][1]).toLowerCase().trim() === stewardEmail.toLowerCase().trim()) {
+        if (updates.status) sheet.getRange(i + 1, 7).setValue(updates.status);
+        if (updates.priority) sheet.getRange(i + 1, 6).setValue(updates.priority);
+        if (updates.title) sheet.getRange(i + 1, 3).setValue(updates.title.substring(0, 200));
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Task not found.' };
+  }
+
+  function completeTask(stewardEmail, taskId) {
+    var sheet = _ensureStewardTasks();
+    if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === taskId && String(data[i][1]).toLowerCase().trim() === stewardEmail.toLowerCase().trim()) {
+        sheet.getRange(i + 1, 7).setValue('completed');
+        sheet.getRange(i + 1, 10).setValue(new Date());
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Task not found.' };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Member Stats (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getStewardMemberStats(stewardEmail) {
+    var members = getStewardMembers(stewardEmail);
+    if (members.length === 0) return { total: 0, byLocation: {}, byDues: {} };
+    var byLocation = {};
+    var byDues = {};
+    members.forEach(function(m) {
+      var loc = m.workLocation || 'Unknown';
+      byLocation[loc] = (byLocation[loc] || 0) + 1;
+      var dues = m.duesStatus || 'Unknown';
+      byDues[dues] = (byDues[dues] || 0) + 1;
+    });
+    return { total: members.length, byLocation: byLocation, byDues: byDues };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Directory (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getStewardDirectory() {
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return [];
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var stewards = [];
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildUserRecord(data[i], colMap);
+      if (!rec.isSteward) continue;
+      stewards.push({
+        name: rec.name,
+        email: rec.email,
+        workLocation: rec.workLocation,
+        officeDays: rec.officeDays,
+        phone: rec.phone,
+        unit: rec.unit,
+      });
+    }
+    stewards.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    return stewards;
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Grievance Stats (v4.12.0) — anonymized
+  // ═══════════════════════════════════════
+
+  function getGrievanceStats() {
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return { available: false };
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { available: false };
+    var colMap = _buildColumnMap(data[0]);
+    var total = data.length - 1;
+    if (total < 10) return { available: false, count: total, threshold: 10 };
+
+    var byStatus = {};
+    var byStep = {};
+    var byUnit = {};
+    var monthly = {};
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildGrievanceRecord(data[i], colMap);
+      var s = rec.status || 'unknown';
+      byStatus[s] = (byStatus[s] || 0) + 1;
+      var step = rec.step || 'Unknown';
+      byStep[step] = (byStep[step] || 0) + 1;
+      var u = rec.unit || 'Unknown';
+      byUnit[u] = (byUnit[u] || 0) + 1;
+      if (rec.filedTimestamp) {
+        var d = new Date(rec.filedTimestamp);
+        var key = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+        monthly[key] = (monthly[key] || 0) + 1;
+      }
+    }
+    var monthlyArr = Object.keys(monthly).sort().map(function(k) { return { month: k, count: monthly[k] }; });
+    return { available: true, total: total, byStatus: byStatus, byStep: byStep, byUnit: byUnit, monthly: monthlyArr };
+  }
+
+  function getGrievanceHotSpots() {
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return [];
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return [];
+    var colMap = _buildColumnMap(data[0]);
+    var unitCol = _findColumn(colMap, HEADERS.grievanceUnit);
+    if (unitCol === -1) return [];
+
+    var counts = {};
+    for (var i = 1; i < data.length; i++) {
+      var unit = String(data[i][unitCol]).trim() || 'Unknown';
+      counts[unit] = (counts[unit] || 0) + 1;
+    }
+    var spots = [];
+    for (var u in counts) {
+      if (counts[u] >= 3) spots.push({ location: u, count: counts[u] });
+    }
+    spots.sort(function(a, b) { return b.count - a.count; });
+    return spots;
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Membership Stats (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getMembershipStats() {
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return { available: false };
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { available: false };
+    var total = data.length - 1;
+    if (total < 20) return { available: false, count: total, threshold: 20 };
+
+    var colMap = _buildColumnMap(data[0]);
+    var byUnit = {};
+    var byLocation = {};
+    var byDues = {};
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildUserRecord(data[i], colMap);
+      var unit = rec.unit || 'Unknown';
+      byUnit[unit] = (byUnit[unit] || 0) + 1;
+      var loc = rec.workLocation || 'Unknown';
+      byLocation[loc] = (byLocation[loc] || 0) + 1;
+      var dues = rec.duesStatus || 'Unknown';
+      byDues[dues] = (byDues[dues] || 0) + 1;
+    }
+    return { available: true, total: total, byUnit: byUnit, byLocation: byLocation, byDues: byDues };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Upcoming Events via CalendarApp (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getUpcomingEvents(limit) {
+    limit = limit || 10;
+    try {
+      var config = ConfigReader.getConfig();
+      if (!config.calendarId) return [];
+      var cache = CacheService.getScriptCache();
+      var cacheKey = 'events_' + config.calendarId;
+      var cached = cache.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+
+      var cal = CalendarApp.getCalendarById(config.calendarId);
+      if (!cal) return [];
+      var now = new Date();
+      var future = new Date(now.getTime() + 90 * 86400000);
+      var events = cal.getEvents(now, future);
+      var result = [];
+      for (var i = 0; i < Math.min(events.length, limit); i++) {
+        var ev = events[i];
+        result.push({
+          title: ev.getTitle(),
+          startTime: ev.getStartTime().toISOString(),
+          endTime: ev.getEndTime().toISOString(),
+          location: ev.getLocation() || '',
+          description: (ev.getDescription() || '').substring(0, 300),
+        });
+      }
+      cache.put(cacheKey, JSON.stringify(result), 900);
+      return result;
+    } catch (e) {
+      Logger.log('getUpcomingEvents error: ' + e.message);
+      return [];
+    }
+  }
+
   // Public API
   return {
     findUserByEmail: findUserByEmail,
@@ -901,8 +1202,22 @@ var DataService = (function () {
     getStewardSurveyTracking: getStewardSurveyTracking,
     sendBroadcastMessage: sendBroadcastMessage,
     getSurveyResults: getSurveyResults,
+    // v4.12.0
+    logMemberContact: logMemberContact,
+    getMemberContactHistory: getMemberContactHistory,
+    getStewardContactLog: getStewardContactLog,
+    createTask: createTask,
+    getTasks: getTasks,
+    updateTask: updateTask,
+    completeTask: completeTask,
+    getStewardMemberStats: getStewardMemberStats,
+    getStewardDirectory: getStewardDirectory,
+    getGrievanceStats: getGrievanceStats,
+    getGrievanceHotSpots: getGrievanceHotSpots,
+    getMembershipStats: getMembershipStats,
+    getUpcomingEvents: getUpcomingEvents,
   };
-  
+
 })();
 
 
@@ -931,3 +1246,18 @@ function dataGetStewardMembers(email) { return DataService.getStewardMembers(ema
 function dataGetStewardSurveyTracking(email) { return DataService.getStewardSurveyTracking(email); }
 function dataSendBroadcast(email, filter, msg) { return DataService.sendBroadcastMessage(email, filter, msg); }
 function dataGetSurveyResults() { return DataService.getSurveyResults(); }
+
+// v4.12.0 — new data service wrappers
+function dataLogMemberContact(stewardEmail, memberEmail, type, notes, duration) { return DataService.logMemberContact(stewardEmail, memberEmail, type, notes, duration); }
+function dataGetMemberContactHistory(stewardEmail, memberEmail) { return DataService.getMemberContactHistory(stewardEmail, memberEmail); }
+function dataGetStewardContactLog(stewardEmail) { return DataService.getStewardContactLog(stewardEmail); }
+function dataCreateTask(stewardEmail, title, desc, memberEmail, priority, dueDate) { return DataService.createTask(stewardEmail, title, desc, memberEmail, priority, dueDate); }
+function dataGetTasks(stewardEmail, statusFilter) { return DataService.getTasks(stewardEmail, statusFilter); }
+function dataUpdateTask(stewardEmail, taskId, updates) { return DataService.updateTask(stewardEmail, taskId, updates); }
+function dataCompleteTask(stewardEmail, taskId) { return DataService.completeTask(stewardEmail, taskId); }
+function dataGetStewardMemberStats(stewardEmail) { return DataService.getStewardMemberStats(stewardEmail); }
+function dataGetStewardDirectory() { return DataService.getStewardDirectory(); }
+function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
+function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
+function dataGetMembershipStats() { return DataService.getMembershipStats(); }
+function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(limit); }

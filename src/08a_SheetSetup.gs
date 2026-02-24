@@ -142,6 +142,25 @@ function CREATE_DASHBOARD() {
       }
     }
 
+    // Initialize Weekly Questions sheets (24_WeeklyQuestions.gs)
+    if (typeof WeeklyQuestions !== 'undefined' && WeeklyQuestions.initWeeklyQuestionSheets) {
+      try {
+        WeeklyQuestions.initWeeklyQuestionSheets();
+        ss.toast('Weekly Questions sheets created', '🏗️ Progress', 2);
+      } catch (wqError) {
+        Logger.log('Weekly Questions sheets skipped: ' + wqError.message);
+      }
+    }
+
+    // Initialize Contact Log and Steward Tasks sheets (v4.12.0)
+    try {
+      _ensureContactLogSheet(ss);
+      _ensureStewardTasksSheet(ss);
+      ss.toast('Contact Log & Steward Tasks sheets created', '🏗️ Progress', 2);
+    } catch (v12Error) {
+      Logger.log('v4.12.0 sheets skipped: ' + v12Error.message);
+    }
+
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
@@ -170,6 +189,38 @@ function CREATE_DASHBOARD() {
       ui.alert('❌ Error', 'An error occurred: ' + error.message, ui.ButtonSet.OK);
     }
   }
+}
+
+// ============================================================================
+// v4.12.0 SHEET SETUP — Contact Log & Steward Tasks
+// ============================================================================
+
+function _ensureContactLogSheet(ss) {
+  var name = SHEETS.CONTACT_LOG;
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, 8).setValues([[
+      'ID', 'Steward Email', 'Member Email', 'Contact Type',
+      'Date', 'Notes', 'Duration', 'Created'
+    ]]);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
+
+function _ensureStewardTasksSheet(ss) {
+  var name = SHEETS.STEWARD_TASKS;
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, 10).setValues([[
+      'ID', 'Steward Email', 'Title', 'Description', 'Member Email',
+      'Priority', 'Status', 'Due Date', 'Created', 'Completed'
+    ]]);
+    sheet.hideSheet();
+  }
+  return sheet;
 }
 
 // ============================================================================

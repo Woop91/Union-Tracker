@@ -553,7 +553,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.11.0",
+  VERSION: "4.12.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -684,7 +684,7 @@ var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 11,
   PATCH: 0,
-  BUILD: 'v4.11.0',
+  BUILD: 'v4.12.0',
   CURRENT: '4.11.0',
   BUILD_DATE: '2026-02-24',
   CODENAME: 'Web Dashboard SPA Enhancement'
@@ -794,7 +794,10 @@ var SHEETS = {
   // Weekly Questions System (24_WeeklyQuestions.gs)
   WEEKLY_QUESTIONS:   '_Weekly_Questions',   // hidden — active/past questions
   WEEKLY_RESPONSES:   '_Weekly_Responses',   // hidden — hashed-email responses
-  QUESTION_POOL:      '_Question_Pool'       // hidden — member-submitted candidates
+  QUESTION_POOL:      '_Question_Pool',      // hidden — member-submitted candidates
+  // Contact Log & Steward Tasks (v4.12.0)
+  CONTACT_LOG:        '_Contact_Log',        // hidden — steward-member contact history
+  STEWARD_TASKS:      '_Steward_Tasks'       // hidden — task assignments for stewards
 };
 
 // SHEET_NAMES alias for backward compatibility

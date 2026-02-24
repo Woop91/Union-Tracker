@@ -1,7 +1,7 @@
 <script>
 /**
  * Steward View — "Mono Signal"
- * v4.11.0 — Cases, Members tab, Broadcast, Survey tracking, Weekly Q manager,
+ * v4.12.0 — Cases, Members tab, Broadcast, Survey tracking, Weekly Q manager,
  * Resources tab, responsive sidebar layout.
  */
 
@@ -201,37 +201,6 @@ function renderBottomNav(container, role, activeTab) {
   container.appendChild(nav);
 }
 
-// Override _handleTabNav to include steward more menu
-var _origHandleTabNav = typeof _handleTabNav === 'function' ? _handleTabNav : null;
-function _handleTabNavExtended(role, tabId) {
-  var app = document.getElementById('app');
-  if (tabId === '_member_more') { renderMemberMore(app); return; }
-  if (tabId === '_steward_more') { renderStewardMore(app); return; }
-  if (role === 'steward') {
-    switch(tabId) {
-      case 'cases': renderStewardDashboard(app); return;
-      case 'members': renderStewardMembers(app); return;
-      case 'deadlines': renderStewardDashboard(app); return;
-      case 'broadcast': renderBroadcast(app); return;
-      case 'resources': renderStewardResources(app); return;
-      case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); return;
-      case 'surveytrack': renderSurveyTracking(app); return;
-    }
-  }
-  if (role === 'member') {
-    switch(tabId) {
-      case 'home': renderMemberHome(app); return;
-      case 'cases': renderMyCases(app); return;
-      case 'contact': renderStewardContact(app); return;
-      case 'profile': renderUpdateProfile(app); return;
-      case 'resources': renderMemberResources(app); return;
-      case 'workload': renderWorkloadTracker(app); return;
-      case 'weeklyq': renderWeeklyQuestionsPage(app, 'member'); return;
-      case 'survey': renderSurveyResultsPage(app); return;
-    }
-  }
-}
-
 // ═══════════════════════════════════════
 // MEMBERS TAB
 // ═══════════════════════════════════════
@@ -267,20 +236,92 @@ function renderStewardMembers(appContainer) {
       });
       content.appendChild(kpiStrip);
 
+      // Chart.js stats
+      if (typeof ChartHelper !== 'undefined') {
+        google.script.run.withSuccessHandler(function(stats) {
+          if (!stats || !stats.byDues) return;
+          var chartRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' } });
+          // Dues doughnut
+          var duesCard = el('div', { className: 'card', style: { padding: '12px' } });
+          duesCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Dues Status'));
+          var dLabels = Object.keys(stats.byDues);
+          var dData = dLabels.map(function(k) { return stats.byDues[k]; });
+          ChartHelper.createDoughnutChart(duesCard, 'members-dues-chart', dLabels, dData);
+          chartRow.appendChild(duesCard);
+          // Location bar
+          var locCard = el('div', { className: 'card', style: { padding: '12px' } });
+          locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Location'));
+          var lLabels = Object.keys(stats.byLocation);
+          var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
+          ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
+          chartRow.appendChild(locCard);
+          // Insert after KPI strip
+          var searchEl = content.querySelector('.search-input');
+          if (searchEl) content.insertBefore(chartRow, searchEl);
+          else content.appendChild(chartRow);
+        }).dataGetStewardMemberStats(CURRENT_USER.email);
+      }
+
+      // Sort & Filter controls
+      var controlRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } });
+      var sortSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
+      [{ v: 'name-az', l: 'Name A-Z' }, { v: 'name-za', l: 'Name Z-A' }, { v: 'location', l: 'Location' }, { v: 'dues', l: 'Dues Status' }].forEach(function(o) {
+        sortSelect.appendChild(el('option', { value: o.v }, o.l));
+      });
+      controlRow.appendChild(sortSelect);
+
+      var filterSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
+      filterSelect.appendChild(el('option', { value: 'all' }, 'All'));
+      filterSelect.appendChild(el('option', { value: 'grievance' }, 'Has Open Case'));
+      var locs = {};
+      members.forEach(function(m) { if (m.workLocation) locs[m.workLocation] = true; });
+      Object.keys(locs).sort().forEach(function(loc) {
+        filterSelect.appendChild(el('option', { value: 'loc:' + loc }, loc));
+      });
+      controlRow.appendChild(filterSelect);
+      content.appendChild(controlRow);
+
       // Search
       var searchInput = el('input', {
         className: 'search-input',
         placeholder: 'Search members...',
-        onInput: function() {
-          var q = searchInput.value.toLowerCase();
-          renderFilteredMembers(listArea, members, q);
-        }
+        onInput: rerender
       });
       content.appendChild(searchInput);
 
       var listArea = el('div');
-      renderFilteredMembers(listArea, members, '');
       content.appendChild(listArea);
+
+      sortSelect.addEventListener('change', rerender);
+      filterSelect.addEventListener('change', rerender);
+
+      function rerender() {
+        var q = searchInput.value.toLowerCase();
+        var sortKey = sortSelect.value;
+        var filterKey = filterSelect.value;
+        var filtered = members.slice();
+        if (q) {
+          filtered = filtered.filter(function(m) {
+            return (m.name || '').toLowerCase().indexOf(q) !== -1 ||
+                   (m.email || '').toLowerCase().indexOf(q) !== -1 ||
+                   (m.workLocation || '').toLowerCase().indexOf(q) !== -1;
+          });
+        }
+        if (filterKey === 'grievance') {
+          filtered = filtered.filter(function(m) { return m.hasOpenGrievance; });
+        } else if (filterKey.indexOf('loc:') === 0) {
+          var loc = filterKey.substring(4);
+          filtered = filtered.filter(function(m) { return m.workLocation === loc; });
+        }
+        filtered.sort(function(a, b) {
+          if (sortKey === 'name-za') return (b.name || '').localeCompare(a.name || '');
+          if (sortKey === 'location') return (a.workLocation || '').localeCompare(b.workLocation || '');
+          if (sortKey === 'dues') return (a.duesStatus || '').localeCompare(b.duesStatus || '');
+          return (a.name || '').localeCompare(b.name || '');
+        });
+        renderFilteredMembers(listArea, filtered, '');
+      }
+      rerender();
     }).dataGetStewardMembers(CURRENT_USER.email);
   });
 }
@@ -426,13 +467,24 @@ function renderSurveyTracking(appContainer) {
         return;
       }
 
-      // Progress bar
+      // Progress chart (doughnut)
       var pct = Math.round((data.completed / data.total) * 100);
       var progCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '14px' } });
       progCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Completion: ' + data.completed + '/' + data.total));
-      var track = el('div', { className: 'bar-chart-track', style: { height: '10px' } });
-      track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)' } }));
-      progCard.appendChild(track);
+
+      if (typeof ChartHelper !== 'undefined') {
+        var remaining = data.total - data.completed;
+        var cColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#facc15' : '#ef4444';
+        ChartHelper.createDoughnutChart(progCard, 'survey-track-chart',
+          ['Completed', 'Pending'],
+          [data.completed, remaining],
+          [cColor, 'rgba(255,255,255,0.08)']
+        );
+      } else {
+        var track = el('div', { className: 'bar-chart-track', style: { height: '10px' } });
+        track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)' } }));
+        progCard.appendChild(track);
+      }
       progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px' } }, pct + '% complete'));
       content.appendChild(progCard);
 
@@ -460,7 +512,10 @@ function renderStewardMore(appContainer) {
     _stewardHeader(container, 'More');
     var content = el('div', { className: 'content' });
     var menuItems = [
+      { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { renderStewardTasks(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
       { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { renderBroadcast(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
       { icon: '\u2753', label: 'Weekly Questions', desc: 'Manage weekly engagement questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'steward'); } },
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
@@ -484,6 +539,301 @@ function renderStewardMore(appContainer) {
 // ═══════════════════════════════════════
 // Note: The shared renderWeeklyQuestionsPage() in member_view.html handles
 // the basic display. For steward role, we add the manager after the list.
+
+// ═══════════════════════════════════════
+// CONTACT LOG (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderContactLog(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'contactlog', function(container) {
+    _stewardHeader(container, 'Contact Log');
+    var content = el('div', { className: 'content' });
+
+    // Sub-tabs
+    var activeSubTab = 'log';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['log', 'recent', 'by member'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'log') _renderContactForm(subContent);
+      else if (activeSubTab === 'recent') _renderRecentContacts(subContent);
+      else _renderContactByMember(subContent);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderContactForm(container) {
+  var typeIcons = { 'Phone': '\uD83D\uDCDE', 'Email': '\u2709\uFE0F', 'In Person': '\uD83D\uDC64', 'Text': '\uD83D\uDCAC' };
+  container.appendChild(el('h3', { className: 'section-title' }, 'Log a Contact'));
+
+  var memberGroup = el('div', { className: 'form-group' });
+  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Member Email'));
+  var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  memberGroup.appendChild(memberInput);
+  container.appendChild(memberGroup);
+
+  var typeGroup = el('div', { className: 'form-group' });
+  typeGroup.appendChild(el('label', { className: 'form-label' }, 'Contact Type'));
+  var typeRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  var selectedType = 'Phone';
+  Object.keys(typeIcons).forEach(function(t) {
+    var btn = el('button', {
+      className: 'filter-tab' + (t === selectedType ? ' active' : ''),
+      onClick: function() {
+        selectedType = t;
+        typeRow.querySelectorAll('.filter-tab').forEach(function(b, i) {
+          b.className = 'filter-tab' + (Object.keys(typeIcons)[i] === t ? ' active' : '');
+        });
+      }
+    }, typeIcons[t] + ' ' + t);
+    typeRow.appendChild(btn);
+  });
+  typeGroup.appendChild(typeRow);
+  container.appendChild(typeGroup);
+
+  var notesGroup = el('div', { className: 'form-group' });
+  notesGroup.appendChild(el('label', { className: 'form-label' }, 'Notes (optional)'));
+  var notesInput = el('textarea', { className: 'msg-textarea', placeholder: 'Brief notes about the interaction...', style: { minHeight: '60px' } });
+  notesGroup.appendChild(notesInput);
+  container.appendChild(notesGroup);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary',
+    onClick: function() {
+      var email = memberInput.value.trim();
+      if (!email) { statusMsg.textContent = 'Enter a member email.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Logging...'; statusMsg.style.color = 'var(--muted)';
+      google.script.run.withSuccessHandler(function(r) {
+        statusMsg.textContent = r && r.success ? 'Contact logged!' : 'Error logging contact.';
+        statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
+        if (r && r.success) { memberInput.value = ''; notesInput.value = ''; }
+      }).dataLogMemberContact(CURRENT_USER.email, email, selectedType, notesInput.value.trim(), '');
+    }
+  }, 'Log Contact'));
+}
+
+function _renderRecentContacts(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(log) {
+    container.innerHTML = '';
+    if (!log || log.length === 0) {
+      container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No contacts logged yet.'));
+      return;
+    }
+    log.slice(0, 20).forEach(function(entry) {
+      var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px' } });
+      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+      top.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, entry.memberEmail ? entry.memberEmail.split('@')[0] : ''));
+      top.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, entry.date));
+      card.appendChild(top);
+      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)' } }, entry.type));
+      if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
+      container.appendChild(card);
+    });
+  }).dataGetStewardContactLog(CURRENT_USER.email);
+}
+
+function _renderContactByMember(container) {
+  container.appendChild(el('h3', { className: 'section-title' }, 'Look Up by Member'));
+  var searchInput = el('input', { className: 'form-input', placeholder: 'Enter member email...' });
+  container.appendChild(searchInput);
+  var resultArea = el('div', { style: { marginTop: '10px' } });
+  container.appendChild(resultArea);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-secondary', style: { marginTop: '10px' },
+    onClick: function() {
+      var email = searchInput.value.trim();
+      if (!email) return;
+      showLoading(resultArea);
+      google.script.run.withSuccessHandler(function(history) {
+        resultArea.innerHTML = '';
+        if (!history || history.length === 0) {
+          resultArea.appendChild(el('div', { style: { color: 'var(--muted)', padding: '10px 0' } }, 'No contacts found for this member.'));
+          return;
+        }
+        history.forEach(function(entry) {
+          var card = el('div', { className: 'card', style: { padding: '10px 14px', marginBottom: '4px' } });
+          card.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
+            el('span', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600' } }, entry.type),
+            el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, entry.date),
+          ]));
+          if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
+          resultArea.appendChild(card);
+        });
+      }).dataGetMemberContactHistory(CURRENT_USER.email, email);
+    }
+  }, 'Search'));
+}
+
+// ═══════════════════════════════════════
+// STEWARD TASKS (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderStewardTasks(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'tasks', function(container) {
+    _stewardHeader(container, 'Tasks');
+    var content = el('div', { className: 'content' });
+
+    var activeSubTab = 'open';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['open', 'completed', 'new task'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'new task') _renderNewTaskForm(subContent, function() { activeSubTab = 'open'; refreshSubTabs(); renderSubContent(); });
+      else _renderTaskList(subContent, activeSubTab === 'completed' ? 'completed' : null);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderTaskList(container, statusFilter) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(tasks) {
+    container.innerHTML = '';
+    var filtered = statusFilter ? tasks.filter(function(t) { return t.status === statusFilter; }) : tasks.filter(function(t) { return t.status !== 'completed'; });
+
+    if (filtered.length === 0) {
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, statusFilter === 'completed' ? 'No completed tasks.' : 'No open tasks. Create one!'));
+      return;
+    }
+
+    // KPI strip
+    var highPri = filtered.filter(function(t) { return t.priority === 'high'; }).length;
+    var overdue = filtered.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
+    var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '10px' } });
+    [
+      { label: 'Total', value: filtered.length },
+      { label: 'High Priority', value: highPri, color: highPri > 0 ? 'var(--danger)' : null },
+      { label: 'Overdue', value: overdue, color: overdue > 0 ? 'var(--warning)' : null },
+    ].forEach(function(kpi) {
+      var card = el('div', { className: 'kpi-card' });
+      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+      if (kpi.color) val.style.color = kpi.color;
+      card.appendChild(val);
+      kpiStrip.appendChild(card);
+    });
+    container.appendChild(kpiStrip);
+
+    filtered.forEach(function(task) {
+      var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
+      var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
+      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+      top.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, task.title));
+      if (task.dueDate) top.appendChild(el('span', { style: { fontSize: '10px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, task.dueDate));
+      card.appendChild(top);
+      if (task.memberEmail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, task.memberEmail.split('@')[0]));
+      if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
+
+      if (task.status !== 'completed') {
+        var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px' } });
+        actions.appendChild(el('button', {
+          style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
+          onClick: function() {
+            google.script.run.withSuccessHandler(function() { renderStewardTasks(document.getElementById('app')); }).dataCompleteTask(CURRENT_USER.email, task.id);
+          }
+        }, '\u2705 Complete'));
+        card.appendChild(actions);
+      }
+      container.appendChild(card);
+    });
+  }).dataGetTasks(CURRENT_USER.email, statusFilter);
+}
+
+function _renderNewTaskForm(container, onCreated) {
+  container.appendChild(el('h3', { className: 'section-title' }, 'Create Task'));
+
+  var titleGroup = el('div', { className: 'form-group' });
+  titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
+  var titleInput = el('input', { className: 'form-input', placeholder: 'e.g., Check in on member' });
+  titleGroup.appendChild(titleInput);
+  container.appendChild(titleGroup);
+
+  var descGroup = el('div', { className: 'form-group' });
+  descGroup.appendChild(el('label', { className: 'form-label' }, 'Description (optional)'));
+  var descInput = el('textarea', { className: 'msg-textarea', placeholder: 'Details...', style: { minHeight: '60px' } });
+  descGroup.appendChild(descInput);
+  container.appendChild(descGroup);
+
+  var memberGroup = el('div', { className: 'form-group' });
+  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Related Member (optional)'));
+  var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  memberGroup.appendChild(memberInput);
+  container.appendChild(memberGroup);
+
+  var priGroup = el('div', { className: 'form-group' });
+  priGroup.appendChild(el('label', { className: 'form-label' }, 'Priority'));
+  var priSelect = el('select', { className: 'form-select' });
+  ['medium', 'high', 'low'].forEach(function(p) {
+    var opt = el('option', { value: p }, p.charAt(0).toUpperCase() + p.slice(1));
+    priSelect.appendChild(opt);
+  });
+  priGroup.appendChild(priSelect);
+  container.appendChild(priGroup);
+
+  var dueGroup = el('div', { className: 'form-group' });
+  dueGroup.appendChild(el('label', { className: 'form-label' }, 'Due Date (optional)'));
+  var dueInput = el('input', { className: 'form-input', type: 'date' });
+  dueGroup.appendChild(dueInput);
+  container.appendChild(dueGroup);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary',
+    onClick: function() {
+      var title = titleInput.value.trim();
+      if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Creating...'; statusMsg.style.color = 'var(--muted)';
+      google.script.run.withSuccessHandler(function(r) {
+        if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+      }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+    }
+  }, 'Create Task'));
+}
+
+// ═══════════════════════════════════════
+// MEMBERS TAB — Sort, Filter & Stats (v4.12.0 enhancements)
+// ═══════════════════════════════════════
+// Overrides the original renderStewardMembers with enhanced version
 
 // renderWeeklyQuestionsPage already handles steward role via the role param.
 // Additional steward-specific manager (set question, review pool):

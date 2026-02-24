@@ -1104,12 +1104,17 @@ function processWorkloadFormSSO(email, formData) {
     return 'Error: Submission limit reached. Please wait before submitting again.';
   }
 
-  // Validate numeric fields
+  // Validate workload fields — accept range strings ("0", "1-5", "6-10", "11-20", "21+") or numeric
+  var validRanges = ['0', '1-5', '6-10', '11-20', '21+'];
   var numFields = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8'];
   for (var n = 0; n < numFields.length; n++) {
-    var val = Number(formData[numFields[n]]) || 0;
-    if (val < 0 || val > 999 || !Number.isInteger(val)) {
-      return 'Error: Workload values must be whole numbers between 0 and 999.';
+    var val = String(formData[numFields[n]] || '0').trim();
+    // Accept range strings OR legacy numeric values
+    if (validRanges.indexOf(val) === -1) {
+      var numVal = Number(val);
+      if (isNaN(numVal) || numVal < 0 || numVal > 999) {
+        return 'Error: Invalid workload value for ' + numFields[n] + '.';
+      }
     }
   }
 
@@ -1119,19 +1124,24 @@ function processWorkloadFormSSO(email, formData) {
       return 'Error: Workload sheets not initialized. Run Setup > Initialize Dashboard first.';
     }
 
-    var sanitizeNum = function(v) { return Math.min(999, Math.max(0, Math.floor(Number(v) || 0))); };
+    // Accept both range strings and legacy numeric values
+    var sanitizeVal = function(v) {
+      var s = String(v || '0').trim();
+      if (['0', '1-5', '6-10', '11-20', '21+'].indexOf(s) !== -1) return s;
+      return Math.min(999, Math.max(0, Math.floor(Number(v) || 0)));
+    };
 
     var row = [
       new Date(),                               // Timestamp
       emailLower,                               // Email
-      sanitizeNum(formData.t1),                 // Priority Cases
-      sanitizeNum(formData.t2),                 // Pending Cases
-      sanitizeNum(formData.t3),                 // Unread Docs
-      sanitizeNum(formData.t4),                 // To-Do Items
-      sanitizeNum(formData.t5),                 // Sent Referrals
-      sanitizeNum(formData.t6),                 // CE Activities
-      sanitizeNum(formData.t7),                 // Assistance Requests
-      sanitizeNum(formData.t8),                 // Aged Cases
+      sanitizeVal(formData.t1),                 // Priority Cases
+      sanitizeVal(formData.t2),                 // Pending Cases
+      sanitizeVal(formData.t3),                 // Unread Docs
+      sanitizeVal(formData.t4),                 // To-Do Items
+      sanitizeVal(formData.t5),                 // Sent Referrals
+      sanitizeVal(formData.t6),                 // CE Activities
+      sanitizeVal(formData.t7),                 // Assistance Requests
+      sanitizeVal(formData.t8),                 // Aged Cases
       sanitizeNum(formData.weekly_cases),        // Weekly Cases
       formData.sub_categories || '',             // Sub-categories JSON
       formData.employment_type || 'Full-time',   // Employment type
@@ -1211,7 +1221,7 @@ function getWorkloadDashboardDataSSO(email) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
   if (!vault || vault.getLastRow() <= 1) {
-    return { success: true, data: { totalSubmissions: 0, members: 0, categories: {} }, message: '' };
+    return { success: true, data: { totalSubmissions: 0, members: 0, categories: {}, averages: {} }, message: '' };
   }
 
   var data = vault.getDataRange().getValues();
@@ -1272,4 +1282,52 @@ function getWorkloadDashboardDataSSO(email) {
       } : {}
     }
   };
+}
+
+
+// ============================================================================
+// SSO: REMINDER PREFERENCES (Web Dashboard)
+// ============================================================================
+
+/**
+ * Gets the current user's reminder preferences for the web dashboard.
+ * @param {string} email
+ * @returns {Object} { enabled: boolean, day: string }
+ */
+function getWorkloadReminderSSO(email) {
+  if (!email) return { enabled: false, day: 'monday' };
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_REMINDERS);
+  if (!sheet || sheet.getLastRow() <= 1) return { enabled: false, day: 'monday' };
+
+  var emailLower = email.toLowerCase().trim();
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][WT_REMINDERS_COLS.EMAIL] &&
+        data[i][WT_REMINDERS_COLS.EMAIL].toString().toLowerCase().trim() === emailLower) {
+      return {
+        enabled: data[i][WT_REMINDERS_COLS.ENABLED] === 'Yes',
+        day: data[i][WT_REMINDERS_COLS.DAY] || 'monday'
+      };
+    }
+  }
+  return { enabled: false, day: 'monday' };
+}
+
+/**
+ * Saves reminder preferences from the web dashboard.
+ * @param {string} email
+ * @param {boolean} enabled
+ * @param {string} day — day of week (monday, tuesday, etc.)
+ * @returns {Object} { success: boolean }
+ */
+function setWorkloadReminderSSO(email, enabled, day) {
+  if (!email) return { success: false };
+  wtSaveReminderPreference_({
+    email: email,
+    enabled: enabled,
+    frequency: 'weekly',
+    day: day || 'monday',
+    time: '08:00'
+  });
+  return { success: true };
 }
