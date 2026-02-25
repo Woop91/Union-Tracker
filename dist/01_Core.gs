@@ -458,8 +458,8 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 9,
-  patch: 1,
+  minor: 12,
+  patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
   }
@@ -553,7 +553,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.11.0",
+  VERSION: "4.12.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -682,12 +682,12 @@ function getLocalNumberFromConfig_() {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 11,
+  MINOR: 12,
   PATCH: 0,
-  BUILD: 'v4.11.0',
-  CURRENT: '4.11.0',
+  BUILD: 'v4.12.0',
+  CURRENT: '4.12.0',
   BUILD_DATE: '2026-02-24',
-  CODENAME: 'Web Dashboard SPA Enhancement'
+  CODENAME: 'Bug Fixes & Chart.js Enhancements'
 };
 
 /**
@@ -697,7 +697,15 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.12.0', date: '2026-02-24', codename: 'Bug Fixes & Chart.js Enhancements', changes: 'Chart.js integration for steward and member views, bug fixes across web dashboard, steward and member view enhancements, workload tracker improvements, error view retry fix, portal sheet setup infrastructure.' },
   { version: '4.11.0', date: '2026-02-24', codename: 'Web Dashboard SPA Enhancement', changes: 'Responsive layout (mobile/tablet/desktop), sidebar nav, member self-service (profile editor, steward picker, resources, survey results, workload tracker embedding), steward tools (members tab, broadcast, survey tracking), weekly questions engagement system, CSS-only bar charts, quarterly survey results with privacy threshold.' },
+  { version: '4.10.0', date: '2026-02-23', codename: 'Workload Tracker Integration', changes: 'Workload Tracker module (18_WorkloadTracker.gs + WorkloadTracker.html), web-dashboard SPA integration (19-22 .gs + 6 .html), multi-file build mode, 8 workload categories, privacy controls, reciprocity enforcement, email reminders, portal sheets infrastructure (23_PortalSheets.gs).' },
+  { version: '4.9.1', date: '2026-02-23', codename: 'Security Vulnerability Fix Pass', changes: 'Fix 15 broken getClientSideEscapeHtml() includes, escape member data in grievance form HTML templates, URL scheme validation on Config URLs, escape steward contact data in Public Dashboard, replace unsafe onclick injection, add email format validation, formula injection protection, server-side input validation.' },
+  { version: '4.9.0', date: '2026-02-17', codename: 'Constant Contact Integration', changes: 'Constant Contact v3 API integration with OAuth2, multi-select dropdown support for Grievance Log, auto-discovery column system, 151 column system tests, dynamic CONFIG_COLS and MEMBER_COLS constants.' },
+  { version: '4.8.2', date: '2026-02-16', codename: 'State Field', changes: 'State field added to member contact update across all surfaces.' },
+  { version: '4.8.1', date: '2026-02-15', codename: 'Contact Fields Expansion', changes: '5 new contact form fields (Hire Date, Employee ID, Street Address, City, Zip Code), unified name-based Member ID system.' },
+  { version: '4.8.0', date: '2026-02-15', codename: 'Security Event Alerting', changes: 'Security event alerting system, zero-knowledge survey vault with SHA-256 hashes, event bus architecture, survey completion tracker.' },
+  { version: '4.7.0', date: '2026-02-14', codename: 'Security Hardening', changes: '40+ code review fixes across security, correctness, performance, and test quality. XSS hardening, onEdit optimization, deduplicated escapeHtml, 1090 tests.' },
   { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling. Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (org email only) and Lockdown future feature roadmap items.' },
   { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
   { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
@@ -794,7 +802,10 @@ var SHEETS = {
   // Weekly Questions System (24_WeeklyQuestions.gs)
   WEEKLY_QUESTIONS:   '_Weekly_Questions',   // hidden — active/past questions
   WEEKLY_RESPONSES:   '_Weekly_Responses',   // hidden — hashed-email responses
-  QUESTION_POOL:      '_Question_Pool'       // hidden — member-submitted candidates
+  QUESTION_POOL:      '_Question_Pool',      // hidden — member-submitted candidates
+  // Contact Log & Steward Tasks (v4.12.0)
+  CONTACT_LOG:        '_Contact_Log',        // hidden — steward-member contact history
+  STEWARD_TASKS:      '_Steward_Tasks'       // hidden — task assignments for stewards
 };
 
 // SHEET_NAMES alias for backward compatibility

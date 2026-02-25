@@ -71,7 +71,14 @@ var WeeklyQuestions = (function() {
   }
 
   function _getSheet(name) {
-    return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      // Lazy-init: auto-create missing sheets
+      initWeeklyQuestionSheets();
+      sheet = ss.getSheetByName(name);
+    }
+    return sheet;
   }
 
   // ═══════════════════════════════════════
@@ -325,6 +332,51 @@ var WeeklyQuestions = (function() {
     return { success: true, questionId: newId, text: selected.text };
   }
 
+  // ═══════════════════════════════════════
+  // PUBLIC: History (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getHistory(email, page, pageSize) {
+    page = page || 1;
+    pageSize = pageSize || 10;
+    var emailHash = _hashEmail(email);
+
+    var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
+    if (!qSheet || qSheet.getLastRow() <= 1) return { questions: [], hasMore: false };
+
+    var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
+    var responses = rSheet && rSheet.getLastRow() > 1 ? rSheet.getDataRange().getValues() : [];
+
+    var qData = qSheet.getDataRange().getValues();
+    var allQs = [];
+    for (var i = 1; i < qData.length; i++) {
+      allQs.push({ id: qData[i][0], text: qData[i][1], source: qData[i][2], weekStart: qData[i][4] });
+    }
+    allQs.sort(function(a, b) {
+      var da = a.weekStart instanceof Date ? a.weekStart.getTime() : 0;
+      var db = b.weekStart instanceof Date ? b.weekStart.getTime() : 0;
+      return db - da;
+    });
+
+    var start = (page - 1) * pageSize;
+    var paged = allQs.slice(start, start + pageSize);
+
+    paged.forEach(function(q) {
+      var counts = {};
+      var total = 0;
+      for (var r = 1; r < responses.length; r++) {
+        if (responses[r][1] !== q.id) continue;
+        total++;
+        var resp = responses[r][3];
+        counts[resp] = (counts[resp] || 0) + 1;
+      }
+      q.stats = { total: total, counts: counts };
+      q.weekStr = q.weekStart instanceof Date ? q.weekStart.toLocaleDateString() : String(q.weekStart || '');
+    });
+
+    return { questions: paged, hasMore: start + pageSize < allQs.length };
+  }
+
   // Public API
   return {
     initWeeklyQuestionSheets: initWeeklyQuestionSheets,
@@ -336,6 +388,7 @@ var WeeklyQuestions = (function() {
     setStewardQuestion: setStewardQuestion,
     getPoolQuestions: getPoolQuestions,
     selectRandomPoolQuestion: selectRandomPoolQuestion,
+    getHistory: getHistory,
   };
 
 })();
@@ -351,3 +404,4 @@ function wqSubmitPoolQuestion(email, text) { return WeeklyQuestions.submitPoolQu
 function wqSetStewardQuestion(stewardEmail, text) { return WeeklyQuestions.setStewardQuestion(stewardEmail, text); }
 function wqGetPoolQuestions() { return WeeklyQuestions.getPoolQuestions(); }
 function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
+function wqGetHistory(email, page, pageSize) { return WeeklyQuestions.getHistory(email, page, pageSize); }
