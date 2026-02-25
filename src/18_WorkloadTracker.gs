@@ -29,7 +29,7 @@
 
 /** @const {Object} Workload tracker app configuration */
 var WT_APP_CONFIG = {
-  version: '4.10.0',
+  version: '4.11.0',
   name: 'Workload Tracker',
   maxStringLength: 255,
   dataRetentionMonths: 24,
@@ -1080,4 +1080,254 @@ function shareWorkloadPortalLink() {
       ui.alert('Portal URL saved. Members can now access workload tracking at:\n' + url + '?page=workload');
     }
   }
+}
+
+// ============================================================================
+// SSO WRAPPERS (v4.11.0) — called from web dashboard SPA
+// Skip PIN authentication; rely on existing SSO session identity.
+// ============================================================================
+
+/**
+ * Processes a workload form submission using SSO session identity (no PIN).
+ * Called from the embedded workload tracker in the member dashboard.
+ * @param {string} email — verified by SSO session
+ * @param {Object} formData — { t1..t8, employment_type, part_time_hours, ... }
+ * @returns {string} Success/error message
+ */
+function processWorkloadFormSSO(email, formData) {
+  if (!email || !formData) return 'Error: Missing data.';
+  var emailLower = email.toLowerCase().trim();
+
+  // Submission rate limit
+  var submitLimit = wtCheckSubmissionRateLimit_(emailLower);
+  if (!submitLimit.allowed) {
+    return 'Error: Submission limit reached. Please wait before submitting again.';
+  }
+
+  // Validate workload fields — accept range strings ("0", "1-5", "6-10", "11-20", "21+") or numeric
+  var validRanges = ['0', '1-5', '6-10', '11-20', '21+'];
+  var numFields = ['t1', 't2', 't3', 't4', 't5', 't6', 't7', 't8'];
+  for (var n = 0; n < numFields.length; n++) {
+    var val = String(formData[numFields[n]] || '0').trim();
+    // Accept range strings OR legacy numeric values
+    if (validRanges.indexOf(val) === -1) {
+      var numVal = Number(val);
+      if (isNaN(numVal) || numVal < 0 || numVal > 999) {
+        return 'Error: Invalid workload value for ' + numFields[n] + '.';
+      }
+    }
+  }
+
+  return withLock(function() {
+    var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+    if (!vault) {
+      return 'Error: Workload sheets not initialized. Run Setup > Initialize Dashboard first.';
+    }
+
+    // Accept both range strings and legacy numeric values
+    var sanitizeVal = function(v) {
+      var s = String(v || '0').trim();
+      if (['0', '1-5', '6-10', '11-20', '21+'].indexOf(s) !== -1) return s;
+      return Math.min(999, Math.max(0, Math.floor(Number(v) || 0)));
+    };
+
+    var row = [
+      new Date(),                               // Timestamp
+      emailLower,                               // Email
+      sanitizeVal(formData.t1),                 // Priority Cases
+      sanitizeVal(formData.t2),                 // Pending Cases
+      sanitizeVal(formData.t3),                 // Unread Docs
+      sanitizeVal(formData.t4),                 // To-Do Items
+      sanitizeVal(formData.t5),                 // Sent Referrals
+      sanitizeVal(formData.t6),                 // CE Activities
+      sanitizeVal(formData.t7),                 // Assistance Requests
+      sanitizeVal(formData.t8),                 // Aged Cases
+      sanitizeNum(formData.weekly_cases),        // Weekly Cases
+      formData.sub_categories || '',             // Sub-categories JSON
+      formData.employment_type || 'Full-time',   // Employment type
+      formData.part_time_hours || '',            // PT hours
+      formData.leave_type || '',                 // Leave type
+      formData.leave_planned || '',              // Leave planned
+      formData.leave_start || '',                // Leave start
+      formData.leave_end || '',                  // Leave end
+      formData.no_intake_choice || '',           // No-intake choice
+      formData.notice_time || '',                // Notice time
+      formData.half_day || '',                   // Half day
+      formData.privacy || 'Shared',              // Privacy
+      formData.on_plan || '',                    // On plan
+      formData.overtime_hours || ''              // Overtime hours
+    ];
+
+    vault.appendRow(row);
+    wtRecordSubmission_(emailLower);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('WT_SSO_SUBMIT', { email: emailLower });
+    }
+
+    return 'Workload data submitted successfully!';
+  }, 'workload_sso_submit');
+}
+
+/**
+ * Returns the authenticated member's submission history using SSO (no PIN).
+ * @param {string} email — verified by SSO session
+ * @returns {Object} { success, history:Array, message }
+ */
+function getWorkloadHistorySSO(email) {
+  if (!email) return { success: false, history: [], message: 'Email required.' };
+
+  var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
+  if (!vault || vault.getLastRow() <= 1) {
+    return { success: true, history: [], message: '' };
+  }
+
+  var emailLower = email.toLowerCase().trim();
+  var data = vault.getDataRange().getValues();
+  var history = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var rowEmail = data[i][WT_VAULT_COLS.EMAIL];
+    if (!rowEmail || rowEmail.toString().toLowerCase().trim() !== emailLower) continue;
+    history.push({
+      date:       data[i][WT_VAULT_COLS.TIMESTAMP],
+      t1:         data[i][WT_VAULT_COLS.PRIORITY_CASES],
+      t2:         data[i][WT_VAULT_COLS.PENDING_CASES],
+      t3:         data[i][WT_VAULT_COLS.UNREAD_DOCS],
+      t4:         data[i][WT_VAULT_COLS.TODO_ITEMS],
+      t5:         data[i][WT_VAULT_COLS.SENT_REFERRALS],
+      t6:         data[i][WT_VAULT_COLS.CE_ACTIVITIES],
+      t7:         data[i][WT_VAULT_COLS.ASSISTANCE_REQUESTS],
+      t8:         data[i][WT_VAULT_COLS.AGED_CASES],
+      weeklyCases: data[i][WT_VAULT_COLS.WEEKLY_CASES],
+      employment: data[i][WT_VAULT_COLS.EMPLOYMENT_TYPE],
+      privacy:    data[i][WT_VAULT_COLS.PRIVACY],
+    });
+  }
+
+  history.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+  return { success: true, history: history, message: '' };
+}
+
+/**
+ * Returns collective workload stats using SSO (no PIN).
+ * Respects privacy settings and sharing start dates.
+ * @param {string} email — verified by SSO session
+ * @returns {Object} { success, data, message }
+ */
+function getWorkloadDashboardDataSSO(email) {
+  if (!email) return { success: false, data: null, message: 'Email required.' };
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var vault = ss.getSheetByName(SHEETS.WORKLOAD_VAULT);
+  if (!vault || vault.getLastRow() <= 1) {
+    return { success: true, data: { totalSubmissions: 0, members: 0, categories: {}, averages: {} }, message: '' };
+  }
+
+  var data = vault.getDataRange().getValues();
+  var userSharingStart = typeof wtGetUserSharingStartDate_ === 'function'
+    ? wtGetUserSharingStartDate_(email.toLowerCase().trim())
+    : null;
+
+  var totals = { t1: 0, t2: 0, t3: 0, t4: 0, t5: 0, t6: 0, t7: 0, t8: 0 };
+  var memberSet = {};
+  var submissionCount = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][WT_VAULT_COLS.PRIVACY] === 'Private') continue;
+    var ts = new Date(data[i][WT_VAULT_COLS.TIMESTAMP]);
+    if (userSharingStart && ts < userSharingStart) continue;
+
+    submissionCount++;
+    var rowEmail = data[i][WT_VAULT_COLS.EMAIL];
+    if (rowEmail) memberSet[rowEmail.toString().toLowerCase()] = true;
+
+    totals.t1 += Number(data[i][WT_VAULT_COLS.PRIORITY_CASES]) || 0;
+    totals.t2 += Number(data[i][WT_VAULT_COLS.PENDING_CASES])  || 0;
+    totals.t3 += Number(data[i][WT_VAULT_COLS.UNREAD_DOCS])    || 0;
+    totals.t4 += Number(data[i][WT_VAULT_COLS.TODO_ITEMS])     || 0;
+    totals.t5 += Number(data[i][WT_VAULT_COLS.SENT_REFERRALS]) || 0;
+    totals.t6 += Number(data[i][WT_VAULT_COLS.CE_ACTIVITIES])  || 0;
+    totals.t7 += Number(data[i][WT_VAULT_COLS.ASSISTANCE_REQUESTS]) || 0;
+    totals.t8 += Number(data[i][WT_VAULT_COLS.AGED_CASES])     || 0;
+  }
+
+  var memberCount = Object.keys(memberSet).length;
+
+  return {
+    success: true,
+    message: '',
+    data: {
+      totalSubmissions: submissionCount,
+      members: memberCount,
+      categories: {
+        'Priority Cases':      totals.t1,
+        'Pending Cases':       totals.t2,
+        'Unread Documents':    totals.t3,
+        'To-Do Items':         totals.t4,
+        'Sent Referrals':      totals.t5,
+        'CE Activities':       totals.t6,
+        'Assistance Requests': totals.t7,
+        'Aged Cases':          totals.t8
+      },
+      averages: submissionCount > 0 ? {
+        'Priority Cases':      (totals.t1 / submissionCount).toFixed(1),
+        'Pending Cases':       (totals.t2 / submissionCount).toFixed(1),
+        'Unread Documents':    (totals.t3 / submissionCount).toFixed(1),
+        'To-Do Items':         (totals.t4 / submissionCount).toFixed(1),
+        'Sent Referrals':      (totals.t5 / submissionCount).toFixed(1),
+        'CE Activities':       (totals.t6 / submissionCount).toFixed(1),
+        'Assistance Requests': (totals.t7 / submissionCount).toFixed(1),
+        'Aged Cases':          (totals.t8 / submissionCount).toFixed(1)
+      } : {}
+    }
+  };
+}
+
+
+// ============================================================================
+// SSO: REMINDER PREFERENCES (Web Dashboard)
+// ============================================================================
+
+/**
+ * Gets the current user's reminder preferences for the web dashboard.
+ * @param {string} email
+ * @returns {Object} { enabled: boolean, day: string }
+ */
+function getWorkloadReminderSSO(email) {
+  if (!email) return { enabled: false, day: 'monday' };
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_REMINDERS);
+  if (!sheet || sheet.getLastRow() <= 1) return { enabled: false, day: 'monday' };
+
+  var emailLower = email.toLowerCase().trim();
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][WT_REMINDERS_COLS.EMAIL] &&
+        data[i][WT_REMINDERS_COLS.EMAIL].toString().toLowerCase().trim() === emailLower) {
+      return {
+        enabled: data[i][WT_REMINDERS_COLS.ENABLED] === 'Yes',
+        day: data[i][WT_REMINDERS_COLS.DAY] || 'monday'
+      };
+    }
+  }
+  return { enabled: false, day: 'monday' };
+}
+
+/**
+ * Saves reminder preferences from the web dashboard.
+ * @param {string} email
+ * @param {boolean} enabled
+ * @param {string} day — day of week (monday, tuesday, etc.)
+ * @returns {Object} { success: boolean }
+ */
+function setWorkloadReminderSSO(email, enabled, day) {
+  if (!email) return { success: false };
+  wtSaveReminderPreference_({
+    email: email,
+    enabled: enabled,
+    frequency: 'weekly',
+    day: day || 'monday',
+    time: '08:00'
+  });
+  return { success: true };
 }
