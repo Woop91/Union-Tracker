@@ -66536,6 +66536,7 @@ function getindex_HTML() {
       kpis: null,
       grievances: [],
       loading: true,
+      initialTab: PAGE_DATA.initialTab || null, // deep-link: ?page=resources etc.
     };
     
     // ═══════════════════════════════════════
@@ -66559,14 +66560,6 @@ function getindex_HTML() {
           break;
         default:
           renderAuth(app);
-      }
-      
-      // Deep-link: if ?page= was passed, navigate to that tab after init
-      if (PAGE_DATA.initialTab && (CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member')) {
-        // Delay to let initial render complete
-        setTimeout(function() {
-          _handleTabNav(CURRENT_VIEW, PAGE_DATA.initialTab);
-        }, 500);
       }
     }
     
@@ -66814,6 +66807,18 @@ function getindex_HTML() {
       }
     }
 
+    /**
+     * Deep-link: if AppState.initialTab is set (from ?page=), navigate to it.
+     * Called once after init data loads. Clears itself after first use.
+     */
+    function _checkDeepLink(role) {
+      var tab = AppState.initialTab;
+      if (tab) {
+        AppState.initialTab = null; // one-shot
+        _handleTabNav(role, tab);
+      }
+    }
+
     // Debounced resize handler — re-renders on breakpoint change
     var _resizeTimer = null;
     var _prevMode = '';
@@ -67005,11 +67010,13 @@ function initMemberView(container) {
       AppState.grievances = grievances || [];
       AppState.loading = false;
       renderMemberHome(container);
+      _checkDeepLink('member');
     })
     .withFailureHandler(function() {
       AppState.grievances = [];
       AppState.loading = false;
       renderMemberHome(container);
+      _checkDeepLink('member');
     })
     .dataGetMemberGrievances(CURRENT_USER.email);
 }
@@ -68577,11 +68584,13 @@ function initStewardView(container) {
           AppState.kpis = kpis;
           AppState.loading = false;
           renderStewardDashboard(container);
+          _checkDeepLink('steward');
         })
         .withFailureHandler(function() {
           AppState.kpis = { totalCases: AppState.cases.length, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
           AppState.loading = false;
           renderStewardDashboard(container);
+          _checkDeepLink('steward');
         })
         .dataGetStewardKPIs(CURRENT_USER.email);
     })
@@ -68589,6 +68598,7 @@ function initStewardView(container) {
       AppState.cases = [];
       AppState.loading = false;
       renderStewardDashboard(container);
+      _checkDeepLink('steward');
     })
     .dataGetStewardCases(CURRENT_USER.email);
 }
