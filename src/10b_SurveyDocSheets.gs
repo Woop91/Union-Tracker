@@ -1941,3 +1941,253 @@ function createFeaturesReferenceSheet(ss) {
   return sheet;
 }
 
+// ============================================================================
+// RESOURCES SHEET — Educational Content Management (v4.11.0)
+// ============================================================================
+
+/**
+ * Create the Resources sheet for managing educational content.
+ * Stewards populate this with contract articles, FAQ, forms, guides.
+ * The web app reads from this sheet to serve the educational hub.
+ *
+ * @param {Spreadsheet} ss - Active spreadsheet
+ * @returns {Sheet} Created sheet
+ */
+function createResourcesSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+
+  // Don't recreate if exists
+  var existing = ss.getSheetByName(SHEETS.RESOURCES);
+  if (existing) return existing;
+
+  var sheet = ss.insertSheet(SHEETS.RESOURCES);
+
+  // Headers from header map (single source of truth)
+  var headers = getHeadersFromMap_(RESOURCES_HEADER_MAP_);
+  var headerRow = 1;
+  sheet.getRange(headerRow, 1, 1, headers.length).setValues([headers]);
+
+  // Header formatting
+  sheet.getRange(headerRow, 1, 1, headers.length)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+
+  // Column widths
+  sheet.setColumnWidth(RESOURCES_COLS.RESOURCE_ID, 100);
+  sheet.setColumnWidth(RESOURCES_COLS.TITLE, 250);
+  sheet.setColumnWidth(RESOURCES_COLS.CATEGORY, 160);
+  sheet.setColumnWidth(RESOURCES_COLS.SUMMARY, 300);
+  sheet.setColumnWidth(RESOURCES_COLS.CONTENT, 500);
+  sheet.setColumnWidth(RESOURCES_COLS.URL, 250);
+  sheet.setColumnWidth(RESOURCES_COLS.ICON, 60);
+  sheet.setColumnWidth(RESOURCES_COLS.SORT_ORDER, 80);
+  sheet.setColumnWidth(RESOURCES_COLS.VISIBLE, 70);
+  sheet.setColumnWidth(RESOURCES_COLS.AUDIENCE, 120);
+  sheet.setColumnWidth(RESOURCES_COLS.DATE_ADDED, 120);
+  sheet.setColumnWidth(RESOURCES_COLS.ADDED_BY, 150);
+
+  // Data validation for Category
+  var categoryRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList([
+      'Contract Article',
+      'Know Your Rights',
+      'Grievance Process',
+      'Forms & Templates',
+      'FAQ',
+      'Guide',
+      'Policy',
+      'Contact Info',
+      'Link'
+    ])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, RESOURCES_COLS.CATEGORY, 500).setDataValidation(categoryRule);
+
+  // Data validation for Visible
+  var visibleRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Yes', 'No'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, RESOURCES_COLS.VISIBLE, 500).setDataValidation(visibleRule);
+
+  // Data validation for Audience
+  var audienceRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['All', 'Members', 'Stewards'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, RESOURCES_COLS.AUDIENCE, 500).setDataValidation(audienceRule);
+
+  // Starter content — guides stewards on what to populate
+  var tz = Session.getScriptTimeZone();
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var starterRows = [
+    ['RES-001', 'What Is a Grievance?', 'Grievance Process', 'A grievance is a formal complaint that your employer violated the union contract.', 'A grievance is filed when management violates the collective bargaining agreement. This can include unfair discipline, contract violations, safety issues, or denial of benefits. Your union steward can help you determine if your situation qualifies.', '', '📋', 1, 'Yes', 'All', today, 'System'],
+    ['RES-002', 'Grievance Steps Explained', 'Grievance Process', 'The grievance process has multiple steps, each with deadlines.', 'Step I: Filed with immediate supervisor within the contractual time limit. Management must respond within the specified days.\\nStep II: If Step I is denied, an appeal is filed. A hearing may be held.\\nStep III / Arbitration: Final step involving a neutral arbitrator. The decision is binding.\\nYour steward handles all filings and deadlines — you just need to provide information.', '', '📊', 2, 'Yes', 'All', today, 'System'],
+    ['RES-003', 'Your Weingarten Rights', 'Know Your Rights', 'You have the right to union representation during investigatory interviews.', 'If you are called into a meeting that could lead to discipline, you have the right to request a union steward be present. This is called your Weingarten Right. Say: "If this discussion could in any way lead to my being disciplined or terminated, I respectfully request that my union representative be present."\\n\\nManagement must either: (1) grant your request, (2) end the meeting, or (3) offer you the choice to continue without representation.', '', '🛡️', 3, 'Yes', 'All', today, 'System'],
+    ['RES-004', 'How to File a Grievance', 'Forms & Templates', 'Contact your steward or use the grievance form to start a case.', 'Step 1: Talk to your steward about the issue.\\nStep 2: Gather any evidence (emails, memos, witnesses).\\nStep 3: Your steward will help you complete the grievance form.\\nStep 4: The steward files it with management within the deadline.\\n\\nYou can also use the "File a Grievance" link in the dashboard to start the process.', '', '📝', 4, 'Yes', 'All', today, 'System'],
+    ['RES-005', 'Just Cause Standard', 'Know Your Rights', 'Management must meet the "just cause" standard before disciplining you.', 'Under most union contracts, management cannot discipline without just cause. The 7 tests of just cause are:\\n1. Was the employee warned?\\n2. Was the rule reasonable?\\n3. Was an investigation done before discipline?\\n4. Was the investigation fair?\\n5. Was there proof of guilt?\\n6. Were rules applied equally?\\n7. Was the penalty appropriate?\\n\\nIf management fails any test, the discipline may be overturned.', '', '⚖️', 5, 'Yes', 'All', today, 'System'],
+    ['RES-006', 'Frequently Asked Questions', 'FAQ', 'Common questions about the union, your rights, and the grievance process.', 'Q: How long do I have to file a grievance?\\nA: Check your contract — typically 15-30 days from the incident.\\n\\nQ: Can I file a grievance on my own?\\nA: Talk to your steward first. They know the process and deadlines.\\n\\nQ: Will filing a grievance get me in trouble?\\nA: No. Retaliation for union activity is illegal.\\n\\nQ: What happens at a grievance hearing?\\nA: Your steward presents your case to management. You may be asked to describe what happened.\\n\\nQ: How long does the process take?\\nA: It varies. Step I may resolve in weeks. Arbitration can take months.', '', '❓', 6, 'Yes', 'All', today, 'System'],
+    ['RES-007', 'Contact Your Steward', 'Contact Info', 'Your assigned steward is your first point of contact for any workplace issue.', 'Your steward can help with:\\n- Contract questions\\n- Workplace disputes\\n- Filing grievances\\n- Investigatory meetings (Weingarten rights)\\n- General workplace concerns\\n\\nCheck the dashboard for your assigned steward\'s contact information.', '', '📞', 7, 'Yes', 'All', today, 'System'],
+    ['RES-008', 'Union Meeting Schedule', 'Guide', 'Regular meetings keep members informed and involved.', 'Check the Events tab in the dashboard for upcoming meetings. You can check in using your email and PIN. Meeting attendance is one way to stay engaged and informed about contract negotiations, grievance updates, and workplace issues.', '', '🗓️', 8, 'Yes', 'All', today, 'System']
+  ];
+
+  sheet.getRange(2, 1, starterRows.length, headers.length).setValues(starterRows);
+
+  // Wrap text on Content column
+  sheet.getRange(2, RESOURCES_COLS.CONTENT, 500).setWrap(true);
+  sheet.getRange(2, RESOURCES_COLS.SUMMARY, 500).setWrap(true);
+
+  // Freeze header
+  sheet.setFrozenRows(1);
+
+  // Tab color
+  sheet.setTabColor('#3B82F6');
+
+  // Apply filter
+  var dataRange = sheet.getRange(1, 1, starterRows.length + 1, headers.length);
+  dataRange.createFilter();
+
+  return sheet;
+}
+
+
+// ============================================================================
+// NOTIFICATIONS SHEET CREATION (v4.12.0)
+// ============================================================================
+// Steward-composed notifications for member web view.
+// Persist until Expires date set by steward OR dismissed by individual member.
+// Stewards compose via separate form in steward dashboard.
+// ============================================================================
+
+/**
+ * Creates the 📢 Notifications sheet with headers, validation, and 2 starter entries.
+ * @param {Spreadsheet} [ss] — defaults to active spreadsheet
+ * @returns {Sheet}
+ */
+function createNotificationsSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+
+  // Don't recreate if exists
+  var existing = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+  if (existing) return existing;
+
+  var sheet = ss.insertSheet(SHEETS.NOTIFICATIONS);
+
+  // Headers from header map (single source of truth)
+  var headers = getHeadersFromMap_(NOTIFICATIONS_HEADER_MAP_);
+  var headerRow = 1;
+  sheet.getRange(headerRow, 1, 1, headers.length).setValues([headers]);
+
+  // Header formatting
+  sheet.getRange(headerRow, 1, 1, headers.length)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+
+  // Column widths
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.NOTIFICATION_ID, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.RECIPIENT, 200);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.TYPE, 140);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.TITLE, 250);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.MESSAGE, 400);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.PRIORITY, 90);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.SENT_BY, 200);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.SENT_BY_NAME, 140);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.CREATED_DATE, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.EXPIRES_DATE, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.DISMISSED_BY, 300);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.STATUS, 90);
+
+  // Data validation — Type
+  var typeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Steward Message', 'Announcement', 'Deadline', 'System'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.TYPE, 500).setDataValidation(typeRule);
+
+  // Data validation — Priority
+  var priorityRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Normal', 'Urgent'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.PRIORITY, 500).setDataValidation(priorityRule);
+
+  // Data validation — Status
+  var statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Active', 'Expired', 'Archived'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.STATUS, 500).setDataValidation(statusRule);
+
+  // Data validation — Expires Date (must be date)
+  var dateRule = SpreadsheetApp.newDataValidation()
+    .requireDate()
+    .setAllowInvalid(true)  // blank = no expiry
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.EXPIRES_DATE, 500).setDataValidation(dateRule);
+
+  // 2 starter entries
+  var tz = Session.getScriptTimeZone();
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  var nextWeekStr = Utilities.formatDate(nextWeek, tz, 'yyyy-MM-dd');
+  var nextMonth = new Date();
+  nextMonth.setDate(nextMonth.getDate() + 30);
+  var nextMonthStr = Utilities.formatDate(nextMonth, tz, 'yyyy-MM-dd');
+
+  var starterRows = [
+    [
+      'NOTIF-001',
+      'All Members',
+      'Announcement',
+      'Welcome to the Union Dashboard',
+      'Your union dashboard is now live! Here you can check in to meetings, learn about your rights, and track grievance progress. Contact your steward if you have any questions.',
+      'Normal',
+      'system@massability.org',
+      'System',
+      today,
+      nextMonthStr,
+      '',
+      'Active'
+    ],
+    [
+      'NOTIF-002',
+      'All Members',
+      'Announcement',
+      'Monthly General Meeting — Check In Available',
+      'The Monthly General Membership Meeting is scheduled. Use the Check In page to mark your attendance. Virtual join link is available in the Events tab.',
+      'Normal',
+      'system@massability.org',
+      'System',
+      today,
+      nextWeekStr,
+      '',
+      'Active'
+    ]
+  ];
+
+  sheet.getRange(2, 1, starterRows.length, headers.length).setValues(starterRows);
+
+  // Wrap text on Message column
+  sheet.getRange(2, NOTIFICATIONS_COLS.MESSAGE, 500).setWrap(true);
+  sheet.getRange(2, NOTIFICATIONS_COLS.DISMISSED_BY, 500).setWrap(true);
+
+  // Freeze header
+  sheet.setFrozenRows(1);
+
+  // Tab color — orange for notifications
+  sheet.setTabColor('#F59E0B');
+
+  // Apply filter
+  var dataRange = sheet.getRange(1, 1, starterRows.length + 1, headers.length);
+  dataRange.createFilter();
+
+  return sheet;
+}
+

@@ -4,7 +4,7 @@
  * Validates the auto-discovery column infrastructure:
  * - buildColsFromMap_() correctly generates 1-indexed column constants
  * - getHeadersFromMap_() correctly extracts header text arrays
- * - buildLegacyCols_() correctly generates 0-indexed compat objects
+ * - Legacy column constants (GRIEVANCE_COLUMNS, MEMBER_COLUMNS) have been removed
  * - getColumnLetter() correctly converts column numbers to letters
  * - All header maps produce valid, contiguous column constants
  * - SATISFACTION_COLS and SATISFACTION_SECTIONS are cross-consistent
@@ -95,41 +95,6 @@ describe('getHeadersFromMap_', () => {
       { key: 'B', header: 'Step 1 Due Date' }
     ];
     expect(getHeadersFromMap_(map)).toEqual(['Yes/No (Dropdowns)', 'Step 1 Due Date']);
-  });
-});
-
-// ============================================================================
-// buildLegacyCols_
-// ============================================================================
-
-describe('buildLegacyCols_', () => {
-  test('subtracts 1 from all values to create 0-indexed map', () => {
-    const primary = { A: 1, B: 2, C: 3 };
-    const legacy = buildLegacyCols_(primary);
-    expect(legacy.A).toBe(0);
-    expect(legacy.B).toBe(1);
-    expect(legacy.C).toBe(2);
-  });
-
-  test('applies extra aliases pointing to primary keys', () => {
-    const primary = { FIRST_NAME: 1, DATE_FILED: 5 };
-    const legacy = buildLegacyCols_(primary, { MEMBER_NAME: 'FIRST_NAME', FILING_DATE: 'DATE_FILED' });
-    expect(legacy.MEMBER_NAME).toBe(0); // FIRST_NAME(1) - 1
-    expect(legacy.FILING_DATE).toBe(4); // DATE_FILED(5) - 1
-  });
-
-  test('includes all original keys plus aliases', () => {
-    const primary = { A: 1, B: 2 };
-    const legacy = buildLegacyCols_(primary, { C: 'A' });
-    expect(Object.keys(legacy)).toContain('A');
-    expect(Object.keys(legacy)).toContain('B');
-    expect(Object.keys(legacy)).toContain('C');
-  });
-
-  test('handles no extra aliases', () => {
-    const primary = { X: 10 };
-    const legacy = buildLegacyCols_(primary);
-    expect(legacy.X).toBe(9);
   });
 });
 
@@ -230,42 +195,6 @@ describe('Header map to COLS consistency', () => {
         });
       });
     });
-  });
-});
-
-// ============================================================================
-// Legacy compat objects (MEMBER_COLUMNS, GRIEVANCE_COLUMNS)
-// ============================================================================
-
-describe('Legacy compat: MEMBER_COLUMNS', () => {
-  test('every key in MEMBER_COLS exists in MEMBER_COLUMNS with offset -1', () => {
-    Object.keys(MEMBER_COLS).forEach(key => {
-      expect(MEMBER_COLUMNS[key]).toBeDefined();
-      expect(MEMBER_COLUMNS[key]).toBe(MEMBER_COLS[key] - 1);
-    });
-  });
-
-  test('legacy aliases exist and map correctly', () => {
-    expect(MEMBER_COLUMNS.ID).toBe(MEMBER_COLS.MEMBER_ID - 1);
-    expect(MEMBER_COLUMNS.JOB_DEPT).toBe(MEMBER_COLS.JOB_TITLE - 1);
-    expect(MEMBER_COLUMNS.STATUS).toBe(MEMBER_COLS.GRIEVANCE_STATUS - 1);
-    expect(MEMBER_COLUMNS.LAST_UPDATED).toBe(MEMBER_COLS.RECENT_CONTACT_DATE - 1);
-  });
-});
-
-describe('Legacy compat: GRIEVANCE_COLUMNS', () => {
-  test('every key in GRIEVANCE_COLS exists in GRIEVANCE_COLUMNS with offset -1', () => {
-    Object.keys(GRIEVANCE_COLS).forEach(key => {
-      expect(GRIEVANCE_COLUMNS[key]).toBeDefined();
-      expect(GRIEVANCE_COLUMNS[key]).toBe(GRIEVANCE_COLS[key] - 1);
-    });
-  });
-
-  test('legacy aliases exist and map correctly', () => {
-    expect(GRIEVANCE_COLUMNS.MEMBER_NAME).toBe(GRIEVANCE_COLS.FIRST_NAME - 1);
-    expect(GRIEVANCE_COLUMNS.FILING_DATE).toBe(GRIEVANCE_COLS.DATE_FILED - 1);
-    expect(GRIEVANCE_COLUMNS.ARBITRATION_DATE).toBe(GRIEVANCE_COLS.DATE_CLOSED - 1);
-    expect(GRIEVANCE_COLUMNS.GRIEVANCE_TYPE).toBe(GRIEVANCE_COLS.ISSUE_CATEGORY - 1);
   });
 });
 
@@ -618,5 +547,39 @@ describe('Audit log schemas', () => {
     expect(AUDIT_LOG_COLS.ACTION_TYPE).toBeDefined();
     expect(AUDIT_LOG_COLS.OLD_VALUE).toBeDefined();
     expect(AUDIT_LOG_COLS.NEW_VALUE).toBeDefined();
+  });
+});
+
+// ============================================================================
+// Regression: legacy column constants fully removed
+// ============================================================================
+
+describe('Legacy column constants removed', () => {
+  test('GRIEVANCE_COLUMNS is no longer defined', () => {
+    expect(typeof GRIEVANCE_COLUMNS).toBe('undefined');
+  });
+
+  test('MEMBER_COLUMNS is no longer defined', () => {
+    expect(typeof MEMBER_COLUMNS).toBe('undefined');
+  });
+
+  test('buildLegacyCols_ is no longer defined', () => {
+    expect(typeof buildLegacyCols_).toBe('undefined');
+  });
+
+  test('GRIEVANCE_COLS has LOCATION, not UNIT (regression)', () => {
+    expect(GRIEVANCE_COLS.UNIT).toBeUndefined();
+    expect(GRIEVANCE_COLS.LOCATION).toBeDefined();
+  });
+
+  test('GRIEVANCE_COLS has ISSUE_CATEGORY, not TYPE (regression)', () => {
+    expect(GRIEVANCE_COLS.TYPE).toBeUndefined();
+    expect(GRIEVANCE_COLS.ISSUE_CATEGORY).toBeDefined();
+  });
+
+  test('GRIEVANCE_COLS.RESOLUTION is a single column (no NOTES/OUTCOME aliases)', () => {
+    expect(GRIEVANCE_COLS.RESOLUTION).toBeDefined();
+    expect(GRIEVANCE_COLS.NOTES).toBeUndefined();
+    expect(GRIEVANCE_COLS.OUTCOME).toBeUndefined();
   });
 });

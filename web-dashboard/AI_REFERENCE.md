@@ -1,16 +1,33 @@
 # AI REFERENCE DOCUMENT — Grievance Dashboard Web App
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
-# Last updated: 2026-02-21
+# Last updated: 2026-02-23
 
 ---
 
-## 🏗️ PROJECT OVERVIEW
+## 🔴🔴🔴 DEPRECATION NOTICE (2026-02-23) 🔴🔴🔴
+##
+## THIS ENTIRE `web-dashboard/` FOLDER IS ORPHANED LEGACY CODE.
+## It is NOT deployed. It is NOT used. The `web-dashboard` branch was deleted.
+##
+## The LIVE web app is served by `dist/ConsolidatedDashboard.gs` which contains
+## its own `doGet()` function with inline HTML (not template files).
+##
+## DO NOT try to deploy, integrate, or reference this folder's code.
+## The canonical AI reference is `/AI_REFERENCE.md` in the repo root.
+##
+## This folder is preserved only for historical reference.
+##
+## 🔴🔴🔴 END DEPRECATION NOTICE 🔴🔴🔴
+
+---
+
+## 🏗️ PROJECT OVERVIEW (DEPRECATED — see above)
 
 **What:** Mobile-optimized web app dashboard for workplace organization grievance tracking & member management.
 **Served by:** Google Apps Script `doGet()` → HtmlService, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users).
-**Repo:** `Woop91/MULTIPLE-SCRIPS-REPO` → branch: `web-dashboard`
+**Repo:** `Woop91/DDS-Dashboard` → branch: `web-dashboard` **(BRANCH DELETED)**
 **All other repos are DEPRECATED** (509-dashboard, union-steward-app — do not reference).
 
 ---
@@ -22,7 +39,7 @@
 3. **Role column exists** in Member Directory. Read it dynamically — do not assume column position. Find by header name.
 4. **Bound to existing sheet** — the web app code lives in the same Apps Script project as the existing 15k-line dashboard code. Do NOT create a separate script project.
 5. **Bitly redirect** — users arrive via a Bitly short link. The raw Apps Script deployment URL changes on each deploy. Bitly is updated manually. The app should never expose or reference the raw script.google.com URL to users.
-6. **One repo only** — `Woop91/MULTIPLE-SCRIPS-REPO`, branch `web-dashboard`. All pushes go here.
+6. **One repo only** — `Woop91/DDS-Dashboard`, branch `web-dashboard`. All pushes go here.
 7. **Auth: SSO + Magic Link** — both options available to all users. Role determined by directory lookup post-auth, not by auth method.
 8. **Dual-role users** default to steward view with a toggle to switch to member view.
 9. **No member PII** visible to other members. Members see only their own grievances.
@@ -106,7 +123,7 @@ Note: Apps Script serves HTML files via HtmlService. JS and CSS must be embedded
 ### 2026-02-21 — Initial creation
 - Created AI_REFERENCE.md
 - Created project file structure
-- Decisions locked: bound script, SSO + magic link auth, Mono Signal (steward) + Glass Depth (member), dynamic config, Bitly redirect, MULTIPLE-SCRIPS-REPO only
+- Decisions locked: bound script, SSO + magic link auth, Mono Signal (steward) + Glass Depth (member), dynamic config, Bitly redirect, DDS-Dashboard only
 - Auth: 7-day magic link, 30-day cookie, dual-role defaults to steward
 
 ---
