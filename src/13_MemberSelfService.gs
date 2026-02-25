@@ -1143,7 +1143,7 @@ function updateMemberContact(sessionToken, updates) {
         value = formatPhoneNumber_(value);
       }
 
-      sheet.getRange(memberRow, fieldMapping[field]).setValue(value);
+      sheet.getRange(memberRow, fieldMapping[field]).setValue(escapeForFormula(value));
       updated.push(field);
     }
   }
@@ -1448,7 +1448,7 @@ function getMemberSelfServicePortalHtml() {
     '</div>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var sessionToken=null;' +
     'var profileData=null;' +
 
@@ -1721,7 +1721,7 @@ function getMemberSelfServicePortal() {
   var html = getMemberSelfServicePortalHtml();
   return HtmlService.createHtmlOutput(html)
     .setTitle('Member Self-Service Portal')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 /**

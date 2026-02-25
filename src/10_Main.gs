@@ -66,6 +66,13 @@ function onOpen() {
       console.log('Tab colors not applied: ' + tabError.message);
     }
 
+    // Enforce hidden sheets on every open (prevents mobile visibility)
+    try {
+      enforceHiddenSheets();
+    } catch (hideError) {
+      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+    }
+
     // Show welcome toast
     ss.toast(
       'Dashboard loaded successfully',
@@ -206,6 +213,32 @@ function onEdit(e) {
 }
 
 /**
+ * Simple trigger: fires when the user changes cell selection.
+ * Delegates to the multi-select auto-open handler when the
+ * user has enabled it via Tools > Multi-Select > Enable Auto-Open.
+ *
+ * Note: onSelectionChange is only available as a simple trigger
+ * in Google Apps Script — it cannot be installed via ScriptApp.newTrigger().
+ *
+ * @param {Object} e - The selection change event object
+ */
+function onSelectionChange(e) {
+  if (!e || !e.range) return;
+
+  try {
+    var autoOpen = PropertiesService.getUserProperties()
+      .getProperty('multiSelectAutoOpen');
+    if (autoOpen !== 'true') return;
+
+    if (typeof onSelectionChangeMultiSelect === 'function') {
+      onSelectionChangeMultiSelect(e);
+    }
+  } catch (_err) {
+    // Silent — selection-change triggers must not surface errors
+  }
+}
+
+/**
  * Handles security audit logging for change tracking
  * Logs all edits to the Audit Log sheet for accountability
  * Includes sabotage protection for mass deletions (>15 cells)
@@ -222,7 +255,7 @@ function handleSecurityAudit_(e) {
       auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
       auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
       auditSheet.setFrozenRows(1);
-      auditSheet.hideSheet();
+      setSheetVeryHidden_(auditSheet);
     }
 
     var userEmail = '';
@@ -408,7 +441,7 @@ function handleStageGateWorkflow_(e) {
 
 /**
  * Sends escalation alert email to Chief Steward
- * Reads email from Config sheet (column AS)
+ * Reads email from Config sheet (column AQ)
  * @param {string} memberName - Name of the member
  * @param {string} caseID - Grievance case ID
  * @param {string} status - New status/step
@@ -419,7 +452,7 @@ function sendEscalationAlert_(memberName, caseID, status) {
   var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
 
   if (!chiefStewardEmail) {
-    console.log('Chief Steward email not configured in Config sheet (column AS) - skipping escalation alert');
+    console.log('Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
     return;
   }
 
@@ -465,15 +498,20 @@ function getConfigValue_(columnNum) {
 
 /**
  * Gets escalation status values from Config sheet or falls back to defaults
- * Config format: comma-separated values (e.g., "In Arbitration,Appealed")
+ * Reads all non-empty rows from the ESCALATION_STATUSES config column.
  * @returns {Array} Array of status values that trigger escalation alerts
  * @private
  */
 function getEscalationStatuses_() {
-  var configValue = getConfigValue_(CONFIG_COLS.ESCALATION_STATUSES);
-
-  if (configValue) {
-    return configValue.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var values = getConfigValues(configSheet, CONFIG_COLS.ESCALATION_STATUSES);
+      if (values.length > 0) return values;
+    }
+  } catch (e) {
+    console.log('Error reading escalation statuses: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -482,15 +520,20 @@ function getEscalationStatuses_() {
 
 /**
  * Gets escalation step values from Config sheet or falls back to defaults
- * Config format: comma-separated values (e.g., "Step II,Step III,Arbitration")
+ * Reads all non-empty rows from the ESCALATION_STEPS config column.
  * @returns {Array} Array of step values that trigger escalation alerts
  * @private
  */
 function getEscalationSteps_() {
-  var configValue = getConfigValue_(CONFIG_COLS.ESCALATION_STEPS);
-
-  if (configValue) {
-    return configValue.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var values = getConfigValues(configSheet, CONFIG_COLS.ESCALATION_STEPS);
+      if (values.length > 0) return values;
+    }
+  } catch (e) {
+    console.log('Error reading escalation steps: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -557,7 +600,36 @@ function handleGrievanceEdit(e) {
     GRIEVANCE_COLS.STEP3_APPEAL_FILED, GRIEVANCE_COLS.DATE_CLOSED
   ];
   if (statusAndDateCols.indexOf(col) !== -1) {
-    sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(new Date());
+    // Compute the actual next deadline based on current step, matching the logic
+    // in recalculateDownstreamDeadlines_. Only set to a real deadline date, not now().
+    var currentStep = sheet.getRange(row, GRIEVANCE_COLS.CURRENT_STEP).getValue();
+    var status = sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue();
+    var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
+
+    if (closedStatuses.indexOf(status) === -1 && currentStep) {
+      var nextActionDate = '';
+      if (currentStep === 'Informal') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.FILING_DEADLINE).getValue();
+      } else if (currentStep === 'Step I') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP1_DUE).getValue();
+      } else if (currentStep === 'Step II') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP2_DUE).getValue();
+      } else if (currentStep === 'Step III') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP3_APPEAL_DUE).getValue();
+      }
+
+      if (nextActionDate instanceof Date) {
+        sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(nextActionDate);
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        var daysTo = Math.floor((nextActionDate - today) / (1000 * 60 * 60 * 24));
+        sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue(daysTo);
+      }
+    } else if (closedStatuses.indexOf(status) !== -1) {
+      // Clear deadline for closed grievances
+      sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue('');
+      sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue('');
+    }
   }
 
   // If status changed, check for auto-actions
@@ -775,44 +847,81 @@ function handleMemberEdit(e) {
  * @private
  */
 function syncDropdownToConfig_(e, sheetName) {
+  // Accept e.value (simple edits) or fall back to reading the cell directly
+  // (handles pastes, programmatic setValue, and multi-cell edits)
   var newValue = e.value;
-  // Only handle single-cell text edits with a non-empty value
+  if (!newValue && e.range && e.range.getNumRows() === 1 && e.range.getNumColumns() === 1) {
+    try { newValue = e.range.getValue(); } catch (_) { /* skip */ }
+  }
   if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') return;
   newValue = newValue.trim();
 
   var col = e.range.getColumn();
 
-  // Look up the Config column from the central DROPDOWN_MAP (single source of truth).
-  var entries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
-              : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
-              : null;
-  if (!entries) return;
+  // Look up the Config column from DROPDOWN_MAP and MULTI_SELECT_COLS.
+  // Both maps are checked so that custom values typed into either single-select
+  // or multi-select columns get synced back to Config.
+  var ddEntries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
+                : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
+                : [];
+  var msEntries = (sheetName === SHEETS.MEMBER_DIR) ? MULTI_SELECT_COLS.MEMBER_DIR
+                : (sheetName === SHEETS.GRIEVANCE_LOG) ? MULTI_SELECT_COLS.GRIEVANCE_LOG
+                : [];
+  if (ddEntries.length === 0 && msEntries.length === 0) return;
 
   var configCol = null;
-  for (var d = 0; d < entries.length; d++) {
-    if (entries[d].col === col) { configCol = entries[d].configCol; break; }
+  var isMultiSelect = false;
+  for (var d = 0; d < ddEntries.length; d++) {
+    if (ddEntries[d].col === col) { configCol = ddEntries[d].configCol; break; }
+  }
+  if (!configCol) {
+    for (var ms = 0; ms < msEntries.length; ms++) {
+      if (msEntries[ms].col === col) { configCol = msEntries[ms].configCol; isMultiSelect = true; break; }
+    }
   }
 
-  if (!configCol) return; // Not a synced dropdown column
+  if (!configCol) return; // Not a synced dropdown or multi-select column
+
+  // For multi-select columns, split comma-separated values and sync each individually
+  var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];
+
+  // Filter out pure-numeric values — they're data-entry errors (e.g. index numbers
+  // typed instead of text labels like "Email", "Phone").  All dropdown/multi-select
+  // Config columns expect text labels, never bare integers.
+  var filteredValues = [];
+  for (var fv = 0; fv < valuesToSync.length; fv++) {
+    var candidate = valuesToSync[fv].trim();
+    if (candidate && !/^\d+$/.test(candidate)) {
+      filteredValues.push(candidate);
+    }
+  }
+  valuesToSync = filteredValues;
+  if (valuesToSync.length === 0) return;
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!configSheet) return;
 
-  // Check if the value already exists in Config
+  // Build set of existing Config values for this column
+  var existingSet = {};
   var lastRow = configSheet.getLastRow();
   var configRows = lastRow >= 3 ? lastRow - 2 : 0;
   if (configRows > 0) {
     var existingValues = configSheet.getRange(3, configCol, configRows, 1).getValues();
     for (var i = 0; i < existingValues.length; i++) {
-      if (existingValues[i][0] && existingValues[i][0].toString().trim() === newValue) {
-        return; // Already exists, no need to add
-      }
+      var ev = (existingValues[i][0] || '').toString().trim();
+      if (ev) existingSet[ev] = true;
     }
   }
 
-  // Add the new value to the first empty row in the Config column
-  addToConfigDropdown_(configCol, newValue);
+  // Add each value that doesn't already exist in Config
+  for (var v = 0; v < valuesToSync.length; v++) {
+    var val = valuesToSync[v].trim();
+    if (val && !existingSet[val]) {
+      addToConfigDropdown_(configCol, val);
+      existingSet[val] = true;
+    }
+  }
 }
 
 /**
@@ -1473,7 +1582,7 @@ function updateGrievance(grievanceId, updates) {
 
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1;
         break;
       }
@@ -1483,19 +1592,19 @@ function updateGrievance(grievanceId, updates) {
       return errorResponse('Grievance not found');
     }
 
-    // Update each provided field
+    // Update each provided field (use canonical GRIEVANCE_COLS, 1-indexed)
     if (updates.description !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.DESCRIPTION + 1).setValue(updates.description);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(updates.description);
     }
     if (updates.notes !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(updates.notes);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(updates.notes);
     }
     if (updates.status !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(updates.status);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(updates.status);
     }
 
     // Update timestamp
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(new Date());
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(new Date());
 
     logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
       grievanceId: grievanceId,
@@ -1783,17 +1892,15 @@ function startGrievanceForMember() {
   }
 
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const memberId = data[MEMBER_COLUMNS.ID];
-  const memberName = `${data[MEMBER_COLUMNS.FIRST_NAME]} ${data[MEMBER_COLUMNS.LAST_NAME]}`;
+  const memberId = data[MEMBER_COLS.MEMBER_ID - 1];
+  const memberName = `${data[MEMBER_COLS.FIRST_NAME - 1]} ${data[MEMBER_COLS.LAST_NAME - 1]}`;
 
   // Open new grievance dialog pre-populated with member info
   // Sanitize values before embedding in script context
-  const safeMemberId = String(memberId || '').replace(/['"\\<>&]/g, '');
-  const safeMemberName = String(memberName || '').replace(/['"\\<>&]/g, '');
   const html = HtmlService.createHtmlOutput(
     '<script>' +
-      'sessionStorage.setItem("prefillMemberId", "' + safeMemberId + '");' +
-      'sessionStorage.setItem("prefillMemberName", "' + safeMemberName + '");' +
+      'sessionStorage.setItem("prefillMemberId", ' + JSON.stringify(String(memberId || '')) + ');' +
+      'sessionStorage.setItem("prefillMemberName", ' + JSON.stringify(String(memberName || '')) + ');' +
       'google.script.host.close();' +
       'google.script.run.showNewGrievanceDialog();' +
     '</script>'
@@ -2180,10 +2287,10 @@ function searchMembersForDialog(term) {
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const firstName = (row[MEMBER_COLUMNS.FIRST_NAME] || '').toString().toLowerCase();
-    const lastName = (row[MEMBER_COLUMNS.LAST_NAME] || '').toString().toLowerCase();
-    const email = (row[MEMBER_COLUMNS.EMAIL] || '').toString().toLowerCase();
-    const memberId = (row[MEMBER_COLUMNS.ID] || '').toString().toLowerCase();
+    const firstName = (row[MEMBER_COLS.FIRST_NAME - 1] || '').toString().toLowerCase();
+    const lastName = (row[MEMBER_COLS.LAST_NAME - 1] || '').toString().toLowerCase();
+    const email = (row[MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase();
+    const memberId = (row[MEMBER_COLS.MEMBER_ID - 1] || '').toString().toLowerCase();
 
     if (firstName.includes(searchLower) ||
         lastName.includes(searchLower) ||
@@ -2191,9 +2298,9 @@ function searchMembersForDialog(term) {
         memberId.includes(searchLower)) {
       results.push({
         row: i + 1,
-        name: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-        email: row[MEMBER_COLUMNS.EMAIL],
-        id: row[MEMBER_COLUMNS.ID]
+        name: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
+        email: row[MEMBER_COLS.EMAIL - 1],
+        id: row[MEMBER_COLS.MEMBER_ID - 1]
       });
 
       if (results.length >= 10) break; // Limit results

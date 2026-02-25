@@ -110,11 +110,11 @@ function getUnifiedDashboardData(includePII) {
       totalWithPhone: 0
     },
 
-    // Engagement Metrics (from Member Directory columns Q-W)
+    // Engagement Metrics (from Member Directory columns R-X)
     engagement: {
-      emailOpenRate: 0,           // Average from OPEN_RATE column (S)
-      virtualMeetingRate: 0,      // % with recent virtual meeting (Q)
-      inPersonMeetingRate: 0,     // % with recent in-person meeting (R)
+      emailOpenRate: 0,           // Average from OPEN_RATE column (T)
+      virtualMeetingRate: 0,      // % with recent virtual meeting (R)
+      inPersonMeetingRate: 0,     // % with recent in-person meeting (S)
       totalVolunteerHours: 0,     // Sum from VOLUNTEER_HOURS column (T)
       unionInterestLocal: 0,      // % interested in local issues (U)
       unionInterestChapter: 0,    // % interested in chapter activities (V)
@@ -230,6 +230,19 @@ function getUnifiedDashboardData(includePII) {
       folderId: '',
       folderUrl: '',
       recentFiles: []
+    },
+
+    // Upcoming Events (from Google Calendar)
+    upcomingEvents: [],
+
+    // Resource Links (from Config sheet)
+    resourceLinks: {
+      surveyUrl: '',
+      contactFormUrl: '',
+      customLink1Name: '',
+      customLink1Url: '',
+      customLink2Name: '',
+      customLink2Url: ''
     },
 
     // Meeting Notes (for member dashboard - completed meetings with published notes)
@@ -1010,7 +1023,7 @@ function getUnifiedDashboardData(includePII) {
   }
   data.hotSpots.lowEngagement.sort(function(a,b){return a.engagement - b.engagement;});
 
-  // Get Google Drive resources folder from Config tab (column AU / 47)
+  // Get Google Drive resources folder from Config tab (column AS / CONFIG_COLS.ARCHIVE_FOLDER_ID)
   try {
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     var archiveFolderId = '';
@@ -1048,6 +1061,79 @@ function getUnifiedDashboardData(includePII) {
     }
   } catch (e) {
     Logger.log('Error accessing Drive resources: ' + e.message);
+  }
+
+  // Populate Upcoming Events from Google Calendars (Grievance Deadlines + Union Meetings)
+  try {
+    var upcomingEvents = [];
+    var eventStart = new Date();
+    var eventEnd = new Date(eventStart.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days ahead
+
+    // Fetch from Grievance Deadlines calendar
+    try {
+      var deadlineCal = getOrCreateDeadlinesCalendar();
+      var deadlineEvents = deadlineCal.getEvents(eventStart, eventEnd);
+      for (var dei = 0; dei < deadlineEvents.length && dei < 20; dei++) {
+        var de = deadlineEvents[dei];
+        upcomingEvents.push({
+          title: de.getTitle(),
+          date: Utilities.formatDate(de.getStartTime(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+          time: Utilities.formatDate(de.getStartTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          endTime: Utilities.formatDate(de.getEndTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          type: 'deadline',
+          description: de.getDescription() || '',
+          location: de.getLocation() || '',
+          allDay: de.isAllDayEvent()
+        });
+      }
+    } catch (calErr) {
+      Logger.log('Error fetching deadline events: ' + calErr.message);
+    }
+
+    // Fetch from Union Meetings calendar
+    try {
+      var meetingCal = getOrCreateMeetingsCalendar();
+      var meetingEvents = meetingCal.getEvents(eventStart, eventEnd);
+      for (var mei = 0; mei < meetingEvents.length && mei < 20; mei++) {
+        var me = meetingEvents[mei];
+        upcomingEvents.push({
+          title: me.getTitle(),
+          date: Utilities.formatDate(me.getStartTime(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+          time: Utilities.formatDate(me.getStartTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          endTime: Utilities.formatDate(me.getEndTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          type: 'meeting',
+          description: me.getDescription() || '',
+          location: me.getLocation() || '',
+          allDay: me.isAllDayEvent()
+        });
+      }
+    } catch (calErr) {
+      Logger.log('Error fetching meeting events: ' + calErr.message);
+    }
+
+    // Sort by date ascending
+    upcomingEvents.sort(function(a, b) {
+      return new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time);
+    });
+
+    data.upcomingEvents = upcomingEvents;
+  } catch (e) {
+    Logger.log('Error populating upcoming events: ' + e.message);
+  }
+
+  // Populate Resource Links from Config sheet
+  try {
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      data.resourceLinks.surveyUrl = String(configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '').trim();
+      data.resourceLinks.contactFormUrl = String(configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).getValue() || '').trim();
+      data.resourceLinks.customLink1Name = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_NAME).getValue() || '').trim();
+      data.resourceLinks.customLink1Url = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_URL).getValue() || '').trim();
+      data.resourceLinks.customLink2Name = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_2_NAME).getValue() || '').trim();
+      data.resourceLinks.customLink2Url = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_2_URL).getValue() || '').trim();
+    }
+  } catch (e) {
+    Logger.log('Error loading resource links: ' + e.message);
   }
 
   // Populate Meeting Notes (completed meetings with notes docs, chronological order)
@@ -1611,6 +1697,7 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="tab" onclick="showTab(\'hotspots\')">Hot Spots</div>' +
     '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
     '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
+    '<div class="tab" onclick="showTab(\'events\')">Events</div>' +
     '<div class="tab" onclick="showTab(\'resources\')">Resources</div>' +
     '<div class="tab" onclick="showTab(\'meetingnotes\')">Meeting Notes</div>' +
     '<div class="tab" onclick="showTab(\'compare\')">Compare</div>' +
@@ -1655,7 +1742,8 @@ function getUnifiedDashboardHtml(isPII) {
 
     // JavaScript
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
+    'function safeUrl(u){if(!u)return"";return/^https?:\\/\\//i.test(u)?u:""}' +
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+escapeHtml(e.message)+"</div>"}' +
@@ -2001,34 +2089,84 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("main-content").innerHTML=html;if(sat.sections&&sat.sections.length>0)renderSatisfactionChart()' +
     '}' +
 
+    // Events Tab - Upcoming events from Google Calendar
+    'else if(tab==="events"){' +
+    'var events=d.upcomingEvents||[];' +
+    'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">event</i>Upcoming Events</h2>";' +
+    // Filter buttons
+    'html+="<div style=\\"display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap\\">";' +
+    'html+="<button class=\\"btn btn-sm event-filter active\\" onclick=\\"filterEvents(\\x27all\\x27,this)\\">All</button>";' +
+    'html+="<button class=\\"btn btn-sm event-filter\\" onclick=\\"filterEvents(\\x27meeting\\x27,this)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">groups</i> Meetings</button>";' +
+    'html+="<button class=\\"btn btn-sm event-filter\\" onclick=\\"filterEvents(\\x27deadline\\x27,this)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">gavel</i> Deadlines</button>";' +
+    'html+="</div>";' +
+    'if(events.length===0){' +
+    'html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#64748b\\">event_busy</i><p style=\\"color:#94a3b8;margin-top:16px\\">No upcoming events in the next 30 days.</p></div>"' +
+    '}else{' +
+    // Group events by date
+    'var grouped={};events.forEach(function(ev){var dk=ev.date;if(!grouped[dk])grouped[dk]=[];grouped[dk].push(ev)});' +
+    'var dateKeys=Object.keys(grouped).sort();' +
+    'dateKeys.forEach(function(dk){' +
+    'var dateObj=new Date(dk+"T12:00:00");var dayName=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dateObj.getDay()];' +
+    'var monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];' +
+    'var dateLabel=dayName+", "+monthNames[dateObj.getMonth()]+" "+dateObj.getDate()+", "+dateObj.getFullYear();' +
+    'var today=new Date();today.setHours(0,0,0,0);var evDate=new Date(dk+"T00:00:00");var isToday=evDate.getTime()===today.getTime();' +
+    'var tomorrow=new Date(today.getTime()+86400000);var isTomorrow=evDate.getTime()===tomorrow.getTime();' +
+    'var prefix=isToday?"Today — ":isTomorrow?"Tomorrow — ":"";' +
+    'html+="<div class=\\"event-date-group\\" data-date=\\""+dk+"\\"><div style=\\"font-size:13px;font-weight:700;color:"+(isToday?"#60a5fa":isTomorrow?"#a78bfa":"#94a3b8")+";margin:20px 0 8px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">calendar_today</i>"+prefix+dateLabel+"</div>";' +
+    'grouped[dk].forEach(function(ev){' +
+    'var typeColor=ev.type==="meeting"?"#22c55e":"#f59e0b";' +
+    'var typeIcon=ev.type==="meeting"?"groups":"gavel";' +
+    'var typeLabel=ev.type==="meeting"?"Meeting":"Deadline";' +
+    'html+="<div class=\\"event-item chart-card\\" data-type=\\""+ev.type+"\\" style=\\"margin-bottom:8px;padding:14px;border-left:3px solid "+typeColor+"\\"><div style=\\"display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px\\"><div style=\\"flex:1;min-width:0\\"><div style=\\"display:flex;align-items:center;gap:8px;margin-bottom:6px\\"><span class=\\"badge\\" style=\\"background:"+typeColor+";color:#fff;font-size:10px;padding:2px 8px\\"><i class=\\"material-icons\\" style=\\"font-size:12px;vertical-align:middle\\">"+typeIcon+"</i> "+typeLabel+"</span></div><div style=\\"font-weight:600;color:#e2e8f0;font-size:14px\\">"+escapeHtml(ev.title)+"</div></div><div style=\\"text-align:right;white-space:nowrap\\"><div style=\\"font-size:12px;color:#60a5fa;font-weight:600\\">"+(ev.allDay?"All Day":ev.time)+"</div>";' +
+    'if(!ev.allDay&&ev.endTime){html+="<div style=\\"font-size:10px;color:#64748b\\">to "+ev.endTime+"</div>"}' +
+    'html+="</div></div>";' +
+    'if(ev.location){html+="<div style=\\"margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+escapeHtml(ev.location)+"</div>"}' +
+    'if(ev.description){html+="<div style=\\"margin-top:4px;font-size:11px;color:#64748b;white-space:pre-line\\">"+escapeHtml(ev.description).substring(0,200)+"</div>"}' +
+    'html+="</div>"});' +
+    'html+="</div>"});' +
+    // Summary card at bottom
+    'var meetingCount=events.filter(function(e){return e.type==="meeting"}).length;' +
+    'var deadlineCount=events.filter(function(e){return e.type==="deadline"}).length;' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">summarize</i>Summary</div><div style=\\"display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center\\"><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#60a5fa\\">"+events.length+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Total Events</div></div><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#22c55e\\">"+meetingCount+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Meetings</div></div><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#f59e0b\\">"+deadlineCount+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Deadlines</div></div></div></div>"' +
+    '}' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+
     // Resources Tab (Enhanced with Steward Directory)
     'else if(tab==="resources"){' +
     'var dr=d.driveResources;' +
+    'var rl=d.resourceLinks||{};' +
     'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">folder</i>Union Resources</h2>";' +
     'html+="<div class=\\"resource-grid\\">";' +
-    'if(dr.folderUrl){html+="<a href=\\""+dr.folderUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contract PDF\\x27)\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Forms\\x27)\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
+    'if(dr.folderUrl){var sfu=safeUrl(dr.folderUrl);if(sfu){html+="<a href=\\""+escapeHtml(sfu)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}}' +
+    // Member Survey link
+    'if(rl.surveyUrl){var ssu=safeUrl(rl.surveyUrl);if(ssu){html+="<a href=\\""+escapeHtml(ssu)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📊</div><div class=\\"resource-title\\">Member Survey</div><div class=\\"resource-desc\\">Complete the member satisfaction survey</div></a>"}}' +
+    // Member Contact Update link
+    'if(rl.contactFormUrl){var scf=safeUrl(rl.contactFormUrl);if(scf){html+="<a href=\\""+escapeHtml(scf)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📋</div><div class=\\"resource-title\\">Contact Update</div><div class=\\"resource-desc\\">Update your personal contact information</div></a>"}}' +
+    // Custom Link 1 (configurable from Config tab)
+    'if(rl.customLink1Url){var sc1=safeUrl(rl.customLink1Url);if(sc1){html+="<a href=\\""+escapeHtml(sc1)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+escapeHtml(rl.customLink1Name||"Custom Link 1")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}}' +
+    // Custom Link 2 (configurable from Config tab)
+    'if(rl.customLink2Url){var sc2=safeUrl(rl.customLink2Url);if(sc2){html+="<a href=\\""+escapeHtml(sc2)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+escapeHtml(rl.customLink2Name||"Custom Link 2")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}}' +
     'html+="</div>";' +
     // Steward Contact Directory with Smart Search
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">contacts</i>Steward Contact Directory</div>";' +
     'html+="<div style=\\"position:relative\\"><input type=\\"text\\" id=\\"stewardSearch\\" placeholder=\\"Start typing to search stewards...\\" oninput=\\"smartFilterStewards()\\" onfocus=\\"showSearchSuggestions()\\" autocomplete=\\"off\\" style=\\"width:100%;padding:10px 10px 10px 36px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><i class=\\"material-icons\\" style=\\"position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#64748b;font-size:18px\\">search</i><div id=\\"searchSuggestions\\" style=\\"display:none;position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #475569;border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.3)\\"></div></div>";' +
     'html+="<div style=\\"display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap\\"><span style=\\"color:#64748b;font-size:11px\\">Quick filters:</span>";' +
     'var locations=[...new Set(d.stewardList.map(function(s){return s.location}))].filter(Boolean).slice(0,5);' +
-    'locations.forEach(function(loc){html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px\\" onclick=\\"quickFilterSteward(\\x27"+loc+"\\x27)\\">"+loc+"</button>"});' +
+    'locations.forEach(function(loc){html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px\\" data-loc=\\""+escapeHtml(loc)+"\\" onclick=\\"quickFilterSteward(this.dataset.loc)\\">"+escapeHtml(loc)+"</button>"});' +
     'html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px;background:#475569\\" onclick=\\"clearStewardFilter()\\">Clear</button></div>";' +
     'html+="<div id=\\"stewardList\\" class=\\"list-container\\" style=\\"max-height:300px\\">";' +
     'if(d.stewardList&&d.stewardList.length>0){d.stewardList.forEach(function(s){' +
-    'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase()+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+s.name+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" onclick=\\"saveStewardContact(\\x27"+s.name+"\\x27,\\x27"+(s.email||"")+"\\x27,\\x27"+(s.phone||"")+"\\x27)\\">Save Contact</button></div>";' +
-    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+s.location+" | "+s.unit+"</div>";' +
-    'if(s.email){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#60a5fa\\">email</i> <a href=\\"mailto:"+s.email+"\\" style=\\"color:#60a5fa\\">"+s.email+"</a></div>"}' +
-    'if(s.phone){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#22c55e\\">phone</i> <a href=\\"tel:"+s.phone+"\\" style=\\"color:#22c55e\\">"+s.phone+"</a></div>"}' +
+    'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+escapeHtml(((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase())+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+escapeHtml(s.name)+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" data-sname=\\""+escapeHtml(s.name)+"\\" data-semail=\\""+escapeHtml(s.email||"")+"\\" data-sphone=\\""+escapeHtml(s.phone||"")+"\\" onclick=\\"saveStewardContact(this.dataset.sname,this.dataset.semail,this.dataset.sphone)\\">Save Contact</button></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+escapeHtml(s.location)+" | "+escapeHtml(s.unit)+"</div>";' +
+    'if(s.email){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#60a5fa\\">email</i> <a href=\\"mailto:"+escapeHtml(s.email)+"\\" style=\\"color:#60a5fa\\">"+escapeHtml(s.email)+"</a></div>"}' +
+    'if(s.phone){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#22c55e\\">phone</i> <a href=\\"tel:"+escapeHtml(s.phone)+"\\" style=\\"color:#22c55e\\">"+escapeHtml(s.phone)+"</a></div>"}' +
     'html+="</div>"})}' +
     'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">No steward contacts available</p>"}' +
     'html+="</div></div>";' +
     'if(dr.recentFiles&&dr.recentFiles.length>0){' +
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">description</i>Recent Files</div><div class=\\"list-container\\">";' +
-    'dr.recentFiles.forEach(function(f){html+="<a href=\\""+f.url+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+f.name+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"});' +
+    'dr.recentFiles.forEach(function(f){var srf=safeUrl(f.url);if(srf){html+="<a href=\\""+escapeHtml(srf)+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+escapeHtml(f.name)+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"}});' +
     'html+="</div></div>"}' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
@@ -2043,8 +2181,8 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<input type=\\"text\\" id=\\"notesSearch\\" placeholder=\\"Search meetings...\\" oninput=\\"filterMeetingNotes()\\" style=\\"width:100%;padding:10px 10px 10px 36px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\">";' +
     'html+="<div id=\\"notesList\\" class=\\"list-container\\" style=\\"max-height:500px\\">";' +
     'notes.forEach(function(n){' +
-    'html+="<div class=\\"meeting-note-item list-item\\" data-search=\\""+((n.name||"")+" "+(n.date||"")+" "+(n.type||"")).toLowerCase()+"\\" style=\\"flex-wrap:wrap;padding:16px\\"><div style=\\"display:flex;justify-content:space-between;width:100%;align-items:center\\"><div><span style=\\"font-weight:600;color:#e2e8f0;font-size:14px\\">"+escapeHtml(n.name)+"</span></div><span class=\\"badge\\" style=\\"background:#475569;color:#e2e8f0\\">"+escapeHtml(n.type)+"</span></div>";' +
-    'html+="<div style=\\"width:100%;margin-top:8px;display:flex;justify-content:space-between;align-items:center\\"><span style=\\"font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">event</i> "+escapeHtml(n.date)+"</span><a href=\\""+n.notesUrl+"\\" target=\\"_blank\\" class=\\"btn btn-sm\\" style=\\"background:#3b82f6;color:white;text-decoration:none;display:flex;align-items:center;gap:4px\\"><i class=\\"material-icons\\" style=\\"font-size:14px\\">open_in_new</i>View Notes</a></div></div>"});' +
+    'html+="<div class=\\"meeting-note-item list-item\\" data-search=\\""+escapeHtml(((n.name||"")+" "+(n.date||"")+" "+(n.type||"")).toLowerCase())+"\\" style=\\"flex-wrap:wrap;padding:16px\\"><div style=\\"display:flex;justify-content:space-between;width:100%;align-items:center\\"><div><span style=\\"font-weight:600;color:#e2e8f0;font-size:14px\\">"+escapeHtml(n.name)+"</span></div><span class=\\"badge\\" style=\\"background:#475569;color:#e2e8f0\\">"+escapeHtml(n.type)+"</span></div>";' +
+    'var snu=safeUrl(n.notesUrl);html+="<div style=\\"width:100%;margin-top:8px;display:flex;justify-content:space-between;align-items:center\\"><span style=\\"font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">event</i> "+escapeHtml(n.date)+"</span>"+(snu?"<a href=\\""+escapeHtml(snu)+"\\" target=\\"_blank\\" class=\\"btn btn-sm\\" style=\\"background:#3b82f6;color:white;text-decoration:none;display:flex;align-items:center;gap:4px\\"><i class=\\"material-icons\\" style=\\"font-size:14px\\">open_in_new</i>View Notes</a>":"")+"</div></div>"});' +
     'html+="</div></div>"}' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
@@ -2151,7 +2289,8 @@ function getUnifiedDashboardHtml(isPII) {
     '{name:"Hot Spots Tab",desc:"Locations with high case concentrations. Heatmap colors show severity. Prioritize these areas.",icon:"whatshot"},' +
     '{name:"Bargaining Tab",desc:"Contract-related metrics for bargaining preparation. Category breakdowns and resolution patterns.",icon:"handshake"},' +
     '{name:"Satisfaction Tab",desc:"Member survey results with section scores, key insights, and actionable recommendations.",icon:"sentiment_satisfied"},' +
-    '{name:"Resources Tab",desc:"Quick links to contract, forms, and resources. Searchable steward contact directory.",icon:"folder"},' +
+    '{name:"Events Tab",desc:"Upcoming events from the union calendar including meetings and grievance deadlines. Filter by type.",icon:"event"},' +
+    '{name:"Resources Tab",desc:"Quick links to survey, contact update form, configurable links, and resources. Searchable steward contact directory.",icon:"folder"},' +
     '{name:"Compare Tab",desc:"Select multiple metrics to compare side-by-side. Export data as CSV for reporting.",icon:"compare"}' +
     '];' +
     'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">search</i>Search Help</div>";' +
@@ -2315,6 +2454,21 @@ function getUnifiedDashboardHtml(isPII) {
     '}' +
 
     // Filter Meeting Notes by search
+    // Filter events by type (Events tab)
+    'function filterEvents(type,btn){' +
+    'document.querySelectorAll(".event-filter").forEach(function(b){b.classList.remove("active")});' +
+    'if(btn)btn.classList.add("active");' +
+    'document.querySelectorAll(".event-item").forEach(function(el){' +
+    'if(type==="all")el.style.display="";' +
+    'else el.style.display=el.getAttribute("data-type")===type?"":"none"' +
+    '});' +
+    'document.querySelectorAll(".event-date-group").forEach(function(g){' +
+    'var visible=g.querySelectorAll(".event-item:not([style*=\\"display: none\\"]),.event-item:not([style*=\\"display:none\\"])");' +
+    'var hasVisible=false;g.querySelectorAll(".event-item").forEach(function(ei){if(ei.style.display!=="none")hasVisible=true});' +
+    'g.style.display=hasVisible?"":"none"' +
+    '})' +
+    '}' +
+
     'function filterMeetingNotes(){' +
     'var q=(document.getElementById("notesSearch")||{value:""}).value.toLowerCase();' +
     'document.querySelectorAll(".meeting-note-item").forEach(function(el){' +
@@ -2343,7 +2497,7 @@ function getUnifiedDashboardHtml(isPII) {
     'if(name)matches.push(name.textContent)}' +
     '});' +
     'if(matches.length>0&&matches.length<10){' +
-    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+escapeHtml(m)+"</div>"}).join("");' +
+    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" data-name=\\""+escapeHtml(m)+"\\" onclick=\\"selectStewardSuggestion(this.dataset.name)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+escapeHtml(m)+"</div>"}).join("");' +
     'suggestions.style.display="block"}else{suggestions.style.display="none"}' +
     '}' +
     'function selectStewardSuggestion(name){' +
@@ -2559,7 +2713,7 @@ function getUnifiedDashboardHtml(isPII) {
     'else if(p.key==="overdue")val=dashData.overdueCount;' +
     'else if(p.key==="morale")val=dashData.moraleScore;' +
     '}' +
-    'html+="<div class=\\"pinned-metric\\"><button class=\\"unpin-btn\\" onclick=\\"togglePin(\\x27"+p.key+"\\x27,\\x27"+p.label+"\\x27)\\"><i class=\\"material-icons\\">close</i></button><div style=\\"font-size:10px;color:#94a3b8\\">"+p.label+"</div><div style=\\"font-size:24px;font-weight:700;color:"+p.color+"\\">"+val+"</div></div>"});' +
+    'html+="<div class=\\"pinned-metric\\"><button class=\\"unpin-btn\\" data-key=\\""+escapeHtml(p.key)+"\\" data-label=\\""+escapeHtml(p.label)+"\\" onclick=\\"togglePin(this.dataset.key,this.dataset.label)\\"><i class=\\"material-icons\\">close</i></button><div style=\\"font-size:10px;color:#94a3b8\\">"+escapeHtml(p.label)+"</div><div style=\\"font-size:24px;font-weight:700;color:"+p.color+"\\">"+val+"</div></div>"});' +
     'html+="</div></div>";' +
     'var content=document.getElementById("main-content");' +
     'if(content)content.insertAdjacentHTML("afterbegin",html)' +
@@ -2572,21 +2726,21 @@ function getUnifiedDashboardHtml(isPII) {
     'var result=JSON.parse(json);' +
     'var html="<div class=\\"drill-breadcrumbs\\">";' +
     'result.breadcrumbs.forEach(function(bc,idx){' +
-    'if(idx<result.breadcrumbs.length-1){html+="<a onclick=\\"showChartDrillDown(\\x27"+type+"\\x27,\\x27"+(bc.key||"")+"\\x27,\\x27"+title+"\\x27)\\">"+bc.label+"</a><span> / </span>"}' +
-    'else{html+="<span style=\\"color:#e2e8f0\\">"+bc.label+"</span>"}' +
+    'if(idx<result.breadcrumbs.length-1){html+="<a data-type=\\""+escapeHtml(type)+"\\" data-key=\\""+escapeHtml(bc.key||"")+"\\" data-title=\\""+escapeHtml(title)+"\\" onclick=\\"showChartDrillDown(this.dataset.type,this.dataset.key,this.dataset.title)\\">"+escapeHtml(bc.label)+"</a><span> / </span>"}' +
+    'else{html+="<span style=\\"color:#e2e8f0\\">"+escapeHtml(bc.label)+"</span>"}' +
     '});html+="</div>";' +
     'if(result.subGroups&&!secondaryKey){' +
     'var sgKeys=Object.keys(result.subGroups);' +
     'if(sgKeys.length>0){html+="<div style=\\"font-size:11px;color:#94a3b8;margin-bottom:6px\\">Drill deeper:</div><div class=\\"drill-sub-groups\\">";' +
     'sgKeys.forEach(function(dim){' +
     'var entries=Object.keys(result.subGroups[dim]);' +
-    'entries.forEach(function(ek){html+="<button class=\\"drill-sub-btn\\" onclick=\\"showChartDrillDown(\\x27"+type+"\\x27,\\x27"+key+"\\x27,\\x27"+title+"\\x27,\\x27"+ek+"\\x27)\\">"+ek+" ("+result.subGroups[dim][ek]+")</button>"});' +
+    'entries.forEach(function(ek){html+="<button class=\\"drill-sub-btn\\" data-type=\\""+escapeHtml(type)+"\\" data-key=\\""+escapeHtml(key)+"\\" data-title=\\""+escapeHtml(title)+"\\" data-ek=\\""+escapeHtml(ek)+"\\" onclick=\\"showChartDrillDown(this.dataset.type,this.dataset.key,this.dataset.title,this.dataset.ek)\\">"+escapeHtml(ek)+" ("+result.subGroups[dim][ek]+")</button>"});' +
     '});html+="</div>"}}' +
     'html+="<div class=\\"drill-down-list\\" style=\\"margin-top:8px\\">";' +
     'result.items.forEach(function(item){' +
-    'if(item.id&&item.member){html+="<div class=\\"drill-down-item\\"><span><strong>"+item.id+"</strong> - "+item.member+"</span><span style=\\"color:#94a3b8\\">"+(item.steward||"")+" | "+(item.location||"")+"</span></div>"}' +
-    'else if(item.id&&item.name){html+="<div class=\\"drill-down-item\\"><span>"+item.name+"</span><span style=\\"color:#94a3b8\\">"+(item.location||"")+(item.isSteward?" (Steward)":"")+"</span></div>"}' +
-    'else if(item.name){html+="<div class=\\"drill-down-item\\"><span>"+item.name+"</span><span style=\\"color:#94a3b8\\">"+(item.location||"")+"</span></div>"}' +
+    'if(item.id&&item.member){html+="<div class=\\"drill-down-item\\"><span><strong>"+escapeHtml(item.id)+"</strong> - "+escapeHtml(item.member)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.steward||"")+" | "+escapeHtml(item.location||"")+"</span></div>"}' +
+    'else if(item.id&&item.name){html+="<div class=\\"drill-down-item\\"><span>"+escapeHtml(item.name)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.location||"")+(item.isSteward?" (Steward)":"")+"</span></div>"}' +
+    'else if(item.name){html+="<div class=\\"drill-down-item\\"><span>"+escapeHtml(item.name)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.location||"")+"</span></div>"}' +
     '});html+="</div>";' +
     'openModal(title+" ("+result.totalCount+")",html)' +
     '}).getMultiLevelDrillDown(dashMode==="steward",type,key,secondaryKey||null)' +
@@ -2655,7 +2809,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var list=JSON.parse(json);var el=document.getElementById("rptScheduleList");if(!el)return;' +
     'if(list.length===0){el.innerHTML="<p style=\\"color:#64748b;font-size:11px\\">No scheduled reports</p>";return}' +
     'var html="<div style=\\"font-size:11px;color:#94a3b8;margin-top:8px\\"><strong>Active Schedules:</strong></div>";' +
-    'list.forEach(function(s){html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span style=\\"font-size:11px;color:#e2e8f0\\">"+s.email+" ("+s.frequency+")</span><button onclick=\\"removeReport(\\x27"+s.id+"\\x27)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px\\">Remove</button></div>"});' +
+    'list.forEach(function(s){html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span style=\\"font-size:11px;color:#e2e8f0\\">"+escapeHtml(s.email)+" ("+escapeHtml(s.frequency)+")</span><button data-id=\\""+escapeHtml(s.id)+"\\" onclick=\\"removeReport(this.dataset.id)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px\\">Remove</button></div>"});' +
     'el.innerHTML=html' +
     '}).getScheduledReports()' +
     '}' +
@@ -2826,7 +2980,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var el=document.getElementById("presetManagerList");if(!el)return;' +
     'if(chartPresets.length===0){el.innerHTML="<p style=\\"color:#64748b\\">No saved presets</p>";return}' +
     'var html="";chartPresets.forEach(function(p){' +
-    'html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span>"+p.name+"</span><button onclick=\\"deletePreset(\\x27"+p.id+"\\x27)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:10px\\">Delete</button></div>"' +
+    'html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span>"+escapeHtml(p.name)+"</span><button data-id=\\""+escapeHtml(p.id)+"\\" onclick=\\"deletePreset(this.dataset.id)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:10px\\">Delete</button></div>"' +
     '});el.innerHTML=html' +
     '}' +
 
@@ -2848,11 +3002,11 @@ function getUnifiedDashboardHtml(isPII) {
     'var html="<div style=\\"padding:4px\\">";' +
     'if(views.length===0){html+="<p style=\\"color:#94a3b8\\">No shared views yet</p>"}' +
     'views.forEach(function(v){' +
-    'html+="<div style=\\"background:#0f172a;padding:12px;border-radius:8px;margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;align-items:center\\"><strong style=\\"color:#e2e8f0\\">"+v.name+"</strong><span style=\\"font-size:10px;color:#64748b\\">by "+v.createdBy+"</span></div>";' +
-    'html+="<div style=\\"font-size:11px;color:#94a3b8;margin-top:4px\\">Shared with: "+(v.sharedWith.join(", ")||"No one")+"</div>";' +
+    'html+="<div style=\\"background:#0f172a;padding:12px;border-radius:8px;margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;align-items:center\\"><strong style=\\"color:#e2e8f0\\">"+escapeHtml(v.name)+"</strong><span style=\\"font-size:10px;color:#64748b\\">by "+escapeHtml(v.createdBy)+"</span></div>";' +
+    'html+="<div style=\\"font-size:11px;color:#94a3b8;margin-top:4px\\">Shared with: "+escapeHtml(v.sharedWith.join(", ")||"No one")+"</div>";' +
     'if(v.comments&&v.comments.length>0){html+="<div style=\\"margin-top:8px;font-size:11px;color:#94a3b8\\">Comments ("+v.comments.length+"):</div>";' +
-    'v.comments.slice(-3).forEach(function(c){html+="<div style=\\"padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.05)\\"><strong>"+c.author+":</strong> "+c.text+"</div>"})}' +
-    'html+="<div style=\\"margin-top:8px;display:flex;gap:6px\\"><button onclick=\\"addCommentToView(\\x27"+v.id+"\\x27)\\" style=\\"font-size:11px;background:none;border:1px solid #334155;color:#94a3b8;padding:4px 8px;border-radius:4px;cursor:pointer\\">Comment</button><button onclick=\\"deleteView(\\x27"+v.id+"\\x27)\\" style=\\"font-size:11px;background:none;border:1px solid #ef4444;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer\\">Delete</button></div>";' +
+    'v.comments.slice(-3).forEach(function(c){html+="<div style=\\"padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.05)\\"><strong>"+escapeHtml(c.author)+":</strong> "+escapeHtml(c.text)+"</div>"})}' +
+    'html+="<div style=\\"margin-top:8px;display:flex;gap:6px\\"><button data-id=\\""+escapeHtml(v.id)+"\\" onclick=\\"addCommentToView(this.dataset.id)\\" style=\\"font-size:11px;background:none;border:1px solid #334155;color:#94a3b8;padding:4px 8px;border-radius:4px;cursor:pointer\\">Comment</button><button data-id=\\""+escapeHtml(v.id)+"\\" onclick=\\"deleteView(this.dataset.id)\\" style=\\"font-size:11px;background:none;border:1px solid #ef4444;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer\\">Delete</button></div>";' +
     'html+="</div>"' +
     '});html+="</div>";' +
     'openModal("Shared Views",html)' +
@@ -2938,7 +3092,7 @@ function getUnifiedDashboardHtml(isPII) {
     'if(notifs.length===0){el.innerHTML="<p>No notifications</p>";return}' +
     'var html="";notifs.slice(0,5).forEach(function(n){' +
     'var style=n.read?"color:#64748b":"color:#e2e8f0;font-weight:500";' +
-    'html+="<div style=\\"padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"+style+"\\" onclick=\\"markNotifRead(\\x27"+n.id+"\\x27)\\">"+n.title+"<br><span style=\\"font-size:10px;color:#64748b\\">"+new Date(n.timestamp).toLocaleString()+"</span></div>"' +
+    'html+="<div style=\\"padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"+style+"\\" data-id=\\""+escapeHtml(n.id)+"\\" onclick=\\"markNotifRead(this.dataset.id)\\">"+escapeHtml(n.title)+"<br><span style=\\"font-size:10px;color:#64748b\\">"+new Date(n.timestamp).toLocaleString()+"</span></div>"' +
     '});el.innerHTML=html;' +
     'var unread=notifs.filter(function(n){return!n.read}).length;' +
     'var badge=document.getElementById("alertBadge");if(badge&&unread>0){badge.textContent=unread;badge.style.display="inline"}' +

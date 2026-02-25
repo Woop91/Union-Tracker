@@ -330,7 +330,7 @@ function getInteractiveDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
     // Debug mode and error handler wrapper
@@ -339,6 +339,7 @@ function getInteractiveDashboardHtml() {
     'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+escapeHtml(e.message))}' +
     'function safeRun(fn,fallback){try{fn()}catch(e){console.error("[Dashboard]",e);if(fallback)fallback(e)}}' +
     'function showLoading(elementId,msg){var el=document.getElementById(elementId);if(el)el.innerHTML="<div class=\\"loading-state\\"><div class=\\"loading-spinner\\"></div><div>"+escapeHtml(msg||"Loading...")+"</div></div>"}' +
+    'function safeUrl(url){if(!url)return "#";var s=String(url).trim();return(/^https?:\\/\\//i.test(s))?escapeHtml(s):"#"}' +
 
     // Tab switching with error handling
     'function switchTab(tabName,btn){' +
@@ -488,8 +489,8 @@ function getInteractiveDashboardHtml() {
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+escapeHtml(g.location)+"</span></div>' +
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+escapeHtml(g.articles)+"</span></div>' +
     '        <div class=\\"detail-actions\\">' +
-    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">⚡ Quick Actions</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-primary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(this.dataset.gid)\\">⚡ Quick Actions</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(this.dataset.gid)\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +
@@ -763,8 +764,8 @@ function getInteractiveDashboardHtml() {
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+escapeHtml(g.steward)+"</span></div>' +
     '        "+(g.resolution?"<div class=\\"detail-row\\"><span class=\\"detail-label\\">✅ Resolution:</span><span class=\\"detail-value\\">"+escapeHtml(g.resolution)+"</span></div>":"")+"' +
     '        <div class=\\"detail-actions\\">' +
-    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">⚡ Quick Actions</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-primary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(this.dataset.gid)\\">⚡ Quick Actions</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(this.dataset.gid)\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +
@@ -850,7 +851,7 @@ function getInteractiveDashboardHtml() {
     '    var maxStatus=Math.max.apply(null,data.grievanceStats.byStatus.map(function(s){return s.count}))||1;' +
     '    data.grievanceStats.byStatus.forEach(function(status){' +
     '      var pct=(status.count/maxStatus*100);' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">"+status.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+status.color+"\\"></div></div><div class=\\"bar-value\\">"+status.count+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">"+escapeHtml(status.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+status.color+"\\"></div></div><div class=\\"bar-value\\">"+status.count+"</div></div>";' +
     '    });' +
     '  }else if(totalG>0){' +
     '    var maxS=Math.max(data.statusCounts.open,data.statusCounts.pending,data.statusCounts.closed)||1;' +
@@ -868,7 +869,7 @@ function getInteractiveDashboardHtml() {
     '    catData.forEach(function(cat,idx){' +
     '      var pct=(cat.count/maxCat*100);' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+cat.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+cat.count+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(cat.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+cat.count+"</div></div>";' +
     '    });' +
     '  }else{html+="<div class=\\"empty-state\\">No issue data</div>"}' +
     '  html+="</div></div>";' +
@@ -880,7 +881,7 @@ function getInteractiveDashboardHtml() {
     '    data.grievanceStats.byLocation.forEach(function(loc,idx){' +
     '      var pct=(loc.total/maxLoc*100);' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+loc.name+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div>"+(loc.open>0?"<div style=\\"position:absolute;right:8px;top:2px;font-size:9px;color:#dc2626\\">"+loc.open+" open</div>":"")+"</div><div class=\\"bar-value\\">"+loc.total+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(loc.name)+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div>"+(loc.open>0?"<div style=\\"position:absolute;right:8px;top:2px;font-size:9px;color:#dc2626\\">"+loc.open+" open</div>":"")+"</div><div class=\\"bar-value\\">"+loc.total+"</div></div>";' +
     '    });' +
     '  }else{html+="<div class=\\"empty-state\\">No location data</div>"}' +
     '  html+="</div></div>";' +
@@ -909,7 +910,7 @@ function getInteractiveDashboardHtml() {
     '    data.stewardPerformance.topPerformers.forEach(function(p,i){' +
     '      var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";' +
     '      var scoreColor=p.score>=70?"#059669":p.score>=50?"#F97316":"#DC2626";' +
-    '      html+="<tr style=\\"border-bottom:1px solid #e5e7eb\\"><td style=\\"padding:8px\\">"+medal+(i+1)+"</td><td style=\\"padding:8px\\">"+p.name+"</td><td style=\\"padding:8px;text-align:center;font-weight:bold;color:"+scoreColor+"\\">"+Math.round(p.score)+"</td><td style=\\"padding:8px;text-align:center\\">"+(p.winRate||0)+"%</td><td style=\\"padding:8px;text-align:center\\">"+(p.avgDays||0)+"</td></tr>";' +
+    '      html+="<tr style=\\"border-bottom:1px solid #e5e7eb\\"><td style=\\"padding:8px\\">"+medal+(i+1)+"</td><td style=\\"padding:8px\\">"+escapeHtml(p.name)+"</td><td style=\\"padding:8px;text-align:center;font-weight:bold;color:"+scoreColor+"\\">"+Math.round(p.score)+"</td><td style=\\"padding:8px;text-align:center\\">"+(p.winRate||0)+"%</td><td style=\\"padding:8px;text-align:center\\">"+(p.avgDays||0)+"</td></tr>";' +
     '    });' +
     '    html+="</table>";' +
     '  }else{html+="<div class=\\"empty-state\\">No performance data available.<br><small>Run Data Integrity Check to generate scores.</small></div>"}' +
@@ -923,7 +924,7 @@ function getInteractiveDashboardHtml() {
     '    data.stewardPerformance.busiestStewards.forEach(function(s,idx){' +
     '      var pct=(s.total/maxCases*100);' +
     '      var openPct=(s.open/s.total*100);' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:110px;font-size:11px\\">"+s.name+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:linear-gradient(90deg,#F97316 "+openPct+"%,#059669 "+openPct+"%)\\"></div></div><div class=\\"bar-value\\">"+s.total+" <small style=\\"color:#F97316\\">("+s.open+" open)</small></div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:110px;font-size:11px\\">"+escapeHtml(s.name)+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:linear-gradient(90deg,#F97316 "+openPct+"%,#059669 "+openPct+"%)\\"></div></div><div class=\\"bar-value\\">"+s.total+" <small style=\\"color:#F97316\\">("+s.open+" open)</small></div></div>";' +
     '    });' +
     '    html+="</div>";' +
     '  }else{html+="<div class=\\"empty-state\\">No steward case data</div>"}' +
@@ -942,7 +943,7 @@ function getInteractiveDashboardHtml() {
     '      data.surveyResults.bySection.forEach(function(sec,idx){' +
     '        var pct=(sec.avg/10*100);' +
     '        var clr=sec.avg>=7?"#059669":sec.avg>=5?"#F97316":"#DC2626";' +
-    '        html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+sec.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+sec.avg+"</div></div>";' +
+    '        html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(sec.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+sec.avg+"</div></div>";' +
     '      });' +
     '      html+="</div>";' +
     '    }else{html+="<div style=\\"color:#999;font-size:12px;text-align:center;padding:10px\\">No section data. Complete surveys to see breakdown.</div>"}' +
@@ -977,7 +978,7 @@ function getInteractiveDashboardHtml() {
     '      var pct=Math.round(loc.count/totalMembers*100);' +
     '      var size=Math.max(60,Math.min(120,60+(loc.count/maxLoc*60)));' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div style=\\"text-align:center;padding:10px\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:10px\\">"+pct+"%</span></div><div style=\\"font-size:11px;color:#666;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis\\">"+loc.name+"</div></div>";' +
+    '      html+="<div style=\\"text-align:center;padding:10px\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:10px\\">"+pct+"%</span></div><div style=\\"font-size:11px;color:#666;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis\\">"+escapeHtml(loc.name)+"</div></div>";' +
     '    });' +
     '    html+="</div>";' +
     '  }else{html+="<div class=\\"empty-state\\">No location data</div>"}' +
@@ -1013,20 +1014,20 @@ function getInteractiveDashboardHtml() {
     '  var c=document.getElementById("resources-content");' +
     '  var html="";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📝 Forms & Submissions</div><div class=\\"link-grid\\">";' +
-    '  if(data.grievanceForm)html+="<a href=\\""+data.grievanceForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">📋 Grievance Form</a>";' +
-    '  if(data.contactForm)html+="<a href=\\""+data.contactForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">✉️ Contact Form</a>";' +
-    '  if(data.satisfactionForm)html+="<a href=\\""+data.satisfactionForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Satisfaction Survey</a>";' +
+    '  if(data.grievanceForm)html+="<a href=\\""+safeUrl(data.grievanceForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📋 Grievance Form</a>";' +
+    '  if(data.contactForm)html+="<a href=\\""+safeUrl(data.contactForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">✉️ Contact Form</a>";' +
+    '  if(data.satisfactionForm)html+="<a href=\\""+safeUrl(data.satisfactionForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Satisfaction Survey</a>";' +
     '  if(!data.grievanceForm&&!data.contactForm&&!data.satisfactionForm)html+="<div class=\\"empty-state\\">No forms configured. Add URLs in Config sheet.</div>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📂 Data & Documents</div><div class=\\"link-grid\\">";' +
-    '  html+="<a href=\\""+data.spreadsheetUrl+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Open Full Spreadsheet</a>";' +
+    '  html+="<a href=\\""+safeUrl(data.spreadsheetUrl)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Open Full Spreadsheet</a>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showMemberDirectory()\\">👥 Member Directory</button>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showGrievanceLog()\\">📋 Grievance Log</button>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showConfigSheet()\\">⚙️ Configuration</button>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">🌐 External Links</div><div class=\\"link-grid\\">";' +
-    '  if(data.orgWebsite)html+="<a href=\\""+data.orgWebsite+"\\" target=\\"_blank\\" class=\\"resource-link\\">🏛️ Organization Website</a>";' +
-    '  if(data.githubRepo)html+="<a href=\\""+data.githubRepo+"\\" target=\\"_blank\\" class=\\"resource-link\\">📦 GitHub Repository</a>";' +
+    '  if(data.orgWebsite)html+="<a href=\\""+safeUrl(data.orgWebsite)+"\\" target=\\"_blank\\" class=\\"resource-link\\">🏛️ Organization Website</a>";' +
+    '  if(data.githubRepo)html+="<a href=\\""+safeUrl(data.githubRepo)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📦 GitHub Repository</a>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">⚡ Quick Actions</div><div class=\\"link-grid\\">";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showMobileUnifiedSearch()\\">🔍 Search All</button>";' +
@@ -1704,6 +1705,61 @@ function saveInteractiveMember(memberData, mode) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!sheet) throw new Error('Member Directory sheet not found');
 
+  // --- Input validation ---
+  var MAX_FIELD_LENGTH = 200;
+  var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var PHONE_REGEX = /^[\d\s\-\+\(\)\.ext]{0,30}$/;
+
+  // Required fields
+  if (!memberData.firstName || !String(memberData.firstName).trim()) {
+    throw new Error('First name is required');
+  }
+  if (!memberData.lastName || !String(memberData.lastName).trim()) {
+    throw new Error('Last name is required');
+  }
+
+  // Field length checks on all string fields
+  var fieldsToCheck = ['firstName', 'lastName', 'jobTitle', 'location', 'unit',
+    'officeDays', 'email', 'phone', 'supervisor', 'manager'];
+  for (var f = 0; f < fieldsToCheck.length; f++) {
+    var fieldName = fieldsToCheck[f];
+    if (memberData[fieldName] && String(memberData[fieldName]).length > MAX_FIELD_LENGTH) {
+      throw new Error(fieldName + ' exceeds maximum length of ' + MAX_FIELD_LENGTH + ' characters');
+    }
+  }
+
+  // Email format validation (if provided)
+  if (memberData.email && String(memberData.email).trim() !== '') {
+    if (!EMAIL_REGEX.test(String(memberData.email).trim())) {
+      throw new Error('Invalid email format');
+    }
+  }
+
+  // Phone format validation (if provided)
+  if (memberData.phone && String(memberData.phone).trim() !== '') {
+    if (!PHONE_REGEX.test(String(memberData.phone).trim())) {
+      throw new Error('Invalid phone format. Use digits, spaces, dashes, parentheses, or dots (max 30 chars)');
+    }
+  }
+
+  // isSteward must be Yes or No
+  if (memberData.isSteward && memberData.isSteward !== 'Yes' && memberData.isSteward !== 'No') {
+    throw new Error('isSteward must be "Yes" or "No"');
+  }
+
+  // Sanitize all string values with escapeForFormula to prevent formula injection
+  var safeFirstName = escapeForFormula(String(memberData.firstName || '').trim());
+  var safeLastName = escapeForFormula(String(memberData.lastName || '').trim());
+  var safeJobTitle = escapeForFormula(String(memberData.jobTitle || '').trim());
+  var safeLocation = escapeForFormula(String(memberData.location || '').trim());
+  var safeUnit = escapeForFormula(String(memberData.unit || '').trim());
+  var safeOfficeDays = escapeForFormula(String(memberData.officeDays || '').trim());
+  var safeEmail = escapeForFormula(String(memberData.email || '').trim());
+  var safePhone = escapeForFormula(String(memberData.phone || '').trim());
+  var safeSupervisor = escapeForFormula(String(memberData.supervisor || '').trim());
+  var safeManager = escapeForFormula(String(memberData.manager || '').trim());
+  var safeIsSteward = (memberData.isSteward === 'Yes') ? 'Yes' : 'No';
+
   if (mode === 'add') {
     // Generate a new member ID
     var existingIds = {};
@@ -1712,28 +1768,28 @@ function saveInteractiveMember(memberData, mode) {
       if (row[0]) existingIds[row[0]] = true;
     });
 
-    var newId = generateNameBasedId('M', memberData.firstName, memberData.lastName, existingIds);
+    var newId = generateNameBasedId('M', safeFirstName, safeLastName, existingIds);
 
     // Create new row array
     var newRow = [];
     for (var i = 0; i < MEMBER_COLS.QUICK_ACTIONS; i++) newRow.push('');
 
     newRow[MEMBER_COLS.MEMBER_ID - 1] = newId;
-    newRow[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName;
-    newRow[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName;
-    newRow[MEMBER_COLS.JOB_TITLE - 1] = memberData.jobTitle || '';
-    newRow[MEMBER_COLS.WORK_LOCATION - 1] = memberData.location || '';
-    newRow[MEMBER_COLS.UNIT - 1] = memberData.unit || '';
-    newRow[MEMBER_COLS.OFFICE_DAYS - 1] = memberData.officeDays || '';
-    newRow[MEMBER_COLS.EMAIL - 1] = memberData.email || '';
-    newRow[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
-    newRow[MEMBER_COLS.SUPERVISOR - 1] = memberData.supervisor || '';
-    newRow[MEMBER_COLS.MANAGER - 1] = memberData.manager || '';
-    newRow[MEMBER_COLS.IS_STEWARD - 1] = memberData.isSteward || 'No';
+    newRow[MEMBER_COLS.FIRST_NAME - 1] = safeFirstName;
+    newRow[MEMBER_COLS.LAST_NAME - 1] = safeLastName;
+    newRow[MEMBER_COLS.JOB_TITLE - 1] = safeJobTitle;
+    newRow[MEMBER_COLS.WORK_LOCATION - 1] = safeLocation;
+    newRow[MEMBER_COLS.UNIT - 1] = safeUnit;
+    newRow[MEMBER_COLS.OFFICE_DAYS - 1] = safeOfficeDays;
+    newRow[MEMBER_COLS.EMAIL - 1] = safeEmail;
+    newRow[MEMBER_COLS.PHONE - 1] = safePhone;
+    newRow[MEMBER_COLS.SUPERVISOR - 1] = safeSupervisor;
+    newRow[MEMBER_COLS.MANAGER - 1] = safeManager;
+    newRow[MEMBER_COLS.IS_STEWARD - 1] = safeIsSteward;
 
     // Append the new row
     sheet.appendRow(newRow);
-    ss.toast('New member added: ' + memberData.firstName + ' ' + memberData.lastName + ' (' + newId + ')', 'Member Added', 5);
+    ss.toast('New member added: ' + safeFirstName + ' ' + safeLastName + ' (' + newId + ')', 'Member Added', 5);
 
     return { success: true, memberId: newId, mode: 'add' };
 
@@ -1754,19 +1810,19 @@ function saveInteractiveMember(memberData, mode) {
     if (rowIndex === -1) throw new Error('Member not found: ' + memberId);
 
     // Update the member data
-    sheet.getRange(rowIndex, MEMBER_COLS.FIRST_NAME).setValue(memberData.firstName);
-    sheet.getRange(rowIndex, MEMBER_COLS.LAST_NAME).setValue(memberData.lastName);
-    sheet.getRange(rowIndex, MEMBER_COLS.JOB_TITLE).setValue(memberData.jobTitle || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.WORK_LOCATION).setValue(memberData.location || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.UNIT).setValue(memberData.unit || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.OFFICE_DAYS).setValue(memberData.officeDays || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.EMAIL).setValue(memberData.email || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.PHONE).setValue(memberData.phone || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.SUPERVISOR).setValue(memberData.supervisor || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.MANAGER).setValue(memberData.manager || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.IS_STEWARD).setValue(memberData.isSteward || 'No');
+    sheet.getRange(rowIndex, MEMBER_COLS.FIRST_NAME).setValue(safeFirstName);
+    sheet.getRange(rowIndex, MEMBER_COLS.LAST_NAME).setValue(safeLastName);
+    sheet.getRange(rowIndex, MEMBER_COLS.JOB_TITLE).setValue(safeJobTitle);
+    sheet.getRange(rowIndex, MEMBER_COLS.WORK_LOCATION).setValue(safeLocation);
+    sheet.getRange(rowIndex, MEMBER_COLS.UNIT).setValue(safeUnit);
+    sheet.getRange(rowIndex, MEMBER_COLS.OFFICE_DAYS).setValue(safeOfficeDays);
+    sheet.getRange(rowIndex, MEMBER_COLS.EMAIL).setValue(safeEmail);
+    sheet.getRange(rowIndex, MEMBER_COLS.PHONE).setValue(safePhone);
+    sheet.getRange(rowIndex, MEMBER_COLS.SUPERVISOR).setValue(safeSupervisor);
+    sheet.getRange(rowIndex, MEMBER_COLS.MANAGER).setValue(safeManager);
+    sheet.getRange(rowIndex, MEMBER_COLS.IS_STEWARD).setValue(safeIsSteward);
 
-    ss.toast('Member updated: ' + memberData.firstName + ' ' + memberData.lastName, 'Member Updated', 5);
+    ss.toast('Member updated: ' + safeFirstName + ' ' + safeLastName, 'Member Updated', 5);
 
     return { success: true, memberId: memberId, mode: 'edit' };
   }

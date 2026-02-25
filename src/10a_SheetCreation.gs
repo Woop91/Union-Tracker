@@ -40,35 +40,49 @@
  */
 function createConfigSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.CONFIG);
+  var isExistingSheet = sheet.getLastRow() > 2;
+
   // Only clear if sheet is new or has no meaningful data (≤2 rows = headers only)
-  if (sheet.getLastRow() <= 2) {
+  if (!isExistingSheet) {
     sheet.clear();
   } else {
-    Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear to preserve settings');
-    return sheet;
+    Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
+
+    // Migration: remove orphaned "Yes/No (Dropdowns)" column (was column E).
+    // Deleting the column shifts all data to the right of it left by 1,
+    // keeping headers and data aligned.
+    migrateRemoveYesNoColumn_(sheet);
   }
 
   // Row 1: Section Headers (grouped categories)
   var sectionHeaders = [
-    '── EMPLOYMENT INFO ──', '', '', '', '',           // A-E (5 cols)
-    '── SUPERVISION ──', '',                            // F-G (2 cols)
-    '── STEWARD INFO ──', '',                           // H-I (2 cols)
+    '── EMPLOYMENT INFO ──', '', '', '',                // A-D (4 cols)
+    '── SUPERVISION ──', '',                            // E-F (2 cols)
+    '── STEWARD INFO ──', '',                           // G-H (2 cols)
     '── GRIEVANCE SETTINGS ──', '', '', '',             // J-M (4 cols)
     '── LINKS & COORDINATORS ──', '', '', '',           // N-Q (4 cols)
     '── NOTIFICATIONS ──', '', '',                      // R-T (3 cols)
     '── ORGANIZATION ──', '', '', '',                   // U-X (4 cols)
     '── INTEGRATION ──', '',                            // Y-Z (2 cols)
     '── DEADLINES ──', '', '', '',                      // AA-AD (4 cols)
-    '── MULTI-SELECT OPTIONS ──', '',                   // AE-AF (2 cols)
-    '── CONTRACT & LEGAL ──', '', '', '',               // AG-AJ (4 cols)
-    '── ORG IDENTITY ──', '', '',                       // AK-AM (3 cols)
-    '── EXTENDED CONTACT ──', '', '', '', '',           // AN-AR (5 cols)
-    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AS-AY (7 cols)
-    '── MOBILE DASHBOARD ──'                            // AZ (1 col) - LAST COLUMN
+    '── MULTI-SELECT OPTIONS ──',                        // AE (1 col)
+    '── CONTRACT & LEGAL ──', '', '', '',               // AF-AI (4 cols)
+    '── ORG IDENTITY ──', '', '',                       // AJ-AL (3 cols)
+    '── EXTENDED CONTACT ──', '', '', '', '',           // AM-AQ (5 cols)
+    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AR-AX (7 cols)
+    '── MOBILE DASHBOARD ──', '', '', '', '', '', '',    // AY-BE (7 cols)
+    '── CUSTOM LINKS ──', '', '', '',                     // BE-BH (4 cols)
+    '── SURVEY LOG ──', ''                                // BI-BJ (2 cols)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
   var columnHeaders = getHeadersFromMap_(CONFIG_HEADER_MAP_);
+
+  // Ensure sheet has enough columns for all headers (handles sheets created before new columns were added)
+  ensureMinimumColumns(sheet, columnHeaders.length);
+
+  // Always apply headers (Row 1 & 2) — safe to overwrite since these are structure, not data.
+  // This ensures existing sheets pick up newly-added columns beyond AZ.
 
   // Apply section headers (Row 1)
   sheet.getRange(1, 1, 1, sectionHeaders.length).setValues([sectionHeaders])
@@ -86,75 +100,88 @@ function createConfigSheet(ss) {
     .setHorizontalAlignment('center');
 
   // Add default dropdown values (Row 3+)
+  // For existing sheets, seedConfigDefault_ only writes to columns that are currently empty.
+  // This ensures re-running CREATE_DASHBOARD fills in newly-added columns without
+  // overwriting user-customized values.
+
   // Office Days (D)
-  sheet.getRange(3, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS.length, 1)
-    .setValues(DEFAULT_CONFIG.OFFICE_DAYS.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, isExistingSheet);
 
-  // Yes/No (E)
-  sheet.getRange(3, CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO.length, 1)
-    .setValues(DEFAULT_CONFIG.YES_NO.map(function(v) { return [v]; }));
-
-  // Steward Committees (I)
+  // Steward Committees (H)
   var committees = ['Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
                     'Political Action Committee', 'Membership Committee', 'Executive Board'];
-  sheet.getRange(3, CONFIG_COLS.STEWARD_COMMITTEES, committees.length, 1)
-    .setValues(committees.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_COMMITTEES, committees, isExistingSheet);
 
   // Grievance Status (J)
-  sheet.getRange(3, CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS.length, 1)
-    .setValues(DEFAULT_CONFIG.GRIEVANCE_STATUS.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS, isExistingSheet);
 
   // Grievance Step (K)
-  sheet.getRange(3, CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP.length, 1)
-    .setValues(DEFAULT_CONFIG.GRIEVANCE_STEP.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP, isExistingSheet);
 
   // Issue Category (L)
-  sheet.getRange(3, CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY.length, 1)
-    .setValues(DEFAULT_CONFIG.ISSUE_CATEGORY.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY, isExistingSheet);
 
   // Articles (M)
-  sheet.getRange(3, CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES.length, 1)
-    .setValues(DEFAULT_CONFIG.ARTICLES.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES, isExistingSheet);
 
   // Communication Methods (N)
-  sheet.getRange(3, CONFIG_COLS.COMM_METHODS, DEFAULT_CONFIG.COMM_METHODS.length, 1)
-    .setValues(DEFAULT_CONFIG.COMM_METHODS.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.COMM_METHODS, DEFAULT_CONFIG.COMM_METHODS, isExistingSheet);
 
   // Alert Days (S) - default notification intervals
-  sheet.getRange(3, CONFIG_COLS.ALERT_DAYS, 1, 1).setValue('3, 7, 14');
+  seedConfigDefault_(sheet, CONFIG_COLS.ALERT_DAYS, ['3, 7, 14'], isExistingSheet);
 
   // Organization defaults (placeholders — update in Config sheet)
-  sheet.getRange(3, CONFIG_COLS.ORG_NAME, 1, 1).setValue('Your Union Name');
-  sheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER, 1, 1).setValue('000');
-  sheet.getRange(3, CONFIG_COLS.MAIN_ADDRESS, 1, 1).setValue('123 Main Street, Suite 100, City, ST 00000');
-  sheet.getRange(3, CONFIG_COLS.MAIN_PHONE, 1, 1).setValue('555-000-0000');
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_NAME, ['Your Union Name'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOCAL_NUMBER, ['000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_ADDRESS, ['123 Main Street, Suite 100, City, ST 00000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_PHONE, ['555-000-0000'], isExistingSheet);
 
   // Deadline defaults (in days) — values from DEADLINE_DEFAULTS (01_Core.gs)
-  sheet.getRange(3, CONFIG_COLS.FILING_DEADLINE_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.FILING_DAYS);
-  sheet.getRange(3, CONFIG_COLS.STEP1_RESPONSE_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.STEP_1_RESPONSE);
-  sheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.STEP_2_APPEAL);
-  sheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.STEP_2_RESPONSE);
+  seedConfigDefault_(sheet, CONFIG_COLS.FILING_DEADLINE_DAYS, [DEADLINE_DEFAULTS.FILING_DAYS], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEP1_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_1_RESPONSE], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEP2_APPEAL_DAYS, [DEADLINE_DEFAULTS.STEP_2_APPEAL], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEP2_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_2_RESPONSE], isExistingSheet);
 
   // Best Times to Contact (AE)
   var bestTimes = ['Morning (8am-12pm)', 'Afternoon (12pm-5pm)', 'Evening (5pm-8pm)', 'Weekends', 'Flexible'];
-  sheet.getRange(3, CONFIG_COLS.BEST_TIMES, bestTimes.length, 1)
-    .setValues(bestTimes.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.BEST_TIMES, bestTimes, isExistingSheet);
 
   // Contract articles
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_GRIEVANCE, 1, 1).setValue('Article XX');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_DISCIPLINE, 1, 1).setValue('Article YY');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_WORKLOAD, 1, 1).setValue('Article ZZ');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_NAME, 1, 1).setValue('Current CBA');
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_GRIEVANCE, ['Article XX'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_DISCIPLINE, ['Article YY'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_WORKLOAD, ['Article ZZ'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_NAME, ['Current CBA'], isExistingSheet);
 
   // Org identity
-  sheet.getRange(3, CONFIG_COLS.UNION_PARENT, 1, 1).setValue('Your Parent Union');
-  sheet.getRange(3, CONFIG_COLS.STATE_REGION, 1, 1).setValue('Your State');
-  sheet.getRange(3, CONFIG_COLS.ORG_WEBSITE, 1, 1).setValue('https://www.example.org/');
+  seedConfigDefault_(sheet, CONFIG_COLS.UNION_PARENT, ['Your Parent Union'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STATE_REGION, ['Your State'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_WEBSITE, ['https://www.example.org/'], isExistingSheet);
 
   // Extended contact
-  sheet.getRange(3, CONFIG_COLS.MAIN_FAX, 1, 1).setValue('555-000-0001');
-  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_NAME, 1, 1).setValue('Contact Name');
-  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_EMAIL, 1, 1).setValue('contact@example.org');
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_FAX, ['555-000-0001'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_NAME, ['Contact Name'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_EMAIL, ['contact@example.org'], isExistingSheet);
+
+  // Escalation triggers (comma-separated values read at runtime)
+  var escalationStatuses = COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
+  seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STATUSES, escalationStatuses, isExistingSheet);
+
+  var escalationSteps = COMMAND_CONFIG.ESCALATION_STEPS || ['Step II', 'Step III', 'Arbitration'];
+  seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STEPS, escalationSteps, isExistingSheet);
+
+  // Mobile Dashboard & branding defaults
+  seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [250], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['UN'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_LABEL, ['Steward'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MEMBER_LABEL, ['Member'], isExistingSheet);
+
+  // Custom links (placeholders)
+  seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_1_NAME, ['Resources'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_1_URL, ['https://www.example.org/resources'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_2_NAME, ['Help'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_2_URL, ['https://www.example.org/help'], isExistingSheet);
 
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
@@ -174,6 +201,187 @@ function createConfigSheet(ss) {
 
   // Set tab color
   sheet.setTabColor(COLORS.PRIMARY_PURPLE);
+}
+
+/**
+ * Migration: removes the orphaned "Yes/No (Dropdowns)" column from existing Config sheets.
+ * The column was removed from CONFIG_HEADER_MAP_ but existing sheets still have it.
+ * Deleting the physical column shifts all data right of it left by 1, keeping
+ * headers and data aligned when new headers are applied.
+ * @param {Sheet} sheet - The Config sheet
+ * @private
+ */
+function migrateRemoveYesNoColumn_(sheet) {
+  // Check row 2 for the old header — only migrate if it's still present
+  var maxCol = sheet.getMaxColumns();
+  if (maxCol < 5) return;
+  var row2 = sheet.getRange(2, 1, 1, Math.min(maxCol, 10)).getValues()[0];
+  for (var c = 0; c < row2.length; c++) {
+    if (String(row2[c]).trim() === 'Yes/No (Dropdowns)') {
+      sheet.deleteColumn(c + 1); // 1-indexed
+      Logger.log('migrateRemoveYesNoColumn_: deleted orphaned Yes/No column at position ' + (c + 1));
+      return;
+    }
+  }
+}
+
+/**
+ * Seeds default values into a Config column only if the column is currently empty.
+ * For new sheets (isExisting=false), always writes. For existing sheets,
+ * checks whether the column already has data and skips if so.
+ * @param {Sheet} sheet - The Config sheet
+ * @param {number} col - 1-indexed column number
+ * @param {Array} values - Array of default values to write
+ * @param {boolean} isExisting - Whether the sheet already had data
+ * @private
+ */
+function seedConfigDefault_(sheet, col, values, isExisting) {
+  if (isExisting) {
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 3) {
+      var existing = sheet.getRange(3, col, lastRow - 2, 1).getValues();
+      for (var i = 0; i < existing.length; i++) {
+        if (existing[i][0] !== '' && existing[i][0] !== null) {
+          return; // Column already has data, don't overwrite
+        }
+      }
+    }
+  }
+  sheet.getRange(3, col, values.length, 1)
+    .setValues(values.map(function(v) { return [v]; }));
+}
+
+/**
+ * Scans Grievance Log and Member Directory for unique values in dropdown
+ * columns and backfills them into the Config sheet. This handles the case
+ * where data was entered before dropdown sync was active, or where bulk
+ * imports/pastes bypassed the onEdit trigger.
+ *
+ * Safe to run multiple times — skips values already present in Config.
+ * Callable from menu: Union Hub > Admin > Populate Config from Sheet Data
+ */
+function populateConfigFromSheetData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) {
+    SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.');
+    return;
+  }
+
+  var added = 0;
+
+  // Gather all dropdown and multi-select mappings
+  var sources = [
+    { sheetName: SHEETS.MEMBER_DIR, maps: DROPDOWN_MAP.MEMBER_DIR.concat(MULTI_SELECT_COLS.MEMBER_DIR) },
+    { sheetName: SHEETS.GRIEVANCE_LOG, maps: DROPDOWN_MAP.GRIEVANCE_LOG.concat(MULTI_SELECT_COLS.GRIEVANCE_LOG) }
+  ];
+
+  for (var s = 0; s < sources.length; s++) {
+    var sourceSheet = ss.getSheetByName(sources[s].sheetName);
+    if (!sourceSheet || sourceSheet.getLastRow() < 2) continue;
+
+    var data = sourceSheet.getDataRange().getValues();
+
+    for (var m = 0; m < sources[s].maps.length; m++) {
+      var mapping = sources[s].maps[m];
+      var targetCol = mapping.col;       // column in source sheet (1-indexed)
+      var configCol = mapping.configCol;  // column in Config (1-indexed)
+
+      // Collect existing Config values for this column
+      var existingSet = {};
+      var configLastRow = configSheet.getLastRow();
+      if (configLastRow >= 3) {
+        var configData = configSheet.getRange(3, configCol, configLastRow - 2, 1).getValues();
+        for (var c = 0; c < configData.length; c++) {
+          var cv = (configData[c][0] || '').toString().trim();
+          if (cv) existingSet[cv] = true;
+        }
+      }
+
+      // Scan the source sheet for unique values in this column
+      for (var r = 1; r < data.length; r++) {
+        var cellVal = (data[r][targetCol - 1] || '').toString().trim();
+        if (!cellVal) continue;
+
+        // Handle comma-separated multi-select values
+        var parts = cellVal.split(',');
+        for (var p = 0; p < parts.length; p++) {
+          var val = parts[p].trim();
+          // Skip pure-numeric values — they're data-entry errors (index numbers
+          // instead of text labels). All dropdown Config columns expect text.
+          if (val && !existingSet[val] && !/^\d+$/.test(val)) {
+            addToConfigDropdown_(configCol, val);
+            existingSet[val] = true;
+            added++;
+          }
+        }
+      }
+    }
+  }
+
+  // Dedup and sort each Config dropdown column
+  deduplicateAndSortConfigColumns_(configSheet);
+
+  ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
+}
+
+/**
+ * Deduplicates and alphabetically sorts all dropdown/multi-select Config columns.
+ * Preserves rows 1-2 (section/column headers). Only touches row 3+.
+ * @param {Sheet} configSheet - The Config sheet
+ * @private
+ */
+function deduplicateAndSortConfigColumns_(configSheet) {
+  if (!configSheet) return;
+
+  // Gather all Config columns that are populated by dropdown/multi-select sync
+  var configColsToClean = {};
+  var ddMember = DROPDOWN_MAP.MEMBER_DIR;
+  var ddGriev = DROPDOWN_MAP.GRIEVANCE_LOG;
+  var msMember = MULTI_SELECT_COLS.MEMBER_DIR;
+  var msGriev = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+
+  var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
+  for (var i = 0; i < allMaps.length; i++) {
+    var cc = allMaps[i].configCol;
+    if (cc) {
+      configColsToClean[cc] = true;
+    }
+  }
+
+  var lastRow = configSheet.getLastRow();
+  if (lastRow < 3) return;
+  var dataRows = lastRow - 2;
+
+  for (var colNum in configColsToClean) {
+    colNum = parseInt(colNum, 10);
+    var colData = configSheet.getRange(3, colNum, dataRows, 1).getValues();
+
+    // Collect unique non-empty values
+    var seen = {};
+    var unique = [];
+    for (var r = 0; r < colData.length; r++) {
+      var v = (colData[r][0] || '').toString().trim();
+      if (v && !seen[v]) {
+        // Also reject pure-numeric values during cleanup
+        if (/^\d+$/.test(v)) continue;
+        seen[v] = true;
+        unique.push(v);
+      }
+    }
+
+    // Sort alphabetically (case-insensitive)
+    unique.sort(function(a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    // Write back: sorted values + blank fill for remaining rows
+    var writeData = [];
+    for (var w = 0; w < dataRows; w++) {
+      writeData.push([w < unique.length ? unique[w] : '']);
+    }
+    configSheet.getRange(3, colNum, dataRows, 1).setValues(writeData);
+  }
 }
 
 /**
@@ -258,7 +466,7 @@ function applyConfigSheetStyling(sheet) {
  * @private
  */
 function applySectionColors_(sheet, lastCol) {
-  // Section color definitions (15 sections, columns A-AZ)
+  // Section color definitions (16 sections, columns A-BI)
   var SECTION_COLORS = {
     EMPLOYMENT: { bg: '#3b82f6', text: '#ffffff' },      // Blue - A-E
     SUPERVISION: { bg: '#8b5cf6', text: '#ffffff' },     // Violet - F-G
@@ -269,16 +477,17 @@ function applySectionColors_(sheet, lastCol) {
     ORGANIZATION: { bg: '#22c55e', text: '#ffffff' },    // Green - U-X
     INTEGRATION: { bg: '#14b8a6', text: '#ffffff' },     // Teal - Y-Z
     DEADLINES: { bg: '#ec4899', text: '#ffffff' },       // Pink - AA-AD
-    MULTISELECT: { bg: '#a855f7', text: '#ffffff' },     // Purple - AE-AF
-    CONTRACT: { bg: '#6366f1', text: '#ffffff' },        // Indigo - AG-AJ
-    IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AK-AM
-    EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AN-AR
-    COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AS-AY
-    MOBILE: { bg: '#10b981', text: '#ffffff' }           // Emerald - AZ (LAST COLUMN)
+    MULTISELECT: { bg: '#a855f7', text: '#ffffff' },     // Purple - AE
+    CONTRACT: { bg: '#6366f1', text: '#ffffff' },        // Indigo - AF-AI
+    IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AJ-AL
+    EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AM-AQ
+    COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AR-AX
+    MOBILE: { bg: '#10b981', text: '#ffffff' },          // Emerald - AY-BE
+    CUSTOM_LINKS: { bg: '#f59e0b', text: '#1e293b' }    // Amber - BF-BI
   };
 
   // Apply colors by column ranges (both row 1 section header and row 2 column header)
-  // Total: 52 columns (A-AZ)
+  // Total: 61 columns (A-BI)
   var sections = [
     { start: 1, end: 5, color: SECTION_COLORS.EMPLOYMENT },      // A-E
     { start: 6, end: 7, color: SECTION_COLORS.SUPERVISION },     // F-G
@@ -289,12 +498,13 @@ function applySectionColors_(sheet, lastCol) {
     { start: 21, end: 24, color: SECTION_COLORS.ORGANIZATION },  // U-X
     { start: 25, end: 26, color: SECTION_COLORS.INTEGRATION },   // Y-Z
     { start: 27, end: 30, color: SECTION_COLORS.DEADLINES },     // AA-AD
-    { start: 31, end: 32, color: SECTION_COLORS.MULTISELECT },   // AE-AF
-    { start: 33, end: 36, color: SECTION_COLORS.CONTRACT },      // AG-AJ
-    { start: 37, end: 39, color: SECTION_COLORS.IDENTITY },      // AK-AM
-    { start: 40, end: 44, color: SECTION_COLORS.EXTENDED },      // AN-AR
-    { start: 45, end: 51, color: SECTION_COLORS.COMMAND },       // AS-AY (Strategic Command Center)
-    { start: 52, end: 52, color: SECTION_COLORS.MOBILE }         // AZ (Mobile Dashboard - LAST COLUMN)
+    { start: 31, end: 31, color: SECTION_COLORS.MULTISELECT },   // AE
+    { start: 32, end: 35, color: SECTION_COLORS.CONTRACT },      // AF-AI
+    { start: 36, end: 38, color: SECTION_COLORS.IDENTITY },      // AJ-AL
+    { start: 39, end: 43, color: SECTION_COLORS.EXTENDED },      // AM-AQ
+    { start: 44, end: 50, color: SECTION_COLORS.COMMAND },       // AR-AX (Strategic Command Center)
+    { start: 51, end: 57, color: SECTION_COLORS.MOBILE },        // AY-BE (Mobile Dashboard)
+    { start: 58, end: 61, color: SECTION_COLORS.CUSTOM_LINKS }   // BF-BI (Custom Links)
   ];
 
   sections.forEach(function(section) {
@@ -569,8 +779,8 @@ function createMemberDirectory(ss) {
   });
 
   // Format numeric columns with comma separators
-  sheet.getRange(2, MEMBER_COLS.OPEN_RATE, 998, 1).setNumberFormat('#,##0.0');       // S - Open Rate %
-  sheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, 998, 1).setNumberFormat('#,##0');  // T - Volunteer Hours
+  sheet.getRange(2, MEMBER_COLS.OPEN_RATE, 998, 1).setNumberFormat('#,##0.0');       // T - Open Rate %
+  sheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, 998, 1).setNumberFormat('#,##0');  // U - Volunteer Hours
 
   // Columns AB-AD (Has Open Grievance?, Grievance Status, Days to Deadline)
   // are populated by syncGrievanceToMemberDirectory() with STATIC values
@@ -725,7 +935,7 @@ function createMemberDirectory(ss) {
   // This enables sorting via dropdown on: Last Name, Job Title, Work Location, Unit,
   // Office Days, Preferred Communication, Best Time to Contact, Supervisor, Manager,
   // Committees, Assigned Steward, Last Virtual Mtg, Last In-Person Mtg, Open Rate %,
-  // Volunteer Hours, Interest: Local/Chapter/Allied, Home Town, Recent Contact Date,
+  // Volunteer Hours, Interest: Local/Chapter/Allied, Recent Contact Date,
   // Contact Steward, Contact Notes, Has Open Grievance?, Grievance Status, Days to Deadline
   var filterRange = sheet.getRange(1, 1, 5000, headers.length);
   filterRange.createFilter();

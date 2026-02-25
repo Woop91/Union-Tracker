@@ -210,7 +210,7 @@ function sendContactInfoForm() {
   if (response === ui.Button.YES) {
     // Open form in new window
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
     ).setWidth(1).setHeight(1);
     ui.showModalDialog(html, 'Opening form...');
   } else if (response === ui.Button.NO) {
@@ -219,7 +219,7 @@ function sendContactInfoForm() {
       '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
       '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
       '<p>Copy this link and share with members:</p>' +
-      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + formUrl + '</textarea>' +
+      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + escapeHtml(formUrl) + '</textarea>' +
       '<br><br>' +
       '<button onclick="copyLink()" style="padding: 8px 16px; cursor: pointer;">Copy to Clipboard</button>' +
       '<span id="copied" style="color: green; margin-left: 10px; display: none;">Copied!</span>' +
@@ -316,31 +316,31 @@ function onContactFormSubmit(e) {
       }
       var memberId = generateNameBasedId('M', firstName, lastName, existingIds);
 
-      // Build new row array
+      // Build new row array (escapeForFormula on all user-supplied strings to prevent formula injection)
       var newRow = [];
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
-      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
-      newRow[MEMBER_COLS.JOB_TITLE - 1] = jobTitle || '';
-      newRow[MEMBER_COLS.WORK_LOCATION - 1] = workLocation || '';
-      newRow[MEMBER_COLS.UNIT - 1] = unit || '';
-      newRow[MEMBER_COLS.OFFICE_DAYS - 1] = officeDays || '';
-      newRow[MEMBER_COLS.EMAIL - 1] = email || '';
-      newRow[MEMBER_COLS.PHONE - 1] = phone || '';
-      newRow[MEMBER_COLS.PREFERRED_COMM - 1] = preferredComm || '';
-      newRow[MEMBER_COLS.BEST_TIME - 1] = bestTime || '';
-      newRow[MEMBER_COLS.SUPERVISOR - 1] = supervisor || '';
-      newRow[MEMBER_COLS.MANAGER - 1] = manager || '';
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(firstName);
+      newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(lastName);
+      newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(jobTitle || '');
+      newRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(workLocation || '');
+      newRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(unit || '');
+      newRow[MEMBER_COLS.OFFICE_DAYS - 1] = escapeForFormula(officeDays || '');
+      newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(email || '');
+      newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(phone || '');
+      newRow[MEMBER_COLS.PREFERRED_COMM - 1] = escapeForFormula(preferredComm || '');
+      newRow[MEMBER_COLS.BEST_TIME - 1] = escapeForFormula(bestTime || '');
+      newRow[MEMBER_COLS.SUPERVISOR - 1] = escapeForFormula(supervisor || '');
+      newRow[MEMBER_COLS.MANAGER - 1] = escapeForFormula(manager || '');
       newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-      newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = interestLocal || '';
-      newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = interestChapter || '';
-      newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = interestAllied || '';
+      newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = escapeForFormula(interestLocal || '');
+      newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = escapeForFormula(interestChapter || '');
+      newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = escapeForFormula(interestAllied || '');
       newRow[MEMBER_COLS.HIRE_DATE - 1] = hireDate ? parseFormDate_(hireDate) : '';
-      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = employeeId || '';
-      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = streetAddress || '';
-      newRow[MEMBER_COLS.CITY - 1] = city || '';
-      newRow[MEMBER_COLS.STATE - 1] = state || '';
-      newRow[MEMBER_COLS.ZIP_CODE - 1] = zipCode || '';
+      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(employeeId || '');
+      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = escapeForFormula(streetAddress || '');
+      newRow[MEMBER_COLS.CITY - 1] = escapeForFormula(city || '');
+      newRow[MEMBER_COLS.STATE - 1] = escapeForFormula(state || '');
+      newRow[MEMBER_COLS.ZIP_CODE - 1] = escapeForFormula(zipCode || '');
 
       // Append new member row
       memberSheet.appendRow(newRow);
@@ -619,7 +619,7 @@ function getSatisfactionSurveyLink() {
   if (response === ui.Button.YES) {
     // Open form in new window
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
     ).setWidth(1).setHeight(1);
     ui.showModalDialog(html, 'Opening survey...');
   } else if (response === ui.Button.NO) {
@@ -628,7 +628,7 @@ function getSatisfactionSurveyLink() {
       '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
       '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
       '<p>Copy this link and share with members:</p>' +
-      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + formUrl + '</textarea>' +
+      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + escapeHtml(formUrl) + '</textarea>' +
       '<br><br>' +
       '<button onclick="copyLink()" style="padding: 8px 16px; cursor: pointer;">Copy to Clipboard</button>' +
       '<span id="copied" style="color: green; margin-left: 10px; display: none;">Copied!</span>' +
@@ -794,6 +794,13 @@ function onSatisfactionFormSubmit(e) {
     var memberMatch = validateMemberEmail(email);
     var verified = memberMatch ? 'Yes' : 'Pending Review';
     var memberId = memberMatch ? memberMatch.memberId : '';
+
+    // ── Sanitize all user-supplied values to prevent formula injection ──
+    for (var fi = 0; fi < newRow.length; fi++) {
+      if (typeof newRow[fi] === 'string') {
+        newRow[fi] = escapeForFormula(newRow[fi]);
+      }
+    }
 
     // ── Append ANONYMOUS response to Satisfaction sheet ──
     satSheet.appendRow(newRow);
@@ -1399,6 +1406,20 @@ function sendRandomSurveyEmails() {
  * @returns {string} Result message
  */
 function executeSendRandomSurveyEmails(opts) {
+  // Validate parameters from client-side input
+  opts = opts || {};
+  if (typeof opts.subject !== 'string' || opts.subject.length === 0 || opts.subject.length > 200) {
+    throw new Error('Invalid subject: must be a non-empty string of 200 characters or fewer.');
+  }
+  opts.count = parseInt(opts.count, 10);
+  if (isNaN(opts.count) || opts.count < 1 || opts.count > 1000) {
+    throw new Error('Invalid count: must be a positive integer up to 1000.');
+  }
+  opts.excludeDays = parseInt(opts.excludeDays, 10);
+  if (isNaN(opts.excludeDays) || opts.excludeDays < 0) {
+    throw new Error('Invalid excludeDays: must be a non-negative integer.');
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -1413,14 +1434,16 @@ function executeSendRandomSurveyEmails(opts) {
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;
   var lastNameCol = MEMBER_COLS.LAST_NAME - 1;
 
-  // Get survey email log from Config (if exists)
-  var surveyLogCol = 50; // Column AX for survey email log
+  // Get survey email log from Config (uses dedicated columns, not PDF_FOLDER_ID)
+  var surveyLogCol = CONFIG_COLS.SURVEY_LOG_IDS;
   var surveyLog = {};
   try {
-    var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
-    logData.forEach(function(row) {
-      if (row[0]) surveyLog[row[0]] = new Date(row[1]);
-    });
+    if (configSheet && configSheet.getLastRow() > 1) {
+      var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
+      logData.forEach(function(row) {
+        if (row[0]) surveyLog[row[0]] = new Date(row[1]);
+      });
+    }
   } catch(_e) { /* No log yet */ }
 
   var cutoffDate = new Date();
@@ -1494,11 +1517,13 @@ function executeSendRandomSurveyEmails(opts) {
   });
 
   // Update survey email log - find actual last row in log column to avoid overwriting
-  if (newLogEntries.length > 0) {
-    var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow(), 1).getValues();
+  if (newLogEntries.length > 0 && configSheet) {
     var nextRow = 2;
-    for (var lr = logValues.length - 1; lr >= 0; lr--) {
-      if (logValues[lr][0]) { nextRow = lr + 3; break; }
+    if (configSheet.getLastRow() > 1) {
+      var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 1).getValues();
+      for (var lr = logValues.length - 1; lr >= 0; lr--) {
+        if (logValues[lr][0]) { nextRow = lr + 3; break; }
+      }
     }
     configSheet.getRange(nextRow, surveyLogCol, newLogEntries.length, 2).setValues(newLogEntries);
   }
@@ -1830,7 +1855,9 @@ function sendSurveyCompletionReminders() {
 
     // Skip if reminder was sent within cooldown period
     if (lastReminder) {
-      var daysSinceReminder = (now - new Date(lastReminder)) / (1000 * 60 * 60 * 24);
+      var reminderDate = new Date(lastReminder);
+      if (isNaN(reminderDate.getTime())) continue;
+      var daysSinceReminder = (now - reminderDate) / (1000 * 60 * 60 * 24);
       if (daysSinceReminder < cooldownDays) {
         skippedCount++;
         continue;

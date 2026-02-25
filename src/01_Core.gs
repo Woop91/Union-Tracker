@@ -154,17 +154,19 @@ function logErrorToSheet_(errorInfo) {
     // Create sheet if it doesn't exist
     if (!sheet) {
       sheet = ss.insertSheet(ERROR_CONFIG.LOG_SHEET_NAME);
-      sheet.hideSheet();
       sheet.appendRow(['Timestamp', 'Level', 'Context', 'Message', 'User', 'Stack']);
       sheet.getRange(1, 1, 1, 6).setFontWeight('bold');
+      setSheetVeryHidden_(sheet);
     }
 
-    // Add error row
+    // Add error row (formula-protect user-influenced fields)
+    var safeContext = typeof escapeForFormula === 'function' ? escapeForFormula(errorInfo.context) : errorInfo.context;
+    var safeMessage = typeof escapeForFormula === 'function' ? escapeForFormula(errorInfo.message) : errorInfo.message;
     sheet.appendRow([
       errorInfo.timestamp,
       errorInfo.level,
-      errorInfo.context,
-      errorInfo.message,
+      safeContext,
+      safeMessage,
       errorInfo.user,
       ERROR_CONFIG.SHOW_STACK_TRACE ? errorInfo.stack : ''
     ]);
@@ -211,8 +213,19 @@ function showErrorNotification_(errorInfo) {
 function sendCriticalErrorNotification_(errorInfo) {
   try {
     var adminEmail = Session.getEffectiveUser().getEmail();
-    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
-    var body = 'A critical error occurred in the ' + COMMAND_CONFIG.SYSTEM_NAME + ':\n\n' +
+    var subject;
+    try {
+      subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
+    } catch (e) {
+      subject = 'Critical Error: ' + (errorInfo.context || 'Unknown');
+    }
+    var systemName;
+    try {
+      systemName = COMMAND_CONFIG.SYSTEM_NAME;
+    } catch (e) {
+      systemName = 'Union Dashboard';
+    }
+    var body = 'A critical error occurred in the ' + systemName + ':\n\n' +
                'Time: ' + errorInfo.timestamp + '\n' +
                'Context: ' + errorInfo.context + '\n' +
                'Message: ' + errorInfo.message + '\n' +
@@ -488,7 +501,7 @@ function showErrorLog() {
     return;
   }
 
-  sheet.showSheet();
+  setSheetVisible_(sheet);
   ss.setActiveSheet(sheet);
 }
 
@@ -817,6 +830,237 @@ var HIDDEN_SHEETS = {
 };
 
 // ============================================================================
+// HIDDEN SHEET ENFORCEMENT - Mobile-safe hiding via Sheets API
+// ============================================================================
+// Google Sheets mobile can display sheets hidden with hideSheet().
+// These helpers use the Sheets Advanced Service (API v4) to set hidden=true
+// at the API level AND apply sheet protection so the sheets stay invisible
+// and uneditable even on mobile devices.
+// Requires: Sheets Advanced Service enabled in appsscript.json
+
+/**
+ * Protection description used to identify auto-protections on hidden sheets.
+ * @const {string}
+ * @private
+ */
+var HIDDEN_SHEET_PROTECTION_DESC_ = 'Hidden Sheet — Auto Protected';
+
+/**
+ * Hides a sheet using the Sheets Advanced Service and applies protection.
+ * This is more robust than sheet.hideSheet() alone because:
+ *   1. The API-level hide is better enforced on Google Sheets mobile.
+ *   2. Sheet protection prevents editing even if a mobile user discovers the tab.
+ *
+ * Falls back to sheet.hideSheet() if the Advanced Service is unavailable.
+ *
+ * @param {Sheet} sheet - The sheet to hide
+ * @private
+ */
+function setSheetVeryHidden_(sheet) {
+  if (!sheet) return;
+
+  // 1. Hide via Sheets Advanced Service (API v4) for stronger mobile enforcement
+  try {
+    var ssId = sheet.getParent().getId();
+    Sheets.Spreadsheets.batchUpdate({
+      requests: [{
+        updateSheetProperties: {
+          properties: {
+            sheetId: sheet.getSheetId(),
+            hidden: true
+          },
+          fields: 'hidden'
+        }
+      }]
+    }, ssId);
+  } catch (_apiError) {
+    // Fallback: use standard hideSheet() if Advanced Service is not available
+    try {
+      sheet.hideSheet();
+    } catch (_hideError) {
+      Logger.log('Could not hide sheet "' + sheet.getName() + '": ' + _hideError.message);
+    }
+  }
+
+  // 2. Apply protection so the sheet cannot be edited even if visible on mobile
+  protectHiddenSheet_(sheet);
+}
+
+/**
+ * Shows a previously very-hidden sheet (for admin viewing).
+ * Removes the auto-protection so the admin can inspect the sheet.
+ *
+ * @param {Sheet} sheet - The sheet to show
+ * @private
+ */
+function setSheetVisible_(sheet) {
+  if (!sheet) return;
+
+  // 1. Show via Sheets Advanced Service
+  try {
+    var ssId = sheet.getParent().getId();
+    Sheets.Spreadsheets.batchUpdate({
+      requests: [{
+        updateSheetProperties: {
+          properties: {
+            sheetId: sheet.getSheetId(),
+            hidden: false
+          },
+          fields: 'hidden'
+        }
+      }]
+    }, ssId);
+  } catch (_apiError) {
+    // Fallback
+    try {
+      sheet.showSheet();
+    } catch (_showError) {
+      Logger.log('Could not show sheet "' + sheet.getName() + '": ' + _showError.message);
+    }
+  }
+
+  // 2. Remove the auto-protection so admin can inspect the data
+  removeHiddenSheetProtection_(sheet);
+}
+
+/**
+ * Applies sheet protection to a hidden sheet.
+ * Only the spreadsheet owner / script installer can edit.
+ * Skips if a protection with the same description already exists.
+ *
+ * @param {Sheet} sheet - The sheet to protect
+ * @private
+ */
+function protectHiddenSheet_(sheet) {
+  if (!sheet) return;
+
+  // Check for existing protection
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === HIDDEN_SHEET_PROTECTION_DESC_) {
+      return; // already protected
+    }
+  }
+
+  try {
+    var protection = sheet.protect().setDescription(HIDDEN_SHEET_PROTECTION_DESC_);
+    protection.setWarningOnly(false);
+
+    // Remove all editors except the owner (script installer)
+    var editors = protection.getEditors();
+    if (editors.length > 0) {
+      protection.removeEditors(editors);
+    }
+    // The owner is always retained by Google Sheets automatically
+  } catch (_e) {
+    Logger.log('Could not protect sheet "' + sheet.getName() + '": ' + _e.message);
+  }
+}
+
+/**
+ * Removes the auto-protection placed by setSheetVeryHidden_().
+ *
+ * @param {Sheet} sheet - The sheet to unprotect
+ * @private
+ */
+function removeHiddenSheetProtection_(sheet) {
+  if (!sheet) return;
+
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === HIDDEN_SHEET_PROTECTION_DESC_) {
+      protections[i].remove();
+    }
+  }
+}
+
+/**
+ * Enforces hidden state on ALL sheets that should be hidden.
+ * Checks every sheet whose name starts with '_' (the project convention for hidden sheets).
+ * Safe to call from onOpen() and from a time-driven trigger.
+ *
+ * @returns {Object} Result with counts of sheets checked and enforced
+ */
+function enforceHiddenSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var allSheets = ss.getSheets();
+  var enforced = 0;
+  var checked = 0;
+
+  // Collect all known hidden sheet names from both HIDDEN_SHEETS and SHEETS constants
+  var knownHiddenNames = {};
+  for (var key in HIDDEN_SHEETS) {
+    knownHiddenNames[HIDDEN_SHEETS[key]] = true;
+  }
+  // Also include the error log sheet
+  knownHiddenNames[ERROR_CONFIG.LOG_SHEET_NAME] = true;
+
+  for (var i = 0; i < allSheets.length; i++) {
+    var sheet = allSheets[i];
+    var name = sheet.getName();
+
+    // A sheet should be hidden if its name starts with '_' or is in the known list
+    if (name.charAt(0) === '_' || knownHiddenNames[name]) {
+      checked++;
+
+      if (!sheet.isSheetHidden()) {
+        // Sheet should be hidden but isn't — enforce
+        setSheetVeryHidden_(sheet);
+        enforced++;
+      } else {
+        // Already hidden — ensure protection is in place
+        protectHiddenSheet_(sheet);
+      }
+    }
+  }
+
+  if (enforced > 0) {
+    Logger.log('enforceHiddenSheets: re-hid ' + enforced + ' of ' + checked + ' hidden sheets');
+  }
+
+  return { checked: checked, enforced: enforced };
+}
+
+/**
+ * Installs a time-driven trigger that enforces hidden sheets every hour.
+ * Prevents mobile users from accessing hidden sheets between spreadsheet opens.
+ */
+function installHiddenSheetEnforcerTrigger() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
+
+  // Check if trigger already exists
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'enforceHiddenSheets') {
+      Logger.log('Hidden sheet enforcer trigger already installed');
+      return;
+    }
+  }
+
+  ScriptApp.newTrigger('enforceHiddenSheets')
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  Logger.log('Installed hourly hidden-sheet enforcer trigger');
+}
+
+/**
+ * Removes the hidden-sheet enforcer trigger.
+ */
+function removeHiddenSheetEnforcerTrigger() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
+
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'enforceHiddenSheets') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      Logger.log('Removed hidden-sheet enforcer trigger');
+    }
+  }
+}
+
+// ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System
 // ============================================================================
 
@@ -1126,46 +1370,6 @@ var GRIEVANCE_HEADER_MAP_ = [
 var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_);
 
 // ============================================================================
-// BACKWARD COMPATIBILITY ALIASES (0-indexed for array access)
-// Auto-derived from 1-indexed *_COLS — stays in sync automatically.
-// ============================================================================
-
-/** Legacy-only aliases for GRIEVANCE_COLUMNS (keys not in GRIEVANCE_COLS) */
-var GRIEVANCE_LEGACY_ALIASES_ = {
-  MEMBER_NAME: 'FIRST_NAME',
-  FILING_DATE: 'DATE_FILED',
-  STEP_1_DUE: 'STEP1_DUE',
-  STEP_1_DATE: 'STEP1_RCVD',
-  STEP_1_STATUS: 'STATUS',
-  STEP_2_DATE: 'STEP2_APPEAL_FILED',
-  STEP_2_DUE: 'STEP2_DUE',
-  STEP_2_STATUS: 'STATUS',
-  STEP_3_DATE: 'STEP3_APPEAL_FILED',
-  STEP3_DUE: 'STEP3_APPEAL_DUE',
-  STEP_3_DUE: 'STEP3_APPEAL_DUE',
-  STEP_3_STATUS: 'STATUS',
-  ARBITRATION_DATE: 'DATE_CLOSED',
-  RECORD_LAST_UPDATED: 'LAST_UPDATED',
-  GRIEVANCE_TYPE: 'ISSUE_CATEGORY',
-  DESCRIPTION: 'ISSUE_CATEGORY',
-  OUTCOME: 'RESOLUTION',
-  NOTES: 'RESOLUTION',
-  DRIVE_FOLDER: 'DRIVE_FOLDER_URL'
-};
-
-var GRIEVANCE_COLUMNS = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-
-/** Legacy-only aliases for MEMBER_COLUMNS (keys not in MEMBER_COLS) */
-var MEMBER_LEGACY_ALIASES_ = {
-  ID: 'MEMBER_ID',
-  JOB_DEPT: 'JOB_TITLE',
-  STATUS: 'GRIEVANCE_STATUS',
-  LAST_UPDATED: 'RECENT_CONTACT_DATE'
-};
-
-var MEMBER_COLUMNS = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-
-// ============================================================================
 // CONFIG COLUMN MAPPING — Auto-derived from header map
 // Config sheet uses row 2 for headers (row 1 is section headers).
 // ============================================================================
@@ -1175,7 +1379,6 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'OFFICE_LOCATIONS',      header: 'Office Locations' },
   { key: 'UNITS',                 header: 'Units' },
   { key: 'OFFICE_DAYS',           header: 'Office Days' },
-  { key: 'YES_NO',                header: 'Yes/No (Dropdowns)' },
   { key: 'SUPERVISORS',           header: 'Supervisors' },
   { key: 'MANAGERS',              header: 'Managers' },
   { key: 'STEWARDS',              header: 'Stewards' },
@@ -1202,7 +1405,6 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'STEP2_APPEAL_DAYS',     header: 'Step II Appeal Days' },
   { key: 'STEP2_RESPONSE_DAYS',   header: 'Step II Response Days' },
   { key: 'BEST_TIMES',            header: 'Best Times to Contact' },
-  { key: 'HOME_TOWNS',            header: 'Home Towns' },
   { key: 'CONTRACT_GRIEVANCE',    header: 'Contract Article (Grievance)' },
   { key: 'CONTRACT_DISCIPLINE',   header: 'Contract Article (Discipline)' },
   { key: 'CONTRACT_WORKLOAD',     header: 'Contract Article (Workload)' },
@@ -1222,7 +1424,19 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'ESCALATION_STEPS',      header: 'Escalation Steps' },
   { key: 'TEMPLATE_ID',           header: 'Template ID' },
   { key: 'PDF_FOLDER_ID',         header: 'PDF Folder ID' },
-  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' }
+  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' },
+  { key: 'ACCENT_HUE',            header: 'Accent Hue' },
+  { key: 'LOGO_INITIALS',         header: 'Logo Initials' },
+  { key: 'MAGIC_LINK_EXPIRY_DAYS', header: 'Magic Link Expiry Days' },
+  { key: 'COOKIE_DURATION_DAYS',  header: 'Cookie Duration Days' },
+  { key: 'STEWARD_LABEL',         header: 'Steward Label' },
+  { key: 'MEMBER_LABEL',          header: 'Member Label' },
+  { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
+  { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
+  { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
+  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' },
+  { key: 'SURVEY_LOG_IDS',       header: 'Survey Log (Member IDs)' },
+  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -1661,30 +1875,6 @@ function getHeadersFromMap_(headerMap) {
 }
 
 /**
- * Build a 0-indexed legacy column map from a 1-indexed COLS object.
- * @param {Object} colsObj - 1-indexed column constants
- * @param {Object} [extraAliases] - { 'LEGACY_KEY': 'PRIMARY_KEY' } for legacy-only aliases
- * @returns {Object} 0-indexed column constants
- */
-function buildLegacyCols_(colsObj, extraAliases) {
-  var legacy = {};
-  for (var key in colsObj) {
-    if (colsObj.hasOwnProperty(key)) {
-      legacy[key] = colsObj[key] - 1;
-    }
-  }
-  if (extraAliases) {
-    for (var alias in extraAliases) {
-      if (extraAliases.hasOwnProperty(alias)) {
-        var target = extraAliases[alias];
-        legacy[alias] = colsObj[target] !== undefined ? colsObj[target] - 1 : legacy[target];
-      }
-    }
-  }
-  return legacy;
-}
-
-/**
  * Resolve column positions by reading actual sheet headers at runtime.
  * @param {string} sheetName - Sheet name to read
  * @param {Array<{key: string, header: string}>} headerMap - Expected headers
@@ -1771,16 +1961,6 @@ function syncColumnMaps() {
     if (moved) result.synced.push(entry.name);
   }
 
-  // Rebuild legacy compat objects if primary maps changed
-  if (result.synced.indexOf('MEMBER_COLS') >= 0) {
-    var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-    for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
-  }
-  if (result.synced.indexOf('GRIEVANCE_COLS') >= 0) {
-    var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-    for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
-  }
-
   // Rebuild derived column configs so dropdown dialogs and bidirectional
   // sync use the up-to-date column positions after any columns shifted.
   if (result.synced.length > 0) {
@@ -1791,6 +1971,11 @@ function syncColumnMaps() {
     var freshDD = buildDropdownMap_();
     DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
     DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+    // Rebuild JOB_METADATA_FIELDS so it reflects the resolved column positions.
+    // Without this, functions using getJobMetadataByMemberCol() would use stale
+    // column numbers captured at script load time.
+    rebuildJobMetadataFields_();
   }
 
   if (result.synced.length > 0) {
@@ -1889,14 +2074,9 @@ function loadCachedColumnMaps_() {
       }
     }
 
-    // Rebuild derived objects (legacy compat, dropdown map, multi-select)
+    // Rebuild derived objects (dropdown map, multi-select, job metadata)
     // only if something actually changed.
     if (changed) {
-      var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-      for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
-      var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-      for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
-
       var freshMulti = buildMultiSelectCols_();
       MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
       MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
@@ -1904,6 +2084,8 @@ function loadCachedColumnMaps_() {
       var freshDD = buildDropdownMap_();
       DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
       DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+      rebuildJobMetadataFields_();
     }
 
     return true;
@@ -1986,6 +2168,19 @@ function getColumnNumber(columnLetter) {
 }
 
 /**
+ * Safe accessor for numeric fields — returns the value as-is when it's a
+ * number (including 0), and '' for null/undefined/empty-string.
+ * Avoids the `value || ''` pitfall where 0 is treated as falsy.
+ * @param {*} value - Cell value
+ * @returns {number|string}
+ * @private
+ */
+function numericField_(value) {
+  if (value === null || value === undefined || value === '') return '';
+  return value;
+}
+
+/**
  * Map a Member Directory row array to a structured object
  * @param {Array} row - Row data array from Member Directory
  * @returns {Object} Structured member object
@@ -2012,8 +2207,8 @@ function mapMemberRow(row) {
     assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',
     lastVirtualMtg: row[MEMBER_COLS.LAST_VIRTUAL_MTG - 1] || '',
     lastInPersonMtg: row[MEMBER_COLS.LAST_INPERSON_MTG - 1] || '',
-    openRate: row[MEMBER_COLS.OPEN_RATE - 1] || '',
-    volunteerHours: row[MEMBER_COLS.VOLUNTEER_HOURS - 1] || '',
+    openRate: numericField_(row[MEMBER_COLS.OPEN_RATE - 1]),
+    volunteerHours: numericField_(row[MEMBER_COLS.VOLUNTEER_HOURS - 1]),
     interestLocal: row[MEMBER_COLS.INTEREST_LOCAL - 1] || '',
     interestChapter: row[MEMBER_COLS.INTEREST_CHAPTER - 1] || '',
     interestAllied: row[MEMBER_COLS.INTEREST_ALLIED - 1] || '',
@@ -2053,9 +2248,9 @@ function mapGrievanceRow(row) {
     step3AppealDue: row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1] || '',
     step3AppealFiled: row[GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1] || '',
     dateClosed: row[GRIEVANCE_COLS.DATE_CLOSED - 1] || '',
-    daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || '',
+    daysOpen: numericField_(row[GRIEVANCE_COLS.DAYS_OPEN - 1]),
     nextActionDue: row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] || '',
-    daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] || '',
+    daysToDeadline: numericField_(row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1]),
     articles: row[GRIEVANCE_COLS.ARTICLES - 1] || '',
     issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
     memberEmail: row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] || '',
@@ -2102,7 +2297,6 @@ function getGrievanceHeaders() {
  */
 var DEFAULT_CONFIG = {
   OFFICE_DAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-  YES_NO: ['Yes', 'No'],
   // Status includes both workflow states (Open, Pending, In Arbitration) AND outcomes (Won, Denied, Settled, Withdrawn)
   // This single-column design allows Dashboard metrics to count outcomes directly from STATUS column
   GRIEVANCE_STATUS: ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Denied', 'Won', 'Appealed', 'In Arbitration', 'Closed'],
@@ -2225,9 +2419,9 @@ function getDeadlineRules() {
       var s2Appeal = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS).getValue());
       var s2Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS).getValue());
       return {
-        FILING_DAYS: filing || DEADLINE_DEFAULTS.FILING_DAYS,
-        STEP_1: { DAYS_FOR_RESPONSE: s1Resp || DEADLINE_DEFAULTS.STEP_1_RESPONSE },
-        STEP_2: { DAYS_TO_APPEAL: s2Appeal || DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: s2Resp || DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+        FILING_DAYS: isNaN(filing) ? DEADLINE_DEFAULTS.FILING_DAYS : filing,
+        STEP_1: { DAYS_FOR_RESPONSE: isNaN(s1Resp) ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : s1Resp },
+        STEP_2: { DAYS_TO_APPEAL: isNaN(s2Appeal) ? DEADLINE_DEFAULTS.STEP_2_APPEAL : s2Appeal, DAYS_FOR_RESPONSE: isNaN(s2Resp) ? DEADLINE_DEFAULTS.STEP_2_RESPONSE : s2Resp },
         STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
         ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
       };
@@ -2383,6 +2577,25 @@ function getJobMetadataByMemberCol(memberCol) {
   return null;
 }
 
+/**
+ * Rebuild JOB_METADATA_FIELDS from the current *_COLS values.
+ * Called by syncColumnMaps() and loadCachedColumnMaps_() so that
+ * JOB_METADATA_FIELDS stays in sync when columns shift at runtime.
+ * @private
+ */
+function rebuildJobMetadataFields_() {
+  JOB_METADATA_FIELDS.length = 0; // clear in-place to preserve the reference
+  JOB_METADATA_FIELDS.push(
+    { label: 'Job Title', memberCol: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, configName: 'Job Titles' },
+    { label: 'Work Location', memberCol: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, configName: 'Office Locations' },
+    { label: 'Unit', memberCol: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, configName: 'Units' },
+    { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
+    { label: 'Manager', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Managers' },
+    { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
+    { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
+  );
+}
+
 // ============================================================================
 // MULTI-SELECT COLUMN CONFIGURATION
 // ============================================================================
@@ -2460,19 +2673,22 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
       { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
       { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
-      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      // IS_STEWARD and INTEREST_* columns deliberately excluded — they use hardcoded
+      // validation ('Yes'/'No'), not a Config column.  The YES_NO Config column was
+      // removed to eliminate contamination risk.  Steward status sync is handled by
+      // handleMemberEdit() and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS.
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
-      { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
-      { col: MEMBER_COLS.INTEREST_CHAPTER,  configCol: CONFIG_COLS.YES_NO },
-      { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
       { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
     ],
+    // ISSUE_CATEGORY and ARTICLES are multi-select columns (comma-separated values).
+    // They live in MULTI_SELECT_COLS.GRIEVANCE_LOG, NOT here.
+    // Keeping them here caused setupDataValidations() to apply single-select first,
+    // then multi-select would overwrite — wasting a sheet API call and risking the
+    // wrong validation type if execution order ever changed.
     GRIEVANCE_LOG: [
       { col: GRIEVANCE_COLS.STATUS,         configCol: CONFIG_COLS.GRIEVANCE_STATUS },
-      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP },
-      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY },
-      { col: GRIEVANCE_COLS.ARTICLES,       configCol: CONFIG_COLS.ARTICLES }
+      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP }
     ]
   };
 }

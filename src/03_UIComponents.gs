@@ -108,8 +108,7 @@ function createDashboardMenu() {
       .addItem('✅ Open Meeting Check-In', 'showMeetingCheckInDialog')
       .addSeparator()
       .addItem('🔗 Sync Deadlines', 'syncDeadlinesToCalendar')
-      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar')
-      .addItem('🗑️ Clear Calendar Events', 'clearAllCalendarEvents'))
+      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar'))
 
     .addSubMenu(ui.createMenu('📁 Google Drive')
       .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
@@ -228,6 +227,7 @@ function createDashboardMenu() {
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
+      .addItem('🔒 Enforce Hidden Sheets (Mobile Fix)', 'enforceHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
       .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
       .addSeparator()
@@ -235,6 +235,7 @@ function createDashboardMenu() {
       .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+      .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
       .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet')
       .addSeparator()
@@ -249,6 +250,7 @@ function createDashboardMenu() {
         .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
         .addSeparator()
         .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+        .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
         .addSeparator()
         .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
   }
@@ -1289,7 +1291,7 @@ function showMobileGrievanceList() {
     '<div class="header"><h2>📋 Grievances</h2><input type="text" class="search" placeholder="Search..." oninput="filter(this.value)"></div>' +
     '<div class="filters"><button class="filter active" onclick="filterStatus(\'all\',this)">All</button><button class="filter" onclick="filterStatus(\'Open\',this)">Open</button><button class="filter" onclick="filterStatus(\'Pending Info\',this)">Pending</button><button class="filter" onclick="filterStatus(\'Resolved\',this)">Resolved</button></div>' +
     '<div class="list" id="list"><div style="text-align:center;padding:40px;color:#666;grid-column:1/-1">Loading...</div></div>' +
-    '<script>var all=[];google.script.run.withSuccessHandler(function(data){all=data;render(data)}).getRecentGrievancesForMobile(100);function render(data){var c=document.getElementById("list");if(!data||data.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";return}c.innerHTML=data.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+g.id+"</div><div class=\'card-status\'>"+(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+g.memberName+"</div><div class=\'card-row\'><strong>Issue:</strong> "+(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+g.filedDate+"</div></div>"}).join("")}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");render(s==="all"?all:all.filter(function(g){return g.status===s}))}function filter(q){render(all.filter(function(g){q=q.toLowerCase();return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0}))}</script></body></html>'
+    '<script>' + getClientSideEscapeHtml() + 'var all=[];google.script.run.withSuccessHandler(function(data){all=data;render(data)}).getRecentGrievancesForMobile(100);function render(data){var c=document.getElementById("list");if(!data||data.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";return}c.innerHTML=data.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+escapeHtml(g.id)+"</div><div class=\'card-status\'>"+escapeHtml(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class=\'card-row\'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("")}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");render(s==="all"?all:all.filter(function(g){return g.status===s}))}function filter(q){render(all.filter(function(g){q=q.toLowerCase();return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0}))}</script></body></html>'
   ).setWidth(800).setHeight(700);
   SpreadsheetApp.getUi().showModalDialog(html, '📋 Grievance List');
 }
@@ -1332,7 +1334,7 @@ function showMobileUnifiedSearch() {
     '<div class="header"><h2>🔍 Search</h2><div class="search-container"><span class="search-icon">🔍</span><input type="text" class="search-input" id="q" placeholder="Search members or grievances..." oninput="search(this.value)"></div></div>' +
     '<div class="tabs"><button class="tab active" onclick="setTab(\'all\',this)">All</button><button class="tab" onclick="setTab(\'members\',this)">Members</button><button class="tab" onclick="setTab(\'grievances\',this)">Grievances</button></div>' +
     '<div class="results" id="results"><div class="empty-state">Type to search...</div></div>' +
-    '<script>var tab="all";function setTab(t,btn){tab=t;document.querySelectorAll(".tab").forEach(function(tb){tb.classList.remove("active")});btn.classList.add("active");search(document.getElementById("q").value)}function search(q){if(!q||q.length<2){document.getElementById("results").innerHTML="<div class=\'empty-state\'>Type to search...</div>";return}google.script.run.withSuccessHandler(function(data){render(data)}).getMobileSearchData(q,tab)}function render(data){var c=document.getElementById("results");if(!data||data.length===0){c.innerHTML="<div class=\'empty-state\'>No results</div>";return}c.innerHTML=data.map(function(r){return"<div class=\'result-card\'><div class=\'result-title\'>"+(r.type==="member"?"👤 ":"📋 ")+r.title+"</div><div class=\'result-detail\'>"+r.subtitle+"</div>"+(r.detail?"<div class=\'result-detail\'>"+r.detail+"</div>":"")+"</div>"}).join("")}</script></body></html>'
+    '<script>' + getClientSideEscapeHtml() + 'var tab="all";function setTab(t,btn){tab=t;document.querySelectorAll(".tab").forEach(function(tb){tb.classList.remove("active")});btn.classList.add("active");search(document.getElementById("q").value)}function search(q){if(!q||q.length<2){document.getElementById("results").innerHTML="<div class=\'empty-state\'>Type to search...</div>";return}google.script.run.withSuccessHandler(function(data){render(data)}).getMobileSearchData(q,tab)}function render(data){var c=document.getElementById("results");if(!data||data.length===0){c.innerHTML="<div class=\'empty-state\'>No results</div>";return}c.innerHTML=data.map(function(r){return"<div class=\'result-card\'><div class=\'result-title\'>"+(r.type==="member"?"👤 ":"📋 ")+escapeHtml(r.title)+"</div><div class=\'result-detail\'>"+escapeHtml(r.subtitle)+"</div>"+(r.detail?"<div class=\'result-detail\'>"+escapeHtml(r.detail)+"</div>":"")+"</div>"}).join("")}</script></body></html>'
   ).setWidth(800).setHeight(700);
   SpreadsheetApp.getUi().showModalDialog(html, '🔍 Search');
 }
@@ -1577,9 +1579,9 @@ function showGrievanceQuickActions(row) {
   if (memberEmail) {
     emailStatusBtn =
       '<div class="section-header">📨 Communication</div>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailGrievanceStatusToMember(\'' + grievanceId + '\');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Email Status to Member</div><div class="desc">Send grievance status update to ' + memberEmail + '</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>';
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailGrievanceStatusToMember(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Email Status to Member</div><div class="desc">Send grievance status update to ' + escapeHtml(String(memberEmail)) + '</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>';
   }
 
   var html = HtmlService.createHtmlOutput(
@@ -1607,18 +1609,18 @@ function showGrievanceQuickActions(row) {
     '</style></head><body><div class="container">' +
     '<h2>⚡ Grievance Actions</h2>' +
     '<div class="info">' +
-    '<div class="gid">' + grievanceId + '</div>' +
-    '<div class="gmem">' + name + ' (' + memberId + ')' + (memberEmail ? ' - ' + memberEmail : '') + '</div>' +
+    '<div class="gid">' + escapeHtml(grievanceId) + '</div>' +
+    '<div class="gmem">' + escapeHtml(name) + ' (' + escapeHtml(memberId) + ')' + (memberEmail ? ' - ' + escapeHtml(memberEmail) : '') + '</div>' +
     '<div class="gstatus">' +
-    '<span class="badge">' + status + '</span>' +
-    '<span class="badge">' + step + '</span>' +
+    '<span class="badge">' + escapeHtml(status) + '</span>' +
+    '<span class="badge">' + escapeHtml(step) + '</span>' +
     (daysTo !== null && daysTo !== '' ? '<span class="badge" style="background:' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '#ffebee;color:#c62828' : '#e3f2fd;color:#1565c0') + '">' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '⚠️ Overdue' : '📅 ' + daysTo + ' days') + '</span>' : '') +
     '</div></div>' +
     '<div class="actions">' +
     '<div class="section-header">📋 Case Management</div>' +
-    '<button class="action-btn" onclick="google.script.run.syncSingleGrievanceToCalendar(\'' + grievanceId + '\');google.script.host.close()"><span class="icon">📅</span><span><div class="title">Sync to Calendar</div><div class="desc">Add deadlines to Google Calendar</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.setupDriveFolderForGrievance();google.script.host.close()"><span class="icon">📁</span><span><div class="title">Setup Drive Folder</div><div class="desc">Create document folder</div></span></button>' +
-    '<button class="action-btn" onclick="navigator.clipboard.writeText(\'' + grievanceId + '\');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Grievance ID</div><div class="desc">' + grievanceId + '</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.syncSingleGrievanceToCalendar(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📅</span><span><div class="title">Sync to Calendar</div><div class="desc">Add deadlines to Google Calendar</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.setupDriveFolderForGrievance(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📁</span><span><div class="title">Setup Drive Folder</div><div class="desc">Create document folder</div></span></button>' +
+    '<button class="action-btn" onclick="navigator.clipboard.writeText(' + JSON.stringify(grievanceId) + ');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Grievance ID</div><div class="desc">' + escapeHtml(grievanceId) + '</div></span></button>' +
     emailStatusBtn +
     '</div>' +
     (isOpen ? '<div class="status-section"><h4>Quick Status Update</h4><select id="statusSelect"><option value="">-- Select --</option><option value="Open">Open</option><option value="Pending Info">Pending Info</option><option value="Settled">Settled</option><option value="Withdrawn">Withdrawn</option><option value="Won">Won</option><option value="Denied">Denied</option><option value="Closed">Closed</option></select><button class="action-btn" style="margin-top:10px" onclick="var s=document.getElementById(\'statusSelect\').value;if(!s){alert(\'Select status\');return}google.script.run.withSuccessHandler(function(){alert(\'Updated!\');google.script.host.close()}).quickUpdateGrievanceStatus(' + row + ',s)"><span class="icon">✓</span><span><div class="title">Update Status</div></span></button></div>' : '') +
@@ -1637,6 +1639,18 @@ function quickUpdateGrievanceStatus(row, newStatus) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) throw new Error('Grievance Log not found');
+
+  // Validate row bounds
+  if (row < 2 || row > sheet.getLastRow()) {
+    throw new Error('Invalid row number: ' + row);
+  }
+
+  // Validate status against allowlist
+  var validStatuses = ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Won', 'Denied', 'Closed', 'In Arbitration', 'Appealed'];
+  if (validStatuses.indexOf(newStatus) === -1) {
+    throw new Error('Invalid status: ' + newStatus);
+  }
+
   sheet.getRange(row, GRIEVANCE_COLS.STATUS).setValue(newStatus);
   if (['Closed', 'Settled', 'Withdrawn'].indexOf(newStatus) >= 0) {
     var closeCol = GRIEVANCE_COLS.DATE_CLOSED;
@@ -1656,7 +1670,7 @@ function quickUpdateGrievanceStatus(row, newStatus) {
 function composeEmailForMember(memberId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (!sheet) return;
+  if (!sheet || sheet.getLastRow() <= 1) return;
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, MEMBER_COLS.EMAIL).getValues();
   for (var i = 0; i < data.length; i++) {
     if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
@@ -1664,7 +1678,7 @@ function composeEmailForMember(memberId) {
       var name = data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1];
       if (!email) { SpreadsheetApp.getUi().alert('No email on file.'); return; }
       var html = HtmlService.createHtmlOutput(
-        '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}.form-group{margin:15px 0}label{display:block;font-weight:bold;margin-bottom:5px;font-size:clamp(12px,3vw,14px)}input,textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;min-height:44px}textarea{min-height:180px}input:focus,textarea:focus{outline:none;border-color:#1a73e8}.buttons{display:flex;gap:10px;margin-top:20px}button{padding:12px 24px;font-size:clamp(13px,3.5vw,14px);border:none;border-radius:4px;cursor:pointer;flex:1;min-height:44px}.primary{background:#1a73e8;color:white}.secondary{background:#6c757d;color:white}@media(max-width:480px){.buttons{flex-direction:column}}</style></head><body><div class="container"><h2>📧 Email to Member</h2><div class="info"><strong>' + name + '</strong> (' + memberId + ')<br>' + email + '</div><div class="form-group"><label>Subject:</label><input type="text" id="subject" placeholder="Email subject"></div><div class="form-group"><label>Message:</label><textarea id="message" placeholder="Type your message..."></textarea></div><div class="buttons"><button class="primary" onclick="send()">📤 Send</button><button class="secondary" onclick="google.script.host.close()">Cancel</button></div></div><script>function send(){var s=document.getElementById("subject").value.trim();var m=document.getElementById("message").value.trim();if(!s||!m){alert("Fill in subject and message");return}google.script.run.withSuccessHandler(function(){alert("Email sent!");google.script.host.close()}).withFailureHandler(function(e){alert("Error: "+e.message)}).sendQuickEmail("' + email + '",s,m,"' + memberId + '")}</script></body></html>'
+        '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}.form-group{margin:15px 0}label{display:block;font-weight:bold;margin-bottom:5px;font-size:clamp(12px,3vw,14px)}input,textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;min-height:44px}textarea{min-height:180px}input:focus,textarea:focus{outline:none;border-color:#1a73e8}.buttons{display:flex;gap:10px;margin-top:20px}button{padding:12px 24px;font-size:clamp(13px,3.5vw,14px);border:none;border-radius:4px;cursor:pointer;flex:1;min-height:44px}.primary{background:#1a73e8;color:white}.secondary{background:#6c757d;color:white}@media(max-width:480px){.buttons{flex-direction:column}}</style></head><body><div class="container"><h2>📧 Email to Member</h2><div class="info"><strong>' + escapeHtml(name) + '</strong> (' + escapeHtml(memberId) + ')<br>' + escapeHtml(email) + '</div><div class="form-group"><label>Subject:</label><input type="text" id="subject" placeholder="Email subject"></div><div class="form-group"><label>Message:</label><textarea id="message" placeholder="Type your message..."></textarea></div><div class="buttons"><button class="primary" onclick="send()">📤 Send</button><button class="secondary" onclick="google.script.host.close()">Cancel</button></div></div><script>function send(){var s=document.getElementById("subject").value.trim();var m=document.getElementById("message").value.trim();if(!s||!m){alert("Fill in subject and message");return}google.script.run.withSuccessHandler(function(){alert("Email sent!");google.script.host.close()}).withFailureHandler(function(e){alert("Error: "+e.message)}).sendQuickEmail(' + JSON.stringify(email) + ',s,m,' + JSON.stringify(memberId) + ')}</script></body></html>'
       ).setWidth(600).setHeight(500);
       SpreadsheetApp.getUi().showModalDialog(html, '📧 Compose Email');
       return;
@@ -1781,7 +1795,7 @@ function emailDashboardLinkToMember(memberId) {
     SpreadsheetApp.getUi().alert('Web app is not deployed. Please deploy the web app first via Extensions > Apps Script > Deploy.');
     return;
   }
-  var portalUrl = webAppUrl + '?id=' + memberId;
+  var portalUrl = webAppUrl + '?id=' + encodeURIComponent(memberId);
   var orgName = getOrgNameFromConfig_();
 
   var subject = orgName + ' - Member Dashboard Access';
@@ -1819,7 +1833,7 @@ function emailGrievanceStatusToMember(grievanceId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
-  if (!grievanceSheet) {
+  if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) {
     SpreadsheetApp.getUi().alert('Grievance Log not found.');
     return;
   }
@@ -1916,7 +1930,7 @@ function emailGrievanceStatusToMember(grievanceId) {
 function getMemberDataById_(memberId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (!sheet) return null;
+  if (!sheet || sheet.getLastRow() <= 1) return null;
 
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, MEMBER_COLS.EMAIL).getValues();
   for (var i = 0; i < data.length; i++) {
@@ -1955,10 +1969,10 @@ function showMemberGrievanceHistory(memberId) {
   });
   if (mine.length === 0) { SpreadsheetApp.getUi().alert('No grievances for this member.'); return; }
   var list = mine.map(function(g) {
-    return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === 'Open' ? '#f44336' : '#4caf50') + '"><strong>' + g.id + '</strong><br><span style="color:#666">Status: ' + g.status + ' | Step: ' + g.step + '</span><br><span style="color:#888;font-size:12px">' + g.issue + ' | Filed: ' + (g.filed ? new Date(g.filed).toLocaleDateString() : 'N/A') + '</span></div>';
+    return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === 'Open' ? '#f44336' : '#4caf50') + '"><strong>' + escapeHtml(g.id) + '</strong><br><span style="color:#666">Status: ' + escapeHtml(g.status) + ' | Step: ' + escapeHtml(g.step) + '</span><br><span style="color:#888;font-size:12px">' + escapeHtml(g.issue) + ' | Filed: ' + (g.filed ? new Date(g.filed).toLocaleDateString() : 'N/A') + '</span></div>';
   }).join('');
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + memberId + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === 'Open'; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== 'Open'; }).length + '</div>' + list + '</body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + escapeHtml(memberId) + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === 'Open'; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== 'Open'; }).length + '</div>' + list + '</body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, 'Grievance History - ' + memberId);
 }
@@ -2370,7 +2384,7 @@ function getDesktopSearchHtml() {
 
           let html = '';
           results.forEach(function(item) {
-            html += '<div class="result-item" onclick="selectResult(\\'' + item.id + '\\', \\'' + item.type + '\\')">';
+            html += '<div class="result-item" data-id="' + escapeHtml(item.id) + '" data-type="' + escapeHtml(item.type) + '" onclick="selectResult(this.dataset.id, this.dataset.type)">';
             html += '<div class="result-title">' + escapeHtml(item.title) + '</div>';
             html += '<div class="result-subtitle">' + escapeHtml(item.subtitle) + '</div>';
             html += '</div>';
@@ -2387,7 +2401,7 @@ function getDesktopSearchHtml() {
 
         function handleError(error) {
           document.getElementById('resultsContainer').innerHTML =
-            '<div class="no-results"><p>Error: ' + error.message + '</p></div>';
+            '<div class="no-results"><p>Error: ' + escapeHtml(error.message) + '</p></div>';
         }
 
         ${getClientSideEscapeHtml()}
@@ -2462,6 +2476,7 @@ function getQuickSearchHtml() {
         <div class="quick-hint">Press Enter to select first result, Esc to close</div>
       </div>
       <script>
+        ${getClientSideEscapeHtml()}
         let debounceTimer;
         let results = [];
 
@@ -2699,6 +2714,7 @@ function getAdvancedSearchHtml() {
         </div>
       </div>
       <script>
+        ${getClientSideEscapeHtml()}
         function runAdvancedSearch() {
           const filters = {
             includeMembers: document.getElementById('searchMembers').checked,
@@ -2718,7 +2734,7 @@ function getAdvancedSearchHtml() {
             .withSuccessHandler(displayAdvancedResults)
             .withFailureHandler(function(e) {
               document.getElementById('resultsBody').innerHTML =
-                '<tr><td colspan="5" style="text-align:center;color:red">Error: ' + e.message + '</td></tr>';
+                '<tr><td colspan="5" style="text-align:center;color:red">Error: ' + escapeHtml(e.message) + '</td></tr>';
             })
             .advancedSearch(filters);
         }
@@ -2733,12 +2749,12 @@ function getAdvancedSearchHtml() {
           }
 
           tbody.innerHTML = results.map(function(r) {
-            return '<tr onclick="selectResult(\\'' + r.id + '\\', \\'' + r.type + '\\')" style="cursor:pointer">' +
-                   '<td>' + r.type + '</td>' +
-                   '<td>' + r.name + '</td>' +
-                   '<td>' + r.details + '</td>' +
-                   '<td>' + r.status + '</td>' +
-                   '<td>' + r.date + '</td>' +
+            return '<tr data-id="' + escapeHtml(r.id) + '" data-type="' + escapeHtml(r.type) + '" onclick="selectResult(this.dataset.id, this.dataset.type)" style="cursor:pointer">' +
+                   '<td>' + escapeHtml(r.type) + '</td>' +
+                   '<td>' + escapeHtml(r.name) + '</td>' +
+                   '<td>' + escapeHtml(r.details) + '</td>' +
+                   '<td>' + escapeHtml(r.status) + '</td>' +
+                   '<td>' + escapeHtml(r.date) + '</td>' +
                    '</tr>';
           }).join('');
         }

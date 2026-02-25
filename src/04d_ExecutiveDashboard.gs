@@ -202,7 +202,7 @@ function getExecutiveDashboardHtml_() {
     '    </div>' +
     '  </div>' +
     '  <script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     '    window.onload = function() {' +
     '      google.script.run.withSuccessHandler(renderDashboard).withFailureHandler(showError).getDashboardStats();' +
     '    };' +
@@ -343,8 +343,8 @@ function showStewardDashboard() {
     '</style></head><body><div class="icon">🛡️</div><h1>Steward Command Center</h1>' +
     '<div class="warning">INTERNAL USE ONLY - Contains PII</div>' +
     '<p>Open the Steward Dashboard web app. This version includes full member details and sensitive information.</p>' +
-    '<div class="url" id="url">' + url + '</div>' +
-    '<div class="btn-row"><a class="open-link" href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<div class="url" id="url">' + escapeHtml(url) + '</div>' +
+    '<div class="btn-row"><a class="open-link" href="' + escapeHtml(url) + '" target="_blank">Open Dashboard</a>' +
     '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
     '</body></html>'
   ).setWidth(500).setHeight(400);
@@ -687,8 +687,8 @@ function showStewardPerformanceModal_UIService_() {
     var winClass = s.winRate >= 70 ? 'win-high' : (s.winRate >= 40 ? 'win-med' : 'win-low');
 
     html += '<tr>' +
-      '<td><strong>' + firstName + ' ' + lastName + '</strong></td>' +
-      '<td>' + unit + '</td>' +
+      '<td><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) + '</strong></td>' +
+      '<td>' + escapeHtml(unit) + '</td>' +
       '<td>' + (s.activeCases || 0) + '</td>' +
       '<td>' + (s.totalCases || 0) + '</td>' +
       '<td><span class="win-rate ' + winClass + '">' + (s.winRate || 0) + '%</span></td>' +

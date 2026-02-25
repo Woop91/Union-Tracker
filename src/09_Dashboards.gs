@@ -257,7 +257,7 @@ function getSatisfactionDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allResponses=[];var currentFilter="all";var analyticsLoaded=false;var sectionsLoaded=false;' +
 
     // Tab switching
@@ -2111,58 +2111,25 @@ function syncMemberToGrievanceLog() {
 // ============================================================================
 
 /**
- * Sync new values from Member Directory to Config (bidirectional sync)
- * When a user enters a new value in a job metadata field, add it to Config
+ * Sync new values from Member Directory to Config (bidirectional sync).
+ * When a user enters a new value in a dropdown/multi-select column, add it to Config.
+ *
+ * Delegates to syncDropdownToConfig_ which uses the dynamically-rebuilt
+ * DROPDOWN_MAP and MULTI_SELECT_COLS (kept current by syncColumnMaps).
+ *
  * @param {Object} e - The edit event object
  */
 function syncNewValueToConfig(e) {
   if (!e || !e.range) return;
 
   var sheet = e.range.getSheet();
-  if (sheet.getName() !== SHEETS.MEMBER_DIR) return;
+  var sheetName = sheet.getName();
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
-  var col = e.range.getColumn();
-  var newValue = e.range.getValue();
-
-  // Skip if empty or header row
-  if (!newValue || e.range.getRow() === 1) return;
-
-  // Check if this column is a job metadata field (includes Committees and Home Town)
-  var fieldConfig = getJobMetadataByMemberCol(col);
-  if (!fieldConfig) return; // Not a synced column
-
-  // Get current Config values for this column
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!configSheet) return;
-
-  var existingValues = getConfigValues(configSheet, fieldConfig.configCol);
-
-  // Handle multi-value fields (comma-separated)
-  var valuesToCheck = newValue.toString().split(',').map(function(v) { return v.trim(); });
-
-  var valuesToAdd = [];
-  for (var j = 0; j < valuesToCheck.length; j++) {
-    var val = valuesToCheck[j];
-    if (val && existingValues.indexOf(val) === -1) {
-      valuesToAdd.push(val);
-    }
-  }
-
-  // Add new values to Config
-  if (valuesToAdd.length > 0) {
-    var lastRow = configSheet.getLastRow();
-    var dataStartRow = Math.max(lastRow + 1, 3); // Start at row 3 minimum
-
-    for (var k = 0; k < valuesToAdd.length; k++) {
-      configSheet.getRange(dataStartRow + k, fieldConfig.configCol).setValue(valuesToAdd[k]);
-    }
-
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Added "' + valuesToAdd.join(', ') + '" to ' + fieldConfig.configName,
-      'Config Updated', 3
-    );
-  }
+  // syncDropdownToConfig_ uses DROPDOWN_MAP + MULTI_SELECT_COLS (rebuilt by
+  // syncColumnMaps) and writes via addToConfigDropdown_ which correctly finds
+  // the first empty row in the target Config column.
+  syncDropdownToConfig_(e, sheetName);
 }
 
 // ============================================================================
@@ -2274,6 +2241,12 @@ function syncAllData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
   ss.toast('Syncing all data...', 'Sync', 3);
+
+  // Restore any Config entries that exist in Member Directory / Grievance Log
+  // but are missing from the Config sheet (self-healing bidirectional sync)
+  if (typeof restoreConfigFromSheetData_ === 'function') {
+    try { restoreConfigFromSheetData_(); } catch (_e) { Logger.log('Config restore skipped: ' + _e.message); }
+  }
 
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();
@@ -3398,7 +3371,7 @@ function getFlaggedSubmissionsHtml() {
     '<div id="content"><div class="empty-state">Loading...</div></div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function load(){google.script.run.withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
@@ -3521,6 +3494,13 @@ function approveFlaggedSubmission(rowNum) {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function rejectFlaggedSubmission(rowNum) {
+  // Verify caller is an authorized steward
+  var callerEmail = '';
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  if (!callerEmail) {
+    throw new Error('Authorization required: unable to verify user identity');
+  }
+
   // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
@@ -3532,7 +3512,7 @@ function rejectFlaggedSubmission(rowNum) {
       var vaultRow = i + 1;
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Rejected');
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
-      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
       break;
     }
   }
@@ -3614,7 +3594,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '.trend-area { margin-top: 10px; }' +
     '</style>' +
     '<script type="text/javascript">' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'google.charts.load("current", {"packages":["corechart", "gauge"]});' +
     'google.charts.setOnLoadCallback(drawCharts);' +
     'function drawCharts() {' +

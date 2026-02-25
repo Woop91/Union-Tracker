@@ -50,7 +50,7 @@
  */
 
 // ============================================================================
-// SOURCE: 00_Security.gs (1158 lines)
+// SOURCE: 00_Security.gs (1168 lines)
 // ============================================================================
 
 /**
@@ -299,6 +299,11 @@ function buildSafeQuery(sheetName, query, headers) {
     .replace(/'/g, "''")
     .replace(/"/g, '\\"');
 
+  // Reject queries that could break out of the QUERY string context
+  if (/["\)]\s*[\+\&,]/.test(safeQuery) || /IMPORTRANGE|IMPORTDATA|IMPORTFEED|IMPORTHTML|IMAGE/i.test(safeQuery)) {
+    throw new Error('Query contains disallowed patterns');
+  }
+
   return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
 }
 
@@ -399,7 +404,7 @@ function getUserRole_(email) {
 
     // Check if user is the spreadsheet owner (admin)
     var owner = ss.getOwner();
-    if (owner && owner.getEmail() === email) {
+    if (owner && owner.getEmail().toLowerCase() === email.toLowerCase()) {
       return 'admin';
     }
 
@@ -409,9 +414,9 @@ function getUserRole_(email) {
       if (memberSheet) {
         var data = memberSheet.getDataRange().getValues();
         for (var i = 1; i < data.length; i++) {
-          var memberEmail = data[i][MEMBER_COLUMNS.EMAIL] || '';
+          var memberEmail = data[i][MEMBER_COLS.EMAIL - 1] || '';
           if (memberEmail.toLowerCase() === email.toLowerCase()) {
-            var isSteward = data[i][MEMBER_COLUMNS.IS_STEWARD];
+            var isSteward = data[i][MEMBER_COLS.IS_STEWARD - 1];
             if (isTruthyValue(isSteward)) {
               return 'steward';
             }
@@ -437,12 +442,17 @@ function validateWebAppRequest(e) {
   var result = {
     isValid: true,
     params: {},
-    errors: []
+    errors: [],
+    hasParams: false
   };
 
   if (!e || !e.parameter) {
-    return result;  // No parameters is valid
+    // No parameters is structurally valid; callers must check result.hasParams
+    // independently if they require specific parameters to be present.
+    return result;
   }
+
+  result.hasParams = !!(e && e.parameter && Object.keys(e.parameter).length > 0);
 
   // Validate and sanitize 'mode' parameter
   if (e.parameter.mode) {
@@ -519,7 +529,7 @@ function getAccessDeniedPage(message) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Access Denied')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 // ============================================================================
@@ -1010,7 +1020,7 @@ function sendDailySecurityDigest() {
 
     // Gather recipients
     var recipients = [];
-    if (typeof getConfigValue_ === 'function') {
+    if (typeof getConfigValue_ === 'function' && typeof CONFIG_COLS !== 'undefined') {
       try {
         var chiefEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
         var adminEmails = getConfigValue_(CONFIG_COLS.ADMIN_EMAILS);
@@ -1213,7 +1223,7 @@ function showSecurityStatusDialog() {
 
 
 // ============================================================================
-// SOURCE: 00_DataAccess.gs (626 lines)
+// SOURCE: 00_DataAccess.gs (624 lines)
 // ============================================================================
 
 /**
@@ -1341,7 +1351,7 @@ var DataAccess = {
           sheet.getRange(1, 1, 1, options.headers.length).setFontWeight('bold');
         }
         if (options.hidden) {
-          sheet.hideSheet();
+          setSheetVeryHidden_(sheet);
         }
       }
     }
@@ -1575,26 +1585,25 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
                     SHEETS.MEMBER_DIR : 'Member Directory';
 
-    var result = this.findRow(sheetName, MEMBER_COLUMNS.MEMBER_ID, memberId);
+    var result = this.findRow(sheetName, MEMBER_COLS.MEMBER_ID - 1, memberId);
 
     if (!result) return null;
 
-    // Map to object using MEMBER_COLUMNS
     var row = result.data;
     return {
       rowNumber: result.rowNumber,
-      memberId: row[MEMBER_COLUMNS.MEMBER_ID],
-      firstName: row[MEMBER_COLUMNS.FIRST_NAME],
-      lastName: row[MEMBER_COLUMNS.LAST_NAME],
-      jobTitle: row[MEMBER_COLUMNS.JOB_TITLE],
-      workLocation: row[MEMBER_COLUMNS.WORK_LOCATION],
-      unit: row[MEMBER_COLUMNS.UNIT],
-      email: row[MEMBER_COLUMNS.EMAIL],
-      phone: row[MEMBER_COLUMNS.PHONE],
-      isSteward: row[MEMBER_COLUMNS.IS_STEWARD],
-      assignedSteward: row[MEMBER_COLUMNS.ASSIGNED_STEWARD],
-      hasOpenGrievance: row[MEMBER_COLUMNS.HAS_OPEN_GRIEVANCE],
-      grievanceStatus: row[MEMBER_COLUMNS.GRIEVANCE_STATUS]
+      memberId: row[MEMBER_COLS.MEMBER_ID - 1],
+      firstName: row[MEMBER_COLS.FIRST_NAME - 1],
+      lastName: row[MEMBER_COLS.LAST_NAME - 1],
+      jobTitle: row[MEMBER_COLS.JOB_TITLE - 1],
+      workLocation: row[MEMBER_COLS.WORK_LOCATION - 1],
+      unit: row[MEMBER_COLS.UNIT - 1],
+      email: row[MEMBER_COLS.EMAIL - 1],
+      phone: row[MEMBER_COLS.PHONE - 1],
+      isSteward: row[MEMBER_COLS.IS_STEWARD - 1],
+      assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1],
+      hasOpenGrievance: row[MEMBER_COLS.HAS_OPEN_GRIEVANCE - 1],
+      grievanceStatus: row[MEMBER_COLS.GRIEVANCE_STATUS - 1]
     };
   },
 
@@ -1619,28 +1628,28 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (!row[MEMBER_COLUMNS.MEMBER_ID]) continue;
+      if (row[MEMBER_COLS.MEMBER_ID - 1] === '' || row[MEMBER_COLS.MEMBER_ID - 1] == null) continue;
 
-      // Apply filters
-      if (options.unit && row[MEMBER_COLUMNS.UNIT] !== options.unit) continue;
-      if (options.location && row[MEMBER_COLUMNS.WORK_LOCATION] !== options.location) continue;
+      // Apply filters (use String() coercion for type-safe comparison)
+      if (options.unit && String(row[MEMBER_COLS.UNIT - 1]) !== String(options.unit)) continue;
+      if (options.location && String(row[MEMBER_COLS.WORK_LOCATION - 1]) !== String(options.location)) continue;
       if (options.stewardsOnly) {
-        var isSteward = row[MEMBER_COLUMNS.IS_STEWARD];
+        var isSteward = row[MEMBER_COLS.IS_STEWARD - 1];
         if (!isTruthyValue(isSteward)) continue;
       }
 
       members.push({
         rowNumber: i + 2,  // Account for header and 0-index
-        memberId: row[MEMBER_COLUMNS.MEMBER_ID],
-        firstName: row[MEMBER_COLUMNS.FIRST_NAME],
-        lastName: row[MEMBER_COLUMNS.LAST_NAME],
-        jobTitle: row[MEMBER_COLUMNS.JOB_TITLE],
-        workLocation: row[MEMBER_COLUMNS.WORK_LOCATION],
-        unit: row[MEMBER_COLUMNS.UNIT],
-        email: row[MEMBER_COLUMNS.EMAIL],
-        phone: row[MEMBER_COLUMNS.PHONE],
-        isSteward: row[MEMBER_COLUMNS.IS_STEWARD],
-        assignedSteward: row[MEMBER_COLUMNS.ASSIGNED_STEWARD]
+        memberId: row[MEMBER_COLS.MEMBER_ID - 1],
+        firstName: row[MEMBER_COLS.FIRST_NAME - 1],
+        lastName: row[MEMBER_COLS.LAST_NAME - 1],
+        jobTitle: row[MEMBER_COLS.JOB_TITLE - 1],
+        workLocation: row[MEMBER_COLS.WORK_LOCATION - 1],
+        unit: row[MEMBER_COLS.UNIT - 1],
+        email: row[MEMBER_COLS.EMAIL - 1],
+        phone: row[MEMBER_COLS.PHONE - 1],
+        isSteward: row[MEMBER_COLS.IS_STEWARD - 1],
+        assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1]
       });
     }
 
@@ -1662,31 +1671,30 @@ var DataAccess = {
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
                     SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
-    var result = this.findRow(sheetName, GRIEVANCE_COLUMNS.GRIEVANCE_ID, grievanceId);
+    var result = this.findRow(sheetName, GRIEVANCE_COLS.GRIEVANCE_ID - 1, grievanceId);
 
     if (!result) return null;
 
     var row = result.data;
     return {
       rowNumber: result.rowNumber,
-      grievanceId: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-      memberId: row[GRIEVANCE_COLUMNS.MEMBER_ID],
-      firstName: row[GRIEVANCE_COLUMNS.FIRST_NAME],
-      lastName: row[GRIEVANCE_COLUMNS.LAST_NAME],
-      status: row[GRIEVANCE_COLUMNS.STATUS],
-      currentStep: row[GRIEVANCE_COLUMNS.CURRENT_STEP],
-      incidentDate: row[GRIEVANCE_COLUMNS.INCIDENT_DATE],
-      filingDeadline: row[GRIEVANCE_COLUMNS.FILING_DEADLINE],
-      dateFiled: row[GRIEVANCE_COLUMNS.DATE_FILED],
-      daysOpen: row[GRIEVANCE_COLUMNS.DAYS_OPEN],
-      nextActionDue: row[GRIEVANCE_COLUMNS.NEXT_ACTION_DUE],
-      daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
-      articles: row[GRIEVANCE_COLUMNS.ARTICLES],
-      issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
-      unit: row[GRIEVANCE_COLUMNS.UNIT],
-      location: row[GRIEVANCE_COLUMNS.LOCATION],
-      steward: row[GRIEVANCE_COLUMNS.STEWARD],
-      resolution: row[GRIEVANCE_COLUMNS.RESOLUTION]
+      grievanceId: row[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+      memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1],
+      firstName: row[GRIEVANCE_COLS.FIRST_NAME - 1],
+      lastName: row[GRIEVANCE_COLS.LAST_NAME - 1],
+      status: row[GRIEVANCE_COLS.STATUS - 1],
+      currentStep: row[GRIEVANCE_COLS.CURRENT_STEP - 1],
+      incidentDate: row[GRIEVANCE_COLS.INCIDENT_DATE - 1],
+      filingDeadline: row[GRIEVANCE_COLS.FILING_DEADLINE - 1],
+      dateFiled: row[GRIEVANCE_COLS.DATE_FILED - 1],
+      daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1],
+      nextActionDue: row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1],
+      daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1],
+      articles: row[GRIEVANCE_COLS.ARTICLES - 1],
+      issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
+      location: row[GRIEVANCE_COLS.LOCATION - 1],
+      steward: row[GRIEVANCE_COLS.STEWARD - 1],
+      resolution: row[GRIEVANCE_COLS.RESOLUTION - 1]
     };
   },
 
@@ -1711,29 +1719,29 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (!row[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) continue;
+      if (row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] === '' || row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] == null) continue;
 
-      // Apply filters
-      if (options.status && row[GRIEVANCE_COLUMNS.STATUS] !== options.status) continue;
-      if (options.steward && row[GRIEVANCE_COLUMNS.STEWARD] !== options.steward) continue;
+      // Apply filters (use String() coercion for type-safe comparison)
+      if (options.status && String(row[GRIEVANCE_COLS.STATUS - 1]) !== String(options.status)) continue;
+      if (options.steward && String(row[GRIEVANCE_COLS.STEWARD - 1]) !== String(options.steward)) continue;
       if (options.overdueOnly) {
-        var daysToDeadline = row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE];
+        var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
         if (typeof daysToDeadline !== 'number' || daysToDeadline >= 0) continue;
       }
 
       grievances.push({
         rowNumber: i + 2,
-        grievanceId: row[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-        memberId: row[GRIEVANCE_COLUMNS.MEMBER_ID],
-        firstName: row[GRIEVANCE_COLUMNS.FIRST_NAME],
-        lastName: row[GRIEVANCE_COLUMNS.LAST_NAME],
-        status: row[GRIEVANCE_COLUMNS.STATUS],
-        currentStep: row[GRIEVANCE_COLUMNS.CURRENT_STEP],
-        incidentDate: row[GRIEVANCE_COLUMNS.INCIDENT_DATE],
-        daysOpen: row[GRIEVANCE_COLUMNS.DAYS_OPEN],
-        daysToDeadline: row[GRIEVANCE_COLUMNS.DAYS_TO_DEADLINE],
-        issueCategory: row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY],
-        steward: row[GRIEVANCE_COLUMNS.STEWARD]
+        grievanceId: row[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+        memberId: row[GRIEVANCE_COLS.MEMBER_ID - 1],
+        firstName: row[GRIEVANCE_COLS.FIRST_NAME - 1],
+        lastName: row[GRIEVANCE_COLS.LAST_NAME - 1],
+        status: row[GRIEVANCE_COLS.STATUS - 1],
+        currentStep: row[GRIEVANCE_COLS.CURRENT_STEP - 1],
+        incidentDate: row[GRIEVANCE_COLS.INCIDENT_DATE - 1],
+        daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1],
+        daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1],
+        issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
+        steward: row[GRIEVANCE_COLS.STEWARD - 1]
       });
     }
 
@@ -1844,7 +1852,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3116 lines)
+// SOURCE: 01_Core.gs (3332 lines)
 // ============================================================================
 
 /**
@@ -2003,17 +2011,19 @@ function logErrorToSheet_(errorInfo) {
     // Create sheet if it doesn't exist
     if (!sheet) {
       sheet = ss.insertSheet(ERROR_CONFIG.LOG_SHEET_NAME);
-      sheet.hideSheet();
       sheet.appendRow(['Timestamp', 'Level', 'Context', 'Message', 'User', 'Stack']);
       sheet.getRange(1, 1, 1, 6).setFontWeight('bold');
+      setSheetVeryHidden_(sheet);
     }
 
-    // Add error row
+    // Add error row (formula-protect user-influenced fields)
+    var safeContext = typeof escapeForFormula === 'function' ? escapeForFormula(errorInfo.context) : errorInfo.context;
+    var safeMessage = typeof escapeForFormula === 'function' ? escapeForFormula(errorInfo.message) : errorInfo.message;
     sheet.appendRow([
       errorInfo.timestamp,
       errorInfo.level,
-      errorInfo.context,
-      errorInfo.message,
+      safeContext,
+      safeMessage,
       errorInfo.user,
       ERROR_CONFIG.SHOW_STACK_TRACE ? errorInfo.stack : ''
     ]);
@@ -2060,8 +2070,19 @@ function showErrorNotification_(errorInfo) {
 function sendCriticalErrorNotification_(errorInfo) {
   try {
     var adminEmail = Session.getEffectiveUser().getEmail();
-    var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
-    var body = 'A critical error occurred in the ' + COMMAND_CONFIG.SYSTEM_NAME + ':\n\n' +
+    var subject;
+    try {
+      subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
+    } catch (e) {
+      subject = 'Critical Error: ' + (errorInfo.context || 'Unknown');
+    }
+    var systemName;
+    try {
+      systemName = COMMAND_CONFIG.SYSTEM_NAME;
+    } catch (e) {
+      systemName = 'Union Dashboard';
+    }
+    var body = 'A critical error occurred in the ' + systemName + ':\n\n' +
                'Time: ' + errorInfo.timestamp + '\n' +
                'Context: ' + errorInfo.context + '\n' +
                'Message: ' + errorInfo.message + '\n' +
@@ -2337,7 +2358,7 @@ function showErrorLog() {
     return;
   }
 
-  sheet.showSheet();
+  setSheetVisible_(sheet);
   ss.setActiveSheet(sheet);
 }
 
@@ -2666,6 +2687,237 @@ var HIDDEN_SHEETS = {
 };
 
 // ============================================================================
+// HIDDEN SHEET ENFORCEMENT - Mobile-safe hiding via Sheets API
+// ============================================================================
+// Google Sheets mobile can display sheets hidden with hideSheet().
+// These helpers use the Sheets Advanced Service (API v4) to set hidden=true
+// at the API level AND apply sheet protection so the sheets stay invisible
+// and uneditable even on mobile devices.
+// Requires: Sheets Advanced Service enabled in appsscript.json
+
+/**
+ * Protection description used to identify auto-protections on hidden sheets.
+ * @const {string}
+ * @private
+ */
+var HIDDEN_SHEET_PROTECTION_DESC_ = 'Hidden Sheet — Auto Protected';
+
+/**
+ * Hides a sheet using the Sheets Advanced Service and applies protection.
+ * This is more robust than sheet.hideSheet() alone because:
+ *   1. The API-level hide is better enforced on Google Sheets mobile.
+ *   2. Sheet protection prevents editing even if a mobile user discovers the tab.
+ *
+ * Falls back to sheet.hideSheet() if the Advanced Service is unavailable.
+ *
+ * @param {Sheet} sheet - The sheet to hide
+ * @private
+ */
+function setSheetVeryHidden_(sheet) {
+  if (!sheet) return;
+
+  // 1. Hide via Sheets Advanced Service (API v4) for stronger mobile enforcement
+  try {
+    var ssId = sheet.getParent().getId();
+    Sheets.Spreadsheets.batchUpdate({
+      requests: [{
+        updateSheetProperties: {
+          properties: {
+            sheetId: sheet.getSheetId(),
+            hidden: true
+          },
+          fields: 'hidden'
+        }
+      }]
+    }, ssId);
+  } catch (_apiError) {
+    // Fallback: use standard hideSheet() if Advanced Service is not available
+    try {
+      sheet.hideSheet();
+    } catch (_hideError) {
+      Logger.log('Could not hide sheet "' + sheet.getName() + '": ' + _hideError.message);
+    }
+  }
+
+  // 2. Apply protection so the sheet cannot be edited even if visible on mobile
+  protectHiddenSheet_(sheet);
+}
+
+/**
+ * Shows a previously very-hidden sheet (for admin viewing).
+ * Removes the auto-protection so the admin can inspect the sheet.
+ *
+ * @param {Sheet} sheet - The sheet to show
+ * @private
+ */
+function setSheetVisible_(sheet) {
+  if (!sheet) return;
+
+  // 1. Show via Sheets Advanced Service
+  try {
+    var ssId = sheet.getParent().getId();
+    Sheets.Spreadsheets.batchUpdate({
+      requests: [{
+        updateSheetProperties: {
+          properties: {
+            sheetId: sheet.getSheetId(),
+            hidden: false
+          },
+          fields: 'hidden'
+        }
+      }]
+    }, ssId);
+  } catch (_apiError) {
+    // Fallback
+    try {
+      sheet.showSheet();
+    } catch (_showError) {
+      Logger.log('Could not show sheet "' + sheet.getName() + '": ' + _showError.message);
+    }
+  }
+
+  // 2. Remove the auto-protection so admin can inspect the data
+  removeHiddenSheetProtection_(sheet);
+}
+
+/**
+ * Applies sheet protection to a hidden sheet.
+ * Only the spreadsheet owner / script installer can edit.
+ * Skips if a protection with the same description already exists.
+ *
+ * @param {Sheet} sheet - The sheet to protect
+ * @private
+ */
+function protectHiddenSheet_(sheet) {
+  if (!sheet) return;
+
+  // Check for existing protection
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === HIDDEN_SHEET_PROTECTION_DESC_) {
+      return; // already protected
+    }
+  }
+
+  try {
+    var protection = sheet.protect().setDescription(HIDDEN_SHEET_PROTECTION_DESC_);
+    protection.setWarningOnly(false);
+
+    // Remove all editors except the owner (script installer)
+    var editors = protection.getEditors();
+    if (editors.length > 0) {
+      protection.removeEditors(editors);
+    }
+    // The owner is always retained by Google Sheets automatically
+  } catch (_e) {
+    Logger.log('Could not protect sheet "' + sheet.getName() + '": ' + _e.message);
+  }
+}
+
+/**
+ * Removes the auto-protection placed by setSheetVeryHidden_().
+ *
+ * @param {Sheet} sheet - The sheet to unprotect
+ * @private
+ */
+function removeHiddenSheetProtection_(sheet) {
+  if (!sheet) return;
+
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  for (var i = 0; i < protections.length; i++) {
+    if (protections[i].getDescription() === HIDDEN_SHEET_PROTECTION_DESC_) {
+      protections[i].remove();
+    }
+  }
+}
+
+/**
+ * Enforces hidden state on ALL sheets that should be hidden.
+ * Checks every sheet whose name starts with '_' (the project convention for hidden sheets).
+ * Safe to call from onOpen() and from a time-driven trigger.
+ *
+ * @returns {Object} Result with counts of sheets checked and enforced
+ */
+function enforceHiddenSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var allSheets = ss.getSheets();
+  var enforced = 0;
+  var checked = 0;
+
+  // Collect all known hidden sheet names from both HIDDEN_SHEETS and SHEETS constants
+  var knownHiddenNames = {};
+  for (var key in HIDDEN_SHEETS) {
+    knownHiddenNames[HIDDEN_SHEETS[key]] = true;
+  }
+  // Also include the error log sheet
+  knownHiddenNames[ERROR_CONFIG.LOG_SHEET_NAME] = true;
+
+  for (var i = 0; i < allSheets.length; i++) {
+    var sheet = allSheets[i];
+    var name = sheet.getName();
+
+    // A sheet should be hidden if its name starts with '_' or is in the known list
+    if (name.charAt(0) === '_' || knownHiddenNames[name]) {
+      checked++;
+
+      if (!sheet.isSheetHidden()) {
+        // Sheet should be hidden but isn't — enforce
+        setSheetVeryHidden_(sheet);
+        enforced++;
+      } else {
+        // Already hidden — ensure protection is in place
+        protectHiddenSheet_(sheet);
+      }
+    }
+  }
+
+  if (enforced > 0) {
+    Logger.log('enforceHiddenSheets: re-hid ' + enforced + ' of ' + checked + ' hidden sheets');
+  }
+
+  return { checked: checked, enforced: enforced };
+}
+
+/**
+ * Installs a time-driven trigger that enforces hidden sheets every hour.
+ * Prevents mobile users from accessing hidden sheets between spreadsheet opens.
+ */
+function installHiddenSheetEnforcerTrigger() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
+
+  // Check if trigger already exists
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'enforceHiddenSheets') {
+      Logger.log('Hidden sheet enforcer trigger already installed');
+      return;
+    }
+  }
+
+  ScriptApp.newTrigger('enforceHiddenSheets')
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  Logger.log('Installed hourly hidden-sheet enforcer trigger');
+}
+
+/**
+ * Removes the hidden-sheet enforcer trigger.
+ */
+function removeHiddenSheetEnforcerTrigger() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
+
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'enforceHiddenSheets') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      Logger.log('Removed hidden-sheet enforcer trigger');
+    }
+  }
+}
+
+// ============================================================================
 // COLOR SCHEME - Enhanced Visual Theme System
 // ============================================================================
 
@@ -2975,46 +3227,6 @@ var GRIEVANCE_HEADER_MAP_ = [
 var GRIEVANCE_COLS = buildColsFromMap_(GRIEVANCE_HEADER_MAP_);
 
 // ============================================================================
-// BACKWARD COMPATIBILITY ALIASES (0-indexed for array access)
-// Auto-derived from 1-indexed *_COLS — stays in sync automatically.
-// ============================================================================
-
-/** Legacy-only aliases for GRIEVANCE_COLUMNS (keys not in GRIEVANCE_COLS) */
-var GRIEVANCE_LEGACY_ALIASES_ = {
-  MEMBER_NAME: 'FIRST_NAME',
-  FILING_DATE: 'DATE_FILED',
-  STEP_1_DUE: 'STEP1_DUE',
-  STEP_1_DATE: 'STEP1_RCVD',
-  STEP_1_STATUS: 'STATUS',
-  STEP_2_DATE: 'STEP2_APPEAL_FILED',
-  STEP_2_DUE: 'STEP2_DUE',
-  STEP_2_STATUS: 'STATUS',
-  STEP_3_DATE: 'STEP3_APPEAL_FILED',
-  STEP3_DUE: 'STEP3_APPEAL_DUE',
-  STEP_3_DUE: 'STEP3_APPEAL_DUE',
-  STEP_3_STATUS: 'STATUS',
-  ARBITRATION_DATE: 'DATE_CLOSED',
-  RECORD_LAST_UPDATED: 'LAST_UPDATED',
-  GRIEVANCE_TYPE: 'ISSUE_CATEGORY',
-  DESCRIPTION: 'ISSUE_CATEGORY',
-  OUTCOME: 'RESOLUTION',
-  NOTES: 'RESOLUTION',
-  DRIVE_FOLDER: 'DRIVE_FOLDER_URL'
-};
-
-var GRIEVANCE_COLUMNS = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-
-/** Legacy-only aliases for MEMBER_COLUMNS (keys not in MEMBER_COLS) */
-var MEMBER_LEGACY_ALIASES_ = {
-  ID: 'MEMBER_ID',
-  JOB_DEPT: 'JOB_TITLE',
-  STATUS: 'GRIEVANCE_STATUS',
-  LAST_UPDATED: 'RECENT_CONTACT_DATE'
-};
-
-var MEMBER_COLUMNS = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-
-// ============================================================================
 // CONFIG COLUMN MAPPING — Auto-derived from header map
 // Config sheet uses row 2 for headers (row 1 is section headers).
 // ============================================================================
@@ -3024,7 +3236,6 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'OFFICE_LOCATIONS',      header: 'Office Locations' },
   { key: 'UNITS',                 header: 'Units' },
   { key: 'OFFICE_DAYS',           header: 'Office Days' },
-  { key: 'YES_NO',                header: 'Yes/No (Dropdowns)' },
   { key: 'SUPERVISORS',           header: 'Supervisors' },
   { key: 'MANAGERS',              header: 'Managers' },
   { key: 'STEWARDS',              header: 'Stewards' },
@@ -3051,7 +3262,6 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'STEP2_APPEAL_DAYS',     header: 'Step II Appeal Days' },
   { key: 'STEP2_RESPONSE_DAYS',   header: 'Step II Response Days' },
   { key: 'BEST_TIMES',            header: 'Best Times to Contact' },
-  { key: 'HOME_TOWNS',            header: 'Home Towns' },
   { key: 'CONTRACT_GRIEVANCE',    header: 'Contract Article (Grievance)' },
   { key: 'CONTRACT_DISCIPLINE',   header: 'Contract Article (Discipline)' },
   { key: 'CONTRACT_WORKLOAD',     header: 'Contract Article (Workload)' },
@@ -3071,7 +3281,19 @@ var CONFIG_HEADER_MAP_ = [
   { key: 'ESCALATION_STEPS',      header: 'Escalation Steps' },
   { key: 'TEMPLATE_ID',           header: 'Template ID' },
   { key: 'PDF_FOLDER_ID',         header: 'PDF Folder ID' },
-  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' }
+  { key: 'MOBILE_DASHBOARD_URL',  header: '\uD83D\uDCF1 Mobile Dashboard URL' },
+  { key: 'ACCENT_HUE',            header: 'Accent Hue' },
+  { key: 'LOGO_INITIALS',         header: 'Logo Initials' },
+  { key: 'MAGIC_LINK_EXPIRY_DAYS', header: 'Magic Link Expiry Days' },
+  { key: 'COOKIE_DURATION_DAYS',  header: 'Cookie Duration Days' },
+  { key: 'STEWARD_LABEL',         header: 'Steward Label' },
+  { key: 'MEMBER_LABEL',          header: 'Member Label' },
+  { key: 'CUSTOM_LINK_1_NAME',   header: 'Custom Link 1 Name' },
+  { key: 'CUSTOM_LINK_1_URL',    header: 'Custom Link 1 URL' },
+  { key: 'CUSTOM_LINK_2_NAME',   header: 'Custom Link 2 Name' },
+  { key: 'CUSTOM_LINK_2_URL',    header: 'Custom Link 2 URL' },
+  { key: 'SURVEY_LOG_IDS',       header: 'Survey Log (Member IDs)' },
+  { key: 'SURVEY_LOG_DATES',     header: 'Survey Log (Dates)' }
 ];
 
 var CONFIG_COLS = buildColsFromMap_(CONFIG_HEADER_MAP_);
@@ -3510,30 +3732,6 @@ function getHeadersFromMap_(headerMap) {
 }
 
 /**
- * Build a 0-indexed legacy column map from a 1-indexed COLS object.
- * @param {Object} colsObj - 1-indexed column constants
- * @param {Object} [extraAliases] - { 'LEGACY_KEY': 'PRIMARY_KEY' } for legacy-only aliases
- * @returns {Object} 0-indexed column constants
- */
-function buildLegacyCols_(colsObj, extraAliases) {
-  var legacy = {};
-  for (var key in colsObj) {
-    if (colsObj.hasOwnProperty(key)) {
-      legacy[key] = colsObj[key] - 1;
-    }
-  }
-  if (extraAliases) {
-    for (var alias in extraAliases) {
-      if (extraAliases.hasOwnProperty(alias)) {
-        var target = extraAliases[alias];
-        legacy[alias] = colsObj[target] !== undefined ? colsObj[target] - 1 : legacy[target];
-      }
-    }
-  }
-  return legacy;
-}
-
-/**
  * Resolve column positions by reading actual sheet headers at runtime.
  * @param {string} sheetName - Sheet name to read
  * @param {Array<{key: string, header: string}>} headerMap - Expected headers
@@ -3620,16 +3818,6 @@ function syncColumnMaps() {
     if (moved) result.synced.push(entry.name);
   }
 
-  // Rebuild legacy compat objects if primary maps changed
-  if (result.synced.indexOf('MEMBER_COLS') >= 0) {
-    var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-    for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
-  }
-  if (result.synced.indexOf('GRIEVANCE_COLS') >= 0) {
-    var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-    for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
-  }
-
   // Rebuild derived column configs so dropdown dialogs and bidirectional
   // sync use the up-to-date column positions after any columns shifted.
   if (result.synced.length > 0) {
@@ -3640,6 +3828,11 @@ function syncColumnMaps() {
     var freshDD = buildDropdownMap_();
     DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
     DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+    // Rebuild JOB_METADATA_FIELDS so it reflects the resolved column positions.
+    // Without this, functions using getJobMetadataByMemberCol() would use stale
+    // column numbers captured at script load time.
+    rebuildJobMetadataFields_();
   }
 
   if (result.synced.length > 0) {
@@ -3738,14 +3931,9 @@ function loadCachedColumnMaps_() {
       }
     }
 
-    // Rebuild derived objects (legacy compat, dropdown map, multi-select)
+    // Rebuild derived objects (dropdown map, multi-select, job metadata)
     // only if something actually changed.
     if (changed) {
-      var rebuilt = buildLegacyCols_(MEMBER_COLS, MEMBER_LEGACY_ALIASES_);
-      for (var mk in rebuilt) { if (rebuilt.hasOwnProperty(mk)) MEMBER_COLUMNS[mk] = rebuilt[mk]; }
-      var rebuilt2 = buildLegacyCols_(GRIEVANCE_COLS, GRIEVANCE_LEGACY_ALIASES_);
-      for (var gk in rebuilt2) { if (rebuilt2.hasOwnProperty(gk)) GRIEVANCE_COLUMNS[gk] = rebuilt2[gk]; }
-
       var freshMulti = buildMultiSelectCols_();
       MULTI_SELECT_COLS.MEMBER_DIR = freshMulti.MEMBER_DIR;
       MULTI_SELECT_COLS.GRIEVANCE_LOG = freshMulti.GRIEVANCE_LOG;
@@ -3753,6 +3941,8 @@ function loadCachedColumnMaps_() {
       var freshDD = buildDropdownMap_();
       DROPDOWN_MAP.MEMBER_DIR = freshDD.MEMBER_DIR;
       DROPDOWN_MAP.GRIEVANCE_LOG = freshDD.GRIEVANCE_LOG;
+
+      rebuildJobMetadataFields_();
     }
 
     return true;
@@ -3835,6 +4025,19 @@ function getColumnNumber(columnLetter) {
 }
 
 /**
+ * Safe accessor for numeric fields — returns the value as-is when it's a
+ * number (including 0), and '' for null/undefined/empty-string.
+ * Avoids the `value || ''` pitfall where 0 is treated as falsy.
+ * @param {*} value - Cell value
+ * @returns {number|string}
+ * @private
+ */
+function numericField_(value) {
+  if (value === null || value === undefined || value === '') return '';
+  return value;
+}
+
+/**
  * Map a Member Directory row array to a structured object
  * @param {Array} row - Row data array from Member Directory
  * @returns {Object} Structured member object
@@ -3861,8 +4064,8 @@ function mapMemberRow(row) {
     assignedSteward: row[MEMBER_COLS.ASSIGNED_STEWARD - 1] || '',
     lastVirtualMtg: row[MEMBER_COLS.LAST_VIRTUAL_MTG - 1] || '',
     lastInPersonMtg: row[MEMBER_COLS.LAST_INPERSON_MTG - 1] || '',
-    openRate: row[MEMBER_COLS.OPEN_RATE - 1] || '',
-    volunteerHours: row[MEMBER_COLS.VOLUNTEER_HOURS - 1] || '',
+    openRate: numericField_(row[MEMBER_COLS.OPEN_RATE - 1]),
+    volunteerHours: numericField_(row[MEMBER_COLS.VOLUNTEER_HOURS - 1]),
     interestLocal: row[MEMBER_COLS.INTEREST_LOCAL - 1] || '',
     interestChapter: row[MEMBER_COLS.INTEREST_CHAPTER - 1] || '',
     interestAllied: row[MEMBER_COLS.INTEREST_ALLIED - 1] || '',
@@ -3902,9 +4105,9 @@ function mapGrievanceRow(row) {
     step3AppealDue: row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1] || '',
     step3AppealFiled: row[GRIEVANCE_COLS.STEP3_APPEAL_FILED - 1] || '',
     dateClosed: row[GRIEVANCE_COLS.DATE_CLOSED - 1] || '',
-    daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || '',
+    daysOpen: numericField_(row[GRIEVANCE_COLS.DAYS_OPEN - 1]),
     nextActionDue: row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1] || '',
-    daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] || '',
+    daysToDeadline: numericField_(row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1]),
     articles: row[GRIEVANCE_COLS.ARTICLES - 1] || '',
     issueCategory: row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
     memberEmail: row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] || '',
@@ -3951,7 +4154,6 @@ function getGrievanceHeaders() {
  */
 var DEFAULT_CONFIG = {
   OFFICE_DAYS: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-  YES_NO: ['Yes', 'No'],
   // Status includes both workflow states (Open, Pending, In Arbitration) AND outcomes (Won, Denied, Settled, Withdrawn)
   // This single-column design allows Dashboard metrics to count outcomes directly from STATUS column
   GRIEVANCE_STATUS: ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Denied', 'Won', 'Appealed', 'In Arbitration', 'Closed'],
@@ -4074,9 +4276,9 @@ function getDeadlineRules() {
       var s2Appeal = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS).getValue());
       var s2Resp = Number(configSheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS).getValue());
       return {
-        FILING_DAYS: filing || DEADLINE_DEFAULTS.FILING_DAYS,
-        STEP_1: { DAYS_FOR_RESPONSE: s1Resp || DEADLINE_DEFAULTS.STEP_1_RESPONSE },
-        STEP_2: { DAYS_TO_APPEAL: s2Appeal || DEADLINE_DEFAULTS.STEP_2_APPEAL, DAYS_FOR_RESPONSE: s2Resp || DEADLINE_DEFAULTS.STEP_2_RESPONSE },
+        FILING_DAYS: isNaN(filing) ? DEADLINE_DEFAULTS.FILING_DAYS : filing,
+        STEP_1: { DAYS_FOR_RESPONSE: isNaN(s1Resp) ? DEADLINE_DEFAULTS.STEP_1_RESPONSE : s1Resp },
+        STEP_2: { DAYS_TO_APPEAL: isNaN(s2Appeal) ? DEADLINE_DEFAULTS.STEP_2_APPEAL : s2Appeal, DAYS_FOR_RESPONSE: isNaN(s2Resp) ? DEADLINE_DEFAULTS.STEP_2_RESPONSE : s2Resp },
         STEP_3: { DAYS_TO_APPEAL: DEADLINE_DEFAULTS.STEP_3_APPEAL, DAYS_FOR_RESPONSE: DEADLINE_DEFAULTS.STEP_3_RESPONSE },
         ARBITRATION: { DAYS_TO_DEMAND: DEADLINE_DEFAULTS.ARBITRATION_DEMAND }
       };
@@ -4232,6 +4434,25 @@ function getJobMetadataByMemberCol(memberCol) {
   return null;
 }
 
+/**
+ * Rebuild JOB_METADATA_FIELDS from the current *_COLS values.
+ * Called by syncColumnMaps() and loadCachedColumnMaps_() so that
+ * JOB_METADATA_FIELDS stays in sync when columns shift at runtime.
+ * @private
+ */
+function rebuildJobMetadataFields_() {
+  JOB_METADATA_FIELDS.length = 0; // clear in-place to preserve the reference
+  JOB_METADATA_FIELDS.push(
+    { label: 'Job Title', memberCol: MEMBER_COLS.JOB_TITLE, configCol: CONFIG_COLS.JOB_TITLES, configName: 'Job Titles' },
+    { label: 'Work Location', memberCol: MEMBER_COLS.WORK_LOCATION, configCol: CONFIG_COLS.OFFICE_LOCATIONS, configName: 'Office Locations' },
+    { label: 'Unit', memberCol: MEMBER_COLS.UNIT, configCol: CONFIG_COLS.UNITS, configName: 'Units' },
+    { label: 'Supervisor', memberCol: MEMBER_COLS.SUPERVISOR, configCol: CONFIG_COLS.SUPERVISORS, configName: 'Supervisors' },
+    { label: 'Manager', memberCol: MEMBER_COLS.MANAGER, configCol: CONFIG_COLS.MANAGERS, configName: 'Managers' },
+    { label: 'Assigned Steward', memberCol: MEMBER_COLS.ASSIGNED_STEWARD, configCol: CONFIG_COLS.STEWARDS, configName: 'Stewards' },
+    { label: 'Committees', memberCol: MEMBER_COLS.COMMITTEES, configCol: CONFIG_COLS.STEWARD_COMMITTEES, configName: 'Steward Committees' }
+  );
+}
+
 // ============================================================================
 // MULTI-SELECT COLUMN CONFIGURATION
 // ============================================================================
@@ -4309,19 +4530,22 @@ function buildDropdownMap_() {
       { col: MEMBER_COLS.JOB_TITLE,        configCol: CONFIG_COLS.JOB_TITLES },
       { col: MEMBER_COLS.WORK_LOCATION,     configCol: CONFIG_COLS.OFFICE_LOCATIONS },
       { col: MEMBER_COLS.UNIT,              configCol: CONFIG_COLS.UNITS },
-      { col: MEMBER_COLS.IS_STEWARD,        configCol: CONFIG_COLS.YES_NO },
+      // IS_STEWARD and INTEREST_* columns deliberately excluded — they use hardcoded
+      // validation ('Yes'/'No'), not a Config column.  The YES_NO Config column was
+      // removed to eliminate contamination risk.  Steward status sync is handled by
+      // handleMemberEdit() and syncStewardStatus(), which write to CONFIG_COLS.STEWARDS.
       { col: MEMBER_COLS.SUPERVISOR,        configCol: CONFIG_COLS.SUPERVISORS },
       { col: MEMBER_COLS.MANAGER,           configCol: CONFIG_COLS.MANAGERS },
-      { col: MEMBER_COLS.INTEREST_LOCAL,    configCol: CONFIG_COLS.YES_NO },
-      { col: MEMBER_COLS.INTEREST_CHAPTER,  configCol: CONFIG_COLS.YES_NO },
-      { col: MEMBER_COLS.INTEREST_ALLIED,   configCol: CONFIG_COLS.YES_NO },
       { col: MEMBER_COLS.CONTACT_STEWARD,   configCol: CONFIG_COLS.STEWARDS }
     ],
+    // ISSUE_CATEGORY and ARTICLES are multi-select columns (comma-separated values).
+    // They live in MULTI_SELECT_COLS.GRIEVANCE_LOG, NOT here.
+    // Keeping them here caused setupDataValidations() to apply single-select first,
+    // then multi-select would overwrite — wasting a sheet API call and risking the
+    // wrong validation type if execution order ever changed.
     GRIEVANCE_LOG: [
       { col: GRIEVANCE_COLS.STATUS,         configCol: CONFIG_COLS.GRIEVANCE_STATUS },
-      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP },
-      { col: GRIEVANCE_COLS.ISSUE_CATEGORY, configCol: CONFIG_COLS.ISSUE_CATEGORY },
-      { col: GRIEVANCE_COLS.ARTICLES,       configCol: CONFIG_COLS.ARTICLES }
+      { col: GRIEVANCE_COLS.CURRENT_STEP,   configCol: CONFIG_COLS.GRIEVANCE_STEP }
     ]
   };
 }
@@ -4965,7 +5189,7 @@ function getMobileOptimizedHead() {
 
 
 // ============================================================================
-// SOURCE: 02_DataManagers.gs (2843 lines)
+// SOURCE: 02_DataManagers.gs (2815 lines)
 // ============================================================================
 
 /**
@@ -5010,14 +5234,14 @@ function addMember(memberData) {
   var newRow = lastRow + 1;
 
   // Set member data
-  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(memberId);
-  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(memberData.firstName || '');
-  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(memberData.lastName || '');
-  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(memberData.email || '');
-  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(memberData.phone || '');
-  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(memberData.jobTitle || '');
-  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(memberData.workLocation || '');
-  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(memberData.unit || '');
+  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(escapeForFormula(memberId));
+  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(memberData.firstName || ''));
+  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(memberData.lastName || ''));
+  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(memberData.email || ''));
+  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(memberData.phone || ''));
+  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(memberData.jobTitle || ''));
+  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(memberData.workLocation || ''));
+  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(memberData.unit || ''));
 
   return memberId;
 }
@@ -5051,13 +5275,13 @@ function updateMember(memberId, updateData) {
   }
 
   // Update fields
-  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(updateData.firstName);
-  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(updateData.lastName);
-  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(updateData.email);
-  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(updateData.phone);
-  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(updateData.jobTitle);
-  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(updateData.workLocation);
-  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(updateData.unit);
+  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
 }
 
 /**
@@ -5698,6 +5922,8 @@ function removeFromConfigDropdown_(configCol, value) {
 
   if (!configSheet) return;
 
+  if (configSheet.getLastRow() < 3) return;
+
   var colData = configSheet.getRange(3, configCol, configSheet.getLastRow() - 2, 1).getValues();
 
   for (var i = 0; i < colData.length; i++) {
@@ -5997,6 +6223,7 @@ function getImportMembersHtml_() {
     '</div>' +
     '' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'var parsedData = [];' +
     'var csvHeaders = [];' +
     'var BATCH_SIZE = 25;' +
@@ -6083,11 +6310,11 @@ function getImportMembersHtml_() {
     '  var rows = parsedData.slice(0, 3);' +
     '  if (rows.length === 0) { preview.innerHTML = ""; return; }' +
     '  var html = "<strong>Preview (first " + rows.length + " rows):</strong><table class=\\"preview-table\\"><tr>";' +
-    '  csvHeaders.forEach(function(h) { html += "<th>" + h + "</th>"; });' +
+    '  csvHeaders.forEach(function(h) { html += "<th>" + escapeHtml(h) + "</th>"; });' +
     '  html += "</tr>";' +
     '  rows.forEach(function(row) {' +
     '    html += "<tr>";' +
-    '    row.forEach(function(cell) { html += "<td>" + (cell || "-") + "</td>"; });' +
+    '    row.forEach(function(cell) { html += "<td>" + escapeHtml(cell || "-") + "</td>"; });' +
     '    html += "</tr>";' +
     '  });' +
     '  html += "</table>";' +
@@ -6204,7 +6431,7 @@ function getImportMembersHtml_() {
     '  }' +
     '}' +
     '' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function showStatus(msg, isError) {' +
     '  var area = document.getElementById("statusArea");' +
     '  area.innerHTML = "<div class=\\"status " + (isError ? "error" : "success") + "\\">" + escapeHtml(msg) + "</div>";' +
@@ -6273,8 +6500,8 @@ function importMembersFromData(data, mapping) {
       // Generate Member ID
       var memberId = generateMemberID_(firstName, lastName);
 
-      // Build new row with empty values for all columns (up to last column: STATE)
-      var newRow = new Array(MEMBER_COLS.STATE).fill('');
+      // Build new row with empty values for all columns
+      var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
       newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
       newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
@@ -6401,7 +6628,7 @@ function importMembersBatch(batchData, mapping) {
       if (!memberId) memberId = namePrefix + String(Date.now()).slice(-3);
 
       // Build new row
-      var newRow = new Array(MEMBER_COLS.STATE).fill('');
+      var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
       newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
       newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
@@ -6534,33 +6761,21 @@ function startNewGrievance(grievanceData) {
     const filingDate = grievanceData.filingDate ? new Date(grievanceData.filingDate) : new Date();
     const deadlines = calculateInitialDeadlines(filingDate);
 
-    // Prepare row data
-    const rowData = [
-      grievanceId,                                    // Grievance ID
-      grievanceData.memberId || '',                   // Member ID
-      grievanceData.memberName || '',                 // Member Name
-      filingDate,                                     // Filing Date
-      grievanceData.grievanceType || '',              // Grievance Type
-      grievanceData.articleViolated || '',            // Article Violated
-      grievanceData.description || '',                // Description
-      1,                                              // Current Step (starts at 1)
-      filingDate,                                     // Step 1 Date
-      deadlines.step1Due,                             // Step 1 Due
-      'Pending',                                      // Step 1 Status
-      '',                                             // Step 2 Date
-      '',                                             // Step 2 Due
-      '',                                             // Step 2 Status
-      '',                                             // Step 3 Date
-      '',                                             // Step 3 Due
-      '',                                             // Step 3 Status
-      '',                                             // Arbitration Date
-      '',                                             // Resolution
-      GRIEVANCE_OUTCOMES.PENDING,                     // Outcome
-      '',                                             // Drive Folder
-      grievanceData.notes || '',                      // Notes
-      GRIEVANCE_STATUS.OPEN,                          // Status
-      new Date()                                      // Last Updated
-    ];
+    // Prepare row data using GRIEVANCE_COLS constants (1-indexed; subtract 1 for array)
+    const totalCols = getGrievanceHeaders().length;
+    const rowData = new Array(totalCols).fill('');
+
+    rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1]   = grievanceId;
+    rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = grievanceData.memberId || '';
+    rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = grievanceData.memberName || '';
+    rowData[GRIEVANCE_COLS.STATUS - 1]          = GRIEVANCE_STATUS.OPEN;
+    rowData[GRIEVANCE_COLS.CURRENT_STEP - 1]    = 1;
+    rowData[GRIEVANCE_COLS.DATE_FILED - 1]      = filingDate;
+    rowData[GRIEVANCE_COLS.STEP1_DUE - 1]       = deadlines.step1Due;
+    rowData[GRIEVANCE_COLS.ARTICLES - 1]        = grievanceData.articleViolated || '';
+    rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = grievanceData.grievanceType || '';
+    rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = grievanceData.notes || '';
+    rowData[GRIEVANCE_COLS.LAST_UPDATED - 1]    = new Date();
 
     // Append to sheet
     grievanceSheet.appendRow(rowData);
@@ -6701,7 +6916,7 @@ function getNextGrievanceId(sheet) {
 
   // Find highest sequence number for current year
   for (let i = 1; i < data.length; i++) {
-    const id = data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+    const id = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
     if (id && typeof id === 'string') {
       const match = id.match(/^GRV-(\d{4})-(\d{4})$/);
       if (match && parseInt(match[1]) === currentYear) {
@@ -6842,7 +7057,7 @@ function advanceGrievanceStep(grievanceId, options) {
     // Find the grievance row
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1; // 1-indexed for sheet operations
         break;
       }
@@ -6852,7 +7067,7 @@ function advanceGrievanceStep(grievanceId, options) {
       return errorResponse('Grievance not found', 'advanceGrievanceStep');
     }
 
-    const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP]);
+    const currentStep = Number(data[rowIndex - 1][GRIEVANCE_COLS.CURRENT_STEP - 1]);
     if (isNaN(currentStep) || currentStep < 1) {
       return errorResponse('Invalid current step value for this grievance', 'advanceGrievanceStep');
     }
@@ -6865,15 +7080,11 @@ function advanceGrievanceStep(grievanceId, options) {
     const today = new Date();
     const responseDue = calculateResponseDeadline(nextStep, today);
 
-    // Batch all updates into a single row write where possible
-    const currentStepStatusCol = getStepStatusColumn(currentStep);
-    sheet.getRange(rowIndex, currentStepStatusCol).setValue(options.currentStepOutcome || 'Appealed');
-
-    // Collect column updates to batch write
+    // Collect column updates to batch write (use GRIEVANCE_COLS, 1-indexed)
     var updates = [];
-    updates.push({ col: GRIEVANCE_COLUMNS.CURRENT_STEP + 1, val: nextStep });
-    updates.push({ col: GRIEVANCE_COLUMNS.STATUS + 1, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
-    updates.push({ col: GRIEVANCE_COLUMNS.LAST_UPDATED + 1, val: today });
+    updates.push({ col: GRIEVANCE_COLS.CURRENT_STEP, val: nextStep });
+    updates.push({ col: GRIEVANCE_COLS.STATUS, val: nextStep === 4 ? GRIEVANCE_STATUS.AT_ARBITRATION : GRIEVANCE_STATUS.APPEALED });
+    updates.push({ col: GRIEVANCE_COLS.LAST_UPDATED, val: today });
 
     if (nextStep <= 3) {
       const nextStepDateCol = getStepDateColumn(nextStep);
@@ -6881,16 +7092,16 @@ function advanceGrievanceStep(grievanceId, options) {
       updates.push({ col: nextStepDateCol + 1, val: responseDue });
       updates.push({ col: nextStepDateCol + 2, val: 'Pending' });
     } else {
-      updates.push({ col: GRIEVANCE_COLUMNS.ARBITRATION_DATE + 1, val: today });
+      updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
 
     // Add notes if provided
     if (options.notes) {
-      const existingNotes = data[rowIndex - 1][GRIEVANCE_COLUMNS.NOTES] || '';
+      const existingResolution = data[rowIndex - 1][GRIEVANCE_COLS.RESOLUTION - 1] || '';
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
-      const newNotes = existingNotes + (existingNotes ? '\n' : '') +
+      const newResolution = existingResolution + (existingResolution ? '\n' : '') +
                        `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${options.notes}`;
-      updates.push({ col: GRIEVANCE_COLUMNS.NOTES + 1, val: newNotes });
+      updates.push({ col: GRIEVANCE_COLS.RESOLUTION, val: newResolution });
     }
 
     // Write all collected updates
@@ -6926,23 +7137,9 @@ function advanceGrievanceStep(grievanceId, options) {
  */
 function getStepDateColumn(step) {
   switch (step) {
-    case 1: return GRIEVANCE_COLUMNS.STEP_1_DATE + 1;
-    case 2: return GRIEVANCE_COLUMNS.STEP_2_DATE + 1;
-    case 3: return GRIEVANCE_COLUMNS.STEP_3_DATE + 1;
-    default: return null;
-  }
-}
-
-/**
- * Gets column index for step status
- * @param {number} step - Step number
- * @return {number} 1-indexed column number
- */
-function getStepStatusColumn(step) {
-  switch (step) {
-    case 1: return GRIEVANCE_COLUMNS.STEP_1_STATUS + 1;
-    case 2: return GRIEVANCE_COLUMNS.STEP_2_STATUS + 1;
-    case 3: return GRIEVANCE_COLUMNS.STEP_3_STATUS + 1;
+    case 1: return GRIEVANCE_COLS.STEP1_RCVD;
+    case 2: return GRIEVANCE_COLS.STEP2_APPEAL_FILED;
+    case 3: return GRIEVANCE_COLS.STEP3_APPEAL_FILED;
     default: return null;
   }
 }
@@ -6980,14 +7177,14 @@ function recalcAllGrievancesBatched() {
     }
 
     const row = data[i];
-    const status = row[GRIEVANCE_COLUMNS.STATUS];
+    const status = row[GRIEVANCE_COLS.STATUS - 1];
 
     // Only recalculate open/pending grievances
     if (status === GRIEVANCE_STATUS.OPEN ||
         status === GRIEVANCE_STATUS.PENDING ||
         status === GRIEVANCE_STATUS.APPEALED) {
 
-      const currentStep = row[GRIEVANCE_COLUMNS.CURRENT_STEP];
+      const currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
       const stepDate = row[getStepDateColumn(currentStep) - 1]; // 0-indexed for data array
 
       if (stepDate instanceof Date) {
@@ -7023,6 +7220,12 @@ function recalcAllGrievancesBatched() {
  * @return {Object} Result object
  */
 function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
+  // Authorization check — only stewards and admins may bulk-update grievances
+  var authResult = checkWebAppAuthorization('steward');
+  if (!authResult.isAuthorized) {
+    return errorResponse(authResult.message || 'Unauthorized: steward access required', 'bulkUpdateGrievanceStatus');
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
   ensureMinimumColumns(sheet, getGrievanceHeaders().length);
@@ -7033,21 +7236,21 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
   const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
   for (let i = 1; i < data.length; i++) {
-    const grievanceId = data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+    const grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
 
     if (grievanceIds.includes(grievanceId)) {
       const rowIndex = i + 1;
 
-      // Update status
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(newStatus);
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(today);
+      // Update status (use GRIEVANCE_COLS, 1-indexed)
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(newStatus);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
 
-      // Add notes if provided
+      // Add notes if provided (NOTES aliases to RESOLUTION — use directly)
       if (notes) {
-        const existingNotes = data[i][GRIEVANCE_COLUMNS.NOTES] || '';
-        const newNotes = existingNotes + (existingNotes ? '\n' : '') +
+        const existingResolution = data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '';
+        const newResolution = existingResolution + (existingResolution ? '\n' : '') +
                          `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
-        sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(newNotes);
+        sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(newResolution);
       }
 
       updatedCount++;
@@ -7077,7 +7280,7 @@ function getGrievanceById(grievanceId) {
   const headers = data[0];
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
       const grievance = {};
       headers.forEach((header, index) => {
         grievance[header] = data[i][index];
@@ -7109,7 +7312,7 @@ function getOpenGrievances() {
   const results = [];
 
   for (let i = 1; i < data.length; i++) {
-    const status = data[i][GRIEVANCE_COLUMNS.STATUS];
+    const status = data[i][GRIEVANCE_COLS.STATUS - 1];
     if (openStatuses.includes(status)) {
       const grievance = {};
       headers.forEach((header, index) => {
@@ -7138,19 +7341,19 @@ function getUpcomingDeadlines(daysAhead) {
   const upcoming = [];
 
   openGrievances.forEach(g => {
-    const currentStep = g['Current Step'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
+    const currentStep = g['Current Step'];
     let deadline;
 
     // Get the due date for current step
     switch (currentStep) {
       case 1:
-        deadline = g['Step 1 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
+        deadline = g['Step 1 Due'];
         break;
       case 2:
-        deadline = g['Step 2 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
+        deadline = g['Step 2 Due'];
         break;
       case 3:
-        deadline = g['Step 3 Due'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
+        deadline = g['Step 3 Due'];
         break;
     }
 
@@ -7161,8 +7364,8 @@ function getUpcomingDeadlines(daysAhead) {
       if (deadlineDate <= cutoffDate) {
         const daysLeft = Math.ceil((deadlineDate - today) / (1000 * 60 * 60 * 24));
         upcoming.push({
-          grievanceId: g['Grievance ID'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]],
-          memberName: g['Member Name'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.MEMBER_NAME]],
+          grievanceId: g['Grievance ID'],
+          memberName: g['Member Name'],
           step: `Step ${currentStep}`,
           deadline: deadline,
           date: Utilities.formatDate(deadline, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
@@ -7210,9 +7413,9 @@ function getGrievanceStats() {
   const categoryCounts = {};
 
   for (let i = 1; i < data.length; i++) {
-    const status = data[i][GRIEVANCE_COLUMNS.STATUS];
-    const lastUpdated = data[i][GRIEVANCE_COLUMNS.LAST_UPDATED];
-    const category = data[i][GRIEVANCE_COLUMNS.ISSUE_CATEGORY] || 'Other';
+    const status = data[i][GRIEVANCE_COLS.STATUS - 1];
+    const lastUpdated = data[i][GRIEVANCE_COLS.LAST_UPDATED - 1];
+    const category = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'Other';
 
     // Count by category
     categoryCounts[category] = (categoryCounts[category] || 0) + 1;
@@ -7291,7 +7494,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
 
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1;
         break;
       }
@@ -7304,26 +7507,19 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
     const today = new Date();
     const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
 
-    // Update resolution fields
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.RESOLUTION + 1).setValue(resolution);
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.OUTCOME + 1).setValue(outcome);
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(GRIEVANCE_STATUS.RESOLVED);
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(today);
-
-    // Mark current step as completed
-    const currentStep = data[rowIndex - 1][GRIEVANCE_COLUMNS.CURRENT_STEP];
-    const stepStatusCol = getStepStatusColumn(currentStep);
-    if (stepStatusCol) {
-      sheet.getRange(rowIndex, stepStatusCol).setValue(outcome);
+    // Build combined resolution text
+    var resolutionText = outcome || '';
+    if (resolution) {
+      resolutionText += (resolutionText ? ': ' : '') + resolution;
     }
-
-    // Add resolution notes
     if (notes) {
-      const existingNotes = data[rowIndex - 1][GRIEVANCE_COLUMNS.NOTES] || '';
-      const newNotes = existingNotes + (existingNotes ? '\n' : '') +
-                       `[${timestamp}] RESOLVED - ${outcome}: ${notes}`;
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(newNotes);
+      resolutionText += (resolutionText ? '\n' : '') +
+                        '[' + timestamp + '] ' + notes;
     }
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(resolutionText);
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(GRIEVANCE_STATUS.RESOLVED);
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.DATE_CLOSED).setValue(today);
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
 
     // Log the resolution
     logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
@@ -7377,7 +7573,7 @@ function showEditGrievanceDialog() {
   }
 
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const grievanceId = data[GRIEVANCE_COLUMNS.GRIEVANCE_ID];
+  const grievanceId = data[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
 
   const html = HtmlService.createHtmlOutput(getEditGrievanceFormHtml(grievanceId))
     .setWidth(DIALOG_SIZES.LARGE.width)
@@ -7398,7 +7594,7 @@ function showBulkStatusUpdate() {
 
   const openGrievances = getOpenGrievances();
   const items = openGrievances.map(g => ({
-    id: g['Grievance ID'] || g[Object.keys(g)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]],
+    id: g['Grievance ID'],
     label: `${g['Grievance ID']} - ${g['Member Name']}`,
     selected: false
   }));
@@ -7414,7 +7610,7 @@ function getNewGrievanceFormHtml() {
   // Get member list for dropdown
   const members = getMemberList();
   const memberOptions = members.map(m =>
-    `<option value="${m.id}">${m.name} (${m.department})</option>`
+    `<option value="${escapeHtml(String(m.id))}">${escapeHtml(String(m.name))} (${escapeHtml(String(m.department))})</option>`
   ).join('');
 
   return `
@@ -7633,21 +7829,21 @@ function getEditGrievanceFormHtml(grievanceId) {
     <body>
       <div class="form-container">
         <div class="info-box">
-          <strong>Grievance ID:</strong> ${grievanceId}<br>
-          <strong>Current Step:</strong> ${grievance['Current Step'] || 1}<br>
+          <strong>Grievance ID:</strong> ${escapeHtml(String(grievanceId))}<br>
+          <strong>Current Step:</strong> ${escapeHtml(String(grievance['Current Step'] || 1))}<br>
           <strong>Status:</strong> <span class="status-badge status-open">
-            ${grievance['Status'] || 'Open'}</span>
+            ${escapeHtml(String(grievance['Status'] || 'Open'))}</span>
         </div>
 
         <form id="editForm">
           <div class="form-group">
-            <label class="form-label">Description</label>
-            <textarea class="form-textarea" id="description">${grievance['Description'] || ''}</textarea>
+            <label class="form-label">Issue Category</label>
+            <textarea class="form-textarea" id="description">${escapeHtml(String(grievance['Issue Category'] || ''))}</textarea>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Notes</label>
-            <textarea class="form-textarea" id="notes">${grievance['Notes'] || ''}</textarea>
+            <label class="form-label">Resolution / Notes</label>
+            <textarea class="form-textarea" id="notes">${escapeHtml(String(grievance['Resolution'] || ''))}</textarea>
           </div>
 
           <div class="form-actions">
@@ -7663,7 +7859,7 @@ function getEditGrievanceFormHtml(grievanceId) {
       </div>
 
       <script>
-        const grievanceId = '${grievanceId}';
+        const grievanceId = ${JSON.stringify(grievanceId)};
 
         document.getElementById('editForm').addEventListener('submit', function(e) {
           e.preventDefault();
@@ -7813,7 +8009,7 @@ function highlightUrgentGrievances() {
 
 
 // ============================================================================
-// SOURCE: 03_UIComponents.gs (2778 lines)
+// SOURCE: 03_UIComponents.gs (2794 lines)
 // ============================================================================
 
 /**
@@ -7926,8 +8122,7 @@ function createDashboardMenu() {
       .addItem('✅ Open Meeting Check-In', 'showMeetingCheckInDialog')
       .addSeparator()
       .addItem('🔗 Sync Deadlines', 'syncDeadlinesToCalendar')
-      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar')
-      .addItem('🗑️ Clear Calendar Events', 'clearAllCalendarEvents'))
+      .addItem('👁️ View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar'))
 
     .addSubMenu(ui.createMenu('📁 Google Drive')
       .addItem('📁 Setup Folder for Grievance', 'setupFolderForSelectedGrievance')
@@ -8046,6 +8241,7 @@ function createDashboardMenu() {
       .addItem('🔧 Setup All Hidden Sheets', 'setupAllHiddenSheets')
       .addItem('🔧 Repair All Hidden Sheets', 'repairAllHiddenSheets')
       .addItem('🔍 Verify Hidden Sheets', 'verifyHiddenSheets')
+      .addItem('🔒 Enforce Hidden Sheets (Mobile Fix)', 'enforceHiddenSheets')
       .addItem('⚙️ Setup Data Validations', 'setupDataValidations')
       .addItem('🎨 Setup Comfort View Defaults', 'setupADHDDefaults')
       .addSeparator()
@@ -8053,6 +8249,7 @@ function createDashboardMenu() {
       .addItem('📋 Create Features Reference Sheet', 'createFeaturesReferenceSheet')
       .addItem('❓ Create FAQ Sheet', 'createFAQSheet')
       .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+      .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
       .addItem('📱 Add Mobile Dashboard Link', 'addMobileDashboardLinkToConfig')
       .addItem('🔓 Unlock Checklist Sheet', 'unlockChecklistSheet')
       .addSeparator()
@@ -8067,6 +8264,7 @@ function createDashboardMenu() {
         .addItem('📋 Seed Grievances Only...', 'SEED_GRIEVANCES_DIALOG')
         .addSeparator()
         .addItem('🔄 Restore Config & Dropdowns', 'restoreConfigAndDropdowns')
+        .addItem('📥 Populate Config from Sheet Data', 'populateConfigFromSheetData')
         .addSeparator()
         .addItem('☢️ NUKE SEEDED DATA', 'NUKE_SEEDED_DATA'));
   }
@@ -9107,7 +9305,7 @@ function showMobileGrievanceList() {
     '<div class="header"><h2>📋 Grievances</h2><input type="text" class="search" placeholder="Search..." oninput="filter(this.value)"></div>' +
     '<div class="filters"><button class="filter active" onclick="filterStatus(\'all\',this)">All</button><button class="filter" onclick="filterStatus(\'Open\',this)">Open</button><button class="filter" onclick="filterStatus(\'Pending Info\',this)">Pending</button><button class="filter" onclick="filterStatus(\'Resolved\',this)">Resolved</button></div>' +
     '<div class="list" id="list"><div style="text-align:center;padding:40px;color:#666;grid-column:1/-1">Loading...</div></div>' +
-    '<script>var all=[];google.script.run.withSuccessHandler(function(data){all=data;render(data)}).getRecentGrievancesForMobile(100);function render(data){var c=document.getElementById("list");if(!data||data.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";return}c.innerHTML=data.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+g.id+"</div><div class=\'card-status\'>"+(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+g.memberName+"</div><div class=\'card-row\'><strong>Issue:</strong> "+(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+g.filedDate+"</div></div>"}).join("")}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");render(s==="all"?all:all.filter(function(g){return g.status===s}))}function filter(q){render(all.filter(function(g){q=q.toLowerCase();return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0}))}</script></body></html>'
+    '<script>' + getClientSideEscapeHtml() + 'var all=[];google.script.run.withSuccessHandler(function(data){all=data;render(data)}).getRecentGrievancesForMobile(100);function render(data){var c=document.getElementById("list");if(!data||data.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";return}c.innerHTML=data.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+escapeHtml(g.id)+"</div><div class=\'card-status\'>"+escapeHtml(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class=\'card-row\'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("")}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");render(s==="all"?all:all.filter(function(g){return g.status===s}))}function filter(q){render(all.filter(function(g){q=q.toLowerCase();return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0}))}</script></body></html>'
   ).setWidth(800).setHeight(700);
   SpreadsheetApp.getUi().showModalDialog(html, '📋 Grievance List');
 }
@@ -9150,7 +9348,7 @@ function showMobileUnifiedSearch() {
     '<div class="header"><h2>🔍 Search</h2><div class="search-container"><span class="search-icon">🔍</span><input type="text" class="search-input" id="q" placeholder="Search members or grievances..." oninput="search(this.value)"></div></div>' +
     '<div class="tabs"><button class="tab active" onclick="setTab(\'all\',this)">All</button><button class="tab" onclick="setTab(\'members\',this)">Members</button><button class="tab" onclick="setTab(\'grievances\',this)">Grievances</button></div>' +
     '<div class="results" id="results"><div class="empty-state">Type to search...</div></div>' +
-    '<script>var tab="all";function setTab(t,btn){tab=t;document.querySelectorAll(".tab").forEach(function(tb){tb.classList.remove("active")});btn.classList.add("active");search(document.getElementById("q").value)}function search(q){if(!q||q.length<2){document.getElementById("results").innerHTML="<div class=\'empty-state\'>Type to search...</div>";return}google.script.run.withSuccessHandler(function(data){render(data)}).getMobileSearchData(q,tab)}function render(data){var c=document.getElementById("results");if(!data||data.length===0){c.innerHTML="<div class=\'empty-state\'>No results</div>";return}c.innerHTML=data.map(function(r){return"<div class=\'result-card\'><div class=\'result-title\'>"+(r.type==="member"?"👤 ":"📋 ")+r.title+"</div><div class=\'result-detail\'>"+r.subtitle+"</div>"+(r.detail?"<div class=\'result-detail\'>"+r.detail+"</div>":"")+"</div>"}).join("")}</script></body></html>'
+    '<script>' + getClientSideEscapeHtml() + 'var tab="all";function setTab(t,btn){tab=t;document.querySelectorAll(".tab").forEach(function(tb){tb.classList.remove("active")});btn.classList.add("active");search(document.getElementById("q").value)}function search(q){if(!q||q.length<2){document.getElementById("results").innerHTML="<div class=\'empty-state\'>Type to search...</div>";return}google.script.run.withSuccessHandler(function(data){render(data)}).getMobileSearchData(q,tab)}function render(data){var c=document.getElementById("results");if(!data||data.length===0){c.innerHTML="<div class=\'empty-state\'>No results</div>";return}c.innerHTML=data.map(function(r){return"<div class=\'result-card\'><div class=\'result-title\'>"+(r.type==="member"?"👤 ":"📋 ")+escapeHtml(r.title)+"</div><div class=\'result-detail\'>"+escapeHtml(r.subtitle)+"</div>"+(r.detail?"<div class=\'result-detail\'>"+escapeHtml(r.detail)+"</div>":"")+"</div>"}).join("")}</script></body></html>'
   ).setWidth(800).setHeight(700);
   SpreadsheetApp.getUi().showModalDialog(html, '🔍 Search');
 }
@@ -9395,9 +9593,9 @@ function showGrievanceQuickActions(row) {
   if (memberEmail) {
     emailStatusBtn =
       '<div class="section-header">📨 Communication</div>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailGrievanceStatusToMember(\'' + grievanceId + '\');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Email Status to Member</div><div class="desc">Send grievance status update to ' + memberEmail + '</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
-      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(\'' + memberId + '\');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>';
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailGrievanceStatusToMember(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📧</span><span><div class="title">Email Status to Member</div><div class="desc">Send grievance status update to ' + escapeHtml(String(memberEmail)) + '</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailSurveyToMember(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📊</span><span><div class="title">Send Satisfaction Survey</div><div class="desc">Email survey link to member</div></span></button>' +
+      '<button class="action-btn" onclick="google.script.run.withSuccessHandler(function(){}).withFailureHandler(function(e){alert(e.message)}).emailContactFormToMember(' + JSON.stringify(memberId) + ');google.script.host.close()"><span class="icon">📝</span><span><div class="title">Send Contact Update Form</div><div class="desc">Request info update from member</div></span></button>';
   }
 
   var html = HtmlService.createHtmlOutput(
@@ -9425,18 +9623,18 @@ function showGrievanceQuickActions(row) {
     '</style></head><body><div class="container">' +
     '<h2>⚡ Grievance Actions</h2>' +
     '<div class="info">' +
-    '<div class="gid">' + grievanceId + '</div>' +
-    '<div class="gmem">' + name + ' (' + memberId + ')' + (memberEmail ? ' - ' + memberEmail : '') + '</div>' +
+    '<div class="gid">' + escapeHtml(grievanceId) + '</div>' +
+    '<div class="gmem">' + escapeHtml(name) + ' (' + escapeHtml(memberId) + ')' + (memberEmail ? ' - ' + escapeHtml(memberEmail) : '') + '</div>' +
     '<div class="gstatus">' +
-    '<span class="badge">' + status + '</span>' +
-    '<span class="badge">' + step + '</span>' +
+    '<span class="badge">' + escapeHtml(status) + '</span>' +
+    '<span class="badge">' + escapeHtml(step) + '</span>' +
     (daysTo !== null && daysTo !== '' ? '<span class="badge" style="background:' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '#ffebee;color:#c62828' : '#e3f2fd;color:#1565c0') + '">' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '⚠️ Overdue' : '📅 ' + daysTo + ' days') + '</span>' : '') +
     '</div></div>' +
     '<div class="actions">' +
     '<div class="section-header">📋 Case Management</div>' +
-    '<button class="action-btn" onclick="google.script.run.syncSingleGrievanceToCalendar(\'' + grievanceId + '\');google.script.host.close()"><span class="icon">📅</span><span><div class="title">Sync to Calendar</div><div class="desc">Add deadlines to Google Calendar</div></span></button>' +
-    '<button class="action-btn" onclick="google.script.run.setupDriveFolderForGrievance();google.script.host.close()"><span class="icon">📁</span><span><div class="title">Setup Drive Folder</div><div class="desc">Create document folder</div></span></button>' +
-    '<button class="action-btn" onclick="navigator.clipboard.writeText(\'' + grievanceId + '\');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Grievance ID</div><div class="desc">' + grievanceId + '</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.syncSingleGrievanceToCalendar(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📅</span><span><div class="title">Sync to Calendar</div><div class="desc">Add deadlines to Google Calendar</div></span></button>' +
+    '<button class="action-btn" onclick="google.script.run.setupDriveFolderForGrievance(' + JSON.stringify(grievanceId) + ');google.script.host.close()"><span class="icon">📁</span><span><div class="title">Setup Drive Folder</div><div class="desc">Create document folder</div></span></button>' +
+    '<button class="action-btn" onclick="navigator.clipboard.writeText(' + JSON.stringify(grievanceId) + ');alert(\'Copied!\')"><span class="icon">📋</span><span><div class="title">Copy Grievance ID</div><div class="desc">' + escapeHtml(grievanceId) + '</div></span></button>' +
     emailStatusBtn +
     '</div>' +
     (isOpen ? '<div class="status-section"><h4>Quick Status Update</h4><select id="statusSelect"><option value="">-- Select --</option><option value="Open">Open</option><option value="Pending Info">Pending Info</option><option value="Settled">Settled</option><option value="Withdrawn">Withdrawn</option><option value="Won">Won</option><option value="Denied">Denied</option><option value="Closed">Closed</option></select><button class="action-btn" style="margin-top:10px" onclick="var s=document.getElementById(\'statusSelect\').value;if(!s){alert(\'Select status\');return}google.script.run.withSuccessHandler(function(){alert(\'Updated!\');google.script.host.close()}).quickUpdateGrievanceStatus(' + row + ',s)"><span class="icon">✓</span><span><div class="title">Update Status</div></span></button></div>' : '') +
@@ -9455,6 +9653,18 @@ function quickUpdateGrievanceStatus(row, newStatus) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) throw new Error('Grievance Log not found');
+
+  // Validate row bounds
+  if (row < 2 || row > sheet.getLastRow()) {
+    throw new Error('Invalid row number: ' + row);
+  }
+
+  // Validate status against allowlist
+  var validStatuses = ['Open', 'Pending Info', 'Settled', 'Withdrawn', 'Won', 'Denied', 'Closed', 'In Arbitration', 'Appealed'];
+  if (validStatuses.indexOf(newStatus) === -1) {
+    throw new Error('Invalid status: ' + newStatus);
+  }
+
   sheet.getRange(row, GRIEVANCE_COLS.STATUS).setValue(newStatus);
   if (['Closed', 'Settled', 'Withdrawn'].indexOf(newStatus) >= 0) {
     var closeCol = GRIEVANCE_COLS.DATE_CLOSED;
@@ -9474,7 +9684,7 @@ function quickUpdateGrievanceStatus(row, newStatus) {
 function composeEmailForMember(memberId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (!sheet) return;
+  if (!sheet || sheet.getLastRow() <= 1) return;
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, MEMBER_COLS.EMAIL).getValues();
   for (var i = 0; i < data.length; i++) {
     if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
@@ -9482,7 +9692,7 @@ function composeEmailForMember(memberId) {
       var name = data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1];
       if (!email) { SpreadsheetApp.getUi().alert('No email on file.'); return; }
       var html = HtmlService.createHtmlOutput(
-        '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}.form-group{margin:15px 0}label{display:block;font-weight:bold;margin-bottom:5px;font-size:clamp(12px,3vw,14px)}input,textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;min-height:44px}textarea{min-height:180px}input:focus,textarea:focus{outline:none;border-color:#1a73e8}.buttons{display:flex;gap:10px;margin-top:20px}button{padding:12px 24px;font-size:clamp(13px,3.5vw,14px);border:none;border-radius:4px;cursor:pointer;flex:1;min-height:44px}.primary{background:#1a73e8;color:white}.secondary{background:#6c757d;color:white}@media(max-width:480px){.buttons{flex-direction:column}}</style></head><body><div class="container"><h2>📧 Email to Member</h2><div class="info"><strong>' + name + '</strong> (' + memberId + ')<br>' + email + '</div><div class="form-group"><label>Subject:</label><input type="text" id="subject" placeholder="Email subject"></div><div class="form-group"><label>Message:</label><textarea id="message" placeholder="Type your message..."></textarea></div><div class="buttons"><button class="primary" onclick="send()">📤 Send</button><button class="secondary" onclick="google.script.host.close()">Cancel</button></div></div><script>function send(){var s=document.getElementById("subject").value.trim();var m=document.getElementById("message").value.trim();if(!s||!m){alert("Fill in subject and message");return}google.script.run.withSuccessHandler(function(){alert("Email sent!");google.script.host.close()}).withFailureHandler(function(e){alert("Error: "+e.message)}).sendQuickEmail("' + email + '",s,m,"' + memberId + '")}</script></body></html>'
+        '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px);background:#f5f5f5}.container{background:white;padding:clamp(15px,4vw,25px);border-radius:8px}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.info{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}.form-group{margin:15px 0}label{display:block;font-weight:bold;margin-bottom:5px;font-size:clamp(12px,3vw,14px)}input,textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:4px;font-size:16px;box-sizing:border-box;min-height:44px}textarea{min-height:180px}input:focus,textarea:focus{outline:none;border-color:#1a73e8}.buttons{display:flex;gap:10px;margin-top:20px}button{padding:12px 24px;font-size:clamp(13px,3.5vw,14px);border:none;border-radius:4px;cursor:pointer;flex:1;min-height:44px}.primary{background:#1a73e8;color:white}.secondary{background:#6c757d;color:white}@media(max-width:480px){.buttons{flex-direction:column}}</style></head><body><div class="container"><h2>📧 Email to Member</h2><div class="info"><strong>' + escapeHtml(name) + '</strong> (' + escapeHtml(memberId) + ')<br>' + escapeHtml(email) + '</div><div class="form-group"><label>Subject:</label><input type="text" id="subject" placeholder="Email subject"></div><div class="form-group"><label>Message:</label><textarea id="message" placeholder="Type your message..."></textarea></div><div class="buttons"><button class="primary" onclick="send()">📤 Send</button><button class="secondary" onclick="google.script.host.close()">Cancel</button></div></div><script>function send(){var s=document.getElementById("subject").value.trim();var m=document.getElementById("message").value.trim();if(!s||!m){alert("Fill in subject and message");return}google.script.run.withSuccessHandler(function(){alert("Email sent!");google.script.host.close()}).withFailureHandler(function(e){alert("Error: "+e.message)}).sendQuickEmail(' + JSON.stringify(email) + ',s,m,' + JSON.stringify(memberId) + ')}</script></body></html>'
       ).setWidth(600).setHeight(500);
       SpreadsheetApp.getUi().showModalDialog(html, '📧 Compose Email');
       return;
@@ -9599,7 +9809,7 @@ function emailDashboardLinkToMember(memberId) {
     SpreadsheetApp.getUi().alert('Web app is not deployed. Please deploy the web app first via Extensions > Apps Script > Deploy.');
     return;
   }
-  var portalUrl = webAppUrl + '?id=' + memberId;
+  var portalUrl = webAppUrl + '?id=' + encodeURIComponent(memberId);
   var orgName = getOrgNameFromConfig_();
 
   var subject = orgName + ' - Member Dashboard Access';
@@ -9637,7 +9847,7 @@ function emailGrievanceStatusToMember(grievanceId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
-  if (!grievanceSheet) {
+  if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) {
     SpreadsheetApp.getUi().alert('Grievance Log not found.');
     return;
   }
@@ -9734,7 +9944,7 @@ function emailGrievanceStatusToMember(grievanceId) {
 function getMemberDataById_(memberId) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-  if (!sheet) return null;
+  if (!sheet || sheet.getLastRow() <= 1) return null;
 
   var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, MEMBER_COLS.EMAIL).getValues();
   for (var i = 0; i < data.length; i++) {
@@ -9773,10 +9983,10 @@ function showMemberGrievanceHistory(memberId) {
   });
   if (mine.length === 0) { SpreadsheetApp.getUi().alert('No grievances for this member.'); return; }
   var list = mine.map(function(g) {
-    return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === 'Open' ? '#f44336' : '#4caf50') + '"><strong>' + g.id + '</strong><br><span style="color:#666">Status: ' + g.status + ' | Step: ' + g.step + '</span><br><span style="color:#888;font-size:12px">' + g.issue + ' | Filed: ' + (g.filed ? new Date(g.filed).toLocaleDateString() : 'N/A') + '</span></div>';
+    return '<div style="background:#f8f9fa;padding:12px;margin:8px 0;border-radius:4px;border-left:4px solid ' + (g.status === 'Open' ? '#f44336' : '#4caf50') + '"><strong>' + escapeHtml(g.id) + '</strong><br><span style="color:#666">Status: ' + escapeHtml(g.status) + ' | Step: ' + escapeHtml(g.step) + '</span><br><span style="color:#888;font-size:12px">' + escapeHtml(g.issue) + ' | Filed: ' + (g.filed ? new Date(g.filed).toLocaleDateString() : 'N/A') + '</span></div>';
   }).join('');
   var html = HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + memberId + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === 'Open'; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== 'Open'; }).length + '</div>' + list + '</body></html>'
+    '<!DOCTYPE html><html><head><base target="_top">' + getMobileOptimizedHead() + '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:clamp(12px,3vw,20px)}h2{color:#1a73e8;font-size:clamp(16px,4.5vw,20px)}.summary{background:#e8f4fd;padding:clamp(10px,3vw,15px);border-radius:8px;margin-bottom:20px;font-size:clamp(12px,3vw,14px)}</style></head><body><h2>📁 Grievance History</h2><div class="summary"><strong>Member ID:</strong> ' + escapeHtml(memberId) + '<br><strong>Total:</strong> ' + mine.length + '<br><strong>Open:</strong> ' + mine.filter(function(g) { return g.status === 'Open'; }).length + '<br><strong>Closed:</strong> ' + mine.filter(function(g) { return g.status !== 'Open'; }).length + '</div>' + list + '</body></html>'
   ).setWidth(500).setHeight(500);
   SpreadsheetApp.getUi().showModalDialog(html, 'Grievance History - ' + memberId);
 }
@@ -10188,7 +10398,7 @@ function getDesktopSearchHtml() {
 
           let html = '';
           results.forEach(function(item) {
-            html += '<div class="result-item" onclick="selectResult(\\'' + item.id + '\\', \\'' + item.type + '\\')">';
+            html += '<div class="result-item" data-id="' + escapeHtml(item.id) + '" data-type="' + escapeHtml(item.type) + '" onclick="selectResult(this.dataset.id, this.dataset.type)">';
             html += '<div class="result-title">' + escapeHtml(item.title) + '</div>';
             html += '<div class="result-subtitle">' + escapeHtml(item.subtitle) + '</div>';
             html += '</div>';
@@ -10205,7 +10415,7 @@ function getDesktopSearchHtml() {
 
         function handleError(error) {
           document.getElementById('resultsContainer').innerHTML =
-            '<div class="no-results"><p>Error: ' + error.message + '</p></div>';
+            '<div class="no-results"><p>Error: ' + escapeHtml(error.message) + '</p></div>';
         }
 
         ${getClientSideEscapeHtml()}
@@ -10280,6 +10490,7 @@ function getQuickSearchHtml() {
         <div class="quick-hint">Press Enter to select first result, Esc to close</div>
       </div>
       <script>
+        ${getClientSideEscapeHtml()}
         let debounceTimer;
         let results = [];
 
@@ -10517,6 +10728,7 @@ function getAdvancedSearchHtml() {
         </div>
       </div>
       <script>
+        ${getClientSideEscapeHtml()}
         function runAdvancedSearch() {
           const filters = {
             includeMembers: document.getElementById('searchMembers').checked,
@@ -10536,7 +10748,7 @@ function getAdvancedSearchHtml() {
             .withSuccessHandler(displayAdvancedResults)
             .withFailureHandler(function(e) {
               document.getElementById('resultsBody').innerHTML =
-                '<tr><td colspan="5" style="text-align:center;color:red">Error: ' + e.message + '</td></tr>';
+                '<tr><td colspan="5" style="text-align:center;color:red">Error: ' + escapeHtml(e.message) + '</td></tr>';
             })
             .advancedSearch(filters);
         }
@@ -10551,12 +10763,12 @@ function getAdvancedSearchHtml() {
           }
 
           tbody.innerHTML = results.map(function(r) {
-            return '<tr onclick="selectResult(\\'' + r.id + '\\', \\'' + r.type + '\\')" style="cursor:pointer">' +
-                   '<td>' + r.type + '</td>' +
-                   '<td>' + r.name + '</td>' +
-                   '<td>' + r.details + '</td>' +
-                   '<td>' + r.status + '</td>' +
-                   '<td>' + r.date + '</td>' +
+            return '<tr data-id="' + escapeHtml(r.id) + '" data-type="' + escapeHtml(r.type) + '" onclick="selectResult(this.dataset.id, this.dataset.type)" style="cursor:pointer">' +
+                   '<td>' + escapeHtml(r.type) + '</td>' +
+                   '<td>' + escapeHtml(r.name) + '</td>' +
+                   '<td>' + escapeHtml(r.details) + '</td>' +
+                   '<td>' + escapeHtml(r.status) + '</td>' +
+                   '<td>' + escapeHtml(r.date) + '</td>' +
                    '</tr>';
           }).join('');
         }
@@ -10596,7 +10808,7 @@ function getAdvancedSearchHtml() {
 
 
 // ============================================================================
-// SOURCE: 04a_UIMenus.gs (914 lines)
+// SOURCE: 04a_UIMenus.gs (918 lines)
 // ============================================================================
 
 /**
@@ -11189,6 +11401,10 @@ function showMultiSelectDialog(title, items, callback) {
  * @return {string} HTML content
  */
 function getMultiSelectHtml(items, callback) {
+  var allowedCallbacks = ['applyMultiSelectValue', 'handleBulkStatusSelection'];
+  if (allowedCallbacks.indexOf(callback) === -1) {
+    throw new Error('Invalid callback function name: ' + callback);
+  }
   const itemsJson = JSON.stringify(items);
 
   return `
@@ -11515,7 +11731,7 @@ function getDashboardSidebarHtml() {
 
 
 // ============================================================================
-// SOURCE: 04b_AccessibilityFeatures.gs (1031 lines)
+// SOURCE: 04b_AccessibilityFeatures.gs (1033 lines)
 // ============================================================================
 
 // ============================================================================
@@ -11890,6 +12106,7 @@ function showQuickCaptureNotepad() {
     '</div>' +
     '<div class="status" id="status"></div>' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'var notesEl = document.getElementById("notes");' +
     'var statusEl = document.getElementById("status");' +
     'var metaEl = document.getElementById("meta");' +
@@ -11916,7 +12133,7 @@ function showQuickCaptureNotepad() {
     '' +
     'function saveNotes() {' +
     '  google.script.run.withSuccessHandler(function(result) {' +
-    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + result.message, !result.success);' +
+    '    showStatus(result.success ? "✅ Notes saved!" : "❌ " + escapeHtml(result.message), !result.success);' +
     '  }).saveQuickCaptureNotes(notesEl.value);' +
     '}' +
     '' +
@@ -11932,7 +12149,7 @@ function showQuickCaptureNotepad() {
     '  if (confirm("Clear all notes? This cannot be undone.")) {' +
     '    notesEl.value = "";' +
     '    google.script.run.withSuccessHandler(function(result) {' +
-    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + result.message, !result.success);' +
+    '      showStatus(result.success ? "🗑️ Notes cleared" : "❌ " + escapeHtml(result.message), !result.success);' +
     '      updateMeta();' +
     '    }).clearQuickCaptureNotes();' +
     '  }' +
@@ -12018,15 +12235,16 @@ function getImportDialogHtml_() {
     '<button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>' +
     '</div></div>' +
     '<script>' +
+    getClientSideEscapeHtml() +
     'function previewData() {' +
     '  var csv = document.getElementById("csvData").value.trim();' +
     '  if (!csv) { showStatus("Please paste CSV data first", "error"); return; }' +
     '  var rows = parseCSV(csv);' +
     '  if (rows.length < 2) { showStatus("Need at least a header row and one data row", "error"); return; }' +
     '  document.getElementById("rowCount").textContent = rows.length - 1;' +
-    '  var previewHtml = "<div class=\\"preview-row\\"><strong>" + rows[0].join(" | ") + "</strong></div>";' +
+    '  var previewHtml = "<div class=\\"preview-row\\"><strong>" + rows[0].map(function(c){return escapeHtml(c)}).join(" | ") + "</strong></div>";' +
     '  for (var i = 1; i < Math.min(rows.length, 6); i++) {' +
-    '    previewHtml += "<div class=\\"preview-row\\">" + rows[i].join(" | ") + "</div>";' +
+    '    previewHtml += "<div class=\\"preview-row\\">" + rows[i].map(function(c){return escapeHtml(c)}).join(" | ") + "</div>";' +
     '  }' +
     '  if (rows.length > 6) previewHtml += "<div class=\\"preview-row\\">... and " + (rows.length - 6) + " more rows</div>";' +
     '  document.getElementById("preview").innerHTML = previewHtml;' +
@@ -12056,10 +12274,10 @@ function getImportDialogHtml_() {
     '      showStatus("✅ Successfully imported " + result.count + " members!", "success");' +
     '      setTimeout(function() { google.script.host.close(); }, 2000);' +
     '    } else {' +
-    '      showStatus("❌ " + result.error, "error");' +
+    '      showStatus("❌ " + escapeHtml(result.error), "error");' +
     '    }' +
     '  }).withFailureHandler(function(err) {' +
-    '    showStatus("❌ Error: " + err.message, "error");' +
+    '    showStatus("❌ Error: " + escapeHtml(err.message), "error");' +
     '  }).processMemberImport(csv);' +
     '}' +
     'function showStatus(msg, type) {' +
@@ -12257,10 +12475,10 @@ function showExportDialog_UIService_() {
     '<h2>Export Ready!</h2>' +
     '<div class="info">' +
     '<strong>' + (lastRow - 1) + ' members</strong> exported to CSV<br>' +
-    'File: ' + fileName +
+    'File: ' + escapeHtml(fileName) +
     '</div>' +
-    '<a href="' + file.getDownloadUrl() + '" target="_blank" class="btn">📥 Download CSV</a>' +
-    '<a href="' + file.getUrl() + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
+    '<a href="' + escapeHtml(file.getDownloadUrl()) + '" target="_blank" class="btn">📥 Download CSV</a>' +
+    '<a href="' + escapeHtml(file.getUrl()) + '" target="_blank" class="btn btn-secondary">📂 Open in Drive</a>' +
     '<p class="note">File will be available in your Google Drive.<br>Link expires when you close this dialog.</p>' +
     '<script>setTimeout(function() { google.script.host.setHeight(350); }, 100);</script>'
   ).setWidth(450).setHeight(350);
@@ -12551,7 +12769,7 @@ function getSmartDashboardHtml() {
 
 
 // ============================================================================
-// SOURCE: 04c_InteractiveDashboard.gs (1807 lines)
+// SOURCE: 04c_InteractiveDashboard.gs (1863 lines)
 // ============================================================================
 
 // ============================================================================
@@ -12886,7 +13104,7 @@ function getInteractiveDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allMembers=[];var allGrievances=[];var myCases=[];var currentGrievanceFilter="all";var currentMyCasesFilter="all";var memberFilters={location:"all",unit:"all",officeDays:"all"};var resourceLinks={};' +
 
     // Debug mode and error handler wrapper
@@ -12895,6 +13113,7 @@ function getInteractiveDashboardHtml() {
     'function logError(msg,e){console.error("[Dashboard Error] "+msg,e);if(DEBUG_MODE)alert("Debug: "+msg+"\\n"+escapeHtml(e.message))}' +
     'function safeRun(fn,fallback){try{fn()}catch(e){console.error("[Dashboard]",e);if(fallback)fallback(e)}}' +
     'function showLoading(elementId,msg){var el=document.getElementById(elementId);if(el)el.innerHTML="<div class=\\"loading-state\\"><div class=\\"loading-spinner\\"></div><div>"+escapeHtml(msg||"Loading...")+"</div></div>"}' +
+    'function safeUrl(url){if(!url)return "#";var s=String(url).trim();return(/^https?:\\/\\//i.test(s))?escapeHtml(s):"#"}' +
 
     // Tab switching with error handling
     'function switchTab(tabName,btn){' +
@@ -13044,8 +13263,8 @@ function getInteractiveDashboardHtml() {
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📍 Location:</span><span class=\\"detail-value\\">"+escapeHtml(g.location)+"</span></div>' +
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">📜 Articles:</span><span class=\\"detail-value\\">"+escapeHtml(g.articles)+"</span></div>' +
     '        <div class=\\"detail-actions\\">' +
-    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">⚡ Quick Actions</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-primary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(this.dataset.gid)\\">⚡ Quick Actions</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(this.dataset.gid)\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +
@@ -13319,8 +13538,8 @@ function getInteractiveDashboardHtml() {
     '        <div class=\\"detail-row\\"><span class=\\"detail-label\\">🛡️ Steward:</span><span class=\\"detail-value\\">"+escapeHtml(g.steward)+"</span></div>' +
     '        "+(g.resolution?"<div class=\\"detail-row\\"><span class=\\"detail-label\\">✅ Resolution:</span><span class=\\"detail-value\\">"+escapeHtml(g.resolution)+"</span></div>":"")+"' +
     '        <div class=\\"detail-actions\\">' +
-    '          <button class=\\"action-btn action-btn-primary\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">⚡ Quick Actions</button>' +
-    '          <button class=\\"action-btn action-btn-secondary\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(\'"+escapeHtml(g.id).replace(/\'/g,"")+"\')\\">📄 View in Sheet</button>' +
+    '          <button class=\\"action-btn action-btn-primary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.showGrievanceQuickActions(this.dataset.gid)\\">⚡ Quick Actions</button>' +
+    '          <button class=\\"action-btn action-btn-secondary\\" data-gid=\\""+escapeHtml(g.id)+"\\" onclick=\\"event.stopPropagation();google.script.run.navigateToGrievanceInSheet(this.dataset.gid)\\">📄 View in Sheet</button>' +
     '        </div>' +
     '      </div>' +
     '    </div>"' +
@@ -13406,7 +13625,7 @@ function getInteractiveDashboardHtml() {
     '    var maxStatus=Math.max.apply(null,data.grievanceStats.byStatus.map(function(s){return s.count}))||1;' +
     '    data.grievanceStats.byStatus.forEach(function(status){' +
     '      var pct=(status.count/maxStatus*100);' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">"+status.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+status.color+"\\"></div></div><div class=\\"bar-value\\">"+status.count+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:100px\\">"+escapeHtml(status.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+status.color+"\\"></div></div><div class=\\"bar-value\\">"+status.count+"</div></div>";' +
     '    });' +
     '  }else if(totalG>0){' +
     '    var maxS=Math.max(data.statusCounts.open,data.statusCounts.pending,data.statusCounts.closed)||1;' +
@@ -13424,7 +13643,7 @@ function getInteractiveDashboardHtml() {
     '    catData.forEach(function(cat,idx){' +
     '      var pct=(cat.count/maxCat*100);' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+cat.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+cat.count+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(cat.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+cat.count+"</div></div>";' +
     '    });' +
     '  }else{html+="<div class=\\"empty-state\\">No issue data</div>"}' +
     '  html+="</div></div>";' +
@@ -13436,7 +13655,7 @@ function getInteractiveDashboardHtml() {
     '    data.grievanceStats.byLocation.forEach(function(loc,idx){' +
     '      var pct=(loc.total/maxLoc*100);' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+loc.name+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div>"+(loc.open>0?"<div style=\\"position:absolute;right:8px;top:2px;font-size:9px;color:#dc2626\\">"+loc.open+" open</div>":"")+"</div><div class=\\"bar-value\\">"+loc.total+"</div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(loc.name)+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div>"+(loc.open>0?"<div style=\\"position:absolute;right:8px;top:2px;font-size:9px;color:#dc2626\\">"+loc.open+" open</div>":"")+"</div><div class=\\"bar-value\\">"+loc.total+"</div></div>";' +
     '    });' +
     '  }else{html+="<div class=\\"empty-state\\">No location data</div>"}' +
     '  html+="</div></div>";' +
@@ -13465,7 +13684,7 @@ function getInteractiveDashboardHtml() {
     '    data.stewardPerformance.topPerformers.forEach(function(p,i){' +
     '      var medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";' +
     '      var scoreColor=p.score>=70?"#059669":p.score>=50?"#F97316":"#DC2626";' +
-    '      html+="<tr style=\\"border-bottom:1px solid #e5e7eb\\"><td style=\\"padding:8px\\">"+medal+(i+1)+"</td><td style=\\"padding:8px\\">"+p.name+"</td><td style=\\"padding:8px;text-align:center;font-weight:bold;color:"+scoreColor+"\\">"+Math.round(p.score)+"</td><td style=\\"padding:8px;text-align:center\\">"+(p.winRate||0)+"%</td><td style=\\"padding:8px;text-align:center\\">"+(p.avgDays||0)+"</td></tr>";' +
+    '      html+="<tr style=\\"border-bottom:1px solid #e5e7eb\\"><td style=\\"padding:8px\\">"+medal+(i+1)+"</td><td style=\\"padding:8px\\">"+escapeHtml(p.name)+"</td><td style=\\"padding:8px;text-align:center;font-weight:bold;color:"+scoreColor+"\\">"+Math.round(p.score)+"</td><td style=\\"padding:8px;text-align:center\\">"+(p.winRate||0)+"%</td><td style=\\"padding:8px;text-align:center\\">"+(p.avgDays||0)+"</td></tr>";' +
     '    });' +
     '    html+="</table>";' +
     '  }else{html+="<div class=\\"empty-state\\">No performance data available.<br><small>Run Data Integrity Check to generate scores.</small></div>"}' +
@@ -13479,7 +13698,7 @@ function getInteractiveDashboardHtml() {
     '    data.stewardPerformance.busiestStewards.forEach(function(s,idx){' +
     '      var pct=(s.total/maxCases*100);' +
     '      var openPct=(s.open/s.total*100);' +
-    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:110px;font-size:11px\\">"+s.name+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:linear-gradient(90deg,#F97316 "+openPct+"%,#059669 "+openPct+"%)\\"></div></div><div class=\\"bar-value\\">"+s.total+" <small style=\\"color:#F97316\\">("+s.open+" open)</small></div></div>";' +
+    '      html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:110px;font-size:11px\\">"+escapeHtml(s.name)+"</div><div class=\\"bar-container\\" style=\\"position:relative\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:linear-gradient(90deg,#F97316 "+openPct+"%,#059669 "+openPct+"%)\\"></div></div><div class=\\"bar-value\\">"+s.total+" <small style=\\"color:#F97316\\">("+s.open+" open)</small></div></div>";' +
     '    });' +
     '    html+="</div>";' +
     '  }else{html+="<div class=\\"empty-state\\">No steward case data</div>"}' +
@@ -13498,7 +13717,7 @@ function getInteractiveDashboardHtml() {
     '      data.surveyResults.bySection.forEach(function(sec,idx){' +
     '        var pct=(sec.avg/10*100);' +
     '        var clr=sec.avg>=7?"#059669":sec.avg>=5?"#F97316":"#DC2626";' +
-    '        html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+sec.name+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+sec.avg+"</div></div>";' +
+    '        html+="<div class=\\"bar-row\\"><div class=\\"bar-label\\" style=\\"width:130px;font-size:11px\\">"+escapeHtml(sec.name)+"</div><div class=\\"bar-container\\"><div class=\\"bar-fill\\" style=\\"width:"+pct+"%;background:"+clr+"\\"></div></div><div class=\\"bar-value\\">"+sec.avg+"</div></div>";' +
     '      });' +
     '      html+="</div>";' +
     '    }else{html+="<div style=\\"color:#999;font-size:12px;text-align:center;padding:10px\\">No section data. Complete surveys to see breakdown.</div>"}' +
@@ -13533,7 +13752,7 @@ function getInteractiveDashboardHtml() {
     '      var pct=Math.round(loc.count/totalMembers*100);' +
     '      var size=Math.max(60,Math.min(120,60+(loc.count/maxLoc*60)));' +
     '      var clr=colors[idx%colors.length];' +
-    '      html+="<div style=\\"text-align:center;padding:10px\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:10px\\">"+pct+"%</span></div><div style=\\"font-size:11px;color:#666;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis\\">"+loc.name+"</div></div>";' +
+    '      html+="<div style=\\"text-align:center;padding:10px\\"><div style=\\"width:"+size+"px;height:"+size+"px;border-radius:50%;background:"+clr+";display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-weight:bold;margin:0 auto\\"><span style=\\"font-size:"+(size/3)+"px\\">"+loc.count+"</span><span style=\\"font-size:10px\\">"+pct+"%</span></div><div style=\\"font-size:11px;color:#666;margin-top:6px;max-width:100px;overflow:hidden;text-overflow:ellipsis\\">"+escapeHtml(loc.name)+"</div></div>";' +
     '    });' +
     '    html+="</div>";' +
     '  }else{html+="<div class=\\"empty-state\\">No location data</div>"}' +
@@ -13569,20 +13788,20 @@ function getInteractiveDashboardHtml() {
     '  var c=document.getElementById("resources-content");' +
     '  var html="";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📝 Forms & Submissions</div><div class=\\"link-grid\\">";' +
-    '  if(data.grievanceForm)html+="<a href=\\""+data.grievanceForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">📋 Grievance Form</a>";' +
-    '  if(data.contactForm)html+="<a href=\\""+data.contactForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">✉️ Contact Form</a>";' +
-    '  if(data.satisfactionForm)html+="<a href=\\""+data.satisfactionForm+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Satisfaction Survey</a>";' +
+    '  if(data.grievanceForm)html+="<a href=\\""+safeUrl(data.grievanceForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📋 Grievance Form</a>";' +
+    '  if(data.contactForm)html+="<a href=\\""+safeUrl(data.contactForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">✉️ Contact Form</a>";' +
+    '  if(data.satisfactionForm)html+="<a href=\\""+safeUrl(data.satisfactionForm)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Satisfaction Survey</a>";' +
     '  if(!data.grievanceForm&&!data.contactForm&&!data.satisfactionForm)html+="<div class=\\"empty-state\\">No forms configured. Add URLs in Config sheet.</div>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">📂 Data & Documents</div><div class=\\"link-grid\\">";' +
-    '  html+="<a href=\\""+data.spreadsheetUrl+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Open Full Spreadsheet</a>";' +
+    '  html+="<a href=\\""+safeUrl(data.spreadsheetUrl)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📊 Open Full Spreadsheet</a>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showMemberDirectory()\\">👥 Member Directory</button>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showGrievanceLog()\\">📋 Grievance Log</button>";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showConfigSheet()\\">⚙️ Configuration</button>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">🌐 External Links</div><div class=\\"link-grid\\">";' +
-    '  if(data.orgWebsite)html+="<a href=\\""+data.orgWebsite+"\\" target=\\"_blank\\" class=\\"resource-link\\">🏛️ Organization Website</a>";' +
-    '  if(data.githubRepo)html+="<a href=\\""+data.githubRepo+"\\" target=\\"_blank\\" class=\\"resource-link\\">📦 GitHub Repository</a>";' +
+    '  if(data.orgWebsite)html+="<a href=\\""+safeUrl(data.orgWebsite)+"\\" target=\\"_blank\\" class=\\"resource-link\\">🏛️ Organization Website</a>";' +
+    '  if(data.githubRepo)html+="<a href=\\""+safeUrl(data.githubRepo)+"\\" target=\\"_blank\\" class=\\"resource-link\\">📦 GitHub Repository</a>";' +
     '  html+="</div></div>";' +
     '  html+="<div class=\\"chart-container\\"><div class=\\"chart-title\\">⚡ Quick Actions</div><div class=\\"link-grid\\">";' +
     '  html+="<button class=\\"resource-link\\" onclick=\\"google.script.run.showMobileUnifiedSearch()\\">🔍 Search All</button>";' +
@@ -14260,6 +14479,61 @@ function saveInteractiveMember(memberData, mode) {
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   if (!sheet) throw new Error('Member Directory sheet not found');
 
+  // --- Input validation ---
+  var MAX_FIELD_LENGTH = 200;
+  var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var PHONE_REGEX = /^[\d\s\-\+\(\)\.ext]{0,30}$/;
+
+  // Required fields
+  if (!memberData.firstName || !String(memberData.firstName).trim()) {
+    throw new Error('First name is required');
+  }
+  if (!memberData.lastName || !String(memberData.lastName).trim()) {
+    throw new Error('Last name is required');
+  }
+
+  // Field length checks on all string fields
+  var fieldsToCheck = ['firstName', 'lastName', 'jobTitle', 'location', 'unit',
+    'officeDays', 'email', 'phone', 'supervisor', 'manager'];
+  for (var f = 0; f < fieldsToCheck.length; f++) {
+    var fieldName = fieldsToCheck[f];
+    if (memberData[fieldName] && String(memberData[fieldName]).length > MAX_FIELD_LENGTH) {
+      throw new Error(fieldName + ' exceeds maximum length of ' + MAX_FIELD_LENGTH + ' characters');
+    }
+  }
+
+  // Email format validation (if provided)
+  if (memberData.email && String(memberData.email).trim() !== '') {
+    if (!EMAIL_REGEX.test(String(memberData.email).trim())) {
+      throw new Error('Invalid email format');
+    }
+  }
+
+  // Phone format validation (if provided)
+  if (memberData.phone && String(memberData.phone).trim() !== '') {
+    if (!PHONE_REGEX.test(String(memberData.phone).trim())) {
+      throw new Error('Invalid phone format. Use digits, spaces, dashes, parentheses, or dots (max 30 chars)');
+    }
+  }
+
+  // isSteward must be Yes or No
+  if (memberData.isSteward && memberData.isSteward !== 'Yes' && memberData.isSteward !== 'No') {
+    throw new Error('isSteward must be "Yes" or "No"');
+  }
+
+  // Sanitize all string values with escapeForFormula to prevent formula injection
+  var safeFirstName = escapeForFormula(String(memberData.firstName || '').trim());
+  var safeLastName = escapeForFormula(String(memberData.lastName || '').trim());
+  var safeJobTitle = escapeForFormula(String(memberData.jobTitle || '').trim());
+  var safeLocation = escapeForFormula(String(memberData.location || '').trim());
+  var safeUnit = escapeForFormula(String(memberData.unit || '').trim());
+  var safeOfficeDays = escapeForFormula(String(memberData.officeDays || '').trim());
+  var safeEmail = escapeForFormula(String(memberData.email || '').trim());
+  var safePhone = escapeForFormula(String(memberData.phone || '').trim());
+  var safeSupervisor = escapeForFormula(String(memberData.supervisor || '').trim());
+  var safeManager = escapeForFormula(String(memberData.manager || '').trim());
+  var safeIsSteward = (memberData.isSteward === 'Yes') ? 'Yes' : 'No';
+
   if (mode === 'add') {
     // Generate a new member ID
     var existingIds = {};
@@ -14268,28 +14542,28 @@ function saveInteractiveMember(memberData, mode) {
       if (row[0]) existingIds[row[0]] = true;
     });
 
-    var newId = generateNameBasedId('M', memberData.firstName, memberData.lastName, existingIds);
+    var newId = generateNameBasedId('M', safeFirstName, safeLastName, existingIds);
 
     // Create new row array
     var newRow = [];
     for (var i = 0; i < MEMBER_COLS.QUICK_ACTIONS; i++) newRow.push('');
 
     newRow[MEMBER_COLS.MEMBER_ID - 1] = newId;
-    newRow[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName;
-    newRow[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName;
-    newRow[MEMBER_COLS.JOB_TITLE - 1] = memberData.jobTitle || '';
-    newRow[MEMBER_COLS.WORK_LOCATION - 1] = memberData.location || '';
-    newRow[MEMBER_COLS.UNIT - 1] = memberData.unit || '';
-    newRow[MEMBER_COLS.OFFICE_DAYS - 1] = memberData.officeDays || '';
-    newRow[MEMBER_COLS.EMAIL - 1] = memberData.email || '';
-    newRow[MEMBER_COLS.PHONE - 1] = memberData.phone || '';
-    newRow[MEMBER_COLS.SUPERVISOR - 1] = memberData.supervisor || '';
-    newRow[MEMBER_COLS.MANAGER - 1] = memberData.manager || '';
-    newRow[MEMBER_COLS.IS_STEWARD - 1] = memberData.isSteward || 'No';
+    newRow[MEMBER_COLS.FIRST_NAME - 1] = safeFirstName;
+    newRow[MEMBER_COLS.LAST_NAME - 1] = safeLastName;
+    newRow[MEMBER_COLS.JOB_TITLE - 1] = safeJobTitle;
+    newRow[MEMBER_COLS.WORK_LOCATION - 1] = safeLocation;
+    newRow[MEMBER_COLS.UNIT - 1] = safeUnit;
+    newRow[MEMBER_COLS.OFFICE_DAYS - 1] = safeOfficeDays;
+    newRow[MEMBER_COLS.EMAIL - 1] = safeEmail;
+    newRow[MEMBER_COLS.PHONE - 1] = safePhone;
+    newRow[MEMBER_COLS.SUPERVISOR - 1] = safeSupervisor;
+    newRow[MEMBER_COLS.MANAGER - 1] = safeManager;
+    newRow[MEMBER_COLS.IS_STEWARD - 1] = safeIsSteward;
 
     // Append the new row
     sheet.appendRow(newRow);
-    ss.toast('New member added: ' + memberData.firstName + ' ' + memberData.lastName + ' (' + newId + ')', 'Member Added', 5);
+    ss.toast('New member added: ' + safeFirstName + ' ' + safeLastName + ' (' + newId + ')', 'Member Added', 5);
 
     return { success: true, memberId: newId, mode: 'add' };
 
@@ -14310,19 +14584,19 @@ function saveInteractiveMember(memberData, mode) {
     if (rowIndex === -1) throw new Error('Member not found: ' + memberId);
 
     // Update the member data
-    sheet.getRange(rowIndex, MEMBER_COLS.FIRST_NAME).setValue(memberData.firstName);
-    sheet.getRange(rowIndex, MEMBER_COLS.LAST_NAME).setValue(memberData.lastName);
-    sheet.getRange(rowIndex, MEMBER_COLS.JOB_TITLE).setValue(memberData.jobTitle || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.WORK_LOCATION).setValue(memberData.location || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.UNIT).setValue(memberData.unit || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.OFFICE_DAYS).setValue(memberData.officeDays || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.EMAIL).setValue(memberData.email || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.PHONE).setValue(memberData.phone || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.SUPERVISOR).setValue(memberData.supervisor || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.MANAGER).setValue(memberData.manager || '');
-    sheet.getRange(rowIndex, MEMBER_COLS.IS_STEWARD).setValue(memberData.isSteward || 'No');
+    sheet.getRange(rowIndex, MEMBER_COLS.FIRST_NAME).setValue(safeFirstName);
+    sheet.getRange(rowIndex, MEMBER_COLS.LAST_NAME).setValue(safeLastName);
+    sheet.getRange(rowIndex, MEMBER_COLS.JOB_TITLE).setValue(safeJobTitle);
+    sheet.getRange(rowIndex, MEMBER_COLS.WORK_LOCATION).setValue(safeLocation);
+    sheet.getRange(rowIndex, MEMBER_COLS.UNIT).setValue(safeUnit);
+    sheet.getRange(rowIndex, MEMBER_COLS.OFFICE_DAYS).setValue(safeOfficeDays);
+    sheet.getRange(rowIndex, MEMBER_COLS.EMAIL).setValue(safeEmail);
+    sheet.getRange(rowIndex, MEMBER_COLS.PHONE).setValue(safePhone);
+    sheet.getRange(rowIndex, MEMBER_COLS.SUPERVISOR).setValue(safeSupervisor);
+    sheet.getRange(rowIndex, MEMBER_COLS.MANAGER).setValue(safeManager);
+    sheet.getRange(rowIndex, MEMBER_COLS.IS_STEWARD).setValue(safeIsSteward);
 
-    ss.toast('Member updated: ' + memberData.firstName + ' ' + memberData.lastName, 'Member Updated', 5);
+    ss.toast('Member updated: ' + safeFirstName + ' ' + safeLastName, 'Member Updated', 5);
 
     return { success: true, memberId: memberId, mode: 'edit' };
   }
@@ -14570,7 +14844,7 @@ function getExecutiveDashboardHtml_() {
     '    </div>' +
     '  </div>' +
     '  <script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     '    window.onload = function() {' +
     '      google.script.run.withSuccessHandler(renderDashboard).withFailureHandler(showError).getDashboardStats();' +
     '    };' +
@@ -14711,8 +14985,8 @@ function showStewardDashboard() {
     '</style></head><body><div class="icon">🛡️</div><h1>Steward Command Center</h1>' +
     '<div class="warning">INTERNAL USE ONLY - Contains PII</div>' +
     '<p>Open the Steward Dashboard web app. This version includes full member details and sensitive information.</p>' +
-    '<div class="url" id="url">' + url + '</div>' +
-    '<div class="btn-row"><a class="open-link" href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<div class="url" id="url">' + escapeHtml(url) + '</div>' +
+    '<div class="btn-row"><a class="open-link" href="' + escapeHtml(url) + '" target="_blank">Open Dashboard</a>' +
     '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
     '</body></html>'
   ).setWidth(500).setHeight(400);
@@ -15055,8 +15329,8 @@ function showStewardPerformanceModal_UIService_() {
     var winClass = s.winRate >= 70 ? 'win-high' : (s.winRate >= 40 ? 'win-med' : 'win-low');
 
     html += '<tr>' +
-      '<td><strong>' + firstName + ' ' + lastName + '</strong></td>' +
-      '<td>' + unit + '</td>' +
+      '<td><strong>' + escapeHtml(firstName) + ' ' + escapeHtml(lastName) + '</strong></td>' +
+      '<td>' + escapeHtml(unit) + '</td>' +
       '<td>' + (s.activeCases || 0) + '</td>' +
       '<td>' + (s.totalCases || 0) + '</td>' +
       '<td><span class="win-rate ' + winClass + '">' + (s.winRate || 0) + '%</span></td>' +
@@ -15343,7 +15617,7 @@ function applyStatusColors() {
 
 
 // ============================================================================
-// SOURCE: 04e_PublicDashboard.gs (2967 lines)
+// SOURCE: 04e_PublicDashboard.gs (3121 lines)
 // ============================================================================
 
 // ============================================================================
@@ -15458,11 +15732,11 @@ function getUnifiedDashboardData(includePII) {
       totalWithPhone: 0
     },
 
-    // Engagement Metrics (from Member Directory columns Q-W)
+    // Engagement Metrics (from Member Directory columns R-X)
     engagement: {
-      emailOpenRate: 0,           // Average from OPEN_RATE column (S)
-      virtualMeetingRate: 0,      // % with recent virtual meeting (Q)
-      inPersonMeetingRate: 0,     // % with recent in-person meeting (R)
+      emailOpenRate: 0,           // Average from OPEN_RATE column (T)
+      virtualMeetingRate: 0,      // % with recent virtual meeting (R)
+      inPersonMeetingRate: 0,     // % with recent in-person meeting (S)
       totalVolunteerHours: 0,     // Sum from VOLUNTEER_HOURS column (T)
       unionInterestLocal: 0,      // % interested in local issues (U)
       unionInterestChapter: 0,    // % interested in chapter activities (V)
@@ -15578,6 +15852,19 @@ function getUnifiedDashboardData(includePII) {
       folderId: '',
       folderUrl: '',
       recentFiles: []
+    },
+
+    // Upcoming Events (from Google Calendar)
+    upcomingEvents: [],
+
+    // Resource Links (from Config sheet)
+    resourceLinks: {
+      surveyUrl: '',
+      contactFormUrl: '',
+      customLink1Name: '',
+      customLink1Url: '',
+      customLink2Name: '',
+      customLink2Url: ''
     },
 
     // Meeting Notes (for member dashboard - completed meetings with published notes)
@@ -16358,7 +16645,7 @@ function getUnifiedDashboardData(includePII) {
   }
   data.hotSpots.lowEngagement.sort(function(a,b){return a.engagement - b.engagement;});
 
-  // Get Google Drive resources folder from Config tab (column AU / 47)
+  // Get Google Drive resources folder from Config tab (column AS / CONFIG_COLS.ARCHIVE_FOLDER_ID)
   try {
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     var archiveFolderId = '';
@@ -16396,6 +16683,79 @@ function getUnifiedDashboardData(includePII) {
     }
   } catch (e) {
     Logger.log('Error accessing Drive resources: ' + e.message);
+  }
+
+  // Populate Upcoming Events from Google Calendars (Grievance Deadlines + Union Meetings)
+  try {
+    var upcomingEvents = [];
+    var eventStart = new Date();
+    var eventEnd = new Date(eventStart.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days ahead
+
+    // Fetch from Grievance Deadlines calendar
+    try {
+      var deadlineCal = getOrCreateDeadlinesCalendar();
+      var deadlineEvents = deadlineCal.getEvents(eventStart, eventEnd);
+      for (var dei = 0; dei < deadlineEvents.length && dei < 20; dei++) {
+        var de = deadlineEvents[dei];
+        upcomingEvents.push({
+          title: de.getTitle(),
+          date: Utilities.formatDate(de.getStartTime(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+          time: Utilities.formatDate(de.getStartTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          endTime: Utilities.formatDate(de.getEndTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          type: 'deadline',
+          description: de.getDescription() || '',
+          location: de.getLocation() || '',
+          allDay: de.isAllDayEvent()
+        });
+      }
+    } catch (calErr) {
+      Logger.log('Error fetching deadline events: ' + calErr.message);
+    }
+
+    // Fetch from Union Meetings calendar
+    try {
+      var meetingCal = getOrCreateMeetingsCalendar();
+      var meetingEvents = meetingCal.getEvents(eventStart, eventEnd);
+      for (var mei = 0; mei < meetingEvents.length && mei < 20; mei++) {
+        var me = meetingEvents[mei];
+        upcomingEvents.push({
+          title: me.getTitle(),
+          date: Utilities.formatDate(me.getStartTime(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+          time: Utilities.formatDate(me.getStartTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          endTime: Utilities.formatDate(me.getEndTime(), Session.getScriptTimeZone(), 'h:mm a'),
+          type: 'meeting',
+          description: me.getDescription() || '',
+          location: me.getLocation() || '',
+          allDay: me.isAllDayEvent()
+        });
+      }
+    } catch (calErr) {
+      Logger.log('Error fetching meeting events: ' + calErr.message);
+    }
+
+    // Sort by date ascending
+    upcomingEvents.sort(function(a, b) {
+      return new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time);
+    });
+
+    data.upcomingEvents = upcomingEvents;
+  } catch (e) {
+    Logger.log('Error populating upcoming events: ' + e.message);
+  }
+
+  // Populate Resource Links from Config sheet
+  try {
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      data.resourceLinks.surveyUrl = String(configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '').trim();
+      data.resourceLinks.contactFormUrl = String(configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).getValue() || '').trim();
+      data.resourceLinks.customLink1Name = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_NAME).getValue() || '').trim();
+      data.resourceLinks.customLink1Url = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_1_URL).getValue() || '').trim();
+      data.resourceLinks.customLink2Name = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_2_NAME).getValue() || '').trim();
+      data.resourceLinks.customLink2Url = String(configSheet.getRange(3, CONFIG_COLS.CUSTOM_LINK_2_URL).getValue() || '').trim();
+    }
+  } catch (e) {
+    Logger.log('Error loading resource links: ' + e.message);
   }
 
   // Populate Meeting Notes (completed meetings with notes docs, chronological order)
@@ -16959,6 +17319,7 @@ function getUnifiedDashboardHtml(isPII) {
     '<div class="tab" onclick="showTab(\'hotspots\')">Hot Spots</div>' +
     '<div class="tab" onclick="showTab(\'bargaining\')">Bargaining</div>' +
     '<div class="tab" onclick="showTab(\'satisfaction\')">Satisfaction</div>' +
+    '<div class="tab" onclick="showTab(\'events\')">Events</div>' +
     '<div class="tab" onclick="showTab(\'resources\')">Resources</div>' +
     '<div class="tab" onclick="showTab(\'meetingnotes\')">Meeting Notes</div>' +
     '<div class="tab" onclick="showTab(\'compare\')">Compare</div>' +
@@ -17003,7 +17364,8 @@ function getUnifiedDashboardHtml(isPII) {
 
     // JavaScript
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
+    'function safeUrl(u){if(!u)return"";return/^https?:\\/\\//i.test(u)?u:""}' +
     'var dashData=null;var isPII=' + isPII + ';' +
     'window.onload=function(){google.script.run.withSuccessHandler(render).withFailureHandler(showError).getUnifiedDashboardDataAPI(isPII)};' +
     'function showError(e){document.getElementById("main-content").innerHTML="<div class=\\"loading\\">Error: "+escapeHtml(e.message)+"</div>"}' +
@@ -17349,34 +17711,84 @@ function getUnifiedDashboardHtml(isPII) {
     'document.getElementById("main-content").innerHTML=html;if(sat.sections&&sat.sections.length>0)renderSatisfactionChart()' +
     '}' +
 
+    // Events Tab - Upcoming events from Google Calendar
+    'else if(tab==="events"){' +
+    'var events=d.upcomingEvents||[];' +
+    'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">event</i>Upcoming Events</h2>";' +
+    // Filter buttons
+    'html+="<div style=\\"display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap\\">";' +
+    'html+="<button class=\\"btn btn-sm event-filter active\\" onclick=\\"filterEvents(\\x27all\\x27,this)\\">All</button>";' +
+    'html+="<button class=\\"btn btn-sm event-filter\\" onclick=\\"filterEvents(\\x27meeting\\x27,this)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">groups</i> Meetings</button>";' +
+    'html+="<button class=\\"btn btn-sm event-filter\\" onclick=\\"filterEvents(\\x27deadline\\x27,this)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">gavel</i> Deadlines</button>";' +
+    'html+="</div>";' +
+    'if(events.length===0){' +
+    'html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#64748b\\">event_busy</i><p style=\\"color:#94a3b8;margin-top:16px\\">No upcoming events in the next 30 days.</p></div>"' +
+    '}else{' +
+    // Group events by date
+    'var grouped={};events.forEach(function(ev){var dk=ev.date;if(!grouped[dk])grouped[dk]=[];grouped[dk].push(ev)});' +
+    'var dateKeys=Object.keys(grouped).sort();' +
+    'dateKeys.forEach(function(dk){' +
+    'var dateObj=new Date(dk+"T12:00:00");var dayName=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][dateObj.getDay()];' +
+    'var monthNames=["January","February","March","April","May","June","July","August","September","October","November","December"];' +
+    'var dateLabel=dayName+", "+monthNames[dateObj.getMonth()]+" "+dateObj.getDate()+", "+dateObj.getFullYear();' +
+    'var today=new Date();today.setHours(0,0,0,0);var evDate=new Date(dk+"T00:00:00");var isToday=evDate.getTime()===today.getTime();' +
+    'var tomorrow=new Date(today.getTime()+86400000);var isTomorrow=evDate.getTime()===tomorrow.getTime();' +
+    'var prefix=isToday?"Today — ":isTomorrow?"Tomorrow — ":"";' +
+    'html+="<div class=\\"event-date-group\\" data-date=\\""+dk+"\\"><div style=\\"font-size:13px;font-weight:700;color:"+(isToday?"#60a5fa":isTomorrow?"#a78bfa":"#94a3b8")+";margin:20px 0 8px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"font-size:16px\\">calendar_today</i>"+prefix+dateLabel+"</div>";' +
+    'grouped[dk].forEach(function(ev){' +
+    'var typeColor=ev.type==="meeting"?"#22c55e":"#f59e0b";' +
+    'var typeIcon=ev.type==="meeting"?"groups":"gavel";' +
+    'var typeLabel=ev.type==="meeting"?"Meeting":"Deadline";' +
+    'html+="<div class=\\"event-item chart-card\\" data-type=\\""+ev.type+"\\" style=\\"margin-bottom:8px;padding:14px;border-left:3px solid "+typeColor+"\\"><div style=\\"display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px\\"><div style=\\"flex:1;min-width:0\\"><div style=\\"display:flex;align-items:center;gap:8px;margin-bottom:6px\\"><span class=\\"badge\\" style=\\"background:"+typeColor+";color:#fff;font-size:10px;padding:2px 8px\\"><i class=\\"material-icons\\" style=\\"font-size:12px;vertical-align:middle\\">"+typeIcon+"</i> "+typeLabel+"</span></div><div style=\\"font-weight:600;color:#e2e8f0;font-size:14px\\">"+escapeHtml(ev.title)+"</div></div><div style=\\"text-align:right;white-space:nowrap\\"><div style=\\"font-size:12px;color:#60a5fa;font-weight:600\\">"+(ev.allDay?"All Day":ev.time)+"</div>";' +
+    'if(!ev.allDay&&ev.endTime){html+="<div style=\\"font-size:10px;color:#64748b\\">to "+ev.endTime+"</div>"}' +
+    'html+="</div></div>";' +
+    'if(ev.location){html+="<div style=\\"margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+escapeHtml(ev.location)+"</div>"}' +
+    'if(ev.description){html+="<div style=\\"margin-top:4px;font-size:11px;color:#64748b;white-space:pre-line\\">"+escapeHtml(ev.description).substring(0,200)+"</div>"}' +
+    'html+="</div>"});' +
+    'html+="</div>"});' +
+    // Summary card at bottom
+    'var meetingCount=events.filter(function(e){return e.type==="meeting"}).length;' +
+    'var deadlineCount=events.filter(function(e){return e.type==="deadline"}).length;' +
+    'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">summarize</i>Summary</div><div style=\\"display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center\\"><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#60a5fa\\">"+events.length+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Total Events</div></div><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#22c55e\\">"+meetingCount+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Meetings</div></div><div style=\\"background:#1e293b;padding:12px;border-radius:8px\\"><div style=\\"font-size:24px;font-weight:700;color:#f59e0b\\">"+deadlineCount+"</div><div style=\\"font-size:11px;color:#94a3b8\\">Deadlines</div></div></div></div>"' +
+    '}' +
+    'document.getElementById("main-content").innerHTML=html' +
+    '}' +
+
     // Resources Tab (Enhanced with Steward Directory)
     'else if(tab==="resources"){' +
     'var dr=d.driveResources;' +
+    'var rl=d.resourceLinks||{};' +
     'html="<h2 style=\\"color:#e2e8f0;font-size:16px;margin-bottom:20px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#60a5fa\\">folder</i>Union Resources</h2>";' +
     'html+="<div class=\\"resource-grid\\">";' +
-    'if(dr.folderUrl){html+="<a href=\\""+dr.folderUrl+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Contract PDF\\x27)\\"><div class=\\"resource-icon\\">📜</div><div class=\\"resource-title\\">Contract</div><div class=\\"resource-desc\\">Current collective bargaining agreement</div></div>";' +
-    'html+="<div class=\\"resource-card\\" onclick=\\"alert(\\x27Coming soon: Forms\\x27)\\"><div class=\\"resource-icon\\">📝</div><div class=\\"resource-title\\">Forms</div><div class=\\"resource-desc\\">Grievance forms and templates</div></div>";' +
+    'if(dr.folderUrl){var sfu=safeUrl(dr.folderUrl);if(sfu){html+="<a href=\\""+escapeHtml(sfu)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📁</div><div class=\\"resource-title\\">Google Drive Folder</div><div class=\\"resource-desc\\">Access all union documents</div></a>"}}' +
+    // Member Survey link
+    'if(rl.surveyUrl){var ssu=safeUrl(rl.surveyUrl);if(ssu){html+="<a href=\\""+escapeHtml(ssu)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📊</div><div class=\\"resource-title\\">Member Survey</div><div class=\\"resource-desc\\">Complete the member satisfaction survey</div></a>"}}' +
+    // Member Contact Update link
+    'if(rl.contactFormUrl){var scf=safeUrl(rl.contactFormUrl);if(scf){html+="<a href=\\""+escapeHtml(scf)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">📋</div><div class=\\"resource-title\\">Contact Update</div><div class=\\"resource-desc\\">Update your personal contact information</div></a>"}}' +
+    // Custom Link 1 (configurable from Config tab)
+    'if(rl.customLink1Url){var sc1=safeUrl(rl.customLink1Url);if(sc1){html+="<a href=\\""+escapeHtml(sc1)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+escapeHtml(rl.customLink1Name||"Custom Link 1")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}}' +
+    // Custom Link 2 (configurable from Config tab)
+    'if(rl.customLink2Url){var sc2=safeUrl(rl.customLink2Url);if(sc2){html+="<a href=\\""+escapeHtml(sc2)+"\\" target=\\"_blank\\" class=\\"resource-card\\"><div class=\\"resource-icon\\">🔗</div><div class=\\"resource-title\\">"+escapeHtml(rl.customLink2Name||"Custom Link 2")+"</div><div class=\\"resource-desc\\">Configured resource link</div></a>"}}' +
     'html+="</div>";' +
     // Steward Contact Directory with Smart Search
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">contacts</i>Steward Contact Directory</div>";' +
     'html+="<div style=\\"position:relative\\"><input type=\\"text\\" id=\\"stewardSearch\\" placeholder=\\"Start typing to search stewards...\\" oninput=\\"smartFilterStewards()\\" onfocus=\\"showSearchSuggestions()\\" autocomplete=\\"off\\" style=\\"width:100%;padding:10px 10px 10px 36px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\"><i class=\\"material-icons\\" style=\\"position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#64748b;font-size:18px\\">search</i><div id=\\"searchSuggestions\\" style=\\"display:none;position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #475569;border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.3)\\"></div></div>";' +
     'html+="<div style=\\"display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap\\"><span style=\\"color:#64748b;font-size:11px\\">Quick filters:</span>";' +
     'var locations=[...new Set(d.stewardList.map(function(s){return s.location}))].filter(Boolean).slice(0,5);' +
-    'locations.forEach(function(loc){html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px\\" onclick=\\"quickFilterSteward(\\x27"+loc+"\\x27)\\">"+loc+"</button>"});' +
+    'locations.forEach(function(loc){html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px\\" data-loc=\\""+escapeHtml(loc)+"\\" onclick=\\"quickFilterSteward(this.dataset.loc)\\">"+escapeHtml(loc)+"</button>"});' +
     'html+="<button class=\\"btn btn-sm\\" style=\\"font-size:10px;padding:4px 8px;background:#475569\\" onclick=\\"clearStewardFilter()\\">Clear</button></div>";' +
     'html+="<div id=\\"stewardList\\" class=\\"list-container\\" style=\\"max-height:300px\\">";' +
     'if(d.stewardList&&d.stewardList.length>0){d.stewardList.forEach(function(s){' +
-    'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase()+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+s.name+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" onclick=\\"saveStewardContact(\\x27"+s.name+"\\x27,\\x27"+(s.email||"")+"\\x27,\\x27"+(s.phone||"")+"\\x27)\\">Save Contact</button></div>";' +
-    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+s.location+" | "+s.unit+"</div>";' +
-    'if(s.email){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#60a5fa\\">email</i> <a href=\\"mailto:"+s.email+"\\" style=\\"color:#60a5fa\\">"+s.email+"</a></div>"}' +
-    'if(s.phone){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#22c55e\\">phone</i> <a href=\\"tel:"+s.phone+"\\" style=\\"color:#22c55e\\">"+s.phone+"</a></div>"}' +
+    'html+="<div class=\\"steward-contact list-item\\" data-search=\\""+escapeHtml(((s.name||"")+" "+(s.location||"")+" "+(s.unit||"")).toLowerCase())+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600;color:#e2e8f0\\">"+escapeHtml(s.name)+"</span><button class=\\"btn btn-sm\\" style=\\"background:#22c55e;color:white;padding:4px 8px\\" data-sname=\\""+escapeHtml(s.name)+"\\" data-semail=\\""+escapeHtml(s.email||"")+"\\" data-sphone=\\""+escapeHtml(s.phone||"")+"\\" onclick=\\"saveStewardContact(this.dataset.sname,this.dataset.semail,this.dataset.sphone)\\">Save Contact</button></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">location_on</i> "+escapeHtml(s.location)+" | "+escapeHtml(s.unit)+"</div>";' +
+    'if(s.email){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#60a5fa\\">email</i> <a href=\\"mailto:"+escapeHtml(s.email)+"\\" style=\\"color:#60a5fa\\">"+escapeHtml(s.email)+"</a></div>"}' +
+    'if(s.phone){html+="<div style=\\"width:100%;margin-top:4px;font-size:12px\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;color:#22c55e\\">phone</i> <a href=\\"tel:"+escapeHtml(s.phone)+"\\" style=\\"color:#22c55e\\">"+escapeHtml(s.phone)+"</a></div>"}' +
     'html+="</div>"})}' +
     'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">No steward contacts available</p>"}' +
     'html+="</div></div>";' +
     'if(dr.recentFiles&&dr.recentFiles.length>0){' +
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:20px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">description</i>Recent Files</div><div class=\\"list-container\\">";' +
-    'dr.recentFiles.forEach(function(f){html+="<a href=\\""+f.url+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+f.name+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"});' +
+    'dr.recentFiles.forEach(function(f){var srf=safeUrl(f.url);if(srf){html+="<a href=\\""+escapeHtml(srf)+"\\" target=\\"_blank\\" class=\\"list-item\\" style=\\"text-decoration:none;color:inherit\\"><span>"+escapeHtml(f.name)+"</span><span class=\\"badge\\" style=\\"background:#475569;color:white\\">Open</span></a>"}});' +
     'html+="</div></div>"}' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
@@ -17391,8 +17803,8 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<input type=\\"text\\" id=\\"notesSearch\\" placeholder=\\"Search meetings...\\" oninput=\\"filterMeetingNotes()\\" style=\\"width:100%;padding:10px 10px 10px 36px;margin:12px 0;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#f8fafc;font-size:13px\\">";' +
     'html+="<div id=\\"notesList\\" class=\\"list-container\\" style=\\"max-height:500px\\">";' +
     'notes.forEach(function(n){' +
-    'html+="<div class=\\"meeting-note-item list-item\\" data-search=\\""+((n.name||"")+" "+(n.date||"")+" "+(n.type||"")).toLowerCase()+"\\" style=\\"flex-wrap:wrap;padding:16px\\"><div style=\\"display:flex;justify-content:space-between;width:100%;align-items:center\\"><div><span style=\\"font-weight:600;color:#e2e8f0;font-size:14px\\">"+escapeHtml(n.name)+"</span></div><span class=\\"badge\\" style=\\"background:#475569;color:#e2e8f0\\">"+escapeHtml(n.type)+"</span></div>";' +
-    'html+="<div style=\\"width:100%;margin-top:8px;display:flex;justify-content:space-between;align-items:center\\"><span style=\\"font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">event</i> "+escapeHtml(n.date)+"</span><a href=\\""+n.notesUrl+"\\" target=\\"_blank\\" class=\\"btn btn-sm\\" style=\\"background:#3b82f6;color:white;text-decoration:none;display:flex;align-items:center;gap:4px\\"><i class=\\"material-icons\\" style=\\"font-size:14px\\">open_in_new</i>View Notes</a></div></div>"});' +
+    'html+="<div class=\\"meeting-note-item list-item\\" data-search=\\""+escapeHtml(((n.name||"")+" "+(n.date||"")+" "+(n.type||"")).toLowerCase())+"\\" style=\\"flex-wrap:wrap;padding:16px\\"><div style=\\"display:flex;justify-content:space-between;width:100%;align-items:center\\"><div><span style=\\"font-weight:600;color:#e2e8f0;font-size:14px\\">"+escapeHtml(n.name)+"</span></div><span class=\\"badge\\" style=\\"background:#475569;color:#e2e8f0\\">"+escapeHtml(n.type)+"</span></div>";' +
+    'var snu=safeUrl(n.notesUrl);html+="<div style=\\"width:100%;margin-top:8px;display:flex;justify-content:space-between;align-items:center\\"><span style=\\"font-size:12px;color:#94a3b8\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle\\">event</i> "+escapeHtml(n.date)+"</span>"+(snu?"<a href=\\""+escapeHtml(snu)+"\\" target=\\"_blank\\" class=\\"btn btn-sm\\" style=\\"background:#3b82f6;color:white;text-decoration:none;display:flex;align-items:center;gap:4px\\"><i class=\\"material-icons\\" style=\\"font-size:14px\\">open_in_new</i>View Notes</a>":"")+"</div></div>"});' +
     'html+="</div></div>"}' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
@@ -17499,7 +17911,8 @@ function getUnifiedDashboardHtml(isPII) {
     '{name:"Hot Spots Tab",desc:"Locations with high case concentrations. Heatmap colors show severity. Prioritize these areas.",icon:"whatshot"},' +
     '{name:"Bargaining Tab",desc:"Contract-related metrics for bargaining preparation. Category breakdowns and resolution patterns.",icon:"handshake"},' +
     '{name:"Satisfaction Tab",desc:"Member survey results with section scores, key insights, and actionable recommendations.",icon:"sentiment_satisfied"},' +
-    '{name:"Resources Tab",desc:"Quick links to contract, forms, and resources. Searchable steward contact directory.",icon:"folder"},' +
+    '{name:"Events Tab",desc:"Upcoming events from the union calendar including meetings and grievance deadlines. Filter by type.",icon:"event"},' +
+    '{name:"Resources Tab",desc:"Quick links to survey, contact update form, configurable links, and resources. Searchable steward contact directory.",icon:"folder"},' +
     '{name:"Compare Tab",desc:"Select multiple metrics to compare side-by-side. Export data as CSV for reporting.",icon:"compare"}' +
     '];' +
     'html="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">search</i>Search Help</div>";' +
@@ -17663,6 +18076,21 @@ function getUnifiedDashboardHtml(isPII) {
     '}' +
 
     // Filter Meeting Notes by search
+    // Filter events by type (Events tab)
+    'function filterEvents(type,btn){' +
+    'document.querySelectorAll(".event-filter").forEach(function(b){b.classList.remove("active")});' +
+    'if(btn)btn.classList.add("active");' +
+    'document.querySelectorAll(".event-item").forEach(function(el){' +
+    'if(type==="all")el.style.display="";' +
+    'else el.style.display=el.getAttribute("data-type")===type?"":"none"' +
+    '});' +
+    'document.querySelectorAll(".event-date-group").forEach(function(g){' +
+    'var visible=g.querySelectorAll(".event-item:not([style*=\\"display: none\\"]),.event-item:not([style*=\\"display:none\\"])");' +
+    'var hasVisible=false;g.querySelectorAll(".event-item").forEach(function(ei){if(ei.style.display!=="none")hasVisible=true});' +
+    'g.style.display=hasVisible?"":"none"' +
+    '})' +
+    '}' +
+
     'function filterMeetingNotes(){' +
     'var q=(document.getElementById("notesSearch")||{value:""}).value.toLowerCase();' +
     'document.querySelectorAll(".meeting-note-item").forEach(function(el){' +
@@ -17691,7 +18119,7 @@ function getUnifiedDashboardHtml(isPII) {
     'if(name)matches.push(name.textContent)}' +
     '});' +
     'if(matches.length>0&&matches.length<10){' +
-    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" onclick=\\"selectStewardSuggestion(\\x27"+m.replace(/\\x27/g,"")+"\\x27)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+escapeHtml(m)+"</div>"}).join("");' +
+    'suggestions.innerHTML=matches.slice(0,5).map(function(m){return "<div style=\\"padding:8px 12px;cursor:pointer;border-bottom:1px solid #334155\\" onmouseover=\\"this.style.background=\\x27#334155\\x27\\" onmouseout=\\"this.style.background=\\x27transparent\\x27\\" data-name=\\""+escapeHtml(m)+"\\" onclick=\\"selectStewardSuggestion(this.dataset.name)\\"><i class=\\"material-icons\\" style=\\"font-size:14px;vertical-align:middle;margin-right:6px;color:#60a5fa\\">person</i>"+escapeHtml(m)+"</div>"}).join("");' +
     'suggestions.style.display="block"}else{suggestions.style.display="none"}' +
     '}' +
     'function selectStewardSuggestion(name){' +
@@ -17907,7 +18335,7 @@ function getUnifiedDashboardHtml(isPII) {
     'else if(p.key==="overdue")val=dashData.overdueCount;' +
     'else if(p.key==="morale")val=dashData.moraleScore;' +
     '}' +
-    'html+="<div class=\\"pinned-metric\\"><button class=\\"unpin-btn\\" onclick=\\"togglePin(\\x27"+p.key+"\\x27,\\x27"+p.label+"\\x27)\\"><i class=\\"material-icons\\">close</i></button><div style=\\"font-size:10px;color:#94a3b8\\">"+p.label+"</div><div style=\\"font-size:24px;font-weight:700;color:"+p.color+"\\">"+val+"</div></div>"});' +
+    'html+="<div class=\\"pinned-metric\\"><button class=\\"unpin-btn\\" data-key=\\""+escapeHtml(p.key)+"\\" data-label=\\""+escapeHtml(p.label)+"\\" onclick=\\"togglePin(this.dataset.key,this.dataset.label)\\"><i class=\\"material-icons\\">close</i></button><div style=\\"font-size:10px;color:#94a3b8\\">"+escapeHtml(p.label)+"</div><div style=\\"font-size:24px;font-weight:700;color:"+p.color+"\\">"+val+"</div></div>"});' +
     'html+="</div></div>";' +
     'var content=document.getElementById("main-content");' +
     'if(content)content.insertAdjacentHTML("afterbegin",html)' +
@@ -17920,21 +18348,21 @@ function getUnifiedDashboardHtml(isPII) {
     'var result=JSON.parse(json);' +
     'var html="<div class=\\"drill-breadcrumbs\\">";' +
     'result.breadcrumbs.forEach(function(bc,idx){' +
-    'if(idx<result.breadcrumbs.length-1){html+="<a onclick=\\"showChartDrillDown(\\x27"+type+"\\x27,\\x27"+(bc.key||"")+"\\x27,\\x27"+title+"\\x27)\\">"+bc.label+"</a><span> / </span>"}' +
-    'else{html+="<span style=\\"color:#e2e8f0\\">"+bc.label+"</span>"}' +
+    'if(idx<result.breadcrumbs.length-1){html+="<a data-type=\\""+escapeHtml(type)+"\\" data-key=\\""+escapeHtml(bc.key||"")+"\\" data-title=\\""+escapeHtml(title)+"\\" onclick=\\"showChartDrillDown(this.dataset.type,this.dataset.key,this.dataset.title)\\">"+escapeHtml(bc.label)+"</a><span> / </span>"}' +
+    'else{html+="<span style=\\"color:#e2e8f0\\">"+escapeHtml(bc.label)+"</span>"}' +
     '});html+="</div>";' +
     'if(result.subGroups&&!secondaryKey){' +
     'var sgKeys=Object.keys(result.subGroups);' +
     'if(sgKeys.length>0){html+="<div style=\\"font-size:11px;color:#94a3b8;margin-bottom:6px\\">Drill deeper:</div><div class=\\"drill-sub-groups\\">";' +
     'sgKeys.forEach(function(dim){' +
     'var entries=Object.keys(result.subGroups[dim]);' +
-    'entries.forEach(function(ek){html+="<button class=\\"drill-sub-btn\\" onclick=\\"showChartDrillDown(\\x27"+type+"\\x27,\\x27"+key+"\\x27,\\x27"+title+"\\x27,\\x27"+ek+"\\x27)\\">"+ek+" ("+result.subGroups[dim][ek]+")</button>"});' +
+    'entries.forEach(function(ek){html+="<button class=\\"drill-sub-btn\\" data-type=\\""+escapeHtml(type)+"\\" data-key=\\""+escapeHtml(key)+"\\" data-title=\\""+escapeHtml(title)+"\\" data-ek=\\""+escapeHtml(ek)+"\\" onclick=\\"showChartDrillDown(this.dataset.type,this.dataset.key,this.dataset.title,this.dataset.ek)\\">"+escapeHtml(ek)+" ("+result.subGroups[dim][ek]+")</button>"});' +
     '});html+="</div>"}}' +
     'html+="<div class=\\"drill-down-list\\" style=\\"margin-top:8px\\">";' +
     'result.items.forEach(function(item){' +
-    'if(item.id&&item.member){html+="<div class=\\"drill-down-item\\"><span><strong>"+item.id+"</strong> - "+item.member+"</span><span style=\\"color:#94a3b8\\">"+(item.steward||"")+" | "+(item.location||"")+"</span></div>"}' +
-    'else if(item.id&&item.name){html+="<div class=\\"drill-down-item\\"><span>"+item.name+"</span><span style=\\"color:#94a3b8\\">"+(item.location||"")+(item.isSteward?" (Steward)":"")+"</span></div>"}' +
-    'else if(item.name){html+="<div class=\\"drill-down-item\\"><span>"+item.name+"</span><span style=\\"color:#94a3b8\\">"+(item.location||"")+"</span></div>"}' +
+    'if(item.id&&item.member){html+="<div class=\\"drill-down-item\\"><span><strong>"+escapeHtml(item.id)+"</strong> - "+escapeHtml(item.member)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.steward||"")+" | "+escapeHtml(item.location||"")+"</span></div>"}' +
+    'else if(item.id&&item.name){html+="<div class=\\"drill-down-item\\"><span>"+escapeHtml(item.name)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.location||"")+(item.isSteward?" (Steward)":"")+"</span></div>"}' +
+    'else if(item.name){html+="<div class=\\"drill-down-item\\"><span>"+escapeHtml(item.name)+"</span><span style=\\"color:#94a3b8\\">"+escapeHtml(item.location||"")+"</span></div>"}' +
     '});html+="</div>";' +
     'openModal(title+" ("+result.totalCount+")",html)' +
     '}).getMultiLevelDrillDown(dashMode==="steward",type,key,secondaryKey||null)' +
@@ -18003,7 +18431,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var list=JSON.parse(json);var el=document.getElementById("rptScheduleList");if(!el)return;' +
     'if(list.length===0){el.innerHTML="<p style=\\"color:#64748b;font-size:11px\\">No scheduled reports</p>";return}' +
     'var html="<div style=\\"font-size:11px;color:#94a3b8;margin-top:8px\\"><strong>Active Schedules:</strong></div>";' +
-    'list.forEach(function(s){html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span style=\\"font-size:11px;color:#e2e8f0\\">"+s.email+" ("+s.frequency+")</span><button onclick=\\"removeReport(\\x27"+s.id+"\\x27)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px\\">Remove</button></div>"});' +
+    'list.forEach(function(s){html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span style=\\"font-size:11px;color:#e2e8f0\\">"+escapeHtml(s.email)+" ("+escapeHtml(s.frequency)+")</span><button data-id=\\""+escapeHtml(s.id)+"\\" onclick=\\"removeReport(this.dataset.id)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px\\">Remove</button></div>"});' +
     'el.innerHTML=html' +
     '}).getScheduledReports()' +
     '}' +
@@ -18174,7 +18602,7 @@ function getUnifiedDashboardHtml(isPII) {
     'var el=document.getElementById("presetManagerList");if(!el)return;' +
     'if(chartPresets.length===0){el.innerHTML="<p style=\\"color:#64748b\\">No saved presets</p>";return}' +
     'var html="";chartPresets.forEach(function(p){' +
-    'html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span>"+p.name+"</span><button onclick=\\"deletePreset(\\x27"+p.id+"\\x27)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:10px\\">Delete</button></div>"' +
+    'html+="<div style=\\"display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05)\\"><span>"+escapeHtml(p.name)+"</span><button data-id=\\""+escapeHtml(p.id)+"\\" onclick=\\"deletePreset(this.dataset.id)\\" style=\\"background:none;border:none;color:#ef4444;cursor:pointer;font-size:10px\\">Delete</button></div>"' +
     '});el.innerHTML=html' +
     '}' +
 
@@ -18196,11 +18624,11 @@ function getUnifiedDashboardHtml(isPII) {
     'var html="<div style=\\"padding:4px\\">";' +
     'if(views.length===0){html+="<p style=\\"color:#94a3b8\\">No shared views yet</p>"}' +
     'views.forEach(function(v){' +
-    'html+="<div style=\\"background:#0f172a;padding:12px;border-radius:8px;margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;align-items:center\\"><strong style=\\"color:#e2e8f0\\">"+v.name+"</strong><span style=\\"font-size:10px;color:#64748b\\">by "+v.createdBy+"</span></div>";' +
-    'html+="<div style=\\"font-size:11px;color:#94a3b8;margin-top:4px\\">Shared with: "+(v.sharedWith.join(", ")||"No one")+"</div>";' +
+    'html+="<div style=\\"background:#0f172a;padding:12px;border-radius:8px;margin-bottom:8px\\"><div style=\\"display:flex;justify-content:space-between;align-items:center\\"><strong style=\\"color:#e2e8f0\\">"+escapeHtml(v.name)+"</strong><span style=\\"font-size:10px;color:#64748b\\">by "+escapeHtml(v.createdBy)+"</span></div>";' +
+    'html+="<div style=\\"font-size:11px;color:#94a3b8;margin-top:4px\\">Shared with: "+escapeHtml(v.sharedWith.join(", ")||"No one")+"</div>";' +
     'if(v.comments&&v.comments.length>0){html+="<div style=\\"margin-top:8px;font-size:11px;color:#94a3b8\\">Comments ("+v.comments.length+"):</div>";' +
-    'v.comments.slice(-3).forEach(function(c){html+="<div style=\\"padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.05)\\"><strong>"+c.author+":</strong> "+c.text+"</div>"})}' +
-    'html+="<div style=\\"margin-top:8px;display:flex;gap:6px\\"><button onclick=\\"addCommentToView(\\x27"+v.id+"\\x27)\\" style=\\"font-size:11px;background:none;border:1px solid #334155;color:#94a3b8;padding:4px 8px;border-radius:4px;cursor:pointer\\">Comment</button><button onclick=\\"deleteView(\\x27"+v.id+"\\x27)\\" style=\\"font-size:11px;background:none;border:1px solid #ef4444;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer\\">Delete</button></div>";' +
+    'v.comments.slice(-3).forEach(function(c){html+="<div style=\\"padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.05)\\"><strong>"+escapeHtml(c.author)+":</strong> "+escapeHtml(c.text)+"</div>"})}' +
+    'html+="<div style=\\"margin-top:8px;display:flex;gap:6px\\"><button data-id=\\""+escapeHtml(v.id)+"\\" onclick=\\"addCommentToView(this.dataset.id)\\" style=\\"font-size:11px;background:none;border:1px solid #334155;color:#94a3b8;padding:4px 8px;border-radius:4px;cursor:pointer\\">Comment</button><button data-id=\\""+escapeHtml(v.id)+"\\" onclick=\\"deleteView(this.dataset.id)\\" style=\\"font-size:11px;background:none;border:1px solid #ef4444;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer\\">Delete</button></div>";' +
     'html+="</div>"' +
     '});html+="</div>";' +
     'openModal("Shared Views",html)' +
@@ -18286,7 +18714,7 @@ function getUnifiedDashboardHtml(isPII) {
     'if(notifs.length===0){el.innerHTML="<p>No notifications</p>";return}' +
     'var html="";notifs.slice(0,5).forEach(function(n){' +
     'var style=n.read?"color:#64748b":"color:#e2e8f0;font-weight:500";' +
-    'html+="<div style=\\"padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"+style+"\\" onclick=\\"markNotifRead(\\x27"+n.id+"\\x27)\\">"+n.title+"<br><span style=\\"font-size:10px;color:#64748b\\">"+new Date(n.timestamp).toLocaleString()+"</span></div>"' +
+    'html+="<div style=\\"padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);"+style+"\\" data-id=\\""+escapeHtml(n.id)+"\\" onclick=\\"markNotifRead(this.dataset.id)\\">"+escapeHtml(n.title)+"<br><span style=\\"font-size:10px;color:#64748b\\">"+new Date(n.timestamp).toLocaleString()+"</span></div>"' +
     '});el.innerHTML=html;' +
     'var unread=notifs.filter(function(n){return!n.read}).length;' +
     'var badge=document.getElementById("alertBadge");if(badge&&unread>0){badge.textContent=unread;badge.style.display="inline"}' +
@@ -18315,7 +18743,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (4340 lines)
+// SOURCE: 05_Integrations.gs (4700 lines)
 // ============================================================================
 
 /**
@@ -18362,15 +18790,29 @@ var CALENDAR_CONFIG = {
  * @return {Folder} The root grievance folder
  */
 function getOrCreateRootFolder() {
+  // Check for stored folder ID first to avoid global name-search ambiguity
+  var props = PropertiesService.getScriptProperties();
+  var storedFolderId = props.getProperty('GRIEVANCE_ROOT_FOLDER_ID');
+  if (storedFolderId) {
+    try {
+      return DriveApp.getFolderById(storedFolderId);
+    } catch (_e) {
+      // Stored ID invalid, fall through to name search
+    }
+  }
+
   const folderName = DRIVE_CONFIG.ROOT_FOLDER_NAME;
   const folders = DriveApp.getFoldersByName(folderName);
 
   if (folders.hasNext()) {
-    return folders.next();
+    var existing = folders.next();
+    props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', existing.getId());
+    return existing;
   }
 
   // Create the root folder
   const newFolder = DriveApp.createFolder(folderName);
+  props.setProperty('GRIEVANCE_ROOT_FOLDER_ID', newFolder.getId());
 
   // Set folder color/description
   newFolder.setDescription('Union Grievance Documentation - Auto-managed by Dashboard');
@@ -18572,7 +19014,7 @@ function setupFolderForSelectedGrievance() {
 
     if (response === ui.Button.YES) {
       var html = HtmlService.createHtmlOutput(
-        '<script>window.open("' + existingUrl + '", "_blank"); google.script.host.close();</script>'
+        '<script>window.open(' + JSON.stringify(existingUrl) + ', "_blank"); google.script.host.close();</script>'
       ).setWidth(1).setHeight(1);
       ui.showModalDialog(html, 'Opening folder...');
     }
@@ -18668,8 +19110,8 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
-    if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
-      sheet.getRange(i + 1, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).setValue(folderUrl);
+    if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
+      sheet.getRange(i + 1, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(folderUrl);
       break;
     }
   }
@@ -18688,7 +19130,7 @@ function openGrievanceFolder() {
   const row = sheet.getActiveRange().getRow();
   if (row <= 1) return;
 
-  const folderUrl = sheet.getRange(row, GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1).getValue();
+  const folderUrl = sheet.getRange(row, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
 
   if (folderUrl) {
     const html = HtmlService.createHtmlOutput(
@@ -18697,7 +19139,7 @@ function openGrievanceFolder() {
     SpreadsheetApp.getUi().showModalDialog(html, 'Opening folder...');
   } else {
     if (showConfirmation('No folder exists. Create one now?', 'Create Folder')) {
-      const grievanceId = sheet.getRange(row, GRIEVANCE_COLUMNS.GRIEVANCE_ID + 1).getValue();
+      const grievanceId = sheet.getRange(row, GRIEVANCE_COLS.GRIEVANCE_ID).getValue();
       const result = setupDriveFolderForGrievance(grievanceId);
       if (result.success) {
         const html = HtmlService.createHtmlOutput(
@@ -18717,6 +19159,7 @@ function openGrievanceFolder() {
 function sanitizeFolderName(name) {
   if (!name) return 'Unknown';
   return name
+    .trim()
     .replace(/[<>:"/\\|?*]/g, '')
     .replace(/\s+/g, '_')
     .substring(0, 50);
@@ -18752,6 +19195,8 @@ function createMeetingCalendarEvent(meetingData) {
   try {
     var calendar = getOrCreateMeetingsCalendar();
     var meetingDate = new Date(meetingData.date + 'T00:00:00');
+    // Note: Date parsing uses script timezone. For explicit control, consider
+    // Utilities.formatDate() with Session.getScriptTimeZone().
     var startTime = meetingData.time || '09:00';
     var durationHours = parseFloat(meetingData.duration) || 1;
     var timeParts = startTime.split(':');
@@ -18811,6 +19256,15 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     return errorResponse('Meeting ID and recipient emails are required');
   }
 
+  // Validate all recipient email addresses
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emails = String(recipientEmails).split(',');
+  for (var e = 0; e < emails.length; e++) {
+    if (!emailRegex.test(emails[e].trim())) {
+      return errorResponse('Invalid email address: ' + emails[e].trim());
+    }
+  }
+
   try {
     var result = getMeetingAttendees(meetingId);
     if (!result.success) {
@@ -18820,6 +19274,9 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Find meeting details from the check-in log
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+    if (!sheet || sheet.getLastRow() <= 1) {
+      return errorResponse('No meeting check-in data found');
+    }
     var data = sheet.getDataRange().getValues();
     var meetingName = '';
     var meetingDate = '';
@@ -18839,10 +19296,10 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
     // Build email body
     var body = '<h2>Meeting Attendance Report</h2>' +
       '<table style="border-collapse:collapse;margin:10px 0">' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Meeting:</td><td style="padding:4px 12px">' + meetingName + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Date:</td><td style="padding:4px 12px">' + dateStr + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Type:</td><td style="padding:4px 12px">' + meetingType + '</td></tr>' +
-      '<tr><td style="padding:4px 12px;font-weight:bold">Total Attendees:</td><td style="padding:4px 12px">' + result.count + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Meeting:</td><td style="padding:4px 12px">' + escapeHtml(meetingName) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Date:</td><td style="padding:4px 12px">' + escapeHtml(dateStr) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Type:</td><td style="padding:4px 12px">' + escapeHtml(meetingType) + '</td></tr>' +
+      '<tr><td style="padding:4px 12px;font-weight:bold">Total Attendees:</td><td style="padding:4px 12px">' + escapeHtml(String(result.count)) + '</td></tr>' +
       '</table>';
 
     if (result.attendees.length > 0) {
@@ -18859,9 +19316,9 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
         var a = result.attendees[j];
         body += '<tr>' +
           '<td style="padding:6px;border:1px solid #ddd">' + (j + 1) + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.memberId + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.name + '</td>' +
-          '<td style="padding:6px;border:1px solid #ddd">' + a.time + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.memberId)) + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.name)) + '</td>' +
+          '<td style="padding:6px;border:1px solid #ddd">' + escapeHtml(String(a.time)) + '</td>' +
           '</tr>';
       }
       body += '</table>';
@@ -19030,14 +19487,26 @@ function setDocViewOnlyByLink(docUrl) {
  */
 function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipientEmails) {
   if (!recipientEmails || !docUrl) return;
+
+  // Validate all recipient email addresses
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var emails = String(recipientEmails).split(',');
+  for (var e = 0; e < emails.length; e++) {
+    if (!emailRegex.test(emails[e].trim())) {
+      Logger.log('Invalid email address in recipient list: ' + emails[e].trim());
+      return;
+    }
+  }
+
   try {
     var typeLabel = docType === 'agenda' ? 'Meeting Agenda' : 'Meeting Notes';
-    var body = '<h2>' + typeLabel + '</h2>' +
-      '<p><strong>Meeting:</strong> ' + meetingName + '</p>' +
-      '<p><strong>Date:</strong> ' + meetingDate + '</p>' +
-      '<p>Click the link below to access the ' + typeLabel.toLowerCase() + ':</p>' +
-      '<p><a href="' + docUrl + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
-      'Open ' + typeLabel + '</a></p>' +
+    var safeDocUrl = /^https:\/\/docs\.google\.com\//.test(docUrl) ? docUrl : '';
+    var body = '<h2>' + escapeHtml(typeLabel) + '</h2>' +
+      '<p><strong>Meeting:</strong> ' + escapeHtml(meetingName) + '</p>' +
+      '<p><strong>Date:</strong> ' + escapeHtml(meetingDate) + '</p>' +
+      '<p>Click the link below to access the ' + escapeHtml(typeLabel.toLowerCase()) + ':</p>' +
+      (safeDocUrl ? '<p><a href="' + escapeHtml(safeDocUrl) + '" style="background:#1a73e8;color:white;padding:10px 20px;border-radius:4px;text-decoration:none;display:inline-block">' +
+      'Open ' + escapeHtml(typeLabel) + '</a></p>' : '<p><em>Document link unavailable.</em></p>') +
       '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
 
     MailApp.sendEmail({
@@ -19336,29 +19805,23 @@ function syncDeadlinesToCalendar() {
  * @return {Object} Sync result
  */
 function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
-  const grievanceId = grievance['Grievance ID'] ||
-                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.GRIEVANCE_ID]];
-  const memberName = grievance['Member Name'] ||
-                     grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.MEMBER_NAME]];
-  const currentStep = grievance['Current Step'] ||
-                      grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.CURRENT_STEP]];
+  const grievanceId = grievance['Grievance ID'];
+  const memberName = grievance['Member Name'];
+  const currentStep = grievance['Current Step'];
 
   // Get the deadline for current step
   let deadline;
   switch (currentStep) {
     case 'Step I':
     case 'Informal':
-      deadline = grievance['Step 1 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_1_DUE]];
+      deadline = grievance['Step 1 Due'];
       break;
     case 'Step II':
-      deadline = grievance['Step 2 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_2_DUE]];
+      deadline = grievance['Step 2 Due'];
       break;
     case 'Step III':
     case 'Arbitration':
-      deadline = grievance['Step 3 Due'] ||
-                 grievance[Object.keys(grievance)[GRIEVANCE_COLUMNS.STEP_3_DUE]];
+      deadline = grievance['Step 3 Due'];
       break;
     default:
       return { synced: false, reason: 'No applicable deadline' };
@@ -19408,46 +19871,6 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
 
 // Note: syncSingleGrievanceToCalendar() is defined in MobileQuickActions.gs
 
-/**
- * Clears all calendar events created by the dashboard
- * @return {Object} Result with count of deleted events
- */
-function clearAllCalendarEvents() {
-  try {
-    const calendar = getOrCreateDeadlinesCalendar();
-
-    // Get all events from now until 1 year from now
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1);
-
-    const events = calendar.getEvents(startDate, endDate, {
-      search: '[GRV]'
-    });
-
-    let deleted = 0;
-    for (const event of events) {
-      event.deleteEvent();
-      deleted++;
-
-      // Rate limiting
-      if (deleted % 50 === 0) {
-        Utilities.sleep(200);
-      }
-    }
-
-    return {
-      success: true,
-      deleted: deleted,
-      message: `Deleted ${deleted} calendar events`
-    };
-
-  } catch (error) {
-    console.error('Error clearing calendar:', error);
-    return errorResponse(error.message);
-  }
-}
-
 // ============================================================================
 // EMAIL NOTIFICATIONS
 // ============================================================================
@@ -19461,6 +19884,10 @@ function sendDeadlineReminders(daysAhead) {
   try {
     const deadlines = getUpcomingDeadlines(daysAhead || 7);
     const userEmail = Session.getActiveUser().getEmail();
+
+    if (!userEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail)) {
+      return errorResponse('Could not determine a valid email address for the current user');
+    }
 
     if (deadlines.length === 0) {
       return { success: true, sent: false, message: 'No upcoming deadlines' };
@@ -19529,7 +19956,7 @@ function sendEmailToMember(memberId, subject, body) {
     }
 
     const email = member['Email'] || member.email;
-    if (!email || !VALIDATION_RULES.EMAIL_PATTERN.test(email)) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
       return errorResponse('Invalid email address');
     }
 
@@ -19720,7 +20147,7 @@ function createPDFForSelectedGrievance() {
 
     // Open folder in new tab
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + folder.getUrl() + '", "_blank"); google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(folder.getUrl()) + ', "_blank"); google.script.host.close();</script>'
     ).setWidth(100).setHeight(50);
     ui.showModalDialog(html, 'Opening folder...');
 
@@ -19736,6 +20163,10 @@ function createPDFForSelectedGrievance() {
  * @private
  */
 function sendGrievancePdfEmail_(data, pdf) {
+  if (!data.memberEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.memberEmail).trim())) {
+    throw new Error('Invalid or missing member email address');
+  }
+
   var subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Grievance Form - ' + data.grievanceId;
 
   var body = 'Dear ' + data.name + ',\n\n' +
@@ -19795,10 +20226,10 @@ function onGrievanceFormSubmit(e) {
     var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
     if (sheet) {
-      // Find the last row (where the form just added data) and add the PDF link
-      var lastRow = sheet.getLastRow();
+      // Use the event range to find the exact row the form submission added to
+      var targetRow = e.range ? e.range.getRow() : sheet.getLastRow();
       if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
-        sheet.getRange(lastRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+        sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
       }
     }
 
@@ -19807,8 +20238,8 @@ function onGrievanceFormSubmit(e) {
       secureLog('FormSubmission', 'Form submission processed - PDF created', {});
     }
 
-  } catch (e) {
-    Logger.log('Error processing form submission: ' + e.message);
+  } catch (err) {
+    Logger.log('Error processing form submission: ' + err.message);
   }
 }
 
@@ -19844,14 +20275,6 @@ function showCalendarSyncDialog() {
           </button>
         </div>
 
-        <div class="sync-option">
-          <h4>Clear All Events</h4>
-          <p>Removes all grievance-related events from the calendar</p>
-          <button class="btn btn-danger" onclick="clearAll()" style="margin-top: 10px;">
-            Clear Calendar
-          </button>
-        </div>
-
         <div id="status" class="status"></div>
 
         <div class="action-buttons">
@@ -19875,16 +20298,6 @@ function showCalendarSyncDialog() {
             })
             .syncDeadlinesToCalendar();
         }
-
-        function clearAll() {
-          if (!confirm('Are you sure you want to clear all grievance events from the calendar?')) return;
-          showStatus('Clearing...', false);
-          google.script.run
-            .withSuccessHandler(function(r) {
-              showStatus(r.success ? r.message : 'Error: ' + r.error, !r.success);
-            })
-            .clearAllCalendarEvents();
-        }
       </script>
     </body>
     </html>
@@ -19906,10 +20319,10 @@ function showUpcomingDeadlines() {
     deadlines.forEach(d => {
       const urgentStyle = d.daysLeft <= 3 ? 'background:#fee2e2;' : '';
       tableRows += `<tr style="${urgentStyle}">
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.grievanceId}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.memberName}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.step}</td>
-        <td style="padding:8px; border-bottom:1px solid #ddd;">${d.date} (${d.daysLeft} days)</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.grievanceId))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.memberName))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.step))}</td>
+        <td style="padding:8px; border-bottom:1px solid #ddd;">${escapeHtml(String(d.date))} (${escapeHtml(String(d.daysLeft))} days)</td>
       </tr>`;
     });
   }
@@ -19939,25 +20352,6 @@ function showUpcomingDeadlines() {
   `).setWidth(600).setHeight(400);
 
   SpreadsheetApp.getUi().showModalDialog(html, 'Upcoming Deadlines');
-}
-
-/**
- * Shows confirmation dialog for clearing calendar
- */
-function showClearCalendarConfirm() {
-  const result = showConfirmation(
-    'This will delete ALL grievance-related events from your calendar. This cannot be undone. Continue?',
-    'Clear Calendar Events'
-  );
-
-  if (result) {
-    const clearResult = clearAllCalendarEvents();
-    if (clearResult.success) {
-      showToast(clearResult.message, 'Calendar Cleared');
-    } else {
-      showAlert('Error: ' + clearResult.error, 'Error');
-    }
-  }
 }
 /**
  * ============================================================================
@@ -20003,7 +20397,7 @@ function doGet(e) {
   }
 
   // Step 2: Check for unified dashboard mode parameter
-  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode);
+  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode) || '';
   if (mode === 'steward' || mode === 'member') {
     // v4.5.2: isPII is determined by auth result, NOT the URL parameter.
     // Default to false; only grant PII access after confirmed steward/admin authorization.
@@ -20033,7 +20427,7 @@ function doGet(e) {
     var html = getUnifiedDashboardHtml(isPII);
     return HtmlService.createHtmlOutput(html)
       .setTitle(title)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
   }
 
@@ -20071,7 +20465,7 @@ function doGet(e) {
         var authHtml = getMemberSelfServicePortalHtml();
         return HtmlService.createHtmlOutput(authHtml)
           .setTitle('Member Login')
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
           .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
       }
     }
@@ -20150,6 +20544,10 @@ function doGet(e) {
       // v4.11.0: Educational content hub — contract articles, rights, FAQ, guides
       html = getWebAppResourcesHtml();
       break;
+    case 'notifications':
+      // v4.12.0: Notifications — members view/dismiss, stewards compose inline
+      html = getWebAppNotificationsHtml();
+      break;
     case 'portal':
       // Public portal without member ID
       if (typeof buildPublicPortal === 'function') {
@@ -20163,9 +20561,13 @@ function doGet(e) {
       break;
   }
 
+  if (!html) {
+    return getAccessDeniedPage('Unable to load the requested page');
+  }
+
   return HtmlService.createHtmlOutput(html)
     .setTitle('Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
 }
 
@@ -20310,7 +20712,8 @@ function getWebAppDashboardHtml() {
 
     // Script to load overdue preview
     '<script>' +
-    'var baseUrl="' + baseUrl + '";' +
+    getClientSideEscapeHtml() +
+    'var baseUrl=' + JSON.stringify(baseUrl) + ';' +
     'var retryCount=0;' +
     'function loadOverdue(){' +
     '  if(!navigator.onLine){document.getElementById("overdue-preview").innerHTML="<div style=\\"padding:15px;text-align:center;color:#666\\">📡 Offline</div>";return}' +
@@ -20322,7 +20725,7 @@ function getWebAppDashboardHtml() {
     '    if(overdue.length===0){document.getElementById("overdue-preview").innerHTML="<div style=\\"padding:15px;text-align:center;color:#10B981\\">✅ No overdue cases - great job!</div>";return}' +
     '    var html="<div class=\\"overdue-section\\"><div class=\\"overdue-title\\">⚠️ Overdue Cases ("+overdue.length+")</div>";' +
     '    overdue.slice(0,3).forEach(function(g){' +
-    '      html+="<div class=\\"overdue-item\\"><div class=\\"overdue-id\\">"+(g.id||"")+"</div><div class=\\"overdue-name\\">"+(g.name||"")+"</div><div class=\\"overdue-detail\\">"+(g.category||"")+" • "+(g.step||"")+"</div></div>";' +
+    '      html+="<div class=\\"overdue-item\\"><div class=\\"overdue-id\\">"+escapeHtml(g.id||"")+"</div><div class=\\"overdue-name\\">"+escapeHtml(g.name||"")+"</div><div class=\\"overdue-detail\\">"+escapeHtml(g.category||"")+" • "+escapeHtml(g.step||"")+"</div></div>";' +
     '    });' +
     '    if(overdue.length>3)html+="<button class=\\"view-all-btn\\" onclick=\\"location.href=baseUrl+\'?page=grievances&filter=overdue\'\\">View All "+overdue.length+" Overdue Cases</button>";' +
     '    html+="</div>";' +
@@ -20431,7 +20834,7 @@ function getWebAppSearchHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var currentTab="all";' +
     'var searchTimeout=null;' +
     'var lastQuery="";' +
@@ -20608,7 +21011,7 @@ function getWebAppGrievanceListHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -20808,7 +21211,7 @@ function getWebAppMemberListHtml() {
     '</nav>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allData=[];' +
     'var currentFilter="all";' +
     'var PAGE_SIZE=25;' +
@@ -20963,6 +21366,8 @@ function getWebAppLinksHtml() {
     '</nav>' +
 
     '<script>' +
+    getClientSideEscapeHtml() +
+    'function safeUrl(u){if(!u)return"#";u=String(u);return/^https?:\\/\\//i.test(u)?u:"#";}' +
     'function loadLinks(){' +
     '  google.script.run.withSuccessHandler(function(links){' +
     '    renderLinks(links);' +
@@ -20977,17 +21382,17 @@ function getWebAppLinksHtml() {
     '  // Forms section' +
     '  html+="<div class=\\"section-title\\">📝 Forms</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+links.grievanceForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
-    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+links.contactForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
-    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+links.satisfactionForm+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
+    '  if(links.grievanceForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.grievanceForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📋</span><span class=\\"link-label\\">Grievance Form</span><span class=\\"link-desc\\">File a grievance</span></a>";}' +
+    '  if(links.contactForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.contactForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">✉️</span><span class=\\"link-label\\">Contact Form</span><span class=\\"link-desc\\">Send a message</span></a>";}' +
+    '  if(links.satisfactionForm){html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.satisfactionForm))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Satisfaction Survey</span><span class=\\"link-desc\\">Give feedback</span></a>";}' +
     '  if(!links.grievanceForm&&!links.contactForm&&!links.satisfactionForm){html+="<div class=\\"link-card full\\"><span class=\\"link-icon\\">ℹ️</span><div class=\\"link-content\\"><span class=\\"link-label\\">No Forms Configured</span><span class=\\"link-desc\\">Add form URLs to Config sheet</span></div></div>";}' +
     '  html+="</div>";' +
 
     '  // Resources section' +
     '  html+="<div class=\\"section-title\\">🔧 Resources</div>";' +
     '  html+="<div class=\\"link-grid\\">";' +
-    '  html+="<a class=\\"link-card\\" href=\\""+links.spreadsheetUrl+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
-    '  html+="<a class=\\"link-card github\\" href=\\""+links.githubRepo+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
+    '  html+="<a class=\\"link-card\\" href=\\""+escapeHtml(safeUrl(links.spreadsheetUrl))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📊</span><span class=\\"link-label\\">Spreadsheet</span><span class=\\"link-desc\\">Open full dashboard</span></a>";' +
+    '  html+="<a class=\\"link-card github\\" href=\\""+escapeHtml(safeUrl(links.githubRepo))+"\\" target=\\"_blank\\"><span class=\\"link-icon\\">📦</span><span class=\\"link-label\\">GitHub Repo</span><span class=\\"link-desc\\">Source code</span></a>";' +
     '  html+="</div>";' +
 
     '  document.getElementById("linksContent").innerHTML=html;' +
@@ -21279,36 +21684,26 @@ function addMobileDashboardLinkToConfig() {
     return;
   }
 
-  // Find first empty row in column AZ (or create Mobile Dashboard URL section)
-  var _lastRow = configSheet.getLastRow();
-  var targetRow = 2;
-  var targetCol = 52; // Column AZ
+  // Use the canonical column constant — never hardcode column numbers.
+  var targetCol = CONFIG_COLS.MOBILE_DASHBOARD_URL;
 
-  // Check if header exists
-  var headerCell = configSheet.getRange(1, targetCol);
-  if (!headerCell.getValue()) {
-    headerCell.setValue('📱 Mobile Dashboard URL');
-    headerCell.setFontWeight('bold');
-    headerCell.setBackground('#1a73e8');
-    headerCell.setFontColor('#ffffff');
-  }
-
-  // Add the hyperlink
-  var linkCell = configSheet.getRange(targetRow, targetCol);
-  linkCell.setFormula('=HYPERLINK("' + url + '", "📱 Tap to Open Dashboard")');
+  // Write data starting at row 3 (first data row).
+  // Rows 1-2 are section/column headers managed by createConfigSheet — don't touch them.
+  var linkCell = configSheet.getRange(3, targetCol);
+  linkCell.setFormula('=HYPERLINK(' + JSON.stringify(url) + ', "📱 Tap to Open Dashboard")');
   linkCell.setFontSize(14);
   linkCell.setFontWeight('bold');
   linkCell.setFontColor('#1a73e8');
   linkCell.setBackground('#e8f0fe');
 
   // Also add plain URL below for copying
-  var urlCell = configSheet.getRange(targetRow + 1, targetCol);
+  var urlCell = configSheet.getRange(4, targetCol);
   urlCell.setValue(url);
   urlCell.setFontSize(10);
   urlCell.setWrap(true);
 
   // Add instructions
-  var instructionCell = configSheet.getRange(targetRow + 2, targetCol);
+  var instructionCell = configSheet.getRange(5, targetCol);
   instructionCell.setValue('Open Google Sheets on your phone, navigate to Config tab, and tap the blue link above to access the dashboard.');
   instructionCell.setFontSize(9);
   instructionCell.setFontColor('#666666');
@@ -21319,11 +21714,11 @@ function addMobileDashboardLinkToConfig() {
 
   SpreadsheetApp.getUi().alert(
     '📱 Mobile Dashboard Link Added!',
-    'A clickable link has been added to column AZ of the Config sheet.\n\n' +
+    'A clickable link has been added to the "📱 Mobile Dashboard URL" column of the Config sheet.\n\n' +
     'To access on mobile:\n' +
     '1. Open this spreadsheet in Google Sheets mobile app\n' +
     '2. Go to the Config tab\n' +
-    '3. Scroll to column AZ\n' +
+    '3. Scroll to the Mobile Dashboard section\n' +
     '4. Tap the blue "Tap to Open Dashboard" link\n\n' +
     'URL: ' + url,
     SpreadsheetApp.getUi().ButtonSet.OK
@@ -21488,7 +21883,7 @@ function authorizeConstantContact() {
     '  if(!match){alert("Could not find authorization code in that URL. Make sure you copied the full URL.");return;}' +
     '  google.script.run' +
     '    .withSuccessHandler(function(msg){' +
-    '      document.querySelector(".container").innerHTML="<h2>✅ "+msg+"</h2><p>You can close this dialog.</p>";' +
+    '      var c=document.querySelector(".container");c.innerHTML="";var h=document.createElement("h2");h.textContent="\\u2705 "+msg;var p=document.createElement("p");p.textContent="You can close this dialog.";c.appendChild(h);c.appendChild(p);' +
     '    })' +
     '    .withFailureHandler(function(e){alert("Error: "+e.message);})' +
     '    .exchangeConstantContactCode(match[1]);' +
@@ -21890,7 +22285,7 @@ function syncConstantContactEngagement() {
         openRateUpdates.push([engagement.openRate]);
         contactDateUpdates.push([engagement.lastActivityDate || '']);
       } else {
-        openRateUpdates.push([memberData[i][MEMBER_COLS.OPEN_RATE - 1] || '']);
+        openRateUpdates.push([numericField_(memberData[i][MEMBER_COLS.OPEN_RATE - 1])]);
         contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
       }
 
@@ -21900,7 +22295,7 @@ function syncConstantContactEngagement() {
       }
     } else {
       // No CC match — preserve existing values
-      openRateUpdates.push([memberData[i][MEMBER_COLS.OPEN_RATE - 1] || '']);
+      openRateUpdates.push([numericField_(memberData[i][MEMBER_COLS.OPEN_RATE - 1])]);
       contactDateUpdates.push([memberData[i][MEMBER_COLS.RECENT_CONTACT_DATE - 1] || '']);
     }
   }
@@ -22659,8 +23054,401 @@ function getNotificationRecipientList() {
 }
 
 
+/**
+ * Get full member list with directory columns for filtering/sorting.
+ * Used by steward notification compose form recipient picker.
+ * Returns: name, email, location, department, jobTitle for each member.
+ * @returns {Object[]}
+ */
+function getNotificationRecipientListFull() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+
+    var C = MEMBER_COLS;
+    var results = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var firstName = String(data[i][C.FIRST_NAME - 1] || '').trim();
+      var lastName = String(data[i][C.LAST_NAME - 1] || '').trim();
+      var email = String(data[i][C.EMAIL - 1] || '').trim();
+      if (!email) continue;
+
+      var fullName = (firstName + ' ' + lastName).trim();
+      var location = '';
+      var department = '';
+      var jobTitle = '';
+
+      if (C.WORK_LOCATION) location = String(data[i][C.WORK_LOCATION - 1] || '').trim();
+      if (C.DEPARTMENT) department = String(data[i][C.DEPARTMENT - 1] || '').trim();
+      if (C.JOB_TITLE) jobTitle = String(data[i][C.JOB_TITLE - 1] || '').trim();
+
+      results.push({
+        name: fullName || email,
+        email: email,
+        location: location,
+        department: department,
+        jobTitle: jobTitle
+      });
+    }
+
+    results.sort(function(a, b) { return a.name.localeCompare(b.name); });
+    return results;
+  } catch (e) {
+    logError_('getNotificationRecipientListFull', e);
+    return [];
+  }
+}
+
+
 // ============================================================================
-// SOURCE: 06_Maintenance.gs (3531 lines)
+// NOTIFICATIONS WEB PAGE (v4.12.0)
+// ============================================================================
+// ?page=notifications - dual-role page
+// Members: view + dismiss notifications
+// Stewards: inline compose form + recipient picker + view/manage
+// Recipient picker: groups + individuals, filterable by location/dept/title
+// ============================================================================
+
+/**
+ * Generate notifications page HTML.
+ * Detects role via checkWebAppAuthorization - stewards get compose form.
+ * @returns {string} full HTML page
+ */
+function getWebAppNotificationsHtml() {
+  var isSteward = false;
+  var userEmail = '';
+  var userName = '';
+  try {
+    var authResult = checkWebAppAuthorization('steward');
+    isSteward = authResult.isAuthorized;
+    userEmail = authResult.email || Session.getActiveUser().getEmail() || '';
+    userName = userEmail.split('@')[0] || '';
+  } catch (authErr) {
+    try { userEmail = Session.getActiveUser().getEmail() || ''; } catch (e2) { userEmail = ''; }
+  }
+
+  var userRole = isSteward ? 'steward' : 'member';
+  var notifications = getWebAppNotifications(userEmail, userRole);
+  var notifJson = JSON.stringify(notifications || []);
+  var recipientJson = isSteward ? JSON.stringify(getNotificationRecipientListFull() || []) : '[]';
+
+  var p = [];
+  p.push('<!DOCTYPE html><html><head>');
+  p.push('<meta charset="utf-8">');
+  p.push('<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">');
+  p.push('<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">');
+  p.push('<title>Notifications | MassAbility DDS</title>');
+
+  // ── CSS ──
+  p.push('<style>');
+  p.push('*{box-sizing:border-box;margin:0;padding:0}');
+  p.push('body{font-family:"DM Sans",sans-serif;background:#fafaf9;min-height:100vh;padding-bottom:20px;color:#1c1917}');
+  p.push('.hero{background:linear-gradient(145deg,#92400e,#b45309);color:#fff;padding:26px 20px 34px;position:relative;overflow:hidden}');
+  p.push('.hero h1{font-family:"Fraunces",serif;font-size:clamp(22px,5vw,28px);font-weight:700;letter-spacing:-0.02em;margin-bottom:5px}');
+  p.push('.hero .sub{font-size:14px;opacity:0.85}');
+  p.push('.hero .curve{position:absolute;bottom:-20px;left:-20px;right:-20px;height:40px;background:#fafaf9;border-radius:50% 50% 0 0}');
+  p.push('.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(255,255,255,0.15);border-radius:20px;font-size:12px;font-weight:600;margin-top:8px}');
+  p.push('.container{max-width:600px;margin:0 auto;padding:0 16px}');
+  // Compose
+  p.push('.compose{background:#fff;border-radius:16px;padding:20px;margin-top:-12px;position:relative;z-index:2;box-shadow:0 2px 12px rgba(0,0,0,0.08);border:1px solid #f5f5f4;margin-bottom:20px}');
+  p.push('.compose h2{font-family:"Fraunces",serif;font-size:18px;color:#92400e;margin-bottom:16px}');
+  p.push('.fg{margin-bottom:14px}');
+  p.push('.fg label{display:block;font-weight:600;font-size:13px;margin-bottom:6px;color:#44403c}');
+  p.push('.fg input,.fg select,.fg textarea{width:100%;padding:12px;border:2px solid #e7e5e4;border-radius:10px;font-size:14px;font-family:"DM Sans",sans-serif;outline:none}');
+  p.push('.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:#b45309}');
+  p.push('.fg textarea{min-height:80px;resize:vertical}');
+  // Tabs
+  p.push('.rtabs{display:flex;gap:6px;margin-bottom:10px}');
+  p.push('.rtabs button{padding:6px 14px;border-radius:20px;border:2px solid #e7e5e4;background:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif}');
+  p.push('.rtabs button.act{background:#92400e;color:#fff;border-color:#92400e}');
+  // Groups
+  p.push('.gbtn{padding:8px 14px;border-radius:10px;border:2px solid #e7e5e4;background:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:"DM Sans",sans-serif;margin:0 6px 6px 0}');
+  p.push('.gbtn.sel{background:#fffbeb;border-color:#b45309;color:#92400e}');
+  // Filter bar
+  p.push('.fbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}');
+  p.push('.fbar select{padding:8px 10px;border:2px solid #e7e5e4;border-radius:8px;font-size:12px;font-family:"DM Sans",sans-serif;background:#fff;outline:none;min-width:100px}');
+  p.push('.fbar input{flex:1;min-width:120px;padding:8px 12px;border:2px solid #e7e5e4;border-radius:8px;font-size:12px;font-family:"DM Sans",sans-serif;outline:none}');
+  // Member list
+  p.push('.mlist{max-height:240px;overflow-y:auto;border:2px solid #e7e5e4;border-radius:10px;background:#fff}');
+  p.push('.mrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f5f5f4;cursor:pointer}');
+  p.push('.mrow:hover{background:#fffbeb}.mrow.sel{background:#fef3c7}');
+  p.push('.mchk{width:18px;height:18px;border-radius:4px;border:2px solid #d6d3d1;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px}');
+  p.push('.mchk.on{background:#92400e;border-color:#92400e;color:#fff}');
+  p.push('.mname{font-weight:600;font-size:13px}.mdtl{font-size:11px;color:#78716c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}');
+  p.push('.scnt{font-size:12px;color:#78716c;margin-top:6px}');
+  // Send button
+  p.push('.btn-send{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:"DM Sans",sans-serif;background:#92400e;color:#fff;margin-top:16px}');
+  p.push('.btn-send:disabled{opacity:0.5;cursor:not-allowed}');
+  // Notification cards
+  p.push('.slabel{font-size:12px;font-weight:700;color:#a8a29e;text-transform:uppercase;letter-spacing:0.06em;margin:20px 0 10px}');
+  p.push('.nc{background:#fff;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f5f5f4;position:relative;animation:fi 0.3s ease both}');
+  p.push('.nc.urg{border-left:4px solid #dc2626}');
+  p.push('.nc h3{font-family:"Fraunces",serif;font-size:15px;font-weight:700;color:#1c1917;margin-bottom:4px;line-height:1.3}');
+  p.push('.nc .msg{font-size:13px;color:#57534e;line-height:1.5}');
+  p.push('.nc .meta{display:flex;gap:12px;margin-top:10px;font-size:11px;color:#a8a29e;flex-wrap:wrap}');
+  p.push('.nc .dbtn{position:absolute;top:12px;right:12px;background:none;border:none;font-size:18px;color:#d6d3d1;cursor:pointer;padding:4px;line-height:1}');
+  p.push('.nc .dbtn:hover{color:#78716c}');
+  p.push('.tbdg{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;margin-right:4px}');
+  p.push('.empty{text-align:center;padding:40px 20px;color:#a8a29e}');
+  p.push('.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.15);display:none}');
+  p.push('.toast.ok{background:#065f46;color:#fff}.toast.err{background:#dc2626;color:#fff}');
+  p.push('@keyframes fi{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}');
+  p.push('</style></head><body>');
+
+  // ── Hero ──
+  p.push('<div class="hero"><div class="curve"></div>');
+  p.push('<h1>&#128276; Notifications</h1>');
+  var heroSub = isSteward ? 'Compose and manage member notifications' : 'Messages from your union steward';
+  p.push('<div class="sub">' + heroSub + '</div>');
+  if (isSteward) {
+    p.push('<div class="badge">&#128737;&#65039; Steward &#183; Compose Access</div>');
+  }
+  p.push('</div>');
+  p.push('<div class="container">');
+
+  // ── Steward Compose Form ──
+  if (isSteward) {
+    p.push('<div class="compose" id="composeForm">');
+    p.push('<h2>&#9997;&#65039; Send Notification</h2>');
+
+    // Recipient section
+    p.push('<div class="fg">');
+    p.push('<label>To</label>');
+    p.push('<div class="rtabs" id="rtabs">');
+    p.push('<button class="act" onclick="switchTab(0)">Groups</button>');
+    p.push('<button onclick="switchTab(1)">Individuals</button>');
+    p.push('</div>');
+
+    // Groups tab
+    p.push('<div id="grpTab">');
+    p.push('<button class="gbtn sel" onclick="selGrp(this,\'All Members\')">&#128226; All Members</button>');
+    p.push('<button class="gbtn" onclick="selGrp(this,\'All Stewards\')">&#128737;&#65039; All Stewards</button>');
+    p.push('<button class="gbtn" onclick="selGrp(this,\'Everyone\')">&#127760; Everyone</button>');
+    p.push('</div>');
+
+    // Individuals tab
+    p.push('<div id="indTab" style="display:none">');
+    p.push('<div class="fbar">');
+    p.push('<input type="text" id="mSearch" placeholder="Search name..." oninput="filterM()">');
+    p.push('<select id="fLoc" onchange="filterM()"><option value="">All Locations</option></select>');
+    p.push('<select id="fDept" onchange="filterM()"><option value="">All Depts</option></select>');
+    p.push('<select id="fTitle" onchange="filterM()"><option value="">All Titles</option></select>');
+    p.push('</div>');
+    p.push('<div class="mlist" id="mList"></div>');
+    p.push('<div class="scnt" id="sCnt">0 selected</div>');
+    p.push('</div>');
+    p.push('</div>');
+
+    // Type + Priority row
+    p.push('<div style="display:flex;gap:10px">');
+    p.push('<div class="fg" style="flex:1"><label>Type</label>');
+    p.push('<select id="nType"><option>Steward Message</option><option>Announcement</option><option>Deadline</option><option>System</option></select></div>');
+    p.push('<div class="fg" style="flex:1"><label>Priority</label>');
+    p.push('<select id="nPri"><option>Normal</option><option>Urgent</option></select></div>');
+    p.push('</div>');
+
+    // Title, Message, Expires
+    p.push('<div class="fg"><label>Title</label><input type="text" id="nTitle" placeholder="Short headline..."></div>');
+    p.push('<div class="fg"><label>Message</label><textarea id="nMsg" placeholder="Notification body..."></textarea></div>');
+    p.push('<div class="fg"><label>Expires (blank = manual archive only)</label><input type="date" id="nExp"></div>');
+    p.push('<button class="btn-send" id="sendBtn" onclick="doSend()">Send Notification</button>');
+    p.push('</div>'); // end compose
+  }
+
+  // ── Notification List ──
+  p.push('<div class="slabel">Your Notifications</div>');
+  p.push('<div id="nList"></div>');
+  p.push('</div>'); // end container
+  p.push('<div id="toast" class="toast"></div>');
+
+  // ── JavaScript ──
+  p.push('<script>');
+  p.push('var UE="' + userEmail.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '";');
+  p.push('var UR="' + userRole + '";');
+  p.push('var UN="' + userName.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '";');
+  p.push('var IS=' + String(isSteward) + ';');
+  p.push('var notifs=' + notifJson + ';');
+  p.push('var allM=' + recipientJson + ';');
+  p.push('var rMode="groups";');
+  p.push('var selGroup="All Members";');
+  p.push('var selMems={};');
+
+  // Render notifications
+  p.push('function renderN(){');
+  p.push('var el=document.getElementById("nList");');
+  p.push('if(!notifs||!notifs.length){');
+  p.push('el.innerHTML=\'<div class="empty"><div style="font-size:48px;margin-bottom:12px;opacity:0.4">\\ud83d\\udd14</div><div style="font-family:Fraunces,serif;font-size:18px;font-weight:700;color:#78716c;margin-bottom:4px">All caught up!</div><div>No new notifications</div></div>\';');
+  p.push('return;}');
+  p.push('var tc={"Steward Message":{bg:"#eff6ff",c:"#1e40af"},"Announcement":{bg:"#f0fdf4",c:"#065f46"},"Deadline":{bg:"#fef2f2",c:"#dc2626"},"System":{bg:"#faf5ff",c:"#7c3aed"}};');
+  p.push('var h="";');
+  p.push('for(var i=0;i<notifs.length;i++){');
+  p.push('var n=notifs[i];var t=tc[n.type]||tc.System;var u=n.priority==="Urgent"?" urg":"";');
+  p.push('h+=\'<div class="nc\'+u+\'" style="animation-delay:\'+i*0.06+\'s" id="n-\'+n.id+\'">\';');
+  p.push('h+=\'<button class="dbtn" onclick="dismissN(\\x27\'+n.id+\'\\x27)">\\u2715</button>\';');
+  p.push('h+=\'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">\';');
+  p.push('h+=\'<div><span class="tbdg" style="background:\'+t.bg+\';color:\'+t.c+\'">\'+n.type+\'</span>\';');
+  p.push('if(n.priority==="Urgent")h+=\'<span class="tbdg" style="background:#fef2f2;color:#dc2626">URGENT</span>\';');
+  p.push('h+=\'</div><span style="font-size:11px;color:#a8a29e">\'+n.createdDate+\'</span></div>\';');
+  p.push('h+=\'<h3>\'+n.title+\'</h3>\';');
+  p.push('h+=\'<div class="msg">\'+n.message+\'</div>\';');
+  p.push('h+=\'<div class="meta">\';');
+  p.push('if(n.sentBy)h+=\'<span>From: \'+n.sentBy+\'</span>\';');
+  p.push('if(n.expiresDate)h+=\'<span>Expires: \'+n.expiresDate+\'</span>\';');
+  p.push('h+=\'</div></div>\';');
+  p.push('}');
+  p.push('el.innerHTML=h;}');
+
+  // Dismiss
+  p.push('function dismissN(id){');
+  p.push('var c=document.getElementById("n-"+id);');
+  p.push('if(c){c.style.opacity="0.3";c.style.pointerEvents="none";}');
+  p.push('google.script.run.withSuccessHandler(function(r){');
+  p.push('if(r&&r.success){if(c)c.remove();');
+  p.push('notifs=notifs.filter(function(n){return n.id!==id;});');
+  p.push('if(!notifs.length)renderN();showT("Dismissed","ok");}');
+  p.push('else{if(c){c.style.opacity="1";c.style.pointerEvents="auto";}');
+  p.push('showT((r&&r.message)||"Failed","err");}');
+  p.push('}).withFailureHandler(function(err){');
+  p.push('if(c){c.style.opacity="1";c.style.pointerEvents="auto";}');
+  p.push('showT("Error: "+err,"err");');
+  p.push('}).dismissWebAppNotification(id,UE);}');
+
+  // Steward-only functions
+  if (isSteward) {
+    // Switch tabs
+    p.push('function switchTab(idx){');
+    p.push('rMode=idx===0?"groups":"individual";');
+    p.push('document.getElementById("grpTab").style.display=idx===0?"block":"none";');
+    p.push('document.getElementById("indTab").style.display=idx===1?"block":"none";');
+    p.push('var btns=document.querySelectorAll("#rtabs button");');
+    p.push('btns[0].className=idx===0?"act":"";btns[1].className=idx===1?"act":"";');
+    p.push('if(idx===1&&!document.getElementById("mList").innerHTML)renderML();}');
+
+    // Select group
+    p.push('function selGrp(btn,grp){');
+    p.push('var all=document.querySelectorAll(".gbtn");');
+    p.push('for(var i=0;i<all.length;i++)all[i].className="gbtn";');
+    p.push('btn.className="gbtn sel";selGroup=grp;}');
+
+    // Build filter dropdowns
+    p.push('function buildFilters(){');
+    p.push('var locs={},depts={},titles={};');
+    p.push('for(var i=0;i<allM.length;i++){');
+    p.push('if(allM[i].location)locs[allM[i].location]=1;');
+    p.push('if(allM[i].department)depts[allM[i].department]=1;');
+    p.push('if(allM[i].jobTitle)titles[allM[i].jobTitle]=1;}');
+    p.push('var addOpts=function(selId,obj){var s=document.getElementById(selId);var ks=Object.keys(obj).sort();');
+    p.push('for(var j=0;j<ks.length;j++){var o=document.createElement("option");o.value=ks[j];o.textContent=ks[j];s.appendChild(o);}};');
+    p.push('addOpts("fLoc",locs);addOpts("fDept",depts);addOpts("fTitle",titles);}');
+
+    // Render member list
+    p.push('function renderML(){');
+    p.push('var q=(document.getElementById("mSearch").value||"").toLowerCase();');
+    p.push('var loc=document.getElementById("fLoc").value;');
+    p.push('var dept=document.getElementById("fDept").value;');
+    p.push('var title=document.getElementById("fTitle").value;');
+    p.push('var fl=[];');
+    p.push('for(var i=0;i<allM.length;i++){');
+    p.push('var m=allM[i];');
+    p.push('if(q&&m.name.toLowerCase().indexOf(q)===-1&&m.email.toLowerCase().indexOf(q)===-1)continue;');
+    p.push('if(loc&&m.location!==loc)continue;');
+    p.push('if(dept&&m.department!==dept)continue;');
+    p.push('if(title&&m.jobTitle!==title)continue;');
+    p.push('fl.push(m);}');
+    p.push('var el=document.getElementById("mList");');
+    p.push('if(!fl.length){el.innerHTML=\'<div style="padding:20px;text-align:center;color:#a8a29e">No members match</div>\';return;}');
+    p.push('var h="";');
+    p.push('for(var j=0;j<fl.length;j++){');
+    p.push('var m=fl[j];var s=!!selMems[m.email];');
+    p.push('h+=\'<div class="mrow\'+(s?" sel":"")+\'" onclick="togM(\\x27\'+m.email+\'\\x27,\\x27\'+m.name.replace(/\\x27/g,"\\\\\\x27")+\'\\x27)">\';');
+    p.push('h+=\'<div class="mchk\'+(s?" on":"")+"\">"+(s?"\\u2713":"")+"</div>";');
+    p.push('h+=\'<div style="flex:1;min-width:0"><div class="mname">\'+m.name+\'</div>\';');
+    p.push('h+=\'<div class="mdtl">\'+m.email;');
+    p.push('if(m.location)h+=" \\u00b7 "+m.location;');
+    p.push('if(m.department)h+=" \\u00b7 "+m.department;');
+    p.push('h+=\'</div></div></div>\';}');
+    p.push('el.innerHTML=h;updCnt();}');
+
+    p.push('function filterM(){renderML();}');
+
+    // Toggle member
+    p.push('function togM(email,name){');
+    p.push('if(selMems[email])delete selMems[email];');
+    p.push('else selMems[email]=name;');
+    p.push('renderML();}');
+
+    p.push('function updCnt(){');
+    p.push('var c=Object.keys(selMems).length;');
+    p.push('document.getElementById("sCnt").textContent=c+" selected";}');
+
+    // Send notification
+    p.push('function doSend(){');
+    p.push('var title=document.getElementById("nTitle").value.trim();');
+    p.push('var msg=document.getElementById("nMsg").value.trim();');
+    p.push('if(!title||!msg){showT("Title and message required","err");return;}');
+    p.push('var btn=document.getElementById("sendBtn");');
+    p.push('btn.disabled=true;btn.textContent="Sending...";');
+    p.push('var recips=[];');
+    p.push('if(rMode==="groups"){recips=[selGroup];}');
+    p.push('else{recips=Object.keys(selMems);');
+    p.push('if(!recips.length){showT("Select at least one recipient","err");btn.disabled=false;btn.textContent="Send Notification";return;}}');
+    p.push('var sent=0;var total=recips.length;var errs=[];');
+    p.push('for(var i=0;i<recips.length;i++){');
+    p.push('(function(recip){');
+    p.push('google.script.run.withSuccessHandler(function(r){');
+    p.push('sent++;if(!r||!r.success)errs.push(recip);');
+    p.push('if(sent===total){btn.disabled=false;btn.textContent="Send Notification";');
+    p.push('if(errs.length){showT(errs.length+" failed","err");}');
+    p.push('else{showT("Sent to "+total+" recipient"+(total>1?"s":""),"ok");');
+    p.push('document.getElementById("nTitle").value="";');
+    p.push('document.getElementById("nMsg").value="";');
+    p.push('document.getElementById("nExp").value="";');
+    p.push('selMems={};updCnt();renderML();refreshN();}}');
+    p.push('}).withFailureHandler(function(err){');
+    p.push('sent++;errs.push(recip);');
+    p.push('if(sent===total){btn.disabled=false;btn.textContent="Send Notification";showT("Error: "+err,"err");}');
+    p.push('}).sendWebAppNotification({');
+    p.push('recipient:recip,');
+    p.push('type:document.getElementById("nType").value,');
+    p.push('title:title,message:msg,');
+    p.push('priority:document.getElementById("nPri").value,');
+    p.push('expiresDate:document.getElementById("nExp").value,');
+    p.push('senderName:UN});');
+    p.push('})(recips[i]);}');
+    p.push('}');
+
+    // Refresh after send
+    p.push('function refreshN(){');
+    p.push('google.script.run.withSuccessHandler(function(data){');
+    p.push('notifs=data||[];renderN();');
+    p.push('}).getWebAppNotifications(UE,UR);}');
+  }
+
+  // Toast
+  p.push('function showT(msg,type){');
+  p.push('var t=document.getElementById("toast");');
+  p.push('t.className="toast "+(type||"ok");');
+  p.push('t.textContent=msg;t.style.display="block";');
+  p.push('setTimeout(function(){t.style.display="none";},3000);}');
+
+  // Init
+  p.push('renderN();');
+  if (isSteward) {
+    p.push('buildFilters();');
+  }
+  p.push('</script></body></html>');
+
+  return p.join('\n');
+}
+
+
+// ============================================================================
+// SOURCE: 06_Maintenance.gs (3530 lines)
 // ============================================================================
 
 /**
@@ -22788,10 +23576,10 @@ function DIAGNOSE_SETUP() {
     var invalidDates = 0;
 
     for (var i = 1; i < data.length; i++) {
-      var memberId = data[i][GRIEVANCE_COLUMNS.MEMBER_ID];
-      var filingDate = data[i][GRIEVANCE_COLUMNS.FILING_DATE];
+      var memberId = data[i][GRIEVANCE_COLS.MEMBER_ID - 1];
+      var filingDate = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
 
-      if (!memberId && data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID]) {
+      if (!memberId && data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1]) {
         orphanedGrievances++;
       }
 
@@ -22914,6 +23702,13 @@ function REPAIR_DASHBOARD() {
   } catch (error) {
     Logger.log('Error in REPAIR_DASHBOARD: ' + error.message);
     ui.alert('❌ Error', 'Repair failed: ' + error.message, ui.ButtonSet.OK);
+
+    logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
+      action: 'REPAIR_DASHBOARD',
+      status: 'FAILED',
+      error: error.message,
+      runBy: Session.getActiveUser().getEmail()
+    });
   }
 }
 
@@ -22926,8 +23721,8 @@ function removeDeprecatedTabs() {
   var deprecatedSheets = [
     'Dashboard_OLD',
     'Member List_OLD',
-    'BACKUP_',
-    'TEST_'
+    'DEPRECATED_BACKUP_',
+    'DEPRECATED_TEST_'
   ];
 
   var removed = [];
@@ -23639,7 +24434,15 @@ function saveUndoHistory(history) {
     history.currentIndex = Math.min(history.currentIndex, history.actions.length);
   }
 
-  props.setProperty(UNDO_CONFIG.STORAGE_KEY, JSON.stringify(history));
+  // UserProperties has a 9KB per-property limit; progressively trim if too large
+  var json = JSON.stringify(history);
+  while (json.length > 8000 && history.actions.length > 1) {
+    history.actions.shift();
+    history.currentIndex = Math.max(0, history.currentIndex - 1);
+    json = JSON.stringify(history);
+  }
+
+  props.setProperty(UNDO_CONFIG.STORAGE_KEY, json);
 }
 
 /**
@@ -23890,6 +24693,35 @@ function restoreFromSnapshot(snapshot) {
     throw new Error('Grievance Log not found');
   }
 
+  // Validate snapshot column structure matches current sheet
+  if (snapshot.data && snapshot.data.length > 0 && sheet.getLastColumn() > 0) {
+    if (snapshot.data[0].length !== sheet.getLastColumn()) {
+      throw new Error('Snapshot column count (' + snapshot.data[0].length +
+        ') does not match current sheet (' + sheet.getLastColumn() + ')');
+    }
+  }
+
+  // Confirm with user before proceeding
+  var ui = SpreadsheetApp.getUi();
+  var response = ui.alert(
+    'Restore Snapshot',
+    'This will replace all current grievance data with the snapshot from ' +
+    snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
+    ui.ButtonSet.YES_NO
+  );
+  if (response !== ui.Button.YES) {
+    return;
+  }
+
+  // Create a backup of current data before restoring
+  try {
+    var preRestoreBackup = createGrievanceSnapshot();
+    preRestoreBackup.label = 'Pre-Restore Backup';
+    Logger.log('Pre-restore backup created at ' + preRestoreBackup.timestamp);
+  } catch (_backupErr) {
+    Logger.log('Warning: Could not create pre-restore backup: ' + _backupErr.message);
+  }
+
   // Clear existing data (keep header)
   if (sheet.getLastRow() > 1) {
     sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clear();
@@ -23966,9 +24798,9 @@ function showUndoRedoPanel() {
 
         return '<tr>' +
           '<td>' + idx + '</td>' +
-          '<td><span class="badge ' + a.type.toLowerCase() + '">' + a.type + '</span></td>' +
-          '<td>' + a.description + '</td>' +
-          '<td style="font-size:12px;color:#666">' + time + '</td>' +
+          '<td><span class="badge ' + escapeHtml(a.type.toLowerCase()) + '">' + escapeHtml(a.type) + '</span></td>' +
+          '<td>' + escapeHtml(a.description) + '</td>' +
+          '<td style="font-size:12px;color:#666">' + escapeHtml(time) + '</td>' +
           '<td>' + (canUndo ? '<button onclick="undo(' + (idx - 1) + ')">↩️</button>' : '') + '</td>' +
           '</tr>';
       }).join('');
@@ -24017,7 +24849,7 @@ function showUndoRedoPanel() {
     'function performRedo(){google.script.run.withSuccessHandler(function(){location.reload()}).withFailureHandler(function(e){alert("Error: "+e.message)}).redoLastAction()}' +
     'function undo(i){google.script.run.withSuccessHandler(function(){location.reload()}).undoToIndex(i)}' +
     'function clearHistory(){if(confirm("Clear all history?")){google.script.run.withSuccessHandler(function(){location.reload()}).clearUndoHistory()}}' +
-    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");window.open(url,"_blank")}).exportUndoHistoryToSheet()}' +
+    'function exportHistory(){google.script.run.withSuccessHandler(function(url){alert("Exported!");if(/^https:\\/\\/docs\\.google\\.com\\//.test(url))window.open(url,"_blank");else alert("Invalid URL")}).exportUndoHistoryToSheet()}' +
     '</script></body></html>'
   ).setWidth(800).setHeight(600);
 
@@ -24047,69 +24879,10 @@ function showUndoRedoPanel() {
  * @requires Constants.gs
  */
 
-// ============================================================================
-// SYSTEM DIAGNOSTICS
-// ============================================================================
-
-/**
- * Runs a complete diagnostic check on the dashboard setup
- * Checks all required sheets, columns, formulas, and configurations
- * @return {Object} Diagnostic results
- */
-
-// ============================================================================
-// MODAL DIAGNOSTICS (v4.2.2)
-// ============================================================================
-
-/**
- * Diagnoses why modals might not be loading data
- * Checks sheet names, structure, data, and simulates modal data loading
- * @return {Object} Diagnostic results
- */
-
-/**
- * Shows modal diagnostic results in a dialog
- */
-
-/**
- * Shows diagnostic results in a dialog
- */
-
-// ============================================================================
-// DASHBOARD REPAIR
-// ============================================================================
-
-/**
- * Repairs common dashboard issues
- * - Creates missing sheets
- * - Repairs hidden calculation sheets
- * - Fixes data quality issues
- * @return {Object} Repair results
- */
-
-/**
- * Removes deprecated tabs from the spreadsheet
- * Currently removes:
- * - 💼 Dashboard (deprecated in v4.3.2 - use modal dashboards instead)
- *
- * Run this function to clean up legacy tabs that are no longer needed.
- * @return {Object} Results with list of removed tabs
- */
-
-/**
- * Sets up basic structure for a sheet based on type
- * @param {Sheet} sheet - The sheet to set up
- * @param {string} sheetType - The type key from SHEET_NAMES
- */
-
-/**
- * Shows the repair dialog
- */
-
-// ============================================================================
-// Note: verifyHiddenSheets() and fixDataQualityIssues() are defined in
-// HiddenSheets.gs and DataIntegrity.gs which contain comprehensive implementations.
-// ============================================================================
+// Note: DIAGNOSE_SETUP(), REPAIR_DASHBOARD(), removeDeprecatedTabs(), and
+// showRepairDialog() implementations are defined earlier in this file.
+// verifyHiddenSheets() and fixDataQualityIssues() are in HiddenSheets.gs
+// and DataIntegrity.gs respectively.
 
 // ============================================================================
 // AUDIT LOGGING
@@ -24211,14 +24984,17 @@ function getRecentAuditLogs(count) {
 
   if (numRows <= 0) return [];
 
-  const data = auditSheet.getRange(startRow, 1, numRows, EVENT_AUDIT_COLS.SESSION_ID).getValues();
+  // Read all columns including Integrity Hash
+  var numCols = EVENT_AUDIT_COLS.INTEGRITY_HASH;
+  const data = auditSheet.getRange(startRow, 1, numRows, numCols).getValues();
 
   return data.map(row => ({
     timestamp: row[EVENT_AUDIT_COLS.TIMESTAMP - 1],
     eventType: row[EVENT_AUDIT_COLS.EVENT_TYPE - 1],
     user: row[EVENT_AUDIT_COLS.USER - 1],
     details: row[EVENT_AUDIT_COLS.DETAILS - 1],
-    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1]
+    sessionId: row[EVENT_AUDIT_COLS.SESSION_ID - 1],
+    integrityHash: row[EVENT_AUDIT_COLS.INTEGRITY_HASH - 1] || ''
   })).reverse();
 }
 
@@ -24307,10 +25083,11 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  // Try canonical SHEETS.GRIEVANCE_LOG first, fall back to SHEET_NAMES.GRIEVANCE_TRACKER
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) || ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
 
   if (!sheet) {
-    return errorResponse('Grievance Tracker not found');
+    return errorResponse('Grievance Log/Tracker not found');
   }
 
   const lastRow = sheet.getLastRow();
@@ -24374,7 +25151,7 @@ function createWeeklySnapshot() {
     } catch (createErr) {
       ui.alert('Archive Folder Error',
         'Could not auto-create archive folder: ' + createErr.message + '\n\n' +
-        'You can manually set the Archive Folder ID in the Config sheet (column AU).',
+        'You can manually set the Archive Folder ID in the Config sheet (column AS).',
         ui.ButtonSet.OK);
       return;
     }
@@ -24384,7 +25161,7 @@ function createWeeklySnapshot() {
     if (!folder) {
       folder = DriveApp.getFolderById(archiveFolderId);
     }
-    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd_HH-mm');
+    var date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HH-mm');
     var snapshotName = 'SNAPSHOT_' + date;
 
     // Create the copy
@@ -24426,7 +25203,7 @@ function createAutomatedSnapshot() {
 
   try {
     var folder = DriveApp.getFolderById(archiveFolderId);
-    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
+    var date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     var snapshotName = 'AUTO_SNAPSHOT_' + date;
 
     DriveApp.getFileById(ss.getId()).makeCopy(snapshotName, folder);
@@ -24486,12 +25263,12 @@ function navigateToAuditLog() {
       .setFontWeight('bold')
       .setBackground(COLORS.CARD_DARK_BG)
       .setFontColor(COLORS.CARD_DARK_TEXT);
-    auditSheet.hideSheet();
+    setSheetVeryHidden_(auditSheet);
   }
 
   // Unhide temporarily and activate
   if (auditSheet.isSheetHidden()) {
-    auditSheet.showSheet();
+    setSheetVisible_(auditSheet);
   }
   auditSheet.activate();
 
@@ -24931,7 +25708,10 @@ function checkDuplicateMemberId(memberId) {
 
   if (!memberSheet) return { exists: false, row: null };
 
-  var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, memberSheet.getLastRow() - 1, 1).getValues();
+  var lastRow = memberSheet.getLastRow();
+  if (lastRow < 2) return { exists: false, row: null };
+
+  var memberIds = memberSheet.getRange(2, MEMBER_COLS.MEMBER_ID, lastRow - 1, 1).getValues();
 
   for (var i = 0; i < memberIds.length; i++) {
     if (memberIds[i][0] === memberId) {
@@ -24995,6 +25775,10 @@ function findOrphanedGrievances() {
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
   if (!memberSheet || !grievanceSheet) {
+    return [];
+  }
+
+  if (memberSheet.getLastRow() < 2 || grievanceSheet.getLastRow() < 2) {
     return [];
   }
 
@@ -25121,7 +25905,7 @@ function calculateStewardWorkload() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
-  if (!grievanceSheet) return [];
+  if (!grievanceSheet || grievanceSheet.getLastRow() <= 1) return [];
 
   var grievanceData = grievanceSheet.getRange(2, 1, grievanceSheet.getLastRow() - 1, GRIEVANCE_COLS.STEWARD).getValues();
 
@@ -25222,9 +26006,9 @@ function showStewardWorkloadDashboard() {
     var loadColor = statusClass === 'high' ? '#DC2626' : (statusClass === 'medium' ? '#F59E0B' : '#059669');
 
     html += '<tr class="' + statusClass + '">' +
-      '<td><strong>' + s.name + '</strong></td>' +
-      '<td>' + s.activeCount + '</td>' +
-      '<td>' + s.urgentCount + '</td>' +
+      '<td><strong>' + escapeHtml(String(s.name)) + '</strong></td>' +
+      '<td>' + escapeHtml(String(s.activeCount)) + '</td>' +
+      '<td>' + escapeHtml(String(s.urgentCount)) + '</td>' +
       '<td>' +
         '<div class="load-bar"><div class="load-fill" style="width: ' + loadPct + '%; background: ' + loadColor + ';"></div></div>' +
         '<small>' + s.loadScore + '</small>' +
@@ -25254,6 +26038,7 @@ function getStewardWithLowestWorkload() {
   // Also get all stewards from Config (some may have 0 cases)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet || configSheet.getLastRow() <= 1) return null;
   var stewardList = configSheet.getRange(3, CONFIG_COLS.STEWARDS, 50, 1).getValues()
     .filter(function(row) { return row[0] !== ''; })
     .map(function(row) { return row[0]; });
@@ -25327,6 +26112,8 @@ function findMissingConfigValues() {
     var missing = {};
     dataValues.forEach(function(row, index) {
       var value = row[0];
+      // Skip pure-numeric values — they're data-entry errors, not text labels
+      if (value && /^\d+$/.test(String(value).trim())) return;
       if (value && !validSet[value] && !missing[value]) {
         missing[value] = {
           field: field.name,
@@ -25386,7 +26173,7 @@ function showConfigHealthCheck() {
   html += '<table><tr><th>Field</th><th>Missing Value</th><th>Example Row</th></tr>';
 
   report.missingValues.slice(0, 20).forEach(function(item) {
-    html += '<tr><td>' + item.field + '</td><td><strong>' + item.value + '</strong></td><td>' + item.exampleRow + '</td></tr>';
+    html += '<tr><td>' + escapeHtml(String(item.field)) + '</td><td><strong>' + escapeHtml(String(item.value)) + '</strong></td><td>' + escapeHtml(String(item.exampleRow)) + '</td></tr>';
   });
 
   if (report.missingValues.length > 20) {
@@ -25415,9 +26202,6 @@ function autoFixMissingConfigValues() {
     return;
   }
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-
   // Group by config column
   var byColumn = {};
   report.autoFixable.forEach(function(item) {
@@ -25427,23 +26211,13 @@ function autoFixMissingConfigValues() {
     byColumn[item.configCol].push(item.value);
   });
 
-  // Add values to each column
+  // Add values to each column using the canonical write path
   Object.keys(byColumn).forEach(function(colStr) {
     var col = parseInt(colStr);
     var values = byColumn[col];
 
-    // Find next empty row in this column
-    var colData = configSheet.getRange(3, col, 100, 1).getValues();
-    var nextRow = 3;
-    for (var i = 0; i < colData.length; i++) {
-      if (colData[i][0] !== '') {
-        nextRow = i + 4;
-      }
-    }
-
-    // Add values
-    values.forEach(function(value, index) {
-      configSheet.getRange(nextRow + index, col).setValue(value);
+    values.forEach(function(value) {
+      addToConfigDropdown_(col, value);
     });
   });
 
@@ -25476,7 +26250,7 @@ function logIntegrityEvent(eventType, details, additionalInfo) {
   // Create audit log if it doesn't exist
   if (!auditSheet) {
     auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-    auditSheet.hideSheet();
+    setSheetVeryHidden_(auditSheet);
 
     // Set up headers
     var headers = ['Timestamp', 'User Email', 'Event Type', 'Details', 'Additional Info', 'Spreadsheet ID'];
@@ -25586,10 +26360,10 @@ function showAuditLogViewer() {
                      (eventType.indexOf('CONFIG') !== -1 ? 'config' : ''));
 
     html += '<tr>' +
-      '<td>' + timestamp + '</td>' +
-      '<td>' + user + '</td>' +
-      '<td><span class="' + eventClass + '">' + eventType + '</span></td>' +
-      '<td>' + details.substring(0, 100) + (details.length > 100 ? '...' : '') + '</td>' +
+      '<td>' + escapeHtml(String(timestamp)) + '</td>' +
+      '<td>' + escapeHtml(String(user)) + '</td>' +
+      '<td><span class="' + eventClass + '">' + escapeHtml(String(eventType)) + '</span></td>' +
+      '<td>' + escapeHtml(String(details).substring(0, 100)) + (details.length > 100 ? '...' : '') + '</td>' +
       '</tr>';
   });
 
@@ -25627,7 +26401,7 @@ function archiveClosedGrievances(daysOld) {
 
   if (!archiveSheet) {
     archiveSheet = ss.insertSheet(archiveSheetName);
-    archiveSheet.hideSheet();
+    setSheetVeryHidden_(archiveSheet);
 
     // Copy headers
     var headers = grievanceSheet.getRange(1, 1, 1, grievanceSheet.getLastColumn()).getValues();
@@ -25670,9 +26444,18 @@ function archiveClosedGrievances(daysOld) {
     .setValues(rowsToArchive);
 
   // Delete from main sheet (in reverse order to maintain row indices)
+  var failedDeletes = [];
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
-    grievanceSheet.deleteRow(rowIndex);
+    try {
+      grievanceSheet.deleteRow(rowIndex);
+    } catch (deleteErr) {
+      failedDeletes.push(rowIndex);
+      Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
+    }
   });
+  if (failedDeletes.length > 0) {
+    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedDeletes.join(', '));
+  }
 
   // Log the archive operation
   logIntegrityEvent('AUTO_ARCHIVE',
@@ -25741,6 +26524,10 @@ function restoreFromArchive(grievanceIds) {
 
   if (!archiveSheet || !grievanceSheet) {
     return { restored: 0, error: 'Required sheets not found' };
+  }
+
+  if (archiveSheet.getLastRow() <= 1) {
+    return { restored: 0 };
   }
 
   var archiveData = archiveSheet.getRange(2, 1, archiveSheet.getLastRow() - 1, archiveSheet.getLastColumn()).getValues();
@@ -26196,7 +26983,7 @@ var VALIDATION_MESSAGES = {
 
 
 // ============================================================================
-// SOURCE: 07_DevTools.gs (2963 lines)
+// SOURCE: 07_DevTools.gs (3083 lines)
 // ============================================================================
 
 /**
@@ -26426,7 +27213,7 @@ function seedConfigData() {
     return;
   }
 
-  // Ensure Config sheet has enough columns (AZ = column 52 is the last column)
+  // Ensure Config sheet has enough columns (AX = column 50 = MOBILE_DASHBOARD_URL)
   ensureMinimumColumns(sheet, CONFIG_COLS.MOBILE_DASHBOARD_URL);
 
   // Data row start (after section headers row 1 and column headers row 2)
@@ -26452,10 +27239,7 @@ function seedConfigData() {
   // Office Days (Column D) - PRESET
   if (seedIfEmpty(CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS)) seededAny = true;
 
-  // Yes/No (Column E) - PRESET
-  if (seedIfEmpty(CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO)) seededAny = true;
-
-  // Grievance Status (Column J) - PRESET
+  // Grievance Status (Column I) - PRESET
   if (seedIfEmpty(CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS)) seededAny = true;
 
   // Grievance Step (Column K) - PRESET
@@ -26528,13 +27312,6 @@ function seedConfigData() {
   if (seedIfEmpty(CONFIG_COLS.STEWARD_COMMITTEES, [
     'Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
     'Political Action Committee', 'Membership Committee', 'Executive Board'
-  ])) seededAny = true;
-
-  // Home Towns (Column AF)
-  if (seedIfEmpty(CONFIG_COLS.HOME_TOWNS, [
-    'Boston', 'Worcester', 'Springfield', 'Cambridge', 'Lowell', 'Brockton',
-    'Quincy', 'New Bedford', 'Fall River', 'Lawrence', 'Framingham', 'Somerville',
-    'Lynn', 'Haverhill', 'Malden', 'Medford', 'Waltham', 'Newton', 'Brookline'
   ])) seededAny = true;
 
   if (seededAny) {
@@ -26953,22 +27730,153 @@ function seedSatisfactionData() {
 
 /**
  * Restore Config dropdowns AND re-apply dropdown validations to Member Directory and Grievance Log
- * This is the full restore function for use after nuking or when dropdowns are missing
+ * This is the full restore function for use after nuking or when dropdowns are missing.
+ *
+ * Three-phase restore:
+ *   1. seedConfigData()              – populate empty Config columns with defaults
+ *   2. restoreConfigFromSheetData_() – scan Member Directory & Grievance Log for values
+ *                                      that exist in the data but are missing from Config
+ *   3. setupDataValidations()        – re-apply dropdown validations to both sheets
  */
 function restoreConfigAndDropdowns() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  ss.toast('Restoring Config values...', '🔄 Restoring', 2);
+  ss.toast('Seeding default Config values...', '🔄 Restoring', 2);
 
-  // First, seed the Config values
+  // Phase 1: seed empty Config columns with defaults
   seedConfigData();
+
+  ss.toast('Scanning sheets for missing Config entries...', '🔄 Restoring', 2);
+
+  // Phase 2: restore any values present in Member Directory / Grievance Log
+  // but missing from Config (e.g., deleted during a merge or nuke)
+  restoreConfigFromSheetData_();
 
   ss.toast('Applying dropdown validations...', '🔄 Restoring', 2);
 
-  // Then, re-apply dropdown validations to Member Directory and Grievance Log
+  // Phase 3: re-apply dropdown validations to Member Directory and Grievance Log
   setupDataValidations();
 
   ss.toast('Config and dropdowns restored!', '✅ Success', 3);
+}
+
+/**
+ * Scans Member Directory and Grievance Log for values currently in use in
+ * dropdown/multi-select columns and adds any that are missing from the Config
+ * sheet.  This is the reverse of the live bidirectional sync — it bulk-restores
+ * Config entries after they have been accidentally deleted.
+ * @private
+ */
+function restoreConfigFromSheetData_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var grievanceSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!configSheet) {
+    Logger.log('restoreConfigFromSheetData_: Config sheet not found');
+    return;
+  }
+
+  // Build a combined mapping of { configCol -> [sheetRef, targetCol] } from both
+  // DROPDOWN_MAP and MULTI_SELECT_COLS so we cover every linked column.
+  var mappings = [];
+
+  // Member Directory — single-select dropdowns
+  var memberDD = DROPDOWN_MAP.MEMBER_DIR;
+  for (var i = 0; i < memberDD.length; i++) {
+    mappings.push({ sheet: memberSheet, col: memberDD[i].col, configCol: memberDD[i].configCol });
+  }
+
+  // Member Directory — multi-select columns
+  var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
+  for (var j = 0; j < memberMS.length; j++) {
+    mappings.push({ sheet: memberSheet, col: memberMS[j].col, configCol: memberMS[j].configCol, multi: true });
+  }
+
+  // Grievance Log — single-select dropdowns
+  var grievDD = DROPDOWN_MAP.GRIEVANCE_LOG;
+  for (var k = 0; k < grievDD.length; k++) {
+    if (grievanceSheet) {
+      mappings.push({ sheet: grievanceSheet, col: grievDD[k].col, configCol: grievDD[k].configCol });
+    }
+  }
+
+  // Grievance Log — multi-select columns
+  var grievMS = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+  for (var l = 0; l < grievMS.length; l++) {
+    if (grievanceSheet) {
+      mappings.push({ sheet: grievanceSheet, col: grievMS[l].col, configCol: grievMS[l].configCol, multi: true });
+    }
+  }
+
+  // NOTE: JOB_METADATA_FIELDS fallback was removed here.  Every column in
+  // JOB_METADATA_FIELDS is already covered by DROPDOWN_MAP or MULTI_SELECT_COLS.
+  // The old fallback used JOB_METADATA_FIELDS values that could go stale when
+  // syncColumnMaps() updated column positions, causing data to land in wrong
+  // Config columns.  DROPDOWN_MAP and MULTI_SELECT_COLS are dynamically rebuilt
+  // and are the single source of truth.  See: CLAUDE.md § Config Write Paths.
+
+  var totalRestored = 0;
+
+  // Process each mapping: read unique values from the sheet column, compare
+  // with Config, and add any missing values.
+  for (var p = 0; p < mappings.length; p++) {
+    var map = mappings[p];
+    if (!map.sheet) continue;
+
+    var sheetLastRow = map.sheet.getLastRow();
+    if (sheetLastRow < 2) continue; // No data rows
+
+    // Collect unique non-empty values from the data sheet column
+    var sheetData = map.sheet.getRange(2, map.col, sheetLastRow - 1, 1).getValues();
+    var uniqueValues = {};
+    for (var q = 0; q < sheetData.length; q++) {
+      var cellVal = (sheetData[q][0] || '').toString().trim();
+      if (!cellVal) continue;
+
+      if (map.multi) {
+        // Multi-select columns store comma-separated values
+        var parts = cellVal.split(',');
+        for (var r = 0; r < parts.length; r++) {
+          var part = parts[r].trim();
+          if (part) uniqueValues[part] = true;
+        }
+      } else {
+        uniqueValues[cellVal] = true;
+      }
+    }
+
+    // Get current Config values for this column
+    var existingConfig = getConfigValues(configSheet, map.configCol);
+    var existingSet = {};
+    for (var s = 0; s < existingConfig.length; s++) {
+      existingSet[existingConfig[s].toString().trim()] = true;
+    }
+
+    // Add missing values to Config
+    var missing = [];
+    for (var val in uniqueValues) {
+      if (!existingSet[val]) {
+        missing.push(val);
+      }
+    }
+
+    for (var t = 0; t < missing.length; t++) {
+      addToConfigDropdown_(map.configCol, missing[t]);
+      totalRestored++;
+    }
+  }
+
+  if (totalRestored > 0) {
+    Logger.log('restoreConfigFromSheetData_: restored ' + totalRestored + ' missing Config entries');
+    SpreadsheetApp.getActiveSpreadsheet().toast(
+      'Restored ' + totalRestored + ' entries from sheet data',
+      '🔄 Config Restore', 3
+    );
+  } else {
+    Logger.log('restoreConfigFromSheetData_: no missing entries found');
+  }
 }
 
 /**
@@ -28010,8 +28918,7 @@ function NUKE_CONFIG_DROPDOWNS() {
     CONFIG_COLS.MANAGERS,
     CONFIG_COLS.STEWARDS,
     CONFIG_COLS.STEWARD_COMMITTEES,
-    CONFIG_COLS.GRIEVANCE_COORDINATORS,
-    CONFIG_COLS.HOME_TOWNS
+    CONFIG_COLS.GRIEVANCE_COORDINATORS
   ];
 
   userColumns.forEach(function(col) {
@@ -29164,7 +30071,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (651 lines)
+// SOURCE: 08a_SheetSetup.gs (693 lines)
 // ============================================================================
 
 /**
@@ -29442,7 +30349,7 @@ function setupHiddenSheets(ss) {
     }
     sheet.clear();
     config.setup(sheet);
-    sheet.hideSheet();
+    setSheetVeryHidden_(sheet);
   });
 
   // Self-contained hidden sheet setups (each creates/hides its own sheet)
@@ -29506,6 +30413,21 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
+  // IS_STEWARD and INTEREST_* columns use hardcoded Yes/No validation.
+  // The YES_NO Config column was removed to eliminate contamination risk.
+  // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
+  var yesNoValues = ['Yes', 'No'];
+  var yesNoCols = [MEMBER_COLS.IS_STEWARD, MEMBER_COLS.INTEREST_LOCAL,
+                   MEMBER_COLS.INTEREST_CHAPTER, MEMBER_COLS.INTEREST_ALLIED];
+  var yesNoRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(yesNoValues, true)
+    .setAllowInvalid(true)
+    .build();
+  for (var yn = 0; yn < yesNoCols.length; yn++) {
+    var ynRange = memberSheet.getRange(2, yesNoCols[yn], Math.max(1, memberSheet.getMaxRows() - 1), 1);
+    ynRange.setDataValidation(yesNoRule);
+  }
+
   // Member Directory Validations — driven by MULTI_SELECT_COLS
   var memberMS = MULTI_SELECT_COLS.MEMBER_DIR;
   for (var mm = 0; mm < memberMS.length; mm++) {
@@ -29535,7 +30457,8 @@ function setupDataValidations() {
  */
 function setMemberIdValidation(grievanceSheet, memberSheet) {
   var memberIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
-  var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + '1000');
+  var lastRow = Math.max(memberSheet.getLastRow(), 2);
+  var sourceRange = memberSheet.getRange(memberIdCol + '2:' + memberIdCol + lastRow);
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInRange(sourceRange, true)
@@ -29568,14 +30491,19 @@ function setDropdownValidation(targetSheet, targetCol, configSheet, sourceCol) {
     }
   }
 
-  if (values.length === 0) return; // No values to validate against
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow custom entries for bidirectional sync with Config
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -29600,14 +30528,19 @@ function setMultiSelectValidation(targetSheet, targetCol, configSheet, sourceCol
     }
   }
 
-  if (values.length === 0) return;
+  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
+
+  if (values.length === 0) {
+    // Clear any stale validation so cells don't show errors against an old list
+    targetRange.clearDataValidations();
+    return;
+  }
 
   var rule = SpreadsheetApp.newDataValidation()
     .requireValueInList(values, true)
     .setAllowInvalid(true)  // Allow comma-separated values from multi-select dialog
     .build();
 
-  var targetRange = targetSheet.getRange(2, targetCol, Math.max(1, targetSheet.getMaxRows() - 1), 1);
   targetRange.setDataValidation(rule);
 }
 
@@ -29641,6 +30574,13 @@ function getConfigValues(configSheet, col) {
  * @returns {void}
  */
 function applyMultiSelectValue(value) {
+  // The inline dialog (getMultiSelectHtml) passes an array of selected IDs,
+  // while MultiSelectDialog.html passes a pre-joined comma string.
+  // Normalise to a comma-separated string so all selections are saved.
+  if (Array.isArray(value)) {
+    value = value.join(', ');
+  }
+
   var props = PropertiesService.getUserProperties();
   var row = parseInt(props.getProperty('multiSelectRow'), 10);
   var col = parseInt(props.getProperty('multiSelectCol'), 10);
@@ -29724,50 +30664,59 @@ function onSelectionChangeMultiSelect(e) {
 }
 
 /**
- * Installs the multi-select auto-open trigger
+ * Enables the multi-select auto-open feature.
+ * Uses a user property flag checked by the simple onSelectionChange trigger.
+ * (onSelectionChange cannot be installed via ScriptApp.newTrigger; it only
+ * works as a simple trigger defined in code.)
  * @returns {void}
  */
 function installMultiSelectTrigger() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var triggers = ScriptApp.getUserTriggers(ss);
-
-  // Check if trigger already exists
-  for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'onSelectionChangeMultiSelect') {
-      SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled.');
-      return;
-    }
+  var props = PropertiesService.getUserProperties();
+  if (props.getProperty('multiSelectAutoOpen') === 'true') {
+    SpreadsheetApp.getUi().alert('Multi-Select auto-open is already enabled.');
+    return;
   }
 
-  ScriptApp.newTrigger('onSelectionChangeMultiSelect')
-    .forSpreadsheet(ss)
-    .onChange()
-    .create();
+  props.setProperty('multiSelectAutoOpen', 'true');
+
+  // Clean up any legacy .onChange() triggers that were incorrectly installed
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var triggers = ScriptApp.getUserTriggers(ss);
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'onSelectionChangeMultiSelect') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
 
   SpreadsheetApp.getUi().alert('Multi-Select auto-open has been enabled!\n\n' +
     'The multi-select dialog will now open automatically when you click a multi-select cell.');
 }
 
 /**
- * Removes the multi-select auto-open trigger
+ * Disables the multi-select auto-open feature.
+ * Clears the user property flag and removes any legacy installable triggers.
  * @returns {void}
  */
 function removeMultiSelectTrigger() {
+  var props = PropertiesService.getUserProperties();
+  var wasEnabled = props.getProperty('multiSelectAutoOpen') === 'true';
+  props.deleteProperty('multiSelectAutoOpen');
+  props.deleteProperty('lastMultiSelectCell');
+
+  // Also clean up any legacy .onChange() triggers
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var triggers = ScriptApp.getUserTriggers(ss);
-  var removed = false;
-
   triggers.forEach(function(trigger) {
     if (trigger.getHandlerFunction() === 'onSelectionChangeMultiSelect') {
       ScriptApp.deleteTrigger(trigger);
-      removed = true;
+      wasEnabled = true;
     }
   });
 
-  if (removed) {
+  if (wasEnabled) {
     SpreadsheetApp.getUi().alert('Multi-Select auto-open has been disabled.');
   } else {
-    SpreadsheetApp.getUi().alert('No multi-select trigger was found.');
+    SpreadsheetApp.getUi().alert('Multi-Select auto-open was not enabled.');
   }
 }
 
@@ -30084,13 +31033,13 @@ function advancedSearch(filters) {
         var matches = true;
 
         // Apply department filter
-        if (filters.department && row[MEMBER_COLUMNS.JOB_TITLE] !== filters.department) {
+        if (filters.department && row[MEMBER_COLS.JOB_TITLE - 1] !== filters.department) {
           matches = false;
         }
 
         // Apply name filter
         if (filters.name && matches) {
-          var fullName = (row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME]).toLowerCase();
+          var fullName = (row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1]).toLowerCase();
           if (fullName.indexOf(filters.name.toLowerCase()) === -1) {
             matches = false;
           }
@@ -30098,17 +31047,17 @@ function advancedSearch(filters) {
 
         // Apply steward filter
         if (filters.stewardOnly && matches) {
-          if (!isTruthyValue(row[MEMBER_COLUMNS.IS_STEWARD])) {
+          if (!isTruthyValue(row[MEMBER_COLS.IS_STEWARD - 1])) {
             matches = false;
           }
         }
 
-        if (matches && row[MEMBER_COLUMNS.ID]) {
+        if (matches && row[MEMBER_COLS.MEMBER_ID - 1]) {
           results.push({
-            id: row[MEMBER_COLUMNS.ID],
+            id: row[MEMBER_COLS.MEMBER_ID - 1],
             type: 'member',
-            title: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-            subtitle: row[MEMBER_COLUMNS.JOB_TITLE],
+            title: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
+            subtitle: row[MEMBER_COLS.JOB_TITLE - 1],
             row: i + 1
           });
         }
@@ -30127,31 +31076,31 @@ function advancedSearch(filters) {
         var gMatches = true;
 
         // Apply status filter
-        if (filters.status && gRow[GRIEVANCE_COLUMNS.STATUS] !== filters.status) {
+        if (filters.status && gRow[GRIEVANCE_COLS.STATUS - 1] !== filters.status) {
           gMatches = false;
         }
 
         // Apply date range filter
         if (filters.startDate && gMatches) {
-          var filedDate = gRow[GRIEVANCE_COLUMNS.FILING_DATE];
+          var filedDate = gRow[GRIEVANCE_COLS.DATE_FILED - 1];
           if (filedDate && new Date(filedDate) < new Date(filters.startDate)) {
             gMatches = false;
           }
         }
 
         if (filters.endDate && gMatches) {
-          var endFiledDate = gRow[GRIEVANCE_COLUMNS.FILING_DATE];
+          var endFiledDate = gRow[GRIEVANCE_COLS.DATE_FILED - 1];
           if (endFiledDate && new Date(endFiledDate) > new Date(filters.endDate)) {
             gMatches = false;
           }
         }
 
-        if (gMatches && gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID]) {
+        if (gMatches && gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1]) {
           results.push({
-            id: gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
+            id: gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
             type: 'grievance',
-            title: gRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID],
-            subtitle: gRow[GRIEVANCE_COLUMNS.STATUS] + ' - ' + gRow[GRIEVANCE_COLUMNS.TYPE],
+            title: gRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1],
+            subtitle: gRow[GRIEVANCE_COLS.STATUS - 1] + ' - ' + gRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1],
             row: j + 1
           });
         }
@@ -30174,9 +31123,9 @@ function getDepartmentList() {
     var memberSheet = SpreadsheetApp.getActiveSpreadsheet()
       .getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
-    if (!memberSheet) return [];
+    if (!memberSheet || memberSheet.getLastRow() <= 1) return [];
 
-    var data = memberSheet.getRange(2, MEMBER_COLUMNS.JOB_TITLE + 1,
+    var data = memberSheet.getRange(2, MEMBER_COLS.JOB_TITLE,
       memberSheet.getLastRow() - 1, 1).getValues();
 
     var depts = {};
@@ -30205,11 +31154,11 @@ function getMemberList() {
   var members = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLUMNS.ID]) {
+    if (data[i][MEMBER_COLS.MEMBER_ID - 1]) {
       members.push({
-        id: data[i][MEMBER_COLUMNS.ID],
-        name: data[i][MEMBER_COLUMNS.FIRST_NAME] + ' ' + data[i][MEMBER_COLUMNS.LAST_NAME],
-        department: data[i][MEMBER_COLUMNS.JOB_TITLE]
+        id: data[i][MEMBER_COLS.MEMBER_ID - 1],
+        name: data[i][MEMBER_COLS.FIRST_NAME - 1] + ' ' + data[i][MEMBER_COLS.LAST_NAME - 1],
+        department: data[i][MEMBER_COLS.JOB_TITLE - 1]
       });
     }
   }
@@ -30710,7 +31659,7 @@ function padRight(str, len) {
 
 
 // ============================================================================
-// SOURCE: 08c_FormsAndNotifications.gs (1984 lines)
+// SOURCE: 08c_FormsAndNotifications.gs (2011 lines)
 // ============================================================================
 
 
@@ -30925,7 +31874,7 @@ function sendContactInfoForm() {
   if (response === ui.Button.YES) {
     // Open form in new window
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
     ).setWidth(1).setHeight(1);
     ui.showModalDialog(html, 'Opening form...');
   } else if (response === ui.Button.NO) {
@@ -30934,7 +31883,7 @@ function sendContactInfoForm() {
       '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
       '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
       '<p>Copy this link and share with members:</p>' +
-      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + formUrl + '</textarea>' +
+      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + escapeHtml(formUrl) + '</textarea>' +
       '<br><br>' +
       '<button onclick="copyLink()" style="padding: 8px 16px; cursor: pointer;">Copy to Clipboard</button>' +
       '<span id="copied" style="color: green; margin-left: 10px; display: none;">Copied!</span>' +
@@ -31031,31 +31980,31 @@ function onContactFormSubmit(e) {
       }
       var memberId = generateNameBasedId('M', firstName, lastName, existingIds);
 
-      // Build new row array
+      // Build new row array (escapeForFormula on all user-supplied strings to prevent formula injection)
       var newRow = [];
       newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
-      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
-      newRow[MEMBER_COLS.JOB_TITLE - 1] = jobTitle || '';
-      newRow[MEMBER_COLS.WORK_LOCATION - 1] = workLocation || '';
-      newRow[MEMBER_COLS.UNIT - 1] = unit || '';
-      newRow[MEMBER_COLS.OFFICE_DAYS - 1] = officeDays || '';
-      newRow[MEMBER_COLS.EMAIL - 1] = email || '';
-      newRow[MEMBER_COLS.PHONE - 1] = phone || '';
-      newRow[MEMBER_COLS.PREFERRED_COMM - 1] = preferredComm || '';
-      newRow[MEMBER_COLS.BEST_TIME - 1] = bestTime || '';
-      newRow[MEMBER_COLS.SUPERVISOR - 1] = supervisor || '';
-      newRow[MEMBER_COLS.MANAGER - 1] = manager || '';
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(firstName);
+      newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(lastName);
+      newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(jobTitle || '');
+      newRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(workLocation || '');
+      newRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(unit || '');
+      newRow[MEMBER_COLS.OFFICE_DAYS - 1] = escapeForFormula(officeDays || '');
+      newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(email || '');
+      newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(phone || '');
+      newRow[MEMBER_COLS.PREFERRED_COMM - 1] = escapeForFormula(preferredComm || '');
+      newRow[MEMBER_COLS.BEST_TIME - 1] = escapeForFormula(bestTime || '');
+      newRow[MEMBER_COLS.SUPERVISOR - 1] = escapeForFormula(supervisor || '');
+      newRow[MEMBER_COLS.MANAGER - 1] = escapeForFormula(manager || '');
       newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-      newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = interestLocal || '';
-      newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = interestChapter || '';
-      newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = interestAllied || '';
+      newRow[MEMBER_COLS.INTEREST_LOCAL - 1] = escapeForFormula(interestLocal || '');
+      newRow[MEMBER_COLS.INTEREST_CHAPTER - 1] = escapeForFormula(interestChapter || '');
+      newRow[MEMBER_COLS.INTEREST_ALLIED - 1] = escapeForFormula(interestAllied || '');
       newRow[MEMBER_COLS.HIRE_DATE - 1] = hireDate ? parseFormDate_(hireDate) : '';
-      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = employeeId || '';
-      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = streetAddress || '';
-      newRow[MEMBER_COLS.CITY - 1] = city || '';
-      newRow[MEMBER_COLS.STATE - 1] = state || '';
-      newRow[MEMBER_COLS.ZIP_CODE - 1] = zipCode || '';
+      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(employeeId || '');
+      newRow[MEMBER_COLS.STREET_ADDRESS - 1] = escapeForFormula(streetAddress || '');
+      newRow[MEMBER_COLS.CITY - 1] = escapeForFormula(city || '');
+      newRow[MEMBER_COLS.STATE - 1] = escapeForFormula(state || '');
+      newRow[MEMBER_COLS.ZIP_CODE - 1] = escapeForFormula(zipCode || '');
 
       // Append new member row
       memberSheet.appendRow(newRow);
@@ -31334,7 +32283,7 @@ function getSatisfactionSurveyLink() {
   if (response === ui.Button.YES) {
     // Open form in new window
     var html = HtmlService.createHtmlOutput(
-      '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+      '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
     ).setWidth(1).setHeight(1);
     ui.showModalDialog(html, 'Opening survey...');
   } else if (response === ui.Button.NO) {
@@ -31343,7 +32292,7 @@ function getSatisfactionSurveyLink() {
       '<html><head>' + getMobileOptimizedHead() + '</head><body>' +
       '<div style="font-family: Arial, sans-serif; padding: 10px;">' +
       '<p>Copy this link and share with members:</p>' +
-      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + formUrl + '</textarea>' +
+      '<textarea id="link" style="width: 100%; height: 80px; font-size: 12px;">' + escapeHtml(formUrl) + '</textarea>' +
       '<br><br>' +
       '<button onclick="copyLink()" style="padding: 8px 16px; cursor: pointer;">Copy to Clipboard</button>' +
       '<span id="copied" style="color: green; margin-left: 10px; display: none;">Copied!</span>' +
@@ -31509,6 +32458,13 @@ function onSatisfactionFormSubmit(e) {
     var memberMatch = validateMemberEmail(email);
     var verified = memberMatch ? 'Yes' : 'Pending Review';
     var memberId = memberMatch ? memberMatch.memberId : '';
+
+    // ── Sanitize all user-supplied values to prevent formula injection ──
+    for (var fi = 0; fi < newRow.length; fi++) {
+      if (typeof newRow[fi] === 'string') {
+        newRow[fi] = escapeForFormula(newRow[fi]);
+      }
+    }
 
     // ── Append ANONYMOUS response to Satisfaction sheet ──
     satSheet.appendRow(newRow);
@@ -32114,6 +33070,20 @@ function sendRandomSurveyEmails() {
  * @returns {string} Result message
  */
 function executeSendRandomSurveyEmails(opts) {
+  // Validate parameters from client-side input
+  opts = opts || {};
+  if (typeof opts.subject !== 'string' || opts.subject.length === 0 || opts.subject.length > 200) {
+    throw new Error('Invalid subject: must be a non-empty string of 200 characters or fewer.');
+  }
+  opts.count = parseInt(opts.count, 10);
+  if (isNaN(opts.count) || opts.count < 1 || opts.count > 1000) {
+    throw new Error('Invalid count: must be a positive integer up to 1000.');
+  }
+  opts.excludeDays = parseInt(opts.excludeDays, 10);
+  if (isNaN(opts.excludeDays) || opts.excludeDays < 0) {
+    throw new Error('Invalid excludeDays: must be a non-negative integer.');
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
@@ -32128,14 +33098,16 @@ function executeSendRandomSurveyEmails(opts) {
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;
   var lastNameCol = MEMBER_COLS.LAST_NAME - 1;
 
-  // Get survey email log from Config (if exists)
-  var surveyLogCol = 50; // Column AX for survey email log
+  // Get survey email log from Config (uses dedicated columns, not PDF_FOLDER_ID)
+  var surveyLogCol = CONFIG_COLS.SURVEY_LOG_IDS;
   var surveyLog = {};
   try {
-    var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
-    logData.forEach(function(row) {
-      if (row[0]) surveyLog[row[0]] = new Date(row[1]);
-    });
+    if (configSheet && configSheet.getLastRow() > 1) {
+      var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
+      logData.forEach(function(row) {
+        if (row[0]) surveyLog[row[0]] = new Date(row[1]);
+      });
+    }
   } catch(_e) { /* No log yet */ }
 
   var cutoffDate = new Date();
@@ -32209,11 +33181,13 @@ function executeSendRandomSurveyEmails(opts) {
   });
 
   // Update survey email log - find actual last row in log column to avoid overwriting
-  if (newLogEntries.length > 0) {
-    var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow(), 1).getValues();
+  if (newLogEntries.length > 0 && configSheet) {
     var nextRow = 2;
-    for (var lr = logValues.length - 1; lr >= 0; lr--) {
-      if (logValues[lr][0]) { nextRow = lr + 3; break; }
+    if (configSheet.getLastRow() > 1) {
+      var logValues = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 1).getValues();
+      for (var lr = logValues.length - 1; lr >= 0; lr--) {
+        if (logValues[lr][0]) { nextRow = lr + 3; break; }
+      }
     }
     configSheet.getRange(nextRow, surveyLogCol, newLogEntries.length, 2).setValues(newLogEntries);
   }
@@ -32545,7 +33519,9 @@ function sendSurveyCompletionReminders() {
 
     // Skip if reminder was sent within cooldown period
     if (lastReminder) {
-      var daysSinceReminder = (now - new Date(lastReminder)) / (1000 * 60 * 60 * 24);
+      var reminderDate = new Date(lastReminder);
+      if (isNaN(reminderDate.getTime())) continue;
+      var daysSinceReminder = (now - reminderDate) / (1000 * 60 * 60 * 24);
       if (daysSinceReminder < cooldownDays) {
         skippedCount++;
         continue;
@@ -32753,7 +33729,7 @@ function setupAuditLogSheet() {
   sheet.setColumnWidth(AUDIT_LOG_COLS.ACTION_TYPE, 100);
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   // ═══ SHEET PROTECTION ═══
   // v4.8.1: Audit log now gets vault-style protection (owner-only editing)
@@ -32920,7 +33896,7 @@ function viewAuditLog() {
   }
 
   // Show the hidden sheet temporarily
-  sheet.showSheet();
+  setSheetVisible_(sheet);
   ss.setActiveSheet(sheet);
 
   // Sort by timestamp descending (newest first)
@@ -33162,7 +34138,7 @@ function setupGrievanceCalcSheet() {
   sheet.getRange('G2').setFormula(lastDateFormula);
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   Logger.log('_Grievance_Calc sheet setup complete');
 }
@@ -33384,7 +34360,7 @@ function setupGrievanceFormulasSheet() {
   sheet.getRange('S:S').setNumberFormat('MM/dd/yyyy');
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   Logger.log('_Grievance_Formulas sheet setup complete');
 }
@@ -33441,7 +34417,7 @@ function setupMemberLookupSheet() {
   sheet.getRange('G2').setFormula('=ARRAYFORMULA(IF(A2:A="","",IFERROR(' + vlookupBase + (MEMBER_COLS.ASSIGNED_STEWARD - mIdOffset + 1) + ',FALSE),"")))');
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   Logger.log('_Member_Lookup sheet setup complete');
 }
@@ -33493,7 +34469,7 @@ function setupStewardContactCalcSheet() {
   // Auto-resize columns
   sheet.autoResizeColumns(1, headers.length);
 
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
   Logger.log('_Steward_Contact_Calc sheet setup complete with live formulas');
 }
 
@@ -33563,7 +34539,7 @@ function setupDashboardCalcSheet() {
   sheet.setColumnWidth(2, 100);
   sheet.setColumnWidth(3, 300);
 
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
   Logger.log('_Dashboard_Calc sheet setup complete');
 }
 
@@ -33632,7 +34608,7 @@ function setupStewardPerformanceCalcSheet() {
   // Performance Score (weighted: Win Rate * 0.4 + (100 - Overdue%) * 0.3 + (100 - AvgDays/60*100) * 0.3)
   sheet.getRange('J2').setFormula('=ARRAYFORMULA(IF(A2:A="","",ROUND(F2:F*0.4 + (100-IFERROR(H2:H/C2:C*100,0))*0.3 + MAX(0,100-G2:G/60*100)*0.3,1)))');
 
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
   Logger.log('_Steward_Performance_Calc sheet setup complete');
 }
 
@@ -34324,7 +35300,7 @@ function setupSurveyVaultSheet() {
   }
 
   // Hide the sheet
-  sheet.hideSheet();
+  setSheetVeryHidden_(sheet);
 
   // ═══ SHEET PROTECTION ═══
   // Only the script owner (installer) can edit this sheet.
@@ -34857,7 +35833,7 @@ function verifySurveyVaultIntegrityDialog() {
 
 
 // ============================================================================
-// SOURCE: 09_Dashboards.gs (4044 lines)
+// SOURCE: 09_Dashboards.gs (4024 lines)
 // ============================================================================
 
 /**
@@ -35119,7 +36095,7 @@ function getSatisfactionDashboardHtml() {
     // JavaScript
     '<script>' +
     // XSS Prevention - escape HTML special characters
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var allResponses=[];var currentFilter="all";var analyticsLoaded=false;var sectionsLoaded=false;' +
 
     // Tab switching
@@ -36973,58 +37949,25 @@ function syncMemberToGrievanceLog() {
 // ============================================================================
 
 /**
- * Sync new values from Member Directory to Config (bidirectional sync)
- * When a user enters a new value in a job metadata field, add it to Config
+ * Sync new values from Member Directory to Config (bidirectional sync).
+ * When a user enters a new value in a dropdown/multi-select column, add it to Config.
+ *
+ * Delegates to syncDropdownToConfig_ which uses the dynamically-rebuilt
+ * DROPDOWN_MAP and MULTI_SELECT_COLS (kept current by syncColumnMaps).
+ *
  * @param {Object} e - The edit event object
  */
 function syncNewValueToConfig(e) {
   if (!e || !e.range) return;
 
   var sheet = e.range.getSheet();
-  if (sheet.getName() !== SHEETS.MEMBER_DIR) return;
+  var sheetName = sheet.getName();
+  if (sheetName !== SHEETS.MEMBER_DIR && sheetName !== SHEETS.GRIEVANCE_LOG) return;
 
-  var col = e.range.getColumn();
-  var newValue = e.range.getValue();
-
-  // Skip if empty or header row
-  if (!newValue || e.range.getRow() === 1) return;
-
-  // Check if this column is a job metadata field (includes Committees and Home Town)
-  var fieldConfig = getJobMetadataByMemberCol(col);
-  if (!fieldConfig) return; // Not a synced column
-
-  // Get current Config values for this column
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!configSheet) return;
-
-  var existingValues = getConfigValues(configSheet, fieldConfig.configCol);
-
-  // Handle multi-value fields (comma-separated)
-  var valuesToCheck = newValue.toString().split(',').map(function(v) { return v.trim(); });
-
-  var valuesToAdd = [];
-  for (var j = 0; j < valuesToCheck.length; j++) {
-    var val = valuesToCheck[j];
-    if (val && existingValues.indexOf(val) === -1) {
-      valuesToAdd.push(val);
-    }
-  }
-
-  // Add new values to Config
-  if (valuesToAdd.length > 0) {
-    var lastRow = configSheet.getLastRow();
-    var dataStartRow = Math.max(lastRow + 1, 3); // Start at row 3 minimum
-
-    for (var k = 0; k < valuesToAdd.length; k++) {
-      configSheet.getRange(dataStartRow + k, fieldConfig.configCol).setValue(valuesToAdd[k]);
-    }
-
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Added "' + valuesToAdd.join(', ') + '" to ' + fieldConfig.configName,
-      'Config Updated', 3
-    );
-  }
+  // syncDropdownToConfig_ uses DROPDOWN_MAP + MULTI_SELECT_COLS (rebuilt by
+  // syncColumnMaps) and writes via addToConfigDropdown_ which correctly finds
+  // the first empty row in the target Config column.
+  syncDropdownToConfig_(e, sheetName);
 }
 
 // ============================================================================
@@ -37136,6 +38079,12 @@ function syncAllData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
   ss.toast('Syncing all data...', 'Sync', 3);
+
+  // Restore any Config entries that exist in Member Directory / Grievance Log
+  // but are missing from the Config sheet (self-healing bidirectional sync)
+  if (typeof restoreConfigFromSheetData_ === 'function') {
+    try { restoreConfigFromSheetData_(); } catch (_e) { Logger.log('Config restore skipped: ' + _e.message); }
+  }
 
   syncGrievanceFormulasToLog();
   syncGrievanceToMemberDirectory();
@@ -38260,7 +39209,7 @@ function getFlaggedSubmissionsHtml() {
     '<div id="content"><div class="empty-state">Loading...</div></div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function load(){google.script.run.withSuccessHandler(render).getFlaggedSubmissionsData()}' +
     'function render(d){' +
     '  var h="<div class=\\"stats-row\\">";' +
@@ -38383,6 +39332,13 @@ function approveFlaggedSubmission(rowNum) {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function rejectFlaggedSubmission(rowNum) {
+  // Verify caller is an authorized steward
+  var callerEmail = '';
+  try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+  if (!callerEmail) {
+    throw new Error('Authorization required: unable to verify user identity');
+  }
+
   // Update in vault (not on Satisfaction sheet — no PII there)
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var vault = ss.getSheetByName(HIDDEN_SHEETS.SURVEY_VAULT || '_Survey_Vault');
@@ -38394,7 +39350,7 @@ function rejectFlaggedSubmission(rowNum) {
       var vaultRow = i + 1;
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.VERIFIED).setValue('Rejected');
       vault.getRange(vaultRow, SURVEY_VAULT_COLS.IS_LATEST).setValue('No');
-      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
+      vault.getRange(vaultRow, SURVEY_VAULT_COLS.REVIEWER_NOTES).setValue('Rejected by ' + callerEmail + ' on ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'));
       break;
     }
   }
@@ -38476,7 +39432,7 @@ function getSecureMemberDashboardHtml(stats, stewards, satisfaction, coverage) {
     '.trend-area { margin-top: 10px; }' +
     '</style>' +
     '<script type="text/javascript">' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'google.charts.load("current", {"packages":["corechart", "gauge"]});' +
     'google.charts.setOnLoadCallback(drawCharts);' +
     'function drawCharts() {' +
@@ -38906,7 +39862,7 @@ function getStewardCoverageStats() {
 
 
 // ============================================================================
-// SOURCE: 10a_SheetCreation.gs (1792 lines)
+// SOURCE: 10a_SheetCreation.gs (2002 lines)
 // ============================================================================
 
 /**
@@ -38951,35 +39907,49 @@ function getStewardCoverageStats() {
  */
 function createConfigSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.CONFIG);
+  var isExistingSheet = sheet.getLastRow() > 2;
+
   // Only clear if sheet is new or has no meaningful data (≤2 rows = headers only)
-  if (sheet.getLastRow() <= 2) {
+  if (!isExistingSheet) {
     sheet.clear();
   } else {
-    Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — skipping clear to preserve settings');
-    return sheet;
+    Logger.log('createConfigSheet: Config sheet has ' + sheet.getLastRow() + ' rows of data — updating headers while preserving settings');
+
+    // Migration: remove orphaned "Yes/No (Dropdowns)" column (was column E).
+    // Deleting the column shifts all data to the right of it left by 1,
+    // keeping headers and data aligned.
+    migrateRemoveYesNoColumn_(sheet);
   }
 
   // Row 1: Section Headers (grouped categories)
   var sectionHeaders = [
-    '── EMPLOYMENT INFO ──', '', '', '', '',           // A-E (5 cols)
-    '── SUPERVISION ──', '',                            // F-G (2 cols)
-    '── STEWARD INFO ──', '',                           // H-I (2 cols)
+    '── EMPLOYMENT INFO ──', '', '', '',                // A-D (4 cols)
+    '── SUPERVISION ──', '',                            // E-F (2 cols)
+    '── STEWARD INFO ──', '',                           // G-H (2 cols)
     '── GRIEVANCE SETTINGS ──', '', '', '',             // J-M (4 cols)
     '── LINKS & COORDINATORS ──', '', '', '',           // N-Q (4 cols)
     '── NOTIFICATIONS ──', '', '',                      // R-T (3 cols)
     '── ORGANIZATION ──', '', '', '',                   // U-X (4 cols)
     '── INTEGRATION ──', '',                            // Y-Z (2 cols)
     '── DEADLINES ──', '', '', '',                      // AA-AD (4 cols)
-    '── MULTI-SELECT OPTIONS ──', '',                   // AE-AF (2 cols)
-    '── CONTRACT & LEGAL ──', '', '', '',               // AG-AJ (4 cols)
-    '── ORG IDENTITY ──', '', '',                       // AK-AM (3 cols)
-    '── EXTENDED CONTACT ──', '', '', '', '',           // AN-AR (5 cols)
-    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AS-AY (7 cols)
-    '── MOBILE DASHBOARD ──'                            // AZ (1 col) - LAST COLUMN
+    '── MULTI-SELECT OPTIONS ──',                        // AE (1 col)
+    '── CONTRACT & LEGAL ──', '', '', '',               // AF-AI (4 cols)
+    '── ORG IDENTITY ──', '', '',                       // AJ-AL (3 cols)
+    '── EXTENDED CONTACT ──', '', '', '', '',           // AM-AQ (5 cols)
+    '── STRATEGIC COMMAND CENTER ──', '', '', '', '', '', '', // AR-AX (7 cols)
+    '── MOBILE DASHBOARD ──', '', '', '', '', '', '',    // AY-BE (7 cols)
+    '── CUSTOM LINKS ──', '', '', '',                     // BE-BH (4 cols)
+    '── SURVEY LOG ──', ''                                // BI-BJ (2 cols)
   ];
 
   // Row 2: Column Headers — auto-derived from CONFIG_HEADER_MAP_
   var columnHeaders = getHeadersFromMap_(CONFIG_HEADER_MAP_);
+
+  // Ensure sheet has enough columns for all headers (handles sheets created before new columns were added)
+  ensureMinimumColumns(sheet, columnHeaders.length);
+
+  // Always apply headers (Row 1 & 2) — safe to overwrite since these are structure, not data.
+  // This ensures existing sheets pick up newly-added columns beyond AZ.
 
   // Apply section headers (Row 1)
   sheet.getRange(1, 1, 1, sectionHeaders.length).setValues([sectionHeaders])
@@ -38997,75 +39967,88 @@ function createConfigSheet(ss) {
     .setHorizontalAlignment('center');
 
   // Add default dropdown values (Row 3+)
+  // For existing sheets, seedConfigDefault_ only writes to columns that are currently empty.
+  // This ensures re-running CREATE_DASHBOARD fills in newly-added columns without
+  // overwriting user-customized values.
+
   // Office Days (D)
-  sheet.getRange(3, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS.length, 1)
-    .setValues(DEFAULT_CONFIG.OFFICE_DAYS.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.OFFICE_DAYS, DEFAULT_CONFIG.OFFICE_DAYS, isExistingSheet);
 
-  // Yes/No (E)
-  sheet.getRange(3, CONFIG_COLS.YES_NO, DEFAULT_CONFIG.YES_NO.length, 1)
-    .setValues(DEFAULT_CONFIG.YES_NO.map(function(v) { return [v]; }));
-
-  // Steward Committees (I)
+  // Steward Committees (H)
   var committees = ['Grievance Committee', 'Bargaining Committee', 'Health & Safety Committee',
                     'Political Action Committee', 'Membership Committee', 'Executive Board'];
-  sheet.getRange(3, CONFIG_COLS.STEWARD_COMMITTEES, committees.length, 1)
-    .setValues(committees.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_COMMITTEES, committees, isExistingSheet);
 
   // Grievance Status (J)
-  sheet.getRange(3, CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS.length, 1)
-    .setValues(DEFAULT_CONFIG.GRIEVANCE_STATUS.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STATUS, DEFAULT_CONFIG.GRIEVANCE_STATUS, isExistingSheet);
 
   // Grievance Step (K)
-  sheet.getRange(3, CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP.length, 1)
-    .setValues(DEFAULT_CONFIG.GRIEVANCE_STEP.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.GRIEVANCE_STEP, DEFAULT_CONFIG.GRIEVANCE_STEP, isExistingSheet);
 
   // Issue Category (L)
-  sheet.getRange(3, CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY.length, 1)
-    .setValues(DEFAULT_CONFIG.ISSUE_CATEGORY.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.ISSUE_CATEGORY, DEFAULT_CONFIG.ISSUE_CATEGORY, isExistingSheet);
 
   // Articles (M)
-  sheet.getRange(3, CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES.length, 1)
-    .setValues(DEFAULT_CONFIG.ARTICLES.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.ARTICLES, DEFAULT_CONFIG.ARTICLES, isExistingSheet);
 
   // Communication Methods (N)
-  sheet.getRange(3, CONFIG_COLS.COMM_METHODS, DEFAULT_CONFIG.COMM_METHODS.length, 1)
-    .setValues(DEFAULT_CONFIG.COMM_METHODS.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.COMM_METHODS, DEFAULT_CONFIG.COMM_METHODS, isExistingSheet);
 
   // Alert Days (S) - default notification intervals
-  sheet.getRange(3, CONFIG_COLS.ALERT_DAYS, 1, 1).setValue('3, 7, 14');
+  seedConfigDefault_(sheet, CONFIG_COLS.ALERT_DAYS, ['3, 7, 14'], isExistingSheet);
 
   // Organization defaults (placeholders — update in Config sheet)
-  sheet.getRange(3, CONFIG_COLS.ORG_NAME, 1, 1).setValue('Your Union Name');
-  sheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER, 1, 1).setValue('000');
-  sheet.getRange(3, CONFIG_COLS.MAIN_ADDRESS, 1, 1).setValue('123 Main Street, Suite 100, City, ST 00000');
-  sheet.getRange(3, CONFIG_COLS.MAIN_PHONE, 1, 1).setValue('555-000-0000');
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_NAME, ['Your Union Name'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOCAL_NUMBER, ['000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_ADDRESS, ['123 Main Street, Suite 100, City, ST 00000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_PHONE, ['555-000-0000'], isExistingSheet);
 
   // Deadline defaults (in days) — values from DEADLINE_DEFAULTS (01_Core.gs)
-  sheet.getRange(3, CONFIG_COLS.FILING_DEADLINE_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.FILING_DAYS);
-  sheet.getRange(3, CONFIG_COLS.STEP1_RESPONSE_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.STEP_1_RESPONSE);
-  sheet.getRange(3, CONFIG_COLS.STEP2_APPEAL_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.STEP_2_APPEAL);
-  sheet.getRange(3, CONFIG_COLS.STEP2_RESPONSE_DAYS, 1, 1).setValue(DEADLINE_DEFAULTS.STEP_2_RESPONSE);
+  seedConfigDefault_(sheet, CONFIG_COLS.FILING_DEADLINE_DAYS, [DEADLINE_DEFAULTS.FILING_DAYS], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEP1_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_1_RESPONSE], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEP2_APPEAL_DAYS, [DEADLINE_DEFAULTS.STEP_2_APPEAL], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEP2_RESPONSE_DAYS, [DEADLINE_DEFAULTS.STEP_2_RESPONSE], isExistingSheet);
 
   // Best Times to Contact (AE)
   var bestTimes = ['Morning (8am-12pm)', 'Afternoon (12pm-5pm)', 'Evening (5pm-8pm)', 'Weekends', 'Flexible'];
-  sheet.getRange(3, CONFIG_COLS.BEST_TIMES, bestTimes.length, 1)
-    .setValues(bestTimes.map(function(v) { return [v]; }));
+  seedConfigDefault_(sheet, CONFIG_COLS.BEST_TIMES, bestTimes, isExistingSheet);
 
   // Contract articles
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_GRIEVANCE, 1, 1).setValue('Article XX');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_DISCIPLINE, 1, 1).setValue('Article YY');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_WORKLOAD, 1, 1).setValue('Article ZZ');
-  sheet.getRange(3, CONFIG_COLS.CONTRACT_NAME, 1, 1).setValue('Current CBA');
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_GRIEVANCE, ['Article XX'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_DISCIPLINE, ['Article YY'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_WORKLOAD, ['Article ZZ'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CONTRACT_NAME, ['Current CBA'], isExistingSheet);
 
   // Org identity
-  sheet.getRange(3, CONFIG_COLS.UNION_PARENT, 1, 1).setValue('Your Parent Union');
-  sheet.getRange(3, CONFIG_COLS.STATE_REGION, 1, 1).setValue('Your State');
-  sheet.getRange(3, CONFIG_COLS.ORG_WEBSITE, 1, 1).setValue('https://www.example.org/');
+  seedConfigDefault_(sheet, CONFIG_COLS.UNION_PARENT, ['Your Parent Union'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STATE_REGION, ['Your State'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ORG_WEBSITE, ['https://www.example.org/'], isExistingSheet);
 
   // Extended contact
-  sheet.getRange(3, CONFIG_COLS.MAIN_FAX, 1, 1).setValue('555-000-0001');
-  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_NAME, 1, 1).setValue('Contact Name');
-  sheet.getRange(3, CONFIG_COLS.MAIN_CONTACT_EMAIL, 1, 1).setValue('contact@example.org');
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_FAX, ['555-000-0001'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_NAME, ['Contact Name'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_EMAIL, ['contact@example.org'], isExistingSheet);
+
+  // Escalation triggers (comma-separated values read at runtime)
+  var escalationStatuses = COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
+  seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STATUSES, escalationStatuses, isExistingSheet);
+
+  var escalationSteps = COMMAND_CONFIG.ESCALATION_STEPS || ['Step II', 'Step III', 'Arbitration'];
+  seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STEPS, escalationSteps, isExistingSheet);
+
+  // Mobile Dashboard & branding defaults
+  seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [250], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['UN'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.STEWARD_LABEL, ['Steward'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MEMBER_LABEL, ['Member'], isExistingSheet);
+
+  // Custom links (placeholders)
+  seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_1_NAME, ['Resources'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_1_URL, ['https://www.example.org/resources'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_2_NAME, ['Help'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.CUSTOM_LINK_2_URL, ['https://www.example.org/help'], isExistingSheet);
 
   // Freeze header rows (1 and 2)
   sheet.setFrozenRows(2);
@@ -39085,6 +40068,187 @@ function createConfigSheet(ss) {
 
   // Set tab color
   sheet.setTabColor(COLORS.PRIMARY_PURPLE);
+}
+
+/**
+ * Migration: removes the orphaned "Yes/No (Dropdowns)" column from existing Config sheets.
+ * The column was removed from CONFIG_HEADER_MAP_ but existing sheets still have it.
+ * Deleting the physical column shifts all data right of it left by 1, keeping
+ * headers and data aligned when new headers are applied.
+ * @param {Sheet} sheet - The Config sheet
+ * @private
+ */
+function migrateRemoveYesNoColumn_(sheet) {
+  // Check row 2 for the old header — only migrate if it's still present
+  var maxCol = sheet.getMaxColumns();
+  if (maxCol < 5) return;
+  var row2 = sheet.getRange(2, 1, 1, Math.min(maxCol, 10)).getValues()[0];
+  for (var c = 0; c < row2.length; c++) {
+    if (String(row2[c]).trim() === 'Yes/No (Dropdowns)') {
+      sheet.deleteColumn(c + 1); // 1-indexed
+      Logger.log('migrateRemoveYesNoColumn_: deleted orphaned Yes/No column at position ' + (c + 1));
+      return;
+    }
+  }
+}
+
+/**
+ * Seeds default values into a Config column only if the column is currently empty.
+ * For new sheets (isExisting=false), always writes. For existing sheets,
+ * checks whether the column already has data and skips if so.
+ * @param {Sheet} sheet - The Config sheet
+ * @param {number} col - 1-indexed column number
+ * @param {Array} values - Array of default values to write
+ * @param {boolean} isExisting - Whether the sheet already had data
+ * @private
+ */
+function seedConfigDefault_(sheet, col, values, isExisting) {
+  if (isExisting) {
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 3) {
+      var existing = sheet.getRange(3, col, lastRow - 2, 1).getValues();
+      for (var i = 0; i < existing.length; i++) {
+        if (existing[i][0] !== '' && existing[i][0] !== null) {
+          return; // Column already has data, don't overwrite
+        }
+      }
+    }
+  }
+  sheet.getRange(3, col, values.length, 1)
+    .setValues(values.map(function(v) { return [v]; }));
+}
+
+/**
+ * Scans Grievance Log and Member Directory for unique values in dropdown
+ * columns and backfills them into the Config sheet. This handles the case
+ * where data was entered before dropdown sync was active, or where bulk
+ * imports/pastes bypassed the onEdit trigger.
+ *
+ * Safe to run multiple times — skips values already present in Config.
+ * Callable from menu: Union Hub > Admin > Populate Config from Sheet Data
+ */
+function populateConfigFromSheetData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!configSheet) {
+    SpreadsheetApp.getUi().alert('Config sheet not found. Run CREATE_DASHBOARD first.');
+    return;
+  }
+
+  var added = 0;
+
+  // Gather all dropdown and multi-select mappings
+  var sources = [
+    { sheetName: SHEETS.MEMBER_DIR, maps: DROPDOWN_MAP.MEMBER_DIR.concat(MULTI_SELECT_COLS.MEMBER_DIR) },
+    { sheetName: SHEETS.GRIEVANCE_LOG, maps: DROPDOWN_MAP.GRIEVANCE_LOG.concat(MULTI_SELECT_COLS.GRIEVANCE_LOG) }
+  ];
+
+  for (var s = 0; s < sources.length; s++) {
+    var sourceSheet = ss.getSheetByName(sources[s].sheetName);
+    if (!sourceSheet || sourceSheet.getLastRow() < 2) continue;
+
+    var data = sourceSheet.getDataRange().getValues();
+
+    for (var m = 0; m < sources[s].maps.length; m++) {
+      var mapping = sources[s].maps[m];
+      var targetCol = mapping.col;       // column in source sheet (1-indexed)
+      var configCol = mapping.configCol;  // column in Config (1-indexed)
+
+      // Collect existing Config values for this column
+      var existingSet = {};
+      var configLastRow = configSheet.getLastRow();
+      if (configLastRow >= 3) {
+        var configData = configSheet.getRange(3, configCol, configLastRow - 2, 1).getValues();
+        for (var c = 0; c < configData.length; c++) {
+          var cv = (configData[c][0] || '').toString().trim();
+          if (cv) existingSet[cv] = true;
+        }
+      }
+
+      // Scan the source sheet for unique values in this column
+      for (var r = 1; r < data.length; r++) {
+        var cellVal = (data[r][targetCol - 1] || '').toString().trim();
+        if (!cellVal) continue;
+
+        // Handle comma-separated multi-select values
+        var parts = cellVal.split(',');
+        for (var p = 0; p < parts.length; p++) {
+          var val = parts[p].trim();
+          // Skip pure-numeric values — they're data-entry errors (index numbers
+          // instead of text labels). All dropdown Config columns expect text.
+          if (val && !existingSet[val] && !/^\d+$/.test(val)) {
+            addToConfigDropdown_(configCol, val);
+            existingSet[val] = true;
+            added++;
+          }
+        }
+      }
+    }
+  }
+
+  // Dedup and sort each Config dropdown column
+  deduplicateAndSortConfigColumns_(configSheet);
+
+  ss.toast('Added ' + added + ' new values to Config from existing sheet data.', 'Config Sync', 5);
+}
+
+/**
+ * Deduplicates and alphabetically sorts all dropdown/multi-select Config columns.
+ * Preserves rows 1-2 (section/column headers). Only touches row 3+.
+ * @param {Sheet} configSheet - The Config sheet
+ * @private
+ */
+function deduplicateAndSortConfigColumns_(configSheet) {
+  if (!configSheet) return;
+
+  // Gather all Config columns that are populated by dropdown/multi-select sync
+  var configColsToClean = {};
+  var ddMember = DROPDOWN_MAP.MEMBER_DIR;
+  var ddGriev = DROPDOWN_MAP.GRIEVANCE_LOG;
+  var msMember = MULTI_SELECT_COLS.MEMBER_DIR;
+  var msGriev = MULTI_SELECT_COLS.GRIEVANCE_LOG;
+
+  var allMaps = ddMember.concat(ddGriev, msMember, msGriev);
+  for (var i = 0; i < allMaps.length; i++) {
+    var cc = allMaps[i].configCol;
+    if (cc) {
+      configColsToClean[cc] = true;
+    }
+  }
+
+  var lastRow = configSheet.getLastRow();
+  if (lastRow < 3) return;
+  var dataRows = lastRow - 2;
+
+  for (var colNum in configColsToClean) {
+    colNum = parseInt(colNum, 10);
+    var colData = configSheet.getRange(3, colNum, dataRows, 1).getValues();
+
+    // Collect unique non-empty values
+    var seen = {};
+    var unique = [];
+    for (var r = 0; r < colData.length; r++) {
+      var v = (colData[r][0] || '').toString().trim();
+      if (v && !seen[v]) {
+        // Also reject pure-numeric values during cleanup
+        if (/^\d+$/.test(v)) continue;
+        seen[v] = true;
+        unique.push(v);
+      }
+    }
+
+    // Sort alphabetically (case-insensitive)
+    unique.sort(function(a, b) {
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    // Write back: sorted values + blank fill for remaining rows
+    var writeData = [];
+    for (var w = 0; w < dataRows; w++) {
+      writeData.push([w < unique.length ? unique[w] : '']);
+    }
+    configSheet.getRange(3, colNum, dataRows, 1).setValues(writeData);
+  }
 }
 
 /**
@@ -39169,7 +40333,7 @@ function applyConfigSheetStyling(sheet) {
  * @private
  */
 function applySectionColors_(sheet, lastCol) {
-  // Section color definitions (15 sections, columns A-AZ)
+  // Section color definitions (16 sections, columns A-BI)
   var SECTION_COLORS = {
     EMPLOYMENT: { bg: '#3b82f6', text: '#ffffff' },      // Blue - A-E
     SUPERVISION: { bg: '#8b5cf6', text: '#ffffff' },     // Violet - F-G
@@ -39180,16 +40344,17 @@ function applySectionColors_(sheet, lastCol) {
     ORGANIZATION: { bg: '#22c55e', text: '#ffffff' },    // Green - U-X
     INTEGRATION: { bg: '#14b8a6', text: '#ffffff' },     // Teal - Y-Z
     DEADLINES: { bg: '#ec4899', text: '#ffffff' },       // Pink - AA-AD
-    MULTISELECT: { bg: '#a855f7', text: '#ffffff' },     // Purple - AE-AF
-    CONTRACT: { bg: '#6366f1', text: '#ffffff' },        // Indigo - AG-AJ
-    IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AK-AM
-    EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AN-AR
-    COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AS-AY
-    MOBILE: { bg: '#10b981', text: '#ffffff' }           // Emerald - AZ (LAST COLUMN)
+    MULTISELECT: { bg: '#a855f7', text: '#ffffff' },     // Purple - AE
+    CONTRACT: { bg: '#6366f1', text: '#ffffff' },        // Indigo - AF-AI
+    IDENTITY: { bg: '#0ea5e9', text: '#ffffff' },        // Sky - AJ-AL
+    EXTENDED: { bg: '#84cc16', text: '#1e293b' },        // Lime - AM-AQ
+    COMMAND: { bg: '#f43f5e', text: '#ffffff' },         // Rose - AR-AX
+    MOBILE: { bg: '#10b981', text: '#ffffff' },          // Emerald - AY-BE
+    CUSTOM_LINKS: { bg: '#f59e0b', text: '#1e293b' }    // Amber - BF-BI
   };
 
   // Apply colors by column ranges (both row 1 section header and row 2 column header)
-  // Total: 52 columns (A-AZ)
+  // Total: 61 columns (A-BI)
   var sections = [
     { start: 1, end: 5, color: SECTION_COLORS.EMPLOYMENT },      // A-E
     { start: 6, end: 7, color: SECTION_COLORS.SUPERVISION },     // F-G
@@ -39200,12 +40365,13 @@ function applySectionColors_(sheet, lastCol) {
     { start: 21, end: 24, color: SECTION_COLORS.ORGANIZATION },  // U-X
     { start: 25, end: 26, color: SECTION_COLORS.INTEGRATION },   // Y-Z
     { start: 27, end: 30, color: SECTION_COLORS.DEADLINES },     // AA-AD
-    { start: 31, end: 32, color: SECTION_COLORS.MULTISELECT },   // AE-AF
-    { start: 33, end: 36, color: SECTION_COLORS.CONTRACT },      // AG-AJ
-    { start: 37, end: 39, color: SECTION_COLORS.IDENTITY },      // AK-AM
-    { start: 40, end: 44, color: SECTION_COLORS.EXTENDED },      // AN-AR
-    { start: 45, end: 51, color: SECTION_COLORS.COMMAND },       // AS-AY (Strategic Command Center)
-    { start: 52, end: 52, color: SECTION_COLORS.MOBILE }         // AZ (Mobile Dashboard - LAST COLUMN)
+    { start: 31, end: 31, color: SECTION_COLORS.MULTISELECT },   // AE
+    { start: 32, end: 35, color: SECTION_COLORS.CONTRACT },      // AF-AI
+    { start: 36, end: 38, color: SECTION_COLORS.IDENTITY },      // AJ-AL
+    { start: 39, end: 43, color: SECTION_COLORS.EXTENDED },      // AM-AQ
+    { start: 44, end: 50, color: SECTION_COLORS.COMMAND },       // AR-AX (Strategic Command Center)
+    { start: 51, end: 57, color: SECTION_COLORS.MOBILE },        // AY-BE (Mobile Dashboard)
+    { start: 58, end: 61, color: SECTION_COLORS.CUSTOM_LINKS }   // BF-BI (Custom Links)
   ];
 
   sections.forEach(function(section) {
@@ -39480,8 +40646,8 @@ function createMemberDirectory(ss) {
   });
 
   // Format numeric columns with comma separators
-  sheet.getRange(2, MEMBER_COLS.OPEN_RATE, 998, 1).setNumberFormat('#,##0.0');       // S - Open Rate %
-  sheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, 998, 1).setNumberFormat('#,##0');  // T - Volunteer Hours
+  sheet.getRange(2, MEMBER_COLS.OPEN_RATE, 998, 1).setNumberFormat('#,##0.0');       // T - Open Rate %
+  sheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, 998, 1).setNumberFormat('#,##0');  // U - Volunteer Hours
 
   // Columns AB-AD (Has Open Grievance?, Grievance Status, Days to Deadline)
   // are populated by syncGrievanceToMemberDirectory() with STATIC values
@@ -39636,7 +40802,7 @@ function createMemberDirectory(ss) {
   // This enables sorting via dropdown on: Last Name, Job Title, Work Location, Unit,
   // Office Days, Preferred Communication, Best Time to Contact, Supervisor, Manager,
   // Committees, Assigned Steward, Last Virtual Mtg, Last In-Person Mtg, Open Rate %,
-  // Volunteer Hours, Interest: Local/Chapter/Allied, Home Town, Recent Contact Date,
+  // Volunteer Hours, Interest: Local/Chapter/Allied, Recent Contact Date,
   // Contact Steward, Contact Notes, Has Open Grievance?, Grievance Status, Days to Deadline
   var filterRange = sheet.getRange(1, 1, 5000, headers.length);
   filterRange.createFilter();
@@ -40703,7 +41869,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (2195 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (2194 lines)
 // ============================================================================
 
 // ============================================================================
@@ -41622,7 +42788,6 @@ function createFunctionChecklistSheet_() {
     // ═══ PHASE 7: Calendar ═══
     ['7️⃣ Calendar', '📊 Calendar', '📅 Sync Deadlines to Calendar', 'syncDeadlinesToCalendar', 'Adds grievance deadlines to Google Calendar with reminders'],
     ['7️⃣ Calendar', '📊 Calendar', '📅 View Upcoming Deadlines', 'showUpcomingDeadlinesFromCalendar', 'Shows next 30 days of deadlines from calendar'],
-    ['7️⃣ Calendar', '📊 Calendar', '🗑️ Clear Calendar Events', 'clearAllCalendarEvents', 'Removes all grievance events from calendar (use with caution)'],
 
     // ═══ PHASE 8: Notifications ═══
     ['8️⃣ Notify', '📊 Notifications', '⚙️ Notification Settings', 'showNotificationSettings', 'Configure email notification preferences and timing'],
@@ -42274,7 +43439,7 @@ function createFAQSheet(ss) {
 
   var engagementFAQs = [
     ['Q: What engagement metrics are tracked?',
-     'A: Email open rates (column S), virtual meeting attendance (Q), in-person meeting attendance (R), volunteer hours (T), and union interest in local/chapter/allied activities (U-W).'],
+     'A: Email open rates (column T), virtual meeting attendance (R), in-person meeting attendance (S), volunteer hours (U), and union interest in local/chapter/allied activities (V-X).'],
     ['Q: Where do engagement metrics appear?',
      'A: Engagement metrics appear in the Unified Web App Dashboard (both Steward and Member views), in the Engagement tab with email open rates, meeting attendance, volunteer hours, and union interest breakdowns.'],
     ['Q: What are low engagement hot spots?',
@@ -42903,7 +44068,7 @@ function createNotificationsSheet(ss) {
 
 
 // ============================================================================
-// SOURCE: 10c_FormHandlers.gs (691 lines)
+// SOURCE: 10c_FormHandlers.gs (694 lines)
 // ============================================================================
 
 // ============================================================================
@@ -42912,11 +44077,11 @@ function createNotificationsSheet(ss) {
 
 /**
  * Grievance Form Configuration
- * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column O), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only — update via Script Properties or Config sheet.
  */
 var GRIEVANCE_FORM_CONFIG = {
-  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('grievance')
+  // Form URL — set in Config sheet column O, read via getFormUrlFromConfig('grievance')
   FORM_URL: '',
 
   // Default form field entry IDs — overridden by Script Properties at runtime
@@ -42948,11 +44113,11 @@ var GRIEVANCE_FORM_CONFIG = {
  */
 /**
  * Contact Form Configuration
- * Form URL reads from Config sheet (column Q), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column P), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only.
  */
 var CONTACT_FORM_CONFIG = {
-  // Form URL — set in Config sheet column Q, read via getFormUrlFromConfig('contact')
+  // Form URL — set in Config sheet column P, read via getFormUrlFromConfig('contact')
   FORM_URL: '',
 
   // Form field entry IDs mapped to Member Directory columns
@@ -43170,9 +44335,12 @@ function shareWithCoordinators_(folder) {
 
     if (!configSheet) return;
 
-    // Get coordinator emails from Config (column O = GRIEVANCE_COORDINATORS)
-    var coordData = configSheet.getRange(2, CONFIG_COLS.GRIEVANCE_COORDINATORS,
-                                          configSheet.getLastRow() - 1, 1).getValues();
+    // Get coordinator emails from Config (column N = GRIEVANCE_COORDINATORS)
+    // Config data starts at row 3 (row 1 = section headers, row 2 = column headers)
+    var lastRow = configSheet.getLastRow();
+    if (lastRow < 3) return; // No data rows
+    var coordData = configSheet.getRange(3, CONFIG_COLS.GRIEVANCE_COORDINATORS,
+                                          lastRow - 2, 1).getValues();
 
     for (var i = 0; i < coordData.length; i++) {
       var email = coordData[i][0];
@@ -43234,11 +44402,11 @@ function testGrievanceFormSubmission() {
 
 /**
  * Satisfaction Survey Form Configuration
- * Form URL reads from Config sheet (column AR), entry IDs read from Script Properties.
+ * Form URL reads from Config sheet (column AP), entry IDs read from Script Properties.
  * Hardcoded values serve as defaults only.
  */
 var SATISFACTION_FORM_CONFIG = {
-  // Form URLs — set in Config sheet column AR, read via getFormUrlFromConfig('satisfaction')
+  // Form URLs — set in Config sheet column AP, read via getFormUrlFromConfig('satisfaction')
   FORM_URL: '',
   EDIT_URL: '',
 
@@ -43824,7 +44992,7 @@ function showGrievanceFiles() {
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
         var html = HtmlService.createHtmlOutput(
-          '<script>window.open("' + folderUrl + '", "_blank");google.script.host.close();</script>'
+          '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
       }
@@ -43834,7 +45002,7 @@ function showGrievanceFiles() {
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
         var html = HtmlService.createHtmlOutput(
-          '<script>window.open("' + folderUrl + '", "_blank");google.script.host.close();</script>'
+          '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
       }
@@ -44198,7 +45366,7 @@ function openGrievanceFormForRow_(sheet, row) {
   // Open form in new window
   var ui = SpreadsheetApp.getUi();
   var html = HtmlService.createHtmlOutput(
-    '<script>window.open("' + formUrl + '", "_blank");google.script.host.close();</script>'
+    '<script>window.open(' + JSON.stringify(formUrl) + ', "_blank");google.script.host.close();</script>'
   ).setWidth(200).setHeight(50);
 
   ui.showModalDialog(html, 'Opening Grievance Form...');
@@ -44298,7 +45466,7 @@ function fixDataQualityIssues() {
     '</style></head><body><div class="container">' +
     '<h2>⚠️ Data Quality Issues</h2>' +
     '<p>The following issues were found:</p>' +
-    issues.map(function(i) { return '<div class="issue">' + i + '</div>'; }).join('') +
+    issues.map(function(i) { return '<div class="issue">' + escapeHtml(String(i)) + '</div>'; }).join('') +
     '<h3>How to Fix:</h3>' +
     '<div class="fix-option"><strong>Option 1:</strong> Manually update Member IDs in Grievance Log</div>' +
     '<div class="fix-option"><strong>Option 2:</strong> Add missing members to Member Directory first</div>' +
@@ -44461,8 +45629,8 @@ function syncVolunteerHoursToMemberDirectory() {
 
   for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
     var row = volunteerData[i];
-    var memberId = row[1];  // Column B - Member ID (Volunteer Hours sheet - no shared constant)
-    var hours = row[5];     // Column F - Hours (Volunteer Hours sheet - no shared constant)
+    var memberId = row[1];  // Column B = Member ID (Volunteer Hours: A=Title, B=MemberID, C=Name, D=Date, E=Activity, F=Hours)
+    var hours = row[5];     // Column F = Hours (see column layout above)
 
     if (!memberId) continue;
 
@@ -44480,7 +45648,7 @@ function syncVolunteerHoursToMemberDirectory() {
   var memberData = memberSheet.getDataRange().getValues();
   if (memberData.length < 2) return;
 
-  // Update column S (VOLUNTEER_HOURS)
+  // Update VOLUNTEER_HOURS column (U)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
     var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
@@ -44497,7 +45665,7 @@ function syncVolunteerHoursToMemberDirectory() {
 
 /**
  * Syncs meeting attendance from Meeting Attendance sheet to Member Directory
- * Updates Last Virtual Mtg (column P) and Last In-Person Mtg (column Q)
+ * Updates Last Virtual Mtg (column R) and Last In-Person Mtg (column S)
  * @returns {void}
  */
 function syncMeetingAttendanceToMemberDirectory() {
@@ -44523,10 +45691,10 @@ function syncMeetingAttendanceToMemberDirectory() {
 
   for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
     var row = attendanceData[i];
-    var meetingDate = row[1];     // Column B - Meeting Date (Meeting Attendance sheet - no shared constant)
-    var meetingType = row[2];     // Column C - Meeting Type (Meeting Attendance sheet - no shared constant)
-    var memberId = row[4];        // Column E - Member ID (Meeting Attendance sheet - no shared constant)
-    var attended = row[6];        // Column G - Attended (Meeting Attendance sheet - no shared constant)
+    var meetingDate = row[1];     // Column B = Meeting Date (Meeting Attendance: A=MeetingID, B=Date, C=Type, D=Name, E=MemberID, F=Email, G=Attended)
+    var meetingType = row[2];     // Column C = Meeting Type (see column layout above)
+    var memberId = row[4];        // Column E = Member ID (see column layout above)
+    var attended = row[6];        // Column G = Attended (see column layout above)
 
     if (!memberId || !attended || !meetingDate) continue;
 
@@ -44633,7 +45801,7 @@ function removeDeprecatedDashboard() {
 
 
 // ============================================================================
-// SOURCE: 10_Main.gs (2220 lines)
+// SOURCE: 10_Main.gs (2327 lines)
 // ============================================================================
 
 /**
@@ -44702,6 +45870,13 @@ function onOpen() {
       }
     } catch (tabError) {
       console.log('Tab colors not applied: ' + tabError.message);
+    }
+
+    // Enforce hidden sheets on every open (prevents mobile visibility)
+    try {
+      enforceHiddenSheets();
+    } catch (hideError) {
+      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
     }
 
     // Show welcome toast
@@ -44844,6 +46019,32 @@ function onEdit(e) {
 }
 
 /**
+ * Simple trigger: fires when the user changes cell selection.
+ * Delegates to the multi-select auto-open handler when the
+ * user has enabled it via Tools > Multi-Select > Enable Auto-Open.
+ *
+ * Note: onSelectionChange is only available as a simple trigger
+ * in Google Apps Script — it cannot be installed via ScriptApp.newTrigger().
+ *
+ * @param {Object} e - The selection change event object
+ */
+function onSelectionChange(e) {
+  if (!e || !e.range) return;
+
+  try {
+    var autoOpen = PropertiesService.getUserProperties()
+      .getProperty('multiSelectAutoOpen');
+    if (autoOpen !== 'true') return;
+
+    if (typeof onSelectionChangeMultiSelect === 'function') {
+      onSelectionChangeMultiSelect(e);
+    }
+  } catch (_err) {
+    // Silent — selection-change triggers must not surface errors
+  }
+}
+
+/**
  * Handles security audit logging for change tracking
  * Logs all edits to the Audit Log sheet for accountability
  * Includes sabotage protection for mass deletions (>15 cells)
@@ -44860,7 +46061,7 @@ function handleSecurityAudit_(e) {
       auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
       auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID']);
       auditSheet.setFrozenRows(1);
-      auditSheet.hideSheet();
+      setSheetVeryHidden_(auditSheet);
     }
 
     var userEmail = '';
@@ -45046,7 +46247,7 @@ function handleStageGateWorkflow_(e) {
 
 /**
  * Sends escalation alert email to Chief Steward
- * Reads email from Config sheet (column AS)
+ * Reads email from Config sheet (column AQ)
  * @param {string} memberName - Name of the member
  * @param {string} caseID - Grievance case ID
  * @param {string} status - New status/step
@@ -45057,7 +46258,7 @@ function sendEscalationAlert_(memberName, caseID, status) {
   var chiefStewardEmail = getConfigValue_(CONFIG_COLS.CHIEF_STEWARD_EMAIL);
 
   if (!chiefStewardEmail) {
-    console.log('Chief Steward email not configured in Config sheet (column AS) - skipping escalation alert');
+    console.log('Chief Steward email not configured in Config sheet (column AQ) - skipping escalation alert');
     return;
   }
 
@@ -45103,15 +46304,20 @@ function getConfigValue_(columnNum) {
 
 /**
  * Gets escalation status values from Config sheet or falls back to defaults
- * Config format: comma-separated values (e.g., "In Arbitration,Appealed")
+ * Reads all non-empty rows from the ESCALATION_STATUSES config column.
  * @returns {Array} Array of status values that trigger escalation alerts
  * @private
  */
 function getEscalationStatuses_() {
-  var configValue = getConfigValue_(CONFIG_COLS.ESCALATION_STATUSES);
-
-  if (configValue) {
-    return configValue.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var values = getConfigValues(configSheet, CONFIG_COLS.ESCALATION_STATUSES);
+      if (values.length > 0) return values;
+    }
+  } catch (e) {
+    console.log('Error reading escalation statuses: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -45120,15 +46326,20 @@ function getEscalationStatuses_() {
 
 /**
  * Gets escalation step values from Config sheet or falls back to defaults
- * Config format: comma-separated values (e.g., "Step II,Step III,Arbitration")
+ * Reads all non-empty rows from the ESCALATION_STEPS config column.
  * @returns {Array} Array of step values that trigger escalation alerts
  * @private
  */
 function getEscalationSteps_() {
-  var configValue = getConfigValue_(CONFIG_COLS.ESCALATION_STEPS);
-
-  if (configValue) {
-    return configValue.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s; });
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet) {
+      var values = getConfigValues(configSheet, CONFIG_COLS.ESCALATION_STEPS);
+      if (values.length > 0) return values;
+    }
+  } catch (e) {
+    console.log('Error reading escalation steps: ' + e.message);
   }
 
   // Fall back to defaults from COMMAND_CONFIG
@@ -45195,7 +46406,36 @@ function handleGrievanceEdit(e) {
     GRIEVANCE_COLS.STEP3_APPEAL_FILED, GRIEVANCE_COLS.DATE_CLOSED
   ];
   if (statusAndDateCols.indexOf(col) !== -1) {
-    sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(new Date());
+    // Compute the actual next deadline based on current step, matching the logic
+    // in recalculateDownstreamDeadlines_. Only set to a real deadline date, not now().
+    var currentStep = sheet.getRange(row, GRIEVANCE_COLS.CURRENT_STEP).getValue();
+    var status = sheet.getRange(row, GRIEVANCE_COLS.STATUS).getValue();
+    var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
+
+    if (closedStatuses.indexOf(status) === -1 && currentStep) {
+      var nextActionDate = '';
+      if (currentStep === 'Informal') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.FILING_DEADLINE).getValue();
+      } else if (currentStep === 'Step I') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP1_DUE).getValue();
+      } else if (currentStep === 'Step II') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP2_DUE).getValue();
+      } else if (currentStep === 'Step III') {
+        nextActionDate = sheet.getRange(row, GRIEVANCE_COLS.STEP3_APPEAL_DUE).getValue();
+      }
+
+      if (nextActionDate instanceof Date) {
+        sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue(nextActionDate);
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        var daysTo = Math.floor((nextActionDate - today) / (1000 * 60 * 60 * 24));
+        sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue(daysTo);
+      }
+    } else if (closedStatuses.indexOf(status) !== -1) {
+      // Clear deadline for closed grievances
+      sheet.getRange(row, GRIEVANCE_COLS.NEXT_ACTION_DUE).setValue('');
+      sheet.getRange(row, GRIEVANCE_COLS.DAYS_TO_DEADLINE).setValue('');
+    }
   }
 
   // If status changed, check for auto-actions
@@ -45413,44 +46653,81 @@ function handleMemberEdit(e) {
  * @private
  */
 function syncDropdownToConfig_(e, sheetName) {
+  // Accept e.value (simple edits) or fall back to reading the cell directly
+  // (handles pastes, programmatic setValue, and multi-cell edits)
   var newValue = e.value;
-  // Only handle single-cell text edits with a non-empty value
+  if (!newValue && e.range && e.range.getNumRows() === 1 && e.range.getNumColumns() === 1) {
+    try { newValue = e.range.getValue(); } catch (_) { /* skip */ }
+  }
   if (!newValue || typeof newValue !== 'string' || newValue.trim() === '') return;
   newValue = newValue.trim();
 
   var col = e.range.getColumn();
 
-  // Look up the Config column from the central DROPDOWN_MAP (single source of truth).
-  var entries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
-              : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
-              : null;
-  if (!entries) return;
+  // Look up the Config column from DROPDOWN_MAP and MULTI_SELECT_COLS.
+  // Both maps are checked so that custom values typed into either single-select
+  // or multi-select columns get synced back to Config.
+  var ddEntries = (sheetName === SHEETS.MEMBER_DIR) ? DROPDOWN_MAP.MEMBER_DIR
+                : (sheetName === SHEETS.GRIEVANCE_LOG) ? DROPDOWN_MAP.GRIEVANCE_LOG
+                : [];
+  var msEntries = (sheetName === SHEETS.MEMBER_DIR) ? MULTI_SELECT_COLS.MEMBER_DIR
+                : (sheetName === SHEETS.GRIEVANCE_LOG) ? MULTI_SELECT_COLS.GRIEVANCE_LOG
+                : [];
+  if (ddEntries.length === 0 && msEntries.length === 0) return;
 
   var configCol = null;
-  for (var d = 0; d < entries.length; d++) {
-    if (entries[d].col === col) { configCol = entries[d].configCol; break; }
+  var isMultiSelect = false;
+  for (var d = 0; d < ddEntries.length; d++) {
+    if (ddEntries[d].col === col) { configCol = ddEntries[d].configCol; break; }
+  }
+  if (!configCol) {
+    for (var ms = 0; ms < msEntries.length; ms++) {
+      if (msEntries[ms].col === col) { configCol = msEntries[ms].configCol; isMultiSelect = true; break; }
+    }
   }
 
-  if (!configCol) return; // Not a synced dropdown column
+  if (!configCol) return; // Not a synced dropdown or multi-select column
+
+  // For multi-select columns, split comma-separated values and sync each individually
+  var valuesToSync = isMultiSelect ? newValue.split(',') : [newValue];
+
+  // Filter out pure-numeric values — they're data-entry errors (e.g. index numbers
+  // typed instead of text labels like "Email", "Phone").  All dropdown/multi-select
+  // Config columns expect text labels, never bare integers.
+  var filteredValues = [];
+  for (var fv = 0; fv < valuesToSync.length; fv++) {
+    var candidate = valuesToSync[fv].trim();
+    if (candidate && !/^\d+$/.test(candidate)) {
+      filteredValues.push(candidate);
+    }
+  }
+  valuesToSync = filteredValues;
+  if (valuesToSync.length === 0) return;
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var configSheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!configSheet) return;
 
-  // Check if the value already exists in Config
+  // Build set of existing Config values for this column
+  var existingSet = {};
   var lastRow = configSheet.getLastRow();
   var configRows = lastRow >= 3 ? lastRow - 2 : 0;
   if (configRows > 0) {
     var existingValues = configSheet.getRange(3, configCol, configRows, 1).getValues();
     for (var i = 0; i < existingValues.length; i++) {
-      if (existingValues[i][0] && existingValues[i][0].toString().trim() === newValue) {
-        return; // Already exists, no need to add
-      }
+      var ev = (existingValues[i][0] || '').toString().trim();
+      if (ev) existingSet[ev] = true;
     }
   }
 
-  // Add the new value to the first empty row in the Config column
-  addToConfigDropdown_(configCol, newValue);
+  // Add each value that doesn't already exist in Config
+  for (var v = 0; v < valuesToSync.length; v++) {
+    var val = valuesToSync[v].trim();
+    if (val && !existingSet[val]) {
+      addToConfigDropdown_(configCol, val);
+      existingSet[val] = true;
+    }
+  }
 }
 
 /**
@@ -46111,7 +47388,7 @@ function updateGrievance(grievanceId, updates) {
 
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
-      if (data[i][GRIEVANCE_COLUMNS.GRIEVANCE_ID] === grievanceId) {
+      if (data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] === grievanceId) {
         rowIndex = i + 1;
         break;
       }
@@ -46121,19 +47398,19 @@ function updateGrievance(grievanceId, updates) {
       return errorResponse('Grievance not found');
     }
 
-    // Update each provided field
+    // Update each provided field (use canonical GRIEVANCE_COLS, 1-indexed)
     if (updates.description !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.DESCRIPTION + 1).setValue(updates.description);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(updates.description);
     }
     if (updates.notes !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.NOTES + 1).setValue(updates.notes);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(updates.notes);
     }
     if (updates.status !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.STATUS + 1).setValue(updates.status);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(updates.status);
     }
 
     // Update timestamp
-    sheet.getRange(rowIndex, GRIEVANCE_COLUMNS.LAST_UPDATED + 1).setValue(new Date());
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(new Date());
 
     logAuditEvent(AUDIT_EVENTS.GRIEVANCE_UPDATED, {
       grievanceId: grievanceId,
@@ -46421,17 +47698,15 @@ function startGrievanceForMember() {
   }
 
   const data = sheet.getRange(row, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const memberId = data[MEMBER_COLUMNS.ID];
-  const memberName = `${data[MEMBER_COLUMNS.FIRST_NAME]} ${data[MEMBER_COLUMNS.LAST_NAME]}`;
+  const memberId = data[MEMBER_COLS.MEMBER_ID - 1];
+  const memberName = `${data[MEMBER_COLS.FIRST_NAME - 1]} ${data[MEMBER_COLS.LAST_NAME - 1]}`;
 
   // Open new grievance dialog pre-populated with member info
   // Sanitize values before embedding in script context
-  const safeMemberId = String(memberId || '').replace(/['"\\<>&]/g, '');
-  const safeMemberName = String(memberName || '').replace(/['"\\<>&]/g, '');
   const html = HtmlService.createHtmlOutput(
     '<script>' +
-      'sessionStorage.setItem("prefillMemberId", "' + safeMemberId + '");' +
-      'sessionStorage.setItem("prefillMemberName", "' + safeMemberName + '");' +
+      'sessionStorage.setItem("prefillMemberId", ' + JSON.stringify(String(memberId || '')) + ');' +
+      'sessionStorage.setItem("prefillMemberName", ' + JSON.stringify(String(memberName || '')) + ');' +
       'google.script.host.close();' +
       'google.script.run.showNewGrievanceDialog();' +
     '</script>'
@@ -46818,10 +48093,10 @@ function searchMembersForDialog(term) {
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const firstName = (row[MEMBER_COLUMNS.FIRST_NAME] || '').toString().toLowerCase();
-    const lastName = (row[MEMBER_COLUMNS.LAST_NAME] || '').toString().toLowerCase();
-    const email = (row[MEMBER_COLUMNS.EMAIL] || '').toString().toLowerCase();
-    const memberId = (row[MEMBER_COLUMNS.ID] || '').toString().toLowerCase();
+    const firstName = (row[MEMBER_COLS.FIRST_NAME - 1] || '').toString().toLowerCase();
+    const lastName = (row[MEMBER_COLS.LAST_NAME - 1] || '').toString().toLowerCase();
+    const email = (row[MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase();
+    const memberId = (row[MEMBER_COLS.MEMBER_ID - 1] || '').toString().toLowerCase();
 
     if (firstName.includes(searchLower) ||
         lastName.includes(searchLower) ||
@@ -46829,9 +48104,9 @@ function searchMembersForDialog(term) {
         memberId.includes(searchLower)) {
       results.push({
         row: i + 1,
-        name: row[MEMBER_COLUMNS.FIRST_NAME] + ' ' + row[MEMBER_COLUMNS.LAST_NAME],
-        email: row[MEMBER_COLUMNS.EMAIL],
-        id: row[MEMBER_COLUMNS.ID]
+        name: row[MEMBER_COLS.FIRST_NAME - 1] + ' ' + row[MEMBER_COLS.LAST_NAME - 1],
+        email: row[MEMBER_COLS.EMAIL - 1],
+        id: row[MEMBER_COLS.MEMBER_ID - 1]
       });
 
       if (results.length >= 10) break; // Limit results
@@ -48207,7 +49482,7 @@ function getSearchDialogHtml_() {
             var name = escapeHtml((member['First Name'] || '') + ' ' + (member['Last Name'] || ''));
             var id = escapeHtml(member['Member ID'] || 'N/A');
             var email = escapeHtml(member['Email'] || '');
-            html += '<div class="result-item" onclick="selectMember(\\'' + id.replace(/'/g,"") + '\\')">';
+            html += '<div class="result-item" data-id="' + id + '" onclick="selectMember(this.dataset.id)">';
             html += '<strong>' + name + '</strong> (' + id + ')';
             if (email) html += '<br><small>' + email + '</small>';
             html += '</div>';
@@ -48359,7 +49634,7 @@ function createGrievancePDF(folder, data) {
   var templateId = getConfigValue_(CONFIG_COLS.TEMPLATE_ID) || COMMAND_CONFIG.TEMPLATE_ID;
 
   if (!templateId) {
-    throw new Error('PDF Template ID not configured. Set it in Config sheet column AX.');
+    throw new Error('PDF Template ID not configured. Set it in Config sheet column AV.');
   }
 
   // Make a copy of the template
@@ -48874,9 +50149,9 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     if (text.length > 500) ocrNote += '...';
 
     if (existingResolution) {
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(existingResolution + '\n\n' + ocrNote);
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(existingResolution + '\n\n' + ocrNote));
     } else {
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(ocrNote);
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(ocrNote));
     }
     fieldsPopulated.push('Resolution Notes (OCR text)');
 
@@ -49366,7 +50641,7 @@ function showOCRDialog() {
     '    "</div>";' +
     '  }' +
     '}' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'document.getElementById("fileId").addEventListener("keypress", function(e) {' +
     '  if (e.key === "Enter") runOCR();' +
     '});' +
@@ -49671,7 +50946,7 @@ function showSearchPrecedents() {
     '  <div class="empty">Enter search terms to find historical grievances</div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'function searchPrecedents() {' +
     '  var query = document.getElementById("searchQuery").value;' +
     '  var outcomeFilter = document.getElementById("filterOutcome").value;' +
@@ -50207,7 +51482,7 @@ function buildMemberPortal(memberId) {
   var html = getMemberPortalHtml_(profile);
   return HtmlService.createHtmlOutput(html)
     .setTitle('Member Portal - ' + profile.firstName)
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 /**
@@ -50222,7 +51497,7 @@ function buildPublicPortal() {
   var html = getPublicPortalHtml_(stats, stewards, satisfaction);
   return HtmlService.createHtmlOutput(html)
     .setTitle('Union Member Portal')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 /**
@@ -50378,8 +51653,8 @@ function getMemberPortalHtml_(profile) {
     '    </div>' +
     '    ' +
     '    <div class="btn-grid">' +
-    '      <a href="' + CONTRACT_PDF_URL + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
-    '      <a href="' + RESOURCE_DRIVE_URL + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
+    '      <a href="' + (/^https:\/\//.test(CONTRACT_PDF_URL) ? escapeHtml(CONTRACT_PDF_URL) : '#') + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
+    '      <a href="' + (/^https:\/\//.test(RESOURCE_DRIVE_URL) ? escapeHtml(RESOURCE_DRIVE_URL) : '#') + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
     '    </div>' +
     '    ' +
     '    <div class="card">' +
@@ -50399,7 +51674,7 @@ function getMemberPortalHtml_(profile) {
     '    ' +
     '    <div class="footer">' +
     '      <i class="material-icons" style="font-size:12px;vertical-align:middle">lock</i> ' +
-    '      Secure Member Portal | Member ID: ' + profile.memberId +
+    '      Secure Member Portal | Member ID: ' + escapeHtml(profile.memberId) +
     '    </div>' +
     '  </div>' +
     '</body>' +
@@ -50462,8 +51737,8 @@ function getPublicPortalHtml_(stats, stewards, satisfaction) {
     '    </div>' +
     '    ' +
     '    <div class="btn-grid">' +
-    '      <a href="' + CONTRACT_PDF_URL + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
-    '      <a href="' + RESOURCE_DRIVE_URL + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
+    '      <a href="' + (/^https:\/\//.test(CONTRACT_PDF_URL) ? escapeHtml(CONTRACT_PDF_URL) : '#') + '" target="_blank" class="btn btn-purple"><i class="material-icons">description</i> Contract</a>' +
+    '      <a href="' + (/^https:\/\//.test(RESOURCE_DRIVE_URL) ? escapeHtml(RESOURCE_DRIVE_URL) : '#') + '" target="_blank" class="btn btn-green"><i class="material-icons">folder</i> Resources</a>' +
     '    </div>' +
     '    ' +
     '    <div class="card">' +
@@ -51857,8 +53132,8 @@ function setupChecklistCalcSheet() {
   sheet.setColumnWidth(7, 100);  // All Required Done
   sheet.setColumnWidth(8, 120);  // Display String
 
-  // Hide the sheet
-  sheet.hideSheet();
+  // Hide the sheet (mobile-safe via Sheets API + protection)
+  setSheetVeryHidden_(sheet);
 
   Logger.log('_Checklist_Calc sheet setup complete with self-healing formulas');
   return sheet;
@@ -52203,7 +53478,7 @@ function repairDynamicFormulas() {
 
   if (!calcSheet) {
     calcSheet = ss.insertSheet(EXTENSION_CONFIG.HIDDEN_CALC_SHEET);
-    calcSheet.hideSheet();
+    setSheetVeryHidden_(calcSheet);
   }
 
   const startRow = EXTENSION_CONFIG.DYNAMIC_FORMULA_ROW;
@@ -52363,7 +53638,9 @@ function saveExpansionData(memberId, customData) {
     const fieldName = fieldNames[i];
     const col = headerMap[fieldName];
     if (col && col > coreCount) {
-      updates.push({ col: col, value: customData[fieldName] });
+      var rawValue = customData[fieldName];
+      var safeValue = typeof rawValue === 'string' ? escapeForFormula(rawValue) : rawValue;
+      updates.push({ col: col, value: safeValue });
     }
   }
 
@@ -52402,24 +53679,22 @@ function saveExpansionData(memberId, customData) {
  */
 function setupMemberLeaderRole() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const configSheetName = SHEETS.CONFIG;
-  const configSheet = ss.getSheetByName(configSheetName);
 
-  if (!configSheet) {
-    SpreadsheetApp.getUi().alert('Error: Config sheet not found');
-    return errorResponse('Config sheet not found');
+  // Add "Member Leader" directly to IS_STEWARD validation (not Config column E).
+  // IS_STEWARD uses hardcoded validation; Config column E is reserved for INTEREST_* columns.
+  const memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet) {
+    SpreadsheetApp.getUi().alert('Error: Member Directory not found. Run CREATE_DASHBOARD first.');
+    return errorResponse('Member Directory not found');
   }
 
-  const yesNoCol = CONFIG_COLS.YES_NO;
-  const existingValues = configSheet.getRange(3, yesNoCol, 10, 1).getValues().flat().filter(Boolean);
-
-  if (existingValues.indexOf(EXTENSION_CONFIG.LEADER_ROLE_NAME) !== -1) {
-    ss.toast('Member Leader role already configured', 'Setup Complete', 3);
-    return { success: true, alreadyExists: true };
-  }
-
-  const nextRow = existingValues.length + 3;
-  configSheet.getRange(nextRow, yesNoCol).setValue(EXTENSION_CONFIG.LEADER_ROLE_NAME);
+  const leaderValues = ['Yes', 'No', EXTENSION_CONFIG.LEADER_ROLE_NAME];
+  const isRange = memberSheet.getRange(2, MEMBER_COLS.IS_STEWARD, Math.max(1, memberSheet.getMaxRows() - 1), 1);
+  const isRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(leaderValues, true)
+    .setAllowInvalid(true)
+    .build();
+  isRange.setDataValidation(isRule);
 
   if (typeof logAuditEvent === 'function' && typeof AUDIT_EVENTS !== 'undefined') {
     logAuditEvent(AUDIT_EVENTS.SETTINGS_CHANGED, {
@@ -52429,8 +53704,8 @@ function setupMemberLeaderRole() {
     });
   }
 
-  ss.toast('Member Leader role added to Config.', 'Setup Complete', 5);
-  return { success: true, addedAt: nextRow };
+  ss.toast('Member Leader role added to IS_STEWARD validation.', 'Setup Complete', 5);
+  return { success: true };
 }
 
 /**
@@ -52836,8 +54111,8 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
 </head>
 <body>
   <div class="header">
-    <h2>Grievance ${grievanceId}</h2>
-    <div class="member">${reminders.memberName} • ${reminders.status}</div>
+    <h2>Grievance ${escapeHtml(grievanceId)}</h2>
+    <div class="member">${escapeHtml(reminders.memberName)} • ${escapeHtml(reminders.status)}</div>
   </div>
 
   <div class="reminder-card">
@@ -52848,7 +54123,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
     </div>
     <div class="form-group">
       <label class="form-label">Note (e.g., "Schedule Step II meeting")</label>
-      <input type="text" class="form-input" id="r1Note" value="${reminders.reminder1.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
+      <input type="text" class="form-input" id="r1Note" value="${escapeHtml(reminders.reminder1.note)}" placeholder="Brief description...">
     </div>
     <div class="btn-row">
       <button class="btn btn-clear" onclick="clearReminder(1)">Clear</button>
@@ -52863,7 +54138,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
     </div>
     <div class="form-group">
       <label class="form-label">Note</label>
-      <input type="text" class="form-input" id="r2Note" value="${reminders.reminder2.note.replace(/"/g, '&quot;')}" placeholder="Brief description...">
+      <input type="text" class="form-input" id="r2Note" value="${escapeHtml(reminders.reminder2.note)}" placeholder="Brief description...">
     </div>
     <div class="btn-row">
       <button class="btn btn-clear" onclick="clearReminder(2)">Clear</button>
@@ -52878,7 +54153,7 @@ function buildReminderDialogHtml_(grievanceId, reminders) {
   </div>
 
   <script>
-    var grievanceId = '${grievanceId}';
+    var grievanceId = ${JSON.stringify(grievanceId)};
 
     function saveReminders() {
       var r1Date = document.getElementById('r1Date').value;
@@ -53110,7 +54385,7 @@ function setupLookerIntegration() {
 
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      sheet.hideSheet();
+      setSheetVeryHidden_(sheet);
       created.push(sheetName);
     }
   }
@@ -53326,8 +54601,8 @@ function refreshLookerGrievances_() {
       row[cols.INCIDENT_DATE - 1] || '',
       dateFiled || '',
       dateClosed || '',
-      row[cols.DAYS_OPEN - 1] || '',
-      daysToDeadline || '',
+      numericField_(row[cols.DAYS_OPEN - 1]),
+      numericField_(daysToDeadline),
       isOverdue ? 'Yes' : 'No',
       row[cols.ISSUE_CATEGORY - 1] || '',
       row[cols.ARTICLES - 1] || '',
@@ -53610,7 +54885,7 @@ function setupLookerAnonIntegration() {
 
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
-      sheet.hideSheet();
+      setSheetVeryHidden_(sheet);
       created.push(sheetName);
     }
   }
@@ -53837,8 +55112,8 @@ function refreshLookerAnonGrievances_() {
       closedMonth,
       closedQuarter,
       closedYear,
-      row[cols.DAYS_OPEN - 1] || '',
-      daysToDeadline || '',
+      numericField_(row[cols.DAYS_OPEN - 1]),
+      numericField_(daysToDeadline),
       isOverdue ? 'Yes' : 'No',
       row[cols.ISSUE_CATEGORY - 1] || '',
       row[cols.ARTICLES - 1] || '',
@@ -55700,7 +56975,7 @@ function updateMemberContact(sessionToken, updates) {
         value = formatPhoneNumber_(value);
       }
 
-      sheet.getRange(memberRow, fieldMapping[field]).setValue(value);
+      sheet.getRange(memberRow, fieldMapping[field]).setValue(escapeForFormula(value));
       updated.push(field);
     }
   }
@@ -56005,7 +57280,7 @@ function getMemberSelfServicePortalHtml() {
     '</div>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'var sessionToken=null;' +
     'var profileData=null;' +
 
@@ -56278,7 +57553,7 @@ function getMemberSelfServicePortal() {
   var html = getMemberSelfServicePortalHtml();
   return HtmlService.createHtmlOutput(html)
     .setTitle('Member Self-Service Portal')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 /**
@@ -56771,9 +58046,9 @@ function processMeetingCheckIn(meetingId, email, pin) {
     meetingDate,
     meetingType,
     memberId,
-    memberName.trim(),
+    escapeForFormula(memberName.trim()),
     new Date(),
-    email
+    escapeForFormula(email)
   ]);
 
   // If this is a Scheduled meeting getting its first check-in, mark as Active
@@ -57077,7 +58352,7 @@ function getSetupMeetingHtml_() {
     '<div id="success" class="success"></div>' +
     '</div>' +
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
     'document.getElementById("meetingDate").valueAsDate=new Date();' +
     'var stewardData=[];' +
     // Load stewards on dialog open
@@ -57240,7 +58515,7 @@ function getMeetingCheckInHtml_() {
     '</div>' +
 
     '<script>' +
-    ' + getClientSideEscapeHtml() + ' +
+    getClientSideEscapeHtml() +
 
     // Load only today's eligible meetings for check-in
     'google.script.run' +
@@ -57772,13 +59047,13 @@ function showEventBusStatus() {
     '<h4>Registered Events (' + events.length + '):</h4><ul>';
 
   events.forEach(function(name) {
-    html += '<li>' + name + ' (' + EventBus.listenerCount(name) + ' listeners)</li>';
+    html += '<li>' + escapeHtml(name) + ' (' + EventBus.listenerCount(name) + ' listeners)</li>';
   });
   html += '</ul>';
 
   html += '<h4>Recent Events (' + log.length + '):</h4><ul>';
   log.forEach(function(entry) {
-    html += '<li>' + entry.timestamp.substr(11, 8) + ' - ' + entry.event + '</li>';
+    html += '<li>' + escapeHtml(entry.timestamp.substr(11, 8)) + ' - ' + escapeHtml(entry.event) + '</li>';
   });
   html += '</ul>';
 
@@ -58015,10 +59290,10 @@ function sendDashboardReportEmail_(schedule) {
     html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Summary Metrics</h2>';
     html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
-    html += '<tr><td>Total Members</td><td style="text-align:right;font-weight:bold">' + data.totalMembers + '</td></tr>';
-    html += '<tr><td>Open Cases</td><td style="text-align:right;font-weight:bold">' + data.openCases + '</td></tr>';
-    html += '<tr><td>Win Rate</td><td style="text-align:right;font-weight:bold">' + data.winRate + '%</td></tr>';
-    html += '<tr><td>Morale Score</td><td style="text-align:right;font-weight:bold">' + data.moraleScore + '/10</td></tr>';
+    html += '<tr><td>Total Members</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.totalMembers)) + '</td></tr>';
+    html += '<tr><td>Open Cases</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.openCases)) + '</td></tr>';
+    html += '<tr><td>Win Rate</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.winRate)) + '%</td></tr>';
+    html += '<tr><td>Morale Score</td><td style="text-align:right;font-weight:bold">' + escapeHtml(String(data.moraleScore)) + '/10</td></tr>';
     html += '</table></div>';
   }
 
@@ -58027,7 +59302,7 @@ function sendDashboardReportEmail_(schedule) {
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Monthly Filings Trend</h2>';
     html += '<table style="width:100%;color:#e2e8f0;font-size:13px">';
     for (var m = 0; m < data.monthlyFilings.length; m++) {
-      html += '<tr><td>' + data.monthlyFilings[m].month + '</td><td style="text-align:right">' + data.monthlyFilings[m].count + ' filed</td></tr>';
+      html += '<tr><td>' + escapeHtml(String(data.monthlyFilings[m].month)) + '</td><td style="text-align:right">' + escapeHtml(String(data.monthlyFilings[m].count)) + ' filed</td></tr>';
     }
     html += '</table></div>';
   }
@@ -58035,7 +59310,7 @@ function sendDashboardReportEmail_(schedule) {
   if (sections.indexOf('satisfaction') >= 0) {
     html += '<div style="background:#334155;padding:16px;border-radius:8px;margin:16px 0">';
     html += '<h2 style="font-size:14px;color:#e2e8f0;margin-bottom:12px">Satisfaction</h2>';
-    html += '<p style="color:#e2e8f0">Overall Morale: <strong>' + data.moraleScore + '/10</strong></p>';
+    html += '<p style="color:#e2e8f0">Overall Morale: <strong>' + escapeHtml(String(data.moraleScore)) + '/10</strong></p>';
     html += '</div>';
   }
 
