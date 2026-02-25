@@ -1,14 +1,20 @@
 <script>
 /**
  * Steward View — "Mono Signal"
- * Dense, monospace, dot-status, filterable case list
+ * v4.12.0 — Cases, Members tab, Broadcast, Survey tracking, Weekly Q manager,
+ * Resources tab, responsive sidebar layout.
  */
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+
 function initStewardView(container) {
   var t = ThemeEngine.getTheme('steward', AppState.isDark);
   ThemeEngine.applyTheme(t);
+  AppState.activeRole = 'steward';
   showLoading(container);
-  
-  // Load data
+
   google.script.run
     .withSuccessHandler(function(cases) {
       AppState.cases = cases || [];
@@ -25,7 +31,7 @@ function initStewardView(container) {
         })
         .dataGetStewardKPIs(CURRENT_USER.email);
     })
-    .withFailureHandler(function(err) {
+    .withFailureHandler(function() {
       AppState.cases = [];
       AppState.loading = false;
       renderStewardDashboard(container);
@@ -33,202 +39,157 @@ function initStewardView(container) {
     .dataGetStewardCases(CURRENT_USER.email);
 }
 
-function renderStewardDashboard(container) {
-  container.innerHTML = '';
-  var filter = 'all';
-  
-  var t = ThemeEngine.getTheme('steward', AppState.isDark);
-  
-  // Header
+// ═══════════════════════════════════════
+// STEWARD HEADER (shared)
+// ═══════════════════════════════════════
+
+function _stewardHeader(container, title, subtitle) {
   var header = el('div', { className: 'page-header' });
   var headerLeft = el('div', { className: 'page-header-left' });
-  headerLeft.appendChild(el('div', { className: 'page-title' }, 'Cases'));
-  headerLeft.appendChild(el('div', { className: 'page-subtitle' }, CURRENT_USER.name + ' · ' + CURRENT_USER.unit));
+  headerLeft.appendChild(el('div', { className: 'page-title' }, title));
+  if (subtitle) headerLeft.appendChild(el('div', { className: 'page-subtitle' }, subtitle));
   header.appendChild(headerLeft);
-  
+
   var headerRight = el('div', { className: 'page-header-right' });
-  
-  // Dual role toggle
-  if (IS_DUAL_ROLE) {
-    var switchBtn = el('button', {
-      style: {
-        background: 'var(--accentBg)', border: '1px solid var(--accentBorder)',
-        borderRadius: '6px', padding: '4px 10px', fontSize: '10px',
-        color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)',
-      },
-      onClick: function() {
-        AppState.activeRole = 'member';
-        var memberTheme = ThemeEngine.getTheme('member', AppState.isDark);
-        ThemeEngine.applyTheme(memberTheme);
-        initMemberView(container);
-      }
-    }, '👤 ' + CONFIG.memberLabel);
-    headerRight.appendChild(switchBtn);
-  }
-  
-  // Dark/light toggle
-  headerRight.appendChild(el('button', {
-    className: 'icon-btn',
-    onClick: function() {
-      AppState.isDark = !AppState.isDark;
-      var newTheme = ThemeEngine.getTheme('steward', AppState.isDark);
-      ThemeEngine.applyTheme(newTheme);
-      renderStewardDashboard(container);
+  if (!isSidebarLayout()) {
+    if (IS_DUAL_ROLE) {
+      headerRight.appendChild(el('button', {
+        style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+        onClick: function() { AppState.activeRole = 'member'; initMemberView(document.getElementById('app')); }
+      }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
     }
-  }, AppState.isDark ? '☀️' : '🌙'));
-  
-  // Logout
-  headerRight.appendChild(el('button', { className: 'icon-btn', onClick: handleLogout }, '↩'));
-  
+    headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
+      AppState.isDark = !AppState.isDark;
+      ThemeEngine.applyTheme(ThemeEngine.getTheme('steward', AppState.isDark));
+      renderStewardDashboard(document.getElementById('app'));
+    }}, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));
+    headerRight.appendChild(el('button', { className: 'icon-btn', onClick: handleLogout }, '\u21A9'));
+  }
   header.appendChild(headerRight);
   container.appendChild(header);
-  
-  // KPIs
-  var kpis = AppState.kpis || {};
-  var kpiGrid = el('div', { className: 'kpi-grid' });
-  var kpiItems = [
-    { label: 'My Cases', value: kpis.totalCases || 0 },
-    { label: 'Overdue', value: kpis.overdue || 0, color: kpis.overdue > 0 ? 'var(--danger)' : null },
-    { label: 'Due <7d', value: kpis.dueSoon || 0, color: kpis.dueSoon > 0 ? 'var(--warning)' : null },
-    { label: 'Resolved', value: kpis.resolved || 0, color: 'var(--success)' },
-  ];
-  kpiItems.forEach(function(kpi) {
-    var card = el('div', { className: 'kpi-card' });
-    card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
-    var val = el('div', { className: 'kpi-value' }, String(kpi.value));
-    if (kpi.color) val.style.color = kpi.color;
-    card.appendChild(val);
-    kpiGrid.appendChild(card);
+}
+
+// ═══════════════════════════════════════
+// CASES DASHBOARD (main steward tab)
+// ═══════════════════════════════════════
+
+function renderStewardDashboard(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'cases', function(container) {
+    _stewardHeader(container, 'Cases', CURRENT_USER.name + ' \u00B7 ' + CURRENT_USER.unit);
+
+    // KPIs
+    var kpis = AppState.kpis || {};
+    var kpiGrid = el('div', { className: 'kpi-grid' });
+    var kpiItems = [
+      { label: 'My Cases', value: kpis.totalCases || 0 },
+      { label: 'Overdue', value: kpis.overdue || 0, color: kpis.overdue > 0 ? 'var(--danger)' : null },
+      { label: 'Due <7d', value: kpis.dueSoon || 0, color: kpis.dueSoon > 0 ? 'var(--warning)' : null },
+      { label: 'Resolved', value: kpis.resolved || 0, color: 'var(--success)' },
+    ];
+    kpiItems.forEach(function(kpi) {
+      var card = el('div', { className: 'kpi-card' });
+      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+      if (kpi.color) val.style.color = kpi.color;
+      card.appendChild(val);
+      kpiGrid.appendChild(card);
+    });
+    container.appendChild(kpiGrid);
+
+    // Filter bar
+    var filter = 'all';
+    var filterBar = el('div', { className: 'filter-bar' });
+    var overdueCount = AppState.cases.filter(function(c) { return c.status === 'overdue'; }).length;
+    var filters = [
+      { key: 'all', label: 'All ' + AppState.cases.length },
+      { key: 'overdue', label: 'Overdue ' + overdueCount },
+      { key: 'active', label: 'Active' },
+    ];
+
+    filters.forEach(function(f) {
+      var tab = el('button', {
+        className: 'filter-tab' + (filter === f.key ? ' active' : ''),
+        onClick: function() {
+          filter = f.key;
+          renderCaseList(caseListContainer, filter);
+          filterBar.querySelectorAll('.filter-tab').forEach(function(t, i) {
+            t.className = 'filter-tab' + (filters[i].key === filter ? ' active' : '');
+          });
+        }
+      }, f.label);
+      filterBar.appendChild(tab);
+    });
+    container.appendChild(filterBar);
+
+    var caseListContainer = el('div', { className: 'content' });
+    renderCaseList(caseListContainer, filter);
+    container.appendChild(caseListContainer);
+
+    // FAB — opens broadcast
+    var fab = el('button', { className: 'fab', onClick: function() { renderBroadcast(document.getElementById('app')); } }, '\uD83D\uDCE2');
+    container.appendChild(fab);
   });
-  container.appendChild(kpiGrid);
-  
-  // Filter bar
-  var filterBar = el('div', { className: 'filter-bar' });
-  var overdueCount = AppState.cases.filter(function(c) { return c.status === 'overdue'; }).length;
-  var filters = [
-    { key: 'all', label: 'All ' + AppState.cases.length },
-    { key: 'overdue', label: 'Overdue ' + overdueCount },
-    { key: 'active', label: 'Active' },
-  ];
-  
-  filters.forEach(function(f) {
-    var tab = el('button', {
-      className: 'filter-tab' + (filter === f.key ? ' active' : ''),
-      onClick: function() {
-        filter = f.key;
-        renderCaseList(caseListContainer, filter);
-        // Update active states
-        filterBar.querySelectorAll('.filter-tab').forEach(function(t, i) {
-          t.className = 'filter-tab' + (filters[i].key === filter ? ' active' : '');
-        });
-      }
-    }, f.label);
-    filterBar.appendChild(tab);
-  });
-  container.appendChild(filterBar);
-  
-  // Case list container
-  var caseListContainer = el('div', { className: 'content' });
-  renderCaseList(caseListContainer, filter);
-  container.appendChild(caseListContainer);
-  
-  // FAB
-  var fab = el('button', { className: 'fab' }, '+');
-  container.appendChild(fab);
-  
-  // Bottom nav
-  renderBottomNav(container, 'steward', 'cases');
 }
 
 function renderCaseList(container, filter) {
   container.innerHTML = '';
-  
   var cases = AppState.cases;
   if (filter === 'overdue') cases = cases.filter(function(c) { return c.status === 'overdue'; });
   if (filter === 'active') cases = cases.filter(function(c) { return c.status === 'active' || c.status === 'new'; });
-  
+
   if (cases.length === 0) {
-    container.appendChild(el('div', {
-      style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' }
-    }, filter === 'all' ? 'No cases assigned.' : 'No ' + filter + ' cases.'));
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } },
+      filter === 'all' ? 'No cases assigned.' : 'No ' + filter + ' cases.'));
     return;
   }
-  
+
   cases.forEach(function(c) {
     var isOverdue = c.status === 'overdue';
     var statusClass = c.status || 'active';
-    
-    var card = el('div', {
-      className: 'card card-clickable',
-      style: {
-        padding: '11px 14px',
-        marginBottom: '6px',
-        borderLeftColor: isOverdue ? 'var(--danger)' : undefined,
-      }
-    });
-    
-    // Top row: dot + ID + deadline
+    var card = el('div', { className: 'card card-clickable', style: { padding: '11px 14px', marginBottom: '6px' } });
+
     var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
-    
     var leftGroup = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
     leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
-    leftGroup.appendChild(el('span', {
-      style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' }
-    }, c.id));
-    
+    leftGroup.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, c.id));
     topRow.appendChild(leftGroup);
-    
-    var deadlineSpan = el('span', {
-      style: {
-        fontFamily: 'var(--fontBody)', fontSize: '11px',
-        color: isOverdue ? 'var(--danger)' : 'var(--muted)',
-        fontWeight: isOverdue ? '700' : '400',
-      }
-    });
-    if (c.deadlineDays !== null) {
-      deadlineSpan.textContent = c.deadlineDays < 0 ? c.deadlineDays + 'd' : c.deadlineDays + 'd';
-    } else {
-      deadlineSpan.textContent = '—';
-    }
+
+    var deadlineSpan = el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: isOverdue ? 'var(--danger)' : 'var(--muted)', fontWeight: isOverdue ? '700' : '400' } });
+    deadlineSpan.textContent = c.deadlineDays !== null ? c.deadlineDays + 'd' : '\u2014';
     topRow.appendChild(deadlineSpan);
     card.appendChild(topRow);
-    
-    // Bottom row: name + step + unit
+
     var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
-    
-    // We only have email, not member name in grievance record
-    // In production, you'd join with member directory
     var memberDisplay = c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown';
-    bottomRow.appendChild(el('span', {
-      style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' }
-    }, memberDisplay + ' · ' + (c.step || '')));
-    bottomRow.appendChild(el('span', {
-      style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' }
-    }, c.unit || ''));
-    
+    bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' } }, memberDisplay + ' \u00B7 ' + (c.step || '')));
+    bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' } }, c.unit || ''));
     card.appendChild(bottomRow);
     container.appendChild(card);
   });
 }
 
+// ═══════════════════════════════════════
+// BOTTOM NAV (shared by both views)
+// ═══════════════════════════════════════
+
 function renderBottomNav(container, role, activeTab) {
   var nav = el('div', { className: 'bottom-nav' });
-  
   var tabs = role === 'steward' ? [
-    { id: 'cases', icon: '📋', label: 'Cases' },
-    { id: 'members', icon: '👥', label: 'Members' },
-    { id: 'deadlines', icon: '📅', label: 'Deadlines' },
-    { id: 'settings', icon: '⚙️', label: 'Settings' },
+    { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
+    { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
+    { id: 'deadlines', icon: '\uD83D\uDCC5', label: 'Deadlines' },
+    { id: 'more_steward', icon: '\u2630', label: 'More' },
   ] : [
-    { id: 'home', icon: '🏠', label: 'Home' },
-    { id: 'cases', icon: '📋', label: 'My Cases' },
-    { id: 'contact', icon: '💬', label: 'Contact' },
-    { id: 'more', icon: '☰', label: 'More' },
+    { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
+    { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
+    { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
+    { id: 'more', icon: '\u2630', label: 'More' },
   ];
-  
+
   tabs.forEach(function(tab) {
     var item = el('div', {
       className: 'nav-item' + (tab.id === activeTab ? ' active' : ''),
+      onClick: function() { _handleTabNav(role, tab.id === 'more_steward' ? '_steward_more' : tab.id === 'more' ? '_member_more' : tab.id); }
     });
     item.appendChild(el('span', { className: 'nav-icon' }, tab.icon));
     var label = el('span', { className: 'nav-label' }, tab.label);
@@ -236,7 +197,694 @@ function renderBottomNav(container, role, activeTab) {
     item.appendChild(label);
     nav.appendChild(item);
   });
-  
+
   container.appendChild(nav);
+}
+
+// ═══════════════════════════════════════
+// MEMBERS TAB
+// ═══════════════════════════════════════
+
+function renderStewardMembers(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'members', function(container) {
+    _stewardHeader(container, 'Members');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(members) {
+      content.innerHTML = '';
+      if (!members || members.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'No members assigned.'));
+        return;
+      }
+
+      // KPI strip
+      var activeGrievances = members.filter(function(m) { return m.hasOpenGrievance; }).length;
+      var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
+      [
+        { label: 'Assigned', value: members.length },
+        { label: 'Active Cases', value: activeGrievances, color: activeGrievances > 0 ? 'var(--warning)' : null },
+        { label: 'Members', value: members.length, color: 'var(--accent)' },
+      ].forEach(function(kpi) {
+        var card = el('div', { className: 'kpi-card' });
+        card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+        var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+        if (kpi.color) val.style.color = kpi.color;
+        card.appendChild(val);
+        kpiStrip.appendChild(card);
+      });
+      content.appendChild(kpiStrip);
+
+      // Chart.js stats
+      if (typeof ChartHelper !== 'undefined') {
+        google.script.run.withSuccessHandler(function(stats) {
+          if (!stats || !stats.byDues) return;
+          var chartRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' } });
+          // Dues doughnut
+          var duesCard = el('div', { className: 'card', style: { padding: '12px' } });
+          duesCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Dues Status'));
+          var dLabels = Object.keys(stats.byDues);
+          var dData = dLabels.map(function(k) { return stats.byDues[k]; });
+          ChartHelper.createDoughnutChart(duesCard, 'members-dues-chart', dLabels, dData);
+          chartRow.appendChild(duesCard);
+          // Location bar
+          var locCard = el('div', { className: 'card', style: { padding: '12px' } });
+          locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Location'));
+          var lLabels = Object.keys(stats.byLocation);
+          var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
+          ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
+          chartRow.appendChild(locCard);
+          // Insert after KPI strip
+          var searchEl = content.querySelector('.search-input');
+          if (searchEl) content.insertBefore(chartRow, searchEl);
+          else content.appendChild(chartRow);
+        }).dataGetStewardMemberStats(CURRENT_USER.email);
+      }
+
+      // Sort & Filter controls
+      var controlRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } });
+      var sortSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
+      [{ v: 'name-az', l: 'Name A-Z' }, { v: 'name-za', l: 'Name Z-A' }, { v: 'location', l: 'Location' }, { v: 'dues', l: 'Dues Status' }].forEach(function(o) {
+        sortSelect.appendChild(el('option', { value: o.v }, o.l));
+      });
+      controlRow.appendChild(sortSelect);
+
+      var filterSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
+      filterSelect.appendChild(el('option', { value: 'all' }, 'All'));
+      filterSelect.appendChild(el('option', { value: 'grievance' }, 'Has Open Case'));
+      var locs = {};
+      members.forEach(function(m) { if (m.workLocation) locs[m.workLocation] = true; });
+      Object.keys(locs).sort().forEach(function(loc) {
+        filterSelect.appendChild(el('option', { value: 'loc:' + loc }, loc));
+      });
+      controlRow.appendChild(filterSelect);
+      content.appendChild(controlRow);
+
+      // Search
+      var searchInput = el('input', {
+        className: 'search-input',
+        placeholder: 'Search members...',
+        onInput: rerender
+      });
+      content.appendChild(searchInput);
+
+      var listArea = el('div');
+      content.appendChild(listArea);
+
+      sortSelect.addEventListener('change', rerender);
+      filterSelect.addEventListener('change', rerender);
+
+      function rerender() {
+        var q = searchInput.value.toLowerCase();
+        var sortKey = sortSelect.value;
+        var filterKey = filterSelect.value;
+        var filtered = members.slice();
+        if (q) {
+          filtered = filtered.filter(function(m) {
+            return (m.name || '').toLowerCase().indexOf(q) !== -1 ||
+                   (m.email || '').toLowerCase().indexOf(q) !== -1 ||
+                   (m.workLocation || '').toLowerCase().indexOf(q) !== -1;
+          });
+        }
+        if (filterKey === 'grievance') {
+          filtered = filtered.filter(function(m) { return m.hasOpenGrievance; });
+        } else if (filterKey.indexOf('loc:') === 0) {
+          var loc = filterKey.substring(4);
+          filtered = filtered.filter(function(m) { return m.workLocation === loc; });
+        }
+        filtered.sort(function(a, b) {
+          if (sortKey === 'name-za') return (b.name || '').localeCompare(a.name || '');
+          if (sortKey === 'location') return (a.workLocation || '').localeCompare(b.workLocation || '');
+          if (sortKey === 'dues') return (a.duesStatus || '').localeCompare(b.duesStatus || '');
+          return (a.name || '').localeCompare(b.name || '');
+        });
+        renderFilteredMembers(listArea, filtered, '');
+      }
+      rerender();
+    }).dataGetStewardMembers(CURRENT_USER.email);
+  });
+}
+
+function renderFilteredMembers(container, members, query) {
+  container.innerHTML = '';
+  var filtered = query ? members.filter(function(m) {
+    return (m.name || '').toLowerCase().indexOf(query) !== -1 ||
+           (m.email || '').toLowerCase().indexOf(query) !== -1 ||
+           (m.workLocation || '').toLowerCase().indexOf(query) !== -1;
+  }) : members;
+
+  if (filtered.length === 0) {
+    container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '16px 0', textAlign: 'center' } }, 'No matches.'));
+    return;
+  }
+
+  filtered.forEach(function(m) {
+    var item = el('div', { className: 'member-list-item' });
+    item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
+    var info = el('div', { className: 'member-list-info' });
+    info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
+    var meta = m.workLocation || '';
+    if (m.officeDays) meta += (meta ? ' \u00B7 ' : '') + m.officeDays;
+    info.appendChild(el('div', { className: 'member-list-meta' }, meta));
+    item.appendChild(info);
+
+    var badges = el('div', { className: 'member-list-badges' });
+    if (m.hasOpenGrievance) badges.appendChild(el('div', { className: 'status-dot active', title: 'Has open grievance' }));
+    item.appendChild(badges);
+    container.appendChild(item);
+  });
+}
+
+// ═══════════════════════════════════════
+// BROADCAST
+// ═══════════════════════════════════════
+
+function renderBroadcast(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'broadcast', function(container) {
+    _stewardHeader(container, 'Broadcast Message');
+    var content = el('div', { className: 'content' });
+
+    // Location filter
+    var locationGroup = el('div', { className: 'form-group' });
+    locationGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Location (optional)'));
+    var locationInput = el('input', { className: 'form-input', placeholder: 'All locations' });
+    locationGroup.appendChild(locationInput);
+    content.appendChild(locationGroup);
+
+    // Office days filter
+    var daysGroup = el('div', { className: 'form-group' });
+    daysGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Office Days (optional)'));
+    var daysInput = el('input', { className: 'form-input', placeholder: 'e.g., Monday, Wednesday' });
+    daysGroup.appendChild(daysInput);
+    content.appendChild(daysGroup);
+
+    // Message
+    var msgGroup = el('div', { className: 'form-group' });
+    msgGroup.appendChild(el('label', { className: 'form-label' }, 'Message'));
+    var msgTextarea = el('textarea', { className: 'msg-textarea', placeholder: 'Type your message to members...' });
+    msgGroup.appendChild(msgTextarea);
+    content.appendChild(msgGroup);
+
+    var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '10px' } });
+    content.appendChild(statusMsg);
+
+    content.appendChild(el('button', {
+      className: 'btn btn-primary',
+      onClick: function() {
+        var msg = msgTextarea.value.trim();
+        if (!msg) { statusMsg.textContent = 'Please enter a message.'; statusMsg.style.color = 'var(--danger)'; return; }
+        var filter = {};
+        if (locationInput.value.trim()) filter.location = locationInput.value.trim();
+        if (daysInput.value.trim()) filter.officeDays = daysInput.value.trim();
+        statusMsg.textContent = 'Sending...';
+        statusMsg.style.color = 'var(--muted)';
+        google.script.run.withSuccessHandler(function(result) {
+          statusMsg.textContent = result && result.success ? result.message : (result && result.message) || 'Error sending.';
+          statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+          if (result && result.success) msgTextarea.value = '';
+        }).withFailureHandler(function() {
+          statusMsg.textContent = 'Error sending. Try again.';
+          statusMsg.style.color = 'var(--danger)';
+        }).dataSendBroadcast(CURRENT_USER.email, filter, msg);
+      }
+    }, 'Send Broadcast'));
+
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// STEWARD RESOURCES
+// ═══════════════════════════════════════
+
+function renderStewardResources(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'resources', function(container) {
+    _stewardHeader(container, 'Resources');
+    var content = el('div', { className: 'content' });
+    var items = [
+      { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
+      { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
+      { icon: '\uD83D\uDCD6', label: 'Know Your Rights', sub: 'Contract highlights' },
+      { icon: '\uD83D\uDCDD', label: 'File a Grievance', sub: 'Start a new case for a member' },
+      { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
+    ];
+    if (CONFIG.orgWebsite) items.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+
+    items.forEach(function(r) {
+      var item = el('div', {
+        className: 'card card-clickable',
+        style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
+        onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
+      });
+      item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
+      var tg = el('div', { style: { flex: '1' } });
+      tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+      tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+      item.appendChild(tg);
+      item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+      content.appendChild(item);
+    });
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// SURVEY TRACKING (steward view)
+// ═══════════════════════════════════════
+
+function renderSurveyTracking(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'surveytrack', function(container) {
+    _stewardHeader(container, 'Survey Tracking');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(data) {
+      content.innerHTML = '';
+      if (!data || data.total === 0) {
+        content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No assigned members to track.'));
+        return;
+      }
+
+      // Progress chart (doughnut)
+      var pct = Math.round((data.completed / data.total) * 100);
+      var progCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '14px' } });
+      progCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Completion: ' + data.completed + '/' + data.total));
+
+      if (typeof ChartHelper !== 'undefined') {
+        var remaining = data.total - data.completed;
+        var cColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#facc15' : '#ef4444';
+        ChartHelper.createDoughnutChart(progCard, 'survey-track-chart',
+          ['Completed', 'Pending'],
+          [data.completed, remaining],
+          [cColor, 'rgba(255,255,255,0.08)']
+        );
+      } else {
+        var track = el('div', { className: 'bar-chart-track', style: { height: '10px' } });
+        track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)' } }));
+        progCard.appendChild(track);
+      }
+      progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px' } }, pct + '% complete'));
+      content.appendChild(progCard);
+
+      // Member list with checkmarks
+      (data.members || []).forEach(function(m) {
+        var item = el('div', { className: 'member-list-item' });
+        item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
+        var info = el('div', { className: 'member-list-info' });
+        info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
+        if (m.lastCompleted) info.appendChild(el('div', { className: 'member-list-meta' }, 'Completed ' + m.lastCompleted));
+        item.appendChild(info);
+        item.appendChild(el('span', { style: { fontSize: '16px', color: m.completed ? 'var(--success)' : 'var(--muted)' } }, m.completed ? '\u2705' : '\u2B1C'));
+        content.appendChild(item);
+      });
+    }).dataGetStewardSurveyTracking(CURRENT_USER.email);
+  });
+}
+
+// ═══════════════════════════════════════
+// STEWARD MORE MENU
+// ═══════════════════════════════════════
+
+function renderStewardMore(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'more_steward', function(container) {
+    _stewardHeader(container, 'More');
+    var content = el('div', { className: 'content' });
+    var menuItems = [
+      { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { renderStewardTasks(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { renderBroadcast(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
+      { icon: '\u2753', label: 'Weekly Questions', desc: 'Manage weekly engagement questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'steward'); } },
+      { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
+    ];
+
+    menuItems.forEach(function(m) {
+      var item = el('div', { className: 'more-menu-item', onClick: m.action });
+      item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
+      var text = el('div');
+      text.appendChild(el('div', { className: 'more-menu-label' }, m.label));
+      text.appendChild(el('div', { className: 'more-menu-desc' }, m.desc));
+      item.appendChild(text);
+      content.appendChild(item);
+    });
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// WEEKLY QUESTIONS — Steward Manager
+// ═══════════════════════════════════════
+// Note: The shared renderWeeklyQuestionsPage() in member_view.html handles
+// the basic display. For steward role, we add the manager after the list.
+
+// ═══════════════════════════════════════
+// CONTACT LOG (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderContactLog(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'contactlog', function(container) {
+    _stewardHeader(container, 'Contact Log');
+    var content = el('div', { className: 'content' });
+
+    // Sub-tabs
+    var activeSubTab = 'log';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['log', 'recent', 'by member'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'log') _renderContactForm(subContent);
+      else if (activeSubTab === 'recent') _renderRecentContacts(subContent);
+      else _renderContactByMember(subContent);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderContactForm(container) {
+  var typeIcons = { 'Phone': '\uD83D\uDCDE', 'Email': '\u2709\uFE0F', 'In Person': '\uD83D\uDC64', 'Text': '\uD83D\uDCAC' };
+  container.appendChild(el('h3', { className: 'section-title' }, 'Log a Contact'));
+
+  var memberGroup = el('div', { className: 'form-group' });
+  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Member Email'));
+  var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  memberGroup.appendChild(memberInput);
+  container.appendChild(memberGroup);
+
+  var typeGroup = el('div', { className: 'form-group' });
+  typeGroup.appendChild(el('label', { className: 'form-label' }, 'Contact Type'));
+  var typeRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  var selectedType = 'Phone';
+  Object.keys(typeIcons).forEach(function(t) {
+    var btn = el('button', {
+      className: 'filter-tab' + (t === selectedType ? ' active' : ''),
+      onClick: function() {
+        selectedType = t;
+        typeRow.querySelectorAll('.filter-tab').forEach(function(b, i) {
+          b.className = 'filter-tab' + (Object.keys(typeIcons)[i] === t ? ' active' : '');
+        });
+      }
+    }, typeIcons[t] + ' ' + t);
+    typeRow.appendChild(btn);
+  });
+  typeGroup.appendChild(typeRow);
+  container.appendChild(typeGroup);
+
+  var notesGroup = el('div', { className: 'form-group' });
+  notesGroup.appendChild(el('label', { className: 'form-label' }, 'Notes (optional)'));
+  var notesInput = el('textarea', { className: 'msg-textarea', placeholder: 'Brief notes about the interaction...', style: { minHeight: '60px' } });
+  notesGroup.appendChild(notesInput);
+  container.appendChild(notesGroup);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary',
+    onClick: function() {
+      var email = memberInput.value.trim();
+      if (!email) { statusMsg.textContent = 'Enter a member email.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Logging...'; statusMsg.style.color = 'var(--muted)';
+      google.script.run.withSuccessHandler(function(r) {
+        statusMsg.textContent = r && r.success ? 'Contact logged!' : 'Error logging contact.';
+        statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
+        if (r && r.success) { memberInput.value = ''; notesInput.value = ''; }
+      }).dataLogMemberContact(CURRENT_USER.email, email, selectedType, notesInput.value.trim(), '');
+    }
+  }, 'Log Contact'));
+}
+
+function _renderRecentContacts(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(log) {
+    container.innerHTML = '';
+    if (!log || log.length === 0) {
+      container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No contacts logged yet.'));
+      return;
+    }
+    log.slice(0, 20).forEach(function(entry) {
+      var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px' } });
+      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+      top.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, entry.memberEmail ? entry.memberEmail.split('@')[0] : ''));
+      top.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, entry.date));
+      card.appendChild(top);
+      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)' } }, entry.type));
+      if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
+      container.appendChild(card);
+    });
+  }).dataGetStewardContactLog(CURRENT_USER.email);
+}
+
+function _renderContactByMember(container) {
+  container.appendChild(el('h3', { className: 'section-title' }, 'Look Up by Member'));
+  var searchInput = el('input', { className: 'form-input', placeholder: 'Enter member email...' });
+  container.appendChild(searchInput);
+  var resultArea = el('div', { style: { marginTop: '10px' } });
+  container.appendChild(resultArea);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-secondary', style: { marginTop: '10px' },
+    onClick: function() {
+      var email = searchInput.value.trim();
+      if (!email) return;
+      showLoading(resultArea);
+      google.script.run.withSuccessHandler(function(history) {
+        resultArea.innerHTML = '';
+        if (!history || history.length === 0) {
+          resultArea.appendChild(el('div', { style: { color: 'var(--muted)', padding: '10px 0' } }, 'No contacts found for this member.'));
+          return;
+        }
+        history.forEach(function(entry) {
+          var card = el('div', { className: 'card', style: { padding: '10px 14px', marginBottom: '4px' } });
+          card.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
+            el('span', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600' } }, entry.type),
+            el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, entry.date),
+          ]));
+          if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
+          resultArea.appendChild(card);
+        });
+      }).dataGetMemberContactHistory(CURRENT_USER.email, email);
+    }
+  }, 'Search'));
+}
+
+// ═══════════════════════════════════════
+// STEWARD TASKS (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderStewardTasks(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'tasks', function(container) {
+    _stewardHeader(container, 'Tasks');
+    var content = el('div', { className: 'content' });
+
+    var activeSubTab = 'open';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['open', 'completed', 'new task'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'new task') _renderNewTaskForm(subContent, function() { activeSubTab = 'open'; refreshSubTabs(); renderSubContent(); });
+      else _renderTaskList(subContent, activeSubTab === 'completed' ? 'completed' : null);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderTaskList(container, statusFilter) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(tasks) {
+    container.innerHTML = '';
+    var filtered = statusFilter ? tasks.filter(function(t) { return t.status === statusFilter; }) : tasks.filter(function(t) { return t.status !== 'completed'; });
+
+    if (filtered.length === 0) {
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, statusFilter === 'completed' ? 'No completed tasks.' : 'No open tasks. Create one!'));
+      return;
+    }
+
+    // KPI strip
+    var highPri = filtered.filter(function(t) { return t.priority === 'high'; }).length;
+    var overdue = filtered.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
+    var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '10px' } });
+    [
+      { label: 'Total', value: filtered.length },
+      { label: 'High Priority', value: highPri, color: highPri > 0 ? 'var(--danger)' : null },
+      { label: 'Overdue', value: overdue, color: overdue > 0 ? 'var(--warning)' : null },
+    ].forEach(function(kpi) {
+      var card = el('div', { className: 'kpi-card' });
+      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+      if (kpi.color) val.style.color = kpi.color;
+      card.appendChild(val);
+      kpiStrip.appendChild(card);
+    });
+    container.appendChild(kpiStrip);
+
+    filtered.forEach(function(task) {
+      var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
+      var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
+      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+      top.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, task.title));
+      if (task.dueDate) top.appendChild(el('span', { style: { fontSize: '10px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, task.dueDate));
+      card.appendChild(top);
+      if (task.memberEmail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, task.memberEmail.split('@')[0]));
+      if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
+
+      if (task.status !== 'completed') {
+        var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px' } });
+        actions.appendChild(el('button', {
+          style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
+          onClick: function() {
+            google.script.run.withSuccessHandler(function() { renderStewardTasks(document.getElementById('app')); }).dataCompleteTask(CURRENT_USER.email, task.id);
+          }
+        }, '\u2705 Complete'));
+        card.appendChild(actions);
+      }
+      container.appendChild(card);
+    });
+  }).dataGetTasks(CURRENT_USER.email, statusFilter);
+}
+
+function _renderNewTaskForm(container, onCreated) {
+  container.appendChild(el('h3', { className: 'section-title' }, 'Create Task'));
+
+  var titleGroup = el('div', { className: 'form-group' });
+  titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
+  var titleInput = el('input', { className: 'form-input', placeholder: 'e.g., Check in on member' });
+  titleGroup.appendChild(titleInput);
+  container.appendChild(titleGroup);
+
+  var descGroup = el('div', { className: 'form-group' });
+  descGroup.appendChild(el('label', { className: 'form-label' }, 'Description (optional)'));
+  var descInput = el('textarea', { className: 'msg-textarea', placeholder: 'Details...', style: { minHeight: '60px' } });
+  descGroup.appendChild(descInput);
+  container.appendChild(descGroup);
+
+  var memberGroup = el('div', { className: 'form-group' });
+  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Related Member (optional)'));
+  var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  memberGroup.appendChild(memberInput);
+  container.appendChild(memberGroup);
+
+  var priGroup = el('div', { className: 'form-group' });
+  priGroup.appendChild(el('label', { className: 'form-label' }, 'Priority'));
+  var priSelect = el('select', { className: 'form-select' });
+  ['medium', 'high', 'low'].forEach(function(p) {
+    var opt = el('option', { value: p }, p.charAt(0).toUpperCase() + p.slice(1));
+    priSelect.appendChild(opt);
+  });
+  priGroup.appendChild(priSelect);
+  container.appendChild(priGroup);
+
+  var dueGroup = el('div', { className: 'form-group' });
+  dueGroup.appendChild(el('label', { className: 'form-label' }, 'Due Date (optional)'));
+  var dueInput = el('input', { className: 'form-input', type: 'date' });
+  dueGroup.appendChild(dueInput);
+  container.appendChild(dueGroup);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary',
+    onClick: function() {
+      var title = titleInput.value.trim();
+      if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Creating...'; statusMsg.style.color = 'var(--muted)';
+      google.script.run.withSuccessHandler(function(r) {
+        if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+      }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+    }
+  }, 'Create Task'));
+}
+
+// ═══════════════════════════════════════
+// MEMBERS TAB — Sort, Filter & Stats (v4.12.0 enhancements)
+// ═══════════════════════════════════════
+// Overrides the original renderStewardMembers with enhanced version
+
+// renderWeeklyQuestionsPage already handles steward role via the role param.
+// Additional steward-specific manager (set question, review pool):
+function renderWeeklyQuestionManager(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'weeklyq', function(container) {
+    _stewardHeader(container, 'Weekly Question Manager');
+    var content = el('div', { className: 'content' });
+
+    // Set steward question
+    content.appendChild(el('h3', { className: 'section-title' }, 'Set This Week\'s Question'));
+    var questionInput = el('textarea', { className: 'msg-textarea', placeholder: 'Type your question for this week...' });
+    content.appendChild(questionInput);
+
+    var setStatus = el('div', { style: { fontSize: '13px', minHeight: '20px', marginTop: '6px' } });
+    content.appendChild(setStatus);
+
+    content.appendChild(el('button', {
+      className: 'btn btn-primary', style: { marginTop: '10px', marginBottom: '24px' },
+      onClick: function() {
+        var text = questionInput.value.trim();
+        if (!text) { setStatus.textContent = 'Enter a question.'; setStatus.style.color = 'var(--danger)'; return; }
+        setStatus.textContent = 'Saving...';
+        google.script.run.withSuccessHandler(function(result) {
+          setStatus.textContent = result && result.success ? 'Question set!' : 'Error.';
+          setStatus.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+          if (result && result.success) questionInput.value = '';
+        }).wqSetStewardQuestion(CURRENT_USER.email, text);
+      }
+    }, 'Set Question'));
+
+    // Pool review
+    content.appendChild(el('h3', { className: 'section-title' }, 'Submitted Questions Pool'));
+    var poolArea = el('div');
+    showLoading(poolArea);
+    content.appendChild(poolArea);
+
+    google.script.run.withSuccessHandler(function(pool) {
+      poolArea.innerHTML = '';
+      if (!pool || pool.length === 0) {
+        poolArea.appendChild(el('div', { style: { color: 'var(--muted)', padding: '16px 0' } }, 'No pending questions in the pool.'));
+        return;
+      }
+      pool.forEach(function(q) {
+        var card = el('div', { className: 'wq-card' });
+        card.appendChild(el('div', { className: 'wq-question' }, q.text));
+        card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Status: ' + (q.status || 'pending')));
+        poolArea.appendChild(card);
+      });
+    }).wqGetPoolQuestions();
+
+    container.appendChild(content);
+  });
 }
 </script>

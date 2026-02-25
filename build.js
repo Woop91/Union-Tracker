@@ -59,6 +59,8 @@ const BUILD_ORDER = [
   '20_WebDashConfigReader.gs',
   '21_WebDashDataService.gs',
   '22_WebDashApp.gs',
+  '23_PortalSheets.gs',
+  '24_WeeklyQuestions.gs',
 ];
 
 // .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)

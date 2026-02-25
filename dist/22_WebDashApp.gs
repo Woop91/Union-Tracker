@@ -35,6 +35,28 @@ function doGetWebDashboard(e) {
     var userRecord = DataService.findUserByEmail(user.email);
     
     if (!userRecord) {
+      // Check if the visitor is the script owner � grant bootstrap access
+      // so the app is usable before the Member Directory is populated.
+      try {
+        var ownerEmail = Session.getEffectiveUser().getEmail().toLowerCase();
+        if (user.email && user.email.toLowerCase() === ownerEmail) {
+          userRecord = {
+            email: user.email,
+            name: 'Admin',
+            firstName: 'Admin',
+            lastName: '',
+            role: 'both',
+            unit: 'Admin',
+            joined: '',
+            duesStatus: 'Active',
+            phone: '',
+            isBootstrapAdmin: true,
+          };
+        }
+      } catch (ownerErr) { /* SSO not available � fall through */ }
+    }
+
+    if (!userRecord) {
       // Email not in directory
       return _serveError(config, 'not_found', user.email);
     }
@@ -71,7 +93,7 @@ function _serveAuth(config, e) {
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 /**
@@ -91,8 +113,12 @@ function _serveDashboard(config, userRecord, role, sessionToken) {
     joined: userRecord.joined,
     duesStatus: userRecord.duesStatus,
     phone: userRecord.phone,
+    workLocation: userRecord.workLocation || '',
+    officeDays: userRecord.officeDays || '',
+    assignedSteward: userRecord.assignedSteward || '',
+    hasOpenGrievance: userRecord.hasOpenGrievance || false,
   };
-  
+
   template.pageData = JSON.stringify({
     view: role === 'steward' || role === 'both' ? 'steward' : 'member',
     config: _sanitizeConfig(config),
@@ -104,7 +130,7 @@ function _serveDashboard(config, userRecord, role, sessionToken) {
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 /**
@@ -132,7 +158,7 @@ function _serveError(config, type, detail) {
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 /**
@@ -148,6 +174,10 @@ function _sanitizeConfig(config) {
     memberLabel: config.memberLabel,
     magicLinkExpiryDays: config.magicLinkExpiryDays,
     cookieDurationDays: config.cookieDurationDays,
+    calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
+    driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
+    surveyFormUrl: config.satisfactionFormUrl || '',
+    orgWebsite: config.orgWebsite || '',
   };
 }
 
