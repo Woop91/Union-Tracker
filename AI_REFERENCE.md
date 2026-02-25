@@ -392,3 +392,29 @@ Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Nam
 **Deep-link:** ?page=resources/notifications → SPA with initialTab pre-selected
 **SHEETS:** Added CONTACT_LOG, STEWARD_TASKS constants
 **Config default:** Accent hue 250→30 (amber)
+
+---
+
+## 🔄 SYNC RULES — DDS ↔ UNION-TRACKER (Added 2026-02-25)
+
+### Repo Relationship
+- **DDS-Dashboard** (private): Primary repo. Default branch: `Main` (capital M).
+- **Union-Tracker** (public): Mirror minus Workload Tracker. Target branch: `staging`.
+- UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+- DDS Apps Script ID must NEVER appear in this repo.
+
+### Sync Flow
+```
+DDS Main → UT staging → (user manages) → UT dev → UT main
+```
+
+### Data Protection Rules
+- **No function may delete or overwrite manually entered data.**
+- Manually entered = imported by users via import function OR typed directly into cells.
+- System-generated = anything written by code functions (except import function output).
+
+### Workload Tracker
+- This repo does NOT include the Workload Tracker module.
+- Files excluded: `src/18_WorkloadTracker.gs`, `src/WorkloadTracker.html`
+- Files with typeof guards handle WT absence gracefully.
+- See SYNC-LOG.md for full exclusion registry.
