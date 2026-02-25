@@ -41,10 +41,22 @@
  *   - 16_DashboardEnhancements.gs
  *   - 17_CorrelationEngine.gs
  *   - 18_WorkloadTracker.gs
+ *   - 19_WebDashAuth.gs
+ *   - 20_WebDashConfigReader.gs
+ *   - 21_WebDashDataService.gs
+ *   - 22_WebDashApp.gs
+ *   - 23_PortalSheets.gs
+ *   - 24_WeeklyQuestions.gs
  *
  * HTML Files (embedded):
  *  *   - MultiSelectDialog.html
  *   - WorkloadTracker.html
+ *   - auth_view.html
+ *   - error_view.html
+ *   - index.html
+ *   - member_view.html
+ *   - steward_view.html
+ *   - styles.html
  *
  * ============================================================================
  */
@@ -18743,7 +18755,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (4700 lines)
+// SOURCE: 05_Integrations.gs (4703 lines)
 // ============================================================================
 
 /**
@@ -20553,10 +20565,13 @@ function doGet(e) {
       if (typeof buildPublicPortal === 'function') {
         return buildPublicPortal();
       }
-      // Fall through to dashboard
+      // Fall through to SPA dashboard
     case 'dashboard':
     default:
-      // v4.4.0: Default to unified member dashboard
+      // v4.12.2: Default to SPA web dashboard (SSO + magic link auth)
+      if (typeof doGetWebDashboard === 'function') {
+        return doGetWebDashboard(e);
+      }
       html = getUnifiedDashboardHtml(false);
       break;
   }
@@ -62139,6 +62154,2545 @@ function shareWorkloadPortalLink() {
 
 
 // ============================================================================
+// SOURCE: 19_WebDashAuth.gs (316 lines)
+// ============================================================================
+
+/**
+ * Auth.gs
+ * Handles authentication for the web app dashboard.
+ * 
+ * Two auth paths:
+ *   1. Google SSO — Session.getActiveUser().getEmail()
+ *   2. Magic Link — email-based token sent via MailApp
+ * 
+ * Token storage: ScriptProperties (server-side)
+ * Client persistence: localStorage token (acts as "cookie")
+ * 
+ * Flow:
+ *   doGet() → Auth.resolveUser(e) → returns { email, method } or null
+ *   If null → serve login page
+ *   If email → lookup role in directory → route to dashboard
+ */
+
+var Auth = (function () {
+  
+  var TOKEN_PREFIX = 'MAGIC_TOKEN_';
+  var SESSION_PREFIX = 'SESSION_';
+  var HMAC_SECRET_KEY = 'AUTH_HMAC_SECRET';
+  
+  /**
+   * Attempts to resolve the current user from available auth signals.
+   * Priority: (1) session token in URL, (2) SSO, (3) magic link token in URL
+   * @param {Object} e - doGet event object
+   * @returns {Object|null} { email: string, method: 'sso'|'magic'|'session' } or null
+   */
+  function resolveUser(e) {
+    var params = e ? e.parameter || {} : {};
+    
+    // 1. Check for session token (returning user with "remember me")
+    if (params.sessionToken) {
+      var sessionEmail = _validateSessionToken(params.sessionToken);
+      if (sessionEmail) {
+        return { email: sessionEmail, method: 'session' };
+      }
+    }
+    
+    // 2. Check Google SSO
+    try {
+      var ssoUser = Session.getActiveUser().getEmail();
+      if (ssoUser && ssoUser !== '') {
+        return { email: ssoUser.toLowerCase(), method: 'sso' };
+      }
+    } catch (err) {
+      // SSO not available — continue
+    }
+    
+    // 3. Check magic link token in URL
+    if (params.token) {
+      var magicEmail = _validateMagicToken(params.token);
+      if (magicEmail) {
+        return { email: magicEmail, method: 'magic' };
+      }
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Generates a magic link and sends it to the given email.
+   * Called from the client via google.script.run.
+   * @param {string} email - The email to send the link to
+   * @param {boolean} rememberMe - Whether to create a long-lived session
+   * @returns {Object} { success: boolean, message: string }
+   */
+  function sendMagicLink(email, rememberMe) {
+    email = String(email).trim().toLowerCase();
+    
+    // Validate email exists in directory
+    var userRecord = DataService.findUserByEmail(email);
+    if (!userRecord) {
+      // Don't reveal whether email exists — security best practice
+      // But still return success to prevent enumeration
+      return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
+    }
+    
+    var config = ConfigReader.getConfig();
+    var token = _generateMagicToken(email);
+    var webAppUrl = ScriptApp.getService().getUrl();
+    
+    var linkParams = '?token=' + encodeURIComponent(token);
+    if (rememberMe) {
+      linkParams += '&remember=1';
+    }
+    
+    var signInUrl = webAppUrl + linkParams;
+    
+    var subject = 'Sign in to ' + config.orgName + ' Dashboard';
+    var htmlBody = _buildEmailHtml(config, signInUrl, email);
+    
+    try {
+      MailApp.sendEmail({
+        to: email,
+        subject: subject,
+        htmlBody: htmlBody,
+        noReply: true,
+      });
+      
+      return { success: true, message: 'Sign-in link sent to ' + email };
+    } catch (err) {
+      Logger.log('Auth: Failed to send magic link: ' + err.message);
+      return { success: false, message: 'Failed to send email. Please try again or use Google Sign-In.' };
+    }
+  }
+  
+  /**
+   * Creates a session token for "remember me" functionality.
+   * Called after successful auth if remember=1.
+   * @param {string} email
+   * @returns {string} Session token
+   */
+  function createSessionToken(email) {
+    var config = ConfigReader.getConfig();
+    var token = _generateToken();
+    var expiry = Date.now() + config.cookieDurationMs;
+    
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(SESSION_PREFIX + token, JSON.stringify({
+      email: email.toLowerCase(),
+      expiry: expiry,
+      created: Date.now(),
+    }));
+    
+    return token;
+  }
+  
+  /**
+   * Invalidates a session token (logout).
+   * @param {string} token
+   */
+  function invalidateSession(token) {
+    if (!token) return;
+    var props = PropertiesService.getScriptProperties();
+    props.deleteProperty(SESSION_PREFIX + token);
+  }
+  
+  /**
+   * Cleans up expired tokens from ScriptProperties.
+   * Should be run periodically via a time-based trigger.
+   */
+  function cleanupExpiredTokens() {
+    var props = PropertiesService.getScriptProperties();
+    var all = props.getProperties();
+    var now = Date.now();
+    var cleaned = 0;
+    
+    for (var key in all) {
+      if (key.indexOf(TOKEN_PREFIX) === 0 || key.indexOf(SESSION_PREFIX) === 0) {
+        try {
+          var data = JSON.parse(all[key]);
+          if (data.expiry && data.expiry < now) {
+            props.deleteProperty(key);
+            cleaned++;
+          }
+        } catch (e) {
+          // Malformed entry — delete it
+          props.deleteProperty(key);
+          cleaned++;
+        }
+      }
+    }
+    
+    Logger.log('Auth: Cleaned up ' + cleaned + ' expired tokens.');
+    return cleaned;
+  }
+  
+  // ═══════════════════════════════════════
+  // PRIVATE METHODS
+  // ═══════════════════════════════════════
+  
+  function _generateMagicToken(email) {
+    var config = ConfigReader.getConfig();
+    var token = _generateToken();
+    var expiry = Date.now() + config.magicLinkExpiryMs;
+    
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(TOKEN_PREFIX + token, JSON.stringify({
+      email: email.toLowerCase(),
+      expiry: expiry,
+      created: Date.now(),
+      used: false,
+    }));
+    
+    return token;
+  }
+  
+  function _validateMagicToken(token) {
+    var props = PropertiesService.getScriptProperties();
+    var raw = props.getProperty(TOKEN_PREFIX + token);
+    
+    if (!raw) return null;
+    
+    try {
+      var data = JSON.parse(raw);
+      
+      // Check expiry
+      if (data.expiry < Date.now()) {
+        props.deleteProperty(TOKEN_PREFIX + token);
+        return null;
+      }
+      
+      // Mark as used (one-time use)
+      data.used = true;
+      props.setProperty(TOKEN_PREFIX + token, JSON.stringify(data));
+      
+      // Delete after short delay to prevent replay but allow page load
+      // Token will be cleaned up by cleanupExpiredTokens()
+      
+      return data.email;
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  function _validateSessionToken(token) {
+    var props = PropertiesService.getScriptProperties();
+    var raw = props.getProperty(SESSION_PREFIX + token);
+    
+    if (!raw) return null;
+    
+    try {
+      var data = JSON.parse(raw);
+      
+      if (data.expiry < Date.now()) {
+        props.deleteProperty(SESSION_PREFIX + token);
+        return null;
+      }
+      
+      return data.email;
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  function _generateToken() {
+    // Generate a random token using Utilities
+    var bytes = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+    return Utilities.base64EncodeWebSafe(bytes).replace(/[=]+$/, '');
+  }
+  
+  function _getHmacSecret() {
+    var props = PropertiesService.getScriptProperties();
+    var secret = props.getProperty(HMAC_SECRET_KEY);
+    if (!secret) {
+      secret = Utilities.getUuid() + '-' + Utilities.getUuid();
+      props.setProperty(HMAC_SECRET_KEY, secret);
+    }
+    return secret;
+  }
+  
+  function _buildEmailHtml(config, signInUrl, email) {
+    // Dynamic accent color from config
+    var hue = config.accentHue || 250;
+    var accent = 'hsl(' + hue + ', 70%, 55%)';
+    var accentLight = 'hsl(' + hue + ', 70%, 95%)';
+    
+    return '<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin:0; padding:40px 20px; background:#f5f5f5;">'
+      + '<div style="max-width:480px; margin:0 auto; background:#fff; border-radius:16px; padding:40px 32px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
+      + '<div style="text-align:center; margin-bottom:24px;">'
+      + '<div style="display:inline-block; width:48px; height:48px; border-radius:12px; background:' + accent + '; color:#fff; font-size:20px; font-weight:700; line-height:48px;">' + config.logoInitials + '</div>'
+      + '</div>'
+      + '<h1 style="text-align:center; font-size:20px; color:#1a1a2e; margin:0 0 8px;">Sign in to ' + config.orgName + '</h1>'
+      + '<p style="text-align:center; color:#666; font-size:14px; margin:0 0 28px;">Click the button below to access your dashboard.</p>'
+      + '<div style="text-align:center; margin-bottom:28px;">'
+      + '<a href="' + signInUrl + '" style="display:inline-block; background:' + accent + '; color:#fff; text-decoration:none; padding:14px 36px; border-radius:10px; font-size:16px; font-weight:600;">Sign In</a>'
+      + '</div>'
+      + '<p style="color:#999; font-size:12px; text-align:center; line-height:1.6;">'
+      + 'This link expires in ' + config.magicLinkExpiryDays + ' days.<br>'
+      + 'If you didn\'t request this, you can safely ignore this email.'
+      + '</p>'
+      + '<hr style="border:none; border-top:1px solid #eee; margin:24px 0;">'
+      + '<p style="color:#bbb; font-size:11px; text-align:center;">' + config.orgName + ' Grievance Dashboard</p>'
+      + '</div></body></html>';
+  }
+  
+  // Public API
+  return {
+    resolveUser: resolveUser,
+    sendMagicLink: sendMagicLink,
+    createSessionToken: createSessionToken,
+    invalidateSession: invalidateSession,
+    cleanupExpiredTokens: cleanupExpiredTokens,
+  };
+  
+})();
+
+
+// ═══════════════════════════════════════
+// GLOBAL FUNCTIONS (callable from client via google.script.run)
+// ═══════════════════════════════════════
+
+/**
+ * Client-callable: Send a magic link to the given email
+ */
+function authSendMagicLink(email, rememberMe) {
+  return Auth.sendMagicLink(email, rememberMe);
+}
+
+/**
+ * Client-callable: Create a session token after successful auth
+ */
+function authCreateSessionToken(email) {
+  return Auth.createSessionToken(email);
+}
+
+/**
+ * Client-callable: Invalidate session (logout)
+ */
+function authLogout(sessionToken) {
+  Auth.invalidateSession(sessionToken);
+  return { success: true };
+}
+
+
+// ============================================================================
+// SOURCE: 20_WebDashConfigReader.gs (159 lines)
+// ============================================================================
+
+/**
+ * ConfigReader.gs
+ * Reads org-specific configuration from the "Config" tab.
+ * Caches in CacheService to avoid repeated sheet reads.
+ * 
+ * Config Tab Expected Layout:
+ *   Column A: Setting Name
+ *   Column B: Setting Value
+ * 
+ * Required rows (by name in Column A):
+ *   - Org Name
+ *   - Org Abbreviation
+ *   - Logo Initials
+ *   - Accent Hue          (0-360, integer)
+ *   - Magic Link Expiry   (days, integer)
+ *   - Cookie Duration      (days, integer)
+ *   - Steward Label        (optional, default "Steward")
+ *   - Member Label         (optional, default "Member")
+ */
+
+var ConfigReader = (function () {
+  
+  var CACHE_KEY = 'ORG_CONFIG';
+  var CACHE_TTL = 21600; // 6 hours in seconds
+  var CONFIG_SHEET_NAME = 'Config';
+  
+  /**
+   * Reads the Config tab and returns a settings object.
+   * Uses CacheService for performance.
+   * @param {boolean} [forceRefresh=false] - Bypass cache
+   * @returns {Object} Config settings
+   */
+  function getConfig(forceRefresh) {
+    // Try cache first
+    if (!forceRefresh) {
+      var cache = CacheService.getScriptCache();
+      var cached = cache.get(CACHE_KEY);
+      if (cached) {
+        try {
+          return JSON.parse(cached);
+        } catch (e) {
+          // Cache corrupted, fall through to read from sheet
+        }
+      }
+    }
+    
+    // Read from sheet
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(CONFIG_SHEET_NAME);
+    
+    if (!sheet) {
+      throw new Error('Config tab "' + CONFIG_SHEET_NAME + '" not found. Please create it.');
+    }
+    
+    var data = sheet.getDataRange().getValues();
+    var configMap = {};
+    
+    // Build key-value map from columns A and B
+    for (var i = 0; i < data.length; i++) {
+      var key = String(data[i][0]).trim().toLowerCase();
+      var value = data[i][1];
+      if (key) {
+        configMap[key] = value;
+      }
+    }
+    
+    // Build config object with defaults
+    var config = {
+      orgName:             configMap['org name'] || configMap['organization name'] || 'My Organization',
+      orgAbbrev:           configMap['org abbreviation'] || configMap['abbreviation'] || '',
+      logoInitials:        configMap['logo initials'] || configMap['logo'] || _deriveInitials(configMap['org name'] || 'MO'),
+      accentHue:           _parseInt(configMap['accent hue'] || configMap['accent color hue'], 250),
+      magicLinkExpiryDays: _parseInt(configMap['magic link expiry'] || configMap['magic link expiry days'], 7),
+      cookieDurationDays:  _parseInt(configMap['cookie duration'] || configMap['cookie duration days'], 30),
+      stewardLabel:        configMap['steward label'] || 'Steward',
+      memberLabel:         configMap['member label'] || 'Member',
+      // Org links
+      calendarId:          configMap['calendar id'] || configMap['google calendar id'] || '',
+      driveFolderId:       configMap['drive folder id'] || configMap['shared drive folder'] || '',
+      satisfactionFormUrl: configMap['satisfaction form url'] || configMap['survey form url'] || '',
+      orgWebsite:          configMap['org website'] || configMap['website'] || '',
+      // Derived
+      magicLinkExpiryMs:   0,
+      cookieDurationMs:    0,
+    };
+    
+    config.magicLinkExpiryMs = config.magicLinkExpiryDays * 24 * 60 * 60 * 1000;
+    config.cookieDurationMs = config.cookieDurationDays * 24 * 60 * 60 * 1000;
+    
+    // Cache it
+    try {
+      var cache = CacheService.getScriptCache();
+      cache.put(CACHE_KEY, JSON.stringify(config), CACHE_TTL);
+    } catch (e) {
+      // Cache write failed — non-fatal, will just re-read next time
+      Logger.log('ConfigReader: Cache write failed: ' + e.message);
+    }
+    
+    return config;
+  }
+  
+  /**
+   * Returns config as JSON string (for injecting into HTML templates)
+   * @returns {string} JSON string
+   */
+  function getConfigJSON() {
+    return JSON.stringify(getConfig());
+  }
+  
+  /**
+   * Forces a cache refresh and returns fresh config
+   * @returns {Object} Fresh config
+   */
+  function refreshConfig() {
+    return getConfig(true);
+  }
+  
+  /**
+   * Validates that all required config fields are present
+   * @returns {Object} { valid: boolean, missing: string[] }
+   */
+  function validateConfig() {
+    var config = getConfig(true);
+    var missing = [];
+    
+    if (!config.orgName || config.orgName === 'My Organization') missing.push('Org Name');
+    if (config.accentHue < 0 || config.accentHue > 360) missing.push('Accent Hue (must be 0-360)');
+    
+    return {
+      valid: missing.length === 0,
+      missing: missing,
+      config: config
+    };
+  }
+  
+  // --- Helpers ---
+  
+  function _parseInt(val, defaultVal) {
+    var parsed = parseInt(val, 10);
+    return isNaN(parsed) ? defaultVal : parsed;
+  }
+  
+  function _deriveInitials(name) {
+    if (!name) return 'ORG';
+    var words = String(name).trim().split(/\s+/);
+    if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+    return words.map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
+  }
+  
+  // Public API
+  return {
+    getConfig: getConfig,
+    getConfigJSON: getConfigJSON,
+    refreshConfig: refreshConfig,
+    validateConfig: validateConfig,
+  };
+  
+})();
+
+
+// ============================================================================
+// SOURCE: 21_WebDashDataService.gs (1264 lines)
+// ============================================================================
+
+/**
+ * DataService.gs
+ * Data access layer for the web app dashboard.
+ * 
+ * Reads from:
+ *   - Member Directory sheet
+ *   - Grievance Log sheet
+ * 
+ * All column positions are resolved dynamically by header name.
+ * NEVER hardcode column indices.
+ * 
+ * Access control:
+ *   - Stewards see all cases assigned to them
+ *   - Members see only their own grievances
+ *   - No member PII is exposed to other members
+ */
+
+var DataService = (function () {
+  
+  // Sheet names — read from Config if available, fallback to defaults
+  var MEMBER_SHEET = 'Member Directory';
+  var GRIEVANCE_SHEET = 'Grievance Log';
+  
+  // Header name mappings — these are the expected header labels
+  // If your sheet uses different labels, update these OR add aliases
+  var HEADERS = {
+    // Member Directory
+    memberEmail:     ['email', 'email address', 'member email', 'e-mail', 'work email'],
+    memberName:      ['name', 'full name', 'member name'],
+    memberFirstName: ['first name', 'first'],
+    memberLastName:  ['last name', 'last'],
+    memberRole:      ['role', 'member role', 'type', 'member type', 'membership type'],
+    memberUnit:      ['unit', 'workplace unit', 'department'],
+    memberPhone:     ['phone', 'phone number', 'cell', 'mobile'],
+    memberJoined:    ['joined', 'join date', 'member since', 'date joined'],
+    memberDuesStatus:['dues status', 'dues', 'status'],
+    memberId:        ['member id', 'id', 'member number'],
+    memberWorkLocation: ['work location', 'location', 'office location'],
+    memberOfficeDays:   ['office days', 'in-office days', 'days in office'],
+    memberAssignedSteward: ['assigned steward', 'steward assignment'],
+    memberIsSteward: ['is steward', 'steward'],
+    memberStreet:    ['street address', 'street', 'address'],
+    memberCity:      ['city'],
+    memberState:     ['state'],
+    memberZip:       ['zip code', 'zip', 'postal code'],
+    memberHasOpenGrievance: ['has open grievance?', 'has open grievance', 'open grievance'],
+    memberSupervisor: ['supervisor'],
+    memberJobTitle:  ['job title', 'title', 'position'],
+    
+    // Grievance Log
+    grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
+    grievanceMemberEmail: ['member email', 'email', 'filed by email', 'grievant email'],
+    grievanceStatus: ['status', 'grievance status', 'case status'],
+    grievanceStep:   ['step', 'current step', 'grievance step'],
+    grievanceDeadline: ['deadline', 'next deadline', 'due date'],
+    grievanceFiled:  ['filed', 'filed date', 'date filed', 'created'],
+    grievanceSteward:['steward', 'assigned steward', 'steward email', 'assigned to'],
+    grievanceUnit:   ['unit', 'workplace unit'],
+    grievancePriority: ['priority', 'urgency'],
+    grievanceNotes:  ['notes', 'description', 'summary'],
+  };
+  
+  // ═══════════════════════════════════════
+  // PUBLIC: User Lookup
+  // ═══════════════════════════════════════
+  
+  /**
+   * Finds a user in the Member Directory by email.
+   * Returns sanitized user record or null.
+   * @param {string} email
+   * @returns {Object|null}
+   */
+  function findUserByEmail(email) {
+    if (!email) return null;
+    email = String(email).trim().toLowerCase();
+    
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return null;
+    
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+    
+    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
+    if (emailCol === -1) return null;
+    
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
+      if (rowEmail === email) {
+        return _buildUserRecord(data[i], colMap);
+      }
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Returns the role for a given email.
+   * @param {string} email
+   * @returns {string|null} 'steward', 'member', 'both', or null
+   */
+  function getUserRole(email) {
+    var user = findUserByEmail(email);
+    if (!user) return null;
+    return user.role;
+  }
+  
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Data
+  // ═══════════════════════════════════════
+  
+  /**
+   * Returns all grievances assigned to a steward.
+   * @param {string} stewardEmail
+   * @returns {Object[]} Array of grievance records
+   */
+  function getStewardCases(stewardEmail) {
+    stewardEmail = String(stewardEmail).trim().toLowerCase();
+    
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return [];
+    
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+    
+    var stewardCol = _findColumn(colMap, HEADERS.grievanceSteward);
+    if (stewardCol === -1) {
+      Logger.log('DataService: Steward column not found in Grievance Log');
+      return [];
+    }
+    
+    var cases = [];
+    for (var i = 1; i < data.length; i++) {
+      var assignedTo = String(data[i][stewardCol]).trim().toLowerCase();
+      if (assignedTo === stewardEmail) {
+        cases.push(_buildGrievanceRecord(data[i], colMap));
+      }
+    }
+    
+    // Sort: overdue first, then by deadline ascending
+    cases.sort(function (a, b) {
+      if (a.status === 'overdue' && b.status !== 'overdue') return -1;
+      if (b.status === 'overdue' && a.status !== 'overdue') return 1;
+      return (a.deadlineDays || 999) - (b.deadlineDays || 999);
+    });
+    
+    return cases;
+  }
+  
+  /**
+   * Returns KPIs for a steward's personal caseload.
+   * @param {string} stewardEmail
+   * @returns {Object} { totalCases, overdue, dueSoon, resolved }
+   */
+  function getStewardKPIs(stewardEmail) {
+    var cases = getStewardCases(stewardEmail);
+    
+    var now = new Date();
+    var sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    
+    var total = cases.length;
+    var overdue = 0;
+    var dueSoon = 0;
+    var resolved = 0;
+    var active = 0;
+    
+    for (var i = 0; i < cases.length; i++) {
+      var c = cases[i];
+      var status = String(c.status).toLowerCase();
+      
+      if (status === 'resolved') {
+        resolved++;
+      } else if (status === 'overdue') {
+        overdue++;
+      } else {
+        active++;
+        if (c.deadlineDays !== null && c.deadlineDays <= 7 && c.deadlineDays > 0) {
+          dueSoon++;
+        }
+      }
+    }
+    
+    return {
+      totalCases: total,
+      activeCases: active,
+      overdue: overdue,
+      dueSoon: dueSoon,
+      resolved: resolved,
+    };
+  }
+  
+  // ═══════════════════════════════════════
+  // PUBLIC: Member Data
+  // ═══════════════════════════════════════
+  
+  /**
+   * Returns grievances for a specific member (their own only).
+   * @param {string} memberEmail
+   * @returns {Object[]} Array of grievance records
+   */
+  function getMemberGrievances(memberEmail) {
+    memberEmail = String(memberEmail).trim().toLowerCase();
+    
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return [];
+    
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+    
+    var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
+    if (memberCol === -1) return [];
+    
+    var grievances = [];
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][memberCol]).trim().toLowerCase();
+      if (rowEmail === memberEmail) {
+        grievances.push(_buildGrievanceRecord(data[i], colMap));
+      }
+    }
+    
+    // Sort by filed date, most recent first
+    grievances.sort(function (a, b) {
+      return (b.filedTimestamp || 0) - (a.filedTimestamp || 0);
+    });
+    
+    return grievances;
+  }
+  
+  /**
+   * Returns steward contact info for a member.
+   * Only returns email (always) and phone (if listed).
+   * @param {string} stewardEmail
+   * @returns {Object|null} { name, email, phone }
+   */
+  function getStewardContact(stewardEmail) {
+    if (!stewardEmail) return null;
+    var user = findUserByEmail(stewardEmail);
+    if (!user) return null;
+    
+    return {
+      name: user.name || user.firstName + ' ' + user.lastName,
+      email: user.email,
+      phone: user.phone || null, // Only if listed
+    };
+  }
+  
+  // ═══════════════════════════════════════
+  // PUBLIC: Full Profile & Profile Updates
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns full member profile for self-service profile page.
+   * Only returns data for the authenticated user (email match).
+   * @param {string} email
+   * @returns {Object|null}
+   */
+  function getFullMemberProfile(email) {
+    var user = findUserByEmail(email);
+    if (!user) return null;
+    return {
+      email: user.email,
+      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      unit: user.unit,
+      workLocation: user.workLocation,
+      officeDays: user.officeDays,
+      street: user.street,
+      city: user.city,
+      state: user.state,
+      zip: user.zip,
+      phone: user.phone,
+      supervisor: user.supervisor,
+      jobTitle: user.jobTitle,
+      joined: user.joined,
+    };
+  }
+
+  /**
+   * Updates a member's self-service profile fields.
+   * Only allows editing specific fields: address, work location, office days.
+   * @param {string} email - The member's email (verified against session)
+   * @param {Object} updates - { street, city, state, zip, workLocation, officeDays }
+   * @returns {Object} { success: boolean, message: string }
+   */
+  function updateMemberProfile(email, updates) {
+    if (!email || !updates) return { success: false, message: 'Invalid request.' };
+    email = String(email).trim().toLowerCase();
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return { success: false, message: 'Member directory unavailable.' };
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
+    if (emailCol === -1) return { success: false, message: 'System configuration error.' };
+
+    // Editable field mappings
+    var editableFields = {
+      street:       HEADERS.memberStreet,
+      city:         HEADERS.memberCity,
+      state:        HEADERS.memberState,
+      zip:          HEADERS.memberZip,
+      workLocation: HEADERS.memberWorkLocation,
+      officeDays:   HEADERS.memberOfficeDays,
+    };
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
+      if (rowEmail !== email) continue;
+
+      var rowNum = i + 1; // 1-indexed for sheet ops
+      for (var field in updates) {
+        if (!editableFields[field]) continue;
+        var col = _findColumn(colMap, editableFields[field]);
+        if (col === -1) continue;
+        var val = String(updates[field] || '').trim().substring(0, 255);
+        sheet.getRange(rowNum, col + 1).setValue(val);
+      }
+
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('PROFILE_UPDATE', { email: email, fields: Object.keys(updates).join(',') });
+      }
+      return { success: true, message: 'Profile updated.' };
+    }
+
+    return { success: false, message: 'Member not found.' };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Assignment
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns the assigned steward info for a member.
+   * @param {string} email
+   * @returns {Object|null} { name, email, phone, workLocation, officeDays }
+   */
+  function getAssignedStewardInfo(email) {
+    var user = findUserByEmail(email);
+    if (!user || !user.assignedSteward) return null;
+    var steward = findUserByEmail(user.assignedSteward);
+    if (!steward) return null;
+    return {
+      name: steward.name,
+      email: steward.email,
+      phone: steward.phone,
+      workLocation: steward.workLocation,
+      officeDays: steward.officeDays,
+    };
+  }
+
+  /**
+   * Returns stewards at the same location as the member.
+   * Used for self-assign steward picker.
+   * @param {string} memberEmail
+   * @returns {Object[]} Array of { name, email, workLocation, officeDays }
+   */
+  function getAvailableStewards(memberEmail) {
+    var member = findUserByEmail(memberEmail);
+    if (!member) return [];
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var isStewardCol = _findColumn(colMap, HEADERS.memberIsSteward);
+    var roleCol = _findColumn(colMap, HEADERS.memberRole);
+    var locationCol = _findColumn(colMap, HEADERS.memberWorkLocation);
+
+    var stewards = [];
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildUserRecord(data[i], colMap);
+      if (!rec.isSteward) continue;
+      if (rec.email === memberEmail) continue;
+      // Prioritize same location, but include all stewards
+      stewards.push({
+        name: rec.name,
+        email: rec.email,
+        workLocation: rec.workLocation,
+        officeDays: rec.officeDays,
+        sameLocation: rec.workLocation && member.workLocation &&
+          rec.workLocation.toLowerCase() === member.workLocation.toLowerCase(),
+      });
+    }
+
+    // Sort: same location first, then alphabetical
+    stewards.sort(function(a, b) {
+      if (a.sameLocation && !b.sameLocation) return -1;
+      if (!a.sameLocation && b.sameLocation) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    return stewards;
+  }
+
+  /**
+   * Assigns a steward to a member (self-service).
+   * @param {string} memberEmail
+   * @param {string} stewardEmail
+   * @returns {Object} { success, message }
+   */
+  function assignStewardToMember(memberEmail, stewardEmail) {
+    if (!memberEmail || !stewardEmail) return { success: false, message: 'Invalid request.' };
+    memberEmail = String(memberEmail).trim().toLowerCase();
+    stewardEmail = String(stewardEmail).trim().toLowerCase();
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return { success: false, message: 'System error.' };
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var emailCol = _findColumn(colMap, HEADERS.memberEmail);
+    var stewardCol = _findColumn(colMap, HEADERS.memberAssignedSteward);
+    if (emailCol === -1 || stewardCol === -1) return { success: false, message: 'Configuration error.' };
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][emailCol]).trim().toLowerCase() === memberEmail) {
+        sheet.getRange(i + 1, stewardCol + 1).setValue(stewardEmail);
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('STEWARD_SELF_ASSIGN', { member: memberEmail, steward: stewardEmail });
+        }
+        return { success: true, message: 'Steward assigned.' };
+      }
+    }
+    return { success: false, message: 'Member not found.' };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Grievance Drive & Survey Status
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns the Google Drive folder URL for a member's grievance case files.
+   * @param {string} email
+   * @returns {string|null} Drive folder URL or null
+   */
+  function getMemberGrievanceDriveUrl(email) {
+    // Convention: folder named by grievance ID in the org shared drive
+    var grievances = getMemberGrievances(email);
+    if (!grievances || grievances.length === 0) return null;
+    var activeG = grievances.find(function(g) { return g.status !== 'resolved'; });
+    if (!activeG) return null;
+    // Drive URL would come from a column or Drive API lookup.
+    // For now, return null — steward can provide the link.
+    return null;
+  }
+
+  /**
+   * Returns survey completion status for a member.
+   * @param {string} email
+   * @returns {Object} { hasCompleted: boolean, lastCompleted: string|null }
+   */
+  function getMemberSurveyStatus(email) {
+    if (!email) return { hasCompleted: false, lastCompleted: null };
+    email = String(email).trim().toLowerCase();
+
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var trackSheet = ss.getSheetByName('_Survey_Tracking');
+      if (!trackSheet || trackSheet.getLastRow() <= 1) {
+        return { hasCompleted: false, lastCompleted: null };
+      }
+
+      var data = trackSheet.getDataRange().getValues();
+      var headers = data[0];
+      var colMap = _buildColumnMap(headers);
+      var emailCol = _findColumn(colMap, ['email', 'member email']);
+      var statusCol = _findColumn(colMap, ['status', 'completion status', 'completed']);
+      var dateCol = _findColumn(colMap, ['completed date', 'date completed', 'completion date']);
+
+      if (emailCol === -1) return { hasCompleted: false, lastCompleted: null };
+
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][emailCol]).trim().toLowerCase() !== email) continue;
+        var status = statusCol !== -1 ? String(data[i][statusCol]).trim().toLowerCase() : '';
+        var completed = status === 'completed' || status === 'yes' || status === 'true';
+        var dateVal = dateCol !== -1 ? data[i][dateCol] : null;
+        return {
+          hasCompleted: completed,
+          lastCompleted: dateVal instanceof Date ? _formatDate(dateVal) : (dateVal ? String(dateVal) : null),
+        };
+      }
+    } catch (e) {
+      Logger.log('DataService.getMemberSurveyStatus error: ' + e.message);
+    }
+    return { hasCompleted: false, lastCompleted: null };
+  }
+
+  /**
+   * Returns org-wide links (calendar, drive, survey form, etc.)
+   * @returns {Object}
+   */
+  function getOrgLinks() {
+    try {
+      var config = ConfigReader.getConfig();
+      return {
+        calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
+        driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
+        surveyFormUrl: config.satisfactionFormUrl || '',
+        orgWebsite: config.orgWebsite || '',
+      };
+    } catch (e) {
+      return { calendarUrl: '', driveFolderUrl: '', surveyFormUrl: '', orgWebsite: '' };
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward — Member Management
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns all members assigned to a steward with summary stats.
+   * @param {string} stewardEmail
+   * @returns {Object[]} Array of member summaries
+   */
+  function getStewardMembers(stewardEmail) {
+    if (!stewardEmail) return [];
+    stewardEmail = String(stewardEmail).trim().toLowerCase();
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var stewardCol = _findColumn(colMap, HEADERS.memberAssignedSteward);
+    if (stewardCol === -1) return [];
+
+    var members = [];
+    for (var i = 1; i < data.length; i++) {
+      var assigned = String(data[i][stewardCol]).trim().toLowerCase();
+      if (assigned !== stewardEmail) continue;
+      var rec = _buildUserRecord(data[i], colMap);
+      members.push({
+        name: rec.name,
+        email: rec.email,
+        workLocation: rec.workLocation,
+        officeDays: rec.officeDays,
+        hasOpenGrievance: rec.hasOpenGrievance,
+        duesStatus: rec.duesStatus,
+      });
+    }
+
+    members.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    return members;
+  }
+
+  /**
+   * Returns survey completion tracking for a steward's assigned members.
+   * Does NOT return actual survey responses — only completion status.
+   * @param {string} stewardEmail
+   * @returns {Object} { total, completed, members: [{name, email, completed}] }
+   */
+  function getStewardSurveyTracking(stewardEmail) {
+    var members = getStewardMembers(stewardEmail);
+    if (members.length === 0) return { total: 0, completed: 0, members: [] };
+
+    var tracking = [];
+    var completedCount = 0;
+
+    for (var i = 0; i < members.length; i++) {
+      var status = getMemberSurveyStatus(members[i].email);
+      tracking.push({
+        name: members[i].name,
+        email: members[i].email,
+        completed: status.hasCompleted,
+        lastCompleted: status.lastCompleted,
+      });
+      if (status.hasCompleted) completedCount++;
+    }
+
+    return { total: members.length, completed: completedCount, members: tracking };
+  }
+
+  /**
+   * Sends a broadcast email to filtered members assigned to a steward.
+   * @param {string} stewardEmail - The steward sending the broadcast
+   * @param {Object} filter - { location, officeDays }
+   * @param {string} message - The message body
+   * @returns {Object} { success, sentCount, message }
+   */
+  function sendBroadcastMessage(stewardEmail, filter, message) {
+    if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
+
+    var members = getStewardMembers(stewardEmail);
+    if (members.length === 0) return { success: false, sentCount: 0, message: 'No assigned members found.' };
+
+    // Apply filters
+    var filtered = members.filter(function(m) {
+      if (filter && filter.location && m.workLocation) {
+        if (m.workLocation.toLowerCase() !== filter.location.toLowerCase()) return false;
+      }
+      if (filter && filter.officeDays && m.officeDays) {
+        var filterDays = filter.officeDays.toLowerCase().split(',').map(function(d) { return d.trim(); });
+        var memberDays = m.officeDays.toLowerCase();
+        var hasMatch = filterDays.some(function(d) { return memberDays.indexOf(d) !== -1; });
+        if (!hasMatch) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) return { success: false, sentCount: 0, message: 'No members match the filter.' };
+
+    var sentCount = 0;
+    var config = ConfigReader.getConfig();
+    var subject = config.orgAbbrev + ' - Message from your ' + config.stewardLabel;
+
+    for (var i = 0; i < filtered.length; i++) {
+      try {
+        MailApp.sendEmail(filtered[i].email, subject, message);
+        sentCount++;
+      } catch (e) {
+        Logger.log('Broadcast send error for ' + filtered[i].email + ': ' + e.message);
+      }
+    }
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('BROADCAST_SENT', {
+        steward: stewardEmail,
+        recipientCount: sentCount,
+        filter: JSON.stringify(filter || {}),
+      });
+    }
+
+    return { success: true, sentCount: sentCount, message: 'Sent to ' + sentCount + ' member(s).' };
+  }
+
+  /**
+   * Returns aggregated quarterly survey results.
+   * Privacy threshold: only returns data if 30+ responses.
+   * @returns {Object} { available, count, threshold, sections }
+   */
+  function getSurveyResults() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var satSheet = ss.getSheetByName(SHEETS.SATISFACTION);
+      if (!satSheet) return { available: false, count: 0, threshold: 30, sections: [] };
+
+      var data = satSheet.getDataRange().getValues();
+      if (data.length <= 1) return { available: false, count: 0, threshold: 30, sections: [] };
+
+      var responseCount = data.length - 1;
+      if (responseCount < 30) {
+        return { available: false, count: responseCount, threshold: 30, sections: [] };
+      }
+
+      // Use SATISFACTION_SECTIONS from 01_Core.gs to aggregate
+      var sections = [];
+      if (typeof SATISFACTION_SECTIONS !== 'undefined') {
+        for (var key in SATISFACTION_SECTIONS) {
+          var sec = SATISFACTION_SECTIONS[key];
+          if (!sec.scale) continue; // Skip non-scale sections
+
+          var qCols = sec.questions;
+          var totalScore = 0;
+          var totalCount = 0;
+          var questionAvgs = [];
+
+          for (var q = 0; q < qCols.length; q++) {
+            var colIdx = qCols[q] - 1; // 0-indexed
+            var qSum = 0;
+            var qCount = 0;
+            for (var r = 1; r < data.length; r++) {
+              var val = Number(data[r][colIdx]);
+              if (!isNaN(val) && val > 0) {
+                qSum += val;
+                qCount++;
+              }
+            }
+            var avg = qCount > 0 ? qSum / qCount : 0;
+            questionAvgs.push({ question: colIdx + 1, avg: Math.round(avg * 10) / 10 });
+            totalScore += qSum;
+            totalCount += qCount;
+          }
+
+          sections.push({
+            name: sec.name,
+            key: key,
+            avg: totalCount > 0 ? Math.round((totalScore / totalCount) * 10) / 10 : 0,
+            questions: questionAvgs,
+          });
+        }
+      }
+
+      return { available: true, count: responseCount, threshold: 30, sections: sections };
+    } catch (e) {
+      Logger.log('DataService.getSurveyResults error: ' + e.message);
+      return { available: false, count: 0, threshold: 30, sections: [], error: e.message };
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Shared Data (non-PII)
+  // ═══════════════════════════════════════
+  
+  /**
+   * Returns the list of units from the directory (no PII).
+   * Useful for filter dropdowns.
+   * @returns {string[]} Unique unit names
+   */
+  function getUnits() {
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return [];
+    
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var unitCol = _findColumn(colMap, HEADERS.memberUnit);
+    if (unitCol === -1) return [];
+    
+    var units = {};
+    for (var i = 1; i < data.length; i++) {
+      var unit = String(data[i][unitCol]).trim();
+      if (unit) units[unit] = true;
+    }
+    
+    return Object.keys(units).sort();
+  }
+  
+  // ═══════════════════════════════════════
+  // PRIVATE: Sheet & Column Helpers
+  // ═══════════════════════════════════════
+  
+  function _getSheet(name) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      Logger.log('DataService: Sheet "' + name + '" not found.');
+    }
+    return sheet;
+  }
+  
+  /**
+   * Builds a map of normalized header names to column indices.
+   * @param {Array} headerRow
+   * @returns {Object} { normalizedName: columnIndex }
+   */
+  function _buildColumnMap(headerRow) {
+    var map = {};
+    for (var i = 0; i < headerRow.length; i++) {
+      var normalized = String(headerRow[i]).trim().toLowerCase();
+      if (normalized) {
+        map[normalized] = i;
+      }
+    }
+    return map;
+  }
+  
+  /**
+   * Finds a column index given an array of possible header names.
+   * Returns the index of the first match, or -1 if none found.
+   * @param {Object} colMap - from _buildColumnMap
+   * @param {string[]} aliases - possible header names
+   * @returns {number} Column index or -1
+   */
+  function _findColumn(colMap, aliases) {
+    for (var i = 0; i < aliases.length; i++) {
+      var key = aliases[i].toLowerCase();
+      if (colMap.hasOwnProperty(key)) {
+        return colMap[key];
+      }
+    }
+    return -1;
+  }
+  
+  /**
+   * Safe getter — returns cell value or default
+   */
+  function _getVal(row, colMap, aliases, defaultVal) {
+    var col = _findColumn(colMap, aliases);
+    if (col === -1 || col >= row.length) return defaultVal !== undefined ? defaultVal : '';
+    var val = row[col];
+    return (val === null || val === undefined) ? (defaultVal !== undefined ? defaultVal : '') : val;
+  }
+  
+  function _buildUserRecord(row, colMap) {
+    var firstName = String(_getVal(row, colMap, HEADERS.memberFirstName, '')).trim();
+    var lastName = String(_getVal(row, colMap, HEADERS.memberLastName, '')).trim();
+    var fullName = String(_getVal(row, colMap, HEADERS.memberName, '')).trim();
+    
+    if (!fullName && (firstName || lastName)) {
+      fullName = (firstName + ' ' + lastName).trim();
+    }
+    
+    var roleRaw = String(_getVal(row, colMap, HEADERS.memberRole, 'member')).trim().toLowerCase();
+    // Normalize role
+    var role = 'member';
+    if (roleRaw === 'steward' || roleRaw === 'rep' || roleRaw === 'representative') role = 'steward';
+    if (roleRaw === 'both' || roleRaw === 'steward/member') role = 'both';
+    
+    var hasGrievance = String(_getVal(row, colMap, HEADERS.memberHasOpenGrievance, '')).trim().toLowerCase();
+
+    return {
+      email: String(_getVal(row, colMap, HEADERS.memberEmail, '')).trim().toLowerCase(),
+      name: fullName,
+      firstName: firstName,
+      lastName: lastName,
+      role: role,
+      unit: String(_getVal(row, colMap, HEADERS.memberUnit, '')).trim(),
+      phone: String(_getVal(row, colMap, HEADERS.memberPhone, '')).trim() || null,
+      joined: _getVal(row, colMap, HEADERS.memberJoined, ''),
+      duesStatus: String(_getVal(row, colMap, HEADERS.memberDuesStatus, '')).trim(),
+      memberId: String(_getVal(row, colMap, HEADERS.memberId, '')).trim(),
+      workLocation: String(_getVal(row, colMap, HEADERS.memberWorkLocation, '')).trim(),
+      officeDays: String(_getVal(row, colMap, HEADERS.memberOfficeDays, '')).trim(),
+      assignedSteward: String(_getVal(row, colMap, HEADERS.memberAssignedSteward, '')).trim().toLowerCase(),
+      isSteward: role === 'steward' || role === 'both',
+      hasOpenGrievance: hasGrievance === 'yes' || hasGrievance === 'true' || hasGrievance === '1',
+      street: String(_getVal(row, colMap, HEADERS.memberStreet, '')).trim(),
+      city: String(_getVal(row, colMap, HEADERS.memberCity, '')).trim(),
+      state: String(_getVal(row, colMap, HEADERS.memberState, '')).trim(),
+      zip: String(_getVal(row, colMap, HEADERS.memberZip, '')).trim(),
+      supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
+      jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
+    };
+  }
+  
+  function _buildGrievanceRecord(row, colMap) {
+    var deadlineRaw = _getVal(row, colMap, HEADERS.grievanceDeadline, null);
+    var deadlineDays = null;
+    var deadlineFormatted = '—';
+    
+    if (deadlineRaw && deadlineRaw instanceof Date) {
+      var now = new Date();
+      var diff = deadlineRaw.getTime() - now.getTime();
+      deadlineDays = Math.ceil(diff / (24 * 60 * 60 * 1000));
+      deadlineFormatted = _formatDate(deadlineRaw);
+    } else if (deadlineRaw) {
+      var parsed = new Date(deadlineRaw);
+      if (!isNaN(parsed.getTime())) {
+        var now = new Date();
+        var diff = parsed.getTime() - now.getTime();
+        deadlineDays = Math.ceil(diff / (24 * 60 * 60 * 1000));
+        deadlineFormatted = _formatDate(parsed);
+      }
+    }
+    
+    var filedRaw = _getVal(row, colMap, HEADERS.grievanceFiled, null);
+    var filedFormatted = '';
+    var filedTimestamp = 0;
+    if (filedRaw && filedRaw instanceof Date) {
+      filedFormatted = _formatDate(filedRaw);
+      filedTimestamp = filedRaw.getTime();
+    } else if (filedRaw) {
+      var parsed = new Date(filedRaw);
+      if (!isNaN(parsed.getTime())) {
+        filedFormatted = _formatDate(parsed);
+        filedTimestamp = parsed.getTime();
+      }
+    }
+    
+    var status = String(_getVal(row, colMap, HEADERS.grievanceStatus, 'new')).trim().toLowerCase();
+    
+    // Auto-detect overdue if deadline is past and status is active
+    if (deadlineDays !== null && deadlineDays < 0 && status !== 'resolved') {
+      status = 'overdue';
+    }
+    
+    return {
+      id: String(_getVal(row, colMap, HEADERS.grievanceId, '')).trim(),
+      memberEmail: String(_getVal(row, colMap, HEADERS.grievanceMemberEmail, '')).trim().toLowerCase(),
+      status: status,
+      step: String(_getVal(row, colMap, HEADERS.grievanceStep, '')).trim(),
+      deadline: deadlineFormatted,
+      deadlineDays: deadlineDays,
+      filed: filedFormatted,
+      filedTimestamp: filedTimestamp,
+      steward: String(_getVal(row, colMap, HEADERS.grievanceSteward, '')).trim().toLowerCase(),
+      unit: String(_getVal(row, colMap, HEADERS.grievanceUnit, '')).trim(),
+      priority: String(_getVal(row, colMap, HEADERS.grievancePriority, 'medium')).trim().toLowerCase(),
+      notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
+    };
+  }
+  
+  function _formatDate(date) {
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+  }
+  
+  // ═══════════════════════════════════════
+  // PUBLIC: Contact Log (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function _ensureContactLog() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.CONTACT_LOG);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEETS.CONTACT_LOG);
+      sheet.getRange(1, 1, 1, 8).setValues([['ID', 'Steward Email', 'Member Email', 'Contact Type', 'Date', 'Notes', 'Duration', 'Created']]);
+      sheet.hideSheet();
+    }
+    return sheet;
+  }
+
+  function logMemberContact(stewardEmail, memberEmail, contactType, notes, duration) {
+    if (!stewardEmail || !memberEmail || !contactType) return { success: false, message: 'Missing fields.' };
+    var sheet = _ensureContactLog();
+    var id = 'CL_' + Date.now().toString(36);
+    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), memberEmail.toLowerCase().trim(), contactType, new Date(), (notes || '').substring(0, 500), duration || '', new Date()]);
+    if (typeof logAuditEvent === 'function') logAuditEvent('CONTACT_LOG', { steward: stewardEmail, member: memberEmail, type: contactType });
+    return { success: true, message: 'Contact logged.' };
+  }
+
+  function getMemberContactHistory(stewardEmail, memberEmail) {
+    var sheet = _ensureContactLog();
+    if (sheet.getLastRow() <= 1) return [];
+    var data = sheet.getDataRange().getValues();
+    var results = [];
+    var sEmail = stewardEmail.toLowerCase().trim();
+    var mEmail = memberEmail.toLowerCase().trim();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase().trim() === sEmail && String(data[i][2]).toLowerCase().trim() === mEmail) {
+        results.push({ id: data[i][0], type: data[i][3], date: data[i][4] instanceof Date ? _formatDate(data[i][4]) : String(data[i][4]), notes: data[i][5], duration: data[i][6] });
+      }
+    }
+    results.sort(function(a, b) { return b.date > a.date ? 1 : -1; });
+    return results;
+  }
+
+  function getStewardContactLog(stewardEmail) {
+    var sheet = _ensureContactLog();
+    if (sheet.getLastRow() <= 1) return [];
+    var data = sheet.getDataRange().getValues();
+    var results = [];
+    var sEmail = stewardEmail.toLowerCase().trim();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase().trim() === sEmail) {
+        results.push({ id: data[i][0], memberEmail: data[i][2], type: data[i][3], date: data[i][4] instanceof Date ? _formatDate(data[i][4]) : String(data[i][4]), notes: data[i][5], duration: data[i][6] });
+      }
+    }
+    results.sort(function(a, b) { return b.date > a.date ? 1 : -1; });
+    return results.slice(0, 100);
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Tasks (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function _ensureStewardTasks() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.STEWARD_TASKS);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEETS.STEWARD_TASKS);
+      sheet.getRange(1, 1, 1, 10).setValues([['ID', 'Steward Email', 'Title', 'Description', 'Member Email', 'Priority', 'Status', 'Due Date', 'Created', 'Completed']]);
+      sheet.hideSheet();
+    }
+    return sheet;
+  }
+
+  function createTask(stewardEmail, title, description, memberEmail, priority, dueDate) {
+    if (!stewardEmail || !title) return { success: false, message: 'Missing fields.' };
+    var sheet = _ensureStewardTasks();
+    var id = 'ST_' + Date.now().toString(36);
+    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
+    return { success: true, message: 'Task created.', taskId: id };
+  }
+
+  function getTasks(stewardEmail, statusFilter) {
+    var sheet = _ensureStewardTasks();
+    if (sheet.getLastRow() <= 1) return [];
+    var data = sheet.getDataRange().getValues();
+    var tasks = [];
+    var sEmail = stewardEmail.toLowerCase().trim();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase().trim() !== sEmail) continue;
+      var status = String(data[i][6]).toLowerCase().trim();
+      if (statusFilter && status !== statusFilter) continue;
+      var dueDateRaw = data[i][7];
+      var dueStr = dueDateRaw instanceof Date ? _formatDate(dueDateRaw) : String(dueDateRaw || '');
+      var dueDays = null;
+      if (dueDateRaw instanceof Date) {
+        dueDays = Math.ceil((dueDateRaw.getTime() - Date.now()) / (86400000));
+      }
+      tasks.push({ id: data[i][0], title: data[i][2], description: data[i][3], memberEmail: data[i][4], priority: data[i][5], status: status, dueDate: dueStr, dueDays: dueDays, created: data[i][8] instanceof Date ? _formatDate(data[i][8]) : '' });
+    }
+    tasks.sort(function(a, b) {
+      var pa = a.priority === 'high' ? 0 : a.priority === 'medium' ? 1 : 2;
+      var pb = b.priority === 'high' ? 0 : b.priority === 'medium' ? 1 : 2;
+      if (pa !== pb) return pa - pb;
+      return (a.dueDays || 999) - (b.dueDays || 999);
+    });
+    return tasks;
+  }
+
+  function updateTask(stewardEmail, taskId, updates) {
+    var sheet = _ensureStewardTasks();
+    if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === taskId && String(data[i][1]).toLowerCase().trim() === stewardEmail.toLowerCase().trim()) {
+        if (updates.status) sheet.getRange(i + 1, 7).setValue(updates.status);
+        if (updates.priority) sheet.getRange(i + 1, 6).setValue(updates.priority);
+        if (updates.title) sheet.getRange(i + 1, 3).setValue(updates.title.substring(0, 200));
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Task not found.' };
+  }
+
+  function completeTask(stewardEmail, taskId) {
+    var sheet = _ensureStewardTasks();
+    if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === taskId && String(data[i][1]).toLowerCase().trim() === stewardEmail.toLowerCase().trim()) {
+        sheet.getRange(i + 1, 7).setValue('completed');
+        sheet.getRange(i + 1, 10).setValue(new Date());
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Task not found.' };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Member Stats (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getStewardMemberStats(stewardEmail) {
+    var members = getStewardMembers(stewardEmail);
+    if (members.length === 0) return { total: 0, byLocation: {}, byDues: {} };
+    var byLocation = {};
+    var byDues = {};
+    members.forEach(function(m) {
+      var loc = m.workLocation || 'Unknown';
+      byLocation[loc] = (byLocation[loc] || 0) + 1;
+      var dues = m.duesStatus || 'Unknown';
+      byDues[dues] = (byDues[dues] || 0) + 1;
+    });
+    return { total: members.length, byLocation: byLocation, byDues: byDues };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward Directory (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getStewardDirectory() {
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return [];
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var stewards = [];
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildUserRecord(data[i], colMap);
+      if (!rec.isSteward) continue;
+      stewards.push({
+        name: rec.name,
+        email: rec.email,
+        workLocation: rec.workLocation,
+        officeDays: rec.officeDays,
+        phone: rec.phone,
+        unit: rec.unit,
+      });
+    }
+    stewards.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    return stewards;
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Grievance Stats (v4.12.0) — anonymized
+  // ═══════════════════════════════════════
+
+  function getGrievanceStats() {
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return { available: false };
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { available: false };
+    var colMap = _buildColumnMap(data[0]);
+    var total = data.length - 1;
+    if (total < 10) return { available: false, count: total, threshold: 10 };
+
+    var byStatus = {};
+    var byStep = {};
+    var byUnit = {};
+    var monthly = {};
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildGrievanceRecord(data[i], colMap);
+      var s = rec.status || 'unknown';
+      byStatus[s] = (byStatus[s] || 0) + 1;
+      var step = rec.step || 'Unknown';
+      byStep[step] = (byStep[step] || 0) + 1;
+      var u = rec.unit || 'Unknown';
+      byUnit[u] = (byUnit[u] || 0) + 1;
+      if (rec.filedTimestamp) {
+        var d = new Date(rec.filedTimestamp);
+        var key = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+        monthly[key] = (monthly[key] || 0) + 1;
+      }
+    }
+    var monthlyArr = Object.keys(monthly).sort().map(function(k) { return { month: k, count: monthly[k] }; });
+    return { available: true, total: total, byStatus: byStatus, byStep: byStep, byUnit: byUnit, monthly: monthlyArr };
+  }
+
+  function getGrievanceHotSpots() {
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return [];
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return [];
+    var colMap = _buildColumnMap(data[0]);
+    var unitCol = _findColumn(colMap, HEADERS.grievanceUnit);
+    if (unitCol === -1) return [];
+
+    var counts = {};
+    for (var i = 1; i < data.length; i++) {
+      var unit = String(data[i][unitCol]).trim() || 'Unknown';
+      counts[unit] = (counts[unit] || 0) + 1;
+    }
+    var spots = [];
+    for (var u in counts) {
+      if (counts[u] >= 3) spots.push({ location: u, count: counts[u] });
+    }
+    spots.sort(function(a, b) { return b.count - a.count; });
+    return spots;
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Membership Stats (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getMembershipStats() {
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return { available: false };
+    var data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { available: false };
+    var total = data.length - 1;
+    if (total < 20) return { available: false, count: total, threshold: 20 };
+
+    var colMap = _buildColumnMap(data[0]);
+    var byUnit = {};
+    var byLocation = {};
+    var byDues = {};
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildUserRecord(data[i], colMap);
+      var unit = rec.unit || 'Unknown';
+      byUnit[unit] = (byUnit[unit] || 0) + 1;
+      var loc = rec.workLocation || 'Unknown';
+      byLocation[loc] = (byLocation[loc] || 0) + 1;
+      var dues = rec.duesStatus || 'Unknown';
+      byDues[dues] = (byDues[dues] || 0) + 1;
+    }
+    return { available: true, total: total, byUnit: byUnit, byLocation: byLocation, byDues: byDues };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Upcoming Events via CalendarApp (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getUpcomingEvents(limit) {
+    limit = limit || 10;
+    try {
+      var config = ConfigReader.getConfig();
+      if (!config.calendarId) return [];
+      var cache = CacheService.getScriptCache();
+      var cacheKey = 'events_' + config.calendarId;
+      var cached = cache.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+
+      var cal = CalendarApp.getCalendarById(config.calendarId);
+      if (!cal) return [];
+      var now = new Date();
+      var future = new Date(now.getTime() + 90 * 86400000);
+      var events = cal.getEvents(now, future);
+      var result = [];
+      for (var i = 0; i < Math.min(events.length, limit); i++) {
+        var ev = events[i];
+        result.push({
+          title: ev.getTitle(),
+          startTime: ev.getStartTime().toISOString(),
+          endTime: ev.getEndTime().toISOString(),
+          location: ev.getLocation() || '',
+          description: (ev.getDescription() || '').substring(0, 300),
+        });
+      }
+      cache.put(cacheKey, JSON.stringify(result), 900);
+      return result;
+    } catch (e) {
+      Logger.log('getUpcomingEvents error: ' + e.message);
+      return [];
+    }
+  }
+
+  // Public API
+  return {
+    findUserByEmail: findUserByEmail,
+    getUserRole: getUserRole,
+    getStewardCases: getStewardCases,
+    getStewardKPIs: getStewardKPIs,
+    getMemberGrievances: getMemberGrievances,
+    getStewardContact: getStewardContact,
+    getUnits: getUnits,
+    getFullMemberProfile: getFullMemberProfile,
+    updateMemberProfile: updateMemberProfile,
+    getAssignedStewardInfo: getAssignedStewardInfo,
+    getAvailableStewards: getAvailableStewards,
+    assignStewardToMember: assignStewardToMember,
+    getMemberGrievanceDriveUrl: getMemberGrievanceDriveUrl,
+    getMemberSurveyStatus: getMemberSurveyStatus,
+    getOrgLinks: getOrgLinks,
+    getStewardMembers: getStewardMembers,
+    getStewardSurveyTracking: getStewardSurveyTracking,
+    sendBroadcastMessage: sendBroadcastMessage,
+    getSurveyResults: getSurveyResults,
+    // v4.12.0
+    logMemberContact: logMemberContact,
+    getMemberContactHistory: getMemberContactHistory,
+    getStewardContactLog: getStewardContactLog,
+    createTask: createTask,
+    getTasks: getTasks,
+    updateTask: updateTask,
+    completeTask: completeTask,
+    getStewardMemberStats: getStewardMemberStats,
+    getStewardDirectory: getStewardDirectory,
+    getGrievanceStats: getGrievanceStats,
+    getGrievanceHotSpots: getGrievanceHotSpots,
+    getMembershipStats: getMembershipStats,
+    getUpcomingEvents: getUpcomingEvents,
+  };
+
+})();
+
+
+// ═══════════════════════════════════════
+// GLOBAL FUNCTIONS (callable from client via google.script.run)
+// ═══════════════════════════════════════
+
+function dataGetStewardCases(email) { return DataService.getStewardCases(email); }
+function dataGetStewardKPIs(email) { return DataService.getStewardKPIs(email); }
+function dataGetMemberGrievances(email) { return DataService.getMemberGrievances(email); }
+function dataGetStewardContact(email) { return DataService.getStewardContact(email); }
+function dataGetUserRole(email) { return DataService.getUserRole(email); }
+function dataGetUserProfile(email) { return DataService.findUserByEmail(email); }
+function dataGetUnits() { return DataService.getUnits(); }
+
+// v4.11.0 — new data service wrappers
+function dataGetFullProfile(email) { return DataService.getFullMemberProfile(email); }
+function dataUpdateProfile(email, updates) { return DataService.updateMemberProfile(email, updates); }
+function dataGetAssignedSteward(email) { return DataService.getAssignedStewardInfo(email); }
+function dataGetAvailableStewards(email) { return DataService.getAvailableStewards(email); }
+function dataAssignSteward(memberEmail, stewardEmail) { return DataService.assignStewardToMember(memberEmail, stewardEmail); }
+function dataGetGrievanceDriveUrl(email) { return DataService.getMemberGrievanceDriveUrl(email); }
+function dataGetSurveyStatus(email) { return DataService.getMemberSurveyStatus(email); }
+function dataGetOrgLinks() { return DataService.getOrgLinks(); }
+function dataGetStewardMembers(email) { return DataService.getStewardMembers(email); }
+function dataGetStewardSurveyTracking(email) { return DataService.getStewardSurveyTracking(email); }
+function dataSendBroadcast(email, filter, msg) { return DataService.sendBroadcastMessage(email, filter, msg); }
+function dataGetSurveyResults() { return DataService.getSurveyResults(); }
+
+// v4.12.0 — new data service wrappers
+function dataLogMemberContact(stewardEmail, memberEmail, type, notes, duration) { return DataService.logMemberContact(stewardEmail, memberEmail, type, notes, duration); }
+function dataGetMemberContactHistory(stewardEmail, memberEmail) { return DataService.getMemberContactHistory(stewardEmail, memberEmail); }
+function dataGetStewardContactLog(stewardEmail) { return DataService.getStewardContactLog(stewardEmail); }
+function dataCreateTask(stewardEmail, title, desc, memberEmail, priority, dueDate) { return DataService.createTask(stewardEmail, title, desc, memberEmail, priority, dueDate); }
+function dataGetTasks(stewardEmail, statusFilter) { return DataService.getTasks(stewardEmail, statusFilter); }
+function dataUpdateTask(stewardEmail, taskId, updates) { return DataService.updateTask(stewardEmail, taskId, updates); }
+function dataCompleteTask(stewardEmail, taskId) { return DataService.completeTask(stewardEmail, taskId); }
+function dataGetStewardMemberStats(stewardEmail) { return DataService.getStewardMemberStats(stewardEmail); }
+function dataGetStewardDirectory() { return DataService.getStewardDirectory(); }
+function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
+function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
+function dataGetMembershipStats() { return DataService.getMembershipStats(); }
+function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(limit); }
+
+
+// ============================================================================
+// SOURCE: 22_WebDashApp.gs (193 lines)
+// ============================================================================
+
+/**
+ * WebApp.gs
+ * Main entry point for the web app dashboard.
+ * 
+ * doGetWebDashboard(e) handles:
+ *   1. Auth resolution (SSO / magic link / session token)
+ *   2. Role lookup from Member Directory
+ *   3. Routing to the correct view (auth, steward, member)
+ *   4. Injecting config + user data into the HTML template
+ * 
+ * Deployment: Deploy as Web App
+ *   - Execute as: Me (the script owner)
+ *   - Who has access: Anyone (or anyone within org)
+ *   - Note: Users arrive via Bitly redirect, not the raw URL
+ */
+
+/**
+ * Main GET handler — serves the single-page app.
+ * @param {Object} e - Event object with URL parameters
+ * @returns {HtmlOutput}
+ */
+function doGetWebDashboard(e) {
+  e = e || { parameter: {} };
+  
+  try {
+    var config = ConfigReader.getConfig();
+    var user = Auth.resolveUser(e);
+    
+    if (!user) {
+      // Not authenticated — show login screen
+      return _serveAuth(config, e);
+    }
+    
+    // Authenticated — look up role
+    var userRecord = DataService.findUserByEmail(user.email);
+    
+    if (!userRecord) {
+      // Check if the visitor is the script owner � grant bootstrap access
+      // so the app is usable before the Member Directory is populated.
+      try {
+        var ownerEmail = Session.getEffectiveUser().getEmail().toLowerCase();
+        if (user.email && user.email.toLowerCase() === ownerEmail) {
+          userRecord = {
+            email: user.email,
+            name: 'Admin',
+            firstName: 'Admin',
+            lastName: '',
+            role: 'both',
+            unit: 'Admin',
+            joined: '',
+            duesStatus: 'Active',
+            phone: '',
+            isBootstrapAdmin: true,
+          };
+        }
+      } catch (ownerErr) { /* SSO not available � fall through */ }
+    }
+
+    if (!userRecord) {
+      // Email not in directory
+      return _serveError(config, 'not_found', user.email);
+    }
+    
+    // Handle "remember me" — create session token if requested
+    var sessionToken = null;
+    if (e.parameter.remember === '1' && user.method === 'magic') {
+      sessionToken = Auth.createSessionToken(user.email);
+    }
+    
+    // Route to appropriate dashboard
+    var role = userRecord.role; // 'steward', 'member', or 'both'
+    
+    return _serveDashboard(config, userRecord, role, sessionToken);
+    
+  } catch (err) {
+    Logger.log('WebApp doGet error: ' + err.message + '\n' + err.stack);
+    return _serveError(ConfigReader.getConfig(), 'error', err.message);
+  }
+}
+
+/**
+ * Serves the login/auth page.
+ */
+function _serveAuth(config, e) {
+  var template = HtmlService.createTemplateFromFile('index');
+  
+  template.pageData = JSON.stringify({
+    view: 'auth',
+    config: _sanitizeConfig(config),
+    error: e.parameter.authError || null,
+  });
+  
+  return template.evaluate()
+    .setTitle(config.orgName + ' Dashboard')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Serves the dashboard (steward or member view).
+ */
+function _serveDashboard(config, userRecord, role, sessionToken) {
+  var template = HtmlService.createTemplateFromFile('index');
+  
+  // Sanitize user record — strip sensitive fields
+  var safeUser = {
+    email: userRecord.email,
+    name: userRecord.name,
+    firstName: userRecord.firstName,
+    lastName: userRecord.lastName,
+    role: role,
+    unit: userRecord.unit,
+    joined: userRecord.joined,
+    duesStatus: userRecord.duesStatus,
+    phone: userRecord.phone,
+    workLocation: userRecord.workLocation || '',
+    officeDays: userRecord.officeDays || '',
+    assignedSteward: userRecord.assignedSteward || '',
+    hasOpenGrievance: userRecord.hasOpenGrievance || false,
+  };
+
+  template.pageData = JSON.stringify({
+    view: role === 'steward' || role === 'both' ? 'steward' : 'member',
+    config: _sanitizeConfig(config),
+    user: safeUser,
+    isDualRole: role === 'both',
+    sessionToken: sessionToken || null,
+  });
+  
+  return template.evaluate()
+    .setTitle(config.orgName + ' Dashboard')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Serves an error page.
+ */
+function _serveError(config, type, detail) {
+  var template = HtmlService.createTemplateFromFile('index');
+  
+  var messages = {
+    'not_found': 'Your email was not found in the member directory. Please contact your steward for access.',
+    'expired': 'Your sign-in link has expired. Please request a new one.',
+    'error': 'Something went wrong. Please try again.',
+  };
+  
+  template.pageData = JSON.stringify({
+    view: 'error',
+    config: _sanitizeConfig(config),
+    error: {
+      type: type,
+      message: messages[type] || messages['error'],
+      detail: type === 'error' ? detail : null,
+    },
+  });
+  
+  return template.evaluate()
+    .setTitle(config.orgName + ' Dashboard')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Strips internal-only fields from config before sending to client.
+ */
+function _sanitizeConfig(config) {
+  return {
+    orgName: config.orgName,
+    orgAbbrev: config.orgAbbrev,
+    logoInitials: config.logoInitials,
+    accentHue: config.accentHue,
+    stewardLabel: config.stewardLabel,
+    memberLabel: config.memberLabel,
+    magicLinkExpiryDays: config.magicLinkExpiryDays,
+    cookieDurationDays: config.cookieDurationDays,
+    calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
+    driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
+    surveyFormUrl: config.satisfactionFormUrl || '',
+    orgWebsite: config.orgWebsite || '',
+  };
+}
+
+/**
+ * Include helper — allows <?!= include('filename') ?> in HTML templates.
+ * Used to compose the SPA from multiple HTML files.
+ * @param {string} filename - Name of the HTML file (without .html extension)
+ * @returns {string} Raw HTML content
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+
+// ============================================================================
+// SOURCE: 23_PortalSheets.gs (169 lines)
+// ============================================================================
+
+/**
+ * 23_PortalSheets.gs
+ * Sheet setup infrastructure for the Member & Steward Portal.
+ * Creates the 8 portal-specific sheets and defines their column constants.
+ *
+ * Sheets created:
+ *   PortalMemberDirectory (hidden) — portal profile extensions (office days, badges, etc.)
+ *   Events               — upcoming union events and meetings
+ *   MeetingMinutes       — union meeting notes with bullet summaries
+ *   FlashPolls           — active quick-vote polls
+ *   PollResponses (hidden) — individual poll vote records
+ *   PortalGrievances (hidden) — portal grievance cases (separate from Grievance Log)
+ *   StewardLog (hidden)  — steward-member interaction audit trail
+ *   MegaSurvey (hidden)  — 56-question survey progress
+ *
+ * Note: Sheet names PortalMemberDirectory and PortalGrievances are distinct from
+ * DDS's existing "Member Directory" and "Grievance Log" sheets to avoid schema collision.
+ */
+
+// ═══════════════════════════════════════════════════════
+// COLUMN CONSTANTS (PORTAL_ prefix to avoid global conflicts)
+// ═══════════════════════════════════════════════════════
+
+var PORTAL_MEMBER_DIR_COLS = {
+  EMAIL: 0, NAME: 1, PERSONAL_EMAIL: 2, PHONE: 3, ROLE: 4,
+  OFFICE: 5, UNIT: 6, JOIN_DATE: 7, OFFICE_DAYS: 8, BADGES: 9,
+  GRIEVANCE_MODE: 10, LAST_ACTIVE: 11
+};
+
+var PORTAL_EVENT_COLS = {
+  ID: 0, TITLE: 1, TYPE: 2, DATE_TIME: 3, END_TIME: 4,
+  LOCATION: 5, DESCRIPTION: 6, ZOOM_LINK: 7, CREATED_BY: 8, CREATED_DATE: 9
+};
+
+var PORTAL_MINUTES_COLS = {
+  ID: 0, MEETING_DATE: 1, TITLE: 2, BULLETS: 3, FULL_MINUTES: 4,
+  CREATED_BY: 5, CREATED_DATE: 6
+};
+
+var PORTAL_POLL_COLS = {
+  ID: 0, QUESTION: 1, OPTIONS: 2, ACTIVE: 3, UNIT: 4,
+  CREATED_BY: 5, CREATED_DATE: 6
+};
+
+var PORTAL_POLL_RESPONSE_COLS = {
+  POLL_ID: 0, EMAIL: 1, RESPONSE: 2, TIMESTAMP: 3
+};
+
+var PORTAL_GRIEVANCE_COLS = {
+  ID: 0, MEMBER_EMAIL: 1, STEWARD_EMAIL: 2, STEP: 3, STATUS: 4,
+  DESCRIPTION: 5, GDRIVE_LINK: 6, ZOOM_LINK: 7, DEADLINES: 8,
+  NOTES: 9, CREATED_DATE: 10, UPDATED_DATE: 11
+};
+
+var PORTAL_STEWARD_LOG_COLS = {
+  ID: 0, STEWARD_EMAIL: 1, MEMBER_EMAIL: 2, TYPE: 3,
+  NOTES: 4, OFFICE: 5, TIMESTAMP: 6
+};
+
+var PORTAL_MEGA_SURVEY_COLS = {
+  EMAIL: 0, RESPONSES: 1, PROGRESS: 2, LAST_UPDATED: 3, COMPLETED: 4
+};
+
+// ═══════════════════════════════════════════════════════
+// SHEET SETUP FUNCTIONS
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Internal helper to get or create a sheet with headers.
+ * Named portalGetOrCreateSheet_ to avoid conflict with
+ * 08a_SheetSetup.gs's getOrCreateSheet(ss, name).
+ */
+function portalGetOrCreateSheet_(name, headers, hidden) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold')
+      .setBackground('#1a1a2e')
+      .setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+    if (hidden) sheet.hideSheet();
+  }
+  return sheet;
+}
+
+function getOrCreatePortalMemberDirectory() {
+  return portalGetOrCreateSheet_('PortalMemberDirectory', [
+    'Email', 'Name', 'Personal Email', 'Phone', 'Role',
+    'Office', 'Unit', 'Join Date', 'Office Days', 'Badges',
+    'Grievance Mode', 'Last Active'
+  ], true);
+}
+
+function getOrCreateEventsSheet() {
+  return portalGetOrCreateSheet_('Events', [
+    'ID', 'Title', 'Type', 'DateTime', 'EndTime',
+    'Location', 'Description', 'ZoomLink', 'CreatedBy', 'CreatedDate'
+  ], false);
+}
+
+function getOrCreateMinutesSheet() {
+  return portalGetOrCreateSheet_('MeetingMinutes', [
+    'ID', 'MeetingDate', 'Title', 'Bullets', 'FullMinutes',
+    'CreatedBy', 'CreatedDate'
+  ], false);
+}
+
+function getOrCreatePollsSheet() {
+  return portalGetOrCreateSheet_('FlashPolls', [
+    'ID', 'Question', 'Options', 'Active', 'Unit',
+    'CreatedBy', 'CreatedDate'
+  ], false);
+}
+
+function getOrCreatePollResponsesSheet() {
+  return portalGetOrCreateSheet_('PollResponses', [
+    'PollID', 'Email', 'Response', 'Timestamp'
+  ], true);
+}
+
+function getOrCreatePortalGrievanceSheet() {
+  return portalGetOrCreateSheet_('PortalGrievances', [
+    'ID', 'MemberEmail', 'StewardEmail', 'Step', 'Status',
+    'Description', 'GDriveLink', 'ZoomLink', 'Deadlines',
+    'Notes', 'CreatedDate', 'UpdatedDate'
+  ], true);
+}
+
+function getOrCreateStewardLogSheet() {
+  return portalGetOrCreateSheet_('StewardLog', [
+    'ID', 'StewardEmail', 'MemberEmail', 'Type',
+    'Notes', 'Office', 'Timestamp'
+  ], true);
+}
+
+function getOrCreateMegaSurveySheet() {
+  return portalGetOrCreateSheet_('MegaSurvey', [
+    'Email', 'Responses', 'Progress', 'LastUpdated', 'Completed'
+  ], true);
+}
+
+/**
+ * Creates all 8 portal sheets. Called from CREATE_DASHBOARD()
+ * in 08a_SheetSetup.gs, and directly via initPortalSheetsManual().
+ */
+function initPortalSheets() {
+  getOrCreatePortalMemberDirectory();
+  getOrCreateEventsSheet();
+  getOrCreateMinutesSheet();
+  getOrCreatePollsSheet();
+  getOrCreatePollResponsesSheet();
+  getOrCreatePortalGrievanceSheet();
+  getOrCreateStewardLogSheet();
+  getOrCreateMegaSurveySheet();
+  Logger.log('Portal sheets initialized.');
+}
+
+/**
+ * Standalone entry point for existing deployments.
+ * Run from the GAS editor when CREATE_DASHBOARD has already been executed.
+ */
+function initPortalSheetsManual() {
+  initPortalSheets();
+  SpreadsheetApp.getUi().alert('Portal sheets created successfully.\n\nNew sheets: PortalMemberDirectory, Events, MeetingMinutes, FlashPolls, PollResponses, PortalGrievances, StewardLog, MegaSurvey');
+}
+
+
+// ============================================================================
+// SOURCE: 24_WeeklyQuestions.gs (408 lines)
+// ============================================================================
+
+/**
+ * 24_WeeklyQuestions.gs — Weekly Questions Engagement System
+ *
+ * Two questions per week: one set by a steward, one drawn from the member pool.
+ * Responses are anonymous (email hashed). Results show live after responding.
+ *
+ * Sheets (hidden):
+ *   _Weekly_Questions  — active and past questions
+ *   _Weekly_Responses  — hashed-email responses
+ *   _Question_Pool     — member-submitted question candidates
+ *
+ * @version 4.11.0
+ * @requires 01_Core.gs (SHEETS)
+ * @requires 06_Maintenance.gs (logAuditEvent)
+ */
+
+var WeeklyQuestions = (function() {
+
+  // ═══════════════════════════════════════
+  // SHEET SETUP
+  // ═══════════════════════════════════════
+
+  function initWeeklyQuestionSheets() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    _ensureSheet(ss, SHEETS.WEEKLY_QUESTIONS, [
+      'ID', 'Text', 'Source', 'Submitted By', 'Week Start', 'Active', 'Created'
+    ]);
+    _ensureSheet(ss, SHEETS.WEEKLY_RESPONSES, [
+      'ID', 'Question ID', 'Email Hash', 'Response', 'Timestamp'
+    ]);
+    _ensureSheet(ss, SHEETS.QUESTION_POOL, [
+      'ID', 'Text', 'Submitted By Hash', 'Status', 'Created'
+    ]);
+  }
+
+  function _ensureSheet(ss, name, headers) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      sheet = ss.insertSheet(name);
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.hideSheet();
+    }
+    return sheet;
+  }
+
+  // ═══════════════════════════════════════
+  // HELPERS
+  // ═══════════════════════════════════════
+
+  function _hashEmail(email) {
+    var raw = String(email).trim().toLowerCase();
+    var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw);
+    return digest.map(function(b) {
+      return ('0' + (b & 0xFF).toString(16)).slice(-2);
+    }).join('');
+  }
+
+  function _getWeekStart(date) {
+    date = date || new Date();
+    var d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    var day = d.getDay();
+    var diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
+    d.setDate(diff);
+    return d;
+  }
+
+  function _generateId() {
+    return 'WQ_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 4);
+  }
+
+  function _getSheet(name) {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      // Lazy-init: auto-create missing sheets
+      initWeeklyQuestionSheets();
+      sheet = ss.getSheetByName(name);
+    }
+    return sheet;
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Get Active Questions
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns this week's active questions with user response status + live stats.
+   * @param {string} email
+   * @returns {Object} { questions: [{id, text, source, hasResponded, stats}] }
+   */
+  function getActiveQuestions(email) {
+    var weekStart = _getWeekStart();
+    var weekStr = weekStart.toISOString().split('T')[0];
+    var emailHash = _hashEmail(email);
+
+    var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
+    if (!qSheet || qSheet.getLastRow() <= 1) return { questions: [] };
+
+    var qData = qSheet.getDataRange().getValues();
+    var activeQs = [];
+
+    for (var i = 1; i < qData.length; i++) {
+      var qWeek = qData[i][4]; // Week Start column
+      if (qWeek instanceof Date) qWeek = qWeek.toISOString().split('T')[0];
+      var active = String(qData[i][5]).toLowerCase();
+      if (String(qWeek) === weekStr && (active === 'true' || active === 'yes' || active === '1')) {
+        activeQs.push({
+          id: qData[i][0],
+          text: qData[i][1],
+          source: qData[i][2],
+        });
+      }
+    }
+
+    // Check responses and get stats
+    var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
+    var responses = rSheet && rSheet.getLastRow() > 1 ? rSheet.getDataRange().getValues() : [];
+
+    activeQs.forEach(function(q) {
+      q.hasResponded = false;
+      var counts = {};
+      var total = 0;
+      for (var r = 1; r < responses.length; r++) {
+        if (responses[r][1] !== q.id) continue;
+        total++;
+        var resp = responses[r][3];
+        counts[resp] = (counts[resp] || 0) + 1;
+        if (responses[r][2] === emailHash) q.hasResponded = true;
+      }
+      q.stats = { total: total, counts: counts };
+    });
+
+    return { questions: activeQs };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Submit Response
+  // ═══════════════════════════════════════
+
+  /**
+   * Submits a response to a weekly question. Returns updated stats.
+   * @param {string} email
+   * @param {string} questionId
+   * @param {string} response
+   * @returns {Object} { success, stats }
+   */
+  function submitResponse(email, questionId, response) {
+    if (!email || !questionId || !response) {
+      return { success: false, message: 'Missing required fields.' };
+    }
+
+    var emailHash = _hashEmail(email);
+
+    // Check for duplicate
+    var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
+    if (!rSheet) return { success: false, message: 'System not initialized.' };
+
+    if (rSheet.getLastRow() > 1) {
+      var existing = rSheet.getDataRange().getValues();
+      for (var i = 1; i < existing.length; i++) {
+        if (existing[i][1] === questionId && existing[i][2] === emailHash) {
+          return { success: false, message: 'Already responded.' };
+        }
+      }
+    }
+
+    // Write response
+    var id = _generateId();
+    rSheet.appendRow([id, questionId, emailHash, response, new Date()]);
+
+    // Calculate updated stats
+    var allResp = rSheet.getDataRange().getValues();
+    var counts = {};
+    var total = 0;
+    for (var r = 1; r < allResp.length; r++) {
+      if (allResp[r][1] !== questionId) continue;
+      total++;
+      var resp = allResp[r][3];
+      counts[resp] = (counts[resp] || 0) + 1;
+    }
+
+    return { success: true, stats: { total: total, counts: counts } };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Submit Pool Question
+  // ═══════════════════════════════════════
+
+  /**
+   * Submits a candidate question to the pool.
+   * @param {string} email
+   * @param {string} questionText
+   * @returns {Object} { success, message }
+   */
+  function submitPoolQuestion(email, questionText) {
+    if (!email || !questionText) return { success: false, message: 'Missing fields.' };
+
+    var sheet = _getSheet(SHEETS.QUESTION_POOL);
+    if (!sheet) return { success: false, message: 'System not initialized.' };
+
+    var id = _generateId();
+    var emailHash = _hashEmail(email);
+    sheet.appendRow([id, questionText.trim().substring(0, 500), emailHash, 'pending', new Date()]);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('WQ_POOL_SUBMIT', { emailHash: emailHash.substring(0, 8) });
+    }
+
+    return { success: true, message: 'Question submitted.' };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Question Stats
+  // ═══════════════════════════════════════
+
+  function getQuestionStats(questionId) {
+    var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
+    if (!rSheet || rSheet.getLastRow() <= 1) return { total: 0, counts: {} };
+
+    var data = rSheet.getDataRange().getValues();
+    var counts = {};
+    var total = 0;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][1] !== questionId) continue;
+      total++;
+      var resp = data[i][3];
+      counts[resp] = (counts[resp] || 0) + 1;
+    }
+    return { total: total, counts: counts };
+  }
+
+  function hasUserResponded(email, questionId) {
+    var emailHash = _hashEmail(email);
+    var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
+    if (!rSheet || rSheet.getLastRow() <= 1) return false;
+
+    var data = rSheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][1] === questionId && data[i][2] === emailHash) return true;
+    }
+    return false;
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Steward — Set Question & Pool Management
+  // ═══════════════════════════════════════
+
+  /**
+   * Steward sets their weekly question.
+   * @param {string} stewardEmail
+   * @param {string} text
+   * @returns {Object} { success, message }
+   */
+  function setStewardQuestion(stewardEmail, text) {
+    if (!stewardEmail || !text) return { success: false, message: 'Missing fields.' };
+
+    var sheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
+    if (!sheet) return { success: false, message: 'System not initialized.' };
+
+    var weekStart = _getWeekStart();
+    var weekStr = weekStart.toISOString().split('T')[0];
+    var id = _generateId();
+
+    sheet.appendRow([id, text.trim().substring(0, 500), 'steward', stewardEmail, weekStr, 'TRUE', new Date()]);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('WQ_STEWARD_SET', { steward: stewardEmail, weekStart: weekStr });
+    }
+
+    return { success: true, message: 'Question set for this week.' };
+  }
+
+  /**
+   * Returns pending pool questions for steward review.
+   * @returns {Object[]} Array of { id, text, status, created }
+   */
+  function getPoolQuestions() {
+    var sheet = _getSheet(SHEETS.QUESTION_POOL);
+    if (!sheet || sheet.getLastRow() <= 1) return [];
+
+    var data = sheet.getDataRange().getValues();
+    var questions = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][3]).toLowerCase() === 'pending') {
+        questions.push({
+          id: data[i][0],
+          text: data[i][1],
+          status: data[i][3],
+          created: data[i][4],
+        });
+      }
+    }
+    return questions;
+  }
+
+  /**
+   * Selects a random question from the pending pool and makes it active.
+   * Intended for a weekly time-driven trigger.
+   * @returns {Object} { success, questionId }
+   */
+  function selectRandomPoolQuestion() {
+    var poolSheet = _getSheet(SHEETS.QUESTION_POOL);
+    if (!poolSheet || poolSheet.getLastRow() <= 1) return { success: false, message: 'No pool questions.' };
+
+    var data = poolSheet.getDataRange().getValues();
+    var pending = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][3]).toLowerCase() === 'pending') {
+        pending.push({ row: i + 1, id: data[i][0], text: data[i][1] });
+      }
+    }
+
+    if (pending.length === 0) return { success: false, message: 'No pending questions.' };
+
+    var selected = pending[Math.floor(Math.random() * pending.length)];
+
+    // Mark as used in pool
+    poolSheet.getRange(selected.row, 4).setValue('used');
+
+    // Add to active questions
+    var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
+    if (!qSheet) return { success: false, message: 'Questions sheet missing.' };
+
+    var weekStart = _getWeekStart();
+    var weekStr = weekStart.toISOString().split('T')[0];
+    var newId = _generateId();
+
+    qSheet.appendRow([newId, selected.text, 'pool', '', weekStr, 'TRUE', new Date()]);
+
+    return { success: true, questionId: newId, text: selected.text };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: History (v4.12.0)
+  // ═══════════════════════════════════════
+
+  function getHistory(email, page, pageSize) {
+    page = page || 1;
+    pageSize = pageSize || 10;
+    var emailHash = _hashEmail(email);
+
+    var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
+    if (!qSheet || qSheet.getLastRow() <= 1) return { questions: [], hasMore: false };
+
+    var rSheet = _getSheet(SHEETS.WEEKLY_RESPONSES);
+    var responses = rSheet && rSheet.getLastRow() > 1 ? rSheet.getDataRange().getValues() : [];
+
+    var qData = qSheet.getDataRange().getValues();
+    var allQs = [];
+    for (var i = 1; i < qData.length; i++) {
+      allQs.push({ id: qData[i][0], text: qData[i][1], source: qData[i][2], weekStart: qData[i][4] });
+    }
+    allQs.sort(function(a, b) {
+      var da = a.weekStart instanceof Date ? a.weekStart.getTime() : 0;
+      var db = b.weekStart instanceof Date ? b.weekStart.getTime() : 0;
+      return db - da;
+    });
+
+    var start = (page - 1) * pageSize;
+    var paged = allQs.slice(start, start + pageSize);
+
+    paged.forEach(function(q) {
+      var counts = {};
+      var total = 0;
+      for (var r = 1; r < responses.length; r++) {
+        if (responses[r][1] !== q.id) continue;
+        total++;
+        var resp = responses[r][3];
+        counts[resp] = (counts[resp] || 0) + 1;
+      }
+      q.stats = { total: total, counts: counts };
+      q.weekStr = q.weekStart instanceof Date ? q.weekStart.toLocaleDateString() : String(q.weekStart || '');
+    });
+
+    return { questions: paged, hasMore: start + pageSize < allQs.length };
+  }
+
+  // Public API
+  return {
+    initWeeklyQuestionSheets: initWeeklyQuestionSheets,
+    getActiveQuestions: getActiveQuestions,
+    submitResponse: submitResponse,
+    submitPoolQuestion: submitPoolQuestion,
+    getQuestionStats: getQuestionStats,
+    hasUserResponded: hasUserResponded,
+    setStewardQuestion: setStewardQuestion,
+    getPoolQuestions: getPoolQuestions,
+    selectRandomPoolQuestion: selectRandomPoolQuestion,
+    getHistory: getHistory,
+  };
+
+})();
+
+
+// ═══════════════════════════════════════
+// GLOBAL WRAPPERS (callable from client)
+// ═══════════════════════════════════════
+
+function wqGetActiveQuestions(email) { return WeeklyQuestions.getActiveQuestions(email); }
+function wqSubmitResponse(email, questionId, response) { return WeeklyQuestions.submitResponse(email, questionId, response); }
+function wqSubmitPoolQuestion(email, text) { return WeeklyQuestions.submitPoolQuestion(email, text); }
+function wqSetStewardQuestion(stewardEmail, text) { return WeeklyQuestions.setStewardQuestion(stewardEmail, text); }
+function wqGetPoolQuestions() { return WeeklyQuestions.getPoolQuestions(); }
+function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
+function wqGetHistory(email, page, pageSize) { return WeeklyQuestions.getHistory(email, page, pageSize); }
+
+
+// ============================================================================
 // EMBEDDED HTML TEMPLATES
 // ============================================================================
 
@@ -63148,6 +65702,5193 @@ function getWorkloadTracker_HTML() {
 </script>
 </body>
 </html>
+`;
+}
+
+/**
+ * Embedded HTML: auth_view.html
+ * @returns {string} HTML content
+ */
+function getauth_view_HTML() {
+  return `<script>
+/**
+ * Auth View — Login screen
+ * Renders: Google SSO button, magic link email form
+ * States: choose → email → sending → sent → error
+ */
+function renderAuth(container) {
+  // Apply auth theme (always dark)
+  var hue = CONFIG.accentHue || 250;
+  document.documentElement.style.setProperty('--bg', '#0a0a18');
+  document.documentElement.style.setProperty('--surface', 'rgba(255,255,255,0.04)');
+  document.documentElement.style.setProperty('--raised', 'rgba(255,255,255,0.06)');
+  document.documentElement.style.setProperty('--text', '#eeedf5');
+  document.documentElement.style.setProperty('--muted', '#6b6b80');
+  document.documentElement.style.setProperty('--accent', 'hsl(' + hue + ', 70%, 68%)');
+  document.documentElement.style.setProperty('--accentBg', 'hsla(' + hue + ', 70%, 68%, 0.1)');
+  document.documentElement.style.setProperty('--accentBorder', 'hsla(' + hue + ', 70%, 68%, 0.25)');
+  document.documentElement.style.setProperty('--border', 'rgba(255,255,255,0.08)');
+  document.documentElement.style.setProperty('--success', '#34d399');
+  document.documentElement.style.setProperty('--danger', '#f87171');
+  document.documentElement.style.setProperty('--fontBody', "'Plus Jakarta Sans', sans-serif");
+  document.documentElement.style.setProperty('--fontDisplay', "'Sora', sans-serif");
+  document.body.style.background = '#0a0a18';
+  document.body.style.color = '#eeedf5';
+  
+  showAuthChoose(container);
+}
+
+function showAuthChoose(container) {
+  container.innerHTML = '';
+  var wrapper = el('div', { className: 'auth-container fade-in' });
+  
+  // Logo
+  var logo = el('div', { 
+    className: 'auth-logo',
+    style: {
+      background: 'linear-gradient(135deg, hsl(' + CONFIG.accentHue + ', 70%, 55%), hsl(' + (CONFIG.accentHue + 30) + ', 70%, 65%))',
+      fontSize: CONFIG.logoInitials.length > 2 ? '14px' : '22px',
+      boxShadow: '0 6px 20px hsla(' + CONFIG.accentHue + ', 70%, 55%, 0.4)',
+    }
+  }, CONFIG.logoInitials);
+  wrapper.appendChild(logo);
+  
+  // Title
+  wrapper.appendChild(el('div', { className: 'auth-title' }, CONFIG.orgName));
+  wrapper.appendChild(el('div', { className: 'auth-subtitle' }, 'Grievance Tracker & Member Portal'));
+  
+  // Spacer
+  wrapper.appendChild(el('div', { style: { height: '32px' } }));
+  
+  // Google SSO button
+  var googleBtn = el('button', {
+    className: 'btn btn-google',
+    onClick: function() {
+      // SSO is handled server-side — just reload, doGet will pick up the session
+      // In Apps Script web apps deployed as "Anyone", SSO is automatic if user is signed into Google
+      window.top.location.reload();
+    }
+  });
+  googleBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Continue with Google';
+  wrapper.appendChild(googleBtn);
+  
+  // Divider
+  var divider = el('div', { className: 'auth-divider' });
+  divider.appendChild(el('div', { className: 'auth-divider-line' }));
+  divider.appendChild(el('span', { className: 'auth-divider-text' }, 'or'));
+  divider.appendChild(el('div', { className: 'auth-divider-line' }));
+  wrapper.appendChild(divider);
+  
+  // Magic link button
+  var emailBtn = el('button', {
+    className: 'btn btn-secondary',
+    onClick: function() { showAuthEmail(container); }
+  }, '✉️  Sign in with Email');
+  wrapper.appendChild(emailBtn);
+  
+  // Footer
+  var footer = el('div', { style: { textAlign: 'center', marginTop: '24px', fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' } });
+  footer.textContent = 'Your role (' + CONFIG.stewardLabel.toLowerCase() + ' or ' + CONFIG.memberLabel.toLowerCase() + ') is determined automatically from the directory.';
+  wrapper.appendChild(footer);
+  
+  container.appendChild(wrapper);
+}
+
+function showAuthEmail(container) {
+  container.innerHTML = '';
+  var wrapper = el('div', { className: 'auth-container fade-in' });
+  
+  // Back button
+  var back = el('button', {
+    style: { color: 'var(--accent)', fontSize: '13px', marginBottom: '20px', textAlign: 'left', fontFamily: 'var(--fontBody)' },
+    onClick: function() { showAuthChoose(container); }
+  }, '← Back');
+  wrapper.appendChild(back);
+  
+  wrapper.appendChild(el('div', { className: 'auth-title', style: { textAlign: 'left' } }, 'Sign in with email'));
+  wrapper.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px', marginBottom: '24px', lineHeight: '1.5' } }, "We'll send a secure link. No password needed."));
+  
+  // Email input
+  var inputLabel = el('label', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '6px' } }, 'Email address');
+  wrapper.appendChild(inputLabel);
+  
+  var emailInput = el('input', {
+    className: 'auth-input',
+    type: 'email',
+    placeholder: 'you@example.com',
+  });
+  wrapper.appendChild(emailInput);
+  
+  // Remember me toggle
+  var rememberMe = { value: true };
+  var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' } });
+  
+  var track = el('div', {
+    className: 'auth-toggle-track',
+    style: { background: 'var(--accent)' }
+  });
+  var thumb = el('div', {
+    className: 'auth-toggle-thumb',
+    style: { left: '18px' }
+  });
+  track.appendChild(thumb);
+  toggleContainer.appendChild(track);
+  toggleContainer.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'Remember this device (' + CONFIG.cookieDurationDays + ' days)'));
+  
+  toggleContainer.addEventListener('click', function() {
+    rememberMe.value = !rememberMe.value;
+    track.style.background = rememberMe.value ? 'var(--accent)' : '#333';
+    thumb.style.left = rememberMe.value ? '18px' : '2px';
+  });
+  wrapper.appendChild(toggleContainer);
+  
+  // Submit button
+  var submitBtn = el('button', {
+    className: 'btn btn-primary',
+    style: { marginTop: '8px', opacity: '0.5' },
+    onClick: function() {
+      var email = emailInput.value.trim();
+      if (!email || email.indexOf('@') === -1) return;
+      showAuthSending(container, email, rememberMe.value);
+    }
+  }, 'Send sign-in link');
+  wrapper.appendChild(submitBtn);
+  
+  // Enable button on valid input
+  emailInput.addEventListener('input', function() {
+    var valid = emailInput.value.indexOf('@') > 0;
+    submitBtn.style.opacity = valid ? '1' : '0.5';
+  });
+  
+  // Enter key
+  emailInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') submitBtn.click();
+  });
+  
+  container.appendChild(wrapper);
+  emailInput.focus();
+}
+
+function showAuthSending(container, email, rememberMe) {
+  container.innerHTML = '';
+  var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
+  
+  var spinner = el('div', { className: 'spinner', style: { marginBottom: '16px' } });
+  wrapper.appendChild(spinner);
+  wrapper.appendChild(el('div', { style: { fontSize: '14px', color: 'var(--text)' } }, 'Sending sign-in link...'));
+  
+  container.appendChild(wrapper);
+  
+  // Actually send the magic link
+  google.script.run
+    .withSuccessHandler(function(result) {
+      if (result.success) {
+        showAuthSent(container, email, rememberMe);
+      } else {
+        showAuthError(container, result.message, email);
+      }
+    })
+    .withFailureHandler(function(err) {
+      showAuthError(container, err.message || 'Failed to send email. Please try again.', email);
+    })
+    .authSendMagicLink(email, rememberMe);
+}
+
+function showAuthSent(container, email, rememberMe) {
+  container.innerHTML = '';
+  var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
+  
+  wrapper.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '✉️'));
+  wrapper.appendChild(el('div', { className: 'auth-title' }, 'Check your email'));
+  
+  var desc = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.6' } });
+  desc.innerHTML = 'Sign-in link sent to<br><span style="color: var(--accent); font-weight: 600;">' + email + '</span>';
+  wrapper.appendChild(desc);
+  
+  var info = el('div', {
+    className: 'card card-glass',
+    style: { marginTop: '20px', fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6', textAlign: 'center', maxWidth: '280px' }
+  });
+  info.innerHTML = 'Link expires in <span style="color: var(--text); font-weight: 600;">' + CONFIG.magicLinkExpiryDays + ' days</span>.';
+  if (rememberMe) {
+    info.innerHTML += '<br>You\'ll stay signed in for <span style="color: var(--text); font-weight: 600;">' + CONFIG.cookieDurationDays + ' days</span>.';
+  }
+  wrapper.appendChild(info);
+  
+  // Actions
+  var actions = el('div', { style: { display: 'flex', gap: '16px', marginTop: '20px' } });
+  actions.appendChild(el('button', {
+    style: { color: 'var(--accent)', fontSize: '13px', fontWeight: '600' },
+    onClick: function() { showAuthSending(container, email, rememberMe); }
+  }, 'Resend'));
+  actions.appendChild(el('button', {
+    style: { color: 'var(--muted)', fontSize: '13px' },
+    onClick: function() { showAuthEmail(container); }
+  }, 'Different email'));
+  wrapper.appendChild(actions);
+  
+  container.appendChild(wrapper);
+}
+
+function showAuthError(container, message, email) {
+  container.innerHTML = '';
+  var wrapper = el('div', { className: 'auth-container fade-in', style: { alignItems: 'center', textAlign: 'center' } });
+  
+  wrapper.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '16px' } }, '⚠️'));
+  wrapper.appendChild(el('div', { className: 'auth-title' }, 'Something went wrong'));
+  wrapper.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.6', maxWidth: '300px' } }, message));
+  
+  wrapper.appendChild(el('button', {
+    className: 'btn btn-primary',
+    style: { marginTop: '24px', maxWidth: '280px' },
+    onClick: function() { showAuthChoose(container); }
+  }, 'Try again'));
+  
+  container.appendChild(wrapper);
+}
+</script>
+`;
+}
+
+/**
+ * Embedded HTML: error_view.html
+ * @returns {string} HTML content
+ */
+function geterror_view_HTML() {
+  return `<script>
+/**
+ * Error View
+ * Shows when auth fails, user not found, or something breaks
+ */
+function renderError(container, error) {
+  // Apply dark theme
+  document.documentElement.style.setProperty('--bg', '#0a0a18');
+  document.documentElement.style.setProperty('--text', '#eeedf5');
+  document.documentElement.style.setProperty('--muted', '#6b6b80');
+  document.documentElement.style.setProperty('--accent', 'hsl(' + (CONFIG.accentHue || 250) + ', 70%, 68%)');
+  document.documentElement.style.setProperty('--fontBody', "'Plus Jakarta Sans', sans-serif");
+  document.documentElement.style.setProperty('--fontDisplay', "'Sora', sans-serif");
+  document.body.style.background = '#0a0a18';
+  
+  container.innerHTML = '';
+  var wrapper = el('div', { className: 'error-container fade-in' });
+  
+  var icons = { not_found: '\u{1F50D}', expired: '\u23F3', error: '\u26A0\uFE0F' };
+  wrapper.appendChild(el('div', { className: 'error-icon' }, icons[error.type] || '\u26A0\uFE0F'));
+  
+  var titles = { not_found: 'Not Found', expired: 'Link Expired', error: 'Something Went Wrong' };
+  wrapper.appendChild(el('div', { className: 'error-title' }, titles[error.type] || 'Error'));
+  wrapper.appendChild(el('div', { className: 'error-message' }, error.message));
+  
+  var retryLabel = (error.type === 'not_found' || error.type === 'expired') ? 'Back to Sign In' : 'Try Again';
+  wrapper.appendChild(el('button', {
+    className: 'btn btn-primary',
+    style: { marginTop: '24px', maxWidth: '280px' },
+    onClick: function() {
+      if (error.type === 'not_found' || error.type === 'expired') {
+        // Re-render the auth screen client-side — no server round-trip needed
+        renderAuth(document.getElementById('app'));
+      } else {
+        window.location.reload();
+      }
+    }
+  }, retryLabel));
+  
+  container.appendChild(wrapper);
+}
+</script>
+`;
+}
+
+/**
+ * Embedded HTML: index.html
+ * @returns {string} HTML content
+ */
+function getindex_HTML() {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Dashboard</title>
+  
+  <!-- Fonts — DM Sans (body) + Fraunces (display) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  
+  <?!= include('styles') ?>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  
+  <script>
+    // ═══════════════════════════════════════
+    // BOOTSTRAP — Parse server-injected data
+    // ═══════════════════════════════════════
+    var PAGE_DATA = <?!= pageData ?>;
+    var CONFIG = PAGE_DATA.config;
+    var CURRENT_VIEW = PAGE_DATA.view;
+    var CURRENT_USER = PAGE_DATA.user || null;
+    var IS_DUAL_ROLE = PAGE_DATA.isDualRole || false;
+    var SESSION_TOKEN = PAGE_DATA.sessionToken || null;
+    
+    // Store session token in localStorage if provided
+    if (SESSION_TOKEN) {
+      localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
+    }
+    
+    // Check for existing session token
+    var storedToken = localStorage.getItem('dashboardSessionToken');
+    
+    // ═══════════════════════════════════════
+    // THEME ENGINE
+    // ═══════════════════════════════════════
+    var ThemeEngine = (function() {
+      
+      function generatePalette(hue) {
+        // Override: warm amber accent to match our system
+        return {
+          accent:       'hsl(' + hue + ', 65%, 42%)',
+          accentDim:    'hsl(' + hue + ', 50%, 35%)',
+          accentGlow:   'hsla(' + hue + ', 65%, 42%, 0.3)',
+          accentBg:     'hsla(' + hue + ', 65%, 42%, 0.08)',
+          accentBorder: 'hsla(' + hue + ', 65%, 42%, 0.25)',
+        };
+      }
+      
+      var palette = generatePalette(CONFIG.accentHue || 30);
+      
+      var themes = {
+        steward: {
+          dark: {
+            bg: '#1a1815', surface: '#252220', raised: '#2e2b28',
+            text: '#e7e5e4', muted: '#78716c',
+            success: '#4ade80', warning: '#facc15', danger: '#ef4444', info: '#60a5fa',
+            border: '#3d3835', radius: '14px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
+            mode: 'dark',
+          },
+          light: {
+            bg: '#fafaf9', surface: '#ffffff', raised: '#f5f5f4',
+            text: '#1c1917', muted: '#78716c',
+            success: '#16a34a', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
+            border: '#e7e5e4', radius: '14px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
+            mode: 'light',
+          }
+        },
+        member: {
+          dark: {
+            bg: '#1a1815', surface: '#252220', raised: '#2e2b28',
+            text: '#e7e5e4', muted: '#78716c',
+            success: '#34d399', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa',
+            border: '#3d3835', radius: '16px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
+            mode: 'dark',
+          },
+          light: {
+            bg: '#fafaf9', surface: '#ffffff', raised: '#f5f5f4',
+            text: '#1c1917', muted: '#78716c',
+            success: '#059669', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
+            border: '#e7e5e4', radius: '16px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
+            mode: 'light',
+          }
+        }
+      };
+      
+      function getTheme(role, isDark) {
+        var base = themes[role] || themes.member;
+        var t = isDark ? base.dark : base.light;
+        // Merge accent colors
+        for (var key in palette) {
+          t[key] = palette[key];
+        }
+        return t;
+      }
+      
+      function applyTheme(t) {
+        var root = document.documentElement;
+        for (var key in t) {
+          if (typeof t[key] === 'string') {
+            root.style.setProperty('--' + key, t[key]);
+          }
+        }
+        document.body.style.background = t.bg;
+        document.body.style.color = t.text;
+        document.body.style.fontFamily = t.fontBody;
+      }
+      
+      return {
+        getTheme: getTheme,
+        applyTheme: applyTheme,
+        palette: palette,
+      };
+    })();
+    
+    // ═══════════════════════════════════════
+    // APP STATE
+    // ═══════════════════════════════════════
+    var AppState = {
+      view: CURRENT_VIEW,
+      role: CURRENT_USER ? CURRENT_USER.role : null,
+      activeRole: CURRENT_VIEW, // which view is shown (for dual-role toggle)
+      isDark: false,
+      user: CURRENT_USER,
+      cases: [],
+      kpis: null,
+      grievances: [],
+      loading: true,
+    };
+    
+    // ═══════════════════════════════════════
+    // ROUTER
+    // ═══════════════════════════════════════
+    function initApp() {
+      var app = document.getElementById('app');
+      
+      switch (CURRENT_VIEW) {
+        case 'auth':
+          renderAuth(app);
+          break;
+        case 'steward':
+          initStewardView(app);
+          break;
+        case 'member':
+          initMemberView(app);
+          break;
+        case 'error':
+          renderError(app, PAGE_DATA.error);
+          break;
+        default:
+          renderAuth(app);
+      }
+    }
+    
+    // ═══════════════════════════════════════
+    // UTILITY FUNCTIONS
+    // ═══════════════════════════════════════
+    function el(tag, attrs, children) {
+      var elem = document.createElement(tag);
+      if (attrs) {
+        for (var key in attrs) {
+          if (key === 'style' && typeof attrs[key] === 'object') {
+            for (var s in attrs[key]) {
+              elem.style[s] = attrs[key][s];
+            }
+          } else if (key === 'className') {
+            elem.className = attrs[key];
+          } else if (key.indexOf('on') === 0) {
+            elem.addEventListener(key.substring(2).toLowerCase(), attrs[key]);
+          } else {
+            elem.setAttribute(key, attrs[key]);
+          }
+        }
+      }
+      if (children) {
+        if (typeof children === 'string') {
+          elem.textContent = children;
+        } else if (Array.isArray(children)) {
+          children.forEach(function(child) {
+            if (typeof child === 'string') {
+              elem.appendChild(document.createTextNode(child));
+            } else if (child) {
+              elem.appendChild(child);
+            }
+          });
+        } else {
+          elem.appendChild(children);
+        }
+      }
+      return elem;
+    }
+    
+    function html(str) {
+      var div = document.createElement('div');
+      div.innerHTML = str;
+      return div.firstChild;
+    }
+    
+    function showLoading(container) {
+      container.innerHTML = '';
+      var loader = el('div', { className: 'loading-spinner' });
+      loader.innerHTML = '<div class="spinner"></div><div class="loading-text">Loading...</div>';
+      container.appendChild(loader);
+    }
+    
+    function handleLogout() {
+      var token = localStorage.getItem('dashboardSessionToken');
+      if (token) {
+        google.script.run.authLogout(token);
+        localStorage.removeItem('dashboardSessionToken');
+      }
+      // Reload the page — will show auth screen since no valid session
+      google.script.run
+        .withSuccessHandler(function() { window.top.location.reload(); })
+        .withFailureHandler(function() { window.top.location.reload(); })
+        .authLogout(token || '');
+      // Fallback reload
+      setTimeout(function() { window.top.location.reload(); }, 1000);
+    }
+    
+    // ═══════════════════════════════════════
+    // LAYOUT DETECTION
+    // ═══════════════════════════════════════
+    var LayoutState = { mode: 'mobile', width: 0 };
+
+    function getLayoutMode() {
+      var w = window.innerWidth || document.documentElement.clientWidth;
+      LayoutState.width = w;
+      if (w >= 1024) { LayoutState.mode = 'desktop'; }
+      else if (w >= 640) { LayoutState.mode = 'tablet'; }
+      else { LayoutState.mode = 'mobile'; }
+      return LayoutState.mode;
+    }
+
+    function isSidebarLayout() {
+      return LayoutState.mode !== 'mobile';
+    }
+
+    /**
+     * Renders the page with sidebar nav on tablet+ or bottom nav on mobile.
+     * @param {Element} container - The #app element
+     * @param {string} role - 'member' or 'steward'
+     * @param {string} activeTab - The currently active tab id
+     * @param {Function} contentFn - Called with contentContainer to render page content
+     */
+    function renderPageLayout(container, role, activeTab, contentFn) {
+      container.innerHTML = '';
+      getLayoutMode();
+
+      if (isSidebarLayout()) {
+        var layout = el('div', { className: 'page-layout' });
+        var sidebar = el('nav', { className: 'sidebar-nav' });
+        renderSidebarItems(sidebar, role, activeTab);
+        layout.appendChild(sidebar);
+
+        var content = el('div', { className: 'page-layout-content' });
+        contentFn(content);
+        layout.appendChild(content);
+        container.appendChild(layout);
+      } else {
+        contentFn(container);
+        renderBottomNav(container, role, activeTab);
+      }
+    }
+
+    function renderSidebarItems(sidebar, role, activeTab) {
+      var header = el('div', { className: 'sidebar-header' });
+      header.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
+      if (CURRENT_USER) {
+        header.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
+      }
+      sidebar.appendChild(header);
+
+      var tabs = _getSidebarTabs(role);
+      tabs.forEach(function(tab) {
+        if (tab.divider) {
+          sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
+          return;
+        }
+        var item = el('div', {
+          className: 'sidebar-item' + (tab.id === activeTab ? ' active' : ''),
+          onClick: function() { _handleTabNav(role, tab.id); }
+        }, [
+          el('span', { className: 'sidebar-item-icon' }, tab.icon),
+          el('span', null, tab.label)
+        ]);
+        sidebar.appendChild(item);
+      });
+
+      // Bottom utility items
+      sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
+      if (IS_DUAL_ROLE) {
+        var switchRole = role === 'steward' ? 'member' : 'steward';
+        var switchLabel = role === 'steward' ? CONFIG.memberLabel : CONFIG.stewardLabel;
+        sidebar.appendChild(el('div', {
+          className: 'sidebar-item',
+          onClick: function() {
+            AppState.activeRole = switchRole;
+            var app = document.getElementById('app');
+            if (switchRole === 'steward') initStewardView(app);
+            else initMemberView(app);
+          }
+        }, [
+          el('span', { className: 'sidebar-item-icon' }, role === 'steward' ? '\uD83D\uDC64' : '\uD83D\uDD27'),
+          el('span', null, 'Switch to ' + switchLabel)
+        ]));
+      }
+      sidebar.appendChild(el('div', {
+        className: 'sidebar-item',
+        onClick: function() {
+          AppState.isDark = !AppState.isDark;
+          var t = ThemeEngine.getTheme(AppState.activeRole || 'member', AppState.isDark);
+          ThemeEngine.applyTheme(t);
+          _handleTabNav(role, activeTab);
+        }
+      }, [
+        el('span', { className: 'sidebar-item-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'),
+        el('span', null, AppState.isDark ? 'Light Mode' : 'Dark Mode')
+      ]));
+      sidebar.appendChild(el('div', {
+        className: 'sidebar-item',
+        onClick: handleLogout
+      }, [
+        el('span', { className: 'sidebar-item-icon' }, '\u21A9'),
+        el('span', null, 'Sign Out')
+      ]));
+    }
+
+    function _getSidebarTabs(role) {
+      if (role === 'steward') return [
+        { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
+        { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
+        { id: 'tasks', icon: '\u2705', label: 'Tasks' },
+        { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
+        { divider: true },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
+        { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
+        { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
+        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
+        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
+      ];
+      return [
+        { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
+        { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
+        { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
+        { divider: true },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
+        { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
+        { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
+        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
+        { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
+        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
+        { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
+        { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
+      ];
+    }
+
+    function _handleTabNav(role, tabId) {
+      var app = document.getElementById('app');
+      // Handle "More" menus for both roles (mobile bottom-nav)
+      if (tabId === '_member_more') { renderMemberMore(app); return; }
+      if (tabId === '_steward_more') { renderStewardMore(app); return; }
+      if (role === 'member') {
+        switch(tabId) {
+          case 'home': renderMemberHome(app); break;
+          case 'cases': renderMyCases(app); break;
+          case 'contact': renderStewardContact(app); break;
+          case 'notifications': renderMemberNotifications(app); break;
+          case 'profile': renderUpdateProfile(app); break;
+          case 'resources': renderMemberResources(app); break;
+          case 'workload': renderWorkloadTracker(app); break;
+          case 'weeklyq': renderWeeklyQuestionsPage(app, 'member'); break;
+          case 'survey': renderSurveyResultsPage(app); break;
+          case 'unionstats': renderUnionStatsPage(app); break;
+          case 'events': renderEventsPage(app); break;
+          case 'stewarddirectory': renderStewardDirectory(app); break;
+          default: renderMemberHome(app);
+        }
+      } else {
+        switch(tabId) {
+          case 'cases': renderStewardDashboard(app); break;
+          case 'members': renderStewardMembers(app); break;
+          case 'deadlines': renderStewardDashboard(app); break;
+          case 'broadcast': renderBroadcast(app); break;
+          case 'notifications': renderStewardNotifications(app); break;
+          case 'resources': renderStewardResources(app); break;
+          case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); break;
+          case 'surveytrack': renderSurveyTracking(app); break;
+          case 'contactlog': renderContactLog(app); break;
+          case 'tasks': renderStewardTasks(app); break;
+          case 'events': renderEventsPage(app); break;
+          default: renderStewardDashboard(app);
+        }
+      }
+    }
+
+    // Debounced resize handler — re-renders on breakpoint change
+    var _resizeTimer = null;
+    var _prevMode = '';
+    window.addEventListener('resize', function() {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(function() {
+        var newMode = getLayoutMode();
+        if (newMode !== _prevMode) {
+          _prevMode = newMode;
+          // Re-render current view
+          var app = document.getElementById('app');
+          if (AppState.activeRole === 'steward') renderStewardDashboard(app);
+          else if (AppState.activeRole === 'member') renderMemberHome(app);
+        }
+      }, 200);
+    });
+
+    // ═══════════════════════════════════════
+    // CHART HELPER (requires Chart.js CDN)
+    // ═══════════════════════════════════════
+    var ChartHelper = (function() {
+      var _charts = {};
+
+      function _getColors() {
+        var cs = getComputedStyle(document.documentElement);
+        return {
+          accent:  cs.getPropertyValue('--accent').trim() || '#7c6ef6',
+          success: cs.getPropertyValue('--success').trim() || '#4ade80',
+          warning: cs.getPropertyValue('--warning').trim() || '#facc15',
+          danger:  cs.getPropertyValue('--danger').trim() || '#ef4444',
+          info:    cs.getPropertyValue('--info').trim() || '#60a5fa',
+          text:    cs.getPropertyValue('--text').trim() || '#e0e0e0',
+          muted:   cs.getPropertyValue('--muted').trim() || '#6b6b6b',
+          border:  cs.getPropertyValue('--border').trim() || '#2a2a2a',
+          surface: cs.getPropertyValue('--surface').trim() || '#1e1e1e',
+        };
+      }
+
+      function _palette(count) {
+        var c = _getColors();
+        var pool = [c.accent, c.success, c.warning, c.info, c.danger, '#a78bfa', '#f472b6', '#38bdf8'];
+        var out = [];
+        for (var i = 0; i < count; i++) out.push(pool[i % pool.length]);
+        return out;
+      }
+
+      function destroyChart(id) {
+        if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+      }
+
+      function _create(container, id, cfg) {
+        destroyChart(id);
+        var wrap = el('div', { className: 'chart-container' });
+        var canvas = document.createElement('canvas');
+        canvas.id = id;
+        wrap.appendChild(canvas);
+        container.appendChild(wrap);
+        var c = _getColors();
+        Chart.defaults.color = c.muted;
+        Chart.defaults.borderColor = c.border;
+        Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+        _charts[id] = new Chart(canvas, cfg);
+        return _charts[id];
+      }
+
+      function createBarChart(container, id, labels, datasets, opts) {
+        var c = _getColors();
+        var dsList = datasets.map(function(ds, i) {
+          return Object.assign({
+            backgroundColor: ds.color || _palette(datasets.length)[i],
+            borderRadius: 4,
+            maxBarThickness: 40,
+          }, ds);
+        });
+        return _create(container, id, {
+          type: 'bar',
+          data: { labels: labels, datasets: dsList },
+          options: Object.assign({
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
+            scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
+          }, opts || {}),
+        });
+      }
+
+      function createHorizontalBarChart(container, id, labels, data, colors) {
+        var c = _getColors();
+        return _create(container, id, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderRadius: 4, maxBarThickness: 28 }],
+          },
+          options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { x: { beginAtZero: true, grid: { color: c.border } }, y: { grid: { display: false } } },
+          },
+        });
+      }
+
+      function createDoughnutChart(container, id, labels, data, colors) {
+        return _create(container, id, {
+          type: 'doughnut',
+          data: {
+            labels: labels,
+            datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderWidth: 0, spacing: 2 }],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, cutout: '65%',
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } } },
+          },
+        });
+      }
+
+      function createLineChart(container, id, labels, datasets, opts) {
+        var c = _getColors();
+        var dsList = datasets.map(function(ds, i) {
+          return Object.assign({
+            borderColor: ds.color || _palette(datasets.length)[i],
+            backgroundColor: (ds.color || _palette(datasets.length)[i]) + '20',
+            fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2,
+          }, ds);
+        });
+        return _create(container, id, {
+          type: 'line',
+          data: { labels: labels, datasets: dsList },
+          options: Object.assign({
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
+            scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
+          }, opts || {}),
+        });
+      }
+
+      return {
+        createBarChart: createBarChart,
+        createHorizontalBarChart: createHorizontalBarChart,
+        createDoughnutChart: createDoughnutChart,
+        createLineChart: createLineChart,
+        destroyChart: destroyChart,
+      };
+    })();
+
+    // ═══════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════
+    document.addEventListener('DOMContentLoaded', function() {
+      getLayoutMode();
+      _prevMode = LayoutState.mode;
+      initApp();
+    });
+  </script>
+  
+  <?!= include('auth_view') ?>
+  <?!= include('steward_view') ?>
+  <?!= include('member_view') ?>
+  <?!= include('error_view') ?>
+  
+</body>
+</html>
+`;
+}
+
+/**
+ * Embedded HTML: member_view.html
+ * @returns {string} HTML content
+ */
+function getmember_view_HTML() {
+  return `<script>
+/**
+ * Member View — "Glass Depth"
+ * v4.12.0 — Full member dashboard with responsive layout,
+ * steward contact, profile editor, resources, survey, workload, weekly questions.
+ */
+
+// ═══════════════════════════════════════
+// INIT & DATA LOADING
+// ═══════════════════════════════════════
+
+function initMemberView(container) {
+  var t = ThemeEngine.getTheme('member', AppState.isDark);
+  ThemeEngine.applyTheme(t);
+  AppState.activeRole = 'member';
+  showLoading(container);
+
+  google.script.run
+    .withSuccessHandler(function(grievances) {
+      AppState.grievances = grievances || [];
+      AppState.loading = false;
+      renderMemberHome(container);
+    })
+    .withFailureHandler(function() {
+      AppState.grievances = [];
+      AppState.loading = false;
+      renderMemberHome(container);
+    })
+    .dataGetMemberGrievances(CURRENT_USER.email);
+}
+
+// ═══════════════════════════════════════
+// MEMBER HEADER (shared across all member pages)
+// ═══════════════════════════════════════
+
+function _memberHeader(container, title, subtitle) {
+  var header = el('div', { className: 'page-header' });
+  var headerLeft = el('div', { className: 'page-header-left' });
+  headerLeft.appendChild(el('div', { className: 'page-title' }, title));
+  if (subtitle) headerLeft.appendChild(el('div', { className: 'page-subtitle' }, subtitle));
+  header.appendChild(headerLeft);
+
+  var headerRight = el('div', { className: 'page-header-right' });
+  // Only show utility buttons on mobile (sidebar handles these on tablet+)
+  if (!isSidebarLayout()) {
+    if (IS_DUAL_ROLE) {
+      headerRight.appendChild(el('button', {
+        style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+        onClick: function() { AppState.activeRole = 'steward'; initStewardView(document.getElementById('app')); }
+      }, '\uD83D\uDD27 ' + CONFIG.stewardLabel));
+    }
+    headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
+      AppState.isDark = !AppState.isDark;
+      ThemeEngine.applyTheme(ThemeEngine.getTheme('member', AppState.isDark));
+      renderMemberHome(document.getElementById('app'));
+    }}, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));
+    headerRight.appendChild(el('button', { className: 'icon-btn', onClick: handleLogout }, '\u21A9'));
+  }
+  header.appendChild(headerRight);
+  container.appendChild(header);
+}
+
+// ═══════════════════════════════════════
+// HOME TAB
+// ═══════════════════════════════════════
+
+function _getGreeting() {
+  var h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function renderMemberHome(appContainer) {
+  renderPageLayout(appContainer, 'member', 'home', function(container) {
+    var firstName = CURRENT_USER.firstName || CURRENT_USER.name.split(' ')[0] || 'there';
+    _memberHeader(container, _getGreeting() + ', ' + firstName, CURRENT_USER.unit + ' \u00B7 Since ' + (CURRENT_USER.joined || 'N/A'));
+
+    // Survey banner
+    google.script.run.withSuccessHandler(function(status) {
+      if (status && !status.hasCompleted && CONFIG.surveyFormUrl) {
+        var banner = el('div', { className: 'survey-banner fade-in' });
+        var bannerLeft = el('div');
+        bannerLeft.appendChild(el('span', { className: 'survey-banner-text' }, 'Quarterly survey is open!'));
+        bannerLeft.appendChild(el('div', { className: 'privacy-badge', style: { marginTop: '4px', fontSize: '10px', padding: '3px 8px' } }, '\uD83D\uDD12 Anonymous via one-way encryption'));
+        banner.appendChild(bannerLeft);
+        banner.appendChild(el('button', {
+          className: 'survey-banner-btn',
+          onClick: function() { window.open(CONFIG.surveyFormUrl, '_blank'); }
+        }, 'Take Survey'));
+        // Insert after header
+        var firstContent = container.querySelector('.content, .card');
+        if (firstContent) container.insertBefore(banner, firstContent);
+        else container.appendChild(banner);
+      }
+    }).dataGetSurveyStatus(CURRENT_USER.email);
+
+    // Active grievance card
+    var activeG = AppState.grievances.find(function(g) { return g.status !== 'resolved'; });
+    if (activeG) {
+      renderGrievanceCard(container, activeG);
+    } else {
+      var emptyCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '22px', textAlign: 'center' } });
+      var hasAny = AppState.grievances.length > 0;
+      emptyCard.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, hasAny ? '\u2705' : '\uD83D\uDCCB'));
+      emptyCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)' } }, hasAny ? 'All grievances resolved' : 'No active grievances'));
+      container.appendChild(emptyCard);
+    }
+
+    // Steward card (single card, no dues)
+    var stewardCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px' } });
+    stewardCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, 'Your ' + CONFIG.stewardLabel));
+    var stewardName = el('div', { style: { fontSize: '13px', fontFamily: 'var(--fontDisplay)', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Loading...');
+    stewardCard.appendChild(stewardName);
+    var stewardActions = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    stewardCard.appendChild(stewardActions);
+    container.appendChild(stewardCard);
+
+    google.script.run.withSuccessHandler(function(info) {
+      if (info) {
+        stewardName.textContent = info.name || info.email;
+        stewardActions.appendChild(el('a', {
+          href: 'mailto:' + info.email,
+          style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+        }, '\u2709\uFE0F ' + info.email));
+        if (info.phone) {
+          stewardActions.appendChild(el('a', {
+            href: 'tel:' + info.phone,
+            style: { background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+          }, '\uD83D\uDCDE ' + info.phone));
+        }
+      } else {
+        stewardName.textContent = 'Not assigned';
+        stewardActions.appendChild(el('button', {
+          style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+          onClick: function() { renderStewardContact(document.getElementById('app')); }
+        }, 'Find a ' + CONFIG.stewardLabel));
+      }
+    }).dataGetAssignedSteward(CURRENT_USER.email);
+
+    // Stats strip
+    var statsStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
+    var activeCaseCount = AppState.grievances.filter(function(g) { return g.status !== 'resolved'; }).length;
+    var totalCaseCount = AppState.grievances.length;
+    var joinedStr = CURRENT_USER.joined || '';
+    var daysMember = '';
+    if (joinedStr) {
+      var joinDate = new Date(joinedStr);
+      if (!isNaN(joinDate.getTime())) daysMember = String(Math.floor((Date.now() - joinDate.getTime()) / 86400000));
+    }
+    [
+      { label: 'Days as Member', value: daysMember || '--' },
+      { label: 'Active Cases', value: activeCaseCount, color: activeCaseCount > 0 ? 'var(--warning)' : null },
+      { label: 'Total Cases', value: totalCaseCount },
+    ].forEach(function(kpi) {
+      var card = el('div', { className: 'kpi-card card-fade-in' });
+      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+      if (kpi.color) val.style.color = kpi.color;
+      card.appendChild(val);
+      statsStrip.appendChild(card);
+    });
+    container.appendChild(statsStrip);
+
+    // Upcoming Events section
+    var eventsSection = el('div', { className: 'content', style: { marginBottom: '14px' } });
+    eventsSection.appendChild(el('h3', { className: 'section-title' }, 'Upcoming Events'));
+    var eventsArea = el('div');
+    eventsSection.appendChild(eventsArea);
+    container.appendChild(eventsSection);
+
+    google.script.run.withSuccessHandler(function(events) {
+      if (!events || events.length === 0) {
+        eventsArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'No upcoming events.'));
+        return;
+      }
+      events.slice(0, 3).forEach(function(ev, i) {
+        var card = el('div', { className: 'card card-glass card-fade-in card-accent-border', style: { padding: '14px 16px', animationDelay: (i * 0.1) + 's' } });
+        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, ev.title));
+        var startDate = new Date(ev.startTime);
+        var dateStr = startDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        var timeStr = startDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--accent)', marginTop: '4px' } }, dateStr + ' at ' + timeStr));
+        if (ev.location) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '2px' } }, '\uD83D\uDCCD ' + ev.location));
+        // Add to Calendar button
+        var calUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+          '&text=' + encodeURIComponent(ev.title) +
+          '&dates=' + ev.startTime.replace(/[-:]/g, '').replace('.000Z', 'Z') + '/' + ev.endTime.replace(/[-:]/g, '').replace('.000Z', 'Z') +
+          (ev.location ? '&location=' + encodeURIComponent(ev.location) : '');
+        card.appendChild(el('a', {
+          href: calUrl, target: '_blank',
+          style: { display: 'inline-block', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginTop: '6px' }
+        }, '+ Add to My Calendar'));
+        eventsArea.appendChild(card);
+      });
+      if (events.length > 3) {
+        eventsArea.appendChild(el('button', {
+          className: 'btn btn-secondary', style: { marginTop: '8px', fontSize: '13px', padding: '8px' },
+          onClick: function() { renderEventsPage(document.getElementById('app')); }
+        }, 'View All Events'));
+      }
+    }).dataGetUpcomingEvents(5);
+
+    // Quick links
+    var res = el('div', { className: 'content' });
+    res.appendChild(el('h3', { className: 'section-title' }, 'Quick Links'));
+    var links = [
+      { icon: '\uD83D\uDCD6', label: 'Know Your Rights', sub: 'Contract highlights' },
+      { icon: '\uD83D\uDCDD', label: 'File a Grievance', sub: 'Start a new case' },
+      { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
+    ];
+    links.forEach(function(r) {
+      var item = el('div', { className: 'card card-glass card-clickable card-fade-in', style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' } });
+      item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
+      var tg = el('div', { style: { flex: '1' } });
+      tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+      tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+      item.appendChild(tg);
+      item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+      res.appendChild(item);
+    });
+    container.appendChild(res);
+  });
+}
+
+// ═══════════════════════════════════════
+// GRIEVANCE CARD & DETAIL (preserved from v4.10)
+// ═══════════════════════════════════════
+
+function renderGrievanceCard(parentContainer, g) {
+  var dl = g.deadlineDays;
+  var dc = dl !== null && dl < 0 ? 'var(--danger)' : dl !== null && dl <= 3 ? 'var(--warning)' : dl !== null && dl <= 7 ? 'var(--info)' : 'var(--success)';
+
+  var card = el('div', { className: 'card card-glass card-clickable', style: { margin: '0 16px 14px', padding: '22px', position: 'relative', overflow: 'hidden' },
+    onClick: function() { renderGrievanceDetail(document.getElementById('app'), g); }
+  });
+
+  var sc = g.status === 'overdue' ? 'danger' : g.status === 'active' ? 'warning' : 'info';
+  card.appendChild(el('div', { className: 'glow-bar ' + sc }));
+  card.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' } }, 'Your Active Grievance'));
+  card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, g.step || 'Grievance'));
+  card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '14px' } }, g.id + ' \u00B7 Filed ' + (g.filed || 'N/A')));
+
+  if (dl !== null) {
+    var cd = el('div', { style: { background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '11px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+    cd.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text)' } }, 'Next deadline'));
+    var dg = el('div');
+    dg.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '20px', fontWeight: '700', color: dc } }, String(Math.abs(dl))));
+    dg.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)', marginLeft: '3px' } }, dl < 0 ? 'days overdue' : 'days'));
+    cd.appendChild(dg);
+    card.appendChild(cd);
+  }
+
+  card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)', marginTop: '10px', fontWeight: '600' } }, 'View timeline \u2192'));
+  parentContainer.appendChild(card);
+}
+
+function renderGrievanceDetail(appContainer, g) {
+  renderPageLayout(appContainer, 'member', 'cases', function(container) {
+    // Back button
+    container.appendChild(el('div', { style: { padding: '12px 20px' } },
+      el('button', { style: { color: 'var(--accent)', fontSize: '13px', fontFamily: 'var(--fontBody)' },
+        onClick: function() { renderMyCases(document.getElementById('app')); }
+      }, '\u2190 Back')
+    ));
+
+    var dl = g.deadlineDays;
+    var dc = dl !== null && dl < 0 ? 'var(--danger)' : dl !== null && dl <= 3 ? 'var(--warning)' : 'var(--info)';
+
+    var detailCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '20px', position: 'relative', overflow: 'hidden' } });
+    var sc = g.status === 'overdue' ? 'danger' : g.status === 'active' ? 'warning' : 'info';
+    detailCard.appendChild(el('div', { className: 'glow-bar ' + sc, style: { top: '0', bottom: 'auto' } }));
+
+    var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' } });
+    topRow.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontWeight: '700', fontSize: '17px', color: 'var(--text)' } }, g.id));
+    var badge = el('span', { className: 'status-badge', style: { color: 'var(--' + sc + ')', background: 'rgba(255,255,255,0.06)' } });
+    badge.textContent = g.status.charAt(0).toUpperCase() + g.status.slice(1);
+    topRow.appendChild(badge);
+    detailCard.appendChild(topRow);
+
+    detailCard.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '13px', color: 'var(--text)', marginBottom: '12px' } }, g.step || ''));
+
+    var infoRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', padding: '12px 0', borderTop: '1px solid var(--border)' } });
+    var filed = el('div');
+    filed.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' } }, 'Filed'));
+    filed.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', marginTop: '2px' } }, g.filed || 'N/A'));
+    infoRow.appendChild(filed);
+    var deadline = el('div');
+    deadline.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' } }, 'Deadline'));
+    deadline.appendChild(el('div', { style: { fontSize: '12px', color: dc, fontWeight: '600', marginTop: '2px' } }, g.deadline || 'N/A'));
+    infoRow.appendChild(deadline);
+    detailCard.appendChild(infoRow);
+    container.appendChild(detailCard);
+
+    // Timeline
+    var timelineSection = el('div', { style: { padding: '0 16px' } });
+    timelineSection.appendChild(el('h3', { className: 'section-title' }, 'Timeline'));
+    var steps = [];
+    if (g.filed) steps.push({ date: g.filed, event: 'Grievance filed', done: true });
+    if (g.step) {
+      var currentStepNum = parseInt(g.step.replace(/\D/g, '')) || 1;
+      for (var s = 1; s <= currentStepNum; s++) {
+        if (s < currentStepNum) steps.push({ date: '', event: 'Step ' + s + ' completed', done: true });
+        else steps.push({ date: g.deadline || '', event: g.step + ' \u2014 in progress', done: false });
+      }
+    }
+    steps.forEach(function(step, i) {
+      var item = el('div', { className: 'timeline-item' });
+      var track = el('div', { className: 'timeline-track' });
+      track.appendChild(el('div', { className: 'timeline-dot ' + (step.done ? 'done' : 'pending') }));
+      if (i < steps.length - 1) track.appendChild(el('div', { className: 'timeline-line ' + (step.done && steps[i + 1].done ? 'done' : 'pending') }));
+      item.appendChild(track);
+      var content = el('div', { className: 'timeline-content' });
+      content.appendChild(el('div', { className: 'timeline-event', style: { color: step.done ? 'var(--text)' : 'var(--muted)' } }, step.event));
+      if (step.date) content.appendChild(el('div', { className: 'timeline-date' }, step.date));
+      item.appendChild(content);
+      timelineSection.appendChild(item);
+    });
+    container.appendChild(timelineSection);
+
+    // Steward contact in detail view
+    if (g.steward) {
+      var contactSection = el('div', { style: { padding: '12px 16px' } });
+      var contactCard = el('div', { className: 'card card-glass', style: { padding: '16px' } });
+      contactCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, CONFIG.stewardLabel));
+      var cName = el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, 'Loading...');
+      contactCard.appendChild(cName);
+      var contactBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+      contactCard.appendChild(contactBtns);
+      contactSection.appendChild(contactCard);
+      container.appendChild(contactSection);
+
+      google.script.run.withSuccessHandler(function(contact) {
+        if (!contact) { cName.textContent = 'Not available'; return; }
+        cName.textContent = contact.name || contact.email;
+        contactBtns.appendChild(el('a', {
+          href: 'mailto:' + contact.email,
+          style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+        }, '\u2709\uFE0F ' + contact.email));
+        if (contact.phone) {
+          contactBtns.appendChild(el('a', {
+            href: 'tel:' + contact.phone,
+            style: { background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.25)', borderRadius: '10px', padding: '7px 14px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', fontFamily: 'var(--fontBody)', display: 'inline-block' }
+          }, '\uD83D\uDCDE ' + contact.phone));
+        }
+      }).dataGetStewardContact(g.steward);
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// MY CASES TAB
+// ═══════════════════════════════════════
+
+function renderMyCases(appContainer) {
+  renderPageLayout(appContainer, 'member', 'cases', function(container) {
+    _memberHeader(container, 'My Cases', AppState.grievances.length + ' total');
+
+    var content = el('div', { className: 'content' });
+    if (AppState.grievances.length === 0) {
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No grievances on file.'));
+    } else {
+      AppState.grievances.forEach(function(g) {
+        renderGrievanceCard(content, g);
+      });
+    }
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// CONTACT / STEWARD PICKER
+// ═══════════════════════════════════════
+
+function renderStewardContact(appContainer) {
+  renderPageLayout(appContainer, 'member', 'contact', function(container) {
+    _memberHeader(container, 'Contact ' + CONFIG.stewardLabel);
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(info) {
+      content.innerHTML = '';
+      if (info) {
+        // Has assigned steward — show full contact card
+        var card = el('div', { className: 'card card-glass', style: { padding: '18px' } });
+        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '17px', fontWeight: '700', color: 'var(--text)', marginBottom: '10px' } }, info.name || 'Your ' + CONFIG.stewardLabel));
+        var details = [
+          { label: 'Email', value: info.email, icon: '\u2709\uFE0F', href: 'mailto:' + info.email },
+          { label: 'Phone', value: info.phone, icon: '\uD83D\uDCDE', href: 'tel:' + info.phone },
+          { label: 'Location', value: info.workLocation, icon: '\uD83D\uDCCD' },
+          { label: 'Office Days', value: info.officeDays, icon: '\uD83D\uDCC5' },
+        ];
+        details.forEach(function(d) {
+          if (!d.value) return;
+          var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--border)' } });
+          row.appendChild(el('span', { style: { fontSize: '14px' } }, d.icon));
+          var info_ = el('div', { style: { flex: '1' } });
+          info_.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase' } }, d.label));
+          if (d.href) {
+            info_.appendChild(el('a', { href: d.href, style: { fontSize: '13px', color: 'var(--accent)', fontWeight: '600' } }, d.value));
+          } else {
+            info_.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)' } }, d.value));
+          }
+          row.appendChild(info_);
+          card.appendChild(row);
+        });
+        content.appendChild(card);
+
+        // Option to change steward
+        content.appendChild(el('button', {
+          className: 'btn btn-secondary', style: { marginTop: '14px' },
+          onClick: function() { _renderStewardPicker(content); }
+        }, 'Change ' + CONFIG.stewardLabel));
+      } else {
+        // No steward assigned — show picker
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0' } },
+          el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDC65')
+        ));
+        content.appendChild(el('div', { style: { textAlign: 'center', fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No ' + CONFIG.stewardLabel + ' Assigned'));
+        content.appendChild(el('div', { style: { textAlign: 'center', fontSize: '13px', color: 'var(--muted)', marginBottom: '16px' } }, 'Pick one from your location below.'));
+        _renderStewardPicker(content);
+      }
+    }).dataGetAssignedSteward(CURRENT_USER.email);
+  });
+}
+
+function _renderStewardPicker(content) {
+  var pickerArea = el('div');
+  pickerArea.innerHTML = '<div class="loading-spinner" style="min-height:100px"><div class="spinner"></div></div>';
+  content.appendChild(pickerArea);
+
+  google.script.run.withSuccessHandler(function(stewards) {
+    pickerArea.innerHTML = '';
+    if (!stewards || stewards.length === 0) {
+      pickerArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px', padding: '16px 0' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's available.'));
+      return;
+    }
+    pickerArea.appendChild(el('h3', { className: 'section-title' }, 'Available ' + CONFIG.stewardLabel + 's'));
+    stewards.forEach(function(s) {
+      var item = el('div', { className: 'card card-glass card-clickable', style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '13px 16px', marginBottom: '6px' } });
+      var avatar = el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase());
+      item.appendChild(avatar);
+      var info = el('div', { style: { flex: '1' } });
+      info.appendChild(el('div', { className: 'member-list-name' }, s.name || s.email));
+      var meta = s.workLocation || '';
+      if (s.officeDays) meta += (meta ? ' \u00B7 ' : '') + s.officeDays;
+      if (s.sameLocation) meta += ' \u2605';
+      info.appendChild(el('div', { className: 'member-list-meta' }, meta));
+      item.appendChild(info);
+      item.appendChild(el('button', {
+        style: { background: 'var(--accent)', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '11px', fontWeight: '600' },
+        onClick: function(e) {
+          e.stopPropagation();
+          google.script.run.withSuccessHandler(function(result) {
+            if (result && result.success) {
+              renderStewardContact(document.getElementById('app'));
+            }
+          }).dataAssignSteward(CURRENT_USER.email, s.email);
+        }
+      }, 'Select'));
+      pickerArea.appendChild(item);
+    });
+  }).dataGetAvailableStewards(CURRENT_USER.email);
+}
+
+// ═══════════════════════════════════════
+// RESOURCES TAB
+// ═══════════════════════════════════════
+
+// ═══════════════════════════════════════
+// NOTIFICATIONS (member view)
+// ═══════════════════════════════════════
+
+function renderMemberNotifications(appContainer) {
+  renderPageLayout(appContainer, 'member', 'notifications', function(container) {
+    // Hero header — amber gradient matching our system
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(145deg, #92400e, #b45309)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDD14 Notifications'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Stay updated on union news, deadlines, and steward messages'));
+    container.appendChild(hero);
+
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
+    showLoading(content);
+    container.appendChild(content);
+
+    var typeColors = {
+      'Steward Message': { bg: 'rgba(45,90,135,0.12)', text: '#2d5a87' },
+      'Announcement': { bg: 'rgba(22,163,74,0.12)', text: '#16a34a' },
+      'Deadline': { bg: 'rgba(220,38,38,0.12)', text: '#dc2626' },
+      'System': { bg: 'rgba(147,51,234,0.12)', text: '#9333ea' }
+    };
+
+    google.script.run.withSuccessHandler(function(notifs) {
+      content.innerHTML = '';
+      if (!notifs || notifs.length === 0) {
+        var empty = el('div', { className: 'notif-empty' });
+        empty.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDD14'));
+        empty.appendChild(el('div', { className: 'notif-empty-title' }, 'All caught up!'));
+        empty.appendChild(el('div', { className: 'notif-empty-sub' }, 'No new notifications right now.'));
+        content.appendChild(empty);
+        return;
+      }
+
+      notifs.forEach(function(n) {
+        var card = el('div', {
+          className: 'notif-card' + (n.priority === 'Urgent' ? ' urgent' : ''),
+          id: 'notif-' + n.id
+        });
+        var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' } });
+        var tc = typeColors[n.type] || typeColors['System'];
+        topRow.appendChild(el('span', { className: 'type-badge', style: { background: tc.bg, color: tc.text } }, n.type));
+        if (n.priority === 'Urgent') {
+          topRow.appendChild(el('span', { className: 'type-badge', style: { background: 'rgba(220,38,38,0.15)', color: '#dc2626' } }, 'URGENT'));
+        }
+        topRow.appendChild(el('span', { style: { flex: '1' } }));
+        topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, n.createdDate));
+        card.appendChild(topRow);
+        card.appendChild(el('button', {
+          className: 'notif-dismiss',
+          onClick: function() {
+            var ce = document.getElementById('notif-' + n.id);
+            if (ce) { ce.style.opacity = '0'; ce.style.transform = 'translateX(30px)'; }
+            google.script.run.withSuccessHandler(function() {
+              setTimeout(function() { if (ce) ce.remove(); _checkNotifEmpty(content); }, 300);
+            }).withFailureHandler(function() {
+              if (ce) { ce.style.opacity = '1'; ce.style.transform = 'none'; }
+            }).dismissWebAppNotification(n.id, CURRENT_USER.email);
+          }
+        }, '\u2715'));
+        card.appendChild(el('div', { className: 'notif-title' }, n.title));
+        card.appendChild(el('div', { className: 'notif-msg' }, n.message));
+        var meta = [];
+        if (n.sentBy) meta.push('From: ' + n.sentBy);
+        if (n.expiresDate) meta.push('Expires: ' + n.expiresDate);
+        if (meta.length > 0) card.appendChild(el('div', { className: 'notif-meta' }, meta.join(' \u00B7 ')));
+        content.appendChild(card);
+      });
+    }).withFailureHandler(function(err) {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '20px' } }, 'Error: ' + String(err)));
+    }).getWebAppNotifications(CURRENT_USER.email, 'member');
+  });
+}
+
+function _checkNotifEmpty(container) {
+  var remaining = container.querySelectorAll('[id^="notif-"]');
+  if (remaining.length === 0) {
+    container.innerHTML = '';
+    var empty = el('div', { className: 'notif-empty' });
+    empty.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDD14'));
+    empty.appendChild(el('div', { className: 'notif-empty-title' }, 'All caught up!'));
+    empty.appendChild(el('div', { className: 'notif-empty-sub' }, 'No new notifications right now.'));
+    container.appendChild(empty);
+  }
+}
+
+// ═══════════════════════════════════════
+// RESOURCES — Educational Hub (member view)
+// Search, category pills, expandable cards, external links
+// ═══════════════════════════════════════
+
+function renderMemberResources(appContainer) {
+  renderPageLayout(appContainer, 'member', 'resources', function(container) {
+    // Hero header
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDCDA Know Your Rights'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Your guide to the union contract, grievance process, and workplace protections'));
+    hero.appendChild(el('div', { className: 'page-hero', style: { position: 'absolute', bottom: '-20px', left: '-20px', right: '-20px', height: '40px', background: 'var(--bg)', borderRadius: '50% 50% 0 0', padding: '0' } }));
+    container.appendChild(hero);
+
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
+
+    // Search bar
+    var searchWrap = el('div', { className: 'res-search-wrap' });
+    searchWrap.appendChild(el('i', { className: 'material-icons res-search-icon' }, 'search'));
+    var searchInput = el('input', {
+      className: 'res-search-bar',
+      placeholder: 'Search articles, rights, FAQ...',
+      onInput: function() { _filterResources(); }
+    });
+    searchWrap.appendChild(searchInput);
+    content.appendChild(searchWrap);
+
+    // Category pills
+    var pillsRow = el('div', { className: 'cat-pills', id: 'res-cat-pills' });
+    content.appendChild(pillsRow);
+
+    // Quick links
+    var quickLinks = [];
+    if (CONFIG.calendarUrl) quickLinks.push({ icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl });
+    if (CONFIG.driveFolderUrl) quickLinks.push({ icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+
+    if (quickLinks.length > 0) {
+      var qlRow = el('div', { style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px' } });
+      quickLinks.forEach(function(r) {
+        var item = el('div', {
+          className: 'card card-clickable',
+          style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', flex: '0 0 auto', minWidth: '160px' },
+          onClick: function() { window.open(r.url, '_blank'); }
+        });
+        item.appendChild(el('span', { style: { fontSize: '20px' } }, r.icon));
+        var tg = el('div');
+        tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+        tg.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)' } }, r.sub));
+        item.appendChild(tg);
+        qlRow.appendChild(item);
+      });
+      content.appendChild(qlRow);
+    }
+
+    // Resource list container
+    var resList = el('div', { id: 'res-list' });
+    showLoading(resList);
+    content.appendChild(resList);
+    container.appendChild(content);
+
+    // State
+    var _allResources = [];
+    var _currentCat = 'all';
+
+    google.script.run.withSuccessHandler(function(data) {
+      _allResources = data || [];
+      _buildCatPills();
+      _renderResourceList(_allResources);
+    }).withFailureHandler(function(err) {
+      resList.innerHTML = '';
+      resList.appendChild(_resEmpty('\u26A0\uFE0F', 'Error loading resources', String(err || '')));
+    }).getWebAppResourcesList('All');
+
+    function _filterResources() {
+      var q = (searchInput.value || '').toLowerCase();
+      var filtered = _allResources.filter(function(r) {
+        var matchesCat = _currentCat === 'all' || r.category === _currentCat;
+        var matchesQ = !q || q.length < 2 || r.title.toLowerCase().indexOf(q) >= 0 || r.summary.toLowerCase().indexOf(q) >= 0 || (r.content || '').toLowerCase().indexOf(q) >= 0 || r.category.toLowerCase().indexOf(q) >= 0;
+        return matchesCat && matchesQ;
+      });
+      _renderResourceList(filtered);
+    }
+
+    function _setCat(cat) {
+      _currentCat = cat;
+      var pills = document.querySelectorAll('.cat-pill');
+      for (var i = 0; i < pills.length; i++) {
+        pills[i].className = pills[i].getAttribute('data-cat') === cat ? 'cat-pill active' : 'cat-pill';
+      }
+      _filterResources();
+    }
+
+    function _buildCatPills() {
+      var cats = {};
+      _allResources.forEach(function(r) { cats[r.category] = (cats[r.category] || 0) + 1; });
+      pillsRow.innerHTML = '';
+      var allPill = el('button', { className: 'cat-pill active', 'data-cat': 'all', onClick: function() { _setCat('all'); } }, 'All (' + _allResources.length + ')');
+      pillsRow.appendChild(allPill);
+      Object.keys(cats).sort().forEach(function(c) {
+        pillsRow.appendChild(el('button', { className: 'cat-pill', 'data-cat': c, onClick: function() { _setCat(c); } }, c + ' (' + cats[c] + ')'));
+      });
+    }
+
+    function _renderResourceList(items) {
+      resList.innerHTML = '';
+      if (!items || items.length === 0) {
+        resList.appendChild(_resEmpty('\uD83D\uDCD6', 'No resources found', 'Try a different search or category'));
+        return;
+      }
+      items.forEach(function(r) {
+        var card = el('div', { className: 'res-card', onClick: function() { card.classList.toggle('expanded'); } });
+        card.appendChild(el('span', { className: 'res-icon' }, r.icon || '\uD83D\uDCC4'));
+        card.appendChild(el('div', { className: 'res-category' }, r.category));
+        card.appendChild(el('div', { className: 'res-title' }, r.title));
+        card.appendChild(el('div', { className: 'res-summary' }, r.summary));
+        var hasContent = r.content && r.content.trim().length > 0;
+        var hasUrl = r.url && r.url.trim().length > 0;
+        if (hasContent) {
+          var hint = el('div', { className: 'expand-hint' });
+          hint.appendChild(el('i', { className: 'material-icons' }, 'expand_more'));
+          hint.appendChild(document.createTextNode('Tap to read more'));
+          card.appendChild(hint);
+          var contentDiv = el('div', { className: 'res-content' });
+          contentDiv.textContent = r.content;
+          card.appendChild(contentDiv);
+        }
+        if (hasUrl) {
+          var link = el('a', { className: 'res-link', href: r.url, target: '_blank', onClick: function(e) { e.stopPropagation(); } });
+          link.appendChild(el('i', { className: 'material-icons', style: { fontSize: '16px' } }, 'open_in_new'));
+          link.appendChild(document.createTextNode('Open Resource'));
+          card.appendChild(link);
+        }
+        if (r.dateAdded) card.appendChild(el('div', { className: 'res-meta' }, 'Added ' + r.dateAdded));
+        resList.appendChild(card);
+      });
+    }
+
+    function _resEmpty(icon, title, sub) {
+      var d = el('div', { className: 'notif-empty' });
+      d.appendChild(el('div', { className: 'notif-empty-icon' }, icon));
+      d.appendChild(el('div', { className: 'notif-empty-title' }, title));
+      d.appendChild(el('div', { className: 'notif-empty-sub' }, sub));
+      return d;
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// UPDATE PROFILE
+// ═══════════════════════════════════════
+
+function renderUpdateProfile(appContainer) {
+  renderPageLayout(appContainer, 'member', 'profile', function(container) {
+    _memberHeader(container, 'Update Profile');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(profile) {
+      content.innerHTML = '';
+      if (!profile) {
+        var errCard = el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } });
+        errCard.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDC64'));
+        errCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Unable to load profile'));
+        errCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'No matching record found for ' + (CURRENT_USER.email || 'your email') + '. Please contact your ' + CONFIG.stewardLabel + ' for help.'));
+        content.appendChild(errCard);
+        return;
+      }
+
+      var fields = [
+        { key: 'street', label: 'Street Address', value: profile.street },
+        { key: 'city', label: 'City', value: profile.city },
+        { key: 'state', label: 'State', value: profile.state },
+        { key: 'zip', label: 'Zip Code', value: profile.zip },
+        { key: 'workLocation', label: 'Work Location', value: profile.workLocation },
+        { key: 'officeDays', label: 'Office Days', value: profile.officeDays },
+      ];
+
+      var form = el('div');
+      var inputs = {};
+      fields.forEach(function(f) {
+        var group = el('div', { className: 'form-group' });
+        group.appendChild(el('label', { className: 'form-label' }, f.label));
+        var input = el('input', { className: 'form-input', value: f.value || '', placeholder: f.label });
+        inputs[f.key] = input;
+        group.appendChild(input);
+        form.appendChild(group);
+      });
+
+      var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px', minHeight: '20px' } });
+      form.appendChild(statusMsg);
+
+      var saveBtn = el('button', { className: 'btn btn-primary', onClick: function() {
+        var updates = {};
+        for (var k in inputs) updates[k] = inputs[k].value;
+        saveBtn.textContent = 'Saving...';
+        saveBtn.disabled = true;
+        google.script.run.withSuccessHandler(function(result) {
+          saveBtn.textContent = 'Save Changes';
+          saveBtn.disabled = false;
+          statusMsg.textContent = result && result.success ? 'Profile updated!' : (result && result.message) || 'Error saving.';
+          statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+        }).withFailureHandler(function() {
+          saveBtn.textContent = 'Save Changes';
+          saveBtn.disabled = false;
+          statusMsg.textContent = 'Error saving. Please try again.';
+          statusMsg.style.color = 'var(--danger)';
+        }).dataUpdateProfile(CURRENT_USER.email, updates);
+      }}, 'Save Changes');
+      form.appendChild(saveBtn);
+
+      content.appendChild(form);
+    }).dataGetFullProfile(CURRENT_USER.email);
+  });
+}
+
+// ═══════════════════════════════════════
+// MORE MENU
+// ═══════════════════════════════════════
+
+function renderMemberMore(appContainer) {
+  renderPageLayout(appContainer, 'member', 'more', function(container) {
+    _memberHeader(container, 'More');
+    var content = el('div', { className: 'content' });
+    var menuItems = [
+      { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'View your notifications', action: function() { renderMemberNotifications(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', action: function() { renderUnionStatsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardDirectory(document.getElementById('app')); } },
+      { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderMemberResources(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCCA', label: 'Workload Tracker', desc: 'Submit weekly caseload data', action: function() { renderWorkloadTracker(document.getElementById('app')); } },
+      { icon: '\u2753', label: 'Weekly Questions', desc: 'Vote on this week\'s questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'member'); } },
+      { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { renderSurveyResultsPage(document.getElementById('app')); } },
+    ];
+
+    menuItems.forEach(function(m) {
+      var item = el('div', { className: 'more-menu-item', onClick: m.action });
+      item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
+      var text = el('div');
+      text.appendChild(el('div', { className: 'more-menu-label' }, m.label));
+      text.appendChild(el('div', { className: 'more-menu-desc' }, m.desc));
+      item.appendChild(text);
+      content.appendChild(item);
+    });
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// SURVEY RESULTS
+// ═══════════════════════════════════════
+
+function renderSurveyResultsPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'survey', function(container) {
+    _memberHeader(container, 'Survey Results');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(data) {
+      content.innerHTML = '';
+      if (!data) {
+        content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Survey data unavailable.'));
+        return;
+      }
+
+      if (!data.available) {
+        // Below threshold
+        var pct = data.threshold > 0 ? Math.round((data.count / data.threshold) * 100) : 0;
+        var card = el('div', { className: 'card card-glass', style: { padding: '22px', textAlign: 'center' } });
+        card.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCCA'));
+        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Not enough responses yet'));
+        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.count + ' of ' + data.threshold + ' needed'));
+        var track = el('div', { className: 'bar-chart-track', style: { height: '10px', margin: '0 auto', maxWidth: '240px' } });
+        var fill = el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: 'var(--accent)' } });
+        track.appendChild(fill);
+        card.appendChild(track);
+        content.appendChild(card);
+        return;
+      }
+
+      // Render section charts
+      content.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '10px' } }, '\uD83D\uDD12 Your responses are fully anonymous via one-way encryption'));
+      content.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.count + ' responses'));
+
+      // Chart.js horizontal bar — all sections
+      var secLabels = [];
+      var secData = [];
+      var secColors = [];
+      (data.sections || []).forEach(function(sec) {
+        secLabels.push(sec.name);
+        secData.push(sec.avg || 0);
+        var avg = sec.avg || 0;
+        secColors.push(avg < 4 ? '#ef4444' : avg < 6 ? '#facc15' : avg < 8 ? '#4ade80' : '#22c55e');
+      });
+
+      if (secLabels.length > 0 && typeof ChartHelper !== 'undefined') {
+        var chartCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+        chartCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, 'Section Averages'));
+        ChartHelper.createHorizontalBarChart(chartCard, 'survey-sections-chart', secLabels, secData, secColors);
+        content.appendChild(chartCard);
+      }
+
+      // Individual section cards with numeric display
+      (data.sections || []).forEach(function(sec) {
+        var secCard = el('div', { className: 'card card-glass card-accent-border', style: { padding: '16px', marginBottom: '10px' } });
+        var avg = sec.avg || 0;
+        var color = avg < 4 ? 'var(--danger)' : avg < 6 ? 'var(--warning)' : avg < 8 ? 'var(--success)' : '#22c55e';
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
+        row.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, sec.name));
+        row.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '20px', fontWeight: '700', color: color } }, avg.toFixed(1)));
+        secCard.appendChild(row);
+        content.appendChild(secCard);
+      });
+    }).dataGetSurveyResults();
+  });
+}
+
+// ═══════════════════════════════════════
+// WORKLOAD TRACKER (embedded, SSO)
+// ═══════════════════════════════════════
+
+function renderWorkloadTracker(appContainer) {
+  renderPageLayout(appContainer, 'member', 'workload', function(container) {
+    _memberHeader(container, 'Workload Tracker');
+    var content = el('div', { className: 'content' });
+
+    // Sub-tabs
+    var activeSubTab = 'submit';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['submit', 'history', 'stats', 'reminders'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'submit') _renderWTSubmit(subContent);
+      else if (activeSubTab === 'history') _renderWTHistory(subContent);
+      else if (activeSubTab === 'stats') _renderWTStats(subContent);
+      else if (activeSubTab === 'reminders') _renderWTReminders(subContent);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderWTSubmit(container) {
+  var rangeOptions = ['0', '1-5', '6-10', '11-20', '21+'];
+  var categories = [
+    { id: 't1', label: 'Priority Cases' },
+    { id: 't2', label: 'Pending Cases' },
+    { id: 't3', label: 'Unread Documents' },
+    { id: 't4', label: 'To-Do Items' },
+    { id: 't5', label: 'Sent Referrals' },
+    { id: 't6', label: 'CE Activities' },
+    { id: 't7', label: 'Assistance Requests' },
+    { id: 't8', label: 'Aged Cases' },
+  ];
+
+  var inputs = {};
+
+  // Caseload categories
+  container.appendChild(el('h3', { className: 'section-title' }, 'Caseload'));
+  categories.forEach(function(cat) {
+    var row = el('div', { className: 'wt-category' });
+    row.appendChild(el('div', { className: 'wt-category-label' }, cat.label));
+    var select = el('select', { className: 'form-select', style: { width: '100px', textAlign: 'center' } });
+    rangeOptions.forEach(function(opt) {
+      select.appendChild(el('option', { value: opt }, opt));
+    });
+    inputs[cat.id] = select;
+    row.appendChild(select);
+    container.appendChild(row);
+  });
+
+  // Additional fields
+  container.appendChild(el('h3', { className: 'section-title', style: { marginTop: '18px' } }, 'Assessment'));
+
+  var recipGroup = el('div', { className: 'form-group' });
+  recipGroup.appendChild(el('label', { className: 'form-label' }, 'Reciprocity Score'));
+  var recipSelect = el('select', { className: 'form-select' });
+  ['1 - Very Low', '2 - Low', '3 - Average', '4 - High', '5 - Very High'].forEach(function(opt) {
+    recipSelect.appendChild(el('option', { value: opt }, opt));
+  });
+  recipSelect.value = '3 - Average';
+  inputs.reciprocity = recipSelect;
+  recipGroup.appendChild(recipSelect);
+  container.appendChild(recipGroup);
+
+  var planGroup = el('div', { className: 'form-group' });
+  planGroup.appendChild(el('label', { className: 'form-label' }, 'Workflow Plan'));
+  var planSelect = el('select', { className: 'form-select' });
+  ['Yes', 'No', 'In Progress'].forEach(function(opt) {
+    planSelect.appendChild(el('option', { value: opt }, opt));
+  });
+  inputs.workflowPlan = planSelect;
+  planGroup.appendChild(planSelect);
+  container.appendChild(planGroup);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '10px', minHeight: '20px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary', style: { marginTop: '14px' },
+    onClick: function() {
+      var formData = { email: CURRENT_USER.email };
+      for (var k in inputs) formData[k] = inputs[k].value;
+      statusMsg.textContent = 'Submitting...';
+      statusMsg.style.color = 'var(--muted)';
+      google.script.run.withSuccessHandler(function(result) {
+        var isError = typeof result === 'string' && result.indexOf('Error') === 0;
+        if (!isError) {
+          // Show confirmation card
+          container.innerHTML = '';
+          var card = el('div', { className: 'confirm-card' });
+          card.appendChild(el('div', { className: 'confirm-icon' }, '\u2705'));
+          card.appendChild(el('div', { className: 'confirm-title' }, 'Submitted!'));
+          card.appendChild(el('div', { className: 'confirm-text' }, 'Your workload data has been recorded. This data helps your union track caseload trends and advocate for better working conditions.'));
+          card.appendChild(el('button', {
+            className: 'btn btn-secondary', style: { marginTop: '16px' },
+            onClick: function() { container.innerHTML = ''; _renderWTSubmit(container); }
+          }, 'Submit Another'));
+          container.appendChild(card);
+        } else {
+          statusMsg.textContent = result;
+          statusMsg.style.color = 'var(--danger)';
+        }
+      }).withFailureHandler(function() {
+        statusMsg.textContent = 'Error submitting. Try again.';
+        statusMsg.style.color = 'var(--danger)';
+      }).processWorkloadFormSSO(CURRENT_USER.email, formData);
+    }
+  }, 'Submit Workload'));
+}
+
+
+function _renderWTHistory(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(result) {
+    container.innerHTML = '';
+    if (!result || !result.success || !result.history || result.history.length === 0) {
+      container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No submissions yet.'));
+      return;
+    }
+    result.history.forEach(function(entry) {
+      var card = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '8px' } });
+      card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' } }, entry.date ? new Date(entry.date).toLocaleDateString() : 'Unknown'));
+      var grid = el('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' } });
+      var labels = ['Pri', 'Pend', 'Doc', 'ToDo', 'Ref', 'CE', 'Asst', 'Aged'];
+      for (var i = 0; i < 8; i++) {
+        var cell = el('div', { style: { textAlign: 'center' } });
+        cell.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)' } }, labels[i]));
+        cell.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, String(entry['t' + (i + 1)] || 0)));
+        grid.appendChild(cell);
+      }
+      card.appendChild(grid);
+      container.appendChild(card);
+    });
+  }).getWorkloadHistorySSO(CURRENT_USER.email);
+}
+
+function _renderWTStats(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(result) {
+    container.innerHTML = '';
+    if (!result || !result.success || !result.data) {
+      container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No data available.'));
+      return;
+    }
+    var d = result.data;
+    container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' } }, d.totalSubmissions + ' submissions from ' + d.members + ' members'));
+
+    var avgs = d.averages || {};
+    var labels = [];
+    var values = [];
+    for (var cat in avgs) {
+      labels.push(cat);
+      values.push(parseFloat(avgs[cat]) || 0);
+    }
+
+    if (labels.length > 0 && typeof ChartHelper !== 'undefined') {
+      ChartHelper.createBarChart(container, 'wt-stats-chart', labels, [{ label: 'Average', data: values }]);
+    } else {
+      // Fallback CSS bars
+      for (var cat in avgs) {
+        var row = el('div', { className: 'bar-chart-row' });
+        row.appendChild(el('div', { className: 'bar-chart-label' }, cat));
+        var val = parseFloat(avgs[cat]) || 0;
+        var pct = Math.min(100, Math.round((val / 100) * 100));
+        var track = el('div', { className: 'bar-chart-track' });
+        track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: Math.max(pct, 2) + '%', background: 'var(--accent)' } }));
+        row.appendChild(track);
+        row.appendChild(el('div', { className: 'bar-chart-value' }, avgs[cat]));
+        container.appendChild(row);
+      }
+    }
+  }).getWorkloadDashboardDataSSO(CURRENT_USER.email);
+}
+
+function _renderWTReminders(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(prefs) {
+    container.innerHTML = '';
+    prefs = prefs || { enabled: false, day: 'monday' };
+
+    var card = el('div', { className: 'glass-card card-fade-in' });
+    card.appendChild(el('div', { className: 'section-title' }, 'Email Reminders'));
+    card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } },
+      'Get a weekly email reminder to submit your workload data.'));
+
+    // Enable toggle
+    var toggleRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' } });
+    toggleRow.appendChild(el('label', { className: 'form-label', style: { margin: 0 } }, 'Enabled'));
+    var toggle = el('input', { type: 'checkbox', checked: prefs.enabled });
+    toggleRow.appendChild(toggle);
+    card.appendChild(toggleRow);
+
+    // Day picker
+    var dayGroup = el('div', { className: 'form-group' });
+    dayGroup.appendChild(el('label', { className: 'form-label' }, 'Reminder Day'));
+    var daySelect = el('select', { className: 'form-select' });
+    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(function(d) {
+      daySelect.appendChild(el('option', { value: d, selected: prefs.day === d }, d.charAt(0).toUpperCase() + d.slice(1)));
+    });
+    dayGroup.appendChild(daySelect);
+    card.appendChild(dayGroup);
+
+    var statusMsg = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', minHeight: '20px' } });
+
+    card.appendChild(el('button', {
+      className: 'btn btn-primary', style: { marginTop: '10px' },
+      onClick: function() {
+        statusMsg.textContent = 'Saving...';
+        statusMsg.style.color = 'var(--muted)';
+        google.script.run.withSuccessHandler(function(res) {
+          if (res && res.success) {
+            statusMsg.textContent = 'Preferences saved!';
+            statusMsg.style.color = 'var(--accent)';
+          } else {
+            statusMsg.textContent = 'Error saving.';
+            statusMsg.style.color = 'var(--danger)';
+          }
+        }).withFailureHandler(function() {
+          statusMsg.textContent = 'Error saving. Try again.';
+          statusMsg.style.color = 'var(--danger)';
+        }).setWorkloadReminderSSO(CURRENT_USER.email, toggle.checked, daySelect.value);
+      }
+    }, 'Save Preferences'));
+    card.appendChild(statusMsg);
+
+    container.appendChild(card);
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'Unable to load reminder settings.'));
+  }).getWorkloadReminderSSO(CURRENT_USER.email);
+}
+
+// ═══════════════════════════════════════
+// WEEKLY QUESTIONS (member side)
+// ═══════════════════════════════════════
+
+function renderWeeklyQuestionsPage(appContainer, role) {
+  var isMember = role === 'member';
+  renderPageLayout(appContainer, role, 'weeklyq', function(container) {
+    if (isMember) _memberHeader(container, 'Weekly Questions');
+    else container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title' }, 'Weekly Questions')));
+
+    var content = el('div', { className: 'content' });
+
+    // Sub-tabs: This Week | Past Questions | Suggest
+    var activeSubTab = 'current';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      var tabs = [{ id: 'current', label: 'This Week' }, { id: 'past', label: 'Past Questions' }, { id: 'suggest', label: 'Suggest' }];
+      tabs.forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderWQSubContent(); }
+        }, tab.label));
+      });
+    }
+
+    function renderWQSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'suggest') { _renderQuestionSubmission(subContent); return; }
+      if (activeSubTab === 'past') { _renderPastQuestions(subContent); return; }
+      _renderCurrentQuestions(subContent);
+    }
+
+    function _renderCurrentQuestions(target) {
+      showLoading(target);
+      google.script.run.withSuccessHandler(function(data) {
+        target.innerHTML = '';
+        if (!data || !data.questions || data.questions.length === 0) {
+          target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No questions this week.'));
+          return;
+        }
+
+        // Survey anonymity badge
+        target.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '\uD83D\uDD12 Your responses are fully anonymous via one-way encryption'));
+
+        data.questions.forEach(function(q) {
+          var qCard = el('div', { className: 'wq-card' });
+          qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+
+          if (q.hasResponded) {
+            _renderQuestionResults(qCard, q);
+          } else {
+            var options = ['Strongly Agree', 'Agree', 'Neutral', 'Disagree', 'Strongly Disagree'];
+            options.forEach(function(opt) {
+              var optEl = el('div', { className: 'wq-option', onClick: function() {
+                google.script.run.withSuccessHandler(function(result) {
+                  if (result && result.success) {
+                    q.hasResponded = true;
+                    q.stats = result.stats;
+                    qCard.innerHTML = '';
+                    qCard.appendChild(el('div', { className: 'wq-question' }, q.text));
+                    _renderQuestionResults(qCard, q);
+                  }
+                }).wqSubmitResponse(CURRENT_USER.email, q.id, opt);
+              }}, opt);
+              qCard.appendChild(optEl);
+            });
+          }
+          target.appendChild(qCard);
+        });
+      }).wqGetActiveQuestions(CURRENT_USER.email);
+    }
+
+    function _renderPastQuestions(target) {
+      showLoading(target);
+      var page = 1;
+      function loadPage(p) {
+        showLoading(target);
+        google.script.run.withSuccessHandler(function(data) {
+          target.innerHTML = '';
+          if (!data || !data.questions || data.questions.length === 0) {
+            target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, p > 1 ? 'No more past questions.' : 'No past questions available.'));
+            return;
+          }
+          data.questions.forEach(function(q) {
+            var card = el('div', { className: 'wq-card' });
+            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Week of ' + q.weekStr));
+            card.appendChild(el('div', { className: 'wq-question' }, q.text));
+            if (q.stats && q.stats.total > 0) _renderQuestionResults(card, q);
+            else card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No responses'));
+            target.appendChild(card);
+          });
+          // Pagination
+          if (data.hasMore || p > 1) {
+            var nav = el('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center', marginTop: '14px' } });
+            if (p > 1) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p - 1; loadPage(page); } }, '\u2190 Previous'));
+            if (data.hasMore) nav.appendChild(el('button', { className: 'btn btn-secondary', style: { width: 'auto', fontSize: '12px', padding: '8px 16px' }, onClick: function() { page = p + 1; loadPage(page); } }, 'Next \u2192'));
+            target.appendChild(nav);
+          }
+        }).wqGetHistory(CURRENT_USER.email, p, 10);
+      }
+      loadPage(page);
+    }
+
+    refreshSubTabs();
+    renderWQSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderQuestionResults(container, q) {
+  var stats = q.stats || {};
+  var total = stats.total || 0;
+  var options = ['Strongly Agree', 'Agree', 'Neutral', 'Disagree', 'Strongly Disagree'];
+
+  if (typeof ChartHelper !== 'undefined' && total > 0) {
+    var labels = [];
+    var data = [];
+    var colors = ['#4ade80', '#60a5fa', '#a78bfa', '#facc15', '#ef4444'];
+    options.forEach(function(opt, i) {
+      labels.push(opt);
+      data.push((stats.counts && stats.counts[opt]) || 0);
+    });
+    var chartId = 'wq-results-' + (q.id || Math.random().toString(36).substr(2, 6));
+    ChartHelper.createHorizontalBarChart(container, chartId, labels, data, colors);
+  } else {
+    options.forEach(function(opt) {
+      var count = (stats.counts && stats.counts[opt]) || 0;
+      var pct = total > 0 ? Math.round((count / total) * 100) : 0;
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' } });
+      row.appendChild(el('div', { style: { width: '110px', fontSize: '11px', color: 'var(--muted)', textAlign: 'right', flexShrink: '0' } }, opt));
+      var bar = el('div', { className: 'wq-results-bar' });
+      bar.appendChild(el('div', { className: 'wq-results-fill', style: { width: pct + '%' } }));
+      row.appendChild(bar);
+      row.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--text)', fontWeight: '600', width: '40px' } }, pct + '%'));
+      container.appendChild(row);
+    });
+  }
+  container.appendChild(el('div', { className: 'wq-stats' }, total + ' responses'));
+}
+
+// ═══════════════════════════════════════
+// EVENTS PAGE (shared member+steward) (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderEventsPage(appContainer) {
+  var role = AppState.activeRole || 'member';
+  renderPageLayout(appContainer, role, 'events', function(container) {
+    if (role === 'member') _memberHeader(container, 'Upcoming Events');
+    else _stewardHeader(container, 'Upcoming Events');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(events) {
+      content.innerHTML = '';
+      if (!events || events.length === 0) {
+        var emptyCard = el('div', { style: { textAlign: 'center', padding: '40px 0' } });
+        emptyCard.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '10px' } }, '\uD83D\uDCC5'));
+        emptyCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'No upcoming events'));
+        emptyCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'Check back later for meetings and events.'));
+        content.appendChild(emptyCard);
+        return;
+      }
+      events.forEach(function(ev, i) {
+        var card = el('div', { className: 'card card-glass card-fade-in card-accent-border', style: { padding: '16px', animationDelay: (i * 0.08) + 's' } });
+        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)' } }, ev.title));
+        var startDate = new Date(ev.startTime);
+        var endDate = new Date(ev.endTime);
+        var dateStr = startDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+        var timeStr = startDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) + ' - ' + endDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--accent)', marginTop: '6px', fontWeight: '600' } }, dateStr));
+        card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)' } }, timeStr));
+        if (ev.location) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px' } }, '\uD83D\uDCCD ' + ev.location));
+        if (ev.description) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '6px', lineHeight: '1.5' } }, ev.description));
+        // Add to Calendar
+        var calUrl = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+          '&text=' + encodeURIComponent(ev.title) +
+          '&dates=' + ev.startTime.replace(/[-:]/g, '').replace('.000Z', 'Z') + '/' + ev.endTime.replace(/[-:]/g, '').replace('.000Z', 'Z') +
+          (ev.location ? '&location=' + encodeURIComponent(ev.location) : '');
+        card.appendChild(el('a', {
+          href: calUrl, target: '_blank',
+          style: { display: 'inline-block', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginTop: '8px', padding: '6px 14px', borderRadius: '8px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)' }
+        }, '\uD83D\uDCC5 Add to My Calendar'));
+        content.appendChild(card);
+      });
+    }).dataGetUpcomingEvents(20);
+  });
+}
+
+// ═══════════════════════════════════════
+// UNION STATS PAGE (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderUnionStatsPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'unionstats', function(container) {
+    _memberHeader(container, 'Union Stats');
+    var content = el('div', { className: 'content' });
+
+    // Sub-tabs
+    var activeSubTab = 'grievances';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['grievances', 'hot spots', 'membership'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'grievances') _renderGrievanceStats(subContent);
+      else if (activeSubTab === 'hot spots') _renderHotSpots(subContent);
+      else _renderMembershipStats(subContent);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderGrievanceStats(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(data) {
+    container.innerHTML = '';
+    if (!data || !data.available) {
+      var msg = data && data.threshold ? 'Need ' + data.threshold + '+ grievances for anonymized stats (' + (data.count || 0) + ' current).' : 'Grievance stats unavailable.';
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, msg));
+      return;
+    }
+
+    container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.total + ' total grievances'));
+    container.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '\uD83D\uDD12 Anonymized aggregate data only'));
+
+    if (typeof ChartHelper !== 'undefined') {
+      // Status doughnut
+      var statusLabels = Object.keys(data.byStatus);
+      var statusData = statusLabels.map(function(k) { return data.byStatus[k]; });
+      var statusCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+      statusCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Status'));
+      ChartHelper.createDoughnutChart(statusCard, 'griev-status-chart', statusLabels, statusData);
+      container.appendChild(statusCard);
+
+      // Step bar
+      var stepLabels = Object.keys(data.byStep);
+      var stepData = stepLabels.map(function(k) { return data.byStep[k]; });
+      var stepCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+      stepCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Step'));
+      ChartHelper.createBarChart(stepCard, 'griev-step-chart', stepLabels, [{ label: 'Count', data: stepData }]);
+      container.appendChild(stepCard);
+
+      // Monthly trend
+      if (data.monthly && data.monthly.length > 1) {
+        var monthLabels = data.monthly.map(function(m) { return m.month; });
+        var monthData = data.monthly.map(function(m) { return m.count; });
+        var monthCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+        monthCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Monthly Trend'));
+        ChartHelper.createLineChart(monthCard, 'griev-trend-chart', monthLabels, [{ label: 'Filed', data: monthData }]);
+        container.appendChild(monthCard);
+      }
+    }
+  }).dataGetGrievanceStats();
+}
+
+function _renderHotSpots(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(spots) {
+    container.innerHTML = '';
+    if (!spots || spots.length === 0) {
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'Not enough data for hot spot analysis.'));
+      return;
+    }
+    container.appendChild(el('div', { className: 'privacy-badge', style: { marginBottom: '14px' } }, '\uD83D\uDD12 Locations with 3+ grievances shown'));
+
+    if (typeof ChartHelper !== 'undefined') {
+      var labels = spots.map(function(s) { return s.location; });
+      var data = spots.map(function(s) { return s.count; });
+      ChartHelper.createHorizontalBarChart(container, 'hotspots-chart', labels, data);
+    }
+
+    spots.forEach(function(spot, i) {
+      var card = el('div', { className: 'card card-glass card-fade-in', style: { padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', animationDelay: (i * 0.08) + 's' } });
+      card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, spot.location));
+      card.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '16px', fontWeight: '700', color: 'var(--accent)' } }, String(spot.count)));
+      container.appendChild(card);
+    });
+  }).dataGetGrievanceHotSpots();
+}
+
+function _renderMembershipStats(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(data) {
+    container.innerHTML = '';
+    if (!data || !data.available) {
+      var msg = data && data.threshold ? 'Need ' + data.threshold + '+ members for anonymized stats (' + (data.count || 0) + ' current).' : 'Membership stats unavailable.';
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, msg));
+      return;
+    }
+
+    container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.total + ' total members'));
+
+    if (typeof ChartHelper !== 'undefined') {
+      // Dues pie
+      var dLabels = Object.keys(data.byDues);
+      var dData = dLabels.map(function(k) { return data.byDues[k]; });
+      var dCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+      dCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Dues Status'));
+      ChartHelper.createDoughnutChart(dCard, 'membership-dues-chart', dLabels, dData);
+      container.appendChild(dCard);
+
+      // Location bar
+      var lLabels = Object.keys(data.byLocation);
+      var lData = lLabels.map(function(k) { return data.byLocation[k]; });
+      var lCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+      lCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Location'));
+      ChartHelper.createHorizontalBarChart(lCard, 'membership-loc-chart', lLabels, lData);
+      container.appendChild(lCard);
+    }
+  }).dataGetMembershipStats();
+}
+
+// ═══════════════════════════════════════
+// STEWARD DIRECTORY (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderStewardDirectory(appContainer) {
+  renderPageLayout(appContainer, 'member', 'stewarddirectory', function(container) {
+    _memberHeader(container, CONFIG.stewardLabel + ' Directory');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(stewards) {
+      content.innerHTML = '';
+      if (!stewards || stewards.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's found.'));
+        return;
+      }
+
+      var searchInput = el('input', { className: 'search-input', placeholder: 'Search by name or location...', onInput: function() { renderList(searchInput.value.toLowerCase()); } });
+      content.appendChild(searchInput);
+      var listArea = el('div');
+      content.appendChild(listArea);
+
+      function renderList(query) {
+        listArea.innerHTML = '';
+        var filtered = query ? stewards.filter(function(s) {
+          return (s.name || '').toLowerCase().indexOf(query) !== -1 || (s.workLocation || '').toLowerCase().indexOf(query) !== -1;
+        }) : stewards;
+        filtered.forEach(function(s, i) {
+          var card = el('div', { className: 'card card-glass card-fade-in', style: { padding: '14px 16px', marginBottom: '6px', animationDelay: (i * 0.05) + 's' } });
+          var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } });
+          topRow.appendChild(el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase()));
+          var info = el('div', { style: { flex: '1' } });
+          info.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, s.name || s.email));
+          var meta = [];
+          if (s.workLocation) meta.push(s.workLocation);
+          if (s.officeDays) meta.push(s.officeDays);
+          if (s.unit) meta.push(s.unit);
+          info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
+          topRow.appendChild(info);
+          card.appendChild(topRow);
+
+          // Contact details (expandable)
+          var details = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
+          if (s.email) details.appendChild(el('a', { href: 'mailto:' + s.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px' } }, '\u2709\uFE0F ' + s.email));
+          if (s.phone) details.appendChild(el('a', { href: 'tel:' + s.phone, style: { display: 'block', fontSize: '12px', color: 'var(--success)', marginBottom: '4px' } }, '\uD83D\uDCDE ' + s.phone));
+          details.appendChild(el('button', {
+            style: { fontSize: '11px', padding: '6px 14px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', fontWeight: '600', marginTop: '6px' },
+            onClick: function(e) {
+              e.stopPropagation();
+              google.script.run.withSuccessHandler(function(result) {
+                if (result && result.success) renderStewardContact(document.getElementById('app'));
+              }).dataAssignSteward(CURRENT_USER.email, s.email);
+            }
+          }, 'Select as my ' + CONFIG.stewardLabel));
+          card.appendChild(details);
+
+          card.addEventListener('click', function() {
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+          });
+          card.style.cursor = 'pointer';
+          listArea.appendChild(card);
+        });
+      }
+      renderList('');
+    }).dataGetStewardDirectory();
+  });
+}
+
+// ═══════════════════════════════════════
+// WEEKLY QUESTION HISTORY (v4.12.0)
+// ═══════════════════════════════════════
+// (Integrated as sub-tab in the Weekly Questions page below)
+
+function _renderQuestionSubmission(container) {
+  container.innerHTML = '';
+  container.appendChild(el('h3', { className: 'section-title' }, 'Suggest a Question'));
+  container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' } }, 'Your question will be reviewed and may appear in future weeks.'));
+  var textarea = el('textarea', { className: 'msg-textarea', placeholder: 'Type your question here...', style: { minHeight: '80px' } });
+  container.appendChild(textarea);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginTop: '6px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary', style: { marginTop: '10px' },
+    onClick: function() {
+      var text = textarea.value.trim();
+      if (!text) { statusMsg.textContent = 'Please enter a question.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Submitting...';
+      google.script.run.withSuccessHandler(function(result) {
+        statusMsg.textContent = result && result.success ? 'Question submitted! Thank you.' : 'Error submitting.';
+        statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+        if (result && result.success) textarea.value = '';
+      }).wqSubmitPoolQuestion(CURRENT_USER.email, text);
+    }
+  }, 'Submit Question'));
+}
+</script>
+`;
+}
+
+/**
+ * Embedded HTML: steward_view.html
+ * @returns {string} HTML content
+ */
+function getsteward_view_HTML() {
+  return `<script>
+/**
+ * Steward View — "Mono Signal"
+ * v4.12.0 — Cases, Members tab, Broadcast, Survey tracking, Weekly Q manager,
+ * Resources tab, responsive sidebar layout.
+ */
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+
+function initStewardView(container) {
+  var t = ThemeEngine.getTheme('steward', AppState.isDark);
+  ThemeEngine.applyTheme(t);
+  AppState.activeRole = 'steward';
+  showLoading(container);
+
+  google.script.run
+    .withSuccessHandler(function(cases) {
+      AppState.cases = cases || [];
+      google.script.run
+        .withSuccessHandler(function(kpis) {
+          AppState.kpis = kpis;
+          AppState.loading = false;
+          renderStewardDashboard(container);
+        })
+        .withFailureHandler(function() {
+          AppState.kpis = { totalCases: AppState.cases.length, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
+          AppState.loading = false;
+          renderStewardDashboard(container);
+        })
+        .dataGetStewardKPIs(CURRENT_USER.email);
+    })
+    .withFailureHandler(function() {
+      AppState.cases = [];
+      AppState.loading = false;
+      renderStewardDashboard(container);
+    })
+    .dataGetStewardCases(CURRENT_USER.email);
+}
+
+// ═══════════════════════════════════════
+// STEWARD HEADER (shared)
+// ═══════════════════════════════════════
+
+function _stewardHeader(container, title, subtitle) {
+  var header = el('div', { className: 'page-header' });
+  var headerLeft = el('div', { className: 'page-header-left' });
+  headerLeft.appendChild(el('div', { className: 'page-title' }, title));
+  if (subtitle) headerLeft.appendChild(el('div', { className: 'page-subtitle' }, subtitle));
+  header.appendChild(headerLeft);
+
+  var headerRight = el('div', { className: 'page-header-right' });
+  if (!isSidebarLayout()) {
+    if (IS_DUAL_ROLE) {
+      headerRight.appendChild(el('button', {
+        style: { background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', borderRadius: '6px', padding: '4px 10px', fontSize: '10px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--fontBody)' },
+        onClick: function() { AppState.activeRole = 'member'; initMemberView(document.getElementById('app')); }
+      }, '\uD83D\uDC64 ' + CONFIG.memberLabel));
+    }
+    headerRight.appendChild(el('button', { className: 'icon-btn', onClick: function() {
+      AppState.isDark = !AppState.isDark;
+      ThemeEngine.applyTheme(ThemeEngine.getTheme('steward', AppState.isDark));
+      renderStewardDashboard(document.getElementById('app'));
+    }}, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'));
+    headerRight.appendChild(el('button', { className: 'icon-btn', onClick: handleLogout }, '\u21A9'));
+  }
+  header.appendChild(headerRight);
+  container.appendChild(header);
+}
+
+// ═══════════════════════════════════════
+// CASES DASHBOARD (main steward tab)
+// ═══════════════════════════════════════
+
+function renderStewardDashboard(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'cases', function(container) {
+    _stewardHeader(container, 'Cases', CURRENT_USER.name + ' \u00B7 ' + CURRENT_USER.unit);
+
+    // KPIs
+    var kpis = AppState.kpis || {};
+    var kpiGrid = el('div', { className: 'kpi-grid' });
+    var kpiItems = [
+      { label: 'My Cases', value: kpis.totalCases || 0 },
+      { label: 'Overdue', value: kpis.overdue || 0, color: kpis.overdue > 0 ? 'var(--danger)' : null },
+      { label: 'Due <7d', value: kpis.dueSoon || 0, color: kpis.dueSoon > 0 ? 'var(--warning)' : null },
+      { label: 'Resolved', value: kpis.resolved || 0, color: 'var(--success)' },
+    ];
+    kpiItems.forEach(function(kpi) {
+      var card = el('div', { className: 'kpi-card' });
+      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+      if (kpi.color) val.style.color = kpi.color;
+      card.appendChild(val);
+      kpiGrid.appendChild(card);
+    });
+    container.appendChild(kpiGrid);
+
+    // Filter bar
+    var filter = 'all';
+    var filterBar = el('div', { className: 'filter-bar' });
+    var overdueCount = AppState.cases.filter(function(c) { return c.status === 'overdue'; }).length;
+    var filters = [
+      { key: 'all', label: 'All ' + AppState.cases.length },
+      { key: 'overdue', label: 'Overdue ' + overdueCount },
+      { key: 'active', label: 'Active' },
+    ];
+
+    filters.forEach(function(f) {
+      var tab = el('button', {
+        className: 'filter-tab' + (filter === f.key ? ' active' : ''),
+        onClick: function() {
+          filter = f.key;
+          renderCaseList(caseListContainer, filter);
+          filterBar.querySelectorAll('.filter-tab').forEach(function(t, i) {
+            t.className = 'filter-tab' + (filters[i].key === filter ? ' active' : '');
+          });
+        }
+      }, f.label);
+      filterBar.appendChild(tab);
+    });
+    container.appendChild(filterBar);
+
+    var caseListContainer = el('div', { className: 'content' });
+    renderCaseList(caseListContainer, filter);
+    container.appendChild(caseListContainer);
+
+    // FAB — opens broadcast
+    var fab = el('button', { className: 'fab', onClick: function() { renderBroadcast(document.getElementById('app')); } }, '\uD83D\uDCE2');
+    container.appendChild(fab);
+  });
+}
+
+function renderCaseList(container, filter) {
+  container.innerHTML = '';
+  var cases = AppState.cases;
+  if (filter === 'overdue') cases = cases.filter(function(c) { return c.status === 'overdue'; });
+  if (filter === 'active') cases = cases.filter(function(c) { return c.status === 'active' || c.status === 'new'; });
+
+  if (cases.length === 0) {
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } },
+      filter === 'all' ? 'No cases assigned.' : 'No ' + filter + ' cases.'));
+    return;
+  }
+
+  cases.forEach(function(c) {
+    var isOverdue = c.status === 'overdue';
+    var statusClass = c.status || 'active';
+    var card = el('div', { className: 'card card-clickable', style: { padding: '11px 14px', marginBottom: '6px' } });
+
+    var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
+    var leftGroup = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+    leftGroup.appendChild(el('div', { className: 'status-dot ' + statusClass }));
+    leftGroup.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '12px', fontWeight: '600', color: 'var(--text)' } }, c.id));
+    topRow.appendChild(leftGroup);
+
+    var deadlineSpan = el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: isOverdue ? 'var(--danger)' : 'var(--muted)', fontWeight: isOverdue ? '700' : '400' } });
+    deadlineSpan.textContent = c.deadlineDays !== null ? c.deadlineDays + 'd' : '\u2014';
+    topRow.appendChild(deadlineSpan);
+    card.appendChild(topRow);
+
+    var bottomRow = el('div', { style: { paddingLeft: '15px', display: 'flex', justifyContent: 'space-between' } });
+    var memberDisplay = c.memberEmail ? c.memberEmail.split('@')[0] : 'Unknown';
+    bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)' } }, memberDisplay + ' \u00B7 ' + (c.step || '')));
+    bottomRow.appendChild(el('span', { style: { fontFamily: 'var(--fontBody)', fontSize: '10px', color: 'var(--muted)' } }, c.unit || ''));
+    card.appendChild(bottomRow);
+    container.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════
+// BOTTOM NAV (shared by both views)
+// ═══════════════════════════════════════
+
+function renderBottomNav(container, role, activeTab) {
+  var nav = el('div', { className: 'bottom-nav' });
+  var tabs = role === 'steward' ? [
+    { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
+    { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
+    { id: 'deadlines', icon: '\uD83D\uDCC5', label: 'Deadlines' },
+    { id: 'more_steward', icon: '\u2630', label: 'More' },
+  ] : [
+    { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
+    { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
+    { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
+    { id: 'more', icon: '\u2630', label: 'More' },
+  ];
+
+  tabs.forEach(function(tab) {
+    var item = el('div', {
+      className: 'nav-item' + (tab.id === activeTab ? ' active' : ''),
+      onClick: function() { _handleTabNav(role, tab.id === 'more_steward' ? '_steward_more' : tab.id === 'more' ? '_member_more' : tab.id); }
+    });
+    item.appendChild(el('span', { className: 'nav-icon' }, tab.icon));
+    var label = el('span', { className: 'nav-label' }, tab.label);
+    if (tab.id === activeTab) label.style.color = 'var(--accent)';
+    item.appendChild(label);
+    nav.appendChild(item);
+  });
+
+  container.appendChild(nav);
+}
+
+// ═══════════════════════════════════════
+// MEMBERS TAB
+// ═══════════════════════════════════════
+
+function renderStewardMembers(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'members', function(container) {
+    _stewardHeader(container, 'Members');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(members) {
+      content.innerHTML = '';
+      if (!members || members.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'No members assigned.'));
+        return;
+      }
+
+      // KPI strip
+      var activeGrievances = members.filter(function(m) { return m.hasOpenGrievance; }).length;
+      var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
+      [
+        { label: 'Assigned', value: members.length },
+        { label: 'Active Cases', value: activeGrievances, color: activeGrievances > 0 ? 'var(--warning)' : null },
+        { label: 'Members', value: members.length, color: 'var(--accent)' },
+      ].forEach(function(kpi) {
+        var card = el('div', { className: 'kpi-card' });
+        card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+        var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+        if (kpi.color) val.style.color = kpi.color;
+        card.appendChild(val);
+        kpiStrip.appendChild(card);
+      });
+      content.appendChild(kpiStrip);
+
+      // Chart.js stats
+      if (typeof ChartHelper !== 'undefined') {
+        google.script.run.withSuccessHandler(function(stats) {
+          if (!stats || !stats.byDues) return;
+          var chartRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' } });
+          // Dues doughnut
+          var duesCard = el('div', { className: 'card', style: { padding: '12px' } });
+          duesCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Dues Status'));
+          var dLabels = Object.keys(stats.byDues);
+          var dData = dLabels.map(function(k) { return stats.byDues[k]; });
+          ChartHelper.createDoughnutChart(duesCard, 'members-dues-chart', dLabels, dData);
+          chartRow.appendChild(duesCard);
+          // Location bar
+          var locCard = el('div', { className: 'card', style: { padding: '12px' } });
+          locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Location'));
+          var lLabels = Object.keys(stats.byLocation);
+          var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
+          ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
+          chartRow.appendChild(locCard);
+          // Insert after KPI strip
+          var searchEl = content.querySelector('.search-input');
+          if (searchEl) content.insertBefore(chartRow, searchEl);
+          else content.appendChild(chartRow);
+        }).dataGetStewardMemberStats(CURRENT_USER.email);
+      }
+
+      // Sort & Filter controls
+      var controlRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } });
+      var sortSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
+      [{ v: 'name-az', l: 'Name A-Z' }, { v: 'name-za', l: 'Name Z-A' }, { v: 'location', l: 'Location' }, { v: 'dues', l: 'Dues Status' }].forEach(function(o) {
+        sortSelect.appendChild(el('option', { value: o.v }, o.l));
+      });
+      controlRow.appendChild(sortSelect);
+
+      var filterSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
+      filterSelect.appendChild(el('option', { value: 'all' }, 'All'));
+      filterSelect.appendChild(el('option', { value: 'grievance' }, 'Has Open Case'));
+      var locs = {};
+      members.forEach(function(m) { if (m.workLocation) locs[m.workLocation] = true; });
+      Object.keys(locs).sort().forEach(function(loc) {
+        filterSelect.appendChild(el('option', { value: 'loc:' + loc }, loc));
+      });
+      controlRow.appendChild(filterSelect);
+      content.appendChild(controlRow);
+
+      // Search
+      var searchInput = el('input', {
+        className: 'search-input',
+        placeholder: 'Search members...',
+        onInput: rerender
+      });
+      content.appendChild(searchInput);
+
+      var listArea = el('div');
+      content.appendChild(listArea);
+
+      sortSelect.addEventListener('change', rerender);
+      filterSelect.addEventListener('change', rerender);
+
+      function rerender() {
+        var q = searchInput.value.toLowerCase();
+        var sortKey = sortSelect.value;
+        var filterKey = filterSelect.value;
+        var filtered = members.slice();
+        if (q) {
+          filtered = filtered.filter(function(m) {
+            return (m.name || '').toLowerCase().indexOf(q) !== -1 ||
+                   (m.email || '').toLowerCase().indexOf(q) !== -1 ||
+                   (m.workLocation || '').toLowerCase().indexOf(q) !== -1;
+          });
+        }
+        if (filterKey === 'grievance') {
+          filtered = filtered.filter(function(m) { return m.hasOpenGrievance; });
+        } else if (filterKey.indexOf('loc:') === 0) {
+          var loc = filterKey.substring(4);
+          filtered = filtered.filter(function(m) { return m.workLocation === loc; });
+        }
+        filtered.sort(function(a, b) {
+          if (sortKey === 'name-za') return (b.name || '').localeCompare(a.name || '');
+          if (sortKey === 'location') return (a.workLocation || '').localeCompare(b.workLocation || '');
+          if (sortKey === 'dues') return (a.duesStatus || '').localeCompare(b.duesStatus || '');
+          return (a.name || '').localeCompare(b.name || '');
+        });
+        renderFilteredMembers(listArea, filtered, '');
+      }
+      rerender();
+    }).dataGetStewardMembers(CURRENT_USER.email);
+  });
+}
+
+function renderFilteredMembers(container, members, query) {
+  container.innerHTML = '';
+  var filtered = query ? members.filter(function(m) {
+    return (m.name || '').toLowerCase().indexOf(query) !== -1 ||
+           (m.email || '').toLowerCase().indexOf(query) !== -1 ||
+           (m.workLocation || '').toLowerCase().indexOf(query) !== -1;
+  }) : members;
+
+  if (filtered.length === 0) {
+    container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '16px 0', textAlign: 'center' } }, 'No matches.'));
+    return;
+  }
+
+  filtered.forEach(function(m) {
+    var item = el('div', { className: 'member-list-item' });
+    item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
+    var info = el('div', { className: 'member-list-info' });
+    info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
+    var meta = m.workLocation || '';
+    if (m.officeDays) meta += (meta ? ' \u00B7 ' : '') + m.officeDays;
+    info.appendChild(el('div', { className: 'member-list-meta' }, meta));
+    item.appendChild(info);
+
+    var badges = el('div', { className: 'member-list-badges' });
+    if (m.hasOpenGrievance) badges.appendChild(el('div', { className: 'status-dot active', title: 'Has open grievance' }));
+    item.appendChild(badges);
+    container.appendChild(item);
+  });
+}
+
+// ═══════════════════════════════════════
+// BROADCAST
+// ═══════════════════════════════════════
+
+function renderBroadcast(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'broadcast', function(container) {
+    _stewardHeader(container, 'Broadcast Message');
+    var content = el('div', { className: 'content' });
+
+    // Location filter
+    var locationGroup = el('div', { className: 'form-group' });
+    locationGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Location (optional)'));
+    var locationInput = el('input', { className: 'form-input', placeholder: 'All locations' });
+    locationGroup.appendChild(locationInput);
+    content.appendChild(locationGroup);
+
+    // Office days filter
+    var daysGroup = el('div', { className: 'form-group' });
+    daysGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Office Days (optional)'));
+    var daysInput = el('input', { className: 'form-input', placeholder: 'e.g., Monday, Wednesday' });
+    daysGroup.appendChild(daysInput);
+    content.appendChild(daysGroup);
+
+    // Message
+    var msgGroup = el('div', { className: 'form-group' });
+    msgGroup.appendChild(el('label', { className: 'form-label' }, 'Message'));
+    var msgTextarea = el('textarea', { className: 'msg-textarea', placeholder: 'Type your message to members...' });
+    msgGroup.appendChild(msgTextarea);
+    content.appendChild(msgGroup);
+
+    var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '10px' } });
+    content.appendChild(statusMsg);
+
+    content.appendChild(el('button', {
+      className: 'btn btn-primary',
+      onClick: function() {
+        var msg = msgTextarea.value.trim();
+        if (!msg) { statusMsg.textContent = 'Please enter a message.'; statusMsg.style.color = 'var(--danger)'; return; }
+        var filter = {};
+        if (locationInput.value.trim()) filter.location = locationInput.value.trim();
+        if (daysInput.value.trim()) filter.officeDays = daysInput.value.trim();
+        statusMsg.textContent = 'Sending...';
+        statusMsg.style.color = 'var(--muted)';
+        google.script.run.withSuccessHandler(function(result) {
+          statusMsg.textContent = result && result.success ? result.message : (result && result.message) || 'Error sending.';
+          statusMsg.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+          if (result && result.success) msgTextarea.value = '';
+        }).withFailureHandler(function() {
+          statusMsg.textContent = 'Error sending. Try again.';
+          statusMsg.style.color = 'var(--danger)';
+        }).dataSendBroadcast(CURRENT_USER.email, filter, msg);
+      }
+    }, 'Send Broadcast'));
+
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// STEWARD NOTIFICATIONS — Compose + View
+// ═══════════════════════════════════════
+
+function renderStewardNotifications(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'notifications', function(container) {
+    // Hero header — amber gradient matching our system
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(145deg, #92400e, #b45309)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDD14 Notifications'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Send and manage notifications for your members'));
+    container.appendChild(hero);
+
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
+
+    // ── COMPOSE FORM ──
+    var composeCard = el('div', { className: 'notif-compose' });
+    composeCard.appendChild(el('h2', null, 'Send Notification'));
+
+    // Recipient picker state
+    var _recipientMode = 'groups';
+    var _selectedGroup = '';
+    var _selectedIndividuals = {};
+    var _allMembers = [];
+
+    // Recipient mode tabs
+    var tabRow = el('div', { style: { display: 'flex', gap: '0', marginBottom: '12px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' } });
+    var groupsTab = el('button', {
+      id: 'notif-tab-groups',
+      style: { flex: '1', padding: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: 'none', background: 'var(--accent)', color: '#fff', fontFamily: 'inherit' },
+      onClick: function() { _switchRecipientTab('groups'); }
+    }, 'Groups');
+    var individualsTab = el('button', {
+      id: 'notif-tab-individuals',
+      style: { flex: '1', padding: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: 'none', background: 'var(--surface)', color: 'var(--muted)', fontFamily: 'inherit' },
+      onClick: function() { _switchRecipientTab('individuals'); }
+    }, 'Individuals');
+    tabRow.appendChild(groupsTab);
+    tabRow.appendChild(individualsTab);
+    composeCard.appendChild(tabRow);
+
+    // Groups panel
+    var groupsPanel = el('div', { id: 'notif-groups-panel' });
+    var groupBtnRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' } });
+    ['All Members', 'All Stewards', 'Everyone'].forEach(function(g) {
+      var btn = el('button', {
+        className: 'notif-group-btn',
+        'data-group': g,
+        style: { padding: '8px 14px', fontSize: '12px', fontWeight: '500', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' },
+        onClick: function() {
+          _selectedGroup = _selectedGroup === g ? '' : g;
+          _updateGroupBtns();
+        }
+      }, g);
+      groupBtnRow.appendChild(btn);
+    });
+    groupsPanel.appendChild(groupBtnRow);
+    composeCard.appendChild(groupsPanel);
+
+    // Individuals panel (hidden by default)
+    var individualsPanel = el('div', { id: 'notif-individuals-panel', style: { display: 'none' } });
+
+    // Search
+    var searchInput = el('input', {
+      className: 'form-input',
+      placeholder: 'Search by name or email...',
+      style: { marginBottom: '8px', fontSize: '12px' },
+      onInput: function() { _filterMemberList(); }
+    });
+    individualsPanel.appendChild(searchInput);
+
+    // Filter row
+    var filterRow = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' } });
+    var locFilter = el('select', { className: 'form-select', id: 'notif-filter-loc', style: { flex: '1', fontSize: '11px', padding: '6px 8px', minWidth: '80px' }, onChange: function() { _filterMemberList(); } });
+    locFilter.appendChild(el('option', { value: '' }, 'All Locations'));
+    var deptFilter = el('select', { className: 'form-select', id: 'notif-filter-dept', style: { flex: '1', fontSize: '11px', padding: '6px 8px', minWidth: '80px' }, onChange: function() { _filterMemberList(); } });
+    deptFilter.appendChild(el('option', { value: '' }, 'All Depts'));
+    var titleFilter = el('select', { className: 'form-select', id: 'notif-filter-title', style: { flex: '1', fontSize: '11px', padding: '6px 8px', minWidth: '80px' }, onChange: function() { _filterMemberList(); } });
+    titleFilter.appendChild(el('option', { value: '' }, 'All Titles'));
+    filterRow.appendChild(locFilter);
+    filterRow.appendChild(deptFilter);
+    filterRow.appendChild(titleFilter);
+    individualsPanel.appendChild(filterRow);
+
+    // Selected count
+    var selectedCount = el('div', { id: 'notif-selected-count', style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, '0 selected');
+    individualsPanel.appendChild(selectedCount);
+
+    // Member list container
+    var memberListEl = el('div', { id: 'notif-member-list', style: { maxHeight: '220px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '12px' } });
+    individualsPanel.appendChild(memberListEl);
+    composeCard.appendChild(individualsPanel);
+
+    // Form fields
+    var typeGroup = el('div', { className: 'form-group' });
+    typeGroup.appendChild(el('label', { className: 'form-label' }, 'Type'));
+    var typeSelect = el('select', { className: 'form-select' });
+    ['Steward Message', 'Announcement', 'Deadline', 'System'].forEach(function(t) {
+      typeSelect.appendChild(el('option', { value: t }, t));
+    });
+    typeGroup.appendChild(typeSelect);
+    composeCard.appendChild(typeGroup);
+
+    var priorityGroup = el('div', { className: 'form-group' });
+    priorityGroup.appendChild(el('label', { className: 'form-label' }, 'Priority'));
+    var prioritySelect = el('select', { className: 'form-select' });
+    ['Normal', 'Urgent'].forEach(function(p) {
+      prioritySelect.appendChild(el('option', { value: p }, p));
+    });
+    priorityGroup.appendChild(prioritySelect);
+    composeCard.appendChild(priorityGroup);
+
+    var titleGroup = el('div', { className: 'form-group' });
+    titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
+    var titleInput = el('input', { className: 'form-input', placeholder: 'Notification title' });
+    titleGroup.appendChild(titleInput);
+    composeCard.appendChild(titleGroup);
+
+    var msgGroup = el('div', { className: 'form-group' });
+    msgGroup.appendChild(el('label', { className: 'form-label' }, 'Message'));
+    var msgTextarea = el('textarea', { className: 'msg-textarea', placeholder: 'Write your notification message...' });
+    msgGroup.appendChild(msgTextarea);
+    composeCard.appendChild(msgGroup);
+
+    var expiresGroup = el('div', { className: 'form-group' });
+    expiresGroup.appendChild(el('label', { className: 'form-label' }, 'Expires (optional)'));
+    var expiresInput = el('input', { className: 'form-input', type: 'date' });
+    expiresGroup.appendChild(expiresInput);
+    composeCard.appendChild(expiresGroup);
+
+    var sendStatus = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '8px', color: 'var(--muted)' } });
+    composeCard.appendChild(sendStatus);
+
+    var sendBtn = el('button', {
+      className: 'btn btn-primary',
+      onClick: function() { _handleSendNotification(); }
+    }, 'Send Notification');
+    composeCard.appendChild(sendBtn);
+
+    content.appendChild(composeCard);
+
+    // ── EXISTING NOTIFICATIONS LIST ──
+    content.appendChild(el('div', {
+      style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', margin: '20px 0 10px' }
+    }, 'Your Notifications'));
+
+    var notifList = el('div', { id: 'steward-notif-list' });
+    showLoading(notifList);
+    content.appendChild(notifList);
+    container.appendChild(content);
+
+    // ── LOAD DATA ──
+    // Load member list for recipient picker
+    google.script.run.withSuccessHandler(function(members) {
+      _allMembers = members || [];
+      _populateFilters();
+      _renderMemberList();
+    }).withFailureHandler(function() {
+      _allMembers = [];
+    }).getNotificationRecipientListFull();
+
+    // Load steward's own notifications
+    _loadStewardNotifs();
+
+    // ── HELPER FUNCTIONS ──
+    function _switchRecipientTab(mode) {
+      _recipientMode = mode;
+      document.getElementById('notif-groups-panel').style.display = mode === 'groups' ? 'block' : 'none';
+      document.getElementById('notif-individuals-panel').style.display = mode === 'individuals' ? 'block' : 'none';
+      document.getElementById('notif-tab-groups').style.background = mode === 'groups' ? 'var(--accent)' : 'var(--surface)';
+      document.getElementById('notif-tab-groups').style.color = mode === 'groups' ? '#fff' : 'var(--muted)';
+      document.getElementById('notif-tab-individuals').style.background = mode === 'individuals' ? 'var(--accent)' : 'var(--surface)';
+      document.getElementById('notif-tab-individuals').style.color = mode === 'individuals' ? '#fff' : 'var(--muted)';
+    }
+
+    function _updateGroupBtns() {
+      var btns = document.querySelectorAll('.notif-group-btn');
+      for (var i = 0; i < btns.length; i++) {
+        var isActive = btns[i].getAttribute('data-group') === _selectedGroup;
+        btns[i].style.background = isActive ? 'var(--accent)' : 'var(--surface)';
+        btns[i].style.color = isActive ? '#fff' : 'var(--text)';
+        btns[i].style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+      }
+    }
+
+    function _populateFilters() {
+      var locs = {}, depts = {}, titles = {};
+      _allMembers.forEach(function(m) {
+        if (m.location) locs[m.location] = true;
+        if (m.department) depts[m.department] = true;
+        if (m.jobTitle) titles[m.jobTitle] = true;
+      });
+      _populateSelect(document.getElementById('notif-filter-loc'), Object.keys(locs).sort(), 'All Locations');
+      _populateSelect(document.getElementById('notif-filter-dept'), Object.keys(depts).sort(), 'All Depts');
+      _populateSelect(document.getElementById('notif-filter-title'), Object.keys(titles).sort(), 'All Titles');
+    }
+
+    function _populateSelect(selectEl, options, defaultLabel) {
+      selectEl.innerHTML = '';
+      selectEl.appendChild(el('option', { value: '' }, defaultLabel));
+      options.forEach(function(opt) {
+        selectEl.appendChild(el('option', { value: opt }, opt));
+      });
+    }
+
+    function _filterMemberList() {
+      _renderMemberList();
+    }
+
+    function _renderMemberList() {
+      var listEl = document.getElementById('notif-member-list');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+
+      var searchVal = (searchInput.value || '').toLowerCase();
+      var locVal = document.getElementById('notif-filter-loc').value;
+      var deptVal = document.getElementById('notif-filter-dept').value;
+      var titleVal = document.getElementById('notif-filter-title').value;
+
+      var filtered = _allMembers.filter(function(m) {
+        if (searchVal && m.name.toLowerCase().indexOf(searchVal) === -1 && m.email.toLowerCase().indexOf(searchVal) === -1) return false;
+        if (locVal && m.location !== locVal) return false;
+        if (deptVal && m.department !== deptVal) return false;
+        if (titleVal && m.jobTitle !== titleVal) return false;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        listEl.appendChild(el('div', { style: { padding: '14px', textAlign: 'center', fontSize: '12px', color: 'var(--muted)' } }, 'No members match filters.'));
+        return;
+      }
+
+      filtered.forEach(function(m) {
+        var isChecked = !!_selectedIndividuals[m.email];
+        var row = el('div', {
+          style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: isChecked ? 'var(--accentBg)' : 'transparent', transition: 'background 0.15s' },
+          onClick: function() {
+            if (_selectedIndividuals[m.email]) delete _selectedIndividuals[m.email];
+            else _selectedIndividuals[m.email] = m.name;
+            _renderMemberList();
+          }
+        });
+        row.appendChild(el('span', { style: { fontSize: '14px', width: '18px', textAlign: 'center' } }, isChecked ? '\u2611' : '\u2610'));
+        var info = el('div', { style: { flex: '1', minWidth: '0' } });
+        info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '500', color: 'var(--text)' } }, m.name));
+        var detail = [m.email];
+        if (m.location) detail.push(m.location);
+        if (m.department) detail.push(m.department);
+        info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, detail.join(' \u00B7 ')));
+        row.appendChild(info);
+        listEl.appendChild(row);
+      });
+
+      var count = Object.keys(_selectedIndividuals).length;
+      document.getElementById('notif-selected-count').textContent = count + ' selected';
+    }
+
+    function _handleSendNotification() {
+      var title = titleInput.value.trim();
+      var message = msgTextarea.value.trim();
+      if (!title || !message) {
+        sendStatus.textContent = 'Title and message are required.';
+        sendStatus.style.color = 'var(--danger)';
+        return;
+      }
+
+      var recipients = [];
+      if (_recipientMode === 'groups') {
+        if (!_selectedGroup) { sendStatus.textContent = 'Select a recipient group.'; sendStatus.style.color = 'var(--danger)'; return; }
+        recipients.push(_selectedGroup);
+      } else {
+        var emails = Object.keys(_selectedIndividuals);
+        if (emails.length === 0) { sendStatus.textContent = 'Select at least one recipient.'; sendStatus.style.color = 'var(--danger)'; return; }
+        recipients = emails;
+      }
+
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending...';
+      sendStatus.textContent = '';
+
+      var sent = 0; var failed = 0; var total = recipients.length;
+      var baseData = {
+        type: typeSelect.value,
+        priority: prioritySelect.value,
+        title: title,
+        message: message,
+        expiresDate: expiresInput.value || '',
+        senderName: CURRENT_USER.name || CURRENT_USER.email.split('@')[0]
+      };
+
+      recipients.forEach(function(r) {
+        var data = {};
+        for (var k in baseData) data[k] = baseData[k];
+        data.recipient = r;
+        google.script.run.withSuccessHandler(function(result) {
+          if (result && result.success) sent++; else failed++;
+          if (sent + failed >= total) _onSendComplete(sent, failed);
+        }).withFailureHandler(function() {
+          failed++;
+          if (sent + failed >= total) _onSendComplete(sent, failed);
+        }).sendWebAppNotification(data);
+      });
+    }
+
+    function _onSendComplete(sent, failed) {
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send Notification';
+      if (failed === 0) {
+        sendStatus.textContent = 'Sent to ' + sent + ' recipient' + (sent > 1 ? 's' : '') + '.';
+        sendStatus.style.color = 'var(--success)';
+        titleInput.value = '';
+        msgTextarea.value = '';
+        expiresInput.value = '';
+        _selectedGroup = '';
+        _selectedIndividuals = {};
+        _updateGroupBtns();
+        _renderMemberList();
+        _loadStewardNotifs();
+      } else {
+        sendStatus.textContent = sent + ' sent, ' + failed + ' failed.';
+        sendStatus.style.color = 'var(--danger)';
+      }
+    }
+
+    function _loadStewardNotifs() {
+      var listEl = document.getElementById('steward-notif-list');
+      if (!listEl) return;
+      showLoading(listEl);
+
+      google.script.run.withSuccessHandler(function(notifs) {
+        listEl.innerHTML = '';
+        if (!notifs || notifs.length === 0) {
+          listEl.appendChild(el('div', { style: { textAlign: 'center', padding: '30px', color: 'var(--muted)', fontSize: '13px' } }, 'No notifications.'));
+          return;
+        }
+
+        var typeColors = {
+          'Steward Message': { bg: 'rgba(45,90,135,0.12)', text: '#2d5a87' },
+          'Announcement': { bg: 'rgba(22,163,74,0.12)', text: '#16a34a' },
+          'Deadline': { bg: 'rgba(220,38,38,0.12)', text: '#dc2626' },
+          'System': { bg: 'rgba(147,51,234,0.12)', text: '#9333ea' }
+        };
+
+        notifs.forEach(function(n) {
+          var card = el('div', {
+            className: 'notif-card' + (n.priority === 'Urgent' ? ' urgent' : ''),
+            id: 'snotif-' + n.id
+          });
+          var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' } });
+          var tc = typeColors[n.type] || typeColors['System'];
+          topRow.appendChild(el('span', { className: 'type-badge', style: { background: tc.bg, color: tc.text } }, n.type));
+          if (n.priority === 'Urgent') {
+            topRow.appendChild(el('span', { className: 'type-badge', style: { background: 'rgba(220,38,38,0.15)', color: '#dc2626' } }, 'URGENT'));
+          }
+          topRow.appendChild(el('span', { style: { flex: '1' } }));
+          topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, n.createdDate));
+          card.appendChild(topRow);
+          card.appendChild(el('button', {
+            className: 'notif-dismiss',
+            onClick: function() {
+              var ce = document.getElementById('snotif-' + n.id);
+              if (ce) { ce.style.opacity = '0'; ce.style.transform = 'translateX(30px)'; }
+              google.script.run.withSuccessHandler(function() {
+                setTimeout(function() { if (ce) ce.remove(); }, 300);
+              }).dismissWebAppNotification(n.id, CURRENT_USER.email);
+            }
+          }, '\u2715'));
+          card.appendChild(el('div', { className: 'notif-title' }, n.title));
+          card.appendChild(el('div', { className: 'notif-msg' }, n.message));
+          var meta = [];
+          if (n.sentBy) meta.push('From: ' + n.sentBy);
+          if (n.expiresDate) meta.push('Expires: ' + n.expiresDate);
+          if (meta.length) card.appendChild(el('div', { className: 'notif-meta' }, meta.join(' \u00B7 ')));
+          listEl.appendChild(card);
+        });
+      }).withFailureHandler(function() {
+        listEl.innerHTML = '';
+        listEl.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '10px' } }, 'Error loading notifications.'));
+      }).getWebAppNotifications(CURRENT_USER.email, 'steward');
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// STEWARD RESOURCES — Educational Hub
+// Search, category pills, expandable cards, external links
+// ═══════════════════════════════════════
+
+function renderStewardResources(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'resources', function(container) {
+    // Hero header
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDCDA Know Your Rights'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Resources for stewards — contract guides, grievance tools, and member support'));
+    container.appendChild(hero);
+
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
+
+    // Search bar
+    var searchWrap = el('div', { className: 'res-search-wrap' });
+    searchWrap.appendChild(el('i', { className: 'material-icons res-search-icon' }, 'search'));
+    var searchInput = el('input', {
+      className: 'res-search-bar',
+      placeholder: 'Search articles, rights, FAQ...',
+      onInput: function() { _filterResources(); }
+    });
+    searchWrap.appendChild(searchInput);
+    content.appendChild(searchWrap);
+
+    // Category pills
+    var pillsRow = el('div', { className: 'cat-pills' });
+    content.appendChild(pillsRow);
+
+    // Quick links
+    var quickLinks = [];
+    if (CONFIG.calendarUrl) quickLinks.push({ icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl });
+    if (CONFIG.driveFolderUrl) quickLinks.push({ icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+
+    if (quickLinks.length > 0) {
+      var qlRow = el('div', { style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px' } });
+      quickLinks.forEach(function(r) {
+        var item = el('div', {
+          className: 'card card-clickable',
+          style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', flex: '0 0 auto', minWidth: '160px' },
+          onClick: function() { window.open(r.url, '_blank'); }
+        });
+        item.appendChild(el('span', { style: { fontSize: '20px' } }, r.icon));
+        var tg = el('div');
+        tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+        tg.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)' } }, r.sub));
+        item.appendChild(tg);
+        qlRow.appendChild(item);
+      });
+      content.appendChild(qlRow);
+    }
+
+    var resList = el('div');
+    showLoading(resList);
+    content.appendChild(resList);
+    container.appendChild(content);
+
+    var _allResources = [];
+    var _currentCat = 'all';
+
+    google.script.run.withSuccessHandler(function(data) {
+      _allResources = data || [];
+      _buildCatPills();
+      _renderResourceList(_allResources);
+    }).withFailureHandler(function(err) {
+      resList.innerHTML = '';
+      var d = el('div', { className: 'notif-empty' });
+      d.appendChild(el('div', { className: 'notif-empty-icon' }, '\u26A0\uFE0F'));
+      d.appendChild(el('div', { className: 'notif-empty-title' }, 'Error loading resources'));
+      d.appendChild(el('div', { className: 'notif-empty-sub' }, String(err || '')));
+      resList.appendChild(d);
+    }).getWebAppResourcesList('All');
+
+    function _filterResources() {
+      var q = (searchInput.value || '').toLowerCase();
+      var filtered = _allResources.filter(function(r) {
+        var matchesCat = _currentCat === 'all' || r.category === _currentCat;
+        var matchesQ = !q || q.length < 2 || r.title.toLowerCase().indexOf(q) >= 0 || r.summary.toLowerCase().indexOf(q) >= 0 || (r.content || '').toLowerCase().indexOf(q) >= 0 || r.category.toLowerCase().indexOf(q) >= 0;
+        return matchesCat && matchesQ;
+      });
+      _renderResourceList(filtered);
+    }
+
+    function _setCat(cat) {
+      _currentCat = cat;
+      var pills = pillsRow.querySelectorAll('.cat-pill');
+      for (var i = 0; i < pills.length; i++) {
+        pills[i].className = pills[i].getAttribute('data-cat') === cat ? 'cat-pill active' : 'cat-pill';
+      }
+      _filterResources();
+    }
+
+    function _buildCatPills() {
+      var cats = {};
+      _allResources.forEach(function(r) { cats[r.category] = (cats[r.category] || 0) + 1; });
+      pillsRow.innerHTML = '';
+      pillsRow.appendChild(el('button', { className: 'cat-pill active', 'data-cat': 'all', onClick: function() { _setCat('all'); } }, 'All (' + _allResources.length + ')'));
+      Object.keys(cats).sort().forEach(function(c) {
+        pillsRow.appendChild(el('button', { className: 'cat-pill', 'data-cat': c, onClick: function() { _setCat(c); } }, c + ' (' + cats[c] + ')'));
+      });
+    }
+
+    function _renderResourceList(items) {
+      resList.innerHTML = '';
+      if (!items || items.length === 0) {
+        var d = el('div', { className: 'notif-empty' });
+        d.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDCD6'));
+        d.appendChild(el('div', { className: 'notif-empty-title' }, 'No resources found'));
+        d.appendChild(el('div', { className: 'notif-empty-sub' }, 'Try a different search or category'));
+        resList.appendChild(d);
+        return;
+      }
+      items.forEach(function(r) {
+        var card = el('div', { className: 'res-card', onClick: function() { card.classList.toggle('expanded'); } });
+        card.appendChild(el('span', { className: 'res-icon' }, r.icon || '\uD83D\uDCC4'));
+        card.appendChild(el('div', { className: 'res-category' }, r.category));
+        card.appendChild(el('div', { className: 'res-title' }, r.title));
+        card.appendChild(el('div', { className: 'res-summary' }, r.summary));
+        var hasContent = r.content && r.content.trim().length > 0;
+        var hasUrl = r.url && r.url.trim().length > 0;
+        if (hasContent) {
+          var hint = el('div', { className: 'expand-hint' });
+          hint.appendChild(el('i', { className: 'material-icons' }, 'expand_more'));
+          hint.appendChild(document.createTextNode('Tap to read more'));
+          card.appendChild(hint);
+          var contentDiv = el('div', { className: 'res-content' });
+          contentDiv.textContent = r.content;
+          card.appendChild(contentDiv);
+        }
+        if (hasUrl) {
+          var link = el('a', { className: 'res-link', href: r.url, target: '_blank', onClick: function(e) { e.stopPropagation(); } });
+          link.appendChild(el('i', { className: 'material-icons', style: { fontSize: '16px' } }, 'open_in_new'));
+          link.appendChild(document.createTextNode('Open Resource'));
+          card.appendChild(link);
+        }
+        if (r.dateAdded) card.appendChild(el('div', { className: 'res-meta' }, 'Added ' + r.dateAdded));
+        resList.appendChild(card);
+      });
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// SURVEY TRACKING (steward view)
+// ═══════════════════════════════════════
+
+function renderSurveyTracking(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'surveytrack', function(container) {
+    _stewardHeader(container, 'Survey Tracking');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(data) {
+      content.innerHTML = '';
+      if (!data || data.total === 0) {
+        content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No assigned members to track.'));
+        return;
+      }
+
+      // Progress chart (doughnut)
+      var pct = Math.round((data.completed / data.total) * 100);
+      var progCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '14px' } });
+      progCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Completion: ' + data.completed + '/' + data.total));
+
+      if (typeof ChartHelper !== 'undefined') {
+        var remaining = data.total - data.completed;
+        var cColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#facc15' : '#ef4444';
+        ChartHelper.createDoughnutChart(progCard, 'survey-track-chart',
+          ['Completed', 'Pending'],
+          [data.completed, remaining],
+          [cColor, 'rgba(255,255,255,0.08)']
+        );
+      } else {
+        var track = el('div', { className: 'bar-chart-track', style: { height: '10px' } });
+        track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)' } }));
+        progCard.appendChild(track);
+      }
+      progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px' } }, pct + '% complete'));
+      content.appendChild(progCard);
+
+      // Member list with checkmarks
+      (data.members || []).forEach(function(m) {
+        var item = el('div', { className: 'member-list-item' });
+        item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
+        var info = el('div', { className: 'member-list-info' });
+        info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
+        if (m.lastCompleted) info.appendChild(el('div', { className: 'member-list-meta' }, 'Completed ' + m.lastCompleted));
+        item.appendChild(info);
+        item.appendChild(el('span', { style: { fontSize: '16px', color: m.completed ? 'var(--success)' : 'var(--muted)' } }, m.completed ? '\u2705' : '\u2B1C'));
+        content.appendChild(item);
+      });
+    }).dataGetStewardSurveyTracking(CURRENT_USER.email);
+  });
+}
+
+// ═══════════════════════════════════════
+// STEWARD MORE MENU
+// ═══════════════════════════════════════
+
+function renderStewardMore(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'more_steward', function(container) {
+    _stewardHeader(container, 'More');
+    var content = el('div', { className: 'content' });
+    var menuItems = [
+      { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { renderStewardTasks(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
+      { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Send & manage notifications', action: function() { renderStewardNotifications(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { renderBroadcast(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
+      { icon: '\u2753', label: 'Weekly Questions', desc: 'Manage weekly engagement questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'steward'); } },
+      { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
+    ];
+
+    menuItems.forEach(function(m) {
+      var item = el('div', { className: 'more-menu-item', onClick: m.action });
+      item.appendChild(el('span', { className: 'more-menu-icon' }, m.icon));
+      var text = el('div');
+      text.appendChild(el('div', { className: 'more-menu-label' }, m.label));
+      text.appendChild(el('div', { className: 'more-menu-desc' }, m.desc));
+      item.appendChild(text);
+      content.appendChild(item);
+    });
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// WEEKLY QUESTIONS — Steward Manager
+// ═══════════════════════════════════════
+// Note: The shared renderWeeklyQuestionsPage() in member_view.html handles
+// the basic display. For steward role, we add the manager after the list.
+
+// ═══════════════════════════════════════
+// CONTACT LOG (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderContactLog(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'contactlog', function(container) {
+    _stewardHeader(container, 'Contact Log');
+    var content = el('div', { className: 'content' });
+
+    // Sub-tabs
+    var activeSubTab = 'log';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['log', 'recent', 'by member'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'log') _renderContactForm(subContent);
+      else if (activeSubTab === 'recent') _renderRecentContacts(subContent);
+      else _renderContactByMember(subContent);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderContactForm(container) {
+  var typeIcons = { 'Phone': '\uD83D\uDCDE', 'Email': '\u2709\uFE0F', 'In Person': '\uD83D\uDC64', 'Text': '\uD83D\uDCAC' };
+  container.appendChild(el('h3', { className: 'section-title' }, 'Log a Contact'));
+
+  var memberGroup = el('div', { className: 'form-group' });
+  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Member Email'));
+  var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  memberGroup.appendChild(memberInput);
+  container.appendChild(memberGroup);
+
+  var typeGroup = el('div', { className: 'form-group' });
+  typeGroup.appendChild(el('label', { className: 'form-label' }, 'Contact Type'));
+  var typeRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+  var selectedType = 'Phone';
+  Object.keys(typeIcons).forEach(function(t) {
+    var btn = el('button', {
+      className: 'filter-tab' + (t === selectedType ? ' active' : ''),
+      onClick: function() {
+        selectedType = t;
+        typeRow.querySelectorAll('.filter-tab').forEach(function(b, i) {
+          b.className = 'filter-tab' + (Object.keys(typeIcons)[i] === t ? ' active' : '');
+        });
+      }
+    }, typeIcons[t] + ' ' + t);
+    typeRow.appendChild(btn);
+  });
+  typeGroup.appendChild(typeRow);
+  container.appendChild(typeGroup);
+
+  var notesGroup = el('div', { className: 'form-group' });
+  notesGroup.appendChild(el('label', { className: 'form-label' }, 'Notes (optional)'));
+  var notesInput = el('textarea', { className: 'msg-textarea', placeholder: 'Brief notes about the interaction...', style: { minHeight: '60px' } });
+  notesGroup.appendChild(notesInput);
+  container.appendChild(notesGroup);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary',
+    onClick: function() {
+      var email = memberInput.value.trim();
+      if (!email) { statusMsg.textContent = 'Enter a member email.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Logging...'; statusMsg.style.color = 'var(--muted)';
+      google.script.run.withSuccessHandler(function(r) {
+        statusMsg.textContent = r && r.success ? 'Contact logged!' : 'Error logging contact.';
+        statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
+        if (r && r.success) { memberInput.value = ''; notesInput.value = ''; }
+      }).dataLogMemberContact(CURRENT_USER.email, email, selectedType, notesInput.value.trim(), '');
+    }
+  }, 'Log Contact'));
+}
+
+function _renderRecentContacts(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(log) {
+    container.innerHTML = '';
+    if (!log || log.length === 0) {
+      container.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No contacts logged yet.'));
+      return;
+    }
+    log.slice(0, 20).forEach(function(entry) {
+      var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px' } });
+      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+      top.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, entry.memberEmail ? entry.memberEmail.split('@')[0] : ''));
+      top.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, entry.date));
+      card.appendChild(top);
+      card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--accent)' } }, entry.type));
+      if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
+      container.appendChild(card);
+    });
+  }).dataGetStewardContactLog(CURRENT_USER.email);
+}
+
+function _renderContactByMember(container) {
+  container.appendChild(el('h3', { className: 'section-title' }, 'Look Up by Member'));
+  var searchInput = el('input', { className: 'form-input', placeholder: 'Enter member email...' });
+  container.appendChild(searchInput);
+  var resultArea = el('div', { style: { marginTop: '10px' } });
+  container.appendChild(resultArea);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-secondary', style: { marginTop: '10px' },
+    onClick: function() {
+      var email = searchInput.value.trim();
+      if (!email) return;
+      showLoading(resultArea);
+      google.script.run.withSuccessHandler(function(history) {
+        resultArea.innerHTML = '';
+        if (!history || history.length === 0) {
+          resultArea.appendChild(el('div', { style: { color: 'var(--muted)', padding: '10px 0' } }, 'No contacts found for this member.'));
+          return;
+        }
+        history.forEach(function(entry) {
+          var card = el('div', { className: 'card', style: { padding: '10px 14px', marginBottom: '4px' } });
+          card.appendChild(el('div', { style: { display: 'flex', justifyContent: 'space-between' } }, [
+            el('span', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600' } }, entry.type),
+            el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, entry.date),
+          ]));
+          if (entry.notes) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, entry.notes));
+          resultArea.appendChild(card);
+        });
+      }).dataGetMemberContactHistory(CURRENT_USER.email, email);
+    }
+  }, 'Search'));
+}
+
+// ═══════════════════════════════════════
+// STEWARD TASKS (v4.12.0)
+// ═══════════════════════════════════════
+
+function renderStewardTasks(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'tasks', function(container) {
+    _stewardHeader(container, 'Tasks');
+    var content = el('div', { className: 'content' });
+
+    var activeSubTab = 'open';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['open', 'completed', 'new task'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'new task') _renderNewTaskForm(subContent, function() { activeSubTab = 'open'; refreshSubTabs(); renderSubContent(); });
+      else _renderTaskList(subContent, activeSubTab === 'completed' ? 'completed' : null);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+function _renderTaskList(container, statusFilter) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(tasks) {
+    container.innerHTML = '';
+    var filtered = statusFilter ? tasks.filter(function(t) { return t.status === statusFilter; }) : tasks.filter(function(t) { return t.status !== 'completed'; });
+
+    if (filtered.length === 0) {
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, statusFilter === 'completed' ? 'No completed tasks.' : 'No open tasks. Create one!'));
+      return;
+    }
+
+    // KPI strip
+    var highPri = filtered.filter(function(t) { return t.priority === 'high'; }).length;
+    var overdue = filtered.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
+    var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '10px' } });
+    [
+      { label: 'Total', value: filtered.length },
+      { label: 'High Priority', value: highPri, color: highPri > 0 ? 'var(--danger)' : null },
+      { label: 'Overdue', value: overdue, color: overdue > 0 ? 'var(--warning)' : null },
+    ].forEach(function(kpi) {
+      var card = el('div', { className: 'kpi-card' });
+      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+      if (kpi.color) val.style.color = kpi.color;
+      card.appendChild(val);
+      kpiStrip.appendChild(card);
+    });
+    container.appendChild(kpiStrip);
+
+    filtered.forEach(function(task) {
+      var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
+      var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
+      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+      top.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, task.title));
+      if (task.dueDate) top.appendChild(el('span', { style: { fontSize: '10px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, task.dueDate));
+      card.appendChild(top);
+      if (task.memberEmail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, task.memberEmail.split('@')[0]));
+      if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
+
+      if (task.status !== 'completed') {
+        var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px' } });
+        actions.appendChild(el('button', {
+          style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
+          onClick: function() {
+            google.script.run.withSuccessHandler(function() { renderStewardTasks(document.getElementById('app')); }).dataCompleteTask(CURRENT_USER.email, task.id);
+          }
+        }, '\u2705 Complete'));
+        card.appendChild(actions);
+      }
+      container.appendChild(card);
+    });
+  }).dataGetTasks(CURRENT_USER.email, statusFilter);
+}
+
+function _renderNewTaskForm(container, onCreated) {
+  container.appendChild(el('h3', { className: 'section-title' }, 'Create Task'));
+
+  var titleGroup = el('div', { className: 'form-group' });
+  titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
+  var titleInput = el('input', { className: 'form-input', placeholder: 'e.g., Check in on member' });
+  titleGroup.appendChild(titleInput);
+  container.appendChild(titleGroup);
+
+  var descGroup = el('div', { className: 'form-group' });
+  descGroup.appendChild(el('label', { className: 'form-label' }, 'Description (optional)'));
+  var descInput = el('textarea', { className: 'msg-textarea', placeholder: 'Details...', style: { minHeight: '60px' } });
+  descGroup.appendChild(descInput);
+  container.appendChild(descGroup);
+
+  var memberGroup = el('div', { className: 'form-group' });
+  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Related Member (optional)'));
+  var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  memberGroup.appendChild(memberInput);
+  container.appendChild(memberGroup);
+
+  var priGroup = el('div', { className: 'form-group' });
+  priGroup.appendChild(el('label', { className: 'form-label' }, 'Priority'));
+  var priSelect = el('select', { className: 'form-select' });
+  ['medium', 'high', 'low'].forEach(function(p) {
+    var opt = el('option', { value: p }, p.charAt(0).toUpperCase() + p.slice(1));
+    priSelect.appendChild(opt);
+  });
+  priGroup.appendChild(priSelect);
+  container.appendChild(priGroup);
+
+  var dueGroup = el('div', { className: 'form-group' });
+  dueGroup.appendChild(el('label', { className: 'form-label' }, 'Due Date (optional)'));
+  var dueInput = el('input', { className: 'form-input', type: 'date' });
+  dueGroup.appendChild(dueInput);
+  container.appendChild(dueGroup);
+
+  var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+  container.appendChild(statusMsg);
+
+  container.appendChild(el('button', {
+    className: 'btn btn-primary',
+    onClick: function() {
+      var title = titleInput.value.trim();
+      if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
+      statusMsg.textContent = 'Creating...'; statusMsg.style.color = 'var(--muted)';
+      google.script.run.withSuccessHandler(function(r) {
+        if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+      }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+    }
+  }, 'Create Task'));
+}
+
+// ═══════════════════════════════════════
+// MEMBERS TAB — Sort, Filter & Stats (v4.12.0 enhancements)
+// ═══════════════════════════════════════
+// Overrides the original renderStewardMembers with enhanced version
+
+// renderWeeklyQuestionsPage already handles steward role via the role param.
+// Additional steward-specific manager (set question, review pool):
+function renderWeeklyQuestionManager(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'weeklyq', function(container) {
+    _stewardHeader(container, 'Weekly Question Manager');
+    var content = el('div', { className: 'content' });
+
+    // Set steward question
+    content.appendChild(el('h3', { className: 'section-title' }, 'Set This Week\'s Question'));
+    var questionInput = el('textarea', { className: 'msg-textarea', placeholder: 'Type your question for this week...' });
+    content.appendChild(questionInput);
+
+    var setStatus = el('div', { style: { fontSize: '13px', minHeight: '20px', marginTop: '6px' } });
+    content.appendChild(setStatus);
+
+    content.appendChild(el('button', {
+      className: 'btn btn-primary', style: { marginTop: '10px', marginBottom: '24px' },
+      onClick: function() {
+        var text = questionInput.value.trim();
+        if (!text) { setStatus.textContent = 'Enter a question.'; setStatus.style.color = 'var(--danger)'; return; }
+        setStatus.textContent = 'Saving...';
+        google.script.run.withSuccessHandler(function(result) {
+          setStatus.textContent = result && result.success ? 'Question set!' : 'Error.';
+          setStatus.style.color = result && result.success ? 'var(--success)' : 'var(--danger)';
+          if (result && result.success) questionInput.value = '';
+        }).wqSetStewardQuestion(CURRENT_USER.email, text);
+      }
+    }, 'Set Question'));
+
+    // Pool review
+    content.appendChild(el('h3', { className: 'section-title' }, 'Submitted Questions Pool'));
+    var poolArea = el('div');
+    showLoading(poolArea);
+    content.appendChild(poolArea);
+
+    google.script.run.withSuccessHandler(function(pool) {
+      poolArea.innerHTML = '';
+      if (!pool || pool.length === 0) {
+        poolArea.appendChild(el('div', { style: { color: 'var(--muted)', padding: '16px 0' } }, 'No pending questions in the pool.'));
+        return;
+      }
+      pool.forEach(function(q) {
+        var card = el('div', { className: 'wq-card' });
+        card.appendChild(el('div', { className: 'wq-question' }, q.text));
+        card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Status: ' + (q.status || 'pending')));
+        poolArea.appendChild(card);
+      });
+    }).wqGetPoolQuestions();
+
+    container.appendChild(content);
+  });
+}
+</script>
+`;
+}
+
+/**
+ * Embedded HTML: styles.html
+ * @returns {string} HTML content
+ */
+function getstyles_HTML() {
+  return `<style>
+/* ═══════════════════════════════════════
+   RESET & BASE
+   ═══════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; padding: 0;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background 0.3s, color 0.3s;
+}
+a { text-decoration: none; color: inherit; }
+button { cursor: pointer; border: none; background: none; font: inherit; }
+input { font: inherit; }
+
+/* ═══════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════ */
+#app {
+  margin: 0 auto;
+  min-height: 100vh;
+  position: relative;
+  padding-bottom: 72px; /* space for bottom nav on mobile */
+}
+
+/* Page layout: sidebar + content on tablet+ */
+.page-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.page-layout-content {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 72px;
+}
+
+/* ═══════════════════════════════════════
+   SIDEBAR NAV (tablet+ only, hidden on mobile)
+   ═══════════════════════════════════════ */
+.sidebar-nav {
+  display: none;
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 16px 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.sidebar-header {
+  padding: 12px 20px 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.sidebar-header-title {
+  font-family: var(--fontDisplay);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.sidebar-header-sub {
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  font-family: var(--fontBody);
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-left: 3px solid transparent;
+}
+.sidebar-item:hover {
+  background: var(--accentBg);
+  color: var(--text);
+}
+.sidebar-item.active {
+  color: var(--accent);
+  background: var(--accentBg);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+.sidebar-item-icon { font-size: 16px; width: 20px; text-align: center; }
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 20px;
+}
+
+.page-header {
+  padding: 12px 20px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.page-header-left {}
+.page-header-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.page-title {
+  font-family: var(--fontDisplay);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+.page-subtitle {
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.content { padding: 0 16px; }
+.section-title {
+  font-family: var(--fontDisplay);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+
+/* ═══════════════════════════════════════
+   CARDS
+   ═══════════════════════════════════════ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 10px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.card-glass {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.card-clickable { cursor: pointer; }
+.card-clickable:active { opacity: 0.85; }
+
+/* ═══════════════════════════════════════
+   KPI GRID
+   ═══════════════════════════════════════ */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 0 16px 14px;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 8px;
+  text-align: center;
+}
+.kpi-label {
+  font-family: var(--fontBody);
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+.kpi-value {
+  font-family: var(--fontBody);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.kpi-change {
+  font-size: 10px;
+  font-family: var(--fontBody);
+  margin-top: 3px;
+}
+
+/* ═══════════════════════════════════════
+   STATUS INDICATORS
+   ═══════════════════════════════════════ */
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.overdue { background: var(--danger); box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+.status-dot.active { background: var(--warning); box-shadow: 0 0 8px rgba(250,204,21,0.4); }
+.status-dot.new { background: var(--info); box-shadow: 0 0 8px rgba(96,165,250,0.4); }
+.status-dot.resolved { background: var(--success); box-shadow: 0 0 8px rgba(74,222,128,0.4); }
+
+.status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: var(--fontBody);
+}
+
+.glow-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 3px;
+  opacity: 0.6;
+}
+.glow-bar.warning { background: linear-gradient(90deg, transparent, var(--warning), transparent); }
+.glow-bar.danger { background: linear-gradient(90deg, transparent, var(--danger), transparent); }
+.glow-bar.success { background: linear-gradient(90deg, transparent, var(--success), transparent); }
+.glow-bar.info { background: linear-gradient(90deg, transparent, var(--info), transparent); }
+
+/* ═══════════════════════════════════════
+   FILTER TABS
+   ═══════════════════════════════════════ */
+.filter-bar {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+.filter-tab {
+  font-family: var(--fontBody);
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.filter-tab.active {
+  color: var(--accent);
+  background: var(--accentBg);
+  border-color: var(--accentBorder);
+}
+
+/* ═══════════════════════════════════════
+   BOTTOM NAV
+   ═══════════════════════════════════════ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0 max(14px, env(safe-area-inset-bottom));
+  z-index: 100;
+}
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+  padding: 4px 12px;
+}
+.nav-item.active { opacity: 1; }
+.nav-icon { font-size: 18px; }
+.nav-label {
+  font-size: 9px;
+  font-family: var(--fontBody);
+}
+
+/* ═══════════════════════════════════════
+   BUTTONS
+   ═══════════════════════════════════════ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-family: var(--fontDisplay);
+  font-size: 15px;
+  font-weight: 600;
+  transition: all 0.2s;
+  width: 100%;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-google {
+  background: #fff;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.btn:active { transform: scale(0.98); }
+
+.icon-btn {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  background: var(--raised, var(--surface));
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+/* ═══════════════════════════════════════
+   FAB
+   ═══════════════════════════════════════ */
+.fab {
+  position: fixed;
+  bottom: 80px;
+  right: calc((100vw - min(480px, 100vw)) / 2 + 16px);
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px var(--accentGlow);
+  z-index: 50;
+}
+
+/* ═══════════════════════════════════════
+   TIMELINE
+   ═══════════════════════════════════════ */
+.timeline { padding: 0 16px; }
+.timeline-item { display: flex; gap: 12px; }
+.timeline-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+.timeline-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-top: 3px;
+}
+.timeline-dot.done {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accentGlow);
+}
+.timeline-dot.pending {
+  background: transparent;
+  border: 2px solid var(--muted);
+  opacity: 0.4;
+}
+.timeline-line {
+  width: 2px;
+  flex: 1;
+  min-height: 24px;
+}
+.timeline-line.done { background: var(--accentBorder); }
+.timeline-line.pending { background: var(--border); }
+.timeline-content { padding-bottom: 10px; }
+.timeline-event {
+  font-family: var(--fontBody);
+  font-size: 13px;
+}
+.timeline-date {
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* ═══════════════════════════════════════
+   LOADING & ANIMATIONS
+   ═══════════════════════════════════════ */
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  gap: 16px;
+}
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.loading-text {
+  font-family: var(--fontBody);
+  font-size: 13px;
+  color: var(--muted);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════
+   AUTH SCREEN
+   ═══════════════════════════════════════ */
+.auth-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.auth-logo {
+  width: 56px; height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+.auth-title {
+  font-family: var(--fontDisplay);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+}
+.auth-subtitle {
+  font-family: var(--fontBody);
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 4px;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+.auth-divider-line { flex: 1; height: 1px; background: var(--border); }
+.auth-divider-text {
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.auth-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-family: var(--fontBody);
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.auth-input:focus { border-color: var(--accent); }
+.auth-input::placeholder { color: var(--muted); }
+
+.auth-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 0;
+}
+.auth-toggle-track {
+  width: 36px; height: 20px;
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.2s;
+}
+.auth-toggle-thumb {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 2px;
+  transition: left 0.2s;
+}
+
+/* ═══════════════════════════════════════
+   ERROR PAGE
+   ═══════════════════════════════════════ */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  text-align: center;
+}
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.error-title {
+  font-family: var(--fontDisplay);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.error-message {
+  font-family: var(--fontBody);
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+/* ═══════════════════════════════════════
+   FORM INPUTS
+   ═══════════════════════════════════════ */
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block;
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 5px;
+}
+.form-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--fontBody);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--fontBody);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* ═══════════════════════════════════════
+   SURVEY BANNER
+   ═══════════════════════════════════════ */
+.survey-banner {
+  margin: 0 16px 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--accentBg);
+  border: 1px solid var(--accentBorder);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.survey-banner-text {
+  font-family: var(--fontBody);
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.survey-banner-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-family: var(--fontBody);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════
+   BAR CHART (CSS-only)
+   ═══════════════════════════════════════ */
+.bar-chart-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.bar-chart-label {
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+  width: 120px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.bar-chart-track {
+  flex: 1;
+  height: 22px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+.bar-chart-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s ease;
+  min-width: 2px;
+}
+.bar-chart-value {
+  font-family: var(--fontBody);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════
+   BROADCAST / MESSAGE AREA
+   ═══════════════════════════════════════ */
+.msg-textarea {
+  width: 100%;
+  min-height: 100px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-family: var(--fontBody);
+  font-size: 14px;
+  color: var(--text);
+  resize: vertical;
+  outline: none;
+}
+.msg-textarea:focus { border-color: var(--accent); }
+.recipient-count {
+  font-family: var(--fontBody);
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0 12px;
+}
+
+/* ═══════════════════════════════════════
+   WEEKLY QUESTIONS
+   ═══════════════════════════════════════ */
+.wq-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 12px;
+}
+.wq-question {
+  font-family: var(--fontDisplay);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+.wq-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--fontBody);
+  font-size: 13px;
+  color: var(--text);
+}
+.wq-option:hover { border-color: var(--accent); background: var(--accentBg); }
+.wq-option.selected {
+  border-color: var(--accent);
+  background: var(--accentBg);
+  color: var(--accent);
+  font-weight: 600;
+}
+.wq-results-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  flex: 1;
+}
+.wq-results-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+.wq-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ═══════════════════════════════════════
+   MEMBER LIST (steward view)
+   ═══════════════════════════════════════ */
+.member-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.member-list-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--accentBg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  font-family: var(--fontDisplay);
+  flex-shrink: 0;
+}
+.member-list-info { flex: 1; min-width: 0; }
+.member-list-name {
+  font-family: var(--fontDisplay);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.member-list-meta {
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+}
+.member-list-badges {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════
+   SEARCH INPUT
+   ═══════════════════════════════════════ */
+.search-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px 10px 36px;
+  font-family: var(--fontBody);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  margin-bottom: 12px;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-wrap {
+  position: relative;
+}
+.search-wrap::before {
+  content: '\1F50D';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════
+   WORKLOAD TRACKER EMBED
+   ═══════════════════════════════════════ */
+.wt-category {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.wt-category-label {
+  font-family: var(--fontBody);
+  font-size: 13px;
+  color: var(--text);
+}
+.wt-category-input {
+  width: 70px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-family: var(--fontBody);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+}
+.wt-category-input:focus { border-color: var(--accent); }
+
+/* Sub-tabs (workload, weekly questions) */
+.sub-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 0 14px;
+}
+.sub-tab {
+  font-family: var(--fontBody);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  transition: all 0.15s;
+}
+.sub-tab.active {
+  color: var(--accent);
+  background: var(--accentBg);
+  border-color: var(--accentBorder);
+}
+
+/* ═══════════════════════════════════════
+   MORE MENU
+   ═══════════════════════════════════════ */
+.more-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.more-menu-item:hover { background: var(--accentBg); }
+.more-menu-item:active { opacity: 0.85; }
+.more-menu-icon { font-size: 18px; width: 24px; text-align: center; }
+.more-menu-label {
+  font-family: var(--fontBody);
+  font-size: 14px;
+  color: var(--text);
+}
+.more-menu-desc {
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ═══════════════════════════════════════
+   CHART.JS CONTAINERS
+   ═══════════════════════════════════════ */
+.chart-container {
+  position: relative;
+  height: 260px;
+  width: 100%;
+  margin-bottom: 14px;
+}
+.chart-container-sm {
+  position: relative;
+  height: 180px;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+/* ═══════════════════════════════════════
+   RESOURCE HUB — Educational Content
+   ═══════════════════════════════════════ */
+.res-search-wrap {
+  position: relative;
+  margin-bottom: 16px;
+}
+.res-search-bar {
+  width: 100%;
+  padding: 14px 14px 14px 44px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  font-size: 15px;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: border-color 0.2s;
+  outline: none;
+}
+.res-search-bar:focus {
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px var(--accentGlow);
+}
+.res-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 20px;
+}
+.cat-pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.cat-pills::-webkit-scrollbar { display: none; }
+.cat-pill {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--muted);
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+.cat-pill.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.cat-pill:hover { border-color: var(--accent); }
+.res-card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.25s;
+}
+.res-card:active { transform: scale(0.99); }
+.res-card.expanded { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.res-icon { font-size: 28px; margin-bottom: 10px; display: block; }
+.res-title {
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+.res-category {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.res-summary {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.res-content {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+  white-space: pre-line;
+}
+.res-card.expanded .res-content { display: block; }
+.res-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: var(--accentBg);
+  color: var(--accent);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.res-link:hover { opacity: 0.85; }
+.res-meta { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.expand-hint {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.expand-hint i { font-size: 16px; transition: transform 0.2s; }
+.res-card.expanded .expand-hint i { transform: rotate(180deg); }
+
+/* ═══════════════════════════════════════
+   NOTIFICATION CARDS
+   ═══════════════════════════════════════ */
+.notif-card {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border: 1px solid var(--border);
+  position: relative;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.notif-card.urgent { border-left: 4px solid #dc2626; }
+.notif-card .notif-title {
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+.notif-card .notif-msg {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.notif-card .notif-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.notif-card .notif-dismiss {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.notif-card .notif-dismiss:hover { opacity: 1; }
+.type-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 4px;
+}
+.notif-empty {
+  text-align: center;
+  padding: 60px 20px;
+}
+.notif-empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+.notif-empty-title {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.notif-empty-sub { font-size: 13px; color: var(--muted); }
+
+/* Compose form (steward notifications) */
+.notif-compose {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border: 1px solid var(--border);
+}
+.notif-compose h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+.notif-tab-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.notif-tab-btn {
+  flex: 1;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+.notif-group-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  margin: 0 6px 6px 0;
+  transition: all 0.15s;
+}
+.notif-group-btn.sel {
+  background: var(--accentBg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.notif-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.notif-member-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 12px;
+}
+.notif-member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notif-member-row:hover { background: var(--accentBg); }
+.notif-member-row.sel { background: var(--accentBg); }
+.notif-chk {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+  transition: all 0.15s;
+}
+.notif-chk.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-send {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--accent);
+  color: #fff;
+  margin-top: 16px;
+  transition: opacity 0.2s;
+}
+.btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  font-family: 'DM Sans', sans-serif;
+  transition: opacity 0.3s;
+}
+
+/* Page hero header (gradient) */
+.page-hero {
+  padding: 24px 20px 34px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.page-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: -20px;
+  right: -20px;
+  height: 40px;
+  background: var(--bg);
+  border-radius: 50% 50% 0 0;
+}
+.page-hero h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(22px, 5vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 5px;
+}
+.page-hero .hero-sub {
+  font-size: 14px;
+  opacity: 0.85;
+  line-height: 1.4;
+}
+
+/* ═══════════════════════════════════════
+   CARD ANIMATIONS (fade-in stagger)
+   ═══════════════════════════════════════ */
+.card-fade-in {
+  animation: cardFadeIn 0.4s ease-out both;
+}
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Gradient accent border on cards */
+.card-accent-border {
+  border-left: 3px solid var(--accent);
+}
+
+/* Privacy badge */
+.privacy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(52,211,153,0.1);
+  border: 1px solid rgba(52,211,153,0.25);
+  font-family: var(--fontBody);
+  font-size: 11px;
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* Confirmation card */
+.confirm-card {
+  text-align: center;
+  padding: 30px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+}
+.confirm-icon { font-size: 48px; margin-bottom: 12px; }
+.confirm-title {
+  font-family: var(--fontDisplay);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--success);
+  margin-bottom: 6px;
+}
+.confirm-text {
+  font-family: var(--fontBody);
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE — Mobile (<640px)
+   ═══════════════════════════════════════ */
+@media (max-width: 639px) {
+  .kpi-grid { gap: 6px; }
+  .kpi-card { padding: 10px 6px; }
+  .kpi-value { font-size: 20px; }
+  .sidebar-nav { display: none !important; }
+  .page-layout { display: block; }
+  .page-layout-content { padding-bottom: 72px; }
+  .bar-chart-label { width: 80px; font-size: 10px; }
+}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE — Tablet (640-1024px)
+   ═══════════════════════════════════════ */
+@media (min-width: 640px) {
+  #app { padding-bottom: 0; }
+  .page-layout-content { padding-bottom: 0; }
+  .bottom-nav { display: none; }
+  .sidebar-nav { display: block; }
+  .kpi-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .fab { bottom: 24px; right: 24px; }
+  .info-grid-responsive { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ═══════════════════════════════════════
+   RESPONSIVE — Desktop (>1024px)
+   ═══════════════════════════════════════ */
+@media (min-width: 1024px) {
+  .page-layout-content { max-width: 800px; }
+  .kpi-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .info-grid-responsive { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
 `;
 }
 

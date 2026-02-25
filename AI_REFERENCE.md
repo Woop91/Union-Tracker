@@ -284,3 +284,19 @@ Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Nam
 6. **Deploy with `npm run deploy`** (includes lint + test + prod build + clasp push).
 7. **Current file size is 2.4MB / 6MB limit.** If adding major features, monitor growth.
 8. **The `doGet()` function is in `src/04e_PublicDashboard.gs`** (or check `src/` files for the source location).
+
+### v4.12.2 — SPA Port + Theme Overhaul (2026-02-25)
+**SPA files added to DDS-Dashboard:**
+- src/19_WebDashAuth.gs (315 lines) — Google SSO + magic link auth
+- src/20_WebDashConfigReader.gs (158 lines) — Config reader with CacheService
+- src/21_WebDashDataService.gs (1263 lines) — Data access layer
+- src/22_WebDashApp.gs (192 lines) — SPA entry point (doGetWebDashboard)
+- src/23_PortalSheets.gs (168 lines) — Portal sheet setup
+- src/24_WeeklyQuestions.gs (407 lines) — Weekly engagement system
+- src/auth_view.html, error_view.html, index.html, member_view.html, steward_view.html, styles.html
+
+**Theme:** DM Sans + Fraunces, warm palette, default light mode
+**Resources:** Full educational hub (search, category pills, expandable cards)
+**Notifications:** Hero headers, CSS classes, urgent borders, type badges
+**doGet():** Default now routes to SPA (doGetWebDashboard) with SSO/magic link
+**Build:** 36 GS modules + 8 HTML files → 70,586 lines / 2,907 KB
