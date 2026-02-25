@@ -806,6 +806,8 @@ var SHEETS = {
   WEEKLY_QUESTIONS:   '_Weekly_Questions',    // hidden — active/scheduled questions
   WEEKLY_RESPONSES:   '_Weekly_Responses',    // hidden — SHA-256 hashed anonymous responses
   QUESTION_POOL:      '_Question_Pool',       // hidden — reusable question bank
+  // Notifications (v4.13.0 — SPA in-app notification system)
+  NOTIFICATIONS:      '📢 Notifications',     // steward-to-member in-app messages
   // Contact Log & Steward Tasks (v4.12.0) — steward activity tracking
   CONTACT_LOG:        '_Contact_Log',         // hidden — steward-member contact history
   STEWARD_TASKS:      '_Steward_Tasks'        // hidden — task assignments for stewards
@@ -1810,6 +1812,24 @@ var RESOURCES_HEADER_MAP_ = [
 ];
 
 var RESOURCES_COLS = buildColsFromMap_(RESOURCES_HEADER_MAP_);
+
+// Notifications sheet — in-app notification system (v4.13.0)
+var NOTIFICATIONS_HEADER_MAP_ = [
+  { key: 'NOTIFICATION_ID', header: 'Notification ID' },
+  { key: 'RECIPIENT',       header: 'Recipient' },
+  { key: 'TYPE',             header: 'Type' },
+  { key: 'TITLE',            header: 'Title' },
+  { key: 'MESSAGE',          header: 'Message' },
+  { key: 'PRIORITY',         header: 'Priority' },
+  { key: 'SENT_BY',          header: 'Sent_By' },
+  { key: 'SENT_BY_NAME',     header: 'Sent_By_Name' },
+  { key: 'CREATED_DATE',     header: 'Created_Date' },
+  { key: 'EXPIRES_DATE',     header: 'Expires_Date' },
+  { key: 'DISMISSED_BY',     header: 'Dismissed_By' },
+  { key: 'STATUS',           header: 'Status' }
+];
+
+var NOTIFICATIONS_COLS = buildColsFromMap_(NOTIFICATIONS_HEADER_MAP_);
 
 // ============================================================================
 // COLUMN AUTO-DISCOVERY SYSTEM

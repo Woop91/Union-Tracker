@@ -141,6 +141,7 @@
       grievances: [],
       loading: true,
       initialTab: INITIAL_TAB, // deep-link: ?page=xxx from URL
+      notificationCount: 0,
     };
 
     // ═══════════════════════════════════════
@@ -279,11 +280,21 @@
     }
 
     function renderSidebarItems(sidebar, role, activeTab) {
-      var header = el('div', { className: 'sidebar-header' });
-      header.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
+      var header = el('div', { className: 'sidebar-header', style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' } });
+      var headerText = el('div');
+      headerText.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
       if (CURRENT_USER) {
-        header.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
+        headerText.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
       }
+      header.appendChild(headerText);
+      var bellWrap = el('div', { className: 'notif-bell-wrap', onClick: function() {
+        _handleTabNav(role, 'notifications');
+      }});
+      bellWrap.appendChild(el('span', { className: 'notif-bell-icon' }, '\uD83D\uDD14'));
+      if (AppState.notificationCount > 0) {
+        bellWrap.appendChild(el('span', { className: 'notif-bell-badge' }, String(AppState.notificationCount)));
+      }
+      header.appendChild(bellWrap);
       sidebar.appendChild(header);
 
       var tabs = _getSidebarTabs(role);
@@ -349,6 +360,7 @@
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
         { divider: true },
         { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
@@ -359,6 +371,7 @@
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
         { divider: true },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
@@ -388,6 +401,7 @@
           case 'unionstats': renderUnionStatsPage(app); break;
           case 'events': renderEventsPage(app); break;
           case 'stewarddirectory': renderStewardDirectory(app); break;
+          case 'notifications': renderMemberNotifications(app); break;
           default: renderMemberHome(app);
         }
       } else {
@@ -396,6 +410,7 @@
           case 'members': renderStewardMembers(app); break;
           case 'deadlines': renderStewardDashboard(app); break;
           case 'broadcast': renderBroadcast(app); break;
+          case 'notifications': renderStewardNotifications(app); break;
           case 'resources': renderStewardResources(app); break;
           case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); break;
           case 'surveytrack': renderSurveyTracking(app); break;
