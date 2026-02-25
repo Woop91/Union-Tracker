@@ -5,6 +5,54 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.0] - 2026-02-23
+
+### Added
+- **Workload Tracker module** (`18_WorkloadTracker.gs` + `WorkloadTracker.html`) — members submit weekly caseload data via the web portal (`?page=workload`)
+- 8 workload categories: Priority Cases, Pending Cases, Unread Documents, To-Do Items, Sent Referrals, CE Activities, Assistance Requests, Aged Cases — each with expandable sub-category breakdowns
+- Anonymized reporting: member identities replaced with REDACTED in Workload Reporting sheet; private submissions excluded from collective stats
+- Privacy controls: Unit Anonymous / Agency Anonymous / Private per submission
+- Reciprocity enforcement: members only see collective stats from their own sharing start date forward
+- Employment tracking: Full-time / Part-time (with hours) + optional overtime hours field
+- Email reminder system with configurable frequency/day/time via `setupWorkloadReminderSystem()`
+- Data retention: 24-month rolling archive via `wtArchiveOldData_()`
+- CSV backup to Google Drive via `createWorkloadBackup()`
+- **📊 Workload Tracker submenu** added to Union Hub menu
+- `?page=workload` route added to `doGet()` in `05_Integrations.gs`
+- 5 new sheet name constants in `SHEETS`: `WORKLOAD_VAULT`, `WORKLOAD_REPORTING`, `WORKLOAD_REMINDERS`, `WORKLOAD_USERMETA`, `WORKLOAD_ARCHIVE`
+- Workload sheets auto-created by `CREATE_DASHBOARD()` in `08a_SheetSetup.gs`
+
+### Security
+- Workload auth reuses DDS member PIN system (`verifyPIN()` / `hashPIN()` from `13_MemberSelfService.gs`) — no separate credential store
+- Rate limiting on PIN attempts (5/15 min) and submissions (10/hour) via CacheService with `WT_RATE_` key prefix
+- Workload audit events logged via DDS's `logAuditEvent()`
+- LockService prevents concurrent Vault writes
+
+## [4.9.1] - 2026-02-23
+
+### Security
+- **CRITICAL: Fix 15 broken `getClientSideEscapeHtml()` includes** — client-side XSS protection was non-functional in most dialogs and web app pages (F109)
+- **CRITICAL: Escape member data in grievance form HTML templates** — XSS via `<option>` tags and JS string literals (F128, F129)
+- **CRITICAL: URL scheme validation on Config URLs** — `javascript:` URLs in Config could execute in web app Links page and dashboard resources (F112, F130)
+- **CRITICAL: Escape steward contact data in Public Dashboard** — names, emails, phone numbers injected into HTML/onclick without escaping (F113)
+- **HIGH: Replace unsafe onclick injection with data-\* attributes** — 7 locations in PublicDashboard, 1 in InteractiveDashboard, 1 in CommandHub (F82, F114)
+- **HIGH: Add email format validation** to 5 email send functions in Integrations (F135)
+- **HIGH: Add escapeForFormula()** to addMember/updateMember setValue calls, saveExpansionData, MeetingCheckIn appendRow (F118, F114, F115)
+- **HIGH: Add server-side input validation** to saveInteractiveMember — email, phone, length limits, formula injection (F119)
+- **HIGH: Escape formUrl in textarea elements** — XSS via `</textarea>` breakout in satisfaction survey dialogs (F154)
+- **MEDIUM: Add callback function whitelist** to multi-select dialog (F127)
+- **MEDIUM: Use JSON.stringify() for baseUrl** in JS context (F142)
+- **MEDIUM: Escape data values in email report HTML** — month names, counts, scores (F89)
+- **MEDIUM: Escape event names in EventBus diagnostic dialog** (F111)
+
+### Fixed
+- `startNewGrievance()` hardcoded array replaced with GRIEVANCE_COLS sparse array (F136)
+- `bulkUpdateGrievanceStatus()` now requires steward authorization (F138)
+- `emailDashboardLinkToMember()` URL parameter now encoded with `encodeURIComponent()` (F122)
+- `executeSendRandomSurveyEmails()` empty-sheet crash guard added (F134)
+- Reminder dialog XSS — escaped grievanceId, memberName, status in HTML and JS contexts (F112)
+- `escapeHtml(url)` applied to steward dashboard URL dialog (F124)
+
 ## [4.9.0] - 2026-02-17
 
 ### Added

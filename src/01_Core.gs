@@ -445,7 +445,7 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 7,
+  minor: 10,
   patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
@@ -540,7 +540,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.7.0",
+  VERSION: "4.10.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -669,12 +669,12 @@ function getLocalNumberFromConfig_() {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 7,
+  MINOR: 10,
   PATCH: 0,
-  BUILD: 'v4.7.0',
-  CURRENT: '4.7.0',
-  BUILD_DATE: '2026-02-14',
-  CODENAME: 'Security Hardening & Code Quality'
+  BUILD: 'v4.10.0',
+  CURRENT: '4.10.0',
+  BUILD_DATE: '2026-02-24',
+  CODENAME: 'Workload Tracker Integration'
 };
 
 /**
@@ -684,6 +684,13 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.10.0', date: '2026-02-24', codename: 'Workload Tracker Integration', changes: 'Workload Tracker module (18_WorkloadTracker.gs + WorkloadTracker.html), 8 workload categories with sub-breakdowns, privacy controls, reciprocity enforcement, email reminders, 24-month data retention, CSV backup, Workload Tracker submenu in Union Hub, ?page=workload web route, 5 new hidden sheets.' },
+  { version: '4.9.1', date: '2026-02-23', codename: 'Security Vulnerability Fix Pass', changes: 'Fix 15 broken getClientSideEscapeHtml() includes, escape member data in grievance form HTML templates, URL scheme validation on Config URLs, escape steward contact data in Public Dashboard, replace unsafe onclick injection, add email format validation, formula injection protection, server-side input validation.' },
+  { version: '4.9.0', date: '2026-02-17', codename: 'Constant Contact Integration', changes: 'Constant Contact v3 API integration with OAuth2, multi-select dropdown support for Grievance Log, auto-discovery column system, 151 column system tests, dynamic CONFIG_COLS and MEMBER_COLS constants.' },
+  { version: '4.8.2', date: '2026-02-16', codename: 'State Field', changes: 'State field added to member contact update across all surfaces.' },
+  { version: '4.8.1', date: '2026-02-15', codename: 'Contact Fields Expansion', changes: '5 new contact form fields (Hire Date, Employee ID, Street Address, City, Zip Code), unified name-based Member ID system.' },
+  { version: '4.8.0', date: '2026-02-15', codename: 'Security Event Alerting', changes: 'Security event alerting system, zero-knowledge survey vault with SHA-256 hashes, event bus architecture, survey completion tracker.' },
+  { version: '4.7.0', date: '2026-02-14', codename: 'Security Hardening', changes: '40+ code review fixes across security, correctness, performance, and test quality. XSS hardening, onEdit optimization, deduplicated escapeHtml, 1090 tests.' },
   { version: '4.6.0', date: '2026-02-12', codename: 'Meeting Intelligence & Document Automation', changes: 'Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling. Added Employee ID, Department, Hire Date columns to Member Directory. Added PII mailing address columns (Street, City, State) hidden by default. Added Last Updated to Grievance Log. Fixed diagnostics checks. Removed deprecated Dashboard/Satisfaction from sheet ordering. Added Export (org email only) and Lockdown future feature roadmap items.' },
   { version: '4.5.1', date: '2026-02-11', codename: 'Engagement Fixes',                          changes: 'Engagement tracking fixes, 950 Jest tests, GRIEVANCE_OUTCOMES/generateGrievanceId fixes' },
   { version: '4.5.0', date: '2026-02-01', codename: 'Security & Testing',                         changes: 'Security module, Data Access Layer, Member Self-Service, consolidated to 16 source files' },
@@ -770,7 +777,15 @@ var SHEETS = {
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
-  REPORTS: '💼 Dashboard'
+  REPORTS: '💼 Dashboard',
+  // Workload Tracker sheets (18_WorkloadTracker.gs)
+  WORKLOAD_VAULT:     'Workload Vault',      // hidden — raw submissions with email
+  WORKLOAD_REPORTING: 'Workload Reporting',  // visible — anonymized ledger
+  WORKLOAD_REMINDERS: 'Workload Reminders',  // hidden — email reminder prefs
+  WORKLOAD_USERMETA:  'Workload UserMeta',   // hidden — sharing start dates
+  WORKLOAD_ARCHIVE:   'Workload Archive',     // hidden — data older than 24 months
+  // Resources & Education (v4.11.0 — content management for educational hub)
+  RESOURCES:          '📚 Resources'          // steward-managed educational content
 };
 
 // SHEET_NAMES alias for backward compatibility
@@ -1554,6 +1569,24 @@ var FEEDBACK_HEADER_MAP_ = [
 
 var FEEDBACK_COLS = buildColsFromMap_(FEEDBACK_HEADER_MAP_);
 
+// Resources sheet — educational content management (v4.11.0)
+var RESOURCES_HEADER_MAP_ = [
+  { key: 'RESOURCE_ID',  header: 'Resource ID' },
+  { key: 'TITLE',        header: 'Title' },
+  { key: 'CATEGORY',     header: 'Category' },
+  { key: 'SUMMARY',      header: 'Summary' },
+  { key: 'CONTENT',      header: 'Content' },
+  { key: 'URL',          header: 'URL' },
+  { key: 'ICON',         header: 'Icon' },
+  { key: 'SORT_ORDER',   header: 'Sort Order' },
+  { key: 'VISIBLE',      header: 'Visible' },
+  { key: 'AUDIENCE',     header: 'Audience' },
+  { key: 'DATE_ADDED',   header: 'Date Added' },
+  { key: 'ADDED_BY',     header: 'Added By' }
+];
+
+var RESOURCES_COLS = buildColsFromMap_(RESOURCES_HEADER_MAP_);
+
 // ============================================================================
 // COLUMN AUTO-DISCOVERY SYSTEM
 // ============================================================================
@@ -1684,7 +1717,8 @@ function syncColumnMaps() {
     { name: 'SURVEY_VAULT_COLS', sheet: SHEETS.SURVEY_VAULT, map: SURVEY_VAULT_HEADER_MAP_, target: SURVEY_VAULT_COLS },
     { name: 'SURVEY_TRACKING_COLS', sheet: SHEETS.SURVEY_TRACKING, map: SURVEY_TRACKING_HEADER_MAP_, target: SURVEY_TRACKING_COLS },
     { name: 'FEEDBACK_COLS', sheet: SHEETS.FEEDBACK, map: FEEDBACK_HEADER_MAP_, target: FEEDBACK_COLS },
-    { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS }
+    { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS },
+    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS }
   ];
 
   for (var m = 0; m < maps.length; m++) {

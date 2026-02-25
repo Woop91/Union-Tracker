@@ -52,7 +52,8 @@ function CREATE_DASHBOARD() {
       '• 📋 Features Reference (complete feature list)\n' +
       '• 📚 Getting Started (setup instructions)\n' +
       '• ❓ FAQ (common questions)\n' +
-      '• 📖 Config Guide (how to use Config tab)\n\n' +
+      '• 📖 Config Guide (how to use Config tab)\n' +
+      '• 📊 Workload Tracker (member caseload tracking)\n\n' +
       'Note: All dashboards are now modal-based (popup windows).\n' +
       'Access them via: Union Hub > Dashboards menu.\n\n' +
       'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
@@ -127,19 +128,36 @@ function CREATE_DASHBOARD() {
     reorderSheetsToStandard(ss);
     ss.toast('Sheets reordered', '🏗️ Progress', 2);
 
+    // Install hourly trigger to keep hidden sheets hidden on mobile
+    installHiddenSheetEnforcerTrigger();
+    ss.toast('Hidden sheet enforcer installed', '🏗️ Progress', 2);
+
+    // Initialize Workload Tracker sheets (18_WorkloadTracker.gs)
+    if (typeof initWorkloadTrackerSheets === 'function') {
+      try {
+        initWorkloadTrackerSheets();
+        ss.toast('Workload Tracker sheets created', '🏗️ Progress', 2);
+      } catch (wtError) {
+        Logger.log('Workload tracker sheets skipped: ' + wtError.message);
+      }
+    }
+
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
-        '14 sheets created:\n' +
+        '15 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
         '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
-        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
+        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
+        '• 📊 Workload Reporting (member caseload tracking)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
         'Access via: Union Hub > Dashboards menu.\n\n' +
+        'Workload Tracker: Union Hub > 📊 Workload Tracker\n' +
+        'Members submit via: [web app URL]?page=workload\n\n' +
         'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
         '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
         'update automatically when you edit the sheets.\n\n' +
