@@ -785,7 +785,9 @@ var SHEETS = {
   WORKLOAD_USERMETA:  'Workload UserMeta',   // hidden — sharing start dates
   WORKLOAD_ARCHIVE:   'Workload Archive',     // hidden — data older than 24 months
   // Resources & Education (v4.11.0 — content management for educational hub)
-  RESOURCES:          '📚 Resources'          // steward-managed educational content
+  RESOURCES:          '📚 Resources',          // steward-managed educational content
+  // Notifications (v4.12.0 — steward-to-member messaging, dismissable with expiry)
+  NOTIFICATIONS:      '📢 Notifications'       // steward-composed, member-dismissable
 };
 
 // SHEET_NAMES alias for backward compatibility
@@ -1587,6 +1589,27 @@ var RESOURCES_HEADER_MAP_ = [
 
 var RESOURCES_COLS = buildColsFromMap_(RESOURCES_HEADER_MAP_);
 
+// ── Notifications (v4.12.0) ───────────────────────────────────────────────
+// Steward-composed notifications shown in member web view.
+// Persist until Expires date OR member dismisses (tracked in Dismissed_By).
+// Stewards compose via separate form in steward web view.
+var NOTIFICATIONS_HEADER_MAP_ = [
+  { key: 'NOTIFICATION_ID', header: 'Notification ID' },
+  { key: 'RECIPIENT',       header: 'Recipient' },       // email, "All Members", "All Stewards", "Everyone"
+  { key: 'TYPE',            header: 'Type' },             // Steward Message, Announcement, Deadline, System
+  { key: 'TITLE',           header: 'Title' },            // short headline
+  { key: 'MESSAGE',         header: 'Message' },          // body text
+  { key: 'PRIORITY',        header: 'Priority' },         // Normal, Urgent
+  { key: 'SENT_BY',         header: 'Sent By' },          // steward email
+  { key: 'SENT_BY_NAME',    header: 'Sent By Name' },     // display name (e.g. "Wardis")
+  { key: 'CREATED_DATE',    header: 'Created Date' },
+  { key: 'EXPIRES_DATE',    header: 'Expires Date' },     // set by steward — blank = no expiry
+  { key: 'DISMISSED_BY',    header: 'Dismissed By' },     // comma-separated emails
+  { key: 'STATUS',          header: 'Status' }            // Active, Expired, Archived
+];
+
+var NOTIFICATIONS_COLS = buildColsFromMap_(NOTIFICATIONS_HEADER_MAP_);
+
 // ============================================================================
 // COLUMN AUTO-DISCOVERY SYSTEM
 // ============================================================================
@@ -1718,7 +1741,8 @@ function syncColumnMaps() {
     { name: 'SURVEY_TRACKING_COLS', sheet: SHEETS.SURVEY_TRACKING, map: SURVEY_TRACKING_HEADER_MAP_, target: SURVEY_TRACKING_COLS },
     { name: 'FEEDBACK_COLS', sheet: SHEETS.FEEDBACK, map: FEEDBACK_HEADER_MAP_, target: FEEDBACK_COLS },
     { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS },
-    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS }
+    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS },
+    { name: 'NOTIFICATIONS_COLS', sheet: SHEETS.NOTIFICATIONS, map: NOTIFICATIONS_HEADER_MAP_, target: NOTIFICATIONS_COLS }
   ];
 
   for (var m = 0; m < maps.length; m++) {

@@ -4095,3 +4095,245 @@ function getWebAppCheckInHtml() {
 
     '</body></html>';
 }
+
+
+// ============================================================================
+// NOTIFICATIONS API (v4.12.0)
+// ============================================================================
+// Steward-composed, member-dismissable notifications.
+// Data lives in 📢 Notifications sheet. Shown in member web view.
+// Persist until Expires date set by steward OR dismissed by member.
+// Steward composes via separate form accessible from steward dashboard.
+// ============================================================================
+
+/**
+ * Get active notifications for a user.
+ * Filters: Status=Active, not expired, not dismissed by this user.
+ * Matches: direct email recipient, "All Members", "All Stewards", "Everyone"
+ * @param {string} userEmail — the logged-in user's email
+ * @param {string} [userRole] — "steward" or "member" for audience matching
+ * @returns {Object[]} array of notification objects
+ */
+function getWebAppNotifications(userEmail, userRole) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+
+    var headers = data[0];
+    var C = NOTIFICATIONS_COLS;
+    var now = new Date();
+    var results = [];
+    userEmail = (userEmail || '').toLowerCase().trim();
+    userRole = (userRole || 'member').toLowerCase();
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
+      // Status must be Active
+      var status = String(row[C.STATUS - 1] || '').trim();
+      if (status !== 'Active') continue;
+
+      // Check expiry
+      var expires = row[C.EXPIRES_DATE - 1];
+      if (expires && expires instanceof Date && expires < now) continue;
+      if (expires && typeof expires === 'string' && expires.trim()) {
+        var parsed = new Date(expires);
+        if (!isNaN(parsed.getTime()) && parsed < now) continue;
+      }
+
+      // Check dismissed
+      var dismissed = String(row[C.DISMISSED_BY - 1] || '');
+      var dismissedList = dismissed.split(',').map(function(e) { return e.trim().toLowerCase(); });
+      if (userEmail && dismissedList.indexOf(userEmail) !== -1) continue;
+
+      // Check recipient match
+      var recipient = String(row[C.RECIPIENT - 1] || '').trim().toLowerCase();
+      var matches = false;
+      if (recipient === 'everyone') matches = true;
+      else if (recipient === 'all members') matches = true;
+      else if (recipient === 'all stewards' && userRole === 'steward') matches = true;
+      else if (recipient === userEmail) matches = true;
+      if (!matches) continue;
+
+      results.push({
+        id: String(row[C.NOTIFICATION_ID - 1] || ''),
+        recipient: String(row[C.RECIPIENT - 1] || ''),
+        type: String(row[C.TYPE - 1] || 'System'),
+        title: String(row[C.TITLE - 1] || ''),
+        message: String(row[C.MESSAGE - 1] || ''),
+        priority: String(row[C.PRIORITY - 1] || 'Normal'),
+        sentBy: String(row[C.SENT_BY_NAME - 1] || ''),
+        createdDate: row[C.CREATED_DATE - 1] ? Utilities.formatDate(
+          row[C.CREATED_DATE - 1] instanceof Date ? row[C.CREATED_DATE - 1] : new Date(row[C.CREATED_DATE - 1]),
+          Session.getScriptTimeZone(), 'MMM d, yyyy') : '',
+        expiresDate: row[C.EXPIRES_DATE - 1] ? Utilities.formatDate(
+          row[C.EXPIRES_DATE - 1] instanceof Date ? row[C.EXPIRES_DATE - 1] : new Date(row[C.EXPIRES_DATE - 1]),
+          Session.getScriptTimeZone(), 'MMM d, yyyy') : '',
+        rowIndex: i + 1
+      });
+    }
+
+    // Sort: Urgent first, then newest first
+    results.sort(function(a, b) {
+      if (a.priority === 'Urgent' && b.priority !== 'Urgent') return -1;
+      if (b.priority === 'Urgent' && a.priority !== 'Urgent') return 1;
+      return 0; // preserve sheet order (newest at bottom, but we'll reverse)
+    });
+    results.reverse();
+
+    return results;
+  } catch (e) {
+    logError_('getWebAppNotifications', e);
+    return [];
+  }
+}
+
+
+/**
+ * Dismiss a notification for a specific user.
+ * Appends user's email to the Dismissed_By column (comma-separated).
+ * @param {string} notificationId — e.g. "NOTIF-001"
+ * @param {string} userEmail — the user dismissing
+ * @returns {Object} { success: boolean, message: string }
+ */
+function dismissWebAppNotification(notificationId, userEmail) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) return { success: false, message: 'Notifications sheet not found' };
+
+    var data = sheet.getDataRange().getValues();
+    var C = NOTIFICATIONS_COLS;
+    userEmail = (userEmail || '').toLowerCase().trim();
+    if (!userEmail) return { success: false, message: 'No email provided' };
+
+    for (var i = 1; i < data.length; i++) {
+      var rowId = String(data[i][C.NOTIFICATION_ID - 1] || '').trim();
+      if (rowId === notificationId) {
+        var existing = String(data[i][C.DISMISSED_BY - 1] || '').trim();
+        var emails = existing ? existing.split(',').map(function(e) { return e.trim().toLowerCase(); }) : [];
+        if (emails.indexOf(userEmail) === -1) {
+          emails.push(userEmail);
+          sheet.getRange(i + 1, C.DISMISSED_BY).setValue(emails.join(', '));
+        }
+        return { success: true, message: 'Notification dismissed' };
+      }
+    }
+
+    return { success: false, message: 'Notification not found' };
+  } catch (e) {
+    logError_('dismissWebAppNotification', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Send a new notification (steward form submission).
+ * Creates a new row in the Notifications sheet.
+ * @param {Object} data — { recipient, type, title, message, priority, expiresDate }
+ * @returns {Object} { success: boolean, notificationId: string, message: string }
+ */
+function sendWebAppNotification(data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) {
+      sheet = createNotificationsSheet(ss);
+    }
+
+    // Validate required fields
+    if (!data.title || !data.message) {
+      return { success: false, message: 'Title and message are required' };
+    }
+    if (!data.recipient) {
+      return { success: false, message: 'Recipient is required' };
+    }
+
+    // Get steward info from session
+    var stewardEmail = Session.getActiveUser().getEmail() || 'unknown';
+    var stewardName = data.senderName || stewardEmail.split('@')[0];
+
+    // Generate next ID
+    var allData = sheet.getDataRange().getValues();
+    var maxNum = 0;
+    var C = NOTIFICATIONS_COLS;
+    for (var i = 1; i < allData.length; i++) {
+      var existId = String(allData[i][C.NOTIFICATION_ID - 1] || '');
+      var match = existId.match(/NOTIF-(\d+)/);
+      if (match) {
+        var num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    var nextId = 'NOTIF-' + String(maxNum + 1).padStart(3, '0');
+
+    var tz = Session.getScriptTimeZone();
+    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+    // Build row (must match NOTIFICATIONS_HEADER_MAP_ order)
+    var newRow = [
+      nextId,
+      data.recipient || 'All Members',
+      data.type || 'Steward Message',
+      data.title,
+      data.message,
+      data.priority || 'Normal',
+      stewardEmail,
+      stewardName,
+      today,
+      data.expiresDate || '',   // blank = no expiry
+      '',                        // Dismissed_By starts empty
+      'Active'
+    ];
+
+    sheet.appendRow(newRow);
+
+    return { success: true, notificationId: nextId, message: 'Notification sent' };
+  } catch (e) {
+    logError_('sendWebAppNotification', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Get member list for notification recipient picker (steward use).
+ * Returns simplified list: name + email for dropdown.
+ * @returns {Object[]} [{ name, email }]
+ */
+function getNotificationRecipientList() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+
+    var C = MEMBER_COLS;
+    var results = [];
+    // Preset groups first
+    results.push({ name: '📢 All Members', email: 'All Members' });
+    results.push({ name: '🛡️ All Stewards', email: 'All Stewards' });
+    results.push({ name: '🌐 Everyone', email: 'Everyone' });
+
+    for (var i = 1; i < data.length; i++) {
+      var firstName = String(data[i][C.FIRST_NAME - 1] || '').trim();
+      var lastName = String(data[i][C.LAST_NAME - 1] || '').trim();
+      var email = String(data[i][C.EMAIL - 1] || '').trim();
+      if (!email) continue;
+      var fullName = (firstName + ' ' + lastName).trim();
+      results.push({ name: fullName || email, email: email });
+    }
+
+    return results;
+  } catch (e) {
+    logError_('getNotificationRecipientList', e);
+    return [];
+  }
+}
