@@ -468,35 +468,200 @@ function _renderStewardPicker(content) {
 // RESOURCES TAB
 // ═══════════════════════════════════════
 
+// ═══════════════════════════════════════
+// NOTIFICATIONS (member view)
+// ═══════════════════════════════════════
+
+function renderMemberNotifications(appContainer) {
+  renderPageLayout(appContainer, 'member', 'notifications', function(container) {
+    _memberHeader(container, 'Notifications');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(notifs) {
+      content.innerHTML = '';
+      if (!notifs || notifs.length === 0) {
+        var emptyState = el('div', { style: { textAlign: 'center', padding: '60px 20px' } });
+        emptyState.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
+        emptyState.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'All caught up!'));
+        emptyState.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'No new notifications right now.'));
+        content.appendChild(emptyState);
+        return;
+      }
+
+      // Badge colors by type
+      var typeColors = {
+        'Steward Message': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
+        'Announcement': { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
+        'Deadline': { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },
+        'System': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' }
+      };
+
+      notifs.forEach(function(n) {
+        var card = el('div', {
+          className: 'card card-glass',
+          id: 'notif-' + n.id,
+          style: { padding: '16px', marginBottom: '10px', position: 'relative', transition: 'opacity 0.3s, transform 0.3s' }
+        });
+
+        // Top row: badges + date + dismiss
+        var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' } });
+        var tc = typeColors[n.type] || typeColors['System'];
+        topRow.appendChild(el('span', {
+          style: { fontSize: '10px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px', background: tc.bg, color: tc.text, textTransform: 'uppercase', letterSpacing: '0.5px' }
+        }, n.type));
+        if (n.priority === 'Urgent') {
+          topRow.appendChild(el('span', {
+            style: { fontSize: '10px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', textTransform: 'uppercase' }
+          }, 'URGENT'));
+        }
+        topRow.appendChild(el('span', { style: { flex: '1' } }));
+        topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, n.createdDate));
+        // Dismiss button
+        var dismissBtn = el('button', {
+          style: { background: 'none', border: 'none', color: 'var(--muted)', fontSize: '16px', cursor: 'pointer', padding: '0 0 0 8px', lineHeight: '1' },
+          title: 'Dismiss',
+          onClick: function() {
+            var cardEl = document.getElementById('notif-' + n.id);
+            if (cardEl) { cardEl.style.opacity = '0'; cardEl.style.transform = 'translateX(30px)'; }
+            google.script.run.withSuccessHandler(function() {
+              setTimeout(function() { if (cardEl) cardEl.remove(); _checkNotifEmpty(content); }, 300);
+            }).withFailureHandler(function() {
+              if (cardEl) { cardEl.style.opacity = '1'; cardEl.style.transform = 'none'; }
+            }).dismissWebAppNotification(n.id, CURRENT_USER.email);
+          }
+        }, '\u2715');
+        topRow.appendChild(dismissBtn);
+        card.appendChild(topRow);
+
+        // Title
+        card.appendChild(el('div', {
+          style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' }
+        }, n.title));
+
+        // Message
+        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', lineHeight: '1.5', marginBottom: '8px' } }, n.message));
+
+        // Meta line
+        var meta = [];
+        if (n.sentBy) meta.push('From: ' + n.sentBy);
+        if (n.expiresDate) meta.push('Expires: ' + n.expiresDate);
+        if (meta.length > 0) {
+          card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
+        }
+
+        content.appendChild(card);
+      });
+    }).withFailureHandler(function(err) {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '20px' } }, 'Error loading notifications: ' + String(err)));
+    }).getWebAppNotifications(CURRENT_USER.email, 'member');
+  });
+}
+
+function _checkNotifEmpty(container) {
+  var remaining = container.querySelectorAll('[id^="notif-"]');
+  if (remaining.length === 0) {
+    container.innerHTML = '';
+    var emptyState = el('div', { style: { textAlign: 'center', padding: '60px 20px' } });
+    emptyState.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
+    emptyState.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'All caught up!'));
+    emptyState.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'No new notifications right now.'));
+    container.appendChild(emptyState);
+  }
+}
+
+// ═══════════════════════════════════════
+// RESOURCES (member view) — Dynamic from Resources sheet
+// ═══════════════════════════════════════
+
 function renderMemberResources(appContainer) {
   renderPageLayout(appContainer, 'member', 'resources', function(container) {
     _memberHeader(container, 'Resources');
     var content = el('div', { className: 'content' });
 
-    var items = [
-      { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
-      { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
-      { icon: '\uD83D\uDCD6', label: 'Know Your Rights', sub: 'Contract highlights' },
-      { icon: '\uD83D\uDCDD', label: 'File a Grievance', sub: 'Start a new case' },
-      { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
-    ];
-    if (CONFIG.orgWebsite) items.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+    // Quick links (always visible, from Config)
+    var quickLinks = [];
+    if (CONFIG.calendarUrl) quickLinks.push({ icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl });
+    if (CONFIG.driveFolderUrl) quickLinks.push({ icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
-    items.forEach(function(r) {
-      var item = el('div', {
-        className: 'card card-glass card-clickable',
-        style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
-        onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
+    if (quickLinks.length > 0) {
+      content.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Quick Links'));
+      quickLinks.forEach(function(r) {
+        var item = el('div', {
+          className: 'card card-glass card-clickable',
+          style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', marginBottom: '6px' },
+          onClick: function() { window.open(r.url, '_blank'); }
+        });
+        item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
+        var tg = el('div', { style: { flex: '1' } });
+        tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+        tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+        item.appendChild(tg);
+        item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+        content.appendChild(item);
       });
-      item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
-      var tg = el('div', { style: { flex: '1' } });
-      tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-      tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
-      item.appendChild(tg);
-      item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-      content.appendChild(item);
-    });
+    }
+
+    // Dynamic resources from sheet
+    var dynamicContainer = el('div');
+    showLoading(dynamicContainer);
+    content.appendChild(dynamicContainer);
     container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(resources) {
+      dynamicContainer.innerHTML = '';
+      if (!resources || resources.length === 0) {
+        dynamicContainer.appendChild(el('div', { style: { color: 'var(--muted)', textAlign: 'center', padding: '20px 0', fontSize: '13px' } }, 'No additional resources available.'));
+        return;
+      }
+
+      // Group by category
+      var categories = {};
+      resources.forEach(function(r) {
+        var cat = r.category || 'General';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(r);
+      });
+
+      Object.keys(categories).forEach(function(cat) {
+        dynamicContainer.appendChild(el('div', {
+          style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', margin: '18px 0 8px', textTransform: 'uppercase', letterSpacing: '0.5px' }
+        }, cat));
+
+        categories[cat].forEach(function(r) {
+          var card = el('div', {
+            className: 'card card-glass',
+            style: { padding: '14px 16px', marginBottom: '8px', cursor: r.url ? 'pointer' : 'default' },
+            onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
+          });
+
+          var headerRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: r.summary || r.content ? '6px' : '0' } });
+          headerRow.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon || '\uD83D\uDCC4'));
+          headerRow.appendChild(el('div', { style: { flex: '1', fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, r.title));
+          if (r.url) headerRow.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+          card.appendChild(headerRow);
+
+          if (r.summary) {
+            card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.4', marginLeft: '28px' } }, r.summary));
+          }
+          if (r.content && !r.url) {
+            var contentDiv = el('div', {
+              style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', marginLeft: '28px', padding: '10px', background: 'var(--raised)', borderRadius: '8px' }
+            });
+            contentDiv.innerHTML = r.content.replace(/\n/g, '<br>');
+            card.appendChild(contentDiv);
+          }
+
+          dynamicContainer.appendChild(card);
+        });
+      });
+    }).withFailureHandler(function() {
+      dynamicContainer.innerHTML = '';
+      dynamicContainer.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '10px' } }, 'Error loading resources.'));
+    }).getWebAppResourcesList('All');
   });
 }
 
@@ -579,6 +744,7 @@ function renderMemberMore(appContainer) {
     var content = el('div', { className: 'content' });
     var menuItems = [
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'View your notifications', action: function() { renderMemberNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', action: function() { renderUnionStatsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardDirectory(document.getElementById('app')); } },
       { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },

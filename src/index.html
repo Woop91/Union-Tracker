@@ -346,6 +346,7 @@
         { id: 'tasks', icon: '\u2705', label: 'Tasks' },
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
         { divider: true },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
@@ -357,6 +358,7 @@
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
         { divider: true },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
@@ -378,6 +380,7 @@
           case 'home': renderMemberHome(app); break;
           case 'cases': renderMyCases(app); break;
           case 'contact': renderStewardContact(app); break;
+          case 'notifications': renderMemberNotifications(app); break;
           case 'profile': renderUpdateProfile(app); break;
           case 'resources': renderMemberResources(app); break;
           case 'workload': renderWorkloadTracker(app); break;
@@ -394,6 +397,7 @@
           case 'members': renderStewardMembers(app); break;
           case 'deadlines': renderStewardDashboard(app); break;
           case 'broadcast': renderBroadcast(app); break;
+          case 'notifications': renderStewardNotifications(app); break;
           case 'resources': renderStewardResources(app); break;
           case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); break;
           case 'surveytrack': renderSurveyTracking(app); break;
