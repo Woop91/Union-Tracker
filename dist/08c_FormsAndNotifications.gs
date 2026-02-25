@@ -1062,6 +1062,15 @@ function checkDeadlinesAndNotify_() {
         step: currentStep,
         days: daysToDeadline
       });
+
+      // Emit EventBus notification for SPA bell alerts
+      if (typeof EventBus !== 'undefined' && EventBus.emit) {
+        EventBus.emit('grievance:deadline:approaching', {
+          grievanceId: grievanceId,
+          memberName: String(data[i][GRIEVANCE_COLS.MEMBER_ID - 1] || ''),
+          daysLeft: daysToDeadline === 'Overdue' ? 0 : daysToDeadline
+        });
+      }
     }
   }
 
@@ -1191,6 +1200,15 @@ function sendStewardDeadlineAlerts() {
       daysRemaining: daysRemaining,
       nextDue: nextDue
     });
+
+    // Emit EventBus notification for SPA bell alerts
+    if (typeof EventBus !== 'undefined' && EventBus.emit) {
+      EventBus.emit('grievance:deadline:approaching', {
+        grievanceId: grievanceId,
+        memberName: memberInfo.name,
+        daysLeft: daysRemaining
+      });
+    }
   }
 
   // Get steward emails from Member Directory (stewards are members with IS_STEWARD = Yes)
