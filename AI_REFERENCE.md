@@ -70,6 +70,20 @@ doGet(e)
 ├── ?page=checkin  → Meeting check-in (v4.11.0)
 ├── ?page=resources → Educational content hub (v4.11.0)
 └── (default)      → Unified member dashboard
+
+### Sheets
+```
+📢 Notifications (v4.12.0) — 12 columns
+├── Notification ID  — auto-generated NOTIF-XXX
+├── Recipient        — email, "All Members", "All Stewards", "Everyone"
+├── Type             — Steward Message | Announcement | Deadline | System
+├── Title / Message  — headline + body
+├── Priority         — Normal | Urgent
+├── Sent By / Name   — steward email + display name
+├── Created / Expires— dates (blank Expires = no auto-expiry)
+├── Dismissed By     — comma-separated emails
+└── Status           — Active | Expired | Archived
+```
 ```
 
 ### Authentication System
@@ -151,6 +165,38 @@ The consolidated file uses `HtmlService.createHtmlOutput()` with **inline HTML s
 3. Grievance history for members
 4. Welcome/landing page
 5. Events page with Join Virtual button
+
+### 2026-02-24 — v4.12.0: Notifications System (by Claude, claude.ai)
+**New Features:**
+1. ✅ `📢 Notifications` sheet — 12 columns, data validation, 2 starter entries, orange tab
+2. ✅ `getWebAppNotifications(email, role)` — filters Active, non-expired, non-dismissed, audience-matched
+3. ✅ `dismissWebAppNotification(id, email)` — appends to Dismissed_By column (per-member tracking)
+4. ✅ `sendWebAppNotification(data)` — steward form creates row with auto-ID (NOTIF-XXX)
+5. ✅ `getNotificationRecipientList()` — member directory + preset groups (All Members, All Stewards, Everyone)
+6. ✅ Notifications persist until steward-set Expires date OR member dismisses
+7. ✅ Types: Steward Message, Announcement, Deadline, System
+8. ✅ Priority: Normal (default), Urgent (sorts first in display)
+
+**Notification Sheet Columns:**
+Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Name, Created Date, Expires Date, Dismissed By, Status
+
+**Persistence Logic:**
+- Active until: (a) Expires Date passes, (b) member dismisses (email appended to Dismissed_By), or (c) steward sets Status=Archived
+- Dismissed_By is comma-separated emails — each member dismisses independently
+- Blank Expires Date = no auto-expiry (steward must archive manually)
+
+**Files Changed:**
+- `src/01_Core.gs` — Added `SHEETS.NOTIFICATIONS`, `NOTIFICATIONS_HEADER_MAP_` (12 cols), `NOTIFICATIONS_COLS`, registered in syncColumnMaps
+- `src/05_Integrations.gs` — Added 4 API functions (getWebAppNotifications, dismissWebAppNotification, sendWebAppNotification, getNotificationRecipientList)
+- `src/10b_SurveyDocSheets.gs` — Added `createNotificationsSheet()` with validation + 2 starter entries
+- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,532 lines / 2,587 KB)
+
+**Design Decisions:**
+- Separate sheet (not a column in Member Directory) — notifications are ephemeral, don't pollute member data
+- Dismissed_By as comma-separated in single cell — avoids per-member rows, scales to thousands
+- Steward composes via separate form in steward view (not inline) — cleaner UX, prevents accidental sends
+- Auto-ID generation scans existing IDs for max number — gap-safe
+- Recipient supports individual emails AND group targets — flexible
 
 ---
 
