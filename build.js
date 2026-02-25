@@ -54,12 +54,24 @@ const BUILD_ORDER = [
   '15_EventBus.gs',                 // Event-driven pub/sub architecture
   '16_DashboardEnhancements.gs',    // Dashboard features: filters, presets, export, collaboration
   '17_CorrelationEngine.gs',        // Cross-dimensional correlation engine with insights
-  '18_WorkloadTracker.gs'           // Member workload tracking, anonymized reporting
+  '18_WorkloadTracker.gs',           // Member workload tracking, anonymized reporting
+  '19_WebDashAuth.gs',               // SPA auth: Google SSO + magic link tokens
+  '20_WebDashConfigReader.gs',       // SPA config reader with CacheService
+  '21_WebDashDataService.gs',        // SPA data access layer (Member Directory + Grievance Log)
+  '22_WebDashApp.gs',                // SPA main entry point (doGetWebDashboard)
+  '23_PortalSheets.gs',              // Portal sheet setup (8 portal-specific sheets)
+  '24_WeeklyQuestions.gs'            // Weekly engagement questions system
 ];
 
 const HTML_FILES = [
   'MultiSelectDialog.html',
-  'WorkloadTracker.html'
+  'WorkloadTracker.html',
+  'auth_view.html',
+  'error_view.html',
+  'index.html',
+  'member_view.html',
+  'steward_view.html',
+  'styles.html'
 ];
 
 function build() {
