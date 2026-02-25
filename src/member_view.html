@@ -20,11 +20,13 @@ function initMemberView(container) {
       AppState.grievances = grievances || [];
       AppState.loading = false;
       renderMemberHome(container);
+      _checkDeepLink('member');
     })
     .withFailureHandler(function() {
       AppState.grievances = [];
       AppState.loading = false;
       renderMemberHome(container);
+      _checkDeepLink('member');
     })
     .dataGetMemberGrievances(CURRENT_USER.email);
 }
