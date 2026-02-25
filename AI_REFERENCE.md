@@ -1,45 +1,66 @@
 # AI REFERENCE DOCUMENT — DDS-Dashboard
 # ⚠️ THIS FILE MUST NEVER BE DELETED. ONLY APPEND. ⚠️
 # Used by: Claude, Gemini, ChatGPT, or any LLM working on this codebase.
-# Last updated: 2026-02-23
+# Last updated: 2026-02-25
+# Consolidation note: On 2026-02-25, duplicate sections were replaced with
+# pointers to their canonical source files. No information was removed.
+
+---
+
+## 📖 HOW TO USE THIS FILE
+
+Read these files **in this order** when onboarding to this codebase:
+
+| Order | File | What it covers |
+|-------|------|----------------|
+| 1 | **CLAUDE.md** | Critical rules, column constants, security patterns, config write paths, coding conventions, git conventions |
+| 2 | **This file (AI_REFERENCE.md)** | Project overview, architecture map, LLM-specific context, error log, protected code |
+| 3 | **SYNC-LOG.md** | DDS↔Union-Tracker sync flow, Workload Tracker exclusion registry |
+| 4 | **CHANGELOG.md** | Full version history (Keep a Changelog format) |
+| 5 | **FEATURES.md** | Detailed feature documentation |
+| 6 | **COLUMN_ISSUES_LOG.md** | Recurring column bugs — READ if touching column-related code |
+| 7 | **CODE_REVIEW.md** | Canonical security/code review |
+| 8 | **DEVELOPER_GUIDE.md** | Developer onboarding |
+
+**Do NOT duplicate content from those files here.** If you need to add context an LLM would need that doesn't fit those files, add it here.
 
 ---
 
 ## 🏗️ PROJECT OVERVIEW
 
 **What:** Google Apps Script application for union steward grievance tracking, member management, and reporting.
-**Repo:** `Woop91/DDS-Dashboard` (private)
+**Repo:** `Woop91/DDS-Dashboard` (private). Default branch: `Main` (capital M).
+**Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users) at MassAbility DDS (SEIU 509).
-**Architecture:** 30 source `.gs` files in `src/` → built into single `dist/ConsolidatedDashboard.gs` (~60K lines, ~2.4MB) via `node build.js`.
-**Web App:** Served via `doGet()` in `ConsolidatedDashboard.gs` using inline HTML (NOT template files).
+**Architecture:** 36 source `.gs` files + 8 `.html` files in `src/` → built into single `dist/ConsolidatedDashboard.gs` via `node build.js`.
+**Current build:** ~70,586 lines / ~2,907 KB (limit: 6MB).
+**Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
+**DDS Apps Script ID:** `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
+**UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+
+### ⚠️ Key Reminders
+- **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
+- **Sync rules & WT exclusions** → **See SYNC-LOG.md**
+- **`dist/ConsolidatedDashboard.gs` is auto-generated.** Never edit directly.
+- **`web-dashboard/` folder is LEGACY/ORPHANED.** Do not deploy or integrate it.
+- **CLASP rootDir:** `./dist` — only `dist/` contents go to Apps Script.
+- **Deploy:** `npm run deploy` (lint + test + build:prod + clasp push). Must run locally (requires Google OAuth).
+- **After any merge to Main:** Remind user to run `npm run deploy`. Agent cannot run clasp remotely.
 
 ---
 
-## 🔴 CRITICAL RULES — READ FIRST
-
-1. **EVERYTHING MUST BE DYNAMIC.** Never hardcode org names, unit names, column positions, sheet names, or any data that lives in the spreadsheet. Always read from the sheet or the Config tab.
-2. **Column constants are 1-indexed** (matching Google Sheets `getRange()`). For array access on `getValues()` data, subtract 1: `row[GRIEVANCE_COLS.STATUS - 1]`.
-3. **All HTML must use `escapeHtml()`** for dynamic values. Defined in `src/00_Security.gs`. No exceptions.
-4. **`dist/ConsolidatedDashboard.gs` is auto-generated.** Never edit it directly. Edit `src/*.gs` files, then run `npm run build`.
-5. **The `web-dashboard/` folder is LEGACY/ORPHANED code.** It uses a different architecture (template files + `include()`) that is NOT deployed. The consolidated build is the live system.
-6. **Branches:** `Main` (primary, uppercase M), `staging`, `dev`. All currently in sync. Push to `Main` directly (branch protection disabled).
-7. **Deploy command:** `npm run deploy` (lint + test + build:prod + clasp push).
-8. **CLASP rootDir:** `./dist` — only files in `dist/` are pushed to Google Apps Script.
-9. **Google Apps Script file size limit:** ~6MB. Current build is ~2.4MB. Monitor growth.
-
----
-
-## 📁 ARCHITECTURE
+## 📁 ARCHITECTURE MAP
 
 ### Build Pipeline
 ```
-src/*.gs (30 files) → build.js → dist/ConsolidatedDashboard.gs (single file)
-                                  dist/appsscript.json (manifest)
-                    → clasp push → Google Apps Script project
+src/*.gs (36 files) + src/*.html (8 files)
+    → build.js → dist/ConsolidatedDashboard.gs (single file)
+                  dist/appsscript.json (manifest)
+    → clasp push → Google Apps Script project
 ```
 
-### Source File Load Order (numbered prefixes)
+### Source File Load Order
 | Prefix | Layer | Key Files |
 |--------|-------|-----------|
 | `00_` | Foundation | `DataAccess.gs`, `Security.gs` |
@@ -47,17 +68,32 @@ src/*.gs (30 files) → build.js → dist/ConsolidatedDashboard.gs (single file)
 | `02_` | Data | `DataManagers.gs` — CRUD operations |
 | `03_` | UI | `UIComponents.gs` — menus, dialogs |
 | `04a-e` | UI modules | Menus, accessibility, interactive/executive/public dashboards |
-| `05_` | Integrations | Drive, Calendar, Email |
+| `05_` | Integrations | Drive, Calendar, Email, Web App API functions |
 | `06_` | Maintenance | Admin tools, undo/redo, audit |
-| `07_` | DevTools | Dev-only utilities (excluded in prod build) |
+| `07_` | DevTools | Dev-only utilities (**excluded in prod build**) |
 | `08a-d` | Sheet utils | Setup, search, forms, audit formulas |
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
+| `18_` | Workload Tracker | **DDS ONLY** — excluded from Union-Tracker |
+| `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, weekly questions |
+
+### HTML Files in src/
+| File | Purpose |
+|------|---------|
+| `index.html` | SPA entry point (unified dashboard) |
+| `steward_view.html` | Steward command center |
+| `member_view.html` | Member dashboard |
+| `auth_view.html` | Login/auth page |
+| `error_view.html` | Error display |
+| `styles.html` | Shared CSS |
+| `MultiSelectDialog.html` | Multi-select dropdown UI |
+| `WorkloadTracker.html` | WT portal (**DDS only**) |
 
 ### Web App Routing (doGet)
 ```
 doGet(e)
+├── Default → SPA (doGetWebDashboard) with SSO/magic link auth
 ├── ?mode=steward  → Steward Command Center (requires auth, shows PII)
 ├── ?mode=member   → Member Dashboard (no PII)
 ├── ?page=search   → Search (requires steward auth)
@@ -66,32 +102,19 @@ doGet(e)
 ├── ?page=links    → Links page
 ├── ?page=selfservice → Member self-service (Google auth or PIN)
 ├── ?page=portal   → Public portal
-├── ?page=workload → Workload tracker
+├── ?page=workload → Workload tracker (DDS only)
 ├── ?page=checkin  → Meeting check-in (v4.11.0)
-├── ?page=resources → Educational content hub (v4.11.0)
-├── ?page=notifications → Notifications page — dual role (v4.12.0)
-└── (default)      → Unified member dashboard
-
-### Sheets
-```
-📢 Notifications (v4.12.0) — 12 columns
-├── Notification ID  — auto-generated NOTIF-XXX
-├── Recipient        — email, "All Members", "All Stewards", "Everyone"
-├── Type             — Steward Message | Announcement | Deadline | System
-├── Title / Message  — headline + body
-├── Priority         — Normal | Urgent
-├── Sent By / Name   — steward email + display name
-├── Created / Expires— dates (blank Expires = no auto-expiry)
-├── Dismissed By     — comma-separated emails
-└── Status           — Active | Expired | Archived
-```
+├── ?page=resources → SPA with resources tab pre-selected (v4.11.0)
+├── ?page=notifications → SPA with notifications tab pre-selected (v4.12.0)
+└── Deep-link: ?page=X → SPA reads PAGE_DATA.initialTab → _handleTabNav()
 ```
 
 ### Authentication System
 - **Steward access:** Google account email matched against authorized list via `checkWebAppAuthorization('steward')`
 - **Member access:** Google account email OR PIN-based login
+- **SPA auth:** Google SSO + magic link (19_WebDashAuth.gs)
 - **Dashboard auth toggle:** `isDashboardMemberAuthRequired()` — when enabled, all dashboard pages require member login
-- **Auth config stored in:** `ScriptProperties`
+- **Auth config:** `ScriptProperties` (no manual setup required — `initWebDashboardAuth()` handles first-time)
 
 ### HTML Serving Method
 The consolidated file uses `HtmlService.createHtmlOutput()` with **inline HTML strings** built by functions like `getUnifiedDashboardHtml()`, `getWebAppDashboardHtml()`, etc. It does NOT use `createTemplateFromFile()` or separate `.html` files (that's the orphaned `web-dashboard/` architecture).
@@ -111,316 +134,37 @@ The consolidated file uses `HtmlService.createHtmlOutput()` with **inline HTML s
 ### Config Tab
 - Single source of truth for org-specific settings
 - Columns built via `CONFIG_HEADER_MAP_` → `CONFIG_COLS`
-- See CLAUDE.md for detailed write-path documentation
+- Row 1 = section headers, Row 2 = column headers, Data starts at row 3
+- **See CLAUDE.md for detailed write-path rules**
 
----
+### Resources Sheet (12 columns, v4.11.0)
+- Headers via `RESOURCES_HEADER_MAP_` → `RESOURCES_COLS`
+- Auto-creates with 8 starter articles on first access
 
-## 🔄 CHANGE LOG
-
-### 2026-02-23 — Deployment Audit & Fixes (by Claude, claude.ai)
-**Issues Found & Fixed:**
-1. ❌ GitHub token `ghp_FTE8...` in user preferences was expired → User generated new token `ghp_xlP7...`
-2. ❌ Second token `ghp_q3Zd...` lacked `repo` scope → User generated third token with correct scope
-3. ❌ CI workflow triggers on `main` (lowercase) but branch is `Main` (uppercase) → **FIXED**: Updated `.github/workflows/build.yml`
-4. ⚠️ `web-dashboard/` folder contains orphaned code from deleted branch → **FIXED**: Added deprecation banner to `web-dashboard/AI_REFERENCE.md`
-5. ✅ `doGet()` exists in `ConsolidatedDashboard.gs` at line 20313 with full routing — verified all 8 dependencies present
-6. ✅ `appsscript.json` manifest identical between root and `dist/`
-7. ✅ OAuth scopes correct including `userinfo.email`
-8. ✅ All branches (Main, staging, dev) synced to same commit
-9. ✅ Build is clean — `npm run build` produces identical `dist/` output
-10. ✅ All 1295 tests pass (21 suites)
-11. ✅ File size 2.4MB / 6MB GAS limit — healthy headroom
-
-**Files Changed:**
-- `.github/workflows/build.yml` — Added `Main`, `staging`, `dev` to CI trigger branches
-- `AI_REFERENCE.md` — Created (this file)
-- `web-dashboard/AI_REFERENCE.md` — Added deprecation notice (folder is orphaned legacy code)
-
-### 2026-02-24 — v4.11.0: Resources Hub + Meeting Check-In Web Route (by Claude, claude.ai)
-**New Features:**
-1. ✅ `?page=resources` — Educational content hub: Know Your Rights, Grievance Process, FAQ, Forms & Templates
-2. ✅ `?page=checkin` — Meeting check-in as standalone web page (reuses existing 14_MeetingCheckIn.gs logic)
-3. ✅ `📚 Resources` sheet — Steward-managed content with 12 columns, data validation, 8 starter articles
-4. ✅ `RESOURCES_HEADER_MAP_` + `RESOURCES_COLS` — Dynamic column system, registered in `syncColumnMaps()`
-5. ✅ `getWebAppResourcesList()` API — Returns visible resources with audience filtering
-6. ✅ Design refresh: DM Sans + Fraunces serif fonts, warm navy/earth tones (not generic purple)
-7. ✅ `PHASE2_PLAN.md` — Tracks parked features (bulk actions, deadline calendar, etc.)
-
-**Files Changed:**
-- `src/01_Core.gs` — Added `SHEETS.RESOURCES`, `RESOURCES_HEADER_MAP_`, `RESOURCES_COLS`, registered in syncColumnMaps
-- `src/05_Integrations.gs` — Added `case 'checkin'` and `case 'resources'` to doGet switch + 3 new functions: `getWebAppResourcesList()`, `getWebAppResourcesHtml()`, `getWebAppCheckInHtml()`
-- `src/10b_SurveyDocSheets.gs` — Added `createResourcesSheet()` with starter content and validation
-- `PHASE2_PLAN.md` — Created
-- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,121 lines / 2,569 KB)
-
-**Design Decisions:**
-- Resources page uses warm serif typography (Fraunces) to convey authority/trust — it's a union tool
-- Navy + earth tones (#1e3a5f, #fafaf9) instead of generic purple gradients
-- Check-in page uses green theme to differentiate from other pages
-- All existing routes, tabs, and pages completely untouched — additive only
-- Resources sheet auto-creates with starter content when first accessed
-
-**Parked for later (ranked):**
-1. Bulk actions (flag/email/export)
-2. Deadline calendar view
-3. Grievance history for members
-4. Welcome/landing page
-5. Events page with Join Virtual button
-
-### 2026-02-24 — v4.12.0: Notifications System (by Claude, claude.ai)
-**New Features:**
-1. ✅ `📢 Notifications` sheet — 12 columns, data validation, 2 starter entries, orange tab
-2. ✅ `getWebAppNotifications(email, role)` — filters Active, non-expired, non-dismissed, audience-matched
-3. ✅ `dismissWebAppNotification(id, email)` — appends to Dismissed_By column (per-member tracking)
-4. ✅ `sendWebAppNotification(data)` — steward form creates row with auto-ID (NOTIF-XXX)
-5. ✅ `getNotificationRecipientList()` — member directory + preset groups (All Members, All Stewards, Everyone)
-6. ✅ Notifications persist until steward-set Expires date OR member dismisses
-7. ✅ Types: Steward Message, Announcement, Deadline, System
-8. ✅ Priority: Normal (default), Urgent (sorts first in display)
-
-**Notification Sheet Columns:**
-Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Name, Created Date, Expires Date, Dismissed By, Status
-
-**Persistence Logic:**
-- Active until: (a) Expires Date passes, (b) member dismisses (email appended to Dismissed_By), or (c) steward sets Status=Archived
-- Dismissed_By is comma-separated emails — each member dismisses independently
-- Blank Expires Date = no auto-expiry (steward must archive manually)
-
-**Files Changed:**
-- `src/01_Core.gs` — Added `SHEETS.NOTIFICATIONS`, `NOTIFICATIONS_HEADER_MAP_` (12 cols), `NOTIFICATIONS_COLS`, registered in syncColumnMaps
-- `src/05_Integrations.gs` — Added 4 API functions (getWebAppNotifications, dismissWebAppNotification, sendWebAppNotification, getNotificationRecipientList)
-- `src/10b_SurveyDocSheets.gs` — Added `createNotificationsSheet()` with validation + 2 starter entries
-- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,532 lines / 2,587 KB)
-
-**Design Decisions:**
-- Separate sheet (not a column in Member Directory) — notifications are ephemeral, don't pollute member data
-- Dismissed_By as comma-separated in single cell — avoids per-member rows, scales to thousands
-- Steward composes via separate form in steward view (not inline) — cleaner UX, prevents accidental sends
-- Auto-ID generation scans existing IDs for max number — gap-safe
-- Recipient supports individual emails AND group targets — flexible
-
-### 2026-02-25 — v4.12.0 continued: Notifications Page + Branch Sync (by Claude, claude.ai)
-**New Features:**
-1. ✅ `?page=notifications` route in doGet
-2. ✅ `getWebAppNotificationsHtml()` — dual-role page: member view + steward inline compose
-3. ✅ `getNotificationRecipientListFull()` — member list with location/dept/title for filter dropdowns
-4. ✅ Steward compose form: Groups tab (All Members/Stewards/Everyone) + Individuals tab
-5. ✅ Individual picker: search by name, filter by location/department/job title dropdowns
-6. ✅ Member notification cards: type badges, urgency indicators, dismiss with ✕
-7. ✅ Toast feedback on send/dismiss
-8. ✅ All branches synced: staging → Main → dev + Union-Tracker
-
-**Files Changed:**
-- `src/05_Integrations.gs` — Added `case 'notifications'` route, `getNotificationRecipientListFull()`, `getWebAppNotificationsHtml()` (~395 lines)
-- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,929 lines / 2,608 KB)
-- `AI_REFERENCE.md` — Updated route table + changelog
-
----
-
-## 🐛 ERRORS & FIXES LOG
-
-### 2026-02-22 — CLASP Setup
-- **Error:** `clasp push` → "Project contents must include a manifest file named appsscript"
-- **Fix:** Copied `appsscript.json` into `dist/` folder (CLASP rootDir)
-- **Error:** `clasp push` → "User has not enabled the Apps Script API"
-- **Fix:** Enabled at https://script.google.com/home/usersettings
-
-### 2026-02-23 — CI Not Triggering on Main
-- **Error:** GitHub Actions workflow only triggered on `main` (lowercase), but branch is `Main` (uppercase)
-- **Fix:** Updated `.github/workflows/build.yml` to include `Main` in push/PR triggers
-
----
-
-## ✅ FEATURES & HOW THEY WORK
-
-### Web App Dashboard (doGet)
-- Served via Google Apps Script web app deployment
-- URL format: `https://script.google.com/macros/s/{DEPLOYMENT_ID}/exec`
-- Mobile-optimized with viewport meta tags and responsive CSS
-- Dark theme with Inter font family, Material Icons, Chart.js
-
-### Steward Command Center (?mode=steward)
-- Requires Google account authorization
-- Shows PII (member contact info, full grievance details)
-- 4-up KPI bar, filterable case list, bulk operations
-
-### Member Dashboard (?mode=member)
-- No PII visible to other members
-- Members see only their own grievances
-- Countdown timers, timeline, resources
-
-### Member Self-Service Portal (?page=selfservice)
-- Dual auth: Google account verification → PIN fallback
-- Members can view their own info and file grievances
-
-### Authentication Toggle
-- `enableDashboardMemberAuth()` / `disableDashboardMemberAuth()` — admin menu toggle
-- When enabled: all dashboard pages require member login
-- When disabled: dashboard pages are openly accessible
-
-### Build System
-- `npm run build` — concatenates `src/*.gs` → `dist/ConsolidatedDashboard.gs`
-- `npm run build:prod` — same but excludes `07_DevTools.gs` (removes test data seeding)
-- `npm run deploy` — lint + test + build:prod + clasp push
-- `npm run ci` — clean + lint + build + test:unit
-
-### Security
-- `escapeHtml()` for all dynamic HTML content
-- `escapeForFormula()` for spreadsheet cell values
-- `secureLog()` masks PII before logging
-- `validateRole()` for role-based access control
-- `validateWebAppRequest()` sanitizes URL parameters
-- Security events logged to audit sheet
-
----
-
-## 📝 NOTES FOR FUTURE LLMs
-
-1. **Read CLAUDE.md first** — it has the most detailed architectural documentation including column constant rules, config write paths, and security patterns.
-2. **Read this file second** — it has the deployment context, change history, and known issues.
-3. **The `web-dashboard/` folder is dead code.** Do not try to deploy it or integrate it. The consolidated build handles everything.
-4. **Never edit `dist/ConsolidatedDashboard.gs` directly.** Edit `src/*.gs` files and run `npm run build`.
-5. **Test with `npm run ci`** before pushing.
-6. **Deploy with `npm run deploy`** (includes lint + test + prod build + clasp push).
-7. **Current file size is 2.4MB / 6MB limit.** If adding major features, monitor growth.
-8. **The `doGet()` function is in `src/04e_PublicDashboard.gs`** (or check `src/` files for the source location).
-
-### v4.12.2 — SPA Port + Theme Overhaul (2026-02-25)
-**SPA files added to DDS-Dashboard:**
-- src/19_WebDashAuth.gs (315 lines) — Google SSO + magic link auth
-- src/20_WebDashConfigReader.gs (158 lines) — Config reader with CacheService
-- src/21_WebDashDataService.gs (1263 lines) — Data access layer
-- src/22_WebDashApp.gs (192 lines) — SPA entry point (doGetWebDashboard)
-- src/23_PortalSheets.gs (168 lines) — Portal sheet setup
-- src/24_WeeklyQuestions.gs (407 lines) — Weekly engagement system
-- src/auth_view.html, error_view.html, index.html, member_view.html, steward_view.html, styles.html
-
-**Theme:** DM Sans + Fraunces, warm palette, default light mode
-**Resources:** Full educational hub (search, category pills, expandable cards)
-**Notifications:** Hero headers, CSS classes, urgent borders, type badges
-**doGet():** Default now routes to SPA (doGetWebDashboard) with SSO/magic link
-**Build:** 36 GS modules + 8 HTML files → 70,586 lines / 2,907 KB
-
-### v4.12.2b — UT Feature Port + Config/Auth/Routing (2026-02-25)
-**SHEETS constants added to DDS:**
-- WEEKLY_QUESTIONS: '_Weekly_Questions' (hidden, weekly engagement questions)
-- CONTACT_LOG: '_Contact_Log' (hidden, steward-member interaction log)
-- STEWARD_TASKS: '_Steward_Tasks' (hidden, steward task management)
-
-**Version history synced:** Added v4.11.0, v4.12.0, v4.12.2 entries to DDS
-
-**Sheet setup (08a_SheetSetup.gs):**
-- Weekly Questions init (calls WeeklyQuestions.initWeeklyQuestionSheets if available)
-- Contact Log sheet creation (_ensureContactLogSheet) — 8 columns, auto-hidden
-- Steward Tasks sheet creation (_ensureStewardTasksSheet) — 10 columns, auto-hidden
-
-**ConfigReader rewritten (20_WebDashConfigReader.gs):**
-- OLD: Read key-value pairs from Column A/B (row-based layout)
-- NEW: Read from column-based Config tab using CONFIG_COLS constants
-- Values read from row 3 (row 1=headers, row 2=section labels)
-- Falls back to _defaults() when Config tab missing
-- Added: calendarUrl/driveFolderUrl derived from IDs, localNumber, mainPhone
-
-**Auth helper (19_WebDashAuth.gs):**
-- Added initWebDashboardAuth() — first-time setup verifier
-- SSO: Works immediately via Session.getActiveUser().getEmail()
-- Magic links: Self-create via PropertiesService.getScriptProperties()
-- No manual ScriptProperties setup required
-
-**Deep-link routing (22_WebDashApp.gs + index.html + 05_Integrations.gs):**
-- _serveDashboard() now accepts initialTab parameter
-- doGetWebDashboard() reads e.parameter.page → passes as initialTab
-- SPA index.html reads PAGE_DATA.initialTab → calls _handleTabNav() after init
-- ?page=resources → SPA with resources tab pre-selected
-- ?page=notifications → SPA with notifications tab pre-selected
-- Standalone HTML pages kept as fallback if doGetWebDashboard unavailable
-
-**Default accent hue:** Changed from 250 (blue) → 30 (amber) in 10a_SheetCreation.gs
-
-**Files changed:**
-- src/01_Core.gs — SHEETS constants, version history
-- src/05_Integrations.gs — resources/notifications → SPA routing
-- src/08a_SheetSetup.gs — Weekly Questions, Contact Log, Steward Tasks init
-- src/10a_SheetCreation.gs — accent hue default 250→30
-- src/19_WebDashAuth.gs — initWebDashboardAuth()
-- src/20_WebDashConfigReader.gs — column-based Config tab reader
-- src/22_WebDashApp.gs — initialTab deep-link support
-- src/index.html — initialTab navigation after init
-
----
-
-## 🔄 SYNC RULES — DDS ↔ UNION-TRACKER (Added 2026-02-25)
-
-### Repo Relationship
-- **DDS-Dashboard** (private): Primary repo. Default branch: `Main` (capital M).
-- **Union-Tracker** (public): Mirror minus Workload Tracker. Target branch: `staging`.
-- DDS Apps Script ID: `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu` — NEVER in UT.
-- UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
-- GitHub Token (shared): `ghp_7MY0...DC9` (account-level, works for both repos)
-
-### Sync Flow
+### Notifications Sheet (12 columns, v4.12.0)
 ```
-DDS Main → UT staging → (user manages) → UT dev → UT main
+Notification ID | Recipient | Type | Title | Message | Priority
+Sent By | Sent By Name | Created Date | Expires Date | Dismissed By | Status
 ```
+- Auto-ID: NOTIF-XXX
+- Types: Steward Message, Announcement, Deadline, System
+- Priority: Normal, Urgent
+- Dismissed_By: comma-separated emails (per-member tracking)
+- Active until: Expires Date passes, member dismisses, or steward archives
 
-### Data Protection Rules
-- **No function may delete or overwrite manually entered data.**
-- Manually entered = imported by users via import function OR typed directly into cells.
-- System-generated = anything written by code functions (except import function output).
-- Functions may: append, write to system-generated fields, clear auto-generated content.
+### Hidden Sheets (v4.12.2)
+- `_Weekly_Questions` — weekly engagement questions
+- `_Contact_Log` — steward-member interaction log (8 columns)
+- `_Steward_Tasks` — steward task management (10 columns)
 
-### Workload Tracker Exclusion Registry
+### Architectural Rule: No Formulas in Visible Sheets
+All visible sheets (Dashboard, Member Satisfaction, Feedback) contain only VALUES, never formulas. Data is recomputed by JavaScript on each change. No broken formula references, no circular dependencies, no formula chains.
 
-**❌ EXCLUDE from UT:**
-| File | Reason |
-|------|--------|
-| `src/18_WorkloadTracker.gs` | Core WT module — 32 functions |
-| `src/WorkloadTracker.html` | WT portal HTML template |
+---
 
-**⚠️ MODIFY for UT (add typeof guards):**
-| File | Lines | What to guard |
-|------|-------|---------------|
-| `src/03_UIComponents.gs` | 85-94 | `📊 Workload Tracker` submenu |
-| `src/index.html` | 370, 389 | `workload` nav item and route |
-| `src/member_view.html` | 792, 881-1129 | `renderWorkloadTracker` + SSO calls |
+## ⚠️ PROTECTED CODE — DO NOT MODIFY
 
-**✅ ALREADY SAFE (typeof guards exist):**
-- `src/05_Integrations.gs` — `typeof getWorkloadTrackerPortalHtml === 'function'`
-- `src/08a_SheetSetup.gs` — `typeof initWorkloadTrackerSheets === 'function'`
-
-**✅ KEEP AS-IS (not WT module):**
-- "Steward workload" references = grievance case counts per steward (core feature)
-- WT sheet constants in `01_Core.gs` = inert without module
-- WT CSS in `styles.html` = dead code, no errors
-
-## 🐛 ERRORS & FIXES (Added 2026-02-25)
-
-| Date | Error | Cause | Fix |
-|------|-------|-------|-----|
-| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` |
-| 2026-02-25 | Expired GitHub token `ghp_FTE8...` in memory | Token rotated | Updated to `ghp_7MY0...` |
-
-## 📝 CHANGES LOG (Added 2026-02-25)
-
-| Date | Agent | Change |
-|------|-------|--------|
-| 2026-02-25 | Claude (claude.ai) | Appended sync rules, WT exclusion registry, data protection rules to AI_REFERENCE.md |
-| 2026-02-25 | Claude (claude.ai) | Created SYNC-LOG.md with full exclusion analysis |
-| 2026-02-25 | Claude (claude.ai) | Created .gitignore for Union-Tracker repo |
-
-## 🚀 DEPLOYMENT RULE (Added 2026-02-25)
-
-### After any merge or work to DDS Main:
-1. Push to GitHub (all relevant branches)
-2. **Run `clasp push` to update the Google Sheet**
-   - Command: `cd C:\Users\deskc\Documents\DDS-Dashboard && npm run deploy` (or `clasp push`)
-   - CLASP rootDir is `./dist` — only `dist/` contents go to Apps Script
-   - Requires Google OAuth — must be run from local machine, not CI (unless secrets configured)
-   - If agent cannot run clasp, **always remind the user to run it**
-
-## ⚠️ PROTECTED CODE — DO NOT MODIFY (Migrated from AIR.md, 2026-02-25)
-
-The following code sections are USER APPROVED and must NOT be modified or removed:
+The following code sections are USER APPROVED and must NOT be modified or removed without explicit user permission:
 
 ### Dashboard Modal Popup — `src/04c_InteractiveDashboard.gs`
 Protected functions: `showInteractiveDashboardTab()`, `getInteractiveDashboardHtml()`, `getInteractiveOverviewData()`, `getInteractiveGrievanceData()`, `getInteractiveMemberData()`, `getMyStewardCases()`
@@ -434,6 +178,79 @@ Tabs: Overview, Trends, Responses, Sections, Insights
 Protected functions: `showPublicMemberDashboard()`, `showStewardPerformanceModal()`, `safetyValveScrub()`, `getSecureGrievanceStats_()`, `getSecureAllStewards_()`, `getSecureSatisfactionStats_()`, `getStewardWorkload()`
 Features: Material Design UI, Weingarten Rights, live steward search, PII scrubbing
 
-## 📐 ARCHITECTURE: No Formulas in Visible Sheets (Migrated from AIR.md)
+---
 
-All visible sheets (Dashboard, Member Satisfaction, Feedback) contain only VALUES, never formulas. Data is recomputed by JavaScript on each change. No broken formula references, no circular dependencies, no formula chains.
+## 🐛 CONSOLIDATED ERRORS & FIXES LOG
+
+| Date | Error | Cause | Fix | Status |
+|------|-------|-------|-----|--------|
+| 2026-02-22 | `clasp push` → "must include manifest" | `appsscript.json` not in `dist/` | Copied manifest to `dist/` | ✅ |
+| 2026-02-22 | `clasp push` → "User has not enabled Apps Script API" | API disabled | Enabled at script.google.com/home/usersettings | ✅ |
+| 2026-02-23 | GitHub Actions CI not triggering | Workflow triggers `main` (lowercase) but branch is `Main` | Updated `.github/workflows/build.yml` | ✅ |
+| 2026-02-23 | GitHub token `ghp_FTE8...` expired | Token rotated | User generated new token | ✅ |
+| 2026-02-23 | Token `ghp_q3Zd...` lacked `repo` scope | Wrong scope selected | User generated third token with correct scope | ✅ |
+| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` | ✅ |
+| 2026-02-25 | Expired token `ghp_FTE8...` still in memory | Token rotated but memory stale | Updated memory to `ghp_7MY0...` | ✅ |
+
+---
+
+## 🔑 DESIGN DECISIONS LOG
+
+Records **why** architectural choices were made, so future LLMs don't undo them.
+
+| Date | Decision | Reasoning |
+|------|----------|-----------|
+| 2026-02-24 | Resources page uses Fraunces serif font | Conveys authority/trust — it's a union tool, not a SaaS product |
+| 2026-02-24 | Navy + earth tones (#1e3a5f, #fafaf9) | Avoid generic AI purple gradients |
+| 2026-02-24 | Check-in page uses green theme | Differentiate from other pages visually |
+| 2026-02-24 | Notifications in separate sheet (not Member Directory column) | Notifications are ephemeral; don't pollute member data |
+| 2026-02-24 | Dismissed_By as comma-separated in single cell | Avoids per-member rows, scales to thousands |
+| 2026-02-24 | Notification auto-ID scans existing IDs for max number | Gap-safe even if rows deleted |
+| 2026-02-25 | ConfigReader reads column-based Config (not row-based key-value) | Aligns with existing CONFIG_COLS system; old reader was incompatible |
+| 2026-02-25 | Default accent hue changed from 250 (blue) → 30 (amber) | Warm palette matches union identity, distinguishes from generic dashboards |
+| 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
+| 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
+
+---
+
+## 📝 AGENT ACTIVITY LOG
+
+Records what each AI agent changed, when, and in which files.
+
+| Date | Agent | Action | Files Changed |
+|------|-------|--------|---------------|
+| 2026-02-23 | Claude (claude.ai) | Deployment audit — fixed CI triggers, verified doGet, synced branches | `.github/workflows/build.yml`, `AI_REFERENCE.md`, `web-dashboard/AI_REFERENCE.md` |
+| 2026-02-24 | Claude (claude.ai) | v4.11.0: Resources Hub + Meeting Check-In | `01_Core.gs`, `05_Integrations.gs`, `10b_SurveyDocSheets.gs`, `PHASE2_PLAN.md`, `dist/` |
+| 2026-02-24 | Claude (claude.ai) | v4.12.0: Notifications system (sheet + API + page) | `01_Core.gs`, `05_Integrations.gs`, `10b_SurveyDocSheets.gs`, `dist/` |
+| 2026-02-25 | Claude (claude.ai) | v4.12.0 continued: Notifications page + branch sync | `05_Integrations.gs`, `dist/`, `AI_REFERENCE.md` |
+| 2026-02-25 | Claude (claude.ai) | Created SYNC-LOG.md, appended sync rules | `SYNC-LOG.md`, `AI_REFERENCE.md` |
+| 2026-02-25 | Claude (claude.ai) | v4.12.2: SPA port — 6 new GS modules + 6 HTML files | `19-24_*.gs`, `*.html`, `dist/` |
+| 2026-02-25 | Claude (claude.ai) | v4.12.2b: UT feature port — config reader, auth, deep-link routing | `01_Core.gs`, `05_Integrations.gs`, `08a_SheetSetup.gs`, `10a_SheetCreation.gs`, `19-22_*.gs`, `index.html` |
+| 2026-02-25 | Claude (claude.ai) | Consolidated AI_REFERENCE.md — removed duplication with CLAUDE.md, SYNC-LOG.md, CHANGELOG.md | `AI_REFERENCE.md`, `CHANGELOG.md` |
+
+---
+
+## 🚀 PARKED FEATURES (ranked by priority)
+
+1. Bulk actions (flag/email/export)
+2. Deadline calendar view
+3. Grievance history for members
+4. Welcome/landing page
+5. Events page with Join Virtual button
+
+See `PHASE2_PLAN.md` for details.
+
+---
+
+## 📝 NOTES FOR FUTURE LLMs
+
+1. **Read CLAUDE.md first** — it has the most critical rules including column constant patterns, config write paths, and security patterns.
+2. **Read this file second** — it has architecture context, error history, and protected code.
+3. **Read SYNC-LOG.md if touching UT** — full exclusion registry with line numbers.
+4. **The `web-dashboard/` folder is dead code.** Do not deploy or integrate it.
+5. **Never edit `dist/ConsolidatedDashboard.gs` directly.** Edit `src/*.gs` and run `npm run build`.
+6. **Test with `npm run ci`** before pushing.
+7. **Deploy with `npm run deploy`** (lint + test + prod build + clasp push).
+8. **Build is ~2.9MB / 6MB limit.** Monitor growth — you have ~50% headroom.
+9. **The `doGet()` source is in `src/05_Integrations.gs`** (routes) and `src/22_WebDashApp.gs` (SPA entry).
+10. **Do not duplicate information across reference docs.** Each doc has one canonical purpose (see table at top).

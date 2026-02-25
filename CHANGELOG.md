@@ -5,6 +5,47 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.2] - 2026-02-25
+
+### Added
+- **SPA Web Dashboard** (`19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`) — full single-page app with Google SSO + magic link auth
+- 6 HTML files: `index.html`, `steward_view.html`, `member_view.html`, `auth_view.html`, `error_view.html`, `styles.html`
+- Hidden sheets: `_Weekly_Questions`, `_Contact_Log` (8 cols), `_Steward_Tasks` (10 cols)
+- `initWebDashboardAuth()` — auto-configures auth on first run, no manual ScriptProperties setup
+- Deep-link routing: `?page=X` → SPA with tab pre-selected via `PAGE_DATA.initialTab`
+- `doGet()` default now routes to SPA (`doGetWebDashboard`) with SSO/magic link
+
+### Changed
+- ConfigReader (`20_WebDashConfigReader.gs`) rewritten from row-based key-value to column-based Config tab using `CONFIG_COLS`
+- Default accent hue changed from 250 (blue) → 30 (amber)
+- `?page=resources` and `?page=notifications` now route through SPA instead of standalone HTML
+
+## [4.12.0] - 2026-02-24
+
+### Added
+- **📢 Notifications sheet** — 12 columns with data validation and 2 starter entries
+- `getWebAppNotifications(email, role)` — filters Active, non-expired, non-dismissed, audience-matched
+- `dismissWebAppNotification(id, email)` — per-member dismiss tracking via Dismissed_By column
+- `sendWebAppNotification(data)` — steward compose with auto-ID (NOTIF-XXX)
+- `getNotificationRecipientList()` / `getNotificationRecipientListFull()` — member directory + preset groups
+- `?page=notifications` route with dual-role page: member cards + steward inline compose
+- Notification types: Steward Message, Announcement, Deadline, System
+- Priority levels: Normal (default), Urgent (sorts first)
+- `NOTIFICATIONS_HEADER_MAP_` + `NOTIFICATIONS_COLS` registered in `syncColumnMaps()`
+
+## [4.11.0] - 2026-02-24
+
+### Added
+- **📚 Resources sheet** — 12 columns, data validation, 8 starter articles (Know Your Rights, Grievance Process, FAQ, Forms & Templates)
+- `?page=resources` route — educational content hub with search, category pills, expandable cards
+- `?page=checkin` route — meeting check-in as standalone web page (reuses `14_MeetingCheckIn.gs`)
+- `getWebAppResourcesList()` API — returns visible resources with audience filtering
+- `RESOURCES_HEADER_MAP_` + `RESOURCES_COLS` registered in `syncColumnMaps()`
+- `PHASE2_PLAN.md` — tracks parked features (bulk actions, deadline calendar, etc.)
+
+### Changed
+- Design refresh: DM Sans + Fraunces serif fonts, warm navy/earth tones (#1e3a5f, #fafaf9)
+
 ## [4.10.0] - 2026-02-23
 
 ### Added
@@ -236,6 +277,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 4.12.2 | 2026-02-25 | SPA web dashboard, SSO + magic link, deep-link routing, hidden sheets |
+| 4.12.0 | 2026-02-24 | Notifications system (sheet + API + dual-role page) |
+| 4.11.0 | 2026-02-24 | Resources hub, meeting check-in route, design refresh |
+| 4.10.0 | 2026-02-23 | Workload Tracker module |
+| 4.9.1 | 2026-02-23 | 15 security fixes (XSS, formula injection, URL validation) |
 | 4.9.0 | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns |
 | 4.8.2 | 2026-02-16 | State field added to member contacts |
 | 4.8.1 | 2026-02-15 | 5 new contact form fields, unified name-based Member IDs |
