@@ -1,8 +1,8 @@
 # Strategic Command Center
 
-**Version 4.9.0** | Union Steward Dashboard for Google Sheets
+**Version 4.12.0** | Union Steward Dashboard for Google Sheets
 
-A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 30-file modular architecture.
+A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 37-file modular architecture plus 8 HTML files.
 
 ---
 
@@ -81,7 +81,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    - Click the **+** button next to "Files" to create a new script file
    - Name it to match the source file (without the `.gs` extension)
    - Paste the contents from the corresponding `src/` file
-   - Repeat for all 30 `.gs` files and the `.html` file
+   - Repeat for all 37 `.gs` files and 8 `.html` files
 
 5. **Run the initial setup:**
    - Select `CREATE_DASHBOARD` from the function dropdown
@@ -156,7 +156,7 @@ When you're ready to move from testing to real data:
 2. Delete `07_DevTools.gs` from your Apps Script project (Extensions > Apps Script > right-click > Delete)
 3. Refresh the sheet -- the Demo menu disappears automatically
 
-After that, you have **29 production files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
+After that, you have **36 production .gs files + 8 .html files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
 
 ---
 
@@ -245,6 +245,28 @@ After that, you have **29 production files** and a clean system ready for real m
 - All column references use dynamic `CONFIG_COLS` and `MEMBER_COLS` constants
 - Multi-select dropdown editor for Grievance Log with checkbox UI
 
+### Workload Tracker (v4.10.0)
+- Member-facing web portal for weekly caseload submissions (`?page=workload`)
+- 8 workload categories: Priority Cases, Pending Cases, Unread Documents, To-Do Items, Sent Referrals, CE Activities, Assistance Requests, Aged Cases
+- Privacy controls: Unit Anonymous, Agency Anonymous, or Private per submission
+- Reciprocity enforcement: collective stats visible only from member's own sharing start date
+- Employment tracking with Full-time/Part-time and overtime hours
+- Email reminder system with configurable frequency
+- 24-month rolling data archive and CSV backup to Google Drive
+
+### Web Dashboard SPA (v4.11.0)
+- Responsive layout: mobile (<640px bottom nav), tablet (640-1024px sidebar), desktop (>1024px)
+- Member self-service: profile editor, steward picker, resources, survey results, workload tracker
+- Steward tools: cases dashboard, members tab with search and stats, broadcast, survey tracking
+- Weekly questions engagement system with anonymous responses
+- CSS-only bar charts for quarterly survey results with privacy threshold
+
+### Weekly Questions (v4.11.0)
+- Anonymous weekly engagement questions for members
+- SHA-256 hashed email responses — no plaintext PII stored
+- Steward question manager with question pool and scheduling
+- 3 hidden sheets: `_Weekly_Questions`, `_Weekly_Responses`, `_Question_Pool`
+
 ### Looker Studio Integration
 - **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
 - **PII-Free**: Anonymized `_Looker_Anon_*` sheets for external stakeholders
@@ -278,6 +300,7 @@ The dashboard provides 4 top-level menus:
 | View | Dashboards, dark mode, themes |
 | Comfort View | Focus mode, zebra stripes, font sizes |
 | Multi-Select | Multi-select editor, auto-open triggers |
+| Workload Tracker | Submit workload data, view stats, manage reminders |
 
 ### Admin (System Administration)
 
@@ -369,6 +392,14 @@ These sheets power the auto-updating columns. You don't need to edit them.
 | `_Steward_Performance_Calc` | Steward performance scores |
 | `_Audit_Log` | System activity log |
 | `_Checklist_Calc` | Checklist calculations |
+| `_Workload_Vault` | Encrypted workload submission data |
+| `_Workload_Reporting` | Anonymized workload reporting data |
+| `_Workload_Reminders` | Email reminder configuration |
+| `_Workload_UserMeta` | Member workload preferences and metadata |
+| `_Workload_Archive` | Archived workload data (24-month rolling) |
+| `_Weekly_Questions` | Active weekly engagement questions |
+| `_Weekly_Responses` | Anonymous weekly question responses |
+| `_Question_Pool` | Available questions for weekly rotation |
 
 ---
 
@@ -409,7 +440,7 @@ See the [Developer Guide](DEVELOPER_GUIDE.md) for architecture details, code pat
 
 ## Architecture
 
-The codebase uses a 30-file modular architecture with numbered prefixes that indicate load order and purpose:
+The codebase uses a 37-file modular architecture with numbered prefixes that indicate load order and purpose:
 
 | Prefix | Layer | Files |
 |--------|-------|-------|
@@ -430,13 +461,20 @@ The codebase uses a 30-file modular architecture with numbered prefixes that ind
 | 15 | Event Bus | `15_EventBus.gs` (pub/sub event system) |
 | 16 | Enhancements | `16_DashboardEnhancements.gs` (date ranges, chart export, drill-down) |
 | 17 | Analytics | `17_CorrelationEngine.gs` (cross-dimensional correlation) |
-| -- | HTML | `MultiSelectDialog.html` |
+| 18 | Workload | `18_WorkloadTracker.gs` (member workload submissions) |
+| 19 | Web Auth | `19_WebDashAuth.gs` (web dashboard authentication) |
+| 20 | Web Config | `20_WebDashConfigReader.gs` (web dashboard config) |
+| 21 | Web Data | `21_WebDashDataService.gs` (web dashboard data service) |
+| 22 | Web App | `22_WebDashApp.gs` (web dashboard application) |
+| 23 | Portal | `23_PortalSheets.gs` (portal sheet setup) |
+| 24 | Weekly Q | `24_WeeklyQuestions.gs` (weekly engagement questions) |
+| -- | HTML | `index.html`, `styles.html`, `auth_view.html`, `steward_view.html`, `member_view.html`, `error_view.html`, `MultiSelectDialog.html`, `WorkloadTracker.html` |
 
 ### Design Principles
 
 - **Separation of Concerns**: Each file has one clear purpose
 - **Numbered Prefixes**: Show dependency order for build concatenation
-- **Production Ready**: Delete `07_DevTools.gs` for a 29-file production deployment
+- **Production Ready**: Delete `07_DevTools.gs` for a 36-file production deployment
 - **Failure Isolation**: A bug in Calendar sync won't break the Member Directory
 - **Self-Healing**: Hidden calculation sheets auto-repair their formulas
 - **Performance**: CacheService integration and batch operations handle 5,000+ members
@@ -533,6 +571,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| **4.12.0** | 2026-02-24 | Chart.js integration, steward/member view enhancements, workload improvements, bug fixes |
+| **4.11.0** | 2026-02-24 | Responsive web dashboard SPA, member self-service views, steward tools, weekly questions |
+| **4.10.0** | 2026-02-23 | Workload Tracker module, web-dashboard SPA integration, multi-file build mode |
+| **4.9.1** | 2026-02-23 | Security vulnerability fix pass — 22 findings fixed, XSS hardening |
 | **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 1300+ tests across 21 suites |
 | **4.8.2** | 2026-02-16 | State field added to member contact surfaces |
 | **4.8.1** | 2026-02-15 | 5 new contact form fields, unified name-based Member ID system |

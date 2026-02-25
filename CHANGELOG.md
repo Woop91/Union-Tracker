@@ -5,6 +5,33 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.0] - 2026-02-24
+
+### Added
+- **Chart.js integration** for steward and member dashboard views
+- Steward view enhancements: improved cases dashboard, members tab with search and stats
+- Member view enhancements: improved home, cases, contact, profile, resources views
+- Workload tracker improvements and SSO wrappers (`processWorkloadFormSSO`, `getWorkloadHistorySSO`, `getWorkloadDashboardDataSSO`)
+
+### Fixed
+- Error view retry button now functional
+- Bug fixes across web dashboard views
+- Portal sheet setup infrastructure (`23_PortalSheets.gs`) added to BUILD_ORDER
+
+## [4.11.0] - 2026-02-24
+
+### Added
+- **Responsive web dashboard SPA** — mobile (<640px bottom nav), tablet (640-1024px sidebar), desktop (>1024px)
+- `renderPageLayout()` in index.html switches between sidebar and bottom nav
+- **Member self-service views**: home, cases, contact, profile, resources, workload, weekly questions, survey results, more menu
+- **Steward tools**: cases dashboard, members tab (search+stats), broadcast, survey tracking, weekly question manager, resources, more menu
+- **Weekly Questions engagement system** (`24_WeeklyQuestions.gs`) — IIFE module with 3 hidden sheets, anonymous responses via SHA-256 hashed emails
+- CSS-only bar charts for survey results with privacy threshold
+- 12 new DataService functions + global `data*` wrappers in `21_WebDashDataService.gs`
+- ConfigReader expanded: `calendarId`, `driveFolderId`, `satisfactionFormUrl`, `orgWebsite`
+- SHEETS constants: `WEEKLY_QUESTIONS`, `WEEKLY_RESPONSES`, `QUESTION_POOL`
+- 46 files pushed via clasp (37 .gs + 8 .html + appsscript.json)
+
 ## [4.10.0] - 2026-02-23
 
 ### Added
@@ -236,6 +263,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 4.12.0 | 2026-02-24 | Chart.js integration, steward/member view enhancements, workload improvements, bug fixes |
+| 4.11.0 | 2026-02-24 | Responsive web dashboard SPA, member self-service views, steward tools, weekly questions |
+| 4.10.0 | 2026-02-23 | Workload Tracker module, web-dashboard SPA integration, multi-file build mode |
+| 4.9.1 | 2026-02-23 | Security vulnerability fix pass — XSS hardening, formula injection protection |
 | 4.9.0 | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns |
 | 4.8.2 | 2026-02-16 | State field added to member contacts |
 | 4.8.1 | 2026-02-15 | 5 new contact form fields, unified name-based Member IDs |

@@ -6,6 +6,7 @@
 **Reviewer:** Claude Code (Opus 4.6)
 **Scope:** Full line-by-line codebase review — 30 source files (~59K lines), 23 test files, config/build infrastructure
 **Version:** 4.9.0 (as of 2026-02-17)
+**Note:** This review covers v4.9.0. Versions 4.10.0–4.12.0 added 7 new .gs files and 6 new .html files, not yet in scope.
 **Previous Review:** 2026-02-14 (v4.7.0 — 69 issues, 57 fixed)
 **This Update:** Re-verification pass with cross-cutting pattern searches — 33 new findings added (F76–F108), 1 false positive corrected (F94)
 **Fix Pass:** 2026-02-21 — 30 findings fixed across 16 files (see individual finding annotations below)
