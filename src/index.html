@@ -165,6 +165,14 @@
         default:
           renderAuth(app);
       }
+      
+      // Deep-link: if ?page= was passed, navigate to that tab after init
+      if (PAGE_DATA.initialTab && (CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member')) {
+        // Delay to let initial render complete
+        setTimeout(function() {
+          _handleTabNav(CURRENT_VIEW, PAGE_DATA.initialTab);
+        }, 500);
+      }
     }
     
     // ═══════════════════════════════════════
