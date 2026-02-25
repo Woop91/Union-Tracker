@@ -2053,3 +2053,141 @@ function createResourcesSheet(ss) {
   return sheet;
 }
 
+
+// ============================================================================
+// NOTIFICATIONS SHEET CREATION (v4.12.0)
+// ============================================================================
+// Steward-composed notifications for member web view.
+// Persist until Expires date set by steward OR dismissed by individual member.
+// Stewards compose via separate form in steward dashboard.
+// ============================================================================
+
+/**
+ * Creates the 📢 Notifications sheet with headers, validation, and 2 starter entries.
+ * @param {Spreadsheet} [ss] — defaults to active spreadsheet
+ * @returns {Sheet}
+ */
+function createNotificationsSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+
+  // Don't recreate if exists
+  var existing = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+  if (existing) return existing;
+
+  var sheet = ss.insertSheet(SHEETS.NOTIFICATIONS);
+
+  // Headers from header map (single source of truth)
+  var headers = getHeadersFromMap_(NOTIFICATIONS_HEADER_MAP_);
+  var headerRow = 1;
+  sheet.getRange(headerRow, 1, 1, headers.length).setValues([headers]);
+
+  // Header formatting
+  sheet.getRange(headerRow, 1, 1, headers.length)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+
+  // Column widths
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.NOTIFICATION_ID, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.RECIPIENT, 200);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.TYPE, 140);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.TITLE, 250);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.MESSAGE, 400);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.PRIORITY, 90);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.SENT_BY, 200);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.SENT_BY_NAME, 140);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.CREATED_DATE, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.EXPIRES_DATE, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.DISMISSED_BY, 300);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.STATUS, 90);
+
+  // Data validation — Type
+  var typeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Steward Message', 'Announcement', 'Deadline', 'System'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.TYPE, 500).setDataValidation(typeRule);
+
+  // Data validation — Priority
+  var priorityRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Normal', 'Urgent'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.PRIORITY, 500).setDataValidation(priorityRule);
+
+  // Data validation — Status
+  var statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Active', 'Expired', 'Archived'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.STATUS, 500).setDataValidation(statusRule);
+
+  // Data validation — Expires Date (must be date)
+  var dateRule = SpreadsheetApp.newDataValidation()
+    .requireDate()
+    .setAllowInvalid(true)  // blank = no expiry
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.EXPIRES_DATE, 500).setDataValidation(dateRule);
+
+  // 2 starter entries
+  var tz = Session.getScriptTimeZone();
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  var nextWeekStr = Utilities.formatDate(nextWeek, tz, 'yyyy-MM-dd');
+  var nextMonth = new Date();
+  nextMonth.setDate(nextMonth.getDate() + 30);
+  var nextMonthStr = Utilities.formatDate(nextMonth, tz, 'yyyy-MM-dd');
+
+  var starterRows = [
+    [
+      'NOTIF-001',
+      'All Members',
+      'Announcement',
+      'Welcome to the Union Dashboard',
+      'Your union dashboard is now live! Here you can check in to meetings, learn about your rights, and track grievance progress. Contact your steward if you have any questions.',
+      'Normal',
+      'system@massability.org',
+      'System',
+      today,
+      nextMonthStr,
+      '',
+      'Active'
+    ],
+    [
+      'NOTIF-002',
+      'All Members',
+      'Announcement',
+      'Monthly General Meeting — Check In Available',
+      'The Monthly General Membership Meeting is scheduled. Use the Check In page to mark your attendance. Virtual join link is available in the Events tab.',
+      'Normal',
+      'system@massability.org',
+      'System',
+      today,
+      nextWeekStr,
+      '',
+      'Active'
+    ]
+  ];
+
+  sheet.getRange(2, 1, starterRows.length, headers.length).setValues(starterRows);
+
+  // Wrap text on Message column
+  sheet.getRange(2, NOTIFICATIONS_COLS.MESSAGE, 500).setWrap(true);
+  sheet.getRange(2, NOTIFICATIONS_COLS.DISMISSED_BY, 500).setWrap(true);
+
+  // Freeze header
+  sheet.setFrozenRows(1);
+
+  // Tab color — orange for notifications
+  sheet.setTabColor('#F59E0B');
+
+  // Apply filter
+  var dataRange = sheet.getRange(1, 1, starterRows.length + 1, headers.length);
+  dataRange.createFilter();
+
+  return sheet;
+}
+

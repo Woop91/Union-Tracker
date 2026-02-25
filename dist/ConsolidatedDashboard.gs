@@ -1852,7 +1852,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3308 lines)
+// SOURCE: 01_Core.gs (3332 lines)
 // ============================================================================
 
 /**
@@ -2655,7 +2655,9 @@ var SHEETS = {
   WORKLOAD_USERMETA:  'Workload UserMeta',   // hidden — sharing start dates
   WORKLOAD_ARCHIVE:   'Workload Archive',     // hidden — data older than 24 months
   // Resources & Education (v4.11.0 — content management for educational hub)
-  RESOURCES:          '📚 Resources'          // steward-managed educational content
+  RESOURCES:          '📚 Resources',          // steward-managed educational content
+  // Notifications (v4.12.0 — steward-to-member messaging, dismissable with expiry)
+  NOTIFICATIONS:      '📢 Notifications'       // steward-composed, member-dismissable
 };
 
 // SHEET_NAMES alias for backward compatibility
@@ -3658,6 +3660,27 @@ var RESOURCES_HEADER_MAP_ = [
 
 var RESOURCES_COLS = buildColsFromMap_(RESOURCES_HEADER_MAP_);
 
+// ── Notifications (v4.12.0) ───────────────────────────────────────────────
+// Steward-composed notifications shown in member web view.
+// Persist until Expires date OR member dismisses (tracked in Dismissed_By).
+// Stewards compose via separate form in steward web view.
+var NOTIFICATIONS_HEADER_MAP_ = [
+  { key: 'NOTIFICATION_ID', header: 'Notification ID' },
+  { key: 'RECIPIENT',       header: 'Recipient' },       // email, "All Members", "All Stewards", "Everyone"
+  { key: 'TYPE',            header: 'Type' },             // Steward Message, Announcement, Deadline, System
+  { key: 'TITLE',           header: 'Title' },            // short headline
+  { key: 'MESSAGE',         header: 'Message' },          // body text
+  { key: 'PRIORITY',        header: 'Priority' },         // Normal, Urgent
+  { key: 'SENT_BY',         header: 'Sent By' },          // steward email
+  { key: 'SENT_BY_NAME',    header: 'Sent By Name' },     // display name (e.g. "Wardis")
+  { key: 'CREATED_DATE',    header: 'Created Date' },
+  { key: 'EXPIRES_DATE',    header: 'Expires Date' },     // set by steward — blank = no expiry
+  { key: 'DISMISSED_BY',    header: 'Dismissed By' },     // comma-separated emails
+  { key: 'STATUS',          header: 'Status' }            // Active, Expired, Archived
+];
+
+var NOTIFICATIONS_COLS = buildColsFromMap_(NOTIFICATIONS_HEADER_MAP_);
+
 // ============================================================================
 // COLUMN AUTO-DISCOVERY SYSTEM
 // ============================================================================
@@ -3765,7 +3788,8 @@ function syncColumnMaps() {
     { name: 'SURVEY_TRACKING_COLS', sheet: SHEETS.SURVEY_TRACKING, map: SURVEY_TRACKING_HEADER_MAP_, target: SURVEY_TRACKING_COLS },
     { name: 'FEEDBACK_COLS', sheet: SHEETS.FEEDBACK, map: FEEDBACK_HEADER_MAP_, target: FEEDBACK_COLS },
     { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS },
-    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS }
+    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS },
+    { name: 'NOTIFICATIONS_COLS', sheet: SHEETS.NOTIFICATIONS, map: NOTIFICATIONS_HEADER_MAP_, target: NOTIFICATIONS_COLS }
   ];
 
   for (var m = 0; m < maps.length; m++) {
@@ -18719,7 +18743,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (4061 lines)
+// SOURCE: 05_Integrations.gs (4303 lines)
 // ============================================================================
 
 /**
@@ -22781,6 +22805,248 @@ function getWebAppCheckInHtml() {
     '</script>' +
 
     '</body></html>';
+}
+
+
+// ============================================================================
+// NOTIFICATIONS API (v4.12.0)
+// ============================================================================
+// Steward-composed, member-dismissable notifications.
+// Data lives in 📢 Notifications sheet. Shown in member web view.
+// Persist until Expires date set by steward OR dismissed by member.
+// Steward composes via separate form accessible from steward dashboard.
+// ============================================================================
+
+/**
+ * Get active notifications for a user.
+ * Filters: Status=Active, not expired, not dismissed by this user.
+ * Matches: direct email recipient, "All Members", "All Stewards", "Everyone"
+ * @param {string} userEmail — the logged-in user's email
+ * @param {string} [userRole] — "steward" or "member" for audience matching
+ * @returns {Object[]} array of notification objects
+ */
+function getWebAppNotifications(userEmail, userRole) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+
+    var headers = data[0];
+    var C = NOTIFICATIONS_COLS;
+    var now = new Date();
+    var results = [];
+    userEmail = (userEmail || '').toLowerCase().trim();
+    userRole = (userRole || 'member').toLowerCase();
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+
+      // Status must be Active
+      var status = String(row[C.STATUS - 1] || '').trim();
+      if (status !== 'Active') continue;
+
+      // Check expiry
+      var expires = row[C.EXPIRES_DATE - 1];
+      if (expires && expires instanceof Date && expires < now) continue;
+      if (expires && typeof expires === 'string' && expires.trim()) {
+        var parsed = new Date(expires);
+        if (!isNaN(parsed.getTime()) && parsed < now) continue;
+      }
+
+      // Check dismissed
+      var dismissed = String(row[C.DISMISSED_BY - 1] || '');
+      var dismissedList = dismissed.split(',').map(function(e) { return e.trim().toLowerCase(); });
+      if (userEmail && dismissedList.indexOf(userEmail) !== -1) continue;
+
+      // Check recipient match
+      var recipient = String(row[C.RECIPIENT - 1] || '').trim().toLowerCase();
+      var matches = false;
+      if (recipient === 'everyone') matches = true;
+      else if (recipient === 'all members') matches = true;
+      else if (recipient === 'all stewards' && userRole === 'steward') matches = true;
+      else if (recipient === userEmail) matches = true;
+      if (!matches) continue;
+
+      results.push({
+        id: String(row[C.NOTIFICATION_ID - 1] || ''),
+        recipient: String(row[C.RECIPIENT - 1] || ''),
+        type: String(row[C.TYPE - 1] || 'System'),
+        title: String(row[C.TITLE - 1] || ''),
+        message: String(row[C.MESSAGE - 1] || ''),
+        priority: String(row[C.PRIORITY - 1] || 'Normal'),
+        sentBy: String(row[C.SENT_BY_NAME - 1] || ''),
+        createdDate: row[C.CREATED_DATE - 1] ? Utilities.formatDate(
+          row[C.CREATED_DATE - 1] instanceof Date ? row[C.CREATED_DATE - 1] : new Date(row[C.CREATED_DATE - 1]),
+          Session.getScriptTimeZone(), 'MMM d, yyyy') : '',
+        expiresDate: row[C.EXPIRES_DATE - 1] ? Utilities.formatDate(
+          row[C.EXPIRES_DATE - 1] instanceof Date ? row[C.EXPIRES_DATE - 1] : new Date(row[C.EXPIRES_DATE - 1]),
+          Session.getScriptTimeZone(), 'MMM d, yyyy') : '',
+        rowIndex: i + 1
+      });
+    }
+
+    // Sort: Urgent first, then newest first
+    results.sort(function(a, b) {
+      if (a.priority === 'Urgent' && b.priority !== 'Urgent') return -1;
+      if (b.priority === 'Urgent' && a.priority !== 'Urgent') return 1;
+      return 0; // preserve sheet order (newest at bottom, but we'll reverse)
+    });
+    results.reverse();
+
+    return results;
+  } catch (e) {
+    logError_('getWebAppNotifications', e);
+    return [];
+  }
+}
+
+
+/**
+ * Dismiss a notification for a specific user.
+ * Appends user's email to the Dismissed_By column (comma-separated).
+ * @param {string} notificationId — e.g. "NOTIF-001"
+ * @param {string} userEmail — the user dismissing
+ * @returns {Object} { success: boolean, message: string }
+ */
+function dismissWebAppNotification(notificationId, userEmail) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) return { success: false, message: 'Notifications sheet not found' };
+
+    var data = sheet.getDataRange().getValues();
+    var C = NOTIFICATIONS_COLS;
+    userEmail = (userEmail || '').toLowerCase().trim();
+    if (!userEmail) return { success: false, message: 'No email provided' };
+
+    for (var i = 1; i < data.length; i++) {
+      var rowId = String(data[i][C.NOTIFICATION_ID - 1] || '').trim();
+      if (rowId === notificationId) {
+        var existing = String(data[i][C.DISMISSED_BY - 1] || '').trim();
+        var emails = existing ? existing.split(',').map(function(e) { return e.trim().toLowerCase(); }) : [];
+        if (emails.indexOf(userEmail) === -1) {
+          emails.push(userEmail);
+          sheet.getRange(i + 1, C.DISMISSED_BY).setValue(emails.join(', '));
+        }
+        return { success: true, message: 'Notification dismissed' };
+      }
+    }
+
+    return { success: false, message: 'Notification not found' };
+  } catch (e) {
+    logError_('dismissWebAppNotification', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Send a new notification (steward form submission).
+ * Creates a new row in the Notifications sheet.
+ * @param {Object} data — { recipient, type, title, message, priority, expiresDate }
+ * @returns {Object} { success: boolean, notificationId: string, message: string }
+ */
+function sendWebAppNotification(data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+    if (!sheet) {
+      sheet = createNotificationsSheet(ss);
+    }
+
+    // Validate required fields
+    if (!data.title || !data.message) {
+      return { success: false, message: 'Title and message are required' };
+    }
+    if (!data.recipient) {
+      return { success: false, message: 'Recipient is required' };
+    }
+
+    // Get steward info from session
+    var stewardEmail = Session.getActiveUser().getEmail() || 'unknown';
+    var stewardName = data.senderName || stewardEmail.split('@')[0];
+
+    // Generate next ID
+    var allData = sheet.getDataRange().getValues();
+    var maxNum = 0;
+    var C = NOTIFICATIONS_COLS;
+    for (var i = 1; i < allData.length; i++) {
+      var existId = String(allData[i][C.NOTIFICATION_ID - 1] || '');
+      var match = existId.match(/NOTIF-(\d+)/);
+      if (match) {
+        var num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    var nextId = 'NOTIF-' + String(maxNum + 1).padStart(3, '0');
+
+    var tz = Session.getScriptTimeZone();
+    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+    // Build row (must match NOTIFICATIONS_HEADER_MAP_ order)
+    var newRow = [
+      nextId,
+      data.recipient || 'All Members',
+      data.type || 'Steward Message',
+      data.title,
+      data.message,
+      data.priority || 'Normal',
+      stewardEmail,
+      stewardName,
+      today,
+      data.expiresDate || '',   // blank = no expiry
+      '',                        // Dismissed_By starts empty
+      'Active'
+    ];
+
+    sheet.appendRow(newRow);
+
+    return { success: true, notificationId: nextId, message: 'Notification sent' };
+  } catch (e) {
+    logError_('sendWebAppNotification', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Get member list for notification recipient picker (steward use).
+ * Returns simplified list: name + email for dropdown.
+ * @returns {Object[]} [{ name, email }]
+ */
+function getNotificationRecipientList() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!sheet) return [];
+
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+
+    var C = MEMBER_COLS;
+    var results = [];
+    // Preset groups first
+    results.push({ name: '📢 All Members', email: 'All Members' });
+    results.push({ name: '🛡️ All Stewards', email: 'All Stewards' });
+    results.push({ name: '🌐 Everyone', email: 'Everyone' });
+
+    for (var i = 1; i < data.length; i++) {
+      var firstName = String(data[i][C.FIRST_NAME - 1] || '').trim();
+      var lastName = String(data[i][C.LAST_NAME - 1] || '').trim();
+      var email = String(data[i][C.EMAIL - 1] || '').trim();
+      if (!email) continue;
+      var fullName = (firstName + ' ' + lastName).trim();
+      results.push({ name: fullName || email, email: email });
+    }
+
+    return results;
+  } catch (e) {
+    logError_('getNotificationRecipientList', e);
+    return [];
+  }
 }
 
 
@@ -41206,7 +41472,7 @@ function setupMeetingCheckInSheet() {
 
 
 // ============================================================================
-// SOURCE: 10b_SurveyDocSheets.gs (2056 lines)
+// SOURCE: 10b_SurveyDocSheets.gs (2194 lines)
 // ============================================================================
 
 // ============================================================================
@@ -43256,6 +43522,144 @@ function createResourcesSheet(ss) {
 
   // Tab color
   sheet.setTabColor('#3B82F6');
+
+  // Apply filter
+  var dataRange = sheet.getRange(1, 1, starterRows.length + 1, headers.length);
+  dataRange.createFilter();
+
+  return sheet;
+}
+
+
+// ============================================================================
+// NOTIFICATIONS SHEET CREATION (v4.12.0)
+// ============================================================================
+// Steward-composed notifications for member web view.
+// Persist until Expires date set by steward OR dismissed by individual member.
+// Stewards compose via separate form in steward dashboard.
+// ============================================================================
+
+/**
+ * Creates the 📢 Notifications sheet with headers, validation, and 2 starter entries.
+ * @param {Spreadsheet} [ss] — defaults to active spreadsheet
+ * @returns {Sheet}
+ */
+function createNotificationsSheet(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+
+  // Don't recreate if exists
+  var existing = ss.getSheetByName(SHEETS.NOTIFICATIONS);
+  if (existing) return existing;
+
+  var sheet = ss.insertSheet(SHEETS.NOTIFICATIONS);
+
+  // Headers from header map (single source of truth)
+  var headers = getHeadersFromMap_(NOTIFICATIONS_HEADER_MAP_);
+  var headerRow = 1;
+  sheet.getRange(headerRow, 1, 1, headers.length).setValues([headers]);
+
+  // Header formatting
+  sheet.getRange(headerRow, 1, 1, headers.length)
+    .setBackground(COLORS.HEADER_BG || '#1e293b')
+    .setFontColor('#ffffff')
+    .setFontWeight('bold')
+    .setFontSize(11)
+    .setHorizontalAlignment('center');
+
+  // Column widths
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.NOTIFICATION_ID, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.RECIPIENT, 200);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.TYPE, 140);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.TITLE, 250);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.MESSAGE, 400);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.PRIORITY, 90);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.SENT_BY, 200);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.SENT_BY_NAME, 140);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.CREATED_DATE, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.EXPIRES_DATE, 120);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.DISMISSED_BY, 300);
+  sheet.setColumnWidth(NOTIFICATIONS_COLS.STATUS, 90);
+
+  // Data validation — Type
+  var typeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Steward Message', 'Announcement', 'Deadline', 'System'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.TYPE, 500).setDataValidation(typeRule);
+
+  // Data validation — Priority
+  var priorityRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Normal', 'Urgent'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.PRIORITY, 500).setDataValidation(priorityRule);
+
+  // Data validation — Status
+  var statusRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Active', 'Expired', 'Archived'])
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.STATUS, 500).setDataValidation(statusRule);
+
+  // Data validation — Expires Date (must be date)
+  var dateRule = SpreadsheetApp.newDataValidation()
+    .requireDate()
+    .setAllowInvalid(true)  // blank = no expiry
+    .build();
+  sheet.getRange(2, NOTIFICATIONS_COLS.EXPIRES_DATE, 500).setDataValidation(dateRule);
+
+  // 2 starter entries
+  var tz = Session.getScriptTimeZone();
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  var nextWeekStr = Utilities.formatDate(nextWeek, tz, 'yyyy-MM-dd');
+  var nextMonth = new Date();
+  nextMonth.setDate(nextMonth.getDate() + 30);
+  var nextMonthStr = Utilities.formatDate(nextMonth, tz, 'yyyy-MM-dd');
+
+  var starterRows = [
+    [
+      'NOTIF-001',
+      'All Members',
+      'Announcement',
+      'Welcome to the Union Dashboard',
+      'Your union dashboard is now live! Here you can check in to meetings, learn about your rights, and track grievance progress. Contact your steward if you have any questions.',
+      'Normal',
+      'system@massability.org',
+      'System',
+      today,
+      nextMonthStr,
+      '',
+      'Active'
+    ],
+    [
+      'NOTIF-002',
+      'All Members',
+      'Announcement',
+      'Monthly General Meeting — Check In Available',
+      'The Monthly General Membership Meeting is scheduled. Use the Check In page to mark your attendance. Virtual join link is available in the Events tab.',
+      'Normal',
+      'system@massability.org',
+      'System',
+      today,
+      nextWeekStr,
+      '',
+      'Active'
+    ]
+  ];
+
+  sheet.getRange(2, 1, starterRows.length, headers.length).setValues(starterRows);
+
+  // Wrap text on Message column
+  sheet.getRange(2, NOTIFICATIONS_COLS.MESSAGE, 500).setWrap(true);
+  sheet.getRange(2, NOTIFICATIONS_COLS.DISMISSED_BY, 500).setWrap(true);
+
+  // Freeze header
+  sheet.setFrozenRows(1);
+
+  // Tab color — orange for notifications
+  sheet.setTabColor('#F59E0B');
 
   // Apply filter
   var dataRange = sheet.getRange(1, 1, starterRows.length + 1, headers.length);
