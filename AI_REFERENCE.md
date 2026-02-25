@@ -300,3 +300,49 @@ Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Nam
 **Notifications:** Hero headers, CSS classes, urgent borders, type badges
 **doGet():** Default now routes to SPA (doGetWebDashboard) with SSO/magic link
 **Build:** 36 GS modules + 8 HTML files → 70,586 lines / 2,907 KB
+
+### v4.12.2b — UT Feature Port + Config/Auth/Routing (2026-02-25)
+**SHEETS constants added to DDS:**
+- WEEKLY_QUESTIONS: '_Weekly_Questions' (hidden, weekly engagement questions)
+- CONTACT_LOG: '_Contact_Log' (hidden, steward-member interaction log)
+- STEWARD_TASKS: '_Steward_Tasks' (hidden, steward task management)
+
+**Version history synced:** Added v4.11.0, v4.12.0, v4.12.2 entries to DDS
+
+**Sheet setup (08a_SheetSetup.gs):**
+- Weekly Questions init (calls WeeklyQuestions.initWeeklyQuestionSheets if available)
+- Contact Log sheet creation (_ensureContactLogSheet) — 8 columns, auto-hidden
+- Steward Tasks sheet creation (_ensureStewardTasksSheet) — 10 columns, auto-hidden
+
+**ConfigReader rewritten (20_WebDashConfigReader.gs):**
+- OLD: Read key-value pairs from Column A/B (row-based layout)
+- NEW: Read from column-based Config tab using CONFIG_COLS constants
+- Values read from row 3 (row 1=headers, row 2=section labels)
+- Falls back to _defaults() when Config tab missing
+- Added: calendarUrl/driveFolderUrl derived from IDs, localNumber, mainPhone
+
+**Auth helper (19_WebDashAuth.gs):**
+- Added initWebDashboardAuth() — first-time setup verifier
+- SSO: Works immediately via Session.getActiveUser().getEmail()
+- Magic links: Self-create via PropertiesService.getScriptProperties()
+- No manual ScriptProperties setup required
+
+**Deep-link routing (22_WebDashApp.gs + index.html + 05_Integrations.gs):**
+- _serveDashboard() now accepts initialTab parameter
+- doGetWebDashboard() reads e.parameter.page → passes as initialTab
+- SPA index.html reads PAGE_DATA.initialTab → calls _handleTabNav() after init
+- ?page=resources → SPA with resources tab pre-selected
+- ?page=notifications → SPA with notifications tab pre-selected
+- Standalone HTML pages kept as fallback if doGetWebDashboard unavailable
+
+**Default accent hue:** Changed from 250 (blue) → 30 (amber) in 10a_SheetCreation.gs
+
+**Files changed:**
+- src/01_Core.gs — SHEETS constants, version history
+- src/05_Integrations.gs — resources/notifications → SPA routing
+- src/08a_SheetSetup.gs — Weekly Questions, Contact Log, Steward Tasks init
+- src/10a_SheetCreation.gs — accent hue default 250→30
+- src/19_WebDashAuth.gs — initWebDashboardAuth()
+- src/20_WebDashConfigReader.gs — column-based Config tab reader
+- src/22_WebDashApp.gs — initialTab deep-link support
+- src/index.html — initialTab navigation after init

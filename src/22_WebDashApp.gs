@@ -70,7 +70,10 @@ function doGetWebDashboard(e) {
     // Route to appropriate dashboard
     var role = userRecord.role; // 'steward', 'member', or 'both'
     
-    return _serveDashboard(config, userRecord, role, sessionToken);
+    // Pass through ?page= parameter as initial tab for SPA deep linking
+    var initialTab = (e && e.parameter && e.parameter.page) || null;
+    
+    return _serveDashboard(config, userRecord, role, sessionToken, initialTab);
     
   } catch (err) {
     Logger.log('WebApp doGet error: ' + err.message + '\n' + err.stack);
@@ -99,7 +102,7 @@ function _serveAuth(config, e) {
 /**
  * Serves the dashboard (steward or member view).
  */
-function _serveDashboard(config, userRecord, role, sessionToken) {
+function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var template = HtmlService.createTemplateFromFile('index');
   
   // Sanitize user record — strip sensitive fields
@@ -125,6 +128,7 @@ function _serveDashboard(config, userRecord, role, sessionToken) {
     user: safeUser,
     isDualRole: role === 'both',
     sessionToken: sessionToken || null,
+    initialTab: initialTab || null,
   });
   
   return template.evaluate()

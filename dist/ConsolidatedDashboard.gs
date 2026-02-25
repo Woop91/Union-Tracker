@@ -1864,7 +1864,7 @@ function getDeadlineUrgency(daysToDeadline) {
 
 
 // ============================================================================
-// SOURCE: 01_Core.gs (3332 lines)
+// SOURCE: 01_Core.gs (3340 lines)
 // ============================================================================
 
 /**
@@ -2566,6 +2566,9 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.12.2', date: '2026-02-25', codename: 'SPA Theme Port', changes: 'Ported DM Sans + Fraunces theme to SPA, full educational resource hub with search/category pills/expandable cards, notification cards with hero headers and type badges, doGet() defaults to SPA, SPA files added to DDS-Dashboard.' },
+  { version: '4.12.0', date: '2026-02-24', codename: 'Notifications & Chart.js', changes: 'Notifications system (sheet, API, web page), Resources hub, Meeting Check-In web route, Chart.js integration, steward/member view enhancements, portal sheet setup.' },
+  { version: '4.11.0', date: '2026-02-24', codename: 'Web Dashboard SPA', changes: 'Responsive SPA layout, sidebar nav, Google SSO + magic link auth, member self-service, steward tools, weekly questions, CSS bar charts, quarterly survey results.' },
   { version: '4.10.0', date: '2026-02-24', codename: 'Workload Tracker Integration', changes: 'Workload Tracker module (18_WorkloadTracker.gs + WorkloadTracker.html), 8 workload categories with sub-breakdowns, privacy controls, reciprocity enforcement, email reminders, 24-month data retention, CSV backup, Workload Tracker submenu in Union Hub, ?page=workload web route, 5 new hidden sheets.' },
   { version: '4.9.1', date: '2026-02-23', codename: 'Security Vulnerability Fix Pass', changes: 'Fix 15 broken getClientSideEscapeHtml() includes, escape member data in grievance form HTML templates, URL scheme validation on Config URLs, escape steward contact data in Public Dashboard, replace unsafe onclick injection, add email format validation, formula injection protection, server-side input validation.' },
   { version: '4.9.0', date: '2026-02-17', codename: 'Constant Contact Integration', changes: 'Constant Contact v3 API integration with OAuth2, multi-select dropdown support for Grievance Log, auto-discovery column system, 151 column system tests, dynamic CONFIG_COLS and MEMBER_COLS constants.' },
@@ -2669,7 +2672,12 @@ var SHEETS = {
   // Resources & Education (v4.11.0 — content management for educational hub)
   RESOURCES:          '📚 Resources',          // steward-managed educational content
   // Notifications (v4.12.0 — steward-to-member messaging, dismissable with expiry)
-  NOTIFICATIONS:      '📢 Notifications'       // steward-composed, member-dismissable
+  NOTIFICATIONS:      '📢 Notifications',       // steward-composed, member-dismissable
+  // Weekly Questions System (24_WeeklyQuestions.gs)
+  WEEKLY_QUESTIONS:   '_Weekly_Questions',        // hidden — active/past questions
+  // SPA Portal sheets (23_PortalSheets.gs, 21_WebDashDataService.gs)
+  CONTACT_LOG:        '_Contact_Log',             // hidden — steward-member interaction log
+  STEWARD_TASKS:      '_Steward_Tasks'            // hidden — steward task management
 };
 
 // SHEET_NAMES alias for backward compatibility
@@ -18755,7 +18763,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (4703 lines)
+// SOURCE: 05_Integrations.gs (4709 lines)
 // ============================================================================
 
 /**
@@ -20553,11 +20561,17 @@ function doGet(e) {
       html = getWebAppCheckInHtml();
       break;
     case 'resources':
-      // v4.11.0: Educational content hub — contract articles, rights, FAQ, guides
+      // v4.12.2: Route through SPA (educational hub with search, category pills)
+      if (typeof doGetWebDashboard === 'function') {
+        return doGetWebDashboard(e);
+      }
       html = getWebAppResourcesHtml();
       break;
     case 'notifications':
-      // v4.12.0: Notifications — members view/dismiss, stewards compose inline
+      // v4.12.2: Route through SPA (hero headers, type badges, compose form)
+      if (typeof doGetWebDashboard === 'function') {
+        return doGetWebDashboard(e);
+      }
       html = getWebAppNotificationsHtml();
       break;
     case 'portal':
@@ -30086,7 +30100,7 @@ function showTestDashboard() {
 
 
 // ============================================================================
-// SOURCE: 08a_SheetSetup.gs (693 lines)
+// SOURCE: 08a_SheetSetup.gs (744 lines)
 // ============================================================================
 
 /**
@@ -30231,6 +30245,25 @@ function CREATE_DASHBOARD() {
       } catch (wtError) {
         Logger.log('Workload tracker sheets skipped: ' + wtError.message);
       }
+    }
+
+    // Initialize Weekly Questions sheets (24_WeeklyQuestions.gs)
+    if (typeof WeeklyQuestions !== 'undefined' && WeeklyQuestions.initWeeklyQuestionSheets) {
+      try {
+        WeeklyQuestions.initWeeklyQuestionSheets();
+        ss.toast('Weekly Questions sheets created', '🏗️ Progress', 2);
+      } catch (wqError) {
+        Logger.log('Weekly Questions sheets skipped: ' + wqError.message);
+      }
+    }
+
+    // Initialize Contact Log and Steward Tasks sheets (v4.12.0)
+    try {
+      _ensureContactLogSheet(ss);
+      _ensureStewardTasksSheet(ss);
+      ss.toast('Contact Log & Steward Tasks sheets created', '🏗️ Progress', 2);
+    } catch (v12Error) {
+      Logger.log('v4.12.0 sheets skipped: ' + v12Error.message);
     }
 
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
@@ -30397,6 +30430,38 @@ function setupHiddenSheets(ss) {
  * @version 1.0.0
  * @requires 01_Constants.gs
  */
+
+// ============================================================================
+// v4.12.0 SHEET SETUP — Contact Log & Steward Tasks
+// ============================================================================
+
+function _ensureContactLogSheet(ss) {
+  var name = SHEETS.CONTACT_LOG;
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, 8).setValues([[
+      'ID', 'Steward Email', 'Member Email', 'Contact Type',
+      'Date', 'Notes', 'Duration', 'Created'
+    ]]);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
+
+function _ensureStewardTasksSheet(ss) {
+  var name = SHEETS.STEWARD_TASKS;
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, 10).setValues([[
+      'ID', 'Steward Email', 'Title', 'Description', 'Member Email',
+      'Priority', 'Status', 'Due Date', 'Created', 'Completed'
+    ]]);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
 
 // ============================================================================
 // DATA VALIDATION SETUP
@@ -40052,7 +40117,7 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STEPS, escalationSteps, isExistingSheet);
 
   // Mobile Dashboard & branding defaults
-  seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [250], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [30], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['UN'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
@@ -62154,7 +62219,7 @@ function shareWorkloadPortalLink() {
 
 
 // ============================================================================
-// SOURCE: 19_WebDashAuth.gs (316 lines)
+// SOURCE: 19_WebDashAuth.gs (350 lines)
 // ============================================================================
 
 /**
@@ -62473,9 +62538,43 @@ function authLogout(sessionToken) {
   return { success: true };
 }
 
+/**
+ * First-time setup helper. Run from script editor to verify auth is working.
+ * SSO works immediately for Google-signed-in users.
+ * Magic links self-create when sendMagicLink() is called.
+ * No manual ScriptProperties setup required.
+ */
+function initWebDashboardAuth() {
+  // Clean up any expired tokens
+  Auth.cleanupExpiredTokens();
+  
+  // Check ScriptProperties
+  var props = PropertiesService.getScriptProperties();
+  var allKeys = props.getKeys();
+  var mlCount = allKeys.filter(function(k) { return k.indexOf('ml_') === 0; }).length;
+  var sessCount = allKeys.filter(function(k) { return k.indexOf('sess_') === 0; }).length;
+  
+  Logger.log('=== Web Dashboard Auth Status ===');
+  Logger.log('Magic link tokens: ' + mlCount);
+  Logger.log('Session tokens: ' + sessCount);
+  Logger.log('SSO: Available (Google account required)');
+  Logger.log('Config: ' + (typeof ConfigReader !== 'undefined' ? 'Loaded' : 'Missing'));
+  
+  if (typeof ConfigReader !== 'undefined') {
+    var validation = ConfigReader.validateConfig();
+    Logger.log('Config valid: ' + validation.valid);
+    if (validation.missing.length > 0) {
+      Logger.log('Missing config: ' + validation.missing.join(', '));
+    }
+  }
+  
+  Logger.log('================================');
+  return { mlTokens: mlCount, sessionTokens: sessCount, status: 'ready' };
+}
+
 
 // ============================================================================
-// SOURCE: 20_WebDashConfigReader.gs (159 lines)
+// SOURCE: 20_WebDashConfigReader.gs (194 lines)
 // ============================================================================
 
 /**
@@ -62483,19 +62582,13 @@ function authLogout(sessionToken) {
  * Reads org-specific configuration from the "Config" tab.
  * Caches in CacheService to avoid repeated sheet reads.
  * 
- * Config Tab Expected Layout:
- *   Column A: Setting Name
- *   Column B: Setting Value
+ * Config Tab Layout (column-based):
+ *   Row 1: Headers (matches CONFIG_HEADER_MAP_ keys)
+ *   Row 2: Section labels
+ *   Row 3+: Values
  * 
- * Required rows (by name in Column A):
- *   - Org Name
- *   - Org Abbreviation
- *   - Logo Initials
- *   - Accent Hue          (0-360, integer)
- *   - Magic Link Expiry   (days, integer)
- *   - Cookie Duration      (days, integer)
- *   - Steward Label        (optional, default "Steward")
- *   - Member Label         (optional, default "Member")
+ * Uses CONFIG_COLS constants from 01_Core.gs for column positions.
+ * Falls back to safe defaults when columns or values are missing.
  */
 
 var ConfigReader = (function () {
@@ -62503,6 +62596,7 @@ var ConfigReader = (function () {
   var CACHE_KEY = 'ORG_CONFIG';
   var CACHE_TTL = 21600; // 6 hours in seconds
   var CONFIG_SHEET_NAME = 'Config';
+  var DATA_ROW = 3; // Values live in row 3 (row 1=headers, row 2=section labels)
   
   /**
    * Reads the Config tab and returns a settings object.
@@ -62513,66 +62607,92 @@ var ConfigReader = (function () {
   function getConfig(forceRefresh) {
     // Try cache first
     if (!forceRefresh) {
-      var cache = CacheService.getScriptCache();
-      var cached = cache.get(CACHE_KEY);
-      if (cached) {
-        try {
+      try {
+        var cache = CacheService.getScriptCache();
+        var cached = cache.get(CACHE_KEY);
+        if (cached) {
           return JSON.parse(cached);
-        } catch (e) {
-          // Cache corrupted, fall through to read from sheet
         }
+      } catch (e) {
+        // Cache read failed — non-fatal
       }
     }
     
-    // Read from sheet
+    // Read from sheet using CONFIG_COLS (column-based layout)
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(CONFIG_SHEET_NAME);
     
     if (!sheet) {
-      throw new Error('Config tab "' + CONFIG_SHEET_NAME + '" not found. Please create it.');
+      Logger.log('ConfigReader: Config tab not found, using defaults');
+      return _defaults();
     }
     
-    var data = sheet.getDataRange().getValues();
-    var configMap = {};
+    // Read entire data row at once for efficiency
+    var lastCol = sheet.getLastColumn();
+    if (lastCol < 1) return _defaults();
     
-    // Build key-value map from columns A and B
-    for (var i = 0; i < data.length; i++) {
-      var key = String(data[i][0]).trim().toLowerCase();
-      var value = data[i][1];
-      if (key) {
-        configMap[key] = value;
-      }
+    var dataRow = sheet.getRange(DATA_ROW, 1, 1, lastCol).getValues()[0];
+    
+    /**
+     * Safe column reader — returns value at CONFIG_COLS position or default.
+     * CONFIG_COLS are 1-indexed column numbers; dataRow is 0-indexed.
+     */
+    function _val(colConst, fallback) {
+      if (typeof colConst !== 'number' || colConst < 1 || colConst > lastCol) return fallback;
+      var v = dataRow[colConst - 1];
+      if (v === '' || v === null || v === undefined) return fallback;
+      return v;
     }
     
-    // Build config object with defaults
+    // Check if CONFIG_COLS exists (loaded from 01_Core.gs)
+    var C = (typeof CONFIG_COLS !== 'undefined') ? CONFIG_COLS : {};
+    
+    var orgName = String(_val(C.ORG_NAME, 'My Organization'));
+    
     var config = {
-      orgName:             configMap['org name'] || configMap['organization name'] || 'My Organization',
-      orgAbbrev:           configMap['org abbreviation'] || configMap['abbreviation'] || '',
-      logoInitials:        configMap['logo initials'] || configMap['logo'] || _deriveInitials(configMap['org name'] || 'MO'),
-      accentHue:           _parseInt(configMap['accent hue'] || configMap['accent color hue'], 250),
-      magicLinkExpiryDays: _parseInt(configMap['magic link expiry'] || configMap['magic link expiry days'], 7),
-      cookieDurationDays:  _parseInt(configMap['cookie duration'] || configMap['cookie duration days'], 30),
-      stewardLabel:        configMap['steward label'] || 'Steward',
-      memberLabel:         configMap['member label'] || 'Member',
+      orgName:             orgName,
+      orgAbbrev:           _deriveInitials(orgName),
+      logoInitials:        String(_val(C.LOGO_INITIALS, _deriveInitials(orgName))),
+      accentHue:           _parseInt(_val(C.ACCENT_HUE, 30), 30),
+      magicLinkExpiryDays: _parseInt(_val(C.MAGIC_LINK_EXPIRY_DAYS, 7), 7),
+      cookieDurationDays:  _parseInt(_val(C.COOKIE_DURATION_DAYS, 30), 30),
+      stewardLabel:        String(_val(C.STEWARD_LABEL, 'Steward')),
+      memberLabel:         String(_val(C.MEMBER_LABEL, 'Member')),
+      localNumber:         String(_val(C.LOCAL_NUMBER, '')),
+      mainPhone:           String(_val(C.MAIN_PHONE, '')),
       // Org links
-      calendarId:          configMap['calendar id'] || configMap['google calendar id'] || '',
-      driveFolderId:       configMap['drive folder id'] || configMap['shared drive folder'] || '',
-      satisfactionFormUrl: configMap['satisfaction form url'] || configMap['survey form url'] || '',
-      orgWebsite:          configMap['org website'] || configMap['website'] || '',
-      // Derived
+      calendarId:          String(_val(C.CALENDAR_ID, '')),
+      driveFolderId:       String(_val(C.DRIVE_FOLDER_ID, '')),
+      satisfactionFormUrl: String(_val(C.SATISFACTION_FORM_URL, '')),
+      orgWebsite:          String(_val(C.ORG_WEBSITE, '')),
+      // Derived URLs
+      calendarUrl:         '',
+      driveFolderUrl:      '',
+      // Derived ms
       magicLinkExpiryMs:   0,
       cookieDurationMs:    0,
     };
     
-    config.magicLinkExpiryMs = config.magicLinkExpiryDays * 24 * 60 * 60 * 1000;
-    config.cookieDurationMs = config.cookieDurationDays * 24 * 60 * 60 * 1000;
+    // Build URLs from IDs
+    if (config.calendarId) {
+      config.calendarUrl = 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(config.calendarId);
+    }
+    if (config.driveFolderId) {
+      config.driveFolderUrl = 'https://drive.google.com/drive/folders/' + config.driveFolderId;
+    }
+    var driveFolderUrl = String(_val(C.DRIVE_FOLDER_URL, ''));
+    if (driveFolderUrl && !config.driveFolderUrl) {
+      config.driveFolderUrl = driveFolderUrl;
+    }
+    
+    config.magicLinkExpiryMs = config.magicLinkExpiryDays * 86400000;
+    config.cookieDurationMs = config.cookieDurationDays * 86400000;
     
     // Cache it
     try {
       var cache = CacheService.getScriptCache();
       cache.put(CACHE_KEY, JSON.stringify(config), CACHE_TTL);
     } catch (e) {
-      // Cache write failed — non-fatal, will just re-read next time
       Logger.log('ConfigReader: Cache write failed: ' + e.message);
     }
     
@@ -62610,6 +62730,20 @@ var ConfigReader = (function () {
       valid: missing.length === 0,
       missing: missing,
       config: config
+    };
+  }
+  
+  // --- Defaults (when Config tab doesn't exist) ---
+  
+  function _defaults() {
+    return {
+      orgName: 'My Organization', orgAbbrev: 'MO', logoInitials: 'MO',
+      accentHue: 30, magicLinkExpiryDays: 7, cookieDurationDays: 30,
+      stewardLabel: 'Steward', memberLabel: 'Member',
+      localNumber: '', mainPhone: '',
+      calendarId: '', driveFolderId: '', satisfactionFormUrl: '', orgWebsite: '',
+      calendarUrl: '', driveFolderUrl: '',
+      magicLinkExpiryMs: 604800000, cookieDurationMs: 2592000000,
     };
   }
   
@@ -63908,7 +64042,7 @@ function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(lim
 
 
 // ============================================================================
-// SOURCE: 22_WebDashApp.gs (193 lines)
+// SOURCE: 22_WebDashApp.gs (197 lines)
 // ============================================================================
 
 /**
@@ -63983,7 +64117,10 @@ function doGetWebDashboard(e) {
     // Route to appropriate dashboard
     var role = userRecord.role; // 'steward', 'member', or 'both'
     
-    return _serveDashboard(config, userRecord, role, sessionToken);
+    // Pass through ?page= parameter as initial tab for SPA deep linking
+    var initialTab = (e && e.parameter && e.parameter.page) || null;
+    
+    return _serveDashboard(config, userRecord, role, sessionToken, initialTab);
     
   } catch (err) {
     Logger.log('WebApp doGet error: ' + err.message + '\n' + err.stack);
@@ -64012,7 +64149,7 @@ function _serveAuth(config, e) {
 /**
  * Serves the dashboard (steward or member view).
  */
-function _serveDashboard(config, userRecord, role, sessionToken) {
+function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var template = HtmlService.createTemplateFromFile('index');
   
   // Sanitize user record — strip sensitive fields
@@ -64038,6 +64175,7 @@ function _serveDashboard(config, userRecord, role, sessionToken) {
     user: safeUser,
     isDualRole: role === 'both',
     sessionToken: sessionToken || null,
+    initialTab: initialTab || null,
   });
   
   return template.evaluate()
@@ -66171,6 +66309,14 @@ function getindex_HTML() {
           break;
         default:
           renderAuth(app);
+      }
+      
+      // Deep-link: if ?page= was passed, navigate to that tab after init
+      if (PAGE_DATA.initialTab && (CURRENT_VIEW === 'steward' || CURRENT_VIEW === 'member')) {
+        // Delay to let initial render complete
+        setTimeout(function() {
+          _handleTabNav(CURRENT_VIEW, PAGE_DATA.initialTab);
+        }, 500);
       }
     }
     

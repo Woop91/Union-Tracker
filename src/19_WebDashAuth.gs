@@ -313,3 +313,37 @@ function authLogout(sessionToken) {
   Auth.invalidateSession(sessionToken);
   return { success: true };
 }
+
+/**
+ * First-time setup helper. Run from script editor to verify auth is working.
+ * SSO works immediately for Google-signed-in users.
+ * Magic links self-create when sendMagicLink() is called.
+ * No manual ScriptProperties setup required.
+ */
+function initWebDashboardAuth() {
+  // Clean up any expired tokens
+  Auth.cleanupExpiredTokens();
+  
+  // Check ScriptProperties
+  var props = PropertiesService.getScriptProperties();
+  var allKeys = props.getKeys();
+  var mlCount = allKeys.filter(function(k) { return k.indexOf('ml_') === 0; }).length;
+  var sessCount = allKeys.filter(function(k) { return k.indexOf('sess_') === 0; }).length;
+  
+  Logger.log('=== Web Dashboard Auth Status ===');
+  Logger.log('Magic link tokens: ' + mlCount);
+  Logger.log('Session tokens: ' + sessCount);
+  Logger.log('SSO: Available (Google account required)');
+  Logger.log('Config: ' + (typeof ConfigReader !== 'undefined' ? 'Loaded' : 'Missing'));
+  
+  if (typeof ConfigReader !== 'undefined') {
+    var validation = ConfigReader.validateConfig();
+    Logger.log('Config valid: ' + validation.valid);
+    if (validation.missing.length > 0) {
+      Logger.log('Missing config: ' + validation.missing.join(', '));
+    }
+  }
+  
+  Logger.log('================================');
+  return { mlTokens: mlCount, sessionTokens: sessCount, status: 'ready' };
+}

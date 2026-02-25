@@ -1793,11 +1793,17 @@ function doGet(e) {
       html = getWebAppCheckInHtml();
       break;
     case 'resources':
-      // v4.11.0: Educational content hub — contract articles, rights, FAQ, guides
+      // v4.12.2: Route through SPA (educational hub with search, category pills)
+      if (typeof doGetWebDashboard === 'function') {
+        return doGetWebDashboard(e);
+      }
       html = getWebAppResourcesHtml();
       break;
     case 'notifications':
-      // v4.12.0: Notifications — members view/dismiss, stewards compose inline
+      // v4.12.2: Route through SPA (hero headers, type badges, compose form)
+      if (typeof doGetWebDashboard === 'function') {
+        return doGetWebDashboard(e);
+      }
       html = getWebAppNotificationsHtml();
       break;
     case 'portal':

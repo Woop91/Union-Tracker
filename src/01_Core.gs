@@ -697,6 +697,9 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.12.2', date: '2026-02-25', codename: 'SPA Theme Port', changes: 'Ported DM Sans + Fraunces theme to SPA, full educational resource hub with search/category pills/expandable cards, notification cards with hero headers and type badges, doGet() defaults to SPA, SPA files added to DDS-Dashboard.' },
+  { version: '4.12.0', date: '2026-02-24', codename: 'Notifications & Chart.js', changes: 'Notifications system (sheet, API, web page), Resources hub, Meeting Check-In web route, Chart.js integration, steward/member view enhancements, portal sheet setup.' },
+  { version: '4.11.0', date: '2026-02-24', codename: 'Web Dashboard SPA', changes: 'Responsive SPA layout, sidebar nav, Google SSO + magic link auth, member self-service, steward tools, weekly questions, CSS bar charts, quarterly survey results.' },
   { version: '4.10.0', date: '2026-02-24', codename: 'Workload Tracker Integration', changes: 'Workload Tracker module (18_WorkloadTracker.gs + WorkloadTracker.html), 8 workload categories with sub-breakdowns, privacy controls, reciprocity enforcement, email reminders, 24-month data retention, CSV backup, Workload Tracker submenu in Union Hub, ?page=workload web route, 5 new hidden sheets.' },
   { version: '4.9.1', date: '2026-02-23', codename: 'Security Vulnerability Fix Pass', changes: 'Fix 15 broken getClientSideEscapeHtml() includes, escape member data in grievance form HTML templates, URL scheme validation on Config URLs, escape steward contact data in Public Dashboard, replace unsafe onclick injection, add email format validation, formula injection protection, server-side input validation.' },
   { version: '4.9.0', date: '2026-02-17', codename: 'Constant Contact Integration', changes: 'Constant Contact v3 API integration with OAuth2, multi-select dropdown support for Grievance Log, auto-discovery column system, 151 column system tests, dynamic CONFIG_COLS and MEMBER_COLS constants.' },
@@ -800,7 +803,12 @@ var SHEETS = {
   // Resources & Education (v4.11.0 — content management for educational hub)
   RESOURCES:          '📚 Resources',          // steward-managed educational content
   // Notifications (v4.12.0 — steward-to-member messaging, dismissable with expiry)
-  NOTIFICATIONS:      '📢 Notifications'       // steward-composed, member-dismissable
+  NOTIFICATIONS:      '📢 Notifications',       // steward-composed, member-dismissable
+  // Weekly Questions System (24_WeeklyQuestions.gs)
+  WEEKLY_QUESTIONS:   '_Weekly_Questions',        // hidden — active/past questions
+  // SPA Portal sheets (23_PortalSheets.gs, 21_WebDashDataService.gs)
+  CONTACT_LOG:        '_Contact_Log',             // hidden — steward-member interaction log
+  STEWARD_TASKS:      '_Steward_Tasks'            // hidden — steward task management
 };
 
 // SHEET_NAMES alias for backward compatibility
