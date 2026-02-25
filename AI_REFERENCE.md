@@ -385,3 +385,10 @@ Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Nam
 - src/steward_view.html — Full resource hub + themed notifications + compose form fix
 - src/05_Integrations.gs — doGet default → doGetWebDashboard(e)
 - dist/ConsolidatedDashboard.gs — rebuilt
+
+### v4.12.2b — Feature Parity + Config/Auth/Routing (2026-02-25)
+**ConfigReader rewritten:** Column-based Config tab reader using CONFIG_COLS (was row-based key-value)
+**Auth:** initWebDashboardAuth() helper, SSO + magic link self-bootstrapping
+**Deep-link:** ?page=resources/notifications → SPA with initialTab pre-selected
+**SHEETS:** Added CONTACT_LOG, STEWARD_TASKS constants
+**Config default:** Accent hue 250→30 (amber)
