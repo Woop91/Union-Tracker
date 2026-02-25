@@ -18759,7 +18759,7 @@ function getUnifiedDashboardHtml(isPII) {
 
 
 // ============================================================================
-// SOURCE: 05_Integrations.gs (4700 lines)
+// SOURCE: 05_Integrations.gs (4703 lines)
 // ============================================================================
 
 /**
@@ -20569,10 +20569,13 @@ function doGet(e) {
       if (typeof buildPublicPortal === 'function') {
         return buildPublicPortal();
       }
-      // Fall through to dashboard
+      // Fall through to SPA dashboard
     case 'dashboard':
     default:
-      // v4.4.0: Default to unified member dashboard
+      // v4.12.1: Default to SPA web dashboard (SSO + magic link auth)
+      if (typeof doGetWebDashboard === 'function') {
+        return doGetWebDashboard(e);
+      }
       html = getUnifiedDashboardHtml(false);
       break;
   }
@@ -66314,10 +66317,11 @@ function getindex_HTML() {
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Dashboard</title>
   
-  <!-- Fonts -->
+  <!-- Fonts — DM Sans (body) + Fraunces (display) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   
   <?!= include('styles') ?>
 
@@ -66352,55 +66356,56 @@ function getindex_HTML() {
     var ThemeEngine = (function() {
       
       function generatePalette(hue) {
+        // Override: warm amber accent to match our system
         return {
-          accent:       'hsl(' + hue + ', 70%, 68%)',
-          accentDim:    'hsl(' + hue + ', 50%, 45%)',
-          accentGlow:   'hsla(' + hue + ', 70%, 68%, 0.3)',
-          accentBg:     'hsla(' + hue + ', 70%, 68%, 0.1)',
-          accentBorder: 'hsla(' + hue + ', 70%, 68%, 0.25)',
+          accent:       'hsl(' + hue + ', 65%, 42%)',
+          accentDim:    'hsl(' + hue + ', 50%, 35%)',
+          accentGlow:   'hsla(' + hue + ', 65%, 42%, 0.3)',
+          accentBg:     'hsla(' + hue + ', 65%, 42%, 0.08)',
+          accentBorder: 'hsla(' + hue + ', 65%, 42%, 0.25)',
         };
       }
       
-      var palette = generatePalette(CONFIG.accentHue || 250);
+      var palette = generatePalette(CONFIG.accentHue || 30);
       
       var themes = {
         steward: {
           dark: {
-            bg: '#141414', surface: '#1e1e1e', raised: '#262626',
-            text: '#e0e0e0', muted: '#6b6b6b',
+            bg: '#1a1815', surface: '#252220', raised: '#2e2b28',
+            text: '#e7e5e4', muted: '#78716c',
             success: '#4ade80', warning: '#facc15', danger: '#ef4444', info: '#60a5fa',
-            border: '#2a2a2a', radius: '10px',
-            fontBody: "'JetBrains Mono', monospace",
-            fontDisplay: "'Space Grotesk', sans-serif",
+            border: '#3d3835', radius: '14px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
             mode: 'dark',
           },
           light: {
-            bg: '#f2f2f5', surface: '#ffffff', raised: '#f8f8fa',
-            text: '#1a1a2e', muted: '#8888a0',
+            bg: '#fafaf9', surface: '#ffffff', raised: '#f5f5f4',
+            text: '#1c1917', muted: '#78716c',
             success: '#16a34a', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
-            border: '#e2e2ea', radius: '10px',
-            fontBody: "'JetBrains Mono', monospace",
-            fontDisplay: "'Space Grotesk', sans-serif",
+            border: '#e7e5e4', radius: '14px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
             mode: 'light',
           }
         },
         member: {
           dark: {
-            bg: '#0c0c1d', surface: 'rgba(255,255,255,0.05)', raised: 'rgba(255,255,255,0.08)',
-            text: '#eeedf5', muted: '#7d7b96',
+            bg: '#1a1815', surface: '#252220', raised: '#2e2b28',
+            text: '#e7e5e4', muted: '#78716c',
             success: '#34d399', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa',
-            border: 'rgba(255,255,255,0.08)', radius: '20px',
-            fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Sora', sans-serif",
+            border: '#3d3835', radius: '16px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
             mode: 'dark',
           },
           light: {
-            bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', raised: 'rgba(255,255,255,0.95)',
-            text: '#1a1a2e', muted: '#7d7b96',
+            bg: '#fafaf9', surface: '#ffffff', raised: '#f5f5f4',
+            text: '#1c1917', muted: '#78716c',
             success: '#059669', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
-            border: 'rgba(0,0,0,0.08)', radius: '20px',
-            fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Sora', sans-serif",
+            border: '#e7e5e4', radius: '16px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
             mode: 'light',
           }
         }
@@ -66442,7 +66447,7 @@ function getindex_HTML() {
       view: CURRENT_VIEW,
       role: CURRENT_USER ? CURRENT_USER.role : null,
       activeRole: CURRENT_VIEW, // which view is shown (for dual-role toggle)
-      isDark: true,
+      isDark: false,
       user: CURRENT_USER,
       cases: [],
       kpis: null,
@@ -67363,88 +67368,71 @@ function _renderStewardPicker(content) {
 
 function renderMemberNotifications(appContainer) {
   renderPageLayout(appContainer, 'member', 'notifications', function(container) {
-    _memberHeader(container, 'Notifications');
-    var content = el('div', { className: 'content' });
+    // Hero header — amber gradient matching our system
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(145deg, #92400e, #b45309)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDD14 Notifications'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Stay updated on union news, deadlines, and steward messages'));
+    container.appendChild(hero);
+
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
     showLoading(content);
     container.appendChild(content);
+
+    var typeColors = {
+      'Steward Message': { bg: 'rgba(45,90,135,0.12)', text: '#2d5a87' },
+      'Announcement': { bg: 'rgba(22,163,74,0.12)', text: '#16a34a' },
+      'Deadline': { bg: 'rgba(220,38,38,0.12)', text: '#dc2626' },
+      'System': { bg: 'rgba(147,51,234,0.12)', text: '#9333ea' }
+    };
 
     google.script.run.withSuccessHandler(function(notifs) {
       content.innerHTML = '';
       if (!notifs || notifs.length === 0) {
-        var emptyState = el('div', { style: { textAlign: 'center', padding: '60px 20px' } });
-        emptyState.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
-        emptyState.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'All caught up!'));
-        emptyState.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'No new notifications right now.'));
-        content.appendChild(emptyState);
+        var empty = el('div', { className: 'notif-empty' });
+        empty.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDD14'));
+        empty.appendChild(el('div', { className: 'notif-empty-title' }, 'All caught up!'));
+        empty.appendChild(el('div', { className: 'notif-empty-sub' }, 'No new notifications right now.'));
+        content.appendChild(empty);
         return;
       }
 
-      // Badge colors by type
-      var typeColors = {
-        'Steward Message': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
-        'Announcement': { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
-        'Deadline': { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },
-        'System': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' }
-      };
-
       notifs.forEach(function(n) {
         var card = el('div', {
-          className: 'card card-glass',
-          id: 'notif-' + n.id,
-          style: { padding: '16px', marginBottom: '10px', position: 'relative', transition: 'opacity 0.3s, transform 0.3s' }
+          className: 'notif-card' + (n.priority === 'Urgent' ? ' urgent' : ''),
+          id: 'notif-' + n.id
         });
-
-        // Top row: badges + date + dismiss
         var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' } });
         var tc = typeColors[n.type] || typeColors['System'];
-        topRow.appendChild(el('span', {
-          style: { fontSize: '10px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px', background: tc.bg, color: tc.text, textTransform: 'uppercase', letterSpacing: '0.5px' }
-        }, n.type));
+        topRow.appendChild(el('span', { className: 'type-badge', style: { background: tc.bg, color: tc.text } }, n.type));
         if (n.priority === 'Urgent') {
-          topRow.appendChild(el('span', {
-            style: { fontSize: '10px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', textTransform: 'uppercase' }
-          }, 'URGENT'));
+          topRow.appendChild(el('span', { className: 'type-badge', style: { background: 'rgba(220,38,38,0.15)', color: '#dc2626' } }, 'URGENT'));
         }
         topRow.appendChild(el('span', { style: { flex: '1' } }));
         topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, n.createdDate));
-        // Dismiss button
-        var dismissBtn = el('button', {
-          style: { background: 'none', border: 'none', color: 'var(--muted)', fontSize: '16px', cursor: 'pointer', padding: '0 0 0 8px', lineHeight: '1' },
-          title: 'Dismiss',
+        card.appendChild(topRow);
+        card.appendChild(el('button', {
+          className: 'notif-dismiss',
           onClick: function() {
-            var cardEl = document.getElementById('notif-' + n.id);
-            if (cardEl) { cardEl.style.opacity = '0'; cardEl.style.transform = 'translateX(30px)'; }
+            var ce = document.getElementById('notif-' + n.id);
+            if (ce) { ce.style.opacity = '0'; ce.style.transform = 'translateX(30px)'; }
             google.script.run.withSuccessHandler(function() {
-              setTimeout(function() { if (cardEl) cardEl.remove(); _checkNotifEmpty(content); }, 300);
+              setTimeout(function() { if (ce) ce.remove(); _checkNotifEmpty(content); }, 300);
             }).withFailureHandler(function() {
-              if (cardEl) { cardEl.style.opacity = '1'; cardEl.style.transform = 'none'; }
+              if (ce) { ce.style.opacity = '1'; ce.style.transform = 'none'; }
             }).dismissWebAppNotification(n.id, CURRENT_USER.email);
           }
-        }, '\u2715');
-        topRow.appendChild(dismissBtn);
-        card.appendChild(topRow);
-
-        // Title
-        card.appendChild(el('div', {
-          style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' }
-        }, n.title));
-
-        // Message
-        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', lineHeight: '1.5', marginBottom: '8px' } }, n.message));
-
-        // Meta line
+        }, '\u2715'));
+        card.appendChild(el('div', { className: 'notif-title' }, n.title));
+        card.appendChild(el('div', { className: 'notif-msg' }, n.message));
         var meta = [];
         if (n.sentBy) meta.push('From: ' + n.sentBy);
         if (n.expiresDate) meta.push('Expires: ' + n.expiresDate);
-        if (meta.length > 0) {
-          card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
-        }
-
+        if (meta.length > 0) card.appendChild(el('div', { className: 'notif-meta' }, meta.join(' \u00B7 ')));
         content.appendChild(card);
       });
     }).withFailureHandler(function(err) {
       content.innerHTML = '';
-      content.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '20px' } }, 'Error loading notifications: ' + String(err)));
+      content.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '20px' } }, 'Error: ' + String(err)));
     }).getWebAppNotifications(CURRENT_USER.email, 'member');
   });
 }
@@ -67453,104 +67441,159 @@ function _checkNotifEmpty(container) {
   var remaining = container.querySelectorAll('[id^="notif-"]');
   if (remaining.length === 0) {
     container.innerHTML = '';
-    var emptyState = el('div', { style: { textAlign: 'center', padding: '60px 20px' } });
-    emptyState.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
-    emptyState.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '18px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'All caught up!'));
-    emptyState.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'No new notifications right now.'));
-    container.appendChild(emptyState);
+    var empty = el('div', { className: 'notif-empty' });
+    empty.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDD14'));
+    empty.appendChild(el('div', { className: 'notif-empty-title' }, 'All caught up!'));
+    empty.appendChild(el('div', { className: 'notif-empty-sub' }, 'No new notifications right now.'));
+    container.appendChild(empty);
   }
 }
 
 // ═══════════════════════════════════════
-// RESOURCES (member view) — Dynamic from Resources sheet
+// RESOURCES — Educational Hub (member view)
+// Search, category pills, expandable cards, external links
 // ═══════════════════════════════════════
 
 function renderMemberResources(appContainer) {
   renderPageLayout(appContainer, 'member', 'resources', function(container) {
-    _memberHeader(container, 'Resources');
-    var content = el('div', { className: 'content' });
+    // Hero header
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDCDA Know Your Rights'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Your guide to the union contract, grievance process, and workplace protections'));
+    hero.appendChild(el('div', { className: 'page-hero', style: { position: 'absolute', bottom: '-20px', left: '-20px', right: '-20px', height: '40px', background: 'var(--bg)', borderRadius: '50% 50% 0 0', padding: '0' } }));
+    container.appendChild(hero);
 
-    // Quick links (always visible, from Config)
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
+
+    // Search bar
+    var searchWrap = el('div', { className: 'res-search-wrap' });
+    searchWrap.appendChild(el('i', { className: 'material-icons res-search-icon' }, 'search'));
+    var searchInput = el('input', {
+      className: 'res-search-bar',
+      placeholder: 'Search articles, rights, FAQ...',
+      onInput: function() { _filterResources(); }
+    });
+    searchWrap.appendChild(searchInput);
+    content.appendChild(searchWrap);
+
+    // Category pills
+    var pillsRow = el('div', { className: 'cat-pills', id: 'res-cat-pills' });
+    content.appendChild(pillsRow);
+
+    // Quick links
     var quickLinks = [];
     if (CONFIG.calendarUrl) quickLinks.push({ icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl });
     if (CONFIG.driveFolderUrl) quickLinks.push({ icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl });
     if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
     if (quickLinks.length > 0) {
-      content.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Quick Links'));
+      var qlRow = el('div', { style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px' } });
       quickLinks.forEach(function(r) {
         var item = el('div', {
-          className: 'card card-glass card-clickable',
-          style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', marginBottom: '6px' },
+          className: 'card card-clickable',
+          style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', flex: '0 0 auto', minWidth: '160px' },
           onClick: function() { window.open(r.url, '_blank'); }
         });
-        item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
-        var tg = el('div', { style: { flex: '1' } });
+        item.appendChild(el('span', { style: { fontSize: '20px' } }, r.icon));
+        var tg = el('div');
         tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-        tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+        tg.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)' } }, r.sub));
         item.appendChild(tg);
-        item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-        content.appendChild(item);
+        qlRow.appendChild(item);
+      });
+      content.appendChild(qlRow);
+    }
+
+    // Resource list container
+    var resList = el('div', { id: 'res-list' });
+    showLoading(resList);
+    content.appendChild(resList);
+    container.appendChild(content);
+
+    // State
+    var _allResources = [];
+    var _currentCat = 'all';
+
+    google.script.run.withSuccessHandler(function(data) {
+      _allResources = data || [];
+      _buildCatPills();
+      _renderResourceList(_allResources);
+    }).withFailureHandler(function(err) {
+      resList.innerHTML = '';
+      resList.appendChild(_resEmpty('\u26A0\uFE0F', 'Error loading resources', String(err || '')));
+    }).getWebAppResourcesList('All');
+
+    function _filterResources() {
+      var q = (searchInput.value || '').toLowerCase();
+      var filtered = _allResources.filter(function(r) {
+        var matchesCat = _currentCat === 'all' || r.category === _currentCat;
+        var matchesQ = !q || q.length < 2 || r.title.toLowerCase().indexOf(q) >= 0 || r.summary.toLowerCase().indexOf(q) >= 0 || (r.content || '').toLowerCase().indexOf(q) >= 0 || r.category.toLowerCase().indexOf(q) >= 0;
+        return matchesCat && matchesQ;
+      });
+      _renderResourceList(filtered);
+    }
+
+    function _setCat(cat) {
+      _currentCat = cat;
+      var pills = document.querySelectorAll('.cat-pill');
+      for (var i = 0; i < pills.length; i++) {
+        pills[i].className = pills[i].getAttribute('data-cat') === cat ? 'cat-pill active' : 'cat-pill';
+      }
+      _filterResources();
+    }
+
+    function _buildCatPills() {
+      var cats = {};
+      _allResources.forEach(function(r) { cats[r.category] = (cats[r.category] || 0) + 1; });
+      pillsRow.innerHTML = '';
+      var allPill = el('button', { className: 'cat-pill active', 'data-cat': 'all', onClick: function() { _setCat('all'); } }, 'All (' + _allResources.length + ')');
+      pillsRow.appendChild(allPill);
+      Object.keys(cats).sort().forEach(function(c) {
+        pillsRow.appendChild(el('button', { className: 'cat-pill', 'data-cat': c, onClick: function() { _setCat(c); } }, c + ' (' + cats[c] + ')'));
       });
     }
 
-    // Dynamic resources from sheet
-    var dynamicContainer = el('div');
-    showLoading(dynamicContainer);
-    content.appendChild(dynamicContainer);
-    container.appendChild(content);
-
-    google.script.run.withSuccessHandler(function(resources) {
-      dynamicContainer.innerHTML = '';
-      if (!resources || resources.length === 0) {
-        dynamicContainer.appendChild(el('div', { style: { color: 'var(--muted)', textAlign: 'center', padding: '20px 0', fontSize: '13px' } }, 'No additional resources available.'));
+    function _renderResourceList(items) {
+      resList.innerHTML = '';
+      if (!items || items.length === 0) {
+        resList.appendChild(_resEmpty('\uD83D\uDCD6', 'No resources found', 'Try a different search or category'));
         return;
       }
-
-      // Group by category
-      var categories = {};
-      resources.forEach(function(r) {
-        var cat = r.category || 'General';
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(r);
+      items.forEach(function(r) {
+        var card = el('div', { className: 'res-card', onClick: function() { card.classList.toggle('expanded'); } });
+        card.appendChild(el('span', { className: 'res-icon' }, r.icon || '\uD83D\uDCC4'));
+        card.appendChild(el('div', { className: 'res-category' }, r.category));
+        card.appendChild(el('div', { className: 'res-title' }, r.title));
+        card.appendChild(el('div', { className: 'res-summary' }, r.summary));
+        var hasContent = r.content && r.content.trim().length > 0;
+        var hasUrl = r.url && r.url.trim().length > 0;
+        if (hasContent) {
+          var hint = el('div', { className: 'expand-hint' });
+          hint.appendChild(el('i', { className: 'material-icons' }, 'expand_more'));
+          hint.appendChild(document.createTextNode('Tap to read more'));
+          card.appendChild(hint);
+          var contentDiv = el('div', { className: 'res-content' });
+          contentDiv.textContent = r.content;
+          card.appendChild(contentDiv);
+        }
+        if (hasUrl) {
+          var link = el('a', { className: 'res-link', href: r.url, target: '_blank', onClick: function(e) { e.stopPropagation(); } });
+          link.appendChild(el('i', { className: 'material-icons', style: { fontSize: '16px' } }, 'open_in_new'));
+          link.appendChild(document.createTextNode('Open Resource'));
+          card.appendChild(link);
+        }
+        if (r.dateAdded) card.appendChild(el('div', { className: 'res-meta' }, 'Added ' + r.dateAdded));
+        resList.appendChild(card);
       });
+    }
 
-      Object.keys(categories).forEach(function(cat) {
-        dynamicContainer.appendChild(el('div', {
-          style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', margin: '18px 0 8px', textTransform: 'uppercase', letterSpacing: '0.5px' }
-        }, cat));
-
-        categories[cat].forEach(function(r) {
-          var card = el('div', {
-            className: 'card card-glass',
-            style: { padding: '14px 16px', marginBottom: '8px', cursor: r.url ? 'pointer' : 'default' },
-            onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
-          });
-
-          var headerRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: r.summary || r.content ? '6px' : '0' } });
-          headerRow.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon || '\uD83D\uDCC4'));
-          headerRow.appendChild(el('div', { style: { flex: '1', fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, r.title));
-          if (r.url) headerRow.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-          card.appendChild(headerRow);
-
-          if (r.summary) {
-            card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.4', marginLeft: '28px' } }, r.summary));
-          }
-          if (r.content && !r.url) {
-            var contentDiv = el('div', {
-              style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', marginLeft: '28px', padding: '10px', background: 'var(--raised)', borderRadius: '8px' }
-            });
-            contentDiv.innerHTML = r.content.replace(/\n/g, '<br>');
-            card.appendChild(contentDiv);
-          }
-
-          dynamicContainer.appendChild(card);
-        });
-      });
-    }).withFailureHandler(function() {
-      dynamicContainer.innerHTML = '';
-      dynamicContainer.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '10px' } }, 'Error loading resources.'));
-    }).getWebAppResourcesList('All');
+    function _resEmpty(icon, title, sub) {
+      var d = el('div', { className: 'notif-empty' });
+      d.appendChild(el('div', { className: 'notif-empty-icon' }, icon));
+      d.appendChild(el('div', { className: 'notif-empty-title' }, title));
+      d.appendChild(el('div', { className: 'notif-empty-sub' }, sub));
+      return d;
+    }
   });
 }
 
@@ -68840,12 +68883,17 @@ function renderBroadcast(appContainer) {
 
 function renderStewardNotifications(appContainer) {
   renderPageLayout(appContainer, 'steward', 'notifications', function(container) {
-    _stewardHeader(container, 'Notifications');
-    var content = el('div', { className: 'content' });
+    // Hero header — amber gradient matching our system
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(145deg, #92400e, #b45309)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDD14 Notifications'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Send and manage notifications for your members'));
+    container.appendChild(hero);
+
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
 
     // ── COMPOSE FORM ──
-    var composeCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '16px' } });
-    composeCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '14px' } }, 'Send Notification'));
+    var composeCard = el('div', { className: 'notif-compose' });
+    composeCard.appendChild(el('h2', null, 'Send Notification'));
 
     // Recipient picker state
     var _recipientMode = 'groups';
@@ -69165,28 +69213,28 @@ function renderStewardNotifications(appContainer) {
         }
 
         var typeColors = {
-          'Steward Message': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
-          'Announcement': { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
-          'Deadline': { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },
-          'System': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' }
+          'Steward Message': { bg: 'rgba(45,90,135,0.12)', text: '#2d5a87' },
+          'Announcement': { bg: 'rgba(22,163,74,0.12)', text: '#16a34a' },
+          'Deadline': { bg: 'rgba(220,38,38,0.12)', text: '#dc2626' },
+          'System': { bg: 'rgba(147,51,234,0.12)', text: '#9333ea' }
         };
 
         notifs.forEach(function(n) {
           var card = el('div', {
-            className: 'card',
-            id: 'snotif-' + n.id,
-            style: { padding: '14px', marginBottom: '8px', position: 'relative', transition: 'opacity 0.3s, transform 0.3s' }
+            className: 'notif-card' + (n.priority === 'Urgent' ? ' urgent' : ''),
+            id: 'snotif-' + n.id
           });
           var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' } });
           var tc = typeColors[n.type] || typeColors['System'];
-          topRow.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px', background: tc.bg, color: tc.text, textTransform: 'uppercase', letterSpacing: '0.5px' } }, n.type));
+          topRow.appendChild(el('span', { className: 'type-badge', style: { background: tc.bg, color: tc.text } }, n.type));
           if (n.priority === 'Urgent') {
-            topRow.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', textTransform: 'uppercase' } }, 'URGENT'));
+            topRow.appendChild(el('span', { className: 'type-badge', style: { background: 'rgba(220,38,38,0.15)', color: '#dc2626' } }, 'URGENT'));
           }
           topRow.appendChild(el('span', { style: { flex: '1' } }));
           topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, n.createdDate));
-          var dismissBtn = el('button', {
-            style: { background: 'none', border: 'none', color: 'var(--muted)', fontSize: '16px', cursor: 'pointer', padding: '0 0 0 8px', lineHeight: '1' },
+          card.appendChild(topRow);
+          card.appendChild(el('button', {
+            className: 'notif-dismiss',
             onClick: function() {
               var ce = document.getElementById('snotif-' + n.id);
               if (ce) { ce.style.opacity = '0'; ce.style.transform = 'translateX(30px)'; }
@@ -69194,15 +69242,13 @@ function renderStewardNotifications(appContainer) {
                 setTimeout(function() { if (ce) ce.remove(); }, 300);
               }).dismissWebAppNotification(n.id, CURRENT_USER.email);
             }
-          }, '\u2715');
-          topRow.appendChild(dismissBtn);
-          card.appendChild(topRow);
-          card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, n.title));
-          card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4', marginBottom: '6px' } }, n.message));
+          }, '\u2715'));
+          card.appendChild(el('div', { className: 'notif-title' }, n.title));
+          card.appendChild(el('div', { className: 'notif-msg' }, n.message));
           var meta = [];
           if (n.sentBy) meta.push('From: ' + n.sentBy);
           if (n.expiresDate) meta.push('Expires: ' + n.expiresDate);
-          if (meta.length) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
+          if (meta.length) card.appendChild(el('div', { className: 'notif-meta' }, meta.join(' \u00B7 ')));
           listEl.appendChild(card);
         });
       }).withFailureHandler(function() {
@@ -69214,91 +69260,146 @@ function renderStewardNotifications(appContainer) {
 }
 
 // ═══════════════════════════════════════
-// STEWARD RESOURCES — Dynamic from Resources sheet
+// STEWARD RESOURCES — Educational Hub
+// Search, category pills, expandable cards, external links
 // ═══════════════════════════════════════
 
 function renderStewardResources(appContainer) {
   renderPageLayout(appContainer, 'steward', 'resources', function(container) {
-    _stewardHeader(container, 'Resources');
-    var content = el('div', { className: 'content' });
+    // Hero header
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDCDA Know Your Rights'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Resources for stewards — contract guides, grievance tools, and member support'));
+    container.appendChild(hero);
 
-    // Quick links (always visible, from Config)
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
+
+    // Search bar
+    var searchWrap = el('div', { className: 'res-search-wrap' });
+    searchWrap.appendChild(el('i', { className: 'material-icons res-search-icon' }, 'search'));
+    var searchInput = el('input', {
+      className: 'res-search-bar',
+      placeholder: 'Search articles, rights, FAQ...',
+      onInput: function() { _filterResources(); }
+    });
+    searchWrap.appendChild(searchInput);
+    content.appendChild(searchWrap);
+
+    // Category pills
+    var pillsRow = el('div', { className: 'cat-pills' });
+    content.appendChild(pillsRow);
+
+    // Quick links
     var quickLinks = [];
     if (CONFIG.calendarUrl) quickLinks.push({ icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl });
     if (CONFIG.driveFolderUrl) quickLinks.push({ icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl });
     if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
     if (quickLinks.length > 0) {
-      content.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Quick Links'));
+      var qlRow = el('div', { style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px' } });
       quickLinks.forEach(function(r) {
         var item = el('div', {
           className: 'card card-clickable',
-          style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', marginBottom: '6px' },
+          style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', flex: '0 0 auto', minWidth: '160px' },
           onClick: function() { window.open(r.url, '_blank'); }
         });
-        item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
-        var tg = el('div', { style: { flex: '1' } });
+        item.appendChild(el('span', { style: { fontSize: '20px' } }, r.icon));
+        var tg = el('div');
         tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-        tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+        tg.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)' } }, r.sub));
         item.appendChild(tg);
-        item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-        content.appendChild(item);
+        qlRow.appendChild(item);
+      });
+      content.appendChild(qlRow);
+    }
+
+    var resList = el('div');
+    showLoading(resList);
+    content.appendChild(resList);
+    container.appendChild(content);
+
+    var _allResources = [];
+    var _currentCat = 'all';
+
+    google.script.run.withSuccessHandler(function(data) {
+      _allResources = data || [];
+      _buildCatPills();
+      _renderResourceList(_allResources);
+    }).withFailureHandler(function(err) {
+      resList.innerHTML = '';
+      var d = el('div', { className: 'notif-empty' });
+      d.appendChild(el('div', { className: 'notif-empty-icon' }, '\u26A0\uFE0F'));
+      d.appendChild(el('div', { className: 'notif-empty-title' }, 'Error loading resources'));
+      d.appendChild(el('div', { className: 'notif-empty-sub' }, String(err || '')));
+      resList.appendChild(d);
+    }).getWebAppResourcesList('All');
+
+    function _filterResources() {
+      var q = (searchInput.value || '').toLowerCase();
+      var filtered = _allResources.filter(function(r) {
+        var matchesCat = _currentCat === 'all' || r.category === _currentCat;
+        var matchesQ = !q || q.length < 2 || r.title.toLowerCase().indexOf(q) >= 0 || r.summary.toLowerCase().indexOf(q) >= 0 || (r.content || '').toLowerCase().indexOf(q) >= 0 || r.category.toLowerCase().indexOf(q) >= 0;
+        return matchesCat && matchesQ;
+      });
+      _renderResourceList(filtered);
+    }
+
+    function _setCat(cat) {
+      _currentCat = cat;
+      var pills = pillsRow.querySelectorAll('.cat-pill');
+      for (var i = 0; i < pills.length; i++) {
+        pills[i].className = pills[i].getAttribute('data-cat') === cat ? 'cat-pill active' : 'cat-pill';
+      }
+      _filterResources();
+    }
+
+    function _buildCatPills() {
+      var cats = {};
+      _allResources.forEach(function(r) { cats[r.category] = (cats[r.category] || 0) + 1; });
+      pillsRow.innerHTML = '';
+      pillsRow.appendChild(el('button', { className: 'cat-pill active', 'data-cat': 'all', onClick: function() { _setCat('all'); } }, 'All (' + _allResources.length + ')'));
+      Object.keys(cats).sort().forEach(function(c) {
+        pillsRow.appendChild(el('button', { className: 'cat-pill', 'data-cat': c, onClick: function() { _setCat(c); } }, c + ' (' + cats[c] + ')'));
       });
     }
 
-    // Dynamic resources from sheet
-    var dynamicContainer = el('div');
-    showLoading(dynamicContainer);
-    content.appendChild(dynamicContainer);
-    container.appendChild(content);
-
-    google.script.run.withSuccessHandler(function(resources) {
-      dynamicContainer.innerHTML = '';
-      if (!resources || resources.length === 0) {
-        dynamicContainer.appendChild(el('div', { style: { color: 'var(--muted)', textAlign: 'center', padding: '20px 0', fontSize: '13px' } }, 'No additional resources available.'));
+    function _renderResourceList(items) {
+      resList.innerHTML = '';
+      if (!items || items.length === 0) {
+        var d = el('div', { className: 'notif-empty' });
+        d.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDCD6'));
+        d.appendChild(el('div', { className: 'notif-empty-title' }, 'No resources found'));
+        d.appendChild(el('div', { className: 'notif-empty-sub' }, 'Try a different search or category'));
+        resList.appendChild(d);
         return;
       }
-
-      var categories = {};
-      resources.forEach(function(r) {
-        var cat = r.category || 'General';
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(r);
+      items.forEach(function(r) {
+        var card = el('div', { className: 'res-card', onClick: function() { card.classList.toggle('expanded'); } });
+        card.appendChild(el('span', { className: 'res-icon' }, r.icon || '\uD83D\uDCC4'));
+        card.appendChild(el('div', { className: 'res-category' }, r.category));
+        card.appendChild(el('div', { className: 'res-title' }, r.title));
+        card.appendChild(el('div', { className: 'res-summary' }, r.summary));
+        var hasContent = r.content && r.content.trim().length > 0;
+        var hasUrl = r.url && r.url.trim().length > 0;
+        if (hasContent) {
+          var hint = el('div', { className: 'expand-hint' });
+          hint.appendChild(el('i', { className: 'material-icons' }, 'expand_more'));
+          hint.appendChild(document.createTextNode('Tap to read more'));
+          card.appendChild(hint);
+          var contentDiv = el('div', { className: 'res-content' });
+          contentDiv.textContent = r.content;
+          card.appendChild(contentDiv);
+        }
+        if (hasUrl) {
+          var link = el('a', { className: 'res-link', href: r.url, target: '_blank', onClick: function(e) { e.stopPropagation(); } });
+          link.appendChild(el('i', { className: 'material-icons', style: { fontSize: '16px' } }, 'open_in_new'));
+          link.appendChild(document.createTextNode('Open Resource'));
+          card.appendChild(link);
+        }
+        if (r.dateAdded) card.appendChild(el('div', { className: 'res-meta' }, 'Added ' + r.dateAdded));
+        resList.appendChild(card);
       });
-
-      Object.keys(categories).forEach(function(cat) {
-        dynamicContainer.appendChild(el('div', {
-          style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', margin: '18px 0 8px', textTransform: 'uppercase', letterSpacing: '0.5px' }
-        }, cat));
-
-        categories[cat].forEach(function(r) {
-          var card = el('div', {
-            className: 'card',
-            style: { padding: '14px 16px', marginBottom: '8px', cursor: r.url ? 'pointer' : 'default' },
-            onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
-          });
-          var headerRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: r.summary || r.content ? '6px' : '0' } });
-          headerRow.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon || '\uD83D\uDCC4'));
-          headerRow.appendChild(el('div', { style: { flex: '1', fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, r.title));
-          if (r.url) headerRow.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-          card.appendChild(headerRow);
-          if (r.summary) {
-            card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.4', marginLeft: '28px' } }, r.summary));
-          }
-          if (r.content && !r.url) {
-            var contentDiv = el('div', {
-              style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', marginLeft: '28px', padding: '10px', background: 'var(--raised)', borderRadius: '8px' }
-            });
-            contentDiv.innerHTML = r.content.replace(/\n/g, '<br>');
-            card.appendChild(contentDiv);
-          }
-          dynamicContainer.appendChild(card);
-        });
-      });
-    }).withFailureHandler(function() {
-      dynamicContainer.innerHTML = '';
-      dynamicContainer.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '10px' } }, 'Error loading resources.'));
-    }).getWebAppResourcesList('All');
+    }
   });
 }
 
@@ -70641,6 +70742,366 @@ input { font: inherit; }
   height: 180px;
   width: 100%;
   margin-bottom: 14px;
+}
+
+/* ═══════════════════════════════════════
+   RESOURCE HUB — Educational Content
+   ═══════════════════════════════════════ */
+.res-search-wrap {
+  position: relative;
+  margin-bottom: 16px;
+}
+.res-search-bar {
+  width: 100%;
+  padding: 14px 14px 14px 44px;
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  font-size: 15px;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: border-color 0.2s;
+  outline: none;
+}
+.res-search-bar:focus {
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px var(--accentGlow);
+}
+.res-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 20px;
+}
+.cat-pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.cat-pills::-webkit-scrollbar { display: none; }
+.cat-pill {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--muted);
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+.cat-pill.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.cat-pill:hover { border-color: var(--accent); }
+.res-card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.25s;
+}
+.res-card:active { transform: scale(0.99); }
+.res-card.expanded { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.res-icon { font-size: 28px; margin-bottom: 10px; display: block; }
+.res-title {
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+.res-category {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.res-summary {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.res-content {
+  display: none;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+  white-space: pre-line;
+}
+.res-card.expanded .res-content { display: block; }
+.res-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: var(--accentBg);
+  color: var(--accent);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+.res-link:hover { opacity: 0.85; }
+.res-meta { font-size: 11px; color: var(--muted); margin-top: 8px; }
+.expand-hint {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.expand-hint i { font-size: 16px; transition: transform 0.2s; }
+.res-card.expanded .expand-hint i { transform: rotate(180deg); }
+
+/* ═══════════════════════════════════════
+   NOTIFICATION CARDS
+   ═══════════════════════════════════════ */
+.notif-card {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  border: 1px solid var(--border);
+  position: relative;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.notif-card.urgent { border-left: 4px solid #dc2626; }
+.notif-card .notif-title {
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+.notif-card .notif-msg {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.notif-card .notif-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.notif-card .notif-dismiss {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.notif-card .notif-dismiss:hover { opacity: 1; }
+.type-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: 4px;
+}
+.notif-empty {
+  text-align: center;
+  padding: 60px 20px;
+}
+.notif-empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.6; }
+.notif-empty-title {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.notif-empty-sub { font-size: 13px; color: var(--muted); }
+
+/* Compose form (steward notifications) */
+.notif-compose {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  border: 1px solid var(--border);
+}
+.notif-compose h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+.notif-tab-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.notif-tab-btn {
+  flex: 1;
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+.notif-group-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  margin: 0 6px 6px 0;
+  transition: all 0.15s;
+}
+.notif-group-btn.sel {
+  background: var(--accentBg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.notif-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.notif-member-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  margin-bottom: 12px;
+}
+.notif-member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notif-member-row:hover { background: var(--accentBg); }
+.notif-member-row.sel { background: var(--accentBg); }
+.notif-chk {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+  transition: all 0.15s;
+}
+.notif-chk.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn-send {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--accent);
+  color: #fff;
+  margin-top: 16px;
+  transition: opacity 0.2s;
+}
+.btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  font-family: 'DM Sans', sans-serif;
+  transition: opacity 0.3s;
+}
+
+/* Page hero header (gradient) */
+.page-hero {
+  padding: 24px 20px 34px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.page-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: -20px;
+  right: -20px;
+  height: 40px;
+  background: var(--bg);
+  border-radius: 50% 50% 0 0;
+}
+.page-hero h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(22px, 5vw, 28px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 5px;
+}
+.page-hero .hero-sub {
+  font-size: 14px;
+  opacity: 0.85;
+  line-height: 1.4;
 }
 
 /* ═══════════════════════════════════════

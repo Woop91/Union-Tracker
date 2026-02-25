@@ -420,12 +420,17 @@ function renderBroadcast(appContainer) {
 
 function renderStewardNotifications(appContainer) {
   renderPageLayout(appContainer, 'steward', 'notifications', function(container) {
-    _stewardHeader(container, 'Notifications');
-    var content = el('div', { className: 'content' });
+    // Hero header — amber gradient matching our system
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(145deg, #92400e, #b45309)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDD14 Notifications'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Send and manage notifications for your members'));
+    container.appendChild(hero);
+
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
 
     // ── COMPOSE FORM ──
-    var composeCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '16px' } });
-    composeCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '14px' } }, 'Send Notification'));
+    var composeCard = el('div', { className: 'notif-compose' });
+    composeCard.appendChild(el('h2', null, 'Send Notification'));
 
     // Recipient picker state
     var _recipientMode = 'groups';
@@ -745,28 +750,28 @@ function renderStewardNotifications(appContainer) {
         }
 
         var typeColors = {
-          'Steward Message': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
-          'Announcement': { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
-          'Deadline': { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },
-          'System': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' }
+          'Steward Message': { bg: 'rgba(45,90,135,0.12)', text: '#2d5a87' },
+          'Announcement': { bg: 'rgba(22,163,74,0.12)', text: '#16a34a' },
+          'Deadline': { bg: 'rgba(220,38,38,0.12)', text: '#dc2626' },
+          'System': { bg: 'rgba(147,51,234,0.12)', text: '#9333ea' }
         };
 
         notifs.forEach(function(n) {
           var card = el('div', {
-            className: 'card',
-            id: 'snotif-' + n.id,
-            style: { padding: '14px', marginBottom: '8px', position: 'relative', transition: 'opacity 0.3s, transform 0.3s' }
+            className: 'notif-card' + (n.priority === 'Urgent' ? ' urgent' : ''),
+            id: 'snotif-' + n.id
           });
           var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' } });
           var tc = typeColors[n.type] || typeColors['System'];
-          topRow.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px', background: tc.bg, color: tc.text, textTransform: 'uppercase', letterSpacing: '0.5px' } }, n.type));
+          topRow.appendChild(el('span', { className: 'type-badge', style: { background: tc.bg, color: tc.text } }, n.type));
           if (n.priority === 'Urgent') {
-            topRow.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', textTransform: 'uppercase' } }, 'URGENT'));
+            topRow.appendChild(el('span', { className: 'type-badge', style: { background: 'rgba(220,38,38,0.15)', color: '#dc2626' } }, 'URGENT'));
           }
           topRow.appendChild(el('span', { style: { flex: '1' } }));
           topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, n.createdDate));
-          var dismissBtn = el('button', {
-            style: { background: 'none', border: 'none', color: 'var(--muted)', fontSize: '16px', cursor: 'pointer', padding: '0 0 0 8px', lineHeight: '1' },
+          card.appendChild(topRow);
+          card.appendChild(el('button', {
+            className: 'notif-dismiss',
             onClick: function() {
               var ce = document.getElementById('snotif-' + n.id);
               if (ce) { ce.style.opacity = '0'; ce.style.transform = 'translateX(30px)'; }
@@ -774,15 +779,13 @@ function renderStewardNotifications(appContainer) {
                 setTimeout(function() { if (ce) ce.remove(); }, 300);
               }).dismissWebAppNotification(n.id, CURRENT_USER.email);
             }
-          }, '\u2715');
-          topRow.appendChild(dismissBtn);
-          card.appendChild(topRow);
-          card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, n.title));
-          card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4', marginBottom: '6px' } }, n.message));
+          }, '\u2715'));
+          card.appendChild(el('div', { className: 'notif-title' }, n.title));
+          card.appendChild(el('div', { className: 'notif-msg' }, n.message));
           var meta = [];
           if (n.sentBy) meta.push('From: ' + n.sentBy);
           if (n.expiresDate) meta.push('Expires: ' + n.expiresDate);
-          if (meta.length) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
+          if (meta.length) card.appendChild(el('div', { className: 'notif-meta' }, meta.join(' \u00B7 ')));
           listEl.appendChild(card);
         });
       }).withFailureHandler(function() {
@@ -794,91 +797,146 @@ function renderStewardNotifications(appContainer) {
 }
 
 // ═══════════════════════════════════════
-// STEWARD RESOURCES — Dynamic from Resources sheet
+// STEWARD RESOURCES — Educational Hub
+// Search, category pills, expandable cards, external links
 // ═══════════════════════════════════════
 
 function renderStewardResources(appContainer) {
   renderPageLayout(appContainer, 'steward', 'resources', function(container) {
-    _stewardHeader(container, 'Resources');
-    var content = el('div', { className: 'content' });
+    // Hero header
+    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)' } });
+    hero.appendChild(el('h1', null, '\uD83D\uDCDA Know Your Rights'));
+    hero.appendChild(el('div', { className: 'hero-sub' }, 'Resources for stewards — contract guides, grievance tools, and member support'));
+    container.appendChild(hero);
 
-    // Quick links (always visible, from Config)
+    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
+
+    // Search bar
+    var searchWrap = el('div', { className: 'res-search-wrap' });
+    searchWrap.appendChild(el('i', { className: 'material-icons res-search-icon' }, 'search'));
+    var searchInput = el('input', {
+      className: 'res-search-bar',
+      placeholder: 'Search articles, rights, FAQ...',
+      onInput: function() { _filterResources(); }
+    });
+    searchWrap.appendChild(searchInput);
+    content.appendChild(searchWrap);
+
+    // Category pills
+    var pillsRow = el('div', { className: 'cat-pills' });
+    content.appendChild(pillsRow);
+
+    // Quick links
     var quickLinks = [];
     if (CONFIG.calendarUrl) quickLinks.push({ icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl });
     if (CONFIG.driveFolderUrl) quickLinks.push({ icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl });
     if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
     if (quickLinks.length > 0) {
-      content.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Quick Links'));
+      var qlRow = el('div', { style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px' } });
       quickLinks.forEach(function(r) {
         var item = el('div', {
           className: 'card card-clickable',
-          style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', marginBottom: '6px' },
+          style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', flex: '0 0 auto', minWidth: '160px' },
           onClick: function() { window.open(r.url, '_blank'); }
         });
-        item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
-        var tg = el('div', { style: { flex: '1' } });
+        item.appendChild(el('span', { style: { fontSize: '20px' } }, r.icon));
+        var tg = el('div');
         tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-        tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+        tg.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)' } }, r.sub));
         item.appendChild(tg);
-        item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-        content.appendChild(item);
+        qlRow.appendChild(item);
+      });
+      content.appendChild(qlRow);
+    }
+
+    var resList = el('div');
+    showLoading(resList);
+    content.appendChild(resList);
+    container.appendChild(content);
+
+    var _allResources = [];
+    var _currentCat = 'all';
+
+    google.script.run.withSuccessHandler(function(data) {
+      _allResources = data || [];
+      _buildCatPills();
+      _renderResourceList(_allResources);
+    }).withFailureHandler(function(err) {
+      resList.innerHTML = '';
+      var d = el('div', { className: 'notif-empty' });
+      d.appendChild(el('div', { className: 'notif-empty-icon' }, '\u26A0\uFE0F'));
+      d.appendChild(el('div', { className: 'notif-empty-title' }, 'Error loading resources'));
+      d.appendChild(el('div', { className: 'notif-empty-sub' }, String(err || '')));
+      resList.appendChild(d);
+    }).getWebAppResourcesList('All');
+
+    function _filterResources() {
+      var q = (searchInput.value || '').toLowerCase();
+      var filtered = _allResources.filter(function(r) {
+        var matchesCat = _currentCat === 'all' || r.category === _currentCat;
+        var matchesQ = !q || q.length < 2 || r.title.toLowerCase().indexOf(q) >= 0 || r.summary.toLowerCase().indexOf(q) >= 0 || (r.content || '').toLowerCase().indexOf(q) >= 0 || r.category.toLowerCase().indexOf(q) >= 0;
+        return matchesCat && matchesQ;
+      });
+      _renderResourceList(filtered);
+    }
+
+    function _setCat(cat) {
+      _currentCat = cat;
+      var pills = pillsRow.querySelectorAll('.cat-pill');
+      for (var i = 0; i < pills.length; i++) {
+        pills[i].className = pills[i].getAttribute('data-cat') === cat ? 'cat-pill active' : 'cat-pill';
+      }
+      _filterResources();
+    }
+
+    function _buildCatPills() {
+      var cats = {};
+      _allResources.forEach(function(r) { cats[r.category] = (cats[r.category] || 0) + 1; });
+      pillsRow.innerHTML = '';
+      pillsRow.appendChild(el('button', { className: 'cat-pill active', 'data-cat': 'all', onClick: function() { _setCat('all'); } }, 'All (' + _allResources.length + ')'));
+      Object.keys(cats).sort().forEach(function(c) {
+        pillsRow.appendChild(el('button', { className: 'cat-pill', 'data-cat': c, onClick: function() { _setCat(c); } }, c + ' (' + cats[c] + ')'));
       });
     }
 
-    // Dynamic resources from sheet
-    var dynamicContainer = el('div');
-    showLoading(dynamicContainer);
-    content.appendChild(dynamicContainer);
-    container.appendChild(content);
-
-    google.script.run.withSuccessHandler(function(resources) {
-      dynamicContainer.innerHTML = '';
-      if (!resources || resources.length === 0) {
-        dynamicContainer.appendChild(el('div', { style: { color: 'var(--muted)', textAlign: 'center', padding: '20px 0', fontSize: '13px' } }, 'No additional resources available.'));
+    function _renderResourceList(items) {
+      resList.innerHTML = '';
+      if (!items || items.length === 0) {
+        var d = el('div', { className: 'notif-empty' });
+        d.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDCD6'));
+        d.appendChild(el('div', { className: 'notif-empty-title' }, 'No resources found'));
+        d.appendChild(el('div', { className: 'notif-empty-sub' }, 'Try a different search or category'));
+        resList.appendChild(d);
         return;
       }
-
-      var categories = {};
-      resources.forEach(function(r) {
-        var cat = r.category || 'General';
-        if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(r);
+      items.forEach(function(r) {
+        var card = el('div', { className: 'res-card', onClick: function() { card.classList.toggle('expanded'); } });
+        card.appendChild(el('span', { className: 'res-icon' }, r.icon || '\uD83D\uDCC4'));
+        card.appendChild(el('div', { className: 'res-category' }, r.category));
+        card.appendChild(el('div', { className: 'res-title' }, r.title));
+        card.appendChild(el('div', { className: 'res-summary' }, r.summary));
+        var hasContent = r.content && r.content.trim().length > 0;
+        var hasUrl = r.url && r.url.trim().length > 0;
+        if (hasContent) {
+          var hint = el('div', { className: 'expand-hint' });
+          hint.appendChild(el('i', { className: 'material-icons' }, 'expand_more'));
+          hint.appendChild(document.createTextNode('Tap to read more'));
+          card.appendChild(hint);
+          var contentDiv = el('div', { className: 'res-content' });
+          contentDiv.textContent = r.content;
+          card.appendChild(contentDiv);
+        }
+        if (hasUrl) {
+          var link = el('a', { className: 'res-link', href: r.url, target: '_blank', onClick: function(e) { e.stopPropagation(); } });
+          link.appendChild(el('i', { className: 'material-icons', style: { fontSize: '16px' } }, 'open_in_new'));
+          link.appendChild(document.createTextNode('Open Resource'));
+          card.appendChild(link);
+        }
+        if (r.dateAdded) card.appendChild(el('div', { className: 'res-meta' }, 'Added ' + r.dateAdded));
+        resList.appendChild(card);
       });
-
-      Object.keys(categories).forEach(function(cat) {
-        dynamicContainer.appendChild(el('div', {
-          style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', margin: '18px 0 8px', textTransform: 'uppercase', letterSpacing: '0.5px' }
-        }, cat));
-
-        categories[cat].forEach(function(r) {
-          var card = el('div', {
-            className: 'card',
-            style: { padding: '14px 16px', marginBottom: '8px', cursor: r.url ? 'pointer' : 'default' },
-            onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
-          });
-          var headerRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: r.summary || r.content ? '6px' : '0' } });
-          headerRow.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon || '\uD83D\uDCC4'));
-          headerRow.appendChild(el('div', { style: { flex: '1', fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, r.title));
-          if (r.url) headerRow.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-          card.appendChild(headerRow);
-          if (r.summary) {
-            card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.4', marginLeft: '28px' } }, r.summary));
-          }
-          if (r.content && !r.url) {
-            var contentDiv = el('div', {
-              style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', marginLeft: '28px', padding: '10px', background: 'var(--raised)', borderRadius: '8px' }
-            });
-            contentDiv.innerHTML = r.content.replace(/\n/g, '<br>');
-            card.appendChild(contentDiv);
-          }
-          dynamicContainer.appendChild(card);
-        });
-      });
-    }).withFailureHandler(function() {
-      dynamicContainer.innerHTML = '';
-      dynamicContainer.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '10px' } }, 'Error loading resources.'));
-    }).getWebAppResourcesList('All');
+    }
   });
 }
 
