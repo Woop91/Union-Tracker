@@ -72,6 +72,30 @@ doGet(e)
 ├── ?page=notifications → Notifications page — dual role (v4.12.0)
 └── (default)      → Unified member dashboard
 
+### SPA Web Dashboard (files 19-24, index.html + views)
+Separate SPA served via `doGetWebDashboard()` in `22_WebDashApp.gs`.
+Uses Google SSO + magic link auth (19_WebDashAuth.gs).
+```
+SPA Tabs (v4.12.1):
+├── Steward: Cases, Members, Tasks, Contact Log, Notifications*, Broadcast, Events, Resources*, Weekly Q, Survey Track
+├── Member:  Home, My Cases, Contact, Notifications*, Events, Union Stats, Steward Dir, Profile, Resources*, Workload, Weekly Q, Survey
+└── Both roles: sidebar nav (tablet+), bottom nav with More menu (mobile)
+
+* = Added v4.12.1 (was missing from SPA)
+```
+
+**Notifications in SPA (v4.12.1):**
+- `renderMemberNotifications()` in `member_view.html` — fetches via `getWebAppNotifications(email, role)`, dismiss via `dismissWebAppNotification(id, email)`, animated dismiss, empty state
+- `renderStewardNotifications()` in `steward_view.html` — compose form + recipient picker (groups tab with 3 buttons + individuals tab with search/filter/checkbox list) + notification cards below
+- Recipient picker: `getNotificationRecipientListFull()` returns {name,email,location,department,jobTitle}, 3 filter dropdowns built from member data
+- Send: `sendWebAppNotification(data)` — one call per recipient for individuals, one for groups
+
+**Resources in SPA (v4.12.1):**
+- `renderMemberResources()` + `renderStewardResources()` upgraded from static link list to dynamic
+- Quick Links section: Calendar, Shared Drive, Website (from Config)
+- Dynamic section: `getWebAppResourcesList(audience)` → grouped by category, expandable content cards
+- Data from 📚 Resources sheet (auto-created if missing)
+
 ### Sheets
 ```
 📢 Notifications (v4.12.0) — 12 columns
@@ -284,3 +308,30 @@ Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Nam
 6. **Deploy with `npm run deploy`** (includes lint + test + prod build + clasp push).
 7. **Current file size is 2.4MB / 6MB limit.** If adding major features, monitor growth.
 8. **The `doGet()` function is in `src/04e_PublicDashboard.gs`** (or check `src/` files for the source location).
+
+---
+
+## 📋 CHANGE LOG (append only)
+
+### v4.12.1 — SPA Notifications + Dynamic Resources (2026-02-25)
+**Files changed:**
+- `src/index.html` — Added `notifications` tab to sidebar nav for both roles, added routing in `_handleTabNav()`
+- `src/member_view.html` — Added `renderMemberNotifications()` (~100 lines), upgraded `renderMemberResources()` to dynamic from Resources sheet, added notifications to More menu
+- `src/steward_view.html` — Added `renderStewardNotifications()` (~260 lines) with compose form + recipient picker, upgraded `renderStewardResources()` to dynamic, added notifications to More menu
+- `AI_REFERENCE.md` — Added SPA routing docs + this changelog entry
+
+**Features added:**
+1. Notifications tab in SPA for both member and steward roles
+2. Steward compose form with dual-tab recipient picker (groups + individuals with 3-axis filtering)
+3. Member notification cards with animated dismiss
+4. Dynamic resources pages reading from Resources sheet via `getWebAppResourcesList()`
+5. Quick Links section (Calendar/Drive/Website from Config) + categorized resource cards
+
+**Server functions used (already existed):**
+- `getWebAppNotifications(email, role)` → notification list
+- `dismissWebAppNotification(id, email)` → dismiss
+- `sendWebAppNotification(data)` → send new
+- `getNotificationRecipientListFull()` → member list with filters
+- `getWebAppResourcesList(audience)` → resource cards
+
+**No new server-side code was needed — all functions existed in 05_Integrations.gs.**

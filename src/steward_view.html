@@ -415,37 +415,470 @@ function renderBroadcast(appContainer) {
 }
 
 // ═══════════════════════════════════════
-// STEWARD RESOURCES
+// STEWARD NOTIFICATIONS — Compose + View
+// ═══════════════════════════════════════
+
+function renderStewardNotifications(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'notifications', function(container) {
+    _stewardHeader(container, 'Notifications');
+    var content = el('div', { className: 'content' });
+
+    // ── COMPOSE FORM ──
+    var composeCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '16px' } });
+    composeCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '14px' } }, 'Send Notification'));
+
+    // Recipient picker state
+    var _recipientMode = 'groups';
+    var _selectedGroup = '';
+    var _selectedIndividuals = {};
+    var _allMembers = [];
+
+    // Recipient mode tabs
+    var tabRow = el('div', { style: { display: 'flex', gap: '0', marginBottom: '12px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' } });
+    var groupsTab = el('button', {
+      id: 'notif-tab-groups',
+      style: { flex: '1', padding: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: 'none', background: 'var(--accent)', color: '#fff', fontFamily: 'inherit' },
+      onClick: function() { _switchRecipientTab('groups'); }
+    }, 'Groups');
+    var individualsTab = el('button', {
+      id: 'notif-tab-individuals',
+      style: { flex: '1', padding: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: 'none', background: 'var(--surface)', color: 'var(--muted)', fontFamily: 'inherit' },
+      onClick: function() { _switchRecipientTab('individuals'); }
+    }, 'Individuals');
+    tabRow.appendChild(groupsTab);
+    tabRow.appendChild(individualsTab);
+    composeCard.appendChild(tabRow);
+
+    // Groups panel
+    var groupsPanel = el('div', { id: 'notif-groups-panel' });
+    var groupBtnRow = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' } });
+    ['All Members', 'All Stewards', 'Everyone'].forEach(function(g) {
+      var btn = el('button', {
+        className: 'notif-group-btn',
+        'data-group': g,
+        style: { padding: '8px 14px', fontSize: '12px', fontWeight: '500', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' },
+        onClick: function() {
+          _selectedGroup = _selectedGroup === g ? '' : g;
+          _updateGroupBtns();
+        }
+      }, g);
+      groupBtnRow.appendChild(btn);
+    });
+    groupsPanel.appendChild(groupBtnRow);
+    composeCard.appendChild(groupsPanel);
+
+    // Individuals panel (hidden by default)
+    var individualsPanel = el('div', { id: 'notif-individuals-panel', style: { display: 'none' } });
+
+    // Search
+    var searchInput = el('input', {
+      className: 'form-input',
+      placeholder: 'Search by name or email...',
+      style: { marginBottom: '8px', fontSize: '12px' },
+      onInput: function() { _filterMemberList(); }
+    });
+    individualsPanel.appendChild(searchInput);
+
+    // Filter row
+    var filterRow = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' } });
+    var locFilter = el('select', { className: 'form-select', id: 'notif-filter-loc', style: { flex: '1', fontSize: '11px', padding: '6px 8px', minWidth: '80px' }, onChange: function() { _filterMemberList(); } });
+    locFilter.appendChild(el('option', { value: '' }, 'All Locations'));
+    var deptFilter = el('select', { className: 'form-select', id: 'notif-filter-dept', style: { flex: '1', fontSize: '11px', padding: '6px 8px', minWidth: '80px' }, onChange: function() { _filterMemberList(); } });
+    deptFilter.appendChild(el('option', { value: '' }, 'All Depts'));
+    var titleFilter = el('select', { className: 'form-select', id: 'notif-filter-title', style: { flex: '1', fontSize: '11px', padding: '6px 8px', minWidth: '80px' }, onChange: function() { _filterMemberList(); } });
+    titleFilter.appendChild(el('option', { value: '' }, 'All Titles'));
+    filterRow.appendChild(locFilter);
+    filterRow.appendChild(deptFilter);
+    filterRow.appendChild(titleFilter);
+    individualsPanel.appendChild(filterRow);
+
+    // Selected count
+    var selectedCount = el('div', { id: 'notif-selected-count', style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, '0 selected');
+    individualsPanel.appendChild(selectedCount);
+
+    // Member list container
+    var memberListEl = el('div', { id: 'notif-member-list', style: { maxHeight: '220px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '12px' } });
+    individualsPanel.appendChild(memberListEl);
+    composeCard.appendChild(individualsPanel);
+
+    // Form fields
+    var typeGroup = el('div', { className: 'form-group' });
+    typeGroup.appendChild(el('label', { className: 'form-label' }, 'Type'));
+    var typeSelect = el('select', { className: 'form-select' });
+    ['Steward Message', 'Announcement', 'Deadline', 'System'].forEach(function(t) {
+      typeSelect.appendChild(el('option', { value: t }, t));
+    });
+    typeGroup.appendChild(typeSelect);
+    composeCard.appendChild(typeGroup);
+
+    var priorityGroup = el('div', { className: 'form-group' });
+    priorityGroup.appendChild(el('label', { className: 'form-label' }, 'Priority'));
+    var prioritySelect = el('select', { className: 'form-select' });
+    ['Normal', 'Urgent'].forEach(function(p) {
+      prioritySelect.appendChild(el('option', { value: p }, p));
+    });
+    priorityGroup.appendChild(prioritySelect);
+    composeCard.appendChild(priorityGroup);
+
+    var titleGroup = el('div', { className: 'form-group' });
+    titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
+    var titleInput = el('input', { className: 'form-input', placeholder: 'Notification title' });
+    titleGroup.appendChild(titleInput);
+    composeCard.appendChild(titleGroup);
+
+    var msgGroup = el('div', { className: 'form-group' });
+    msgGroup.appendChild(el('label', { className: 'form-label' }, 'Message'));
+    var msgTextarea = el('textarea', { className: 'msg-textarea', placeholder: 'Write your notification message...' });
+    msgGroup.appendChild(msgTextarea);
+    composeCard.appendChild(msgGroup);
+
+    var expiresGroup = el('div', { className: 'form-group' });
+    expiresGroup.appendChild(el('label', { className: 'form-label' }, 'Expires (optional)'));
+    var expiresInput = el('input', { className: 'form-input', type: 'date' });
+    expiresGroup.appendChild(expiresInput);
+    composeCard.appendChild(expiresGroup);
+
+    var sendStatus = el('div', { style: { fontSize: '12px', minHeight: '18px', marginBottom: '8px', color: 'var(--muted)' } });
+    composeCard.appendChild(sendStatus);
+
+    var sendBtn = el('button', {
+      className: 'btn btn-primary',
+      onClick: function() { _handleSendNotification(); }
+    }, 'Send Notification');
+    composeCard.appendChild(sendBtn);
+
+    content.appendChild(composeCard);
+
+    // ── EXISTING NOTIFICATIONS LIST ──
+    content.appendChild(el('div', {
+      style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', margin: '20px 0 10px' }
+    }, 'Your Notifications'));
+
+    var notifList = el('div', { id: 'steward-notif-list' });
+    showLoading(notifList);
+    content.appendChild(notifList);
+    container.appendChild(content);
+
+    // ── LOAD DATA ──
+    // Load member list for recipient picker
+    google.script.run.withSuccessHandler(function(members) {
+      _allMembers = members || [];
+      _populateFilters();
+      _renderMemberList();
+    }).withFailureHandler(function() {
+      _allMembers = [];
+    }).getNotificationRecipientListFull();
+
+    // Load steward's own notifications
+    _loadStewardNotifs();
+
+    // ── HELPER FUNCTIONS ──
+    function _switchRecipientTab(mode) {
+      _recipientMode = mode;
+      document.getElementById('notif-groups-panel').style.display = mode === 'groups' ? 'block' : 'none';
+      document.getElementById('notif-individuals-panel').style.display = mode === 'individuals' ? 'block' : 'none';
+      document.getElementById('notif-tab-groups').style.background = mode === 'groups' ? 'var(--accent)' : 'var(--surface)';
+      document.getElementById('notif-tab-groups').style.color = mode === 'groups' ? '#fff' : 'var(--muted)';
+      document.getElementById('notif-tab-individuals').style.background = mode === 'individuals' ? 'var(--accent)' : 'var(--surface)';
+      document.getElementById('notif-tab-individuals').style.color = mode === 'individuals' ? '#fff' : 'var(--muted)';
+    }
+
+    function _updateGroupBtns() {
+      var btns = document.querySelectorAll('.notif-group-btn');
+      for (var i = 0; i < btns.length; i++) {
+        var isActive = btns[i].getAttribute('data-group') === _selectedGroup;
+        btns[i].style.background = isActive ? 'var(--accent)' : 'var(--surface)';
+        btns[i].style.color = isActive ? '#fff' : 'var(--text)';
+        btns[i].style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+      }
+    }
+
+    function _populateFilters() {
+      var locs = {}, depts = {}, titles = {};
+      _allMembers.forEach(function(m) {
+        if (m.location) locs[m.location] = true;
+        if (m.department) depts[m.department] = true;
+        if (m.jobTitle) titles[m.jobTitle] = true;
+      });
+      _populateSelect(document.getElementById('notif-filter-loc'), Object.keys(locs).sort(), 'All Locations');
+      _populateSelect(document.getElementById('notif-filter-dept'), Object.keys(depts).sort(), 'All Depts');
+      _populateSelect(document.getElementById('notif-filter-title'), Object.keys(titles).sort(), 'All Titles');
+    }
+
+    function _populateSelect(selectEl, options, defaultLabel) {
+      selectEl.innerHTML = '';
+      selectEl.appendChild(el('option', { value: '' }, defaultLabel));
+      options.forEach(function(opt) {
+        selectEl.appendChild(el('option', { value: opt }, opt));
+      });
+    }
+
+    function _filterMemberList() {
+      _renderMemberList();
+    }
+
+    function _renderMemberList() {
+      var listEl = document.getElementById('notif-member-list');
+      if (!listEl) return;
+      listEl.innerHTML = '';
+
+      var searchVal = (searchInput.value || '').toLowerCase();
+      var locVal = document.getElementById('notif-filter-loc').value;
+      var deptVal = document.getElementById('notif-filter-dept').value;
+      var titleVal = document.getElementById('notif-filter-title').value;
+
+      var filtered = _allMembers.filter(function(m) {
+        if (searchVal && m.name.toLowerCase().indexOf(searchVal) === -1 && m.email.toLowerCase().indexOf(searchVal) === -1) return false;
+        if (locVal && m.location !== locVal) return false;
+        if (deptVal && m.department !== deptVal) return false;
+        if (titleVal && m.jobTitle !== titleVal) return false;
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        listEl.appendChild(el('div', { style: { padding: '14px', textAlign: 'center', fontSize: '12px', color: 'var(--muted)' } }, 'No members match filters.'));
+        return;
+      }
+
+      filtered.forEach(function(m) {
+        var isChecked = !!_selectedIndividuals[m.email];
+        var row = el('div', {
+          style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: isChecked ? 'var(--accentBg)' : 'transparent', transition: 'background 0.15s' },
+          onClick: function() {
+            if (_selectedIndividuals[m.email]) delete _selectedIndividuals[m.email];
+            else _selectedIndividuals[m.email] = m.name;
+            _renderMemberList();
+          }
+        });
+        row.appendChild(el('span', { style: { fontSize: '14px', width: '18px', textAlign: 'center' } }, isChecked ? '\u2611' : '\u2610'));
+        var info = el('div', { style: { flex: '1', minWidth: '0' } });
+        info.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '500', color: 'var(--text)' } }, m.name));
+        var detail = [m.email];
+        if (m.location) detail.push(m.location);
+        if (m.department) detail.push(m.department);
+        info.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, detail.join(' \u00B7 ')));
+        row.appendChild(info);
+        listEl.appendChild(row);
+      });
+
+      var count = Object.keys(_selectedIndividuals).length;
+      document.getElementById('notif-selected-count').textContent = count + ' selected';
+    }
+
+    function _handleSendNotification() {
+      var title = titleInput.value.trim();
+      var message = msgTextarea.value.trim();
+      if (!title || !message) {
+        sendStatus.textContent = 'Title and message are required.';
+        sendStatus.style.color = 'var(--danger)';
+        return;
+      }
+
+      var recipients = [];
+      if (_recipientMode === 'groups') {
+        if (!_selectedGroup) { sendStatus.textContent = 'Select a recipient group.'; sendStatus.style.color = 'var(--danger)'; return; }
+        recipients.push(_selectedGroup);
+      } else {
+        var emails = Object.keys(_selectedIndividuals);
+        if (emails.length === 0) { sendStatus.textContent = 'Select at least one recipient.'; sendStatus.style.color = 'var(--danger)'; return; }
+        recipients = emails;
+      }
+
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Sending...';
+      sendStatus.textContent = '';
+
+      var sent = 0; var failed = 0; var total = recipients.length;
+      var baseData = {
+        type: typeSelect.value,
+        priority: prioritySelect.value,
+        title: title,
+        message: message,
+        expiresDate: expiresInput.value || '',
+        senderName: CURRENT_USER.name || CURRENT_USER.email.split('@')[0]
+      };
+
+      recipients.forEach(function(r) {
+        var data = {};
+        for (var k in baseData) data[k] = baseData[k];
+        data.recipient = r;
+        google.script.run.withSuccessHandler(function(result) {
+          if (result && result.success) sent++; else failed++;
+          if (sent + failed >= total) _onSendComplete(sent, failed);
+        }).withFailureHandler(function() {
+          failed++;
+          if (sent + failed >= total) _onSendComplete(sent, failed);
+        }).sendWebAppNotification(data);
+      });
+    }
+
+    function _onSendComplete(sent, failed) {
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send Notification';
+      if (failed === 0) {
+        sendStatus.textContent = 'Sent to ' + sent + ' recipient' + (sent > 1 ? 's' : '') + '.';
+        sendStatus.style.color = 'var(--success)';
+        titleInput.value = '';
+        msgTextarea.value = '';
+        expiresInput.value = '';
+        _selectedGroup = '';
+        _selectedIndividuals = {};
+        _updateGroupBtns();
+        _renderMemberList();
+        _loadStewardNotifs();
+      } else {
+        sendStatus.textContent = sent + ' sent, ' + failed + ' failed.';
+        sendStatus.style.color = 'var(--danger)';
+      }
+    }
+
+    function _loadStewardNotifs() {
+      var listEl = document.getElementById('steward-notif-list');
+      if (!listEl) return;
+      showLoading(listEl);
+
+      google.script.run.withSuccessHandler(function(notifs) {
+        listEl.innerHTML = '';
+        if (!notifs || notifs.length === 0) {
+          listEl.appendChild(el('div', { style: { textAlign: 'center', padding: '30px', color: 'var(--muted)', fontSize: '13px' } }, 'No notifications.'));
+          return;
+        }
+
+        var typeColors = {
+          'Steward Message': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
+          'Announcement': { bg: 'rgba(74,222,128,0.15)', text: '#4ade80' },
+          'Deadline': { bg: 'rgba(248,113,113,0.15)', text: '#f87171' },
+          'System': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' }
+        };
+
+        notifs.forEach(function(n) {
+          var card = el('div', {
+            className: 'card',
+            id: 'snotif-' + n.id,
+            style: { padding: '14px', marginBottom: '8px', position: 'relative', transition: 'opacity 0.3s, transform 0.3s' }
+          });
+          var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' } });
+          var tc = typeColors[n.type] || typeColors['System'];
+          topRow.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '600', padding: '3px 8px', borderRadius: '6px', background: tc.bg, color: tc.text, textTransform: 'uppercase', letterSpacing: '0.5px' } }, n.type));
+          if (n.priority === 'Urgent') {
+            topRow.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', textTransform: 'uppercase' } }, 'URGENT'));
+          }
+          topRow.appendChild(el('span', { style: { flex: '1' } }));
+          topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, n.createdDate));
+          var dismissBtn = el('button', {
+            style: { background: 'none', border: 'none', color: 'var(--muted)', fontSize: '16px', cursor: 'pointer', padding: '0 0 0 8px', lineHeight: '1' },
+            onClick: function() {
+              var ce = document.getElementById('snotif-' + n.id);
+              if (ce) { ce.style.opacity = '0'; ce.style.transform = 'translateX(30px)'; }
+              google.script.run.withSuccessHandler(function() {
+                setTimeout(function() { if (ce) ce.remove(); }, 300);
+              }).dismissWebAppNotification(n.id, CURRENT_USER.email);
+            }
+          }, '\u2715');
+          topRow.appendChild(dismissBtn);
+          card.appendChild(topRow);
+          card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, n.title));
+          card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4', marginBottom: '6px' } }, n.message));
+          var meta = [];
+          if (n.sentBy) meta.push('From: ' + n.sentBy);
+          if (n.expiresDate) meta.push('Expires: ' + n.expiresDate);
+          if (meta.length) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
+          listEl.appendChild(card);
+        });
+      }).withFailureHandler(function() {
+        listEl.innerHTML = '';
+        listEl.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '10px' } }, 'Error loading notifications.'));
+      }).getWebAppNotifications(CURRENT_USER.email, 'steward');
+    }
+  });
+}
+
+// ═══════════════════════════════════════
+// STEWARD RESOURCES — Dynamic from Resources sheet
 // ═══════════════════════════════════════
 
 function renderStewardResources(appContainer) {
   renderPageLayout(appContainer, 'steward', 'resources', function(container) {
     _stewardHeader(container, 'Resources');
     var content = el('div', { className: 'content' });
-    var items = [
-      { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
-      { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
-      { icon: '\uD83D\uDCD6', label: 'Know Your Rights', sub: 'Contract highlights' },
-      { icon: '\uD83D\uDCDD', label: 'File a Grievance', sub: 'Start a new case for a member' },
-      { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
-    ];
-    if (CONFIG.orgWebsite) items.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
-    items.forEach(function(r) {
-      var item = el('div', {
-        className: 'card card-clickable',
-        style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
-        onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
+    // Quick links (always visible, from Config)
+    var quickLinks = [];
+    if (CONFIG.calendarUrl) quickLinks.push({ icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl });
+    if (CONFIG.driveFolderUrl) quickLinks.push({ icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl });
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+
+    if (quickLinks.length > 0) {
+      content.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' } }, 'Quick Links'));
+      quickLinks.forEach(function(r) {
+        var item = el('div', {
+          className: 'card card-clickable',
+          style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px', marginBottom: '6px' },
+          onClick: function() { window.open(r.url, '_blank'); }
+        });
+        item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
+        var tg = el('div', { style: { flex: '1' } });
+        tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+        tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+        item.appendChild(tg);
+        item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+        content.appendChild(item);
       });
-      item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
-      var tg = el('div', { style: { flex: '1' } });
-      tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-      tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
-      item.appendChild(tg);
-      item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-      content.appendChild(item);
-    });
+    }
+
+    // Dynamic resources from sheet
+    var dynamicContainer = el('div');
+    showLoading(dynamicContainer);
+    content.appendChild(dynamicContainer);
     container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(resources) {
+      dynamicContainer.innerHTML = '';
+      if (!resources || resources.length === 0) {
+        dynamicContainer.appendChild(el('div', { style: { color: 'var(--muted)', textAlign: 'center', padding: '20px 0', fontSize: '13px' } }, 'No additional resources available.'));
+        return;
+      }
+
+      var categories = {};
+      resources.forEach(function(r) {
+        var cat = r.category || 'General';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(r);
+      });
+
+      Object.keys(categories).forEach(function(cat) {
+        dynamicContainer.appendChild(el('div', {
+          style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--muted)', margin: '18px 0 8px', textTransform: 'uppercase', letterSpacing: '0.5px' }
+        }, cat));
+
+        categories[cat].forEach(function(r) {
+          var card = el('div', {
+            className: 'card',
+            style: { padding: '14px 16px', marginBottom: '8px', cursor: r.url ? 'pointer' : 'default' },
+            onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
+          });
+          var headerRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: r.summary || r.content ? '6px' : '0' } });
+          headerRow.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon || '\uD83D\uDCC4'));
+          headerRow.appendChild(el('div', { style: { flex: '1', fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, r.title));
+          if (r.url) headerRow.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+          card.appendChild(headerRow);
+          if (r.summary) {
+            card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.4', marginLeft: '28px' } }, r.summary));
+          }
+          if (r.content && !r.url) {
+            var contentDiv = el('div', {
+              style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', marginLeft: '28px', padding: '10px', background: 'var(--raised)', borderRadius: '8px' }
+            });
+            contentDiv.innerHTML = r.content.replace(/\n/g, '<br>');
+            card.appendChild(contentDiv);
+          }
+          dynamicContainer.appendChild(card);
+        });
+      });
+    }).withFailureHandler(function() {
+      dynamicContainer.innerHTML = '';
+      dynamicContainer.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '10px' } }, 'Error loading resources.'));
+    }).getWebAppResourcesList('All');
   });
 }
 
@@ -514,6 +947,7 @@ function renderStewardMore(appContainer) {
     var menuItems = [
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { renderStewardTasks(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
+      { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Send & manage notifications', action: function() { renderStewardNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { renderBroadcast(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
