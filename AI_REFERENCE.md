@@ -407,3 +407,13 @@ DDS Main → UT staging → (user manages) → UT dev → UT main
 | 2026-02-25 | Claude (claude.ai) | Appended sync rules, WT exclusion registry, data protection rules to AI_REFERENCE.md |
 | 2026-02-25 | Claude (claude.ai) | Created SYNC-LOG.md with full exclusion analysis |
 | 2026-02-25 | Claude (claude.ai) | Created .gitignore for Union-Tracker repo |
+
+## 🚀 DEPLOYMENT RULE (Added 2026-02-25)
+
+### After any merge or work to DDS Main:
+1. Push to GitHub (all relevant branches)
+2. **Run `clasp push` to update the Google Sheet**
+   - Command: `cd C:\Users\deskc\Documents\DDS-Dashboard && npm run deploy` (or `clasp push`)
+   - CLASP rootDir is `./dist` — only `dist/` contents go to Apps Script
+   - Requires Google OAuth — must be run from local machine, not CI (unless secrets configured)
+   - If agent cannot run clasp, **always remind the user to run it**
