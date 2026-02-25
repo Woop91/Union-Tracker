@@ -5,6 +5,22 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.13.0] - 2026-02-25
+
+### Added
+- **Notification bell badge** with unread count in SPA header
+- **Steward notification management** — compose/inbox/manage tabs in steward view
+- **EventBus auto-notifications** — automatic alerts for grievance deadlines and status changes
+- `src/25_WorkloadService.gs` (1,129 lines) — SPA-integrated workload tracking with SSO auth (separate from standalone PIN-auth portal)
+- Member notification view with dismiss functionality
+
+### Changed
+- **Build system rewritten** — `build.js` now copies individual `.gs` + `.html` files to `dist/` instead of concatenating into single `ConsolidatedDashboard.gs`
+- `dist/ConsolidatedDashboard.gs` **deleted** — replaced by 39 individual `.gs` + 8 `.html` files
+- `src/18_WorkloadTracker.gs` major refactor
+- HTML templates reworked for individual-file architecture (`createTemplateFromFile()` now supported)
+- All 3 branches (Main, dev, staging) synced
+
 ## [4.12.2] - 2026-02-25
 
 ### Added
@@ -277,6 +293,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 4.13.0 | 2026-02-25 | Notification bell/EventBus auto-alerts, individual-file build, WorkloadService SPA module |
 | 4.12.2 | 2026-02-25 | SPA web dashboard, SSO + magic link, deep-link routing, hidden sheets |
 | 4.12.0 | 2026-02-24 | Notifications system (sheet + API + dual-role page) |
 | 4.11.0 | 2026-02-24 | Resources hub, meeting check-in route, design refresh |

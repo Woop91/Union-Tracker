@@ -33,8 +33,8 @@ Read these files **in this order** when onboarding to this codebase:
 **Mirror:** `Woop91/Union-Tracker-` (public). See SYNC-LOG.md for exclusion rules.
 **Deployed via:** CLASP (`clasp push`) to Google Apps Script, bound to a Google Sheet.
 **Target users:** Union stewards (power users) and members (casual users) at MassAbility DDS (SEIU 509).
-**Architecture:** 36 source `.gs` files + 8 `.html` files in `src/` → built into single `dist/ConsolidatedDashboard.gs` via `node build.js`.
-**Current build:** ~70,586 lines / ~2,907 KB (limit: 6MB).
+**Architecture:** 39 source `.gs` files + 8 `.html` files in `src/` → copied individually to `dist/` via `node build.js`.
+**Current build:** 39 `.gs` + 8 `.html` files in `dist/` (individual file mode, NOT consolidated).
 **Web App:** Served via `doGet()` using inline HTML (`HtmlService.createHtmlOutput()`). Does NOT use `createTemplateFromFile()`.
 **DDS Apps Script ID:** `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
 **UT Apps Script ID:** `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
@@ -42,7 +42,8 @@ Read these files **in this order** when onboarding to this codebase:
 ### ⚠️ Key Reminders
 - **Critical rules** (dynamic-only, 1-indexed columns, escapeHtml, etc.) → **See CLAUDE.md**
 - **Sync rules & WT exclusions** → **See SYNC-LOG.md**
-- **`dist/ConsolidatedDashboard.gs` is auto-generated.** Never edit directly.
+- **`dist/` files are auto-generated.** Never edit directly. Edit `src/*.gs` files, then run `npm run build`.
+- **`dist/ConsolidatedDashboard.gs` is DELETED** as of v4.13.0. Build now copies individual files.
 - **`web-dashboard/` folder is LEGACY/ORPHANED.** Do not deploy or integrate it.
 - **CLASP rootDir:** `./dist` — only `dist/` contents go to Apps Script.
 - **Deploy:** `npm run deploy` (lint + test + build:prod + clasp push). Must run locally (requires Google OAuth).
@@ -54,11 +55,12 @@ Read these files **in this order** when onboarding to this codebase:
 
 ### Build Pipeline
 ```
-src/*.gs (36 files) + src/*.html (8 files)
-    → build.js → dist/ConsolidatedDashboard.gs (single file)
-                  dist/appsscript.json (manifest)
+src/*.gs (39 files) + src/*.html (8 files)
+    → build.js (copy-files mode) → dist/*.gs + dist/*.html (individual files)
+                                    dist/appsscript.json (manifest)
     → clasp push → Google Apps Script project
 ```
+**Note:** As of v4.13.0, `dist/ConsolidatedDashboard.gs` is deleted. Build copies individual files to `dist/`. GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`.
 
 ### Source File Load Order
 | Prefix | Layer | Key Files |
@@ -77,6 +79,7 @@ src/*.gs (36 files) + src/*.html (8 files)
 | `11_-17_` | Features | CommandHub, self-service, meetings, events, correlation |
 | `18_` | Workload Tracker | **DDS ONLY** — excluded from Union-Tracker |
 | `19_-24_` | Web Dashboard SPA | Auth, config reader, data service, app entry, portal sheets, weekly questions |
+| `25_` | Workload Service | SPA-integrated workload tracking (SSO auth, separate from standalone WT portal) |
 
 ### HTML Files in src/
 | File | Purpose |
@@ -117,7 +120,7 @@ doGet(e)
 - **Auth config:** `ScriptProperties` (no manual setup required — `initWebDashboardAuth()` handles first-time)
 
 ### HTML Serving Method
-The consolidated file uses `HtmlService.createHtmlOutput()` with **inline HTML strings** built by functions like `getUnifiedDashboardHtml()`, `getWebAppDashboardHtml()`, etc. It does NOT use `createTemplateFromFile()` or separate `.html` files (that's the orphaned `web-dashboard/` architecture).
+As of v4.13.0, the build outputs individual `.html` files to `dist/`, enabling both `HtmlService.createHtmlOutput()` (inline strings) and `createTemplateFromFile()`/`createHtmlOutputFromFile()` (file-based). The SPA modules (19-25) use file-based HTML. Legacy modules (04-13) still use inline HTML strings.
 
 ---
 
@@ -210,6 +213,8 @@ Records **why** architectural choices were made, so future LLMs don't undo them.
 | 2026-02-25 | Default accent hue changed from 250 (blue) → 30 (amber) | Warm palette matches union identity, distinguishes from generic dashboards |
 | 2026-02-25 | SPA deep-links (?page=X → initialTab) with standalone HTML fallback | Consistent SPA experience, but graceful degradation if SPA unavailable |
 | 2026-02-25 | `initWebDashboardAuth()` auto-configures on first run | No manual ScriptProperties setup required — reduces deployment friction |
+| 2026-02-25 | Switched from consolidated single-file build to individual-file build | GAS needs separate `.html` files for `createTemplateFromFile()` and `createHtmlOutputFromFile()`. Individual files also easier to debug in GAS editor. |
+| 2026-02-25 | Added `25_WorkloadService.gs` alongside `18_WorkloadTracker.gs` | 25_ is SPA-integrated (SSO auth), 18_ is standalone portal (PIN auth). Different auth models = separate modules. |
 
 ---
 
@@ -227,6 +232,7 @@ Records what each AI agent changed, when, and in which files.
 | 2026-02-25 | Claude (claude.ai) | v4.12.2: SPA port — 6 new GS modules + 6 HTML files | `19-24_*.gs`, `*.html`, `dist/` |
 | 2026-02-25 | Claude (claude.ai) | v4.12.2b: UT feature port — config reader, auth, deep-link routing | `01_Core.gs`, `05_Integrations.gs`, `08a_SheetSetup.gs`, `10a_SheetCreation.gs`, `19-22_*.gs`, `index.html` |
 | 2026-02-25 | Claude (claude.ai) | Consolidated AI_REFERENCE.md — removed duplication with CLAUDE.md, SYNC-LOG.md, CHANGELOG.md | `AI_REFERENCE.md`, `CHANGELOG.md` |
+| 2026-02-25 | Claude (claude.ai) | Merged staging→Main: v4.13.0 SPA overhaul + notification bell/EventBus + individual-file build. Synced all 3 branches. | All `src/`, `dist/`, `build.js`, `CLAUDE.md` |
 
 ---
 
@@ -248,9 +254,9 @@ See `PHASE2_PLAN.md` for details.
 2. **Read this file second** — it has architecture context, error history, and protected code.
 3. **Read SYNC-LOG.md if touching UT** — full exclusion registry with line numbers.
 4. **The `web-dashboard/` folder is dead code.** Do not deploy or integrate it.
-5. **Never edit `dist/ConsolidatedDashboard.gs` directly.** Edit `src/*.gs` and run `npm run build`.
+5. **Never edit `dist/` files directly.** Edit `src/*.gs` and run `npm run build` (copies individual files to dist).
 6. **Test with `npm run ci`** before pushing.
 7. **Deploy with `npm run deploy`** (lint + test + prod build + clasp push).
-8. **Build is ~2.9MB / 6MB limit.** Monitor growth — you have ~50% headroom.
+8. **Build is 39 `.gs` + 8 `.html` individual files in `dist/`.** GAS has a 6MB per-file limit. Monitor individual file sizes.
 9. **The `doGet()` source is in `src/05_Integrations.gs`** (routes) and `src/22_WebDashApp.gs` (SPA entry).
 10. **Do not duplicate information across reference docs.** Each doc has one canonical purpose (see table at top).
