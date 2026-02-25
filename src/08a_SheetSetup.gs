@@ -142,6 +142,16 @@ function CREATE_DASHBOARD() {
       }
     }
 
+    // Initialize Portal sheets (23_PortalSheets.gs) — member directory mirror, events, polls, etc.
+    if (typeof initPortalSheets === 'function') {
+      try {
+        initPortalSheets();
+        ss.toast('Portal sheets created', '🏗️ Progress', 2);
+      } catch (portalError) {
+        Logger.log('Portal sheets skipped: ' + portalError.message);
+      }
+    }
+
     // Initialize Weekly Questions sheets (24_WeeklyQuestions.gs)
     if (typeof WeeklyQuestions !== 'undefined' && WeeklyQuestions.initWeeklyQuestionSheets) {
       try {

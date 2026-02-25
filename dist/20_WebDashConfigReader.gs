@@ -2,28 +2,20 @@
  * ConfigReader.gs
  * Reads org-specific configuration from the "Config" tab.
  * Caches in CacheService to avoid repeated sheet reads.
- * 
- * Config Tab Expected Layout:
- *   Column A: Setting Name
- *   Column B: Setting Value
- * 
- * Required rows (by name in Column A):
- *   - Org Name
- *   - Org Abbreviation
- *   - Logo Initials
- *   - Accent Hue          (0-360, integer)
- *   - Magic Link Expiry   (days, integer)
- *   - Cookie Duration      (days, integer)
- *   - Steward Label        (optional, default "Steward")
- *   - Member Label         (optional, default "Member")
+ *
+ * Config Tab Layout (column-based):
+ *   Row 2 = headers, Row 3 = values
+ *   Indexed via CONFIG_COLS constants from 01_Core.gs
+ *
+ * SPA-specific settings (accent hue, labels, magic link / cookie
+ * duration) are not in the Config tab — sensible defaults are used.
  */
 
 var ConfigReader = (function () {
-  
+
   var CACHE_KEY = 'ORG_CONFIG';
   var CACHE_TTL = 21600; // 6 hours in seconds
-  var CONFIG_SHEET_NAME = 'Config';
-  
+
   /**
    * Reads the Config tab and returns a settings object.
    * Uses CacheService for performance.
@@ -43,50 +35,40 @@ var ConfigReader = (function () {
         }
       }
     }
-    
-    // Read from sheet
+
+    // Read from sheet — column-based layout via CONFIG_COLS
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(CONFIG_SHEET_NAME);
-    
+    var sheet = ss.getSheetByName(SHEETS.CONFIG);
+
     if (!sheet) {
-      throw new Error('Config tab "' + CONFIG_SHEET_NAME + '" not found. Please create it.');
+      throw new Error('Config tab "' + SHEETS.CONFIG + '" not found. Please create it.');
     }
-    
-    var data = sheet.getDataRange().getValues();
-    var configMap = {};
-    
-    // Build key-value map from columns A and B
-    for (var i = 0; i < data.length; i++) {
-      var key = String(data[i][0]).trim().toLowerCase();
-      var value = data[i][1];
-      if (key) {
-        configMap[key] = value;
-      }
-    }
-    
-    // Build config object with defaults
+
+    // Read org-level values from row 3 using CONFIG_COLS
+    var orgName = _readCell(sheet, CONFIG_COLS.ORG_NAME) || 'My Organization';
+
     var config = {
-      orgName:             configMap['org name'] || configMap['organization name'] || 'My Organization',
-      orgAbbrev:           configMap['org abbreviation'] || configMap['abbreviation'] || '',
-      logoInitials:        configMap['logo initials'] || configMap['logo'] || _deriveInitials(configMap['org name'] || 'MO'),
-      accentHue:           _parseInt(configMap['accent hue'] || configMap['accent color hue'], 250),
-      magicLinkExpiryDays: _parseInt(configMap['magic link expiry'] || configMap['magic link expiry days'], 7),
-      cookieDurationDays:  _parseInt(configMap['cookie duration'] || configMap['cookie duration days'], 30),
-      stewardLabel:        configMap['steward label'] || 'Steward',
-      memberLabel:         configMap['member label'] || 'Member',
-      // Org links
-      calendarId:          configMap['calendar id'] || configMap['google calendar id'] || '',
-      driveFolderId:       configMap['drive folder id'] || configMap['shared drive folder'] || '',
-      satisfactionFormUrl: configMap['satisfaction form url'] || configMap['survey form url'] || '',
-      orgWebsite:          configMap['org website'] || configMap['website'] || '',
-      // Derived
+      orgName:             orgName,
+      orgAbbrev:           _deriveAbbrev(orgName),
+      logoInitials:        _deriveInitials(orgName),
+      accentHue:           250,
+      magicLinkExpiryDays: 7,
+      cookieDurationDays:  30,
+      stewardLabel:        'Steward',
+      memberLabel:         'Member',
+      // Org links — from Config tab columns
+      calendarId:          _readCell(sheet, CONFIG_COLS.CALENDAR_ID) || '',
+      driveFolderId:       _readCell(sheet, CONFIG_COLS.DRIVE_FOLDER_ID) || '',
+      satisfactionFormUrl: _readCell(sheet, CONFIG_COLS.SATISFACTION_FORM_URL) || '',
+      orgWebsite:          _readCell(sheet, CONFIG_COLS.ORG_WEBSITE) || '',
+      // Derived (computed below)
       magicLinkExpiryMs:   0,
       cookieDurationMs:    0,
     };
-    
+
     config.magicLinkExpiryMs = config.magicLinkExpiryDays * 24 * 60 * 60 * 1000;
     config.cookieDurationMs = config.cookieDurationDays * 24 * 60 * 60 * 1000;
-    
+
     // Cache it
     try {
       var cache = CacheService.getScriptCache();
@@ -95,10 +77,10 @@ var ConfigReader = (function () {
       // Cache write failed — non-fatal, will just re-read next time
       Logger.log('ConfigReader: Cache write failed: ' + e.message);
     }
-    
+
     return config;
   }
-  
+
   /**
    * Returns config as JSON string (for injecting into HTML templates)
    * @returns {string} JSON string
@@ -106,7 +88,7 @@ var ConfigReader = (function () {
   function getConfigJSON() {
     return JSON.stringify(getConfig());
   }
-  
+
   /**
    * Forces a cache refresh and returns fresh config
    * @returns {Object} Fresh config
@@ -114,7 +96,7 @@ var ConfigReader = (function () {
   function refreshConfig() {
     return getConfig(true);
   }
-  
+
   /**
    * Validates that all required config fields are present
    * @returns {Object} { valid: boolean, missing: string[] }
@@ -122,31 +104,47 @@ var ConfigReader = (function () {
   function validateConfig() {
     var config = getConfig(true);
     var missing = [];
-    
+
     if (!config.orgName || config.orgName === 'My Organization') missing.push('Org Name');
     if (config.accentHue < 0 || config.accentHue > 360) missing.push('Accent Hue (must be 0-360)');
-    
+
     return {
       valid: missing.length === 0,
       missing: missing,
       config: config
     };
   }
-  
+
   // --- Helpers ---
-  
+
+  function _readCell(sheet, col) {
+    if (!col) return '';
+    try {
+      return sheet.getRange(3, col).getValue();
+    } catch (e) {
+      return '';
+    }
+  }
+
   function _parseInt(val, defaultVal) {
     var parsed = parseInt(val, 10);
     return isNaN(parsed) ? defaultVal : parsed;
   }
-  
+
   function _deriveInitials(name) {
     if (!name) return 'ORG';
     var words = String(name).trim().split(/\s+/);
     if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
     return words.map(function (w) { return w[0]; }).join('').substring(0, 3).toUpperCase();
   }
-  
+
+  function _deriveAbbrev(name) {
+    if (!name) return '';
+    var words = String(name).trim().split(/\s+/);
+    if (words.length <= 2) return name;
+    return words.map(function (w) { return w[0]; }).join('').toUpperCase();
+  }
+
   // Public API
   return {
     getConfig: getConfig,
@@ -154,5 +152,5 @@ var ConfigReader = (function () {
     refreshConfig: refreshConfig,
     validateConfig: validateConfig,
   };
-  
+
 })();

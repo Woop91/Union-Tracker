@@ -458,7 +458,7 @@ function runStartupValidation() {
  */
 var API_VERSION = {
   major: 4,
-  minor: 12,
+  minor: 13,
   patch: 0,
   toString: function() {
     return this.major + '.' + this.minor + '.' + this.patch;
@@ -682,12 +682,12 @@ function getLocalNumberFromConfig_() {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 12,
+  MINOR: 13,
   PATCH: 0,
-  BUILD: 'v4.12.0',
-  CURRENT: '4.12.0',
+  BUILD: 'v4.13.0',
+  CURRENT: '4.13.0',
   BUILD_DATE: '2026-02-24',
-  CODENAME: 'Bug Fixes & Chart.js Enhancements'
+  CODENAME: 'Full Workload Tracker Migration'
 };
 
 /**
@@ -697,6 +697,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.13.0', date: '2026-02-24', codename: 'Full Workload Tracker Migration', changes: 'Complete workload tracker migration to web dashboard SPA. New 25_WorkloadService.gs IIFE backend with correct 24-column Vault, full sub-category support (42 items), privacy reciprocity, overtime, leave tracking, employment status, weekly cases, CSV export, vault cleaning, enhanced analytics with sub-category/employment/plan/overtime breakdowns. Removed standalone 18_WorkloadTracker.gs and WorkloadTracker.html.' },
   { version: '4.12.0', date: '2026-02-24', codename: 'Bug Fixes & Chart.js Enhancements', changes: 'Chart.js integration for steward and member views, bug fixes across web dashboard, steward and member view enhancements, workload tracker improvements, error view retry fix, portal sheet setup infrastructure.' },
   { version: '4.11.0', date: '2026-02-24', codename: 'Web Dashboard SPA Enhancement', changes: 'Responsive layout (mobile/tablet/desktop), sidebar nav, member self-service (profile editor, steward picker, resources, survey results, workload tracker embedding), steward tools (members tab, broadcast, survey tracking), weekly questions engagement system, CSS-only bar charts, quarterly survey results with privacy threshold.' },
   { version: '4.10.0', date: '2026-02-23', codename: 'Workload Tracker Integration', changes: 'Workload Tracker module (18_WorkloadTracker.gs + WorkloadTracker.html), web-dashboard SPA integration (19-22 .gs + 6 .html), multi-file build mode, 8 workload categories, privacy controls, reciprocity enforcement, email reminders, portal sheets infrastructure (23_PortalSheets.gs).' },

@@ -1,13 +1,13 @@
 /**
  * WebApp.gs
  * Main entry point for the web app dashboard.
- * 
+ *
  * doGetWebDashboard(e) handles:
  *   1. Auth resolution (SSO / magic link / session token)
  *   2. Role lookup from Member Directory
  *   3. Routing to the correct view (auth, steward, member)
  *   4. Injecting config + user data into the HTML template
- * 
+ *
  * Deployment: Deploy as Web App
  *   - Execute as: Me (the script owner)
  *   - Who has access: Anyone (or anyone within org)
@@ -21,21 +21,21 @@
  */
 function doGetWebDashboard(e) {
   e = e || { parameter: {} };
-  
+
   try {
     var config = ConfigReader.getConfig();
     var user = Auth.resolveUser(e);
-    
+
     if (!user) {
       // Not authenticated — show login screen
       return _serveAuth(config, e);
     }
-    
+
     // Authenticated — look up role
     var userRecord = DataService.findUserByEmail(user.email);
-    
+
     if (!userRecord) {
-      // Check if the visitor is the script owner � grant bootstrap access
+      // Check if the visitor is the script owner — grant bootstrap access
       // so the app is usable before the Member Directory is populated.
       try {
         var ownerEmail = Session.getEffectiveUser().getEmail().toLowerCase();
@@ -53,25 +53,26 @@ function doGetWebDashboard(e) {
             isBootstrapAdmin: true,
           };
         }
-      } catch (ownerErr) { /* SSO not available � fall through */ }
+      } catch (ownerErr) { /* SSO not available — fall through */ }
     }
 
     if (!userRecord) {
       // Email not in directory
       return _serveError(config, 'not_found', user.email);
     }
-    
+
     // Handle "remember me" — create session token if requested
     var sessionToken = null;
     if (e.parameter.remember === '1' && user.method === 'magic') {
       sessionToken = Auth.createSessionToken(user.email);
     }
-    
+
     // Route to appropriate dashboard
     var role = userRecord.role; // 'steward', 'member', or 'both'
-    
-    return _serveDashboard(config, userRecord, role, sessionToken);
-    
+    var initialTab = e.parameter.page || null;
+
+    return _serveDashboard(config, userRecord, role, sessionToken, initialTab);
+
   } catch (err) {
     Logger.log('WebApp doGet error: ' + err.message + '\n' + err.stack);
     return _serveError(ConfigReader.getConfig(), 'error', err.message);
@@ -83,13 +84,13 @@ function doGetWebDashboard(e) {
  */
 function _serveAuth(config, e) {
   var template = HtmlService.createTemplateFromFile('index');
-  
+
   template.pageData = JSON.stringify({
     view: 'auth',
     config: _sanitizeConfig(config),
     error: e.parameter.authError || null,
   });
-  
+
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -99,9 +100,9 @@ function _serveAuth(config, e) {
 /**
  * Serves the dashboard (steward or member view).
  */
-function _serveDashboard(config, userRecord, role, sessionToken) {
+function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var template = HtmlService.createTemplateFromFile('index');
-  
+
   // Sanitize user record — strip sensitive fields
   var safeUser = {
     email: userRecord.email,
@@ -125,8 +126,9 @@ function _serveDashboard(config, userRecord, role, sessionToken) {
     user: safeUser,
     isDualRole: role === 'both',
     sessionToken: sessionToken || null,
+    initialTab: initialTab || null,
   });
-  
+
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -138,13 +140,13 @@ function _serveDashboard(config, userRecord, role, sessionToken) {
  */
 function _serveError(config, type, detail) {
   var template = HtmlService.createTemplateFromFile('index');
-  
+
   var messages = {
     'not_found': 'Your email was not found in the member directory. Please contact your steward for access.',
     'expired': 'Your sign-in link has expired. Please request a new one.',
     'error': 'Something went wrong. Please try again.',
   };
-  
+
   template.pageData = JSON.stringify({
     view: 'error',
     config: _sanitizeConfig(config),
@@ -154,7 +156,7 @@ function _serveError(config, type, detail) {
       detail: type === 'error' ? detail : null,
     },
   });
-  
+
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
