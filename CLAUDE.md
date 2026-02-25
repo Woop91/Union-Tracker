@@ -142,5 +142,6 @@ Canonical review: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/`
 - `AI_REFERENCE.md` — LLM context doc (never delete, only append)
 - `SYNC-LOG.md` — DDS↔UT sync history and exclusion registry
 - `CODE_REVIEW.md` — canonical security/code review
+- `COLUMN_ISSUES_LOG.md` — recurring column bugs and fixes (READ if working on column-related code)
 - `FEATURES.md` — feature documentation
 - `DEVELOPER_GUIDE.md` — developer onboarding

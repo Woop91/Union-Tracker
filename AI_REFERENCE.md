@@ -417,3 +417,23 @@ DDS Main → UT staging → (user manages) → UT dev → UT main
    - CLASP rootDir is `./dist` — only `dist/` contents go to Apps Script
    - Requires Google OAuth — must be run from local machine, not CI (unless secrets configured)
    - If agent cannot run clasp, **always remind the user to run it**
+
+## ⚠️ PROTECTED CODE — DO NOT MODIFY (Migrated from AIR.md, 2026-02-25)
+
+The following code sections are USER APPROVED and must NOT be modified or removed:
+
+### Dashboard Modal Popup — `src/04c_InteractiveDashboard.gs`
+Protected functions: `showInteractiveDashboardTab()`, `getInteractiveDashboardHtml()`, `getInteractiveOverviewData()`, `getInteractiveGrievanceData()`, `getInteractiveMemberData()`, `getMyStewardCases()`
+Tabs: Overview, Grievances, Members, Analytics, My Cases (steward-only)
+
+### Member Satisfaction Dashboard — `src/04c_InteractiveDashboard.gs`
+Protected functions: `showSatisfactionDashboard()`, `getSatisfactionDashboardHtml()`, `getSatisfactionOverviewData()`, `getSatisfactionResponseData()`, `getSatisfactionSectionData()`, `getSatisfactionAnalyticsData()`, `getSatisfactionTrendData()`, `getSatisfactionLocationDrill()`
+Tabs: Overview, Trends, Responses, Sections, Insights
+
+### Secure Member Dashboard — `src/11_CommandHub.gs`
+Protected functions: `showPublicMemberDashboard()`, `showStewardPerformanceModal()`, `safetyValveScrub()`, `getSecureGrievanceStats_()`, `getSecureAllStewards_()`, `getSecureSatisfactionStats_()`, `getStewardWorkload()`
+Features: Material Design UI, Weingarten Rights, live steward search, PII scrubbing
+
+## 📐 ARCHITECTURE: No Formulas in Visible Sheets (Migrated from AIR.md)
+
+All visible sheets (Dashboard, Member Satisfaction, Feedback) contain only VALUES, never formulas. Data is recomputed by JavaScript on each change. No broken formula references, no circular dependencies, no formula chains.
