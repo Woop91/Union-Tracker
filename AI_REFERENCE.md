@@ -335,3 +335,53 @@ Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Nam
 - `getWebAppResourcesList(audience)` → resource cards
 
 **No new server-side code was needed — all functions existed in 05_Integrations.gs.**
+
+### v4.12.2 — Theme + Layout Port to SPA (2026-02-25)
+**Theme overhaul:**
+- Replaced JetBrains Mono/Space Grotesk/Plus Jakarta Sans/Sora → DM Sans (body) + Fraunces (display)
+- Warm color palette: #fafaf9 bg, #1c1917 text, amber accent (hue 30), #e7e5e4 borders
+- Default to light mode (was dark)
+- Material Icons added for expand/search icons
+
+**Resources → Full Educational Hub (both roles):**
+- Hero header with blue gradient (linear-gradient 135deg #1e3a5f→#2d5a87)
+- Search bar with icon (filters by title, summary, content, category)
+- Category pill filters (horizontal scrollable, "All (N)" + per-category counts)
+- Quick Links row (Calendar, Drive, Website from Config)
+- Resource cards: icon, category badge, title (Fraunces serif), summary, expandable content ("Tap to read more"), external link button, date added metadata
+- Data from getWebAppResourcesList() — fully dynamic from Resources sheet
+
+**Notifications → Themed with hero + CSS classes:**
+- Hero header with amber gradient (linear-gradient 145deg #92400e→#b45309)
+- .notif-card CSS class with .urgent modifier (red left border)
+- .type-badge CSS class (color-coded: blue Steward Message, green Announcement, red Deadline, purple System)
+- .notif-dismiss positioned absolute top-right
+- Empty state with bell icon
+
+**CSS additions (styles.html, +360 lines):**
+- .res-search-wrap, .res-search-bar, .res-search-icon — search bar
+- .cat-pills, .cat-pill — horizontal scrollable category filters
+- .res-card, .res-icon, .res-title, .res-category, .res-summary — resource cards
+- .res-content, .expand-hint — expandable "read more" sections
+- .res-link, .res-meta — external links and dates
+- .notif-card, .notif-card.urgent — notification cards
+- .notif-title, .notif-msg, .notif-meta, .notif-dismiss — card internals
+- .type-badge — color-coded type labels
+- .notif-compose, .notif-tab-row, .notif-tab-btn — compose form
+- .notif-group-btn, .notif-filter-bar — recipient picker
+- .notif-member-list, .notif-member-row, .notif-chk — individual picker
+- .btn-send, .toast — send button and feedback
+- .page-hero, .hero-sub — gradient hero headers
+
+**doGet() default route → SPA:**
+- Default case in doGet() now calls doGetWebDashboard(e) (SSO + magic link auth)
+- Fallback to getUnifiedDashboardHtml(false) if doGetWebDashboard unavailable
+- Legacy ?page= routes still work for backward compatibility
+
+**Files changed:**
+- src/index.html — DM Sans + Fraunces fonts, warm theme engine, default light mode
+- src/styles.html — +360 lines of resource hub + notification CSS
+- src/member_view.html — Full resource hub + themed notifications
+- src/steward_view.html — Full resource hub + themed notifications + compose form fix
+- src/05_Integrations.gs — doGet default → doGetWebDashboard(e)
+- dist/ConsolidatedDashboard.gs — rebuilt

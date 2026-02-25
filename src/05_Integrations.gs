@@ -1805,10 +1805,13 @@ function doGet(e) {
       if (typeof buildPublicPortal === 'function') {
         return buildPublicPortal();
       }
-      // Fall through to dashboard
+      // Fall through to SPA dashboard
     case 'dashboard':
     default:
-      // v4.4.0: Default to unified member dashboard
+      // v4.12.1: Default to SPA web dashboard (SSO + magic link auth)
+      if (typeof doGetWebDashboard === 'function') {
+        return doGetWebDashboard(e);
+      }
       html = getUnifiedDashboardHtml(false);
       break;
   }

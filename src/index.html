@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Dashboard</title>
   
-  <!-- Fonts -->
+  <!-- Fonts — DM Sans (body) + Fraunces (display) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   
   <?!= include('styles') ?>
 
@@ -43,55 +44,56 @@
     var ThemeEngine = (function() {
       
       function generatePalette(hue) {
+        // Override: warm amber accent to match our system
         return {
-          accent:       'hsl(' + hue + ', 70%, 68%)',
-          accentDim:    'hsl(' + hue + ', 50%, 45%)',
-          accentGlow:   'hsla(' + hue + ', 70%, 68%, 0.3)',
-          accentBg:     'hsla(' + hue + ', 70%, 68%, 0.1)',
-          accentBorder: 'hsla(' + hue + ', 70%, 68%, 0.25)',
+          accent:       'hsl(' + hue + ', 65%, 42%)',
+          accentDim:    'hsl(' + hue + ', 50%, 35%)',
+          accentGlow:   'hsla(' + hue + ', 65%, 42%, 0.3)',
+          accentBg:     'hsla(' + hue + ', 65%, 42%, 0.08)',
+          accentBorder: 'hsla(' + hue + ', 65%, 42%, 0.25)',
         };
       }
       
-      var palette = generatePalette(CONFIG.accentHue || 250);
+      var palette = generatePalette(CONFIG.accentHue || 30);
       
       var themes = {
         steward: {
           dark: {
-            bg: '#141414', surface: '#1e1e1e', raised: '#262626',
-            text: '#e0e0e0', muted: '#6b6b6b',
+            bg: '#1a1815', surface: '#252220', raised: '#2e2b28',
+            text: '#e7e5e4', muted: '#78716c',
             success: '#4ade80', warning: '#facc15', danger: '#ef4444', info: '#60a5fa',
-            border: '#2a2a2a', radius: '10px',
-            fontBody: "'JetBrains Mono', monospace",
-            fontDisplay: "'Space Grotesk', sans-serif",
+            border: '#3d3835', radius: '14px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
             mode: 'dark',
           },
           light: {
-            bg: '#f2f2f5', surface: '#ffffff', raised: '#f8f8fa',
-            text: '#1a1a2e', muted: '#8888a0',
+            bg: '#fafaf9', surface: '#ffffff', raised: '#f5f5f4',
+            text: '#1c1917', muted: '#78716c',
             success: '#16a34a', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
-            border: '#e2e2ea', radius: '10px',
-            fontBody: "'JetBrains Mono', monospace",
-            fontDisplay: "'Space Grotesk', sans-serif",
+            border: '#e7e5e4', radius: '14px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
             mode: 'light',
           }
         },
         member: {
           dark: {
-            bg: '#0c0c1d', surface: 'rgba(255,255,255,0.05)', raised: 'rgba(255,255,255,0.08)',
-            text: '#eeedf5', muted: '#7d7b96',
+            bg: '#1a1815', surface: '#252220', raised: '#2e2b28',
+            text: '#e7e5e4', muted: '#78716c',
             success: '#34d399', warning: '#fbbf24', danger: '#f87171', info: '#60a5fa',
-            border: 'rgba(255,255,255,0.08)', radius: '20px',
-            fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Sora', sans-serif",
+            border: '#3d3835', radius: '16px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
             mode: 'dark',
           },
           light: {
-            bg: '#f0f0f8', surface: 'rgba(255,255,255,0.85)', raised: 'rgba(255,255,255,0.95)',
-            text: '#1a1a2e', muted: '#7d7b96',
+            bg: '#fafaf9', surface: '#ffffff', raised: '#f5f5f4',
+            text: '#1c1917', muted: '#78716c',
             success: '#059669', warning: '#d97706', danger: '#dc2626', info: '#2563eb',
-            border: 'rgba(0,0,0,0.08)', radius: '20px',
-            fontBody: "'Plus Jakarta Sans', sans-serif",
-            fontDisplay: "'Sora', sans-serif",
+            border: '#e7e5e4', radius: '16px',
+            fontBody: "'DM Sans', sans-serif",
+            fontDisplay: "'Fraunces', serif",
             mode: 'light',
           }
         }
@@ -133,7 +135,7 @@
       view: CURRENT_VIEW,
       role: CURRENT_USER ? CURRENT_USER.role : null,
       activeRole: CURRENT_VIEW, // which view is shown (for dual-role toggle)
-      isDark: true,
+      isDark: false,
       user: CURRENT_USER,
       cases: [],
       kpis: null,
