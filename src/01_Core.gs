@@ -697,6 +697,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.12.2', date: '2026-02-25', codename: 'SPA Theme Port', changes: 'DM Sans + Fraunces theme, full resource hub (search, category pills, expandable cards), notification hero headers + type badges, ConfigReader reads column-based Config tab, doGet() defaults to SPA, deep-link ?page= routing, initWebDashboardAuth() helper.' },
   { version: '4.12.0', date: '2026-02-24', codename: 'Notifications & Chart.js', changes: 'Notifications system (sheet, API, web page), Resources hub, Meeting Check-In web route, Chart.js integration, steward/member view enhancements, portal sheet setup.' },
   { version: '4.11.0', date: '2026-02-24', codename: 'Web Dashboard SPA', changes: 'Responsive layout, sidebar nav, member self-service, steward tools, weekly questions, CSS bar charts, quarterly survey results.' },
   { version: '4.10.0', date: '2026-02-24', codename: 'Workload Tracker Integration', changes: 'Workload Tracker module (18_WorkloadTracker.gs + WorkloadTracker.html), 8 workload categories with sub-breakdowns, privacy controls, reciprocity enforcement, email reminders, 24-month data retention, CSV backup, Workload Tracker submenu in Union Hub, ?page=workload web route, 5 new hidden sheets.' },
@@ -804,7 +805,10 @@ var SHEETS = {
   // Notifications (v4.12.0 — steward-to-member messaging, dismissable with expiry)
   NOTIFICATIONS:      '📢 Notifications',       // steward-composed, member-dismissable
   // Weekly Questions System (24_WeeklyQuestions.gs)
-  WEEKLY_QUESTIONS:   '_Weekly_Questions'        // hidden — active/past questions
+  WEEKLY_QUESTIONS:   '_Weekly_Questions',        // hidden — active/past questions
+  // SPA Portal sheets (23_PortalSheets.gs, 21_WebDashDataService.gs)
+  CONTACT_LOG:        '_Contact_Log',             // hidden — steward-member interaction log
+  STEWARD_TASKS:      '_Steward_Tasks'            // hidden — steward task management
 };
 
 // SHEET_NAMES alias for backward compatibility

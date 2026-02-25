@@ -3,19 +3,13 @@
  * Reads org-specific configuration from the "Config" tab.
  * Caches in CacheService to avoid repeated sheet reads.
  * 
- * Config Tab Expected Layout:
- *   Column A: Setting Name
- *   Column B: Setting Value
+ * Config Tab Layout (column-based):
+ *   Row 1: Headers (matches CONFIG_HEADER_MAP_ keys)
+ *   Row 2: Section labels
+ *   Row 3+: Values
  * 
- * Required rows (by name in Column A):
- *   - Org Name
- *   - Org Abbreviation
- *   - Logo Initials
- *   - Accent Hue          (0-360, integer)
- *   - Magic Link Expiry   (days, integer)
- *   - Cookie Duration      (days, integer)
- *   - Steward Label        (optional, default "Steward")
- *   - Member Label         (optional, default "Member")
+ * Uses CONFIG_COLS constants from 01_Core.gs for column positions.
+ * Falls back to safe defaults when columns or values are missing.
  */
 
 var ConfigReader = (function () {
@@ -23,6 +17,7 @@ var ConfigReader = (function () {
   var CACHE_KEY = 'ORG_CONFIG';
   var CACHE_TTL = 21600; // 6 hours in seconds
   var CONFIG_SHEET_NAME = 'Config';
+  var DATA_ROW = 3; // Values live in row 3 (row 1=headers, row 2=section labels)
   
   /**
    * Reads the Config tab and returns a settings object.
@@ -33,66 +28,92 @@ var ConfigReader = (function () {
   function getConfig(forceRefresh) {
     // Try cache first
     if (!forceRefresh) {
-      var cache = CacheService.getScriptCache();
-      var cached = cache.get(CACHE_KEY);
-      if (cached) {
-        try {
+      try {
+        var cache = CacheService.getScriptCache();
+        var cached = cache.get(CACHE_KEY);
+        if (cached) {
           return JSON.parse(cached);
-        } catch (e) {
-          // Cache corrupted, fall through to read from sheet
         }
+      } catch (e) {
+        // Cache read failed — non-fatal
       }
     }
     
-    // Read from sheet
+    // Read from sheet using CONFIG_COLS (column-based layout)
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(CONFIG_SHEET_NAME);
     
     if (!sheet) {
-      throw new Error('Config tab "' + CONFIG_SHEET_NAME + '" not found. Please create it.');
+      Logger.log('ConfigReader: Config tab not found, using defaults');
+      return _defaults();
     }
     
-    var data = sheet.getDataRange().getValues();
-    var configMap = {};
+    // Read entire data row at once for efficiency
+    var lastCol = sheet.getLastColumn();
+    if (lastCol < 1) return _defaults();
     
-    // Build key-value map from columns A and B
-    for (var i = 0; i < data.length; i++) {
-      var key = String(data[i][0]).trim().toLowerCase();
-      var value = data[i][1];
-      if (key) {
-        configMap[key] = value;
-      }
+    var dataRow = sheet.getRange(DATA_ROW, 1, 1, lastCol).getValues()[0];
+    
+    /**
+     * Safe column reader — returns value at CONFIG_COLS position or default.
+     * CONFIG_COLS are 1-indexed column numbers; dataRow is 0-indexed.
+     */
+    function _val(colConst, fallback) {
+      if (typeof colConst !== 'number' || colConst < 1 || colConst > lastCol) return fallback;
+      var v = dataRow[colConst - 1];
+      if (v === '' || v === null || v === undefined) return fallback;
+      return v;
     }
     
-    // Build config object with defaults
+    // Check if CONFIG_COLS exists (loaded from 01_Core.gs)
+    var C = (typeof CONFIG_COLS !== 'undefined') ? CONFIG_COLS : {};
+    
+    var orgName = String(_val(C.ORG_NAME, 'My Organization'));
+    
     var config = {
-      orgName:             configMap['org name'] || configMap['organization name'] || 'My Organization',
-      orgAbbrev:           configMap['org abbreviation'] || configMap['abbreviation'] || '',
-      logoInitials:        configMap['logo initials'] || configMap['logo'] || _deriveInitials(configMap['org name'] || 'MO'),
-      accentHue:           _parseInt(configMap['accent hue'] || configMap['accent color hue'], 250),
-      magicLinkExpiryDays: _parseInt(configMap['magic link expiry'] || configMap['magic link expiry days'], 7),
-      cookieDurationDays:  _parseInt(configMap['cookie duration'] || configMap['cookie duration days'], 30),
-      stewardLabel:        configMap['steward label'] || 'Steward',
-      memberLabel:         configMap['member label'] || 'Member',
+      orgName:             orgName,
+      orgAbbrev:           _deriveInitials(orgName),
+      logoInitials:        String(_val(C.LOGO_INITIALS, _deriveInitials(orgName))),
+      accentHue:           _parseInt(_val(C.ACCENT_HUE, 30), 30),
+      magicLinkExpiryDays: _parseInt(_val(C.MAGIC_LINK_EXPIRY_DAYS, 7), 7),
+      cookieDurationDays:  _parseInt(_val(C.COOKIE_DURATION_DAYS, 30), 30),
+      stewardLabel:        String(_val(C.STEWARD_LABEL, 'Steward')),
+      memberLabel:         String(_val(C.MEMBER_LABEL, 'Member')),
+      localNumber:         String(_val(C.LOCAL_NUMBER, '')),
+      mainPhone:           String(_val(C.MAIN_PHONE, '')),
       // Org links
-      calendarId:          configMap['calendar id'] || configMap['google calendar id'] || '',
-      driveFolderId:       configMap['drive folder id'] || configMap['shared drive folder'] || '',
-      satisfactionFormUrl: configMap['satisfaction form url'] || configMap['survey form url'] || '',
-      orgWebsite:          configMap['org website'] || configMap['website'] || '',
-      // Derived
+      calendarId:          String(_val(C.CALENDAR_ID, '')),
+      driveFolderId:       String(_val(C.DRIVE_FOLDER_ID, '')),
+      satisfactionFormUrl: String(_val(C.SATISFACTION_FORM_URL, '')),
+      orgWebsite:          String(_val(C.ORG_WEBSITE, '')),
+      // Derived URLs
+      calendarUrl:         '',
+      driveFolderUrl:      '',
+      // Derived ms
       magicLinkExpiryMs:   0,
       cookieDurationMs:    0,
     };
     
-    config.magicLinkExpiryMs = config.magicLinkExpiryDays * 24 * 60 * 60 * 1000;
-    config.cookieDurationMs = config.cookieDurationDays * 24 * 60 * 60 * 1000;
+    // Build URLs from IDs
+    if (config.calendarId) {
+      config.calendarUrl = 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(config.calendarId);
+    }
+    if (config.driveFolderId) {
+      config.driveFolderUrl = 'https://drive.google.com/drive/folders/' + config.driveFolderId;
+    }
+    var driveFolderUrl = String(_val(C.DRIVE_FOLDER_URL, ''));
+    if (driveFolderUrl && !config.driveFolderUrl) {
+      config.driveFolderUrl = driveFolderUrl;
+    }
+    
+    config.magicLinkExpiryMs = config.magicLinkExpiryDays * 86400000;
+    config.cookieDurationMs = config.cookieDurationDays * 86400000;
     
     // Cache it
     try {
       var cache = CacheService.getScriptCache();
       cache.put(CACHE_KEY, JSON.stringify(config), CACHE_TTL);
     } catch (e) {
-      // Cache write failed — non-fatal, will just re-read next time
       Logger.log('ConfigReader: Cache write failed: ' + e.message);
     }
     
@@ -130,6 +151,20 @@ var ConfigReader = (function () {
       valid: missing.length === 0,
       missing: missing,
       config: config
+    };
+  }
+  
+  // --- Defaults (when Config tab doesn't exist) ---
+  
+  function _defaults() {
+    return {
+      orgName: 'My Organization', orgAbbrev: 'MO', logoInitials: 'MO',
+      accentHue: 30, magicLinkExpiryDays: 7, cookieDurationDays: 30,
+      stewardLabel: 'Steward', memberLabel: 'Member',
+      localNumber: '', mainPhone: '',
+      calendarId: '', driveFolderId: '', satisfactionFormUrl: '', orgWebsite: '',
+      calendarUrl: '', driveFolderUrl: '',
+      magicLinkExpiryMs: 604800000, cookieDurationMs: 2592000000,
     };
   }
   
