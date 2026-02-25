@@ -1,8 +1,8 @@
 # Strategic Command Center
 
-**Version 4.9.0** | Union Steward Dashboard for Google Sheets
+**Version 4.10.0** | Union Steward Dashboard for Google Sheets
 
-A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 30-file modular architecture.
+A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 31-file modular architecture.
 
 ---
 
@@ -69,8 +69,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
-   cd MULTIPLE-SCRIPS-REPO
+   git clone https://github.com/Woop91/DDS-Dashboard.git
+   cd DDS-Dashboard
    ```
 
 2. **Create a new Google Sheet** at [sheets.google.com](https://sheets.google.com)
@@ -81,7 +81,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    - Click the **+** button next to "Files" to create a new script file
    - Name it to match the source file (without the `.gs` extension)
    - Paste the contents from the corresponding `src/` file
-   - Repeat for all 30 `.gs` files and the `.html` file
+   - Repeat for all 31 `.gs` files and the 2 `.html` files
 
 5. **Run the initial setup:**
    - Select `CREATE_DASHBOARD` from the function dropdown
@@ -95,8 +95,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone and install:**
 
    ```bash
-   git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
-   cd MULTIPLE-SCRIPS-REPO
+   git clone https://github.com/Woop91/DDS-Dashboard.git
+   cd DDS-Dashboard
    npm install
    ```
 
@@ -156,7 +156,7 @@ When you're ready to move from testing to real data:
 2. Delete `07_DevTools.gs` from your Apps Script project (Extensions > Apps Script > right-click > Delete)
 3. Refresh the sheet -- the Demo menu disappears automatically
 
-After that, you have **29 production files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
+After that, you have **30 production files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
 
 ---
 
@@ -245,6 +245,15 @@ After that, you have **29 production files** and a clean system ready for real m
 - All column references use dynamic `CONFIG_COLS` and `MEMBER_COLS` constants
 - Multi-select dropdown editor for Grievance Log with checkbox UI
 
+### Workload Tracker (v4.10.0)
+- Member-facing web portal for weekly caseload submissions (`?page=workload`)
+- 8 workload categories: Priority Cases, Pending Cases, Unread Documents, To-Do Items, Sent Referrals, CE Activities, Assistance Requests, Aged Cases
+- Privacy controls: Unit Anonymous, Agency Anonymous, or Private per submission
+- Reciprocity enforcement: collective stats visible only from member's own sharing start date
+- Employment tracking with Full-time/Part-time and overtime hours
+- Email reminder system with configurable frequency
+- 24-month rolling data archive and CSV backup to Google Drive
+
 ### Looker Studio Integration
 - **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
 - **PII-Free**: Anonymized `_Looker_Anon_*` sheets for external stakeholders
@@ -278,6 +287,7 @@ The dashboard provides 4 top-level menus:
 | View | Dashboards, dark mode, themes |
 | Comfort View | Focus mode, zebra stripes, font sizes |
 | Multi-Select | Multi-select editor, auto-open triggers |
+| Workload Tracker | Submit workload data, view stats, manage reminders |
 
 ### Admin (System Administration)
 
@@ -369,6 +379,11 @@ These sheets power the auto-updating columns. You don't need to edit them.
 | `_Steward_Performance_Calc` | Steward performance scores |
 | `_Audit_Log` | System activity log |
 | `_Checklist_Calc` | Checklist calculations |
+| `_Workload_Vault` | Encrypted workload submission data |
+| `_Workload_Reporting` | Anonymized workload reporting data |
+| `_Workload_Reminders` | Email reminder configuration |
+| `_Workload_UserMeta` | Member workload preferences and metadata |
+| `_Workload_Archive` | Archived workload data (24-month rolling) |
 
 ---
 
@@ -377,8 +392,8 @@ These sheets power the auto-updating columns. You don't need to edit them.
 ### Setup
 
 ```bash
-git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
-cd MULTIPLE-SCRIPS-REPO
+git clone https://github.com/Woop91/DDS-Dashboard.git
+cd DDS-Dashboard
 npm install
 ```
 
@@ -409,7 +424,7 @@ See the [Developer Guide](DEVELOPER_GUIDE.md) for architecture details, code pat
 
 ## Architecture
 
-The codebase uses a 30-file modular architecture with numbered prefixes that indicate load order and purpose:
+The codebase uses a 31-file modular architecture with numbered prefixes that indicate load order and purpose:
 
 | Prefix | Layer | Files |
 |--------|-------|-------|
@@ -430,13 +445,14 @@ The codebase uses a 30-file modular architecture with numbered prefixes that ind
 | 15 | Event Bus | `15_EventBus.gs` (pub/sub event system) |
 | 16 | Enhancements | `16_DashboardEnhancements.gs` (date ranges, chart export, drill-down) |
 | 17 | Analytics | `17_CorrelationEngine.gs` (cross-dimensional correlation) |
-| -- | HTML | `MultiSelectDialog.html` |
+| 18 | Workload | `18_WorkloadTracker.gs` (member workload submissions) |
+| -- | HTML | `MultiSelectDialog.html`, `WorkloadTracker.html` |
 
 ### Design Principles
 
 - **Separation of Concerns**: Each file has one clear purpose
 - **Numbered Prefixes**: Show dependency order for build concatenation
-- **Production Ready**: Delete `07_DevTools.gs` for a 29-file production deployment
+- **Production Ready**: Delete `07_DevTools.gs` for a 30-file production deployment
 - **Failure Isolation**: A bug in Calendar sync won't break the Member Directory
 - **Self-Healing**: Hidden calculation sheets auto-repair their formulas
 - **Performance**: CacheService integration and batch operations handle 5,000+ members
@@ -533,6 +549,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| **4.10.0** | 2026-02-24 | Workload Tracker module, 8 workload categories, privacy controls, email reminders, 5 new hidden sheets |
+| **4.9.1** | 2026-02-23 | Security vulnerability fix pass — 22 findings fixed, XSS hardening, formula injection protection |
 | **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 1300+ tests across 21 suites |
 | **4.8.2** | 2026-02-16 | State field added to member contact surfaces |
 | **4.8.1** | 2026-02-15 | 5 new contact form fields, unified name-based Member ID system |
