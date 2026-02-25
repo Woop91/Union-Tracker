@@ -366,6 +366,8 @@ function createChainableMockSheet(name) {
     clear: jest.fn(),
     autoResizeColumns: jest.fn(),
     getColumnWidth: jest.fn(() => 80),
+    getMaxColumns: jest.fn(() => 100),
+    insertColumnsAfter: jest.fn(),
     getConditionalFormatRules: jest.fn(() => []),
     setConditionalFormatRules: jest.fn(),
     getFilter: jest.fn(() => null),

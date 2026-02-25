@@ -45,17 +45,18 @@ Files are numbered to control Google Apps Script's execution order:
 
 **Important:** When editing `src/` files, the `dist/` file must also be kept in sync. Either re-run `npm run build` or manually apply the same changes to both locations.
 
-### Constants — KNOWN DUAL SYSTEM
+### Column Constants
 
-Two parallel constant sets exist in `01_Core.gs`. This is technical debt, not a feature:
+All column constants are **1-indexed** (matching Google Sheets `getRange()` conventions):
 
-| Canonical (use these) | Legacy alias | Notes |
-|-----------------------|-------------|-------|
-| `SHEETS.GRIEVANCE_LOG` | `SHEET_NAMES` (alias of `SHEETS`, line 778) | `SHEET_NAMES = SHEETS` — identical |
-| `GRIEVANCE_COLS` (1-indexed) | `GRIEVANCE_COLUMNS` (0-indexed) | **NOT aliases. Different indexing.** |
-| `MEMBER_COLS` (1-indexed) | `MEMBER_COLUMNS` (0-indexed) | **NOT aliases. Different indexing.** |
+| Constant | Source | Notes |
+|----------|--------|-------|
+| `SHEETS` / `SHEET_NAMES` | `01_Core.gs` | `SHEET_NAMES = SHEETS` — identical alias |
+| `GRIEVANCE_COLS` | `buildColsFromMap_(GRIEVANCE_HEADER_MAP_)` | 1-indexed for `getRange()` |
+| `MEMBER_COLS` | `buildColsFromMap_(MEMBER_HEADER_MAP_)` | 1-indexed for `getRange()` |
+| `CONFIG_COLS` | `buildColsFromMap_(CONFIG_HEADER_MAP_)` | 1-indexed for `getRange()` |
 
-**Rule:** Always use `SHEETS`, `GRIEVANCE_COLS`, and `MEMBER_COLS` (1-indexed). When you see `GRIEVANCE_COLUMNS` or `MEMBER_COLUMNS` (0-indexed), you must add `+ 1` for `getRange()` calls or `- 1` for array indexing. Mixing these up causes silent wrong-column bugs.
+**Rule:** For `getRange()` calls, use `*_COLS` values directly. For array access on `getValues()` data, subtract 1: `row[GRIEVANCE_COLS.STATUS - 1]`. The legacy 0-indexed constants (`GRIEVANCE_COLUMNS`, `MEMBER_COLUMNS`) have been removed.
 
 ## Security Patterns
 
@@ -98,6 +99,44 @@ Defined once in `src/00_Security.gs:130`. For HTML served in web apps, a minifie
 - **Function naming**: `camelCase` for regular functions, `UPPER_CASE` for destructive admin functions (e.g., `NUCLEAR_WIPE_GRIEVANCES`), trailing underscore for private helpers (e.g., `buildColsFromMap_()`, `getConfigValue_()`).
 - **Error handling**: Functions that return results use `{ success: true, ... }` / `errorResponse(message)`. Functions called from UI use try/catch with `SpreadsheetApp.getUi().alert()`.
 - **Audit logging**: Use `logAuditEvent(eventType, details)` (in `06_Maintenance.gs:1463`) for security/admin events. Use `logIntegrityEvent(eventType, details)` for data integrity events. These two functions have conflicting schemas on the same sheet — this is known debt (see CODE_REVIEW.md Finding 21).
+
+## Config Sheet Write Paths — CRITICAL
+
+The Config sheet has **multiple code paths** that write to it. This is a known source of recurring bugs. When modifying any Config-writing code, you **must** check all paths for consistency.
+
+### Rules
+
+1. **Column lookup**: Always use `CONFIG_COLS.*` constants, never hardcoded column numbers. These constants may be updated at runtime by `syncColumnMaps()`.
+2. **Write method**: Always use `addToConfigDropdown_(configCol, value)` for adding dropdown/list values. Never use `getRange(lastRow + 1, col).setValue()` — it scatters data past the end of other columns.
+3. **Dynamic maps only**: Use `DROPDOWN_MAP` and `MULTI_SELECT_COLS` (rebuilt by `syncColumnMaps()`) for column lookups. Do **not** use `JOB_METADATA_FIELDS` for Config writes — it captures column numbers at load time and goes stale when `syncColumnMaps()` shifts positions.
+4. **Rows 1-2 are structure**: Row 1 = section headers, Row 2 = column headers. Never overwrite these with data or formulas. Data starts at row 3.
+
+### Canonical Write Paths
+
+| Function | File | Lookup Mechanism | Purpose |
+|----------|------|-----------------|---------|
+| `addToConfigDropdown_()` | `02_DataManagers.gs` | Direct `configCol` param | **Core helper** — all dropdown writes go through here |
+| `syncDropdownToConfig_()` | `10_Main.gs` | `DROPDOWN_MAP` + `MULTI_SELECT_COLS` | onEdit bidirectional sync |
+| `populateConfigFromSheetData()` | `10a_SheetCreation.gs` | `DROPDOWN_MAP` + `MULTI_SELECT_COLS` | Bulk backfill from sheet data |
+| `seedConfigDefault_()` | `10a_SheetCreation.gs` | Direct `CONFIG_COLS.*` param | Initial setup defaults |
+| `restoreConfigFromSheetData_()` | `07_DevTools.gs` | `DROPDOWN_MAP` + `MULTI_SELECT_COLS` | Restore after data loss |
+| `syncStewardStatus()` | `02_DataManagers.gs` | `CONFIG_COLS.STEWARDS` | Steward↔Member bidirectional |
+
+### Yes/No Validation — Hardcoded, Not Config-Driven
+
+The `YES_NO` Config column was **removed** to eliminate a contamination risk (multiple columns sharing one Config source). All Yes/No columns now use hardcoded `['Yes', 'No']` validation applied directly in `setupDataValidations()` (`08a_SheetSetup.gs`):
+
+- `MEMBER_COLS.IS_STEWARD`
+- `MEMBER_COLS.INTEREST_LOCAL`
+- `MEMBER_COLS.INTEREST_CHAPTER`
+- `MEMBER_COLS.INTEREST_ALLIED`
+
+These columns are **not** in `DROPDOWN_MAP` — they are deliberately excluded from bidirectional Config sync. `migrateRemoveYesNoColumn_()` in `10a_SheetCreation.gs` handles deleting the orphaned column on existing sheets when `CREATE_DASHBOARD` is re-run.
+
+### Known Debt
+
+- `syncNewValueToConfig()` in `09_Dashboards.gs` is a legacy wrapper that now delegates to `syncDropdownToConfig_()`. Do not add logic to it — use `syncDropdownToConfig_()` directly.
+- `seedConfigData()` in `07_DevTools.gs` is a DevTools-only seeder — it is excluded from production builds.
 
 ## Testing
 

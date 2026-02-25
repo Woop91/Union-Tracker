@@ -29,8 +29,7 @@ When you execute the **Nuke Seed Data** function, the system will:
    - Managers (Column G)
    - Stewards (Column H)
    - Grievance Coordinators (Column O)
-   - Home Towns (Column AF)
-   - Office Addresses (Column AN)
+   - Office Addresses (Column AM)
 
    > **NOTE (v3.11+):** These fields are now LEFT EMPTY during CREATE_DASHBOARD. Users populate them with their own data. If no user data was added, there's nothing to clear.
 
@@ -400,7 +399,7 @@ Once `07_DevTools.gs` is deleted:
 - ❌ Menu Checklist sheet (entire sheet)
 - ❌ Function Checklist sheet (entire sheet) **(v4.3.4+)**
 - ❌ _Audit_Log hidden sheet (entire sheet) **(v4.3.4+)**
-- ❌ Config demo data (job titles, locations, units, supervisors, managers, stewards, coordinators, home towns, office addresses)
+- ❌ Config demo data (job titles, locations, units, supervisors, managers, stewards, coordinators, office addresses)
 - ❌ Seed/nuke/demo references in FAQ, Config Guide, Getting Started **(v4.3.5+)**
 
 ### What Gets Preserved
