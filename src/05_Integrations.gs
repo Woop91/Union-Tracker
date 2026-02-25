@@ -1633,7 +1633,33 @@ function showUpcomingDeadlines() {
  * - page=search|grievances|members|links|dashboard|portal - Returns specific page
  * - (no params) - Returns default dashboard
  */
+/**
+ * v4.13.0: Thin router — routes legacy admin pages to _legacyDoGet,
+ * everything else to the new web-dashboard SPA (doGetWebDashboard).
+ * UT legacy routes: search, grievances, members, links.
+ */
 function doGet(e) {
+  e = e || { parameter: {} };
+  var page = (e.parameter && e.parameter.page) || '';
+  var mode = (e.parameter && e.parameter.mode) || '';
+
+  // Legacy admin routes — steward-auth required, served by old HTML templates
+  var legacyPages = ['search', 'grievances', 'members', 'links'];
+  var legacyModes = ['steward', 'member'];
+
+  if (legacyPages.indexOf(page) !== -1 || legacyModes.indexOf(mode) !== -1) {
+    return _legacyDoGet(e);
+  }
+
+  // Default: new web-dashboard SPA (SSO + magic link auth)
+  return doGetWebDashboard(e);
+}
+
+/**
+ * Legacy doGet — serves old HTML pages for admin/steward routes.
+ * Renamed from doGet in v4.13.0.
+ */
+function _legacyDoGet(e) {
   // v4.5.0: Add access control and input validation
 
   // Step 1: Validate request parameters (prevents injection attacks)
@@ -1779,8 +1805,13 @@ function doGet(e) {
       }
       break;
     case 'workload':
-      // Workload tracker is now embedded in the SPA member dashboard.
-      // Redirect to the main dashboard which includes the workload tab.
+      // Workload Tracker portal — member PIN auth handled client-side
+      if (typeof getWorkloadTrackerPortalHtml === 'function') {
+        return HtmlService.createHtmlOutput(getWorkloadTrackerPortalHtml())
+          .setTitle('Workload Tracker | SEIU 509')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
       html = getUnifiedDashboardHtml(false);
       break;
     case 'checkin':
@@ -1809,7 +1840,7 @@ function doGet(e) {
       // Fall through to SPA dashboard
     case 'dashboard':
     default:
-      // v4.12.1: Default to SPA web dashboard (SSO + magic link auth)
+      // v4.12.2: Default to SPA web dashboard (SSO + magic link auth)
       if (typeof doGetWebDashboard === 'function') {
         return doGetWebDashboard(e);
       }
@@ -3708,6 +3739,194 @@ function getWebAppResourcesList(audience) {
 }
 
 /**
+ * Get all resources including hidden ones (for steward manage tab).
+ * Same as getWebAppResourcesList but without Visible=Yes filtering.
+ * @returns {Object[]} All resources with visible status
+ */
+function getWebAppResourcesListAll() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) return [];
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return [];
+
+    var data = sheet.getRange(2, 1, lastRow - 1, RESOURCES_COLS.ADDED_BY).getValues();
+    var tz = Session.getScriptTimeZone();
+
+    return data.map(function(row) {
+      var dateAdded = row[RESOURCES_COLS.DATE_ADDED - 1];
+      return {
+        id: row[RESOURCES_COLS.RESOURCE_ID - 1] || '',
+        title: row[RESOURCES_COLS.TITLE - 1] || '',
+        category: row[RESOURCES_COLS.CATEGORY - 1] || 'General',
+        summary: row[RESOURCES_COLS.SUMMARY - 1] || '',
+        content: row[RESOURCES_COLS.CONTENT - 1] || '',
+        url: row[RESOURCES_COLS.URL - 1] || '',
+        icon: row[RESOURCES_COLS.ICON - 1] || '\uD83D\uDCC4',
+        sortOrder: row[RESOURCES_COLS.SORT_ORDER - 1] || 999,
+        visible: String(row[RESOURCES_COLS.VISIBLE - 1] || '').toLowerCase() === 'yes',
+        audience: row[RESOURCES_COLS.AUDIENCE - 1] || 'All',
+        dateAdded: dateAdded instanceof Date ? Utilities.formatDate(dateAdded, tz, 'MMM d, yyyy') : (dateAdded || ''),
+        addedBy: row[RESOURCES_COLS.ADDED_BY - 1] || ''
+      };
+    }).filter(function(r) { return r.id; });
+  } catch (e) {
+    logError_('getWebAppResourcesListAll', e);
+    return [];
+  }
+}
+
+
+/**
+ * Add a new resource to the 📚 Resources sheet.
+ * @param {Object} data — { title, category, summary, content, url, icon, sortOrder, visible, audience }
+ * @returns {Object} { success: boolean, resourceId: string, message: string }
+ */
+function addWebAppResource(data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) {
+      if (typeof createResourcesSheet === 'function') {
+        sheet = createResourcesSheet(ss);
+      }
+      if (!sheet) return { success: false, message: 'Resources sheet not found' };
+    }
+
+    if (!data.title) return { success: false, message: 'Title is required' };
+
+    // Generate next ID
+    var allData = sheet.getDataRange().getValues();
+    var maxNum = 0;
+    for (var i = 1; i < allData.length; i++) {
+      var existId = String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '');
+      var match = existId.match(/RES-(\d+)/);
+      if (match) {
+        var num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    var nextId = 'RES-' + String(maxNum + 1).padStart(3, '0');
+
+    var tz = Session.getScriptTimeZone();
+    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    var addedBy = Session.getActiveUser().getEmail() || 'unknown';
+
+    var newRow = [
+      nextId,
+      data.title,
+      data.category || 'General',
+      data.summary || '',
+      data.content || '',
+      data.url || '',
+      data.icon || '\uD83D\uDCC4',
+      data.sortOrder || 999,
+      data.visible || 'Yes',
+      data.audience || 'All',
+      today,
+      addedBy
+    ];
+
+    sheet.appendRow(newRow);
+    return { success: true, resourceId: nextId, message: 'Resource added' };
+  } catch (e) {
+    logError_('addWebAppResource', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Update an existing resource by ID.
+ * @param {string} resourceId — e.g. "RES-001"
+ * @param {Object} data — fields to update (title, category, summary, content, url, icon, sortOrder, visible, audience)
+ * @returns {Object} { success: boolean, message: string }
+ */
+function updateWebAppResource(resourceId, data) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) return { success: false, message: 'Resources sheet not found' };
+
+    var allData = sheet.getDataRange().getValues();
+    for (var i = 1; i < allData.length; i++) {
+      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+        var row = i + 1;
+        if (data.title !== undefined)     sheet.getRange(row, RESOURCES_COLS.TITLE).setValue(data.title);
+        if (data.category !== undefined)  sheet.getRange(row, RESOURCES_COLS.CATEGORY).setValue(data.category);
+        if (data.summary !== undefined)   sheet.getRange(row, RESOURCES_COLS.SUMMARY).setValue(data.summary);
+        if (data.content !== undefined)   sheet.getRange(row, RESOURCES_COLS.CONTENT).setValue(data.content);
+        if (data.url !== undefined)       sheet.getRange(row, RESOURCES_COLS.URL).setValue(data.url);
+        if (data.icon !== undefined)      sheet.getRange(row, RESOURCES_COLS.ICON).setValue(data.icon);
+        if (data.sortOrder !== undefined) sheet.getRange(row, RESOURCES_COLS.SORT_ORDER).setValue(data.sortOrder);
+        if (data.visible !== undefined)   sheet.getRange(row, RESOURCES_COLS.VISIBLE).setValue(data.visible);
+        if (data.audience !== undefined)  sheet.getRange(row, RESOURCES_COLS.AUDIENCE).setValue(data.audience);
+        return { success: true, message: 'Resource updated' };
+      }
+    }
+    return { success: false, message: 'Resource not found' };
+  } catch (e) {
+    logError_('updateWebAppResource', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Soft-delete a resource (set Visible=No).
+ * @param {string} resourceId — e.g. "RES-001"
+ * @returns {Object} { success: boolean, message: string }
+ */
+function deleteWebAppResource(resourceId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) return { success: false, message: 'Resources sheet not found' };
+
+    var allData = sheet.getDataRange().getValues();
+    for (var i = 1; i < allData.length; i++) {
+      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+        sheet.getRange(i + 1, RESOURCES_COLS.VISIBLE).setValue('No');
+        return { success: true, message: 'Resource hidden' };
+      }
+    }
+    return { success: false, message: 'Resource not found' };
+  } catch (e) {
+    logError_('deleteWebAppResource', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Restore a soft-deleted resource (set Visible=Yes).
+ * @param {string} resourceId — e.g. "RES-001"
+ * @returns {Object} { success: boolean, message: string }
+ */
+function restoreWebAppResource(resourceId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) return { success: false, message: 'Resources sheet not found' };
+
+    var allData = sheet.getDataRange().getValues();
+    for (var i = 1; i < allData.length; i++) {
+      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+        sheet.getRange(i + 1, RESOURCES_COLS.VISIBLE).setValue('Yes');
+        return { success: true, message: 'Resource restored' };
+      }
+    }
+    return { success: false, message: 'Resource not found' };
+  } catch (e) {
+    logError_('restoreWebAppResource', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
  * Returns the educational resources hub HTML page.
  * Warm, welcoming design with categorized content cards.
  * Content is fully dynamic — reads from 📚 Resources sheet.
@@ -4160,6 +4379,24 @@ function getWebAppNotifications(userEmail, userRole) {
   } catch (e) {
     logError_('getWebAppNotifications', e);
     return [];
+  }
+}
+
+
+/**
+ * Lightweight notification count for SPA bell badge.
+ * Reuses same filtering logic as getWebAppNotifications but returns only count.
+ * @param {string} userEmail
+ * @param {string} userRole — 'member' or 'steward'
+ * @returns {Object} { count: number }
+ */
+function getWebAppNotificationCount(userEmail, userRole) {
+  try {
+    var results = getWebAppNotifications(userEmail, userRole);
+    return { count: results.length };
+  } catch (e) {
+    logError_('getWebAppNotificationCount', e);
+    return { count: 0 };
   }
 }
 

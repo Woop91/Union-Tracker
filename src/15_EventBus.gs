@@ -340,6 +340,40 @@ function registerEventBusSubscribers() {
     Logger.log('Data changed: ' + (data && data.source ? data.source : 'unknown'));
   }, { priority: 0, id: 'data_change_logger' });
 
+  // --- Auto-notification: Grievance deadline approaching ---
+  EventBus.on('grievance:deadline:approaching', function(data) {
+    try {
+      if (typeof sendWebAppNotification === 'function') {
+        sendWebAppNotification({
+          recipient: data.memberEmail || 'All Stewards',
+          type: 'Deadline',
+          title: 'Grievance Deadline Approaching',
+          message: data.grievanceId + ' (' + (data.memberName || 'Unknown') + ') \u2014 ' + data.daysLeft + ' day(s) remaining',
+          priority: data.daysLeft <= 1 ? 'Urgent' : 'Normal'
+        });
+      }
+    } catch (err) {
+      Logger.log('EventBus notification error (deadline): ' + err);
+    }
+  }, { priority: 30, id: 'notif_deadline_approaching' });
+
+  // --- Auto-notification: Grievance status changed ---
+  EventBus.on('grievance:status:changed', function(data) {
+    try {
+      if (data.memberEmail && typeof sendWebAppNotification === 'function') {
+        sendWebAppNotification({
+          recipient: data.memberEmail,
+          type: 'System',
+          title: 'Grievance Update: ' + (data.grievanceId || ''),
+          message: 'Status changed to ' + (data.newStatus || 'Unknown'),
+          priority: 'Normal'
+        });
+      }
+    } catch (err) {
+      Logger.log('EventBus notification error (status): ' + err);
+    }
+  }, { priority: 30, id: 'notif_status_changed' });
+
   Logger.log('EventBus: ' + EventBus.listenerCount() + ' subscribers registered');
 }
 
