@@ -346,3 +346,64 @@ Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Nam
 - src/20_WebDashConfigReader.gs — column-based Config tab reader
 - src/22_WebDashApp.gs — initialTab deep-link support
 - src/index.html — initialTab navigation after init
+
+---
+
+## 🔄 SYNC RULES — DDS ↔ UNION-TRACKER (Added 2026-02-25)
+
+### Repo Relationship
+- **DDS-Dashboard** (private): Primary repo. Default branch: `Main` (capital M).
+- **Union-Tracker** (public): Mirror minus Workload Tracker. Target branch: `staging`.
+- DDS Apps Script ID: `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu` — NEVER in UT.
+- UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+- GitHub Token (shared): `ghp_7MY0...DC9` (account-level, works for both repos)
+
+### Sync Flow
+```
+DDS Main → UT staging → (user manages) → UT dev → UT main
+```
+
+### Data Protection Rules
+- **No function may delete or overwrite manually entered data.**
+- Manually entered = imported by users via import function OR typed directly into cells.
+- System-generated = anything written by code functions (except import function output).
+- Functions may: append, write to system-generated fields, clear auto-generated content.
+
+### Workload Tracker Exclusion Registry
+
+**❌ EXCLUDE from UT:**
+| File | Reason |
+|------|--------|
+| `src/18_WorkloadTracker.gs` | Core WT module — 32 functions |
+| `src/WorkloadTracker.html` | WT portal HTML template |
+
+**⚠️ MODIFY for UT (add typeof guards):**
+| File | Lines | What to guard |
+|------|-------|---------------|
+| `src/03_UIComponents.gs` | 85-94 | `📊 Workload Tracker` submenu |
+| `src/index.html` | 370, 389 | `workload` nav item and route |
+| `src/member_view.html` | 792, 881-1129 | `renderWorkloadTracker` + SSO calls |
+
+**✅ ALREADY SAFE (typeof guards exist):**
+- `src/05_Integrations.gs` — `typeof getWorkloadTrackerPortalHtml === 'function'`
+- `src/08a_SheetSetup.gs` — `typeof initWorkloadTrackerSheets === 'function'`
+
+**✅ KEEP AS-IS (not WT module):**
+- "Steward workload" references = grievance case counts per steward (core feature)
+- WT sheet constants in `01_Core.gs` = inert without module
+- WT CSS in `styles.html` = dead code, no errors
+
+## 🐛 ERRORS & FIXES (Added 2026-02-25)
+
+| Date | Error | Cause | Fix |
+|------|-------|-------|-----|
+| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` |
+| 2026-02-25 | Expired GitHub token `ghp_FTE8...` in memory | Token rotated | Updated to `ghp_7MY0...` |
+
+## 📝 CHANGES LOG (Added 2026-02-25)
+
+| Date | Agent | Change |
+|------|-------|--------|
+| 2026-02-25 | Claude (claude.ai) | Appended sync rules, WT exclusion registry, data protection rules to AI_REFERENCE.md |
+| 2026-02-25 | Claude (claude.ai) | Created SYNC-LOG.md with full exclusion analysis |
+| 2026-02-25 | Claude (claude.ai) | Created .gitignore for Union-Tracker repo |
