@@ -69,6 +69,7 @@ doGet(e)
 ├── ?page=workload → Workload tracker
 ├── ?page=checkin  → Meeting check-in (v4.11.0)
 ├── ?page=resources → Educational content hub (v4.11.0)
+├── ?page=notifications → Notifications page — dual role (v4.12.0)
 └── (default)      → Unified member dashboard
 
 ### Sheets
@@ -197,6 +198,22 @@ Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Nam
 - Steward composes via separate form in steward view (not inline) — cleaner UX, prevents accidental sends
 - Auto-ID generation scans existing IDs for max number — gap-safe
 - Recipient supports individual emails AND group targets — flexible
+
+### 2026-02-25 — v4.12.0 continued: Notifications Page + Branch Sync (by Claude, claude.ai)
+**New Features:**
+1. ✅ `?page=notifications` route in doGet
+2. ✅ `getWebAppNotificationsHtml()` — dual-role page: member view + steward inline compose
+3. ✅ `getNotificationRecipientListFull()` — member list with location/dept/title for filter dropdowns
+4. ✅ Steward compose form: Groups tab (All Members/Stewards/Everyone) + Individuals tab
+5. ✅ Individual picker: search by name, filter by location/department/job title dropdowns
+6. ✅ Member notification cards: type badges, urgency indicators, dismiss with ✕
+7. ✅ Toast feedback on send/dismiss
+8. ✅ All branches synced: staging → Main → dev + Union-Tracker
+
+**Files Changed:**
+- `src/05_Integrations.gs` — Added `case 'notifications'` route, `getNotificationRecipientListFull()`, `getWebAppNotificationsHtml()` (~395 lines)
+- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,929 lines / 2,608 KB)
+- `AI_REFERENCE.md` — Updated route table + changelog
 
 ---
 
