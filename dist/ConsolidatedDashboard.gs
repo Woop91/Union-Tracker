@@ -3,7 +3,7 @@
  * DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
- * Version: 4.10.0 (2026-02-25)
+ * Version: 4.6.0 (2026-02-12)
  * Build Date: 2026-02-25
  *
  * This file is auto-generated from the src/ directory.

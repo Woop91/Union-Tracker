@@ -25,8 +25,8 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 ### Step 1: Get the Files
 
 ```bash
-git clone https://github.com/Woop91/DDS-Dashboard.git
-cd DDS-Dashboard/src
+git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
+cd MULTIPLE-SCRIPS-REPO/src
 ```
 
 ### Step 2: Create a New Google Sheet
@@ -138,7 +138,7 @@ Your dashboard is fully operational.
 If you prefer automated deployment:
 
 ```bash
-cd DDS-Dashboard
+cd MULTIPLE-SCRIPS-REPO
 npm install
 clasp login
 clasp create --type sheets --title "Union Dashboard"

@@ -201,7 +201,7 @@ global.HtmlService = {
     setXFrameOptionsMode: jest.fn(function() { return this; }),
     getContent: jest.fn(() => html)
   })),
-  XFrameOptionsMode: { DEFAULT: 'DEFAULT', ALLOWALL: 'ALLOWALL' }
+  XFrameOptionsMode: { DENY: 'DENY', ALLOWALL: 'ALLOWALL' }
 };
 
 // --- MailApp ---

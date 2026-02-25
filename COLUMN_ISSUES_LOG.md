@@ -147,104 +147,6 @@ width computed with `Math.max()` where a multi-column range is needed.
 
 ---
 
-## Issue 5: DROPDOWN_MAP / MULTI_SELECT_COLS overlap and Open Rate data loss
-
-**Commit:** `0e994f7` — _fix: correct Open Rate dropdown mapping and
-column references_
-
-**Severity:** MEDIUM
-
-**Problem:**
-Three interrelated issues found during Open Rate column investigation:
-
-1. **DROPDOWN_MAP / MULTI_SELECT_COLS overlap** — `ARTICLES` and
-   `ISSUE_CATEGORY` appeared in both `buildDropdownMap_()` (single-select)
-   and `buildMultiSelectCols_()` (multi-select). `setupDataValidations()`
-   applied single-select validation first, then multi-select overwrote it.
-   The duplicate entries risked the wrong validation type being applied
-   and caused `syncDropdownToConfig_()` to treat these columns as
-   single-select for bidirectional Config sync.
-
-2. **Multi-select columns excluded from Config sync** —
-   `syncDropdownToConfig_()` only iterated over `DROPDOWN_MAP`, not
-   `MULTI_SELECT_COLS`. After removing the duplicates from
-   `DROPDOWN_MAP` (fix #1), custom values typed into multi-select columns
-   would stop syncing back to Config. Updated the function to also
-   iterate over `MULTI_SELECT_COLS`.
-
-3. **Open Rate 0% data loss** — `mapMemberRow()` used
-   `openRate: row[MEMBER_COLS.OPEN_RATE - 1] || ''` which treats `0` as
-   falsy in JavaScript, converting a legitimate 0% open rate to an empty
-   string. Introduced `numericField_()` helper for null-safe numeric field
-   access that preserves `0` values.
-
-**Additional cleanup:**
-Corrected inline column letter comments across 5 files — Open Rate is
-column T (not S), Volunteer Hours is column U (not T), etc. These
-comments were wrong after a prior column insertion but had no functional
-impact since the code uses `*_COLS` constants.
-
-**Files affected:**
-- `01_Core.gs` — removed ARTICLES/ISSUE_CATEGORY from `buildDropdownMap_()`,
-  added `numericField_()`, fixed `mapMemberRow()`
-- `10_Main.gs` — updated `syncDropdownToConfig_()` to also sync
-  `MULTI_SELECT_COLS`
-- `10a_SheetCreation.gs` — corrected column letter comments
-- `10d_SyncAndMaintenance.gs` — corrected column letter comments
-- `04e_PublicDashboard.gs` — corrected column letter comments
-- `05_Integrations.gs` — corrected column letter comments
-- `10b_SurveyDocSheets.gs` — corrected column letter comments
-- `dist/ConsolidatedDashboard.gs` — consolidated build reflecting all changes
-
-**Resolution:**
-Single-select and multi-select dropdown mappings are now mutually
-exclusive. Both are synced bidirectionally with Config. Numeric fields
-use `numericField_()` to safely preserve zero values.
-
----
-
-## Issue 6: mapGrievanceRow and export functions lose zero-value numeric fields
-
-**Commit:** _(included in this review cycle)_
-
-**Severity:** MEDIUM
-
-**Problem:**
-The same `|| ''` falsy bug fixed for `openRate` in Issue 5 also
-affected `daysOpen` and `daysToDeadline` in three locations:
-
-1. **`mapGrievanceRow()`** in `01_Core.gs` (lines 2011, 2013) —
-   `daysOpen: row[GRIEVANCE_COLS.DAYS_OPEN - 1] || ''` and
-   `daysToDeadline: row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1] || ''`.
-   A grievance with 0 days open (filed today) or 0 days to deadline
-   (deadline is today) would lose its data.
-
-2. **Grievance export functions** in `12_Features.gs` (lines 2802–2803,
-   3313–3314) — `row[cols.DAYS_OPEN - 1] || ''` and
-   `daysToDeadline || ''` in export data arrays. Same zero-erasure bug
-   in exported data.
-
-3. **Test helper functions** in `09_Dashboards.test.js` (lines 165–166)
-   and `04e_PublicDashboard.test.js` (lines 95–96) — test row builders
-   used `overrides.daysOpen || ''` which would silently convert a `0`
-   test override to `''`.
-
-**Note:** Other files (e.g. `04c_InteractiveDashboard.gs`) already used
-the correct `|| 0` pattern for these same fields.
-
-**Files affected:**
-- `01_Core.gs` — `mapGrievanceRow()` now uses `numericField_()`
-- `12_Features.gs` — export functions now use `numericField_()`
-- `09_Dashboards.test.js` — test helper uses `!= null` ternary
-- `04e_PublicDashboard.test.js` — test helper uses `!= null` ternary
-- `dist/ConsolidatedDashboard.gs` — consolidated build reflecting all changes
-
-**Resolution:**
-All numeric fields in grievance data access now use `numericField_()`
-(production code) or null-safe ternaries (test code) to preserve `0`.
-
----
-
 ## Items Confirmed Safe (not bugs)
 
 These were reviewed and determined to be acceptable:
@@ -253,11 +155,6 @@ These were reviewed and determined to be acceptable:
   `_Checklist_Calc`) — These sheets are code-generated with a fixed
   internal layout. Users never interact with them. Hardcoded references
   to their own internal columns are acceptable.
-- **Hidden calc sheet hardcoded indices** (`_Member_Lookup`,
-  `_Steward_Performance_Calc`) — Same as above. Code-generated hidden
-  sheets with fixed layouts. `STEWARD_PERF_COLS` constants exist and
-  are used elsewhere; the few hardcoded reads in `09_Dashboards.gs`
-  (lines 2070–2079, 2883–2889) are consistent with the sheet layout.
 - **Single-column `getRange()` reads with `row[0]`** — When reading a
   1-column-wide range, `row[0]` is the only element. This is correct.
 - **External integration sheets** (Volunteer Hours, Meeting Attendance)
@@ -265,21 +162,6 @@ These were reviewed and determined to be acceptable:
   comments are acceptable for now.
 - **`SATISFACTION_COLS.AVG_SCHEDULING || 82`** — Defensive fallback
   pattern, not a hardcoded value.
-- **Satisfaction survey hardcoded indices** in `04e_PublicDashboard.gs`
-  (lines 797–870) — ~50 hardcoded 0-indexed array accesses for survey
-  questions (e.g. `satData[i][6]` for Q6). Named constants
-  (`SATISFACTION_COLS`) exist and the values match. Not a bug today,
-  but a maintainability risk if survey columns are ever reordered.
-  Acceptable because survey column order is fixed by Google Forms.
-- **`GRIEVANCE_COLUMNS.DRIVE_FOLDER + 1`** in `05_Integrations.gs`
-  (lines 352, 371, 380) — Uses 0-indexed legacy `GRIEVANCE_COLUMNS`
-  constant with `+ 1` to convert for 1-indexed `getRange()`. Math is
-  correct. Could be simplified to `GRIEVANCE_COLS.DRIVE_FOLDER_URL`
-  but not a bug.
-- **Audit log `getRange(row, 1)`** in `08d_AuditAndFormulas.gs`
-  (line 131) — Reads column A (record ID) for both Member Directory
-  and Grievance Log. Column A is the ID column in both sheets by
-  design, so the hardcoded `1` is correct.
 
 ---
 
