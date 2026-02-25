@@ -6,7 +6,7 @@
 2. **Everything must be dynamic.** Never hardcode sheet names, column positions, org names, unit names, or config values. Always read from Config tab or constants.
 3. **Column constants are 1-indexed** (matching `getRange()`). For array access on `getValues()` data, subtract 1: `row[GRIEVANCE_COLS.STATUS - 1]`.
 4. **All HTML must use `escapeHtml()`** for dynamic values. Defined in `00_Security.gs`. No exceptions.
-5. **`dist/ConsolidatedDashboard.gs` is auto-generated.** Never edit directly. Edit `src/*.gs`, then `npm run build`.
+5. **`dist/` contains individual `.gs` + `.html` files for clasp push.** Never edit dist/ directly. Edit `src/*.gs` and `src/*.html`, then copy to dist/. **Do NOT use the consolidated single-file build** (`ConsolidatedDashboard.gs`) — clasp must push individual files because GAS needs separate `.html` files for `HtmlService.createTemplateFromFile()` and `createHtmlOutputFromFile()`.
 6. **This repo is PUBLIC.** No credentials, tokens, API keys, or DDS Script ID may ever appear here.
 
 ## Repos & Sync
@@ -30,7 +30,7 @@ If GitHub is unreachable, work on local repo. Add a note in AI-REFERENCE.md: wha
 ## Commands
 
 ```bash
-npm run build          # Concatenate src/ → dist/ConsolidatedDashboard.gs
+npm run build          # Copy src/*.gs + src/*.html → dist/ (individual files)
 npm run build:prod     # Production build (excludes DevTools)
 npm run lint           # ESLint all src/*.gs
 npm run lint:fix       # ESLint with auto-fix
@@ -65,7 +65,7 @@ npm run deploy         # lint + test:unit + build:prod + clasp push
 
 ### Build Pipeline
 
-`build.js` concatenates all `src/*.gs` files (in sorted order) into `dist/ConsolidatedDashboard.gs`. The `--prod` flag strips `07_DevTools.gs`.
+`dist/` is a flat copy of `src/*.gs` + `src/*.html` — individual files, not consolidated. Clasp pushes individual files so GAS can resolve `createTemplateFromFile()` / `createHtmlOutputFromFile()`. The `--prod` flag strips `07_DevTools.gs`.
 
 ### Column Constants
 
