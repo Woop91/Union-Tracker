@@ -105,7 +105,7 @@ function getFormFieldIds_(formType) {
       for (var key in defaultFields) {
         result[key] = defaultFields[key];
       }
-      for (key in parsed) {
+      for (var key in parsed) {
         result[key] = parsed[key];
       }
       return result;

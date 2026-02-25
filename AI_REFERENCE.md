@@ -66,7 +66,25 @@ doGet(e)
 ├── ?page=links    → Links page
 ├── ?page=selfservice → Member self-service (Google auth or PIN)
 ├── ?page=portal   → Public portal
+├── ?page=workload → Workload tracker
+├── ?page=checkin  → Meeting check-in (v4.11.0)
+├── ?page=resources → Educational content hub (v4.11.0)
+├── ?page=notifications → Notifications page — dual role (v4.12.0)
 └── (default)      → Unified member dashboard
+
+### Sheets
+```
+📢 Notifications (v4.12.0) — 12 columns
+├── Notification ID  — auto-generated NOTIF-XXX
+├── Recipient        — email, "All Members", "All Stewards", "Everyone"
+├── Type             — Steward Message | Announcement | Deadline | System
+├── Title / Message  — headline + body
+├── Priority         — Normal | Urgent
+├── Sent By / Name   — steward email + display name
+├── Created / Expires— dates (blank Expires = no auto-expiry)
+├── Dismissed By     — comma-separated emails
+└── Status           — Active | Expired | Archived
+```
 ```
 
 ### Authentication System
@@ -117,6 +135,85 @@ The consolidated file uses `HtmlService.createHtmlOutput()` with **inline HTML s
 - `.github/workflows/build.yml` — Added `Main`, `staging`, `dev` to CI trigger branches
 - `AI_REFERENCE.md` — Created (this file)
 - `web-dashboard/AI_REFERENCE.md` — Added deprecation notice (folder is orphaned legacy code)
+
+### 2026-02-24 — v4.11.0: Resources Hub + Meeting Check-In Web Route (by Claude, claude.ai)
+**New Features:**
+1. ✅ `?page=resources` — Educational content hub: Know Your Rights, Grievance Process, FAQ, Forms & Templates
+2. ✅ `?page=checkin` — Meeting check-in as standalone web page (reuses existing 14_MeetingCheckIn.gs logic)
+3. ✅ `📚 Resources` sheet — Steward-managed content with 12 columns, data validation, 8 starter articles
+4. ✅ `RESOURCES_HEADER_MAP_` + `RESOURCES_COLS` — Dynamic column system, registered in `syncColumnMaps()`
+5. ✅ `getWebAppResourcesList()` API — Returns visible resources with audience filtering
+6. ✅ Design refresh: DM Sans + Fraunces serif fonts, warm navy/earth tones (not generic purple)
+7. ✅ `PHASE2_PLAN.md` — Tracks parked features (bulk actions, deadline calendar, etc.)
+
+**Files Changed:**
+- `src/01_Core.gs` — Added `SHEETS.RESOURCES`, `RESOURCES_HEADER_MAP_`, `RESOURCES_COLS`, registered in syncColumnMaps
+- `src/05_Integrations.gs` — Added `case 'checkin'` and `case 'resources'` to doGet switch + 3 new functions: `getWebAppResourcesList()`, `getWebAppResourcesHtml()`, `getWebAppCheckInHtml()`
+- `src/10b_SurveyDocSheets.gs` — Added `createResourcesSheet()` with starter content and validation
+- `PHASE2_PLAN.md` — Created
+- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,121 lines / 2,569 KB)
+
+**Design Decisions:**
+- Resources page uses warm serif typography (Fraunces) to convey authority/trust — it's a union tool
+- Navy + earth tones (#1e3a5f, #fafaf9) instead of generic purple gradients
+- Check-in page uses green theme to differentiate from other pages
+- All existing routes, tabs, and pages completely untouched — additive only
+- Resources sheet auto-creates with starter content when first accessed
+
+**Parked for later (ranked):**
+1. Bulk actions (flag/email/export)
+2. Deadline calendar view
+3. Grievance history for members
+4. Welcome/landing page
+5. Events page with Join Virtual button
+
+### 2026-02-24 — v4.12.0: Notifications System (by Claude, claude.ai)
+**New Features:**
+1. ✅ `📢 Notifications` sheet — 12 columns, data validation, 2 starter entries, orange tab
+2. ✅ `getWebAppNotifications(email, role)` — filters Active, non-expired, non-dismissed, audience-matched
+3. ✅ `dismissWebAppNotification(id, email)` — appends to Dismissed_By column (per-member tracking)
+4. ✅ `sendWebAppNotification(data)` — steward form creates row with auto-ID (NOTIF-XXX)
+5. ✅ `getNotificationRecipientList()` — member directory + preset groups (All Members, All Stewards, Everyone)
+6. ✅ Notifications persist until steward-set Expires date OR member dismisses
+7. ✅ Types: Steward Message, Announcement, Deadline, System
+8. ✅ Priority: Normal (default), Urgent (sorts first in display)
+
+**Notification Sheet Columns:**
+Notification ID, Recipient, Type, Title, Message, Priority, Sent By, Sent By Name, Created Date, Expires Date, Dismissed By, Status
+
+**Persistence Logic:**
+- Active until: (a) Expires Date passes, (b) member dismisses (email appended to Dismissed_By), or (c) steward sets Status=Archived
+- Dismissed_By is comma-separated emails — each member dismisses independently
+- Blank Expires Date = no auto-expiry (steward must archive manually)
+
+**Files Changed:**
+- `src/01_Core.gs` — Added `SHEETS.NOTIFICATIONS`, `NOTIFICATIONS_HEADER_MAP_` (12 cols), `NOTIFICATIONS_COLS`, registered in syncColumnMaps
+- `src/05_Integrations.gs` — Added 4 API functions (getWebAppNotifications, dismissWebAppNotification, sendWebAppNotification, getNotificationRecipientList)
+- `src/10b_SurveyDocSheets.gs` — Added `createNotificationsSheet()` with validation + 2 starter entries
+- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,532 lines / 2,587 KB)
+
+**Design Decisions:**
+- Separate sheet (not a column in Member Directory) — notifications are ephemeral, don't pollute member data
+- Dismissed_By as comma-separated in single cell — avoids per-member rows, scales to thousands
+- Steward composes via separate form in steward view (not inline) — cleaner UX, prevents accidental sends
+- Auto-ID generation scans existing IDs for max number — gap-safe
+- Recipient supports individual emails AND group targets — flexible
+
+### 2026-02-25 — v4.12.0 continued: Notifications Page + Branch Sync (by Claude, claude.ai)
+**New Features:**
+1. ✅ `?page=notifications` route in doGet
+2. ✅ `getWebAppNotificationsHtml()` — dual-role page: member view + steward inline compose
+3. ✅ `getNotificationRecipientListFull()` — member list with location/dept/title for filter dropdowns
+4. ✅ Steward compose form: Groups tab (All Members/Stewards/Everyone) + Individuals tab
+5. ✅ Individual picker: search by name, filter by location/department/job title dropdowns
+6. ✅ Member notification cards: type badges, urgency indicators, dismiss with ✕
+7. ✅ Toast feedback on send/dismiss
+8. ✅ All branches synced: staging → Main → dev + Union-Tracker
+
+**Files Changed:**
+- `src/05_Integrations.gs` — Added `case 'notifications'` route, `getNotificationRecipientListFull()`, `getWebAppNotificationsHtml()` (~395 lines)
+- `dist/ConsolidatedDashboard.gs` — Rebuilt (62,929 lines / 2,608 KB)
+- `AI_REFERENCE.md` — Updated route table + changelog
 
 ---
 
@@ -187,3 +284,156 @@ The consolidated file uses `HtmlService.createHtmlOutput()` with **inline HTML s
 6. **Deploy with `npm run deploy`** (includes lint + test + prod build + clasp push).
 7. **Current file size is 2.4MB / 6MB limit.** If adding major features, monitor growth.
 8. **The `doGet()` function is in `src/04e_PublicDashboard.gs`** (or check `src/` files for the source location).
+
+### v4.12.2 — SPA Port + Theme Overhaul (2026-02-25)
+**SPA files added to DDS-Dashboard:**
+- src/19_WebDashAuth.gs (315 lines) — Google SSO + magic link auth
+- src/20_WebDashConfigReader.gs (158 lines) — Config reader with CacheService
+- src/21_WebDashDataService.gs (1263 lines) — Data access layer
+- src/22_WebDashApp.gs (192 lines) — SPA entry point (doGetWebDashboard)
+- src/23_PortalSheets.gs (168 lines) — Portal sheet setup
+- src/24_WeeklyQuestions.gs (407 lines) — Weekly engagement system
+- src/auth_view.html, error_view.html, index.html, member_view.html, steward_view.html, styles.html
+
+**Theme:** DM Sans + Fraunces, warm palette, default light mode
+**Resources:** Full educational hub (search, category pills, expandable cards)
+**Notifications:** Hero headers, CSS classes, urgent borders, type badges
+**doGet():** Default now routes to SPA (doGetWebDashboard) with SSO/magic link
+**Build:** 36 GS modules + 8 HTML files → 70,586 lines / 2,907 KB
+
+### v4.12.2b — UT Feature Port + Config/Auth/Routing (2026-02-25)
+**SHEETS constants added to DDS:**
+- WEEKLY_QUESTIONS: '_Weekly_Questions' (hidden, weekly engagement questions)
+- CONTACT_LOG: '_Contact_Log' (hidden, steward-member interaction log)
+- STEWARD_TASKS: '_Steward_Tasks' (hidden, steward task management)
+
+**Version history synced:** Added v4.11.0, v4.12.0, v4.12.2 entries to DDS
+
+**Sheet setup (08a_SheetSetup.gs):**
+- Weekly Questions init (calls WeeklyQuestions.initWeeklyQuestionSheets if available)
+- Contact Log sheet creation (_ensureContactLogSheet) — 8 columns, auto-hidden
+- Steward Tasks sheet creation (_ensureStewardTasksSheet) — 10 columns, auto-hidden
+
+**ConfigReader rewritten (20_WebDashConfigReader.gs):**
+- OLD: Read key-value pairs from Column A/B (row-based layout)
+- NEW: Read from column-based Config tab using CONFIG_COLS constants
+- Values read from row 3 (row 1=headers, row 2=section labels)
+- Falls back to _defaults() when Config tab missing
+- Added: calendarUrl/driveFolderUrl derived from IDs, localNumber, mainPhone
+
+**Auth helper (19_WebDashAuth.gs):**
+- Added initWebDashboardAuth() — first-time setup verifier
+- SSO: Works immediately via Session.getActiveUser().getEmail()
+- Magic links: Self-create via PropertiesService.getScriptProperties()
+- No manual ScriptProperties setup required
+
+**Deep-link routing (22_WebDashApp.gs + index.html + 05_Integrations.gs):**
+- _serveDashboard() now accepts initialTab parameter
+- doGetWebDashboard() reads e.parameter.page → passes as initialTab
+- SPA index.html reads PAGE_DATA.initialTab → calls _handleTabNav() after init
+- ?page=resources → SPA with resources tab pre-selected
+- ?page=notifications → SPA with notifications tab pre-selected
+- Standalone HTML pages kept as fallback if doGetWebDashboard unavailable
+
+**Default accent hue:** Changed from 250 (blue) → 30 (amber) in 10a_SheetCreation.gs
+
+**Files changed:**
+- src/01_Core.gs — SHEETS constants, version history
+- src/05_Integrations.gs — resources/notifications → SPA routing
+- src/08a_SheetSetup.gs — Weekly Questions, Contact Log, Steward Tasks init
+- src/10a_SheetCreation.gs — accent hue default 250→30
+- src/19_WebDashAuth.gs — initWebDashboardAuth()
+- src/20_WebDashConfigReader.gs — column-based Config tab reader
+- src/22_WebDashApp.gs — initialTab deep-link support
+- src/index.html — initialTab navigation after init
+
+---
+
+## 🔄 SYNC RULES — DDS ↔ UNION-TRACKER (Added 2026-02-25)
+
+### Repo Relationship
+- **DDS-Dashboard** (private): Primary repo. Default branch: `Main` (capital M).
+- **Union-Tracker** (public): Mirror minus Workload Tracker. Target branch: `staging`.
+- DDS Apps Script ID: `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu` — NEVER in UT.
+- UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+- GitHub Token (shared): `ghp_7MY0...DC9` (account-level, works for both repos)
+
+### Sync Flow
+```
+DDS Main → UT staging → (user manages) → UT dev → UT main
+```
+
+### Data Protection Rules
+- **No function may delete or overwrite manually entered data.**
+- Manually entered = imported by users via import function OR typed directly into cells.
+- System-generated = anything written by code functions (except import function output).
+- Functions may: append, write to system-generated fields, clear auto-generated content.
+
+### Workload Tracker Exclusion Registry
+
+**❌ EXCLUDE from UT:**
+| File | Reason |
+|------|--------|
+| `src/18_WorkloadTracker.gs` | Core WT module — 32 functions |
+| `src/WorkloadTracker.html` | WT portal HTML template |
+
+**⚠️ MODIFY for UT (add typeof guards):**
+| File | Lines | What to guard |
+|------|-------|---------------|
+| `src/03_UIComponents.gs` | 85-94 | `📊 Workload Tracker` submenu |
+| `src/index.html` | 370, 389 | `workload` nav item and route |
+| `src/member_view.html` | 792, 881-1129 | `renderWorkloadTracker` + SSO calls |
+
+**✅ ALREADY SAFE (typeof guards exist):**
+- `src/05_Integrations.gs` — `typeof getWorkloadTrackerPortalHtml === 'function'`
+- `src/08a_SheetSetup.gs` — `typeof initWorkloadTrackerSheets === 'function'`
+
+**✅ KEEP AS-IS (not WT module):**
+- "Steward workload" references = grievance case counts per steward (core feature)
+- WT sheet constants in `01_Core.gs` = inert without module
+- WT CSS in `styles.html` = dead code, no errors
+
+## 🐛 ERRORS & FIXES (Added 2026-02-25)
+
+| Date | Error | Cause | Fix |
+|------|-------|-------|-----|
+| 2026-02-25 | Memory had DDS default branch as `staging` | Incorrect memory entry | Corrected to `Main` |
+| 2026-02-25 | Expired GitHub token `ghp_FTE8...` in memory | Token rotated | Updated to `ghp_7MY0...` |
+
+## 📝 CHANGES LOG (Added 2026-02-25)
+
+| Date | Agent | Change |
+|------|-------|--------|
+| 2026-02-25 | Claude (claude.ai) | Appended sync rules, WT exclusion registry, data protection rules to AI_REFERENCE.md |
+| 2026-02-25 | Claude (claude.ai) | Created SYNC-LOG.md with full exclusion analysis |
+| 2026-02-25 | Claude (claude.ai) | Created .gitignore for Union-Tracker repo |
+
+## 🚀 DEPLOYMENT RULE (Added 2026-02-25)
+
+### After any merge or work to DDS Main:
+1. Push to GitHub (all relevant branches)
+2. **Run `clasp push` to update the Google Sheet**
+   - Command: `cd C:\Users\deskc\Documents\DDS-Dashboard && npm run deploy` (or `clasp push`)
+   - CLASP rootDir is `./dist` — only `dist/` contents go to Apps Script
+   - Requires Google OAuth — must be run from local machine, not CI (unless secrets configured)
+   - If agent cannot run clasp, **always remind the user to run it**
+
+## ⚠️ PROTECTED CODE — DO NOT MODIFY (Migrated from AIR.md, 2026-02-25)
+
+The following code sections are USER APPROVED and must NOT be modified or removed:
+
+### Dashboard Modal Popup — `src/04c_InteractiveDashboard.gs`
+Protected functions: `showInteractiveDashboardTab()`, `getInteractiveDashboardHtml()`, `getInteractiveOverviewData()`, `getInteractiveGrievanceData()`, `getInteractiveMemberData()`, `getMyStewardCases()`
+Tabs: Overview, Grievances, Members, Analytics, My Cases (steward-only)
+
+### Member Satisfaction Dashboard — `src/04c_InteractiveDashboard.gs`
+Protected functions: `showSatisfactionDashboard()`, `getSatisfactionDashboardHtml()`, `getSatisfactionOverviewData()`, `getSatisfactionResponseData()`, `getSatisfactionSectionData()`, `getSatisfactionAnalyticsData()`, `getSatisfactionTrendData()`, `getSatisfactionLocationDrill()`
+Tabs: Overview, Trends, Responses, Sections, Insights
+
+### Secure Member Dashboard — `src/11_CommandHub.gs`
+Protected functions: `showPublicMemberDashboard()`, `showStewardPerformanceModal()`, `safetyValveScrub()`, `getSecureGrievanceStats_()`, `getSecureAllStewards_()`, `getSecureSatisfactionStats_()`, `getStewardWorkload()`
+Features: Material Design UI, Weingarten Rights, live steward search, PII scrubbing
+
+## 📐 ARCHITECTURE: No Formulas in Visible Sheets (Migrated from AIR.md)
+
+All visible sheets (Dashboard, Member Satisfaction, Feedback) contain only VALUES, never formulas. Data is recomputed by JavaScript on each change. No broken formula references, no circular dependencies, no formula chains.

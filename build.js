@@ -22,7 +22,7 @@ const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
 const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order - 27 modules
+// Files in build order - 28 modules
 const BUILD_ORDER = [
   '00_Security.gs',                // Security utilities, XSS prevention, access control
   '00_DataAccess.gs',              // Data Access Layer, time constants
@@ -54,12 +54,24 @@ const BUILD_ORDER = [
   '15_EventBus.gs',                 // Event-driven pub/sub architecture
   '16_DashboardEnhancements.gs',    // Dashboard features: filters, presets, export, collaboration
   '17_CorrelationEngine.gs',        // Cross-dimensional correlation engine with insights
-  '18_WorkloadTracker.gs'           // Workload Tracker module
+  '18_WorkloadTracker.gs',           // Member workload tracking, anonymized reporting
+  '19_WebDashAuth.gs',               // SPA auth: Google SSO + magic link tokens
+  '20_WebDashConfigReader.gs',       // SPA config reader with CacheService
+  '21_WebDashDataService.gs',        // SPA data access layer (Member Directory + Grievance Log)
+  '22_WebDashApp.gs',                // SPA main entry point (doGetWebDashboard)
+  '23_PortalSheets.gs',              // Portal sheet setup (8 portal-specific sheets)
+  '24_WeeklyQuestions.gs'            // Weekly engagement questions system
 ];
 
 const HTML_FILES = [
   'MultiSelectDialog.html',
-  'WorkloadTracker.html'
+  'WorkloadTracker.html',
+  'auth_view.html',
+  'error_view.html',
+  'index.html',
+  'member_view.html',
+  'steward_view.html',
+  'styles.html'
 ];
 
 function build() {
@@ -81,7 +93,7 @@ function build() {
  * DASHBOARD - CONSOLIDATED BUILD
  * ============================================================================
  *
- * Version: ${require('./package.json').version} (${new Date().toISOString().split('T')[0]})
+ * Version: 4.6.0 (2026-02-12)
  * Build Date: ${new Date().toISOString().split('T')[0]}
  *
  * This file is auto-generated from the src/ directory.
@@ -112,7 +124,7 @@ function build() {
     totalLines += lineCount;
 
     output += `// ============================================================================\n`;
-    output += `// === FILE: ${file} === (${lineCount} lines)\n`;
+    output += `// SOURCE: ${file} (${lineCount} lines)\n`;
     output += `// ============================================================================\n\n`;
     output += content;
     output += '\n\n';
@@ -145,7 +157,7 @@ function build() {
     output += ` * @returns {string} HTML content\n`;
     output += ` */\n`;
     output += `function get${funcName}() {\n`;
-    output += `  return \`${content.replace(/`/g, '\\`').replace(/\$\{/g, '\\${')}\`;\n`;
+    output += `  return \`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;\n`;
     output += `}\n\n`;
 
     console.log(`  Embedded: ${htmlFile} (${lineCount} lines)`);
@@ -169,7 +181,7 @@ function lint() {
   console.log('Running ESLint on source files...\n');
 
   try {
-    execSync('npx eslint src/**/*.gs', {
+    execSync('npx eslint src/**/*.gs --ext .gs', {
       stdio: 'inherit',
       cwd: __dirname
     });
@@ -218,8 +230,8 @@ if (shouldClean) {
   if (isProd) {
     console.log('Production build: Excluding DevTools...\n');
     const filteredOrder = BUILD_ORDER.filter(f => !PROD_EXCLUDE.includes(f));
-    // Use a filtered copy instead of mutating the const BUILD_ORDER array
-    BUILD_ORDER.splice(0, BUILD_ORDER.length, ...filteredOrder);
+    BUILD_ORDER.length = 0;
+    BUILD_ORDER.push(...filteredOrder);
   }
 
   build();

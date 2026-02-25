@@ -217,13 +217,6 @@ function SEED_SAMPLE_DATA() {
  * Seeds both preset values (Office Days, Grievance Status, etc.) and user-configurable values
  */
 function seedConfigData() {
-  // Guard: prevent seeding in production
-  var prodMode = PropertiesService.getScriptProperties().getProperty('PROD_MODE');
-  if (prodMode === 'true') {
-    SpreadsheetApp.getUi().alert('Seed data is disabled in production mode.');
-    return;
-  }
-
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
 
@@ -612,7 +605,7 @@ function seedSatisfactionData() {
 
   var maxCol = SATISFACTION_COLS.Q67_ADDITIONAL; // last seeded column
 
-  for (i = 0; i < 50; i++) {
+  for (var i = 0; i < 50; i++) {
     // Spread responses over last 60 days
     var daysAgo = Math.floor(Math.random() * 60);
     var timestamp = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
@@ -1762,16 +1755,6 @@ function NUKE_SEEDED_DATA() {
     return;
   }
 
-  // Create backup snapshot before destructive operation
-  if (typeof createBackupSnapshot === 'function') {
-    try {
-      createBackupSnapshot();
-      Logger.log('Backup snapshot created before nuke operation');
-    } catch (_backupErr) {
-      Logger.log('Warning: backup snapshot failed, continuing with nuke: ' + _backupErr.message);
-    }
-  }
-
   ss.toast('Nuking seeded data... This will take 3-5 minutes. Please wait!', '☢️ NUKE', 10);
 
   try {
@@ -2451,7 +2434,7 @@ function onEditValidation(e) {
       else { e.range.clearNote(); e.range.setBackground(null); }
     }
     if (col === MEMBER_COLS.PHONE) {
-      r = validatePhoneNumber(val);
+      var r = validatePhoneNumber(val);
       if (!r.valid) { e.range.setNote('⚠️ ' + r.message); e.range.setBackground('#fff3e0'); }
       else { e.range.clearNote(); e.range.setBackground(null); if (r.formatted !== val) e.range.setValue(r.formatted); }
     }
@@ -3047,11 +3030,11 @@ function showTestDashboard() {
 
   var testRows = results.results.map(function(r) {
     var status = r.passed ? '✅' : '❌';
-    var errorMsg = r.error ? '<span style="color:#ef4444">' + escapeHtml(String(r.error)) + '</span>' : '-';
+    var errorMsg = r.error ? '<span style="color:#ef4444">' + r.error + '</span>' : '-';
     return '<tr>' +
       '<td>' + status + '</td>' +
-      '<td>' + escapeHtml(String(r.name)) + '</td>' +
-      '<td>' + escapeHtml(String(r.duration)) + 'ms</td>' +
+      '<td>' + r.name + '</td>' +
+      '<td>' + r.duration + 'ms</td>' +
       '<td>' + errorMsg + '</td>' +
       '</tr>';
   }).join('');

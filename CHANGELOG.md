@@ -5,6 +5,29 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.0] - 2026-02-23
+
+### Added
+- **Workload Tracker module** (`18_WorkloadTracker.gs` + `WorkloadTracker.html`) — members submit weekly caseload data via the web portal (`?page=workload`)
+- 8 workload categories: Priority Cases, Pending Cases, Unread Documents, To-Do Items, Sent Referrals, CE Activities, Assistance Requests, Aged Cases — each with expandable sub-category breakdowns
+- Anonymized reporting: member identities replaced with REDACTED in Workload Reporting sheet; private submissions excluded from collective stats
+- Privacy controls: Unit Anonymous / Agency Anonymous / Private per submission
+- Reciprocity enforcement: members only see collective stats from their own sharing start date forward
+- Employment tracking: Full-time / Part-time (with hours) + optional overtime hours field
+- Email reminder system with configurable frequency/day/time via `setupWorkloadReminderSystem()`
+- Data retention: 24-month rolling archive via `wtArchiveOldData_()`
+- CSV backup to Google Drive via `createWorkloadBackup()`
+- **📊 Workload Tracker submenu** added to Union Hub menu
+- `?page=workload` route added to `doGet()` in `05_Integrations.gs`
+- 5 new sheet name constants in `SHEETS`: `WORKLOAD_VAULT`, `WORKLOAD_REPORTING`, `WORKLOAD_REMINDERS`, `WORKLOAD_USERMETA`, `WORKLOAD_ARCHIVE`
+- Workload sheets auto-created by `CREATE_DASHBOARD()` in `08a_SheetSetup.gs`
+
+### Security
+- Workload auth reuses DDS member PIN system (`verifyPIN()` / `hashPIN()` from `13_MemberSelfService.gs`) — no separate credential store
+- Rate limiting on PIN attempts (5/15 min) and submissions (10/hour) via CacheService with `WT_RATE_` key prefix
+- Workload audit events logged via DDS's `logAuditEvent()`
+- LockService prevents concurrent Vault writes
+
 ## [4.9.1] - 2026-02-23
 
 ### Security

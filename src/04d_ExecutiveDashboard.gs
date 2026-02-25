@@ -842,8 +842,8 @@ function createGrievancePDF_UIService_(data) {
   }
 
   // Create document from scratch if no template
-  doc = DocumentApp.create('SIGNATURE_REQUIRED_' + data.name + '_' + dateStr);
-  body = doc.getBody();
+  var doc = DocumentApp.create('SIGNATURE_REQUIRED_' + data.name + '_' + dateStr);
+  var body = doc.getBody();
 
   // Header
   body.appendParagraph(COMMAND_CONFIG.SYSTEM_NAME)
@@ -873,7 +873,7 @@ function createGrievancePDF_UIService_(data) {
 
   // Move to archive folder and convert to PDF
   var docFile = DriveApp.getFileById(doc.getId());
-  pdf = folder.createFile(docFile.getAs(MimeType.PDF))
+  var pdf = folder.createFile(docFile.getAs(MimeType.PDF))
     .setName('Grievance_UNSIGNED_' + data.name + '_' + dateStr + '.pdf');
 
   docFile.setTrashed(true);

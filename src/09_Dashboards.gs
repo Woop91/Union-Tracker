@@ -1033,8 +1033,8 @@ function getSatisfactionTrendData(period) {
   try {
     var prioritiesData = sheet.getRange(2, SATISFACTION_COLS.Q64_TOP_PRIORITIES, numRows, 1).getValues();
     var issueMap = {};
-    for (i = 0; i < numRows; i++) {
-      ts = timestamps[i][0];
+    for (var i = 0; i < numRows; i++) {
+      var ts = timestamps[i][0];
       if (!(ts instanceof Date)) continue;
       if (cutoff && ts < cutoff) continue;
 
@@ -1254,7 +1254,7 @@ function getSatisfactionAnalyticsData() {
 
   // By Worksite analysis
   var worksiteMap = {};
-  for (i = 0; i < numRows; i++) {
+  for (var i = 0; i < numRows; i++) {
     var ws = worksiteData[i][0] || 'Unknown';
     if (!worksiteMap[ws]) worksiteMap[ws] = { sum: 0, count: 0 };
     if (scores[i] > 0) {
@@ -1263,7 +1263,7 @@ function getSatisfactionAnalyticsData() {
     }
   }
 
-  for (ws in worksiteMap) {
+  for (var ws in worksiteMap) {
     if (worksiteMap[ws].count > 0) {
       result.byWorksite.push({
         name: ws,
@@ -1276,7 +1276,7 @@ function getSatisfactionAnalyticsData() {
 
   // By Role analysis
   var roleMap = {};
-  for (i = 0; i < numRows; i++) {
+  for (var i = 0; i < numRows; i++) {
     var role = roleData[i][0] || 'Unknown';
     if (!roleMap[role]) roleMap[role] = { sum: 0, count: 0 };
     if (scores[i] > 0) {
@@ -1285,7 +1285,7 @@ function getSatisfactionAnalyticsData() {
     }
   }
 
-  for (role in roleMap) {
+  for (var role in roleMap) {
     if (roleMap[role].count > 0) {
       result.byRole.push({
         name: role,
@@ -1300,7 +1300,7 @@ function getSatisfactionAnalyticsData() {
   var withContactSum = 0, withContactCount = 0;
   var withoutContactSum = 0, withoutContactCount = 0;
 
-  for (i = 0; i < numRows; i++) {
+  for (var i = 0; i < numRows; i++) {
     var contact = String(stewardContactData[i][0]).toLowerCase();
     if (scores[i] > 0) {
       if (contact === 'yes') {
@@ -1324,7 +1324,7 @@ function getSatisfactionAnalyticsData() {
 
   // Top priorities analysis
   var priorityMap = {};
-  for (i = 0; i < numRows; i++) {
+  for (var i = 0; i < numRows; i++) {
     var priorities = String(prioritiesData[i][0] || '');
     if (priorities) {
       // Split by comma and count each priority
@@ -1803,7 +1803,7 @@ function syncGrievanceToMemberDirectory() {
   // Update columns AB-AD (Has Open Grievance?, Grievance Status, Days to Deadline)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var memberInfo = lookup[memberId] || {hasOpen: 'No', status: '', deadline: ''};
     updates.push([memberInfo.hasOpen, memberInfo.status, memberInfo.deadline]);
   }
@@ -1869,7 +1869,7 @@ function syncGrievanceFormulasToLog() {
 
   for (var j = 1; j < grievanceData.length; j++) {
     var row = grievanceData[j];
-    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || ('Row ' + (j + 1));
 
     // Track data quality issues
@@ -2090,7 +2090,7 @@ function syncMemberToGrievanceLog() {
   var infoUpdates = [];
 
   for (var j = 1; j < grievanceData.length; j++) {
-    memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
+    var memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
     var data = lookup[memberId] || {firstName: '', lastName: '', email: '', unit: '', location: '', steward: ''};
     nameUpdates.push([data.firstName, data.lastName]);
     infoUpdates.push([data.email, data.unit, data.location, data.steward]);

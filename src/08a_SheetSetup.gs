@@ -52,7 +52,8 @@ function CREATE_DASHBOARD() {
       '• 📋 Features Reference (complete feature list)\n' +
       '• 📚 Getting Started (setup instructions)\n' +
       '• ❓ FAQ (common questions)\n' +
-      '• 📖 Config Guide (how to use Config tab)\n\n' +
+      '• 📖 Config Guide (how to use Config tab)\n' +
+      '• 📊 Workload Tracker (member caseload tracking)\n\n' +
       'Note: All dashboards are now modal-based (popup windows).\n' +
       'Access them via: Union Hub > Dashboards menu.\n\n' +
       'Plus 6 hidden calculation sheets for self-healing formulas.\n\n' +
@@ -131,19 +132,51 @@ function CREATE_DASHBOARD() {
     installHiddenSheetEnforcerTrigger();
     ss.toast('Hidden sheet enforcer installed', '🏗️ Progress', 2);
 
+    // Initialize Workload Tracker sheets (18_WorkloadTracker.gs)
+    if (typeof initWorkloadTrackerSheets === 'function') {
+      try {
+        initWorkloadTrackerSheets();
+        ss.toast('Workload Tracker sheets created', '🏗️ Progress', 2);
+      } catch (wtError) {
+        Logger.log('Workload tracker sheets skipped: ' + wtError.message);
+      }
+    }
+
+    // Initialize Weekly Questions sheets (24_WeeklyQuestions.gs)
+    if (typeof WeeklyQuestions !== 'undefined' && WeeklyQuestions.initWeeklyQuestionSheets) {
+      try {
+        WeeklyQuestions.initWeeklyQuestionSheets();
+        ss.toast('Weekly Questions sheets created', '🏗️ Progress', 2);
+      } catch (wqError) {
+        Logger.log('Weekly Questions sheets skipped: ' + wqError.message);
+      }
+    }
+
+    // Initialize Contact Log and Steward Tasks sheets (v4.12.0)
+    try {
+      _ensureContactLogSheet(ss);
+      _ensureStewardTasksSheet(ss);
+      ss.toast('Contact Log & Steward Tasks sheets created', '🏗️ Progress', 2);
+    } catch (v12Error) {
+      Logger.log('v4.12.0 sheets skipped: ' + v12Error.message);
+    }
+
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
-        '14 sheets created:\n' +
+        '15 sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
         '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
-        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n\n' +
+        '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
+        '• 📊 Workload Reporting (member caseload tracking)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
         'Access via: Union Hub > Dashboards menu.\n\n' +
+        'Workload Tracker: Union Hub > 📊 Workload Tracker\n' +
+        'Members submit via: [web app URL]?page=workload\n\n' +
         'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
         '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
         'update automatically when you edit the sheets.\n\n' +
@@ -292,6 +325,38 @@ function setupHiddenSheets(ss) {
  * @version 1.0.0
  * @requires 01_Constants.gs
  */
+
+// ============================================================================
+// v4.12.0 SHEET SETUP — Contact Log & Steward Tasks
+// ============================================================================
+
+function _ensureContactLogSheet(ss) {
+  var name = SHEETS.CONTACT_LOG;
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, 8).setValues([[
+      'ID', 'Steward Email', 'Member Email', 'Contact Type',
+      'Date', 'Notes', 'Duration', 'Created'
+    ]]);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
+
+function _ensureStewardTasksSheet(ss) {
+  var name = SHEETS.STEWARD_TASKS;
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1, 1, 10).setValues([[
+      'ID', 'Steward Email', 'Title', 'Description', 'Member Email',
+      'Priority', 'Status', 'Due Date', 'Created', 'Completed'
+    ]]);
+    sheet.hideSheet();
+  }
+  return sheet;
+}
 
 // ============================================================================
 // DATA VALIDATION SETUP

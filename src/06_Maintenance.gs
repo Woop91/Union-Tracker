@@ -1442,10 +1442,6 @@ function showUndoRedoPanel() {
  * (edit, insert, or delete) breaks the chain and is detectable via
  * verifyAuditLogIntegrity().
  *
- * Known debt: logAuditEvent and logIntegrityEvent both write to AUDIT_LOG
- * with different schemas. A future refactor could unify them into a single
- * function with a shared schema, but both are stable and well-tested.
- *
  * @param {string} eventType - The type of event from AUDIT_EVENTS
  * @param {Object} details - Event details object
  */
@@ -1475,10 +1471,9 @@ function logAuditEvent(eventType, details) {
       }
     }
 
-    // Build log entry — mask user email to reduce PII in audit log
+    // Build log entry
     const timestamp = new Date();
-    var rawEmail = Session.getActiveUser().getEmail() || 'Unknown';
-    const user = (typeof maskEmail === 'function') ? maskEmail(rawEmail) : rawEmail;
+    const user = Session.getActiveUser().getEmail() || 'Unknown';
     const detailsJson = JSON.stringify(details);
     const sessionId = Session.getTemporaryActiveUserKey() || '';
 
@@ -2997,36 +2992,25 @@ function archiveClosedGrievances(daysOld) {
 
   // Delete from main sheet (in reverse order to maintain row indices)
   var failedDeletes = [];
-  var failedGrievanceIds = [];
-  // Build a map from row index → grievanceId before reversing the delete order
-  var rowIndexToGrievanceId = {};
-  rowsToArchive.forEach(function(row, i) {
-    rowIndexToGrievanceId[rowIndicesToDelete[i]] = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-  });
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
     try {
       grievanceSheet.deleteRow(rowIndex);
     } catch (deleteErr) {
       failedDeletes.push(rowIndex);
-      failedGrievanceIds.push(rowIndexToGrievanceId[rowIndex]);
       Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
     }
   });
   if (failedDeletes.length > 0) {
-    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedGrievanceIds.join(', '));
+    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedDeletes.join(', '));
   }
 
   // Log the archive operation
   logIntegrityEvent('AUTO_ARCHIVE',
     'Archived ' + rowsToArchive.length + ' closed grievances older than ' + daysOld + ' days',
-    { count: rowsToArchive.length, daysOld: daysOld, failed: failedDeletes.length }
+    { count: rowsToArchive.length, daysOld: daysOld }
   );
 
-  return {
-    archived: rowsToArchive.length - failedDeletes.length,
-    failed: failedDeletes.length,
-    failedIds: failedGrievanceIds
-  };
+  return { archived: rowsToArchive.length };
 }
 
 /**
@@ -3063,14 +3047,7 @@ function showArchiveDialog() {
     'function runArchive() {' +
     '  var days = document.getElementById("daysOld").value;' +
     '  google.script.run.withSuccessHandler(function(result) {' +
-    '    if (result.failed > 0) {' +
-    '      alert("Archived " + result.archived + " grievances.\\n\\n" +' +
-    '        "WARNING: " + result.failed + " row(s) could not be deleted from the main sheet " +' +
-    '        "and may now exist in both places. Manual cleanup required for grievance ID(s): " +' +
-    '        result.failedIds.join(", "));' +
-    '    } else {' +
-    '      alert("Archived " + result.archived + " grievances.");' +
-    '    }' +
+    '    alert("Archived " + result.archived + " grievances.");' +
     '    google.script.host.close();' +
     '  }).archiveClosedGrievances(parseInt(days));' +
     '}' +

@@ -81,6 +81,17 @@ function createDashboardMenu() {
     .addItem('📅 Open Google Calendar', 'openGoogleCalendar')
     .addItem('📁 Open Google Drive', 'openGoogleDrive')
     .addItem('📖 Help & Documentation', 'showHelpDialog')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('📋 Open Workload Portal', 'showWorkloadPortalUrl')
+      .addItem('🔗 Save Portal Link', 'shareWorkloadPortalLink')
+      .addSeparator()
+      .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'wtArchiveOldData_')
+      .addSeparator()
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
+      .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem'))
     .addToUi();
 
   // ============================================================================
@@ -494,22 +505,17 @@ function APPLY_SYSTEM_THEME() {
 /**
  * Applies theme styling to a single sheet
  * @param {Sheet} sheet - The sheet to style
- * @param {string} [themeKey] - Optional theme preset key; defaults to active user theme
  * @returns {void}
  * @private
  */
-function applyThemeToSheet_(sheet, themeKey) {
+function applyThemeToSheet_(sheet) {
   var lastCol = sheet.getLastColumn();
   var lastRow = sheet.getLastRow();
 
   if (lastCol < 1 || lastRow < 1) return;
 
-  // Get theme preset — use provided key or fall back to active user theme
-  var theme = (themeKey && THEME_PRESETS[themeKey]) ? THEME_PRESETS[themeKey] : getActiveThemePreset_();
-
-  // Clamp font sizes to safe range (F26)
-  var fontSize = Math.min(24, Math.max(8, parseInt(theme.fontSize, 10) || 14));
-  var headerSize = Math.min(24, Math.max(8, parseInt(theme.headerSize, 10) || 14));
+  // Get the active theme preset
+  var theme = getActiveThemePreset_();
 
   // Apply header styling (row 1)
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
@@ -518,28 +524,25 @@ function applyThemeToSheet_(sheet, themeKey) {
     .setFontColor(theme.headerText)
     .setFontWeight('bold')
     .setFontFamily(theme.font)
-    .setFontSize(headerSize)
+    .setFontSize(theme.headerSize)
     .setHorizontalAlignment('center');
 
   // Apply data row styling
   if (lastRow > 1) {
-    var numDataRows = lastRow - 1;
-    var dataRange = sheet.getRange(2, 1, numDataRows, lastCol);
+    var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
     dataRange
       .setFontFamily(theme.font)
-      .setFontSize(fontSize);
+      .setFontSize(theme.fontSize);
 
-    // Build 2D color array and apply with single setBackgrounds() call
-    var colors = [];
-    for (var row = 0; row < numDataRows; row++) {
-      var color = (row % 2 === 0) ? theme.altRow : '#ffffff';
-      var rowColors = [];
-      for (var col = 0; col < lastCol; col++) {
-        rowColors.push(color);
+    // Apply alternating row colors
+    for (var row = 2; row <= lastRow; row++) {
+      var rowRange = sheet.getRange(row, 1, 1, lastCol);
+      if (row % 2 === 0) {
+        rowRange.setBackground(theme.altRow);
+      } else {
+        rowRange.setBackground('#ffffff');
       }
-      colors.push(rowColors);
     }
-    dataRange.setBackgrounds(colors);
   }
 }
 
@@ -868,18 +871,14 @@ function applyZebraStripes(sheet) {
 
   if (lastRow < 2 || lastCol < 1) return;
 
-  // Build 2D color array and apply with single setBackgrounds() call
-  var numDataRows = lastRow - 1;
-  var colors = [];
-  for (var row = 0; row < numDataRows; row++) {
-    var color = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
-    var rowColors = [];
-    for (var col = 0; col < lastCol; col++) {
-      rowColors.push(color);
+  for (var row = 2; row <= lastRow; row++) {
+    var rowRange = sheet.getRange(row, 1, 1, lastCol);
+    if (row % 2 === 0) {
+      rowRange.setBackground('#f1f5f9');
+    } else {
+      rowRange.setBackground('#ffffff');
     }
-    colors.push(rowColors);
   }
-  sheet.getRange(2, 1, numDataRows, lastCol).setBackgrounds(colors);
 }
 
 /**
@@ -1708,15 +1707,6 @@ function composeEmailForMember(memberId) {
  * @returns {Object} Success status object
  */
 function sendQuickEmail(to, subject, body, memberId) {
-  // Validate email format
-  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!to || !emailRegex.test(String(to).trim())) {
-    throw new Error('Invalid recipient email address');
-  }
-  // Check quota before attempting send
-  if (MailApp.getRemainingDailyQuota() < 1) {
-    throw new Error('Daily email quota exhausted. Please try again tomorrow.');
-  }
   try {
     MailApp.sendEmail({ to: to, subject: subject, body: body, name: getOrgNameFromConfig_() + ' Dashboard' });
     return { success: true };

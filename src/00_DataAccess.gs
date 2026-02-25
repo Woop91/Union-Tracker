@@ -282,30 +282,23 @@ var DataAccess = {
     var sheet = this.getSheet(sheetName);
     if (!sheet) return;
 
-    // Compute bounding box for a single setValues() call
-    var minRow = cells[0].row, maxRow = cells[0].row;
-    var minCol = cells[0].col, maxCol = cells[0].col;
-    for (var i = 1; i < cells.length; i++) {
-      if (cells[i].row < minRow) minRow = cells[i].row;
-      if (cells[i].row > maxRow) maxRow = cells[i].row;
-      if (cells[i].col < minCol) minCol = cells[i].col;
-      if (cells[i].col > maxCol) maxCol = cells[i].col;
+    // Group cells by row for efficiency
+    var rowUpdates = {};
+    for (var i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      if (!rowUpdates[cell.row]) {
+        rowUpdates[cell.row] = {};
+      }
+      rowUpdates[cell.row][cell.col] = cell.value;
     }
 
-    var numRows = maxRow - minRow + 1;
-    var numCols = maxCol - minCol + 1;
-
-    // Read current values for the bounding box region
-    var range = sheet.getRange(minRow, minCol, numRows, numCols);
-    var values = range.getValues();
-
-    // Apply updates into the 2D array
-    for (var j = 0; j < cells.length; j++) {
-      values[cells[j].row - minRow][cells[j].col - minCol] = cells[j].value;
+    // Apply updates
+    for (var row in rowUpdates) {
+      var updates = rowUpdates[row];
+      for (var col in updates) {
+        sheet.getRange(parseInt(row), parseInt(col)).setValue(updates[col]);
+      }
     }
-
-    // Write back in a single call
-    range.setValues(values);
   },
 
   /**

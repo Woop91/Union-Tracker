@@ -170,7 +170,7 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.ESCALATION_STEPS, escalationSteps, isExistingSheet);
 
   // Mobile Dashboard & branding defaults
-  seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [250], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.ACCENT_HUE, [30], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.LOGO_INITIALS, ['UN'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAGIC_LINK_EXPIRY_DAYS, [7], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.COOKIE_DURATION_DAYS, [30], isExistingSheet);
@@ -1379,7 +1379,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Location values - alternate row coloring
-  for (r = 35; r <= 39; r++) {
+  for (var r = 35; r <= 39; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_BLUE);
@@ -1501,7 +1501,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Busiest stewards values - alternate row coloring with gradient effect
-  for (r = 59; r <= 88; r++) {
+  for (var r = 59; r <= 88; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);
@@ -1530,7 +1530,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Top performers values - gradient green rows
-  for (r = 93; r <= 102; r++) {
+  for (var r = 93; r <= 102; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_GREEN);
@@ -1564,7 +1564,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Stewards needing support - gradient red rows
-  for (r = 107; r <= 116; r++) {
+  for (var r = 107; r <= 116; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);

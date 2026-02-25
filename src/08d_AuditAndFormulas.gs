@@ -327,10 +327,6 @@ function getAuditHistory(recordId) {
  * formula system. These sheets contain complex formulas that aggregate,
  * calculate, and cross-reference data across the dashboard.
  *
- * Known debt (F44): The self-healing pattern re-injects formulas on sync,
- * which is by design for reliability — formulas get corrupted by manual edits,
- * sheet copies, and mobile clients. This is an intentional trade-off.
- *
  * Hidden Sheets Managed:
  * - _Grievance_Calc: Grievance -> Member Directory data sync
  * - _Grievance_Formulas: Self-healing Grievance Log formulas
