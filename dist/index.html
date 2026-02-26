@@ -387,11 +387,15 @@
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
         { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
+        { divider: true },
+        { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
+        { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
+        { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
       ];
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
-        { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
+        { id: 'contact', icon: '\uD83D\uDC65', label: 'Directory' },
         { divider: true },
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
@@ -406,6 +410,10 @@
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
+        { divider: true },
+        { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
+        { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
+        { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
       ];
     }
 
@@ -418,7 +426,7 @@
         switch(tabId) {
           case 'home': renderMemberHome(app); break;
           case 'cases': renderMyCases(app); break;
-          case 'contact': renderStewardContact(app); break;
+          case 'contact': renderStewardDirectory(app); break;
           case 'profile': renderUpdateProfile(app); break;
           case 'resources': renderMemberResources(app); break;
           case 'workload': renderWorkloadTracker(app); break;
@@ -432,6 +440,9 @@
           case 'polls': renderPollsPage(app); break;
           case 'minutes': renderMinutesPage(app); break;
           case 'feedback': renderFeedbackPage(app, 'member'); break;
+          case 'mytasks': renderMemberTasks(app); break;
+          case 'qaforum': renderQAForum(app, 'member'); break;
+          case 'timeline': renderTimelinePage(app); break;
           default: renderMemberHome(app);
         }
       } else {
@@ -451,6 +462,9 @@
           case 'polls': renderManagePolls(app); break;
           case 'minutes': renderStewardMinutes(app); break;
           case 'feedback': renderFeedbackPage(app, 'steward'); break;
+          case 'qaforum': renderQAForum(app, 'steward'); break;
+          case 'timeline': renderTimelinePage(app); break;
+          case 'failsafe': renderFailsafePage(app); break;
           default: renderStewardDashboard(app);
         }
       }

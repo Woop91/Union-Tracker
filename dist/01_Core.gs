@@ -554,7 +554,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.15.0",
+  VERSION: "4.18.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -829,7 +829,14 @@ var SHEETS = {
   NOTIFICATIONS:      '📢 Notifications',     // steward-to-member in-app messages
   // Contact Log & Steward Tasks (v4.12.0) — steward activity tracking
   CONTACT_LOG:        '_Contact_Log',         // hidden — steward-member contact history
-  STEWARD_TASKS:      '_Steward_Tasks'        // hidden — task assignments for stewards
+  STEWARD_TASKS:      '_Steward_Tasks',       // hidden — task assignments for stewards
+  // Q&A Forum (v4.17.0 — member-steward question/answer system)
+  QA_FORUM:           '_QA_Forum',            // hidden — member questions
+  QA_ANSWERS:         '_QA_Answers',          // hidden — steward/member answers
+  // Timeline of Events (v4.17.0 — chronological event records)
+  TIMELINE_EVENTS:    '_Timeline_Events',     // hidden — event timeline entries
+  // Data Failsafe (v4.17.0 — member digest preferences)
+  FAILSAFE_CONFIG:    '_Failsafe_Config'      // hidden — digest/backup preferences
 };
 
 // SHEET_NAMES alias for backward compatibility
