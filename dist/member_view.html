@@ -81,7 +81,7 @@ function _getGreeting() {
 function renderMemberHome(appContainer) {
   renderPageLayout(appContainer, 'member', 'home', function(container) {
     var firstName = CURRENT_USER.firstName || CURRENT_USER.name.split(' ')[0] || 'there';
-    _memberHeader(container, _getGreeting() + ', ' + firstName, CURRENT_USER.unit + ' \u00B7 Since ' + (CURRENT_USER.joined || 'N/A'));
+    _memberHeader(container, _getGreeting() + ', ' + firstName, CURRENT_USER.unit);
 
     // Welcome card placeholder — shows on first visit
     var welcomeSlot = el('div');
@@ -142,7 +142,7 @@ function renderMemberHome(appContainer) {
       pastPreview.appendChild(previewCard);
     }).dataGetMemberGrievanceHistory(CURRENT_USER.email);
 
-    // Steward card (single card, no dues)
+    // Steward card
     var stewardCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px' } });
     stewardCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, 'Your ' + CONFIG.stewardLabel));
     var stewardName = el('div', { style: { fontSize: '13px', fontFamily: 'var(--fontDisplay)', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Loading...');
@@ -372,6 +372,9 @@ function renderGrievanceDetail(appContainer, g) {
       timelineSection.appendChild(item);
     });
     container.appendChild(timelineSection);
+
+    // Case checklist (read-only for members, v4.16.0)
+    _renderMemberCaseChecklist(container, g.id);
 
     // Steward contact in detail view
     if (g.steward) {
@@ -1351,15 +1354,31 @@ function renderSurveyResultsPage(appContainer) {
         content.appendChild(chartCard);
       }
 
-      // Individual section cards with numeric display
+      // Individual section cards with question breakout
       (data.sections || []).forEach(function(sec) {
         var secCard = el('div', { className: 'card card-glass card-accent-border', style: { padding: '16px', marginBottom: '10px' } });
         var avg = sec.avg || 0;
         var color = avg < 4 ? 'var(--danger)' : avg < 6 ? 'var(--warning)' : avg < 8 ? 'var(--success)' : '#22c55e';
-        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
-        row.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, sec.name));
-        row.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '20px', fontWeight: '700', color: color } }, avg.toFixed(1)));
-        secCard.appendChild(row);
+
+        // Section header row with overall average
+        var headerRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (sec.questions && sec.questions.length) ? '10px' : '0' } });
+        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, sec.name));
+        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '20px', fontWeight: '700', color: color } }, avg.toFixed(1)));
+        secCard.appendChild(headerRow);
+
+        // Individual question breakout
+        if (sec.questions && sec.questions.length > 0) {
+          sec.questions.forEach(function(q) {
+            if (!q.text) return;
+            var qAvg = q.avg || 0;
+            var qColor = qAvg < 4 ? 'var(--danger)' : qAvg < 6 ? 'var(--warning)' : qAvg < 8 ? 'var(--success)' : '#22c55e';
+            var qRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.05)' } });
+            qRow.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', flex: '1' } }, q.text));
+            qRow.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: qColor, marginLeft: '12px', minWidth: '32px', textAlign: 'right' } }, qAvg.toFixed(1)));
+            secCard.appendChild(qRow);
+          });
+        }
+
         content.appendChild(secCard);
       });
     }).dataGetSurveyResults();
@@ -2415,14 +2434,6 @@ function _renderMembershipStats(container) {
     container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.total + ' total members'));
 
     if (typeof ChartHelper !== 'undefined') {
-      // Dues pie
-      var dLabels = Object.keys(data.byDues);
-      var dData = dLabels.map(function(k) { return data.byDues[k]; });
-      var dCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
-      dCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Dues Status'));
-      ChartHelper.createDoughnutChart(dCard, 'membership-dues-chart', dLabels, dData);
-      container.appendChild(dCard);
-
       // Location bar
       var lLabels = Object.keys(data.byLocation);
       var lData = lLabels.map(function(k) { return data.byLocation[k]; });
@@ -2604,5 +2615,250 @@ function _renderQuestionSubmission(container) {
       }).wqSubmitPoolQuestion(CURRENT_USER.email, text);
     }
   }, 'Submit Question'));
+}
+
+// ═══════════════════════════════════════
+// MEMBER CASE CHECKLIST (read-only, v4.16.0)
+// ═══════════════════════════════════════
+
+function _renderMemberCaseChecklist(container, caseId) {
+  var section = el('div', { style: { padding: '0 16px 12px' } });
+  section.appendChild(el('h3', { className: 'section-title' }, 'Case Checklist'));
+  var checklistContent = el('div');
+  showLoading(checklistContent);
+  section.appendChild(checklistContent);
+  container.appendChild(section);
+
+  google.script.run.withSuccessHandler(function(items) {
+    checklistContent.innerHTML = '';
+    if (!items || items.length === 0) {
+      checklistContent.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', padding: '8px 0' } }, 'No checklist items for this case.'));
+      return;
+    }
+
+    // Progress bar
+    var completed = items.filter(function(i) { return i.completed; }).length;
+    var pct = Math.round((completed / items.length) * 100);
+    var progRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' } });
+    var progBar = el('div', { style: { flex: '1', height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
+    progBar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: pct === 100 ? 'var(--success)' : 'var(--accent)', borderRadius: '4px' } }));
+    progRow.appendChild(progBar);
+    progRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)', whiteSpace: 'nowrap' } }, completed + '/' + items.length + ' (' + pct + '%)'));
+    checklistContent.appendChild(progRow);
+
+    // Group by category
+    var grouped = {};
+    items.forEach(function(item) {
+      var cat = item.category || 'General';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(item);
+    });
+
+    Object.keys(grouped).forEach(function(cat) {
+      checklistContent.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '10px 0 4px', fontWeight: '600' } }, cat));
+      grouped[cat].forEach(function(item) {
+        var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0' } });
+        row.appendChild(el('span', { style: { fontSize: '16px', color: item.completed ? 'var(--success)' : 'var(--muted)' } }, item.completed ? '\u2611' : '\u2610'));
+        row.appendChild(el('span', { style: { fontSize: '12px', color: item.completed ? 'var(--muted)' : 'var(--text)', textDecoration: item.completed ? 'line-through' : 'none', flex: '1' } }, item.itemText));
+        if (item.required) row.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--danger)', fontWeight: '600' } }, 'REQ'));
+        checklistContent.appendChild(row);
+      });
+    });
+  }).withFailureHandler(function() {
+    checklistContent.innerHTML = '';
+    checklistContent.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', padding: '8px 0' } }, 'Failed to load checklist.'));
+  }).dataGetCaseChecklist(caseId);
+}
+
+// ═══════════════════════════════════════
+// MEETINGS PAGE (member, v4.16.0)
+// ═══════════════════════════════════════
+
+function renderMeetingsPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'meetings', function(container) {
+    _memberHeader(container, 'My Meetings', 'Your meeting attendance history');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(meetings) {
+      content.innerHTML = '';
+      if (!meetings || meetings.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting attendance recorded yet.'));
+        return;
+      }
+
+      content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, meetings.length + ' meeting' + (meetings.length !== 1 ? 's' : '') + ' attended'));
+
+      meetings.forEach(function(m, idx) {
+        var card = el('div', { className: 'card card-glass card-fade-in card-clickable', style: { padding: '14px', marginBottom: '8px', animationDelay: (idx * 40) + 'ms' } });
+        var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
+        topRow.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, m.meetingName || 'Meeting'));
+        topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, m.meetingDate));
+        card.appendChild(topRow);
+
+        var details = el('div', { style: { fontSize: '11px', color: 'var(--muted)' } });
+        var parts = [];
+        if (m.meetingType) parts.push(m.meetingType);
+        if (m.duration) parts.push(m.duration);
+        details.textContent = parts.join(' \u00B7 ');
+        card.appendChild(details);
+
+        // Expandable links section
+        if (m.notesUrl || m.agendaUrl) {
+          var linksDiv = el('div', { style: { display: 'none', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' } });
+          if (m.notesUrl) linksDiv.appendChild(el('a', { href: m.notesUrl, target: '_blank', style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px' } }, 'View Notes'));
+          if (m.agendaUrl) linksDiv.appendChild(el('a', { href: m.agendaUrl, target: '_blank', style: { display: 'block', fontSize: '12px', color: 'var(--accent)' } }, 'View Agenda'));
+          card.appendChild(linksDiv);
+          card.addEventListener('click', function() {
+            linksDiv.style.display = linksDiv.style.display === 'none' ? 'block' : 'none';
+          });
+        }
+
+        content.appendChild(card);
+      });
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load meetings.'));
+    }).dataGetMemberMeetings(CURRENT_USER.email);
+  });
+}
+
+// ═══════════════════════════════════════
+// POLLS PAGE (member, v4.16.0)
+// ═══════════════════════════════════════
+
+function renderPollsPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'polls', function(container) {
+    _memberHeader(container, 'Polls', 'Vote on active polls');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    function loadPolls() {
+      showLoading(content);
+      google.script.run.withSuccessHandler(function(polls) {
+        content.innerHTML = '';
+        if (!polls || polls.length === 0) {
+          content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls right now.'));
+          return;
+        }
+
+        polls.forEach(function(poll) {
+          var card = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+          card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, poll.question));
+
+          if (poll.hasVoted) {
+            // Show results
+            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--success)', marginBottom: '8px', fontWeight: '600' } }, 'You voted: ' + poll.myVote));
+            poll.options.forEach(function(opt) {
+              var count = poll.results[opt] || 0;
+              var pct = poll.totalVotes > 0 ? Math.round((count / poll.totalVotes) * 100) : 0;
+              var isMyVote = opt === poll.myVote;
+              var row = el('div', { style: { marginBottom: '6px' } });
+              var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' } });
+              header.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: isMyVote ? '600' : '400' } }, opt));
+              header.appendChild(el('span', { style: { color: 'var(--muted)' } }, count + ' (' + pct + '%)'));
+              row.appendChild(header);
+              var bar = el('div', { style: { height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
+              bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: isMyVote ? 'var(--accent)' : 'var(--info)', borderRadius: '4px', transition: 'width 0.6s ease' } }));
+              row.appendChild(bar);
+              card.appendChild(row);
+            });
+            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '6px' } }, poll.totalVotes + ' total vote' + (poll.totalVotes !== 1 ? 's' : '')));
+          } else {
+            // Show vote buttons
+            poll.options.forEach(function(opt) {
+              var btn = el('button', { className: 'btn', style: { display: 'block', width: '100%', marginBottom: '6px', textAlign: 'left', padding: '10px 14px', fontSize: '13px' },
+                onClick: function() {
+                  btn.textContent = 'Voting...'; btn.disabled = true;
+                  google.script.run.withSuccessHandler(function(result) {
+                    if (result && result.success) loadPolls();
+                    else { btn.textContent = opt; btn.disabled = false; }
+                  }).withFailureHandler(function() {
+                    btn.textContent = opt; btn.disabled = false;
+                  }).dataSubmitPollVote(CURRENT_USER.email, poll.id, opt);
+                }
+              }, opt);
+              card.appendChild(btn);
+            });
+          }
+          content.appendChild(card);
+        });
+      }).withFailureHandler(function() {
+        content.innerHTML = '';
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
+      }).dataGetActivePolls(CURRENT_USER.email);
+    }
+
+    loadPolls();
+  });
+}
+
+// ═══════════════════════════════════════
+// MINUTES PAGE (member, v4.16.0)
+// ═══════════════════════════════════════
+
+function renderMinutesPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'minutes', function(container) {
+    _memberHeader(container, 'Meeting Minutes', 'Notes from recent meetings');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(minutes) {
+      content.innerHTML = '';
+      if (!minutes || minutes.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting minutes posted yet.'));
+        return;
+      }
+
+      // Search filter
+      var filterInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Search minutes...', style: { marginBottom: '10px', minHeight: '36px' } });
+      content.appendChild(filterInput);
+
+      var listArea = el('div');
+      content.appendChild(listArea);
+
+      function renderFiltered(query) {
+        listArea.innerHTML = '';
+        var q = (query || '').toLowerCase();
+        var filtered = minutes.filter(function(m) {
+          if (!q) return true;
+          return (m.title || '').toLowerCase().indexOf(q) !== -1 || (m.meetingDate || '').toLowerCase().indexOf(q) !== -1 || (m.bullets || '').toLowerCase().indexOf(q) !== -1;
+        });
+
+        if (filtered.length === 0) {
+          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No matching minutes.'));
+          return;
+        }
+
+        filtered.forEach(function(m) {
+          var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
+          var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
+          header.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, m.title));
+          header.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, m.meetingDate));
+          card.appendChild(header);
+          if (m.bullets) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5', whiteSpace: 'pre-wrap' } }, m.bullets));
+
+          if (m.fullMinutes) {
+            var fullDiv = el('div', { style: { display: 'none', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', whiteSpace: 'pre-wrap' } }, m.fullMinutes);
+            card.appendChild(fullDiv);
+            card.addEventListener('click', function() {
+              fullDiv.style.display = fullDiv.style.display === 'none' ? 'block' : 'none';
+            });
+          }
+
+          listArea.appendChild(card);
+        });
+      }
+
+      filterInput.addEventListener('input', function() { renderFiltered(filterInput.value); });
+      renderFiltered('');
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load minutes.'));
+    }).dataGetMeetingMinutes(20);
+  });
 }
 </script>

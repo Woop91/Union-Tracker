@@ -1222,6 +1222,13 @@ function getWebDashBatchData(email, role) {
       result.membershipStats = DataService.getMembershipStats();
     } catch (_e) { result.membershipStats = null; }
 
+    // v4.16.0 — supplemental data from newly-wired sheets
+    try { result.activePolls = DataService.getActivePolls(email); } catch (_e) { result.activePolls = null; }
+    try { result.meetingMinutes = DataService.getMeetingMinutes(3); } catch (_e) { result.meetingMinutes = null; }
+    if (isSteward) {
+      try { result.satisfactionTrends = DataService.getSatisfactionTrends(); } catch (_e) { result.satisfactionTrends = null; }
+    }
+
   } catch (e) {
     Logger.log('getWebDashBatchData error: ' + e.message);
     result.error = e.message;

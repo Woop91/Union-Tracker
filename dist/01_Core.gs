@@ -714,7 +714,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
-  { version: '4.15.0', date: '2026-02-25', codename: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements', changes: '7 TODOs resolved (batch fetch, Drive cleanup, calendar dedup, CC health check, lazy-load help, search pagination, expansion tests). Login UX: SSO loading state, sso_failed fallback, magic link clarification, resend cooldown. In-app survey wizard: multi-step mobile-optimized form with localStorage progress, 1-10 scale buttons, anonymous SHA-256 submission. Steward: chief steward task assignment, agency-wide grievance stats fallback. Member dashboard: actionable KPI strip, conditional grievance card, engagement/workload stats tabs. Broadcast: checkbox pill filters with recipient preview. Workload: removed Private option. Seed data: calendar events, weekly questions, union stats.' },
+  { version: '4.15.0', date: '2026-02-25', codename: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements', changes: 'Infrastructure: batch fetch, Drive cleanup trigger, calendar dedup, CC health check, lazy-load help dialog, search pagination, expansion test suite. Login UX: SSO loading state, sso_failed fallback, magic link clarification, resend cooldown. In-app survey wizard: multi-step mobile-optimized form with localStorage progress, 1-10 scale buttons, anonymous SHA-256 submission. Steward: chief steward task assignment, agency-wide grievance stats fallback, Insights tab (Quick Insights + Filed vs Resolved chart), Steward Directory with vCard download. Member dashboard: actionable KPI strip, conditional grievance card, engagement/workload stats tabs. Broadcast: checkbox pill filters with recipient preview. Workload: removed Private option. Seed data: calendar events, weekly questions, union stats.' },
   { version: '4.14.0', date: '2026-02-25', codename: 'Technical Debt Resolution & PHASE2 Features', changes: '130 code review findings resolved (15 CRITICAL XSS, 26 HIGH security, 50 MEDIUM, 39 LOW). 5 new features: Grievance History, Meeting Check-In Kiosk, Welcome Experience, Bulk Actions, Deadline Calendar View. Engagement sync overhaul with dynamic headers and validation. withScriptLock_() concurrency helper. safeSendEmail() quota wrapper. Version derived from single COMMAND_CONFIG.VERSION source.' },
   { version: '4.13.0', date: '2026-02-24', codename: 'Full Workload Tracker Migration', changes: 'Refactored 18_WorkloadTracker.gs to IIFE module (WorkloadService), enhanced getDashboardData with employment/plan/overtime breakdowns and sub-category aggregation, enhanced getUserHistory with all 24 columns, CSV export, vault deduplication, reciprocity blocking for Private users, multi-frequency reminders (daily/weekly/biweekly/monthly/quarterly), full leave tracking in portal, Weekly Cases dropdown, Clear All/Restore.' },
   { version: '4.12.0', date: '2026-02-24', codename: 'Version Alignment', changes: 'API_VERSION, VERSION_INFO, VERSION_HISTORY normalized. README and CODE_REVIEW updated with correct file counts and version scope.' },
@@ -1301,7 +1301,8 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'STREET_ADDRESS',     header: 'Street Address' },
   { key: 'CITY',               header: 'City' },
   { key: 'STATE',              header: 'State' },
-  { key: 'ZIP_CODE',           header: 'Zip Code' }
+  { key: 'ZIP_CODE',           header: 'Zip Code' },
+  { key: 'DUES_STATUS',        header: 'Dues Status' }
 ];
 
 // CONVENTION: Column constants are 1-indexed (Range API). Use COL - 1 for 0-indexed array access.
@@ -1718,17 +1719,28 @@ var SURVEY_VAULT_COLS = buildColsFromMap_(SURVEY_VAULT_HEADER_MAP_);
  */
 var SATISFACTION_SECTIONS = {
   WORK_CONTEXT: { name: 'Work Context', questions: [2,3,4,5,6], scale: false },
-  OVERALL_SAT: { name: 'Overall Satisfaction', questions: [7,8,9,10], scale: true },
-  STEWARD_3A: { name: 'Steward Ratings', questions: [11,12,13,14,15,16,17], scale: true },
-  STEWARD_3B: { name: 'Steward Access', questions: [19,20,21], scale: true },
-  CHAPTER: { name: 'Chapter Effectiveness', questions: [22,23,24,25,26], scale: true },
-  LEADERSHIP: { name: 'Local Leadership', questions: [27,28,29,30,31,32], scale: true },
-  CONTRACT: { name: 'Contract Enforcement', questions: [33,34,35,36], scale: true },
-  REPRESENTATION: { name: 'Representation Process', questions: [38,39,40,41], scale: true },
-  COMMUNICATION: { name: 'Communication Quality', questions: [42,43,44,45,46], scale: true },
-  MEMBER_VOICE: { name: 'Member Voice & Culture', questions: [47,48,49,50,51], scale: true },
-  VALUE_ACTION: { name: 'Value & Collective Action', questions: [52,53,54,55,56], scale: true },
-  SCHEDULING: { name: 'Scheduling/Office Days', questions: [57,58,59,60,61,62,63], scale: true },
+  OVERALL_SAT: { name: 'Overall Satisfaction', questions: [7,8,9,10], scale: true,
+    questionTexts: ['Satisfied with representation', 'Trust union advocacy', 'Feel protected by union', 'Would recommend joining'] },
+  STEWARD_3A: { name: 'Steward Ratings', questions: [11,12,13,14,15,16,17], scale: true,
+    questionTexts: ['Timely response', 'Treated with respect', 'Explained options clearly', 'Followed through', 'Advocated effectively', 'Safe raising concerns', 'Maintained confidentiality'] },
+  STEWARD_3B: { name: 'Steward Access', questions: [19,20,21], scale: true,
+    questionTexts: ['Know how to contact', 'Confident steward would help', 'Easy to find steward'] },
+  CHAPTER: { name: 'Chapter Effectiveness', questions: [22,23,24,25,26], scale: true,
+    questionTexts: ['Understands workplace issues', 'Effective communication', 'Organizes well', 'Easy to reach chapter', 'Fair representation'] },
+  LEADERSHIP: { name: 'Local Leadership', questions: [27,28,29,30,31,32], scale: true,
+    questionTexts: ['Decisions are clear', 'Understand grievance process', 'Transparent finances', 'Accountable leadership', 'Fair processes', 'Welcomes opinions'] },
+  CONTRACT: { name: 'Contract Enforcement', questions: [33,34,35,36], scale: true,
+    questionTexts: ['Enforces contract', 'Realistic timelines', 'Clear updates', 'Frontline priority'] },
+  REPRESENTATION: { name: 'Representation Process', questions: [38,39,40,41], scale: true,
+    questionTexts: ['Understood the steps', 'Felt supported', 'Updated often enough', 'Outcome was justified'] },
+  COMMUNICATION: { name: 'Communication Quality', questions: [42,43,44,45,46], scale: true,
+    questionTexts: ['Clear and actionable', 'Enough information', 'Easy to find info', 'Reaches all shifts', 'Meetings worth attending'] },
+  MEMBER_VOICE: { name: 'Member Voice & Culture', questions: [47,48,49,50,51], scale: true,
+    questionTexts: ['Voice matters', 'Seeks member input', 'Treated with dignity', 'Newer members supported', 'Conflicts handled respectfully'] },
+  VALUE_ACTION: { name: 'Value & Collective Action', questions: [52,53,54,55,56], scale: true,
+    questionTexts: ['Good value for dues', 'Priorities match needs', 'Prepared to mobilize', 'Know how to get involved', 'Win together'] },
+  SCHEDULING: { name: 'Scheduling/Office Days', questions: [57,58,59,60,61,62,63], scale: true,
+    questionTexts: ['Understand changes', 'Adequately informed', 'Clear criteria', 'Reasonable expectations', 'Effective outcomes', 'Supports wellbeing', 'Concerns taken seriously'] },
   PRIORITIES: { name: 'Priorities & Close', questions: [65,66,67,68], scale: false }
 };
 
