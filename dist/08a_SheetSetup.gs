@@ -142,8 +142,18 @@ function CREATE_DASHBOARD() {
       }
     }
 
-    // Initialize Weekly Questions sheets (24_WeeklyQuestions.gs)
-    if (typeof WeeklyQuestions !== 'undefined' && WeeklyQuestions.initWeeklyQuestionSheets) {
+    // Initialize Portal sheets (23_PortalSheets.gs) — member directory mirror, events, polls, etc.
+    if (typeof initPortalSheets === 'function') {
+      try {
+        initPortalSheets();
+        ss.toast('Portal sheets created', '🏗️ Progress', 2);
+      } catch (portalError) {
+        Logger.log('Portal sheets skipped: ' + portalError.message);
+      }
+    }
+
+    // Initialize Weekly Questions sheets (24_WeeklyQuestions.gs) — anonymous pulse surveys
+    if (typeof WeeklyQuestions !== 'undefined' && typeof WeeklyQuestions.initWeeklyQuestionSheets === 'function') {
       try {
         WeeklyQuestions.initWeeklyQuestionSheets();
         ss.toast('Weekly Questions sheets created', '🏗️ Progress', 2);
@@ -157,27 +167,28 @@ function CREATE_DASHBOARD() {
       _ensureContactLogSheet(ss);
       _ensureStewardTasksSheet(ss);
       ss.toast('Contact Log & Steward Tasks sheets created', '🏗️ Progress', 2);
-    } catch (v12Error) {
-      Logger.log('v4.12.0 sheets skipped: ' + v12Error.message);
+    } catch (ctError) {
+      Logger.log('Contact/Tasks sheets skipped: ' + ctError.message);
     }
 
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
-        '15 sheets created:\n' +
+        '15+ sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
         '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
-        '• 📊 Workload Reporting (member caseload tracking)\n\n' +
+        '• 📊 Workload Reporting (member caseload tracking)\n' +
+        '• Portal, Weekly Questions, Contact Log (web dashboard)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
         'Access via: Union Hub > Dashboards menu.\n\n' +
         'Workload Tracker: Union Hub > 📊 Workload Tracker\n' +
         'Members submit via: [web app URL]?page=workload\n\n' +
-        'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
+        'Plus hidden calculation sheets with self-healing formulas.\n\n' +
         '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
         'update automatically when you edit the sheets.\n\n' +
         'Use the Demo menu to seed sample data.', ui.ButtonSet.OK);
@@ -388,6 +399,7 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
+  // ACCEPTABLE: Hardcoded widths match fixed-layout design
   // IS_STEWARD and INTEREST_* columns use hardcoded Yes/No validation.
   // The YES_NO Config column was removed to eliminate contamination risk.
   // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().

@@ -1,13 +1,36 @@
-# CLAUDE.md — Union Steward Dashboard
+# CLAUDE.md — Union-Tracker
 
-## Project Overview
+## ⛔ CRITICAL RULES — READ FIRST
 
-Google Apps Script application (30 `.gs` source files, ~59K lines) for union steward grievance tracking, member management, and reporting. Deployed to Google Sheets via `clasp`.
+1. **No function may delete or overwrite manually entered data.** Manually entered = imported via import function OR typed into cells by user. System-generated = anything written by code functions (except import function output). Functions may only: append new data, write to system-generated fields, clear auto-generated content.
+2. **Everything must be dynamic.** Never hardcode sheet names, column positions, org names, unit names, or config values. Always read from Config tab or constants.
+3. **Column constants are 1-indexed** (matching `getRange()`). For array access on `getValues()` data, subtract 1: `row[GRIEVANCE_COLS.STATUS - 1]`.
+4. **All HTML must use `escapeHtml()`** for dynamic values. Defined in `00_Security.gs`. No exceptions.
+5. **`dist/` contains individual `.gs` + `.html` files for clasp push.** Never edit dist/ directly. Edit `src/*.gs` and `src/*.html`, then copy to dist/. **Do NOT use the consolidated single-file build** (`ConsolidatedDashboard.gs`) — clasp must push individual files because GAS needs separate `.html` files for `HtmlService.createTemplateFromFile()` and `createHtmlOutputFromFile()`.
+6. **This repo is PUBLIC.** No credentials, tokens, API keys, or DDS Script ID may ever appear here.
+
+## Repos & Sync
+
+- **Union-Tracker** (public): This repo. Receives syncs from DDS `Main` into UT `staging`.
+- **DDS-Dashboard** (private): Primary/source repo. Default branch: `Main`.
+- Sync flow: `DDS Main → UT staging → (user manages) → UT dev → UT main`
+- UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
+- **DDS Script ID must NEVER appear in this repo.**
+
+### What's Excluded from UT
+- `src/18_WorkloadTracker.gs` — DDS-only member caseload module
+- `src/WorkloadTracker.html` — DDS-only portal template
+- Files referencing WT use `typeof` guards to handle its absence gracefully.
+- All "steward workload" references (grievance case counts per steward) are kept — core functionality.
+- See `SYNC-LOG.md` for full exclusion registry.
+
+### Fallback
+If GitHub is unreachable, work on local repo. Add a note in AI-REFERENCE.md: what was done, what needs pushing, which branches affected.
 
 ## Commands
 
 ```bash
-npm run build          # Concatenate src/ → dist/ConsolidatedDashboard.gs
+npm run build          # Copy src/*.gs + src/*.html → dist/ (individual files)
 npm run build:prod     # Production build (excludes DevTools)
 npm run lint           # ESLint all src/*.gs
 npm run lint:fix       # ESLint with auto-fix
@@ -21,8 +44,6 @@ npm run deploy         # lint + test:unit + build:prod + clasp push
 ## Architecture
 
 ### File Naming & Load Order
-
-Files are numbered to control Google Apps Script's execution order:
 
 | Prefix | Layer | Files |
 |--------|-------|-------|
@@ -38,145 +59,76 @@ Files are numbered to control Google Apps Script's execution order:
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, features, self-service, meetings, events, enhancements, correlation |
+| `19_-24_` | Web Dashboard | Auth, config reader, data service, app, portal sheets, weekly questions |
+
+**Note:** There is no `18_` in this repo (Workload Tracker is DDS-only).
 
 ### Build Pipeline
 
-`build.js` concatenates all `src/*.gs` files (in sorted order) into `dist/ConsolidatedDashboard.gs`. The `--prod` flag strips `07_DevTools.gs`.
+`dist/` is a flat copy of `src/*.gs` + `src/*.html` — individual files, not consolidated. Clasp pushes individual files so GAS can resolve `createTemplateFromFile()` / `createHtmlOutputFromFile()`. The `--prod` flag strips `07_DevTools.gs`.
 
-**Important:** When editing `src/` files, the `dist/` file must also be kept in sync. Either re-run `npm run build` or manually apply the same changes to both locations.
+### Column Constants
 
-### Constants — KNOWN DUAL SYSTEM
+| Constant | Source | Notes |
+|----------|--------|-------|
+| `SHEETS` / `SHEET_NAMES` | `01_Core.gs` | `SHEET_NAMES = SHEETS` — identical alias |
+| `GRIEVANCE_COLS` | `buildColsFromMap_(GRIEVANCE_HEADER_MAP_)` | 1-indexed for `getRange()` |
+| `MEMBER_COLS` | `buildColsFromMap_(MEMBER_HEADER_MAP_)` | 1-indexed for `getRange()` |
+| `CONFIG_COLS` | `buildColsFromMap_(CONFIG_HEADER_MAP_)` | 1-indexed for `getRange()` |
 
-Two parallel constant sets exist in `01_Core.gs`. This is technical debt, not a feature:
-
-| Canonical (use these) | Legacy alias | Notes |
-|-----------------------|-------------|-------|
-| `SHEETS.GRIEVANCE_LOG` | `SHEET_NAMES` (alias of `SHEETS`, line 778) | `SHEET_NAMES = SHEETS` — identical |
-| `GRIEVANCE_COLS` (1-indexed) | `GRIEVANCE_COLUMNS` (0-indexed) | **NOT aliases. Different indexing.** |
-| `MEMBER_COLS` (1-indexed) | `MEMBER_COLUMNS` (0-indexed) | **NOT aliases. Different indexing.** |
-
-**Rule:** Always use `SHEETS`, `GRIEVANCE_COLS`, and `MEMBER_COLS` (1-indexed). When you see `GRIEVANCE_COLUMNS` or `MEMBER_COLUMNS` (0-indexed), you must add `+ 1` for `getRange()` calls or `- 1` for array indexing. Mixing these up causes silent wrong-column bugs.
+**Rule:** For `getRange()` calls, use `*_COLS` directly. For array access, subtract 1.
 
 ## Security Patterns
 
 ### HTML Output — MANDATORY
 
-Every dynamic value inserted into HTML **must** be escaped. No exceptions.
-
 ```javascript
-// In HTML strings: use escapeHtml() (defined in 00_Security.gs)
+// GOOD
 '<td>' + escapeHtml(String(userName)) + '</td>'
-
-// In window.open() URLs: use JSON.stringify()
 '<script>window.open(' + JSON.stringify(url) + ', "_blank");</script>'
 
-// In <a href>: validate URL scheme + escapeHtml()
-var safeUrl = /^https:\/\/docs\.google\.com\//.test(url) ? url : '';
-'<a href="' + escapeHtml(safeUrl) + '">Link</a>'
-```
-
-**Never** do this:
-```javascript
-// BAD — XSS via string concatenation
+// BAD — XSS
 '<td>' + memberName + '</td>'
-'<script>window.open("' + url + '");</script>'
 ```
 
-### `escapeHtml()` Location
-
-Defined once in `src/00_Security.gs:130`. For HTML served in web apps, a minified inline version is emitted by `getSecurityScript()` at `00_Security.gs:664`. Do **not** redefine it in other files.
+`escapeHtml()` is in `src/00_Security.gs:130`. Do not redefine it.
 
 ### Other Security Functions
+- `escapeForFormula(value)` — prevents formula injection
+- `secureLog(context, message, data)` — masks PII before logging
+- `validateRole(email, requiredRole)` — role-based access control
 
-- `escapeForFormula(value)` — prevents formula injection in spreadsheet cells
-- `secureLog(context, message, data)` — masks PII (emails, names, phones) before logging
-- `validateRole(email, requiredRole)` — role-based access control for web app pages
+## Config Sheet Write Paths — CRITICAL
+
+1. **Always use `CONFIG_COLS.*`**, never hardcoded column numbers.
+2. **Always use `addToConfigDropdown_()`** for adding values.
+3. **Use `DROPDOWN_MAP` and `MULTI_SELECT_COLS`** (rebuilt by `syncColumnMaps()`).
+4. **Rows 1-2 are structure.** Data starts at row 3.
 
 ## Coding Conventions
 
-- **`var` vs `const`/`let`**: The codebase uses a mix. Older code uses `var`; newer code uses `const`/`let`. Match the style of the file you're editing.
-- **Function naming**: `camelCase` for regular functions, `UPPER_CASE` for destructive admin functions (e.g., `NUCLEAR_WIPE_GRIEVANCES`), trailing underscore for private helpers (e.g., `buildColsFromMap_()`, `getConfigValue_()`).
-- **Error handling**: Functions that return results use `{ success: true, ... }` / `errorResponse(message)`. Functions called from UI use try/catch with `SpreadsheetApp.getUi().alert()`.
-- **Audit logging**: Use `logAuditEvent(eventType, details)` (in `06_Maintenance.gs:1463`) for security/admin events. Use `logIntegrityEvent(eventType, details)` for data integrity events. These two functions have conflicting schemas on the same sheet — this is known debt (see CODE_REVIEW.md Finding 21).
+- `var` vs `const`/`let`: Match the style of the file you're editing.
+- `camelCase` for functions, `UPPER_CASE` for destructive admin functions, trailing `_` for private helpers.
+- Error handling: `{ success: true, ... }` / `errorResponse(message)`.
+- Audit: `logAuditEvent()` for security events, `logIntegrityEvent()` for data events.
 
 ## Testing
 
-- **Framework**: Jest 29 with custom GAS mocks
-- **Test location**: `test/` directory, files named `XX_ModuleName.test.js`
-- **Run**: `npm run test:unit` (Jest only) or `npm run test` (lint + build + Jest)
-- **Architecture tests**: `test/architecture.test.js` and `test/modules.test.js` verify structural invariants (e.g., escapeHtml not redefined, all modules present in build)
-- **Column tests**: `test/columns.test.js` validates column constant consistency
+- Jest 29 with custom GAS mocks in `test/`
+- `test/architecture.test.js` + `test/modules.test.js` verify structural invariants
+- `test/columns.test.js` validates column constant consistency
 
 ## Git Conventions
 
-- **Commits**: Conventional Commits enforced by commitlint (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`)
-- **Pre-commit hook**: `.husky/pre-commit` runs lint-staged + build verification
-- **Main branch**: `Main` (not `master`)
-- **Feature branches**: `claude/<description>-<id>`
+- Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
+- Main branch: `Main` (capital M)
 
----
+## Code Review
 
-## Code Review Methodology
+Canonical review: `CODE_REVIEW.md`. Never claim "FIXED" without citing proof.
 
-**The canonical review document is `CODE_REVIEW.md`.** Archived reviews in `docs/archived-reviews/` are outdated and must not be used.
+## Reference Documents
 
-### Why These Rules Exist
-
-Past reviews produced contradictory results: one said XSS was "FIXED" with Security 9/10 while the code still had 13 critical XSS vulnerabilities. This happened because reviews checked patterns superficially, assumed fixes applied everywhere, and wrote optimistic summaries without line-by-line verification. These rules exist to prevent that from happening again.
-
-### Mandatory Review Process
-
-#### 1. Never Claim Something Is Fixed Without Verifying
-
-- **Do not** mark a finding as "FIXED" based on the existence of a helper function (e.g., `escapeHtml` existing does not mean it's used everywhere).
-- **Do not** mark a finding as "FIXED" because a previous review said so.
-- For every "FIXED" claim, cite the **exact file, line number, and code** that proves it.
-
-#### 2. Line-by-Line Verification Required
-
-For every file reviewed, you must:
-- Read the actual code (not just function signatures or JSDoc)
-- Check every location where dynamic data enters HTML, SQL, URLs, or sheet formulas
-- Check every `getRange()` call for correct column constant usage (1-indexed vs 0-indexed)
-- Check every `getLastRow() - 1` pattern for empty-sheet crashes
-- Verify error handling exists in catch blocks
-
-#### 3. Cross-Reference Across Files
-
-The same pattern often appears in multiple files. When you find a vulnerability:
-- Search the entire codebase for the same pattern (`grep` for `innerHTML`, `window.open`, `'<td>' +`, etc.)
-- Report **every** instance, not just the first one
-- Do not assume other files are clean because one file was fixed
-
-#### 4. Severity Ratings Must Be Evidence-Based
-
-| Severity | Criteria |
-|----------|----------|
-| CRITICAL | Exploitable security vulnerability (XSS, injection, auth bypass) with a concrete attack vector |
-| HIGH | Bug that causes data corruption, crashes, or security weakness under realistic conditions |
-| MEDIUM | Bug that causes incorrect behavior, performance issues, or maintainability problems |
-| LOW | Code quality, style, dead code, minor inconsistencies |
-
-**Do not** rate something CRITICAL without describing how it could be exploited. **Do not** rate something LOW if it causes data corruption.
-
-#### 5. No Inflated Scores
-
-- Do not assign numeric scores (e.g., "Security 9/10") — they create false confidence
-- State findings plainly: "X critical issues remain, Y were fixed since last review"
-- If you're uncertain whether something is fixed, say so — "unable to verify" is better than "FIXED"
-
-#### 6. Review Report Structure
-
-Every review must include:
-1. **Date, version, scope** — what was reviewed
-2. **Findings table** — every finding with file, line, severity, category
-3. **For each finding**: description, vulnerable code snippet, suggested fix
-4. **Unfixed items from previous reviews** — explicitly list what is still open from `CODE_REVIEW.md`
-5. **Verification notes** — for any "FIXED" claim, cite the proof
-
-#### 7. Update CODE_REVIEW.md
-
-After a review is complete:
-- Update `CODE_REVIEW.md` with new findings
-- Mark genuinely fixed items with the commit hash that fixed them
-- Do not create separate review documents — there is one canonical review file
+- `AI_REFERENCE.md` — LLM context doc (never delete, only append)
+- `SYNC-LOG.md` — DDS↔UT sync history and exclusion registry
+- `CODE_REVIEW.md` — canonical security/code review

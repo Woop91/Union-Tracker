@@ -27,7 +27,7 @@ The Dashboard is a Google Apps Script (GAS) application for managing union stewa
 - Node.js build system
 - ESLint for code quality (v9.x flat config)
 
-**Version:** 4.8.0
+**Version:** 4.13.0
 
 ---
 
@@ -36,9 +36,9 @@ The Dashboard is a Google Apps Script (GAS) application for managing union stewa
 ### High-Level Structure
 
 ```
-MULTIPLE-SCRIPS-REPO/
-├── src/                    # 27 source files (.gs) + 1 HTML
-├── test/                   # Jest unit tests (1008 tests)
+DDS-Dashboard/
+├── src/                    # 37 source files (.gs) + 7 HTML
+├── test/                   # Jest unit tests (1300+ tests)
 ├── dist/                   # Build output (auto-generated)
 ├── setup-instructions/     # Optional feature setup guides
 ├── .github/workflows/      # CI/CD configuration
@@ -51,7 +51,7 @@ MULTIPLE-SCRIPS-REPO/
 
 ### Modular Design (v4.6.0)
 
-The codebase follows a layered architecture with 27 modules organized by numbered prefix:
+The codebase follows a layered architecture with 37 modules organized by numbered prefix:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -146,11 +146,37 @@ The codebase follows a layered architecture with 27 modules organized by numbere
 | `13_MemberSelfService.gs` | Member self-service portal with PIN authentication | `generateMemberPIN`, `authenticateMember`, `showMemberSelfService` |
 | `14_MeetingCheckIn.gs` | Meeting check-in system with email + PIN auth | `showSetupMeetingDialog`, `createMeeting`, `showMeetingCheckInDialog` |
 
-### HTML Template
+### Event Bus & Analytics Modules
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `15_EventBus.gs` | Pub/sub event system | `EventBus.emit`, `EventBus.on`, `EventBus.off` |
+| `16_DashboardEnhancements.gs` | Date ranges, chart export, drill-down | `showEnhancedDashboard`, `exportChart` |
+| `17_CorrelationEngine.gs` | Cross-dimensional correlation analysis | `calculateCorrelation`, `getInsightStrings` |
+
+### SPA Web Dashboard Modules
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `19_WebDashAuth.gs` | Google SSO + magic link auth | `initWebDashboardAuth`, `verifyMagicLink` |
+| `20_WebDashConfigReader.gs` | Column-based Config tab reader | `getConfigValue`, `CONFIG_COLS` |
+| `21_WebDashDataService.gs` | Unified data service for SPA | `getSPADashboardData`, `getMemberViewData` |
+| `22_WebDashApp.gs` | SPA entry point and routing | `doGetWebDashboard`, `PAGE_DATA` |
+| `23_PortalSheets.gs` | Hidden sheet management for SPA | `getPortalSheetData`, `updatePortalSheet` |
+| `24_WeeklyQuestions.gs` | Weekly check-in questions | `getWeeklyQuestions`, `submitWeeklyResponse` |
+| `25_WorkloadService.gs` | SPA-integrated workload (IIFE: WorkloadService) | `getWorkloadFormData`, `submitWorkloadData` |
+
+### HTML Templates
 
 | File | Purpose |
 |------|---------|
 | `MultiSelectDialog.html` | Multi-select dialog HTML template |
+| `index.html` | SPA entry point |
+| `styles.html` | SPA shared styles |
+| `steward_view.html` | Steward dashboard SPA view |
+| `member_view.html` | Member dashboard SPA view |
+| `portal_sheets.html` | Portal sheets management UI |
+| `weekly_questions.html` | Weekly questions UI |
 
 ### Development Module (Remove in Production)
 
@@ -315,11 +341,11 @@ npm run deploy
 1. **Lint** (optional): ESLint checks all `.gs` files
 2. **Concatenate**: Files combined in `BUILD_ORDER` sequence
 3. **Embed HTML**: HTML templates converted to functions
-4. **Output**: Single `dist/ConsolidatedDashboard.gs` file
+4. **Output**: Individual `.gs` + `.html` files copied to `dist/`
 
 ### Build Order
 
-Files must be concatenated in dependency order (27 files):
+Files must be concatenated in dependency order (37 files):
 
 ```javascript
 const BUILD_ORDER = [
@@ -349,7 +375,17 @@ const BUILD_ORDER = [
   '11_CommandHub.gs',             // Command center + Secure member dashboard
   '12_Features.gs',               // Checklist, Dynamic Engine, Looker Studio
   '13_MemberSelfService.gs',      // Member self-service portal with PIN auth
-  '14_MeetingCheckIn.gs'          // Meeting check-in system with email + PIN auth
+  '14_MeetingCheckIn.gs',         // Meeting check-in system with email + PIN auth
+  '15_EventBus.gs',               // Pub/sub event system
+  '16_DashboardEnhancements.gs',  // Date ranges, chart export, drill-down
+  '17_CorrelationEngine.gs',      // Cross-dimensional correlation analysis
+  '19_WebDashAuth.gs',            // Google SSO + magic link auth
+  '20_WebDashConfigReader.gs',    // Column-based Config tab reader
+  '21_WebDashDataService.gs',     // Unified data service for SPA
+  '22_WebDashApp.gs',             // SPA entry point and routing
+  '23_PortalSheets.gs',           // Hidden sheet management for SPA
+  '24_WeeklyQuestions.gs',        // Weekly check-in questions
+  '25_WorkloadService.gs'         // SPA-integrated workload (IIFE: WorkloadService)
 ];
 ```
 
@@ -359,7 +395,7 @@ const BUILD_ORDER = [
 
 ### Jest Test Suite (Primary)
 
-The project uses **Jest v29.7.0** as its primary test framework, with 1008 tests across 19 test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
+The project uses **Jest v29.7.0** as its primary test framework, with 1300+ tests across 21+ test suites. Tests run in Node.js using a GAS mock infrastructure that simulates the Google Apps Script environment.
 
 #### Running Tests
 

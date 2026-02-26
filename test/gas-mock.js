@@ -220,10 +220,27 @@ global.DriveApp = {
   getRootFolder: jest.fn(() => ({ getId: jest.fn(() => 'root') }))
 };
 
+// --- DocumentApp ---
+global.DocumentApp = {
+  create: jest.fn(() => ({
+    getBody: jest.fn(() => ({
+      appendParagraph: jest.fn(),
+      appendTable: jest.fn()
+    })),
+    getUrl: jest.fn(() => 'https://docs.google.com/mock-doc'),
+    getId: jest.fn(() => 'mock-doc-id')
+  }))
+};
+
 // --- CalendarApp ---
 global.CalendarApp = {
   getAllCalendars: jest.fn(() => []),
   getCalendarsByName: jest.fn(() => []),
+  getDefaultCalendar: jest.fn(() => ({
+    getName: jest.fn(() => 'Default Calendar'),
+    createEvent: jest.fn(),
+    getEvents: jest.fn(() => [])
+  })),
   createCalendar: jest.fn(() => ({
     getName: jest.fn(() => 'Test Calendar'),
     createEvent: jest.fn()

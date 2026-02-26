@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Dashboard</title>
-  
+
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
+
   <?!= include('styles') ?>
 
   <!-- Chart.js -->
@@ -17,7 +17,7 @@
 </head>
 <body>
   <div id="app"></div>
-  
+
   <script>
     // ═══════════════════════════════════════
     // BOOTSTRAP — Parse server-injected data
@@ -28,20 +28,21 @@
     var CURRENT_USER = PAGE_DATA.user || null;
     var IS_DUAL_ROLE = PAGE_DATA.isDualRole || false;
     var SESSION_TOKEN = PAGE_DATA.sessionToken || null;
-    
+    var INITIAL_TAB = PAGE_DATA.initialTab || null;
+
     // Store session token in localStorage if provided
     if (SESSION_TOKEN) {
       localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
     }
-    
+
     // Check for existing session token
     var storedToken = localStorage.getItem('dashboardSessionToken');
-    
+
     // ═══════════════════════════════════════
     // THEME ENGINE
     // ═══════════════════════════════════════
     var ThemeEngine = (function() {
-      
+
       function generatePalette(hue) {
         return {
           accent:       'hsl(' + hue + ', 70%, 68%)',
@@ -51,9 +52,9 @@
           accentBorder: 'hsla(' + hue + ', 70%, 68%, 0.25)',
         };
       }
-      
+
       var palette = generatePalette(CONFIG.accentHue || 250);
-      
+
       var themes = {
         steward: {
           dark: {
@@ -96,7 +97,7 @@
           }
         }
       };
-      
+
       function getTheme(role, isDark) {
         var base = themes[role] || themes.member;
         var t = isDark ? base.dark : base.light;
@@ -106,7 +107,7 @@
         }
         return t;
       }
-      
+
       function applyTheme(t) {
         var root = document.documentElement;
         for (var key in t) {
@@ -118,14 +119,14 @@
         document.body.style.color = t.text;
         document.body.style.fontFamily = t.fontBody;
       }
-      
+
       return {
         getTheme: getTheme,
         applyTheme: applyTheme,
         palette: palette,
       };
     })();
-    
+
     // ═══════════════════════════════════════
     // APP STATE
     // ═══════════════════════════════════════
@@ -139,14 +140,16 @@
       kpis: null,
       grievances: [],
       loading: true,
+      initialTab: INITIAL_TAB, // deep-link: ?page=xxx from URL
+      notificationCount: 0,
     };
-    
+
     // ═══════════════════════════════════════
     // ROUTER
     // ═══════════════════════════════════════
     function initApp() {
       var app = document.getElementById('app');
-      
+
       switch (CURRENT_VIEW) {
         case 'auth':
           renderAuth(app);
@@ -164,7 +167,7 @@
           renderAuth(app);
       }
     }
-    
+
     // ═══════════════════════════════════════
     // UTILITY FUNCTIONS
     // ═══════════════════════════════════════
@@ -202,20 +205,20 @@
       }
       return elem;
     }
-    
+
     function html(str) {
       var div = document.createElement('div');
       div.innerHTML = str;
       return div.firstChild;
     }
-    
+
     function showLoading(container) {
       container.innerHTML = '';
       var loader = el('div', { className: 'loading-spinner' });
       loader.innerHTML = '<div class="spinner"></div><div class="loading-text">Loading...</div>';
       container.appendChild(loader);
     }
-    
+
     function handleLogout() {
       var token = localStorage.getItem('dashboardSessionToken');
       if (token) {
@@ -230,7 +233,7 @@
       // Fallback reload
       setTimeout(function() { window.top.location.reload(); }, 1000);
     }
-    
+
     // ═══════════════════════════════════════
     // LAYOUT DETECTION
     // ═══════════════════════════════════════
@@ -277,11 +280,21 @@
     }
 
     function renderSidebarItems(sidebar, role, activeTab) {
-      var header = el('div', { className: 'sidebar-header' });
-      header.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
+      var header = el('div', { className: 'sidebar-header', style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' } });
+      var headerText = el('div');
+      headerText.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
       if (CURRENT_USER) {
-        header.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
+        headerText.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
       }
+      header.appendChild(headerText);
+      var bellWrap = el('div', { className: 'notif-bell-wrap', onClick: function() {
+        _handleTabNav(role, 'notifications');
+      }});
+      bellWrap.appendChild(el('span', { className: 'notif-bell-icon' }, '\uD83D\uDD14'));
+      if (AppState.notificationCount > 0) {
+        bellWrap.appendChild(el('span', { className: 'notif-bell-badge' }, String(AppState.notificationCount)));
+      }
+      header.appendChild(bellWrap);
       sidebar.appendChild(header);
 
       var tabs = _getSidebarTabs(role);
@@ -347,6 +360,7 @@
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
         { divider: true },
         { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
@@ -357,6 +371,7 @@
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
         { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
         { divider: true },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
@@ -386,6 +401,7 @@
           case 'unionstats': renderUnionStatsPage(app); break;
           case 'events': renderEventsPage(app); break;
           case 'stewarddirectory': renderStewardDirectory(app); break;
+          case 'notifications': renderMemberNotifications(app); break;
           default: renderMemberHome(app);
         }
       } else {
@@ -394,6 +410,7 @@
           case 'members': renderStewardMembers(app); break;
           case 'deadlines': renderStewardDashboard(app); break;
           case 'broadcast': renderBroadcast(app); break;
+          case 'notifications': renderStewardNotifications(app); break;
           case 'resources': renderStewardResources(app); break;
           case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); break;
           case 'surveytrack': renderSurveyTracking(app); break;
@@ -403,6 +420,17 @@
           default: renderStewardDashboard(app);
         }
       }
+    }
+
+    /**
+     * Deep-link handler — if ?page=xxx was in the URL, navigate to that tab
+     * once data has loaded. Called once, then clears to prevent re-triggering.
+     */
+    function _checkDeepLink(role) {
+      if (!AppState.initialTab) return;
+      var tab = AppState.initialTab;
+      AppState.initialTab = null; // one-shot
+      _handleTabNav(role, tab);
     }
 
     // Debounced resize handler — re-renders on breakpoint change
@@ -558,11 +586,11 @@
       initApp();
     });
   </script>
-  
+
   <?!= include('auth_view') ?>
   <?!= include('steward_view') ?>
   <?!= include('member_view') ?>
   <?!= include('error_view') ?>
-  
+
 </body>
 </html>

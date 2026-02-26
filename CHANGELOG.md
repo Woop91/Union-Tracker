@@ -5,32 +5,93 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.0] - 2026-02-25
+
+### Security (130 code review findings resolved)
+- **15 CRITICAL XSS fixes**: `escapeHtml()` on all HTML contexts, `JSON.stringify()` for JS contexts, URL scheme validation
+- **26 HIGH fixes**: Input validation, rate limiting, email format checks, authorization gates, `withScriptLock_()` for concurrency
+- **50 MEDIUM fixes**: Formula injection protection (`escapeForFormula()`), column constant refactoring, batch write optimization, HMAC audit hashing, archive transaction patterns
+- **39 LOW fixes**: Narrowed `data:` URL pattern, consolidated `API_VERSION`, pinned GitHub Actions to commit SHAs, re-enabled `no-dupe-args` ESLint rule, architectural documentation
+
+### Added
+- **Grievance History for Members** — Past cases tab in SPA member view with color-coded outcome badges
+- **Meeting Check-In Kiosk** — Mobile-optimized `?page=checkin` with email+PIN auth, auto-refresh flow
+- **Welcome Experience** — Personalized first-visit greeting with role-appropriate quick-start action cards
+- **Bulk Actions** — Select All Open, Clear Selection, Bulk Flag/Email/Export CSV for grievances
+- **Deadline Calendar View** — Steward-only `?page=deadlines` with month/list views, color-coded urgency
+- **Engagement Sync Overhaul** — Dynamic headers, case-insensitive matching, data validation, debounce, 21 new sync tests
+- `withScriptLock_(fn, timeoutMs)` concurrency helper in `00_DataAccess.gs`
+- `safeSendEmail(options)` quota-checking email wrapper in `05_Integrations.gs`
+- `findColumnsByHeader_(sheet)` dynamic column resolver in `10d_SyncAndMaintenance.gs`
+- `DocumentApp` mock in test/gas-mock.js
+
+### Changed
+- `escapeHtml()` no longer escapes `/` and `=` (not XSS vectors, caused data corruption)
+- `API_VERSION` now derives from `COMMAND_CONFIG.VERSION` (single source of truth)
+- `onOpen()` defers heavy work to timed trigger for faster menu load
+- `onEdit()` fast-exits for irrelevant sheets
+- Formula setup functions use `getColumnLetter()` instead of hardcoded column letters
+- `addMember()` uses batch `setValues()` instead of individual `setValue()` calls
+
+### Removed
+- `CODE_REVIEW.md`, `PHASE2_PLAN.md`, `docs/archived-reviews/` (all findings resolved)
+
+## [4.13.0] - 2026-02-25
+
+### Added
+- **Notification bell badge** with unread count in SPA header
+- **Steward notification management** — compose/inbox/manage tabs in steward view
+- **EventBus auto-notifications** — automatic alerts for grievance deadlines and status changes
+- `src/25_WorkloadService.gs` (1,129 lines) — SPA-integrated workload tracking with SSO auth (separate from standalone PIN-auth portal)
+- Member notification view with dismiss functionality
+
+### Changed
+- **Build system rewritten** — `build.js` now copies individual `.gs` + `.html` files to `dist/` instead of concatenating into single `ConsolidatedDashboard.gs`
+- `dist/ConsolidatedDashboard.gs` **deleted** — replaced by 39 individual `.gs` + 8 `.html` files
+- `src/18_WorkloadTracker.gs` major refactor
+- HTML templates reworked for individual-file architecture (`createTemplateFromFile()` now supported)
+- All 3 branches (Main, dev, staging) synced
+
+## [4.12.2] - 2026-02-25
+
+### Added
+- **SPA Web Dashboard** (`19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`) — full single-page app with Google SSO + magic link auth
+- 6 HTML files: `index.html`, `steward_view.html`, `member_view.html`, `auth_view.html`, `error_view.html`, `styles.html`
+- Hidden sheets: `_Weekly_Questions`, `_Contact_Log` (8 cols), `_Steward_Tasks` (10 cols)
+- `initWebDashboardAuth()` — auto-configures auth on first run, no manual ScriptProperties setup
+- Deep-link routing: `?page=X` → SPA with tab pre-selected via `PAGE_DATA.initialTab`
+- `doGet()` default now routes to SPA (`doGetWebDashboard`) with SSO/magic link
+
+### Changed
+- ConfigReader (`20_WebDashConfigReader.gs`) rewritten from row-based key-value to column-based Config tab using `CONFIG_COLS`
+- Default accent hue changed from 250 (blue) → 30 (amber)
+- `?page=resources` and `?page=notifications` now route through SPA instead of standalone HTML
+
 ## [4.12.0] - 2026-02-24
 
 ### Added
-- **Chart.js integration** for steward and member dashboard views
-- Steward view enhancements: improved cases dashboard, members tab with search and stats
-- Member view enhancements: improved home, cases, contact, profile, resources views
-- Workload tracker improvements and SSO wrappers (`processWorkloadFormSSO`, `getWorkloadHistorySSO`, `getWorkloadDashboardDataSSO`)
-
-### Fixed
-- Error view retry button now functional
-- Bug fixes across web dashboard views
-- Portal sheet setup infrastructure (`23_PortalSheets.gs`) added to BUILD_ORDER
+- **📢 Notifications sheet** — 12 columns with data validation and 2 starter entries
+- `getWebAppNotifications(email, role)` — filters Active, non-expired, non-dismissed, audience-matched
+- `dismissWebAppNotification(id, email)` — per-member dismiss tracking via Dismissed_By column
+- `sendWebAppNotification(data)` — steward compose with auto-ID (NOTIF-XXX)
+- `getNotificationRecipientList()` / `getNotificationRecipientListFull()` — member directory + preset groups
+- `?page=notifications` route with dual-role page: member cards + steward inline compose
+- Notification types: Steward Message, Announcement, Deadline, System
+- Priority levels: Normal (default), Urgent (sorts first)
+- `NOTIFICATIONS_HEADER_MAP_` + `NOTIFICATIONS_COLS` registered in `syncColumnMaps()`
 
 ## [4.11.0] - 2026-02-24
 
 ### Added
-- **Responsive web dashboard SPA** — mobile (<640px bottom nav), tablet (640-1024px sidebar), desktop (>1024px)
-- `renderPageLayout()` in index.html switches between sidebar and bottom nav
-- **Member self-service views**: home, cases, contact, profile, resources, workload, weekly questions, survey results, more menu
-- **Steward tools**: cases dashboard, members tab (search+stats), broadcast, survey tracking, weekly question manager, resources, more menu
-- **Weekly Questions engagement system** (`24_WeeklyQuestions.gs`) — IIFE module with 3 hidden sheets, anonymous responses via SHA-256 hashed emails
-- CSS-only bar charts for survey results with privacy threshold
-- 12 new DataService functions + global `data*` wrappers in `21_WebDashDataService.gs`
-- ConfigReader expanded: `calendarId`, `driveFolderId`, `satisfactionFormUrl`, `orgWebsite`
-- SHEETS constants: `WEEKLY_QUESTIONS`, `WEEKLY_RESPONSES`, `QUESTION_POOL`
-- 46 files pushed via clasp (37 .gs + 8 .html + appsscript.json)
+- **📚 Resources sheet** — 12 columns, data validation, 8 starter articles (Know Your Rights, Grievance Process, FAQ, Forms & Templates)
+- `?page=resources` route — educational content hub with search, category pills, expandable cards
+- `?page=checkin` route — meeting check-in as standalone web page (reuses `14_MeetingCheckIn.gs`)
+- `getWebAppResourcesList()` API — returns visible resources with audience filtering
+- `RESOURCES_HEADER_MAP_` + `RESOURCES_COLS` registered in `syncColumnMaps()`
+- `PHASE2_PLAN.md` — tracks parked features (bulk actions, deadline calendar, etc.)
+
+### Changed
+- Design refresh: DM Sans + Fraunces serif fonts, warm navy/earth tones (#1e3a5f, #fafaf9)
 
 ## [4.10.0] - 2026-02-23
 
@@ -263,10 +324,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 4.12.0 | 2026-02-24 | Chart.js integration, steward/member view enhancements, workload improvements, bug fixes |
-| 4.11.0 | 2026-02-24 | Responsive web dashboard SPA, member self-service views, steward tools, weekly questions |
-| 4.10.0 | 2026-02-23 | Workload Tracker module, web-dashboard SPA integration, multi-file build mode |
-| 4.9.1 | 2026-02-23 | Security vulnerability fix pass — XSS hardening, formula injection protection |
+| 4.13.0 | 2026-02-25 | Notification bell/EventBus auto-alerts, individual-file build, WorkloadService SPA module |
+| 4.12.2 | 2026-02-25 | SPA web dashboard, SSO + magic link, deep-link routing, hidden sheets |
+| 4.12.0 | 2026-02-24 | Notifications system (sheet + API + dual-role page) |
+| 4.11.0 | 2026-02-24 | Resources hub, meeting check-in route, design refresh |
+| 4.10.0 | 2026-02-23 | Workload Tracker module |
+| 4.9.1 | 2026-02-23 | 15 security fixes (XSS, formula injection, URL validation) |
 | 4.9.0 | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns |
 | 4.8.2 | 2026-02-16 | State field added to member contacts |
 | 4.8.1 | 2026-02-15 | 5 new contact form fields, unified name-based Member IDs |

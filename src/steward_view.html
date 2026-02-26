@@ -15,6 +15,11 @@ function initStewardView(container) {
   AppState.activeRole = 'steward';
   showLoading(container);
 
+  // Load notification count in parallel (for bell badge)
+  google.script.run.withSuccessHandler(function(r) {
+    AppState.notificationCount = (r && r.count) || 0;
+  }).getWebAppNotificationCount(CURRENT_USER.email, 'steward');
+
   google.script.run
     .withSuccessHandler(function(cases) {
       AppState.cases = cases || [];
@@ -23,11 +28,13 @@ function initStewardView(container) {
           AppState.kpis = kpis;
           AppState.loading = false;
           renderStewardDashboard(container);
+          _checkDeepLink('steward');
         })
         .withFailureHandler(function() {
           AppState.kpis = { totalCases: AppState.cases.length, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
           AppState.loading = false;
           renderStewardDashboard(container);
+          _checkDeepLink('steward');
         })
         .dataGetStewardKPIs(CURRENT_USER.email);
     })
@@ -76,6 +83,11 @@ function _stewardHeader(container, title, subtitle) {
 function renderStewardDashboard(appContainer) {
   renderPageLayout(appContainer, 'steward', 'cases', function(container) {
     _stewardHeader(container, 'Cases', CURRENT_USER.name + ' \u00B7 ' + CURRENT_USER.unit);
+
+    // Welcome card placeholder — inserted before KPIs if first visit
+    var welcomeSlot = el('div');
+    container.appendChild(welcomeSlot);
+    _maybeShowWelcome(welcomeSlot, 'steward');
 
     // KPIs
     var kpis = AppState.kpis || {};
@@ -129,6 +141,105 @@ function renderStewardDashboard(appContainer) {
     var fab = el('button', { className: 'fab', onClick: function() { renderBroadcast(document.getElementById('app')); } }, '\uD83D\uDCE2');
     container.appendChild(fab);
   });
+}
+
+// ═══════════════════════════════════════
+// WELCOME EXPERIENCE (steward)
+// ═══════════════════════════════════════
+
+/**
+ * Shows a welcome/onboarding card if it's the user's first visit.
+ * Fetches welcome data from backend, renders card if isFirstVisit.
+ * @param {Element} slot - Container element to insert the welcome card into
+ * @param {string} viewRole - 'steward' or 'member'
+ */
+function _maybeShowWelcome(slot, viewRole) {
+  // Skip if already dismissed in this session
+  if (AppState._welcomeDismissed) return;
+
+  google.script.run.withSuccessHandler(function(data) {
+    if (!data || !data.isFirstVisit) return;
+
+    var card = el('div', {
+      className: 'card card-glass card-fade-in',
+      style: {
+        padding: '24px 20px',
+        margin: '0 0 14px',
+        background: 'linear-gradient(135deg, var(--accentBg), rgba(255,255,255,0.03))',
+        border: '1px solid var(--accentBorder)',
+        position: 'relative'
+      }
+    });
+
+    // Header
+    var safeName = (data.userName || 'there').replace(/[<>&"']/g, '');
+    card.appendChild(el('div', {
+      style: { fontFamily: 'var(--fontDisplay)', fontSize: '20px', fontWeight: '700', color: 'var(--text)', marginBottom: '8px' }
+    }, 'Welcome, ' + safeName + '!'));
+
+    card.appendChild(el('div', {
+      style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.5', marginBottom: '16px' }
+    }, 'This is your ' + CONFIG.stewardLabel + ' dashboard. Track grievance cases, manage member communications, monitor deadlines, and access all your tools in one place.'));
+
+    // Quick-start action cards grid
+    var grid = el('div', {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }
+    });
+
+    (data.quickActions || []).forEach(function(qa) {
+      var actionCard = el('div', {
+        className: 'card card-clickable',
+        style: {
+          padding: '12px',
+          textAlign: 'center',
+          cursor: 'pointer',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '10px'
+        },
+        onClick: function() {
+          _dismissWelcome(card);
+          _handleTabNav('steward', qa.action);
+        }
+      });
+      actionCard.appendChild(el('div', { style: { fontSize: '22px', marginBottom: '4px' } }, qa.icon));
+      actionCard.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)', fontFamily: 'var(--fontDisplay)' } }, qa.label));
+      grid.appendChild(actionCard);
+    });
+    card.appendChild(grid);
+
+    // Dismiss button
+    card.appendChild(el('button', {
+      className: 'btn',
+      style: {
+        width: '100%',
+        background: 'var(--accent)',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '8px',
+        padding: '10px',
+        fontSize: '13px',
+        fontWeight: '600',
+        cursor: 'pointer'
+      },
+      onClick: function() { _dismissWelcome(card); }
+    }, 'Got it!'));
+
+    slot.appendChild(card);
+  }).dataGetWelcomeData(CURRENT_USER.email);
+}
+
+/**
+ * Dismisses the welcome card and saves preference.
+ */
+function _dismissWelcome(cardEl) {
+  AppState._welcomeDismissed = true;
+  if (cardEl) {
+    cardEl.style.opacity = '0';
+    cardEl.style.transition = 'opacity 0.3s ease';
+    setTimeout(function() { cardEl.remove(); }, 300);
+  }
+  google.script.run.dataMarkWelcomeDismissed(CURRENT_USER.email);
 }
 
 function renderCaseList(container, filter) {
@@ -415,36 +526,576 @@ function renderBroadcast(appContainer) {
 }
 
 // ═══════════════════════════════════════
+// STEWARD NOTIFICATIONS
+// ═══════════════════════════════════════
+
+function renderStewardNotifications(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'notifications', function(container) {
+    _stewardHeader(container, 'Notifications', 'View, compose, and manage');
+    var content = el('div', { className: 'content' });
+
+    var activeSubTab = 'inbox';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['inbox', 'compose', 'manage'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'inbox') _renderNotifInbox(subContent);
+      else if (activeSubTab === 'compose') _renderNotifCompose(subContent);
+      else _renderNotifManage(subContent);
+    }
+
+    // --- Inbox: same as member notification list ---
+    function _renderNotifInbox(target) {
+      showLoading(target);
+      google.script.run.withSuccessHandler(function(notifications) {
+        target.innerHTML = '';
+        if (!notifications || notifications.length === 0) {
+          var empty = el('div', { style: { textAlign: 'center', padding: '48px 16px' } });
+          empty.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
+          empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700' } }, 'All caught up!'));
+          empty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '6px' } }, 'No new notifications'));
+          target.appendChild(empty);
+          return;
+        }
+        var typeColors = { System: 'system', Announcement: 'announcement', 'Steward Message': 'steward', Deadline: 'deadline' };
+        notifications.forEach(function(n, idx) {
+          var card = el('div', {
+            className: 'card card-glass notif-card card-fade-in' + (n.priority === 'Urgent' ? ' notif-urgent-border' : ''),
+            style: { animationDelay: (idx * 60) + 'ms' }
+          });
+          var top = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } });
+          var typeClass = typeColors[n.type] || 'system';
+          top.appendChild(el('span', { className: 'notif-type-badge notif-type-' + typeClass }, n.type));
+          if (n.priority === 'Urgent') top.appendChild(el('span', { className: 'notif-type-badge notif-type-deadline' }, 'Urgent'));
+          card.appendChild(top);
+          card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '700', color: 'var(--text)', paddingRight: '28px' } }, n.title));
+          card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', marginTop: '6px', lineHeight: '1.5' } }, n.message));
+          var meta = el('div', { className: 'notif-meta' });
+          if (n.sentBy) meta.appendChild(el('span', null, 'From: ' + n.sentBy + '  '));
+          if (n.createdDate) meta.appendChild(el('span', null, n.createdDate));
+          if (n.expiresDate) meta.appendChild(el('span', null, '  \u00B7 Expires: ' + n.expiresDate));
+          card.appendChild(meta);
+          var dismissBtn = el('button', { className: 'notif-dismiss', onClick: function() {
+            dismissBtn.textContent = '...';
+            google.script.run.withSuccessHandler(function(r) {
+              if (r && r.success) {
+                card.style.opacity = '0';
+                card.style.transition = 'opacity 0.3s';
+                setTimeout(function() { card.remove(); }, 300);
+                AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
+              }
+            }).dismissWebAppNotification(n.id, CURRENT_USER.email);
+          }}, '\u2715');
+          card.appendChild(dismissBtn);
+          target.appendChild(card);
+        });
+      }).withFailureHandler(function() {
+        target.innerHTML = '';
+        target.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--danger)' } }, 'Failed to load notifications.'));
+      }).getWebAppNotifications(CURRENT_USER.email, 'steward');
+    }
+
+    // --- Compose: send new notification ---
+    function _renderNotifCompose(target) {
+      // Recipient mode
+      var selectedRecipient = '';
+      var recipientMode = 'group'; // 'group' or 'individual'
+
+      var modeBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } });
+      var groupBtn = el('button', { className: 'filter-tab active', onClick: function() {
+        recipientMode = 'group'; groupBtn.className = 'filter-tab active'; indivBtn.className = 'filter-tab';
+        recipientArea.innerHTML = ''; buildGroupPicker();
+      }}, 'Groups');
+      var indivBtn = el('button', { className: 'filter-tab', onClick: function() {
+        recipientMode = 'individual'; indivBtn.className = 'filter-tab active'; groupBtn.className = 'filter-tab';
+        recipientArea.innerHTML = ''; buildIndividualPicker();
+      }}, 'Individual');
+      modeBar.appendChild(groupBtn);
+      modeBar.appendChild(indivBtn);
+
+      var recipientArea = el('div');
+      var selectedDisplay = el('div', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600', minHeight: '20px', marginBottom: '8px' } });
+
+      function buildGroupPicker() {
+        var groups = ['All Members', 'All Stewards', 'Everyone'];
+        groups.forEach(function(g) {
+          recipientArea.appendChild(el('button', {
+            className: 'filter-tab' + (selectedRecipient === g ? ' active' : ''),
+            style: { marginRight: '6px', marginBottom: '6px' },
+            onClick: function() {
+              selectedRecipient = g;
+              selectedDisplay.textContent = 'To: ' + g;
+              buildGroupPicker();
+            }
+          }, g));
+        });
+      }
+
+      function buildIndividualPicker() {
+        var searchInput = el('input', { className: 'form-input', placeholder: 'Search members...', style: { marginBottom: '8px' } });
+        var listWrap = el('div', { style: { maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '8px' } });
+        recipientArea.appendChild(searchInput);
+        recipientArea.appendChild(listWrap);
+
+        google.script.run.withSuccessHandler(function(members) {
+          var allMembers = members || [];
+          function renderList(filter) {
+            listWrap.innerHTML = '';
+            var filtered = filter ? allMembers.filter(function(m) {
+              return (m.name || '').toLowerCase().indexOf(filter) !== -1 || (m.email || '').toLowerCase().indexOf(filter) !== -1;
+            }) : allMembers;
+            filtered.slice(0, 50).forEach(function(m) {
+              var row = el('div', {
+                style: { padding: '8px 12px', cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border)', background: selectedRecipient === m.email ? 'var(--accentBg)' : 'transparent' },
+                onClick: function() {
+                  selectedRecipient = m.email;
+                  selectedDisplay.textContent = 'To: ' + m.name + ' (' + m.email + ')';
+                  renderList(searchInput.value.trim().toLowerCase());
+                }
+              }, m.name + ' — ' + m.email);
+              listWrap.appendChild(row);
+            });
+          }
+          renderList('');
+          searchInput.addEventListener('input', function() { renderList(searchInput.value.trim().toLowerCase()); });
+        }).getNotificationRecipientListFull();
+      }
+
+      buildGroupPicker();
+
+      // Type
+      var typeGroup = el('div', { className: 'form-group' });
+      typeGroup.appendChild(el('label', { className: 'form-label' }, 'Type'));
+      var typeSelect = el('select', { className: 'form-input' });
+      ['Steward Message', 'Announcement', 'Deadline', 'System'].forEach(function(t) {
+        typeSelect.appendChild(el('option', { value: t }, t));
+      });
+      typeGroup.appendChild(typeSelect);
+
+      // Priority
+      var selectedPriority = 'Normal';
+      var prioBar = el('div', { style: { display: 'flex', gap: '8px', margin: '8px 0' } });
+      var normalBtn = el('button', { className: 'filter-tab active', onClick: function() {
+        selectedPriority = 'Normal'; normalBtn.className = 'filter-tab active'; urgentBtn.className = 'filter-tab';
+      }}, 'Normal');
+      var urgentBtn = el('button', { className: 'filter-tab', onClick: function() {
+        selectedPriority = 'Urgent'; urgentBtn.className = 'filter-tab active'; normalBtn.className = 'filter-tab';
+      }}, 'Urgent');
+      prioBar.appendChild(normalBtn);
+      prioBar.appendChild(urgentBtn);
+
+      // Title + Message
+      var titleInput = el('input', { className: 'form-input', placeholder: 'Notification title' });
+      var msgTextarea = el('textarea', { className: 'msg-textarea', placeholder: 'Write your message...' });
+
+      // Expires
+      var expiresGroup = el('div', { className: 'form-group' });
+      expiresGroup.appendChild(el('label', { className: 'form-label' }, 'Expires (optional)'));
+      var expiresInput = el('input', { className: 'form-input', type: 'date' });
+      expiresGroup.appendChild(expiresInput);
+
+      var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '10px' } });
+
+      var sendBtn = el('button', { className: 'btn btn-primary', onClick: function() {
+        if (!selectedRecipient) { statusMsg.textContent = 'Please select a recipient.'; statusMsg.style.color = 'var(--danger)'; return; }
+        if (!titleInput.value.trim()) { statusMsg.textContent = 'Please enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
+        if (!msgTextarea.value.trim()) { statusMsg.textContent = 'Please enter a message.'; statusMsg.style.color = 'var(--danger)'; return; }
+
+        sendBtn.textContent = 'Sending...';
+        sendBtn.disabled = true;
+        statusMsg.textContent = '';
+        google.script.run.withSuccessHandler(function(r) {
+          sendBtn.textContent = 'Send Notification';
+          sendBtn.disabled = false;
+          if (r && r.success) {
+            statusMsg.textContent = 'Notification sent! (' + r.notificationId + ')';
+            statusMsg.style.color = 'var(--success)';
+            titleInput.value = '';
+            msgTextarea.value = '';
+          } else {
+            statusMsg.textContent = (r && r.message) || 'Error sending.';
+            statusMsg.style.color = 'var(--danger)';
+          }
+        }).withFailureHandler(function() {
+          sendBtn.textContent = 'Send Notification';
+          sendBtn.disabled = false;
+          statusMsg.textContent = 'Error sending. Try again.';
+          statusMsg.style.color = 'var(--danger)';
+        }).sendWebAppNotification({
+          recipient: selectedRecipient,
+          type: typeSelect.value,
+          title: titleInput.value.trim(),
+          message: msgTextarea.value.trim(),
+          priority: selectedPriority,
+          expiresDate: expiresInput.value || '',
+          senderName: CURRENT_USER.name || ''
+        });
+      }}, 'Send Notification');
+
+      // Assemble form
+      target.appendChild(el('label', { className: 'form-label' }, 'Recipient'));
+      target.appendChild(modeBar);
+      target.appendChild(recipientArea);
+      target.appendChild(selectedDisplay);
+      target.appendChild(typeGroup);
+      target.appendChild(el('label', { className: 'form-label' }, 'Priority'));
+      target.appendChild(prioBar);
+      target.appendChild(el('div', { className: 'form-group' }, [
+        el('label', { className: 'form-label' }, 'Title'),
+        titleInput
+      ]));
+      target.appendChild(el('div', { className: 'form-group' }, [
+        el('label', { className: 'form-label' }, 'Message'),
+        msgTextarea
+      ]));
+      target.appendChild(expiresGroup);
+      target.appendChild(statusMsg);
+      target.appendChild(sendBtn);
+    }
+
+    // --- Manage: view all notifications ---
+    function _renderNotifManage(target) {
+      showLoading(target);
+      google.script.run.withSuccessHandler(function(notifications) {
+        target.innerHTML = '';
+        if (!notifications || notifications.length === 0) {
+          target.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'No notifications found.'));
+          return;
+        }
+        var typeColors = { System: 'system', Announcement: 'announcement', 'Steward Message': 'steward', Deadline: 'deadline' };
+        notifications.forEach(function(n) {
+          var row = el('div', { className: 'res-manage-row', style: { flexWrap: 'wrap' } });
+          var typeClass = typeColors[n.type] || 'system';
+          row.appendChild(el('span', { className: 'notif-type-badge notif-type-' + typeClass, style: { fontSize: '10px' } }, n.type));
+          row.appendChild(el('span', { className: 'res-manage-title' }, n.title));
+          row.appendChild(el('span', { className: 'res-manage-meta' }, 'To: ' + n.recipient));
+          row.appendChild(el('span', { className: 'res-manage-meta' }, n.createdDate));
+          target.appendChild(row);
+        });
+      }).withFailureHandler(function() {
+        target.innerHTML = '';
+        target.appendChild(el('div', { style: { padding: '24px', color: 'var(--danger)' } }, 'Failed to load.'));
+      }).getWebAppNotifications(CURRENT_USER.email, 'steward');
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
 // STEWARD RESOURCES
 // ═══════════════════════════════════════
 
 function renderStewardResources(appContainer) {
   renderPageLayout(appContainer, 'steward', 'resources', function(container) {
-    _stewardHeader(container, 'Resources');
+    _stewardHeader(container, 'Resources', 'Browse and manage content');
     var content = el('div', { className: 'content' });
-    var items = [
-      { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
-      { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
-      { icon: '\uD83D\uDCD6', label: 'Know Your Rights', sub: 'Contract highlights' },
-      { icon: '\uD83D\uDCDD', label: 'File a Grievance', sub: 'Start a new case for a member' },
-      { icon: '\u2753', label: 'FAQ', sub: 'Common questions' },
-    ];
-    if (CONFIG.orgWebsite) items.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
-    items.forEach(function(r) {
-      var item = el('div', {
-        className: 'card card-clickable',
-        style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
-        onClick: r.url ? function() { window.open(r.url, '_blank'); } : undefined
+    var activeSubTab = 'browse';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      ['browse', 'manage'].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
+          onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
+        }, tab.charAt(0).toUpperCase() + tab.slice(1)));
       });
-      item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
-      var tg = el('div', { style: { flex: '1' } });
-      tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-      tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
-      item.appendChild(tg);
-      item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
-      content.appendChild(item);
-    });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'browse') _renderResourceBrowse(subContent);
+      else _renderResourceManage(subContent);
+    }
+
+    // --- Browse: same as member hub but steward audience ---
+    function _renderResourceBrowse(target) {
+      // Quick links
+      var quickLinks = [
+        { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
+        { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
+      ];
+      if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+
+      quickLinks.forEach(function(r) {
+        if (!r.url) return;
+        var item = el('div', {
+          className: 'card card-clickable',
+          style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
+          onClick: function() { window.open(r.url, '_blank'); }
+        });
+        item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
+        var tg = el('div', { style: { flex: '1' } });
+        tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+        tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+        item.appendChild(tg);
+        item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+        target.appendChild(item);
+      });
+
+      // Know Your Rights section
+      var hubSection = el('div', { style: { marginTop: '20px' } });
+      hubSection.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)', marginBottom: '12px' } }, 'Know Your Rights'));
+      var searchInput = el('input', { className: 'search-input form-input', placeholder: 'Search resources...', style: { marginBottom: '8px' } });
+      hubSection.appendChild(searchInput);
+      var pillsWrap = el('div', { className: 'res-pills' });
+      hubSection.appendChild(pillsWrap);
+      var cardsWrap = el('div');
+      hubSection.appendChild(cardsWrap);
+      target.appendChild(hubSection);
+
+      var allResources = [];
+      var activeCategory = 'All';
+      showLoading(cardsWrap);
+
+      google.script.run.withSuccessHandler(function(resources) {
+        allResources = resources || [];
+        var categories = ['All'];
+        allResources.forEach(function(r) { if (r.category && categories.indexOf(r.category) === -1) categories.push(r.category); });
+        renderPills(categories);
+        renderCards();
+      }).withFailureHandler(function() {
+        cardsWrap.innerHTML = '';
+        cardsWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'Unable to load resources.'));
+      }).getWebAppResourcesList('Stewards');
+
+      function renderPills(categories) {
+        pillsWrap.innerHTML = '';
+        categories.forEach(function(cat) {
+          pillsWrap.appendChild(el('button', {
+            className: 'res-pill' + (activeCategory === cat ? ' active' : ''),
+            onClick: function() { activeCategory = cat; renderPills(categories); renderCards(); }
+          }, cat));
+        });
+      }
+
+      function renderCards() {
+        cardsWrap.innerHTML = '';
+        var searchTerm = (searchInput.value || '').toLowerCase().trim();
+        var filtered = allResources.filter(function(r) {
+          if (activeCategory !== 'All' && r.category !== activeCategory) return false;
+          if (searchTerm) {
+            return (r.title || '').toLowerCase().indexOf(searchTerm) !== -1 ||
+                   (r.summary || '').toLowerCase().indexOf(searchTerm) !== -1 ||
+                   (r.content || '').toLowerCase().indexOf(searchTerm) !== -1;
+          }
+          return true;
+        });
+        if (filtered.length === 0) {
+          cardsWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '32px 16px', color: 'var(--muted)' } }, 'No resources match your search.'));
+          return;
+        }
+        filtered.forEach(function(r, idx) {
+          var card = el('div', { className: 'card card-glass res-card card-clickable card-fade-in', style: { animationDelay: (idx * 50) + 'ms' } });
+          card.appendChild(el('div', { className: 'res-card-icon' }, r.icon || '\uD83D\uDCC4'));
+          card.appendChild(el('span', { className: 'notif-type-badge notif-type-announcement', style: { fontSize: '10px', marginBottom: '6px' } }, r.category));
+          card.appendChild(el('div', { className: 'res-card-title' }, r.title));
+          card.appendChild(el('div', { className: 'res-card-summary' }, r.summary));
+          var hint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Tap to read more \u25BE');
+          card.appendChild(hint);
+          var expandContent = el('div', { className: 'res-card-content' });
+          if (r.content) expandContent.appendChild(el('div', null, r.content));
+          if (r.url) expandContent.appendChild(el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource'));
+          if (r.dateAdded) expandContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Added: ' + r.dateAdded));
+          card.appendChild(expandContent);
+          card.addEventListener('click', function() {
+            card.classList.toggle('expanded');
+            hint.textContent = card.classList.contains('expanded') ? 'Tap to collapse \u25B4' : 'Tap to read more \u25BE';
+          });
+          cardsWrap.appendChild(card);
+        });
+      }
+      searchInput.addEventListener('input', function() { renderCards(); });
+    }
+
+    // --- Manage: CRUD for all resources ---
+    function _renderResourceManage(target) {
+      var listWrap = el('div');
+      var formWrap = el('div');
+      target.appendChild(listWrap);
+      target.appendChild(formWrap);
+
+      var addBtn = el('button', { className: 'btn btn-primary', style: { marginBottom: '12px' }, onClick: function() {
+        showResourceForm(null);
+      }}, '+ Add Resource');
+      listWrap.appendChild(addBtn);
+
+      var tableWrap = el('div');
+      listWrap.appendChild(tableWrap);
+      loadResourceList();
+
+      function loadResourceList() {
+        showLoading(tableWrap);
+        google.script.run.withSuccessHandler(function(resources) {
+          tableWrap.innerHTML = '';
+          formWrap.innerHTML = '';
+          if (!resources || resources.length === 0) {
+            tableWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'No resources yet. Add one above!'));
+            return;
+          }
+          resources.forEach(function(r) {
+            var row = el('div', { className: 'res-manage-row' + (r.visible ? '' : ' hidden-res') });
+            row.appendChild(el('span', { style: { fontSize: '20px', flexShrink: '0' } }, r.icon || '\uD83D\uDCC4'));
+            var info = el('div', { style: { flex: '1', minWidth: '0' } });
+            info.appendChild(el('div', { className: 'res-manage-title' }, r.title));
+            info.appendChild(el('div', { className: 'res-manage-meta' }, r.category + ' \u00B7 ' + r.audience + ' \u00B7 ' + (r.visible ? 'Visible' : 'Hidden')));
+            row.appendChild(info);
+            row.appendChild(el('span', { className: 'res-status-dot ' + (r.visible ? 'visible' : 'hidden') }));
+            row.appendChild(el('button', { className: 'icon-btn', style: { fontSize: '14px' }, onClick: function() { showResourceForm(r); }}, '\u270E'));
+            if (r.visible) {
+              row.appendChild(el('button', { className: 'icon-btn', style: { fontSize: '14px', color: 'var(--danger)' }, onClick: function() {
+                if (confirm('Hide "' + r.title + '"? It can be restored later.')) {
+                  google.script.run.withSuccessHandler(function() { loadResourceList(); }).deleteWebAppResource(r.id);
+                }
+              }}, '\uD83D\uDDD1'));
+            } else {
+              row.appendChild(el('button', { className: 'icon-btn', style: { fontSize: '14px', color: 'var(--success)' }, onClick: function() {
+                google.script.run.withSuccessHandler(function() { loadResourceList(); }).restoreWebAppResource(r.id);
+              }}, '\u21A9'));
+            }
+            tableWrap.appendChild(row);
+          });
+        }).withFailureHandler(function() {
+          tableWrap.innerHTML = '';
+          tableWrap.appendChild(el('div', { style: { padding: '24px', color: 'var(--danger)' } }, 'Failed to load resources.'));
+        }).getWebAppResourcesListAll();
+      }
+
+      function showResourceForm(existing) {
+        formWrap.innerHTML = '';
+        listWrap.style.display = 'none';
+
+        var isEdit = !!existing;
+        formWrap.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', marginBottom: '14px' } }, isEdit ? 'Edit Resource' : 'Add Resource'));
+
+        var fields = {};
+        function addField(label, key, type, opts) {
+          var group = el('div', { className: 'form-group' });
+          group.appendChild(el('label', { className: 'form-label' }, label));
+          var input;
+          if (type === 'textarea') {
+            input = el('textarea', { className: 'msg-textarea', style: opts && opts.style || {} });
+            input.value = (existing && existing[key]) || (opts && opts.defaultVal) || '';
+          } else if (type === 'select') {
+            input = el('select', { className: 'form-input' });
+            (opts.options || []).forEach(function(o) { input.appendChild(el('option', { value: o }, o)); });
+            input.value = (existing && existing[key]) || (opts && opts.defaultVal) || '';
+          } else {
+            input = el('input', { className: 'form-input', type: type || 'text' });
+            input.value = (existing && existing[key]) || (opts && opts.defaultVal) || '';
+          }
+          fields[key] = input;
+          group.appendChild(input);
+          formWrap.appendChild(group);
+        }
+
+        addField('Title *', 'title', 'text');
+        addField('Category', 'category', 'select', { options: ['General', 'Know Your Rights', 'Contracts', 'Benefits', 'Workplace Safety', 'Union History', 'Legal', 'Training', 'FAQs'], defaultVal: 'General' });
+        addField('Summary', 'summary', 'textarea');
+        addField('Content', 'content', 'textarea', { style: { minHeight: '120px' } });
+        addField('URL (optional)', 'url', 'text');
+        addField('Icon', 'icon', 'text', { defaultVal: '\uD83D\uDCC4' });
+        addField('Sort Order', 'sortOrder', 'number', { defaultVal: '999' });
+
+        // Visible toggle
+        var visGroup = el('div', { className: 'form-group' });
+        visGroup.appendChild(el('label', { className: 'form-label' }, 'Visible'));
+        var visVal = existing ? (existing.visible ? 'Yes' : 'No') : 'Yes';
+        var visBar = el('div', { style: { display: 'flex', gap: '8px' } });
+        var visYes = el('button', { className: 'filter-tab' + (visVal === 'Yes' ? ' active' : ''), onClick: function() { visVal = 'Yes'; visYes.className = 'filter-tab active'; visNo.className = 'filter-tab'; }}, 'Yes');
+        var visNo = el('button', { className: 'filter-tab' + (visVal === 'No' ? ' active' : ''), onClick: function() { visVal = 'No'; visNo.className = 'filter-tab active'; visYes.className = 'filter-tab'; }}, 'No');
+        visBar.appendChild(visYes);
+        visBar.appendChild(visNo);
+        visGroup.appendChild(visBar);
+        formWrap.appendChild(visGroup);
+
+        // Audience toggle
+        var audGroup = el('div', { className: 'form-group' });
+        audGroup.appendChild(el('label', { className: 'form-label' }, 'Audience'));
+        var audVal = (existing && existing.audience) || 'All';
+        var audBar = el('div', { style: { display: 'flex', gap: '8px' } });
+        var audBtns = {};
+        ['All', 'Members', 'Stewards'].forEach(function(a) {
+          audBtns[a] = el('button', { className: 'filter-tab' + (audVal === a ? ' active' : ''), onClick: function() {
+            audVal = a;
+            for (var k in audBtns) audBtns[k].className = 'filter-tab' + (k === a ? ' active' : '');
+          }}, a);
+          audBar.appendChild(audBtns[a]);
+        });
+        audGroup.appendChild(audBar);
+        formWrap.appendChild(audGroup);
+
+        var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginBottom: '10px' } });
+        formWrap.appendChild(statusMsg);
+
+        var btnRow = el('div', { style: { display: 'flex', gap: '8px' } });
+        var saveBtn = el('button', { className: 'btn btn-primary', onClick: function() {
+          if (!fields.title.value.trim()) { statusMsg.textContent = 'Title is required.'; statusMsg.style.color = 'var(--danger)'; return; }
+          saveBtn.textContent = 'Saving...';
+          saveBtn.disabled = true;
+          var payload = {
+            title: fields.title.value.trim(),
+            category: fields.category.value,
+            summary: fields.summary.value.trim(),
+            content: fields.content.value.trim(),
+            url: fields.url.value.trim(),
+            icon: fields.icon.value.trim() || '\uD83D\uDCC4',
+            sortOrder: parseInt(fields.sortOrder.value, 10) || 999,
+            visible: visVal,
+            audience: audVal
+          };
+          if (isEdit) {
+            google.script.run.withSuccessHandler(function(r) {
+              saveBtn.textContent = 'Save'; saveBtn.disabled = false;
+              if (r && r.success) { listWrap.style.display = ''; formWrap.innerHTML = ''; loadResourceList(); }
+              else { statusMsg.textContent = (r && r.message) || 'Error.'; statusMsg.style.color = 'var(--danger)'; }
+            }).withFailureHandler(function() {
+              saveBtn.textContent = 'Save'; saveBtn.disabled = false;
+              statusMsg.textContent = 'Error saving.'; statusMsg.style.color = 'var(--danger)';
+            }).updateWebAppResource(existing.id, payload);
+          } else {
+            google.script.run.withSuccessHandler(function(r) {
+              saveBtn.textContent = 'Save'; saveBtn.disabled = false;
+              if (r && r.success) { listWrap.style.display = ''; formWrap.innerHTML = ''; loadResourceList(); }
+              else { statusMsg.textContent = (r && r.message) || 'Error.'; statusMsg.style.color = 'var(--danger)'; }
+            }).withFailureHandler(function() {
+              saveBtn.textContent = 'Save'; saveBtn.disabled = false;
+              statusMsg.textContent = 'Error saving.'; statusMsg.style.color = 'var(--danger)';
+            }).addWebAppResource(payload);
+          }
+        }}, 'Save');
+        var cancelBtn = el('button', { className: 'btn', style: { background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }, onClick: function() {
+          listWrap.style.display = '';
+          formWrap.innerHTML = '';
+        }}, 'Cancel');
+        btnRow.appendChild(saveBtn);
+        btnRow.appendChild(cancelBtn);
+        formWrap.appendChild(btnRow);
+      }
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
     container.appendChild(content);
   });
 }
@@ -515,6 +1166,7 @@ function renderStewardMore(appContainer) {
       { icon: '\u2705', label: 'Tasks', desc: 'Manage your to-do list', action: function() { renderStewardTasks(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDE', label: 'Contact Log', desc: 'Log member interactions', action: function() { renderContactLog(document.getElementById('app')); } },
       { icon: '\uD83D\uDCE2', label: 'Broadcast', desc: 'Send message to your members', action: function() { renderBroadcast(document.getElementById('app')); } },
+      { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'View and send notifications', action: function() { renderStewardNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
       { icon: '\u2753', label: 'Weekly Questions', desc: 'Manage weekly engagement questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'steward'); } },

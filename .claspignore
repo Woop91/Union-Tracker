@@ -1,0 +1,37 @@
+# Ignore everything that isn't needed in Google Apps Script
+# This is a safety net — .clasp.json rootDir is ./dist, but this
+# prevents accidental deployment of Node.js files if rootDir changes.
+
+# Node.js / build tooling
+node_modules/**
+build.js
+package.json
+package-lock.json
+
+# Config and CI
+.eslintrc*
+eslint.config.*
+.husky/**
+.git/**
+.github/**
+commitlint.config.*
+
+# Source (deployed via consolidated build in dist/)
+src/**
+
+# Tests
+test/**
+jest.config.*
+coverage/**
+
+# Documentation
+*.md
+docs/**
+CODE_REVIEW.md
+CLAUDE.md
+LICENSE
+
+# IDE / OS
+.vscode/**
+.idea/**
+.DS_Store

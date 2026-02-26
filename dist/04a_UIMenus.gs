@@ -17,6 +17,7 @@
  * @requires 01_Core.gs
  */
 
+// ACCEPTABLE: 40+ menu items match feature breadth for power-user audience
 // ============================================================================
 // MENU CREATION
 // ============================================================================

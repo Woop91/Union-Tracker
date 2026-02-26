@@ -25,31 +25,45 @@
  * @returns {string} The generated Member ID
  */
 function addMember(memberData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  return withScriptLock_(function() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
-  }
+    if (!sheet) {
+      throw new Error('Member Directory sheet not found');
+    }
 
-  // Generate Member ID if not provided
-  var memberId = memberData.memberId || generateMemberID_(memberData.firstName, memberData.lastName);
+    // Generate Member ID if not provided
+    var memberId = memberData.memberId || generateMemberID_(memberData.firstName, memberData.lastName);
 
-  // Find next empty row
-  var lastRow = sheet.getLastRow();
-  var newRow = lastRow + 1;
+    // Find next empty row
+    var lastRow = sheet.getLastRow();
+    var newRow = lastRow + 1;
 
-  // Set member data
-  sheet.getRange(newRow, MEMBER_COLS.MEMBER_ID).setValue(escapeForFormula(memberId));
-  sheet.getRange(newRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(memberData.firstName || ''));
-  sheet.getRange(newRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(memberData.lastName || ''));
-  sheet.getRange(newRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(memberData.email || ''));
-  sheet.getRange(newRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(memberData.phone || ''));
-  sheet.getRange(newRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(memberData.jobTitle || ''));
-  sheet.getRange(newRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(memberData.workLocation || ''));
-  sheet.getRange(newRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(memberData.unit || ''));
+    // Build row array and batch-write all fields in a single setValues() call (F15 perf fix)
+    // Determine the highest column index used so the array covers all positions
+    var maxCol = Math.max(
+      MEMBER_COLS.MEMBER_ID, MEMBER_COLS.FIRST_NAME, MEMBER_COLS.LAST_NAME,
+      MEMBER_COLS.EMAIL, MEMBER_COLS.PHONE, MEMBER_COLS.JOB_TITLE,
+      MEMBER_COLS.WORK_LOCATION, MEMBER_COLS.UNIT
+    );
+    var rowData = [];
+    for (var c = 0; c < maxCol; c++) { rowData[c] = ''; }
 
-  return memberId;
+    // Place values at correct 0-indexed positions (MEMBER_COLS are 1-indexed)
+    rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
+    rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
+    rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
+    rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
+    rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
+    rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+    rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
+    rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+
+    sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
+
+    return memberId;
+  });
 }
 
 /**
@@ -58,36 +72,38 @@ function addMember(memberData) {
  * @param {Object} updateData - Fields to update
  */
 function updateMember(memberId, updateData) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  return withScriptLock_(function() {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
-  if (!sheet) {
-    throw new Error('Member Directory sheet not found');
-  }
-
-  // Find the member row
-  var data = sheet.getDataRange().getValues();
-  var memberRow = -1;
-
-  for (var i = 1; i < data.length; i++) {
-    if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
-      memberRow = i + 1;
-      break;
+    if (!sheet) {
+      throw new Error('Member Directory sheet not found');
     }
-  }
 
-  if (memberRow === -1) {
-    throw new Error('Member not found: ' + memberId);
-  }
+    // Find the member row
+    var data = sheet.getDataRange().getValues();
+    var memberRow = -1;
 
-  // Update fields
-  if (updateData.firstName) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
-  if (updateData.lastName) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
-  if (updateData.email) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
-  if (updateData.phone) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
-  if (updateData.jobTitle) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
-  if (updateData.workLocation) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
-  if (updateData.unit) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
+        memberRow = i + 1;
+        break;
+      }
+    }
+
+    if (memberRow === -1) {
+      throw new Error('Member not found: ' + memberId);
+    }
+
+    // Update fields — use !== undefined so legitimate empty-string updates are not skipped (F16 fix)
+    if (updateData.firstName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
+    if (updateData.lastName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
+    if (updateData.email !== undefined) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
+    if (updateData.phone !== undefined) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
+    if (updateData.jobTitle !== undefined) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
+    if (updateData.workLocation !== undefined) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
+    if (updateData.unit !== undefined) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
+  });
 }
 
 /**
@@ -1253,105 +1269,112 @@ function getImportMembersHtml_() {
  * @returns {Object} Result with imported count and any errors
  */
 function importMembersFromData(data, mapping) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-    if (!sheet) {
-      return errorResponse('Member Directory sheet not found', 'bulkImportMembers');
-    }
-
-    // Get existing data for duplicate checking
-    var existingData = sheet.getDataRange().getValues();
-    var existingEmails = {};
-    var existingNames = {};
-
-    for (var i = 1; i < existingData.length; i++) {
-      var email = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
-      var name = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
-      if (email) existingEmails[email] = true;
-      if (name) existingNames[name] = true;
-    }
-
-    var imported = 0;
-    var skipped = 0;
-    var newRows = [];
-
-    for (var j = 0; j < data.length; j++) {
-      var row = data[j];
-
-      var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
-      var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
-      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
-
-      // Skip if no name
-      if (!firstName && !lastName) {
-        skipped++;
-        continue;
-      }
-
-      // Check for duplicates
-      var emailLower = email.toLowerCase();
-      var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
-
-      if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
-        skipped++;
-        continue;
-      }
-
-      // Mark as existing to prevent duplicates within import batch
-      if (emailLower) existingEmails[emailLower] = true;
-      existingNames[nameLower] = true;
-
-      // Generate Member ID
-      var memberId = generateMemberID_(firstName, lastName);
-
-      // Build new row with empty values for all columns
-      var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
-      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
-      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
-
-      if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
-      if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
-      if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
-      if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
-      if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
-      if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
-      if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
-
-      // Default Is Steward to No
-      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-
-      newRows.push(newRow);
-      imported++;
-    }
-
-    // Batch write all new rows
-    if (newRows.length > 0) {
-      var lastRow = sheet.getLastRow();
-      sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
-    }
-
-    // Log the import
-    logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
-      action: 'BULK_IMPORT',
-      importedCount: imported,
-      skippedCount: skipped,
-      importedBy: Session.getActiveUser().getEmail()
-    });
-
-    return {
-      success: true,
-      imported: imported,
-      skipped: skipped,
-      message: 'Import completed'
-    };
-
-  } catch (e) {
-    console.error('Import error: ' + e.message);
-    return errorResponse(e.message, 'bulkImportMembers');
+  var caller = Session.getEffectiveUser().getEmail();
+  if (!caller) {
+    Logger.log('Unauthorized import attempt');
+    return { success: false, message: 'Not authorized' };
   }
+  return withScriptLock_(function() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+      if (!sheet) {
+        return errorResponse('Member Directory sheet not found', 'bulkImportMembers');
+      }
+
+      // Get existing data for duplicate checking
+      var existingData = sheet.getDataRange().getValues();
+      var existingEmails = {};
+      var existingNames = {};
+
+      for (var i = 1; i < existingData.length; i++) {
+        var email = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+        var name = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
+        if (email) existingEmails[email] = true;
+        if (name) existingNames[name] = true;
+      }
+
+      var imported = 0;
+      var skipped = 0;
+      var newRows = [];
+
+      for (var j = 0; j < data.length; j++) {
+        var row = data[j];
+
+        var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
+        var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
+        var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+
+        // Skip if no name
+        if (!firstName && !lastName) {
+          skipped++;
+          continue;
+        }
+
+        // Check for duplicates
+        var emailLower = email.toLowerCase();
+        var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
+
+        if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
+          skipped++;
+          continue;
+        }
+
+        // Mark as existing to prevent duplicates within import batch
+        if (emailLower) existingEmails[emailLower] = true;
+        existingNames[nameLower] = true;
+
+        // Generate Member ID
+        var memberId = generateMemberID_(firstName, lastName);
+
+        // Build new row with empty values for all columns
+        var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
+        newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
+        newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
+        newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+
+        if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
+        if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
+        if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
+        if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
+        if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
+        if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
+        if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
+
+        // Default Is Steward to No
+        newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+
+        newRows.push(newRow);
+        imported++;
+      }
+
+      // Batch write all new rows
+      if (newRows.length > 0) {
+        var lastRow = sheet.getLastRow();
+        sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+      }
+
+      // Log the import
+      logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
+        action: 'BULK_IMPORT',
+        importedCount: imported,
+        skippedCount: skipped,
+        importedBy: caller
+      });
+
+      return {
+        success: true,
+        imported: imported,
+        skipped: skipped,
+        message: 'Import completed'
+      };
+
+    } catch (e) {
+      console.error('Import error: ' + e.message);
+      return errorResponse(e.message, 'bulkImportMembers');
+    }
+  });
 }
 
 /**
@@ -1386,100 +1409,107 @@ function getExistingMemberKeys() {
  * @returns {Object} Result with imported/skipped counts for this batch
  */
 function importMembersBatch(batchData, mapping) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-
-    if (!sheet) {
-      return errorResponse('Member Directory sheet not found', 'importMembersBatch');
-    }
-
-    // Read existing Member IDs once for this batch (for ID generation)
-    var existingIds = {};
-    if (sheet.getLastRow() > 1) {
-      var ids = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1).getValues();
-      ids.forEach(function(r) { if (r[0]) existingIds[r[0]] = true; });
-    }
-
-    var imported = 0;
-    var skipped = 0;
-    var newRows = [];
-
-    // Dedup already done client-side; just build rows and generate IDs
-    for (var j = 0; j < batchData.length; j++) {
-      var row = batchData[j];
-
-      var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
-      var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
-
-      if (!firstName && !lastName) {
-        skipped++;
-        continue;
-      }
-
-      // Generate Member ID inline using pre-read existingIds
-      var prefix = 'M';
-      var firstPart = (firstName || 'XX').substring(0, 2).toUpperCase();
-      var lastPart = (lastName || 'XX').substring(0, 2).toUpperCase();
-      var namePrefix = prefix + firstPart + lastPart;
-      var memberId = '';
-      for (var num = 100; num < 1000; num++) {
-        var newId = namePrefix + num;
-        if (!existingIds[newId]) {
-          memberId = newId;
-          existingIds[newId] = true;
-          break;
-        }
-      }
-      if (!memberId) memberId = namePrefix + String(Date.now()).slice(-3);
-
-      // Build new row
-      var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
-      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
-      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
-
-      if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
-      if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
-      if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
-      if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
-      if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
-      if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
-      if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
-
-      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-
-      newRows.push(newRow);
-      imported++;
-    }
-
-    // Batch write new rows
-    if (newRows.length > 0) {
-      var lastRow = sheet.getLastRow();
-      sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
-    }
-
-    // Log the batch import
-    if (imported > 0) {
-      logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
-        action: 'BATCH_IMPORT',
-        importedCount: imported,
-        skippedCount: skipped,
-        importedBy: Session.getActiveUser().getEmail()
-      });
-    }
-
-    return {
-      success: true,
-      imported: imported,
-      skipped: skipped,
-      message: 'Batch import completed'
-    };
-
-  } catch (e) {
-    console.error('Batch import error: ' + e.message);
-    return errorResponse(e.message, 'importMembersBatch');
+  var caller = Session.getEffectiveUser().getEmail();
+  if (!caller) {
+    Logger.log('Unauthorized batch import attempt');
+    return { success: false, message: 'Not authorized' };
   }
+  return withScriptLock_(function() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+
+      if (!sheet) {
+        return errorResponse('Member Directory sheet not found', 'importMembersBatch');
+      }
+
+      // Read existing Member IDs once for this batch (for ID generation)
+      var existingIds = {};
+      if (sheet.getLastRow() > 1) {
+        var ids = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, sheet.getLastRow() - 1, 1).getValues();
+        ids.forEach(function(r) { if (r[0]) existingIds[r[0]] = true; });
+      }
+
+      var imported = 0;
+      var skipped = 0;
+      var newRows = [];
+
+      // Dedup already done client-side; just build rows and generate IDs
+      for (var j = 0; j < batchData.length; j++) {
+        var row = batchData[j];
+
+        var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
+        var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
+
+        if (!firstName && !lastName) {
+          skipped++;
+          continue;
+        }
+
+        // Generate Member ID inline using pre-read existingIds
+        var prefix = 'M';
+        var firstPart = (firstName || 'XX').substring(0, 2).toUpperCase();
+        var lastPart = (lastName || 'XX').substring(0, 2).toUpperCase();
+        var namePrefix = prefix + firstPart + lastPart;
+        var memberId = '';
+        for (var num = 100; num < 1000; num++) {
+          var newId = namePrefix + num;
+          if (!existingIds[newId]) {
+            memberId = newId;
+            existingIds[newId] = true;
+            break;
+          }
+        }
+        if (!memberId) memberId = namePrefix + String(Date.now()).slice(-3);
+
+        // Build new row
+        var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
+        newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
+        newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
+        newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+
+        if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
+        if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
+        if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
+        if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
+        if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
+        if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
+        if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
+
+        newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+
+        newRows.push(newRow);
+        imported++;
+      }
+
+      // Batch write new rows
+      if (newRows.length > 0) {
+        var lastRow = sheet.getLastRow();
+        sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+      }
+
+      // Log the batch import
+      if (imported > 0) {
+        logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
+          action: 'BATCH_IMPORT',
+          importedCount: imported,
+          skippedCount: skipped,
+          importedBy: caller
+        });
+      }
+
+      return {
+        success: true,
+        imported: imported,
+        skipped: skipped,
+        message: 'Batch import completed'
+      };
+
+    } catch (e) {
+      console.error('Batch import error: ' + e.message);
+      return errorResponse(e.message, 'importMembersBatch');
+    }
+  });
 }
 
 /**
@@ -1487,7 +1517,17 @@ function importMembersBatch(batchData, mapping) {
  * Allows exporting members to CSV or Google Sheets
  */
 function showExportMembersDialog() {
+  // Permission check: only editors can export member data (viewers lack menu access anyway)
   var ui = SpreadsheetApp.getUi();
+  try {
+    var authResult = checkWebAppAuthorization('steward');
+    if (!authResult.isAuthorized) {
+      ui.alert('Access Denied', 'Steward or admin access is required to export member data.', ui.ButtonSet.OK);
+      return;
+    }
+  } catch (_e) {
+    // If auth check fails (e.g. no Config sheet yet), allow — menu access implies editor role
+  }
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
@@ -1572,15 +1612,15 @@ function startNewGrievance(grievanceData) {
     const rowData = new Array(totalCols).fill('');
 
     rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1]   = grievanceId;
-    rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = grievanceData.memberId || '';
-    rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = grievanceData.memberName || '';
+    rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = escapeForFormula(grievanceData.memberId || '');
+    rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = escapeForFormula(grievanceData.memberName || '');
     rowData[GRIEVANCE_COLS.STATUS - 1]          = GRIEVANCE_STATUS.OPEN;
     rowData[GRIEVANCE_COLS.CURRENT_STEP - 1]    = 1;
     rowData[GRIEVANCE_COLS.DATE_FILED - 1]      = filingDate;
     rowData[GRIEVANCE_COLS.STEP1_DUE - 1]       = deadlines.step1Due;
-    rowData[GRIEVANCE_COLS.ARTICLES - 1]        = grievanceData.articleViolated || '';
-    rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = grievanceData.grievanceType || '';
-    rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = grievanceData.notes || '';
+    rowData[GRIEVANCE_COLS.ARTICLES - 1]        = escapeForFormula(grievanceData.articleViolated || '');
+    rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = escapeForFormula(grievanceData.grievanceType || '');
+    rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = escapeForFormula(grievanceData.notes || '');
     rowData[GRIEVANCE_COLS.LAST_UPDATED - 1]    = new Date();
 
     // Append to sheet
@@ -1638,7 +1678,7 @@ function handleGrievanceDialogSubmit(formData) {
         const grievanceIds = grievanceSheet.getRange(2, GRIEVANCE_COLS.GRIEVANCE_ID, lastRow - 1, 1).getValues();
         for (let i = 0; i < grievanceIds.length; i++) {
           if (grievanceIds[i][0] === result.grievanceId) {
-            grievanceSheet.getRange(i + 2, GRIEVANCE_COLS.ACTION_TYPE).setValue(grievanceData.actionType);
+            grievanceSheet.getRange(i + 2, GRIEVANCE_COLS.ACTION_TYPE).setValue(escapeForFormula(grievanceData.actionType));
             break;
           }
         }
@@ -1893,10 +1933,12 @@ function advanceGrievanceStep(grievanceId, options) {
     updates.push({ col: GRIEVANCE_COLS.LAST_UPDATED, val: today });
 
     if (nextStep <= 3) {
-      const nextStepDateCol = getStepDateColumn(nextStep);
-      updates.push({ col: nextStepDateCol, val: today });
-      updates.push({ col: nextStepDateCol + 1, val: responseDue });
-      updates.push({ col: nextStepDateCol + 2, val: 'Pending' });
+      const stepCols = getStepColumnSet(nextStep);
+      updates.push({ col: stepCols.filed, val: today });
+      updates.push({ col: stepCols.due, val: responseDue });
+      if (stepCols.rcvd) {
+        updates.push({ col: stepCols.rcvd, val: 'Pending' });
+      }
     } else {
       updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
@@ -1906,8 +1948,8 @@ function advanceGrievanceStep(grievanceId, options) {
       const existingResolution = data[rowIndex - 1][GRIEVANCE_COLS.RESOLUTION - 1] || '';
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
       const newResolution = existingResolution + (existingResolution ? '\n' : '') +
-                       `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${options.notes}`;
-      updates.push({ col: GRIEVANCE_COLS.RESOLUTION, val: newResolution });
+                       `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${escapeForFormula(options.notes)}`;
+      updates.push({ col: GRIEVANCE_COLS.RESOLUTION, val: escapeForFormula(newResolution) });
     }
 
     // Write all collected updates
@@ -1946,6 +1988,33 @@ function getStepDateColumn(step) {
     case 1: return GRIEVANCE_COLS.STEP1_RCVD;
     case 2: return GRIEVANCE_COLS.STEP2_APPEAL_FILED;
     case 3: return GRIEVANCE_COLS.STEP3_APPEAL_FILED;
+    default: return null;
+  }
+}
+
+/**
+ * Returns explicit column references for a step's filed/due/rcvd columns.
+ * Avoids hardcoded +1/+2 offsets that break when header order changes.
+ * @param {number} step - Step number (1-3)
+ * @return {Object|null} { filed, due, rcvd } column numbers (1-indexed), or null
+ */
+function getStepColumnSet(step) {
+  switch (step) {
+    case 1: return {
+      filed: GRIEVANCE_COLS.STEP1_RCVD,
+      due:   GRIEVANCE_COLS.STEP1_DUE,
+      rcvd:  null  // Step 1 has no separate received column
+    };
+    case 2: return {
+      filed: GRIEVANCE_COLS.STEP2_APPEAL_FILED,
+      due:   GRIEVANCE_COLS.STEP2_DUE,
+      rcvd:  GRIEVANCE_COLS.STEP2_RCVD
+    };
+    case 3: return {
+      filed: GRIEVANCE_COLS.STEP3_APPEAL_FILED,
+      due:   GRIEVANCE_COLS.STEP3_APPEAL_DUE,
+      rcvd:  null  // Step 3 has no separate received column
+    };
     default: return null;
   }
 }
@@ -1991,13 +2060,13 @@ function recalcAllGrievancesBatched() {
         status === GRIEVANCE_STATUS.APPEALED) {
 
       const currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
-      const stepDate = row[getStepDateColumn(currentStep) - 1]; // 0-indexed for data array
+      const stepCols = getStepColumnSet(currentStep);
+      const stepDate = stepCols ? row[stepCols.filed - 1] : null; // 0-indexed for data array
 
-      if (stepDate instanceof Date) {
+      if (stepDate instanceof Date && stepCols && stepCols.due) {
         const newDue = calculateResponseDeadline(currentStep, stepDate);
-        const dueColumn = getStepDateColumn(currentStep) + 1; // Due is next column after date
 
-        sheet.getRange(i + 1, dueColumn).setValue(newDue);
+        sheet.getRange(i + 1, stepCols.due).setValue(newDue);
         updatedCount++;
       }
     }
@@ -2055,8 +2124,8 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
       if (notes) {
         const existingResolution = data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '';
         const newResolution = existingResolution + (existingResolution ? '\n' : '') +
-                         `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
-        sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(newResolution);
+                         `[${timestamp}] Bulk status update to "${escapeForFormula(newStatus)}": ${escapeForFormula(notes)}`;
+        sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(newResolution));
       }
 
       updatedCount++;
@@ -2322,7 +2391,7 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
       resolutionText += (resolutionText ? '\n' : '') +
                         '[' + timestamp + '] ' + notes;
     }
-    sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(resolutionText);
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(resolutionText));
     sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(GRIEVANCE_STATUS.RESOLVED);
     sheet.getRange(rowIndex, GRIEVANCE_COLS.DATE_CLOSED).setValue(today);
     sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
@@ -2811,4 +2880,265 @@ function highlightUrgentGrievances() {
   }
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Urgent grievances highlighted', COMMAND_CONFIG.SYSTEM_NAME, 3);
+}
+
+// ============================================================================
+// BULK ACTIONS — Grievance Log (PHASE2 Feature 4)
+// ============================================================================
+
+/**
+ * Reads the QUICK_ACTIONS checkbox column from the Grievance Log and returns
+ * an array of 1-indexed row numbers where the checkbox is TRUE.
+ * @returns {number[]} Row numbers of selected grievances
+ */
+function getSelectedGrievanceRows() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return [];
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  var checkboxData = sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, lastRow - 1, 1).getValues();
+  var selected = [];
+  for (var i = 0; i < checkboxData.length; i++) {
+    if (checkboxData[i][0] === true) {
+      selected.push(i + 2); // Convert to 1-indexed row number
+    }
+  }
+  return selected;
+}
+
+/**
+ * Sets MESSAGE_ALERT to TRUE for the given row numbers in the Grievance Log.
+ * Uses batch write for performance.
+ * @param {number[]} rowNumbers - 1-indexed row numbers to flag
+ * @returns {{success: boolean, count: number, error: string}}
+ */
+function bulkFlagGrievances(rowNumbers) {
+  var caller = Session.getEffectiveUser().getEmail();
+  if (!caller) {
+    Logger.log('Unauthorized bulk flag attempt');
+    return { success: false, message: 'Not authorized' };
+  }
+  if (!rowNumbers || !rowNumbers.length) {
+    return errorResponse('No rows selected');
+  }
+  return withScriptLock_(function() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+      if (!sheet) return errorResponse('Grievance Log sheet not found');
+
+      var count = 0;
+      for (var i = 0; i < rowNumbers.length; i++) {
+        var row = rowNumbers[i];
+        if (typeof row !== 'number' || row < 2) continue;
+        sheet.getRange(row, GRIEVANCE_COLS.MESSAGE_ALERT).setValue(true);
+        count++;
+      }
+
+      logAuditEvent('BULK_FLAG_GRIEVANCES', 'Flagged ' + count + ' grievances for message alert. Rows: ' + rowNumbers.join(', '));
+
+      return successResponse({ count: count }, 'Flagged ' + count + ' grievance(s) for message alert');
+    } catch (e) {
+      handleError(e, 'bulkFlagGrievances');
+      return errorResponse(e.message, 'bulkFlagGrievances');
+    }
+  });
+}
+
+/**
+ * Sends a bulk email to members associated with the selected grievance rows.
+ * @param {number[]} rowNumbers - 1-indexed row numbers
+ * @param {string} subject - Email subject line
+ * @param {string} body - Email body (plain text)
+ * @returns {{success: boolean, data: {sent: number, failed: number, skipped: number}, error: string}}
+ */
+function bulkEmailGrievanceMembers(rowNumbers, subject, body) {
+  var caller = Session.getEffectiveUser().getEmail();
+  if (!caller) {
+    Logger.log('Unauthorized bulk email attempt');
+    return { success: false, message: 'Not authorized' };
+  }
+  if (!rowNumbers || !rowNumbers.length) {
+    return errorResponse('No rows selected');
+  }
+  if (!subject || !body) {
+    return errorResponse('Subject and body are required');
+  }
+  return withScriptLock_(function() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+      if (!sheet) return errorResponse('Grievance Log sheet not found');
+
+      var sent = 0;
+      var failed = 0;
+      var skipped = 0;
+      var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      for (var i = 0; i < rowNumbers.length; i++) {
+        var row = rowNumbers[i];
+        if (typeof row !== 'number' || row < 2) { skipped++; continue; }
+
+        var email = sheet.getRange(row, GRIEVANCE_COLS.MEMBER_EMAIL).getValue();
+        if (!email || !emailRegex.test(String(email).trim())) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          var emailSent = safeSendEmail({
+            to: String(email).trim(),
+            subject: subject,
+            body: body
+          });
+          if (emailSent) { sent++; } else { failed++; }
+        } catch (emailErr) {
+          Logger.log('bulkEmailGrievanceMembers: failed for row ' + row + ': ' + emailErr.message);
+          failed++;
+        }
+      }
+
+      logAuditEvent('BULK_EMAIL_GRIEVANCE_MEMBERS', 'Sent ' + sent + ', failed ' + failed + ', skipped ' + skipped + ' of ' + rowNumbers.length + ' selected rows');
+
+      return successResponse(
+        { sent: sent, failed: failed, skipped: skipped },
+        'Sent ' + sent + ' email(s), ' + failed + ' failed, ' + skipped + ' skipped (no valid email)'
+      );
+    } catch (e) {
+      handleError(e, 'bulkEmailGrievanceMembers');
+      return errorResponse(e.message, 'bulkEmailGrievanceMembers');
+    }
+  });
+}
+
+/**
+ * Exports selected grievance rows as CSV and emails it to the current user.
+ * @param {number[]} rowNumbers - 1-indexed row numbers to export
+ * @returns {{success: boolean, message: string, error: string}}
+ */
+function bulkExportGrievancesToCsv(rowNumbers) {
+  var caller = Session.getEffectiveUser().getEmail();
+  if (!caller) {
+    Logger.log('Unauthorized bulk export attempt');
+    return { success: false, message: 'Not authorized' };
+  }
+  if (!rowNumbers || !rowNumbers.length) {
+    return errorResponse('No rows selected');
+  }
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (!sheet) return errorResponse('Grievance Log sheet not found');
+
+    var userEmail = Session.getActiveUser().getEmail();
+    if (!userEmail) return errorResponse('Could not determine current user email');
+
+    // Get header row
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+
+    // Build CSV rows
+    var csvRows = [];
+    // Header row — escape for CSV
+    csvRows.push(headers.map(function(h) {
+      return '"' + String(h).replace(/"/g, '""') + '"';
+    }).join(','));
+
+    // Data rows
+    for (var i = 0; i < rowNumbers.length; i++) {
+      var row = rowNumbers[i];
+      if (typeof row !== 'number' || row < 2) continue;
+      var rowData = sheet.getRange(row, 1, 1, lastCol).getValues()[0];
+      csvRows.push(rowData.map(function(cell) {
+        var val = (cell instanceof Date) ? cell.toISOString() : String(cell);
+        return '"' + val.replace(/"/g, '""') + '"';
+      }).join(','));
+    }
+
+    var csvContent = csvRows.join('\r\n');
+    var blob = Utilities.newBlob(csvContent, 'text/csv', 'grievance_export_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HHmmss') + '.csv');
+
+    safeSendEmail({
+      to: userEmail,
+      subject: 'Grievance Export — ' + rowNumbers.length + ' records',
+      body: 'Attached is a CSV export of ' + rowNumbers.length + ' selected grievance record(s).\n\nExported on: ' + new Date().toLocaleString(),
+      attachments: [blob]
+    });
+
+    logAuditEvent('BULK_EXPORT_GRIEVANCES_CSV', 'Exported ' + rowNumbers.length + ' grievances as CSV to ' + userEmail);
+
+    return successResponse(null, 'CSV with ' + rowNumbers.length + ' record(s) sent to ' + userEmail);
+  } catch (e) {
+    handleError(e, 'bulkExportGrievancesToCsv');
+    return errorResponse(e.message, 'bulkExportGrievancesToCsv');
+  }
+}
+
+/**
+ * Selects (checks) QUICK_ACTIONS for all open/pending grievance rows.
+ * @returns {{success: boolean, count: number}}
+ */
+function selectAllOpenCases() {
+  return withScriptLock_(function() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+      if (!sheet) return errorResponse('Grievance Log sheet not found');
+
+      var lastRow = sheet.getLastRow();
+      if (lastRow < 2) return successResponse({ count: 0 }, 'No data rows found');
+
+      var statusData = sheet.getRange(2, GRIEVANCE_COLS.STATUS, lastRow - 1, 1).getValues();
+      var checkboxValues = [];
+      var count = 0;
+
+      for (var i = 0; i < statusData.length; i++) {
+        var status = String(statusData[i][0]).trim().toLowerCase();
+        var isOpen = (status === 'open' || status === 'pending info');
+        if (isOpen) count++;
+        checkboxValues.push([isOpen]);
+      }
+
+      sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, lastRow - 1, 1).setValues(checkboxValues);
+
+      SpreadsheetApp.getActiveSpreadsheet().toast('Selected ' + count + ' open/pending cases', COMMAND_CONFIG.SYSTEM_NAME, 3);
+      return successResponse({ count: count }, 'Selected ' + count + ' open/pending case(s)');
+    } catch (e) {
+      handleError(e, 'selectAllOpenCases');
+      return errorResponse(e.message, 'selectAllOpenCases');
+    }
+  });
+}
+
+/**
+ * Clears (unchecks) all QUICK_ACTIONS checkboxes in the Grievance Log.
+ * @returns {{success: boolean, message: string}}
+ */
+function clearAllSelections() {
+  return withScriptLock_(function() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+      if (!sheet) return errorResponse('Grievance Log sheet not found');
+
+      var lastRow = sheet.getLastRow();
+      if (lastRow < 2) return successResponse(null, 'No data rows to clear');
+
+      var clearValues = [];
+      for (var i = 0; i < lastRow - 1; i++) {
+        clearValues.push([false]);
+      }
+
+      sheet.getRange(2, GRIEVANCE_COLS.QUICK_ACTIONS, lastRow - 1, 1).setValues(clearValues);
+
+      SpreadsheetApp.getActiveSpreadsheet().toast('Selection cleared', COMMAND_CONFIG.SYSTEM_NAME, 3);
+      return successResponse(null, 'All selections cleared');
+    } catch (e) {
+      handleError(e, 'clearAllSelections');
+      return errorResponse(e.message, 'clearAllSelections');
+    }
+  });
 }

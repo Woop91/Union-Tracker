@@ -1,14 +1,14 @@
 /**
  * DataService.gs
  * Data access layer for the web app dashboard.
- * 
+ *
  * Reads from:
  *   - Member Directory sheet
  *   - Grievance Log sheet
- * 
+ *
  * All column positions are resolved dynamically by header name.
  * NEVER hardcode column indices.
- * 
+ *
  * Access control:
  *   - Stewards see all cases assigned to them
  *   - Members see only their own grievances
@@ -16,11 +16,11 @@
  */
 
 var DataService = (function () {
-  
+
   // Sheet names — read from Config if available, fallback to defaults
   var MEMBER_SHEET = 'Member Directory';
   var GRIEVANCE_SHEET = 'Grievance Log';
-  
+
   // Header name mappings — these are the expected header labels
   // If your sheet uses different labels, update these OR add aliases
   var HEADERS = {
@@ -46,7 +46,7 @@ var DataService = (function () {
     memberHasOpenGrievance: ['has open grievance?', 'has open grievance', 'open grievance'],
     memberSupervisor: ['supervisor'],
     memberJobTitle:  ['job title', 'title', 'position'],
-    
+
     // Grievance Log
     grievanceId:     ['grievance id', 'id', 'case id', 'gr id'],
     grievanceMemberEmail: ['member email', 'email', 'filed by email', 'grievant email'],
@@ -58,12 +58,15 @@ var DataService = (function () {
     grievanceUnit:   ['unit', 'workplace unit'],
     grievancePriority: ['priority', 'urgency'],
     grievanceNotes:  ['notes', 'description', 'summary'],
+    grievanceIssueCategory: ['issue category', 'category', 'issue type'],
+    grievanceResolution: ['resolution', 'outcome', 'result'],
+    grievanceDateClosed: ['date closed', 'closed date', 'closed', 'resolved date'],
   };
-  
+
   // ═══════════════════════════════════════
   // PUBLIC: User Lookup
   // ═══════════════════════════════════════
-  
+
   /**
    * Finds a user in the Member Directory by email.
    * Returns sanitized user record or null.
@@ -73,27 +76,27 @@ var DataService = (function () {
   function findUserByEmail(email) {
     if (!email) return null;
     email = String(email).trim().toLowerCase();
-    
+
     var sheet = _getSheet(MEMBER_SHEET);
     if (!sheet) return null;
-    
+
     var data = sheet.getDataRange().getValues();
     var headers = data[0];
     var colMap = _buildColumnMap(headers);
-    
+
     var emailCol = _findColumn(colMap, HEADERS.memberEmail);
     if (emailCol === -1) return null;
-    
+
     for (var i = 1; i < data.length; i++) {
       var rowEmail = String(data[i][emailCol]).trim().toLowerCase();
       if (rowEmail === email) {
         return _buildUserRecord(data[i], colMap);
       }
     }
-    
+
     return null;
   }
-  
+
   /**
    * Returns the role for a given email.
    * @param {string} email
@@ -104,11 +107,11 @@ var DataService = (function () {
     if (!user) return null;
     return user.role;
   }
-  
+
   // ═══════════════════════════════════════
   // PUBLIC: Steward Data
   // ═══════════════════════════════════════
-  
+
   /**
    * Returns all grievances assigned to a steward.
    * @param {string} stewardEmail
@@ -116,20 +119,20 @@ var DataService = (function () {
    */
   function getStewardCases(stewardEmail) {
     stewardEmail = String(stewardEmail).trim().toLowerCase();
-    
+
     var sheet = _getSheet(GRIEVANCE_SHEET);
     if (!sheet) return [];
-    
+
     var data = sheet.getDataRange().getValues();
     var headers = data[0];
     var colMap = _buildColumnMap(headers);
-    
+
     var stewardCol = _findColumn(colMap, HEADERS.grievanceSteward);
     if (stewardCol === -1) {
       Logger.log('DataService: Steward column not found in Grievance Log');
       return [];
     }
-    
+
     var cases = [];
     for (var i = 1; i < data.length; i++) {
       var assignedTo = String(data[i][stewardCol]).trim().toLowerCase();
@@ -137,17 +140,17 @@ var DataService = (function () {
         cases.push(_buildGrievanceRecord(data[i], colMap));
       }
     }
-    
+
     // Sort: overdue first, then by deadline ascending
     cases.sort(function (a, b) {
       if (a.status === 'overdue' && b.status !== 'overdue') return -1;
       if (b.status === 'overdue' && a.status !== 'overdue') return 1;
       return (a.deadlineDays || 999) - (b.deadlineDays || 999);
     });
-    
+
     return cases;
   }
-  
+
   /**
    * Returns KPIs for a steward's personal caseload.
    * @param {string} stewardEmail
@@ -155,20 +158,20 @@ var DataService = (function () {
    */
   function getStewardKPIs(stewardEmail) {
     var cases = getStewardCases(stewardEmail);
-    
+
     var now = new Date();
     var sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    
+
     var total = cases.length;
     var overdue = 0;
     var dueSoon = 0;
     var resolved = 0;
     var active = 0;
-    
+
     for (var i = 0; i < cases.length; i++) {
       var c = cases[i];
       var status = String(c.status).toLowerCase();
-      
+
       if (status === 'resolved') {
         resolved++;
       } else if (status === 'overdue') {
@@ -180,7 +183,7 @@ var DataService = (function () {
         }
       }
     }
-    
+
     return {
       totalCases: total,
       activeCases: active,
@@ -189,11 +192,11 @@ var DataService = (function () {
       resolved: resolved,
     };
   }
-  
+
   // ═══════════════════════════════════════
   // PUBLIC: Member Data
   // ═══════════════════════════════════════
-  
+
   /**
    * Returns grievances for a specific member (their own only).
    * @param {string} memberEmail
@@ -201,17 +204,17 @@ var DataService = (function () {
    */
   function getMemberGrievances(memberEmail) {
     memberEmail = String(memberEmail).trim().toLowerCase();
-    
+
     var sheet = _getSheet(GRIEVANCE_SHEET);
     if (!sheet) return [];
-    
+
     var data = sheet.getDataRange().getValues();
     var headers = data[0];
     var colMap = _buildColumnMap(headers);
-    
+
     var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
     if (memberCol === -1) return [];
-    
+
     var grievances = [];
     for (var i = 1; i < data.length; i++) {
       var rowEmail = String(data[i][memberCol]).trim().toLowerCase();
@@ -219,15 +222,93 @@ var DataService = (function () {
         grievances.push(_buildGrievanceRecord(data[i], colMap));
       }
     }
-    
+
     // Sort by filed date, most recent first
     grievances.sort(function (a, b) {
       return (b.filedTimestamp || 0) - (a.filedTimestamp || 0);
     });
-    
+
     return grievances;
   }
-  
+
+  /**
+   * Returns resolved/closed grievance history for a member.
+   * Only includes cases with terminal statuses. Excludes internal notes,
+   * steward names, and other sensitive fields for member privacy.
+   * @param {string} memberEmail
+   * @returns {Object} { success: true, history: [...] }
+   */
+  function getMemberGrievanceHistory(memberEmail) {
+    if (!memberEmail) return { success: true, history: [] };
+    memberEmail = String(memberEmail).trim().toLowerCase();
+
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return { success: true, history: [] };
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+
+    var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
+    if (memberCol === -1) return { success: true, history: [] };
+
+    var closedStatuses = ['settled', 'won', 'denied', 'withdrawn', 'closed'];
+    var history = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][memberCol]).trim().toLowerCase();
+      if (rowEmail !== memberEmail) continue;
+
+      var status = String(_getVal(data[i], colMap, HEADERS.grievanceStatus, '')).trim().toLowerCase();
+      if (closedStatuses.indexOf(status) === -1) continue;
+
+      var filedRaw = _getVal(data[i], colMap, HEADERS.grievanceFiled, null);
+      var filedFormatted = '';
+      var filedTimestamp = 0;
+      if (filedRaw instanceof Date) {
+        filedFormatted = _formatDate(filedRaw);
+        filedTimestamp = filedRaw.getTime();
+      } else if (filedRaw) {
+        var parsed = new Date(filedRaw);
+        if (!isNaN(parsed.getTime())) {
+          filedFormatted = _formatDate(parsed);
+          filedTimestamp = parsed.getTime();
+        }
+      }
+
+      var closedRaw = _getVal(data[i], colMap, HEADERS.grievanceDateClosed, null);
+      var closedFormatted = '';
+      if (closedRaw instanceof Date) {
+        closedFormatted = _formatDate(closedRaw);
+      } else if (closedRaw) {
+        var parsedClosed = new Date(closedRaw);
+        if (!isNaN(parsedClosed.getTime())) {
+          closedFormatted = _formatDate(parsedClosed);
+        }
+      }
+
+      history.push({
+        grievanceId: String(_getVal(data[i], colMap, HEADERS.grievanceId, '')).trim(),
+        issueCategory: String(_getVal(data[i], colMap, HEADERS.grievanceIssueCategory, '')).trim(),
+        status: status.charAt(0).toUpperCase() + status.slice(1),
+        outcome: String(_getVal(data[i], colMap, HEADERS.grievanceResolution, '')).trim(),
+        dateFiled: filedFormatted,
+        dateClosed: closedFormatted,
+        filedTimestamp: filedTimestamp,
+      });
+    }
+
+    // Sort by filed date descending (most recent first)
+    history.sort(function(a, b) {
+      return (b.filedTimestamp || 0) - (a.filedTimestamp || 0);
+    });
+
+    // Strip timestamp from returned data
+    history.forEach(function(h) { delete h.filedTimestamp; });
+
+    return { success: true, history: history };
+  }
+
   /**
    * Returns steward contact info for a member.
    * Only returns email (always) and phone (if listed).
@@ -238,14 +319,14 @@ var DataService = (function () {
     if (!stewardEmail) return null;
     var user = findUserByEmail(stewardEmail);
     if (!user) return null;
-    
+
     return {
       name: user.name || user.firstName + ' ' + user.lastName,
       email: user.email,
       phone: user.phone || null, // Only if listed
     };
   }
-  
+
   // ═══════════════════════════════════════
   // PUBLIC: Full Profile & Profile Updates
   // ═══════════════════════════════════════
@@ -696,7 +777,7 @@ var DataService = (function () {
   // ═══════════════════════════════════════
   // PUBLIC: Shared Data (non-PII)
   // ═══════════════════════════════════════
-  
+
   /**
    * Returns the list of units from the directory (no PII).
    * Useful for filter dropdowns.
@@ -705,25 +786,25 @@ var DataService = (function () {
   function getUnits() {
     var sheet = _getSheet(MEMBER_SHEET);
     if (!sheet) return [];
-    
+
     var data = sheet.getDataRange().getValues();
     var colMap = _buildColumnMap(data[0]);
     var unitCol = _findColumn(colMap, HEADERS.memberUnit);
     if (unitCol === -1) return [];
-    
+
     var units = {};
     for (var i = 1; i < data.length; i++) {
       var unit = String(data[i][unitCol]).trim();
       if (unit) units[unit] = true;
     }
-    
+
     return Object.keys(units).sort();
   }
-  
+
   // ═══════════════════════════════════════
   // PRIVATE: Sheet & Column Helpers
   // ═══════════════════════════════════════
-  
+
   function _getSheet(name) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(name);
@@ -732,7 +813,7 @@ var DataService = (function () {
     }
     return sheet;
   }
-  
+
   /**
    * Builds a map of normalized header names to column indices.
    * @param {Array} headerRow
@@ -748,7 +829,7 @@ var DataService = (function () {
     }
     return map;
   }
-  
+
   /**
    * Finds a column index given an array of possible header names.
    * Returns the index of the first match, or -1 if none found.
@@ -765,7 +846,7 @@ var DataService = (function () {
     }
     return -1;
   }
-  
+
   /**
    * Safe getter — returns cell value or default
    */
@@ -775,22 +856,22 @@ var DataService = (function () {
     var val = row[col];
     return (val === null || val === undefined) ? (defaultVal !== undefined ? defaultVal : '') : val;
   }
-  
+
   function _buildUserRecord(row, colMap) {
     var firstName = String(_getVal(row, colMap, HEADERS.memberFirstName, '')).trim();
     var lastName = String(_getVal(row, colMap, HEADERS.memberLastName, '')).trim();
     var fullName = String(_getVal(row, colMap, HEADERS.memberName, '')).trim();
-    
+
     if (!fullName && (firstName || lastName)) {
       fullName = (firstName + ' ' + lastName).trim();
     }
-    
+
     var roleRaw = String(_getVal(row, colMap, HEADERS.memberRole, 'member')).trim().toLowerCase();
     // Normalize role
     var role = 'member';
     if (roleRaw === 'steward' || roleRaw === 'rep' || roleRaw === 'representative') role = 'steward';
     if (roleRaw === 'both' || roleRaw === 'steward/member') role = 'both';
-    
+
     var hasGrievance = String(_getVal(row, colMap, HEADERS.memberHasOpenGrievance, '')).trim().toLowerCase();
 
     return {
@@ -817,12 +898,12 @@ var DataService = (function () {
       jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
     };
   }
-  
+
   function _buildGrievanceRecord(row, colMap) {
     var deadlineRaw = _getVal(row, colMap, HEADERS.grievanceDeadline, null);
     var deadlineDays = null;
     var deadlineFormatted = '—';
-    
+
     if (deadlineRaw && deadlineRaw instanceof Date) {
       var now = new Date();
       var diff = deadlineRaw.getTime() - now.getTime();
@@ -837,7 +918,7 @@ var DataService = (function () {
         deadlineFormatted = _formatDate(parsed);
       }
     }
-    
+
     var filedRaw = _getVal(row, colMap, HEADERS.grievanceFiled, null);
     var filedFormatted = '';
     var filedTimestamp = 0;
@@ -851,14 +932,14 @@ var DataService = (function () {
         filedTimestamp = parsed.getTime();
       }
     }
-    
+
     var status = String(_getVal(row, colMap, HEADERS.grievanceStatus, 'new')).trim().toLowerCase();
-    
+
     // Auto-detect overdue if deadline is past and status is active
     if (deadlineDays !== null && deadlineDays < 0 && status !== 'resolved') {
       status = 'overdue';
     }
-    
+
     return {
       id: String(_getVal(row, colMap, HEADERS.grievanceId, '')).trim(),
       memberEmail: String(_getVal(row, colMap, HEADERS.grievanceMemberEmail, '')).trim().toLowerCase(),
@@ -874,12 +955,12 @@ var DataService = (function () {
       notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
     };
   }
-  
+
   function _formatDate(date) {
     var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
   }
-  
+
   // ═══════════════════════════════════════
   // PUBLIC: Contact Log (v4.12.0)
   // ═══════════════════════════════════════
@@ -1188,6 +1269,7 @@ var DataService = (function () {
     getStewardCases: getStewardCases,
     getStewardKPIs: getStewardKPIs,
     getMemberGrievances: getMemberGrievances,
+    getMemberGrievanceHistory: getMemberGrievanceHistory,
     getStewardContact: getStewardContact,
     getUnits: getUnits,
     getFullMemberProfile: getFullMemberProfile,
@@ -1228,6 +1310,7 @@ var DataService = (function () {
 function dataGetStewardCases(email) { return DataService.getStewardCases(email); }
 function dataGetStewardKPIs(email) { return DataService.getStewardKPIs(email); }
 function dataGetMemberGrievances(email) { return DataService.getMemberGrievances(email); }
+function dataGetMemberGrievanceHistory(email) { return DataService.getMemberGrievanceHistory(email); }
 function dataGetStewardContact(email) { return DataService.getStewardContact(email); }
 function dataGetUserRole(email) { return DataService.getUserRole(email); }
 function dataGetUserProfile(email) { return DataService.findUserByEmail(email); }
@@ -1261,3 +1344,90 @@ function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
 function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
 function dataGetMembershipStats() { return DataService.getMembershipStats(); }
 function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(limit); }
+
+// ═══════════════════════════════════════
+// WELCOME EXPERIENCE (PHASE2)
+// Uses PropertiesService to track first-visit state per user.
+// ═══════════════════════════════════════
+
+/**
+ * Returns welcome/onboarding data for the current user.
+ * Checks if this is the user's first visit by looking up a property key.
+ * @param {string} email - User email
+ * @returns {Object} { isFirstVisit, userName, role, quickActions }
+ */
+function dataGetWelcomeData(email) {
+  if (!email) return { isFirstVisit: false, userName: '', role: 'member', quickActions: [] };
+  email = String(email).trim().toLowerCase();
+
+  var userRecord = DataService.findUserByEmail(email);
+  var firstName = '';
+  var role = 'member';
+  if (userRecord) {
+    firstName = userRecord.firstName || (userRecord.name || '').split(' ')[0] || '';
+    role = userRecord.role || 'member';
+  }
+
+  // Check first-visit flag using script properties (user properties not available
+  // in web app context running as "me"). Use a hash of email as key.
+  var emailHash = _welcomeEmailHash(email);
+  var propKey = 'WELCOME_DISMISSED_' + emailHash;
+  var props = PropertiesService.getScriptProperties();
+  var dismissed = props.getProperty(propKey);
+  var isFirstVisit = !dismissed;
+
+  // Build role-appropriate quick actions
+  var quickActions = [];
+  if (role === 'steward' || role === 'both') {
+    quickActions = [
+      { label: 'View Cases', icon: '\uD83D\uDCCB', action: 'cases' },
+      { label: 'Check Deadlines', icon: '\u23F0', action: 'deadlines' },
+      { label: 'Member Directory', icon: '\uD83D\uDC65', action: 'members' },
+      { label: 'Manage Tasks', icon: '\u2705', action: 'tasks' },
+    ];
+  } else {
+    quickActions = [
+      { label: 'View My Cases', icon: '\uD83D\uDCCB', action: 'cases' },
+      { label: 'Update Contact Info', icon: '\uD83D\uDC64', action: 'profile' },
+      { label: 'Check Resources', icon: '\uD83D\uDCDA', action: 'resources' },
+      { label: 'Contact ' + (ConfigReader.getConfig().stewardLabel || 'Steward'), icon: '\uD83D\uDCAC', action: 'contact' },
+    ];
+  }
+
+  return {
+    isFirstVisit: isFirstVisit,
+    userName: firstName,
+    role: role,
+    quickActions: quickActions,
+  };
+}
+
+/**
+ * Marks the welcome experience as dismissed for a user.
+ * @param {string} email - User email
+ * @returns {Object} { success: boolean }
+ */
+function dataMarkWelcomeDismissed(email) {
+  if (!email) return { success: false };
+  email = String(email).trim().toLowerCase();
+  var emailHash = _welcomeEmailHash(email);
+  var propKey = 'WELCOME_DISMISSED_' + emailHash;
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(propKey, new Date().toISOString());
+  return { success: true };
+}
+
+/**
+ * Simple hash of email for property key (avoids special chars in key names).
+ * @private
+ */
+function _welcomeEmailHash(email) {
+  var hash = 0;
+  var str = String(email).toLowerCase();
+  for (var i = 0; i < str.length; i++) {
+    var c = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + c;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}

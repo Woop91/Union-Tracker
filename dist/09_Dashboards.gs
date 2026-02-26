@@ -3463,11 +3463,15 @@ function getFlaggedSubmissionsData() {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function approveFlaggedSubmission(rowNum) {
-  // Verify caller is an authorized steward
+  // Verify caller is an authorized steward/admin
   var callerEmail = '';
   try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
   if (!callerEmail) {
     throw new Error('Authorization required: unable to verify user identity');
+  }
+  var callerRole = getUserRole_(callerEmail);
+  if (callerRole !== 'admin' && callerRole !== 'steward') {
+    throw new Error('Access denied: steward or admin role required to approve submissions');
   }
 
   // Update in vault (not on Satisfaction sheet — no PII there)
@@ -3494,11 +3498,15 @@ function approveFlaggedSubmission(rowNum) {
  * @param {number} rowNum - Row number (1-indexed)
  */
 function rejectFlaggedSubmission(rowNum) {
-  // Verify caller is an authorized steward
+  // Verify caller is an authorized steward/admin
   var callerEmail = '';
   try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
   if (!callerEmail) {
     throw new Error('Authorization required: unable to verify user identity');
+  }
+  var callerRole = getUserRole_(callerEmail);
+  if (callerRole !== 'admin' && callerRole !== 'steward') {
+    throw new Error('Access denied: steward or admin role required to reject submissions');
   }
 
   // Update in vault (not on Satisfaction sheet — no PII there)

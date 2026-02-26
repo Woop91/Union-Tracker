@@ -1,8 +1,8 @@
 # Strategic Command Center
 
-**Version 4.12.0** | Union Steward Dashboard for Google Sheets
+**Version 4.13.0** | Union Steward Dashboard for Google Sheets
 
-A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 37-file modular architecture plus 8 HTML files.
+A Google Sheets-based system for managing union grievances, tracking member records, monitoring deadlines, and running steward operations. Built on Google Apps Script with a 37-file modular architecture and a full SPA web dashboard.
 
 ---
 
@@ -37,6 +37,8 @@ The Dashboard gives union stewards and leadership a centralized place to:
 - **Automate meetings** with auto-generated Google Docs for notes and agendas
 - **Generate PDFs** for grievance forms with digital signature blocks
 - **Send notifications** for overdue cases, escalation alerts, and reminders
+- **Run a web dashboard** with SPA interface, Google SSO + magic link auth, and role-based views
+- **Track workload** with member-submitted caseload data and anonymized reporting
 - **Protect privacy** with PII masking on all public-facing dashboards
 
 The system runs entirely inside Google Sheets with no external servers required.
@@ -69,8 +71,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone the repository:**
 
    ```bash
-   git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
-   cd MULTIPLE-SCRIPS-REPO
+   git clone https://github.com/Woop91/Union-Tracker.git
+   cd Union-Tracker
    ```
 
 2. **Create a new Google Sheet** at [sheets.google.com](https://sheets.google.com)
@@ -81,7 +83,7 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
    - Click the **+** button next to "Files" to create a new script file
    - Name it to match the source file (without the `.gs` extension)
    - Paste the contents from the corresponding `src/` file
-   - Repeat for all 37 `.gs` files and 8 `.html` files
+   - Repeat for all 37 `.gs` files and 7 `.html` files
 
 5. **Run the initial setup:**
    - Select `CREATE_DASHBOARD` from the function dropdown
@@ -95,8 +97,8 @@ When you're done testing, run **Admin > Demo Data > NUKE SEEDED DATA** to remove
 1. **Clone and install:**
 
    ```bash
-   git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
-   cd MULTIPLE-SCRIPS-REPO
+   git clone https://github.com/Woop91/Union-Tracker.git
+   cd Union-Tracker
    npm install
    ```
 
@@ -156,7 +158,7 @@ When you're ready to move from testing to real data:
 2. Delete `07_DevTools.gs` from your Apps Script project (Extensions > Apps Script > right-click > Delete)
 3. Refresh the sheet -- the Demo menu disappears automatically
 
-After that, you have **36 production .gs files + 8 .html files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
+After that, you have **36 production `.gs` files + 7 `.html` files** and a clean system ready for real member data. See the [Seed & Nuke Guide](SEED_NUKE_GUIDE.md) for the full process.
 
 ---
 
@@ -253,19 +255,35 @@ After that, you have **36 production .gs files + 8 .html files** and a clean sys
 - Employment tracking with Full-time/Part-time and overtime hours
 - Email reminder system with configurable frequency
 - 24-month rolling data archive and CSV backup to Google Drive
+- SPA-integrated SSO workload module (`25_WorkloadService.gs`) embedded in member_view
 
-### Web Dashboard SPA (v4.11.0)
-- Responsive layout: mobile (<640px bottom nav), tablet (640-1024px sidebar), desktop (>1024px)
-- Member self-service: profile editor, steward picker, resources, survey results, workload tracker
-- Steward tools: cases dashboard, members tab with search and stats, broadcast, survey tracking
-- Weekly questions engagement system with anonymous responses
-- CSS-only bar charts for quarterly survey results with privacy threshold
+### Resources Hub (v4.11.0)
+- Educational content hub with search, category pills, and expandable cards (`?page=resources`)
+- 12-column Resources sheet with audience filtering and data validation
+- 8 starter articles: Know Your Rights, Grievance Process, FAQ, Forms & Templates
+- Meeting check-in as standalone web page (`?page=checkin`)
 
-### Weekly Questions (v4.11.0)
-- Anonymous weekly engagement questions for members
-- SHA-256 hashed email responses — no plaintext PII stored
-- Steward question manager with question pool and scheduling
-- 3 hidden sheets: `_Weekly_Questions`, `_Weekly_Responses`, `_Question_Pool`
+### Notifications System (v4.12.0)
+- 12-column Notifications sheet with data validation and starter entries
+- Notification types: Steward Message, Announcement, Deadline, System
+- Priority levels: Normal (default), Urgent (sorts first)
+- Per-member dismiss tracking via Dismissed_By column
+- Steward compose interface with recipient groups and member directory
+- `sendWebAppNotification()` / `dismissWebAppNotification()` / `getWebAppNotifications()` API
+
+### SPA Web Dashboard (v4.12.2)
+- Full single-page application with Google SSO + magic link authentication
+- Role-based views: `steward_view.html` and `member_view.html`
+- Deep-link routing: `?page=X` pre-selects tabs via `PAGE_DATA.initialTab`
+- 6 SPA modules: Auth, ConfigReader, DataService, WebDashApp, PortalSheets, WeeklyQuestions
+- Hidden sheets: `_Weekly_Questions`, `_Contact_Log`, `_Steward_Tasks`
+- Auto-configures auth on first run — no manual ScriptProperties setup
+
+### Notification Bell & EventBus Alerts (v4.13.0)
+- Notification bell badge with unread count in SPA header
+- Steward notification management — compose/inbox/manage tabs
+- EventBus auto-notifications for grievance deadlines and status changes
+- Member notification view with dismiss functionality
 
 ### Looker Studio Integration
 - **Standard**: Hidden `_Looker_*` sheets with full data for internal reports
@@ -397,9 +415,11 @@ These sheets power the auto-updating columns. You don't need to edit them.
 | `_Workload_Reminders` | Email reminder configuration |
 | `_Workload_UserMeta` | Member workload preferences and metadata |
 | `_Workload_Archive` | Archived workload data (24-month rolling) |
-| `_Weekly_Questions` | Active weekly engagement questions |
-| `_Weekly_Responses` | Anonymous weekly question responses |
-| `_Question_Pool` | Available questions for weekly rotation |
+| `_Weekly_Questions` | Weekly check-in questions and responses |
+| `_Contact_Log` | Member contact tracking (8 cols) |
+| `_Steward_Tasks` | Steward task management (10 cols) |
+| `_Resources` | Educational resources and documents |
+| `_Notifications` | System and steward notifications (12 cols) |
 
 ---
 
@@ -408,15 +428,15 @@ These sheets power the auto-updating columns. You don't need to edit them.
 ### Setup
 
 ```bash
-git clone https://github.com/Woop91/MULTIPLE-SCRIPS-REPO.git
-cd MULTIPLE-SCRIPS-REPO
+git clone https://github.com/Woop91/Union-Tracker.git
+cd Union-Tracker
 npm install
 ```
 
 ### Available Commands
 
 ```bash
-npm run build          # Build consolidated file (dist/ConsolidatedDashboard.gs)
+npm run build          # Copy individual .gs + .html files to dist/
 npm run build --prod   # Production build (excludes DevTools)
 npm run lint           # ESLint code quality checks
 npm run lint:fix       # Auto-fix ESLint issues
@@ -430,7 +450,7 @@ npm run deploy         # Deploy to Google Apps Script (requires clasp)
 
 1. Edit files in the `src/` directory
 2. Run `npm run lint` to check for issues
-3. Run `npm run build` to generate the consolidated file
+3. Run `npm run build` to copy files to `dist/`
 4. Run `npm run test:unit` to execute tests
 5. Copy updated files to Google Apps Script (or use `clasp push`)
 
@@ -440,7 +460,7 @@ See the [Developer Guide](DEVELOPER_GUIDE.md) for architecture details, code pat
 
 ## Architecture
 
-The codebase uses a 37-file modular architecture with numbered prefixes that indicate load order and purpose:
+The codebase uses a 37-file modular architecture (+ 7 HTML templates) with numbered prefixes that indicate load order and purpose:
 
 | Prefix | Layer | Files |
 |--------|-------|-------|
@@ -448,7 +468,7 @@ The codebase uses a 37-file modular architecture with numbered prefixes that ind
 | 01 | Core | `01_Core.gs` (constants, error handling) |
 | 02 | Data | `02_DataManagers.gs` |
 | 03-04 | UI | `03_UIComponents.gs`, `04a_UIMenus.gs`, `04b_AccessibilityFeatures.gs`, `04c_InteractiveDashboard.gs`, `04d_ExecutiveDashboard.gs`, `04e_PublicDashboard.gs` |
-| 05 | Integrations | `05_Integrations.gs` (Drive, Calendar, WebApp) |
+| 05 | Integrations | `05_Integrations.gs` (Drive, Calendar, WebApp, doGet router) |
 | 06 | Maintenance | `06_Maintenance.gs` (diagnostics, cache, undo) |
 | 07 | Dev Tools | `07_DevTools.gs` (remove before production) |
 | 08 | Sheet Utilities | `08a_SheetSetup.gs`, `08b_SearchAndCharts.gs`, `08c_FormsAndNotifications.gs`, `08d_AuditAndFormulas.gs` |
@@ -461,14 +481,10 @@ The codebase uses a 37-file modular architecture with numbered prefixes that ind
 | 15 | Event Bus | `15_EventBus.gs` (pub/sub event system) |
 | 16 | Enhancements | `16_DashboardEnhancements.gs` (date ranges, chart export, drill-down) |
 | 17 | Analytics | `17_CorrelationEngine.gs` (cross-dimensional correlation) |
-| 18 | Workload | `18_WorkloadTracker.gs` (member workload submissions) |
-| 19 | Web Auth | `19_WebDashAuth.gs` (web dashboard authentication) |
-| 20 | Web Config | `20_WebDashConfigReader.gs` (web dashboard config) |
-| 21 | Web Data | `21_WebDashDataService.gs` (web dashboard data service) |
-| 22 | Web App | `22_WebDashApp.gs` (web dashboard application) |
-| 23 | Portal | `23_PortalSheets.gs` (portal sheet setup) |
-| 24 | Weekly Q | `24_WeeklyQuestions.gs` (weekly engagement questions) |
-| -- | HTML | `index.html`, `styles.html`, `auth_view.html`, `steward_view.html`, `member_view.html`, `error_view.html`, `MultiSelectDialog.html`, `WorkloadTracker.html` |
+| 19-25 | SPA Web Dashboard | `19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`, `25_WorkloadService.gs` |
+| -- | HTML | `MultiSelectDialog.html`, `index.html`, `styles.html`, `steward_view.html`, `member_view.html`, `portal_sheets.html`, `weekly_questions.html` |
+
+> **Note:** Union-Tracker excludes `18_WorkloadTracker.gs` and `WorkloadTracker.html` (DDS-only standalone workload portal). Workload functionality is embedded in the SPA via `25_WorkloadService.gs` and `member_view.html`.
 
 ### Design Principles
 
@@ -571,10 +587,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| **4.12.0** | 2026-02-24 | Chart.js integration, steward/member view enhancements, workload improvements, bug fixes |
-| **4.11.0** | 2026-02-24 | Responsive web dashboard SPA, member self-service views, steward tools, weekly questions |
-| **4.10.0** | 2026-02-23 | Workload Tracker module, web-dashboard SPA integration, multi-file build mode |
-| **4.9.1** | 2026-02-23 | Security vulnerability fix pass — 22 findings fixed, XSS hardening |
+| **4.13.0** | 2026-02-25 | Notification bell/EventBus auto-alerts, individual-file build, WorkloadService SPA module |
+| **4.12.2** | 2026-02-25 | SPA web dashboard, SSO + magic link auth, deep-link routing, hidden sheets |
+| **4.12.0** | 2026-02-24 | Notifications system (sheet + API + dual-role page) |
+| **4.11.0** | 2026-02-24 | Resources hub, meeting check-in route, design refresh |
+| **4.10.0** | 2026-02-23 | Workload Tracker module, 8 workload categories, privacy controls, email reminders, 5 new hidden sheets |
+| **4.9.1** | 2026-02-23 | Security vulnerability fix pass — 22 findings fixed, XSS hardening, formula injection protection |
 | **4.9.0** | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns, 1300+ tests across 21 suites |
 | **4.8.2** | 2026-02-16 | State field added to member contact surfaces |
 | **4.8.1** | 2026-02-15 | 5 new contact form fields, unified name-based Member ID system |

@@ -17,7 +17,7 @@ loadSources(['00_Security.gs']);
 describe('escapeHtml', () => {
   test('escapes HTML special characters', () => {
     expect(escapeHtml('<script>alert("xss")</script>')).toBe(
-      '&lt;script&gt;alert(&quot;xss&quot;)&lt;&#x2F;script&gt;'
+      '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
     );
   });
 
@@ -29,12 +29,12 @@ describe('escapeHtml', () => {
     expect(escapeHtml('`code`')).toBe('&#x60;code&#x60;');
   });
 
-  test('escapes equals sign', () => {
-    expect(escapeHtml('a=b')).toBe('a&#x3D;b');
+  test('does not escape equals sign (not an XSS vector)', () => {
+    expect(escapeHtml('a=b')).toBe('a=b');
   });
 
-  test('escapes forward slash', () => {
-    expect(escapeHtml('a/b')).toBe('a&#x2F;b');
+  test('does not escape forward slash (not an XSS vector)', () => {
+    expect(escapeHtml('a/b')).toBe('a/b');
   });
 
   test('escapes ampersand', () => {
@@ -63,6 +63,38 @@ describe('escapeHtml', () => {
     expect(result).not.toContain('<');
     expect(result).not.toContain('>');
     expect(result).not.toContain('"');
+  });
+
+  test('escapes input with all special chars combined', () => {
+    const input = '<div class="test">&\'`';
+    const result = escapeHtml(input);
+    // Raw dangerous chars should not appear unescaped
+    expect(result).not.toContain('<');
+    expect(result).not.toContain('>');
+    expect(result).not.toContain('"');
+    expect(result).not.toContain("'");
+    expect(result).not.toContain('`');
+    // Verify each entity is present in the output
+    expect(result).toContain('&lt;');
+    expect(result).toContain('&gt;');
+    expect(result).toContain('&quot;');
+    expect(result).toContain('&amp;');
+    expect(result).toContain('&#x27;');
+    expect(result).toContain('&#x60;');
+  });
+
+  test('handles very long input string', () => {
+    const longStr = '<script>'.repeat(1000);
+    const result = escapeHtml(longStr);
+    expect(result).not.toContain('<');
+    expect(result).not.toContain('>');
+    expect(result.length).toBeGreaterThan(longStr.length);
+  });
+
+  test('handles input containing only special chars', () => {
+    const input = '<>&"\'`';
+    const result = escapeHtml(input);
+    expect(result).toBe('&lt;&gt;&amp;&quot;&#x27;&#x60;');
   });
 });
 
@@ -245,7 +277,7 @@ describe('isValidGrievanceId', () => {
 // ============================================================================
 
 describe('getClientSideEscapeHtml', () => {
-  test('returns JavaScript code with all 8 escape replacements', () => {
+  test('returns JavaScript code with all 6 escape replacements', () => {
     const code = getClientSideEscapeHtml();
     expect(code).toContain('function escapeHtml');
     expect(code).toContain('&amp;');
@@ -253,9 +285,10 @@ describe('getClientSideEscapeHtml', () => {
     expect(code).toContain('&gt;');
     expect(code).toContain('&quot;');
     expect(code).toContain('&#x27;');
-    expect(code).toContain('&#x2F;');
     expect(code).toContain('&#x60;');
-    expect(code).toContain('&#x3D;');
+    // / and = are NOT escaped (F107: not XSS vectors, caused data corruption)
+    expect(code).not.toContain('&#x2F;');
+    expect(code).not.toContain('&#x3D;');
   });
 });
 

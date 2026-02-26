@@ -1131,9 +1131,16 @@ function updateMemberContact(sessionToken, updates) {
 
   // Apply updates
   var updated = [];
+  var fieldMaxLengths = { email: 254, phone: 30, preferredComm: 50, bestTime: 50, state: 50 };
   for (var field in updates) {
     if (allowedFields.indexOf(field) >= 0 && fieldMapping[field]) {
       var value = String(updates[field] || '').trim();
+
+      // Validate safe string (reject injection patterns and enforce max length)
+      var maxLen = fieldMaxLengths[field] || 100;
+      if (typeof isValidSafeString === 'function' && value && !isValidSafeString(value, maxLen)) {
+        return errorResponse('Invalid value for ' + field + ': contains disallowed characters or exceeds max length.');
+      }
 
       // Basic validation
       if (field === 'email' && value && !isValidEmailMSS_(value)) {
@@ -1236,6 +1243,88 @@ function getMemberGrievances(sessionToken) {
     grievances: grievances,
     count: grievances.length
   };
+}
+
+/**
+ * Get member's resolved/closed grievance history (PIN-auth portal)
+ * Returns only non-sensitive fields: case ID, category, status, outcome, dates.
+ * @param {string} sessionTokenOrEmail - Session token or email address
+ * @returns {Object} { success: boolean, history: Array }
+ */
+function getMemberGrievanceHistory(sessionTokenOrEmail) {
+  // Determine if input is a session token or email
+  var memberId;
+  if (sessionTokenOrEmail && sessionTokenOrEmail.indexOf('@') !== -1) {
+    // Email-based lookup (SPA context)
+    var email = String(sessionTokenOrEmail).trim().toLowerCase();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!memberSheet) return { success: true, history: [] };
+    var memberData = memberSheet.getDataRange().getValues();
+    var emailCol = -1;
+    var idCol = -1;
+    for (var c = 0; c < memberData[0].length; c++) {
+      var h = String(memberData[0][c]).toLowerCase().trim();
+      if (h === 'email' || h === 'email address' || h === 'member email' || h === 'work email') emailCol = c;
+      if (h === 'member id' || h === 'id') idCol = c;
+    }
+    if (emailCol === -1) return { success: true, history: [] };
+    for (var r = 1; r < memberData.length; r++) {
+      if (String(memberData[r][emailCol]).trim().toLowerCase() === email) {
+        memberId = String(memberData[r][idCol >= 0 ? idCol : emailCol] || '').trim().toUpperCase();
+        break;
+      }
+    }
+    if (!memberId) return { success: true, history: [] };
+  } else {
+    // Session token (PIN portal context)
+    var session = validateMemberSession(sessionTokenOrEmail);
+    if (!session.valid) {
+      return errorResponse('Session expired. Please log in again.');
+    }
+    memberId = session.memberId;
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+  if (!sheet) return { success: true, history: [] };
+
+  var data = sheet.getDataRange().getValues();
+  var closedStatuses = ['settled', 'won', 'denied', 'withdrawn', 'closed'];
+  var history = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var rowMemberId = String(data[i][GRIEVANCE_COLS.MEMBER_ID - 1] || '').trim().toUpperCase();
+    if (rowMemberId !== memberId) continue;
+
+    var status = String(data[i][GRIEVANCE_COLS.STATUS - 1] || '').trim().toLowerCase();
+    if (closedStatuses.indexOf(status) === -1) continue;
+
+    history.push({
+      grievanceId: data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '',
+      issueCategory: data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '',
+      status: status.charAt(0).toUpperCase() + status.slice(1),
+      outcome: data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '',
+      dateFiled: formatDateMSS_(data[i][GRIEVANCE_COLS.DATE_FILED - 1]),
+      dateClosed: formatDateMSS_(data[i][GRIEVANCE_COLS.DATE_CLOSED - 1])
+    });
+  }
+
+  // Sort by filed date descending
+  history.sort(function(a, b) {
+    return new Date(b.dateFiled || 0) - new Date(a.dateFiled || 0);
+  });
+
+  return { success: true, history: history };
+}
+
+/**
+ * Global wrapper for SPA to call member grievance history.
+ * @param {string} email - Member email address
+ * @returns {Object} { success: boolean, history: Array }
+ */
+function dataGetMemberGrievanceHistoryPortal(email) {
+  return getMemberGrievanceHistory(email);
 }
 
 /**

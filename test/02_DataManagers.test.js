@@ -537,6 +537,7 @@ describe('addMember (mock spreadsheet)', () => {
 
     const mockRange = {
       setValue: jest.fn(),
+      setValues: jest.fn(),
       getValue: jest.fn(),
       getValues: jest.fn(() => [['']]),
       getRow: jest.fn(() => 2),
@@ -562,8 +563,14 @@ describe('addMember (mock spreadsheet)', () => {
     });
 
     expect(memberId).toBe('MS-200-H');
+    // F15 perf fix: addMember now uses batch setValues() instead of individual setValue() calls
     expect(sheet.getRange).toHaveBeenCalled();
-    expect(mockRange.setValue).toHaveBeenCalledWith('MS-200-H');
+    expect(mockRange.setValues).toHaveBeenCalled();
+    const rowData = mockRange.setValues.mock.calls[0][0][0]; // first call, first arg, first row
+    expect(rowData[MEMBER_COLS.MEMBER_ID - 1]).toBe('MS-200-H');
+    expect(rowData[MEMBER_COLS.FIRST_NAME - 1]).toBe('New');
+    expect(rowData[MEMBER_COLS.LAST_NAME - 1]).toBe('Member');
+    expect(rowData[MEMBER_COLS.EMAIL - 1]).toBe('new@example.com');
   });
 
   test('throws error when Member Directory sheet is not found', () => {
