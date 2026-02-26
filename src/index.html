@@ -145,7 +145,7 @@
     };
 
     // ═══════════════════════════════════════
-    // ROUTER
+    // ROUTER (with optional batch pre-fetch)
     // ═══════════════════════════════════════
     function initApp() {
       var app = document.getElementById('app');
@@ -155,10 +155,27 @@
           renderAuth(app);
           break;
         case 'steward':
-          initStewardView(app);
-          break;
         case 'member':
-          initMemberView(app);
+          // Pre-fetch batch data in a single round-trip, then init the view.
+          // Falls back to per-view init if batch fails.
+          if (CURRENT_USER && CURRENT_USER.email) {
+            google.script.run
+              .withSuccessHandler(function(batch) {
+                AppState.batchData = batch || {};
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
+              })
+              .withFailureHandler(function() {
+                // Batch unavailable — views will make individual calls
+                AppState.batchData = null;
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
+              })
+              .dataGetBatchData(CURRENT_USER.email, CURRENT_VIEW);
+          } else {
+            if (CURRENT_VIEW === 'steward') initStewardView(app);
+            else initMemberView(app);
+          }
           break;
         case 'error':
           renderError(app, PAGE_DATA.error);

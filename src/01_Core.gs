@@ -1,3 +1,4 @@
+// GAS_LIMITATION: All .gs files share a single global namespace. Function names must be globally unique.
 /**
  * ============================================================================
  * 01_Core.gs - Core Constants, Error Handling & Configuration
@@ -108,6 +109,7 @@ function isTruthyValue(value) {
  * @param {string} context - Where the error occurred
  * @param {string} [level] - Error severity level
  */
+// STANDARD: All new code should use handleError() for consistent error handling.
 function handleError(error, context, level) {
   level = level || ERROR_LEVEL.ERROR;
 
@@ -456,13 +458,12 @@ function runStartupValidation() {
 /**
  * API version information
  */
+// CONSOLIDATED: Derives version from COMMAND_CONFIG.VERSION (single source of truth)
 var API_VERSION = {
-  major: 4,
-  minor: 13,
-  patch: 0,
-  toString: function() {
-    return this.major + '.' + this.minor + '.' + this.patch;
-  }
+  get major() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[0], 10); },
+  get minor() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[1], 10); },
+  get patch() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[2], 10); },
+  toString: function() { return COMMAND_CONFIG.VERSION; }
 };
 
 /**
@@ -553,7 +554,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.13.0",
+  VERSION: "4.15.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -627,18 +628,24 @@ var DRIVE_CONFIG = {
  * @private
  * @returns {string} Organization name (e.g., "SEIU Local")
  */
+var _cachedOrgName = null;
 function getOrgNameFromConfig_() {
+  if (_cachedOrgName !== null) return _cachedOrgName;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       var orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue();
-      if (orgName) return orgName;
+      if (orgName) {
+        _cachedOrgName = orgName;
+        return _cachedOrgName;
+      }
     }
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  return 'SEIU Local';
+  _cachedOrgName = 'SEIU Local';
+  return _cachedOrgName;
 }
 
 /**
@@ -648,28 +655,38 @@ function getOrgNameFromConfig_() {
  * @private
  * @returns {string} System name (e.g., "Strategic Command Center")
  */
+var _cachedSystemName = null;
 function getSystemName_() {
-  return getLocalNumberFromConfig_() + ' Strategic Command Center';
+  if (_cachedSystemName !== null) return _cachedSystemName;
+  _cachedSystemName = getLocalNumberFromConfig_() + ' Strategic Command Center';
+  return _cachedSystemName;
 }
 
 /**
  * Get local number from Config sheet, falling back to default.
  * Used for UI elements like menu names.
+ * Memoized: reads from Config sheet once per execution, then returns cached value.
  * @private
  * @returns {string} Local number
  */
+var _cachedLocalNumber = null;
 function getLocalNumberFromConfig_() {
+  if (_cachedLocalNumber !== null) return _cachedLocalNumber;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       var localNumber = configSheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER).getValue();
-      if (localNumber) return String(localNumber);
+      if (localNumber) {
+        _cachedLocalNumber = String(localNumber);
+        return _cachedLocalNumber;
+      }
     }
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  return '';
+  _cachedLocalNumber = '';
+  return _cachedLocalNumber;
 }
 
 // ============================================================================
@@ -682,12 +699,12 @@ function getLocalNumberFromConfig_() {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 13,
+  MINOR: 15,
   PATCH: 0,
-  BUILD: 'v4.13.0',
-  CURRENT: '4.13.0',
-  BUILD_DATE: '2026-02-24',
-  CODENAME: 'Full Workload Tracker Migration'
+  BUILD: 'v4.15.0',
+  CURRENT: '4.15.0',
+  BUILD_DATE: '2026-02-25',
+  CODENAME: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements'
 };
 
 /**
@@ -697,6 +714,8 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.15.0', date: '2026-02-25', codename: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements', changes: '7 TODOs resolved (batch fetch, Drive cleanup, calendar dedup, CC health check, lazy-load help, search pagination, expansion tests). Login UX: SSO loading state, sso_failed fallback, magic link clarification, resend cooldown. In-app survey wizard: multi-step mobile-optimized form with localStorage progress, 1-10 scale buttons, anonymous SHA-256 submission. Steward: chief steward task assignment, agency-wide grievance stats fallback. Member dashboard: actionable KPI strip, conditional grievance card, engagement/workload stats tabs. Broadcast: checkbox pill filters with recipient preview. Workload: removed Private option. Seed data: calendar events, weekly questions, union stats.' },
+  { version: '4.14.0', date: '2026-02-25', codename: 'Technical Debt Resolution & PHASE2 Features', changes: '130 code review findings resolved (15 CRITICAL XSS, 26 HIGH security, 50 MEDIUM, 39 LOW). 5 new features: Grievance History, Meeting Check-In Kiosk, Welcome Experience, Bulk Actions, Deadline Calendar View. Engagement sync overhaul with dynamic headers and validation. withScriptLock_() concurrency helper. safeSendEmail() quota wrapper. Version derived from single COMMAND_CONFIG.VERSION source.' },
   { version: '4.13.0', date: '2026-02-24', codename: 'Full Workload Tracker Migration', changes: 'Refactored 18_WorkloadTracker.gs to IIFE module (WorkloadService), enhanced getDashboardData with employment/plan/overtime breakdowns and sub-category aggregation, enhanced getUserHistory with all 24 columns, CSV export, vault deduplication, reciprocity blocking for Private users, multi-frequency reminders (daily/weekly/biweekly/monthly/quarterly), full leave tracking in portal, Weekly Cases dropdown, Clear All/Restore.' },
   { version: '4.12.0', date: '2026-02-24', codename: 'Version Alignment', changes: 'API_VERSION, VERSION_INFO, VERSION_HISTORY normalized. README and CODE_REVIEW updated with correct file counts and version scope.' },
   { version: '4.11.0', date: '2026-02-24', codename: 'Web Dashboard SPA Enhancement', changes: 'Responsive sidebar/bottom-nav layout, member and steward views with full render functions, WeeklyQuestions IIFE module, 12 new DataService functions, SSO workload wrappers, ConfigReader expansion.' },
@@ -1285,6 +1304,7 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'ZIP_CODE',           header: 'Zip Code' }
 ];
 
+// CONVENTION: Column constants are 1-indexed (Range API). Use COL - 1 for 0-indexed array access.
 var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
   LOCATION: 'WORK_LOCATION',
   DAYS_TO_DEADLINE: 'NEXT_DEADLINE'

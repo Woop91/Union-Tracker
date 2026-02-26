@@ -1097,6 +1097,13 @@ function refreshAllHiddenFormulas() {
 function setupCalcMembersSheet(sheet) {
   const memberSheetName = SHEET_NAMES.MEMBER_DIRECTORY;
 
+  // Derive column letters from constants so formulas stay in sync with header map
+  var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var mFirstCol = getColumnLetter(MEMBER_COLS.FIRST_NAME);
+  var mLastCol = getColumnLetter(MEMBER_COLS.LAST_NAME);
+  var mUnitCol = getColumnLetter(MEMBER_COLS.UNIT);
+  var mIsStewardCol = getColumnLetter(MEMBER_COLS.IS_STEWARD);
+
   // Header row
   sheet.getRange('A1').setValue('Member Statistics');
   sheet.getRange('A1').setFontWeight('bold');
@@ -1104,54 +1111,34 @@ function setupCalcMembersSheet(sheet) {
   // Total Members
   sheet.getRange('A2').setValue('Total Members');
   sheet.getRange('B2').setFormula(
-    `=COUNTA('${memberSheetName}'!A:A)-1`
+    `=COUNTA('${memberSheetName}'!${mIdCol}:${mIdCol})-1`
   );
 
-  // Active Members
-  sheet.getRange('A3').setValue('Active Members');
+  // Stewards count (replaces legacy "Active Members" — no Status column exists)
+  sheet.getRange('A3').setValue('Stewards');
   sheet.getRange('B3').setFormula(
-    `=COUNTIF('${memberSheetName}'!K:K,"Active")`
+    `=COUNTIF('${memberSheetName}'!${mIsStewardCol}:${mIsStewardCol},"Yes")`
   );
 
-  // Members by Department (dynamic list)
-  sheet.getRange('A5').setValue('Department');
+  // Members by Unit (dynamic list)
+  sheet.getRange('A5').setValue('Unit');
   sheet.getRange('B5').setValue('Count');
   sheet.getRange('A5:B5').setFontWeight('bold');
 
   sheet.getRange('A6').setFormula(
-    `=UNIQUE(FILTER('${memberSheetName}'!E:E,'${memberSheetName}'!E:E<>"Department",'${memberSheetName}'!E:E<>""))`
+    `=UNIQUE(FILTER('${memberSheetName}'!${mUnitCol}:${mUnitCol},'${memberSheetName}'!${mUnitCol}:${mUnitCol}<>"Unit",'${memberSheetName}'!${mUnitCol}:${mUnitCol}<>""))`
   );
 
   sheet.getRange('B6').setFormula(
-    `=ARRAYFORMULA(IF(A6:A<>"",COUNTIF('${memberSheetName}'!E:E,A6:A),""))`
-  );
-
-  // Union Status breakdown
-  sheet.getRange('D2').setValue('Union Status');
-  sheet.getRange('E2').setValue('Count');
-  sheet.getRange('D2:E2').setFontWeight('bold');
-
-  sheet.getRange('D3').setValue('Full Member');
-  sheet.getRange('E3').setFormula(
-    `=COUNTIF('${memberSheetName}'!L:L,"Full Member")`
-  );
-
-  sheet.getRange('D4').setValue('Agency Fee');
-  sheet.getRange('E4').setFormula(
-    `=COUNTIF('${memberSheetName}'!L:L,"Agency Fee")`
-  );
-
-  sheet.getRange('D5').setValue('Non-Member');
-  sheet.getRange('E5').setFormula(
-    `=COUNTIF('${memberSheetName}'!L:L,"Non-Member")`
+    `=ARRAYFORMULA(IF(A6:A<>"",COUNTIF('${memberSheetName}'!${mUnitCol}:${mUnitCol},A6:A),""))`
   );
 
   // Lookup helper for member names
   sheet.getRange('G1').setValue('ID->Name Lookup');
   sheet.getRange('G1').setFontWeight('bold');
   sheet.getRange('G2').setFormula(
-    `=ARRAYFORMULA(IF('${memberSheetName}'!A2:A<>"",` +
-    `'${memberSheetName}'!A2:A&"|"&'${memberSheetName}'!B2:B&" "&'${memberSheetName}'!C2:C,""))`
+    `=ARRAYFORMULA(IF('${memberSheetName}'!${mIdCol}2:${mIdCol}<>"",` +
+    `'${memberSheetName}'!${mIdCol}2:${mIdCol}&"|"&'${memberSheetName}'!${mFirstCol}2:${mFirstCol}&" "&'${memberSheetName}'!${mLastCol}2:${mLastCol},""))`
   );
 }
 
@@ -1162,6 +1149,12 @@ function setupCalcMembersSheet(sheet) {
  */
 function setupCalcGrievancesSheet(sheet) {
   const grievanceSheetName = SHEET_NAMES.GRIEVANCE_TRACKER;
+
+  // Derive column letters from constants so formulas stay in sync with header map
+  var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
+  var gIssueCategoryCol = getColumnLetter(GRIEVANCE_COLS.ISSUE_CATEGORY);
+  var gCurrentStepCol = getColumnLetter(GRIEVANCE_COLS.CURRENT_STEP);
+  var gDateFiledCol = getColumnLetter(GRIEVANCE_COLS.DATE_FILED);
 
   // Header
   sheet.getRange('A1').setValue('Grievance Statistics');
@@ -1176,22 +1169,22 @@ function setupCalcGrievancesSheet(sheet) {
   statuses.forEach((status, index) => {
     sheet.getRange(4 + index, 1).setValue(status);
     sheet.getRange(4 + index, 2).setFormula(
-      `=COUNTIF('${grievanceSheetName}'!W:W,"${status}")`
+      `=COUNTIF('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"${status}")`
     );
   });
 
-  // Grievances by Type
-  sheet.getRange('D3').setValue('Type');
+  // Grievances by Issue Category
+  sheet.getRange('D3').setValue('Issue Category');
   sheet.getRange('E3').setValue('Count');
   sheet.getRange('D3:E3').setFontWeight('bold');
 
   sheet.getRange('D4').setFormula(
-    `=UNIQUE(FILTER('${grievanceSheetName}'!E:E,` +
-    `'${grievanceSheetName}'!E:E<>"Grievance Type",'${grievanceSheetName}'!E:E<>""))`
+    `=UNIQUE(FILTER('${grievanceSheetName}'!${gIssueCategoryCol}:${gIssueCategoryCol},` +
+    `'${grievanceSheetName}'!${gIssueCategoryCol}:${gIssueCategoryCol}<>"Issue Category",'${grievanceSheetName}'!${gIssueCategoryCol}:${gIssueCategoryCol}<>""))`
   );
 
   sheet.getRange('E4').setFormula(
-    `=ARRAYFORMULA(IF(D4:D<>"",COUNTIF('${grievanceSheetName}'!E:E,D4:D),""))`
+    `=ARRAYFORMULA(IF(D4:D<>"",COUNTIF('${grievanceSheetName}'!${gIssueCategoryCol}:${gIssueCategoryCol},D4:D),""))`
   );
 
   // Grievances by Current Step
@@ -1202,7 +1195,7 @@ function setupCalcGrievancesSheet(sheet) {
   for (let step = 1; step <= 4; step++) {
     sheet.getRange(3 + step, 7).setValue(`Step ${step}`);
     sheet.getRange(3 + step, 8).setFormula(
-      `=COUNTIF('${grievanceSheetName}'!H:H,${step})`
+      `=COUNTIF('${grievanceSheetName}'!${gCurrentStepCol}:${gCurrentStepCol},${step})`
     );
   }
 
@@ -1220,8 +1213,8 @@ function setupCalcGrievancesSheet(sheet) {
       `=EOMONTH(TODAY(),-${i})`
     );
     sheet.getRange(17 + i, 2).setFormula(
-      `=SUMPRODUCT((MONTH('${grievanceSheetName}'!D:D)=MONTH(A${17 + i}))*` +
-      `(YEAR('${grievanceSheetName}'!D:D)=YEAR(A${17 + i})))`
+      `=SUMPRODUCT((MONTH('${grievanceSheetName}'!${gDateFiledCol}:${gDateFiledCol})=MONTH(A${17 + i}))*` +
+      `(YEAR('${grievanceSheetName}'!${gDateFiledCol}:${gDateFiledCol})=YEAR(A${17 + i})))`
     );
   }
 }
@@ -1233,6 +1226,11 @@ function setupCalcGrievancesSheet(sheet) {
  */
 function setupCalcDeadlinesSheet(sheet) {
   const grievanceSheetName = SHEET_NAMES.GRIEVANCE_TRACKER;
+
+  // Derive column letters from constants so formulas stay in sync with header map
+  var gIdCol = getColumnLetter(GRIEVANCE_COLS.GRIEVANCE_ID);
+  var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
+  var gNextActionCol = getColumnLetter(GRIEVANCE_COLS.NEXT_ACTION_DUE);
 
   // Header
   sheet.getRange('A1').setValue('Deadline Calculations');
@@ -1274,19 +1272,19 @@ function setupCalcDeadlinesSheet(sheet) {
   // Complex formula to extract upcoming deadlines
   // This uses FILTER to get open grievances and calculate their current deadline
   sheet.getRange('D3').setFormula(
-    `=IFERROR(FILTER('${grievanceSheetName}'!A:A,` +
-    `('${grievanceSheetName}'!W:W="Open")+('${grievanceSheetName}'!W:W="Pending Response")+` +
-    `('${grievanceSheetName}'!W:W="Appealed")),"")`
+    `=IFERROR(FILTER('${grievanceSheetName}'!${gIdCol}:${gIdCol},` +
+    `('${grievanceSheetName}'!${gStatusCol}:${gStatusCol}="Open")+('${grievanceSheetName}'!${gStatusCol}:${gStatusCol}="Pending Response")+` +
+    `('${grievanceSheetName}'!${gStatusCol}:${gStatusCol}="Appealed")),"")`
   );
 
   // Overdue grievances
   sheet.getRange('I1').setValue('Overdue Grievances');
   sheet.getRange('I1').setFontWeight('bold');
   sheet.getRange('I2').setFormula(
-    `=COUNTIFS('${grievanceSheetName}'!W:W,"<>Resolved",` +
-    `'${grievanceSheetName}'!W:W,"<>Closed",` +
-    `'${grievanceSheetName}'!W:W,"<>Withdrawn",` +
-    `'${grievanceSheetName}'!J:J,"<"&TODAY())`
+    `=COUNTIFS('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"<>Resolved",` +
+    `'${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"<>Closed",` +
+    `'${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"<>Withdrawn",` +
+    `'${grievanceSheetName}'!${gNextActionCol}:${gNextActionCol},"<"&TODAY())`
   );
 
   // Alert thresholds
@@ -1295,14 +1293,14 @@ function setupCalcDeadlinesSheet(sheet) {
 
   sheet.getRange('I5').setValue('Critical (<=3 days)');
   sheet.getRange('J5').setFormula(
-    `=COUNTIFS('${grievanceSheetName}'!W:W,"Open",'${grievanceSheetName}'!J:J,">="&TODAY(),` +
-    `'${grievanceSheetName}'!J:J,"<="&TODAY()+3)`
+    `=COUNTIFS('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Open",'${grievanceSheetName}'!${gNextActionCol}:${gNextActionCol},">="&TODAY(),` +
+    `'${grievanceSheetName}'!${gNextActionCol}:${gNextActionCol},"<="&TODAY()+3)`
   );
 
   sheet.getRange('I6').setValue('Warning (4-7 days)');
   sheet.getRange('J6').setFormula(
-    `=COUNTIFS('${grievanceSheetName}'!W:W,"Open",'${grievanceSheetName}'!J:J,">"&TODAY()+3,` +
-    `'${grievanceSheetName}'!J:J,"<="&TODAY()+7)`
+    `=COUNTIFS('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Open",'${grievanceSheetName}'!${gNextActionCol}:${gNextActionCol},">"&TODAY()+3,` +
+    `'${grievanceSheetName}'!${gNextActionCol}:${gNextActionCol},"<="&TODAY()+7)`
   );
 }
 
@@ -1315,6 +1313,13 @@ function setupCalcStatsSheet(sheet) {
   const memberSheetName = SHEET_NAMES.MEMBER_DIRECTORY;
   const grievanceSheetName = SHEET_NAMES.GRIEVANCE_TRACKER;
 
+  // Derive column letters from constants so formulas stay in sync with header map
+  var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var gStatusCol = getColumnLetter(GRIEVANCE_COLS.STATUS);
+  var gDateClosedCol = getColumnLetter(GRIEVANCE_COLS.DATE_CLOSED);
+  var gResolutionCol = getColumnLetter(GRIEVANCE_COLS.RESOLUTION);
+  var gDateFiledCol = getColumnLetter(GRIEVANCE_COLS.DATE_FILED);
+
   // Header
   sheet.getRange('A1').setValue('Dashboard Statistics');
   sheet.getRange('A1').setFontWeight('bold');
@@ -1325,27 +1330,27 @@ function setupCalcStatsSheet(sheet) {
 
   sheet.getRange('A4').setValue('open_grievances');
   sheet.getRange('B4').setFormula(
-    `=COUNTIF('${grievanceSheetName}'!W:W,"Open")+` +
-    `COUNTIF('${grievanceSheetName}'!W:W,"Pending Response")+` +
-    `COUNTIF('${grievanceSheetName}'!W:W,"Appealed")`
+    `=COUNTIF('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Open")+` +
+    `COUNTIF('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Pending Response")+` +
+    `COUNTIF('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Appealed")`
   );
 
   sheet.getRange('A5').setValue('pending_response');
   sheet.getRange('B5').setFormula(
-    `=COUNTIF('${grievanceSheetName}'!W:W,"Pending Response")`
+    `=COUNTIF('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Pending Response")`
   );
 
   sheet.getRange('A6').setValue('total_members');
   sheet.getRange('B6').setFormula(
-    `=COUNTA('${memberSheetName}'!A:A)-1`
+    `=COUNTA('${memberSheetName}'!${mIdCol}:${mIdCol})-1`
   );
 
   sheet.getRange('A7').setValue('resolved_ytd');
   sheet.getRange('B7').setFormula(
-    `=COUNTIFS('${grievanceSheetName}'!W:W,"Resolved",` +
-    `'${grievanceSheetName}'!X:X,">="&DATE(YEAR(TODAY()),1,1))+` +
-    `COUNTIFS('${grievanceSheetName}'!W:W,"Closed",` +
-    `'${grievanceSheetName}'!X:X,">="&DATE(YEAR(TODAY()),1,1))`
+    `=COUNTIFS('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Resolved",` +
+    `'${grievanceSheetName}'!${gDateClosedCol}:${gDateClosedCol},">="&DATE(YEAR(TODAY()),1,1))+` +
+    `COUNTIFS('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Closed",` +
+    `'${grievanceSheetName}'!${gDateClosedCol}:${gDateClosedCol},">="&DATE(YEAR(TODAY()),1,1))`
   );
 
   // Win rate calculation
@@ -1354,23 +1359,23 @@ function setupCalcStatsSheet(sheet) {
 
   sheet.getRange('A10').setValue('total_resolved');
   sheet.getRange('B10').setFormula(
-    `=COUNTIF('${grievanceSheetName}'!W:W,"Resolved")+` +
-    `COUNTIF('${grievanceSheetName}'!W:W,"Closed")`
+    `=COUNTIF('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Resolved")+` +
+    `COUNTIF('${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Closed")`
   );
 
   sheet.getRange('A11').setValue('sustained_count');
   sheet.getRange('B11').setFormula(
-    `=COUNTIF('${grievanceSheetName}'!T:T,"Sustained")`
+    `=COUNTIF('${grievanceSheetName}'!${gResolutionCol}:${gResolutionCol},"*Sustained*")`
   );
 
   sheet.getRange('A12').setValue('settled_count');
   sheet.getRange('B12').setFormula(
-    `=COUNTIF('${grievanceSheetName}'!T:T,"Settled")`
+    `=COUNTIF('${grievanceSheetName}'!${gResolutionCol}:${gResolutionCol},"*Settled*")`
   );
 
   sheet.getRange('A13').setValue('denied_count');
   sheet.getRange('B13').setFormula(
-    `=COUNTIF('${grievanceSheetName}'!T:T,"Denied")`
+    `=COUNTIF('${grievanceSheetName}'!${gResolutionCol}:${gResolutionCol},"*Denied*")`
   );
 
   sheet.getRange('A14').setValue('win_rate');
@@ -1381,8 +1386,8 @@ function setupCalcStatsSheet(sheet) {
   // Average time to resolution
   sheet.getRange('A16').setValue('avg_days_to_resolve');
   sheet.getRange('B16').setFormula(
-    `=IFERROR(AVERAGEIFS('${grievanceSheetName}'!X:X-'${grievanceSheetName}'!D:D,` +
-    `'${grievanceSheetName}'!W:W,"Resolved"),0)`
+    `=IFERROR(AVERAGEIFS('${grievanceSheetName}'!${gDateClosedCol}:${gDateClosedCol}-'${grievanceSheetName}'!${gDateFiledCol}:${gDateFiledCol},` +
+    `'${grievanceSheetName}'!${gStatusCol}:${gStatusCol},"Resolved"),0)`
   );
 }
 
@@ -1395,6 +1400,10 @@ function setupCalcSyncSheet(sheet) {
   const memberSheetName = SHEET_NAMES.MEMBER_DIRECTORY;
   const grievanceSheetName = SHEET_NAMES.GRIEVANCE_TRACKER;
 
+  // Derive column letters from constants so formulas stay in sync with header map
+  var mIdCol = getColumnLetter(MEMBER_COLS.MEMBER_ID);
+  var gMemberIdCol = getColumnLetter(GRIEVANCE_COLS.MEMBER_ID);
+
   // Header
   sheet.getRange('A1').setValue('Cross-Sheet Sync');
   sheet.getRange('A1').setFontWeight('bold');
@@ -1404,7 +1413,7 @@ function setupCalcSyncSheet(sheet) {
   sheet.getRange('A3').setFontWeight('bold');
 
   sheet.getRange('A4').setFormula(
-    `=FILTER('${memberSheetName}'!A:A,'${memberSheetName}'!A:A<>"ID",'${memberSheetName}'!A:A<>"")`
+    `=FILTER('${memberSheetName}'!${mIdCol}:${mIdCol},'${memberSheetName}'!${mIdCol}:${mIdCol}<>"Member ID",'${memberSheetName}'!${mIdCol}:${mIdCol}<>"")`
   );
 
   // Grievances per member count
@@ -1413,11 +1422,11 @@ function setupCalcSyncSheet(sheet) {
   sheet.getRange('C3:D3').setFontWeight('bold');
 
   sheet.getRange('C4').setFormula(
-    `=UNIQUE(FILTER('${grievanceSheetName}'!B:B,'${grievanceSheetName}'!B:B<>"Member ID",'${grievanceSheetName}'!B:B<>""))`
+    `=UNIQUE(FILTER('${grievanceSheetName}'!${gMemberIdCol}:${gMemberIdCol},'${grievanceSheetName}'!${gMemberIdCol}:${gMemberIdCol}<>"Member ID",'${grievanceSheetName}'!${gMemberIdCol}:${gMemberIdCol}<>""))`
   );
 
   sheet.getRange('D4').setFormula(
-    `=ARRAYFORMULA(IF(C4:C<>"",COUNTIF('${grievanceSheetName}'!B:B,C4:C),""))`
+    `=ARRAYFORMULA(IF(C4:C<>"",COUNTIF('${grievanceSheetName}'!${gMemberIdCol}:${gMemberIdCol},C4:C),""))`
   );
 
   // Data consistency checks
@@ -1426,8 +1435,8 @@ function setupCalcSyncSheet(sheet) {
 
   sheet.getRange('F4').setValue('Orphaned Grievances');
   sheet.getRange('G4').setFormula(
-    `=COUNTIFS('${grievanceSheetName}'!B:B,"<>",'${grievanceSheetName}'!B:B,"<>Member ID")-` +
-    `SUMPRODUCT(COUNTIF(A4:A,'${grievanceSheetName}'!B2:B))`
+    `=COUNTIFS('${grievanceSheetName}'!${gMemberIdCol}:${gMemberIdCol},"<>",'${grievanceSheetName}'!${gMemberIdCol}:${gMemberIdCol},"<>Member ID")-` +
+    `SUMPRODUCT(COUNTIF(A4:A,'${grievanceSheetName}'!${gMemberIdCol}2:${gMemberIdCol}))`
   );
 
   sheet.getRange('F5').setValue('Members with Grievances');

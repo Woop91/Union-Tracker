@@ -1,3 +1,5 @@
+// NOTE(F42): Form submission volume is acceptable for typical union usage (~100-5000 members).
+// No throttling is needed at current scale.
 
 // ============================================================================
 // FORM URL CONFIGURATION
@@ -803,8 +805,17 @@ function onSatisfactionFormSubmit(e) {
     }
 
     // ── Append ANONYMOUS response to Satisfaction sheet ──
-    satSheet.appendRow(newRow);
-    var newRowNum = satSheet.getLastRow();
+    // Use a lock around appendRow + getLastRow to prevent race conditions
+    // when two form submissions arrive simultaneously (F34d fix)
+    var formLock = LockService.getScriptLock();
+    formLock.waitLock(10000);
+    try {
+      satSheet.appendRow(newRow);
+      SpreadsheetApp.flush(); // ensure row is committed before reading back
+      var newRowNum = satSheet.getLastRow();
+    } finally {
+      formLock.releaseLock();
+    }
 
     // ── Write hashed PII to vault (separate protected sheet) ──
     // Supersede any previous entry from same email+quarter
@@ -1459,7 +1470,10 @@ function executeSendRandomSurveyEmails(opts) {
     if (configSheet && configSheet.getLastRow() > 1) {
       var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
       logData.forEach(function(row) {
-        if (row[0]) surveyLog[row[0]] = new Date(row[1]);
+        if (row[0]) {
+          var parsed = new Date(row[1]);
+          if (!isNaN(parsed.getTime())) surveyLog[row[0]] = parsed;
+        }
       });
     }
   } catch(_e) { /* No log yet */ }
@@ -1623,6 +1637,7 @@ function getCurrentQuarter() {
  */
 function getQuarterFromDate(date) {
   var d = new Date(date);
+  if (isNaN(d.getTime())) return '';
   var quarter = Math.floor(d.getMonth() / 3) + 1;
   return d.getFullYear() + '-Q' + quarter;
 }
@@ -2025,4 +2040,118 @@ function showSurveyTrackingDialog() {
  * @version 1.0.0
  * ============================================================================
  */
+
+// ============================================================================
+// IN-APP SURVEY (v4.15.0) — Mobile-optimized questionnaire
+// ============================================================================
+
+/**
+ * Returns structured survey questions derived from Member Satisfaction headers.
+ * Groups questions into sections for the multi-step wizard.
+ * @returns {Object} { sections: [{title, questions: [{id, text, type}]}] }
+ */
+function getSurveyQuestions() {
+  var sections = [
+    { title: 'Work Context', questions: [
+      { id: 'q1', text: 'What is your worksite?', type: 'text' },
+      { id: 'q2', text: 'What is your role?', type: 'text' },
+      { id: 'q3', text: 'What shift do you work?', type: 'text' },
+      { id: 'q4', text: 'How long have you been in your current role?', type: 'text' },
+      { id: 'q5', text: 'Have you had contact with a steward in the past year?', type: 'text' },
+    ]},
+    { title: 'Overall Satisfaction', questions: [
+      { id: 'q6', text: 'How satisfied are you with your union representation?', type: 'scale' },
+      { id: 'q7', text: 'How much do you trust the union to advocate for you?', type: 'scale' },
+      { id: 'q8', text: 'How protected do you feel by the union?', type: 'scale' },
+      { id: 'q9', text: 'How likely are you to recommend joining the union?', type: 'scale' },
+    ]},
+    { title: 'Steward Experience', questions: [
+      { id: 'q10', text: 'Steward responded in a timely manner', type: 'scale' },
+      { id: 'q11', text: 'Steward treated me with respect', type: 'scale' },
+      { id: 'q12', text: 'Steward explained my options clearly', type: 'scale' },
+      { id: 'q13', text: 'Steward followed through on commitments', type: 'scale' },
+      { id: 'q14', text: 'Steward advocated effectively for me', type: 'scale' },
+      { id: 'q15', text: 'I felt safe raising concerns', type: 'scale' },
+      { id: 'q16', text: 'Steward maintained confidentiality', type: 'scale' },
+    ]},
+    { title: 'Chapter & Leadership', questions: [
+      { id: 'q21', text: 'The chapter understands workplace issues', type: 'scale' },
+      { id: 'q22', text: 'Communication from the chapter is effective', type: 'scale' },
+      { id: 'q23', text: 'The chapter organizes well', type: 'scale' },
+      { id: 'q26', text: 'Leadership decisions are clear', type: 'scale' },
+      { id: 'q27', text: 'I understand the grievance process', type: 'scale' },
+      { id: 'q31', text: 'The union welcomes member opinions', type: 'scale' },
+    ]},
+    { title: 'Final Thoughts', questions: [
+      { id: 'q_comment', text: 'Any additional comments or suggestions?', type: 'freetext' },
+    ]},
+  ];
+  return { sections: sections };
+}
+
+/**
+ * Submits an in-app survey response.
+ * Hashes the email with SHA-256 for anonymity, writes to satisfaction sheet.
+ * @param {string} hashedEmail - Pre-hashed email from client (or raw email to hash server-side)
+ * @param {Object} responses - { q1: val, q2: val, ... }
+ * @returns {Object} { success, message }
+ */
+function submitSurveyResponse(hashedEmail, responses) {
+  if (!hashedEmail || !responses) return { success: false, message: 'Missing data.' };
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
+    if (!sheet) return { success: false, message: 'Survey sheet not found.' };
+
+    // Hash the email server-side for vault storage
+    var emailHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+      hashedEmail.toLowerCase().trim())
+      .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+
+    // Check vault for duplicate
+    var vaultSheet = ss.getSheetByName(SHEETS.SURVEY_VAULT || '_Survey_Vault');
+    if (vaultSheet && vaultSheet.getLastRow() > 1) {
+      var vaultData = vaultSheet.getRange(2, 1, vaultSheet.getLastRow() - 1, 1).getValues();
+      for (var v = 0; v < vaultData.length; v++) {
+        if (String(vaultData[v][0]) === emailHash) {
+          return { success: false, message: 'You have already submitted a survey this quarter.' };
+        }
+      }
+    }
+
+    // Build response row — Timestamp + question values in order
+    var row = [new Date()];
+    var questionIds = ['q1','q2','q3','q4','q5','q6','q7','q8','q9','q10','q11','q12','q13','q14','q15','q16','q17','q18','q19','q20','q21','q22','q23','q26','q27','q31','q_comment'];
+    for (var i = 0; i < questionIds.length; i++) {
+      row.push(responses[questionIds[i]] || '');
+    }
+
+    sheet.appendRow(row);
+
+    // Record hash in vault
+    if (vaultSheet) {
+      vaultSheet.appendRow([emailHash, new Date()]);
+    }
+
+    // Update tracking
+    var trackSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING || '_Survey_Tracking');
+    if (trackSheet && trackSheet.getLastRow() > 1) {
+      var trackData = trackSheet.getDataRange().getValues();
+      for (var t = 1; t < trackData.length; t++) {
+        var tEmail = String(trackData[t][1] || '').toLowerCase().trim();
+        if (tEmail === hashedEmail.toLowerCase().trim()) {
+          trackSheet.getRange(t + 1, 3).setValue('Completed');
+          trackSheet.getRange(t + 1, 4).setValue(new Date());
+          break;
+        }
+      }
+    }
+
+    return { success: true, message: 'Thank you! Your anonymous response has been recorded.' };
+  } catch (e) {
+    Logger.log('submitSurveyResponse error: ' + e.message);
+    return { success: false, message: 'Error submitting survey. Please try again.' };
+  }
+}
 

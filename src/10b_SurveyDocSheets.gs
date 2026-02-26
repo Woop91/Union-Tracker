@@ -699,7 +699,7 @@ function populateRoadmapItems(sheet) {
      'and an automatic alert must be sent to senior leadership (Chief Steward and Admin Emails in Config). ' +
      'The export should support column selection so stewards can choose which fields to include. ' +
      'PII columns (Street Address, City, State) require explicit opt-in and are excluded by default.',
-     'New', '', '', 'TODO: Implement email domain validation and leadership alert system'],
+     'Planned', '', '', 'Requires: email domain validation, leadership alert system'],
     // Row 7 - Lockdown Mode (Multi-Steward Authorization)
     [timestamp, 'System', 'Dashboard', 'Feature Request', 'High',
      'Lockdown Mode (Multi-Steward Authorization)',
@@ -712,7 +712,7 @@ function populateRoadmapItems(sheet) {
      '(5) Display a visible lockdown banner on all sheets. ' +
      'Lockdown can only be lifted by the same multi-steward authorization process. ' +
      'A lockdown history should be maintained in the Audit Log.',
-     'New', '', '', 'TODO: Multi-steward auth flow, lockdown state management, access restriction']
+     'Planned', '', '', 'Requires: multi-steward auth flow, lockdown state management, access restriction']
   ];
 
   // Only add if rows are empty (don't overwrite existing data)

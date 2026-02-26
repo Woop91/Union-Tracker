@@ -280,5 +280,5 @@ For technical support with Google Apps Script, consult the [Google Apps Script D
 
 ---
 
-**Last Updated**: 2026-02-14
-**Version**: 4.7.0
+**Last Updated**: 2026-02-25
+**Version**: 4.13.0

@@ -91,6 +91,17 @@ var Auth = (function () {
     var subject = 'Sign in to ' + config.orgName + ' Dashboard';
     var htmlBody = _buildEmailHtml(config, signInUrl, email);
 
+    // Check remaining email quota before attempting to send
+    try {
+      var remaining = MailApp.getRemainingDailyQuota();
+      if (remaining <= 0) {
+        Logger.log('Auth: Daily email quota exhausted');
+        return { success: false, message: 'Email quota reached for today. Please use Google Sign-In or try again tomorrow.' };
+      }
+    } catch (_quotaErr) {
+      // If quota check fails, proceed with send attempt anyway
+    }
+
     try {
       MailApp.sendEmail({
         to: email,
@@ -101,8 +112,16 @@ var Auth = (function () {
 
       return { success: true, message: 'Sign-in link sent to ' + email };
     } catch (err) {
-      Logger.log('Auth: Failed to send magic link: ' + err.message);
-      return { success: false, message: 'Failed to send email. Please try again or use Google Sign-In.' };
+      Logger.log('Auth: Failed to send magic link to ' + email + ': ' + err.message);
+      var msg = 'Failed to send email. ';
+      if (err.message && err.message.indexOf('quota') >= 0) {
+        msg += 'Email quota exhausted. Please use Google Sign-In.';
+      } else if (err.message && err.message.indexOf('invalid') >= 0) {
+        msg += 'The email address may be invalid. Please check and try again.';
+      } else {
+        msg += 'Please try again or use Google Sign-In.';
+      }
+      return { success: false, message: msg };
     }
   }
 

@@ -155,7 +155,7 @@ module.exports = [
       'no-constant-condition': 'off',
       'no-control-regex': 'off',
       'no-debugger': 'off',
-      'no-dupe-args': 'off',
+      'no-dupe-args': 'error',
       'no-dupe-else-if': 'off',
       'no-empty-character-class': 'off',
       'no-ex-assign': 'off',

@@ -9,6 +9,8 @@
  *   node build.js --clean   - Clean dist directory
  *   node build.js --watch   - Watch for changes (not implemented)
  *
+ * // TODO: Source map support would improve debugging (future enhancement)
+ *
  * Production builds (--prod or --production):
  *   Excludes development/test files that should not be deployed:
  *   - 07_DevTools.gs (contains test data seeding functions like NUKE_SEEDED_DATA)
@@ -60,7 +62,8 @@ const BUILD_ORDER = [
   '21_WebDashDataService.gs',        // SPA data access layer (Member Directory + Grievance Log)
   '22_WebDashApp.gs',                // SPA main entry point (doGetWebDashboard)
   '23_PortalSheets.gs',              // Portal sheet setup (8 portal-specific sheets)
-  '24_WeeklyQuestions.gs'            // Weekly engagement questions system
+  '24_WeeklyQuestions.gs',            // Weekly engagement questions system
+  '25_WorkloadService.gs'             // SPA workload service (SSO-auth embedded workload)
 ];
 
 const HTML_FILES = [

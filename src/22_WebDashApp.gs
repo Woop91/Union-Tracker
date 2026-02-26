@@ -27,6 +27,12 @@ function doGetWebDashboard(e) {
     var user = Auth.resolveUser(e);
 
     if (!user) {
+      // If the user explicitly clicked "Continue with Google" (sso=1 param)
+      // but SSO failed, redirect back with an error flag so the login page
+      // can display a helpful message.
+      if (e.parameter.sso === '1') {
+        return _serveAuth(config, e, 'sso_failed');
+      }
       // Not authenticated — show login screen
       return _serveAuth(config, e);
     }
@@ -81,14 +87,17 @@ function doGetWebDashboard(e) {
 
 /**
  * Serves the login/auth page.
+ * @param {Object} config
+ * @param {Object} e - Request event
+ * @param {string} [authError] - Optional auth error code (e.g. 'sso_failed')
  */
-function _serveAuth(config, e) {
+function _serveAuth(config, e, authError) {
   var template = HtmlService.createTemplateFromFile('index');
 
   template.pageData = JSON.stringify({
     view: 'auth',
     config: _sanitizeConfig(config),
-    error: e.parameter.authError || null,
+    error: e.parameter.authError || authError || null,
   });
 
   return template.evaluate()

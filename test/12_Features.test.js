@@ -644,3 +644,143 @@ describe('invalidateHeaderCache', () => {
     expect(() => invalidateHeaderCache('Member Directory')).not.toThrow();
   });
 });
+
+// ============================================================================
+// Expansion Column Engine — integration-style tests
+// ============================================================================
+
+describe('Expansion Column Engine', () => {
+  describe('getExpansionColumnData', () => {
+    test('is a function', () => {
+      expect(typeof getExpansionColumnData).toBe('function');
+    });
+
+    test('returns object with extraHeaders, memberData, coreColumnCount', () => {
+      // Set up a mock sheet with core + 2 extra columns
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('Col' + i);
+      }
+      headers.push('Custom Field A');
+      headers.push('Custom Field B');
+
+      const mockSheet = createMockSheet('Member Directory', [headers]);
+      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
+      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
+
+      // Invalidate cache so fresh read occurs
+      invalidateHeaderCache('Member Directory');
+
+      const result = getExpansionColumnData();
+      expect(result).toHaveProperty('extraHeaders');
+      expect(result).toHaveProperty('memberData');
+      expect(result).toHaveProperty('coreColumnCount');
+      expect(result.coreColumnCount).toBe(EXTENSION_CONFIG.CORE_COLUMN_COUNT);
+    });
+
+    test('identifies extra columns beyond core count', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+      headers.push('Extra1');
+      headers.push('Extra2');
+      headers.push('Extra3');
+
+      const mockSheet = createMockSheet('Member Directory', [headers]);
+      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
+      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
+      invalidateHeaderCache('Member Directory');
+
+      const result = getExpansionColumnData();
+      const extraNames = result.extraHeaders.map(h => h.name);
+      expect(extraNames).toContain('Extra1');
+      expect(extraNames).toContain('Extra2');
+      expect(extraNames).toContain('Extra3');
+      expect(result.extraHeaders.length).toBe(3);
+    });
+
+    test('returns empty extraHeaders when no extra columns exist', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+
+      const mockSheet = createMockSheet('Member Directory', [headers]);
+      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
+      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
+      invalidateHeaderCache('Member Directory');
+
+      const result = getExpansionColumnData();
+      expect(result.extraHeaders).toEqual([]);
+      expect(result.memberData).toEqual({});
+    });
+
+    test('extra headers are sorted by column position', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+      headers.push('Zebra Field');
+      headers.push('Alpha Field');
+
+      const mockSheet = createMockSheet('Member Directory', [headers]);
+      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
+      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
+      invalidateHeaderCache('Member Directory');
+
+      const result = getExpansionColumnData();
+      for (let i = 1; i < result.extraHeaders.length; i++) {
+        expect(result.extraHeaders[i].column).toBeGreaterThan(result.extraHeaders[i - 1].column);
+      }
+    });
+  });
+
+  describe('generateExpansionFieldsHtml', () => {
+    test('returns no-columns comment when no extra columns', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+      const mockSheet = createMockSheet('Member Directory', [headers]);
+      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
+      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
+      invalidateHeaderCache('Member Directory');
+
+      const html = generateExpansionFieldsHtml();
+      expect(html).toContain('No custom columns');
+    });
+
+    test('generates input fields for each extra column', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+      headers.push('Favorite Color');
+      headers.push('Badge Number');
+
+      const mockSheet = createMockSheet('Member Directory', [headers]);
+      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
+      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
+      invalidateHeaderCache('Member Directory');
+
+      const html = generateExpansionFieldsHtml();
+      expect(html).toContain('Favorite Color');
+      expect(html).toContain('Badge Number');
+      expect(html).toContain('Custom Fields');
+      expect(html).toContain('<input');
+    });
+  });
+
+  describe('saveExpansionData', () => {
+    test('rejects missing memberId', () => {
+      const result = saveExpansionData(null, { field: 'val' });
+      expect(result.success).toBe(false);
+    });
+
+    test('rejects missing customData', () => {
+      const result = saveExpansionData('M001', null);
+      expect(result.success).toBe(false);
+    });
+  });
+});

@@ -2,6 +2,8 @@
 
 ## Overview
 
+> **Note (v4.13.0):** The system now includes a full **SPA Web Dashboard** (v4.12+) that serves as the default entry point. The Interactive Dashboard described below remains available via the Sheets menu but the SPA provides a more modern interface. See the [SPA Web Dashboard](#spa-web-dashboard) section in FEATURES.md for details.
+
 The **Interactive Dashboard** system provides comprehensive views of your organization's grievance management data through mobile-friendly **web app interfaces**. Version 4.4.0 introduces the **Unified Web App Dashboard Architecture**.
 
 ---
@@ -606,7 +608,7 @@ Potential additions (from Future Features sheet):
 
 ---
 
-**Version:** 4.7.0
-**Last Updated:** February 2026
+**Version:** 4.13.0
+**Last Updated:** 2026-02-25
 
 *A personal project providing data-driven insights for representatives* 📊

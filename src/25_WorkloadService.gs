@@ -223,9 +223,6 @@ var WorkloadService = (function() {
       var emailKey = rEmail.toString().toLowerCase().trim();
       var rowPrivacy = vaultData[j][VAULT_COLS.PRIVACY] || 'Unit';
 
-      if (rowPrivacy === 'Private') continue;
-      if (latestPrivacy[emailKey] === 'Private') continue;
-
       // Format sub-category summary
       var subCatSummary = '';
       var subCatJson = vaultData[j][VAULT_COLS.SUB_CATEGORIES];
@@ -509,13 +506,11 @@ var WorkloadService = (function() {
         logAuditEvent('WT_SSO_SUBMIT', 'Privacy: ' + (formData.privacy || 'Unit'));
       }
 
-      // Privacy / reciprocity handling
+      // Reciprocity: set sharing start date
       var privacySetting = _sanitizeString(formData.privacy || 'Unit', 20);
-      if (privacySetting !== 'Private') {
-        var existingStartDate = _getUserSharingStartDate(emailLower);
-        if (!existingStartDate) {
-          _setUserSharingStartDate(emailLower, new Date());
-        }
+      var existingStartDate = _getUserSharingStartDate(emailLower);
+      if (!existingStartDate) {
+        _setUserSharingStartDate(emailLower, new Date());
       }
 
       // Save reminder preferences if provided
@@ -650,16 +645,6 @@ var WorkloadService = (function() {
       }
     }
 
-    // Reciprocity: Private users cannot view collective stats
-    if (userPrivacy === 'Private') {
-      return {
-        success: false,
-        data: null,
-        message: 'Private users cannot access collective statistics. Change your privacy setting to view analytics.',
-        reciprocityBlocked: true
-      };
-    }
-
     // Time-based reciprocity: only see data from sharing start date
     var userSharingStart = _getUserSharingStartDate(emailLower);
     if (!userSharingStart) {
@@ -678,16 +663,13 @@ var WorkloadService = (function() {
     var sharedCount = 0;
     var empBreakdown = { 'Full-time': 0, 'Part-time': 0 };
     var planBreakdown = { Yes: 0, No: 0 };
-    var privacyBreakdown = { Unit: 0, Agency: 0, Private: 0 };
+    var privacyBreakdown = { Unit: 0, Agency: 0 };
     var subCatTotals = {};
     var totalOT = 0, otSubmissions = 0;
 
     for (var i = 1; i < data.length; i++) {
       var privacy = data[i][VAULT_COLS.PRIVACY] || 'Unit';
       if (privacyBreakdown.hasOwnProperty(privacy)) privacyBreakdown[privacy]++;
-
-      // Exclude Private from collective stats
-      if (privacy === 'Private') continue;
 
       // Time-based reciprocity filter
       var ts = new Date(data[i][VAULT_COLS.TIMESTAMP]);

@@ -5,6 +5,37 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.0] - 2026-02-25
+
+### Security (130 code review findings resolved)
+- **15 CRITICAL XSS fixes**: `escapeHtml()` on all HTML contexts, `JSON.stringify()` for JS contexts, URL scheme validation
+- **26 HIGH fixes**: Input validation, rate limiting, email format checks, authorization gates, `withScriptLock_()` for concurrency
+- **50 MEDIUM fixes**: Formula injection protection (`escapeForFormula()`), column constant refactoring, batch write optimization, HMAC audit hashing, archive transaction patterns
+- **39 LOW fixes**: Narrowed `data:` URL pattern, consolidated `API_VERSION`, pinned GitHub Actions to commit SHAs, re-enabled `no-dupe-args` ESLint rule, architectural documentation
+
+### Added
+- **Grievance History for Members** — Past cases tab in SPA member view with color-coded outcome badges
+- **Meeting Check-In Kiosk** — Mobile-optimized `?page=checkin` with email+PIN auth, auto-refresh flow
+- **Welcome Experience** — Personalized first-visit greeting with role-appropriate quick-start action cards
+- **Bulk Actions** — Select All Open, Clear Selection, Bulk Flag/Email/Export CSV for grievances
+- **Deadline Calendar View** — Steward-only `?page=deadlines` with month/list views, color-coded urgency
+- **Engagement Sync Overhaul** — Dynamic headers, case-insensitive matching, data validation, debounce, 21 new sync tests
+- `withScriptLock_(fn, timeoutMs)` concurrency helper in `00_DataAccess.gs`
+- `safeSendEmail(options)` quota-checking email wrapper in `05_Integrations.gs`
+- `findColumnsByHeader_(sheet)` dynamic column resolver in `10d_SyncAndMaintenance.gs`
+- `DocumentApp` mock in test/gas-mock.js
+
+### Changed
+- `escapeHtml()` no longer escapes `/` and `=` (not XSS vectors, caused data corruption)
+- `API_VERSION` now derives from `COMMAND_CONFIG.VERSION` (single source of truth)
+- `onOpen()` defers heavy work to timed trigger for faster menu load
+- `onEdit()` fast-exits for irrelevant sheets
+- Formula setup functions use `getColumnLetter()` instead of hardcoded column letters
+- `addMember()` uses batch `setValues()` instead of individual `setValue()` calls
+
+### Removed
+- `CODE_REVIEW.md`, `PHASE2_PLAN.md`, `docs/archived-reviews/` (all findings resolved)
+
 ## [4.13.0] - 2026-02-25
 
 ### Added

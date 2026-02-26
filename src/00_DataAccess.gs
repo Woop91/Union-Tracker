@@ -216,6 +216,7 @@ var DataAccess = {
    * @param {*} searchValue - Value to search for
    * @returns {Object|null} Object with {rowNumber, data} or null
    */
+  // LINEAR_SCAN: Acceptable for typical member counts (<5000)
   findRow: function(sheetName, columnIndex, searchValue) {
     var data = this.getAllData(sheetName, { includeHeaders: true });
 
@@ -292,12 +293,20 @@ var DataAccess = {
       rowUpdates[cell.row][cell.col] = cell.value;
     }
 
-    // Apply updates
+    // Apply updates — batch each row into a single setValues() call
     for (var row in rowUpdates) {
       var updates = rowUpdates[row];
-      for (var col in updates) {
-        sheet.getRange(parseInt(row), parseInt(col)).setValue(updates[col]);
+      var cols = Object.keys(updates).map(function(c) { return parseInt(c); }).sort(function(a, b) { return a - b; });
+      var minCol = cols[0];
+      var maxCol = cols[cols.length - 1];
+      var span = maxCol - minCol + 1;
+
+      // Read current row values for the span so non-updated columns are preserved
+      var existing = sheet.getRange(parseInt(row), minCol, 1, span).getValues()[0];
+      for (var ci = 0; ci < cols.length; ci++) {
+        existing[cols[ci] - minCol] = updates[cols[ci]];
       }
+      sheet.getRange(parseInt(row), minCol, 1, span).setValues([existing]);
     }
   },
 
@@ -620,4 +629,30 @@ function getDeadlineUrgency(daysToDeadline) {
   if (daysToDeadline <= TIME_CONSTANTS.DEADLINE_DAYS.CRITICAL_THRESHOLD) return 'critical';
   if (daysToDeadline <= TIME_CONSTANTS.DEADLINE_DAYS.WARNING_THRESHOLD) return 'warning';
   return 'normal';
+}
+
+// ============================================================================
+// LOCKSERVICE HELPER
+// ============================================================================
+
+/**
+ * Executes a function while holding a script-level lock.
+ * Prevents concurrent execution of critical mutation operations.
+ * @param {Function} fn - The function to execute under lock
+ * @param {number} [timeoutMs=10000] - Lock acquisition timeout in milliseconds
+ * @returns {*} The return value of fn
+ * @throws {Error} If lock cannot be acquired or fn throws
+ */
+function withScriptLock_(fn, timeoutMs) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(timeoutMs || 10000);
+  } catch (e) {
+    throw new Error('Could not acquire lock. Another operation is in progress. Please try again.');
+  }
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
 }
