@@ -161,7 +161,7 @@
   </div>
 
   <div class="button-row">
-    <button class="btn-secondary" onclick="google.script.host.close()">Cancel</button>
+    <button class="btn-secondary" onclick="cancelSelection()">Cancel</button>
     <button class="btn-primary" onclick="saveSelection()">Save</button>
   </div>
 
@@ -235,6 +235,11 @@
       var countEl = document.getElementById('selectedCount');
       var count = currentSelection.length;
       countEl.textContent = count + ' selected';
+    }
+
+    function cancelSelection() {
+      google.script.run.clearMultiSelectState();
+      google.script.host.close();
     }
 
     function saveSelection() {
