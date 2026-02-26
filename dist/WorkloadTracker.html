@@ -355,12 +355,6 @@
           <div class="privacy-option" data-val="Agency" onclick="selectPrivacy(this)">
             <span class="privacy-icon">&#127760;</span>Agency Anonymous
           </div>
-          <div class="privacy-option" data-val="Private" onclick="selectPrivacy(this)">
-            <span class="privacy-icon">&#128274;</span>Private
-          </div>
-        </div>
-        <div id="privacyWarn" class="privacy-warn">
-          Private submissions are excluded from collective stats. You won't be able to view collective statistics.
         </div>
         <p class="text-muted mt-8">Unit/Agency submissions use REDACTED identity in the shared ledger.</p>
       </div>
@@ -539,9 +533,6 @@
     document.querySelectorAll('.privacy-option').forEach(function(o) { o.classList.remove('selected'); });
     el.classList.add('selected');
     selectedPrivacy = el.dataset.val;
-    var warn = document.getElementById('privacyWarn');
-    if (selectedPrivacy === 'Private') warn.classList.add('show');
-    else warn.classList.remove('show');
   }
 
   // ── Toggle helpers ────────────────────────────────────────────────────
@@ -835,12 +826,12 @@
         el.className = 'alert hidden';
         var d = result.data || {};
 
-        // Reciprocity block
+        // Reciprocity block (reserved for future use)
         if (d.blocked) {
           container.innerHTML =
             '<div class="card" style="text-align:center;padding:30px">' +
             '<div style="font-size:2rem;margin-bottom:12px">&#128274;</div>' +
-            '<p style="color:var(--muted)">' + (d.reason || 'Private users cannot view collective stats.') + '</p></div>';
+            '<p style="color:var(--muted)">' + (d.reason || 'Stats are temporarily unavailable.') + '</p></div>';
           return;
         }
 

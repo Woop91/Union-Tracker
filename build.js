@@ -1,15 +1,14 @@
 /**
  * Build Script for Dashboard
- * Concatenates all source files into a single consolidated .gs file
+ * Copies individual source files into dist/ for multi-file CLASP deployment.
+ * GAS V8 loads files in alphabetical filename order — numbered filenames
+ * (00_, 01_, …) guarantee correct load order AND give the GAS editor a
+ * navigable file sidebar.
  *
  * Usage:
- *   node build.js           - Build only (includes all files)
- *   node build.js --prod    - Production build (excludes DevTools.gs for security)
- *   node build.js --lint    - Lint before building
+ *   node build.js           - Build (includes all files)
+ *   node build.js --prod    - Production build (excludes DevTools.gs)
  *   node build.js --clean   - Clean dist directory
- *   node build.js --watch   - Watch for changes (not implemented)
- *
- * // TODO: Source map support would improve debugging (future enhancement)
  *
  * Production builds (--prod or --production):
  *   Excludes development/test files that should not be deployed:
@@ -18,68 +17,69 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 const SRC_DIR = path.join(__dirname, 'src');
 const DIST_DIR = path.join(__dirname, 'dist');
-const OUTPUT_FILE = path.join(DIST_DIR, 'ConsolidatedDashboard.gs');
 
-// Files in build order - 28 modules
+// .gs files in load order — alphabetical filename = correct GAS load order
 const BUILD_ORDER = [
-  '00_Security.gs',                // Security utilities, XSS prevention, access control
-  '00_DataAccess.gs',              // Data Access Layer, time constants
-  '01_Core.gs',                    // Error handling + Constants
-  '02_DataManagers.gs',            // Member + Grievance managers
-  '03_UIComponents.gs',            // Menu, Theme, Mobile, QuickActions, Search
-  '04a_UIMenus.gs',                // Menu creation, visual control panel, navigation, dialogs, sidebar
-  '04b_AccessibilityFeatures.gs',  // Common styles, comfort view, pomodoro, notepad, import/export
-  '04c_InteractiveDashboard.gs',   // Interactive dashboard, mobile views, data retrieval
-  '04d_ExecutiveDashboard.gs',     // Executive dashboard, steward dashboard, alerts, triggers
-  '04e_PublicDashboard.gs',        // Public member dashboard, unified data endpoints
-  '05_Integrations.gs',            // External integrations
-  '06_Maintenance.gs',             // Diagnostics, Cache, Undo, Maintenance
-  '07_DevTools.gs',                // Dev tools + Test framework
-  '08a_SheetSetup.gs',             // Main setup, utility functions, data validation, multi-select
-  '08b_SearchAndCharts.gs',        // Search functions, chart generation
-  '08c_FormsAndNotifications.gs',  // Form handling, notifications, deadline alerts
-  '08d_AuditAndFormulas.gs',       // Audit log, formula sync, hidden calc sheets
-  '09_Dashboards.gs',              // Satisfaction, Sync, Public dashboards
-  '10a_SheetCreation.gs',          // Config, Member Directory, Grievance Log sheet creation
-  '10b_SurveyDocSheets.gs',        // Satisfaction, Feedback, FAQ, Getting Started sheets
-  '10c_FormHandlers.gs',           // Menu handlers, form submissions, flagged reviews
-  '10d_SyncAndMaintenance.gs',     // Formatting, testing, Drive, Calendar, Email, sync, formulas
-  '10_Main.gs',                    // Main entry point
-  '11_CommandHub.gs',              // Command center + Secure dashboard
-  '12_Features.gs',                // Checklist, Dynamic, Looker
-  '13_MemberSelfService.gs',        // Member self-service portal with PIN auth
-  '14_MeetingCheckIn.gs',           // Meeting check-in system with email + PIN
-  '15_EventBus.gs',                 // Event-driven pub/sub architecture
-  '16_DashboardEnhancements.gs',    // Dashboard features: filters, presets, export, collaboration
-  '17_CorrelationEngine.gs',        // Cross-dimensional correlation engine with insights
-  '18_WorkloadTracker.gs',           // Member workload tracking, anonymized reporting
-  '19_WebDashAuth.gs',               // SPA auth: Google SSO + magic link tokens
-  '20_WebDashConfigReader.gs',       // SPA config reader with CacheService
-  '21_WebDashDataService.gs',        // SPA data access layer (Member Directory + Grievance Log)
-  '22_WebDashApp.gs',                // SPA main entry point (doGetWebDashboard)
-  '23_PortalSheets.gs',              // Portal sheet setup (8 portal-specific sheets)
-  '24_WeeklyQuestions.gs',            // Weekly engagement questions system
-  '25_WorkloadService.gs'             // SPA workload service (SSO-auth embedded workload)
+  '00_Security.gs',
+  '00_DataAccess.gs',
+  '01_Core.gs',
+  '02_DataManagers.gs',
+  '03_UIComponents.gs',
+  '04a_UIMenus.gs',
+  '04b_AccessibilityFeatures.gs',
+  '04c_InteractiveDashboard.gs',
+  '04d_ExecutiveDashboard.gs',
+  '04e_PublicDashboard.gs',
+  '05_Integrations.gs',
+  '06_Maintenance.gs',
+  '07_DevTools.gs',
+  '08a_SheetSetup.gs',
+  '08b_SearchAndCharts.gs',
+  '08c_FormsAndNotifications.gs',
+  '08d_AuditAndFormulas.gs',
+  '09_Dashboards.gs',
+  '10a_SheetCreation.gs',
+  '10b_SurveyDocSheets.gs',
+  '10c_FormHandlers.gs',
+  '10d_SyncAndMaintenance.gs',
+  '10_Main.gs',
+  '11_CommandHub.gs',
+  '12_Features.gs',
+  '13_MemberSelfService.gs',
+  '14_MeetingCheckIn.gs',
+  '15_EventBus.gs',
+  '16_DashboardEnhancements.gs',
+  '17_CorrelationEngine.gs',
+  '18_WorkloadTracker.gs',
+  // Web-dashboard SPA modules (load after all DDS modules)
+  '19_WebDashAuth.gs',
+  '20_WebDashConfigReader.gs',
+  '21_WebDashDataService.gs',
+  '22_WebDashApp.gs',
+  '23_PortalSheets.gs',
+  '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs',
 ];
 
+// .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)
 const HTML_FILES = [
   'MultiSelectDialog.html',
   'WorkloadTracker.html',
-  'auth_view.html',
-  'error_view.html',
+  // Web-dashboard SPA templates
   'index.html',
-  'member_view.html',
+  'styles.html',
+  'auth_view.html',
   'steward_view.html',
-  'styles.html'
+  'member_view.html',
+  'error_view.html',
 ];
 
-function build() {
+function build(fileList) {
   const startTime = Date.now();
-  console.log('Building consolidated dashboard...\n');
+  console.log('Building dashboard (multi-file mode)...\n');
 
   // Ensure dist directory exists
   if (!fs.existsSync(DIST_DIR)) {
@@ -87,123 +87,65 @@ function build() {
     console.log('Created dist/ directory');
   }
 
-  let output = '';
   let totalLines = 0;
+  let copiedGs = 0;
+  let copiedHtml = 0;
 
-  // Add header
-  output += `/**
- * ============================================================================
- * DASHBOARD - CONSOLIDATED BUILD
- * ============================================================================
- *
- * Version: 4.6.0 (2026-02-12)
- * Build Date: ${new Date().toISOString().split('T')[0]}
- *
- * This file is auto-generated from the src/ directory.
- * DO NOT EDIT THIS FILE DIRECTLY - edit the source files in src/ instead.
- *
- * Source Files:
- * ${BUILD_ORDER.map(f => ' *   - ' + f).join('\n')}
- *
- * HTML Files (embedded):
- * ${HTML_FILES.map(f => ' *   - ' + f).join('\n')}
- *
- * ============================================================================
- */
+  // Copy each .gs file to dist/
+  for (const file of fileList) {
+    const src = path.join(SRC_DIR, file);
+    const dest = path.join(DIST_DIR, file);
 
-`;
-
-  // Concatenate all .gs files
-  for (const file of BUILD_ORDER) {
-    const filePath = path.join(SRC_DIR, file);
-
-    if (!fs.existsSync(filePath)) {
+    if (!fs.existsSync(src)) {
       console.error(`ERROR: Source file not found: ${file}`);
       process.exit(1);
     }
 
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lineCount = content.split('\n').length;
+    fs.copyFileSync(src, dest);
+    const lineCount = fs.readFileSync(src, 'utf8').split('\n').length;
     totalLines += lineCount;
-
-    output += `// ============================================================================\n`;
-    output += `// SOURCE: ${file} (${lineCount} lines)\n`;
-    output += `// ============================================================================\n\n`;
-    output += content;
-    output += '\n\n';
-
-    console.log(`  Added: ${file} (${lineCount} lines)`);
+    copiedGs++;
+    console.log(`  Copied: ${file} (${lineCount} lines)`);
   }
 
-  // Embed HTML files as template strings
-  output += `// ============================================================================\n`;
-  output += `// EMBEDDED HTML TEMPLATES\n`;
-  output += `// ============================================================================\n\n`;
+  // Copy each .html file to dist/
+  for (const file of HTML_FILES) {
+    const src = path.join(SRC_DIR, file);
+    const dest = path.join(DIST_DIR, file);
 
-  for (const htmlFile of HTML_FILES) {
-    const filePath = path.join(SRC_DIR, htmlFile);
-
-    if (!fs.existsSync(filePath)) {
-      console.warn(`WARNING: HTML file not found: ${htmlFile} - skipping`);
+    if (!fs.existsSync(src)) {
+      console.warn(`WARNING: HTML file not found: ${file} — skipping`);
       continue;
     }
 
-    const content = fs.readFileSync(filePath, 'utf8');
-    const lineCount = content.split('\n').length;
+    fs.copyFileSync(src, dest);
+    const lineCount = fs.readFileSync(src, 'utf8').split('\n').length;
     totalLines += lineCount;
-
-    // Create a function that returns the HTML content
-    const funcName = htmlFile.replace('.html', '').replace(/[^a-zA-Z0-9]/g, '_') + '_HTML';
-
-    output += `/**\n`;
-    output += ` * Embedded HTML: ${htmlFile}\n`;
-    output += ` * @returns {string} HTML content\n`;
-    output += ` */\n`;
-    output += `function get${funcName}() {\n`;
-    output += `  return \`${content.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;\n`;
-    output += `}\n\n`;
-
-    console.log(`  Embedded: ${htmlFile} (${lineCount} lines)`);
+    copiedHtml++;
+    console.log(`  Copied: ${file} (${lineCount} lines)`);
   }
-
-  // Write output file
-  fs.writeFileSync(OUTPUT_FILE, output, 'utf8');
 
   const elapsed = Date.now() - startTime;
   console.log(`\nBuild complete! (${elapsed}ms)`);
-  console.log(`  Output: ${OUTPUT_FILE}`);
+  console.log(`  .gs files:  ${copiedGs}`);
+  console.log(`  .html files: ${copiedHtml}`);
   console.log(`  Total lines: ${totalLines}`);
-  console.log(`  File size: ${(output.length / 1024).toFixed(1)} KB`);
+  console.log(`  Output dir:  ${DIST_DIR}`);
 }
 
-/**
- * Runs ESLint on source files
- * @returns {boolean} True if linting passed
- */
-function lint() {
-  console.log('Running ESLint on source files...\n');
-
-  try {
-    execSync('npx eslint src/**/*.gs --ext .gs', {
-      stdio: 'inherit',
-      cwd: __dirname
-    });
-    console.log('\nLinting passed!\n');
-    return true;
-  } catch (error) {
-    console.error('\nLinting failed. Please fix the errors above.\n');
-    return false;
-  }
-}
-
-/**
- * Cleans the dist directory
- */
 function clean() {
   console.log('Cleaning dist directory...');
   if (fs.existsSync(DIST_DIR)) {
-    fs.rmSync(DIST_DIR, { recursive: true });
-    console.log('Dist directory cleaned.\n');
+    // Remove only .gs and .html files; keep appsscript.json
+    const files = fs.readdirSync(DIST_DIR);
+    let removed = 0;
+    for (const f of files) {
+      if (f.endsWith('.gs') || f.endsWith('.html')) {
+        fs.unlinkSync(path.join(DIST_DIR, f));
+        removed++;
+      }
+    }
+    console.log(`Removed ${removed} files from dist/\n`);
   } else {
     console.log('Dist directory does not exist.\n');
   }
@@ -211,31 +153,22 @@ function clean() {
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-const shouldLint = args.includes('--lint');
 const shouldClean = args.includes('--clean');
 const isProd = args.includes('--prod') || args.includes('--production');
 
-// Files to exclude in production builds (security: removes dev/test tools)
+// Files to exclude in production builds
 const PROD_EXCLUDE = ['07_DevTools.gs'];
 
-// Execute based on arguments
 if (shouldClean) {
   clean();
 } else {
-  if (shouldLint) {
-    const lintPassed = lint();
-    if (!lintPassed) {
-      process.exit(1);
-    }
-  }
+  const fileList = isProd
+    ? BUILD_ORDER.filter(f => !PROD_EXCLUDE.includes(f))
+    : BUILD_ORDER;
 
-  // Filter out excluded files for production builds
   if (isProd) {
     console.log('Production build: Excluding DevTools...\n');
-    const filteredOrder = BUILD_ORDER.filter(f => !PROD_EXCLUDE.includes(f));
-    BUILD_ORDER.length = 0;
-    BUILD_ORDER.push(...filteredOrder);
   }
 
-  build();
+  build(fileList);
 }

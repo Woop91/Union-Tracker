@@ -119,10 +119,12 @@ function applyWinRateGradients() {
  * Called from Visual Control Panel
  */
 function syncAllDashboardData() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
-
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
+
     // Sync hidden calculation sheets first
     if (typeof syncGrievanceCalcSheet === 'function') syncGrievanceCalcSheet();
     if (typeof syncDashboardCalcValues === 'function') syncDashboardCalcValues();
@@ -134,8 +136,10 @@ function syncAllDashboardData() {
 
     ss.toast('All dashboard data synced successfully!', '✅ Complete', 5);
   } catch (e) {
-    ss.toast('Error syncing: ' + e.message, '❌ Error', 5);
+    SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing: ' + e.message, '❌ Error', 5);
     Logger.log('syncAllDashboardData error: ' + e.toString());
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -829,154 +833,213 @@ function repairAllCheckboxes() {
 // ENGAGEMENT TRACKING SYNC FUNCTIONS
 // ============================================================================
 
+/** Reads headers from a sheet, returns {lowercaseName: 0-indexed col}. Falls back to row 2 if row 1 has < 3 populated cells. */
+function findColumnsByHeader_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return {};
+  var row1 = sheet.getRange(1, 1, 1, lastCol).getValues()[0], pop = 0;
+  for (var c = 0; c < row1.length; c++) { if (String(row1[c]).trim() !== '') pop++; }
+  var hdr = (pop >= 3) ? row1 : (sheet.getLastRow() >= 2 ? sheet.getRange(2, 1, 1, lastCol).getValues()[0] : row1);
+  var map = {};
+  for (var i = 0; i < hdr.length; i++) { var n = String(hdr[i]).toLowerCase().trim(); if (n) map[n] = i; }
+  return map;
+}
+/** Debounce helper — returns true if syncName was called within the last 30s. */
+function isSyncDebounced_(syncName) {
+  var cache = CacheService.getScriptCache(), key = 'SYNC_DEBOUNCE_' + syncName;
+  if (cache.get(key)) return true;
+  cache.put(key, 'running', 30);
+  return false;
+}
+/** Returns true only for real, non-NaN Date objects. */
+function isValidDate_(val) { return (val instanceof Date) && !isNaN(val.getTime()); }
+/** Builds {memberId: true} lookup from Member Directory data (skips header row). */
+function buildMemberIdSet_(memberData) {
+  var set = {};
+  for (var i = 1; i < memberData.length; i++) {
+    var id = String(memberData[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
+    if (id !== '') set[id] = true;
+  }
+  return set;
+}
+/** Resolves a header column: checks aliases in order, falls back to default index. */
+function resolveCol_(headers, aliases, fallback) {
+  for (var a = 0; a < aliases.length; a++) { if (headers[aliases[a]] !== undefined) return headers[aliases[a]]; }
+  return fallback;
+}
+/** Parses and validates a date value. Returns Date or null. Rejects future dates (> tomorrow). */
+function parseValidDate_(val, tomorrow) {
+  var d;
+  if (val instanceof Date) { d = val; } else if (val && typeof val === 'string') { d = new Date(val); } else { return null; }
+  return (isNaN(d.getTime()) || d > tomorrow) ? null : d;
+}
+
 /**
- * Syncs volunteer hours from Volunteer Hours sheet to Member Directory
- * Calculates total hours for each member and updates column S (VOLUNTEER_HOURS)
- * @returns {void}
+ * Syncs volunteer hours from Volunteer Hours sheet to Member Directory.
+ * Dynamic headers, data validation, member existence checks, toast notifications.
  */
 function syncVolunteerHoursToMemberDirectory() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var volunteerSheet = ss.getSheetByName(SHEETS.VOLUNTEER_HOURS);
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (isSyncDebounced_('volunteerHours')) { Logger.log('VH sync debounced'); return; }
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.toast('Syncing volunteer hours...', '🔄 Sync', 3);
 
-  if (!volunteerSheet || !memberSheet) {
-    Logger.log('Required sheets not found for volunteer hours sync');
-    return;
-  }
+    var volunteerSheet = ss.getSheetByName(SHEETS.VOLUNTEER_HOURS);
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!volunteerSheet) { ss.toast('Volunteer Hours sheet not found. Run CREATE_DASHBOARD to create it.', '⚠️ Sync Error', 5); return; }
+    if (!memberSheet) { ss.toast('Member Directory not found. Run CREATE_DASHBOARD to create it.', '⚠️ Sync Error', 5); return; }
 
-  // Get volunteer hours data
-  var volunteerData = volunteerSheet.getDataRange().getValues();
-  if (volunteerData.length < 3) {
-    // No data rows (only headers row 1-2)
-    Logger.log('No volunteer hours data to sync');
-    return;
-  }
+    // Dynamic header reading
+    var vh = findColumnsByHeader_(volunteerSheet);
+    var idCol = resolveCol_(vh, ['member id', 'memberid'], 1);
+    var hrsCol = resolveCol_(vh, ['hours'], 5);
+    var dtCol = resolveCol_(vh, ['date'], 3);
 
-  // Build lookup map: memberId -> totalHours
-  var hoursLookup = {};
+    var volunteerData = volunteerSheet.getDataRange().getValues();
+    if (volunteerData.length < 3) { ss.toast('No volunteer hours data to sync.', 'ℹ️ Sync', 3); return; }
 
-  for (var i = 2; i < volunteerData.length; i++) {  // Start at row 3 (index 2)
-    var row = volunteerData[i];
-    var memberId = row[1];  // Column B = Member ID (Volunteer Hours: A=Title, B=MemberID, C=Name, D=Date, E=Activity, F=Hours)
-    var hours = row[5];     // Column F = Hours (see column layout above)
+    var memberData = memberSheet.getDataRange().getValues();
+    if (memberData.length < 2) { ss.toast('Member Directory is empty.', 'ℹ️ Sync', 3); return; }
+    var validMembers = buildMemberIdSet_(memberData);
 
-    if (!memberId) continue;
+    var hoursLookup = {}, skipped = 0, badIds = {};
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(23, 59, 59, 999);
 
-    // Initialize if doesn't exist
-    if (!hoursLookup[memberId]) {
-      hoursLookup[memberId] = 0;
+    for (var i = 2; i < volunteerData.length; i++) {
+      var row = volunteerData[i];
+      var rawId = String(row[idCol] || '').trim();
+      if (rawId === '') { skipped++; continue; }
+      var hours = parseFloat(row[hrsCol]);
+      if (isNaN(hours) || hours <= 0) { skipped++; continue; }
+      if (parseValidDate_(row[dtCol], tomorrow) === null && row[dtCol]) { skipped++; continue; }
+      if (!validMembers[rawId]) { badIds[rawId] = true; skipped++; continue; }
+      hoursLookup[rawId] = (hoursLookup[rawId] || 0) + hours;
     }
 
-    // Add hours (handle both number and string)
-    var hoursNum = parseFloat(hours) || 0;
-    hoursLookup[memberId] += hoursNum;
+    var invalidIds = Object.keys(badIds);
+    if (invalidIds.length > 0) Logger.log('syncVH: ' + invalidIds.length + ' bad ID(s): ' + invalidIds.slice(0, 10).join(', '));
+
+    // Write to Member Directory with array length validation
+    var updates = [], membersUpdated = 0;
+    for (var j = 1; j < memberData.length; j++) {
+      var mid = String(memberData[j][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
+      var tot = hoursLookup[mid] || 0;
+      if (tot > 0) membersUpdated++;
+      updates.push([tot]);
+    }
+    var expected = memberData.length - 1;
+    if (updates.length !== expected) {
+      ss.toast('Write aborted: data length mismatch. Check logs.', '⚠️ Sync Error', 5);
+      Logger.log('syncVH: length mismatch updates=' + updates.length + ' expected=' + expected);
+      return;
+    }
+    if (updates.length > 0) memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, updates.length, 1).setValues(updates);
+
+    var totalSum = 0;
+    for (var k in hoursLookup) totalSum += hoursLookup[k];
+    ss.toast('Synced ' + Math.round(totalSum * 10) / 10 + ' hrs for ' + membersUpdated + ' members, ' + skipped + ' skipped.', '✅ Volunteer Hours', 4);
+    Logger.log('Synced VH: ' + membersUpdated + ' members, ' + skipped + ' skipped');
+  } catch (e) {
+    Logger.log('syncVH error: ' + e.message);
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing volunteer hours: ' + e.message, '❌ Sync Error', 5); } catch (_) {}
+    throw e;
+  } finally {
+    lock.releaseLock();
   }
-
-  // Get member data
-  var memberData = memberSheet.getDataRange().getValues();
-  if (memberData.length < 2) return;
-
-  // Update VOLUNTEER_HOURS column (U)
-  var updates = [];
-  for (var j = 1; j < memberData.length; j++) {
-    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
-    var totalHours = hoursLookup[memberId] || 0;
-    updates.push([totalHours]);
-  }
-
-  if (updates.length > 0) {
-    memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, updates.length, 1).setValues(updates);
-  }
-
-  Logger.log('Synced volunteer hours to ' + updates.length + ' members');
 }
 
 /**
- * Syncs meeting attendance from Meeting Attendance sheet to Member Directory
- * Updates Last Virtual Mtg (column R) and Last In-Person Mtg (column S)
- * @returns {void}
+ * Syncs meeting attendance from Meeting Attendance sheet to Member Directory.
+ * Dynamic headers, case-insensitive type matching, data validation, toast notifications.
  */
 function syncMeetingAttendanceToMemberDirectory() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var attendanceSheet = ss.getSheetByName(SHEETS.MEETING_ATTENDANCE);
-  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (isSyncDebounced_('meetingAttendance')) { Logger.log('MA sync debounced'); return; }
+  var lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ss.toast('Syncing meeting attendance...', '🔄 Sync', 3);
 
-  if (!attendanceSheet || !memberSheet) {
-    Logger.log('Required sheets not found for meeting attendance sync');
-    return;
-  }
+    var attendanceSheet = ss.getSheetByName(SHEETS.MEETING_ATTENDANCE);
+    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+    if (!attendanceSheet) { ss.toast('Meeting Attendance sheet not found. Run CREATE_DASHBOARD to create it.', '⚠️ Sync Error', 5); return; }
+    if (!memberSheet) { ss.toast('Member Directory not found. Run CREATE_DASHBOARD to create it.', '⚠️ Sync Error', 5); return; }
 
-  // Get attendance data
-  var attendanceData = attendanceSheet.getDataRange().getValues();
-  if (attendanceData.length < 3) {
-    // No data rows (only headers row 1-2)
-    Logger.log('No meeting attendance data to sync');
-    return;
-  }
+    // Dynamic header reading
+    var ma = findColumnsByHeader_(attendanceSheet);
+    var maDateCol = resolveCol_(ma, ['date'], 1);
+    var maTypeCol = resolveCol_(ma, ['type', 'meeting type'], 2);
+    var maMemberCol = resolveCol_(ma, ['member id', 'memberid'], 4);
+    var maAttendedCol = resolveCol_(ma, ['attended'], 6);
 
-  // Build lookup map: memberId -> {lastVirtual, lastInPerson}
-  var attendanceLookup = {};
+    var attendanceData = attendanceSheet.getDataRange().getValues();
+    if (attendanceData.length < 3) { ss.toast('No meeting attendance data to sync.', 'ℹ️ Sync', 3); return; }
 
-  for (var i = 2; i < attendanceData.length; i++) {  // Start at row 3 (index 2)
-    var row = attendanceData[i];
-    var meetingDate = row[1];     // Column B = Meeting Date (Meeting Attendance: A=MeetingID, B=Date, C=Type, D=Name, E=MemberID, F=Email, G=Attended)
-    var meetingType = row[2];     // Column C = Meeting Type (see column layout above)
-    var memberId = row[4];        // Column E = Member ID (see column layout above)
-    var attended = row[6];        // Column G = Attended (see column layout above)
+    var memberData = memberSheet.getDataRange().getValues();
+    if (memberData.length < 2) { ss.toast('Member Directory is empty.', 'ℹ️ Sync', 3); return; }
+    var validMembers = buildMemberIdSet_(memberData);
 
-    if (!memberId || !attended || !meetingDate) continue;
+    var lookup = {}, skipped = 0, badIds = {};
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(23, 59, 59, 999);
 
-    // Initialize if doesn't exist
-    if (!attendanceLookup[memberId]) {
-      attendanceLookup[memberId] = {
-        lastVirtual: null,
-        lastInPerson: null
-      };
+    for (var i = 2; i < attendanceData.length; i++) {
+      var row = attendanceData[i];
+      var rawId = String(row[maMemberCol] || '').trim();
+      if (rawId === '') { skipped++; continue; }
+      if (!row[maAttendedCol]) { skipped++; continue; }
+
+      var dateValue = parseValidDate_(row[maDateCol], tomorrow);
+      if (!dateValue) { skipped++; continue; }
+
+      if (!validMembers[rawId]) { badIds[rawId] = true; skipped++; continue; }
+      if (!lookup[rawId]) lookup[rawId] = { lastVirtual: null, lastInPerson: null };
+
+      // Case-insensitive meeting type matching
+      var mType = String(row[maTypeCol] || '').toLowerCase().trim();
+      if (mType === 'virtual') {
+        if (!lookup[rawId].lastVirtual || dateValue > lookup[rawId].lastVirtual) lookup[rawId].lastVirtual = dateValue;
+      } else if (mType === 'in-person' || mType === 'in person' || mType === 'inperson') {
+        if (!lookup[rawId].lastInPerson || dateValue > lookup[rawId].lastInPerson) lookup[rawId].lastInPerson = dateValue;
+      }
     }
 
-    // Convert to date if it's a string
-    var dateValue = meetingDate instanceof Date ? meetingDate : new Date(meetingDate);
+    var invalidIds = Object.keys(badIds);
+    if (invalidIds.length > 0) Logger.log('syncMA: ' + invalidIds.length + ' bad ID(s): ' + invalidIds.slice(0, 10).join(', '));
 
-    // Update last meeting date by type
-    if (meetingType === 'Virtual' || meetingType === 'virtual') {
-      if (!attendanceLookup[memberId].lastVirtual || dateValue > attendanceLookup[memberId].lastVirtual) {
-        attendanceLookup[memberId].lastVirtual = dateValue;
-      }
-    } else if (meetingType === 'In-Person' || meetingType === 'in-person') {
-      if (!attendanceLookup[memberId].lastInPerson || dateValue > attendanceLookup[memberId].lastInPerson) {
-        attendanceLookup[memberId].lastInPerson = dateValue;
-      }
+    // Write to Member Directory with array length validation
+    var updates = [], membersUpdated = 0;
+    for (var j = 1; j < memberData.length; j++) {
+      var mid = String(memberData[j][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
+      var att = lookup[mid] || { lastVirtual: null, lastInPerson: null };
+      if (att.lastVirtual || att.lastInPerson) membersUpdated++;
+      updates.push([att.lastVirtual || '', att.lastInPerson || '']);
     }
+    var expected = memberData.length - 1;
+    if (updates.length !== expected) {
+      ss.toast('Write aborted: data length mismatch. Check logs.', '⚠️ Sync Error', 5);
+      Logger.log('syncMA: length mismatch updates=' + updates.length + ' expected=' + expected);
+      return;
+    }
+    if (updates.length > 0) memberSheet.getRange(2, MEMBER_COLS.LAST_VIRTUAL_MTG, updates.length, 2).setValues(updates);
+
+    ss.toast('Synced attendance for ' + membersUpdated + ' members, ' + skipped + ' skipped.', '✅ Meeting Attendance', 4);
+    Logger.log('Synced MA: ' + membersUpdated + ' members, ' + skipped + ' skipped');
+  } catch (e) {
+    Logger.log('syncMA error: ' + e.message);
+    try { SpreadsheetApp.getActiveSpreadsheet().toast('Error syncing attendance: ' + e.message, '❌ Sync Error', 5); } catch (_) {}
+    throw e;
+  } finally {
+    lock.releaseLock();
   }
-
-  // Get member data
-  var memberData = memberSheet.getDataRange().getValues();
-  if (memberData.length < 2) return;
-
-  // Update columns P (LAST_VIRTUAL_MTG) and Q (LAST_INPERSON_MTG)
-  var updates = [];
-  for (var j = 1; j < memberData.length; j++) {
-    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
-    var memberAttendance = attendanceLookup[memberId] || {lastVirtual: '', lastInPerson: ''};
-    updates.push([
-      memberAttendance.lastVirtual || '',
-      memberAttendance.lastInPerson || ''
-    ]);
-  }
-
-  if (updates.length > 0) {
-    memberSheet.getRange(2, MEMBER_COLS.LAST_VIRTUAL_MTG, updates.length, 2).setValues(updates);
-  }
-
-  Logger.log('Synced meeting attendance to ' + updates.length + ' members');
 }
 
-/**
- * Unified sync function for all engagement tracking
- * Syncs volunteer hours and meeting attendance to Member Directory
- * Call this function after edits to Volunteer Hours or Meeting Attendance sheets
- * @returns {void}
- */
+/** Unified sync: volunteer hours + meeting attendance to Member Directory. */
 function syncEngagementToMemberDirectory() {
   syncVolunteerHoursToMemberDirectory();
   syncMeetingAttendanceToMemberDirectory();

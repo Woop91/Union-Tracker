@@ -308,8 +308,6 @@ var WorkloadPortal = (function () {
       if (!rowE) continue;
       var emailKey = rowE.toString().toLowerCase().trim();
       var rowPrivacy = vaultData[j][VAULT_COLS.PRIVACY];
-      if (rowPrivacy === 'Private') continue;
-      if (latestPrivacy[emailKey] === 'Private') continue;
 
       var identity = 'REDACTED';
       if (rowPrivacy === 'Unit') identity = 'REDACTED (Unit)';
@@ -574,12 +572,10 @@ var WorkloadPortal = (function () {
               (formObj.privacy || 'Unit'));
           }
 
-          // Reciprocity: set sharing start date for non-Private
+          // Reciprocity: set sharing start date
           var privacySetting = _sanitizeString(formObj.privacy || 'Unit', 20);
-          if (privacySetting !== 'Private') {
-            if (!_getUserSharingStartDate(email)) {
-              _setUserSharingStartDate(email, new Date());
-            }
+          if (!_getUserSharingStartDate(email)) {
+            _setUserSharingStartDate(email, new Date());
           }
 
           _recordSubmission(email);
@@ -615,7 +611,6 @@ var WorkloadPortal = (function () {
       var auth = _authenticateMember(email, pin);
       if (!auth.success) return { success: false, data: null, message: auth.message };
 
-      // Reciprocity: Private users blocked from collective stats
       var vault = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_VAULT);
       if (!vault || vault.getLastRow() <= 1) {
         return { success: true, data: { totalSubmissions: 0, members: 0, categories: {}, averages: {} }, message: '' };
@@ -623,27 +618,6 @@ var WorkloadPortal = (function () {
 
       var data = vault.getDataRange().getValues();
       var emailLower = email.toLowerCase().trim();
-
-      // Find user's latest privacy setting
-      var userPrivacy = 'Unit';
-      for (var p = data.length - 1; p >= 1; p--) {
-        var rE = data[p][VAULT_COLS.EMAIL];
-        if (rE && rE.toString().toLowerCase().trim() === emailLower) {
-          userPrivacy = data[p][VAULT_COLS.PRIVACY] || 'Unit';
-          break;
-        }
-      }
-
-      if (userPrivacy === 'Private') {
-        return {
-          success: true, message: '',
-          data: {
-            blocked: true,
-            reason: 'Your privacy setting is Private. To view collective statistics, change your privacy to Unit or Agency Anonymized on your next submission.',
-            totalSubmissions: 0, members: 0, categories: {}, averages: {}
-          }
-        };
-      }
 
       var userSharingStart = _getUserSharingStartDate(emailLower);
       var totals = [0, 0, 0, 0, 0, 0, 0, 0]; // t1-t8
@@ -655,7 +629,6 @@ var WorkloadPortal = (function () {
       var subCatTotals = {};
 
       for (var i = 1; i < data.length; i++) {
-        if (data[i][VAULT_COLS.PRIVACY] === 'Private') continue;
         var ts = new Date(data[i][VAULT_COLS.TIMESTAMP]);
         if (userSharingStart && ts < userSharingStart) continue;
 

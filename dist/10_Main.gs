@@ -34,10 +34,42 @@
  */
 function onOpen() {
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    // Create the dashboard menu
+    // Create the dashboard menu immediately — this is the critical path (F47 perf fix)
     createDashboardMenu();
+
+    // Defer non-critical initialization to a 1-second timed trigger so the
+    // spreadsheet UI is not blocked by heavy I/O (column sync, tab colors,
+    // hidden-sheet enforcement, etc.)
+    try {
+      ScriptApp.newTrigger('onOpenDeferred_')
+        .timeBased()
+        .after(1000)
+        .create();
+    } catch (triggerError) {
+      // If trigger creation fails (quota, permissions), run inline as fallback
+      console.log('Deferred trigger failed, running inline: ' + triggerError.message);
+      onOpenDeferred_();
+    }
+
+  } catch (error) {
+    console.error('Error in onOpen:', error);
+    // Still try to create a basic menu
+    SpreadsheetApp.getUi()
+      .createMenu('Union Dashboard')
+      .addItem('Initialize Dashboard', 'initializeDashboard')
+      .addToUi();
+  }
+}
+
+/**
+ * Deferred onOpen work — runs via a one-shot timed trigger so the
+ * spreadsheet opens fast. Handles column sync, sheet validation,
+ * tab colors, and hidden-sheet enforcement. (F47)
+ * @private
+ */
+function onOpenDeferred_() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
 
     // Sync column maps from actual sheet headers so that column constants
     // (MEMBER_COLS, GRIEVANCE_COLS, CONFIG_COLS, etc.) reflect the real
@@ -73,6 +105,13 @@ function onOpen() {
       console.log('Hidden sheet enforcement skipped: ' + hideError.message);
     }
 
+    // Proactive Constant Contact token health check (non-blocking toast)
+    try {
+      checkConstantContactHealth();
+    } catch (ccError) {
+      console.log('CC health check skipped: ' + ccError.message);
+    }
+
     // Show welcome toast
     ss.toast(
       'Dashboard loaded successfully',
@@ -81,12 +120,28 @@ function onOpen() {
     );
 
   } catch (error) {
-    console.error('Error in onOpen:', error);
-    // Still try to create a basic menu
-    SpreadsheetApp.getUi()
-      .createMenu('Union Dashboard')
-      .addItem('Initialize Dashboard', 'initializeDashboard')
-      .addToUi();
+    console.error('Error in onOpenDeferred_:', error);
+  } finally {
+    // Clean up the one-shot trigger so it does not accumulate
+    cleanUpOnOpenTrigger_();
+  }
+}
+
+/**
+ * Removes any onOpenDeferred_ triggers created by onOpen.
+ * Prevents trigger accumulation across multiple spreadsheet opens.
+ * @private
+ */
+function cleanUpOnOpenTrigger_() {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var i = 0; i < triggers.length; i++) {
+      if (triggers[i].getHandlerFunction() === 'onOpenDeferred_') {
+        ScriptApp.deleteTrigger(triggers[i]);
+      }
+    }
+  } catch (e) {
+    console.log('Trigger cleanup error: ' + e.message);
   }
 }
 
@@ -120,6 +175,14 @@ function onEdit(e) {
 
     // Skip header rows and hidden/calculation sheets (start with '_')
     if (row <= 1 || sheetName.charAt(0) === '_') return;
+
+    // Fast-exit for sheets that have no onEdit logic (e.g. dashboard output tabs)
+    var EDITABLE_SHEETS_ = [
+      SHEETS.GRIEVANCE_LOG, SHEETS.MEMBER_DIR, SHEETS.CONFIG,
+      SHEETS.CASE_CHECKLIST, SHEETS.VOLUNTEER_HOURS, SHEETS.MEETING_ATTENDANCE
+    ];
+    if (typeof CHECKLIST_SHEET_NAME !== 'undefined') EDITABLE_SHEETS_.push(CHECKLIST_SHEET_NAME);
+    if (EDITABLE_SHEETS_.indexOf(sheetName) === -1) return;
 
     // ========================================
     // 1. Security Audit & Change Tracking
@@ -1594,13 +1657,13 @@ function updateGrievance(grievanceId, updates) {
 
     // Update each provided field (use canonical GRIEVANCE_COLS, 1-indexed)
     if (updates.description !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(updates.description);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(escapeForFormula(updates.description));
     }
     if (updates.notes !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(updates.notes);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(updates.notes));
     }
     if (updates.status !== undefined) {
-      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(updates.status);
+      sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(escapeForFormula(updates.status));
     }
 
     // Update timestamp
@@ -2165,8 +2228,8 @@ function exportMemberDirectory(format) {
       // Send email with summary
       const email = Session.getActiveUser().getEmail();
       const subject = 'Member Directory Export - ' + new Date().toLocaleDateString();
-      let body = 'Member Directory Export\\n\\n';
-      body += 'Total Members: ' + (data.length - 1) + '\\n\\n';
+      let body = 'Member Directory Export\n\n';
+      body += 'Total Members: ' + (data.length - 1) + '\n\n';
       body += 'Spreadsheet: ' + ss.getUrl();
       GmailApp.sendEmail(email, subject, body);
       return { success: true, message: 'Report sent to ' + email };

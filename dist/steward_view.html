@@ -84,6 +84,11 @@ function renderStewardDashboard(appContainer) {
   renderPageLayout(appContainer, 'steward', 'cases', function(container) {
     _stewardHeader(container, 'Cases', CURRENT_USER.name + ' \u00B7 ' + CURRENT_USER.unit);
 
+    // Welcome card placeholder — inserted before KPIs if first visit
+    var welcomeSlot = el('div');
+    container.appendChild(welcomeSlot);
+    _maybeShowWelcome(welcomeSlot, 'steward');
+
     // KPIs
     var kpis = AppState.kpis || {};
     var kpiGrid = el('div', { className: 'kpi-grid' });
@@ -138,6 +143,105 @@ function renderStewardDashboard(appContainer) {
   });
 }
 
+// ═══════════════════════════════════════
+// WELCOME EXPERIENCE (steward)
+// ═══════════════════════════════════════
+
+/**
+ * Shows a welcome/onboarding card if it's the user's first visit.
+ * Fetches welcome data from backend, renders card if isFirstVisit.
+ * @param {Element} slot - Container element to insert the welcome card into
+ * @param {string} viewRole - 'steward' or 'member'
+ */
+function _maybeShowWelcome(slot, viewRole) {
+  // Skip if already dismissed in this session
+  if (AppState._welcomeDismissed) return;
+
+  google.script.run.withSuccessHandler(function(data) {
+    if (!data || !data.isFirstVisit) return;
+
+    var card = el('div', {
+      className: 'card card-glass card-fade-in',
+      style: {
+        padding: '24px 20px',
+        margin: '0 0 14px',
+        background: 'linear-gradient(135deg, var(--accentBg), rgba(255,255,255,0.03))',
+        border: '1px solid var(--accentBorder)',
+        position: 'relative'
+      }
+    });
+
+    // Header
+    var safeName = (data.userName || 'there').replace(/[<>&"']/g, '');
+    card.appendChild(el('div', {
+      style: { fontFamily: 'var(--fontDisplay)', fontSize: '20px', fontWeight: '700', color: 'var(--text)', marginBottom: '8px' }
+    }, 'Welcome, ' + safeName + '!'));
+
+    card.appendChild(el('div', {
+      style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.5', marginBottom: '16px' }
+    }, 'This is your ' + CONFIG.stewardLabel + ' dashboard. Track grievance cases, manage member communications, monitor deadlines, and access all your tools in one place.'));
+
+    // Quick-start action cards grid
+    var grid = el('div', {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }
+    });
+
+    (data.quickActions || []).forEach(function(qa) {
+      var actionCard = el('div', {
+        className: 'card card-clickable',
+        style: {
+          padding: '12px',
+          textAlign: 'center',
+          cursor: 'pointer',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '10px'
+        },
+        onClick: function() {
+          _dismissWelcome(card);
+          _handleTabNav('steward', qa.action);
+        }
+      });
+      actionCard.appendChild(el('div', { style: { fontSize: '22px', marginBottom: '4px' } }, qa.icon));
+      actionCard.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)', fontFamily: 'var(--fontDisplay)' } }, qa.label));
+      grid.appendChild(actionCard);
+    });
+    card.appendChild(grid);
+
+    // Dismiss button
+    card.appendChild(el('button', {
+      className: 'btn',
+      style: {
+        width: '100%',
+        background: 'var(--accent)',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '8px',
+        padding: '10px',
+        fontSize: '13px',
+        fontWeight: '600',
+        cursor: 'pointer'
+      },
+      onClick: function() { _dismissWelcome(card); }
+    }, 'Got it!'));
+
+    slot.appendChild(card);
+  }).dataGetWelcomeData(CURRENT_USER.email);
+}
+
+/**
+ * Dismisses the welcome card and saves preference.
+ */
+function _dismissWelcome(cardEl) {
+  AppState._welcomeDismissed = true;
+  if (cardEl) {
+    cardEl.style.opacity = '0';
+    cardEl.style.transition = 'opacity 0.3s ease';
+    setTimeout(function() { cardEl.remove(); }, 300);
+  }
+  google.script.run.dataMarkWelcomeDismissed(CURRENT_USER.email);
+}
+
 function renderCaseList(container, filter) {
   container.innerHTML = '';
   var cases = AppState.cases;
@@ -145,8 +249,41 @@ function renderCaseList(container, filter) {
   if (filter === 'active') cases = cases.filter(function(c) { return c.status === 'active' || c.status === 'new'; });
 
   if (cases.length === 0) {
-    container.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } },
-      filter === 'all' ? 'No cases assigned.' : 'No ' + filter + ' cases.'));
+    if (filter === 'all' && AppState.cases.length === 0) {
+      // No cases at all — show agency-wide stats as fallback
+      var agencySlot = el('div', { style: { textAlign: 'center', padding: '20px 0' } });
+      agencySlot.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px', marginBottom: '14px' } }, 'No cases currently assigned to you.'));
+      agencySlot.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, 'Agency-Wide Overview'));
+      var agencyCharts = el('div');
+      agencySlot.appendChild(agencyCharts);
+      container.appendChild(agencySlot);
+      google.script.run.withSuccessHandler(function(data) {
+        if (!data || !data.available) {
+          agencyCharts.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '12px' } }, 'Grievance stats not yet available.'));
+          return;
+        }
+        agencyCharts.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '8px' } }, data.total + ' total grievances agency-wide'));
+        if (typeof ChartHelper !== 'undefined') {
+          var sLabels = Object.keys(data.byStatus);
+          var sData = sLabels.map(function(k) { return data.byStatus[k]; });
+          var sCard = el('div', { className: 'card card-glass', style: { padding: '14px', marginBottom: '8px', textAlign: 'left' } });
+          sCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Status Breakdown'));
+          ChartHelper.createDoughnutChart(sCard, 'agency-status-chart', sLabels, sData);
+          agencyCharts.appendChild(sCard);
+          if (data.byStep) {
+            var stLabels = Object.keys(data.byStep);
+            var stData = stLabels.map(function(k) { return data.byStep[k]; });
+            var stCard = el('div', { className: 'card card-glass', style: { padding: '14px', textAlign: 'left' } });
+            stCard.appendChild(el('div', { style: { fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Step'));
+            ChartHelper.createBarChart(stCard, 'agency-step-chart', stLabels, [{ label: 'Count', data: stData }]);
+            agencyCharts.appendChild(stCard);
+          }
+        }
+      }).dataGetAgencyGrievanceStats();
+    } else {
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } },
+        'No ' + filter + ' cases.'));
+    }
     return;
   }
 
@@ -372,19 +509,80 @@ function renderBroadcast(appContainer) {
     _stewardHeader(container, 'Broadcast Message');
     var content = el('div', { className: 'content' });
 
-    // Location filter
+    // State for selected checkboxes
+    var selectedLocations = {};
+    var selectedDays = {};
+
+    // Recipient preview
+    var recipientPreview = el('div', { style: { fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginBottom: '12px' } }, 'Loading filters...');
+    content.appendChild(recipientPreview);
+
+    // Location filter (checkboxes)
     var locationGroup = el('div', { className: 'form-group' });
-    locationGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Location (optional)'));
-    var locationInput = el('input', { className: 'form-input', placeholder: 'All locations' });
-    locationGroup.appendChild(locationInput);
+    locationGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Location'));
+    var locationCheckboxes = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' } });
+    locationGroup.appendChild(locationCheckboxes);
     content.appendChild(locationGroup);
 
-    // Office days filter
+    // Office days filter (checkboxes)
     var daysGroup = el('div', { className: 'form-group' });
-    daysGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Office Days (optional)'));
-    var daysInput = el('input', { className: 'form-input', placeholder: 'e.g., Monday, Wednesday' });
-    daysGroup.appendChild(daysInput);
+    daysGroup.appendChild(el('label', { className: 'form-label' }, 'Filter by Office Days'));
+    var daysCheckboxes = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '4px' } });
+    daysGroup.appendChild(daysCheckboxes);
     content.appendChild(daysGroup);
+
+    // Build checkbox pill helper
+    function buildCheckboxPill(parentEl, label, stateObj) {
+      var pill = el('button', {
+        className: 'filter-tab',
+        style: { fontSize: '12px', padding: '5px 12px' },
+        onClick: function() {
+          stateObj[label] = !stateObj[label];
+          pill.className = 'filter-tab' + (stateObj[label] ? ' active' : '');
+          updatePreview();
+        }
+      }, label);
+      parentEl.appendChild(pill);
+    }
+
+    function updatePreview() {
+      var locs = Object.keys(selectedLocations).filter(function(k) { return selectedLocations[k]; });
+      var days = Object.keys(selectedDays).filter(function(k) { return selectedDays[k]; });
+      var parts = [];
+      if (locs.length > 0) parts.push(locs.length + ' location' + (locs.length > 1 ? 's' : ''));
+      if (days.length > 0) parts.push(days.length + ' day' + (days.length > 1 ? 's' : ''));
+      recipientPreview.textContent = parts.length > 0 ? 'Filtering: ' + parts.join(', ') : 'Sending to all assigned members';
+    }
+
+    // Fetch available filter options
+    google.script.run.withSuccessHandler(function(opts) {
+      // "Select All" for locations
+      if (opts.locations.length > 0) {
+        var allLocBtn = el('button', {
+          className: 'filter-tab', style: { fontSize: '11px', padding: '4px 10px', fontWeight: '600' },
+          onClick: function() {
+            var allSelected = opts.locations.every(function(l) { return selectedLocations[l]; });
+            opts.locations.forEach(function(l) { selectedLocations[l] = !allSelected; });
+            locationCheckboxes.querySelectorAll('.filter-tab:not(:first-child)').forEach(function(p) {
+              p.className = 'filter-tab' + (!allSelected ? ' active' : '');
+            });
+            updatePreview();
+          }
+        }, 'All');
+        locationCheckboxes.appendChild(allLocBtn);
+        opts.locations.forEach(function(loc) { buildCheckboxPill(locationCheckboxes, loc, selectedLocations); });
+      } else {
+        locationCheckboxes.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No location data available'));
+      }
+
+      if (opts.officeDays.length > 0) {
+        opts.officeDays.forEach(function(day) { buildCheckboxPill(daysCheckboxes, day, selectedDays); });
+      } else {
+        daysCheckboxes.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, 'No office day data available'));
+      }
+
+      updatePreview();
+    }).dataGetBroadcastFilterOptions(CURRENT_USER.email);
 
     // Message
     var msgGroup = el('div', { className: 'form-group' });
@@ -402,8 +600,10 @@ function renderBroadcast(appContainer) {
         var msg = msgTextarea.value.trim();
         if (!msg) { statusMsg.textContent = 'Please enter a message.'; statusMsg.style.color = 'var(--danger)'; return; }
         var filter = {};
-        if (locationInput.value.trim()) filter.location = locationInput.value.trim();
-        if (daysInput.value.trim()) filter.officeDays = daysInput.value.trim();
+        var locs = Object.keys(selectedLocations).filter(function(k) { return selectedLocations[k]; });
+        var days = Object.keys(selectedDays).filter(function(k) { return selectedDays[k]; });
+        if (locs.length > 0) filter.location = locs.join(',');
+        if (days.length > 0) filter.officeDays = days.join(',');
         statusMsg.textContent = 'Sending...';
         statusMsg.style.color = 'var(--muted)';
         google.script.run.withSuccessHandler(function(result) {
@@ -1328,6 +1528,31 @@ function _renderTaskList(container, statusFilter) {
 function _renderNewTaskForm(container, onCreated) {
   container.appendChild(el('h3', { className: 'section-title' }, 'Create Task'));
 
+  // Chief steward: show "Assign to" dropdown
+  var assignSelect = null;
+  var assignGroup = el('div', { className: 'form-group', style: { display: 'none' } });
+  assignGroup.appendChild(el('label', { className: 'form-label' }, 'Assign to'));
+  assignSelect = el('select', { className: 'form-select' });
+  assignSelect.appendChild(el('option', { value: '' }, 'Myself'));
+  assignGroup.appendChild(assignSelect);
+  container.appendChild(assignGroup);
+
+  // Check if current user is chief steward and populate steward list
+  google.script.run.withSuccessHandler(function(isChief) {
+    if (isChief) {
+      assignGroup.style.display = '';
+      google.script.run.withSuccessHandler(function(stewards) {
+        if (stewards && stewards.length > 0) {
+          stewards.forEach(function(s) {
+            if (s.email !== CURRENT_USER.email) {
+              assignSelect.appendChild(el('option', { value: s.email }, s.name || s.email));
+            }
+          });
+        }
+      }).dataGetStewardDirectory();
+    }
+  }).dataIsChiefSteward(CURRENT_USER.email);
+
   var titleGroup = el('div', { className: 'form-group' });
   titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
   var titleInput = el('input', { className: 'form-input', placeholder: 'e.g., Check in on member' });
@@ -1371,9 +1596,16 @@ function _renderNewTaskForm(container, onCreated) {
       var title = titleInput.value.trim();
       if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
       statusMsg.textContent = 'Creating...'; statusMsg.style.color = 'var(--muted)';
-      google.script.run.withSuccessHandler(function(r) {
-        if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-      }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+      var assignee = assignSelect ? assignSelect.value : '';
+      if (assignee) {
+        google.script.run.withSuccessHandler(function(r) {
+          if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+        }).dataCreateTaskForSteward(CURRENT_USER.email, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+      } else {
+        google.script.run.withSuccessHandler(function(r) {
+          if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+        }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+      }
     }
   }, 'Create Task'));
 }

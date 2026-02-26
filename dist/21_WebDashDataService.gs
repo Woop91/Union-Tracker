@@ -58,6 +58,9 @@ var DataService = (function () {
     grievanceUnit:   ['unit', 'workplace unit'],
     grievancePriority: ['priority', 'urgency'],
     grievanceNotes:  ['notes', 'description', 'summary'],
+    grievanceIssueCategory: ['issue category', 'category', 'issue type'],
+    grievanceResolution: ['resolution', 'outcome', 'result'],
+    grievanceDateClosed: ['date closed', 'closed date', 'closed', 'resolved date'],
   };
 
   // ═══════════════════════════════════════
@@ -226,6 +229,84 @@ var DataService = (function () {
     });
 
     return grievances;
+  }
+
+  /**
+   * Returns resolved/closed grievance history for a member.
+   * Only includes cases with terminal statuses. Excludes internal notes,
+   * steward names, and other sensitive fields for member privacy.
+   * @param {string} memberEmail
+   * @returns {Object} { success: true, history: [...] }
+   */
+  function getMemberGrievanceHistory(memberEmail) {
+    if (!memberEmail) return { success: true, history: [] };
+    memberEmail = String(memberEmail).trim().toLowerCase();
+
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return { success: true, history: [] };
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+
+    var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
+    if (memberCol === -1) return { success: true, history: [] };
+
+    var closedStatuses = ['settled', 'won', 'denied', 'withdrawn', 'closed'];
+    var history = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][memberCol]).trim().toLowerCase();
+      if (rowEmail !== memberEmail) continue;
+
+      var status = String(_getVal(data[i], colMap, HEADERS.grievanceStatus, '')).trim().toLowerCase();
+      if (closedStatuses.indexOf(status) === -1) continue;
+
+      var filedRaw = _getVal(data[i], colMap, HEADERS.grievanceFiled, null);
+      var filedFormatted = '';
+      var filedTimestamp = 0;
+      if (filedRaw instanceof Date) {
+        filedFormatted = _formatDate(filedRaw);
+        filedTimestamp = filedRaw.getTime();
+      } else if (filedRaw) {
+        var parsed = new Date(filedRaw);
+        if (!isNaN(parsed.getTime())) {
+          filedFormatted = _formatDate(parsed);
+          filedTimestamp = parsed.getTime();
+        }
+      }
+
+      var closedRaw = _getVal(data[i], colMap, HEADERS.grievanceDateClosed, null);
+      var closedFormatted = '';
+      if (closedRaw instanceof Date) {
+        closedFormatted = _formatDate(closedRaw);
+      } else if (closedRaw) {
+        var parsedClosed = new Date(closedRaw);
+        if (!isNaN(parsedClosed.getTime())) {
+          closedFormatted = _formatDate(parsedClosed);
+        }
+      }
+
+      history.push({
+        grievanceId: String(_getVal(data[i], colMap, HEADERS.grievanceId, '')).trim(),
+        issueCategory: String(_getVal(data[i], colMap, HEADERS.grievanceIssueCategory, '')).trim(),
+        status: status.charAt(0).toUpperCase() + status.slice(1),
+        outcome: String(_getVal(data[i], colMap, HEADERS.grievanceResolution, '')).trim(),
+        dateFiled: filedFormatted,
+        dateClosed: closedFormatted,
+        filedTimestamp: filedTimestamp,
+      });
+    }
+
+    // Sort by filed date descending (most recent first)
+    history.sort(function(a, b) {
+      return (b.filedTimestamp || 0) - (a.filedTimestamp || 0);
+    });
+
+    // Strip timestamp from returned data
+    history.forEach(function(h) { delete h.filedTimestamp; });
+
+    return { success: true, history: history };
   }
 
   /**
@@ -950,11 +1031,19 @@ var DataService = (function () {
     return sheet;
   }
 
-  function createTask(stewardEmail, title, description, memberEmail, priority, dueDate) {
+  function createTask(stewardEmail, title, description, memberEmail, priority, dueDate, assignToEmail) {
     if (!stewardEmail || !title) return { success: false, message: 'Missing fields.' };
+    // If assignToEmail is provided and caller is chief steward, assign to that steward
+    var ownerEmail = stewardEmail.toLowerCase().trim();
+    if (assignToEmail) {
+      var chiefEmail = _getChiefStewardEmail();
+      if (chiefEmail && ownerEmail === chiefEmail) {
+        ownerEmail = assignToEmail.toLowerCase().trim();
+      }
+    }
     var sheet = _ensureStewardTasks();
     var id = 'ST_' + Date.now().toString(36);
-    sheet.appendRow([id, stewardEmail.toLowerCase().trim(), title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
+    sheet.appendRow([id, ownerEmail, title.substring(0, 200), (description || '').substring(0, 500), (memberEmail || '').toLowerCase().trim(), priority || 'medium', 'open', dueDate || '', new Date(), '']);
     return { success: true, message: 'Task created.', taskId: id };
   }
 
@@ -1012,6 +1101,57 @@ var DataService = (function () {
       }
     }
     return { success: false, message: 'Task not found.' };
+  }
+
+  // ═══════════════════════════════════════
+  // Chief Steward Task View (v4.15.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns the chief steward email from the config sheet.
+   * @private
+   */
+  function _getChiefStewardEmail() {
+    try {
+      var email = '';
+      if (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.CHIEF_STEWARD_EMAIL) {
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var cfgSheet = ss.getSheetByName('Config');
+        if (cfgSheet) email = String(cfgSheet.getRange(2, CONFIG_COLS.CHIEF_STEWARD_EMAIL).getValue() || '').toLowerCase().trim();
+      }
+      if (!email && typeof COMMAND_CONFIG !== 'undefined') email = String(COMMAND_CONFIG.CHIEF_STEWARD_EMAIL || '').toLowerCase().trim();
+      return email || null;
+    } catch (_e) { return null; }
+  }
+
+  /**
+   * Checks if the given email belongs to the chief steward.
+   */
+  function isChiefSteward(email) {
+    if (!email) return false;
+    var chief = _getChiefStewardEmail();
+    return chief ? email.toLowerCase().trim() === chief : false;
+  }
+
+  /**
+   * Gets ALL steward tasks (for chief steward overview).
+   * Returns tasks from all stewards, grouped by steward.
+   */
+  function getChiefStewardTaskView(chiefEmail) {
+    if (!isChiefSteward(chiefEmail)) return { authorized: false, tasks: [] };
+    var sheet = _ensureStewardTasks();
+    if (sheet.getLastRow() <= 1) return { authorized: true, tasks: [] };
+    var data = sheet.getDataRange().getValues();
+    var tasks = [];
+    for (var i = 1; i < data.length; i++) {
+      var status = String(data[i][6]).toLowerCase().trim();
+      var dueDateRaw = data[i][7];
+      var dueStr = dueDateRaw instanceof Date ? _formatDate(dueDateRaw) : String(dueDateRaw || '');
+      var dueDays = null;
+      if (dueDateRaw instanceof Date) dueDays = Math.ceil((dueDateRaw.getTime() - Date.now()) / 86400000);
+      tasks.push({ id: data[i][0], assignedTo: data[i][1], title: data[i][2], description: data[i][3], memberEmail: data[i][4], priority: data[i][5], status: status, dueDate: dueStr, dueDays: dueDays, created: data[i][8] instanceof Date ? _formatDate(data[i][8]) : '' });
+    }
+    return { authorized: true, tasks: tasks };
   }
 
   // ═══════════════════════════════════════
@@ -1074,6 +1214,7 @@ var DataService = (function () {
     var byStatus = {};
     var byStep = {};
     var byUnit = {};
+    var byCategory = {};
     var monthly = {};
     for (var i = 1; i < data.length; i++) {
       var rec = _buildGrievanceRecord(data[i], colMap);
@@ -1083,6 +1224,8 @@ var DataService = (function () {
       byStep[step] = (byStep[step] || 0) + 1;
       var u = rec.unit || 'Unknown';
       byUnit[u] = (byUnit[u] || 0) + 1;
+      var cat = rec.issueCategory || 'Uncategorized';
+      byCategory[cat] = (byCategory[cat] || 0) + 1;
       if (rec.filedTimestamp) {
         var d = new Date(rec.filedTimestamp);
         var key = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
@@ -1090,7 +1233,7 @@ var DataService = (function () {
       }
     }
     var monthlyArr = Object.keys(monthly).sort().map(function(k) { return { month: k, count: monthly[k] }; });
-    return { available: true, total: total, byStatus: byStatus, byStep: byStep, byUnit: byUnit, monthly: monthlyArr };
+    return { available: true, total: total, byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory, monthly: monthlyArr };
   }
 
   function getGrievanceHotSpots() {
@@ -1188,6 +1331,7 @@ var DataService = (function () {
     getStewardCases: getStewardCases,
     getStewardKPIs: getStewardKPIs,
     getMemberGrievances: getMemberGrievances,
+    getMemberGrievanceHistory: getMemberGrievanceHistory,
     getStewardContact: getStewardContact,
     getUnits: getUnits,
     getFullMemberProfile: getFullMemberProfile,
@@ -1216,6 +1360,9 @@ var DataService = (function () {
     getGrievanceHotSpots: getGrievanceHotSpots,
     getMembershipStats: getMembershipStats,
     getUpcomingEvents: getUpcomingEvents,
+    // v4.15.0
+    isChiefSteward: isChiefSteward,
+    getChiefStewardTaskView: getChiefStewardTaskView,
   };
 
 })();
@@ -1228,6 +1375,7 @@ var DataService = (function () {
 function dataGetStewardCases(email) { return DataService.getStewardCases(email); }
 function dataGetStewardKPIs(email) { return DataService.getStewardKPIs(email); }
 function dataGetMemberGrievances(email) { return DataService.getMemberGrievances(email); }
+function dataGetMemberGrievanceHistory(email) { return DataService.getMemberGrievanceHistory(email); }
 function dataGetStewardContact(email) { return DataService.getStewardContact(email); }
 function dataGetUserRole(email) { return DataService.getUserRole(email); }
 function dataGetUserProfile(email) { return DataService.findUserByEmail(email); }
@@ -1252,6 +1400,7 @@ function dataLogMemberContact(stewardEmail, memberEmail, type, notes, duration) 
 function dataGetMemberContactHistory(stewardEmail, memberEmail) { return DataService.getMemberContactHistory(stewardEmail, memberEmail); }
 function dataGetStewardContactLog(stewardEmail) { return DataService.getStewardContactLog(stewardEmail); }
 function dataCreateTask(stewardEmail, title, desc, memberEmail, priority, dueDate) { return DataService.createTask(stewardEmail, title, desc, memberEmail, priority, dueDate); }
+function dataCreateTaskForSteward(assignerEmail, assigneeEmail, title, desc, memberEmail, priority, dueDate) { return DataService.createTask(assignerEmail, title, desc, memberEmail, priority, dueDate, assigneeEmail); }
 function dataGetTasks(stewardEmail, statusFilter) { return DataService.getTasks(stewardEmail, statusFilter); }
 function dataUpdateTask(stewardEmail, taskId, updates) { return DataService.updateTask(stewardEmail, taskId, updates); }
 function dataCompleteTask(stewardEmail, taskId) { return DataService.completeTask(stewardEmail, taskId); }
@@ -1261,3 +1410,150 @@ function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
 function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
 function dataGetMembershipStats() { return DataService.getMembershipStats(); }
 function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(limit); }
+function dataGetSurveyQuestions() { return getSurveyQuestions(); }
+function dataSubmitSurveyResponse(email, responses) { return submitSurveyResponse(email, responses); }
+function dataIsChiefSteward(email) { return DataService.isChiefSteward(email); }
+function dataGetChiefStewardTaskView(email) { return DataService.getChiefStewardTaskView(email); }
+function dataGetAgencyGrievanceStats() { return DataService.getGrievanceStats(); }
+
+// Batch data fetch — single round-trip for SPA init
+function dataGetBatchData(email, role) { return getWebDashBatchData(email, role); }
+
+// Broadcast filter options — returns unique values from steward's members
+function dataGetBroadcastFilterOptions(stewardEmail) {
+  var members = DataService.getStewardMembers(stewardEmail);
+  var locations = {};
+  var officeDays = {};
+  var duesStatuses = {};
+  members.forEach(function(m) {
+    if (m.workLocation) locations[m.workLocation] = true;
+    if (m.officeDays) {
+      m.officeDays.split(/[,;]/).forEach(function(d) {
+        var day = d.trim();
+        if (day) officeDays[day] = true;
+      });
+    }
+    if (m.duesStatus) duesStatuses[m.duesStatus] = true;
+  });
+  return {
+    locations: Object.keys(locations).sort(),
+    officeDays: Object.keys(officeDays).sort(),
+    duesStatuses: Object.keys(duesStatuses).sort(),
+    totalMembers: members.length
+  };
+}
+
+// Engagement stats — reads seeded union stats from Script Properties
+function dataGetEngagementStats() {
+  try {
+    var json = PropertiesService.getScriptProperties().getProperty('SEEDED_UNION_STATS');
+    if (!json) return null;
+    var stats = JSON.parse(json);
+    return {
+      surveyParticipation: stats.engagement.surveyParticipation,
+      weeklyQuestionVotes: stats.engagement.weeklyQuestionVotes,
+      eventAttendance: stats.engagement.eventAttendance,
+      grievanceFilingRate: stats.engagement.grievanceFilingRate,
+      stewardContactRate: stats.engagement.stewardContactRate,
+      resourceDownloads: stats.engagement.resourceDownloads,
+      membershipTrends: stats.membershipTrends || [],
+    };
+  } catch (e) { Logger.log('dataGetEngagementStats error: ' + e.message); return null; }
+}
+
+// Workload summary stats — reads seeded workload aggregate from Script Properties
+function dataGetWorkloadSummaryStats() {
+  try {
+    var json = PropertiesService.getScriptProperties().getProperty('SEEDED_UNION_STATS');
+    if (!json) return null;
+    var stats = JSON.parse(json);
+    return stats.workloadSummary || null;
+  } catch (e) { Logger.log('dataGetWorkloadSummaryStats error: ' + e.message); return null; }
+}
+
+// ═══════════════════════════════════════
+// WELCOME EXPERIENCE (PHASE2)
+// Uses PropertiesService to track first-visit state per user.
+// ═══════════════════════════════════════
+
+/**
+ * Returns welcome/onboarding data for the current user.
+ * Checks if this is the user's first visit by looking up a property key.
+ * @param {string} email - User email
+ * @returns {Object} { isFirstVisit, userName, role, quickActions }
+ */
+function dataGetWelcomeData(email) {
+  if (!email) return { isFirstVisit: false, userName: '', role: 'member', quickActions: [] };
+  email = String(email).trim().toLowerCase();
+
+  var userRecord = DataService.findUserByEmail(email);
+  var firstName = '';
+  var role = 'member';
+  if (userRecord) {
+    firstName = userRecord.firstName || (userRecord.name || '').split(' ')[0] || '';
+    role = userRecord.role || 'member';
+  }
+
+  // Check first-visit flag using script properties (user properties not available
+  // in web app context running as "me"). Use a hash of email as key.
+  var emailHash = _welcomeEmailHash(email);
+  var propKey = 'WELCOME_DISMISSED_' + emailHash;
+  var props = PropertiesService.getScriptProperties();
+  var dismissed = props.getProperty(propKey);
+  var isFirstVisit = !dismissed;
+
+  // Build role-appropriate quick actions
+  var quickActions = [];
+  if (role === 'steward' || role === 'both') {
+    quickActions = [
+      { label: 'View Cases', icon: '\uD83D\uDCCB', action: 'cases' },
+      { label: 'Check Deadlines', icon: '\u23F0', action: 'deadlines' },
+      { label: 'Member Directory', icon: '\uD83D\uDC65', action: 'members' },
+      { label: 'Manage Tasks', icon: '\u2705', action: 'tasks' },
+    ];
+  } else {
+    quickActions = [
+      { label: 'View My Cases', icon: '\uD83D\uDCCB', action: 'cases' },
+      { label: 'Update Contact Info', icon: '\uD83D\uDC64', action: 'profile' },
+      { label: 'Check Resources', icon: '\uD83D\uDCDA', action: 'resources' },
+      { label: 'Contact ' + (ConfigReader.getConfig().stewardLabel || 'Steward'), icon: '\uD83D\uDCAC', action: 'contact' },
+    ];
+  }
+
+  return {
+    isFirstVisit: isFirstVisit,
+    userName: firstName,
+    role: role,
+    quickActions: quickActions,
+  };
+}
+
+/**
+ * Marks the welcome experience as dismissed for a user.
+ * @param {string} email - User email
+ * @returns {Object} { success: boolean }
+ */
+function dataMarkWelcomeDismissed(email) {
+  if (!email) return { success: false };
+  email = String(email).trim().toLowerCase();
+  var emailHash = _welcomeEmailHash(email);
+  var propKey = 'WELCOME_DISMISSED_' + emailHash;
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(propKey, new Date().toISOString());
+  return { success: true };
+}
+
+/**
+ * Simple hash of email for property key (avoids special chars in key names).
+ * @private
+ */
+function _welcomeEmailHash(email) {
+  var hash = 0;
+  var str = String(email).toLowerCase();
+  for (var i = 0; i < str.length; i++) {
+    var c = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + c;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}

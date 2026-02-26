@@ -67,6 +67,12 @@ function createDashboardMenu() {
       .addItem('🔄 Bulk Update Status', 'showBulkStatusUpdate')
       .addItem('📄 Create PDF', 'createPDFForSelectedGrievance')
       .addSeparator()
+      .addSubMenu(ui.createMenu('📋 Bulk Actions')
+        .addItem('📋 Select All Open Cases', 'selectAllOpenCases')
+        .addItem('🔄 Clear Selection', 'clearAllSelections')
+        .addSeparator()
+        .addItem('⚡ Bulk Actions on Selected...', 'showBulkActionsDialog'))
+      .addSeparator()
       .addItem('🚦 Apply Traffic Lights', 'applyTrafficLightIndicators')
       .addItem('🔄 Clear Traffic Lights', 'clearTrafficLightIndicators'))
 
@@ -494,17 +500,18 @@ function APPLY_SYSTEM_THEME() {
 /**
  * Applies theme styling to a single sheet
  * @param {Sheet} sheet - The sheet to style
+ * @param {string} [themeKey] - Optional theme preset key; defaults to active theme
  * @returns {void}
  * @private
  */
-function applyThemeToSheet_(sheet) {
+function applyThemeToSheet_(sheet, themeKey) {
   var lastCol = sheet.getLastColumn();
   var lastRow = sheet.getLastRow();
 
   if (lastCol < 1 || lastRow < 1) return;
 
-  // Get the active theme preset
-  var theme = getActiveThemePreset_();
+  // Get theme by key or fall back to active theme preset
+  var theme = (themeKey && THEME_PRESETS[themeKey]) ? THEME_PRESETS[themeKey] : getActiveThemePreset_();
 
   // Apply header styling (row 1)
   var headerRange = sheet.getRange(1, 1, 1, lastCol);
@@ -523,15 +530,17 @@ function applyThemeToSheet_(sheet) {
       .setFontFamily(theme.font)
       .setFontSize(theme.fontSize);
 
-    // Apply alternating row colors
+    // Apply alternating row colors in a single batch call
+    var bgColors = [];
     for (var row = 2; row <= lastRow; row++) {
-      var rowRange = sheet.getRange(row, 1, 1, lastCol);
-      if (row % 2 === 0) {
-        rowRange.setBackground(theme.altRow);
-      } else {
-        rowRange.setBackground('#ffffff');
+      var rowColors = [];
+      var color = (row % 2 === 0) ? theme.altRow : '#ffffff';
+      for (var c = 0; c < lastCol; c++) {
+        rowColors.push(color);
       }
+      bgColors.push(rowColors);
     }
+    sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(bgColors);
   }
 }
 
@@ -860,14 +869,17 @@ function applyZebraStripes(sheet) {
 
   if (lastRow < 2 || lastCol < 1) return;
 
+  // Build 2D color array and apply in a single batch call
+  var bgColors = [];
   for (var row = 2; row <= lastRow; row++) {
-    var rowRange = sheet.getRange(row, 1, 1, lastCol);
-    if (row % 2 === 0) {
-      rowRange.setBackground('#f1f5f9');
-    } else {
-      rowRange.setBackground('#ffffff');
+    var rowColors = [];
+    var color = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
+    for (var c = 0; c < lastCol; c++) {
+      rowColors.push(color);
     }
+    bgColors.push(rowColors);
   }
+  sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(bgColors);
 }
 
 /**
@@ -1002,11 +1014,12 @@ function applyTheme(themeKey, scope) {
 /**
  * Applies theme to a specific sheet
  * @param {Sheet} sheet - The sheet
- * @param {Object} theme - Theme object
+ * @param {Object|string} [themeOrKey] - Theme object (ignored) or theme key string
  * @returns {void}
  */
-function applyThemeToSheet(sheet, theme) {
-  applyThemeToSheet_(sheet);
+function applyThemeToSheet(sheet, themeOrKey) {
+  var key = (typeof themeOrKey === 'string') ? themeOrKey : undefined;
+  applyThemeToSheet_(sheet, key);
 }
 
 /**
@@ -1255,13 +1268,13 @@ function getRecentGrievancesForMobile(limit) {
 }
 
 // ============================================================================
-// MOBILE GRIEVANCE LIST
+// MOBILE GRIEVANCE LIST (with client-side pagination)
 // ============================================================================
 
 /**
  * Shows mobile-optimized grievance list interface
  * Features:
- * - Card-based layout
+ * - Card-based layout with pagination (20 per page)
  * - Status filters
  * - Search functionality
  * - Responsive grid
@@ -1286,13 +1299,18 @@ function showMobileGrievanceList() {
     '.card-id{font-weight:bold;color:#1a73e8;font-size:clamp(14px,3vw,16px)}' +
     '.card-status{padding:4px 10px;border-radius:12px;font-size:clamp(10px,2vw,12px);font-weight:bold;background:#e8f0fe}' +
     '.card-row{font-size:clamp(12px,2.5vw,14px);margin:5px 0;color:#666}' +
+    '.pagination{display:flex;justify-content:center;align-items:center;gap:12px;padding:16px;background:white;border-top:1px solid #e0e0e0;position:sticky;bottom:0}' +
+    '.pg-btn{padding:10px 20px;border-radius:8px;border:1px solid #1a73e8;color:#1a73e8;background:white;font-size:14px;cursor:pointer;min-height:44px}' +
+    '.pg-btn:disabled{opacity:.4;cursor:default}' +
+    '.pg-info{font-size:13px;color:#666}' +
     '@media (min-width:768px){.list{grid-template-columns:repeat(2,1fr)}}' +
     '@media (min-width:1024px){.list{grid-template-columns:repeat(3,1fr)}}' +
     '</style></head><body>' +
     '<div class="header"><h2>📋 Grievances</h2><input type="text" class="search" placeholder="Search..." oninput="filter(this.value)"></div>' +
     '<div class="filters"><button class="filter active" onclick="filterStatus(\'all\',this)">All</button><button class="filter" onclick="filterStatus(\'Open\',this)">Open</button><button class="filter" onclick="filterStatus(\'Pending Info\',this)">Pending</button><button class="filter" onclick="filterStatus(\'Resolved\',this)">Resolved</button></div>' +
     '<div class="list" id="list"><div style="text-align:center;padding:40px;color:#666;grid-column:1/-1">Loading...</div></div>' +
-    '<script>' + getClientSideEscapeHtml() + 'var all=[];google.script.run.withSuccessHandler(function(data){all=data;render(data)}).getRecentGrievancesForMobile(100);function render(data){var c=document.getElementById("list");if(!data||data.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";return}c.innerHTML=data.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+escapeHtml(g.id)+"</div><div class=\'card-status\'>"+escapeHtml(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class=\'card-row\'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("")}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");render(s==="all"?all:all.filter(function(g){return g.status===s}))}function filter(q){render(all.filter(function(g){q=q.toLowerCase();return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0}))}</script></body></html>'
+    '<div class="pagination" id="pager" style="display:none"><button class="pg-btn" id="prevBtn" onclick="changePage(-1)">Prev</button><span class="pg-info" id="pgInfo"></span><button class="pg-btn" id="nextBtn" onclick="changePage(1)">Next</button></div>' +
+    '<script>' + getClientSideEscapeHtml() + 'var all=[],filtered=[],PAGE_SIZE=20,curPage=0;google.script.run.withSuccessHandler(function(data){all=data;filtered=data;curPage=0;renderPage()}).getRecentGrievancesForMobile(500);function renderPage(){var c=document.getElementById("list");var pg=document.getElementById("pager");if(!filtered||filtered.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";pg.style.display="none";return}var totalPages=Math.ceil(filtered.length/PAGE_SIZE);if(curPage>=totalPages)curPage=totalPages-1;if(curPage<0)curPage=0;var start=curPage*PAGE_SIZE;var page=filtered.slice(start,start+PAGE_SIZE);c.innerHTML=page.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+escapeHtml(g.id)+"</div><div class=\'card-status\'>"+escapeHtml(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class=\'card-row\'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("");if(filtered.length>PAGE_SIZE){pg.style.display="flex";document.getElementById("prevBtn").disabled=curPage===0;document.getElementById("nextBtn").disabled=curPage>=totalPages-1;document.getElementById("pgInfo").textContent="Page "+(curPage+1)+" of "+totalPages+" ("+filtered.length+" results)"}else{pg.style.display="none"}}function changePage(dir){curPage+=dir;renderPage();document.getElementById("list").scrollIntoView({behavior:"smooth"})}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");filtered=s==="all"?all:all.filter(function(g){return g.status===s});curPage=0;renderPage()}function filter(q){q=q.toLowerCase();filtered=all.filter(function(g){return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0});curPage=0;renderPage()}</script></body></html>'
   ).setWidth(800).setHeight(700);
   SpreadsheetApp.getUi().showModalDialog(html, '📋 Grievance List');
 }
@@ -1615,7 +1633,7 @@ function showGrievanceQuickActions(row) {
     '<div class="gstatus">' +
     '<span class="badge">' + escapeHtml(status) + '</span>' +
     '<span class="badge">' + escapeHtml(step) + '</span>' +
-    (daysTo !== null && daysTo !== '' ? '<span class="badge" style="background:' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '#ffebee;color:#c62828' : '#e3f2fd;color:#1565c0') + '">' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '⚠️ Overdue' : '📅 ' + daysTo + ' days') + '</span>' : '') +
+    (daysTo !== null && daysTo !== '' ? '<span class="badge" style="background:' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '#ffebee;color:#c62828' : '#e3f2fd;color:#1565c0') + '">' + (daysTo === 'Overdue' || (typeof daysTo === 'number' && daysTo < 0) ? '⚠️ Overdue' : '📅 ' + escapeHtml(String(daysTo)) + ' days') + '</span>' : '') +
     '</div></div>' +
     '<div class="actions">' +
     '<div class="section-header">📋 Case Management</div>' +
@@ -1697,7 +1715,43 @@ function composeEmailForMember(memberId) {
  */
 function sendQuickEmail(to, subject, body, memberId) {
   try {
-    MailApp.sendEmail({ to: to, subject: subject, body: body, name: getOrgNameFromConfig_() + ' Dashboard' });
+    // Validate email format
+    var EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    var sanitizedTo = String(to || '').trim();
+    if (!EMAIL_REGEX.test(sanitizedTo)) {
+      throw new Error('Invalid email format');
+    }
+
+    // Verify the email matches the member record (prevent address tampering)
+    if (memberId) {
+      var memberData = getMemberDataById_(memberId);
+      if (!memberData || !memberData.email) {
+        throw new Error('Member not found or has no email on file');
+      }
+      if (String(memberData.email).trim().toLowerCase() !== sanitizedTo.toLowerCase()) {
+        throw new Error('Email address does not match the member record');
+      }
+    }
+
+    // Rate limiting: max 10 emails per minute per user
+    var cache = CacheService.getScriptCache();
+    var callerEmail = '';
+    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* ignore */ }
+    var rateLimitKey = 'email_rate_' + (callerEmail || 'unknown');
+    var emailCount = parseInt(cache.get(rateLimitKey) || '0', 10);
+    if (emailCount >= 10) {
+      throw new Error('Rate limit exceeded. Please wait before sending more emails.');
+    }
+    cache.put(rateLimitKey, String(emailCount + 1), 60); // 60-second TTL
+
+    // Validate subject and body are non-empty strings
+    var safeSubject = String(subject || '').trim();
+    var safeBody = String(body || '').trim();
+    if (!safeSubject || !safeBody) {
+      throw new Error('Subject and message body are required');
+    }
+
+    MailApp.sendEmail({ to: sanitizedTo, subject: safeSubject, body: safeBody, name: getOrgNameFromConfig_() + ' Dashboard' });
     return { success: true };
   } catch (e) { throw new Error('Failed to send: ' + e.message); }
 }
@@ -2791,4 +2845,139 @@ function getAdvancedSearchHtml() {
     </body>
     </html>
   `;
+}
+
+// ============================================================================
+// BULK ACTIONS DIALOG (PHASE2 Feature 4)
+// ============================================================================
+
+/**
+ * Shows the Bulk Actions dialog for selected grievance rows.
+ * Reads QUICK_ACTIONS checkboxes and presents action options.
+ */
+function showBulkActionsDialog() {
+  var selected = getSelectedGrievanceRows();
+  var count = selected.length;
+  var html = HtmlService.createHtmlOutput(getBulkActionsDialogHtml_(count, selected))
+    .setWidth(DIALOG_SIZES.MEDIUM.width)
+    .setHeight(DIALOG_SIZES.MEDIUM.height);
+  SpreadsheetApp.getUi().showModalDialog(html, 'Bulk Actions — ' + count + ' Selected');
+}
+
+/**
+ * Generates HTML for the Bulk Actions dialog.
+ * @param {number} selectedCount - Number of currently selected rows
+ * @param {number[]} selectedRows - Array of selected row numbers
+ * @returns {string} HTML content
+ * @private
+ */
+function getBulkActionsDialogHtml_(selectedCount, selectedRows) {
+  var countStr = escapeHtml(String(selectedCount));
+  var rowsJson = JSON.stringify(selectedRows || []);
+
+  return '<!DOCTYPE html><html><head><base target="_top">' +
+    getMobileOptimizedHead() +
+    '<style>' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: "Google Sans", -apple-system, BlinkMacSystemFont, sans-serif; background: #f9fafb; }' +
+    '.container { padding: 24px; max-width: 560px; margin: 0 auto; }' +
+    '.count-badge { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #7C3AED, #5B21B6);' +
+    '  color: white; padding: 10px 20px; border-radius: 50px; font-size: 15px; font-weight: 600; margin-bottom: 20px; }' +
+    '.count-badge .num { font-size: 22px; }' +
+    '.no-selection { text-align: center; padding: 40px 20px; color: #6B7280; }' +
+    '.no-selection p { margin-top: 12px; font-size: 14px; }' +
+    '.action-card { display: flex; align-items: center; gap: 16px; background: white; border: 1px solid #E5E7EB;' +
+    '  border-radius: 12px; padding: 16px 20px; margin-bottom: 12px; cursor: pointer; transition: all 0.2s; }' +
+    '.action-card:hover { border-color: #7C3AED; box-shadow: 0 2px 8px rgba(124,58,237,0.15); transform: translateY(-1px); }' +
+    '.action-card .icon { font-size: 28px; flex-shrink: 0; }' +
+    '.action-card .info { flex: 1; }' +
+    '.action-card .title { font-size: 15px; font-weight: 600; color: #1F2937; }' +
+    '.action-card .desc { font-size: 13px; color: #6B7280; margin-top: 2px; }' +
+    '.spinner-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;' +
+    '  background: rgba(255,255,255,0.85); z-index: 999; justify-content: center; align-items: center; flex-direction: column; }' +
+    '.spinner { width: 40px; height: 40px; border: 4px solid #E5E7EB; border-top: 4px solid #7C3AED;' +
+    '  border-radius: 50%; animation: spin 0.8s linear infinite; }' +
+    '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }' +
+    '.spinner-text { margin-top: 12px; color: #6B7280; font-size: 14px; }' +
+    '.result-banner { padding: 12px 16px; border-radius: 8px; margin-top: 16px; font-size: 14px; display: none; }' +
+    '.result-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }' +
+    '.result-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }' +
+    '.email-form { display: none; background: white; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; margin-top: 16px; }' +
+    '.email-form label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }' +
+    '.email-form input, .email-form textarea { width: 100%; padding: 10px 12px; border: 1px solid #E5E7EB;' +
+    '  border-radius: 8px; font-size: 14px; font-family: inherit; margin-bottom: 12px; }' +
+    '.email-form textarea { min-height: 100px; resize: vertical; }' +
+    '.btn-row { display: flex; gap: 10px; justify-content: flex-end; }' +
+    '.btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }' +
+    '.btn-primary { background: linear-gradient(135deg, #7C3AED, #5B21B6); color: white; }' +
+    '.btn-secondary { background: #f3f4f6; color: #374151; }' +
+    '.btn:hover { opacity: 0.9; }' +
+    '.footer-bar { display: flex; justify-content: flex-end; margin-top: 20px; }' +
+    '</style></head><body>' +
+    '<div class="container">' +
+    '<div class="count-badge"><span class="num">' + countStr + '</span> row(s) selected</div>' +
+    (selectedCount === 0
+      ? '<div class="no-selection"><div style="font-size:48px">&#x1F4CB;</div>' +
+        '<p>No rows are currently selected.<br>Use the checkbox column in the Grievance Log,<br>or use the menu: Select All Open Cases.</p></div>'
+      : '<div id="actionCards">' +
+        '<div class="action-card" onclick="doFlag()">' +
+        '<div class="icon">&#x1F6A9;</div><div class="info"><div class="title">Flag Selected</div>' +
+        '<div class="desc">Set Message Alert to TRUE for all selected grievances</div></div></div>' +
+        '<div class="action-card" onclick="showEmailForm()">' +
+        '<div class="icon">&#x1F4E7;</div><div class="info"><div class="title">Email Selected Members</div>' +
+        '<div class="desc">Send an email to members linked to selected grievances</div></div></div>' +
+        '<div class="action-card" onclick="doExport()">' +
+        '<div class="icon">&#x1F4E4;</div><div class="info"><div class="title">Export Selected as CSV</div>' +
+        '<div class="desc">Export selected rows and email CSV to yourself</div></div></div>' +
+        '</div>' +
+        '<div class="email-form" id="emailForm">' +
+        '<label for="emailSubject">Subject</label>' +
+        '<input type="text" id="emailSubject" placeholder="Enter email subject...">' +
+        '<label for="emailBody">Message</label>' +
+        '<textarea id="emailBody" placeholder="Enter email body..."></textarea>' +
+        '<div class="btn-row">' +
+        '<button class="btn btn-secondary" onclick="hideEmailForm()">Cancel</button>' +
+        '<button class="btn btn-primary" onclick="doEmail()">Send Emails</button>' +
+        '</div></div>') +
+    '<div class="result-banner" id="resultBanner"></div>' +
+    '<div class="spinner-overlay" id="spinnerOverlay">' +
+    '<div class="spinner"></div><div class="spinner-text" id="spinnerText">Processing...</div></div>' +
+    '<div class="footer-bar"><button class="btn btn-secondary" onclick="google.script.host.close()">Close</button></div>' +
+    '</div>' +
+    '<script>' +
+    'var selectedRows = ' + rowsJson + ';' +
+    'var selectedCount = ' + countStr + ';' +
+    'function showSpinner(msg) { document.getElementById("spinnerText").textContent = msg || "Processing...";' +
+    '  document.getElementById("spinnerOverlay").style.display = "flex"; }' +
+    'function hideSpinner() { document.getElementById("spinnerOverlay").style.display = "none"; }' +
+    'function showResult(msg, isError) { var b = document.getElementById("resultBanner");' +
+    '  b.textContent = msg; b.className = "result-banner " + (isError ? "result-error" : "result-success"); b.style.display = "block"; }' +
+    'function showEmailForm() { document.getElementById("emailForm").style.display = "block"; }' +
+    'function hideEmailForm() { document.getElementById("emailForm").style.display = "none"; }' +
+    'function doFlag() {' +
+    '  if (!confirm("Flag " + selectedCount + " selected grievance(s) with Message Alert?")) return;' +
+    '  showSpinner("Flagging selected grievances...");' +
+    '  google.script.run.withSuccessHandler(function(r) { hideSpinner();' +
+    '    if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }' +
+    '  }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true);' +
+    '  }).bulkFlagGrievances(selectedRows); }' +
+    'function doEmail() {' +
+    '  var subj = document.getElementById("emailSubject").value.trim();' +
+    '  var body = document.getElementById("emailBody").value.trim();' +
+    '  if (!subj || !body) { alert("Please enter both a subject and message body."); return; }' +
+    '  if (!confirm("Send email to members of " + selectedCount + " selected grievance(s)?")) return;' +
+    '  showSpinner("Sending emails...");' +
+    '  google.script.run.withSuccessHandler(function(r) { hideSpinner(); hideEmailForm();' +
+    '    if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }' +
+    '  }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true);' +
+    '  }).bulkEmailGrievanceMembers(selectedRows, subj, body); }' +
+    'function doExport() {' +
+    '  if (!confirm("Export " + selectedCount + " selected grievance(s) as CSV and email to you?")) return;' +
+    '  showSpinner("Exporting CSV...");' +
+    '  google.script.run.withSuccessHandler(function(r) { hideSpinner();' +
+    '    if (r && r.success) { showResult(r.message); } else { showResult((r && r.error) || "Unknown error", true); }' +
+    '  }).withFailureHandler(function(e) { hideSpinner(); showResult(e.message, true);' +
+    '  }).bulkExportGrievancesToCsv(selectedRows); }' +
+    '</script>' +
+    '</body></html>';
 }

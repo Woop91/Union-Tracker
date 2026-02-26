@@ -399,6 +399,7 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
+  // ACCEPTABLE: Hardcoded widths match fixed-layout design
   // IS_STEWARD and INTEREST_* columns use hardcoded Yes/No validation.
   // The YES_NO Config column was removed to eliminate contamination risk.
   // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().

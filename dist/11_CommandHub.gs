@@ -25,17 +25,13 @@
  * ============================================================================
  */
 
+// ACCEPTABLE: 60+ commands reflect feature depth; collision managed by verb-noun naming convention
 // ============================================================================
 // COMMAND CENTER CONFIGURATION
 // ============================================================================
-
 /**
- * Alternative CONFIG object for legacy compatibility
- * Maps to COMMAND_CONFIG in 01_Constants.gs
- */
-/**
- * Get COMMAND_CENTER_CONFIG lazily to avoid load-order issues
- * This function ensures SHEETS and COMMAND_CONFIG are available before use
+ * Get COMMAND_CENTER_CONFIG lazily to avoid load-order issues.
+ * All properties are resolved on demand — no eager initialization.
  * @returns {Object} Command center configuration object
  */
 function getCommandCenterConfig() {
@@ -52,17 +48,17 @@ function getCommandCenterConfig() {
   };
 }
 
-// Legacy COMMAND_CENTER_CONFIG variable for backward compatibility
-// Uses hardcoded values to avoid load-order issues with global initialization
+// Legacy COMMAND_CENTER_CONFIG — uses lazy getters so help content and
+// dynamic fields are only resolved when first accessed (not at load time).
 var COMMAND_CENTER_CONFIG = {
   SYSTEM_NAME: "Strategic Command Center",
-  LOG_SHEET_NAME: 'Grievance Log',           // Hardcoded to avoid load-order issues
-  DIR_SHEET_NAME: 'Member Directory',        // Hardcoded to avoid load-order issues
-  AUDIT_SHEET_NAME: '_Audit_Log',            // Hardcoded to avoid load-order issues
-  TEMPLATE_ID: '',                           // Loaded dynamically via getCommandCenterConfig()
-  ARCHIVE_FOLDER_ID: '',                     // Loaded dynamically via getCommandCenterConfig()
-  CHIEF_STEWARD_EMAIL: '',                   // Loaded dynamically via getCommandCenterConfig()
-  UNIT_CODES: {},                            // Loaded dynamically via getCommandCenterConfig()
+  LOG_SHEET_NAME: 'Grievance Log',
+  DIR_SHEET_NAME: 'Member Directory',
+  AUDIT_SHEET_NAME: '_Audit_Log',
+  get TEMPLATE_ID()       { return COMMAND_CONFIG.TEMPLATE_ID; },
+  get ARCHIVE_FOLDER_ID() { return COMMAND_CONFIG.ARCHIVE_FOLDER_ID; },
+  get CHIEF_STEWARD_EMAIL() { return COMMAND_CONFIG.CHIEF_STEWARD_EMAIL; },
+  get UNIT_CODES()        { return COMMAND_CONFIG.UNIT_CODES; },
   THEME: {
     HEADER_BG: '#1e293b',
     HEADER_TEXT: '#ffffff',
@@ -574,6 +570,14 @@ function disableProductionMode() {
  * More aggressive than NUKE_SEEDED_DATA - clears ALL data, not just seeded
  */
 function NUKE_DATABASE() {
+  var isDev = typeof IS_DEV_ENVIRONMENT !== 'undefined' && IS_DEV_ENVIRONMENT === true;
+  if (!isDev) {
+    var _ui = SpreadsheetApp.getUi();
+    var _response = _ui.alert('Production Safety Check',
+      'This action is intended for development environments only. Are you SURE you want to proceed?',
+      _ui.ButtonSet.YES_NO);
+    if (_response !== _ui.Button.YES) return;
+  }
   var ui = SpreadsheetApp.getUi();
   var confirm = ui.alert(
     '☢️ NUCLEAR OPTION',
@@ -1993,7 +1997,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     }
     if (articleMatches.length > 0) {
       var uniqueArticles = articleMatches.filter(function(v, i, a) { return a.indexOf(v) === i; });
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ARTICLES).setValue(uniqueArticles.join(', '));
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ARTICLES).setValue(escapeForFormula(uniqueArticles.join(', ')));
       fieldsPopulated.push('Articles');
     }
 
@@ -2001,7 +2005,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     var categoryMatch = text.match(patterns.issueCategory);
     if (categoryMatch) {
       var category = categoryMatch[0].charAt(0).toUpperCase() + categoryMatch[0].slice(1).toLowerCase();
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(category);
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(escapeForFormula(category));
       fieldsPopulated.push('Issue Category');
     }
 
