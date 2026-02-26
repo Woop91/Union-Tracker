@@ -125,6 +125,7 @@ function showDashboardAuthStatus() {
  *
  * @example
  * // Returns: "&lt;script&gt;alert(&#x27;xss&#x27;)&lt;/script&gt;"
+ * // Note: / and = are NOT escaped (not XSS vectors in HTML text/attribute contexts)
  * escapeHtml("<script>alert('xss')</script>");
  */
 function escapeHtml(input) {
@@ -137,9 +138,7 @@ function escapeHtml(input) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;')
-    .replace(/`/g, '&#x60;')
-    .replace(/=/g, '&#x3D;');
+    .replace(/`/g, '&#x60;');
 }
 
 /**
@@ -250,6 +249,18 @@ function buildSafeQuery(sheetName, query, headers) {
   }
 
   return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
+}
+
+// ============================================================================
+// INPUT LENGTH VALIDATION
+// ============================================================================
+
+function validateInputLength_(value, maxLength, fieldName) {
+  if (typeof value === 'string' && value.length > maxLength) {
+    Logger.log('Input too long for ' + fieldName + ': ' + value.length + ' chars (max ' + maxLength + ')');
+    return value.substring(0, maxLength);
+  }
+  return value || '';
 }
 
 // ============================================================================
@@ -622,7 +633,7 @@ function isValidSafeString(input, maxLength) {
     /<script/i,
     /javascript:/i,
     /on\w+\s*=/i,  // onclick=, onerror=, etc.
-    /data:/i,
+    /^data:/i,
     /vbscript:/i
   ];
 
@@ -679,9 +690,7 @@ function getClientSideEscapeHtml() {
     '.replace(/>/g,"&gt;")' +
     '.replace(/"/g,"&quot;")' +
     '.replace(/\'/g,"&#x27;")' +
-    '.replace(/\\//g,"&#x2F;")' +
-    '.replace(/`/g,"&#x60;")' +
-    '.replace(/=/g,"&#x3D;");' +
+    '.replace(/`/g,"&#x60;");' +
     '}' +
     'function safeText(t){return escapeHtml(t);}';
 }
@@ -703,19 +712,34 @@ function getClientSecurityScript() {
  * Sanitizes data for embedding in JSON within HTML.
  * Use this when passing server data to client-side JavaScript.
  *
+ * WARNING: This function double-escapes string values (escapeHtml inside JSON.stringify).
+ * This is intentional for safe HTML embedding. Do NOT apply escapeHtml again on the output.
+ *
  * @param {Object} data - Data to sanitize
  * @returns {string} JSON string safe for HTML embedding
  */
 function safeJsonForHtml(data) {
   if (!data) return '{}';
 
-  // Convert to JSON and escape HTML entities in strings
-  var json = JSON.stringify(data, function(key, value) {
-    if (typeof value === 'string') {
-      return escapeHtml(value);
+  // Recursively escape all string values AND object keys before serializing.
+  // JSON.stringify's replacer cannot transform keys, so we pre-process the data.
+  function escapeDeep_(obj) {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') return escapeHtml(obj);
+    if (Array.isArray(obj)) return obj.map(escapeDeep_);
+    if (typeof obj === 'object') {
+      var out = {};
+      for (var k in obj) {
+        if (obj.hasOwnProperty(k)) {
+          out[escapeHtml(k)] = escapeDeep_(obj[k]);
+        }
+      }
+      return out;
     }
-    return value;
-  });
+    return obj;
+  }
+
+  var json = JSON.stringify(escapeDeep_(data));
 
   // Escape </script> tags that could break out of script context
   return json.replace(/<\/script>/gi, '<\\/script>');

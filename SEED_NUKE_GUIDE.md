@@ -8,6 +8,21 @@ The **Developer Tools** feature (in `07_DevTools.gs`) allows you to seed demo da
 
 ---
 
+## 🌱 What Does SEED_SAMPLE_DATA Create?
+
+When you run **Admin > Demo Data > Seed All Sample Data**, the system creates:
+
+- 1,000 sample members with complete contact and job metadata
+- 300 grievances (randomly distributed across members, all steps and statuses)
+- 50 sample survey responses in Member Satisfaction
+- Config dropdown values (job titles, locations, units, supervisors, managers, stewards)
+- Resources (Know Your Rights, grievance guides, FMLA, ADA, workplace safety)
+- Notifications (contract updates, workload reminders, steward office hours)
+- Workload tracker sample submissions (20 entries with realistic caseload data)
+- Auto-sync trigger for live updates
+
+---
+
 ## ⚠️ What Does "Nuke Seed Data" Do?
 
 When you execute the **Nuke Seed Data** function, the system will:
@@ -21,7 +36,13 @@ When you execute the **Nuke Seed Data** function, the system will:
 6. **Delete Function Checklist**: Completely removes the Function Checklist sheet **(v4.3.4+)**
 7. **Delete _Audit_Log**: Completely removes the hidden _Audit_Log sheet **(v4.3.4+)**
 8. **Clear Steward Workload**: Remove all test steward assignments
-9. **Clear Config Demo Data**: Remove demo entries from Config tab (if any exist):
+9. **Clear Resources Data** **(v4.13.0+)**: Remove all educational resources from Resources sheet
+10. **Clear Notifications Data** **(v4.13.0+)**: Remove all in-app notifications
+11. **Clear Workload Vault** **(v4.13.0+)**: Remove all workload tracker submissions
+12. **Clear Calendar Events** **(v4.13.0+)**: Remove seeded calendar events
+13. **Clear Weekly Questions** **(v4.13.0+)**: Remove question pool, active questions, and responses
+14. **Clear Union Stats** **(v4.13.0+)**: Remove engagement and membership trend snapshots
+15. **Clear Config Demo Data**: Remove demo entries from Config tab (if any exist):
    - Job Titles (Column A)
    - Office Locations (Column B)
    - Units (Column C)
@@ -29,7 +50,8 @@ When you execute the **Nuke Seed Data** function, the system will:
    - Managers (Column G)
    - Stewards (Column H)
    - Grievance Coordinators (Column O)
-   - Office Addresses (Column AM)
+   - Home Towns (Column AF)
+   - Office Addresses (Column AN)
 
    > **NOTE (v3.11+):** These fields are now LEFT EMPTY during CREATE_DASHBOARD. Users populate them with their own data. If no user data was added, there's nothing to clear.
 
@@ -399,8 +421,14 @@ Once `07_DevTools.gs` is deleted:
 - ❌ Menu Checklist sheet (entire sheet)
 - ❌ Function Checklist sheet (entire sheet) **(v4.3.4+)**
 - ❌ _Audit_Log hidden sheet (entire sheet) **(v4.3.4+)**
-- ❌ Config demo data (job titles, locations, units, supervisors, managers, stewards, coordinators, office addresses)
+- ❌ Config demo data (job titles, locations, units, supervisors, managers, stewards, coordinators, home towns, office addresses)
 - ❌ Seed/nuke/demo references in FAQ, Config Guide, Getting Started **(v4.3.5+)**
+- ❌ Resources data (all educational content cleared) **(v4.13.0+)**
+- ❌ Notifications data (all in-app messages cleared) **(v4.13.0+)**
+- ❌ Workload Vault data (all submissions cleared) **(v4.13.0+)**
+- ❌ Calendar events (seeded events removed) **(v4.13.0+)**
+- ❌ Weekly questions and responses **(v4.13.0+)**
+- ❌ Union stats snapshots **(v4.13.0+)**
 
 ### What Gets Preserved
 - ✅ Headers and structure
@@ -444,8 +472,8 @@ Your dashboard is **production-ready**! 🚀
 
 ---
 
-**Last Updated**: 2026-02-19
-**Version**: 4.7.1
+**Last Updated**: 2026-02-25
+**Version**: 4.13.0
 
 ---
 
