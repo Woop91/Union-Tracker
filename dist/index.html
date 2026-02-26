@@ -145,7 +145,7 @@
     };
 
     // ═══════════════════════════════════════
-    // ROUTER
+    // ROUTER (with optional batch pre-fetch)
     // ═══════════════════════════════════════
     function initApp() {
       var app = document.getElementById('app');
@@ -155,10 +155,27 @@
           renderAuth(app);
           break;
         case 'steward':
-          initStewardView(app);
-          break;
         case 'member':
-          initMemberView(app);
+          // Pre-fetch batch data in a single round-trip, then init the view.
+          // Falls back to per-view init if batch fails.
+          if (CURRENT_USER && CURRENT_USER.email) {
+            google.script.run
+              .withSuccessHandler(function(batch) {
+                AppState.batchData = batch || {};
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
+              })
+              .withFailureHandler(function() {
+                // Batch unavailable — views will make individual calls
+                AppState.batchData = null;
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
+              })
+              .dataGetBatchData(CURRENT_USER.email, CURRENT_VIEW);
+          } else {
+            if (CURRENT_VIEW === 'steward') initStewardView(app);
+            else initMemberView(app);
+          }
           break;
         case 'error':
           renderError(app, PAGE_DATA.error);
@@ -356,6 +373,7 @@
       if (role === 'steward') return [
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
         { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
+        { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
         { id: 'tasks', icon: '\u2705', label: 'Tasks' },
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
         { divider: true },
@@ -363,8 +381,12 @@
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
+        { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+        { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
+        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ];
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
@@ -373,6 +395,9 @@
         { divider: true },
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
+        { id: 'meetings', icon: '\uD83D\uDCC5', label: 'My Meetings' },
+        { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+        { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
@@ -380,6 +405,7 @@
         { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
+        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
       ];
     }
 
@@ -402,13 +428,18 @@
           case 'events': renderEventsPage(app); break;
           case 'stewarddirectory': renderStewardDirectory(app); break;
           case 'notifications': renderMemberNotifications(app); break;
+          case 'meetings': renderMeetingsPage(app); break;
+          case 'polls': renderPollsPage(app); break;
+          case 'minutes': renderMinutesPage(app); break;
+          case 'feedback': renderFeedbackPage(app, 'member'); break;
           default: renderMemberHome(app);
         }
       } else {
         switch(tabId) {
           case 'cases': renderStewardDashboard(app); break;
           case 'members': renderStewardMembers(app); break;
-          case 'deadlines': renderStewardDashboard(app); break;
+          case 'insights': renderInsightsPage(app); break;
+          case 'stewarddirectory': renderStewardDirectoryPage(app); break;
           case 'broadcast': renderBroadcast(app); break;
           case 'notifications': renderStewardNotifications(app); break;
           case 'resources': renderStewardResources(app); break;
@@ -417,6 +448,9 @@
           case 'contactlog': renderContactLog(app); break;
           case 'tasks': renderStewardTasks(app); break;
           case 'events': renderEventsPage(app); break;
+          case 'polls': renderManagePolls(app); break;
+          case 'minutes': renderStewardMinutes(app); break;
+          case 'feedback': renderFeedbackPage(app, 'steward'); break;
           default: renderStewardDashboard(app);
         }
       }

@@ -1184,9 +1184,61 @@ function getUnifiedDashboardData(includePII) {
 }
 
 /**
+ * Batch fetch for the SPA — bundles multiple data calls into one round-trip.
+ * Reduces latency by avoiding separate google.script.run calls.
+ * @param {string} email - User email
+ * @param {string} role  - 'member' | 'steward' | 'both'
+ * @returns {Object} Bundled data: grievances, kpis, events, surveyStatus, notifications, etc.
+ */
+function getWebDashBatchData(email, role) {
+  var result = {};
+  var isSteward = (role === 'steward' || role === 'both');
+
+  try {
+    // Always fetch for all roles
+    result.profile       = DataService.findUserByEmail(email);
+    result.events        = DataService.getUpcomingEvents(5);
+    result.surveyStatus  = DataService.getMemberSurveyStatus(email);
+    result.notifications = DataService.getMemberNotifications ? DataService.getMemberNotifications(email) : [];
+    result.orgLinks      = DataService.getOrgLinks();
+    result.welcome       = dataGetWelcomeData(email);
+
+    if (isSteward) {
+      result.cases          = DataService.getStewardCases(email);
+      result.stewardKPIs    = DataService.getStewardKPIs(email);
+      result.memberStats    = DataService.getStewardMemberStats(email);
+    } else {
+      result.grievances     = DataService.getMemberGrievances(email);
+      result.grievanceHistory = DataService.getMemberGrievanceHistory(email);
+      result.stewardContact = DataService.getStewardContact(email);
+    }
+
+    // Non-critical supplemental data — errors here should not break the batch
+    try {
+      result.grievanceStats = DataService.getGrievanceStats();
+    } catch (_e) { result.grievanceStats = null; }
+
+    try {
+      result.membershipStats = DataService.getMembershipStats();
+    } catch (_e) { result.membershipStats = null; }
+
+    // v4.16.0 — supplemental data from newly-wired sheets
+    try { result.activePolls = DataService.getActivePolls(email); } catch (_e) { result.activePolls = null; }
+    try { result.meetingMinutes = DataService.getMeetingMinutes(3); } catch (_e) { result.meetingMinutes = null; }
+    if (isSteward) {
+      try { result.satisfactionTrends = DataService.getSatisfactionTrends(); } catch (_e) { result.satisfactionTrends = null; }
+    }
+
+  } catch (e) {
+    Logger.log('getWebDashBatchData error: ' + e.message);
+    result.error = e.message;
+  }
+
+  return result;
+}
+
+/**
  * API function for web app to get dashboard data
- * TODO(F46): Consolidate multiple google.script.run calls in the SPA into a single
- * batch fetch to reduce latency (bundle correlations, alerts, and main data).
  * @param {boolean} isPII - Include PII (steward mode)
  * @returns {string} JSON dashboard data
  */
