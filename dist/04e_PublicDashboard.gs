@@ -1,3 +1,4 @@
+// NOTE: ~258KB file. HTML built via string concatenation (GAS has no template engine or module imports).
 // ============================================================================
 // 10. UNIFIED WEB APP DASHBOARDS (v4.4.0)
 // ============================================================================
@@ -23,8 +24,8 @@ function showPublicMemberDashboard() {
     '@media(max-width:480px){.btn-row{flex-direction:column;width:100%}a.open-link,.copy-btn{width:100%;text-align:center}}' +
     '</style></head><body><div class="icon">👥</div><h1>Member Dashboard</h1>' +
     '<p>Open the Member Dashboard web app. This version hides sensitive personal information while showing full analytics.</p>' +
-    '<div class="url" id="url">' + url + '</div>' +
-    '<div class="btn-row"><a class="open-link" href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<div class="url" id="url">' + escapeHtml(url) + '</div>' +
+    '<div class="btn-row"><a class="open-link" href="' + escapeHtml(url) + '" target="_blank">Open Dashboard</a>' +
     '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
     '</body></html>'
   ).setWidth(500).setHeight(350);
@@ -1184,6 +1185,8 @@ function getUnifiedDashboardData(includePII) {
 
 /**
  * API function for web app to get dashboard data
+ * TODO(F46): Consolidate multiple google.script.run calls in the SPA into a single
+ * batch fetch to reduce latency (bundle correlations, alerts, and main data).
  * @param {boolean} isPII - Include PII (steward mode)
  * @returns {string} JSON dashboard data
  */
@@ -1261,6 +1264,8 @@ function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
  * @returns {string} Complete HTML for the web app
  */
 function getUnifiedDashboardHtml(isPII) {
+  // NOTE: This function builds a large HTML string via concatenation. This is an inherent
+  // GAS limitation (no template engine / no file bundler). Keep total size under ~500KB.
   var _mode = isPII ? 'steward' : 'member';
   var title = isPII ? 'STEWARD COMMAND CENTER' : 'MEMBER DASHBOARD';
   var badge = isPII ? '<span class="pii-badge">INTERNAL USE - CONTAINS PII</span>' : '<span class="member-badge">MEMBER VIEW</span>';
@@ -1832,9 +1837,9 @@ function getUnifiedDashboardHtml(isPII) {
     'if(d.myCases.length===0){html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#22c55e\\">check_circle</i><p style=\\"color:#94a3b8;margin-top:16px\\">No active cases assigned to you. Great job!</p></div>"}' +
     'else{html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">folder_open</i>My Assigned Cases</div><div id=\\"myCasesList\\" class=\\"list-container\\" style=\\"max-height:400px\\">";' +
     'd.myCases.forEach(function(c){var statusColor=c.status.toLowerCase()==="open"?"#f59e0b":c.status.toLowerCase().indexOf("pending")>=0?"#ef4444":"#64748b";var isOverdue=c.daysOpen>30||c.status.toLowerCase().indexOf("pending")>=0;' +
-    'html+="<div class=\\"my-case-item list-item\\" data-status=\\""+c.status+"\\" data-overdue=\\""+(isOverdue?"yes":"no")+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+c.id+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+c.status+(isOverdue?" ⚠":"")+"</span></div>";' +
-    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#cbd5e1\\">"+c.member+" | "+c.category+"</div>";' +
-    'html+="<div style=\\"width:100%;display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#94a3b8\\"><span>"+c.step+" | "+c.location+"</span><span>"+c.daysOpen+" days</span></div></div>"});' +
+    'html+="<div class=\\"my-case-item list-item\\" data-status=\\""+escapeHtml(c.status)+"\\" data-overdue=\\""+(isOverdue?"yes":"no")+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+escapeHtml(c.id)+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+escapeHtml(c.status)+(isOverdue?" ⚠":"")+"</span></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#cbd5e1\\">"+escapeHtml(c.member)+" | "+escapeHtml(c.category)+"</div>";' +
+    'html+="<div style=\\"width:100%;display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#94a3b8\\"><span>"+escapeHtml(c.step)+" | "+escapeHtml(c.location)+"</span><span>"+c.daysOpen+" days</span></div></div>"});' +
     'html+="</div></div>"}' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
@@ -1850,11 +1855,11 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg per Steward</div><div class=\\"kpi-value green\\">"+avgCases+"</div></div>";' +
     'html+="<div class=\\"kpi-card "+(overloaded>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Overloaded</div><div class=\\"kpi-value red\\">"+overloaded+"</div></div></div>";' +
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">assignment_ind</i>Steward Caseload</div><div class=\\"list-container\\">";' +
-    'd.stewardWorkload.forEach(function(w){html+="<div class=\\"list-item\\"><span>"+w.name+"</span><span class=\\"badge\\" style=\\"background:"+w.color+";color:white\\">"+w.count+" cases - "+w.status+"</span></div>"});' +
+    'd.stewardWorkload.forEach(function(w){html+="<div class=\\"list-item\\"><span>"+escapeHtml(w.name)+"</span><span class=\\"badge\\" style=\\"background:"+w.color+";color:white\\">"+w.count+" cases - "+escapeHtml(w.status)+"</span></div>"});' +
     'html+="</div></div>";' +
     // Top Performers section
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">emoji_events</i>Top Performers</div><div class=\\"list-container\\">";' +
-    'if(d.topPerformers&&d.topPerformers.length>0){d.topPerformers.forEach(function(p,i){html+="<div class=\\"list-item\\"><span>"+(i+1)+". "+p.name+"</span><span class=\\"badge\\" style=\\"background:#22c55e;color:white\\">Score: "+p.score+" | Win: "+p.winRate+"%</span></div>"})}' +
+    'if(d.topPerformers&&d.topPerformers.length>0){d.topPerformers.forEach(function(p,i){html+="<div class=\\"list-item\\"><span>"+(i+1)+". "+escapeHtml(p.name)+"</span><span class=\\"badge\\" style=\\"background:#22c55e;color:white\\">Score: "+p.score+" | Win: "+p.winRate+"%</span></div>"})}' +
     'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">Performance data not yet calculated</p>"}' +
     'html+="</div></div></div>";' +
     'document.getElementById("main-content").innerHTML=html' +
@@ -1926,9 +1931,9 @@ function getUnifiedDashboardHtml(isPII) {
     'var satUnits=Object.keys(d.satisfactionByUnit).slice(0,8);var satLocs=Object.keys(d.satisfactionByLocation).slice(0,8);' +
     'if(satUnits.length>0&&satLocs.length>0){' +
     'html+="<div style=\\"overflow-x:auto;margin-top:12px\\"><table style=\\"width:100%;border-collapse:collapse;font-size:11px\\"><tr><th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:left\\">Unit / Location</th>";' +
-    'satLocs.forEach(function(l){html+="<th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:center;min-width:80px\\">"+l.substring(0,12)+"</th>"});' +
+    'satLocs.forEach(function(l){html+="<th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:center;min-width:80px\\">"+escapeHtml(l.substring(0,12))+"</th>"});' +
     'html+="</tr>";' +
-    'satUnits.forEach(function(u){html+="<tr><td style=\\"padding:8px;background:#0f172a;color:#e2e8f0;font-weight:500\\">"+u+"</td>";satLocs.forEach(function(l){var uScore=d.satisfactionByUnit[u]?d.satisfactionByUnit[u].score:0;var lScore=d.satisfactionByLocation[l]?d.satisfactionByLocation[l].score:0;var avgS=(uScore+lScore)/2;var cellBg=avgS>=7?"rgba(34,197,94,0.3)":avgS>=5?"rgba(245,158,11,0.3)":"rgba(239,68,68,0.3)";var cellCol=avgS>=7?"#22c55e":avgS>=5?"#f59e0b":"#ef4444";html+="<td style=\\"padding:8px;background:"+cellBg+";color:"+cellCol+";text-align:center;font-weight:600\\">"+avgS.toFixed(1)+"</td>"});html+="</tr>"});' +
+    'satUnits.forEach(function(u){html+="<tr><td style=\\"padding:8px;background:#0f172a;color:#e2e8f0;font-weight:500\\">"+escapeHtml(u)+"</td>";satLocs.forEach(function(l){var uScore=d.satisfactionByUnit[u]?d.satisfactionByUnit[u].score:0;var lScore=d.satisfactionByLocation[l]?d.satisfactionByLocation[l].score:0;var avgS=(uScore+lScore)/2;var cellBg=avgS>=7?"rgba(34,197,94,0.3)":avgS>=5?"rgba(245,158,11,0.3)":"rgba(239,68,68,0.3)";var cellCol=avgS>=7?"#22c55e":avgS>=5?"#f59e0b":"#ef4444";html+="<td style=\\"padding:8px;background:"+cellBg+";color:"+cellCol+";text-align:center;font-weight:600\\">"+avgS.toFixed(1)+"</td>"});html+="</tr>"});' +
     'html+="</table></div>"}' +
     'else{html+="<p style=\\"color:#64748b;text-align:center;padding:30px\\">Not enough satisfaction data for matrix view</p>"}' +
     'html+="</div>";' +
@@ -1936,16 +1941,16 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">contact_phone</i>Contact Updates</h3>";' +
     'html+="<div class=\\"charts-row\\">";' +
     'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">update</i>Recent Updates (30 days)</span><span class=\\"trend-value green\\">"+fmt(dt.recentUpdates.length)+"</span></div><div class=\\"trend-list\\">";' +
-    'dt.recentUpdates.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.date).toLocaleDateString()+"</span></div>"});' +
+    'dt.recentUpdates.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+escapeHtml(m.name)+" ("+escapeHtml(m.id)+")</span><span style=\\"color:#64748b\\">"+new Date(m.date).toLocaleDateString()+"</span></div>"});' +
     'if(dt.recentUpdates.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent updates</p>";' +
     'html+="</div></div>";' +
     'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">warning</i>Stale Contacts (90+ days)</span><span class=\\"trend-value yellow\\">"+fmt(dt.staleContacts.length)+"</span></div><div class=\\"trend-list\\">";' +
-    'dt.staleContacts.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.lastUpdate).toLocaleDateString()+"</span></div>"});' +
+    'dt.staleContacts.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+escapeHtml(m.name)+" ("+escapeHtml(m.id)+")</span><span style=\\"color:#64748b\\">"+new Date(m.lastUpdate).toLocaleDateString()+"</span></div>"});' +
     'if(dt.staleContacts.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">All contacts up to date!</p>";' +
     'html+="</div></div></div>";' +
     // Meeting Attendees
     'html+="<div class=\\"charts-row\\"><div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">groups</i>Recent Meeting Attendees</span><span class=\\"trend-value purple\\">"+fmt(eng.recentMeetingAttendees.length)+"</span></div><div class=\\"trend-list\\">";' +
-    'eng.recentMeetingAttendees.slice(0,8).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+"</span><span style=\\"color:"+(m.type==="Virtual"?"#60a5fa":"#22c55e")+"\\">"+m.type+"</span></div>"});' +
+    'eng.recentMeetingAttendees.slice(0,8).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+escapeHtml(m.name)+"</span><span style=\\"color:"+(m.type==="Virtual"?"#60a5fa":"#22c55e")+"\\">"+escapeHtml(m.type)+"</span></div>"});' +
     'if(eng.recentMeetingAttendees.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent meeting attendance data</p>";' +
     'html+="</div></div><div class=\\"chart-card\\"></div></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderDirectoryCharts()' +
@@ -1978,17 +1983,17 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#ef4444\\">local_fire_department</i>Grievance Hot Zones (3+ Active Cases)</div>";' +
     'html+="<div style=\\"display:flex;gap:4px;margin:12px 0;font-size:10px;align-items:center\\"><span style=\\"color:#94a3b8\\">Low</span><div style=\\"display:flex;height:12px\\"><div style=\\"width:20px;background:#D1FAE5\\"></div><div style=\\"width:20px;background:#FEF3C7\\"></div><div style=\\"width:20px;background:#FCA5A5\\"></div></div><span style=\\"color:#94a3b8\\">High</span></div>";' +
     'if(d.hotZones.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">check_circle</i><p style=\\"margin-top:8px;font-size:13px\\">No grievance hot zones - All clear!</p></div>"}' +
-    'else{d.hotZones.sort(function(a,b){return b.count-a.count}).forEach(function(h){var bgColor=getHeatColor(h.count);var textColor=(h.count-minCases)/(maxCases-minCases||1)>0.6?"#fff":"#1e293b";html+="<div class=\\"hot-zone\\" style=\\"background:"+bgColor+";border-left-color:"+bgColor+"\\"><span style=\\"color:"+textColor+"\\">"+h.location+"</span><span class=\\"badge\\" style=\\"background:rgba(0,0,0,0.2);color:"+textColor+"\\">"+h.count+" cases</span></div>"})}' +
+    'else{d.hotZones.sort(function(a,b){return b.count-a.count}).forEach(function(h){var bgColor=getHeatColor(h.count);var textColor=(h.count-minCases)/(maxCases-minCases||1)>0.6?"#fff":"#1e293b";html+="<div class=\\"hot-zone\\" style=\\"background:"+bgColor+";border-left-color:"+bgColor+"\\"><span style=\\"color:"+textColor+"\\">"+escapeHtml(h.location)+"</span><span class=\\"badge\\" style=\\"background:rgba(0,0,0,0.2);color:"+textColor+"\\">"+h.count+" cases</span></div>"})}' +
     'html+="</div>";' +
     // Dissatisfaction Hot Spots
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">sentiment_dissatisfied</i>Dissatisfaction Hot Spots (Score < 5)</div>";' +
     'if(!hs.dissatisfaction||hs.dissatisfaction.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">sentiment_satisfied</i><p style=\\"margin-top:8px;font-size:13px\\">No dissatisfaction hot spots - Members are satisfied!</p></div>"}' +
-    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.dissatisfaction.forEach(function(h){var scoreColor=h.score<3?"#ef4444":"#f59e0b";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+scoreColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+h.name+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" responses</span><span style=\\"color:"+scoreColor+";font-weight:700\\">"+h.score+"/10</span></div></div>"});html+="</div>"}' +
+    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.dissatisfaction.forEach(function(h){var scoreColor=h.score<3?"#ef4444":"#f59e0b";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+scoreColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+escapeHtml(h.name)+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" responses</span><span style=\\"color:"+scoreColor+";font-weight:700\\">"+h.score+"/10</span></div></div>"});html+="</div>"}' +
     'html+="</div>";' +
     // Low Engagement Hot Spots
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">trending_down</i>Low Engagement Hot Spots (< 30%)</div>";' +
     'if(!hs.lowEngagement||hs.lowEngagement.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">groups</i><p style=\\"margin-top:8px;font-size:13px\\">No low engagement areas - Good outreach!</p></div>"}' +
-    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.lowEngagement.forEach(function(h){var engColor=h.engagement<15?"#ef4444":"#a78bfa";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+engColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+h.name+"</div><div style=\\"color:#64748b;font-size:10px\\">"+h.type+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" members</span><span style=\\"color:"+engColor+";font-weight:700\\">"+h.engagement+"%</span></div></div>"});html+="</div>"}' +
+    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.lowEngagement.forEach(function(h){var engColor=h.engagement<15?"#ef4444":"#a78bfa";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+engColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+escapeHtml(h.name)+"</div><div style=\\"color:#64748b;font-size:10px\\">"+escapeHtml(h.type)+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" members</span><span style=\\"color:"+engColor+";font-weight:700\\">"+h.engagement+"%</span></div></div>"});html+="</div>"}' +
     'html+="</div>";' +
     // Cases by Location chart
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Cases by Location</div><canvas id=\\"hotspotChart\\"></canvas></div>";' +

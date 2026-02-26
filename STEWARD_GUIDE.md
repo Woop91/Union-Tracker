@@ -689,13 +689,26 @@ Believe: **You're making a difference.**
 
 ---
 
+### SPA Web Dashboard (v4.12+)
+
+The system now includes a full **SPA Web Dashboard** accessible via the web app URL. Key features for stewards:
+
+- **Google SSO Authentication** — automatic role detection (steward vs. member)
+- **Steward View** — full dashboard with compose notifications, manage tasks, view workload data
+- **Notification Bell** — unread count badge with compose/inbox/manage tabs (v4.13.0)
+- **Resources Hub** — educational content hub with articles and search (v4.11.0)
+- **Deep-Link Routing** — share links to specific pages: `?page=resources`, `?page=notifications`, `?page=workload`
+- **Weekly Questions** — configurable weekly check-in questions for members
+
+---
+
 **Questions? Feeling stuck? Need encouragement?**
 Reach out to your fellow stewards or leadership. We're all in this together! 🤝
 
 ---
 
-**Last Updated**: February 2026
-**Version**: 4.7.0
+**Last Updated**: 2026-02-25
+**Version**: 4.13.0
 **Created with**: Deep appreciation for steward dedication
 **Purpose**: Celebrating and supporting stewards everywhere 💙
 

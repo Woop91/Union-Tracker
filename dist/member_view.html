@@ -15,6 +15,11 @@ function initMemberView(container) {
   AppState.activeRole = 'member';
   showLoading(container);
 
+  // Load notification count in parallel (for bell badge)
+  google.script.run.withSuccessHandler(function(r) {
+    AppState.notificationCount = (r && r.count) || 0;
+  }).getWebAppNotificationCount(CURRENT_USER.email, 'member');
+
   google.script.run
     .withSuccessHandler(function(grievances) {
       AppState.grievances = grievances || [];
@@ -78,6 +83,11 @@ function renderMemberHome(appContainer) {
     var firstName = CURRENT_USER.firstName || CURRENT_USER.name.split(' ')[0] || 'there';
     _memberHeader(container, _getGreeting() + ', ' + firstName, CURRENT_USER.unit + ' \u00B7 Since ' + (CURRENT_USER.joined || 'N/A'));
 
+    // Welcome card placeholder — shows on first visit
+    var welcomeSlot = el('div');
+    container.appendChild(welcomeSlot);
+    _maybeShowMemberWelcome(welcomeSlot);
+
     // Survey banner
     google.script.run.withSuccessHandler(function(status) {
       if (status && !status.hasCompleted && CONFIG.surveyFormUrl) {
@@ -108,6 +118,29 @@ function renderMemberHome(appContainer) {
       emptyCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '600', color: 'var(--text)' } }, hasAny ? 'All grievances resolved' : 'No active grievances'));
       container.appendChild(emptyCard);
     }
+
+    // Past cases preview (compact — shows up to 2 recent closed cases)
+    var pastPreview = el('div', { style: { margin: '0 16px 14px' } });
+    container.appendChild(pastPreview);
+    google.script.run.withSuccessHandler(function(result) {
+      if (!result || !result.success || !result.history || result.history.length === 0) return;
+      var items = result.history.slice(0, 2);
+      var previewCard = el('div', { className: 'card card-glass', style: { padding: '14px 16px' } });
+      previewCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' } }, 'Past Cases'));
+      items.forEach(function(h) {
+        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' } });
+        row.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text)' } }, (h.grievanceId || 'Case') + (h.issueCategory ? ' \u00B7 ' + h.issueCategory : '')));
+        row.appendChild(el('span', { style: { fontSize: '11px', fontWeight: '600', color: _getOutcomeColor(h.status) } }, h.status));
+        previewCard.appendChild(row);
+      });
+      if (result.history.length > 2) {
+        previewCard.appendChild(el('div', {
+          style: { fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginTop: '8px', cursor: 'pointer' },
+          onClick: function() { renderMyCases(document.getElementById('app')); }
+        }, 'View all ' + result.history.length + ' past cases \u2192'));
+      }
+      pastPreview.appendChild(previewCard);
+    }).dataGetMemberGrievanceHistory(CURRENT_USER.email);
 
     // Steward card (single card, no dues)
     var stewardCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px' } });
@@ -367,7 +400,203 @@ function renderMyCases(appContainer) {
       });
     }
     container.appendChild(content);
+
+    // Past Cases section
+    _renderPastCasesSection(container);
   });
+}
+
+// ═══════════════════════════════════════
+// PAST CASES (resolved/closed grievance history)
+// ═══════════════════════════════════════
+
+function _renderPastCasesSection(parentContainer) {
+  var section = el('div', { className: 'content', style: { marginTop: '4px' } });
+
+  // Collapsible header
+  var pastCasesExpanded = false;
+  var headerRow = el('div', {
+    style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', padding: '2px 0' },
+    onClick: function() {
+      pastCasesExpanded = !pastCasesExpanded;
+      listArea.style.display = pastCasesExpanded ? 'block' : 'none';
+      toggleIcon.textContent = pastCasesExpanded ? '\u25B4' : '\u25BE';
+    }
+  });
+  var titleWrap = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+  titleWrap.appendChild(el('h3', { className: 'section-title', style: { margin: '0' } }, 'Past Cases'));
+  var toggleIcon = el('span', { style: { fontSize: '12px', color: 'var(--muted)' } }, '\u25BE');
+  titleWrap.appendChild(toggleIcon);
+  headerRow.appendChild(titleWrap);
+  section.appendChild(headerRow);
+
+  var listArea = el('div', { style: { display: 'none' } });
+  showLoading(listArea);
+  section.appendChild(listArea);
+  parentContainer.appendChild(section);
+
+  google.script.run.withSuccessHandler(function(result) {
+    listArea.innerHTML = '';
+    if (!result || !result.success || !result.history || result.history.length === 0) {
+      listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No past cases.'));
+      // Update header to show count
+      headerRow.querySelector('.section-title').textContent = 'Past Cases (0)';
+      return;
+    }
+
+    headerRow.querySelector('.section-title').textContent = 'Past Cases (' + result.history.length + ')';
+
+    result.history.forEach(function(h, idx) {
+      var outcomeColor = _getOutcomeColor(h.status);
+      var card = el('div', {
+        className: 'card card-glass card-fade-in',
+        style: { padding: '14px 16px', marginBottom: '6px', borderLeft: '3px solid ' + outcomeColor, animationDelay: (idx * 60) + 'ms' }
+      });
+
+      var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' } });
+      topRow.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, h.grievanceId || 'Case'));
+
+      var badge = el('span', {
+        style: {
+          display: 'inline-block', padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
+          background: _getOutcomeBg(h.status), color: outcomeColor
+        }
+      }, h.status || 'Closed');
+      topRow.appendChild(badge);
+      card.appendChild(topRow);
+
+      if (h.issueCategory) {
+        card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', marginBottom: '4px' } }, h.issueCategory));
+      }
+
+      if (h.outcome) {
+        card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' } }, 'Outcome: ' + h.outcome));
+      }
+
+      var dateRow = el('div', { style: { display: 'flex', gap: '16px', fontSize: '11px', color: 'var(--muted)' } });
+      if (h.dateFiled) dateRow.appendChild(el('span', null, 'Filed: ' + h.dateFiled));
+      if (h.dateClosed) dateRow.appendChild(el('span', null, 'Closed: ' + h.dateClosed));
+      card.appendChild(dateRow);
+
+      listArea.appendChild(card);
+    });
+  }).withFailureHandler(function() {
+    listArea.innerHTML = '';
+    listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontSize: '13px' } }, 'Unable to load past cases.'));
+  }).dataGetMemberGrievanceHistory(CURRENT_USER.email);
+}
+
+function _getOutcomeColor(status) {
+  var s = (status || '').toLowerCase();
+  if (s === 'won' || s === 'settled') return 'var(--success)';
+  if (s === 'denied') return 'var(--danger)';
+  if (s === 'withdrawn') return 'var(--warning)';
+  return 'var(--muted)';
+}
+
+function _getOutcomeBg(status) {
+  var s = (status || '').toLowerCase();
+  if (s === 'won' || s === 'settled') return 'rgba(52,211,153,0.12)';
+  if (s === 'denied') return 'rgba(239,68,68,0.12)';
+  if (s === 'withdrawn') return 'rgba(250,204,21,0.12)';
+  return 'rgba(255,255,255,0.06)';
+}
+
+// ═══════════════════════════════════════
+// WELCOME EXPERIENCE (member)
+// ═══════════════════════════════════════
+
+/**
+ * Shows a welcome/onboarding card on the member home page if first visit.
+ * @param {Element} slot - Container element to insert the welcome card into
+ */
+function _maybeShowMemberWelcome(slot) {
+  // Skip if already dismissed in this session
+  if (AppState._welcomeDismissed) return;
+
+  google.script.run.withSuccessHandler(function(data) {
+    if (!data || !data.isFirstVisit) return;
+
+    var card = el('div', {
+      className: 'card card-glass card-fade-in',
+      style: {
+        padding: '24px 20px',
+        margin: '0 16px 14px',
+        background: 'linear-gradient(135deg, var(--accentBg), rgba(255,255,255,0.03))',
+        border: '1px solid var(--accentBorder)',
+        position: 'relative'
+      }
+    });
+
+    // Header
+    var safeName = (data.userName || 'there').replace(/[<>&"']/g, '');
+    card.appendChild(el('div', {
+      style: { fontFamily: 'var(--fontDisplay)', fontSize: '20px', fontWeight: '700', color: 'var(--text)', marginBottom: '8px' }
+    }, 'Welcome, ' + safeName + '!'));
+
+    card.appendChild(el('div', {
+      style: { fontSize: '13px', color: 'var(--muted)', lineHeight: '1.5', marginBottom: '16px' }
+    }, 'This is your ' + CONFIG.memberLabel + ' dashboard. View your grievance cases, update your contact info, access union resources, and stay connected with your ' + CONFIG.stewardLabel.toLowerCase() + '.'));
+
+    // Quick-start action cards grid
+    var grid = el('div', {
+      style: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }
+    });
+
+    (data.quickActions || []).forEach(function(qa) {
+      var actionCard = el('div', {
+        className: 'card card-clickable',
+        style: {
+          padding: '12px',
+          textAlign: 'center',
+          cursor: 'pointer',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: '10px'
+        },
+        onClick: function() {
+          _dismissMemberWelcome(card);
+          _handleTabNav('member', qa.action);
+        }
+      });
+      actionCard.appendChild(el('div', { style: { fontSize: '22px', marginBottom: '4px' } }, qa.icon));
+      actionCard.appendChild(el('div', { style: { fontSize: '12px', fontWeight: '600', color: 'var(--text)', fontFamily: 'var(--fontDisplay)' } }, qa.label));
+      grid.appendChild(actionCard);
+    });
+    card.appendChild(grid);
+
+    // Dismiss button
+    card.appendChild(el('button', {
+      className: 'btn',
+      style: {
+        width: '100%',
+        background: 'var(--accent)',
+        color: '#fff',
+        border: 'none',
+        borderRadius: '8px',
+        padding: '10px',
+        fontSize: '13px',
+        fontWeight: '600',
+        cursor: 'pointer'
+      },
+      onClick: function() { _dismissMemberWelcome(card); }
+    }, 'Got it!'));
+
+    slot.appendChild(card);
+  }).dataGetWelcomeData(CURRENT_USER.email);
+}
+
+/**
+ * Dismisses the member welcome card and saves preference to backend.
+ */
+function _dismissMemberWelcome(cardEl) {
+  AppState._welcomeDismissed = true;
+  if (cardEl) {
+    cardEl.style.opacity = '0';
+    cardEl.style.transition = 'opacity 0.3s ease';
+    setTimeout(function() { cardEl.remove(); }, 300);
+  }
+  google.script.run.dataMarkWelcomeDismissed(CURRENT_USER.email);
 }
 
 // ═══════════════════════════════════════
@@ -470,238 +699,134 @@ function _renderStewardPicker(content) {
 // RESOURCES TAB
 // ═══════════════════════════════════════
 
-// ═══════════════════════════════════════
-// NOTIFICATIONS (member view)
-// ═══════════════════════════════════════
-
-function renderMemberNotifications(appContainer) {
-  renderPageLayout(appContainer, 'member', 'notifications', function(container) {
-    // Hero header — amber gradient matching our system
-    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(145deg, #92400e, #b45309)' } });
-    hero.appendChild(el('h1', null, '\uD83D\uDD14 Notifications'));
-    hero.appendChild(el('div', { className: 'hero-sub' }, 'Stay updated on union news, deadlines, and steward messages'));
-    container.appendChild(hero);
-
-    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
-    showLoading(content);
-    container.appendChild(content);
-
-    var typeColors = {
-      'Steward Message': { bg: 'rgba(45,90,135,0.12)', text: '#2d5a87' },
-      'Announcement': { bg: 'rgba(22,163,74,0.12)', text: '#16a34a' },
-      'Deadline': { bg: 'rgba(220,38,38,0.12)', text: '#dc2626' },
-      'System': { bg: 'rgba(147,51,234,0.12)', text: '#9333ea' }
-    };
-
-    google.script.run.withSuccessHandler(function(notifs) {
-      content.innerHTML = '';
-      if (!notifs || notifs.length === 0) {
-        var empty = el('div', { className: 'notif-empty' });
-        empty.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDD14'));
-        empty.appendChild(el('div', { className: 'notif-empty-title' }, 'All caught up!'));
-        empty.appendChild(el('div', { className: 'notif-empty-sub' }, 'No new notifications right now.'));
-        content.appendChild(empty);
-        return;
-      }
-
-      notifs.forEach(function(n) {
-        var card = el('div', {
-          className: 'notif-card' + (n.priority === 'Urgent' ? ' urgent' : ''),
-          id: 'notif-' + n.id
-        });
-        var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' } });
-        var tc = typeColors[n.type] || typeColors['System'];
-        topRow.appendChild(el('span', { className: 'type-badge', style: { background: tc.bg, color: tc.text } }, n.type));
-        if (n.priority === 'Urgent') {
-          topRow.appendChild(el('span', { className: 'type-badge', style: { background: 'rgba(220,38,38,0.15)', color: '#dc2626' } }, 'URGENT'));
-        }
-        topRow.appendChild(el('span', { style: { flex: '1' } }));
-        topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, n.createdDate));
-        card.appendChild(topRow);
-        card.appendChild(el('button', {
-          className: 'notif-dismiss',
-          onClick: function() {
-            var ce = document.getElementById('notif-' + n.id);
-            if (ce) { ce.style.opacity = '0'; ce.style.transform = 'translateX(30px)'; }
-            google.script.run.withSuccessHandler(function() {
-              setTimeout(function() { if (ce) ce.remove(); _checkNotifEmpty(content); }, 300);
-            }).withFailureHandler(function() {
-              if (ce) { ce.style.opacity = '1'; ce.style.transform = 'none'; }
-            }).dismissWebAppNotification(n.id, CURRENT_USER.email);
-          }
-        }, '\u2715'));
-        card.appendChild(el('div', { className: 'notif-title' }, n.title));
-        card.appendChild(el('div', { className: 'notif-msg' }, n.message));
-        var meta = [];
-        if (n.sentBy) meta.push('From: ' + n.sentBy);
-        if (n.expiresDate) meta.push('Expires: ' + n.expiresDate);
-        if (meta.length > 0) card.appendChild(el('div', { className: 'notif-meta' }, meta.join(' \u00B7 ')));
-        content.appendChild(card);
-      });
-    }).withFailureHandler(function(err) {
-      content.innerHTML = '';
-      content.appendChild(el('div', { style: { color: 'var(--danger)', textAlign: 'center', padding: '20px' } }, 'Error: ' + String(err)));
-    }).getWebAppNotifications(CURRENT_USER.email, 'member');
-  });
-}
-
-function _checkNotifEmpty(container) {
-  var remaining = container.querySelectorAll('[id^="notif-"]');
-  if (remaining.length === 0) {
-    container.innerHTML = '';
-    var empty = el('div', { className: 'notif-empty' });
-    empty.appendChild(el('div', { className: 'notif-empty-icon' }, '\uD83D\uDD14'));
-    empty.appendChild(el('div', { className: 'notif-empty-title' }, 'All caught up!'));
-    empty.appendChild(el('div', { className: 'notif-empty-sub' }, 'No new notifications right now.'));
-    container.appendChild(empty);
-  }
-}
-
-// ═══════════════════════════════════════
-// RESOURCES — Educational Hub (member view)
-// Search, category pills, expandable cards, external links
-// ═══════════════════════════════════════
-
 function renderMemberResources(appContainer) {
   renderPageLayout(appContainer, 'member', 'resources', function(container) {
-    // Hero header
-    var hero = el('div', { className: 'page-hero', style: { background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%)' } });
-    hero.appendChild(el('h1', null, '\uD83D\uDCDA Know Your Rights'));
-    hero.appendChild(el('div', { className: 'hero-sub' }, 'Your guide to the union contract, grievance process, and workplace protections'));
-    hero.appendChild(el('div', { className: 'page-hero', style: { position: 'absolute', bottom: '-20px', left: '-20px', right: '-20px', height: '40px', background: 'var(--bg)', borderRadius: '50% 50% 0 0', padding: '0' } }));
-    container.appendChild(hero);
+    _memberHeader(container, 'Resources');
+    var content = el('div', { className: 'content' });
 
-    var content = el('div', { className: 'content', style: { marginTop: '-8px', position: 'relative', zIndex: '2' } });
+    // Section 1: Quick Links
+    var quickLinks = [
+      { icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl },
+      { icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl },
+    ];
+    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'SEIU 509 Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
 
-    // Search bar
-    var searchWrap = el('div', { className: 'res-search-wrap' });
-    searchWrap.appendChild(el('i', { className: 'material-icons res-search-icon' }, 'search'));
-    var searchInput = el('input', {
-      className: 'res-search-bar',
-      placeholder: 'Search articles, rights, FAQ...',
-      onInput: function() { _filterResources(); }
+    quickLinks.forEach(function(r) {
+      if (!r.url) return;
+      var item = el('div', {
+        className: 'card card-glass card-clickable',
+        style: { display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 16px' },
+        onClick: function() { window.open(r.url, '_blank'); }
+      });
+      item.appendChild(el('span', { style: { fontSize: '18px' } }, r.icon));
+      var tg = el('div', { style: { flex: '1' } });
+      tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
+      tg.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, r.sub));
+      item.appendChild(tg);
+      item.appendChild(el('span', { style: { color: 'var(--muted)', fontSize: '14px' } }, '\u203A'));
+      content.appendChild(item);
     });
-    searchWrap.appendChild(searchInput);
-    content.appendChild(searchWrap);
 
-    // Category pills
-    var pillsRow = el('div', { className: 'cat-pills', id: 'res-cat-pills' });
-    content.appendChild(pillsRow);
+    // Section 2: Know Your Rights Hub
+    var hubSection = el('div', { style: { marginTop: '24px' } });
+    hubSection.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)', marginBottom: '12px' } }, 'Know Your Rights'));
 
-    // Quick links
-    var quickLinks = [];
-    if (CONFIG.calendarUrl) quickLinks.push({ icon: '\uD83D\uDCC5', label: 'Calendar', sub: 'Upcoming meetings & events', url: CONFIG.calendarUrl });
-    if (CONFIG.driveFolderUrl) quickLinks.push({ icon: '\uD83D\uDCC2', label: 'Shared Drive', sub: 'Contracts, documents & templates', url: CONFIG.driveFolderUrl });
-    if (CONFIG.orgWebsite) quickLinks.push({ icon: '\uD83C\uDF10', label: 'Website', sub: CONFIG.orgWebsite, url: CONFIG.orgWebsite });
+    var searchInput = el('input', { className: 'search-input form-input', placeholder: 'Search resources...', style: { marginBottom: '8px' } });
+    hubSection.appendChild(searchInput);
 
-    if (quickLinks.length > 0) {
-      var qlRow = el('div', { style: { display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '16px' } });
-      quickLinks.forEach(function(r) {
-        var item = el('div', {
-          className: 'card card-clickable',
-          style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', flex: '0 0 auto', minWidth: '160px' },
-          onClick: function() { window.open(r.url, '_blank'); }
-        });
-        item.appendChild(el('span', { style: { fontSize: '20px' } }, r.icon));
-        var tg = el('div');
-        tg.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, r.label));
-        tg.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)' } }, r.sub));
-        item.appendChild(tg);
-        qlRow.appendChild(item);
+    var pillsWrap = el('div', { className: 'res-pills' });
+    hubSection.appendChild(pillsWrap);
+
+    var cardsWrap = el('div');
+    hubSection.appendChild(cardsWrap);
+    content.appendChild(hubSection);
+
+    // Load resources
+    var allResources = [];
+    var activeCategory = 'All';
+    showLoading(cardsWrap);
+
+    google.script.run.withSuccessHandler(function(resources) {
+      allResources = resources || [];
+      // Build category pills
+      var categories = ['All'];
+      allResources.forEach(function(r) {
+        if (r.category && categories.indexOf(r.category) === -1) categories.push(r.category);
       });
-      content.appendChild(qlRow);
-    }
+      renderPills(categories);
+      renderCards();
+    }).withFailureHandler(function() {
+      cardsWrap.innerHTML = '';
+      cardsWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--muted)' } }, 'Unable to load resources.'));
+    }).getWebAppResourcesList('Members');
 
-    // Resource list container
-    var resList = el('div', { id: 'res-list' });
-    showLoading(resList);
-    content.appendChild(resList);
-    container.appendChild(content);
-
-    // State
-    var _allResources = [];
-    var _currentCat = 'all';
-
-    google.script.run.withSuccessHandler(function(data) {
-      _allResources = data || [];
-      _buildCatPills();
-      _renderResourceList(_allResources);
-    }).withFailureHandler(function(err) {
-      resList.innerHTML = '';
-      resList.appendChild(_resEmpty('\u26A0\uFE0F', 'Error loading resources', String(err || '')));
-    }).getWebAppResourcesList('All');
-
-    function _filterResources() {
-      var q = (searchInput.value || '').toLowerCase();
-      var filtered = _allResources.filter(function(r) {
-        var matchesCat = _currentCat === 'all' || r.category === _currentCat;
-        var matchesQ = !q || q.length < 2 || r.title.toLowerCase().indexOf(q) >= 0 || r.summary.toLowerCase().indexOf(q) >= 0 || (r.content || '').toLowerCase().indexOf(q) >= 0 || r.category.toLowerCase().indexOf(q) >= 0;
-        return matchesCat && matchesQ;
-      });
-      _renderResourceList(filtered);
-    }
-
-    function _setCat(cat) {
-      _currentCat = cat;
-      var pills = document.querySelectorAll('.cat-pill');
-      for (var i = 0; i < pills.length; i++) {
-        pills[i].className = pills[i].getAttribute('data-cat') === cat ? 'cat-pill active' : 'cat-pill';
-      }
-      _filterResources();
-    }
-
-    function _buildCatPills() {
-      var cats = {};
-      _allResources.forEach(function(r) { cats[r.category] = (cats[r.category] || 0) + 1; });
-      pillsRow.innerHTML = '';
-      var allPill = el('button', { className: 'cat-pill active', 'data-cat': 'all', onClick: function() { _setCat('all'); } }, 'All (' + _allResources.length + ')');
-      pillsRow.appendChild(allPill);
-      Object.keys(cats).sort().forEach(function(c) {
-        pillsRow.appendChild(el('button', { className: 'cat-pill', 'data-cat': c, onClick: function() { _setCat(c); } }, c + ' (' + cats[c] + ')'));
+    function renderPills(categories) {
+      pillsWrap.innerHTML = '';
+      categories.forEach(function(cat) {
+        pillsWrap.appendChild(el('button', {
+          className: 'res-pill' + (activeCategory === cat ? ' active' : ''),
+          onClick: function() { activeCategory = cat; renderPills(categories); renderCards(); }
+        }, cat));
       });
     }
 
-    function _renderResourceList(items) {
-      resList.innerHTML = '';
-      if (!items || items.length === 0) {
-        resList.appendChild(_resEmpty('\uD83D\uDCD6', 'No resources found', 'Try a different search or category'));
+    function renderCards() {
+      cardsWrap.innerHTML = '';
+      var searchTerm = (searchInput.value || '').toLowerCase().trim();
+      var filtered = allResources.filter(function(r) {
+        if (activeCategory !== 'All' && r.category !== activeCategory) return false;
+        if (searchTerm) {
+          return (r.title || '').toLowerCase().indexOf(searchTerm) !== -1 ||
+                 (r.summary || '').toLowerCase().indexOf(searchTerm) !== -1 ||
+                 (r.content || '').toLowerCase().indexOf(searchTerm) !== -1;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        cardsWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '32px 16px', color: 'var(--muted)' } }, 'No resources match your search.'));
         return;
       }
-      items.forEach(function(r) {
-        var card = el('div', { className: 'res-card', onClick: function() { card.classList.toggle('expanded'); } });
-        card.appendChild(el('span', { className: 'res-icon' }, r.icon || '\uD83D\uDCC4'));
-        card.appendChild(el('div', { className: 'res-category' }, r.category));
-        card.appendChild(el('div', { className: 'res-title' }, r.title));
-        card.appendChild(el('div', { className: 'res-summary' }, r.summary));
-        var hasContent = r.content && r.content.trim().length > 0;
-        var hasUrl = r.url && r.url.trim().length > 0;
-        if (hasContent) {
-          var hint = el('div', { className: 'expand-hint' });
-          hint.appendChild(el('i', { className: 'material-icons' }, 'expand_more'));
-          hint.appendChild(document.createTextNode('Tap to read more'));
-          card.appendChild(hint);
-          var contentDiv = el('div', { className: 'res-content' });
-          contentDiv.textContent = r.content;
-          card.appendChild(contentDiv);
+
+      filtered.forEach(function(r, idx) {
+        var card = el('div', {
+          className: 'card card-glass res-card card-clickable card-fade-in',
+          style: { animationDelay: (idx * 50) + 'ms' }
+        });
+
+        card.appendChild(el('div', { className: 'res-card-icon' }, r.icon || '\uD83D\uDCC4'));
+
+        var catBadge = el('span', { className: 'notif-type-badge notif-type-announcement', style: { fontSize: '10px', marginBottom: '6px' } }, r.category);
+        card.appendChild(catBadge);
+
+        card.appendChild(el('div', { className: 'res-card-title' }, r.title));
+        card.appendChild(el('div', { className: 'res-card-summary' }, r.summary));
+
+        // Expand hint
+        var hint = el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Tap to read more \u25BE');
+        card.appendChild(hint);
+
+        // Expandable content
+        var expandContent = el('div', { className: 'res-card-content' });
+        if (r.content) expandContent.appendChild(el('div', null, r.content));
+        if (r.url) {
+          expandContent.appendChild(el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource'));
         }
-        if (hasUrl) {
-          var link = el('a', { className: 'res-link', href: r.url, target: '_blank', onClick: function(e) { e.stopPropagation(); } });
-          link.appendChild(el('i', { className: 'material-icons', style: { fontSize: '16px' } }, 'open_in_new'));
-          link.appendChild(document.createTextNode('Open Resource'));
-          card.appendChild(link);
-        }
-        if (r.dateAdded) card.appendChild(el('div', { className: 'res-meta' }, 'Added ' + r.dateAdded));
-        resList.appendChild(card);
+        if (r.dateAdded) expandContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Added: ' + r.dateAdded));
+        card.appendChild(expandContent);
+
+        card.addEventListener('click', function() {
+          card.classList.toggle('expanded');
+          hint.textContent = card.classList.contains('expanded') ? 'Tap to collapse \u25B4' : 'Tap to read more \u25BE';
+        });
+
+        cardsWrap.appendChild(card);
       });
     }
 
-    function _resEmpty(icon, title, sub) {
-      var d = el('div', { className: 'notif-empty' });
-      d.appendChild(el('div', { className: 'notif-empty-icon' }, icon));
-      d.appendChild(el('div', { className: 'notif-empty-title' }, title));
-      d.appendChild(el('div', { className: 'notif-empty-sub' }, sub));
-      return d;
-    }
+    searchInput.addEventListener('input', function() { renderCards(); });
+
+    container.appendChild(content);
   });
 }
 
@@ -775,6 +900,76 @@ function renderUpdateProfile(appContainer) {
 }
 
 // ═══════════════════════════════════════
+// NOTIFICATIONS PAGE
+// ═══════════════════════════════════════
+
+function renderMemberNotifications(appContainer) {
+  renderPageLayout(appContainer, 'member', 'notifications', function(container) {
+    _memberHeader(container, 'Notifications', 'Stay informed');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(notifications) {
+      content.innerHTML = '';
+      if (!notifications || notifications.length === 0) {
+        var empty = el('div', { style: { textAlign: 'center', padding: '48px 16px' } });
+        empty.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
+        empty.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)' } }, 'All caught up!'));
+        empty.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '6px' } }, 'No new notifications'));
+        content.appendChild(empty);
+        return;
+      }
+
+      var typeColors = { System: 'system', Announcement: 'announcement', 'Steward Message': 'steward', Deadline: 'deadline' };
+      notifications.forEach(function(n, idx) {
+        var card = el('div', {
+          className: 'card card-glass notif-card card-fade-in' + (n.priority === 'Urgent' ? ' notif-urgent-border' : ''),
+          style: { animationDelay: (idx * 60) + 'ms' }
+        });
+
+        var top = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' } });
+        var typeClass = typeColors[n.type] || 'system';
+        top.appendChild(el('span', { className: 'notif-type-badge notif-type-' + typeClass }, n.type));
+        if (n.priority === 'Urgent') {
+          top.appendChild(el('span', { className: 'notif-type-badge notif-type-deadline' }, 'Urgent'));
+        }
+        card.appendChild(top);
+
+        card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '700', color: 'var(--text)', paddingRight: '28px' } }, n.title));
+        card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', marginTop: '6px', lineHeight: '1.5' } }, n.message));
+
+        var meta = el('div', { className: 'notif-meta' });
+        if (n.sentBy) meta.appendChild(el('span', null, 'From: ' + n.sentBy + '  '));
+        if (n.createdDate) meta.appendChild(el('span', null, n.createdDate));
+        if (n.expiresDate) meta.appendChild(el('span', null, '  · Expires: ' + n.expiresDate));
+        card.appendChild(meta);
+
+        var dismissBtn = el('button', { className: 'notif-dismiss', onClick: function() {
+          dismissBtn.textContent = '...';
+          google.script.run.withSuccessHandler(function(r) {
+            if (r && r.success) {
+              card.style.opacity = '0';
+              card.style.transition = 'opacity 0.3s';
+              setTimeout(function() { card.remove(); }, 300);
+              AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
+            }
+          }).withFailureHandler(function() {
+            dismissBtn.textContent = '\u2715';
+          }).dismissWebAppNotification(n.id, CURRENT_USER.email);
+        }}, '\u2715');
+        card.appendChild(dismissBtn);
+
+        content.appendChild(card);
+      });
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '24px', color: 'var(--danger)' } }, 'Failed to load notifications. Please try again.'));
+    }).getWebAppNotifications(CURRENT_USER.email, 'member');
+  });
+}
+
+// ═══════════════════════════════════════
 // MORE MENU
 // ═══════════════════════════════════════
 
@@ -783,8 +978,8 @@ function renderMemberMore(appContainer) {
     _memberHeader(container, 'More');
     var content = el('div', { className: 'content' });
     var menuItems = [
+      { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'Messages and alerts', action: function() { renderMemberNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC5', label: 'Events', desc: 'Upcoming meetings & events', action: function() { renderEventsPage(document.getElementById('app')); } },
-      { icon: '\uD83D\uDD14', label: 'Notifications', desc: 'View your notifications', action: function() { renderMemberNotifications(document.getElementById('app')); } },
       { icon: '\uD83D\uDCCA', label: 'Union Stats', desc: 'Grievance trends & membership data', action: function() { renderUnionStatsPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Find and select a ' + CONFIG.stewardLabel.toLowerCase(), action: function() { renderStewardDirectory(document.getElementById('app')); } },
       { icon: '\uD83D\uDC64', label: 'Update Profile', desc: 'Address, work location, office days', action: function() { renderUpdateProfile(document.getElementById('app')); } },

@@ -1,3 +1,5 @@
+// NOTE(F42): Form submission volume is acceptable for typical union usage (~100-5000 members).
+// No throttling is needed at current scale.
 
 // ============================================================================
 // FORM URL CONFIGURATION
@@ -803,8 +805,17 @@ function onSatisfactionFormSubmit(e) {
     }
 
     // ── Append ANONYMOUS response to Satisfaction sheet ──
-    satSheet.appendRow(newRow);
-    var newRowNum = satSheet.getLastRow();
+    // Use a lock around appendRow + getLastRow to prevent race conditions
+    // when two form submissions arrive simultaneously (F34d fix)
+    var formLock = LockService.getScriptLock();
+    formLock.waitLock(10000);
+    try {
+      satSheet.appendRow(newRow);
+      SpreadsheetApp.flush(); // ensure row is committed before reading back
+      var newRowNum = satSheet.getLastRow();
+    } finally {
+      formLock.releaseLock();
+    }
 
     // ── Write hashed PII to vault (separate protected sheet) ──
     // Supersede any previous entry from same email+quarter
@@ -1459,7 +1470,10 @@ function executeSendRandomSurveyEmails(opts) {
     if (configSheet && configSheet.getLastRow() > 1) {
       var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
       logData.forEach(function(row) {
-        if (row[0]) surveyLog[row[0]] = new Date(row[1]);
+        if (row[0]) {
+          var parsed = new Date(row[1]);
+          if (!isNaN(parsed.getTime())) surveyLog[row[0]] = parsed;
+        }
       });
     }
   } catch(_e) { /* No log yet */ }
@@ -1623,6 +1637,7 @@ function getCurrentQuarter() {
  */
 function getQuarterFromDate(date) {
   var d = new Date(date);
+  if (isNaN(d.getTime())) return '';
   var quarter = Math.floor(d.getMonth() / 3) + 1;
   return d.getFullYear() + '-Q' + quarter;
 }

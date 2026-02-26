@@ -539,10 +539,10 @@ function updateChecklistItem(checklistId, updates) {
       var row = i + 2;
 
       if (updates.itemText !== undefined) {
-        sheet.getRange(row, CHECKLIST_COLS.ITEM_TEXT).setValue(updates.itemText);
+        sheet.getRange(row, CHECKLIST_COLS.ITEM_TEXT).setValue(escapeForFormula(updates.itemText));
       }
       if (updates.category !== undefined) {
-        sheet.getRange(row, CHECKLIST_COLS.CATEGORY).setValue(updates.category);
+        sheet.getRange(row, CHECKLIST_COLS.CATEGORY).setValue(escapeForFormula(updates.category));
       }
       if (updates.required !== undefined) {
         sheet.getRange(row, CHECKLIST_COLS.REQUIRED).setValue(updates.required ? 'Yes' : 'No');
@@ -551,7 +551,7 @@ function updateChecklistItem(checklistId, updates) {
         sheet.getRange(row, CHECKLIST_COLS.DUE_DATE).setValue(updates.dueDate);
       }
       if (updates.notes !== undefined) {
-        sheet.getRange(row, CHECKLIST_COLS.NOTES).setValue(updates.notes);
+        sheet.getRange(row, CHECKLIST_COLS.NOTES).setValue(escapeForFormula(updates.notes));
       }
 
       return { success: true };
@@ -1714,6 +1714,7 @@ function repairDynamicFormulas() {
 /**
  * Gets expansion column data with optional member data.
  * Optimized to minimize sheet reads.
+ * TODO(F55): Add integration tests for expansion columns (add/remove/rename columns, data round-trip).
  * @param {string} memberId - Optional member ID to fetch data for
  * @returns {Object} Object with extraHeaders and memberData
  */

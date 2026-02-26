@@ -1,6 +1,6 @@
 # Quick Deploy - Union Steward Dashboard
 
-**Version:** 4.7.0 | **Architecture:** 27-File Modular
+**Version:** 4.13.0 | **Architecture:** 44-File Modular
 
 Deploy the Union Steward Dashboard to a Google Sheet using the source files in `src/`.
 
@@ -8,9 +8,10 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 
 ## What You Get
 
-- 27 modular source files (26 in production, after removing DevTools)
+- 37 .gs files + 7 .html files (36 .gs in production, after removing DevTools)
+- SPA web dashboard with SSO and magic link authentication
 - Visible sheets: Config, Member Directory, Grievance Log, Dashboard, Member Satisfaction, Getting Started, FAQ, Config Guide
-- 8 hidden calculation sheets with self-healing formulas
+- 18+ hidden sheets including calculation, workload, weekly questions, contact log, steward tasks, resources, and notifications
 - Demo data seeding (1,000 members + 300 grievances)
 - 4 menu systems with 100+ functions
 - Steward Dashboard, Member Dashboard, and Executive Dashboard
@@ -25,8 +26,8 @@ Deploy the Union Steward Dashboard to a Google Sheet using the source files in `
 ### Step 1: Get the Files
 
 ```bash
-git clone https://github.com/Woop91/DDS-Dashboard.git
-cd DDS-Dashboard/src
+git clone https://github.com/Woop91/Union-Tracker.git
+cd Union-Tracker/src
 ```
 
 ### Step 2: Create a New Google Sheet
@@ -47,7 +48,7 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 1. Click **+** next to "Files" to add a new script file
 2. Name it exactly as shown (without the `.gs` extension)
 3. Paste the contents from the corresponding source file
-4. Repeat for all 27 files plus the HTML file
+4. Repeat for all 37 .gs files plus the 7 .html files
 
 **Files to copy (in order):**
 
@@ -80,7 +81,23 @@ For each `.gs` file in the `src/` folder, create a new script file in Apps Scrip
 | `12_Features` | `src/12_Features.gs` |
 | `13_MemberSelfService` | `src/13_MemberSelfService.gs` |
 | `14_MeetingCheckIn` | `src/14_MeetingCheckIn.gs` |
+| `15_EventBus` | `src/15_EventBus.gs` |
+| `16_DashboardEnhancements` | `src/16_DashboardEnhancements.gs` |
+| `17_CorrelationEngine` | `src/17_CorrelationEngine.gs` |
+| `19_WebDashAuth` | `src/19_WebDashAuth.gs` |
+| `20_WebDashConfigReader` | `src/20_WebDashConfigReader.gs` |
+| `21_WebDashDataService` | `src/21_WebDashDataService.gs` |
+| `22_WebDashApp` | `src/22_WebDashApp.gs` |
+| `23_PortalSheets` | `src/23_PortalSheets.gs` |
+| `24_WeeklyQuestions` | `src/24_WeeklyQuestions.gs` |
+| `25_WorkloadService` | `src/25_WorkloadService.gs` |
 | `MultiSelectDialog` | `src/MultiSelectDialog.html` (create as HTML file) |
+| `index` | `src/index.html` (create as HTML file) |
+| `styles` | `src/styles.html` (create as HTML file) |
+| `steward_view` | `src/steward_view.html` (create as HTML file) |
+| `member_view` | `src/member_view.html` (create as HTML file) |
+| `portal_sheets` | `src/portal_sheets.html` (create as HTML file) |
+| `weekly_questions` | `src/weekly_questions.html` (create as HTML file) |
 
 **Save** the project (Ctrl+S).
 
@@ -119,8 +136,8 @@ Your dashboard is fully operational.
 ### Visible Sheets Created
 
 - **Config** -- Dropdown values and organization settings
-- **Member Directory** -- Union member records (34 columns)
-- **Grievance Log** -- Grievance tracking (34+ columns)
+- **Member Directory** -- Union member records (40 columns)
+- **Grievance Log** -- Grievance tracking (41 columns)
 - **Dashboard** -- Summary statistics and metrics
 - **Member Satisfaction** -- Survey response tracking
 - **Getting Started** -- Setup instructions
@@ -129,7 +146,7 @@ Your dashboard is fully operational.
 
 ### Hidden Sheets (Auto-Managed)
 
-8 calculation sheets with self-healing formulas power the auto-updating columns.
+18+ hidden sheets including calculation, workload, and SPA data sheets with self-healing formulas power the auto-updating columns.
 
 ---
 
@@ -138,7 +155,7 @@ Your dashboard is fully operational.
 If you prefer automated deployment:
 
 ```bash
-cd DDS-Dashboard
+cd Union-Tracker
 npm install
 clasp login
 clasp create --type sheets --title "Union Dashboard"
@@ -188,5 +205,5 @@ See [SEED_NUKE_GUIDE.md](SEED_NUKE_GUIDE.md) for the full production transition 
 
 ---
 
-**Version:** 4.7.0 (27-File Modular Architecture)
-**Last Updated:** 2026-02-14
+**Version:** 4.13.0 (44-File Modular Architecture)
+**Last Updated:** 2026-02-25

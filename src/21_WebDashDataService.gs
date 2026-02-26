@@ -58,6 +58,9 @@ var DataService = (function () {
     grievanceUnit:   ['unit', 'workplace unit'],
     grievancePriority: ['priority', 'urgency'],
     grievanceNotes:  ['notes', 'description', 'summary'],
+    grievanceIssueCategory: ['issue category', 'category', 'issue type'],
+    grievanceResolution: ['resolution', 'outcome', 'result'],
+    grievanceDateClosed: ['date closed', 'closed date', 'closed', 'resolved date'],
   };
 
   // ═══════════════════════════════════════
@@ -226,6 +229,84 @@ var DataService = (function () {
     });
 
     return grievances;
+  }
+
+  /**
+   * Returns resolved/closed grievance history for a member.
+   * Only includes cases with terminal statuses. Excludes internal notes,
+   * steward names, and other sensitive fields for member privacy.
+   * @param {string} memberEmail
+   * @returns {Object} { success: true, history: [...] }
+   */
+  function getMemberGrievanceHistory(memberEmail) {
+    if (!memberEmail) return { success: true, history: [] };
+    memberEmail = String(memberEmail).trim().toLowerCase();
+
+    var sheet = _getSheet(GRIEVANCE_SHEET);
+    if (!sheet) return { success: true, history: [] };
+
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var colMap = _buildColumnMap(headers);
+
+    var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
+    if (memberCol === -1) return { success: true, history: [] };
+
+    var closedStatuses = ['settled', 'won', 'denied', 'withdrawn', 'closed'];
+    var history = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][memberCol]).trim().toLowerCase();
+      if (rowEmail !== memberEmail) continue;
+
+      var status = String(_getVal(data[i], colMap, HEADERS.grievanceStatus, '')).trim().toLowerCase();
+      if (closedStatuses.indexOf(status) === -1) continue;
+
+      var filedRaw = _getVal(data[i], colMap, HEADERS.grievanceFiled, null);
+      var filedFormatted = '';
+      var filedTimestamp = 0;
+      if (filedRaw instanceof Date) {
+        filedFormatted = _formatDate(filedRaw);
+        filedTimestamp = filedRaw.getTime();
+      } else if (filedRaw) {
+        var parsed = new Date(filedRaw);
+        if (!isNaN(parsed.getTime())) {
+          filedFormatted = _formatDate(parsed);
+          filedTimestamp = parsed.getTime();
+        }
+      }
+
+      var closedRaw = _getVal(data[i], colMap, HEADERS.grievanceDateClosed, null);
+      var closedFormatted = '';
+      if (closedRaw instanceof Date) {
+        closedFormatted = _formatDate(closedRaw);
+      } else if (closedRaw) {
+        var parsedClosed = new Date(closedRaw);
+        if (!isNaN(parsedClosed.getTime())) {
+          closedFormatted = _formatDate(parsedClosed);
+        }
+      }
+
+      history.push({
+        grievanceId: String(_getVal(data[i], colMap, HEADERS.grievanceId, '')).trim(),
+        issueCategory: String(_getVal(data[i], colMap, HEADERS.grievanceIssueCategory, '')).trim(),
+        status: status.charAt(0).toUpperCase() + status.slice(1),
+        outcome: String(_getVal(data[i], colMap, HEADERS.grievanceResolution, '')).trim(),
+        dateFiled: filedFormatted,
+        dateClosed: closedFormatted,
+        filedTimestamp: filedTimestamp,
+      });
+    }
+
+    // Sort by filed date descending (most recent first)
+    history.sort(function(a, b) {
+      return (b.filedTimestamp || 0) - (a.filedTimestamp || 0);
+    });
+
+    // Strip timestamp from returned data
+    history.forEach(function(h) { delete h.filedTimestamp; });
+
+    return { success: true, history: history };
   }
 
   /**
@@ -1188,6 +1269,7 @@ var DataService = (function () {
     getStewardCases: getStewardCases,
     getStewardKPIs: getStewardKPIs,
     getMemberGrievances: getMemberGrievances,
+    getMemberGrievanceHistory: getMemberGrievanceHistory,
     getStewardContact: getStewardContact,
     getUnits: getUnits,
     getFullMemberProfile: getFullMemberProfile,
@@ -1228,6 +1310,7 @@ var DataService = (function () {
 function dataGetStewardCases(email) { return DataService.getStewardCases(email); }
 function dataGetStewardKPIs(email) { return DataService.getStewardKPIs(email); }
 function dataGetMemberGrievances(email) { return DataService.getMemberGrievances(email); }
+function dataGetMemberGrievanceHistory(email) { return DataService.getMemberGrievanceHistory(email); }
 function dataGetStewardContact(email) { return DataService.getStewardContact(email); }
 function dataGetUserRole(email) { return DataService.getUserRole(email); }
 function dataGetUserProfile(email) { return DataService.findUserByEmail(email); }
@@ -1261,3 +1344,90 @@ function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
 function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
 function dataGetMembershipStats() { return DataService.getMembershipStats(); }
 function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(limit); }
+
+// ═══════════════════════════════════════
+// WELCOME EXPERIENCE (PHASE2)
+// Uses PropertiesService to track first-visit state per user.
+// ═══════════════════════════════════════
+
+/**
+ * Returns welcome/onboarding data for the current user.
+ * Checks if this is the user's first visit by looking up a property key.
+ * @param {string} email - User email
+ * @returns {Object} { isFirstVisit, userName, role, quickActions }
+ */
+function dataGetWelcomeData(email) {
+  if (!email) return { isFirstVisit: false, userName: '', role: 'member', quickActions: [] };
+  email = String(email).trim().toLowerCase();
+
+  var userRecord = DataService.findUserByEmail(email);
+  var firstName = '';
+  var role = 'member';
+  if (userRecord) {
+    firstName = userRecord.firstName || (userRecord.name || '').split(' ')[0] || '';
+    role = userRecord.role || 'member';
+  }
+
+  // Check first-visit flag using script properties (user properties not available
+  // in web app context running as "me"). Use a hash of email as key.
+  var emailHash = _welcomeEmailHash(email);
+  var propKey = 'WELCOME_DISMISSED_' + emailHash;
+  var props = PropertiesService.getScriptProperties();
+  var dismissed = props.getProperty(propKey);
+  var isFirstVisit = !dismissed;
+
+  // Build role-appropriate quick actions
+  var quickActions = [];
+  if (role === 'steward' || role === 'both') {
+    quickActions = [
+      { label: 'View Cases', icon: '\uD83D\uDCCB', action: 'cases' },
+      { label: 'Check Deadlines', icon: '\u23F0', action: 'deadlines' },
+      { label: 'Member Directory', icon: '\uD83D\uDC65', action: 'members' },
+      { label: 'Manage Tasks', icon: '\u2705', action: 'tasks' },
+    ];
+  } else {
+    quickActions = [
+      { label: 'View My Cases', icon: '\uD83D\uDCCB', action: 'cases' },
+      { label: 'Update Contact Info', icon: '\uD83D\uDC64', action: 'profile' },
+      { label: 'Check Resources', icon: '\uD83D\uDCDA', action: 'resources' },
+      { label: 'Contact ' + (ConfigReader.getConfig().stewardLabel || 'Steward'), icon: '\uD83D\uDCAC', action: 'contact' },
+    ];
+  }
+
+  return {
+    isFirstVisit: isFirstVisit,
+    userName: firstName,
+    role: role,
+    quickActions: quickActions,
+  };
+}
+
+/**
+ * Marks the welcome experience as dismissed for a user.
+ * @param {string} email - User email
+ * @returns {Object} { success: boolean }
+ */
+function dataMarkWelcomeDismissed(email) {
+  if (!email) return { success: false };
+  email = String(email).trim().toLowerCase();
+  var emailHash = _welcomeEmailHash(email);
+  var propKey = 'WELCOME_DISMISSED_' + emailHash;
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(propKey, new Date().toISOString());
+  return { success: true };
+}
+
+/**
+ * Simple hash of email for property key (avoids special chars in key names).
+ * @private
+ */
+function _welcomeEmailHash(email) {
+  var hash = 0;
+  var str = String(email).toLowerCase();
+  for (var i = 0; i < str.length; i++) {
+    var c = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + c;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}

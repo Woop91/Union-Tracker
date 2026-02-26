@@ -25,6 +25,7 @@
  * Checks all required sheets, columns, formulas, and configurations
  * @returns {Object} Diagnostic results with status, checks, warnings, and errors
  */
+// PERF: Diagnostic reads run infrequently (manual trigger), bulk read acceptable
 function DIAGNOSE_SETUP() {
   var results = {
     timestamp: new Date().toISOString(),
@@ -265,9 +266,13 @@ function REPAIR_DASHBOARD() {
  */
 function removeDeprecatedTabs() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var deprecatedSheets = [
+  // Exact-match names — only delete if name matches exactly
+  var exactMatches = [
     'Dashboard_OLD',
-    'Member List_OLD',
+    'Member List_OLD'
+  ];
+  // Prefix patterns — delete if name starts with the pattern (intentional wildcard)
+  var prefixPatterns = [
     'DEPRECATED_BACKUP_',
     'DEPRECATED_TEST_'
   ];
@@ -277,15 +282,27 @@ function removeDeprecatedTabs() {
   for (var i = sheets.length - 1; i >= 0; i--) {
     var sheet = sheets[i];
     var name = sheet.getName();
-    for (var j = 0; j < deprecatedSheets.length; j++) {
-      if (name.indexOf(deprecatedSheets[j]) === 0) {
-        try {
-          ss.deleteSheet(sheet);
-          removed.push(name);
-        } catch (_e) {
-          Logger.log('Could not delete sheet: ' + name);
+    var shouldRemove = false;
+
+    // Check exact matches
+    if (exactMatches.indexOf(name) !== -1) {
+      shouldRemove = true;
+    } else {
+      // Check prefix patterns
+      for (var j = 0; j < prefixPatterns.length; j++) {
+        if (name.indexOf(prefixPatterns[j]) === 0) {
+          shouldRemove = true;
+          break;
         }
-        break;
+      }
+    }
+
+    if (shouldRemove) {
+      try {
+        ss.deleteSheet(sheet);
+        removed.push(name);
+      } catch (_e) {
+        Logger.log('Could not delete sheet: ' + name);
       }
     }
   }
@@ -1262,6 +1279,7 @@ function restoreFromSnapshot(snapshot) {
 
   // Create a backup of current data before restoring
   try {
+    // NOTE: Backup is ephemeral (in-memory only). Persisting to hidden sheet would add complexity for rare usage.
     var preRestoreBackup = createGrievanceSnapshot();
     preRestoreBackup.label = 'Pre-Restore Backup';
     Logger.log('Pre-restore backup created at ' + preRestoreBackup.timestamp);
@@ -1473,8 +1491,26 @@ function logAuditEvent(eventType, details) {
 
     // Build log entry
     const timestamp = new Date();
-    const user = Session.getActiveUser().getEmail() || 'Unknown';
-    const detailsJson = JSON.stringify(details);
+    const rawEmail = Session.getActiveUser().getEmail() || 'Unknown';
+    // Mask email in visible audit column; integrity hash uses full email for verification
+    const user = (typeof maskEmail === 'function') ? maskEmail(rawEmail) : rawEmail;
+
+    // Mask email addresses in details object before logging
+    var sanitizedDetails = details;
+    if (details && typeof details === 'object') {
+      sanitizedDetails = {};
+      var emailKeys = ['runBy', 'performedBy', 'createdBy', 'changedBy', 'email', 'userEmail'];
+      for (var dk in details) {
+        if (details.hasOwnProperty(dk)) {
+          if (emailKeys.indexOf(dk) !== -1 && typeof details[dk] === 'string' && details[dk].indexOf('@') !== -1) {
+            sanitizedDetails[dk] = (typeof maskEmail === 'function') ? maskEmail(details[dk]) : details[dk];
+          } else {
+            sanitizedDetails[dk] = details[dk];
+          }
+        }
+      }
+    }
+    const detailsJson = JSON.stringify(sanitizedDetails);
     const sessionId = Session.getTemporaryActiveUserKey() || '';
 
     // Compute integrity hash chained to previous row
@@ -1497,7 +1533,8 @@ function logAuditEvent(eventType, details) {
 
     var integrityHash = '';
     if (typeof computeAuditRowHash_ === 'function') {
-      integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, user, detailsJson, sessionId);
+      // Use rawEmail (not masked) in integrity hash so hash chain remains verifiable
+      integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, rawEmail, detailsJson, sessionId);
     }
 
     auditSheet.appendRow([timestamp, eventType, user, detailsJson, sessionId, integrityHash]);
@@ -1555,6 +1592,14 @@ function getRecentAuditLogs(count) {
  * @return {Object} Reset results
  */
 function NUCLEAR_RESET_HIDDEN_SHEETS() {
+  var isDev = typeof IS_DEV_ENVIRONMENT !== 'undefined' && IS_DEV_ENVIRONMENT === true;
+  if (!isDev) {
+    var _ui = SpreadsheetApp.getUi();
+    var _response = _ui.alert('Production Safety Check',
+      'This action is intended for development environments only. Are you SURE you want to proceed?',
+      _ui.ButtonSet.YES_NO);
+    if (_response !== _ui.Button.YES) return;
+  }
   // Require double confirmation
   const ui = SpreadsheetApp.getUi();
   const response1 = ui.alert(
@@ -1607,6 +1652,14 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
  * For testing/development use only
  */
 function NUCLEAR_WIPE_GRIEVANCES() {
+  var isDev = typeof IS_DEV_ENVIRONMENT !== 'undefined' && IS_DEV_ENVIRONMENT === true;
+  if (!isDev) {
+    var _ui = SpreadsheetApp.getUi();
+    var _response = _ui.alert('Production Safety Check',
+      'This action is intended for development environments only. Are you SURE you want to proceed?',
+      _ui.ButtonSet.YES_NO);
+    if (_response !== _ui.Button.YES) return;
+  }
   const ui = SpreadsheetApp.getUi();
   const response = ui.alert(
     '⚠️ DANGER - DATA WIPE',
@@ -1638,6 +1691,21 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   }
 
   const lastRow = sheet.getLastRow();
+
+  // Safety snapshot: back up data to a hidden sheet before destructive wipe
+  if (lastRow > 1) {
+    var snapshotName = '_PreWipe_Snapshot_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmm');
+    var snapshotSheet = ss.insertSheet(snapshotName);
+    var allData = sheet.getDataRange().getValues();
+    snapshotSheet.getRange(1, 1, allData.length, allData[0].length).setValues(allData);
+    try {
+      setSheetVeryHidden_(snapshotSheet);
+    } catch (_hideErr) {
+      snapshotSheet.hideSheet();
+    }
+    Logger.log('Pre-wipe snapshot saved to hidden sheet: ' + snapshotName);
+  }
+
   if (lastRow > 1) {
     sheet.deleteRows(2, lastRow - 1);
   }
@@ -1645,6 +1713,7 @@ function NUCLEAR_WIPE_GRIEVANCES() {
   logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR, {
     action: 'NUCLEAR_WIPE_GRIEVANCES',
     rowsDeleted: lastRow - 1,
+    snapshotSheet: lastRow > 1 ? snapshotName : 'N/A (no data)',
     performedBy: Session.getActiveUser().getEmail()
   });
 
@@ -2790,45 +2859,26 @@ function autoFixMissingConfigValues() {
  * @param {string} details - Description of what happened
  * @param {Object} additionalInfo - Optional additional information
  */
+/**
+ * @deprecated Use logAuditEvent() instead. This is a legacy wrapper kept for backward compatibility.
+ * Delegates to logAuditEvent() which handles email masking and integrity hashing.
+ */
 function logIntegrityEvent(eventType, details, additionalInfo) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var auditSheet = ss.getSheetByName(SHEETS.AUDIT_LOG);
-
-  // Create audit log if it doesn't exist
-  if (!auditSheet) {
-    auditSheet = ss.insertSheet(SHEETS.AUDIT_LOG);
-    setSheetVeryHidden_(auditSheet);
-
-    // Set up headers
-    var headers = ['Timestamp', 'User Email', 'Event Type', 'Details', 'Additional Info', 'Spreadsheet ID'];
-    auditSheet.getRange(1, 1, 1, headers.length).setValues([headers])
-      .setFontWeight('bold')
-      .setBackground('#7C3AED')
-      .setFontColor('#FFFFFF');
+  // Consolidate into the primary logAuditEvent function
+  var combinedDetails = {};
+  if (details) combinedDetails.details = details;
+  if (additionalInfo) {
+    if (typeof additionalInfo === 'object') {
+      for (var key in additionalInfo) {
+        if (additionalInfo.hasOwnProperty(key)) {
+          combinedDetails[key] = additionalInfo[key];
+        }
+      }
+    } else {
+      combinedDetails.additionalInfo = additionalInfo;
+    }
   }
-
-  // Get user info
-  var userEmail = Session.getActiveUser().getEmail() || 'Unknown';
-  var timestamp = new Date();
-  var spreadsheetId = ss.getId();
-
-  // Append log entry
-  var logEntry = [
-    timestamp,
-    userEmail,
-    eventType,
-    details,
-    additionalInfo ? JSON.stringify(additionalInfo) : '',
-    spreadsheetId
-  ];
-
-  auditSheet.appendRow(logEntry);
-
-  // Keep audit log to reasonable size (last 5000 entries)
-  var lastRow = auditSheet.getLastRow();
-  if (lastRow > 5000) {
-    auditSheet.deleteRows(2, lastRow - 5000);
-  }
+  logAuditEvent(eventType, combinedDetails);
 }
 
 /**
@@ -2991,26 +3041,35 @@ function archiveClosedGrievances(daysOld) {
     .setValues(rowsToArchive);
 
   // Delete from main sheet (in reverse order to maintain row indices)
+  // Transaction pattern: track individual failures and report at the end
   var failedDeletes = [];
+  var successfulDeletes = 0;
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
     try {
       grievanceSheet.deleteRow(rowIndex);
+      successfulDeletes++;
     } catch (deleteErr) {
-      failedDeletes.push(rowIndex);
+      failedDeletes.push({ row: rowIndex, error: deleteErr.message });
       Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);
     }
   });
   if (failedDeletes.length > 0) {
-    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedDeletes.join(', '));
+    var failedRows = failedDeletes.map(function(f) { return f.row; });
+    Logger.log('Warning: ' + failedDeletes.length + ' rows could not be deleted and may exist in both archive and main sheet: ' + failedRows.join(', '));
   }
 
   // Log the archive operation
   logIntegrityEvent('AUTO_ARCHIVE',
     'Archived ' + rowsToArchive.length + ' closed grievances older than ' + daysOld + ' days',
-    { count: rowsToArchive.length, daysOld: daysOld }
+    { count: rowsToArchive.length, daysOld: daysOld, deleteFailed: failedDeletes.length }
   );
 
-  return { archived: rowsToArchive.length };
+  return {
+    archived: rowsToArchive.length,
+    deleted: successfulDeletes,
+    failedDeletes: failedDeletes.length,
+    failedRows: failedDeletes.length > 0 ? failedDeletes : undefined
+  };
 }
 
 /**
@@ -3099,17 +3158,27 @@ function restoreFromArchive(grievanceIds) {
   grievanceSheet.getRange(lastRow + 1, 1, rowsToRestore.length, rowsToRestore[0].length)
     .setValues(rowsToRestore);
 
-  // Remove from archive
+  // Remove from archive (track failures rather than stopping on first error)
+  var restoreFailedDeletes = [];
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
-    archiveSheet.deleteRow(rowIndex);
+    try {
+      archiveSheet.deleteRow(rowIndex);
+    } catch (deleteErr) {
+      restoreFailedDeletes.push({ row: rowIndex, error: deleteErr.message });
+      Logger.log('Failed to delete archive row ' + rowIndex + ': ' + deleteErr.message);
+    }
   });
 
   logIntegrityEvent('ARCHIVE_RESTORE',
     'Restored ' + rowsToRestore.length + ' grievances from archive',
-    { grievanceIds: grievanceIds }
+    { grievanceIds: grievanceIds, deleteFailed: restoreFailedDeletes.length }
   );
 
-  return { restored: rowsToRestore.length };
+  return {
+    restored: rowsToRestore.length,
+    failedDeletes: restoreFailedDeletes.length,
+    failedRows: restoreFailedDeletes.length > 0 ? restoreFailedDeletes : undefined
+  };
 }
 
 // ============================================================================

@@ -25,9 +25,11 @@
  * ============================================================================
  */
 
+// ACCEPTABLE: 60+ commands reflect feature depth; collision managed by verb-noun naming convention
 // ============================================================================
 // COMMAND CENTER CONFIGURATION
 // ============================================================================
+// TODO(F54): Lazy-load help content on demand instead of building all help text at init time.
 
 /**
  * Alternative CONFIG object for legacy compatibility
@@ -574,6 +576,14 @@ function disableProductionMode() {
  * More aggressive than NUKE_SEEDED_DATA - clears ALL data, not just seeded
  */
 function NUKE_DATABASE() {
+  var isDev = typeof IS_DEV_ENVIRONMENT !== 'undefined' && IS_DEV_ENVIRONMENT === true;
+  if (!isDev) {
+    var _ui = SpreadsheetApp.getUi();
+    var _response = _ui.alert('Production Safety Check',
+      'This action is intended for development environments only. Are you SURE you want to proceed?',
+      _ui.ButtonSet.YES_NO);
+    if (_response !== _ui.Button.YES) return;
+  }
   var ui = SpreadsheetApp.getUi();
   var confirm = ui.alert(
     '☢️ NUCLEAR OPTION',
@@ -1993,7 +2003,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     }
     if (articleMatches.length > 0) {
       var uniqueArticles = articleMatches.filter(function(v, i, a) { return a.indexOf(v) === i; });
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ARTICLES).setValue(uniqueArticles.join(', '));
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ARTICLES).setValue(escapeForFormula(uniqueArticles.join(', ')));
       fieldsPopulated.push('Articles');
     }
 
@@ -2001,7 +2011,7 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
     var categoryMatch = text.match(patterns.issueCategory);
     if (categoryMatch) {
       var category = categoryMatch[0].charAt(0).toUpperCase() + categoryMatch[0].slice(1).toLowerCase();
-      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(category);
+      sheet.getRange(grievanceRow, GRIEVANCE_COLS.ISSUE_CATEGORY).setValue(escapeForFormula(category));
       fieldsPopulated.push('Issue Category');
     }
 
