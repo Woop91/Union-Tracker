@@ -84,6 +84,7 @@ function doGetWebDashboard(e) {
  */
 function _serveAuth(config, e) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = 'auth';
 
   template.pageData = JSON.stringify({
     view: 'auth',
@@ -102,6 +103,7 @@ function _serveAuth(config, e) {
  */
 function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = role; // 'steward', 'member', or 'both'
 
   // Sanitize user record — strip sensitive fields
   var safeUser = {
@@ -140,6 +142,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
  */
 function _serveError(config, type, detail) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = 'error';
 
   var messages = {
     'not_found': 'Your email was not found in the member directory. Please contact your steward for access.',

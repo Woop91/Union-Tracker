@@ -635,10 +635,18 @@
     });
   </script>
 
-  <?!= include('auth_view') ?>
-  <?!= include('steward_view') ?>
-  <?!= include('member_view') ?>
-  <?!= include('error_view') ?>
+  <? if (view === 'auth') { ?>
+    <?!= include('auth_view') ?>
+  <? } else if (view === 'steward') { ?>
+    <?!= include('steward_view') ?>
+  <? } else if (view === 'member') { ?>
+    <?!= include('member_view') ?>
+  <? } else if (view === 'both') { ?>
+    <?!= include('steward_view') ?>
+    <?!= include('member_view') ?>
+  <? } else { ?>
+    <?!= include('error_view') ?>
+  <? } ?>
 
 </body>
 </html>

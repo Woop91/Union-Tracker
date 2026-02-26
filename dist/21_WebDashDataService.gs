@@ -581,7 +581,59 @@ var DataService = (function () {
   }
 
   /**
+   * Get or create a restricted Drive folder named after the spreadsheet.
+   * Users shared on this folder cannot browse outside it.
+   * The folder ID is cached in Script Properties for reuse.
+   * @private
+   * @returns {string} Folder URL (empty string on failure)
+   */
+  function getOrCreateSheetFolder_() {
+    var props = PropertiesService.getScriptProperties();
+    var storedId = props.getProperty('SHEET_DRIVE_FOLDER_ID');
+
+    if (storedId) {
+      try {
+        var existing = DriveApp.getFolderById(storedId);
+        return 'https://drive.google.com/drive/folders/' + existing.getId();
+      } catch (_e) {
+        // Stored ID invalid, fall through to create
+      }
+    }
+
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var folderName = ss.getName();
+
+      // Search for existing folder with same name owned by this user
+      var folders = DriveApp.getFoldersByName(folderName);
+      if (folders.hasNext()) {
+        var found = folders.next();
+        props.setProperty('SHEET_DRIVE_FOLDER_ID', found.getId());
+        return 'https://drive.google.com/drive/folders/' + found.getId();
+      }
+
+      // Create new folder
+      var newFolder = DriveApp.createFolder(folderName);
+      newFolder.setDescription('Restricted shared folder for ' + folderName + ' — auto-managed by Dashboard');
+      props.setProperty('SHEET_DRIVE_FOLDER_ID', newFolder.getId());
+
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('SHEET_DRIVE_FOLDER_CREATED', {
+          folderId: newFolder.getId(),
+          folderName: folderName
+        });
+      }
+
+      return 'https://drive.google.com/drive/folders/' + newFolder.getId();
+    } catch (e) {
+      Logger.log('getOrCreateSheetFolder_ error: ' + e.message);
+      return '';
+    }
+  }
+
+  /**
    * Returns org-wide links (calendar, drive, survey form, etc.)
+   * Drive link points to a restricted folder named after the spreadsheet.
    * @returns {Object}
    */
   function getOrgLinks() {
@@ -589,7 +641,7 @@ var DataService = (function () {
       var config = ConfigReader.getConfig();
       return {
         calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
-        driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
+        driveFolderUrl: getOrCreateSheetFolder_(),
         surveyFormUrl: config.satisfactionFormUrl || '',
         orgWebsite: config.orgWebsite || '',
       };
@@ -1734,6 +1786,11 @@ var DataService = (function () {
 
     gSheet.appendRow(row);
 
+    // Auto-sort so new draft appears in correct priority position
+    if (typeof sortGrievanceLogByStatus === 'function') {
+      try { sortGrievanceLogByStatus(); } catch (_e) { /* non-critical */ }
+    }
+
     if (typeof logAuditEvent === 'function') {
       logAuditEvent('GRIEVANCE_DRAFT_CREATED', { email: email, grievanceId: grievanceId });
     }
@@ -1766,8 +1823,13 @@ var DataService = (function () {
     }
 
     try {
+      // Create inside the restricted sheet folder (not Drive root)
+      var parentUrl = getOrCreateSheetFolder_();
+      var parentId = PropertiesService.getScriptProperties().getProperty('SHEET_DRIVE_FOLDER_ID');
+      var parentFolder = parentId ? DriveApp.getFolderById(parentId) : DriveApp.getRootFolder();
+
       var folderName = memberName + ' - Grievance Docs';
-      var folder = DriveApp.createFolder(folderName);
+      var folder = parentFolder.createFolder(folderName);
       folder.addEditor(email);
       var folderUrl = folder.getUrl();
 
