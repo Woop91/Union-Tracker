@@ -626,9 +626,32 @@ function applyMultiSelectValue(value) {
   var sheet = ss.getSheetByName(sheetName);
   sheet.getRange(row, col).setValue(value);
 
+  // Clear all multi-select state including the de-dup guard so
+  // auto-open works again on the same cell after saving.
   props.deleteProperty('multiSelectRow');
   props.deleteProperty('multiSelectCol');
   props.deleteProperty('multiSelectSheet');
+  props.deleteProperty('lastMultiSelectCell');
+
+  // User feedback — show a brief toast confirming the save
+  var count = value ? value.split(',').length : 0;
+  var msg = count > 0
+    ? count + ' item' + (count !== 1 ? 's' : '') + ' saved'
+    : 'Selection cleared';
+  ss.toast(msg, '✅ Multi-Select', 3);
+}
+
+/**
+ * Clears multi-select dialog state (called on Cancel).
+ * Resets the de-dup guard so auto-open works on the next click.
+ * @returns {void}
+ */
+function clearMultiSelectState() {
+  var props = PropertiesService.getUserProperties();
+  props.deleteProperty('multiSelectRow');
+  props.deleteProperty('multiSelectCol');
+  props.deleteProperty('multiSelectSheet');
+  props.deleteProperty('lastMultiSelectCell');
 }
 
 /**
