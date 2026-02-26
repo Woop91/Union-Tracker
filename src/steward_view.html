@@ -321,7 +321,7 @@ function renderBottomNav(container, role, activeTab) {
   var tabs = role === 'steward' ? [
     { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
     { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
-    { id: 'deadlines', icon: '\uD83D\uDCC5', label: 'Deadlines' },
+    { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
     { id: 'more_steward', icon: '\u2630', label: 'More' },
   ] : [
     { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
@@ -383,33 +383,24 @@ function renderStewardMembers(appContainer) {
       // Chart.js stats
       if (typeof ChartHelper !== 'undefined') {
         google.script.run.withSuccessHandler(function(stats) {
-          if (!stats || !stats.byDues) return;
-          var chartRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '14px' } });
-          // Dues doughnut
-          var duesCard = el('div', { className: 'card', style: { padding: '12px' } });
-          duesCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Dues Status'));
-          var dLabels = Object.keys(stats.byDues);
-          var dData = dLabels.map(function(k) { return stats.byDues[k]; });
-          ChartHelper.createDoughnutChart(duesCard, 'members-dues-chart', dLabels, dData);
-          chartRow.appendChild(duesCard);
+          if (!stats || !stats.byLocation) return;
           // Location bar
-          var locCard = el('div', { className: 'card', style: { padding: '12px' } });
+          var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
           locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Location'));
           var lLabels = Object.keys(stats.byLocation);
           var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
           ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
-          chartRow.appendChild(locCard);
           // Insert after KPI strip
           var searchEl = content.querySelector('.search-input');
-          if (searchEl) content.insertBefore(chartRow, searchEl);
-          else content.appendChild(chartRow);
+          if (searchEl) content.insertBefore(locCard, searchEl);
+          else content.appendChild(locCard);
         }).dataGetStewardMemberStats(CURRENT_USER.email);
       }
 
       // Sort & Filter controls
       var controlRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' } });
       var sortSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
-      [{ v: 'name-az', l: 'Name A-Z' }, { v: 'name-za', l: 'Name Z-A' }, { v: 'location', l: 'Location' }, { v: 'dues', l: 'Dues Status' }].forEach(function(o) {
+      [{ v: 'name-az', l: 'Name A-Z' }, { v: 'name-za', l: 'Name Z-A' }, { v: 'location', l: 'Location' }].forEach(function(o) {
         sortSelect.appendChild(el('option', { value: o.v }, o.l));
       });
       controlRow.appendChild(sortSelect);
@@ -440,6 +431,7 @@ function renderStewardMembers(appContainer) {
       filterSelect.addEventListener('change', rerender);
 
       function rerender() {
+        _memberListPage = 0;
         var q = searchInput.value.toLowerCase();
         var sortKey = sortSelect.value;
         var filterKey = filterSelect.value;
@@ -460,7 +452,7 @@ function renderStewardMembers(appContainer) {
         filtered.sort(function(a, b) {
           if (sortKey === 'name-za') return (b.name || '').localeCompare(a.name || '');
           if (sortKey === 'location') return (a.workLocation || '').localeCompare(b.workLocation || '');
-          if (sortKey === 'dues') return (a.duesStatus || '').localeCompare(b.duesStatus || '');
+
           return (a.name || '').localeCompare(b.name || '');
         });
         renderFilteredMembers(listArea, filtered, '');
@@ -469,6 +461,9 @@ function renderStewardMembers(appContainer) {
     }).dataGetStewardMembers(CURRENT_USER.email);
   });
 }
+
+var _memberListPage = 0;
+var _memberPageSize = 25;
 
 function renderFilteredMembers(container, members, query) {
   container.innerHTML = '';
@@ -483,7 +478,16 @@ function renderFilteredMembers(container, members, query) {
     return;
   }
 
-  filtered.forEach(function(m) {
+  // Reset to page 0 when query changes
+  if (query) _memberListPage = 0;
+
+  var totalPages = Math.ceil(filtered.length / _memberPageSize);
+  if (_memberListPage >= totalPages) _memberListPage = totalPages - 1;
+  if (_memberListPage < 0) _memberListPage = 0;
+  var start = _memberListPage * _memberPageSize;
+  var pageItems = filtered.slice(start, start + _memberPageSize);
+
+  pageItems.forEach(function(m) {
     var item = el('div', { className: 'member-list-item' });
     item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
     var info = el('div', { className: 'member-list-info' });
@@ -498,6 +502,26 @@ function renderFilteredMembers(container, members, query) {
     item.appendChild(badges);
     container.appendChild(item);
   });
+
+  // Pagination controls
+  if (totalPages > 1) {
+    var pager = el('div', { style: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '12px 0' } });
+    var prevBtn = el('button', {
+      className: 'btn', disabled: _memberListPage === 0,
+      style: { fontSize: '12px', padding: '6px 14px', opacity: _memberListPage === 0 ? '0.4' : '1' },
+      onClick: function() { _memberListPage--; renderFilteredMembers(container, members, query); },
+    }, '\u2190 Prev');
+    pager.appendChild(prevBtn);
+    pager.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)' } },
+      (start + 1) + '\u2013' + Math.min(start + _memberPageSize, filtered.length) + ' of ' + filtered.length));
+    var nextBtn = el('button', {
+      className: 'btn', disabled: _memberListPage >= totalPages - 1,
+      style: { fontSize: '12px', padding: '6px 14px', opacity: _memberListPage >= totalPages - 1 ? '0.4' : '1' },
+      onClick: function() { _memberListPage++; renderFilteredMembers(container, members, query); },
+    }, 'Next \u2192');
+    pager.appendChild(nextBtn);
+    container.appendChild(pager);
+  }
 }
 
 // ═══════════════════════════════════════
@@ -1267,6 +1291,7 @@ function renderStewardMore(appContainer) {
       { icon: '\uD83D\uDCDA', label: 'Resources', desc: 'Calendar, Drive, links', action: function() { renderStewardResources(document.getElementById('app')); } },
       { icon: '\u2753', label: 'Weekly Questions', desc: 'Manage weekly engagement questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'steward'); } },
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
+      { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { renderStewardDirectoryPage(document.getElementById('app')); } },
     ];
 
     menuItems.forEach(function(m) {
@@ -1665,6 +1690,275 @@ function renderWeeklyQuestionManager(appContainer) {
     }).wqGetPoolQuestions();
 
     container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// INSIGHTS PAGE (v4.15.0)
+// ═══════════════════════════════════════
+
+function renderInsightsPage(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'insights', function(container) {
+    _stewardHeader(container, 'Insights', 'Agency-wide analytics');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    var statsData = null, hotSpotsData = null;
+    function tryRender() {
+      if (statsData === null || hotSpotsData === null) return;
+      content.innerHTML = '';
+      if (!statsData || !statsData.available) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'Grievance stats not yet available (minimum 10 records needed).'));
+        return;
+      }
+      _renderQuickInsights(content, statsData, hotSpotsData);
+      _renderFiledVsResolved(content, statsData);
+    }
+
+    google.script.run.withSuccessHandler(function(stats) {
+      statsData = stats || { available: false };
+      tryRender();
+    }).withFailureHandler(function() {
+      statsData = { available: false };
+      tryRender();
+    }).dataGetAgencyGrievanceStats();
+
+    google.script.run.withSuccessHandler(function(spots) {
+      hotSpotsData = spots || [];
+      tryRender();
+    }).withFailureHandler(function() {
+      hotSpotsData = [];
+      tryRender();
+    }).dataGetGrievanceHotSpots();
+  });
+}
+
+function _insightCard(title, color, mainText, subText) {
+  var card = el('div', { className: 'card card-glass', style: {
+    padding: '16px 18px', borderLeft: '3px solid ' + color,
+    background: color + '08',
+  }});
+  card.appendChild(el('div', { style: {
+    fontFamily: 'var(--fontDisplay)', fontSize: '11px', fontWeight: '600',
+    color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px',
+  }}, title));
+  card.appendChild(el('div', { style: {
+    fontFamily: 'var(--fontDisplay)', fontSize: '24px', fontWeight: '700', color: color, lineHeight: '1.2',
+  }}, mainText));
+  if (subText) {
+    card.appendChild(el('div', { style: {
+      fontFamily: 'var(--fontBody)', fontSize: '11px', color: 'var(--muted)', marginTop: '6px', lineHeight: '1.4',
+    }}, subText));
+  }
+  return card;
+}
+
+function _renderQuickInsights(container, stats, hotSpots) {
+  var grid = el('div', { style: {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    gap: '10px', marginBottom: '16px',
+  }});
+
+  // Box 1: Grievance Status
+  var activeCount = stats.openCount || 0;
+  var statusSub = stats.total + ' total';
+  var parts = [];
+  if (stats.wonCount) parts.push(stats.wonCount + ' won');
+  if (stats.deniedCount) parts.push(stats.deniedCount + ' denied');
+  if (stats.settledCount) parts.push(stats.settledCount + ' settled');
+  if (parts.length) statusSub += ' \u00B7 ' + parts.join(', ');
+  grid.appendChild(_insightCard('GRIEVANCE STATUS', 'var(--info)', String(activeCount) + ' Active', statusSub));
+
+  // Box 2: Hot Spots
+  var hsCount = hotSpots ? hotSpots.length : 0;
+  var hsColor = hsCount > 0 ? 'var(--danger)' : 'var(--success)';
+  var hsSub = hsCount > 0
+    ? hotSpots.slice(0, 3).map(function(h) { return h.location + ' (' + h.count + ')'; }).join(', ')
+    : 'No concentration areas detected';
+  grid.appendChild(_insightCard('HOT SPOTS', hsColor, hsCount > 0 ? hsCount + ' Location' + (hsCount > 1 ? 's' : '') : 'All Clear', hsSub));
+
+  // Box 3: Step Distribution
+  var stepEntries = [];
+  if (stats.byStep) {
+    Object.keys(stats.byStep).forEach(function(k) { stepEntries.push({ step: k, count: stats.byStep[k] }); });
+    stepEntries.sort(function(a, b) { return b.count - a.count; });
+  }
+  var stepsWithCases = stepEntries.filter(function(e) { return e.count > 0; }).length;
+  var stepSub = stepEntries.slice(0, 3).map(function(e) { return e.step + ': ' + e.count; }).join(', ');
+  grid.appendChild(_insightCard('STEP DISTRIBUTION', 'var(--accent)', stepsWithCases + ' Step' + (stepsWithCases !== 1 ? 's' : ''), stepSub));
+
+  // Box 4: Top Issue Category
+  var catEntries = [];
+  if (stats.byCategory) {
+    Object.keys(stats.byCategory).forEach(function(k) { catEntries.push({ cat: k, count: stats.byCategory[k] }); });
+    catEntries.sort(function(a, b) { return b.count - a.count; });
+  }
+  var topCat = catEntries.length > 0 ? catEntries[0] : { cat: 'N/A', count: 0 };
+  grid.appendChild(_insightCard('TOP ISSUE CATEGORY', 'var(--warning)', topCat.cat, topCat.count + ' cases'));
+
+  container.appendChild(grid);
+}
+
+function _renderFiledVsResolved(container, stats) {
+  if (typeof ChartHelper === 'undefined' || !stats.monthly || stats.monthly.length === 0) return;
+
+  var chartCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '16px' } });
+  chartCard.appendChild(el('div', { style: {
+    fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600',
+    color: 'var(--text)', marginBottom: '12px',
+  }}, 'Filed vs Resolved'));
+
+  var labels = stats.monthly.map(function(m) { return m.month; });
+  var filedData = stats.monthly.map(function(m) { return m.count; });
+  var resolvedData = (stats.monthlyResolved || []).map(function(m) { return m.count; });
+
+  ChartHelper.createLineChart(chartCard, 'insights-filed-resolved', labels, [
+    { label: 'Filed', data: filedData, color: '#f59e0b' },
+    { label: 'Resolved', data: resolvedData, color: '#22c55e' },
+  ]);
+
+  container.appendChild(chartCard);
+}
+
+// ═══════════════════════════════════════
+// STEWARD DIRECTORY (steward role, v4.15.0)
+// ═══════════════════════════════════════
+
+function renderStewardDirectoryPage(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'stewarddirectory', function(container) {
+    _stewardHeader(container, CONFIG.stewardLabel + ' Directory', 'Contact your fellow stewards');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(stewards) {
+      content.innerHTML = '';
+      if (!stewards || stewards.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No ' + CONFIG.stewardLabel.toLowerCase() + 's found.'));
+        return;
+      }
+
+      // Search input
+      var searchInput = el('input', {
+        className: 'search-input',
+        placeholder: 'Search by name, location, or unit...',
+        onInput: function() { renderList(searchInput.value.toLowerCase(), activeLocFilter); },
+      });
+      content.appendChild(searchInput);
+
+      // Location quick-filter pills
+      var locs = {};
+      stewards.forEach(function(s) { if (s.workLocation) locs[s.workLocation] = (locs[s.workLocation] || 0) + 1; });
+      var topLocs = Object.keys(locs).sort(function(a, b) { return locs[b] - locs[a]; }).slice(0, 5);
+      var activeLocFilter = '';
+
+      var pillBar = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' } });
+      function renderPills() {
+        pillBar.innerHTML = '';
+        var clearPill = el('button', {
+          style: {
+            fontSize: '11px', padding: '4px 12px', borderRadius: '16px', fontWeight: '600', fontFamily: 'var(--fontBody)',
+            background: !activeLocFilter ? 'var(--accent)' : 'var(--surface)',
+            color: !activeLocFilter ? '#fff' : 'var(--muted)',
+            border: '1px solid ' + (!activeLocFilter ? 'var(--accent)' : 'var(--border)'),
+          },
+          onClick: function() { activeLocFilter = ''; renderPills(); renderList(searchInput.value.toLowerCase(), ''); },
+        }, 'All');
+        pillBar.appendChild(clearPill);
+        topLocs.forEach(function(loc) {
+          var pill = el('button', {
+            style: {
+              fontSize: '11px', padding: '4px 12px', borderRadius: '16px', fontWeight: '600', fontFamily: 'var(--fontBody)',
+              background: activeLocFilter === loc ? 'var(--accent)' : 'var(--surface)',
+              color: activeLocFilter === loc ? '#fff' : 'var(--muted)',
+              border: '1px solid ' + (activeLocFilter === loc ? 'var(--accent)' : 'var(--border)'),
+            },
+            onClick: function() { activeLocFilter = loc; renderPills(); renderList(searchInput.value.toLowerCase(), loc); },
+          }, loc);
+          pillBar.appendChild(pill);
+        });
+      }
+      if (topLocs.length > 1) {
+        renderPills();
+        content.appendChild(pillBar);
+      }
+
+      var listArea = el('div');
+      content.appendChild(listArea);
+
+      function renderList(query, locFilter) {
+        listArea.innerHTML = '';
+        var filtered = stewards.filter(function(s) {
+          if (locFilter && (s.workLocation || '') !== locFilter) return false;
+          if (!query) return true;
+          return (s.name || '').toLowerCase().indexOf(query) !== -1
+            || (s.workLocation || '').toLowerCase().indexOf(query) !== -1
+            || (s.unit || '').toLowerCase().indexOf(query) !== -1;
+        });
+
+        if (filtered.length === 0) {
+          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0', color: 'var(--muted)' } }, 'No matches.'));
+          return;
+        }
+
+        filtered.forEach(function(s, i) {
+          var card = el('div', {
+            className: 'card card-glass card-fade-in',
+            style: { padding: '14px 16px', marginBottom: '6px', cursor: 'pointer', animationDelay: (i * 0.04) + 's' },
+          });
+          var topRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px' } });
+          topRow.appendChild(el('div', { className: 'member-list-avatar' }, (s.name || 'S').charAt(0).toUpperCase()));
+          var info = el('div', { style: { flex: '1' } });
+          info.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, s.name || s.email));
+          var meta = [];
+          if (s.workLocation) meta.push(s.workLocation);
+          if (s.unit) meta.push(s.unit);
+          info.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, meta.join(' \u00B7 ')));
+          topRow.appendChild(info);
+          card.appendChild(topRow);
+
+          // Expandable details
+          var details = el('div', { style: { display: 'none', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
+          if (s.email) details.appendChild(el('a', { href: 'mailto:' + s.email, style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginBottom: '4px' } }, '\u2709\uFE0F ' + s.email));
+          if (s.phone) details.appendChild(el('a', { href: 'tel:' + s.phone, style: { display: 'block', fontSize: '12px', color: 'var(--success)', marginBottom: '4px' } }, '\uD83D\uDCDE ' + s.phone));
+          if (s.officeDays) details.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '6px' } }, '\uD83D\uDCC5 In-office: ' + s.officeDays));
+
+          // vCard download button
+          details.appendChild(el('button', {
+            style: { fontSize: '11px', padding: '6px 14px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', fontWeight: '600', marginTop: '4px' },
+            onClick: function(e) {
+              e.stopPropagation();
+              var vcf = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + (s.name || '') + '\n';
+              if (s.email) vcf += 'EMAIL:' + s.email + '\n';
+              if (s.phone) vcf += 'TEL:' + s.phone + '\n';
+              if (s.workLocation) vcf += 'ORG:' + (CONFIG.orgName || '') + ';' + s.workLocation + '\n';
+              if (s.unit) vcf += 'TITLE:' + CONFIG.stewardLabel + ' - ' + s.unit + '\n';
+              vcf += 'END:VCARD';
+              var blob = new Blob([vcf], { type: 'text/vcard' });
+              var url = URL.createObjectURL(blob);
+              var a = document.createElement('a');
+              a.href = url;
+              a.download = (s.name || 'contact').replace(/\s+/g, '_') + '.vcf';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            },
+          }, '\uD83D\uDCBE Save Contact'));
+          card.appendChild(details);
+
+          card.addEventListener('click', function() {
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+          });
+          listArea.appendChild(card);
+        });
+      }
+      renderList('', '');
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load directory.'));
+    }).dataGetStewardDirectory();
   });
 }
 </script>

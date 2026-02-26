@@ -535,7 +535,7 @@ describe('getQuarter_', () => {
   });
 
   test('April -> Q2', () => {
-    expect(getQuarter_(new Date('2026-04-01'))).toBe('2026-Q2');
+    expect(getQuarter_(new Date(2026, 3, 1))).toBe('2026-Q2');
   });
 
   test('June -> Q2', () => {
@@ -547,7 +547,7 @@ describe('getQuarter_', () => {
   });
 
   test('October -> Q4', () => {
-    expect(getQuarter_(new Date('2026-10-01'))).toBe('2026-Q4');
+    expect(getQuarter_(new Date(2026, 9, 1))).toBe('2026-Q4');
   });
 
   test('December -> Q4', () => {
@@ -650,13 +650,31 @@ describe('invalidateHeaderCache', () => {
 // ============================================================================
 
 describe('Expansion Column Engine', () => {
+  // Helper: create a mock sheet where getRange returns the actual headers
+  function setupExpansionMock(headers) {
+    const mockSheet = createMockSheet('Member Directory', [headers]);
+    // Override getRange to return proper header data for getHeaderMap
+    mockSheet.getRange = jest.fn(() => ({
+      getValues: jest.fn(() => [headers]),
+      getValue: jest.fn(),
+      setValue: jest.fn(),
+      setValues: jest.fn(),
+      setFontWeight: jest.fn(function() { return this; }),
+      setBackground: jest.fn(function() { return this; }),
+      setFontColor: jest.fn(function() { return this; })
+    }));
+    const mockSS = createMockSpreadsheet([mockSheet]);
+    globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
+    invalidateHeaderCache('Member Directory');
+    return mockSheet;
+  }
+
   describe('getExpansionColumnData', () => {
     test('is a function', () => {
       expect(typeof getExpansionColumnData).toBe('function');
     });
 
     test('returns object with extraHeaders, memberData, coreColumnCount', () => {
-      // Set up a mock sheet with core + 2 extra columns
       const headers = [];
       for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
         headers.push('Col' + i);
@@ -664,12 +682,7 @@ describe('Expansion Column Engine', () => {
       headers.push('Custom Field A');
       headers.push('Custom Field B');
 
-      const mockSheet = createMockSheet('Member Directory', [headers]);
-      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
-      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
-
-      // Invalidate cache so fresh read occurs
-      invalidateHeaderCache('Member Directory');
+      setupExpansionMock(headers);
 
       const result = getExpansionColumnData();
       expect(result).toHaveProperty('extraHeaders');
@@ -687,10 +700,7 @@ describe('Expansion Column Engine', () => {
       headers.push('Extra2');
       headers.push('Extra3');
 
-      const mockSheet = createMockSheet('Member Directory', [headers]);
-      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
-      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
-      invalidateHeaderCache('Member Directory');
+      setupExpansionMock(headers);
 
       const result = getExpansionColumnData();
       const extraNames = result.extraHeaders.map(h => h.name);
@@ -706,10 +716,7 @@ describe('Expansion Column Engine', () => {
         headers.push('CoreCol' + i);
       }
 
-      const mockSheet = createMockSheet('Member Directory', [headers]);
-      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
-      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
-      invalidateHeaderCache('Member Directory');
+      setupExpansionMock(headers);
 
       const result = getExpansionColumnData();
       expect(result.extraHeaders).toEqual([]);
@@ -724,10 +731,7 @@ describe('Expansion Column Engine', () => {
       headers.push('Zebra Field');
       headers.push('Alpha Field');
 
-      const mockSheet = createMockSheet('Member Directory', [headers]);
-      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
-      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
-      invalidateHeaderCache('Member Directory');
+      setupExpansionMock(headers);
 
       const result = getExpansionColumnData();
       for (let i = 1; i < result.extraHeaders.length; i++) {
@@ -742,10 +746,8 @@ describe('Expansion Column Engine', () => {
       for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
         headers.push('CoreCol' + i);
       }
-      const mockSheet = createMockSheet('Member Directory', [headers]);
-      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
-      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
-      invalidateHeaderCache('Member Directory');
+
+      setupExpansionMock(headers);
 
       const html = generateExpansionFieldsHtml();
       expect(html).toContain('No custom columns');
@@ -759,10 +761,7 @@ describe('Expansion Column Engine', () => {
       headers.push('Favorite Color');
       headers.push('Badge Number');
 
-      const mockSheet = createMockSheet('Member Directory', [headers]);
-      const mockSS = createMockSpreadsheet({ 'Member Directory': mockSheet });
-      globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
-      invalidateHeaderCache('Member Directory');
+      setupExpansionMock(headers);
 
       const html = generateExpansionFieldsHtml();
       expect(html).toContain('Favorite Color');

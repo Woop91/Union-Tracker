@@ -423,7 +423,15 @@ var DataService = (function () {
   function getAssignedStewardInfo(email) {
     var user = findUserByEmail(email);
     if (!user || !user.assignedSteward) return null;
+
+    // Try email lookup first
     var steward = findUserByEmail(user.assignedSteward);
+
+    // Fallback: if assignedSteward is a name (no '@'), scan by name
+    if (!steward && user.assignedSteward.indexOf('@') === -1) {
+      steward = _findUserByName(user.assignedSteward);
+    }
+
     if (!steward) return null;
     return {
       name: steward.name,
@@ -753,7 +761,8 @@ var DataService = (function () {
               }
             }
             var avg = qCount > 0 ? qSum / qCount : 0;
-            questionAvgs.push({ question: colIdx + 1, avg: Math.round(avg * 10) / 10 });
+            var text = sec.questionTexts && sec.questionTexts[q] ? sec.questionTexts[q] : '';
+            questionAvgs.push({ question: colIdx + 1, text: text, avg: Math.round(avg * 10) / 10 });
             totalScore += qSum;
             totalCount += qCount;
           }
@@ -872,6 +881,12 @@ var DataService = (function () {
     if (roleRaw === 'steward' || roleRaw === 'rep' || roleRaw === 'representative') role = 'steward';
     if (roleRaw === 'both' || roleRaw === 'steward/member') role = 'both';
 
+    // Also check the IS_STEWARD column (set by seed and manual entry)
+    var isStewardRaw = String(_getVal(row, colMap, HEADERS.memberIsSteward, '')).trim().toLowerCase();
+    if (isStewardRaw === 'yes' || isStewardRaw === 'true' || isStewardRaw === '1') {
+      if (role === 'member') role = 'steward';  // Upgrade role if only 'member'
+    }
+
     var hasGrievance = String(_getVal(row, colMap, HEADERS.memberHasOpenGrievance, '')).trim().toLowerCase();
 
     return {
@@ -897,6 +912,41 @@ var DataService = (function () {
       supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
       jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
     };
+  }
+
+  /**
+   * Finds a user by full name (case-insensitive).
+   * Used as fallback when assignedSteward contains a name instead of email.
+   * @param {string} name - Full name to search for
+   * @returns {Object|null} User record or null
+   */
+  function _findUserByName(name) {
+    if (!name) return null;
+    name = String(name).trim().toLowerCase();
+
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return null;
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var firstNameCol = _findColumn(colMap, HEADERS.memberFirstName);
+    var lastNameCol = _findColumn(colMap, HEADERS.memberLastName);
+    var fullNameCol = _findColumn(colMap, HEADERS.memberName);
+
+    for (var i = 1; i < data.length; i++) {
+      // Check full name column first
+      if (fullNameCol !== -1) {
+        var full = String(data[i][fullNameCol]).trim().toLowerCase();
+        if (full === name) return _buildUserRecord(data[i], colMap);
+      }
+      // Check first+last name combination
+      if (firstNameCol !== -1 && lastNameCol !== -1) {
+        var combined = (String(data[i][firstNameCol]).trim() + ' ' + String(data[i][lastNameCol]).trim()).toLowerCase();
+        if (combined === name) return _buildUserRecord(data[i], colMap);
+      }
+    }
+
+    return null;
   }
 
   function _buildGrievanceRecord(row, colMap) {
@@ -940,6 +990,18 @@ var DataService = (function () {
       status = 'overdue';
     }
 
+    // Parse closed date (same pattern as filed date above)
+    var closedRaw = _getVal(row, colMap, HEADERS.grievanceDateClosed, null);
+    var closedTimestamp = 0;
+    if (closedRaw instanceof Date) {
+      closedTimestamp = closedRaw.getTime();
+    } else if (closedRaw) {
+      var parsedClosed = new Date(closedRaw);
+      if (!isNaN(parsedClosed.getTime())) {
+        closedTimestamp = parsedClosed.getTime();
+      }
+    }
+
     return {
       id: String(_getVal(row, colMap, HEADERS.grievanceId, '')).trim(),
       memberEmail: String(_getVal(row, colMap, HEADERS.grievanceMemberEmail, '')).trim().toLowerCase(),
@@ -949,10 +1011,12 @@ var DataService = (function () {
       deadlineDays: deadlineDays,
       filed: filedFormatted,
       filedTimestamp: filedTimestamp,
+      closedTimestamp: closedTimestamp,
       steward: String(_getVal(row, colMap, HEADERS.grievanceSteward, '')).trim().toLowerCase(),
       unit: String(_getVal(row, colMap, HEADERS.grievanceUnit, '')).trim(),
       priority: String(_getVal(row, colMap, HEADERS.grievancePriority, 'medium')).trim().toLowerCase(),
       notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
+      issueCategory: String(_getVal(row, colMap, HEADERS.grievanceIssueCategory, '')).trim(),
     };
   }
 
@@ -1216,6 +1280,8 @@ var DataService = (function () {
     var byUnit = {};
     var byCategory = {};
     var monthly = {};
+    var monthlyResolved = {};
+    var openCount = 0, wonCount = 0, deniedCount = 0, settledCount = 0;
     for (var i = 1; i < data.length; i++) {
       var rec = _buildGrievanceRecord(data[i], colMap);
       var s = rec.status || 'unknown';
@@ -1226,14 +1292,37 @@ var DataService = (function () {
       byUnit[u] = (byUnit[u] || 0) + 1;
       var cat = rec.issueCategory || 'Uncategorized';
       byCategory[cat] = (byCategory[cat] || 0) + 1;
+      // Summary counts
+      if (s === 'won') wonCount++;
+      else if (s === 'denied') deniedCount++;
+      else if (s === 'settled') settledCount++;
+      else if (s !== 'resolved' && s !== 'withdrawn' && s !== 'closed') openCount++;
+      // Monthly filings
       if (rec.filedTimestamp) {
         var d = new Date(rec.filedTimestamp);
         var key = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
         monthly[key] = (monthly[key] || 0) + 1;
       }
+      // Monthly resolutions
+      if (rec.closedTimestamp) {
+        var dc = new Date(rec.closedTimestamp);
+        var rKey = dc.getFullYear() + '-' + ('0' + (dc.getMonth() + 1)).slice(-2);
+        monthlyResolved[rKey] = (monthlyResolved[rKey] || 0) + 1;
+      }
     }
-    var monthlyArr = Object.keys(monthly).sort().map(function(k) { return { month: k, count: monthly[k] }; });
-    return { available: true, total: total, byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory, monthly: monthlyArr };
+    // Merge month keys from both maps, sort, take last 12
+    var allMonths = {};
+    Object.keys(monthly).forEach(function(k) { allMonths[k] = true; });
+    Object.keys(monthlyResolved).forEach(function(k) { allMonths[k] = true; });
+    var sortedMonths = Object.keys(allMonths).sort().slice(-12);
+    var monthlyArr = sortedMonths.map(function(k) { return { month: k, count: monthly[k] || 0 }; });
+    var monthlyResolvedArr = sortedMonths.map(function(k) { return { month: k, count: monthlyResolved[k] || 0 }; });
+    return {
+      available: true, total: total,
+      byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory,
+      monthly: monthlyArr, monthlyResolved: monthlyResolvedArr,
+      openCount: openCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount,
+    };
   }
 
   function getGrievanceHotSpots() {

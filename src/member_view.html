@@ -81,7 +81,7 @@ function _getGreeting() {
 function renderMemberHome(appContainer) {
   renderPageLayout(appContainer, 'member', 'home', function(container) {
     var firstName = CURRENT_USER.firstName || CURRENT_USER.name.split(' ')[0] || 'there';
-    _memberHeader(container, _getGreeting() + ', ' + firstName, CURRENT_USER.unit + ' \u00B7 Since ' + (CURRENT_USER.joined || 'N/A'));
+    _memberHeader(container, _getGreeting() + ', ' + firstName, CURRENT_USER.unit);
 
     // Welcome card placeholder — shows on first visit
     var welcomeSlot = el('div');
@@ -142,7 +142,7 @@ function renderMemberHome(appContainer) {
       pastPreview.appendChild(previewCard);
     }).dataGetMemberGrievanceHistory(CURRENT_USER.email);
 
-    // Steward card (single card, no dues)
+    // Steward card
     var stewardCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px' } });
     stewardCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, 'Your ' + CONFIG.stewardLabel));
     var stewardName = el('div', { style: { fontSize: '13px', fontFamily: 'var(--fontDisplay)', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Loading...');
@@ -1351,15 +1351,31 @@ function renderSurveyResultsPage(appContainer) {
         content.appendChild(chartCard);
       }
 
-      // Individual section cards with numeric display
+      // Individual section cards with question breakout
       (data.sections || []).forEach(function(sec) {
         var secCard = el('div', { className: 'card card-glass card-accent-border', style: { padding: '16px', marginBottom: '10px' } });
         var avg = sec.avg || 0;
         var color = avg < 4 ? 'var(--danger)' : avg < 6 ? 'var(--warning)' : avg < 8 ? 'var(--success)' : '#22c55e';
-        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
-        row.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, sec.name));
-        row.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '20px', fontWeight: '700', color: color } }, avg.toFixed(1)));
-        secCard.appendChild(row);
+
+        // Section header row with overall average
+        var headerRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (sec.questions && sec.questions.length) ? '10px' : '0' } });
+        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, sec.name));
+        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '20px', fontWeight: '700', color: color } }, avg.toFixed(1)));
+        secCard.appendChild(headerRow);
+
+        // Individual question breakout
+        if (sec.questions && sec.questions.length > 0) {
+          sec.questions.forEach(function(q) {
+            if (!q.text) return;
+            var qAvg = q.avg || 0;
+            var qColor = qAvg < 4 ? 'var(--danger)' : qAvg < 6 ? 'var(--warning)' : qAvg < 8 ? 'var(--success)' : '#22c55e';
+            var qRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.05)' } });
+            qRow.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', flex: '1' } }, q.text));
+            qRow.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: qColor, marginLeft: '12px', minWidth: '32px', textAlign: 'right' } }, qAvg.toFixed(1)));
+            secCard.appendChild(qRow);
+          });
+        }
+
         content.appendChild(secCard);
       });
     }).dataGetSurveyResults();
@@ -2415,14 +2431,6 @@ function _renderMembershipStats(container) {
     container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.total + ' total members'));
 
     if (typeof ChartHelper !== 'undefined') {
-      // Dues pie
-      var dLabels = Object.keys(data.byDues);
-      var dData = dLabels.map(function(k) { return data.byDues[k]; });
-      var dCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
-      dCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Dues Status'));
-      ChartHelper.createDoughnutChart(dCard, 'membership-dues-chart', dLabels, dData);
-      container.appendChild(dCard);
-
       // Location bar
       var lLabels = Object.keys(data.byLocation);
       var lData = lLabels.map(function(k) { return data.byLocation[k]; });

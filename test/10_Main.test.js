@@ -11,6 +11,11 @@ const { loadSources } = require('./load-source');
 // Load in GAS load order — we need constants defined before Main
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs']);
 
+// Derive 0-indexed constants for row position validation
+const MEMBER_COLUMNS = Object.fromEntries(
+  Object.entries(MEMBER_COLS).map(([k, v]) => [k, v - 1])
+);
+
 // We can't fully load 10_Main.gs because it has heavy GAS dependencies,
 // so we test the key logic patterns by extracting them into isolated tests.
 

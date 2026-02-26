@@ -373,6 +373,7 @@
       if (role === 'steward') return [
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
         { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
+        { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
         { id: 'tasks', icon: '\u2705', label: 'Tasks' },
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
         { divider: true },
@@ -380,6 +381,7 @@
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
       ];
@@ -425,7 +427,8 @@
         switch(tabId) {
           case 'cases': renderStewardDashboard(app); break;
           case 'members': renderStewardMembers(app); break;
-          case 'deadlines': renderStewardDashboard(app); break;
+          case 'insights': renderInsightsPage(app); break;
+          case 'stewarddirectory': renderStewardDirectoryPage(app); break;
           case 'broadcast': renderBroadcast(app); break;
           case 'notifications': renderStewardNotifications(app); break;
           case 'resources': renderStewardResources(app); break;

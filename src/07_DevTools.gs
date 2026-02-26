@@ -173,12 +173,14 @@ function SEED_SAMPLE_DATA() {
     '🚀 Seed Sample Data',
     'This will seed:\n' +
     '• Config dropdowns (Job Titles, Locations, etc.)\n' +
-    '• 1,000 sample members\n' +
+    '• 1,000 sample members (with addresses & dues status)\n' +
     '• 300 sample grievances (30%)\n' +
+    '• Script owner as dual-role test user\n' +
+    '• 25 contact log entries\n' +
     '• 50 sample survey responses\n' +
     '• 3 sample feedback entries\n' +
     '• Survey completion tracking data\n' +
-    '• 12 calendar events (meetings, trainings, socials)\n' +
+    '• 15 calendar events (meetings, trainings, socials)\n' +
     '• 22 weekly engagement questions + responses\n' +
     '• Union stats snapshots (engagement, trends, workload)\n' +
     '• Resources (Know Your Rights, grievance guides, policies)\n' +
@@ -200,6 +202,13 @@ function SEED_SAMPLE_DATA() {
 
   ss.toast('Seeding 1,000 members + 300 grievances (this may take a moment)...', '🌱 Seeding', 10);
   SEED_MEMBERS(1000, 30);
+
+  // Add script owner as a dual-role test user so the logged-in dev can test the SPA
+  ss.toast('Adding script owner as test member...', '🌱 Seeding', 2);
+  seedScriptOwnerMember_(ss);
+
+  ss.toast('Seeding contact log entries...', '🌱 Seeding', 2);
+  seedContactLogData();
 
   ss.toast('Seeding survey responses...', '🌱 Seeding', 2);
   seedSatisfactionData();
@@ -234,12 +243,14 @@ function SEED_SAMPLE_DATA() {
   ss.toast('Sample data seeded successfully!', '✅ Success', 5);
   ui.alert('✅ Success', 'Sample data has been seeded!\n\n' +
     '• Config dropdowns populated\n' +
-    '• 1,000 members added\n' +
+    '• 1,000 members added (with addresses & dues)\n' +
     '• 300 grievances added (30%)\n' +
+    '• Script owner added as test steward\n' +
+    '• 25 contact log entries\n' +
     '• 50 survey responses added\n' +
     '• 3 feedback entries added\n' +
     '• Survey tracking populated\n' +
-    '• 12 calendar events created\n' +
+    '• 15 calendar events created\n' +
     '• 22 weekly questions + sample responses\n' +
     '• Union stats data seeded\n' +
     '• Resources expanded (Know Your Rights, guides, policies)\n' +
@@ -1009,11 +1020,29 @@ function SEED_MEMBERS(count, grievancePercent) {
     }
   }
 
-  var rows = [];
+  var allRows = [];
   var seededIds = []; // Track IDs for this seeding session
   var batchSize = 50;
   var today = new Date();
 
+  // Sample contact notes for members who have been contacted
+  var sampleContactNotes = [
+    'Discussed workload concerns',
+    'Follow up on scheduling issue',
+    'Interested in becoming steward',
+    'Addressed safety complaint',
+    'Positive feedback received',
+    'Needs info on benefits',
+    'Question about contract language',
+    'Planning to attend next meeting',
+    'Grievance update provided',
+    'Initial outreach - new member',
+    'Discussed upcoming negotiations',
+    'Shared resources on workplace rights',
+    'Scheduling meeting for next week'
+  ];
+
+  // First pass: generate all member rows
   for (var i = 0; i < count; i++) {
     var firstName = randomChoice(firstNames);
     var lastName = randomChoice(lastNames);
@@ -1023,29 +1052,11 @@ function SEED_MEMBERS(count, grievancePercent) {
     var email = firstName.toLowerCase() + '.' + lastName.toLowerCase() + '.' + memberId.toLowerCase() + '@example.org';
     var phone = '617-555-' + String(Math.floor(Math.random() * 9000) + 1000);
     var isSteward = Math.random() < 0.1 ? 'Yes' : 'No';
-    var assignedSteward = randomChoice(stewards);
 
     // Generate recent contact data (50% chance of having recent contact)
     var hasRecentContact = Math.random() < 0.5;
     var recentContactDate = hasRecentContact ? randomDate(new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000), today) : '';
-    var contactSteward = hasRecentContact ? assignedSteward : '';
-
-    // Sample contact notes for members who have been contacted
-    var sampleContactNotes = [
-      'Discussed workload concerns',
-      'Follow up on scheduling issue',
-      'Interested in becoming steward',
-      'Addressed safety complaint',
-      'Positive feedback received',
-      'Needs info on benefits',
-      'Question about contract language',
-      'Planning to attend next meeting',
-      'Grievance update provided',
-      'Initial outreach - new member',
-      'Discussed upcoming negotiations',
-      'Shared resources on workplace rights',
-      'Scheduling meeting for next week'
-    ];
+    var contactSteward = hasRecentContact ? randomChoice(stewards) : '';
     var contactNotes = hasRecentContact ? randomChoice(sampleContactNotes) : '';
 
     var row = generateSingleMemberRow(
@@ -1061,21 +1072,35 @@ function SEED_MEMBERS(count, grievancePercent) {
       randomChoice(managers),
       isSteward,
       isSteward === 'Yes' ? randomChoice(committees) : '',
-      assignedSteward,
+      '', // assignedSteward — set in second pass
       recentContactDate,
       contactSteward,
       contactNotes
     );
 
-    rows.push(row);
+    allRows.push(row);
+  }
 
-    // Write in batches
-    if (rows.length >= batchSize || i === count - 1) {
-      sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
-      startRow += rows.length;
-      rows = [];
-      Utilities.sleep(100);
+  // Second pass: collect steward emails and assign to non-steward members
+  var stewardEmails = [];
+  for (var s = 0; s < allRows.length; s++) {
+    if (allRows[s][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+      stewardEmails.push(allRows[s][MEMBER_COLS.EMAIL - 1]);
     }
+  }
+  // Fallback: if no stewards generated (unlikely), use first member's email
+  if (stewardEmails.length === 0) stewardEmails.push(allRows[0][MEMBER_COLS.EMAIL - 1]);
+
+  for (var a = 0; a < allRows.length; a++) {
+    allRows[a][MEMBER_COLS.ASSIGNED_STEWARD - 1] = randomChoice(stewardEmails);
+  }
+
+  // Write all rows in batches
+  for (var b = 0; b < allRows.length; b += batchSize) {
+    var batch = allRows.slice(b, Math.min(b + batchSize, allRows.length));
+    sheet.getRange(startRow, 1, batch.length, batch[0].length).setValues(batch);
+    startRow += batch.length;
+    Utilities.sleep(100);
   }
 
   // Re-apply checkboxes to Start Grievance column (AE) - setValues overwrites them
@@ -1177,11 +1202,19 @@ function SEED_MEMBERS_ONLY(count) {
     }
   }
 
-  var rows = [];
+  var allRows = [];
   var seededIds = [];
   var batchSize = 100; // Larger batches for 1000 members
   var today = new Date();
 
+  var sampleContactNotes = [
+    'Discussed workload concerns', 'Follow up on scheduling issue', 'Interested in becoming steward',
+    'Addressed safety complaint', 'Positive feedback received', 'Needs info on benefits',
+    'Question about contract language', 'Planning to attend next meeting', 'Grievance update provided',
+    'Initial outreach - new member', 'Discussed upcoming negotiations', 'Shared resources on workplace rights'
+  ];
+
+  // First pass: generate all member rows
   for (var i = 0; i < count; i++) {
     var firstName = randomChoice(firstNames);
     var lastName = randomChoice(lastNames);
@@ -1191,18 +1224,10 @@ function SEED_MEMBERS_ONLY(count) {
     var email = firstName.toLowerCase() + '.' + lastName.toLowerCase() + '.' + memberId.toLowerCase() + '@example.org';
     var phone = '617-555-' + String(Math.floor(Math.random() * 9000) + 1000);
     var isSteward = Math.random() < 0.1 ? 'Yes' : 'No';
-    var assignedSteward = randomChoice(stewards);
 
     var hasRecentContact = Math.random() < 0.5;
     var recentContactDate = hasRecentContact ? randomDate(new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000), today) : '';
-    var contactSteward = hasRecentContact ? assignedSteward : '';
-
-    var sampleContactNotes = [
-      'Discussed workload concerns', 'Follow up on scheduling issue', 'Interested in becoming steward',
-      'Addressed safety complaint', 'Positive feedback received', 'Needs info on benefits',
-      'Question about contract language', 'Planning to attend next meeting', 'Grievance update provided',
-      'Initial outreach - new member', 'Discussed upcoming negotiations', 'Shared resources on workplace rights'
-    ];
+    var contactSteward = hasRecentContact ? randomChoice(stewards) : '';
     var contactNotes = hasRecentContact ? randomChoice(sampleContactNotes) : '';
 
     var row = generateSingleMemberRow(
@@ -1210,19 +1235,32 @@ function SEED_MEMBERS_ONLY(count) {
       randomChoice(jobTitles), randomChoice(locations), randomChoice(units), randomChoice(officeDays),
       email, phone, randomChoice(commMethods), 'Morning',
       randomChoice(supervisors), randomChoice(managers),
-      isSteward, isSteward === 'Yes' ? randomChoice(committees) : '', assignedSteward,
+      isSteward, isSteward === 'Yes' ? randomChoice(committees) : '', '',
       recentContactDate, contactSteward, contactNotes
     );
 
-    rows.push(row);
+    allRows.push(row);
+  }
 
-    // Write in batches
-    if (rows.length >= batchSize || i === count - 1) {
-      sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
-      startRow += rows.length;
-      rows = [];
-      Utilities.sleep(50);
+  // Second pass: collect steward emails and assign to all members
+  var stewardEmails = [];
+  for (var s = 0; s < allRows.length; s++) {
+    if (allRows[s][MEMBER_COLS.IS_STEWARD - 1] === 'Yes') {
+      stewardEmails.push(allRows[s][MEMBER_COLS.EMAIL - 1]);
     }
+  }
+  if (stewardEmails.length === 0) stewardEmails.push(allRows[0][MEMBER_COLS.EMAIL - 1]);
+
+  for (var a = 0; a < allRows.length; a++) {
+    allRows[a][MEMBER_COLS.ASSIGNED_STEWARD - 1] = randomChoice(stewardEmails);
+  }
+
+  // Write all rows in batches
+  for (var b = 0; b < allRows.length; b += batchSize) {
+    var batch = allRows.slice(b, Math.min(b + batchSize, allRows.length));
+    sheet.getRange(startRow, 1, batch.length, batch[0].length).setValues(batch);
+    startRow += batch.length;
+    Utilities.sleep(50);
   }
 
   // Re-apply checkboxes
@@ -1246,7 +1284,7 @@ function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, locati
   var lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   // Build row sized to the last MEMBER_COLS column, filled with empty strings
-  var maxCol = MEMBER_COLS.STATE; // last defined column
+  var maxCol = MEMBER_COLS.DUES_STATUS; // last defined column (after ZIP_CODE)
   var row = [];
   for (var i = 0; i < maxCol; i++) { row.push(''); }
 
@@ -1295,6 +1333,20 @@ function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, locati
   // HAS_OPEN_GRIEVANCE, GRIEVANCE_STATUS, NEXT_DEADLINE left as ''
   row[MEMBER_COLS.START_GRIEVANCE - 1] = false;
 
+  // Address Data (sample MA addresses)
+  var streets = ['123 Main St', '456 Oak Ave', '789 Elm Blvd', '321 Park Rd', '654 Cedar Ln',
+    '987 Maple Dr', '147 Pine Way', '258 Birch Ct', '369 Walnut St', '741 Spruce Ave'];
+  var cities = ['Boston', 'Worcester', 'Springfield', 'Cambridge', 'Lowell',
+    'Brockton', 'Quincy', 'New Bedford', 'Fall River', 'Lawrence'];
+  row[MEMBER_COLS.STREET_ADDRESS - 1] = randomChoice(streets);
+  row[MEMBER_COLS.CITY - 1] = randomChoice(cities);
+  row[MEMBER_COLS.STATE - 1] = 'MA';
+  row[MEMBER_COLS.ZIP_CODE - 1] = '0' + String(Math.floor(Math.random() * 9000) + 1000);
+
+  // Dues Status
+  var duesStatuses = ['Current', 'Current', 'Current', 'Current', 'Past Due', 'Inactive'];
+  row[MEMBER_COLS.DUES_STATUS - 1] = randomChoice(duesStatuses);
+
   return row;
 }
 
@@ -1332,9 +1384,15 @@ function SEED_GRIEVANCES(count) {
   var categories = DEFAULT_CONFIG.ISSUE_CATEGORY;
   var articles = DEFAULT_CONFIG.ARTICLES;
 
-  // Get config values for stewards
-  var stewards = getConfigValues(configSheet, CONFIG_COLS.STEWARDS);
-  if (stewards.length === 0) stewards = ['Mary Steward'];
+  // Collect steward emails from Member Directory (not Config names)
+  var stewardEmails = [];
+  for (var se = 1; se < memberData.length; se++) {
+    if (String(memberData[se][MEMBER_COLS.IS_STEWARD - 1]).trim().toLowerCase() === 'yes') {
+      var sEmail = String(memberData[se][MEMBER_COLS.EMAIL - 1]).trim();
+      if (sEmail) stewardEmails.push(sEmail);
+    }
+  }
+  if (stewardEmails.length === 0) stewardEmails.push('steward@example.org');
 
   var startRow = Math.max(grievanceSheet.getLastRow() + 1, 2);
 
@@ -1390,7 +1448,7 @@ function SEED_GRIEVANCES(count) {
     var memberEmail = memberRow[MEMBER_COLS.EMAIL - 1] || '';
     var memberUnit = memberRow[MEMBER_COLS.UNIT - 1] || '';
     var memberLocation = memberRow[MEMBER_COLS.WORK_LOCATION - 1] || '';
-    var memberSteward = memberRow[MEMBER_COLS.ASSIGNED_STEWARD - 1] || randomChoice(stewards);
+    var memberSteward = memberRow[MEMBER_COLS.ASSIGNED_STEWARD - 1] || randomChoice(stewardEmails);
 
     var grievanceId = generateNameBasedId('G', firstName, lastName, existingGrievanceIds);
     existingGrievanceIds[grievanceId] = true;
@@ -1690,11 +1748,174 @@ function seed25Grievances() {
 }
 
 // ============================================================================
+// SEED: SCRIPT OWNER AS TEST MEMBER
+// ============================================================================
+
+/**
+ * Adds the script owner (logged-in developer) as a steward member in the
+ * Member Directory so they can test the SPA without manually creating a row.
+ * Assigns a random steward email from existing seeded members.
+ * @param {Spreadsheet} ss - Active spreadsheet
+ * @private
+ */
+function seedScriptOwnerMember_(ss) {
+  var ownerEmail;
+  try {
+    ownerEmail = Session.getActiveUser().getEmail();
+  } catch (e) {
+    Logger.log('Could not get script owner email: ' + e.message);
+    return;
+  }
+  if (!ownerEmail) {
+    Logger.log('Script owner email is empty. Skipping owner seed.');
+    return;
+  }
+
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet || memberSheet.getLastRow() < 2) return;
+
+  // Check if owner already exists
+  var existingData = memberSheet.getDataRange().getValues();
+  for (var i = 1; i < existingData.length; i++) {
+    if (String(existingData[i][MEMBER_COLS.EMAIL - 1]).trim().toLowerCase() === ownerEmail.toLowerCase()) {
+      Logger.log('Script owner already exists in Member Directory. Skipping.');
+      return;
+    }
+  }
+
+  // Find a steward email from existing members for assignment
+  var stewardEmails = [];
+  for (var j = 1; j < existingData.length; j++) {
+    if (String(existingData[j][MEMBER_COLS.IS_STEWARD - 1]).trim().toLowerCase() === 'yes') {
+      stewardEmails.push(String(existingData[j][MEMBER_COLS.EMAIL - 1]).trim());
+    }
+  }
+  var assignedStewardEmail = stewardEmails.length > 0 ? randomChoice(stewardEmails) : '';
+
+  var ownerRow = generateSingleMemberRow(
+    'M-OWNER', 'Test', 'Admin', 'Program Manager',
+    'Boston Main Office', 'Administration', 'Mon, Tue, Wed, Thu, Fri',
+    ownerEmail, '617-555-0001', 'Email', 'Morning',
+    'Maria Rodriguez', 'Patricia Thompson', 'Yes', 'Executive Board',
+    assignedStewardEmail,
+    '', '', '' // no recent contact tracking
+  );
+
+  memberSheet.getRange(memberSheet.getLastRow() + 1, 1, 1, ownerRow.length).setValues([ownerRow]);
+  trackSeededMemberId('M-OWNER');
+  Logger.log('Added script owner (' + ownerEmail + ') as test steward member');
+}
+
+// ============================================================================
+// SEED: CONTACT LOG
+// ============================================================================
+
+/**
+ * Seeds 25 sample contact log entries between stewards and their assigned members.
+ * Uses the _Contact_Log sheet with columns: [ID, Steward Email, Member Email, Contact Type, Date, Notes, Duration, Created]
+ */
+function seedContactLogData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  if (!memberSheet || memberSheet.getLastRow() < 2) {
+    Logger.log('Member Directory empty. Skipping contact log seed.');
+    return;
+  }
+
+  // Ensure the contact log sheet exists
+  var clSheet = ss.getSheetByName(SHEETS.CONTACT_LOG);
+  if (!clSheet) {
+    clSheet = ss.insertSheet(SHEETS.CONTACT_LOG);
+    clSheet.getRange(1, 1, 1, 8).setValues([['ID', 'Steward Email', 'Member Email', 'Contact Type', 'Date', 'Notes', 'Duration', 'Created']]);
+    clSheet.hideSheet();
+  }
+
+  // Skip if already has data
+  if (clSheet.getLastRow() > 1) {
+    Logger.log('Contact log already has data. Skipping seed.');
+    return;
+  }
+
+  // Collect steward emails and their assigned member emails
+  var memberData = memberSheet.getDataRange().getValues();
+  var stewardEmailList = [];
+  var membersByAssignment = {};
+
+  for (var i = 1; i < memberData.length; i++) {
+    var email = String(memberData[i][MEMBER_COLS.EMAIL - 1]).trim().toLowerCase();
+    var isSteward = String(memberData[i][MEMBER_COLS.IS_STEWARD - 1]).trim().toLowerCase();
+    var assignedSteward = String(memberData[i][MEMBER_COLS.ASSIGNED_STEWARD - 1]).trim().toLowerCase();
+
+    if (isSteward === 'yes') {
+      stewardEmailList.push(email);
+    }
+    if (assignedSteward && email) {
+      if (!membersByAssignment[assignedSteward]) membersByAssignment[assignedSteward] = [];
+      membersByAssignment[assignedSteward].push(email);
+    }
+  }
+
+  if (stewardEmailList.length === 0) {
+    Logger.log('No stewards found. Skipping contact log seed.');
+    return;
+  }
+
+  var contactTypes = ['Phone', 'Email', 'In Person', 'Text'];
+  var contactNotes = [
+    'Discussed upcoming contract changes and answered questions.',
+    'Follow-up on workload concerns raised last week.',
+    'Checked in about scheduling conflict with supervisor.',
+    'Provided info on grievance filing process.',
+    'Welcomed new member and explained union benefits.',
+    'Addressed safety concern in the workplace.',
+    'Discussed open enrollment benefits options.',
+    'Followed up on resolved grievance outcome.',
+    'Planning for upcoming membership meeting.',
+    'Shared know-your-rights materials.',
+    'Discussed concerns about overtime expectations.',
+    'Helped member understand FMLA protections.',
+    'Addressed question about union dues.',
+    'Provided update on ongoing negotiations.',
+    'Checked in after return from leave.',
+  ];
+  var durations = ['5 min', '10 min', '15 min', '20 min', '30 min', '45 min'];
+
+  var now = new Date();
+  var rows = [];
+
+  for (var c = 0; c < 25; c++) {
+    var stewardEmail = randomChoice(stewardEmailList);
+    var assignedMembers = membersByAssignment[stewardEmail];
+    var memberEmail = (assignedMembers && assignedMembers.length > 0) ?
+      randomChoice(assignedMembers) :
+      randomChoice(stewardEmailList); // fallback to another steward
+
+    var daysAgo = Math.floor(Math.random() * 60); // within last 60 days
+    var contactDate = new Date(now.getTime() - daysAgo * 86400000);
+    contactDate.setHours(Math.floor(Math.random() * 8) + 9, Math.floor(Math.random() * 60), 0, 0); // 9am-5pm
+
+    rows.push([
+      'CL_SEED_' + (c + 1),
+      stewardEmail,
+      memberEmail,
+      randomChoice(contactTypes),
+      contactDate,
+      randomChoice(contactNotes),
+      randomChoice(durations),
+      contactDate
+    ]);
+  }
+
+  clSheet.getRange(2, 1, rows.length, 8).setValues(rows);
+  Logger.log('Seeded ' + rows.length + ' contact log entries');
+}
+
+// ============================================================================
 // SEED: CALENDAR EVENTS
 // ============================================================================
 
 /**
- * Seeds 12 fictional calendar events (union meetings, trainings, social events)
+ * Seeds 15 fictional calendar events (union meetings, trainings, social events)
  * into the org's Google Calendar. Stores created event IDs for nuke cleanup.
  */
 function seedCalendarEvents() {
@@ -1721,6 +1942,9 @@ function seedCalendarEvents() {
     { title: 'Member Appreciation Cookout', offsetDays: 42, hour: 16, durationHrs: 3, desc: 'Annual summer cookout. Bring your family!' },
     { title: 'Know Your Rights Lunch & Learn', offsetDays: 25, hour: 12, durationHrs: 1, desc: 'Weingarten rights, FMLA, and ADA protections overview.' },
     { title: 'Quarterly All-Hands Town Hall', offsetDays: 30, hour: 17, durationHrs: 1.5, desc: 'Union president report, financial update, open floor Q&A.' },
+    { title: 'Community Volunteering Day', offsetDays: 45, hour: 9, durationHrs: 4, desc: 'Join fellow members for a community service project.' },
+    { title: 'New Contract Ratification Vote', offsetDays: 50, hour: 17, durationHrs: 2, desc: 'Critical vote on the new collective bargaining agreement. All members eligible to vote.' },
+    { title: 'Steward Appreciation Dinner', offsetDays: 55, hour: 18, durationHrs: 3, desc: 'Annual dinner recognizing our stewards. RSVPs required.' },
   ];
 
   var createdIds = [];
@@ -1781,39 +2005,49 @@ function seedWeeklyQuestions() {
     { q: 'How well does management handle employee concerns?', cat: 'Management' },
   ];
 
-  // Write pool: [Question, Category, AddedDate, TimesUsed, LastUsed]
+  // Write pool — matches 24_WeeklyQuestions.gs initWeeklyQuestionSheets():
+  // [ID, Text, Submitted By Hash, Status, Created]
   var poolHeaders = poolSheet.getRange(1, 1, 1, 5).getValues()[0];
   if (!poolHeaders[0]) {
-    poolSheet.getRange(1, 1, 1, 5).setValues([['Question', 'Category', 'Added Date', 'Times Used', 'Last Used']]);
+    poolSheet.getRange(1, 1, 1, 5).setValues([['ID', 'Text', 'Submitted By Hash', 'Status', 'Created']]);
   }
 
-  var poolRows = questions.map(function(q) {
-    return [q.q, q.cat, new Date(), 0, ''];
+  var poolRows = questions.map(function(q, idx) {
+    var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-pool-' + idx)
+      .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+    return ['WP_SEED_' + (idx + 1), q.q, fakeHash, 'pending', new Date()];
   });
   poolSheet.getRange(2, 1, poolRows.length, 5).setValues(poolRows);
 
   // --- Active Weekly Questions (pick 2) ---
+  // Matches 24_WeeklyQuestions.gs: [ID, Text, Source, Submitted By, Week Start, Active, Created]
   var wqSheet = ss.getSheetByName(SHEETS.WEEKLY_QUESTIONS);
   if (wqSheet) {
-    var wqHeaders = wqSheet.getRange(1, 1, 1, 6).getValues()[0];
+    var wqHeaders = wqSheet.getRange(1, 1, 1, 7).getValues()[0];
     if (!wqHeaders[0]) {
-      wqSheet.getRange(1, 1, 1, 6).setValues([['Question ID', 'Question', 'Category', 'Start Date', 'End Date', 'Status']]);
+      wqSheet.getRange(1, 1, 1, 7).setValues([['ID', 'Text', 'Source', 'Submitted By', 'Week Start', 'Active', 'Created']]);
     }
     var now = new Date();
-    var weekEnd = new Date(now.getTime() + 7 * 86400000);
+    var weekStart = new Date(now);
+    weekStart.setHours(0, 0, 0, 0);
+    var day = weekStart.getDay();
+    weekStart.setDate(weekStart.getDate() - day + (day === 0 ? -6 : 1)); // Monday
+    var weekStr = weekStart.toISOString().split('T')[0];
+
     var activeQs = [
-      ['WQ-001', questions[0].q, questions[0].cat, now, weekEnd, 'Active'],
-      ['WQ-002', questions[6].q, questions[6].cat, now, weekEnd, 'Active'],
+      ['WQ-001', questions[0].q, 'steward', '', weekStr, 'TRUE', now],
+      ['WQ-002', questions[6].q, 'pool', '', weekStr, 'TRUE', now],
     ];
-    wqSheet.getRange(2, 1, 2, 6).setValues(activeQs);
+    wqSheet.getRange(2, 1, 2, 7).setValues(activeQs);
   }
 
   // --- Sample Responses (10 anonymous responses per question) ---
+  // Matches 24_WeeklyQuestions.gs: [ID, Question ID, Email Hash, Response, Timestamp]
   var wrSheet = ss.getSheetByName(SHEETS.WEEKLY_RESPONSES);
   if (wrSheet) {
     var wrHeaders = wrSheet.getRange(1, 1, 1, 5).getValues()[0];
     if (!wrHeaders[0]) {
-      wrSheet.getRange(1, 1, 1, 5).setValues([['Question ID', 'Response Hash', 'Response', 'Timestamp', 'Voted']]);
+      wrSheet.getRange(1, 1, 1, 5).setValues([['ID', 'Question ID', 'Email Hash', 'Response', 'Timestamp']]);
     }
 
     var sampleResponses = {
@@ -1840,7 +2074,8 @@ function seedWeeklyQuestions() {
       sampleResponses[qId].forEach(function(resp, idx) {
         var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-user-' + idx + '-' + qId)
           .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
-        responseRows.push([qId, fakeHash, resp, new Date(now.getTime() - idx * 3600000), 'Yes']);
+        var respId = 'WR_SEED_' + qId + '_' + (idx + 1);
+        responseRows.push([respId, qId, fakeHash, resp, new Date(now.getTime() - idx * 3600000)]);
       });
     });
 
