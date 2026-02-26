@@ -89,24 +89,59 @@ function renderStewardDashboard(appContainer) {
     container.appendChild(welcomeSlot);
     _maybeShowWelcome(welcomeSlot, 'steward');
 
-    // KPIs
+    // KPIs — show org-wide fallback if steward has 0 assigned cases
     var kpis = AppState.kpis || {};
     var kpiGrid = el('div', { className: 'kpi-grid' });
-    var kpiItems = [
-      { label: 'My Cases', value: kpis.totalCases || 0 },
-      { label: 'Overdue', value: kpis.overdue || 0, color: kpis.overdue > 0 ? 'var(--danger)' : null },
-      { label: 'Due <7d', value: kpis.dueSoon || 0, color: kpis.dueSoon > 0 ? 'var(--warning)' : null },
-      { label: 'Resolved', value: kpis.resolved || 0, color: 'var(--success)' },
-    ];
-    kpiItems.forEach(function(kpi) {
-      var card = el('div', { className: 'kpi-card' });
-      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
-      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
-      if (kpi.color) val.style.color = kpi.color;
-      card.appendChild(val);
-      kpiGrid.appendChild(card);
-    });
-    container.appendChild(kpiGrid);
+    var isOrgFallback = (kpis.totalCases || 0) === 0;
+
+    if (isOrgFallback) {
+      // Fetch org-wide stats asynchronously, update KPIs when ready
+      var kpiItems = [
+        { label: 'Org Cases', value: '...', color: null },
+        { label: 'Org Overdue', value: '...', color: null },
+        { label: 'Org Due <7d', value: '...', color: null },
+        { label: 'Org Resolved', value: '...', color: 'var(--success)' },
+      ];
+      kpiItems.forEach(function(kpi) {
+        var card = el('div', { className: 'kpi-card' });
+        card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+        var val = el('div', { className: 'kpi-value' }, kpi.value);
+        if (kpi.color) val.style.color = kpi.color;
+        card.appendChild(val);
+        kpiGrid.appendChild(card);
+      });
+      container.appendChild(kpiGrid);
+
+      // Subtext
+      var orgNote = el('div', { style: { textAlign: 'center', fontSize: '11px', color: 'var(--muted)', marginTop: '-6px', marginBottom: '10px' } }, '(no cases assigned to you — showing org-wide)');
+      container.appendChild(orgNote);
+
+      // Fill in org-wide stats
+      google.script.run.withSuccessHandler(function(stats) {
+        if (!stats || !stats.available) return;
+        var cards = kpiGrid.querySelectorAll('.kpi-value');
+        if (cards[0]) cards[0].textContent = String(stats.total || 0);
+        if (cards[1]) { cards[1].textContent = String(stats.overdueCount || 0); if (stats.overdueCount > 0) cards[1].style.color = 'var(--danger)'; }
+        if (cards[2]) { cards[2].textContent = String(stats.dueSoonCount || 0); if (stats.dueSoonCount > 0) cards[2].style.color = 'var(--warning)'; }
+        if (cards[3]) cards[3].textContent = String(stats.settledCount || stats.wonCount || 0);
+      }).dataGetGrievanceStats();
+    } else {
+      var kpiItems = [
+        { label: 'My Cases', value: kpis.totalCases || 0 },
+        { label: 'Overdue', value: kpis.overdue || 0, color: kpis.overdue > 0 ? 'var(--danger)' : null },
+        { label: 'Due <7d', value: kpis.dueSoon || 0, color: kpis.dueSoon > 0 ? 'var(--warning)' : null },
+        { label: 'Resolved', value: kpis.resolved || 0, color: 'var(--success)' },
+      ];
+      kpiItems.forEach(function(kpi) {
+        var card = el('div', { className: 'kpi-card' });
+        card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+        var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+        if (kpi.color) val.style.color = kpi.color;
+        card.appendChild(val);
+        kpiGrid.appendChild(card);
+      });
+      container.appendChild(kpiGrid);
+    }
 
     // Filter bar
     var filter = 'all';
@@ -374,17 +409,18 @@ function renderStewardMembers(appContainer) {
     google.script.run.withSuccessHandler(function(members) {
       content.innerHTML = '';
       if (!members || members.length === 0) {
-        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'No members assigned.'));
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)' } }, 'No members found.'));
         return;
       }
 
       // KPI strip
+      var myCount = members.filter(function(m) { return m.assignedSteward && m.assignedSteward.toLowerCase() === CURRENT_USER.email.toLowerCase(); }).length;
       var activeGrievances = members.filter(function(m) { return m.hasOpenGrievance; }).length;
       var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
       [
-        { label: 'Assigned', value: members.length },
+        { label: 'Total', value: members.length },
         { label: 'Active Cases', value: activeGrievances, color: activeGrievances > 0 ? 'var(--warning)' : null },
-        { label: 'Members', value: members.length, color: 'var(--accent)' },
+        { label: 'My Assigned', value: myCount, color: 'var(--accent)' },
       ].forEach(function(kpi) {
         var card = el('div', { className: 'kpi-card' });
         card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
@@ -422,6 +458,7 @@ function renderStewardMembers(appContainer) {
 
       var filterSelect = el('select', { className: 'form-select', style: { width: 'auto', fontSize: '12px', padding: '6px 10px' } });
       filterSelect.appendChild(el('option', { value: 'all' }, 'All'));
+      filterSelect.appendChild(el('option', { value: 'assigned' }, 'Assigned to Me'));
       filterSelect.appendChild(el('option', { value: 'grievance' }, 'Has Open Case'));
       var locs = {};
       members.forEach(function(m) { if (m.workLocation) locs[m.workLocation] = true; });
@@ -458,7 +495,9 @@ function renderStewardMembers(appContainer) {
                    (m.workLocation || '').toLowerCase().indexOf(q) !== -1;
           });
         }
-        if (filterKey === 'grievance') {
+        if (filterKey === 'assigned') {
+          filtered = filtered.filter(function(m) { return m.assignedSteward && m.assignedSteward.toLowerCase() === CURRENT_USER.email.toLowerCase(); });
+        } else if (filterKey === 'grievance') {
           filtered = filtered.filter(function(m) { return m.hasOpenGrievance; });
         } else if (filterKey.indexOf('loc:') === 0) {
           var loc = filterKey.substring(4);
@@ -473,7 +512,7 @@ function renderStewardMembers(appContainer) {
         renderFilteredMembers(listArea, filtered, '');
       }
       rerender();
-    }).dataGetStewardMembers(CURRENT_USER.email);
+    }).dataGetAllMembers();
   });
 }
 
@@ -1243,49 +1282,82 @@ function renderSurveyTracking(appContainer) {
   renderPageLayout(appContainer, 'steward', 'surveytrack', function(container) {
     _stewardHeader(container, 'Survey Tracking');
     var content = el('div', { className: 'content' });
-    showLoading(content);
+    var activeScope = 'assigned';
+
+    // Scope toggle buttons
+    var toggleRow = el('div', { style: { display: 'flex', gap: '6px', marginBottom: '14px' } });
+    var scopes = [
+      { key: 'assigned', label: 'My Members' },
+      { key: 'location', label: 'My Location' },
+      { key: 'all', label: 'Agency-wide' }
+    ];
+    var toggleBtns = {};
+    scopes.forEach(function(s) {
+      var btn = el('button', { className: 'btn btn-sm', style: { flex: '1', fontSize: '12px', padding: '6px 8px', borderRadius: '8px', border: '1px solid var(--border)', background: s.key === activeScope ? 'var(--accent)' : 'var(--surface)', color: s.key === activeScope ? '#fff' : 'var(--text)', cursor: 'pointer' }, onClick: function() {
+        if (activeScope === s.key) return;
+        activeScope = s.key;
+        scopes.forEach(function(sc) {
+          toggleBtns[sc.key].style.background = sc.key === activeScope ? 'var(--accent)' : 'var(--surface)';
+          toggleBtns[sc.key].style.color = sc.key === activeScope ? '#fff' : 'var(--text)';
+        });
+        loadSurveyData(activeScope);
+      } }, s.label);
+      toggleBtns[s.key] = btn;
+      toggleRow.appendChild(btn);
+    });
+    content.appendChild(toggleRow);
+
+    var dataWrap = el('div');
+    content.appendChild(dataWrap);
     container.appendChild(content);
 
-    google.script.run.withSuccessHandler(function(data) {
-      content.innerHTML = '';
-      if (!data || data.total === 0) {
-        content.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, 'No assigned members to track.'));
-        return;
-      }
+    function loadSurveyData(scope) {
+      dataWrap.innerHTML = '';
+      showLoading(dataWrap);
+      google.script.run.withSuccessHandler(function(data) {
+        dataWrap.innerHTML = '';
+        if (!data || data.total === 0) {
+          var emptyLabel = scope === 'assigned' ? 'No assigned members to track.' : scope === 'location' ? 'No members at your location.' : 'No members found.';
+          dataWrap.appendChild(el('div', { style: { color: 'var(--muted)', padding: '20px 0', textAlign: 'center' } }, emptyLabel));
+          return;
+        }
 
-      // Progress chart (doughnut)
-      var pct = Math.round((data.completed / data.total) * 100);
-      var progCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '14px' } });
-      progCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Completion: ' + data.completed + '/' + data.total));
+        // Progress chart (doughnut)
+        var pct = Math.round((data.completed / data.total) * 100);
+        var progCard = el('div', { className: 'card', style: { padding: '18px', marginBottom: '14px' } });
+        progCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, 'Completion: ' + data.completed + '/' + data.total));
 
-      if (typeof ChartHelper !== 'undefined') {
-        var remaining = data.total - data.completed;
-        var cColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#facc15' : '#ef4444';
-        ChartHelper.createDoughnutChart(progCard, 'survey-track-chart',
-          ['Completed', 'Pending'],
-          [data.completed, remaining],
-          [cColor, 'rgba(255,255,255,0.08)']
-        );
-      } else {
-        var track = el('div', { className: 'bar-chart-track', style: { height: '10px' } });
-        track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)' } }));
-        progCard.appendChild(track);
-      }
-      progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px' } }, pct + '% complete'));
-      content.appendChild(progCard);
+        if (typeof ChartHelper !== 'undefined') {
+          var remaining = data.total - data.completed;
+          var cColor = pct >= 80 ? '#4ade80' : pct >= 50 ? '#facc15' : '#ef4444';
+          ChartHelper.createDoughnutChart(progCard, 'survey-track-chart',
+            ['Completed', 'Pending'],
+            [data.completed, remaining],
+            [cColor, 'rgba(255,255,255,0.08)']
+          );
+        } else {
+          var track = el('div', { className: 'bar-chart-track', style: { height: '10px' } });
+          track.appendChild(el('div', { className: 'bar-chart-fill', style: { width: pct + '%', background: pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)' } }));
+          progCard.appendChild(track);
+        }
+        progCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '4px' } }, pct + '% complete'));
+        dataWrap.appendChild(progCard);
 
-      // Member list with checkmarks
-      (data.members || []).forEach(function(m) {
-        var item = el('div', { className: 'member-list-item' });
-        item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
-        var info = el('div', { className: 'member-list-info' });
-        info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
-        if (m.lastCompleted) info.appendChild(el('div', { className: 'member-list-meta' }, 'Completed ' + m.lastCompleted));
-        item.appendChild(info);
-        item.appendChild(el('span', { style: { fontSize: '16px', color: m.completed ? 'var(--success)' : 'var(--muted)' } }, m.completed ? '\u2705' : '\u2B1C'));
-        content.appendChild(item);
-      });
-    }).dataGetStewardSurveyTracking(CURRENT_USER.email);
+        // Member list with checkmarks
+        (data.members || []).forEach(function(m) {
+          var item = el('div', { className: 'member-list-item' });
+          item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
+          var info = el('div', { className: 'member-list-info' });
+          info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
+          if (m.lastCompleted) info.appendChild(el('div', { className: 'member-list-meta' }, 'Completed ' + m.lastCompleted));
+          item.appendChild(info);
+          item.appendChild(el('span', { style: { fontSize: '16px', color: m.completed ? 'var(--success)' : 'var(--muted)' } }, m.completed ? '\u2705' : '\u2B1C'));
+          dataWrap.appendChild(item);
+        });
+      }).dataGetStewardSurveyTracking(CURRENT_USER.email, scope);
+    }
+
+    loadSurveyData(activeScope);
   });
 }
 
@@ -1307,6 +1379,12 @@ function renderStewardMore(appContainer) {
       { icon: '\u2753', label: 'Weekly Questions', desc: 'Manage weekly engagement questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'steward'); } },
       { icon: '\uD83D\uDCCA', label: 'Survey Tracking', desc: 'Member survey completion status', action: function() { renderSurveyTracking(document.getElementById('app')); } },
       { icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory', desc: 'Contact your fellow stewards', action: function() { renderStewardDirectoryPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Create and manage flash polls', action: function() { renderManagePolls(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderStewardMinutes(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDEE1\uFE0F', label: 'Data Failsafe', desc: 'Backup and recovery tools', action: function() { renderFailsafePage(document.getElementById('app')); } },
     ];
 
     menuItems.forEach(function(m) {
@@ -1371,11 +1449,57 @@ function _renderContactForm(container) {
   var typeIcons = { 'Phone': '\uD83D\uDCDE', 'Email': '\u2709\uFE0F', 'In Person': '\uD83D\uDC64', 'Text': '\uD83D\uDCAC' };
   container.appendChild(el('h3', { className: 'section-title' }, 'Log a Contact'));
 
-  var memberGroup = el('div', { className: 'form-group' });
+  var memberGroup = el('div', { className: 'form-group', style: { position: 'relative' } });
   memberGroup.appendChild(el('label', { className: 'form-label' }, 'Member Email'));
-  var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  var memberInput = el('input', { className: 'form-input', placeholder: 'Type name or email...' });
   memberGroup.appendChild(memberInput);
+  var acDropdown = el('div', { style: {
+    position: 'absolute', top: '100%', left: '0', right: '0', zIndex: '50',
+    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+    maxHeight: '200px', overflowY: 'auto', display: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+  }});
+  memberGroup.appendChild(acDropdown);
   container.appendChild(memberGroup);
+
+  // Typeahead for member email
+  var _acMembers = null;
+  function _loadAcMembers(cb) {
+    if (_acMembers) { cb(_acMembers); return; }
+    google.script.run.withSuccessHandler(function(m) {
+      _acMembers = m || [];
+      cb(_acMembers);
+    }).dataGetAllMembers();
+  }
+  memberInput.addEventListener('input', function() {
+    var q = memberInput.value.toLowerCase().trim();
+    if (q.length < 2) { acDropdown.style.display = 'none'; return; }
+    _loadAcMembers(function(members) {
+      acDropdown.innerHTML = '';
+      var matches = members.filter(function(m) {
+        return (m.name || '').toLowerCase().indexOf(q) !== -1 ||
+               (m.email || '').toLowerCase().indexOf(q) !== -1;
+      }).slice(0, 8);
+      if (matches.length === 0) { acDropdown.style.display = 'none'; return; }
+      matches.forEach(function(m) {
+        var item = el('div', { style: {
+          padding: '8px 12px', cursor: 'pointer', fontSize: '12px', color: 'var(--text)',
+          borderBottom: '1px solid var(--border)'
+        }, onClick: function() {
+          memberInput.value = m.email;
+          acDropdown.style.display = 'none';
+        }});
+        item.appendChild(el('div', { style: { fontWeight: '600' } }, m.name || ''));
+        item.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '11px' } }, m.email));
+        item.addEventListener('mouseenter', function() { item.style.background = 'var(--accentBg)'; });
+        item.addEventListener('mouseleave', function() { item.style.background = 'transparent'; });
+        acDropdown.appendChild(item);
+      });
+      acDropdown.style.display = 'block';
+    });
+  });
+  document.addEventListener('click', function(e) {
+    if (!memberGroup.contains(e.target)) acDropdown.style.display = 'none';
+  });
 
   var typeGroup = el('div', { className: 'form-group' });
   typeGroup.appendChild(el('label', { className: 'form-label' }, 'Contact Type'));
@@ -1489,7 +1613,7 @@ function renderStewardTasks(appContainer) {
 
     function refreshSubTabs() {
       subTabBar.innerHTML = '';
-      ['open', 'completed', 'new task'].forEach(function(tab) {
+      ['open', 'completed', 'new task', 'member tasks'].forEach(function(tab) {
         subTabBar.appendChild(el('button', {
           className: 'sub-tab' + (activeSubTab === tab ? ' active' : ''),
           onClick: function() { activeSubTab = tab; refreshSubTabs(); renderSubContent(); }
@@ -1500,6 +1624,7 @@ function renderStewardTasks(appContainer) {
     function renderSubContent() {
       subContent.innerHTML = '';
       if (activeSubTab === 'new task') _renderNewTaskForm(subContent, function() { activeSubTab = 'open'; refreshSubTabs(); renderSubContent(); });
+      else if (activeSubTab === 'member tasks') _renderStewardMemberTasks(subContent);
       else _renderTaskList(subContent, activeSubTab === 'completed' ? 'completed' : null);
     }
 
@@ -1565,33 +1690,103 @@ function _renderTaskList(container, statusFilter) {
   }).dataGetTasks(CURRENT_USER.email, statusFilter);
 }
 
+function _renderStewardMemberTasks(container) {
+  showLoading(container);
+  google.script.run.withSuccessHandler(function(tasks) {
+    container.innerHTML = '';
+    if (!tasks || tasks.length === 0) {
+      container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No member tasks assigned yet.'));
+      return;
+    }
+
+    // KPI strip
+    var openTasks = tasks.filter(function(t) { return t.status !== 'completed'; });
+    var completedTasks = tasks.filter(function(t) { return t.status === 'completed'; });
+    var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '10px' } });
+    [
+      { label: 'Total Assigned', value: tasks.length },
+      { label: 'Open', value: openTasks.length, color: openTasks.length > 0 ? 'var(--accent)' : null },
+      { label: 'Completed', value: completedTasks.length, color: completedTasks.length > 0 ? 'var(--success)' : null }
+    ].forEach(function(kpi) {
+      var card = el('div', { className: 'kpi-card' });
+      card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+      var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+      if (kpi.color) val.style.color = kpi.color;
+      card.appendChild(val);
+      kpiStrip.appendChild(card);
+    });
+    container.appendChild(kpiStrip);
+
+    tasks.forEach(function(task) {
+      var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
+      var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
+      var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+      top.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, task.title));
+      var statusColor = task.status === 'completed' ? 'var(--success)' : 'var(--accent)';
+      top.appendChild(el('span', { style: { fontSize: '10px', fontWeight: '600', color: statusColor, background: statusColor + '18', padding: '2px 8px', borderRadius: '8px' } }, task.status));
+      card.appendChild(top);
+      if (task.memberEmail) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Assigned to: ' + task.memberEmail.split('@')[0]));
+      if (task.dueDate) card.appendChild(el('div', { style: { fontSize: '11px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, 'Due: ' + task.dueDate));
+      if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
+      container.appendChild(card);
+    });
+  }).withFailureHandler(function() {
+    container.innerHTML = '';
+    container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load member tasks.'));
+  }).dataGetStewardAssignedMemberTasks(CURRENT_USER.email);
+}
+
 function _renderNewTaskForm(container, onCreated) {
   container.appendChild(el('h3', { className: 'section-title' }, 'Create Task'));
 
-  // Chief steward: show "Assign to" dropdown
+  // Assignee type toggle: Steward vs Member
+  var assigneeType = 'steward';
+  var typeGroup = el('div', { className: 'form-group' });
+  typeGroup.appendChild(el('label', { className: 'form-label' }, 'Assign to'));
+  var typeDiv = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '8px' } });
+  var stewardBtn = el('button', { className: 'sub-tab active', onClick: function() { assigneeType = 'steward'; stewardBtn.className = 'sub-tab active'; memberBtn.className = 'sub-tab'; memberEmailGroup.style.display = 'none'; assignGroup.style.display = 'none'; _checkChief(); } }, 'Steward');
+  var memberBtn = el('button', { className: 'sub-tab', onClick: function() { assigneeType = 'member'; memberBtn.className = 'sub-tab active'; stewardBtn.className = 'sub-tab'; memberEmailGroup.style.display = ''; assignGroup.style.display = 'none'; } }, 'Member');
+  typeDiv.appendChild(stewardBtn);
+  typeDiv.appendChild(memberBtn);
+  typeGroup.appendChild(typeDiv);
+  container.appendChild(typeGroup);
+
+  // Member email field (shown when assignee type is member)
+  var memberEmailGroup = el('div', { className: 'form-group', style: { display: 'none' } });
+  memberEmailGroup.appendChild(el('label', { className: 'form-label' }, 'Member Email'));
+  var memberEmailInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
+  memberEmailGroup.appendChild(memberEmailInput);
+  container.appendChild(memberEmailGroup);
+
+  // Chief steward: show "Assign to steward" dropdown
   var assignSelect = null;
   var assignGroup = el('div', { className: 'form-group', style: { display: 'none' } });
-  assignGroup.appendChild(el('label', { className: 'form-label' }, 'Assign to'));
+  assignGroup.appendChild(el('label', { className: 'form-label' }, 'Assign to steward'));
   assignSelect = el('select', { className: 'form-select' });
   assignSelect.appendChild(el('option', { value: '' }, 'Myself'));
   assignGroup.appendChild(assignSelect);
   container.appendChild(assignGroup);
 
   // Check if current user is chief steward and populate steward list
-  google.script.run.withSuccessHandler(function(isChief) {
-    if (isChief) {
-      assignGroup.style.display = '';
-      google.script.run.withSuccessHandler(function(stewards) {
-        if (stewards && stewards.length > 0) {
-          stewards.forEach(function(s) {
-            if (s.email !== CURRENT_USER.email) {
-              assignSelect.appendChild(el('option', { value: s.email }, s.name || s.email));
-            }
-          });
-        }
-      }).dataGetStewardDirectory();
-    }
-  }).dataIsChiefSteward(CURRENT_USER.email);
+  function _checkChief() {
+    google.script.run.withSuccessHandler(function(isChief) {
+      if (isChief && assigneeType === 'steward') {
+        assignGroup.style.display = '';
+        google.script.run.withSuccessHandler(function(stewards) {
+          // Clear existing options except 'Myself'
+          while (assignSelect.options.length > 1) assignSelect.remove(1);
+          if (stewards && stewards.length > 0) {
+            stewards.forEach(function(s) {
+              if (s.email !== CURRENT_USER.email) {
+                assignSelect.appendChild(el('option', { value: s.email }, s.name || s.email));
+              }
+            });
+          }
+        }).dataGetStewardDirectory();
+      }
+    }).dataIsChiefSteward(CURRENT_USER.email);
+  }
+  _checkChief();
 
   var titleGroup = el('div', { className: 'form-group' });
   titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
@@ -1606,7 +1801,7 @@ function _renderNewTaskForm(container, onCreated) {
   container.appendChild(descGroup);
 
   var memberGroup = el('div', { className: 'form-group' });
-  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Related Member (optional)'));
+  memberGroup.appendChild(el('label', { className: 'form-label' }, 'Related Member (optional, for steward tasks)'));
   var memberInput = el('input', { className: 'form-input', placeholder: 'member@example.com' });
   memberGroup.appendChild(memberInput);
   container.appendChild(memberGroup);
@@ -1636,15 +1831,26 @@ function _renderNewTaskForm(container, onCreated) {
       var title = titleInput.value.trim();
       if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
       statusMsg.textContent = 'Creating...'; statusMsg.style.color = 'var(--muted)';
-      var assignee = assignSelect ? assignSelect.value : '';
-      if (assignee) {
+
+      if (assigneeType === 'member') {
+        // Create member task
+        var memEmail = memberEmailInput.value.trim();
+        if (!memEmail) { statusMsg.textContent = 'Enter member email.'; statusMsg.style.color = 'var(--danger)'; return; }
         google.script.run.withSuccessHandler(function(r) {
-          if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-        }).dataCreateTaskForSteward(CURRENT_USER.email, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+          if (r && r.success) { onCreated(); } else { statusMsg.textContent = r ? r.message : 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+        }).dataCreateMemberTask(CURRENT_USER.email, memEmail, title, descInput.value.trim(), priSelect.value, dueInput.value || '');
       } else {
-        google.script.run.withSuccessHandler(function(r) {
-          if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
-        }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+        // Create steward task
+        var assignee = assignSelect ? assignSelect.value : '';
+        if (assignee) {
+          google.script.run.withSuccessHandler(function(r) {
+            if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+          }).dataCreateTaskForSteward(CURRENT_USER.email, assignee, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+        } else {
+          google.script.run.withSuccessHandler(function(r) {
+            if (r && r.success) { onCreated(); } else { statusMsg.textContent = 'Error creating task.'; statusMsg.style.color = 'var(--danger)'; }
+          }).dataCreateTask(CURRENT_USER.email, title, descInput.value.trim(), memberInput.value.trim(), priSelect.value, dueInput.value || '');
+        }
       }
     }
   }, 'Create Task'));
@@ -1767,6 +1973,8 @@ function renderInsightsPage(appContainer) {
   });
 }
 
+function _fmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
 function _insightCard(title, color, mainText, subText) {
   var card = el('div', { className: 'card card-glass', style: {
     padding: '16px 18px', borderLeft: '3px solid ' + color,
@@ -1795,13 +2003,13 @@ function _renderQuickInsights(container, stats, hotSpots) {
 
   // Box 1: Grievance Status
   var activeCount = stats.openCount || 0;
-  var statusSub = stats.total + ' total';
+  var statusSub = _fmtNum(stats.total) + ' total';
   var parts = [];
-  if (stats.wonCount) parts.push(stats.wonCount + ' won');
-  if (stats.deniedCount) parts.push(stats.deniedCount + ' denied');
-  if (stats.settledCount) parts.push(stats.settledCount + ' settled');
+  if (stats.wonCount) parts.push(_fmtNum(stats.wonCount) + ' won');
+  if (stats.deniedCount) parts.push(_fmtNum(stats.deniedCount) + ' denied');
+  if (stats.settledCount) parts.push(_fmtNum(stats.settledCount) + ' settled');
   if (parts.length) statusSub += ' \u00B7 ' + parts.join(', ');
-  grid.appendChild(_insightCard('GRIEVANCE STATUS', 'var(--info)', String(activeCount) + ' Active', statusSub));
+  grid.appendChild(_insightCard('GRIEVANCE STATUS', 'var(--info)', _fmtNum(activeCount) + ' Active', statusSub));
 
   // Box 2: Hot Spots
   var hsCount = hotSpots ? hotSpots.length : 0;
@@ -2507,5 +2715,89 @@ function _renderMyFeedback(container) {
     container.innerHTML = '';
     container.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load feedback.'));
   }).dataGetMyFeedback(CURRENT_USER.email);
+}
+
+// ═══════════════════════════════════════
+// DATA FAILSAFE PAGE (v4.17.0 — steward only)
+// ═══════════════════════════════════════
+
+function renderFailsafePage(appContainer) {
+  renderPageLayout(appContainer, 'steward', 'failsafe', function(container) {
+    _stewardHeader(container, 'Data Failsafe', 'Backups & member data recovery');
+    var content = el('div', { className: 'content' });
+
+    // Card 1: Bulk Member Export
+    var exportCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+    exportCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Bulk Member Export'));
+    exportCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Send every member their personal data summary via email. Includes grievances, workload, and assigned tasks.'));
+    var exportStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+    exportCard.appendChild(exportStatus);
+    exportCard.appendChild(el('button', {
+      className: 'btn btn-primary',
+      onClick: function() {
+        exportStatus.textContent = 'Sending emails... this may take a minute.'; exportStatus.style.color = 'var(--muted)';
+        google.script.run.withSuccessHandler(function(r) {
+          if (r && r.success) { exportStatus.textContent = r.sent + ' member summaries emailed!'; exportStatus.style.color = 'var(--success)'; }
+          else { exportStatus.textContent = r ? r.message : 'Error.'; exportStatus.style.color = 'var(--danger)'; }
+        }).withFailureHandler(function() {
+          exportStatus.textContent = 'Failed to send exports.'; exportStatus.style.color = 'var(--danger)';
+        }).fsTriggerBulkExport(CURRENT_USER.email);
+      }
+    }, 'Send Data to All Members'));
+    content.appendChild(exportCard);
+
+    // Card 2: Manual Backup
+    var backupCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+    backupCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Manual CSV Backup'));
+    backupCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Create CSV backups of critical sheets (Member Directory, Grievances, Tasks, etc.) in your Google Drive.'));
+    var backupStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+    backupCard.appendChild(backupStatus);
+    backupCard.appendChild(el('button', {
+      className: 'btn btn-primary',
+      onClick: function() {
+        backupStatus.textContent = 'Creating backup...'; backupStatus.style.color = 'var(--muted)';
+        google.script.run.withSuccessHandler(function(r) {
+          if (r && r.success) { backupStatus.textContent = r.backedUp + ' sheets backed up to Drive folder: ' + r.folderName; backupStatus.style.color = 'var(--success)'; }
+          else { backupStatus.textContent = 'Backup failed.'; backupStatus.style.color = 'var(--danger)'; }
+        }).withFailureHandler(function() {
+          backupStatus.textContent = 'Backup failed.'; backupStatus.style.color = 'var(--danger)';
+        }).fsBackupCriticalSheets();
+      }
+    }, 'Backup Now'));
+    content.appendChild(backupCard);
+
+    // Card 3: Trigger Management
+    var triggerCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+    triggerCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Automated Triggers'));
+    triggerCard.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Install or remove automated triggers for daily digest checks and weekly Drive backups.'));
+    var triggerStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+    triggerCard.appendChild(triggerStatus);
+    var triggerBtns = el('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+    triggerBtns.appendChild(el('button', {
+      className: 'btn btn-primary',
+      onClick: function() {
+        triggerStatus.textContent = 'Installing...'; triggerStatus.style.color = 'var(--muted)';
+        google.script.run.withSuccessHandler(function(r) {
+          triggerStatus.textContent = r && r.success ? r.message : 'Error.';
+          triggerStatus.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
+        }).fsSetupTriggers();
+      }
+    }, 'Install Triggers'));
+    triggerBtns.appendChild(el('button', {
+      style: { fontSize: '12px', padding: '6px 14px', borderRadius: '8px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
+      onClick: function() {
+        triggerStatus.textContent = 'Removing...'; triggerStatus.style.color = 'var(--muted)';
+        google.script.run.withSuccessHandler(function(r) {
+          triggerStatus.textContent = r && r.success ? r.removed + ' triggers removed.' : 'Error.';
+          triggerStatus.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
+        }).fsRemoveTriggers();
+      }
+    }, 'Remove Triggers'));
+    triggerCard.appendChild(triggerBtns);
+    triggerCard.appendChild(triggerStatus);
+    content.appendChild(triggerCard);
+
+    container.appendChild(content);
+  });
 }
 </script>
