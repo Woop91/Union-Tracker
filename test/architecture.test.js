@@ -53,7 +53,14 @@ loadSources([
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '16_DashboardEnhancements.gs',
-  '17_CorrelationEngine.gs'
+  '17_CorrelationEngine.gs',
+  '19_WebDashAuth.gs',
+  '20_WebDashConfigReader.gs',
+  '21_WebDashDataService.gs',
+  '22_WebDashApp.gs',
+  '23_PortalSheets.gs',
+  '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs'
 ]);
 
 // ============================================================================
