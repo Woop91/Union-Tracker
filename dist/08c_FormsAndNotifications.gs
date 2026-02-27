@@ -549,7 +549,7 @@ function setupGrievanceFormTrigger() {
     } else {
       // Use configured form
       var configFormUrl = GRIEVANCE_FORM_CONFIG.FORM_URL;
-      var match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+      match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
       if (!match) {
         ui.alert('No Form Configured',
           'No form URL provided and could not extract ID from config.\n\n' +
@@ -1051,7 +1051,6 @@ function checkDeadlinesAndNotify_() {
 
   var data = sheet.getDataRange().getValues();
   var today = new Date();
-  var _threeDaysAhead = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
   var urgent = [];
 
   for (var i = 1; i < data.length; i++) {
@@ -1386,7 +1385,6 @@ function configureAlertSettings() {
  */
 function sendRandomSurveyEmails() {
   var ui = SpreadsheetApp.getUi();
-  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Show configuration dialog
   var html = HtmlService.createHtmlOutput(
@@ -1453,7 +1451,6 @@ function executeSendRandomSurveyEmails(opts) {
 
   // Get all members with valid emails
   var memberData = memberSheet.getDataRange().getValues();
-  var _headers = memberData[0];
   var emailCol = MEMBER_COLS.EMAIL - 1;
   var memberIdCol = MEMBER_COLS.MEMBER_ID - 1;
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;

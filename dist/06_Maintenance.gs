@@ -1491,10 +1491,16 @@ function logAuditEvent(eventType, details) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let auditSheet = ss.getSheetByName(SHEET_NAMES.AUDIT_LOG);
 
-    // Create audit sheet if it doesn't exist
+    // Create audit sheet if it doesn't exist — use the canonical 10-col schema
+    // H-43: Standardize to the 10-col AUDIT_LOG_HEADER_MAP_ schema used by
+    // 08d_AuditAndFormulas.gs, plus an Integrity Hash column (col 11).
     if (!auditSheet) {
       auditSheet = ss.insertSheet(SHEET_NAMES.AUDIT_LOG);
-      auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID', 'Integrity Hash']);
+      var headerRow = (typeof getHeadersFromMap_ === 'function' && typeof AUDIT_LOG_HEADER_MAP_ !== 'undefined')
+        ? getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_)
+        : ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column', 'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type'];
+      headerRow.push('Integrity Hash');
+      auditSheet.appendRow(headerRow);
       auditSheet.setFrozenRows(1);
     } else {
       // Ensure Integrity Hash header exists (upgrade path for existing sheets)
@@ -1540,11 +1546,11 @@ function logAuditEvent(eventType, details) {
     var previousHash = '';
     var lastRow = auditSheet.getLastRow();
     if (lastRow >= 2) {
-      // Find Integrity Hash column index
-      var headerRow = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+      // Find Integrity Hash column index dynamically
+      var hdrRow = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
       var integrityColIdx = -1;
-      for (var i = 0; i < headerRow.length; i++) {
-        if (String(headerRow[i]).trim() === 'Integrity Hash') {
+      for (var i = 0; i < hdrRow.length; i++) {
+        if (String(hdrRow[i]).trim() === 'Integrity Hash') {
           integrityColIdx = i + 1; // 1-indexed
           break;
         }
@@ -1560,12 +1566,56 @@ function logAuditEvent(eventType, details) {
       integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, rawEmail, detailsJson, sessionId);
     }
 
-    auditSheet.appendRow([timestamp, eventType, user, detailsJson, sessionId, integrityHash]);
+    // H-43: Write in 10-col schema: Timestamp, User Email, Sheet, Row, Column,
+    // Field Name, Old Value, New Value, Record ID, Action Type, Integrity Hash.
+    // For event-level logging, Sheet/Row/Column/Field Name are empty; details go
+    // in New Value, sessionId in Record ID, eventType in Action Type.
+    auditSheet.appendRow([
+      timestamp,           // Timestamp
+      user,                // User Email
+      '',                  // Sheet (N/A for events)
+      '',                  // Row (N/A for events)
+      '',                  // Column (N/A for events)
+      '',                  // Field Name (N/A for events)
+      '',                  // Old Value (N/A for events)
+      detailsJson,         // New Value (event details JSON)
+      sessionId,           // Record ID (session key)
+      eventType,           // Action Type (event type)
+      integrityHash        // Integrity Hash
+    ]);
 
     // Trim old entries if sheet gets too large (keep last 10,000)
+    // CR-30 WARNING: Deleting rows breaks the integrity hash chain because each
+    // row's hash is chained to the previous row. Before trimming, save the hash
+    // of the last row being deleted as a "chain checkpoint" in ScriptProperties
+    // so that verifyAuditLogIntegrity() can start verification from this checkpoint.
     const rowCount = auditSheet.getLastRow();
     if (rowCount > 10000) {
-      auditSheet.deleteRows(2, rowCount - 10000);
+      var rowsToDelete = rowCount - 10000;
+      // Save the hash of the last deleted row as a chain checkpoint
+      try {
+        var checkpointRow = 1 + rowsToDelete; // last row being deleted (1-indexed, row 1 is header)
+        var trimHeaders = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+        var hashColIdx = -1;
+        for (var ci = 0; ci < trimHeaders.length; ci++) {
+          if (String(trimHeaders[ci]).trim() === 'Integrity Hash') {
+            hashColIdx = ci + 1;
+            break;
+          }
+        }
+        if (hashColIdx > 0) {
+          var checkpointHash = String(auditSheet.getRange(checkpointRow, hashColIdx).getValue() || '');
+          PropertiesService.getScriptProperties().setProperty(
+            'AUDIT_CHAIN_CHECKPOINT_HASH', checkpointHash
+          );
+          PropertiesService.getScriptProperties().setProperty(
+            'AUDIT_CHAIN_CHECKPOINT_TIMESTAMP', new Date().toISOString()
+          );
+        }
+      } catch (cpErr) {
+        Logger.log('Warning: Could not save audit chain checkpoint: ' + cpErr.message);
+      }
+      auditSheet.deleteRows(2, rowsToDelete);
     }
 
   } catch (error) {
@@ -1675,6 +1725,17 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
  * For testing/development use only
  */
 function NUCLEAR_WIPE_GRIEVANCES() {
+  // H-23: Authorization check — only admins may perform destructive data wipe
+  if (typeof getUserRole_ === 'function') {
+    var callerEmail = Session.getActiveUser().getEmail();
+    var callerRole = getUserRole_(callerEmail);
+    if (callerRole !== 'admin') {
+      SpreadsheetApp.getUi().alert('Access Denied',
+        'Only administrators may perform this destructive action.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return errorResponse('Unauthorized: admin role required');
+    }
+  }
+
   var isDev = typeof IS_DEV_ENVIRONMENT !== 'undefined' && IS_DEV_ENVIRONMENT === true;
   if (!isDev) {
     var _ui = SpreadsheetApp.getUi();

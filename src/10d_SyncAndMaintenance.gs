@@ -668,7 +668,6 @@ function checkDataQuality() {
  * Fix data quality issues with interactive dialog
  */
 function fixDataQualityIssues() {
-  var _ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
 
   var issues = checkDataQuality();
@@ -853,12 +852,17 @@ function isSyncDebounced_(syncName) {
 }
 /** Returns true only for real, non-NaN Date objects. */
 function isValidDate_(val) { return (val instanceof Date) && !isNaN(val.getTime()); }
-/** Builds {memberId: true} lookup from Member Directory data (skips header row). */
+/** Builds {memberId: true} lookup from Member Directory data (skips header row).
+ *  M-68: Explicitly starts at index 1 to skip the header row. Also validates
+ *  that the value looks like a member ID (not a header label) as a safeguard. */
 function buildMemberIdSet_(memberData) {
   var set = {};
+  // Start at 1 to skip header row (index 0)
   for (var i = 1; i < memberData.length; i++) {
     var id = String(memberData[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
-    if (id !== '') set[id] = true;
+    // Skip empty values and the header label itself (safeguard against
+    // data arrays that don't include a header at index 0)
+    if (id !== '' && id !== 'Member ID') set[id] = true;
   }
   return set;
 }
@@ -923,13 +927,19 @@ function syncVolunteerHoursToMemberDirectory() {
     var invalidIds = Object.keys(badIds);
     if (invalidIds.length > 0) Logger.log('syncVH: ' + invalidIds.length + ' bad ID(s): ' + invalidIds.slice(0, 10).join(', '));
 
-    // Write to Member Directory with array length validation
+    // M-25: Only update hours for members found in the volunteer sheet.
+    // Members with no volunteer data retain their existing hours value.
     var updates = [], membersUpdated = 0;
+    var existingHours = memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, memberData.length - 1, 1).getValues();
     for (var j = 1; j < memberData.length; j++) {
       var mid = String(memberData[j][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
-      var tot = hoursLookup[mid] || 0;
-      if (tot > 0) membersUpdated++;
-      updates.push([tot]);
+      if (hoursLookup[mid] !== undefined) {
+        membersUpdated++;
+        updates.push([hoursLookup[mid]]);
+      } else {
+        // Keep existing value — don't zero out members without volunteer data
+        updates.push([existingHours[j - 1][0]]);
+      }
     }
     var expected = memberData.length - 1;
     if (updates.length !== expected) {

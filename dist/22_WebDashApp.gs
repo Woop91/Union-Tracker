@@ -140,7 +140,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
 
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 

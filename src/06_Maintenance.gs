@@ -1336,11 +1336,16 @@ function exportUndoHistoryToSheet() {
   var history = getUndoHistory();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var sheet = ss.getSheetByName('Undo_History_Export');
+  // M-17: Use a constant for the export sheet name instead of hardcoded string
+  var UNDO_EXPORT_SHEET_NAME = (typeof SHEETS !== 'undefined' && SHEETS.UNDO_HISTORY_EXPORT)
+    ? SHEETS.UNDO_HISTORY_EXPORT
+    : 'Undo_History_Export';
+
+  var sheet = ss.getSheetByName(UNDO_EXPORT_SHEET_NAME);
   if (sheet) {
     sheet.clear();
   } else {
-    sheet = ss.insertSheet('Undo_History_Export');
+    sheet = ss.insertSheet(UNDO_EXPORT_SHEET_NAME);
   }
 
   var headers = ['#', 'Action Type', 'Description', 'Timestamp', 'Status'];
@@ -1491,10 +1496,16 @@ function logAuditEvent(eventType, details) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let auditSheet = ss.getSheetByName(SHEET_NAMES.AUDIT_LOG);
 
-    // Create audit sheet if it doesn't exist
+    // Create audit sheet if it doesn't exist — use the canonical 10-col schema
+    // H-43: Standardize to the 10-col AUDIT_LOG_HEADER_MAP_ schema used by
+    // 08d_AuditAndFormulas.gs, plus an Integrity Hash column (col 11).
     if (!auditSheet) {
       auditSheet = ss.insertSheet(SHEET_NAMES.AUDIT_LOG);
-      auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID', 'Integrity Hash']);
+      var headerRow = (typeof getHeadersFromMap_ === 'function' && typeof AUDIT_LOG_HEADER_MAP_ !== 'undefined')
+        ? getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_)
+        : ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column', 'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type'];
+      headerRow.push('Integrity Hash');
+      auditSheet.appendRow(headerRow);
       auditSheet.setFrozenRows(1);
     } else {
       // Ensure Integrity Hash header exists (upgrade path for existing sheets)
@@ -1540,11 +1551,11 @@ function logAuditEvent(eventType, details) {
     var previousHash = '';
     var lastRow = auditSheet.getLastRow();
     if (lastRow >= 2) {
-      // Find Integrity Hash column index
-      var headerRow = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+      // Find Integrity Hash column index dynamically
+      var hdrRow = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
       var integrityColIdx = -1;
-      for (var i = 0; i < headerRow.length; i++) {
-        if (String(headerRow[i]).trim() === 'Integrity Hash') {
+      for (var i = 0; i < hdrRow.length; i++) {
+        if (String(hdrRow[i]).trim() === 'Integrity Hash') {
           integrityColIdx = i + 1; // 1-indexed
           break;
         }
@@ -1560,7 +1571,23 @@ function logAuditEvent(eventType, details) {
       integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, rawEmail, detailsJson, sessionId);
     }
 
-    auditSheet.appendRow([timestamp, eventType, user, detailsJson, sessionId, integrityHash]);
+    // H-43: Write in 10-col schema: Timestamp, User Email, Sheet, Row, Column,
+    // Field Name, Old Value, New Value, Record ID, Action Type, Integrity Hash.
+    // For event-level logging, Sheet/Row/Column/Field Name are empty; details go
+    // in New Value, sessionId in Record ID, eventType in Action Type.
+    auditSheet.appendRow([
+      timestamp,           // Timestamp
+      user,                // User Email
+      '',                  // Sheet (N/A for events)
+      '',                  // Row (N/A for events)
+      '',                  // Column (N/A for events)
+      '',                  // Field Name (N/A for events)
+      '',                  // Old Value (N/A for events)
+      detailsJson,         // New Value (event details JSON)
+      sessionId,           // Record ID (session key)
+      eventType,           // Action Type (event type)
+      integrityHash        // Integrity Hash
+    ]);
 
     // Trim old entries if sheet gets too large (keep last 10,000)
     // CR-30 WARNING: Deleting rows breaks the integrity hash chain because each
@@ -1829,7 +1856,9 @@ function createWeeklySnapshot() {
     } catch (createErr) {
       ui.alert('Archive Folder Error',
         'Could not auto-create archive folder: ' + createErr.message + '\n\n' +
-        'You can manually set the Archive Folder ID in the Config sheet (column AS).',
+        'You can manually set the Archive Folder ID in the Config sheet (column ' +
+        (typeof getColumnLetter === 'function' && typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.ARCHIVE_FOLDER_ID
+          ? getColumnLetter(CONFIG_COLS.ARCHIVE_FOLDER_ID) : 'ARCHIVE_FOLDER_ID') + ').',
         ui.ButtonSet.OK);
       return;
     }
