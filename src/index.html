@@ -392,6 +392,7 @@
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org Chart' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
       ];
@@ -404,6 +405,7 @@
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org Chart' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
@@ -417,6 +419,9 @@
       // Handle "More" menus for both roles (mobile bottom-nav)
       if (tabId === '_member_more') { renderMemberMore(app); return; }
       if (tabId === '_steward_more') { renderStewardMore(app); return; }
+      // Shared tabs (available in both roles)
+      if (tabId === 'orgchart') { renderOrgChart(app, role); return; }
+
       if (role === 'member') {
         switch(tabId) {
           case 'home': renderMemberHome(app); break;
@@ -478,6 +483,54 @@
         }
       }, 200);
     });
+
+    // ═══════════════════════════════════════
+    // ORG CHART (lazy-loaded)
+    // ═══════════════════════════════════════
+    var _orgChartCache = null;
+
+    function renderOrgChart(container, role) {
+      renderPageLayout(container, role, 'orgchart', function(content) {
+        var header = el('div', { style: { marginBottom: '16px' } });
+        header.appendChild(el('h2', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '20px', margin: '0 0 4px' } }, 'Org Chart'));
+        header.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)' } }, 'SEIU Local 509 organizational structure'));
+        content.appendChild(header);
+
+        var chartContainer = el('div', { style: { borderRadius: 'var(--radius)', overflow: 'auto', minHeight: '400px' } });
+
+        if (_orgChartCache) {
+          chartContainer.innerHTML = _orgChartCache;
+          _runOrgChartScripts(chartContainer);
+        } else {
+          showLoading(chartContainer);
+          google.script.run
+            .withSuccessHandler(function(html) {
+              _orgChartCache = html;
+              chartContainer.innerHTML = html;
+              _runOrgChartScripts(chartContainer);
+            })
+            .withFailureHandler(function(err) {
+              chartContainer.innerHTML = '';
+              chartContainer.appendChild(el('div', {
+                style: { padding: '40px', textAlign: 'center', color: 'var(--muted)' }
+              }, 'Failed to load org chart. Please try again.'));
+            })
+            .getOrgChartHtml();
+        }
+
+        content.appendChild(chartContainer);
+      });
+    }
+
+    function _runOrgChartScripts(container) {
+      // Execute inline scripts that were injected as HTML
+      var scripts = container.querySelectorAll('script');
+      scripts.forEach(function(oldScript) {
+        var newScript = document.createElement('script');
+        newScript.textContent = oldScript.textContent;
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+    }
 
     // ═══════════════════════════════════════
     // CHART HELPER (requires Chart.js CDN)

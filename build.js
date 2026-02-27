@@ -75,6 +75,7 @@ const HTML_FILES = [
   'steward_view.html',
   'member_view.html',
   'error_view.html',
+  'org_chart.html',
 ];
 
 function build(fileList) {

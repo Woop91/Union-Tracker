@@ -204,3 +204,12 @@ function _sanitizeConfig(config) {
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
+
+/**
+ * Client-callable: Returns the org chart HTML content for lazy-loading.
+ * Loaded on-demand when the user navigates to the Org Chart tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .oc-wrap)
+ */
+function getOrgChartHtml() {
+  return HtmlService.createHtmlOutputFromFile('org_chart').getContent();
+}
