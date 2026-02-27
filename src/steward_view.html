@@ -445,7 +445,7 @@ function renderStewardMembers(appContainer) {
           var searchEl = content.querySelector('.search-input');
           if (searchEl) content.insertBefore(locCard, searchEl);
           else content.appendChild(locCard);
-        }).dataGetStewardMemberStats(CURRENT_USER.email);
+        }).withFailureHandler(function() { /* chart optional — skip on error */ }).dataGetStewardMemberStats(CURRENT_USER.email);
       }
 
       // Sort & Filter controls
@@ -512,6 +512,9 @@ function renderStewardMembers(appContainer) {
         renderFilteredMembers(listArea, filtered, '');
       }
       rerender();
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--danger)' } }, 'Failed to load members. Try refreshing.'));
     }).dataGetAllMembers();
   });
 }
@@ -660,6 +663,9 @@ function renderBroadcast(appContainer) {
       }
 
       updatePreview();
+    }).withFailureHandler(function() {
+      recipientPreview.textContent = 'Failed to load filters. You can still send to all members.';
+      recipientPreview.style.color = 'var(--danger)';
     }).dataGetBroadcastFilterOptions(CURRENT_USER.email);
 
     // Message
@@ -1354,6 +1360,9 @@ function renderSurveyTracking(appContainer) {
           item.appendChild(el('span', { style: { fontSize: '16px', color: m.completed ? 'var(--success)' : 'var(--muted)' } }, m.completed ? '\u2705' : '\u2B1C'));
           dataWrap.appendChild(item);
         });
+      }).withFailureHandler(function() {
+        dataWrap.innerHTML = '';
+        dataWrap.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load survey data.'));
       }).dataGetStewardSurveyTracking(CURRENT_USER.email, scope);
     }
 
@@ -1782,7 +1791,7 @@ function _renderNewTaskForm(container, onCreated) {
               }
             });
           }
-        }).dataGetStewardDirectory();
+        }).withFailureHandler(function() { /* optional — assignment defaults to self */ }).dataGetStewardDirectory();
       }
     }).dataIsChiefSteward(CURRENT_USER.email);
   }
@@ -2073,11 +2082,16 @@ function _renderPerformanceSection(container, perfData) {
     color: 'var(--text)', marginBottom: '12px',
   }}, CONFIG.stewardLabel + ' Performance'));
 
-  // Aggregate stats
-  var totalWinRate = 0, totalAvgDays = 0, count = 0;
-  perfData.forEach(function(p) { totalWinRate += p.winRate; totalAvgDays += p.avgDays; count++; });
-  var avgWin = count > 0 ? Math.round(totalWinRate / count) : 0;
-  var avgDays = count > 0 ? Math.round(totalAvgDays / count) : 0;
+  // Aggregate stats — weighted by case count for accuracy
+  var totalWon = 0, totalClosed = 0, totalDaysWeighted = 0, totalDaysCount = 0, count = 0;
+  perfData.forEach(function(p) {
+    totalWon += p.won || 0;
+    totalClosed += p.closed || 0;
+    if (p.closed > 0) { totalDaysWeighted += (p.avgDays || 0) * p.closed; totalDaysCount += p.closed; }
+    count++;
+  });
+  var avgWin = totalClosed > 0 ? Math.round((totalWon / totalClosed) * 100) : 0;
+  var avgDays = totalDaysCount > 0 ? Math.round(totalDaysWeighted / totalDaysCount) : 0;
 
   var statsRow = el('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '12px' } });
   statsRow.appendChild(_insightCard('AVG WIN RATE', 'var(--success)', avgWin + '%', count + ' ' + CONFIG.stewardLabel.toLowerCase() + 's'));
