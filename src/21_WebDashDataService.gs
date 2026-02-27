@@ -1444,25 +1444,30 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function getStewardDirectory() {
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return [];
-    var data = sheet.getDataRange().getValues();
-    var colMap = _buildColumnMap(data[0]);
-    var stewards = [];
-    for (var i = 1; i < data.length; i++) {
-      var rec = _buildUserRecord(data[i], colMap);
-      if (!rec.isSteward) continue;
-      stewards.push({
-        name: rec.name,
-        email: rec.email,
-        workLocation: rec.workLocation,
-        officeDays: rec.officeDays,
-        phone: rec.phone,
-        unit: rec.unit,
-      });
+    try {
+      var sheet = _getSheet(MEMBER_SHEET);
+      if (!sheet) return [];
+      var data = sheet.getDataRange().getValues();
+      var colMap = _buildColumnMap(data[0]);
+      var stewards = [];
+      for (var i = 1; i < data.length; i++) {
+        var rec = _buildUserRecord(data[i], colMap);
+        if (!rec.isSteward) continue;
+        stewards.push({
+          name: rec.name,
+          email: rec.email,
+          workLocation: rec.workLocation,
+          officeDays: rec.officeDays,
+          phone: rec.phone,
+          unit: rec.unit,
+        });
+      }
+      stewards.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+      return stewards;
+    } catch (e) {
+      Logger.log('getStewardDirectory error: ' + e.message);
+      throw e;
     }
-    stewards.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
-    return stewards;
   }
 
   // ═══════════════════════════════════════
@@ -1476,7 +1481,7 @@ var DataService = (function () {
     if (data.length <= 1) return { available: false };
     var colMap = _buildColumnMap(data[0]);
     var total = data.length - 1;
-    if (total < 10) return { available: false, count: total, threshold: 10 };
+    if (total < 3) return { available: false, count: total, threshold: 3 };
 
     var byStatus = {};
     var byStep = {};
@@ -1485,6 +1490,7 @@ var DataService = (function () {
     var monthly = {};
     var monthlyResolved = {};
     var openCount = 0, wonCount = 0, deniedCount = 0, settledCount = 0;
+    var overdueCount = 0, dueSoonCount = 0;
     for (var i = 1; i < data.length; i++) {
       var rec = _buildGrievanceRecord(data[i], colMap);
       var s = rec.status || 'unknown';
@@ -1500,6 +1506,13 @@ var DataService = (function () {
       else if (s === 'denied') deniedCount++;
       else if (s === 'settled') settledCount++;
       else if (s !== 'resolved' && s !== 'withdrawn' && s !== 'closed') openCount++;
+      // Deadline-based counts for org KPI cards
+      if (s === 'overdue') {
+        overdueCount++;
+      } else if (rec.deadlineDays !== null && rec.deadlineDays > 0 && rec.deadlineDays <= 7 &&
+                 s !== 'resolved' && s !== 'withdrawn' && s !== 'closed' && s !== 'won' && s !== 'denied' && s !== 'settled') {
+        dueSoonCount++;
+      }
       // Monthly filings
       if (rec.filedTimestamp) {
         var d = new Date(rec.filedTimestamp);
@@ -1525,6 +1538,7 @@ var DataService = (function () {
       byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory,
       monthly: monthlyArr, monthlyResolved: monthlyResolvedArr,
       openCount: openCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount,
+      overdueCount: overdueCount, dueSoonCount: dueSoonCount,
     };
   }
 
@@ -1981,7 +1995,7 @@ var DataService = (function () {
 
     var data = sheet.getDataRange().getValues();
     var responseCount = data.length - 1;
-    if (responseCount < 10) return { categories: [], overall: 0, responseCount: responseCount };
+    if (responseCount < 3) return { categories: [], overall: 0, responseCount: responseCount };
 
     var avgCols = [
       { key: 'AVG_OVERALL_SAT',    name: 'Overall Satisfaction', col: SATISFACTION_COLS.AVG_OVERALL_SAT },
@@ -2111,6 +2125,7 @@ var DataService = (function () {
    * @returns {Object[]}
    */
   function getActivePolls(email) {
+    try {
     email = email ? String(email).trim().toLowerCase() : '';
 
     var pollSheet = (typeof getOrCreatePollsSheet === 'function') ? getOrCreatePollsSheet() : null;
@@ -2165,6 +2180,10 @@ var DataService = (function () {
       });
     }
     return polls;
+    } catch (e) {
+      Logger.log('getActivePolls error: ' + e.message);
+      return [];
+    }
   }
 
   /**
@@ -2209,6 +2228,7 @@ var DataService = (function () {
    * @returns {Object[]}
    */
   function getMeetingMinutes(limit) {
+    try {
     limit = limit || 20;
     var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
     if (!sheet || sheet.getLastRow() <= 1) return [];
@@ -2235,6 +2255,10 @@ var DataService = (function () {
     minutes.sort(function(a, b) { return (b.meetingDateTs || 0) - (a.meetingDateTs || 0); });
     minutes.forEach(function(m) { delete m.meetingDateTs; });
     return minutes.slice(0, limit);
+    } catch (e) {
+      Logger.log('getMeetingMinutes error: ' + e.message);
+      return [];
+    }
   }
 
   /**

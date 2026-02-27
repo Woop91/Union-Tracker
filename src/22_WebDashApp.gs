@@ -204,3 +204,12 @@ function _sanitizeConfig(config) {
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
+
+/**
+ * Returns the published web app URL. Used by client-side logout
+ * as a reload fallback when window.top.location.reload() is blocked.
+ * @returns {string}
+ */
+function getWebAppUrl() {
+  return ScriptApp.getService().getUrl();
+}
