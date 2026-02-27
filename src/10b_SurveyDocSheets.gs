@@ -9,7 +9,13 @@
  */
 function createSatisfactionSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.SATISFACTION);
-  sheet.clear();
+  // CR-11: Only clear if sheet has no meaningful user data (survey responses).
+  // If the sheet has > 2 rows of data, skip full clear and only update
+  // headers/formulas/dashboard areas to avoid destroying survey responses.
+  var hasUserData = sheet.getLastRow() > 2;
+  if (!hasUserData) {
+    sheet.clear();
+  }
 
   // Ensure sheet has enough columns (need 100+ for dashboard area)
   var requiredCols = 100;
@@ -155,20 +161,22 @@ function createSatisfactionSheet(ss) {
     .setFontColor(COLORS.WHITE)
     .setWrap(true);
 
-  // Set widths for section columns
-  for (var sc = 72; sc <= 82; sc++) {
+  // H-11: Use SATISFACTION_COLS.SUMMARY_START constant instead of hardcoded 72-82
+  var summaryEnd = SATISFACTION_COLS.SUMMARY_START + sectionHeaders.length - 1;
+  for (var sc = SATISFACTION_COLS.SUMMARY_START; sc <= summaryEnd; sc++) {
     sheet.setColumnWidth(sc, 65);
   }
 
-  // Section averages (columns BT-CD) are computed by syncSatisfactionValues()
+  // Section averages are computed by syncSatisfactionValues()
   // No formulas in visible sheet - values are written by JavaScript
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DASHBOARD / CHART DATA AREA (Columns CF onwards - col 84+)
+  // DASHBOARD / CHART DATA AREA (after summary columns + 1 gap column)
   // Summary metrics for creating charts
   // ═══════════════════════════════════════════════════════════════════════════
 
-  var dashStart = 84; // Column CF
+  // H-11: Derive dashStart from SATISFACTION_COLS instead of hardcoding 84
+  var dashStart = summaryEnd + 2; // 1 gap column after summary section
 
   // Dashboard Header
   sheet.getRange(1, dashStart).setValue('📊 SURVEY DASHBOARD')
@@ -484,8 +492,13 @@ function createSatisfactionSheet(ss) {
  */
 function createFeedbackSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.FEEDBACK);
-  sheet.clear();
-  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
+  // CR-11: Only clear if sheet has no meaningful user data (feedback entries).
+  // If the sheet has > 2 rows of data, skip full clear to avoid destroying entries.
+  var hasFeedbackData = sheet.getLastRow() > 2;
+  if (!hasFeedbackData) {
+    sheet.clear();
+    sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
+  }
 
   // Headers — auto-derived from FEEDBACK_HEADER_MAP_
   var headers = getHeadersFromMap_(FEEDBACK_HEADER_MAP_);
@@ -859,6 +872,7 @@ function createFunctionChecklistSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = SHEETS.FUNCTION_CHECKLIST || 'Menu Checklist';
 
+  // CR-11: This sheet is fully system-generated (menu checklist), safe to clear.
   var sheet = ss.getSheetByName(sheetName);
   if (sheet) {
     sheet.clear();
@@ -1148,6 +1162,7 @@ function createGettingStartedSheet(ss) {
   ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = SHEETS.GETTING_STARTED || '📚 Getting Started';
 
+  // CR-11: This sheet is fully system-generated (setup guide), safe to clear.
   var sheet = ss.getSheetByName(sheetName);
   if (sheet) {
     sheet.clear();
@@ -1384,6 +1399,7 @@ function createFAQSheet(ss) {
   ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = SHEETS.FAQ || '❓ FAQ';
 
+  // CR-11: This sheet is fully system-generated (FAQ content), safe to clear.
   var sheet = ss.getSheetByName(sheetName);
   if (sheet) {
     sheet.clear();
@@ -1737,6 +1753,7 @@ function createFeaturesReferenceSheet(ss) {
   ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = '📋 Features Reference';
 
+  // CR-11: This sheet is fully system-generated (features catalog), safe to clear.
   var sheet = ss.getSheetByName(sheetName);
   if (sheet) {
     sheet.clear();
