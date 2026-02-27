@@ -255,18 +255,6 @@ function sanitizeHtml(input) {
 }
 
 /**
- * Sanitize input for use in SQL-like queries
- * @param {string} input - Input string to sanitize
- * @returns {string} Sanitized string
- */
-function sanitizeForQuery(input) {
-  if (!input) return '';
-  return String(input)
-    .replace(/'/g, "''")
-    .replace(/\\/g, '\\\\');
-}
-
-/**
  * Validate and sanitize email address
  * @param {string} email - Email to validate
  * @returns {string|null} Sanitized email or null if invalid
@@ -518,6 +506,13 @@ function clearErrorLog() {
     if (lastRow > 1) {
       sheet.deleteRows(2, lastRow - 1);
     }
+    // L-29: Log audit event for error log clearing (security-relevant action)
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('CLEAR_ERROR_LOG', {
+        sheet: ERROR_CONFIG.LOG_SHEET_NAME,
+        rowsCleared: lastRow > 1 ? lastRow - 1 : 0
+      });
+    }
     SpreadsheetApp.getActiveSpreadsheet().toast('Error log cleared', 'Success');
   }
 }
@@ -614,6 +609,8 @@ var COMMAND_CONFIG = {
  * @const {Object}
  */
 var DRIVE_CONFIG = {
+  // M-19: Ideally this would come from the Config tab, but acceptable as a constant
+  // since Drive folder names rarely change and renaming would break existing folder links.
   ROOT_FOLDER_NAME: 'Dashboard - Grievance Files',
   // Simplified template: Member Name and Date Filed
   // Template uses placeholders: {date}, {lastName}, {firstName}
@@ -628,6 +625,10 @@ var DRIVE_CONFIG = {
  * @private
  * @returns {string} Organization name (e.g., "SEIU Local")
  */
+// M-43: _cachedOrgName / _cachedSystemName / _cachedLocalNumber are intentionally
+// never invalidated. In Google Apps Script, each script execution is short-lived
+// (max 6 minutes) and runs in an isolated context, so module-level caches are
+// automatically cleared when the execution ends. No manual invalidation is needed.
 var _cachedOrgName = null;
 function getOrgNameFromConfig_() {
   if (_cachedOrgName !== null) return _cachedOrgName;
@@ -694,18 +695,22 @@ function getLocalNumberFromConfig_() {
 // ============================================================================
 
 /**
- * Version information for build system and display
+ * Version information for build system and display.
+ * M-51: Derives version string from COMMAND_CONFIG.VERSION to avoid duplication.
  * @const {Object}
  */
-var VERSION_INFO = {
-  MAJOR: 4,
-  MINOR: 15,
-  PATCH: 0,
-  BUILD: 'v4.15.0',
-  CURRENT: '4.15.0',
-  BUILD_DATE: '2026-02-25',
-  CODENAME: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements'
-};
+var VERSION_INFO = (function() {
+  var parts = COMMAND_CONFIG.VERSION.split('.');
+  return {
+    MAJOR: parseInt(parts[0], 10),
+    MINOR: parseInt(parts[1], 10),
+    PATCH: parseInt(parts[2], 10),
+    BUILD: 'v' + COMMAND_CONFIG.VERSION,
+    CURRENT: COMMAND_CONFIG.VERSION,
+    BUILD_DATE: '2026-02-25',
+    CODENAME: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements'
+  };
+})();
 
 /**
  * Complete version history with release dates and codenames.
@@ -760,7 +765,11 @@ function getVersionDate(ver) {
 // ============================================================================
 
 /**
- * Sheet name constants - use these instead of hardcoded strings
+ * Sheet name constants - use these instead of hardcoded strings.
+ * L-05: Some sheet names contain emoji (e.g., "📅 Meeting Attendance").
+ * Emoji in sheet names may cause issues on some platforms/locales but is fully
+ * supported by Google Sheets. If cross-platform compatibility is needed, the
+ * emoji prefix can be removed without affecting functionality.
  * @const {Object}
  */
 var SHEETS = {

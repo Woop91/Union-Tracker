@@ -671,22 +671,22 @@ function setupGrievanceFormulasSheet() {
 
   // Column U: Member Email (VLOOKUP from Member Directory)
   sheet.getRange('U2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.EMAIL + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.EMAIL) + ',FALSE),"")))'
   );
 
   // Column V: Unit (VLOOKUP from Member Directory)
   sheet.getRange('V2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.UNIT + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.UNIT) + ',FALSE),"")))'
   );
 
   // Column W: Location (VLOOKUP from Member Directory)
   sheet.getRange('W2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.WORK_LOCATION + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.WORK_LOCATION) + ',FALSE),"")))'
   );
 
   // Column X: Steward (VLOOKUP from Member Directory)
   sheet.getRange('X2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.ASSIGNED_STEWARD + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.ASSIGNED_STEWARD) + ',FALSE),"")))'
   );
 
   // Format date columns (MM/dd/yyyy)

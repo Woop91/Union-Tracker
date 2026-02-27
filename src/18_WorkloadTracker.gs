@@ -246,9 +246,9 @@ var WorkloadPortal = (function () {
       }
 
       var data = memberSheet.getDataRange().getValues();
-      var emailCol = (MEMBER_COLS.EMAIL || 9) - 1;
-      var idCol    = (MEMBER_COLS.MEMBER_ID || 1) - 1;
-      var pinCol   = (MEMBER_COLS.PIN_HASH || 33) - 1;
+      var emailCol = (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.EMAIL ? MEMBER_COLS.EMAIL : 9) - 1;
+      var idCol    = (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.MEMBER_ID ? MEMBER_COLS.MEMBER_ID : 1) - 1;
+      var pinCol   = (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.PIN_HASH ? MEMBER_COLS.PIN_HASH : 33) - 1;
 
       for (var i = 1; i < data.length; i++) {
         var rowEmail = data[i][emailCol];
@@ -350,7 +350,9 @@ var WorkloadPortal = (function () {
     for (var i = 1; i < data.length; i++) {
       var ts = data[i][VAULT_COLS.TIMESTAMP];
       var em = data[i][VAULT_COLS.EMAIL];
-      var key = String(ts) + '|' + String(em).toLowerCase().trim();
+      // Use locale-independent key: toISOString() for Date objects, getTime() as fallback
+      var tsKey = (ts instanceof Date) ? ts.toISOString() : String(ts);
+      var key = tsKey + '|' + String(em).toLowerCase().trim();
       if (seen[key]) {
         removed++;
       } else {
@@ -360,10 +362,15 @@ var WorkloadPortal = (function () {
     }
 
     if (removed > 0) {
-      vault.clear();
-      vault.getRange(1, 1, clean.length, header.length).setValues(clean);
-      vault.getRange(1, 1, 1, header.length).setFontWeight('bold')
-        .setBackground('#1a1a2e').setFontColor('#ffffff');
+      var cleanData = clean;
+      var headerLen = header.length;
+      var vaultSheet = vault;
+      (typeof withScriptLock_ === 'function' ? withScriptLock_ : _withLock)(function() {
+        vaultSheet.clear();
+        vaultSheet.getRange(1, 1, cleanData.length, headerLen).setValues(cleanData);
+        vaultSheet.getRange(1, 1, 1, headerLen).setFontWeight('bold')
+          .setBackground('#1a1a2e').setFontColor('#ffffff');
+      });
       _refreshReportingData();
     }
 
@@ -387,7 +394,7 @@ var WorkloadPortal = (function () {
       if ((day || 'monday').toLowerCase() !== todayName) return false;
       if (!lastSent) return true;
       var daysSince = Math.floor((now - new Date(lastSent)) / 86400000);
-      return daysSince >= 13;
+      return daysSince >= 14;
     }
 
     if (freq === 'monthly') {
@@ -772,6 +779,19 @@ var WorkloadPortal = (function () {
         'CE Activities,Assistance Requests,Aged Cases,Weekly Cases,Employment,Privacy,On Plan,Overtime Hours';
       var csvRows = [header];
 
+      // Sanitize CSV cell to prevent formula injection
+      function _csvSafe(val) {
+        var str = String(val == null ? '' : val);
+        if (str.length > 0 && '=+-@'.indexOf(str.charAt(0)) !== -1) {
+          str = '\t' + str;
+        }
+        // Escape quotes and wrap if contains comma/quote/newline
+        if (str.indexOf(',') >= 0 || str.indexOf('"') >= 0 || str.indexOf('\n') >= 0) {
+          str = '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+      }
+
       for (var i = 1; i < data.length; i++) {
         var re = data[i][VAULT_COLS.EMAIL];
         if (!re || re.toString().toLowerCase().trim() !== emailLower) continue;
@@ -779,13 +799,13 @@ var WorkloadPortal = (function () {
         var dateStr = ts instanceof Date ? Utilities.formatDate(ts,
           SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), 'yyyy-MM-dd') : String(ts);
         csvRows.push([
-          dateStr, data[i][VAULT_COLS.PRIORITY_CASES], data[i][VAULT_COLS.PENDING_CASES],
-          data[i][VAULT_COLS.UNREAD_DOCS], data[i][VAULT_COLS.TODO_ITEMS],
-          data[i][VAULT_COLS.SENT_REFERRALS], data[i][VAULT_COLS.CE_ACTIVITIES],
-          data[i][VAULT_COLS.ASSISTANCE_REQUESTS], data[i][VAULT_COLS.AGED_CASES],
-          data[i][VAULT_COLS.WEEKLY_CASES], data[i][VAULT_COLS.EMPLOYMENT_TYPE],
-          data[i][VAULT_COLS.PRIVACY], data[i][VAULT_COLS.ON_PLAN],
-          data[i][VAULT_COLS.OVERTIME_HOURS]
+          _csvSafe(dateStr), _csvSafe(data[i][VAULT_COLS.PRIORITY_CASES]), _csvSafe(data[i][VAULT_COLS.PENDING_CASES]),
+          _csvSafe(data[i][VAULT_COLS.UNREAD_DOCS]), _csvSafe(data[i][VAULT_COLS.TODO_ITEMS]),
+          _csvSafe(data[i][VAULT_COLS.SENT_REFERRALS]), _csvSafe(data[i][VAULT_COLS.CE_ACTIVITIES]),
+          _csvSafe(data[i][VAULT_COLS.ASSISTANCE_REQUESTS]), _csvSafe(data[i][VAULT_COLS.AGED_CASES]),
+          _csvSafe(data[i][VAULT_COLS.WEEKLY_CASES]), _csvSafe(data[i][VAULT_COLS.EMPLOYMENT_TYPE]),
+          _csvSafe(data[i][VAULT_COLS.PRIVACY]), _csvSafe(data[i][VAULT_COLS.ON_PLAN]),
+          _csvSafe(data[i][VAULT_COLS.OVERTIME_HOURS])
         ].join(','));
       }
 

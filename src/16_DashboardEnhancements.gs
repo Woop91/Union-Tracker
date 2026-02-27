@@ -516,10 +516,16 @@ function addViewComment(viewId, commentText) {
 
   for (var i = 0; i < views.length; i++) {
     if (views[i].id === viewId) {
+      // Authorization check — only the view owner or shared users can comment
+      if (views[i].createdBy !== userEmail &&
+          (!views[i].sharedWith || views[i].sharedWith.indexOf(userEmail) === -1)) {
+        return { success: false, error: 'Not authorized to comment on this view.' };
+      }
+
       var comment = {
         id: 'cmt_' + Date.now(),
         author: userEmail,
-        text: commentText,
+        text: escapeHtml(commentText),
         timestamp: new Date().toISOString()
       };
       views[i].comments.push(comment);

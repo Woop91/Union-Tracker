@@ -1735,7 +1735,8 @@ function syncGrievanceToMemberDirectory() {
   var grievanceData = grievanceSheet.getDataRange().getValues();
   if (grievanceData.length < 2) return;
 
-  // Closed statuses - grievances with these statuses don't count as "open"
+  // M-26: Closed statuses - grievances with these statuses don't count as "open"
+  // TODO: Centralize to 01_Core.gs as GRIEVANCE_STATUS.CLOSED_STATUSES to avoid duplication
   var closedStatuses = ['Closed', 'Settled', 'Withdrawn', 'Denied', 'Won'];
 
   // Build lookup map: memberId -> {hasOpen, status, deadline}
@@ -1854,7 +1855,8 @@ function syncGrievanceFormulasToLog() {
   var today = new Date();
   today.setHours(0, 0, 0, 0); // Normalize to start of day
 
-  // Closed statuses that should not have Next Action Due
+  // M-26: Closed statuses that should not have Next Action Due
+  // TODO: Centralize to 01_Core.gs as GRIEVANCE_STATUS.CLOSED_STATUSES to avoid duplication
   var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
 
   // Prepare updates
@@ -1982,6 +1984,17 @@ function syncGrievanceFormulasToLog() {
 
   // Apply updates to Grievance Log
   if (nameUpdates.length > 0) {
+    // CR-10: Before writing names and contact info, check existing cell data.
+    // Never overwrite a non-empty cell with an empty string (would blank manually entered data).
+    var existingNames = grievanceSheet.getRange(2, GRIEVANCE_COLS.FIRST_NAME, nameUpdates.length, 2).getValues();
+    for (var ni = 0; ni < nameUpdates.length; ni++) {
+      for (var nc = 0; nc < 2; nc++) {
+        // Only write if: new value is non-empty, OR existing cell is empty
+        if (!nameUpdates[ni][nc] && existingNames[ni][nc]) {
+          nameUpdates[ni][nc] = existingNames[ni][nc];
+        }
+      }
+    }
     // C-D: First Name, Last Name
     grievanceSheet.getRange(2, GRIEVANCE_COLS.FIRST_NAME, nameUpdates.length, 2).setValues(nameUpdates);
 
@@ -2022,6 +2035,15 @@ function syncGrievanceFormulasToLog() {
     grievanceSheet.getRange(2, GRIEVANCE_COLS.NEXT_ACTION_DUE, metricsUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
     grievanceSheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, metricsUpdates.length, 1).setNumberFormat('General');
 
+    // CR-10: Preserve existing contact info — never overwrite non-empty cells with empty strings
+    var existingContact = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_EMAIL, contactUpdates.length, 4).getValues();
+    for (var ci = 0; ci < contactUpdates.length; ci++) {
+      for (var cc = 0; cc < 4; cc++) {
+        if (!contactUpdates[ci][cc] && existingContact[ci][cc]) {
+          contactUpdates[ci][cc] = existingContact[ci][cc];
+        }
+      }
+    }
     // X, Y, Z, AA: Email, Unit, Location, Steward
     grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_EMAIL, contactUpdates.length, 4).setValues(contactUpdates);
   }

@@ -255,18 +255,6 @@ function sanitizeHtml(input) {
 }
 
 /**
- * Sanitize input for use in SQL-like queries
- * @param {string} input - Input string to sanitize
- * @returns {string} Sanitized string
- */
-function sanitizeForQuery(input) {
-  if (!input) return '';
-  return String(input)
-    .replace(/'/g, "''")
-    .replace(/\\/g, '\\\\');
-}
-
-/**
  * Validate and sanitize email address
  * @param {string} email - Email to validate
  * @returns {string|null} Sanitized email or null if invalid
@@ -517,6 +505,13 @@ function clearErrorLog() {
     var lastRow = sheet.getLastRow();
     if (lastRow > 1) {
       sheet.deleteRows(2, lastRow - 1);
+    }
+    // L-29: Log audit event for error log clearing (security-relevant action)
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('CLEAR_ERROR_LOG', {
+        sheet: ERROR_CONFIG.LOG_SHEET_NAME,
+        rowsCleared: lastRow > 1 ? lastRow - 1 : 0
+      });
     }
     SpreadsheetApp.getActiveSpreadsheet().toast('Error log cleared', 'Success');
   }
@@ -770,7 +765,11 @@ function getVersionDate(ver) {
 // ============================================================================
 
 /**
- * Sheet name constants - use these instead of hardcoded strings
+ * Sheet name constants - use these instead of hardcoded strings.
+ * L-05: Some sheet names contain emoji (e.g., "📅 Meeting Attendance").
+ * Emoji in sheet names may cause issues on some platforms/locales but is fully
+ * supported by Google Sheets. If cross-platform compatibility is needed, the
+ * emoji prefix can be removed without affecting functionality.
  * @const {Object}
  */
 var SHEETS = {
