@@ -30,13 +30,25 @@
     var SESSION_TOKEN = PAGE_DATA.sessionToken || null;
     var INITIAL_TAB = PAGE_DATA.initialTab || null;
 
+    // Web app URL for redirects (injected server-side, avoids iframe URL issues)
+    var WEB_APP_URL = PAGE_DATA.webAppUrl || '';
+
     // Store session token in localStorage if provided
     if (SESSION_TOKEN) {
       localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
     }
 
-    // Check for existing session token
-    var storedToken = localStorage.getItem('dashboardSessionToken');
+    // On auth page: try to restore session from localStorage
+    if (CURRENT_VIEW === 'auth' && WEB_APP_URL) {
+      var storedToken = localStorage.getItem('dashboardSessionToken');
+      if (storedToken && !PAGE_DATA.tokenChecked) {
+        // Redirect to web app URL with stored session token so server can validate
+        window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
+      } else if (PAGE_DATA.tokenChecked && storedToken) {
+        // Server already rejected this token — clear it
+        localStorage.removeItem('dashboardSessionToken');
+      }
+    }
 
     // ═══════════════════════════════════════
     // THEME ENGINE

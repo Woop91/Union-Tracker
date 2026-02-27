@@ -98,6 +98,8 @@ function _serveAuth(config, e, authError) {
     view: 'auth',
     config: _sanitizeConfig(config),
     error: e.parameter.authError || authError || null,
+    webAppUrl: ScriptApp.getService().getUrl(),
+    tokenChecked: !!(e.parameter.sessionToken),
   });
 
   return template.evaluate()
@@ -136,6 +138,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     isDualRole: role === 'both',
     sessionToken: sessionToken || null,
     initialTab: initialTab || null,
+    webAppUrl: ScriptApp.getService().getUrl(),
   });
 
   return template.evaluate()

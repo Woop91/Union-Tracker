@@ -221,7 +221,13 @@ var Auth = (function () {
         return null;
       }
 
-      // Mark as used (one-time use)
+      // Reject already-used tokens (one-time use)
+      if (data.used) {
+        props.deleteProperty(TOKEN_PREFIX + token);
+        return null;
+      }
+
+      // Mark as used
       data.used = true;
       props.setProperty(TOKEN_PREFIX + token, JSON.stringify(data));
 
@@ -276,22 +282,26 @@ var Auth = (function () {
     var accent = 'hsl(' + hue + ', 70%, 55%)';
     var accentLight = 'hsl(' + hue + ', 70%, 95%)';
 
+    var safeInitials = escapeHtml(String(config.logoInitials || ''));
+    var safeOrgName = escapeHtml(String(config.orgName || ''));
+    var safeExpiry = escapeHtml(String(config.magicLinkExpiryDays || 7));
+
     return '<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin:0; padding:40px 20px; background:#f5f5f5;">'
       + '<div style="max-width:480px; margin:0 auto; background:#fff; border-radius:16px; padding:40px 32px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
       + '<div style="text-align:center; margin-bottom:24px;">'
-      + '<div style="display:inline-block; width:48px; height:48px; border-radius:12px; background:' + accent + '; color:#fff; font-size:20px; font-weight:700; line-height:48px;">' + config.logoInitials + '</div>'
+      + '<div style="display:inline-block; width:48px; height:48px; border-radius:12px; background:' + accent + '; color:#fff; font-size:20px; font-weight:700; line-height:48px;">' + safeInitials + '</div>'
       + '</div>'
-      + '<h1 style="text-align:center; font-size:20px; color:#1a1a2e; margin:0 0 8px;">Sign in to ' + config.orgName + '</h1>'
+      + '<h1 style="text-align:center; font-size:20px; color:#1a1a2e; margin:0 0 8px;">Sign in to ' + safeOrgName + '</h1>'
       + '<p style="text-align:center; color:#666; font-size:14px; margin:0 0 28px;">Click the button below to access your dashboard.</p>'
       + '<div style="text-align:center; margin-bottom:28px;">'
       + '<a href="' + signInUrl + '" style="display:inline-block; background:' + accent + '; color:#fff; text-decoration:none; padding:14px 36px; border-radius:10px; font-size:16px; font-weight:600;">Sign In</a>'
       + '</div>'
       + '<p style="color:#999; font-size:12px; text-align:center; line-height:1.6;">'
-      + 'This link expires in ' + config.magicLinkExpiryDays + ' days.<br>'
+      + 'This link expires in ' + safeExpiry + ' days.<br>'
       + 'If you didn\'t request this, you can safely ignore this email.'
       + '</p>'
       + '<hr style="border:none; border-top:1px solid #eee; margin:24px 0;">'
-      + '<p style="color:#bbb; font-size:11px; text-align:center;">' + config.orgName + ' Grievance Dashboard</p>'
+      + '<p style="color:#bbb; font-size:11px; text-align:center;">' + safeOrgName + ' Grievance Dashboard</p>'
       + '</div></body></html>';
   }
 
