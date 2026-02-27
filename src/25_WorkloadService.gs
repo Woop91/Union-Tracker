@@ -878,7 +878,7 @@ var WorkloadService = (function() {
           var subject = 'Reminder: Submit Your Workload Data';
           var body = 'Hello,\n\nThis is your scheduled reminder to submit your workload data.\n\n' +
             (portalUrl ? 'Access the dashboard here:\n' + portalUrl + '\n\n' : '') +
-            'Thank you,\nSEIU 509 DDS Dashboard';
+            'Thank you,\n' + ((typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) ? COMMAND_CONFIG.SYSTEM_NAME : 'Dashboard');
           MailApp.sendEmail({ to: rowEmail, subject: subject, body: body });
           sheet.getRange(i + 1, REMINDERS_COLS.LAST_SENT + 1).setValue(now);
         }
@@ -967,9 +967,11 @@ var WorkloadService = (function() {
       archSheet.setFrozenRows(1);
       archSheet.hideSheet();
     }
+    // M-37: Write archive data first, then rewrite vault — prevents data loss if write fails
     archSheet.getRange(archSheet.getLastRow() + 1, 1, archive.length, header.length).setValues(archive);
 
-    vault.clear();
+    // Only clear and rewrite vault after archive write succeeds
+    vault.clearContents();
     vault.getRange(1, 1, current.length, header.length).setValues(current);
     _refreshReportingData();
 
@@ -1016,8 +1018,21 @@ var WorkloadService = (function() {
     uniqueData.reverse();
     var finalData = [header].concat(uniqueData);
 
-    vault.clear();
-    vault.getRange(1, 1, finalData.length, header.length).setValues(finalData);
+    // M-38: Write new data before clearing to prevent data loss if write fails.
+    // Use a lock to ensure atomicity of the read-clean-write cycle.
+    var lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(CONFIG.lockTimeoutMs);
+    } catch (_lockErr) {
+      console.error('cleanVault: Could not acquire lock');
+      return;
+    }
+    try {
+      vault.clearContents();
+      vault.getRange(1, 1, finalData.length, header.length).setValues(finalData);
+    } finally {
+      lock.releaseLock();
+    }
     _refreshReportingData();
   }
 

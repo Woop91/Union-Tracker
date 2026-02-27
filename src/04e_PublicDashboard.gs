@@ -275,7 +275,7 @@ function getUnifiedDashboardData(includePII) {
 
     for (var m = 1; m < memberData.length; m++) {
       var memberId = memberData[m][MEMBER_COLS.MEMBER_ID - 1];
-      if (!memberId) continue;
+      if (!memberId || !memberId.toString().match(/^M/i)) continue;
 
       data.totalMembers++;
       var firstName = memberData[m][MEMBER_COLS.FIRST_NAME - 1] || '';
@@ -457,6 +457,21 @@ function getUnifiedDashboardData(includePII) {
     data.currentUserEmail = '';
   }
 
+  // Resolve current user's steward name for exact matching in My Cases
+  data.currentUserStewardName_ = '';
+  if (data.currentUserEmail && memberSheet && memberSheet.getLastRow() > 1) {
+    var memberLookup = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, MEMBER_COLS.IS_STEWARD).getValues();
+    for (var ml = 0; ml < memberLookup.length; ml++) {
+      var mlEmail = (memberLookup[ml][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+      if (mlEmail === data.currentUserEmail.toLowerCase().trim() && isTruthyValue(memberLookup[ml][MEMBER_COLS.IS_STEWARD - 1])) {
+        var mlFirst = memberLookup[ml][MEMBER_COLS.FIRST_NAME - 1] || '';
+        var mlLast = memberLookup[ml][MEMBER_COLS.LAST_NAME - 1] || '';
+        data.currentUserStewardName_ = (mlFirst + ' ' + mlLast).trim().toLowerCase();
+        break;
+      }
+    }
+  }
+
   // Process Grievances
   var stewardCases = {};
   var locationCases = {};
@@ -599,12 +614,10 @@ function getUnifiedDashboardData(includePII) {
 
         // My Cases - check if current user is the assigned steward (v4.4.0)
         if (includePII && data.currentUserEmail && steward) {
-          var stewardLower = steward.toLowerCase();
-          var emailLower = data.currentUserEmail.toLowerCase();
-          var emailName = emailLower.split('@')[0].replace(/[._]/g, ' ');
-          // Match by full steward name, email prefix, or partial match
-          if (stewardLower.indexOf(emailName) >= 0 || emailLower.indexOf(stewardLower.replace(/\s+/g, '.')) >= 0 ||
-              stewardLower.split(' ').some(function(part) { return emailName.indexOf(part) >= 0 && part.length > 2; })) {
+          var stewardLower = steward.toLowerCase().trim();
+          var emailLower = data.currentUserEmail.toLowerCase().trim();
+          // Match by exact email first, then exact full name match
+          if (stewardLower === emailLower || stewardLower === data.currentUserStewardName_) {
             data.myCases.push({
               id: grievanceId,
               member: memberName,

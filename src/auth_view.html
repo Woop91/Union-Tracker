@@ -203,7 +203,18 @@ function showAuthSent(container, email, rememberMe) {
   wrapper.appendChild(el('div', { className: 'auth-title' }, 'Check your email'));
 
   var desc = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.6' } });
-  desc.innerHTML = 'We sent a <strong style="color:var(--text)">sign-in link</strong> (not a PIN) to<br><span style="color: var(--accent); font-weight: 600;">' + email + '</span>';
+  // CR-16 fix: build email span via DOM methods to prevent XSS from user-typed email
+  var strong = document.createElement('strong');
+  strong.style.color = 'var(--text)';
+  strong.textContent = 'sign-in link';
+  var emailSpan = document.createElement('span');
+  emailSpan.style.cssText = 'color: var(--accent); font-weight: 600;';
+  emailSpan.textContent = email;
+  desc.appendChild(document.createTextNode('We sent a '));
+  desc.appendChild(strong);
+  desc.appendChild(document.createTextNode(' (not a PIN) to'));
+  desc.appendChild(document.createElement('br'));
+  desc.appendChild(emailSpan);
   wrapper.appendChild(desc);
 
   // Helpful tips

@@ -19,7 +19,6 @@ var Auth = (function () {
 
   var TOKEN_PREFIX = 'MAGIC_TOKEN_';
   var SESSION_PREFIX = 'SESSION_';
-  var HMAC_SECRET_KEY = 'AUTH_HMAC_SECRET';
 
   /**
    * Attempts to resolve the current user from available auth signals.
@@ -215,20 +214,23 @@ var Auth = (function () {
     try {
       var data = JSON.parse(raw);
 
+      // CR-03: Reject already-used tokens (prevent replay)
+      if (data.used === true) {
+        props.deleteProperty(TOKEN_PREFIX + token);
+        return null;
+      }
+
       // Check expiry
       if (data.expiry < Date.now()) {
         props.deleteProperty(TOKEN_PREFIX + token);
         return null;
       }
 
-      // Mark as used (one-time use)
-      data.used = true;
-      props.setProperty(TOKEN_PREFIX + token, JSON.stringify(data));
+      // Mark as used and delete immediately (one-time use)
+      var email = data.email;
+      props.deleteProperty(TOKEN_PREFIX + token);
 
-      // Delete after short delay to prevent replay but allow page load
-      // Token will be cleaned up by cleanupExpiredTokens()
-
-      return data.email;
+      return email;
     } catch (e) {
       return null;
     }
@@ -256,18 +258,11 @@ var Auth = (function () {
 
   function _generateToken() {
     // Generate a random token using Utilities
+    // M-66: Note — base64-encodes the UUID string chars (not raw bytes), producing an
+    // inflated token. This is acceptable because two concatenated UUIDs (64 hex chars)
+    // still provide sufficient entropy (~128 bits) for token security.
     var bytes = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
     return Utilities.base64EncodeWebSafe(bytes).replace(/[=]+$/, '');
-  }
-
-  function _getHmacSecret() {
-    var props = PropertiesService.getScriptProperties();
-    var secret = props.getProperty(HMAC_SECRET_KEY);
-    if (!secret) {
-      secret = Utilities.getUuid() + '-' + Utilities.getUuid();
-      props.setProperty(HMAC_SECRET_KEY, secret);
-    }
-    return secret;
   }
 
   function _buildEmailHtml(config, signInUrl, email) {
@@ -279,9 +274,9 @@ var Auth = (function () {
     return '<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin:0; padding:40px 20px; background:#f5f5f5;">'
       + '<div style="max-width:480px; margin:0 auto; background:#fff; border-radius:16px; padding:40px 32px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
       + '<div style="text-align:center; margin-bottom:24px;">'
-      + '<div style="display:inline-block; width:48px; height:48px; border-radius:12px; background:' + accent + '; color:#fff; font-size:20px; font-weight:700; line-height:48px;">' + config.logoInitials + '</div>'
+      + '<div style="display:inline-block; width:48px; height:48px; border-radius:12px; background:' + accent + '; color:#fff; font-size:20px; font-weight:700; line-height:48px;">' + escapeHtml(String(config.logoInitials || '')) + '</div>'
       + '</div>'
-      + '<h1 style="text-align:center; font-size:20px; color:#1a1a2e; margin:0 0 8px;">Sign in to ' + config.orgName + '</h1>'
+      + '<h1 style="text-align:center; font-size:20px; color:#1a1a2e; margin:0 0 8px;">Sign in to ' + escapeHtml(String(config.orgName || '')) + '</h1>'
       + '<p style="text-align:center; color:#666; font-size:14px; margin:0 0 28px;">Click the button below to access your dashboard.</p>'
       + '<div style="text-align:center; margin-bottom:28px;">'
       + '<a href="' + signInUrl + '" style="display:inline-block; background:' + accent + '; color:#fff; text-decoration:none; padding:14px 36px; border-radius:10px; font-size:16px; font-weight:600;">Sign In</a>'
@@ -291,7 +286,7 @@ var Auth = (function () {
       + 'If you didn\'t request this, you can safely ignore this email.'
       + '</p>'
       + '<hr style="border:none; border-top:1px solid #eee; margin:24px 0;">'
-      + '<p style="color:#bbb; font-size:11px; text-align:center;">' + config.orgName + ' Grievance Dashboard</p>'
+      + '<p style="color:#bbb; font-size:11px; text-align:center;">' + escapeHtml(String(config.orgName || '')) + ' Grievance Dashboard</p>'
       + '</div></body></html>';
   }
 
@@ -319,9 +314,17 @@ function authSendMagicLink(email, rememberMe) {
 }
 
 /**
- * Client-callable: Create a session token after successful auth
+ * Client-callable: Create a session token after successful auth.
+ * CR-02: email is resolved server-side — never trust client-supplied email.
  */
-function authCreateSessionToken(email) {
+function authCreateSessionToken() {
+  var email = '';
+  try {
+    email = Session.getActiveUser().getEmail();
+  } catch (_e) { /* SSO not available */ }
+  if (!email) {
+    return { error: 'Unable to resolve authenticated user. Please sign in again.' };
+  }
   return Auth.createSessionToken(email);
 }
 

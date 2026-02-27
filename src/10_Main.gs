@@ -41,10 +41,22 @@ function onOpen() {
     // spreadsheet UI is not blocked by heavy I/O (column sync, tab colors,
     // hidden-sheet enforcement, etc.)
     try {
-      ScriptApp.newTrigger('onOpenDeferred_')
-        .timeBased()
-        .after(1000)
-        .create();
+      // M-59: Check if the trigger already exists before creating a new one
+      // to prevent trigger accumulation across multiple onOpen calls.
+      var existingTriggers = ScriptApp.getProjectTriggers();
+      var hasDeferredTrigger = false;
+      for (var t = 0; t < existingTriggers.length; t++) {
+        if (existingTriggers[t].getHandlerFunction() === 'onOpenDeferred_') {
+          hasDeferredTrigger = true;
+          break;
+        }
+      }
+      if (!hasDeferredTrigger) {
+        ScriptApp.newTrigger('onOpenDeferred_')
+          .timeBased()
+          .after(1000)
+          .create();
+      }
     } catch (triggerError) {
       // If trigger creation fails (quota, permissions), run inline as fallback
       console.log('Deferred trigger failed, running inline: ' + triggerError.message);
@@ -219,8 +231,14 @@ function onEdit(e) {
         catch (sortError) { Logger.log('Auto-sort error: ' + sortError.message); }
       }
 
+      // M-48: onEditAutoSync calls syncGrievanceFormulasToLog internally.
+      // Mark the event so onEditAutoSync can skip redundant formula sync
+      // since handleGrievanceEdit already computed deadline values for this row.
       if (typeof onEditAutoSync === 'function') {
-        try { onEditAutoSync(e); }
+        try {
+          e._grievanceEditHandled = true;
+          onEditAutoSync(e);
+        }
         catch (syncError) { console.log('AutoSync handler error: ' + syncError.message); }
       }
 
@@ -347,8 +365,11 @@ function handleSecurityAudit_(e) {
         // Config not available
       }
 
-      if (chiefEmail && MailApp.getRemainingDailyQuota() > 0) {
-        try {
+      // L-41: MailApp methods are not available in simple trigger context.
+      // Wrap the entire email block (including quota check) in try/catch
+      // so failures are logged rather than silently dropped.
+      try {
+        if (chiefEmail && MailApp.getRemainingDailyQuota() > 0) {
           MailApp.sendEmail({
             to: chiefEmail,
             subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' SABOTAGE ALERT',
@@ -361,9 +382,9 @@ function handleSecurityAudit_(e) {
                   'Please review immediately.' +
                   COMMAND_CONFIG.EMAIL.FOOTER
           });
-        } catch (emailError) {
-          Logger.log('Sabotage alert email failed (simple onEdit limit): ' + emailError.message);
         }
+      } catch (emailError) {
+        Logger.log('Sabotage alert email failed (simple onEdit trigger cannot send email): ' + emailError.message);
       }
 
       // Log to console for visibility (PII-safe)
@@ -472,7 +493,12 @@ function handleStageGateWorkflow_(e) {
       // Only update Date Closed timestamp for closed statuses
       var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
       if (closedStatuses.indexOf(newValue) !== -1) {
-        sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).setValue(new Date());
+        // CR-12: Only set DATE_CLOSED if the cell is currently empty,
+        // preserving any manually entered close date.
+        var existingCloseDate = sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).getValue();
+        if (!existingCloseDate) {
+          sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).setValue(new Date());
+        }
       }
 
       // Check if this is an escalation status (reads from Config or falls back to default)
@@ -625,7 +651,36 @@ function getUnitCodes_() {
     }
   }
 
-  // Fall back to default codes
+  // H-12: Fall back to reading unit names from Config tab's UNITS column.
+  // If Config has units, derive codes from the first two chars of each name.
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet && CONFIG_COLS.UNITS) {
+      var unitValues = getConfigValues(configSheet, CONFIG_COLS.UNITS);
+      if (unitValues.length > 0) {
+        var dynamicCodes = {};
+        for (var u = 0; u < unitValues.length; u++) {
+          var unitName = unitValues[u].toString().trim();
+          if (unitName) {
+            // Generate 2-char code from first letters of each word, or first 2 chars
+            var words = unitName.split(/\s+/);
+            var code = words.length >= 2
+              ? (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+              : unitName.substring(0, 2).toUpperCase();
+            dynamicCodes[unitName] = code;
+          }
+        }
+        if (Object.keys(dynamicCodes).length > 0) {
+          return dynamicCodes;
+        }
+      }
+    }
+  } catch (configErr) {
+    console.log('Error reading units from Config: ' + configErr.message);
+  }
+
+  // Last resort: default codes (should be configured in Config tab UNIT_CODES column)
   return {
     "Main Station": "MS",
     "Field Ops": "FO",

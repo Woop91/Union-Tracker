@@ -56,6 +56,11 @@ function getDashboardStats() {
     var logData = logSheet.getDataRange().getValues();
     logData.shift(); // Remove headers
 
+    // Filter to only rows with a valid grievance ID (starts with "G")
+    logData = logData.filter(function(row) {
+      var gid = (row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '').toString();
+      return gid.match(/^G/i);
+    });
     stats.totalGrievances = logData.length;
 
     logData.forEach(function(row) {
@@ -74,11 +79,12 @@ function getDashboardStats() {
       if (currentStep.indexOf('step 2') !== -1 || currentStep === '2') stats.activeSteps.step2++;
       if (currentStep.indexOf('arbitration') !== -1 || currentStep.indexOf('step 3') !== -1) stats.activeSteps.arbitration++;
 
-      // Count outcomes
-      if (status === 'won' || status === 'sustained') stats.outcomes.wins++;
-      if (status === 'denied' || status === 'lost') stats.outcomes.losses++;
-      if (status === 'settled') stats.outcomes.settled++;
-      if (status === 'withdrawn') stats.outcomes.withdrawn++;
+      // Count outcomes using the Resolution column (not Status)
+      var resolution = (row[GRIEVANCE_COLS.RESOLUTION - 1] || '').toString().toLowerCase();
+      if (resolution === 'won' || resolution === 'sustained') stats.outcomes.wins++;
+      if (resolution === 'denied' || resolution === 'lost') stats.outcomes.losses++;
+      if (resolution === 'settled') stats.outcomes.settled++;
+      if (resolution === 'withdrawn') stats.outcomes.withdrawn++;
 
       // Unit breakdown
       if (!stats.unitBreakdown[unit]) stats.unitBreakdown[unit] = 0;
@@ -94,14 +100,19 @@ function getDashboardStats() {
         }
       }
 
-      // Check for overdue
-      var step1Due = row[GRIEVANCE_COLS.STEP1_DUE - 1];
-      if (step1Due && new Date(step1Due) < new Date() && (status === 'open' || status === 'pending info')) {
+      // Check for overdue using DAYS_TO_DEADLINE (accounts for all steps)
+      var daysToDeadline = row[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+      if ((status === 'open' || status === 'pending info') &&
+          (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0))) {
         stats.overdueCount++;
       }
     });
 
     // Calculate win rate
+    // NOTE: Settled cases are included in the denominator but NOT the numerator.
+    // This is intentional — settled cases represent partial wins and are counted
+    // conservatively (in the denominator only) to avoid inflating the win rate.
+    // This matches the executive reporting methodology where only full wins count.
     var totalClosed = stats.outcomes.wins + stats.outcomes.losses + stats.outcomes.settled;
     if (totalClosed > 0) {
       stats.winRate = Math.round((stats.outcomes.wins / totalClosed) * 100);
@@ -576,7 +587,7 @@ function checkOverdueGrievances_() {
           (daysToDeadline === 'Overdue' || (typeof daysToDeadline === 'number' && daysToDeadline < 0))) {
         overdueList.push({
           id: data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1],
-          name: data[i][GRIEVANCE_COLS.FIRST_NAME - 1] + ' ' + data[i][GRIEVANCE_COLS.LAST_NAME - 1],
+          name: maskName(data[i][GRIEVANCE_COLS.FIRST_NAME - 1], data[i][GRIEVANCE_COLS.LAST_NAME - 1]),
           steward: data[i][GRIEVANCE_COLS.STEWARD - 1],
           days: daysToDeadline
         });
@@ -710,7 +721,20 @@ function emailExecutivePDF() {
   try {
     var date = new Date();
     var dateStr = Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
-    var blob = ss.getAs('application/pdf').setName("Health_Report_" + dateStr + ".pdf");
+
+    // Export only the active sheet as PDF (not the entire spreadsheet)
+    var activeSheet = ss.getActiveSheet();
+    var sheetGid = activeSheet.getSheetId();
+    var url = ss.getUrl().replace(/\/edit.*$/, '') +
+      '/export?exportFormat=pdf&format=pdf' +
+      '&gid=' + sheetGid +
+      '&size=letter&portrait=true&fitw=1' +
+      '&gridlines=false&printtitle=false&sheetnames=false';
+    var token = ScriptApp.getOAuthToken();
+    var response = UrlFetchApp.fetch(url, {
+      headers: { Authorization: 'Bearer ' + token }
+    });
+    var blob = response.getBlob().setName("Health_Report_" + dateStr + ".pdf");
 
     MailApp.sendEmail({
       to: Session.getEffectiveUser().getEmail(),
@@ -769,6 +793,10 @@ function checkDuplicateMemberIDs_UIService_() {
   if (duplicates.length === 0) {
     ss.toast('No duplicate Member IDs found.', 'Duplicate Check', 3);
   } else {
+    // Clear all previous highlights in the Member ID column before applying new ones
+    var idColRange = sheet.getRange(2, MEMBER_COLS.MEMBER_ID, data.length - 1, 1);
+    idColRange.setBackground(null);
+
     // Highlight duplicates
     for (var j = 1; j < data.length; j++) {
       var memberId = data[j][MEMBER_COLS.MEMBER_ID - 1];
@@ -957,17 +985,26 @@ function applyStatusColors() {
   var lastDataRow = sheet.getLastRow();
   if (lastDataRow < 2) return;
 
-  for (var row = 2; row <= lastDataRow; row++) {
-    var statusCell = sheet.getRange(row, GRIEVANCE_COLS.STATUS);
-    var status = statusCell.getValue();
+  var numRows = lastDataRow - 1;
+  var statusRange = sheet.getRange(2, GRIEVANCE_COLS.STATUS, numRows, 1);
+  var statuses = statusRange.getValues();
+  var backgrounds = statusRange.getBackgrounds();
+  var fontColors = statusRange.getFontColors();
+  var fontWeights = statusRange.getFontWeights();
 
+  for (var i = 0; i < numRows; i++) {
+    var status = statuses[i][0];
     if (status && COMMAND_CONFIG.STATUS_COLORS[status]) {
       var colors = COMMAND_CONFIG.STATUS_COLORS[status];
-      statusCell.setBackground(colors.bg)
-                .setFontColor(colors.text)
-                .setFontWeight('bold');
+      backgrounds[i][0] = colors.bg;
+      fontColors[i][0] = colors.text;
+      fontWeights[i][0] = 'bold';
     }
   }
+
+  statusRange.setBackgrounds(backgrounds)
+             .setFontColors(fontColors)
+             .setFontWeights(fontWeights);
 
   ss.toast('Status colors applied to Grievance Log.', 'Style Engine', 3);
 }
