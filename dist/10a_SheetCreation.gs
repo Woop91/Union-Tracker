@@ -540,7 +540,9 @@ function createConfigGuideSheet(ss) {
   ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = SHEETS.CONFIG_GUIDE || '📖 Config Guide';
 
+  // CR-11: This sheet is fully system-generated (no user data), so clearing is safe.
   var sheet = ss.getSheetByName(sheetName);
+  var isNew = !sheet;
   if (sheet) {
     sheet.clear();
   } else {

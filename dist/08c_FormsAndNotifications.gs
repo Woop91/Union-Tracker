@@ -34,14 +34,9 @@ function getFormUrlFromConfig(formType) {
       return '';
   }
 
-  // Try to get from Config sheet (row 2 contains data, row 3 for newer format)
+  // M-15: Config data starts at row 3 (row 1 = section headers, row 2 = column headers)
   if (configSheet) {
-    // Check row 2 first (original format)
-    var url = configSheet.getRange(2, configCol).getValue();
-    if (!url || url === '') {
-      // Check row 3 (newer format with section headers)
-      url = configSheet.getRange(3, configCol).getValue();
-    }
+    var url = configSheet.getRange(3, configCol).getValue();
     if (url && url !== '' && url.indexOf('http') === 0) {
       return url;
     }
@@ -371,25 +366,26 @@ function onContactFormSubmit(e) {
       var updates = [];
 
       // Update all fields from form (even if they change existing values)
-      if (jobTitle) updates.push({ col: MEMBER_COLS.JOB_TITLE, value: jobTitle });
-      if (unit) updates.push({ col: MEMBER_COLS.UNIT, value: unit });
-      if (workLocation) updates.push({ col: MEMBER_COLS.WORK_LOCATION, value: workLocation });
-      if (officeDays) updates.push({ col: MEMBER_COLS.OFFICE_DAYS, value: officeDays });
-      if (preferredComm) updates.push({ col: MEMBER_COLS.PREFERRED_COMM, value: preferredComm });
-      if (bestTime) updates.push({ col: MEMBER_COLS.BEST_TIME, value: bestTime });
-      if (supervisor) updates.push({ col: MEMBER_COLS.SUPERVISOR, value: supervisor });
-      if (manager) updates.push({ col: MEMBER_COLS.MANAGER, value: manager });
-      if (email) updates.push({ col: MEMBER_COLS.EMAIL, value: email });
-      if (phone) updates.push({ col: MEMBER_COLS.PHONE, value: phone });
-      if (interestLocal) updates.push({ col: MEMBER_COLS.INTEREST_LOCAL, value: interestLocal });
-      if (interestChapter) updates.push({ col: MEMBER_COLS.INTEREST_CHAPTER, value: interestChapter });
-      if (interestAllied) updates.push({ col: MEMBER_COLS.INTEREST_ALLIED, value: interestAllied });
+      // CR-18: Apply escapeForFormula() to all string values (matches new-member branch)
+      if (jobTitle) updates.push({ col: MEMBER_COLS.JOB_TITLE, value: escapeForFormula(jobTitle) });
+      if (unit) updates.push({ col: MEMBER_COLS.UNIT, value: escapeForFormula(unit) });
+      if (workLocation) updates.push({ col: MEMBER_COLS.WORK_LOCATION, value: escapeForFormula(workLocation) });
+      if (officeDays) updates.push({ col: MEMBER_COLS.OFFICE_DAYS, value: escapeForFormula(officeDays) });
+      if (preferredComm) updates.push({ col: MEMBER_COLS.PREFERRED_COMM, value: escapeForFormula(preferredComm) });
+      if (bestTime) updates.push({ col: MEMBER_COLS.BEST_TIME, value: escapeForFormula(bestTime) });
+      if (supervisor) updates.push({ col: MEMBER_COLS.SUPERVISOR, value: escapeForFormula(supervisor) });
+      if (manager) updates.push({ col: MEMBER_COLS.MANAGER, value: escapeForFormula(manager) });
+      if (email) updates.push({ col: MEMBER_COLS.EMAIL, value: escapeForFormula(email) });
+      if (phone) updates.push({ col: MEMBER_COLS.PHONE, value: escapeForFormula(phone) });
+      if (interestLocal) updates.push({ col: MEMBER_COLS.INTEREST_LOCAL, value: escapeForFormula(interestLocal) });
+      if (interestChapter) updates.push({ col: MEMBER_COLS.INTEREST_CHAPTER, value: escapeForFormula(interestChapter) });
+      if (interestAllied) updates.push({ col: MEMBER_COLS.INTEREST_ALLIED, value: escapeForFormula(interestAllied) });
       if (hireDate) updates.push({ col: MEMBER_COLS.HIRE_DATE, value: parseFormDate_(hireDate) });
-      if (employeeId) updates.push({ col: MEMBER_COLS.EMPLOYEE_ID, value: employeeId });
-      if (streetAddress) updates.push({ col: MEMBER_COLS.STREET_ADDRESS, value: streetAddress });
-      if (city) updates.push({ col: MEMBER_COLS.CITY, value: city });
-      if (state) updates.push({ col: MEMBER_COLS.STATE, value: state });
-      if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: zipCode });
+      if (employeeId) updates.push({ col: MEMBER_COLS.EMPLOYEE_ID, value: escapeForFormula(employeeId) });
+      if (streetAddress) updates.push({ col: MEMBER_COLS.STREET_ADDRESS, value: escapeForFormula(streetAddress) });
+      if (city) updates.push({ col: MEMBER_COLS.CITY, value: escapeForFormula(city) });
+      if (state) updates.push({ col: MEMBER_COLS.STATE, value: escapeForFormula(state) });
+      if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: escapeForFormula(zipCode) });
 
       // Apply updates
       for (var j = 0; j < updates.length; j++) {
@@ -1729,8 +1725,23 @@ function populateSurveyTrackingFromMembers() {
     return;
   }
 
-  // Clear existing data (preserve header)
+  // M-39: Only clear tracking data if no existing survey responses exist.
+  // If any rows have a Completed Date (response timestamp), warn and skip the clear
+  // to avoid destroying manually entered or response-driven data.
   if (trackingSheet.getLastRow() > 1) {
+    var existingData = trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).getValues();
+    var hasResponseData = false;
+    for (var chk = 0; chk < existingData.length; chk++) {
+      // Check Completed Date column for any response timestamps
+      if (existingData[chk][SURVEY_TRACKING_COLS.COMPLETED_DATE - 1]) {
+        hasResponseData = true;
+        break;
+      }
+    }
+    if (hasResponseData) {
+      Logger.log('populateSurveyTracking: Existing survey response data found — skipping clear to avoid data loss. Use startNewSurveyRound() to reset.');
+      return;
+    }
     trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).clear();
   }
 
@@ -1919,7 +1930,13 @@ function sendSurveyCompletionReminders() {
       trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.LAST_REMINDER_SENT).setValue(now);
       sentCount++;
     } catch (emailError) {
-      Logger.log('Reminder email failed for ' + email + ': ' + emailError.message);
+      // M-14: Use secureLog/maskEmail instead of logging raw email
+      if (typeof secureLog === 'function') {
+        secureLog('sendSurveyCompletionReminders', 'Reminder email failed', { email: email, error: emailError.message });
+      } else {
+        var masked = typeof maskEmail === 'function' ? maskEmail(email) : '[REDACTED]';
+        Logger.log('Reminder email failed for ' + masked + ': ' + emailError.message);
+      }
     }
   }
 

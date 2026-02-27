@@ -1246,10 +1246,12 @@ function createGrievanceSnapshot() {
 
 /**
  * Restores the grievance log from a snapshot
+ * CR-14: Requires explicit confirmed=true parameter and creates a persistent backup first
  * @param {Object} snapshot - Snapshot to restore
+ * @param {boolean} confirmed - Must be true to proceed; adds programmatic confirmation gate
  * @returns {void}
  */
-function restoreFromSnapshot(snapshot) {
+function restoreFromSnapshot(snapshot, confirmed) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -1265,26 +1267,41 @@ function restoreFromSnapshot(snapshot) {
     }
   }
 
-  // Confirm with user before proceeding
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.alert(
-    'Restore Snapshot',
-    'This will replace all current grievance data with the snapshot from ' +
-    snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
-    ui.ButtonSet.YES_NO
-  );
-  if (response !== ui.Button.YES) {
-    return;
+  // CR-14: Require explicit confirmed parameter as a programmatic safety gate
+  if (confirmed !== true) {
+    // Confirm with user via UI dialog
+    var ui = SpreadsheetApp.getUi();
+    var response = ui.alert(
+      'Restore Snapshot',
+      'This will replace all current grievance data with the snapshot from ' +
+      snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
+      ui.ButtonSet.YES_NO
+    );
+    if (response !== ui.Button.YES) {
+      return;
+    }
   }
 
-  // Create a backup of current data before restoring
+  // CR-14: Create a persistent backup of current data to a hidden sheet before restoring
+  var backupSheetName = '';
   try {
-    // NOTE: Backup is ephemeral (in-memory only). Persisting to hidden sheet would add complexity for rare usage.
-    var preRestoreBackup = createGrievanceSnapshot();
-    preRestoreBackup.label = 'Pre-Restore Backup';
-    Logger.log('Pre-restore backup created at ' + preRestoreBackup.timestamp);
+    var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    backupSheetName = '_PreRestore_Backup_' + timestamp;
+    if (sheet.getLastRow() > 1) {
+      var backupSheet = ss.insertSheet(backupSheetName);
+      var currentData = sheet.getDataRange().getValues();
+      backupSheet.getRange(1, 1, currentData.length, currentData[0].length).setValues(currentData);
+      try {
+        setSheetVeryHidden_(backupSheet);
+      } catch (_hideErr) {
+        backupSheet.hideSheet();
+      }
+      Logger.log('Pre-restore backup saved to hidden sheet: ' + backupSheetName);
+    }
   } catch (_backupErr) {
-    Logger.log('Warning: Could not create pre-restore backup: ' + _backupErr.message);
+    Logger.log('Warning: Could not create pre-restore backup sheet: ' + _backupErr.message);
+    // Continue with restore — backup failure should not block the operation,
+    // but log a warning for audit trail
   }
 
   // Clear existing data (keep header)
@@ -1297,6 +1314,12 @@ function restoreFromSnapshot(snapshot) {
     sheet.getRange(2, 1, snapshot.data.length - 1, snapshot.data[0].length)
       .setValues(snapshot.data.slice(1));
   }
+
+  logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR || 'SNAPSHOT_RESTORED', {
+    snapshotTimestamp: snapshot.timestamp,
+    backupSheet: backupSheetName || 'N/A',
+    restoredBy: Session.getActiveUser().getEmail()
+  });
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Snapshot restored', 'Undo/Redo', 3);
 }
@@ -2123,29 +2146,33 @@ function saveSettings(settings) {
 function batchSetValues(sheet, updates) {
   if (!updates || updates.length === 0) return;
 
-  // Group updates by row for efficient writing
-  var rowGroups = {};
-  updates.forEach(function(update) {
-    if (!rowGroups[update.row]) {
-      rowGroups[update.row] = [];
-    }
-    rowGroups[update.row].push(update);
+  // CR-13: Wrap entire read-modify-write cycle in a script lock to prevent
+  // concurrent writes from overwriting each other's changes
+  withScriptLock_(function() {
+    // Group updates by row for efficient writing
+    var rowGroups = {};
+    updates.forEach(function(update) {
+      if (!rowGroups[update.row]) {
+        rowGroups[update.row] = [];
+      }
+      rowGroups[update.row].push(update);
+    });
+
+    // Get current sheet data for merging
+    var lastRow = Math.max.apply(null, updates.map(function(u) { return u.row; }));
+    var lastCol = Math.max.apply(null, updates.map(function(u) { return u.col; }));
+
+    // Read current data
+    var currentData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+
+    // Apply updates to the array
+    updates.forEach(function(update) {
+      currentData[update.row - 1][update.col - 1] = update.value;
+    });
+
+    // Write back in single operation
+    sheet.getRange(1, 1, lastRow, lastCol).setValues(currentData);
   });
-
-  // Get current sheet data for merging
-  var lastRow = Math.max.apply(null, updates.map(function(u) { return u.row; }));
-  var lastCol = Math.max.apply(null, updates.map(function(u) { return u.col; }));
-
-  // Read current data
-  var currentData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-
-  // Apply updates to the array
-  updates.forEach(function(update) {
-    currentData[update.row - 1][update.col - 1] = update.value;
-  });
-
-  // Write back in single operation
-  sheet.getRange(1, 1, lastRow, lastCol).setValues(currentData);
 }
 
 /**

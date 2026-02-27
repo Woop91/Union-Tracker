@@ -9,7 +9,13 @@
  */
 function createSatisfactionSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.SATISFACTION);
-  sheet.clear();
+  // CR-11: Only clear if sheet has no meaningful user data (survey responses).
+  // If the sheet has > 2 rows of data, skip full clear and only update
+  // headers/formulas/dashboard areas to avoid destroying survey responses.
+  var hasUserData = sheet.getLastRow() > 2;
+  if (!hasUserData) {
+    sheet.clear();
+  }
 
   // Ensure sheet has enough columns (need 100+ for dashboard area)
   var requiredCols = 100;
@@ -484,8 +490,13 @@ function createSatisfactionSheet(ss) {
  */
 function createFeedbackSheet(ss) {
   var sheet = getOrCreateSheet(ss, SHEETS.FEEDBACK);
-  sheet.clear();
-  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
+  // CR-11: Only clear if sheet has no meaningful user data (feedback entries).
+  // If the sheet has > 2 rows of data, skip full clear to avoid destroying entries.
+  var hasFeedbackData = sheet.getLastRow() > 2;
+  if (!hasFeedbackData) {
+    sheet.clear();
+    sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations();
+  }
 
   // Headers — auto-derived from FEEDBACK_HEADER_MAP_
   var headers = getHeadersFromMap_(FEEDBACK_HEADER_MAP_);
@@ -859,6 +870,7 @@ function createFunctionChecklistSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = SHEETS.FUNCTION_CHECKLIST || 'Menu Checklist';
 
+  // CR-11: This sheet is fully system-generated (menu checklist), safe to clear.
   var sheet = ss.getSheetByName(sheetName);
   if (sheet) {
     sheet.clear();

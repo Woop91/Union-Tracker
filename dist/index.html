@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <!-- H-52: CSP — GAS requires 'unsafe-inline' and 'unsafe-eval' for google.script.run -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://apis.google.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:;">
   <title>Dashboard</title>
 
   <!-- Fonts -->
@@ -22,6 +24,9 @@
     // ═══════════════════════════════════════
     // BOOTSTRAP — Parse server-injected data
     // ═══════════════════════════════════════
+    // H-50: pageData is JSON.stringify'd server-side before injection.
+    // Safety depends on server-side serialization via JSON.stringify() which
+    // escapes </script> sequences. Do not change to <?= ?> (double-escape).
     var PAGE_DATA = <?!= pageData ?>;
     var CONFIG = PAGE_DATA.config;
     var CURRENT_VIEW = PAGE_DATA.view;
@@ -30,7 +35,9 @@
     var SESSION_TOKEN = PAGE_DATA.sessionToken || null;
     var INITIAL_TAB = PAGE_DATA.initialTab || null;
 
-    // Store session token in localStorage if provided
+    // H-51: Session token stored in localStorage because GAS web apps cannot
+    // set HttpOnly cookies. This is a known trade-off — XSS prevention (via
+    // escapeHtml, CSP, and input validation) is the primary mitigation.
     if (SESSION_TOKEN) {
       localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
     }
@@ -223,6 +230,11 @@
       return elem;
     }
 
+    /**
+     * H-49: Parses an HTML string into a DOM element. WARNING: Only pass trusted/
+     * pre-escaped HTML strings to this function. Never pass unsanitized user input
+     * — use el() with textContent or escapeHtml() for dynamic data instead.
+     */
     function html(str) {
       var div = document.createElement('div');
       div.innerHTML = str;

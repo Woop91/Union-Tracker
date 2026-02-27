@@ -866,8 +866,8 @@
         html += '<div class="card mt-12"><h2>Category Averages (per submission)</h2>' +
           '<div class="category-grid">';
         Object.keys(cats).forEach(function(key) {
-          html += '<div class="stat-card"><div class="stat-val">' + (avgs[key] || '0') +
-            '</div><div class="stat-label">' + key + '</div></div>';
+          html += '<div class="stat-card"><div class="stat-val">' + escapeHtml(avgs[key] || '0') +
+            '</div><div class="stat-label">' + escapeHtml(key) + '</div></div>';
         });
         html += '</div></div>';
 
@@ -876,7 +876,7 @@
           html += '<div class="card"><h2>Breakdowns</h2>';
           html += '<p class="text-muted">Employment: ';
           var parts = [];
-          for (var ek in d.employmentBreakdown) parts.push(ek + ': ' + d.employmentBreakdown[ek]);
+          for (var ek in d.employmentBreakdown) parts.push(escapeHtml(ek) + ': ' + escapeHtml(d.employmentBreakdown[ek]));
           html += parts.join(', ') + '</p>';
           if (d.onPlanPct !== undefined) {
             html += '<p class="text-muted mt-8">On Performance Plan: ' + d.onPlanPct + '% (' + d.onPlanCount + ')</p>';
@@ -894,7 +894,7 @@
   }
 
   function sCard(val, label) {
-    return '<div class="stat-card"><div class="stat-val">' + val + '</div><div class="stat-label">' + label + '</div></div>';
+    return '<div class="stat-card"><div class="stat-val">' + escapeHtml(val) + '</div><div class="stat-label">' + escapeHtml(label) + '</div></div>';
   }
 
   // ── Reminders tab ─────────────────────────────────────────────────────

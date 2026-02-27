@@ -807,13 +807,15 @@ function handleGrievanceEdit(e) {
   }
 
   // If step dates changed, recalculate deadlines (using dynamic column references)
+  // H-36: Skip downstream recalculation if the edited column IS itself a deadline
+  // column — that would overwrite the steward's manual edit.
   const stepDateColumns = [
     GRIEVANCE_COLS.DATE_FILED,      // Step 1 filing
     GRIEVANCE_COLS.STEP2_APPEAL_FILED,  // Step 2 appeal
     GRIEVANCE_COLS.STEP3_APPEAL_FILED   // Step 3 appeal
   ];
 
-  if (stepDateColumns.includes(col)) {
+  if (stepDateColumns.includes(col) && calculatedDateCols.indexOf(col) === -1) {
     const step = stepDateColumns.indexOf(col) + 1;
     const stepDate = e.value;
 
@@ -865,6 +867,34 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
     }
   }
   if (startIdx === -1) return;
+
+  // M-32: Actually cascade downstream — for each deadline after the overridden one,
+  // check if its source date is empty. If so, use the previous calculated date
+  // as the basis and write the new downstream deadline.
+  var previousDate = overrideDate;
+  for (var d = startIdx + 1; d < deadlineChain.length; d++) {
+    var downstream = deadlineChain[d];
+    var sourceValue = sheet.getRange(row, downstream.sourceCol).getValue();
+
+    // If the downstream step has its own source date, it will be calculated from that
+    // source by syncGrievanceFormulasToLog — skip it.
+    if (sourceValue instanceof Date) {
+      previousDate = new Date(sourceValue.getTime() + downstream.days * 86400000);
+      continue;
+    }
+
+    // No source date entered — cascade from the previous calculated date
+    var downstreamNote = sheet.getRange(row, downstream.calcCol).getNote();
+    // Don't overwrite a steward override on a downstream column
+    if (downstreamNote === 'Steward override') {
+      previousDate = sheet.getRange(row, downstream.calcCol).getValue();
+      if (previousDate instanceof Date) continue;
+    }
+
+    var newDeadline = new Date(previousDate.getTime() + downstream.days * 86400000);
+    sheet.getRange(row, downstream.calcCol).setValue(newDeadline);
+    previousDate = newDeadline;
+  }
 
   // Recalculate Next Action Due and Days to Deadline based on current step
   var currentStep = sheet.getRange(row, GRIEVANCE_COLS.CURRENT_STEP).getValue();
@@ -1957,8 +1987,16 @@ function addNewMember(memberData) {
     const timestamp = Date.now().toString(36).toUpperCase();
     const newId = `MEM-${timestamp}`;
 
+    // M-33: Size row by the maximum column index in MEMBER_COLS (not just STATE,
+    // which may not be the last column).
+    var maxMemberCol = 0;
+    for (var colKey in MEMBER_COLS) {
+      if (MEMBER_COLS.hasOwnProperty(colKey) && MEMBER_COLS[colKey] > maxMemberCol) {
+        maxMemberCol = MEMBER_COLS[colKey];
+      }
+    }
     // Prepare row data using MEMBER_COLS constants (1-indexed)
-    var rowData = new Array(MEMBER_COLS.STATE).fill('');
+    var rowData = new Array(maxMemberCol).fill('');
     rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
     rowData[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName || '';
     rowData[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName || '';
@@ -2123,20 +2161,28 @@ function importMembersFromText(text) {
   const lines = text.split('\n').filter(line => line.trim());
   let imported = 0;
 
+  // CR-24: Use MEMBER_COLS constants to build the row array at correct positions
+  // instead of hardcoded 9-element array with hardcoded column order.
+  // M-33: Size row by the maximum column index in MEMBER_COLS.
+  var maxImportCol = 0;
+  for (var colKey in MEMBER_COLS) {
+    if (MEMBER_COLS.hasOwnProperty(colKey) && MEMBER_COLS[colKey] > maxImportCol) {
+      maxImportCol = MEMBER_COLS[colKey];
+    }
+  }
+
   for (const line of lines) {
     const parts = line.split(',').map(p => p.trim());
     if (parts.length >= 2) {
-      const newRow = [
-        '',                    // ID (will be auto-generated)
-        parts[0] || '',        // First Name
-        parts[1] || '',        // Last Name
-        parts[2] || '',        // Employee ID
-        parts[3] || '',        // Department
-        parts[4] || '',        // Job Title
-        '',                    // Hire Date
-        parts[5] || '',        // Email
-        parts[6] || ''         // Phone
-      ];
+      var newRow = new Array(maxImportCol).fill('');
+      // M-05: Apply escapeForFormula() to all imported values to prevent formula injection
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(parts[0] || '');
+      newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(parts[1] || '');
+      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(parts[2] || '');
+      newRow[MEMBER_COLS.DEPARTMENT - 1] = escapeForFormula(parts[3] || '');
+      newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(parts[4] || '');
+      newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(parts[5] || '');
+      newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(parts[6] || '');
       sheet.appendRow(newRow);
       imported++;
     }
@@ -2273,9 +2319,13 @@ function exportMemberDirectory(format) {
       }).join(',')).join('\n');
       const blob = Utilities.newBlob(csv, 'text/csv', 'MemberDirectory.csv');
       const file = DriveApp.createFile(blob);
+      // M-60: CSV export creates a file in Drive that is never automatically cleaned up.
+      // TODO: Consider adding a time-driven trigger to delete export files older than
+      // 7 days, or move exports to a dedicated "Exports" folder and purge periodically.
+      // For now, users must manually delete old exports from their Drive.
       return {
         success: true,
-        message: 'CSV file created! Opening...',
+        message: 'CSV file created! Opening... (Note: remember to delete from Drive when done)',
         url: file.getUrl()
       };
 

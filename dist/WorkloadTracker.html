@@ -443,6 +443,12 @@
 </div>
 
 <script>
+  // ── XSS prevention helper ─────────────────────────────────────────────
+  function escapeHtml(t) {
+    if (t == null) return '';
+    return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+  }
+
   // ── Category definitions ──────────────────────────────────────────────
   var CATEGORIES = [
     { key: 'priority',   label: 'Priority Cases',      t: 't1' },
@@ -520,10 +526,10 @@
       item.className = 'category-item';
       item.innerHTML =
         '<div class="cat-header">' +
-          '<span class="cat-label">' + cat.label + '</span>' +
+          '<span class="cat-label">' + escapeHtml(cat.label) + '</span>' +
           '<button class="expand-btn" onclick="openSubModal(' + idx + ')">+ detail</button>' +
         '</div>' +
-        '<input type="number" id="' + cat.t + '" min="0" max="999" value="0">';
+        '<input type="number" id="' + escapeHtml(cat.t) + '" min="0" max="999" value="0">';
       grid.appendChild(item);
     });
   }
@@ -572,8 +578,8 @@
       var val = existing[name] || 0;
       var row = document.createElement('div');
       row.className = 'sub-row';
-      row.innerHTML = '<span>' + name + '</span>' +
-        '<input type="number" id="sub_' + (catIdx+1) + '_' + si + '" min="0" max="999" value="' + val + '" ' +
+      row.innerHTML = '<span>' + escapeHtml(name) + '</span>' +
+        '<input type="number" id="sub_' + (catIdx+1) + '_' + si + '" min="0" max="999" value="' + parseInt(val, 10) + '" ' +
         'onchange="updateModalTotal()" oninput="updateModalTotal()">';
       body.appendChild(row);
     });
@@ -769,14 +775,14 @@
           if (h.leaveType) meta.push('Leave: ' + h.leaveType);
 
           div.innerHTML =
-            '<div class="history-date">' + dateStr + ' &mdash; ' + (h.privacy || 'Unit') + '</div>' +
+            '<div class="history-date">' + escapeHtml(dateStr) + ' &mdash; ' + escapeHtml(h.privacy || 'Unit') + '</div>' +
             '<div class="history-grid">' +
               hStat('Priority', h.t1) + hStat('Pending', h.t2) +
               hStat('Unread', h.t3) + hStat('To-Do', h.t4) +
               hStat('Referrals', h.t5) + hStat('CE', h.t6) +
               hStat('Assist.', h.t7) + hStat('Aged', h.t8) +
             '</div>' +
-            (meta.length ? '<div class="history-meta">' + meta.join(' | ') + '</div>' : '');
+            (meta.length ? '<div class="history-meta">' + escapeHtml(meta.join(' | ')) + '</div>' : '');
           list.appendChild(div);
         });
       })
@@ -788,7 +794,7 @@
   }
 
   function hStat(label, val) {
-    return '<div class="history-stat"><div class="val">' + (val || 0) + '</div><div class="key">' + label + '</div></div>';
+    return '<div class="history-stat"><div class="val">' + escapeHtml(val || 0) + '</div><div class="key">' + escapeHtml(label) + '</div></div>';
   }
 
   // ── CSV Export ────────────────────────────────────────────────────────
@@ -831,7 +837,7 @@
           container.innerHTML =
             '<div class="card" style="text-align:center;padding:30px">' +
             '<div style="font-size:2rem;margin-bottom:12px">&#128274;</div>' +
-            '<p style="color:var(--muted)">' + (d.reason || 'Stats are temporarily unavailable.') + '</p></div>';
+            '<p style="color:var(--muted)">' + escapeHtml(d.reason || 'Stats are temporarily unavailable.') + '</p></div>';
           return;
         }
 
@@ -860,8 +866,8 @@
         html += '<div class="card mt-12"><h2>Category Averages (per submission)</h2>' +
           '<div class="category-grid">';
         Object.keys(cats).forEach(function(key) {
-          html += '<div class="stat-card"><div class="stat-val">' + (avgs[key] || '0') +
-            '</div><div class="stat-label">' + key + '</div></div>';
+          html += '<div class="stat-card"><div class="stat-val">' + escapeHtml(avgs[key] || '0') +
+            '</div><div class="stat-label">' + escapeHtml(key) + '</div></div>';
         });
         html += '</div></div>';
 
@@ -870,7 +876,7 @@
           html += '<div class="card"><h2>Breakdowns</h2>';
           html += '<p class="text-muted">Employment: ';
           var parts = [];
-          for (var ek in d.employmentBreakdown) parts.push(ek + ': ' + d.employmentBreakdown[ek]);
+          for (var ek in d.employmentBreakdown) parts.push(escapeHtml(ek) + ': ' + escapeHtml(d.employmentBreakdown[ek]));
           html += parts.join(', ') + '</p>';
           if (d.onPlanPct !== undefined) {
             html += '<p class="text-muted mt-8">On Performance Plan: ' + d.onPlanPct + '% (' + d.onPlanCount + ')</p>';
@@ -888,7 +894,7 @@
   }
 
   function sCard(val, label) {
-    return '<div class="stat-card"><div class="stat-val">' + val + '</div><div class="stat-label">' + label + '</div></div>';
+    return '<div class="stat-card"><div class="stat-val">' + escapeHtml(val) + '</div><div class="stat-label">' + escapeHtml(label) + '</div></div>';
   }
 
   // ── Reminders tab ─────────────────────────────────────────────────────

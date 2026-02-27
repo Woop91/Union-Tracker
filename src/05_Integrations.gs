@@ -806,15 +806,9 @@ function createMeetingDocs(meetingData) {
     agendaDoc.saveAndClose();
 
     // Move to Meeting Agenda folder
+    // L-39: Use file.moveTo() instead of deprecated parent.removeFile()
     var agendaFile = DriveApp.getFileById(agendaDoc.getId());
-    agendaFolder.addFile(agendaFile);
-    var agendaParents = agendaFile.getParents();
-    while (agendaParents.hasNext()) {
-      var agendaParent = agendaParents.next();
-      if (agendaParent.getId() !== agendaFolder.getId()) {
-        agendaParent.removeFile(agendaFile);
-      }
-    }
+    agendaFile.moveTo(agendaFolder);
     result.agendaUrl = agendaDoc.getUrl();
 
     if (typeof logAuditEvent === 'function') {
@@ -1419,23 +1413,23 @@ function getOrCreateMemberFolder(name, id) {
   // Get archive folder ID from Config or COMMAND_CONFIG
   var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
 
+  // L-04: Declare folderName once at the top instead of re-declaring in each branch
+  var folderName = name + ' (' + id + ')';
+
   if (!archiveFolderId) {
     // Fall back to creating in root folder
     var rootFolder = getOrCreateRootFolder();
-    var folderName = name + ' (' + id + ')';
     var folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
 
   try {
     var parentFolder = DriveApp.getFolderById(archiveFolderId);
-    var folderName = name + ' (' + id + ')';
     var folders = parentFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
   } catch (e) {
     Logger.log('Archive folder not found, using root: ' + e.message);
     var rootFolder = getOrCreateRootFolder();
-    var folderName = name + ' (' + id + ')';
     var folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
@@ -1462,17 +1456,23 @@ function createSignatureReadyPDF(folder, data) {
     var doc = DocumentApp.openById(temp.getId());
     var body = doc.getBody();
 
+    // M-09: Helper to escape $ in replacement values — replaceText() uses regex
+    // internally, so $ would be interpreted as backreference syntax
+    function escapeReplacement_(val) {
+      return String(val).replace(/\$/g, '$$$$');
+    }
+
     // Replace placeholders with data
-    body.replaceText('{{MemberName}}', data.name || 'Unknown');
-    body.replaceText('{{MemberID}}', data.id || '000');
-    body.replaceText('{{Date}}', new Date().toLocaleDateString());
-    body.replaceText('{{Details}}', data.details || 'No details provided.');
-    body.replaceText('{{GrievanceID}}', data.grievanceId || '');
-    body.replaceText('{{Articles}}', data.articles || '');
-    body.replaceText('{{Status}}', data.status || '');
-    body.replaceText('{{Unit}}', data.unit || '');
-    body.replaceText('{{Location}}', data.location || '');
-    body.replaceText('{{Steward}}', data.steward || '');
+    body.replaceText('{{MemberName}}', escapeReplacement_(data.name || 'Unknown'));
+    body.replaceText('{{MemberID}}', escapeReplacement_(data.id || '000'));
+    body.replaceText('{{Date}}', escapeReplacement_(new Date().toLocaleDateString()));
+    body.replaceText('{{Details}}', escapeReplacement_(data.details || 'No details provided.'));
+    body.replaceText('{{GrievanceID}}', escapeReplacement_(data.grievanceId || ''));
+    body.replaceText('{{Articles}}', escapeReplacement_(data.articles || ''));
+    body.replaceText('{{Status}}', escapeReplacement_(data.status || ''));
+    body.replaceText('{{Unit}}', escapeReplacement_(data.unit || ''));
+    body.replaceText('{{Location}}', escapeReplacement_(data.location || ''));
+    body.replaceText('{{Steward}}', escapeReplacement_(data.steward || ''));
 
     // Append legal signature block
     body.appendParagraph(COMMAND_CONFIG.PDF.SIGNATURE_BLOCK ||
@@ -1655,8 +1655,16 @@ function onGrievanceFormSubmit(e) {
     if (sheet) {
       // Use the event range to find the exact row the form submission added to
       var targetRow = e.range ? e.range.getRow() : sheet.getLastRow();
+      // M-42: Only write to DRIVE_FOLDER_URL if the column is currently empty,
+      // to avoid overwriting an existing folder URL with the PDF URL.
+      // Write the PDF URL to a separate column if available, otherwise use folder URL
+      // column only as a fallback when it's empty.
       if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
-        sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+        var existingUrl = sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
+        if (!existingUrl) {
+          // Store the member folder URL (not the PDF URL) so the link points to the folder
+          sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(memberFolder.getUrl());
+        }
       }
     }
 

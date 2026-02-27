@@ -17,9 +17,9 @@
 
 var DataService = (function () {
 
-  // Sheet names — read from Config if available, fallback to defaults
-  var MEMBER_SHEET = 'Member Directory';
-  var GRIEVANCE_SHEET = 'Grievance Log';
+  // Sheet names — read from SHEETS constants if available, fallback to defaults
+  var MEMBER_SHEET = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ? SHEETS.MEMBER_DIR : 'Member Directory';
+  var GRIEVANCE_SHEET = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ? SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
   // Header name mappings — these are the expected header labels
   // If your sheet uses different labels, update these OR add aliases
@@ -951,6 +951,7 @@ var DataService = (function () {
       filedTimestamp: filedTimestamp,
       steward: String(_getVal(row, colMap, HEADERS.grievanceSteward, '')).trim().toLowerCase(),
       unit: String(_getVal(row, colMap, HEADERS.grievanceUnit, '')).trim(),
+      issueCategory: String(_getVal(row, colMap, HEADERS.grievanceIssueCategory, '')).trim(),
       priority: String(_getVal(row, colMap, HEADERS.grievancePriority, 'medium')).trim().toLowerCase(),
       notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
     };
@@ -1117,7 +1118,7 @@ var DataService = (function () {
       if (typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.CHIEF_STEWARD_EMAIL) {
         var ss = SpreadsheetApp.getActiveSpreadsheet();
         var cfgSheet = ss.getSheetByName('Config');
-        if (cfgSheet) email = String(cfgSheet.getRange(2, CONFIG_COLS.CHIEF_STEWARD_EMAIL).getValue() || '').toLowerCase().trim();
+        if (cfgSheet) email = String(cfgSheet.getRange(3, CONFIG_COLS.CHIEF_STEWARD_EMAIL).getValue() || '').toLowerCase().trim();
       }
       if (!email && typeof COMMAND_CONFIG !== 'undefined') email = String(COMMAND_CONFIG.CHIEF_STEWARD_EMAIL || '').toLowerCase().trim();
       return email || null;
@@ -1372,55 +1373,77 @@ var DataService = (function () {
 // GLOBAL FUNCTIONS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function dataGetStewardCases(email) { return DataService.getStewardCases(email); }
-function dataGetStewardKPIs(email) { return DataService.getStewardKPIs(email); }
-function dataGetMemberGrievances(email) { return DataService.getMemberGrievances(email); }
-function dataGetMemberGrievanceHistory(email) { return DataService.getMemberGrievanceHistory(email); }
-function dataGetStewardContact(email) { return DataService.getStewardContact(email); }
-function dataGetUserRole(email) { return DataService.getUserRole(email); }
-function dataGetUserProfile(email) { return DataService.findUserByEmail(email); }
+/**
+ * CR-01: Resolves the caller's email server-side. Never trust client-supplied email.
+ * @returns {string} The authenticated caller's email, or empty string if unavailable.
+ * @private
+ */
+function _resolveCallerEmail() {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    return email ? email.toLowerCase().trim() : '';
+  } catch (_e) {
+    return '';
+  }
+}
+
+function dataGetStewardCases() { var e = _resolveCallerEmail(); return e ? DataService.getStewardCases(e) : []; }
+function dataGetStewardKPIs() { var e = _resolveCallerEmail(); return e ? DataService.getStewardKPIs(e) : {}; }
+function dataGetMemberGrievances() { var e = _resolveCallerEmail(); return e ? DataService.getMemberGrievances(e) : []; }
+function dataGetMemberGrievanceHistory() { var e = _resolveCallerEmail(); return e ? DataService.getMemberGrievanceHistory(e) : { success: false, message: 'Not authenticated.' }; }
+function dataGetStewardContact() { var e = _resolveCallerEmail(); return e ? DataService.getStewardContact(e) : null; }
+function dataGetUserRole() { var e = _resolveCallerEmail(); return e ? DataService.getUserRole(e) : null; }
+function dataGetUserProfile() { var e = _resolveCallerEmail(); return e ? DataService.findUserByEmail(e) : null; }
 function dataGetUnits() { return DataService.getUnits(); }
 
 // v4.11.0 — new data service wrappers
-function dataGetFullProfile(email) { return DataService.getFullMemberProfile(email); }
-function dataUpdateProfile(email, updates) { return DataService.updateMemberProfile(email, updates); }
-function dataGetAssignedSteward(email) { return DataService.getAssignedStewardInfo(email); }
-function dataGetAvailableStewards(email) { return DataService.getAvailableStewards(email); }
-function dataAssignSteward(memberEmail, stewardEmail) { return DataService.assignStewardToMember(memberEmail, stewardEmail); }
-function dataGetGrievanceDriveUrl(email) { return DataService.getMemberGrievanceDriveUrl(email); }
-function dataGetSurveyStatus(email) { return DataService.getMemberSurveyStatus(email); }
+function dataGetFullProfile() { var e = _resolveCallerEmail(); return e ? DataService.getFullMemberProfile(e) : null; }
+function dataUpdateProfile(ignoredEmail, updates) { var e = _resolveCallerEmail(); return e ? DataService.updateMemberProfile(e, updates) : { success: false, message: 'Not authenticated.' }; }
+function dataGetAssignedSteward() { var e = _resolveCallerEmail(); return e ? DataService.getAssignedStewardInfo(e) : null; }
+function dataGetAvailableStewards() { var e = _resolveCallerEmail(); return e ? DataService.getAvailableStewards(e) : []; }
+function dataAssignSteward(ignoredMemberEmail, stewardEmail) { var e = _resolveCallerEmail(); return e ? DataService.assignStewardToMember(e, stewardEmail) : { success: false, message: 'Not authenticated.' }; }
+function dataGetGrievanceDriveUrl() { var e = _resolveCallerEmail(); return e ? DataService.getMemberGrievanceDriveUrl(e) : null; }
+function dataGetSurveyStatus() { var e = _resolveCallerEmail(); return e ? DataService.getMemberSurveyStatus(e) : null; }
 function dataGetOrgLinks() { return DataService.getOrgLinks(); }
-function dataGetStewardMembers(email) { return DataService.getStewardMembers(email); }
-function dataGetStewardSurveyTracking(email) { return DataService.getStewardSurveyTracking(email); }
-function dataSendBroadcast(email, filter, msg) { return DataService.sendBroadcastMessage(email, filter, msg); }
+function dataGetStewardMembers() { var e = _resolveCallerEmail(); return e ? DataService.getStewardMembers(e) : []; }
+function dataGetStewardSurveyTracking() { var e = _resolveCallerEmail(); return e ? DataService.getStewardSurveyTracking(e) : []; }
+function dataSendBroadcast(ignoredEmail, filter, msg) { var e = _resolveCallerEmail(); return e ? DataService.sendBroadcastMessage(e, filter, msg) : { success: false, message: 'Not authenticated.' }; }
 function dataGetSurveyResults() { return DataService.getSurveyResults(); }
 
 // v4.12.0 — new data service wrappers
-function dataLogMemberContact(stewardEmail, memberEmail, type, notes, duration) { return DataService.logMemberContact(stewardEmail, memberEmail, type, notes, duration); }
-function dataGetMemberContactHistory(stewardEmail, memberEmail) { return DataService.getMemberContactHistory(stewardEmail, memberEmail); }
-function dataGetStewardContactLog(stewardEmail) { return DataService.getStewardContactLog(stewardEmail); }
-function dataCreateTask(stewardEmail, title, desc, memberEmail, priority, dueDate) { return DataService.createTask(stewardEmail, title, desc, memberEmail, priority, dueDate); }
-function dataCreateTaskForSteward(assignerEmail, assigneeEmail, title, desc, memberEmail, priority, dueDate) { return DataService.createTask(assignerEmail, title, desc, memberEmail, priority, dueDate, assigneeEmail); }
-function dataGetTasks(stewardEmail, statusFilter) { return DataService.getTasks(stewardEmail, statusFilter); }
-function dataUpdateTask(stewardEmail, taskId, updates) { return DataService.updateTask(stewardEmail, taskId, updates); }
-function dataCompleteTask(stewardEmail, taskId) { return DataService.completeTask(stewardEmail, taskId); }
-function dataGetStewardMemberStats(stewardEmail) { return DataService.getStewardMemberStats(stewardEmail); }
+function dataLogMemberContact(ignoredStewardEmail, memberEmail, type, notes, duration) { var e = _resolveCallerEmail(); return e ? DataService.logMemberContact(e, memberEmail, type, notes, duration) : { success: false, message: 'Not authenticated.' }; }
+function dataGetMemberContactHistory(ignoredStewardEmail, memberEmail) { var e = _resolveCallerEmail(); return e ? DataService.getMemberContactHistory(e, memberEmail) : []; }
+function dataGetStewardContactLog() { var e = _resolveCallerEmail(); return e ? DataService.getStewardContactLog(e) : []; }
+function dataCreateTask(ignoredStewardEmail, title, desc, memberEmail, priority, dueDate) { var e = _resolveCallerEmail(); return e ? DataService.createTask(e, title, desc, memberEmail, priority, dueDate) : { success: false, message: 'Not authenticated.' }; }
+function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, desc, memberEmail, priority, dueDate) {
+  var e = _resolveCallerEmail();
+  if (!e) return { success: false, message: 'Not authenticated.' };
+  // Admin/chief steward check: only admins can assign tasks to other stewards
+  if (!DataService.isChiefSteward(e)) return { success: false, message: 'Not authorized.' };
+  return DataService.createTask(e, title, desc, memberEmail, priority, dueDate, assigneeEmail);
+}
+function dataGetTasks(ignoredStewardEmail, statusFilter) { var e = _resolveCallerEmail(); return e ? DataService.getTasks(e, statusFilter) : []; }
+function dataUpdateTask(ignoredStewardEmail, taskId, updates) { var e = _resolveCallerEmail(); return e ? DataService.updateTask(e, taskId, updates) : { success: false, message: 'Not authenticated.' }; }
+function dataCompleteTask(ignoredStewardEmail, taskId) { var e = _resolveCallerEmail(); return e ? DataService.completeTask(e, taskId) : { success: false, message: 'Not authenticated.' }; }
+function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); return e ? DataService.getStewardMemberStats(e) : {}; }
 function dataGetStewardDirectory() { return DataService.getStewardDirectory(); }
 function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
 function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
 function dataGetMembershipStats() { return DataService.getMembershipStats(); }
 function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(limit); }
 function dataGetSurveyQuestions() { return getSurveyQuestions(); }
-function dataSubmitSurveyResponse(email, responses) { return submitSurveyResponse(email, responses); }
-function dataIsChiefSteward(email) { return DataService.isChiefSteward(email); }
-function dataGetChiefStewardTaskView(email) { return DataService.getChiefStewardTaskView(email); }
+function dataSubmitSurveyResponse(ignoredEmail, responses) { var e = _resolveCallerEmail(); return e ? submitSurveyResponse(e, responses) : { success: false, message: 'Not authenticated.' }; }
+function dataIsChiefSteward() { var e = _resolveCallerEmail(); return e ? DataService.isChiefSteward(e) : false; }
+function dataGetChiefStewardTaskView() { var e = _resolveCallerEmail(); return e ? DataService.getChiefStewardTaskView(e) : { authorized: false, tasks: [] }; }
 function dataGetAgencyGrievanceStats() { return DataService.getGrievanceStats(); }
 
 // Batch data fetch — single round-trip for SPA init
-function dataGetBatchData(email, role) { return getWebDashBatchData(email, role); }
+function dataGetBatchData(ignoredEmail, role) { var e = _resolveCallerEmail(); return e ? getWebDashBatchData(e, role) : {}; }
 
 // Broadcast filter options — returns unique values from steward's members
-function dataGetBroadcastFilterOptions(stewardEmail) {
+function dataGetBroadcastFilterOptions() {
+  var stewardEmail = _resolveCallerEmail();
+  if (!stewardEmail) return { locations: [], officeDays: [], duesStatuses: [], totalMembers: 0 };
   var members = DataService.getStewardMembers(stewardEmail);
   var locations = {};
   var officeDays = {};

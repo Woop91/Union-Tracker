@@ -1246,10 +1246,12 @@ function createGrievanceSnapshot() {
 
 /**
  * Restores the grievance log from a snapshot
+ * CR-14: Requires explicit confirmed=true parameter and creates a persistent backup first
  * @param {Object} snapshot - Snapshot to restore
+ * @param {boolean} confirmed - Must be true to proceed; adds programmatic confirmation gate
  * @returns {void}
  */
-function restoreFromSnapshot(snapshot) {
+function restoreFromSnapshot(snapshot, confirmed) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -1265,26 +1267,41 @@ function restoreFromSnapshot(snapshot) {
     }
   }
 
-  // Confirm with user before proceeding
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.alert(
-    'Restore Snapshot',
-    'This will replace all current grievance data with the snapshot from ' +
-    snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
-    ui.ButtonSet.YES_NO
-  );
-  if (response !== ui.Button.YES) {
-    return;
+  // CR-14: Require explicit confirmed parameter as a programmatic safety gate
+  if (confirmed !== true) {
+    // Confirm with user via UI dialog
+    var ui = SpreadsheetApp.getUi();
+    var response = ui.alert(
+      'Restore Snapshot',
+      'This will replace all current grievance data with the snapshot from ' +
+      snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
+      ui.ButtonSet.YES_NO
+    );
+    if (response !== ui.Button.YES) {
+      return;
+    }
   }
 
-  // Create a backup of current data before restoring
+  // CR-14: Create a persistent backup of current data to a hidden sheet before restoring
+  var backupSheetName = '';
   try {
-    // NOTE: Backup is ephemeral (in-memory only). Persisting to hidden sheet would add complexity for rare usage.
-    var preRestoreBackup = createGrievanceSnapshot();
-    preRestoreBackup.label = 'Pre-Restore Backup';
-    Logger.log('Pre-restore backup created at ' + preRestoreBackup.timestamp);
+    var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    backupSheetName = '_PreRestore_Backup_' + timestamp;
+    if (sheet.getLastRow() > 1) {
+      var backupSheet = ss.insertSheet(backupSheetName);
+      var currentData = sheet.getDataRange().getValues();
+      backupSheet.getRange(1, 1, currentData.length, currentData[0].length).setValues(currentData);
+      try {
+        setSheetVeryHidden_(backupSheet);
+      } catch (_hideErr) {
+        backupSheet.hideSheet();
+      }
+      Logger.log('Pre-restore backup saved to hidden sheet: ' + backupSheetName);
+    }
   } catch (_backupErr) {
-    Logger.log('Warning: Could not create pre-restore backup: ' + _backupErr.message);
+    Logger.log('Warning: Could not create pre-restore backup sheet: ' + _backupErr.message);
+    // Continue with restore — backup failure should not block the operation,
+    // but log a warning for audit trail
   }
 
   // Clear existing data (keep header)
@@ -1297,6 +1314,12 @@ function restoreFromSnapshot(snapshot) {
     sheet.getRange(2, 1, snapshot.data.length - 1, snapshot.data[0].length)
       .setValues(snapshot.data.slice(1));
   }
+
+  logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR || 'SNAPSHOT_RESTORED', {
+    snapshotTimestamp: snapshot.timestamp,
+    backupSheet: backupSheetName || 'N/A',
+    restoredBy: Session.getActiveUser().getEmail()
+  });
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Snapshot restored', 'Undo/Redo', 3);
 }
@@ -1540,9 +1563,37 @@ function logAuditEvent(eventType, details) {
     auditSheet.appendRow([timestamp, eventType, user, detailsJson, sessionId, integrityHash]);
 
     // Trim old entries if sheet gets too large (keep last 10,000)
+    // CR-30 WARNING: Deleting rows breaks the integrity hash chain because each
+    // row's hash is chained to the previous row. Before trimming, save the hash
+    // of the last row being deleted as a "chain checkpoint" in ScriptProperties
+    // so that verifyAuditLogIntegrity() can start verification from this checkpoint.
     const rowCount = auditSheet.getLastRow();
     if (rowCount > 10000) {
-      auditSheet.deleteRows(2, rowCount - 10000);
+      var rowsToDelete = rowCount - 10000;
+      // Save the hash of the last deleted row as a chain checkpoint
+      try {
+        var checkpointRow = 1 + rowsToDelete; // last row being deleted (1-indexed, row 1 is header)
+        var trimHeaders = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+        var hashColIdx = -1;
+        for (var ci = 0; ci < trimHeaders.length; ci++) {
+          if (String(trimHeaders[ci]).trim() === 'Integrity Hash') {
+            hashColIdx = ci + 1;
+            break;
+          }
+        }
+        if (hashColIdx > 0) {
+          var checkpointHash = String(auditSheet.getRange(checkpointRow, hashColIdx).getValue() || '');
+          PropertiesService.getScriptProperties().setProperty(
+            'AUDIT_CHAIN_CHECKPOINT_HASH', checkpointHash
+          );
+          PropertiesService.getScriptProperties().setProperty(
+            'AUDIT_CHAIN_CHECKPOINT_TIMESTAMP', new Date().toISOString()
+          );
+        }
+      } catch (cpErr) {
+        Logger.log('Warning: Could not save audit chain checkpoint: ' + cpErr.message);
+      }
+      auditSheet.deleteRows(2, rowsToDelete);
     }
 
   } catch (error) {
@@ -1652,6 +1703,17 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
  * For testing/development use only
  */
 function NUCLEAR_WIPE_GRIEVANCES() {
+  // H-23: Authorization check — only admins may perform destructive data wipe
+  if (typeof getUserRole_ === 'function') {
+    var callerEmail = Session.getActiveUser().getEmail();
+    var callerRole = getUserRole_(callerEmail);
+    if (callerRole !== 'admin') {
+      SpreadsheetApp.getUi().alert('Access Denied',
+        'Only administrators may perform this destructive action.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return errorResponse('Unauthorized: admin role required');
+    }
+  }
+
   var isDev = typeof IS_DEV_ENVIRONMENT !== 'undefined' && IS_DEV_ENVIRONMENT === true;
   if (!isDev) {
     var _ui = SpreadsheetApp.getUi();
@@ -2123,29 +2185,33 @@ function saveSettings(settings) {
 function batchSetValues(sheet, updates) {
   if (!updates || updates.length === 0) return;
 
-  // Group updates by row for efficient writing
-  var rowGroups = {};
-  updates.forEach(function(update) {
-    if (!rowGroups[update.row]) {
-      rowGroups[update.row] = [];
-    }
-    rowGroups[update.row].push(update);
+  // CR-13: Wrap entire read-modify-write cycle in a script lock to prevent
+  // concurrent writes from overwriting each other's changes
+  withScriptLock_(function() {
+    // Group updates by row for efficient writing
+    var rowGroups = {};
+    updates.forEach(function(update) {
+      if (!rowGroups[update.row]) {
+        rowGroups[update.row] = [];
+      }
+      rowGroups[update.row].push(update);
+    });
+
+    // Get current sheet data for merging
+    var lastRow = Math.max.apply(null, updates.map(function(u) { return u.row; }));
+    var lastCol = Math.max.apply(null, updates.map(function(u) { return u.col; }));
+
+    // Read current data
+    var currentData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+
+    // Apply updates to the array
+    updates.forEach(function(update) {
+      currentData[update.row - 1][update.col - 1] = update.value;
+    });
+
+    // Write back in single operation
+    sheet.getRange(1, 1, lastRow, lastCol).setValues(currentData);
   });
-
-  // Get current sheet data for merging
-  var lastRow = Math.max.apply(null, updates.map(function(u) { return u.row; }));
-  var lastCol = Math.max.apply(null, updates.map(function(u) { return u.col; }));
-
-  // Read current data
-  var currentData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-
-  // Apply updates to the array
-  updates.forEach(function(update) {
-    currentData[update.row - 1][update.col - 1] = update.value;
-  });
-
-  // Write back in single operation
-  sheet.getRange(1, 1, lastRow, lastCol).setValues(currentData);
 }
 
 /**

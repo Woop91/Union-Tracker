@@ -829,7 +829,16 @@ var SHEETS = {
   NOTIFICATIONS:      '📢 Notifications',     // steward-to-member in-app messages
   // Contact Log & Steward Tasks (v4.12.0) — steward activity tracking
   CONTACT_LOG:        '_Contact_Log',         // hidden — steward-member contact history
-  STEWARD_TASKS:      '_Steward_Tasks'        // hidden — task assignments for stewards
+  STEWARD_TASKS:      '_Steward_Tasks',       // hidden — task assignments for stewards
+  // Portal sheets (23_PortalSheets.gs) — Member & Steward Portal infrastructure
+  PORTAL_MEMBER_DIR:      'PortalMemberDirectory',  // hidden — portal profile extensions
+  PORTAL_EVENTS:          'Events',                  // upcoming union events and meetings
+  PORTAL_MINUTES:         'MeetingMinutes',          // union meeting notes with bullet summaries
+  PORTAL_POLLS:           'FlashPolls',              // active quick-vote polls
+  PORTAL_POLL_RESPONSES:  'PollResponses',           // hidden — individual poll vote records
+  PORTAL_GRIEVANCES:      'PortalGrievances',        // hidden — portal grievance cases
+  PORTAL_STEWARD_LOG:     'StewardLog',              // hidden — steward-member interaction audit trail
+  PORTAL_MEGA_SURVEY:     'MegaSurvey'               // hidden — 56-question survey progress
 };
 
 // SHEET_NAMES alias for backward compatibility

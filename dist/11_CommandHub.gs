@@ -50,11 +50,12 @@ function getCommandCenterConfig() {
 
 // Legacy COMMAND_CENTER_CONFIG — uses lazy getters so help content and
 // dynamic fields are only resolved when first accessed (not at load time).
+// @deprecated Use getCommandCenterConfig() or COMMAND_CONFIG instead. Kept for backward compatibility.
 var COMMAND_CENTER_CONFIG = {
   SYSTEM_NAME: "Strategic Command Center",
-  LOG_SHEET_NAME: 'Grievance Log',
-  DIR_SHEET_NAME: 'Member Directory',
-  AUDIT_SHEET_NAME: '_Audit_Log',
+  get LOG_SHEET_NAME()    { return typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG ? SHEETS.GRIEVANCE_LOG : 'Grievance Log'; },
+  get DIR_SHEET_NAME()    { return typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR ? SHEETS.MEMBER_DIR : 'Member Directory'; },
+  get AUDIT_SHEET_NAME()  { return typeof SHEETS !== 'undefined' && SHEETS.AUDIT_LOG ? SHEETS.AUDIT_LOG : '_Audit_Log'; },
   get TEMPLATE_ID()       { return COMMAND_CONFIG.TEMPLATE_ID; },
   get ARCHIVE_FOLDER_ID() { return COMMAND_CONFIG.ARCHIVE_FOLDER_ID; },
   get CHIEF_STEWARD_EMAIL() { return COMMAND_CONFIG.CHIEF_STEWARD_EMAIL; },
@@ -353,7 +354,8 @@ function generateMissingMemberIDsBatch() {
     if (id) existingIds[id] = true;
   }
 
-  // Process in memory (no individual cell writes)
+  // Process in memory, tracking which rows were modified
+  var changedRows = []; // { row: sheetRow (1-indexed), id: newId }
   for (var i = 1; i < data.length; i++) {
     var firstName = data[i][MEMBER_COLS.FIRST_NAME - 1];
     var lastName = data[i][MEMBER_COLS.LAST_NAME - 1];
@@ -361,15 +363,18 @@ function generateMissingMemberIDsBatch() {
     // Check if Member ID is empty and member has name data
     if (!data[i][MEMBER_COLS.MEMBER_ID - 1] && (firstName || lastName)) {
       var newId = generateNameBasedId('M', firstName, lastName, existingIds);
-      data[i][MEMBER_COLS.MEMBER_ID - 1] = newId;
       existingIds[newId] = true;
       countAdded++;
+      changedRows.push({ row: i + 1, id: newId });
     }
   }
 
-  // Single batch write (high-performance)
+  // Batch write only the Member ID column cells that were actually changed
   if (countAdded > 0) {
-    sheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+    for (var c = 0; c < changedRows.length; c++) {
+      sheet.getRange(changedRows[c].row, MEMBER_COLS.MEMBER_ID).setValue(changedRows[c].id);
+    }
+    SpreadsheetApp.flush();
   }
 
   ss.toast(countAdded + ' IDs generated.', COMMAND_CONFIG.SYSTEM_NAME, 3);
@@ -923,23 +928,24 @@ function applyConfigSectionColors() {
     return;
   }
 
-  // Section definitions with colors (column ranges are 1-indexed)
+  // Section definitions with colors — derive column ranges from CONFIG_COLS constants
+  var CC = typeof CONFIG_COLS !== 'undefined' ? CONFIG_COLS : {};
   var sections = [
-    { name: 'Employment Info', startCol: 1, endCol: 5, color: '#e3f2fd' },      // Light Blue
-    { name: 'Supervision', startCol: 6, endCol: 7, color: '#fff3e0' },          // Light Orange
-    { name: 'Steward Info', startCol: 8, endCol: 9, color: '#e8f5e9' },         // Light Green
-    { name: 'Grievance Settings', startCol: 10, endCol: 13, color: '#fce4ec' }, // Light Pink
-    { name: 'Links & Coordinators', startCol: 14, endCol: 17, color: '#f3e5f5' }, // Light Purple
-    { name: 'Notifications', startCol: 18, endCol: 20, color: '#fff8e1' },      // Light Amber
-    { name: 'Organization', startCol: 21, endCol: 24, color: '#e0f7fa' },       // Light Cyan
-    { name: 'Integration', startCol: 25, endCol: 26, color: '#fbe9e7' },        // Light Deep Orange
-    { name: 'Deadlines', startCol: 27, endCol: 30, color: '#ffebee' },          // Light Red
-    { name: 'Multi-Select Options', startCol: 31, endCol: 32, color: '#e8eaf6' }, // Light Indigo
-    { name: 'Contract & Legal', startCol: 33, endCol: 36, color: '#f1f8e9' },   // Light Light Green
-    { name: 'Org Identity', startCol: 37, endCol: 39, color: '#eceff1' },       // Light Blue Grey
-    { name: 'Extended Contact', startCol: 40, endCol: 43, color: '#ede7f6' },   // Light Deep Purple
-    { name: 'Form Links', startCol: 44, endCol: 44, color: '#e1f5fe' },         // Light Light Blue
-    { name: 'Strategic Command Center', startCol: 45, endCol: 51, color: '#f9fbe7' } // Light Lime
+    { name: 'Employment Info', startCol: CC.JOB_TITLES || 1, endCol: CC.SUPERVISORS || 5, color: '#e3f2fd' },      // Light Blue
+    { name: 'Supervision', startCol: CC.SUPERVISORS || 6, endCol: CC.MANAGERS || 7, color: '#fff3e0' },             // Light Orange
+    { name: 'Steward Info', startCol: CC.STEWARDS || 8, endCol: CC.STEWARD_COMMITTEES || 9, color: '#e8f5e9' },     // Light Green
+    { name: 'Grievance Settings', startCol: CC.GRIEVANCE_STATUS || 10, endCol: CC.ARTICLES || 13, color: '#fce4ec' }, // Light Pink
+    { name: 'Links & Coordinators', startCol: CC.COMM_METHODS || 14, endCol: CC.CONTACT_FORM_URL || 17, color: '#f3e5f5' }, // Light Purple
+    { name: 'Notifications', startCol: CC.ADMIN_EMAILS || 18, endCol: CC.NOTIFICATION_RECIPIENTS || 20, color: '#fff8e1' }, // Light Amber
+    { name: 'Organization', startCol: CC.ORG_NAME || 21, endCol: CC.MAIN_PHONE || 24, color: '#e0f7fa' },           // Light Cyan
+    { name: 'Integration', startCol: CC.DRIVE_FOLDER_ID || 25, endCol: CC.CALENDAR_ID || 26, color: '#fbe9e7' },    // Light Deep Orange
+    { name: 'Deadlines', startCol: CC.FILING_DEADLINE_DAYS || 27, endCol: CC.BEST_TIMES || 30, color: '#ffebee' },  // Light Red
+    { name: 'Multi-Select Options', startCol: CC.CONTRACT_GRIEVANCE || 31, endCol: CC.CONTRACT_DISCIPLINE || 32, color: '#e8eaf6' }, // Light Indigo
+    { name: 'Contract & Legal', startCol: CC.CONTRACT_WORKLOAD || 33, endCol: CC.CONTRACT_NAME || 36, color: '#f1f8e9' }, // Light Light Green
+    { name: 'Org Identity', startCol: CC.UNION_PARENT || 37, endCol: CC.ORG_WEBSITE || 39, color: '#eceff1' },      // Light Blue Grey
+    { name: 'Extended Contact', startCol: CC.OFFICE_ADDRESSES || 40, endCol: CC.MAIN_CONTACT_EMAIL || 43, color: '#ede7f6' }, // Light Deep Purple
+    { name: 'Form Links', startCol: CC.SATISFACTION_FORM_URL || 44, endCol: CC.SATISFACTION_FORM_URL || 44, color: '#e1f5fe' }, // Light Light Blue
+    { name: 'Strategic Command Center', startCol: CC.CHIEF_STEWARD_EMAIL || 45, endCol: CC.PDF_FOLDER_ID || 51, color: '#f9fbe7' } // Light Lime
   ];
 
   var lastRow = Math.max(configSheet.getLastRow(), 50); // At least 50 rows for visibility
@@ -1032,7 +1038,11 @@ function showDiagnosticReport() {
 
   // Check hidden calculation sheets
   report += '\n📊 HIDDEN CALCULATION SHEETS:\n';
-  var hiddenSheets = ['_Dashboard_Calc', '_Grievance_Calc', '_Member_Lookup'];
+  var hiddenSheets = [
+    typeof HIDDEN_SHEETS !== 'undefined' && HIDDEN_SHEETS.CALC_STATS ? HIDDEN_SHEETS.CALC_STATS : '_Dashboard_Calc',
+    typeof HIDDEN_SHEETS !== 'undefined' && HIDDEN_SHEETS.GRIEVANCE_CALC ? HIDDEN_SHEETS.GRIEVANCE_CALC : '_Grievance_Calc',
+    typeof HIDDEN_SHEETS !== 'undefined' && HIDDEN_SHEETS.MEMBER_LOOKUP ? HIDDEN_SHEETS.MEMBER_LOOKUP : '_Member_Lookup'
+  ];
 
   hiddenSheets.forEach(function(sheetName) {
     var sheet = ss.getSheetByName(sheetName);
@@ -1410,6 +1420,7 @@ function navigateToMember(memberId) {
  * This CONFIG mirrors the Gemini v4.0 unified architecture while
  * maintaining compatibility with the modular SHEETS/COMMAND_CONFIG constants.
  */
+// @deprecated Use COMMAND_CONFIG (01_Core.gs) instead. Kept for backward compatibility with standalone deployments.
 var GEMINI_CONFIG = {
   SYSTEM_NAME: "Strategic Command Center",
   // Legacy emoji-prefixed sheet names (for standalone deployments)
@@ -2178,7 +2189,8 @@ function getRecentSurveyAverage(unitName) {
   }
 
   var lastRow = satSheet.getLastRow();
-  var data = satSheet.getRange(2, 1, lastRow - 1, SATISFACTION_COLS.AVG_SCHEDULING || 82).getValues();
+  var lastCol = (typeof SATISFACTION_COLS !== 'undefined' && SATISFACTION_COLS.AVG_SCHEDULING) ? SATISFACTION_COLS.AVG_SCHEDULING : satSheet.getLastColumn();
+  var data = satSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
 
   // Load vault data to check verified/isLatest status (PII stays in vault)
   var vaultMap = getVaultDataMap_();
@@ -2341,9 +2353,8 @@ function showGrievanceTrends() {
   var data = sheet.getDataRange().getValues();
   var header = data[0];
 
-  // Find date column (column A is typically Case ID, look for Date column)
-  var dateCol = header.indexOf('Date Filed');
-  if (dateCol === -1) dateCol = header.indexOf('Date');
+  // Use GRIEVANCE_COLS constant for date column (subtract 1 for 0-indexed array access)
+  var dateCol = (typeof GRIEVANCE_COLS !== 'undefined' && GRIEVANCE_COLS.DATE_FILED) ? GRIEVANCE_COLS.DATE_FILED - 1 : header.indexOf('Date Filed');
   if (dateCol === -1) dateCol = 1; // Default to column B
 
   // Aggregate by month

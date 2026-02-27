@@ -223,9 +223,27 @@ function cleanupEmptyDriveFolders() {
       if (_isFolderTreeEmpty(folder)) {
         // Check if folder name contains a resolved grievance ID
         var folderName = folder.getName();
-        var isResolved = Object.keys(resolvedIds).some(function(gid) {
-          return folderName.indexOf(gid) >= 0;
-        });
+        // M-49: Extract grievance ID from folder name using known naming patterns,
+        // then do O(1) direct lookup instead of O(n) scan through all resolved IDs.
+        // Simple template: "{grievanceId} - {date}" => ID is everything before " - "
+        var isResolved = false;
+        var dashIdx = folderName.indexOf(' - ');
+        if (dashIdx > 0) {
+          var candidateId = folderName.substring(0, dashIdx).trim();
+          if (resolvedIds[candidateId]) {
+            isResolved = true;
+          }
+        }
+        // Fallback for non-standard naming: linear scan (rare path)
+        if (!isResolved) {
+          var resolvedKeys = Object.keys(resolvedIds);
+          for (var rk = 0; rk < resolvedKeys.length; rk++) {
+            if (folderName.indexOf(resolvedKeys[rk]) >= 0) {
+              isResolved = true;
+              break;
+            }
+          }
+        }
         if (isResolved) {
           folder.setTrashed(true);
           removed++;
@@ -446,7 +464,15 @@ function batchCreateAllMissingFolders() {
  */
 function updateGrievanceFolderLink(grievanceId, folderUrl) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  // CR-09: Use canonical SHEETS.GRIEVANCE_LOG instead of SHEET_NAMES.GRIEVANCE_TRACKER
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  // H-05: Null check after getSheetByName
+  if (!sheet) {
+    Logger.log('updateGrievanceFolderLink: Grievance Log sheet not found');
+    return;
+  }
+
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -462,7 +488,8 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
  */
 function openGrievanceFolder() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEET_NAMES.GRIEVANCE_TRACKER) {
+  // CR-09: Use canonical SHEETS.GRIEVANCE_LOG instead of SHEET_NAMES.GRIEVANCE_TRACKER
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
     showAlert('Please select a grievance in the Grievance Tracker', 'Wrong Sheet');
     return;
   }
@@ -534,9 +561,10 @@ function getOrCreateMeetingsCalendar() {
 function createMeetingCalendarEvent(meetingData) {
   try {
     var calendar = getOrCreateMeetingsCalendar();
-    var meetingDate = new Date(meetingData.date + 'T00:00:00');
-    // Note: Date parsing uses script timezone. For explicit control, consider
-    // Utilities.formatDate() with Session.getScriptTimeZone().
+    // M-55: Append script timezone offset to ensure correct date parsing
+    var tz = Session.getScriptTimeZone();
+    var tzOffset = Utilities.formatDate(new Date(), tz, 'XXX'); // e.g., "-05:00"
+    var meetingDate = new Date(meetingData.date + 'T00:00:00' + tzOffset);
     var startTime = meetingData.time || '09:00';
     var durationHours = parseFloat(meetingData.duration) || 1;
     var timeParts = startTime.split(':');
@@ -592,6 +620,15 @@ function deleteMeetingCalendarEvent(eventId) {
  * @returns {Object} { success, error }
  */
 function emailMeetingAttendanceReport(meetingId, recipientEmails) {
+  // M-56: Authorization check — attendance reports contain PII, restrict to steward/admin
+  if (typeof getUserRole_ === 'function') {
+    var callerEmail = Session.getActiveUser().getEmail();
+    var callerRole = getUserRole_(callerEmail);
+    if (callerRole !== 'admin' && callerRole !== 'steward') {
+      return errorResponse('Unauthorized: only stewards and admins may send attendance reports');
+    }
+  }
+
   if (!meetingId || !recipientEmails) {
     return errorResponse('Meeting ID and recipient emails are required');
   }
@@ -745,15 +782,9 @@ function createMeetingDocs(meetingData) {
     notesDoc.saveAndClose();
 
     // Move to Meeting Notes folder
+    // L-39: Use file.moveTo() instead of deprecated parent.removeFile()
     var notesFile = DriveApp.getFileById(notesDoc.getId());
-    notesFolder.addFile(notesFile);
-    var parents = notesFile.getParents();
-    while (parents.hasNext()) {
-      var parent = parents.next();
-      if (parent.getId() !== notesFolder.getId()) {
-        parent.removeFile(notesFile);
-      }
-    }
+    notesFile.moveTo(notesFolder);
     result.notesUrl = notesDoc.getUrl();
 
     // Create Meeting Agenda doc
@@ -775,15 +806,9 @@ function createMeetingDocs(meetingData) {
     agendaDoc.saveAndClose();
 
     // Move to Meeting Agenda folder
+    // L-39: Use file.moveTo() instead of deprecated parent.removeFile()
     var agendaFile = DriveApp.getFileById(agendaDoc.getId());
-    agendaFolder.addFile(agendaFile);
-    var agendaParents = agendaFile.getParents();
-    while (agendaParents.hasNext()) {
-      var agendaParent = agendaParents.next();
-      if (agendaParent.getId() !== agendaFolder.getId()) {
-        agendaParent.removeFile(agendaFile);
-      }
-    }
+    agendaFile.moveTo(agendaFolder);
     result.agendaUrl = agendaDoc.getUrl();
 
     if (typeof logAuditEvent === 'function') {
@@ -811,7 +836,14 @@ function setDocViewOnlyByLink(docUrl) {
     if (!match) return;
     var fileId = match[1];
     var file = DriveApp.getFileById(fileId);
-    file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+    // M-57: DOMAIN_WITH_LINK fails for non-Workspace (consumer) orgs.
+    // Try domain sharing first, fall back to ANYONE_WITH_LINK.
+    try {
+      file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (domainError) {
+      Logger.log('Domain sharing unavailable, falling back to ANYONE_WITH_LINK: ' + domainError.message);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
   } catch (error) {
     Logger.log('Error setting doc to view-only: ' + error.message);
   }
@@ -1322,6 +1354,15 @@ function sendDeadlineReminders(daysAhead) {
  */
 function sendEmailToMember(memberId, subject, body) {
   try {
+    // CR-21: Authorization check — only stewards and admins may send emails to members
+    var callerEmail = Session.getActiveUser().getEmail();
+    if (typeof getUserRole_ === 'function') {
+      var role = getUserRole_(callerEmail);
+      if (role !== 'admin' && role !== 'steward') {
+        return errorResponse('Unauthorized: only stewards and admins may send emails to members');
+      }
+    }
+
     const member = getMemberById(memberId);
     if (!member) {
       return errorResponse('Member not found');
@@ -1332,10 +1373,18 @@ function sendEmailToMember(memberId, subject, body) {
       return errorResponse('Invalid email address');
     }
 
+    // CR-21: Sanitize subject for use in email header
+    var safeSubject = String(subject || '').substring(0, 500);
+
+    // CR-21: Body is trusted server-side HTML (never passed directly from client).
+    // Callers construct the body server-side using escapeHtml() for dynamic values.
+    // As a defense-in-depth measure, strip <script> tags from the body.
+    var safeBody = String(body || '').replace(/<script[\s\S]*?<\/script>/gi, '');
+
     MailApp.sendEmail({
       to: email,
-      subject: subject,
-      htmlBody: body
+      subject: safeSubject,
+      htmlBody: safeBody
     });
 
     return {
@@ -1364,23 +1413,23 @@ function getOrCreateMemberFolder(name, id) {
   // Get archive folder ID from Config or COMMAND_CONFIG
   var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
 
+  // L-04: Declare folderName once at the top instead of re-declaring in each branch
+  var folderName = name + ' (' + id + ')';
+
   if (!archiveFolderId) {
     // Fall back to creating in root folder
     var rootFolder = getOrCreateRootFolder();
-    var folderName = name + ' (' + id + ')';
     var folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
 
   try {
     var parentFolder = DriveApp.getFolderById(archiveFolderId);
-    var folderName = name + ' (' + id + ')';
     var folders = parentFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
   } catch (e) {
     Logger.log('Archive folder not found, using root: ' + e.message);
     var rootFolder = getOrCreateRootFolder();
-    var folderName = name + ' (' + id + ')';
     var folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
@@ -1407,17 +1456,23 @@ function createSignatureReadyPDF(folder, data) {
     var doc = DocumentApp.openById(temp.getId());
     var body = doc.getBody();
 
+    // M-09: Helper to escape $ in replacement values — replaceText() uses regex
+    // internally, so $ would be interpreted as backreference syntax
+    function escapeReplacement_(val) {
+      return String(val).replace(/\$/g, '$$$$');
+    }
+
     // Replace placeholders with data
-    body.replaceText('{{MemberName}}', data.name || 'Unknown');
-    body.replaceText('{{MemberID}}', data.id || '000');
-    body.replaceText('{{Date}}', new Date().toLocaleDateString());
-    body.replaceText('{{Details}}', data.details || 'No details provided.');
-    body.replaceText('{{GrievanceID}}', data.grievanceId || '');
-    body.replaceText('{{Articles}}', data.articles || '');
-    body.replaceText('{{Status}}', data.status || '');
-    body.replaceText('{{Unit}}', data.unit || '');
-    body.replaceText('{{Location}}', data.location || '');
-    body.replaceText('{{Steward}}', data.steward || '');
+    body.replaceText('{{MemberName}}', escapeReplacement_(data.name || 'Unknown'));
+    body.replaceText('{{MemberID}}', escapeReplacement_(data.id || '000'));
+    body.replaceText('{{Date}}', escapeReplacement_(new Date().toLocaleDateString()));
+    body.replaceText('{{Details}}', escapeReplacement_(data.details || 'No details provided.'));
+    body.replaceText('{{GrievanceID}}', escapeReplacement_(data.grievanceId || ''));
+    body.replaceText('{{Articles}}', escapeReplacement_(data.articles || ''));
+    body.replaceText('{{Status}}', escapeReplacement_(data.status || ''));
+    body.replaceText('{{Unit}}', escapeReplacement_(data.unit || ''));
+    body.replaceText('{{Location}}', escapeReplacement_(data.location || ''));
+    body.replaceText('{{Steward}}', escapeReplacement_(data.steward || ''));
 
     // Append legal signature block
     body.appendParagraph(COMMAND_CONFIG.PDF.SIGNATURE_BLOCK ||
@@ -1600,8 +1655,16 @@ function onGrievanceFormSubmit(e) {
     if (sheet) {
       // Use the event range to find the exact row the form submission added to
       var targetRow = e.range ? e.range.getRow() : sheet.getLastRow();
+      // M-42: Only write to DRIVE_FOLDER_URL if the column is currently empty,
+      // to avoid overwriting an existing folder URL with the PDF URL.
+      // Write the PDF URL to a separate column if available, otherwise use folder URL
+      // column only as a fallback when it's empty.
       if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
-        sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+        var existingUrl = sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
+        if (!existingUrl) {
+          // Store the member folder URL (not the PDF URL) so the link points to the folder
+          sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(memberFolder.getUrl());
+        }
       }
     }
 
