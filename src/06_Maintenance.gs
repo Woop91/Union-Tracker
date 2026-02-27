@@ -891,11 +891,12 @@ function showCacheStatusDashboard() {
       } catch (_e) { /* cached value may not be valid JSON; skip age display */ }
     }
 
+    // M-13: Apply escapeHtml() to dynamic values embedded in HTML
     return '<tr>' +
-      '<td>' + name + '</td>' +
+      '<td>' + escapeHtml(String(name)) + '</td>' +
       '<td>' + (inMem ? '✅' : '❌') + '</td>' +
       '<td>' + (inProps ? '✅' : '❌') + '</td>' +
-      '<td>' + age + '</td>' +
+      '<td>' + escapeHtml(String(age)) + '</td>' +
       '</tr>';
   }).join('');
 
@@ -2158,15 +2159,42 @@ function getSettings() {
  * @param {Object} settings - Settings to save
  */
 function saveSettings(settings) {
+  // M-58: Whitelist of allowed setting keys to prevent arbitrary property writes
+  var ALLOWED_SETTINGS = {
+    autoSyncCalendar: 'boolean',
+    emailReminders: 'boolean',
+    reminderDays: 'number',
+    autoCreateFolders: 'boolean'
+  };
+
+  if (!settings || typeof settings !== 'object') {
+    throw new Error('Invalid settings object');
+  }
+
   const props = PropertiesService.getDocumentProperties();
 
-  props.setProperty('autoSyncCalendar', String(settings.autoSyncCalendar));
-  props.setProperty('emailReminders', String(settings.emailReminders));
-  props.setProperty('reminderDays', String(settings.reminderDays));
-  props.setProperty('autoCreateFolders', String(settings.autoCreateFolders));
+  // Only write whitelisted keys, validate types
+  var savedKeys = [];
+  for (var key in ALLOWED_SETTINGS) {
+    if (ALLOWED_SETTINGS.hasOwnProperty(key) && settings.hasOwnProperty(key)) {
+      var expectedType = ALLOWED_SETTINGS[key];
+      var value = settings[key];
+      // Coerce to expected type for safety
+      if (expectedType === 'boolean') {
+        props.setProperty(key, String(!!value));
+      } else if (expectedType === 'number') {
+        var numVal = parseInt(value, 10);
+        if (isNaN(numVal) || numVal < 0) numVal = 7; // safe default for reminderDays
+        props.setProperty(key, String(numVal));
+      } else {
+        props.setProperty(key, String(value));
+      }
+      savedKeys.push(key);
+    }
+  }
 
   logAuditEvent(AUDIT_EVENTS.SETTINGS_CHANGED, {
-    settings: settings,
+    settingsKeys: savedKeys,
     changedBy: Session.getActiveUser().getEmail()
   });
 }
