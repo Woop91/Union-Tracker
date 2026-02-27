@@ -77,12 +77,11 @@ var DataService = (function () {
     if (!email) return null;
     email = String(email).trim().toLowerCase();
 
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return null;
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return null;
 
-    var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var colMap = _buildColumnMap(headers);
+    var data = cached.data;
+    var colMap = cached.colMap;
 
     var emailCol = _findColumn(colMap, HEADERS.memberEmail);
     if (emailCol === -1) return null;
@@ -120,12 +119,11 @@ var DataService = (function () {
   function getStewardCases(stewardEmail) {
     stewardEmail = String(stewardEmail).trim().toLowerCase();
 
-    var sheet = _getSheet(GRIEVANCE_SHEET);
-    if (!sheet) return [];
+    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    if (!cached) return [];
 
-    var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var colMap = _buildColumnMap(headers);
+    var data = cached.data;
+    var colMap = cached.colMap;
 
     var stewardCol = _findColumn(colMap, HEADERS.grievanceSteward);
     if (stewardCol === -1) {
@@ -205,12 +203,11 @@ var DataService = (function () {
   function getMemberGrievances(memberEmail) {
     memberEmail = String(memberEmail).trim().toLowerCase();
 
-    var sheet = _getSheet(GRIEVANCE_SHEET);
-    if (!sheet) return [];
+    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    if (!cached) return [];
 
-    var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var colMap = _buildColumnMap(headers);
+    var data = cached.data;
+    var colMap = cached.colMap;
 
     var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
     if (memberCol === -1) return [];
@@ -242,12 +239,11 @@ var DataService = (function () {
     if (!memberEmail) return { success: true, history: [] };
     memberEmail = String(memberEmail).trim().toLowerCase();
 
-    var sheet = _getSheet(GRIEVANCE_SHEET);
-    if (!sheet) return { success: true, history: [] };
+    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    if (!cached) return { success: true, history: [] };
 
-    var data = sheet.getDataRange().getValues();
-    var headers = data[0];
-    var colMap = _buildColumnMap(headers);
+    var data = cached.data;
+    var colMap = cached.colMap;
 
     var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
     if (memberCol === -1) return { success: true, history: [] };
@@ -402,6 +398,7 @@ var DataService = (function () {
         sheet.getRange(rowNum, col + 1).setValue(val);
       }
 
+      _invalidateSheetCache(MEMBER_SHEET);
       if (typeof logAuditEvent === 'function') {
         logAuditEvent('PROFILE_UPDATE', { email: email, fields: Object.keys(updates).join(',') });
       }
@@ -444,11 +441,11 @@ var DataService = (function () {
     var member = findUserByEmail(memberEmail);
     if (!member) return [];
 
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return [];
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return [];
 
-    var data = sheet.getDataRange().getValues();
-    var colMap = _buildColumnMap(data[0]);
+    var data = cached.data;
+    var colMap = cached.colMap;
     var isStewardCol = _findColumn(colMap, HEADERS.memberIsSteward);
     var roleCol = _findColumn(colMap, HEADERS.memberRole);
     var locationCol = _findColumn(colMap, HEADERS.memberWorkLocation);
@@ -502,6 +499,7 @@ var DataService = (function () {
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][emailCol]).trim().toLowerCase() === memberEmail) {
         sheet.getRange(i + 1, stewardCol + 1).setValue(stewardEmail);
+        _invalidateSheetCache(MEMBER_SHEET);
         if (typeof logAuditEvent === 'function') {
           logAuditEvent('STEWARD_SELF_ASSIGN', { member: memberEmail, steward: stewardEmail });
         }
@@ -603,11 +601,11 @@ var DataService = (function () {
     if (!stewardEmail) return [];
     stewardEmail = String(stewardEmail).trim().toLowerCase();
 
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return [];
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return [];
 
-    var data = sheet.getDataRange().getValues();
-    var colMap = _buildColumnMap(data[0]);
+    var data = cached.data;
+    var colMap = cached.colMap;
     var stewardCol = _findColumn(colMap, HEADERS.memberAssignedSteward);
     if (stewardCol === -1) return [];
 
@@ -784,11 +782,11 @@ var DataService = (function () {
    * @returns {string[]} Unique unit names
    */
   function getUnits() {
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return [];
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return [];
 
-    var data = sheet.getDataRange().getValues();
-    var colMap = _buildColumnMap(data[0]);
+    var data = cached.data;
+    var colMap = cached.colMap;
     var unitCol = _findColumn(colMap, HEADERS.memberUnit);
     if (unitCol === -1) return [];
 
@@ -1177,10 +1175,10 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function getStewardDirectory() {
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return [];
-    var data = sheet.getDataRange().getValues();
-    var colMap = _buildColumnMap(data[0]);
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return [];
+    var data = cached.data;
+    var colMap = cached.colMap;
     var stewards = [];
     for (var i = 1; i < data.length; i++) {
       var rec = _buildUserRecord(data[i], colMap);
@@ -1203,11 +1201,11 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function getGrievanceStats() {
-    var sheet = _getSheet(GRIEVANCE_SHEET);
-    if (!sheet) return { available: false };
-    var data = sheet.getDataRange().getValues();
+    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    if (!cached) return { available: false };
+    var data = cached.data;
     if (data.length <= 1) return { available: false };
-    var colMap = _buildColumnMap(data[0]);
+    var colMap = cached.colMap;
     var total = data.length - 1;
     if (total < 10) return { available: false, count: total, threshold: 10 };
 
@@ -1237,11 +1235,11 @@ var DataService = (function () {
   }
 
   function getGrievanceHotSpots() {
-    var sheet = _getSheet(GRIEVANCE_SHEET);
-    if (!sheet) return [];
-    var data = sheet.getDataRange().getValues();
+    var cached = _getCachedSheetData(GRIEVANCE_SHEET);
+    if (!cached) return [];
+    var data = cached.data;
     if (data.length <= 1) return [];
-    var colMap = _buildColumnMap(data[0]);
+    var colMap = cached.colMap;
     var unitCol = _findColumn(colMap, HEADERS.grievanceUnit);
     if (unitCol === -1) return [];
 
@@ -1263,14 +1261,14 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function getMembershipStats() {
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return { available: false };
-    var data = sheet.getDataRange().getValues();
+    var cached = _getCachedSheetData(MEMBER_SHEET);
+    if (!cached) return { available: false };
+    var data = cached.data;
     if (data.length <= 1) return { available: false };
     var total = data.length - 1;
     if (total < 20) return { available: false, count: total, threshold: 20 };
 
-    var colMap = _buildColumnMap(data[0]);
+    var colMap = cached.colMap;
     var byUnit = {};
     var byLocation = {};
     var byDues = {};
@@ -1324,6 +1322,166 @@ var DataService = (function () {
     }
   }
 
+  // ═══════════════════════════════════════
+  // SHEET DATA CACHE — avoids redundant full-sheet reads within a single
+  // server execution (multiple methods reading the same sheet).
+  // Uses CacheService with a short TTL for cross-request caching.
+  // ═══════════════════════════════════════
+
+  var _sheetDataCache = {};
+  var SHEET_CACHE_TTL = 120; // 2 minutes
+
+  /**
+   * Returns cached sheet data (headers + rows) or reads from the sheet
+   * and caches the result. Uses in-memory cache for same-execution reuse
+   * and CacheService for cross-request reuse.
+   * @param {string} sheetName
+   * @returns {{ data: Array[], colMap: Object }|null}
+   */
+  function _getCachedSheetData(sheetName) {
+    // In-memory cache (same Apps Script execution)
+    if (_sheetDataCache[sheetName]) return _sheetDataCache[sheetName];
+
+    // CacheService cache (cross-request, short TTL)
+    var cacheKey = 'SD_' + sheetName.replace(/\s/g, '_');
+    try {
+      var cache = CacheService.getScriptCache();
+      var cached = cache.get(cacheKey);
+      if (cached) {
+        var parsed = JSON.parse(cached);
+        // Restore Date objects from serialized __d markers
+        parsed.data = parsed.data.map(function(row) {
+          return row.map(function(cell) {
+            return (cell && typeof cell === 'object' && cell.__d) ? new Date(cell.__d) : cell;
+          });
+        });
+        parsed.colMap = _buildColumnMap(parsed.data[0]);
+        _sheetDataCache[sheetName] = parsed;
+        return parsed;
+      }
+    } catch (e) { /* cache miss or parse error — read from sheet */ }
+
+    var sheet = _getSheet(sheetName);
+    if (!sheet) return null;
+
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var result = { data: data, colMap: colMap };
+
+    // Store in memory
+    _sheetDataCache[sheetName] = result;
+
+    // Store in CacheService (serialize dates as ISO strings for JSON)
+    try {
+      var serializable = data.map(function(row) {
+        return row.map(function(cell) {
+          return cell instanceof Date ? { __d: cell.toISOString() } : cell;
+        });
+      });
+      var json = JSON.stringify({ data: serializable });
+      // CacheService limit is 100KB per key — skip if too large
+      if (json.length < 95000) {
+        cache.put(cacheKey, json, SHEET_CACHE_TTL);
+      }
+    } catch (e) { /* non-fatal — in-memory cache still works */ }
+
+    return result;
+  }
+
+  /**
+   * Invalidates the sheet data cache for a specific sheet.
+   * Call after writes to ensure fresh reads.
+   */
+  function _invalidateSheetCache(sheetName) {
+    delete _sheetDataCache[sheetName];
+    try {
+      var cacheKey = 'SD_' + sheetName.replace(/\s/g, '_');
+      CacheService.getScriptCache().remove(cacheKey);
+    } catch (e) { /* non-fatal */ }
+  }
+
+  // ═══════════════════════════════════════
+  // BATCH DATA — single round-trip for SPA init
+  // Aggregates all data needed for the initial view in one call.
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns all data needed for the initial page render in one round trip.
+   * @param {string} email - User email
+   * @param {string} role - 'member' or 'steward'
+   * @returns {Object} Batch data payload
+   */
+  function getBatchData(email, role) {
+    if (!email) return {};
+    email = String(email).trim().toLowerCase();
+
+    if (role === 'steward') {
+      return _getStewardBatchData(email);
+    }
+    return _getMemberBatchData(email);
+  }
+
+  function _getMemberBatchData(email) {
+    var grievances = getMemberGrievances(email);
+    var history = getMemberGrievanceHistory(email);
+    var stewardInfo = getAssignedStewardInfo(email);
+    var surveyStatus = getMemberSurveyStatus(email);
+    var events = getUpcomingEvents(5);
+    var notifCount = 0;
+    try {
+      if (typeof getWebAppNotificationCount === 'function') {
+        var nc = getWebAppNotificationCount(email, 'member');
+        notifCount = (nc && nc.count) || 0;
+      }
+    } catch (e) { /* non-fatal */ }
+
+    return {
+      grievances: grievances,
+      history: history,
+      stewardInfo: stewardInfo,
+      surveyStatus: surveyStatus,
+      events: events,
+      notificationCount: notifCount,
+    };
+  }
+
+  function _getStewardBatchData(email) {
+    // Read cases once and compute KPIs from same data (avoids double sheet read)
+    var cases = getStewardCases(email);
+    var kpis = _computeKPIsFromCases(cases);
+    var notifCount = 0;
+    try {
+      if (typeof getWebAppNotificationCount === 'function') {
+        var nc = getWebAppNotificationCount(email, 'steward');
+        notifCount = (nc && nc.count) || 0;
+      }
+    } catch (e) { /* non-fatal */ }
+
+    return {
+      cases: cases,
+      kpis: kpis,
+      notificationCount: notifCount,
+    };
+  }
+
+  /**
+   * Computes KPIs from an already-fetched cases array (no extra sheet read).
+   */
+  function _computeKPIsFromCases(cases) {
+    var total = cases.length;
+    var overdue = 0, dueSoon = 0, resolved = 0, active = 0;
+    for (var i = 0; i < cases.length; i++) {
+      var status = String(cases[i].status).toLowerCase();
+      if (status === 'resolved') resolved++;
+      else if (status === 'overdue') overdue++;
+      else {
+        active++;
+        if (cases[i].deadlineDays !== null && cases[i].deadlineDays <= 7 && cases[i].deadlineDays > 0) dueSoon++;
+      }
+    }
+    return { totalCases: total, activeCases: active, overdue: overdue, dueSoon: dueSoon, resolved: resolved };
+  }
+
   // Public API
   return {
     findUserByEmail: findUserByEmail,
@@ -1363,6 +1521,9 @@ var DataService = (function () {
     // v4.15.0
     isChiefSteward: isChiefSteward,
     getChiefStewardTaskView: getChiefStewardTaskView,
+    // Perf: batch + cache
+    getBatchData: getBatchData,
+    _invalidateSheetCache: _invalidateSheetCache,
   };
 
 })();
@@ -1417,7 +1578,7 @@ function dataGetChiefStewardTaskView(email) { return DataService.getChiefSteward
 function dataGetAgencyGrievanceStats() { return DataService.getGrievanceStats(); }
 
 // Batch data fetch — single round-trip for SPA init
-function dataGetBatchData(email, role) { return getWebDashBatchData(email, role); }
+function dataGetBatchData(email, role) { return DataService.getBatchData(email, role); }
 
 // Broadcast filter options — returns unique values from steward's members
 function dataGetBroadcastFilterOptions(stewardEmail) {

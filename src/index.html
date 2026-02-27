@@ -5,15 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Dashboard</title>
 
-  <!-- Fonts -->
+  <!-- Fonts — load only weights used (400, 600) to reduce payload -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 
   <?!= include('styles') ?>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <!-- Chart.js — deferred until actually needed (lazy-loaded by ChartHelper) -->
 </head>
 <body>
   <div id="app"></div>
@@ -118,6 +117,10 @@
         document.body.style.background = t.bg;
         document.body.style.color = t.text;
         document.body.style.fontFamily = t.fontBody;
+        // Invalidate chart color cache on theme change
+        if (typeof ChartHelper !== 'undefined' && ChartHelper.invalidateColorCache) {
+          ChartHelper.invalidateColorCache();
+        }
       }
 
       return {
@@ -125,6 +128,53 @@
         applyTheme: applyTheme,
         palette: palette,
       };
+    })();
+
+    // ═══════════════════════════════════════
+    // CLIENT-SIDE DATA CACHE — prevents redundant server calls on tab switches
+    // ═══════════════════════════════════════
+    var DataCache = (function() {
+      var _cache = {};
+      var DEFAULT_TTL = 120000; // 2 minutes
+
+      function get(key) {
+        var entry = _cache[key];
+        if (!entry) return undefined;
+        if (Date.now() > entry.expires) { delete _cache[key]; return undefined; }
+        return entry.value;
+      }
+
+      function set(key, value, ttlMs) {
+        _cache[key] = { value: value, expires: Date.now() + (ttlMs || DEFAULT_TTL) };
+      }
+
+      function invalidate(key) { if (key) delete _cache[key]; else _cache = {}; }
+
+      /**
+       * Wraps a google.script.run call with caching.
+       * @param {string} cacheKey - Cache key
+       * @param {string} fnName - server function name
+       * @param {Array} args - arguments to pass
+       * @param {Function} onSuccess - success callback
+       * @param {Function} [onFailure] - failure callback
+       * @param {number} [ttlMs] - cache TTL in ms
+       */
+      function cachedCall(cacheKey, fnName, args, onSuccess, onFailure, ttlMs) {
+        var cached = get(cacheKey);
+        if (cached !== undefined) {
+          onSuccess(cached);
+          return;
+        }
+        var runner = google.script.run
+          .withSuccessHandler(function(result) {
+            set(cacheKey, result, ttlMs);
+            onSuccess(result);
+          });
+        if (onFailure) runner = runner.withFailureHandler(onFailure);
+        runner[fnName].apply(runner, args || []);
+      }
+
+      return { get: get, set: set, invalidate: invalidate, cachedCall: cachedCall };
     })();
 
     // ═══════════════════════════════════════
@@ -468,14 +518,40 @@
     });
 
     // ═══════════════════════════════════════
-    // CHART HELPER (requires Chart.js CDN)
+    // CHART HELPER — lazy-loads Chart.js on first use
     // ═══════════════════════════════════════
     var ChartHelper = (function() {
       var _charts = {};
+      var _chartJsLoaded = typeof Chart !== 'undefined';
+      var _chartJsLoading = false;
+      var _pendingCallbacks = [];
+      var _cachedColors = null;
+
+      function _ensureChartJs(callback) {
+        if (_chartJsLoaded) { callback(); return; }
+        _pendingCallbacks.push(callback);
+        if (_chartJsLoading) return;
+        _chartJsLoading = true;
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+        script.onload = function() {
+          _chartJsLoaded = true;
+          _chartJsLoading = false;
+          var cbs = _pendingCallbacks.slice();
+          _pendingCallbacks = [];
+          cbs.forEach(function(cb) { cb(); });
+        };
+        script.onerror = function() {
+          _chartJsLoading = false;
+          _pendingCallbacks = [];
+        };
+        document.head.appendChild(script);
+      }
 
       function _getColors() {
+        if (_cachedColors) return _cachedColors;
         var cs = getComputedStyle(document.documentElement);
-        return {
+        _cachedColors = {
           accent:  cs.getPropertyValue('--accent').trim() || '#7c6ef6',
           success: cs.getPropertyValue('--success').trim() || '#4ade80',
           warning: cs.getPropertyValue('--warning').trim() || '#facc15',
@@ -486,7 +562,10 @@
           border:  cs.getPropertyValue('--border').trim() || '#2a2a2a',
           surface: cs.getPropertyValue('--surface').trim() || '#1e1e1e',
         };
+        return _cachedColors;
       }
+
+      function invalidateColorCache() { _cachedColors = null; }
 
       function _palette(count) {
         var c = _getColors();
@@ -515,73 +594,85 @@
         return _charts[id];
       }
 
+      function _lazyCreate(container, id, cfgFn) {
+        _ensureChartJs(function() { cfgFn(); });
+      }
+
       function createBarChart(container, id, labels, datasets, opts) {
-        var c = _getColors();
-        var dsList = datasets.map(function(ds, i) {
-          return Object.assign({
-            backgroundColor: ds.color || _palette(datasets.length)[i],
-            borderRadius: 4,
-            maxBarThickness: 40,
-          }, ds);
-        });
-        return _create(container, id, {
-          type: 'bar',
-          data: { labels: labels, datasets: dsList },
-          options: Object.assign({
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
-            scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
-          }, opts || {}),
+        _ensureChartJs(function() {
+          var c = _getColors();
+          var dsList = datasets.map(function(ds, i) {
+            return Object.assign({
+              backgroundColor: ds.color || _palette(datasets.length)[i],
+              borderRadius: 4,
+              maxBarThickness: 40,
+            }, ds);
+          });
+          _create(container, id, {
+            type: 'bar',
+            data: { labels: labels, datasets: dsList },
+            options: Object.assign({
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
+              scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
+            }, opts || {}),
+          });
         });
       }
 
       function createHorizontalBarChart(container, id, labels, data, colors) {
-        var c = _getColors();
-        return _create(container, id, {
-          type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderRadius: 4, maxBarThickness: 28 }],
-          },
-          options: {
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, grid: { color: c.border } }, y: { grid: { display: false } } },
-          },
+        _ensureChartJs(function() {
+          var c = _getColors();
+          _create(container, id, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderRadius: 4, maxBarThickness: 28 }],
+            },
+            options: {
+              indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { x: { beginAtZero: true, grid: { color: c.border } }, y: { grid: { display: false } } },
+            },
+          });
         });
       }
 
       function createDoughnutChart(container, id, labels, data, colors) {
-        return _create(container, id, {
-          type: 'doughnut',
-          data: {
-            labels: labels,
-            datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderWidth: 0, spacing: 2 }],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, cutout: '65%',
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } } },
-          },
+        _ensureChartJs(function() {
+          _create(container, id, {
+            type: 'doughnut',
+            data: {
+              labels: labels,
+              datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderWidth: 0, spacing: 2 }],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '65%',
+              plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } } },
+            },
+          });
         });
       }
 
       function createLineChart(container, id, labels, datasets, opts) {
-        var c = _getColors();
-        var dsList = datasets.map(function(ds, i) {
-          return Object.assign({
-            borderColor: ds.color || _palette(datasets.length)[i],
-            backgroundColor: (ds.color || _palette(datasets.length)[i]) + '20',
-            fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2,
-          }, ds);
-        });
-        return _create(container, id, {
-          type: 'line',
-          data: { labels: labels, datasets: dsList },
-          options: Object.assign({
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
-            scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
-          }, opts || {}),
+        _ensureChartJs(function() {
+          var c = _getColors();
+          var dsList = datasets.map(function(ds, i) {
+            return Object.assign({
+              borderColor: ds.color || _palette(datasets.length)[i],
+              backgroundColor: (ds.color || _palette(datasets.length)[i]) + '20',
+              fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2,
+            }, ds);
+          });
+          _create(container, id, {
+            type: 'line',
+            data: { labels: labels, datasets: dsList },
+            options: Object.assign({
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
+              scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
+            }, opts || {}),
+          });
         });
       }
 
@@ -591,6 +682,7 @@
         createDoughnutChart: createDoughnutChart,
         createLineChart: createLineChart,
         destroyChart: destroyChart,
+        invalidateColorCache: invalidateColorCache,
       };
     })();
 

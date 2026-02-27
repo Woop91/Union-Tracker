@@ -15,7 +15,23 @@ function initMemberView(container) {
   AppState.activeRole = 'member';
   showLoading(container);
 
-  // Load notification count in parallel (for bell badge)
+  // Use batch data if available from initApp pre-fetch
+  var batch = AppState.batchData;
+  if (batch && batch.grievances) {
+    AppState.grievances = batch.grievances || [];
+    AppState.notificationCount = batch.notificationCount || 0;
+    // Seed the client-side DataCache with batch results
+    if (batch.history) DataCache.set('memberHistory_' + CURRENT_USER.email, batch.history);
+    if (batch.stewardInfo) DataCache.set('stewardInfo_' + CURRENT_USER.email, batch.stewardInfo);
+    if (batch.surveyStatus) DataCache.set('surveyStatus_' + CURRENT_USER.email, batch.surveyStatus);
+    if (batch.events) DataCache.set('events', batch.events);
+    AppState.loading = false;
+    renderMemberHome(container);
+    _checkDeepLink('member');
+    return;
+  }
+
+  // Fallback: load individually (batch unavailable)
   google.script.run.withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
   }).getWebAppNotificationCount(CURRENT_USER.email, 'member');
@@ -88,8 +104,8 @@ function renderMemberHome(appContainer) {
     container.appendChild(welcomeSlot);
     _maybeShowMemberWelcome(welcomeSlot);
 
-    // Survey banner — links to in-app survey form
-    google.script.run.withSuccessHandler(function(status) {
+    // Survey banner — links to in-app survey form (uses DataCache)
+    DataCache.cachedCall('surveyStatus_' + CURRENT_USER.email, 'dataGetSurveyStatus', [CURRENT_USER.email], function(status) {
       if (status && !status.hasCompleted) {
         var banner = el('div', { className: 'survey-banner fade-in' });
         var bannerLeft = el('div');
@@ -111,7 +127,7 @@ function renderMemberHome(appContainer) {
         if (firstContent) container.insertBefore(banner, firstContent);
         else container.appendChild(banner);
       }
-    }).dataGetSurveyStatus(CURRENT_USER.email);
+    });
 
     // Active grievance card — only show if member has an active case
     var activeG = AppState.grievances.find(function(g) { return g.status !== 'resolved'; });
@@ -122,7 +138,7 @@ function renderMemberHome(appContainer) {
     // Past cases preview (compact — shows up to 2 recent closed cases)
     var pastPreview = el('div', { style: { margin: '0 16px 14px' } });
     container.appendChild(pastPreview);
-    google.script.run.withSuccessHandler(function(result) {
+    DataCache.cachedCall('memberHistory_' + CURRENT_USER.email, 'dataGetMemberGrievanceHistory', [CURRENT_USER.email], function(result) {
       if (!result || !result.success || !result.history || result.history.length === 0) return;
       var items = result.history.slice(0, 2);
       var previewCard = el('div', { className: 'card card-glass', style: { padding: '14px 16px' } });
@@ -140,7 +156,7 @@ function renderMemberHome(appContainer) {
         }, 'View all ' + result.history.length + ' past cases \u2192'));
       }
       pastPreview.appendChild(previewCard);
-    }).dataGetMemberGrievanceHistory(CURRENT_USER.email);
+    });
 
     // Steward card (single card, no dues)
     var stewardCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px' } });
@@ -151,7 +167,7 @@ function renderMemberHome(appContainer) {
     stewardCard.appendChild(stewardActions);
     container.appendChild(stewardCard);
 
-    google.script.run.withSuccessHandler(function(info) {
+    DataCache.cachedCall('stewardInfo_' + CURRENT_USER.email, 'dataGetAssignedSteward', [CURRENT_USER.email], function(info) {
       if (info) {
         stewardName.textContent = info.name || info.email;
         stewardActions.appendChild(el('a', {
@@ -171,7 +187,7 @@ function renderMemberHome(appContainer) {
           onClick: function() { renderStewardContact(document.getElementById('app')); }
         }, 'Find a ' + CONFIG.stewardLabel));
       }
-    }).dataGetAssignedSteward(CURRENT_USER.email);
+    });
 
     // Actionable stats strip — Unread Notifications, Survey Status, Upcoming Events
     var statsStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)' } });
@@ -195,36 +211,29 @@ function renderMemberHome(appContainer) {
 
     container.appendChild(statsStrip);
 
-    // Populate KPIs asynchronously
-    google.script.run.withSuccessHandler(function(status) {
+    // Populate KPIs asynchronously (uses DataCache — no duplicate calls)
+    DataCache.cachedCall('surveyStatus_' + CURRENT_USER.email, 'dataGetSurveyStatus', [CURRENT_USER.email], function(status) {
       if (status) {
         surveyVal.textContent = status.hasCompleted ? 'Done' : 'Open';
         surveyVal.style.color = status.hasCompleted ? 'var(--success)' : 'var(--warning)';
       }
-    }).dataGetSurveyStatus(CURRENT_USER.email);
+    });
 
-    google.script.run.withSuccessHandler(function(events) {
-      eventsVal.textContent = events ? String(events.length) : '0';
-    }).dataGetUpcomingEvents(10);
+    // Notification count
+    notifVal.textContent = String(AppState.notificationCount || 0);
 
-    // Notification count (set from batch or fetch)
-    if (AppState.batchData && AppState.batchData.notifications) {
-      var unread = AppState.batchData.notifications.filter(function(n) { return !n.read; }).length;
-      notifVal.textContent = String(unread);
-      notifVal.style.color = unread > 0 ? 'var(--warning)' : null;
-      AppState.notificationCount = unread;
-    } else {
-      notifVal.textContent = String(AppState.notificationCount || 0);
-    }
-
-    // Upcoming Events section
+    // Upcoming Events section — single fetch populates both KPI and event cards
     var eventsSection = el('div', { className: 'content', style: { marginBottom: '14px' } });
     eventsSection.appendChild(el('h3', { className: 'section-title' }, 'Upcoming Events'));
     var eventsArea = el('div');
     eventsSection.appendChild(eventsArea);
     container.appendChild(eventsSection);
 
-    google.script.run.withSuccessHandler(function(events) {
+    DataCache.cachedCall('events', 'dataGetUpcomingEvents', [10], function(events) {
+      // Update KPI counter
+      eventsVal.textContent = events ? String(events.length) : '0';
+
+      // Render event cards
       if (!events || events.length === 0) {
         eventsArea.appendChild(el('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, 'No upcoming events.'));
         return;
@@ -254,7 +263,7 @@ function renderMemberHome(appContainer) {
           onClick: function() { renderEventsPage(document.getElementById('app')); }
         }, 'View All Events'));
       }
-    }).dataGetUpcomingEvents(5);
+    });
 
     // Quick links
     var res = el('div', { className: 'content' });

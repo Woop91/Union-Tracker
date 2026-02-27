@@ -15,7 +15,19 @@ function initStewardView(container) {
   AppState.activeRole = 'steward';
   showLoading(container);
 
-  // Load notification count in parallel (for bell badge)
+  // Use batch data if available from initApp pre-fetch
+  var batch = AppState.batchData;
+  if (batch && batch.cases) {
+    AppState.cases = batch.cases || [];
+    AppState.kpis = batch.kpis || { totalCases: AppState.cases.length, overdue: 0, dueSoon: 0, resolved: 0, activeCases: 0 };
+    AppState.notificationCount = batch.notificationCount || 0;
+    AppState.loading = false;
+    renderStewardDashboard(container);
+    _checkDeepLink('steward');
+    return;
+  }
+
+  // Fallback: load individually (batch unavailable)
   google.script.run.withSuccessHandler(function(r) {
     AppState.notificationCount = (r && r.count) || 0;
   }).getWebAppNotificationCount(CURRENT_USER.email, 'steward');
