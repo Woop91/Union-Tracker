@@ -284,3 +284,16 @@ See `PHASE2_PLAN.md` for details.
 - **Version bump is mandatory** on every code change: `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
 - **DDS Script ID must NEVER appear in Union-Tracker** (public repo).
 - **Read before act.** Never assume repo state, file contents, or function behavior.
+
+## 2026-02-28 — Workflow Correction (v4.18.2)
+
+### Error Found & Corrected
+- **Previous action (v4.18.1) incorrectly deleted UT staging and dev branches.** The user's intended workflow requires UT `staging` as the Claude-managed sync target, with `dev` and `Main` being user-managed. UT staging and dev branches were recreated from current Main (in full parity).
+- **Root cause:** Claude assumed "ALL REPOS IN PARITY" meant single-branch everywhere. User clarification revealed the correct flow: `DDS Main → UT staging → [user] → UT dev → UT Main`.
+
+### Actions Taken
+- Recreated UT `staging` and `dev` branches (both starting from current Main = v4.18.1, so in parity)
+- Updated CLAUDE.md in both repos with correct sync flow diagram
+- Added Code Review rules: no false "FIXED" claims, full codebase pattern search, no inflated scores
+- Clarified: DDS = single branch (Main only), UT = 3 branches (staging=Claude, dev/Main=user)
+- Added fallback handoff protocol: timestamped notes for follow-on agents
