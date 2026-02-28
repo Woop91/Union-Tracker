@@ -29,7 +29,7 @@ jobs:
         run: npm run lint
         continue-on-error: false
 
-      - name: Build dashboard
+      - name: Build individual files
         run: npm run build
 
       - name: Audit dependencies
@@ -48,10 +48,12 @@ jobs:
 
       - name: Verify build output
         run: |
+          # Build produces individual .gs + .html files in dist/ (not a consolidated file).
+          # Verify key files exist.
           GS_COUNT=$(find dist -name "*.gs" | wc -l)
           HTML_COUNT=$(find dist -name "*.html" | wc -l)
           if [ "$GS_COUNT" -eq 0 ]; then
-            echo "ERROR: No .gs files found in dist/!"
+            echo "ERROR: No .gs files found in dist/"
             exit 1
           fi
           echo "Build output verified: ${GS_COUNT} .gs files, ${HTML_COUNT} .html files"
@@ -59,14 +61,24 @@ jobs:
 
       - name: Report build size
         run: |
-          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          TOTAL_SIZE=0
+          TOTAL_LINES=0
+          for f in dist/*.gs dist/*.html; do
+            if [ -f "$f" ]; then
+              FSIZE=$(stat -c%s "$f" 2>/dev/null || stat -f%z "$f")
+              FLINES=$(wc -l < "$f")
+              TOTAL_SIZE=$((TOTAL_SIZE + FSIZE))
+              TOTAL_LINES=$((TOTAL_LINES + FLINES))
+            fi
+          done
+          SIZE_KB=$(echo "scale=1; $TOTAL_SIZE/1024" | bc)
           GS_COUNT=$(find dist -name "*.gs" | wc -l)
           HTML_COUNT=$(find dist -name "*.html" | wc -l)
-          TOTAL_SIZE=$(find dist -name "*.gs" -o -name "*.html" | xargs stat -c%s 2>/dev/null | awk '{s+=$1} END {print s}')
-          TOTAL_LINES=$(find dist -name "*.gs" -o -name "*.html" | xargs wc -l | tail -1 | awk '{print $1}')
-          SIZE_KB=$(echo "scale=1; $TOTAL_SIZE/1024" | bc)
-          echo "- **Files**: ${GS_COUNT} .gs + ${HTML_COUNT} .html" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Output**: dist/ (multi-file)" >> $GITHUB_STEP_SUMMARY
+          echo "- **.gs files**: ${GS_COUNT}" >> $GITHUB_STEP_SUMMARY
+          echo "- **.html files**: ${HTML_COUNT}" >> $GITHUB_STEP_SUMMARY
           echo "- **Total size**: ${SIZE_KB} KB ($TOTAL_SIZE bytes)" >> $GITHUB_STEP_SUMMARY
           echo "- **Total lines**: $TOTAL_LINES" >> $GITHUB_STEP_SUMMARY
           # Warn if build exceeds 3MB (Google Apps Script limit is ~6MB)
@@ -78,7 +90,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
-          name: dashboard-build
+          name: dashboard-dist
           path: dist/
           retention-days: 30
 
