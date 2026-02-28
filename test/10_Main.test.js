@@ -11,6 +11,11 @@ const { loadSources } = require('./load-source');
 // Load in GAS load order — we need constants defined before Main
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs']);
 
+// Derive 0-indexed constants for row position validation
+const MEMBER_COLUMNS = Object.fromEntries(
+  Object.entries(MEMBER_COLS).map(([k, v]) => [k, v - 1])
+);
+
 // We can't fully load 10_Main.gs because it has heavy GAS dependencies,
 // so we test the key logic patterns by extracting them into isolated tests.
 
@@ -44,57 +49,57 @@ describe('addNewMember row construction', () => {
   test('Member ID is in correct position', () => {
     const row = buildMemberRow({});
     expect(row[0]).toBe('MEM-TEST123'); // Column A = index 0
-    expect(row[MEMBER_COLS.MEMBER_ID - 1]).toBe('MEM-TEST123');
+    expect(row[MEMBER_COLUMNS.MEMBER_ID]).toBe('MEM-TEST123');
   });
 
   test('First Name is in correct position', () => {
     const row = buildMemberRow({ firstName: 'Jane' });
-    expect(row[MEMBER_COLS.FIRST_NAME - 1]).toBe('Jane');
+    expect(row[MEMBER_COLUMNS.FIRST_NAME]).toBe('Jane');
   });
 
   test('Last Name is in correct position', () => {
     const row = buildMemberRow({ lastName: 'Doe' });
-    expect(row[MEMBER_COLS.LAST_NAME - 1]).toBe('Doe');
+    expect(row[MEMBER_COLUMNS.LAST_NAME]).toBe('Doe');
   });
 
   test('Email is in correct position', () => {
     const row = buildMemberRow({ email: 'test@example.com' });
-    expect(row[MEMBER_COLS.EMAIL - 1]).toBe('test@example.com');
+    expect(row[MEMBER_COLUMNS.EMAIL]).toBe('test@example.com');
   });
 
   test('Phone is in correct position', () => {
     const row = buildMemberRow({ phone: '555-123-4567' });
-    expect(row[MEMBER_COLS.PHONE - 1]).toBe('555-123-4567');
+    expect(row[MEMBER_COLUMNS.PHONE]).toBe('555-123-4567');
   });
 
   test('Work Location is in correct position', () => {
     const row = buildMemberRow({ workLocation: 'Main Station' });
-    expect(row[MEMBER_COLS.WORK_LOCATION - 1]).toBe('Main Station');
+    expect(row[MEMBER_COLUMNS.WORK_LOCATION]).toBe('Main Station');
   });
 
   test('Unit is in correct position', () => {
     const row = buildMemberRow({ unit: 'Field Ops' });
-    expect(row[MEMBER_COLS.UNIT - 1]).toBe('Field Ops');
+    expect(row[MEMBER_COLUMNS.UNIT]).toBe('Field Ops');
   });
 
   test('Is Steward defaults to No', () => {
     const row = buildMemberRow({});
-    expect(row[MEMBER_COLS.IS_STEWARD - 1]).toBe('No');
+    expect(row[MEMBER_COLUMNS.IS_STEWARD]).toBe('No');
   });
 
   test('Recent Contact Date is set', () => {
     const row = buildMemberRow({});
-    expect(row[MEMBER_COLS.RECENT_CONTACT_DATE - 1]).toBe('TODAY');
+    expect(row[MEMBER_COLUMNS.RECENT_CONTACT_DATE]).toBe('TODAY');
   });
 
   test('all other fields default to empty string', () => {
     const row = buildMemberRow({});
     // Check that fields not explicitly set are empty
-    expect(row[MEMBER_COLS.JOB_TITLE - 1]).toBe('');
-    expect(row[MEMBER_COLS.SUPERVISOR - 1]).toBe('');
-    expect(row[MEMBER_COLS.MANAGER - 1]).toBe('');
-    expect(row[MEMBER_COLS.COMMITTEES - 1]).toBe('');
-    expect(row[MEMBER_COLS.CONTACT_NOTES - 1]).toBe('');
+    expect(row[MEMBER_COLUMNS.JOB_TITLE]).toBe('');
+    expect(row[MEMBER_COLUMNS.SUPERVISOR]).toBe('');
+    expect(row[MEMBER_COLUMNS.MANAGER]).toBe('');
+    expect(row[MEMBER_COLUMNS.COMMITTEES]).toBe('');
+    expect(row[MEMBER_COLUMNS.CONTACT_NOTES]).toBe('');
   });
 });
 

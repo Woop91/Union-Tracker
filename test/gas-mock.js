@@ -60,17 +60,23 @@ global.PropertiesService = {
   getScriptProperties: jest.fn(() => ({
     getProperty: jest.fn(key => _scriptProperties[key] || null),
     setProperty: jest.fn((key, val) => { _scriptProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; })
+    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; }),
+    deleteAllProperties: jest.fn(() => { for (var k in _scriptProperties) delete _scriptProperties[k]; }),
+    getProperties: jest.fn(() => Object.assign({}, _scriptProperties)),
   })),
   getUserProperties: jest.fn(() => ({
     getProperty: jest.fn(key => _userProperties[key] || null),
     setProperty: jest.fn((key, val) => { _userProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _userProperties[key]; })
+    deleteProperty: jest.fn(key => { delete _userProperties[key]; }),
+    deleteAllProperties: jest.fn(() => { for (var k in _userProperties) delete _userProperties[k]; }),
+    getProperties: jest.fn(() => Object.assign({}, _userProperties)),
   })),
   getDocumentProperties: jest.fn(() => ({
     getProperty: jest.fn(key => _scriptProperties[key] || null),
     setProperty: jest.fn((key, val) => { _scriptProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; })
+    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; }),
+    deleteAllProperties: jest.fn(() => { for (var k in _scriptProperties) delete _scriptProperties[k]; }),
+    getProperties: jest.fn(() => Object.assign({}, _scriptProperties)),
   }))
 };
 
@@ -201,7 +207,7 @@ global.HtmlService = {
     setXFrameOptionsMode: jest.fn(function() { return this; }),
     getContent: jest.fn(() => html)
   })),
-  XFrameOptionsMode: { DEFAULT: 'DEFAULT', ALLOWALL: 'ALLOWALL' }
+  XFrameOptionsMode: { DENY: 'DENY', ALLOWALL: 'ALLOWALL' }
 };
 
 // --- MailApp ---
@@ -220,10 +226,27 @@ global.DriveApp = {
   getRootFolder: jest.fn(() => ({ getId: jest.fn(() => 'root') }))
 };
 
+// --- DocumentApp ---
+global.DocumentApp = {
+  create: jest.fn(() => ({
+    getBody: jest.fn(() => ({
+      appendParagraph: jest.fn(),
+      appendTable: jest.fn()
+    })),
+    getUrl: jest.fn(() => 'https://docs.google.com/mock-doc'),
+    getId: jest.fn(() => 'mock-doc-id')
+  }))
+};
+
 // --- CalendarApp ---
 global.CalendarApp = {
   getAllCalendars: jest.fn(() => []),
   getCalendarsByName: jest.fn(() => []),
+  getDefaultCalendar: jest.fn(() => ({
+    getName: jest.fn(() => 'Default Calendar'),
+    createEvent: jest.fn(),
+    getEvents: jest.fn(() => [])
+  })),
   createCalendar: jest.fn(() => ({
     getName: jest.fn(() => 'Test Calendar'),
     createEvent: jest.fn()

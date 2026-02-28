@@ -104,7 +104,7 @@ function createMeeting(meetingData) {
   // Columns A-P: ID, Name, Date, Type, MemberID, MemberName, CheckInTime, Email, Time, Duration, Status, Notify, CalendarEventId, NotesUrl, AgendaUrl, AgendaStewards
   sheet.appendRow([
     meetingId,
-    meetingName,
+    escapeForFormula(meetingName),
     meetingDate,
     meetingType,
     '',  // No member yet - this is the meeting header
@@ -114,11 +114,11 @@ function createMeeting(meetingData) {
     meetingTime,
     meetingDuration,
     initialStatus,
-    notifyEmails,
+    escapeForFormula(notifyEmails),
     calendarEventId,
     notesDocUrl,
     agendaDocUrl,
-    agendaStewards
+    escapeForFormula(agendaStewards)
   ]);
 
   if (typeof logAuditEvent === 'function') {
@@ -1037,4 +1037,308 @@ function getMeetingCheckInHtml_() {
     'document.getElementById("pin").addEventListener("keypress",function(e){if(e.key==="Enter")checkIn()});' +
 
     '</script></body></html>';
+}
+
+// ============================================================================
+// WEB ROUTE FUNCTIONS (standalone ?page=checkin kiosk)
+// ============================================================================
+
+/**
+ * Validates email + PIN and records a meeting check-in.
+ * Thin wrapper around processMeetingCheckIn for the web route.
+ * @param {string} meetingId - The meeting to check into
+ * @param {string} email - Member's email address
+ * @param {string} pin - Member's PIN
+ * @returns {Object} { success, memberName, message } or { success: false, error }
+ */
+function webCheckInMember(meetingId, email, pin) {
+  return processMeetingCheckIn(meetingId, email, pin);
+}
+
+/**
+ * Returns a mobile-optimized kiosk-mode HTML page for meeting check-in.
+ * Accessible via ?page=checkin web route. Self-contained (no external CDN deps).
+ * Large touch-friendly UI designed for shared tablets in landscape or phones.
+ * Shows today's eligible meetings, email+PIN form, success feedback, auto-reset.
+ * @returns {string} Complete HTML document
+ */
+function getCheckInPageHtml() {
+  var baseUrl = '';
+  try { baseUrl = ScriptApp.getService().getUrl(); } catch (_e) { /* ignore */ }
+
+  // Pre-fetch today's eligible meetings server-side for faster initial render
+  var meetingsResult = { success: true, meetings: [] };
+  try {
+    meetingsResult = getCheckInEligibleMeetings();
+  } catch (_e) {
+    meetingsResult = { success: false, meetings: [] };
+  }
+  var meetingsJson = JSON.stringify(meetingsResult.meetings || []);
+
+  var html = '<!DOCTYPE html>' +
+    '<html lang="en"><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<title>Meeting Check-In | SEIU 509</title>' +
+    '<style>' +
+
+    // Reset
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+
+    // Body
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;' +
+    'background:#fafaf9;min-height:100vh;padding-bottom:80px}' +
+
+    // Header
+    '.header{background:linear-gradient(135deg,#065f46 0%,#047857 100%);color:white;' +
+    'padding:28px 20px 36px;text-align:center;position:relative;overflow:hidden}' +
+    '.header::after{content:"";position:absolute;bottom:-20px;left:-20px;right:-20px;' +
+    'height:40px;background:#fafaf9;border-radius:50% 50% 0 0}' +
+    '.header h1{font-size:clamp(22px,5vw,30px);font-weight:700;margin-bottom:6px}' +
+    '.header .subtitle{font-size:clamp(13px,2.5vw,15px);opacity:0.85}' +
+
+    // Container
+    '.container{max-width:520px;margin:0 auto;padding:20px 16px}' +
+
+    // Cards
+    '.card{background:white;border-radius:16px;padding:24px;' +
+    'box-shadow:0 1px 4px rgba(0,0,0,0.06);border:1px solid #f5f5f4;margin-bottom:16px}' +
+    '.card h2{font-size:18px;font-weight:700;color:#065f46;margin-bottom:16px;text-align:center}' +
+
+    // Meeting option cards
+    '.meeting-option{padding:16px;border:2px solid #e7e5e4;border-radius:14px;' +
+    'margin-bottom:10px;cursor:pointer;transition:all 0.2s;min-height:56px}' +
+    '.meeting-option:hover{border-color:#047857;background:#f0fdf4}' +
+    '.meeting-option.selected{border-color:#047857;background:#ecfdf5}' +
+    '.meeting-name{font-weight:700;color:#1c1917;font-size:16px;margin-bottom:4px}' +
+    '.meeting-meta{font-size:13px;color:#78716c}' +
+    '.meeting-badge{display:inline-block;padding:2px 10px;border-radius:20px;' +
+    'font-size:11px;font-weight:600;background:#ecfdf5;color:#047857;margin-left:6px}' +
+
+    // Form fields (large touch targets)
+    '.field{margin-bottom:20px}' +
+    '.field label{display:block;margin-bottom:8px;font-weight:600;color:#1c1917;font-size:15px}' +
+    '.field input{width:100%;padding:16px;border:2px solid #e7e5e4;border-radius:12px;' +
+    'font-size:18px;font-family:inherit;transition:border-color 0.2s}' +
+    '.field input:focus{outline:none;border-color:#047857;box-shadow:0 0 0 3px rgba(4,120,87,0.1)}' +
+
+    // Check-in button (large, thumb-friendly)
+    '.btn-checkin{width:100%;padding:18px;border:none;border-radius:14px;font-size:19px;' +
+    'font-weight:700;font-family:inherit;cursor:pointer;background:#047857;color:white;' +
+    'transition:all 0.2s;min-height:60px}' +
+    '.btn-checkin:hover{background:#065f46}' +
+    '.btn-checkin:active{transform:scale(0.98)}' +
+    '.btn-checkin:disabled{background:#d6d3d1;cursor:not-allowed;transform:none}' +
+
+    // Error message
+    '.error-msg{color:#dc2626;font-size:14px;text-align:center;padding:14px;' +
+    'background:#fef2f2;border-radius:12px;margin-top:14px;display:none;font-weight:500}' +
+
+    // Success overlay (fullscreen, auto-dismisses)
+    '.success-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(4,120,87,0.95);' +
+    'display:none;align-items:center;justify-content:center;z-index:1000;flex-direction:column}' +
+    '.success-overlay.show{display:flex}' +
+    '.success-check{width:80px;height:80px;border-radius:50%;border:4px solid white;' +
+    'display:flex;align-items:center;justify-content:center;margin-bottom:20px;' +
+    'font-size:40px;color:white;animation:popIn 0.3s ease}' +
+    '.success-name{font-size:clamp(22px,5vw,28px);font-weight:700;color:white;margin-bottom:8px;text-align:center}' +
+    '.success-msg{font-size:16px;color:rgba(255,255,255,0.85);text-align:center}' +
+    '@keyframes popIn{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}' +
+
+    // Attendee count badge
+    '.attendee-badge{text-align:center;padding:12px;background:#ecfdf5;border-radius:12px;' +
+    'color:#047857;font-weight:600;margin-top:12px;font-size:14px}' +
+
+    // No meetings state
+    '.no-meetings{text-align:center;padding:40px 20px;color:#78716c}' +
+    '.no-meetings-icon{font-size:48px;margin-bottom:12px;opacity:0.5}' +
+    '.no-meetings p{margin-bottom:6px}' +
+
+    // Loading spinner
+    '.loading{text-align:center;padding:40px;color:#78716c}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.spinner{display:inline-block;width:28px;height:28px;border:3px solid #e7e5e4;' +
+    'border-top-color:#047857;border-radius:50%;animation:spin 0.8s linear infinite}' +
+
+    // Bottom navigation
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;' +
+    'display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));' +
+    'box-shadow:0 -2px 10px rgba(0,0,0,0.08);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;' +
+    'text-decoration:none;color:#a8a29e;font-size:10px;font-weight:500;min-width:60px;transition:color 0.2s}' +
+    '.nav-item.active{color:#065f46}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+
+    // Landscape tablet optimizations
+    '@media(min-width:768px){' +
+    '.container{max-width:600px;padding:30px 24px}' +
+    '.field input{font-size:20px;padding:18px}' +
+    '.btn-checkin{font-size:22px;padding:22px}' +
+    '.meeting-option{padding:20px}' +
+    '.meeting-name{font-size:18px}' +
+    '}' +
+
+    '</style></head><body>' +
+
+    // Success overlay
+    '<div id="successOverlay" class="success-overlay">' +
+    '<div class="success-check">&#10003;</div>' +
+    '<div class="success-name" id="successName"></div>' +
+    '<div class="success-msg">Checked in successfully!</div>' +
+    '</div>' +
+
+    // Header
+    '<div class="header">' +
+    '<h1>Meeting Check-In</h1>' +
+    '<div class="subtitle">Enter your email and PIN to check in</div>' +
+    '</div>' +
+
+    '<div class="container">' +
+
+    // Meeting selection card
+    '<div class="card" id="meetingCard">' +
+    '<h2>Select Meeting</h2>' +
+    '<div id="meetingList"><div class="loading"><div class="spinner"></div>' +
+    '<div style="margin-top:12px">Loading meetings...</div></div></div>' +
+    '</div>' +
+
+    // Check-in form card (hidden until meeting selected)
+    '<div class="card" id="checkinForm" style="display:none">' +
+    '<h2>Your Information</h2>' +
+    '<div class="field">' +
+    '<label for="email">Email Address</label>' +
+    '<input type="email" id="email" placeholder="your.email@example.com" autocomplete="email">' +
+    '</div>' +
+    '<div class="field">' +
+    '<label for="pin">PIN</label>' +
+    '<input type="password" id="pin" inputmode="numeric" maxlength="8" placeholder="Enter your PIN" autocomplete="off">' +
+    '</div>' +
+    '<button class="btn-checkin" id="checkinBtn" onclick="doCheckIn()">Check In</button>' +
+    '<div class="error-msg" id="errorMsg"></div>' +
+    '<div class="attendee-badge" id="attendeeBadge" style="display:none"></div>' +
+    '</div>' +
+
+    '</div>' +
+
+    // Bottom navigation
+    '<nav class="bottom-nav">' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
+    '<span class="nav-icon">&#x1F4CA;</span>Home</a>' +
+    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=checkin">' +
+    '<span class="nav-icon">&#x2705;</span>Check In</a>' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=selfservice">' +
+    '<span class="nav-icon">&#x1F464;</span>My Info</a>' +
+    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
+    '<span class="nav-icon">&#x1F517;</span>Links</a>' +
+    '</nav>' +
+
+    '<script>' +
+    // Client-side escapeHtml (canonical helper from 00_Security.gs)
+    getClientSideEscapeHtml() +
+
+    // State
+    'var selectedMeetingId=null;' +
+
+    // Render meetings from server-side pre-fetched data
+    'var preloadedMeetings=' + meetingsJson + ';' +
+    'renderMeetings(preloadedMeetings);' +
+
+    'function renderMeetings(meetings){' +
+    '  var el=document.getElementById("meetingList");' +
+    '  if(!meetings||meetings.length===0){' +
+    '    el.innerHTML="<div class=\\"no-meetings\\"><div class=\\"no-meetings-icon\\">&#x1F4C5;</div>' +
+    '<p style=\\"font-size:18px\\">No active meetings right now</p>' +
+    '<p style=\\"font-size:13px\\">Check-in opens on the day of a scheduled meeting</p></div>";' +
+    '    return;' +
+    '  }' +
+    '  if(meetings.length===1){' +
+    '    selectedMeetingId=meetings[0].id;' +
+    '    el.innerHTML=buildMeetingCard(meetings[0],true);' +
+    '    document.getElementById("checkinForm").style.display="block";' +
+    '    refreshAttendeeCount(selectedMeetingId);' +
+    '  }else{' +
+    '    var h="<div style=\\"font-size:14px;color:#78716c;margin-bottom:12px\\">Tap your meeting:</div>";' +
+    '    meetings.forEach(function(m){' +
+    '      h+="<div class=\\"meeting-option\\" onclick=\\"selectMeeting(\\x27"+escapeHtml(m.id)+"\\x27,this)\\">"' +
+    '        +buildMeetingCardInner(m)+"</div>";' +
+    '    });' +
+    '    el.innerHTML=h;' +
+    '  }' +
+    '}' +
+
+    'function buildMeetingCard(m,sel){' +
+    '  return "<div class=\\"meeting-option"+(sel?" selected":"")+"\\">"+buildMeetingCardInner(m)+"</div>";' +
+    '}' +
+
+    'function buildMeetingCardInner(m){' +
+    '  var t=escapeHtml(m.type||"");' +
+    '  return "<div class=\\"meeting-name\\">"+escapeHtml(m.name)+"</div>"' +
+    '    +"<div class=\\"meeting-meta\\">"+escapeHtml(m.time||"")' +
+    '    +(t?" <span class=\\"meeting-badge\\">"+t+"</span>":"")+"</div>";' +
+    '}' +
+
+    'function selectMeeting(id,el){' +
+    '  selectedMeetingId=id;' +
+    '  document.querySelectorAll(".meeting-option").forEach(function(o){o.classList.remove("selected")});' +
+    '  el.classList.add("selected");' +
+    '  document.getElementById("checkinForm").style.display="block";' +
+    '  document.getElementById("email").focus();' +
+    '  refreshAttendeeCount(id);' +
+    '}' +
+
+    'function refreshAttendeeCount(mid){' +
+    '  google.script.run.withSuccessHandler(function(r){' +
+    '    if(r&&r.success){' +
+    '      var el=document.getElementById("attendeeBadge");' +
+    '      el.textContent="Checked in: "+r.count+" member"+(r.count!==1?"s":"");' +
+    '      el.style.display="block";' +
+    '    }' +
+    '  }).getMeetingAttendees(mid);' +
+    '}' +
+
+    // Check-in action
+    'function doCheckIn(){' +
+    '  var email=document.getElementById("email").value.trim();' +
+    '  var pin=document.getElementById("pin").value.trim();' +
+    '  var errEl=document.getElementById("errorMsg");' +
+    '  errEl.style.display="none";' +
+    '  if(!selectedMeetingId){showErr("Please select a meeting");return}' +
+    '  if(!email){showErr("Please enter your email");return}' +
+    '  if(!pin||pin.length<4){showErr("Please enter your PIN (4+ digits)");return}' +
+    '  var btn=document.getElementById("checkinBtn");' +
+    '  btn.disabled=true;btn.textContent="Checking in...";' +
+    '  google.script.run' +
+    '    .withSuccessHandler(handleResult)' +
+    '    .withFailureHandler(function(e){showErr("Error: "+String(e||"Unknown"));resetBtn()})' +
+    '    .webCheckInMember(selectedMeetingId,email,pin);' +
+    '}' +
+
+    'function handleResult(r){' +
+    '  resetBtn();' +
+    '  if(r&&r.success){' +
+    '    document.getElementById("successName").textContent=r.memberName||"Member";' +
+    '    var overlay=document.getElementById("successOverlay");' +
+    '    overlay.classList.add("show");' +
+    '    document.getElementById("email").value="";' +
+    '    document.getElementById("pin").value="";' +
+    '    if(selectedMeetingId)refreshAttendeeCount(selectedMeetingId);' +
+    '    setTimeout(function(){' +
+    '      overlay.classList.remove("show");' +
+    '      document.getElementById("email").focus();' +
+    '    },3500);' +
+    '  }else{' +
+    '    showErr((r&&r.error)||"Check-in failed. Verify your email and PIN.");' +
+    '  }' +
+    '}' +
+
+    'function showErr(msg){var el=document.getElementById("errorMsg");el.textContent=msg;el.style.display="block"}' +
+    'function resetBtn(){var b=document.getElementById("checkinBtn");b.disabled=false;b.textContent="Check In"}' +
+
+    // Enter key navigation
+    'document.getElementById("email").addEventListener("keypress",function(e){if(e.key==="Enter"){e.preventDefault();document.getElementById("pin").focus()}});' +
+    'document.getElementById("pin").addEventListener("keypress",function(e){if(e.key==="Enter"){e.preventDefault();doCheckIn()}});' +
+
+    '</script></body></html>';
+
+  return html;
 }

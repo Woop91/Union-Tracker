@@ -1,9 +1,9 @@
 # Strategic Command Center - Complete Features Reference
 
-**Version:** 4.7.0 | **Codename:** Security Hardening & Code Quality
+**Version:** 4.13.0 | **Codename:** SPA Web Dashboard & Notifications
 **Last Updated:** February 2026
 
-> **New in v4.6.0:** Meeting Notes & Agenda document automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override
+> **New in v4.13.0:** Notification bell with unread badge, EventBus auto-notifications, WorkloadService SPA module, individual-file build system
 
 This document provides a comprehensive, searchable reference of all features in the Dashboard system. Use `Ctrl+F` (or `Cmd+F` on Mac) to search for specific features.
 
@@ -35,6 +35,11 @@ This document provides a comprehensive, searchable reference of all features in 
 22. [Meeting Check-In & Document Automation](#22-meeting-check-in--document-automation)
 23. [Member Drive Folders](#23-member-drive-folders)
 24. [Constant Contact Integration](#24-constant-contact-integration)
+25. [Workload Tracker](#25-workload-tracker)
+26. [Resources Hub](#26-resources-hub)
+27. [Notifications System](#27-notifications-system)
+28. [SPA Web Dashboard](#28-spa-web-dashboard)
+29. [Notification Bell & EventBus Alerts](#29-notification-bell--eventbus-alerts)
 
 ---
 
@@ -672,10 +677,157 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ---
 
+## 25. Workload Tracker
+
+> **Files:** `25_WorkloadService.gs` (SPA module) | **Version:** 4.10.0 / 4.13.0
+>
+> **Note:** The standalone PIN-auth portal (`18_WorkloadTracker.gs` / `WorkloadTracker.html`) is DDS-Dashboard only. Union-Tracker uses the SPA workload module exclusively.
+
+### SPA Workload Module (v4.13.0)
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **SPA Workload Form** | SSO-authenticated workload submission embedded in member_view | `WorkloadService.getFormData()` | SPA, SSO, form |
+| **SPA Workload Submit** | Submit workload via SPA without separate PIN auth | `WorkloadService.submitData()` | submit, SPA, SSO |
+
+### Workload Categories
+
+| Category | Description |
+|----------|-------------|
+| Priority Cases | High-priority cases requiring immediate attention |
+| Pending Cases | Cases awaiting action or response |
+| Unread Documents | Documents not yet reviewed |
+| To-Do Items | Outstanding tasks |
+| Sent Referrals | Referrals sent to other departments |
+| CE Activities | Continuing education activities |
+| Assistance Requests | Requests for assistance received |
+| Aged Cases | Cases open beyond expected timeframes |
+
+### Privacy Controls
+
+| Level | Description |
+|-------|-------------|
+| Unit Anonymous | Identity hidden within unit; data included in collective stats |
+| Agency Anonymous | Identity hidden agency-wide; data included in collective stats |
+| Private | Data excluded from all collective reporting |
+
+### Workload Sheets
+
+| Sheet | Purpose |
+|-------|---------|
+| `_Workload_Vault` | Encrypted raw submission data |
+| `_Workload_Reporting` | Anonymized collective statistics |
+| `_Workload_Reminders` | Email reminder configuration |
+| `_Workload_UserMeta` | Member preferences and metadata |
+| `_Workload_Archive` | Archived data (24-month rolling) |
+
+---
+
+## 26. Resources Hub
+
+> **File:** `08a_SheetSetup.gs`, SPA routes | **Version:** 4.11.0
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Resources Page** | Educational content hub with search, category pills, expandable cards | `?page=resources` route | resources, articles, education |
+| **Resource List API** | Returns visible resources with audience filtering | `getWebAppResourcesList()` | API, filter, audience |
+| **Category Navigation** | Category pill buttons for filtering content | Within SPA | categories, filter, navigation |
+| **Starter Articles** | 8 pre-loaded articles: Know Your Rights, Grievance Process, FAQ, Forms & Templates | Via `CREATE_DASHBOARD()` | starter, articles, setup |
+
+### Resources Sheet (12 columns)
+
+| Column | Description |
+|--------|-------------|
+| Resource_ID | Unique identifier (RES-XXX) |
+| Title | Resource title |
+| Category | Article category |
+| Content | Full article content |
+| Audience | Target audience (All, Members, Stewards) |
+| Status | Active / Inactive |
+| Created_Date | Date created |
+| Created_By | Author |
+| Updated_Date | Last update date |
+| Sort_Order | Display order |
+| Tags | Searchable tags |
+| Visibility | Visible / Hidden |
+
+---
+
+## 27. Notifications System
+
+> **File:** `08a_SheetSetup.gs`, SPA routes | **Version:** 4.12.0
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Get Notifications** | Filters active, non-expired, non-dismissed, audience-matched notifications | `getWebAppNotifications(email, role)` | notifications, filter, active |
+| **Dismiss Notification** | Per-member dismiss tracking via Dismissed_By column | `dismissWebAppNotification(id, email)` | dismiss, hide, per-member |
+| **Send Notification** | Steward compose with auto-ID (NOTIF-XXX) | `sendWebAppNotification(data)` | send, compose, steward |
+| **Recipient List** | Member directory + preset groups for targeting | `getNotificationRecipientList()` | recipients, groups, targeting |
+| **Notifications Page** | Dual-role page: member cards + steward inline compose | `?page=notifications` route | page, cards, compose |
+
+### Notification Types & Priority
+
+| Type | Description |
+|------|-------------|
+| Steward Message | Direct message from steward to members |
+| Announcement | Organization-wide announcement |
+| Deadline | Deadline reminder or alert |
+| System | System-generated notification |
+
+| Priority | Behavior |
+|----------|----------|
+| Normal | Standard display order |
+| Urgent | Sorts first, highlighted display |
+
+---
+
+## 28. SPA Web Dashboard
+
+> **Files:** `19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs` | **Version:** 4.12.2
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **SSO Authentication** | Google SSO with automatic role detection | `initWebDashboardAuth()` | SSO, Google, auth |
+| **Magic Link Auth** | Email-based authentication for non-Google users | `verifyMagicLink(token)` | magic link, email, token |
+| **Steward View** | Full steward dashboard in SPA format | `steward_view.html` | steward, dashboard, SPA |
+| **Member View** | Member-facing dashboard in SPA format | `member_view.html` | member, dashboard, SPA |
+| **Deep-Link Routing** | `?page=X` pre-selects tabs via `PAGE_DATA.initialTab` | `doGetWebDashboard(e)` | deep-link, routing, tabs |
+| **Config Reader** | Column-based Config tab reader with `CONFIG_COLS` | `getConfigValue(key)` | config, settings, reader |
+| **Weekly Questions** | Weekly check-in questions with response tracking | `getWeeklyQuestions()`, `submitWeeklyResponse()` | weekly, questions, check-in |
+| **Portal Sheets** | Hidden sheet management for SPA data | `getPortalSheetData()` | sheets, data, hidden |
+
+### SPA Hidden Sheets
+
+| Sheet | Columns | Purpose |
+|-------|---------|---------|
+| `_Weekly_Questions` | varies | Weekly check-in questions and responses |
+| `_Contact_Log` | 8 | Member contact tracking |
+| `_Steward_Tasks` | 10 | Steward task management |
+
+---
+
+## 29. Notification Bell & EventBus Alerts
+
+> **Files:** `15_EventBus.gs`, SPA views | **Version:** 4.13.0
+
+| Feature | Description | Function | Keywords |
+|---------|-------------|----------|----------|
+| **Notification Bell** | Bell icon with unread count badge in SPA header | Within SPA views | bell, badge, unread |
+| **Steward Notification Management** | Compose/inbox/manage tabs in steward view | Within `steward_view.html` | compose, inbox, manage |
+| **EventBus Auto-Notifications** | Automatic alerts for grievance deadlines and status changes | `EventBus.emit('notification:auto')` | auto, EventBus, alerts |
+| **Member Notification View** | View and dismiss notifications in member view | Within `member_view.html` | view, dismiss, member |
+
+---
+
 ## Version History
 
 | Version | Features Added |
 |---------|----------------|
+| **4.13.0** | Notification bell with unread badge, EventBus auto-notifications, WorkloadService SPA module |
+| **4.12.2** | SPA web dashboard — SSO + magic link auth, steward/member views, deep-link routing |
+| **4.12.0** | Notifications system — sheet, API, dual-role page, steward compose |
+| **4.11.0** | Resources hub, meeting check-in route, design refresh (DM Sans + Fraunces) |
+| **4.10.0** | Workload Tracker — 8 categories, privacy controls, reciprocity, email reminders |
 | **4.9.0** | Constant Contact v3 API integration — read-only email engagement metrics sync (OPEN_RATE, RECENT_CONTACT_DATE) |
 | **4.8.2** | State field added to member contact update (self-service portal, contact form, profile) |
 | **4.6.0** | Meeting Notes & Agenda doc automation, two-tier steward agenda sharing, Meeting Notes dashboard tab, member Drive folders, meeting event scheduling, grievance date override |
@@ -705,4 +857,4 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 ---
 
-*Strategic Command Center v4.7.0 - A personal project providing comprehensive tools for representatives*
+*Strategic Command Center v4.13.0 - A personal project providing comprehensive tools for representatives*

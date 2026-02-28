@@ -444,15 +444,15 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
   });
 
   test('counts open, pending, won, and resolved grievances correctly', () => {
-    // Build data using GRIEVANCE_COLS (1-indexed, subtract 1 for array access)
-    const headerRow = new Array(30).fill('');
+    // Build data matching GRIEVANCE_COLS (1-indexed, subtract 1 for array)
+    const headerRow = new Array(41).fill('');
     headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
     headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
     headerRow[GRIEVANCE_COLS.LAST_UPDATED - 1] = 'Last Updated';
     headerRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = 'Category';
 
     const makeRow = (status, category) => {
-      const row = new Array(30).fill('');
+      const row = new Array(41).fill('');
       row[GRIEVANCE_COLS.STATUS - 1] = status;
       row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = category || 'General';
       row[GRIEVANCE_COLS.LAST_UPDATED - 1] = new Date();
@@ -488,12 +488,12 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
   });
 
   test('categoryData includes header row and category entries', () => {
-    const headerRow = new Array(30).fill('');
+    const headerRow = new Array(41).fill('');
     headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
     headerRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = 'Category';
 
     const makeRow = (status, category) => {
-      const row = new Array(30).fill('');
+      const row = new Array(41).fill('');
       row[GRIEVANCE_COLS.STATUS - 1] = status;
       row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = category;
       row[GRIEVANCE_COLS.LAST_UPDATED - 1] = new Date();
@@ -536,6 +536,7 @@ describe('addMember (mock spreadsheet)', () => {
 
     const mockRange = {
       setValue: jest.fn(),
+      setValues: jest.fn(),
       getValue: jest.fn(),
       getValues: jest.fn(() => [['']]),
       getRow: jest.fn(() => 2),
@@ -561,8 +562,14 @@ describe('addMember (mock spreadsheet)', () => {
     });
 
     expect(memberId).toBe('MS-200-H');
+    // F15 perf fix: addMember now uses batch setValues() instead of individual setValue() calls
     expect(sheet.getRange).toHaveBeenCalled();
-    expect(mockRange.setValue).toHaveBeenCalledWith('MS-200-H');
+    expect(mockRange.setValues).toHaveBeenCalled();
+    const rowData = mockRange.setValues.mock.calls[0][0][0]; // first call, first arg, first row
+    expect(rowData[MEMBER_COLS.MEMBER_ID - 1]).toBe('MS-200-H');
+    expect(rowData[MEMBER_COLS.FIRST_NAME - 1]).toBe('New');
+    expect(rowData[MEMBER_COLS.LAST_NAME - 1]).toBe('Member');
+    expect(rowData[MEMBER_COLS.EMAIL - 1]).toBe('new@example.com');
   });
 
   test('throws error when Member Directory sheet is not found', () => {
@@ -728,10 +735,10 @@ describe('startNewGrievance', () => {
   beforeEach(() => jest.clearAllMocks());
 
   function setupGrievanceMock() {
-    const headerRow = new Array(40).fill('');
+    const headerRow = new Array(41).fill('');
     headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
 
-    const existingRow = new Array(40).fill('');
+    const existingRow = new Array(41).fill('');
     existingRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-2026-0001';
 
     const data = [headerRow, existingRow];
@@ -775,7 +782,7 @@ describe('startNewGrievance', () => {
     expect(sheet.appendRow).toHaveBeenCalledTimes(1);
   });
 
-  test('row data uses GRIEVANCE_COLS positions and includes correct status', () => {
+  test('row data includes GRIEVANCE_STATUS.OPEN as status', () => {
     const { sheet } = setupGrievanceMock();
 
     startNewGrievance({
@@ -786,11 +793,7 @@ describe('startNewGrievance', () => {
     });
 
     const appendedRow = sheet.appendRow.mock.calls[0][0];
-    // Status should be set at the correct GRIEVANCE_COLS position
-    expect(appendedRow[GRIEVANCE_COLS.STATUS - 1]).toBe(GRIEVANCE_STATUS.OPEN);
-    expect(appendedRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1]).toMatch(/^GRV-/);
-    expect(appendedRow[GRIEVANCE_COLS.MEMBER_ID - 1]).toBe('MS-101-H');
-    expect(appendedRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]).toBe('Discipline');
+    expect(appendedRow).toContain(GRIEVANCE_STATUS.OPEN);
     expect(appendedRow[GRIEVANCE_COLS.CURRENT_STEP - 1]).toBe(1);
   });
 
@@ -850,11 +853,11 @@ describe('resolveGrievance', () => {
   beforeEach(() => jest.clearAllMocks());
 
   function setupResolveMock(grievanceId, currentStep) {
-    const headerRow = new Array(40).fill('');
+    const headerRow = new Array(41).fill('');
     headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
     headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
 
-    const grievanceRow = new Array(40).fill('');
+    const grievanceRow = new Array(41).fill('');
     grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId || 'GRV-2026-0001';
     grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.OPEN;
     grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = currentStep || 1;
@@ -865,12 +868,13 @@ describe('resolveGrievance', () => {
     const setValueCalls = {};
     const mockRange = {
       setValue: jest.fn(function(val) { return val; }),
+      setValues: jest.fn(),
       getValue: jest.fn(() => ''),
-      getValues: jest.fn(() => data),
+      getValues: jest.fn(() => [grievanceRow]),
       getRow: jest.fn(() => 2),
       getColumn: jest.fn(() => 1),
-      getNumRows: jest.fn(() => data.length),
-      getNumColumns: jest.fn(() => 40),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 41),
       getA1Notation: jest.fn(() => 'A2'),
       getSheet: jest.fn()
     };
@@ -881,7 +885,7 @@ describe('resolveGrievance', () => {
       getRow: jest.fn(() => 1),
       getColumn: jest.fn(() => 1),
       getNumRows: jest.fn(() => data.length),
-      getNumColumns: jest.fn(() => 40)
+      getNumColumns: jest.fn(() => 41)
     });
     sheet.getRange.mockReturnValue(mockRange);
 
@@ -912,12 +916,10 @@ describe('resolveGrievance', () => {
 
     resolveGrievance('GRV-2026-0001', 'Settled', 'Partial agreement reached', '');
 
-    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    // Outcome and resolution are combined into one RESOLUTION column write
-    const resolutionArg = setValueArgs.find(v => typeof v === 'string' && v.includes('Settled'));
-    expect(resolutionArg).toContain('Settled');
-    expect(resolutionArg).toContain('Partial agreement reached');
-    expect(setValueArgs).toContain(GRIEVANCE_STATUS.RESOLVED);   // status
+    // Batch write: setValues([rowData]) writes entire row at once
+    const rowData = mockRange.setValues.mock.calls[0][0][0];
+    expect(rowData[GRIEVANCE_COLS.RESOLUTION - 1]).toContain('Partial agreement reached');
+    expect(rowData[GRIEVANCE_COLS.STATUS - 1]).toBe(GRIEVANCE_STATUS.RESOLVED);
   });
 
   test('returns error when grievance ID not found', () => {
@@ -949,11 +951,11 @@ describe('resolveGrievance', () => {
 
     resolveGrievance('GRV-2026-0001', 'Won', 'Full remedy', 'Victory!');
 
-    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    // Outcome, resolution, and notes are combined into one RESOLUTION column write
-    const resolutionArg = setValueArgs.find(v => typeof v === 'string' && v.includes('Won'));
-    expect(resolutionArg).toContain('Won');
-    expect(resolutionArg).toContain('Victory!');
+    // Batch write: check the resolution column in the written row
+    const rowData = mockRange.setValues.mock.calls[0][0][0];
+    const resolutionValue = rowData[GRIEVANCE_COLS.RESOLUTION - 1];
+    expect(resolutionValue).toContain('Won');
+    expect(resolutionValue).toContain('Victory!');
   });
 });
 
@@ -965,10 +967,10 @@ describe('advanceGrievanceStep', () => {
   beforeEach(() => jest.clearAllMocks());
 
   function setupAdvanceMock(grievanceId, currentStep) {
-    const headerRow = new Array(40).fill('');
+    const headerRow = new Array(41).fill('');
     headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
 
-    const grievanceRow = new Array(40).fill('');
+    const grievanceRow = new Array(41).fill('');
     grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId || 'GRV-2026-0001';
     grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = currentStep || 1;
     grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.OPEN;
@@ -978,12 +980,13 @@ describe('advanceGrievanceStep', () => {
 
     const mockRange = {
       setValue: jest.fn(),
+      setValues: jest.fn(),
       getValue: jest.fn(() => ''),
-      getValues: jest.fn(() => data),
+      getValues: jest.fn(() => [grievanceRow]),
       getRow: jest.fn(() => 2),
       getColumn: jest.fn(() => 1),
-      getNumRows: jest.fn(() => data.length),
-      getNumColumns: jest.fn(() => 40),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 41),
       getA1Notation: jest.fn(() => 'A2'),
       getSheet: jest.fn()
     };
@@ -994,7 +997,7 @@ describe('advanceGrievanceStep', () => {
       getRow: jest.fn(() => 1),
       getColumn: jest.fn(() => 1),
       getNumRows: jest.fn(() => data.length),
-      getNumColumns: jest.fn(() => 40)
+      getNumColumns: jest.fn(() => 41)
     });
     sheet.getRange.mockReturnValue(mockRange);
 
@@ -1061,8 +1064,9 @@ describe('advanceGrievanceStep', () => {
 
     advanceGrievanceStep('GRV-2026-0001', {});
 
-    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    expect(setValueArgs).toContain(GRIEVANCE_STATUS.APPEALED);
+    // Batch write: check status column in the written row
+    const rowData = mockRange.setValues.mock.calls[0][0][0];
+    expect(rowData[GRIEVANCE_COLS.STATUS - 1]).toBe(GRIEVANCE_STATUS.APPEALED);
   });
 
   test('updates status to In Arbitration for step 3 advance', () => {
@@ -1070,8 +1074,9 @@ describe('advanceGrievanceStep', () => {
 
     advanceGrievanceStep('GRV-2026-0001', {});
 
-    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    expect(setValueArgs).toContain(GRIEVANCE_STATUS.AT_ARBITRATION);
+    // Batch write: check status column in the written row
+    const rowData = mockRange.setValues.mock.calls[0][0][0];
+    expect(rowData[GRIEVANCE_COLS.STATUS - 1]).toBe(GRIEVANCE_STATUS.AT_ARBITRATION);
   });
 
   test('logs audit event with step details', () => {

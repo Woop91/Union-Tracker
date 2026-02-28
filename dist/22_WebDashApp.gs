@@ -27,6 +27,12 @@ function doGetWebDashboard(e) {
     var user = Auth.resolveUser(e);
 
     if (!user) {
+      // If the user explicitly clicked "Continue with Google" (sso=1 param)
+      // but SSO failed, redirect back with an error flag so the login page
+      // can display a helpful message.
+      if (e.parameter.sso === '1') {
+        return _serveAuth(config, e, 'sso_failed');
+      }
       // Not authenticated — show login screen
       return _serveAuth(config, e);
     }
@@ -53,7 +59,7 @@ function doGetWebDashboard(e) {
             isBootstrapAdmin: true,
           };
         }
-      } catch (ownerErr) { /* SSO not available — fall through */ }
+      } catch (_ownerErr) { /* SSO not available — fall through */ }
     }
 
     if (!userRecord) {
@@ -81,19 +87,25 @@ function doGetWebDashboard(e) {
 
 /**
  * Serves the login/auth page.
+ * @param {Object} config
+ * @param {Object} e - Request event
+ * @param {string} [authError] - Optional auth error code (e.g. 'sso_failed')
  */
-function _serveAuth(config, e) {
+function _serveAuth(config, e, authError) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = 'auth';
 
   template.pageData = JSON.stringify({
     view: 'auth',
     config: _sanitizeConfig(config),
-    error: e.parameter.authError || null,
+    error: e.parameter.authError || authError || null,
+    webAppUrl: ScriptApp.getService().getUrl(),
+    tokenChecked: !!(e.parameter.sessionToken),
   });
 
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -102,6 +114,7 @@ function _serveAuth(config, e) {
  */
 function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = role; // 'steward', 'member', or 'both'
 
   // Sanitize user record — strip sensitive fields
   var safeUser = {
@@ -127,11 +140,12 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     isDualRole: role === 'both',
     sessionToken: sessionToken || null,
     initialTab: initialTab || null,
+    webAppUrl: ScriptApp.getService().getUrl(),
   });
 
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -140,6 +154,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
  */
 function _serveError(config, type, detail) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = 'error';
 
   var messages = {
     'not_found': 'Your email was not found in the member directory. Please contact your steward for access.',
@@ -147,19 +162,23 @@ function _serveError(config, type, detail) {
     'error': 'Something went wrong. Please try again.',
   };
 
+  // Log the actual error detail server-side; never expose raw error messages to the client
+  if (type === 'error' && detail) {
+    Logger.log('WebApp _serveError: ' + detail);
+  }
+
   template.pageData = JSON.stringify({
     view: 'error',
     config: _sanitizeConfig(config),
     error: {
       type: type,
       message: messages[type] || messages['error'],
-      detail: type === 'error' ? detail : null,
     },
   });
 
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -191,4 +210,22 @@ function _sanitizeConfig(config) {
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
+ * Client-callable: Returns the org chart HTML content for lazy-loading.
+ * Loaded on-demand when the user navigates to the Org Chart tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .oc-wrap)
+ */
+function getOrgChartHtml() {
+  return HtmlService.createHtmlOutputFromFile('org_chart').getContent();
+}
+
+/**
+ * Returns the published web app URL. Used by client-side logout
+ * as a reload fallback when window.top.location.reload() is blocked.
+ * @returns {string}
+ */
+function getWebAppUrl() {
+  return ScriptApp.getService().getUrl();
 }

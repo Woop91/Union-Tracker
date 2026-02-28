@@ -249,12 +249,27 @@ var WeeklyQuestions = (function() {
 
   /**
    * Steward sets their weekly question.
+   * H-24: Authorization check — only stewards and admins may set the weekly question.
    * @param {string} stewardEmail
    * @param {string} text
    * @returns {Object} { success, message }
    */
   function setStewardQuestion(stewardEmail, text) {
     if (!stewardEmail || !text) return { success: false, message: 'Missing fields.' };
+
+    // H-24: Verify the caller is a steward or admin
+    var callerEmail = '';
+    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* SSO unavailable */ }
+    if (!callerEmail) return { success: false, message: 'Unable to verify identity. Please sign in again.' };
+    callerEmail = callerEmail.toLowerCase().trim();
+
+    var role = null;
+    if (typeof DataService !== 'undefined' && typeof DataService.getUserRole === 'function') {
+      role = DataService.getUserRole(callerEmail);
+    }
+    if (role !== 'steward' && role !== 'admin' && role !== 'both') {
+      return { success: false, message: 'Only stewards and admins can set the weekly question.' };
+    }
 
     var sheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
     if (!sheet) return { success: false, message: 'System not initialized.' };
@@ -274,6 +289,9 @@ var WeeklyQuestions = (function() {
 
   /**
    * Returns pending pool questions for steward review.
+   * H-25: Intentionally accessible without role check — pool questions are
+   * informational and used in the member portal to show community engagement.
+   * No PII is exposed (submitter emails are hashed and not returned).
    * @returns {Object[]} Array of { id, text, status, created }
    */
   function getPoolQuestions() {
@@ -339,7 +357,6 @@ var WeeklyQuestions = (function() {
   function getHistory(email, page, pageSize) {
     page = page || 1;
     pageSize = pageSize || 10;
-    var emailHash = _hashEmail(email);
 
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
     if (!qSheet || qSheet.getLastRow() <= 1) return { questions: [], hasMore: false };
@@ -398,10 +415,25 @@ var WeeklyQuestions = (function() {
 // GLOBAL WRAPPERS (callable from client)
 // ═══════════════════════════════════════
 
-function wqGetActiveQuestions(email) { return WeeklyQuestions.getActiveQuestions(email); }
-function wqSubmitResponse(email, questionId, response) { return WeeklyQuestions.submitResponse(email, questionId, response); }
-function wqSubmitPoolQuestion(email, text) { return WeeklyQuestions.submitPoolQuestion(email, text); }
-function wqSetStewardQuestion(stewardEmail, text) { return WeeklyQuestions.setStewardQuestion(stewardEmail, text); }
+function wqGetActiveQuestions() {
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
+  return e ? WeeklyQuestions.getActiveQuestions(e) : { questions: [] };
+}
+function wqSubmitResponse(ignoredEmail, questionId, response) {
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
+  return e ? WeeklyQuestions.submitResponse(e, questionId, response) : { success: false, message: 'Not authenticated.' };
+}
+function wqSubmitPoolQuestion(ignoredEmail, text) {
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
+  return e ? WeeklyQuestions.submitPoolQuestion(e, text) : { success: false, message: 'Not authenticated.' };
+}
+function wqSetStewardQuestion(ignoredStewardEmail, text) {
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
+  return e ? WeeklyQuestions.setStewardQuestion(e, text) : { success: false, message: 'Not authenticated.' };
+}
 function wqGetPoolQuestions() { return WeeklyQuestions.getPoolQuestions(); }
 function wqInitSheets() { return WeeklyQuestions.initWeeklyQuestionSheets(); }
-function wqGetHistory(email, page, pageSize) { return WeeklyQuestions.getHistory(email, page, pageSize); }
+function wqGetHistory(ignoredEmail, page, pageSize) {
+  var e = ''; try { e = Session.getActiveUser().getEmail(); } catch (_err) {}
+  return e ? WeeklyQuestions.getHistory(e, page, pageSize) : { questions: [], hasMore: false };
+}

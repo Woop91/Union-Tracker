@@ -1,7 +1,7 @@
 # Dashboard - User Tutorials
 
-**Version:** 4.7.0
-**Last Updated:** 2026-02-14
+**Version:** 4.13.0
+**Last Updated:** 2026-02-25
 
 Quick, practical tutorials for common tasks in the Dashboard.
 
@@ -706,5 +706,36 @@ Go to **Admin > Data Sync > CC Connection Status** to see:
 
 ---
 
-**Version:** 4.7.0
-**Last Updated:** 2026-02-14
+## Accessing the Web Dashboard (v4.12+)
+
+The SPA Web Dashboard provides a modern, mobile-friendly interface for both stewards and members.
+
+### How to Access
+1. Open the web app URL (provided by your steward or admin)
+2. Sign in with your Google account (SSO) or request a magic link via email
+3. You'll be automatically directed to your role-based view (steward or member)
+
+### Member Features
+- View your notifications and dismiss read ones
+- Submit weekly workload data (no separate PIN needed — SSO handles auth)
+- Access resources and educational articles
+- Complete weekly check-in questions
+
+### Steward Features
+- Everything members can do, plus:
+- Compose and send notifications to members or groups
+- Manage steward tasks
+- View portal sheet data
+- Access the notification bell with unread count badge
+
+### Deep Links
+Share direct links to specific pages by adding `?page=` to the URL:
+- `?page=resources` — Resources hub
+- `?page=notifications` — Notifications page
+- `?page=workload` — Workload submission
+- `?page=checkin` — Meeting check-in
+
+---
+
+**Version:** 4.13.0
+**Last Updated:** 2026-02-25

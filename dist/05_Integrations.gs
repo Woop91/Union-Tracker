@@ -180,6 +180,112 @@ function setupDriveFolderForGrievance(grievanceId) {
 }
 
 /**
+ * Scans the root grievance Drive folder for empty sub-folders whose
+ * corresponding grievance is resolved, and removes them.
+ * Designed to run on a weekly time-based trigger.
+ * @returns {Object} Cleanup results
+ */
+function cleanupEmptyDriveFolders() {
+  var rootFolder;
+  try {
+    rootFolder = getOrCreateRootFolder();
+  } catch (_e) {
+    return { success: false, reason: 'Could not access root folder' };
+  }
+
+  var removed = 0;
+  var skipped = 0;
+  var subFolders = rootFolder.getFolders();
+
+  // Build a set of resolved grievance IDs for quick lookup
+  var resolvedIds = {};
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+    if (sheet && sheet.getLastRow() > 1) {
+      var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, GRIEVANCE_COLS.STATUS).getValues();
+      for (var i = 0; i < data.length; i++) {
+        var status = String(data[i][GRIEVANCE_COLS.STATUS - 1] || '').toLowerCase();
+        if (status === 'resolved' || status === 'closed' || status === 'withdrawn') {
+          var gId = String(data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '');
+          if (gId) resolvedIds[gId] = true;
+        }
+      }
+    }
+  } catch (sheetErr) {
+    Logger.log('cleanupEmptyDriveFolders: sheet read error: ' + sheetErr.message);
+  }
+
+  while (subFolders.hasNext()) {
+    var folder = subFolders.next();
+    try {
+      // Only remove if folder tree is empty (no files in any sub-level)
+      if (_isFolderTreeEmpty(folder)) {
+        // Check if folder name contains a resolved grievance ID
+        var folderName = folder.getName();
+        // M-49: Extract grievance ID from folder name using known naming patterns,
+        // then do O(1) direct lookup instead of O(n) scan through all resolved IDs.
+        // Simple template: "{grievanceId} - {date}" => ID is everything before " - "
+        var isResolved = false;
+        var dashIdx = folderName.indexOf(' - ');
+        if (dashIdx > 0) {
+          var candidateId = folderName.substring(0, dashIdx).trim();
+          if (resolvedIds[candidateId]) {
+            isResolved = true;
+          }
+        }
+        // Fallback for non-standard naming: linear scan (rare path)
+        if (!isResolved) {
+          var resolvedKeys = Object.keys(resolvedIds);
+          for (var rk = 0; rk < resolvedKeys.length; rk++) {
+            if (folderName.indexOf(resolvedKeys[rk]) >= 0) {
+              isResolved = true;
+              break;
+            }
+          }
+        }
+        if (isResolved) {
+          folder.setTrashed(true);
+          removed++;
+        } else {
+          skipped++;
+        }
+      } else {
+        skipped++;
+      }
+    } catch (folderErr) {
+      Logger.log('cleanupEmptyDriveFolders: error on folder: ' + folderErr.message);
+      skipped++;
+    }
+  }
+
+  if (removed > 0) {
+    logAuditEvent(AUDIT_EVENTS.SYSTEM_ACTION || 'SYSTEM_ACTION', {
+      action: 'cleanupEmptyDriveFolders',
+      removed: removed,
+      skipped: skipped
+    });
+  }
+
+  return { success: true, removed: removed, skipped: skipped };
+}
+
+/**
+ * Recursively checks whether a folder tree contains any files.
+ * @param {Folder} folder
+ * @returns {boolean} true if folder and all sub-folders contain no files
+ * @private
+ */
+function _isFolderTreeEmpty(folder) {
+  if (folder.getFiles().hasNext()) return false;
+  var subs = folder.getFolders();
+  while (subs.hasNext()) {
+    if (!_isFolderTreeEmpty(subs.next())) return false;
+  }
+  return true;
+}
+
+/**
  * Creates Drive folders for multiple grievances in batches
  * @param {string[]} grievanceIds - Array of grievance IDs
  * @return {Object} Result with success count
@@ -358,7 +464,15 @@ function batchCreateAllMissingFolders() {
  */
 function updateGrievanceFolderLink(grievanceId, folderUrl) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
+  // CR-09: Use canonical SHEETS.GRIEVANCE_LOG instead of SHEET_NAMES.GRIEVANCE_TRACKER
+  const sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  // H-05: Null check after getSheetByName
+  if (!sheet) {
+    Logger.log('updateGrievanceFolderLink: Grievance Log sheet not found');
+    return;
+  }
+
   const data = sheet.getDataRange().getValues();
 
   for (let i = 1; i < data.length; i++) {
@@ -374,7 +488,8 @@ function updateGrievanceFolderLink(grievanceId, folderUrl) {
  */
 function openGrievanceFolder() {
   const sheet = SpreadsheetApp.getActiveSheet();
-  if (sheet.getName() !== SHEET_NAMES.GRIEVANCE_TRACKER) {
+  // CR-09: Use canonical SHEETS.GRIEVANCE_LOG instead of SHEET_NAMES.GRIEVANCE_TRACKER
+  if (sheet.getName() !== SHEETS.GRIEVANCE_LOG) {
     showAlert('Please select a grievance in the Grievance Tracker', 'Wrong Sheet');
     return;
   }
@@ -446,9 +561,10 @@ function getOrCreateMeetingsCalendar() {
 function createMeetingCalendarEvent(meetingData) {
   try {
     var calendar = getOrCreateMeetingsCalendar();
-    var meetingDate = new Date(meetingData.date + 'T00:00:00');
-    // Note: Date parsing uses script timezone. For explicit control, consider
-    // Utilities.formatDate() with Session.getScriptTimeZone().
+    // M-55: Append script timezone offset to ensure correct date parsing
+    var tz = Session.getScriptTimeZone();
+    var tzOffset = Utilities.formatDate(new Date(), tz, 'XXX'); // e.g., "-05:00"
+    var meetingDate = new Date(meetingData.date + 'T00:00:00' + tzOffset);
     var startTime = meetingData.time || '09:00';
     var durationHours = parseFloat(meetingData.duration) || 1;
     var timeParts = startTime.split(':');
@@ -461,12 +577,24 @@ function createMeetingCalendarEvent(meetingData) {
     var end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
 
     var eventTitle = '[MTG] ' + meetingData.name + ' (' + (meetingData.type || 'In-Person') + ')';
-    var event = calendar.createEvent(eventTitle, start, end, {
-      description: 'Meeting ID: ' + (meetingData.meetingId || 'TBD') + '\n' +
-                   'Type: ' + (meetingData.type || 'In-Person') + '\n' +
-                   'Check-in opens on the day of the event.\n\n' +
-                   'Auto-generated by Union Dashboard'
-    });
+    var event;
+    try {
+      event = calendar.createEvent(eventTitle, start, end, {
+        description: 'Meeting ID: ' + (meetingData.meetingId || 'TBD') + '\n' +
+                     'Type: ' + (meetingData.type || 'In-Person') + '\n' +
+                     'Check-in opens on the day of the event.\n\n' +
+                     'Auto-generated by Union Dashboard'
+      });
+    } catch (calErr) {
+      // F31: Quota-aware error handling for calendar creation
+      var msg = String(calErr.message || '');
+      if (msg.indexOf('quota') !== -1 || msg.indexOf('limit') !== -1 || msg.indexOf('rate') !== -1) {
+        Logger.log('Calendar quota exceeded, skipping event creation: ' + msg);
+      } else {
+        Logger.log('Error creating calendar event: ' + msg);
+      }
+      return '';
+    }
 
     // Add email reminders
     event.removeAllReminders();
@@ -504,6 +632,15 @@ function deleteMeetingCalendarEvent(eventId) {
  * @returns {Object} { success, error }
  */
 function emailMeetingAttendanceReport(meetingId, recipientEmails) {
+  // M-56: Authorization check — attendance reports contain PII, restrict to steward/admin
+  if (typeof getUserRole_ === 'function') {
+    var callerEmail = Session.getActiveUser().getEmail();
+    var callerRole = getUserRole_(callerEmail);
+    if (callerRole !== 'admin' && callerRole !== 'steward') {
+      return errorResponse('Unauthorized: only stewards and admins may send attendance reports');
+    }
+  }
+
   if (!meetingId || !recipientEmails) {
     return errorResponse('Meeting ID and recipient emails are required');
   }
@@ -580,12 +717,13 @@ function emailMeetingAttendanceReport(meetingId, recipientEmails) {
 
     body += '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
 
-    MailApp.sendEmail({
+    var emailResult = safeSendEmail_({
       to: recipientEmails,
       subject: 'Meeting Attendance: ' + meetingName + ' (' + dateStr + ')',
       htmlBody: body,
       name: 'Union Dashboard'
     });
+    if (!emailResult.success) return errorResponse(emailResult.error);
 
     return { success: true, message: 'Attendance report emailed to ' + recipientEmails };
   } catch (error) {
@@ -657,15 +795,9 @@ function createMeetingDocs(meetingData) {
     notesDoc.saveAndClose();
 
     // Move to Meeting Notes folder
+    // L-39: Use file.moveTo() instead of deprecated parent.removeFile()
     var notesFile = DriveApp.getFileById(notesDoc.getId());
-    notesFolder.addFile(notesFile);
-    var parents = notesFile.getParents();
-    while (parents.hasNext()) {
-      var parent = parents.next();
-      if (parent.getId() !== notesFolder.getId()) {
-        parent.removeFile(notesFile);
-      }
-    }
+    notesFile.moveTo(notesFolder);
     result.notesUrl = notesDoc.getUrl();
 
     // Create Meeting Agenda doc
@@ -687,15 +819,9 @@ function createMeetingDocs(meetingData) {
     agendaDoc.saveAndClose();
 
     // Move to Meeting Agenda folder
+    // L-39: Use file.moveTo() instead of deprecated parent.removeFile()
     var agendaFile = DriveApp.getFileById(agendaDoc.getId());
-    agendaFolder.addFile(agendaFile);
-    var agendaParents = agendaFile.getParents();
-    while (agendaParents.hasNext()) {
-      var agendaParent = agendaParents.next();
-      if (agendaParent.getId() !== agendaFolder.getId()) {
-        agendaParent.removeFile(agendaFile);
-      }
-    }
+    agendaFile.moveTo(agendaFolder);
     result.agendaUrl = agendaDoc.getUrl();
 
     if (typeof logAuditEvent === 'function') {
@@ -723,7 +849,14 @@ function setDocViewOnlyByLink(docUrl) {
     if (!match) return;
     var fileId = match[1];
     var file = DriveApp.getFileById(fileId);
-    file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+    // M-57: DOMAIN_WITH_LINK fails for non-Workspace (consumer) orgs.
+    // Try domain sharing first, fall back to ANYONE_WITH_LINK.
+    try {
+      file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (domainError) {
+      Logger.log('Domain sharing unavailable, falling back to ANYONE_WITH_LINK: ' + domainError.message);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
   } catch (error) {
     Logger.log('Error setting doc to view-only: ' + error.message);
   }
@@ -761,7 +894,7 @@ function emailMeetingDocLink(meetingName, meetingDate, docUrl, docType, recipien
       'Open ' + escapeHtml(typeLabel) + '</a></p>' : '<p><em>Document link unavailable.</em></p>') +
       '<br><p style="font-size:12px;color:#666">Auto-generated by Union Dashboard</p>';
 
-    MailApp.sendEmail({
+    safeSendEmail_({
       to: recipientEmails,
       subject: typeLabel + ': ' + meetingName + ' (' + meetingDate + ')',
       htmlBody: body,
@@ -1091,26 +1224,44 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
   // Create event title
   const eventTitle = `[GRV] ${grievanceId} - Step ${currentStep} Due (${memberName})`;
 
-  // Check for existing event to avoid duplicates
-  const existingEvents = calendar.getEventsForDay(deadline, {
-    search: grievanceId
-  });
+  // Dedup via stored event IDs in ScriptProperties (keyed by grievance ID)
+  var props = PropertiesService.getScriptProperties();
+  var calEventKey = 'CAL_EVENT_' + grievanceId;
+  var storedEventId = props.getProperty(calEventKey);
+  var description = 'Grievance: ' + grievanceId + '\n' +
+                    'Member: ' + memberName + '\n' +
+                    'Step: ' + currentStep + '\n' +
+                    'Action Required: Response deadline\n\n' +
+                    'Auto-generated by Union Dashboard';
 
+  if (storedEventId) {
+    try {
+      var existingEvent = calendar.getEventById(storedEventId);
+      if (existingEvent) {
+        existingEvent.setTitle(eventTitle);
+        existingEvent.setAllDayDate(deadline);
+        existingEvent.setDescription(description);
+        return { synced: true, updated: true };
+      }
+    } catch (_lookupErr) {
+      // Stored ID stale — fall through to create new
+    }
+  }
+
+  // Fallback: search by day in case event exists without stored ID
+  var existingEvents = calendar.getEventsForDay(deadline, { search: grievanceId });
   if (existingEvents.length > 0) {
-    // Update existing event
-    const event = existingEvents[0];
-    event.setTitle(eventTitle);
+    var found = existingEvents[0];
+    found.setTitle(eventTitle);
+    props.setProperty(calEventKey, found.getId());
     return { synced: true, updated: true };
   }
 
   // Create all-day event
-  const event = calendar.createAllDayEvent(eventTitle, deadline, {
-    description: `Grievance: ${grievanceId}\n` +
-                 `Member: ${memberName}\n` +
-                 `Step: ${currentStep}\n` +
-                 `Action Required: Response deadline\n\n` +
-                 `Auto-generated by Union Dashboard`
+  var event = calendar.createAllDayEvent(eventTitle, deadline, {
+    description: description
   });
+  props.setProperty(calEventKey, event.getId());
 
   // Set reminders
   event.removeAllReminders();
@@ -1126,6 +1277,20 @@ function syncGrievanceDeadlinesToCalendar(grievance, calendar) {
 // ============================================================================
 // EMAIL NOTIFICATIONS
 // ============================================================================
+
+/**
+ * Quota-safe email wrapper. Checks MailApp daily quota before sending.
+ * @param {Object} options - MailApp.sendEmail options (to, subject, body, etc.)
+ * @returns {boolean} true if sent, false if quota exceeded
+ */
+function safeSendEmail(options) {
+  if (MailApp.getRemainingDailyQuota() < 1) {
+    Logger.log('Email quota exceeded, skipping: ' + (options.subject || 'no subject'));
+    return false;
+  }
+  MailApp.sendEmail(options);
+  return true;
+}
 
 /**
  * Sends deadline reminder email for upcoming grievances
@@ -1147,7 +1312,7 @@ function sendDeadlineReminders(daysAhead) {
 
     // Build email body
     let body = `<h2>Upcoming Grievance Deadlines</h2>`;
-    body += `<p>The following grievances have deadlines in the next ${daysAhead} days:</p>`;
+    body += `<p>The following grievances have deadlines in the next ${escapeHtml(String(daysAhead))} days:</p>`;
     body += `<table style="border-collapse: collapse; width: 100%;">`;
     body += `<tr style="background: #f0f0f0;">
                <th style="padding: 10px; border: 1px solid #ddd;">Grievance</th>
@@ -1174,7 +1339,7 @@ function sendDeadlineReminders(daysAhead) {
              </p>`;
 
     // Send email
-    MailApp.sendEmail({
+    safeSendEmail_({
       to: userEmail,
       subject: `[Union Dashboard] ${deadlines.length} Upcoming Grievance Deadline${deadlines.length > 1 ? 's' : ''}`,
       htmlBody: body
@@ -1202,6 +1367,15 @@ function sendDeadlineReminders(daysAhead) {
  */
 function sendEmailToMember(memberId, subject, body) {
   try {
+    // CR-21: Authorization check — only stewards and admins may send emails to members
+    var callerEmail = Session.getActiveUser().getEmail();
+    if (typeof getUserRole_ === 'function') {
+      var role = getUserRole_(callerEmail);
+      if (role !== 'admin' && role !== 'steward') {
+        return errorResponse('Unauthorized: only stewards and admins may send emails to members');
+      }
+    }
+
     const member = getMemberById(memberId);
     if (!member) {
       return errorResponse('Member not found');
@@ -1212,10 +1386,10 @@ function sendEmailToMember(memberId, subject, body) {
       return errorResponse('Invalid email address');
     }
 
-    MailApp.sendEmail({
+    safeSendEmail_({
       to: email,
-      subject: subject,
-      htmlBody: body
+      subject: safeSubject,
+      htmlBody: safeBody
     });
 
     return {
@@ -1244,24 +1418,26 @@ function getOrCreateMemberFolder(name, id) {
   // Get archive folder ID from Config or COMMAND_CONFIG
   var archiveFolderId = getConfigValue_(CONFIG_COLS.ARCHIVE_FOLDER_ID) || COMMAND_CONFIG.ARCHIVE_FOLDER_ID;
 
+  // L-04: Declare folderName once at the top instead of re-declaring in each branch
+  var folderName = name + ' (' + id + ')';
+
   if (!archiveFolderId) {
     // Fall back to creating in root folder
     var rootFolder = getOrCreateRootFolder();
-    var folderName = name + ' (' + id + ')';
     var folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
 
   try {
     var parentFolder = DriveApp.getFolderById(archiveFolderId);
-    var folderName = name + ' (' + id + ')';
-    var folders = parentFolder.getFoldersByName(folderName);
+    folderName = name + ' (' + id + ')';
+    folders = parentFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : parentFolder.createFolder(folderName);
   } catch (e) {
     Logger.log('Archive folder not found, using root: ' + e.message);
-    var rootFolder = getOrCreateRootFolder();
-    var folderName = name + ' (' + id + ')';
-    var folders = rootFolder.getFoldersByName(folderName);
+    rootFolder = getOrCreateRootFolder();
+    folderName = name + ' (' + id + ')';
+    folders = rootFolder.getFoldersByName(folderName);
     return folders.hasNext() ? folders.next() : rootFolder.createFolder(folderName);
   }
 }
@@ -1287,17 +1463,23 @@ function createSignatureReadyPDF(folder, data) {
     var doc = DocumentApp.openById(temp.getId());
     var body = doc.getBody();
 
+    // M-09: Helper to escape $ in replacement values — replaceText() uses regex
+    // internally, so $ would be interpreted as backreference syntax
+    function escapeReplacement_(val) {
+      return String(val).replace(/\$/g, '$$$$');
+    }
+
     // Replace placeholders with data
-    body.replaceText('{{MemberName}}', data.name || 'Unknown');
-    body.replaceText('{{MemberID}}', data.id || '000');
-    body.replaceText('{{Date}}', new Date().toLocaleDateString());
-    body.replaceText('{{Details}}', data.details || 'No details provided.');
-    body.replaceText('{{GrievanceID}}', data.grievanceId || '');
-    body.replaceText('{{Articles}}', data.articles || '');
-    body.replaceText('{{Status}}', data.status || '');
-    body.replaceText('{{Unit}}', data.unit || '');
-    body.replaceText('{{Location}}', data.location || '');
-    body.replaceText('{{Steward}}', data.steward || '');
+    body.replaceText('{{MemberName}}', escapeReplacement_(data.name || 'Unknown'));
+    body.replaceText('{{MemberID}}', escapeReplacement_(data.id || '000'));
+    body.replaceText('{{Date}}', escapeReplacement_(new Date().toLocaleDateString()));
+    body.replaceText('{{Details}}', escapeReplacement_(data.details || 'No details provided.'));
+    body.replaceText('{{GrievanceID}}', escapeReplacement_(data.grievanceId || ''));
+    body.replaceText('{{Articles}}', escapeReplacement_(data.articles || ''));
+    body.replaceText('{{Status}}', escapeReplacement_(data.status || ''));
+    body.replaceText('{{Unit}}', escapeReplacement_(data.unit || ''));
+    body.replaceText('{{Location}}', escapeReplacement_(data.location || ''));
+    body.replaceText('{{Steward}}', escapeReplacement_(data.steward || ''));
 
     // Append legal signature block
     body.appendParagraph(COMMAND_CONFIG.PDF.SIGNATURE_BLOCK ||
@@ -1439,7 +1621,7 @@ function sendGrievancePdfEmail_(data, pdf) {
     'If you have any questions, please contact your steward.\n' +
     COMMAND_CONFIG.EMAIL.FOOTER;
 
-  MailApp.sendEmail({
+  safeSendEmail_({
     to: data.memberEmail,
     subject: subject,
     body: body,
@@ -1480,8 +1662,16 @@ function onGrievanceFormSubmit(e) {
     if (sheet) {
       // Use the event range to find the exact row the form submission added to
       var targetRow = e.range ? e.range.getRow() : sheet.getLastRow();
+      // M-42: Only write to DRIVE_FOLDER_URL if the column is currently empty,
+      // to avoid overwriting an existing folder URL with the PDF URL.
+      // Write the PDF URL to a separate column if available, otherwise use folder URL
+      // column only as a fallback when it's empty.
       if (GRIEVANCE_COLS.DRIVE_FOLDER_URL) {
-        sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
+        var existingUrl = sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).getValue();
+        if (!existingUrl) {
+          // Store the member folder URL (not the PDF URL) so the link points to the folder
+          sheet.getRange(targetRow, GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(memberFolder.getUrl());
+        }
       }
     }
 
@@ -1622,210 +1812,68 @@ function showUpcomingDeadlines() {
  * 7. Bookmark this URL on your mobile device for easy access
  */
 
-/**
- * Web app entry point - serves the mobile dashboard and member portal
- * Consolidated to handle both mobile dashboard pages and member portal requests
- * @param {Object} e - Event object with query parameters
- * @returns {HtmlOutput} The HTML page to display
- *
- * URL Parameters:
- * - id=<memberId> - Returns personalized member portal
- * - page=search|grievances|members|links|dashboard|portal - Returns specific page
- * - (no params) - Returns default dashboard
- */
-function doGet(e) {
-  // v4.5.0: Add access control and input validation
+// Dead code removed: doGetLegacy() (207 lines) — replaced by web-dashboard/WebApp.gs doGet()
 
-  // Step 1: Validate request parameters (prevents injection attacks)
-  var validation = validateWebAppRequest(e);
-  if (!validation.isValid) {
-    secureLog('doGet', 'Invalid request parameters', { errors: validation.errors });
-    if (typeof recordSecurityEvent === 'function') {
-      recordSecurityEvent('INVALID_REQUEST', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.MEDIUM : 'MEDIUM',
-        'Invalid web app request parameters detected',
-        { errors: validation.errors });
-    }
-    return getAccessDeniedPage('Invalid request: ' + validation.errors.join(', '));
-  }
+// ============================================================================
+// BOTTOM NAV HELPERS (M-DUP-1: extracted from 8 duplicate instances)
+// ============================================================================
 
-  // Step 2: Check for unified dashboard mode parameter
-  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode) || '';
-  if (mode === 'steward' || mode === 'member') {
-    // v4.5.2: isPII is determined by auth result, NOT the URL parameter.
-    // Default to false; only grant PII access after confirmed steward/admin authorization.
-    var isPII = false;
-
-    if (mode === 'steward') {
-      // Steward mode requires authorization (contains PII)
-      var authResult = checkWebAppAuthorization('steward');
-      if (!authResult.isAuthorized) {
-        secureLog('doGet', 'Unauthorized steward access attempt', {
-          email: authResult.email,
-          role: authResult.role
-        });
-        if (typeof recordSecurityEvent === 'function') {
-          recordSecurityEvent('UNAUTHORIZED_ACCESS', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.HIGH : 'HIGH',
-            'Unauthorized steward mode access attempt',
-            { email: authResult.email, role: authResult.role, page: 'steward' });
-        }
-        return getAccessDeniedPage(authResult.message || 'Steward access required');
-      }
-      // PII access granted ONLY after successful authorization check
-      isPII = true;
-      secureLog('doGet', 'Steward access granted', { email: authResult.email });
-    }
-
-    var title = isPII ? 'STEWARD COMMAND CENTER' : 'MEMBER DASHBOARD';
-    var html = getUnifiedDashboardHtml(isPII);
-    return HtmlService.createHtmlOutput(html)
-      .setTitle(title)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-  }
-
-  // Step 3: (Removed in v4.5.2) The ?id= member portal route has been removed.
-  // Members access their portal via ?page=selfservice using either Google account
-  // verification or PIN authentication. This eliminates IDOR risk from URL-based member IDs.
-
-  // Step 4: Standard page routing for mobile dashboard (legacy support)
-  var page = validation.params.page || (e && e.parameter && e.parameter.page) || 'dashboard';
-
-  // v4.5.2: Check if dashboard member authentication is required (toggled via Admin menu)
-  // When enabled, redirect to selfservice portal for public dashboard pages
-  if (typeof isDashboardMemberAuthRequired === 'function' && isDashboardMemberAuthRequired()) {
-    var publicPages = ['dashboard', 'portal'];
-    if (publicPages.indexOf(page) >= 0 || !page) {
-      secureLog('doGet', 'Dashboard auth required - checking member auth', { requestedPage: page });
-
-      // Try Google account verification first
-      try {
-        var dashAuthUser = Session.getEffectiveUser();
-        var dashAuthEmail = dashAuthUser ? dashAuthUser.getEmail() : null;
-        if (dashAuthEmail && typeof getMemberIdByEmail === 'function') {
-          var dashLinkedId = getMemberIdByEmail(dashAuthEmail);
-          if (dashLinkedId && typeof buildMemberPortal === 'function') {
-            secureLog('doGet', 'Dashboard auth - member verified via Google account', { email: dashAuthEmail });
-            return buildMemberPortal(dashLinkedId);
-          }
-        }
-      } catch (_dashGoogleErr) {
-        // Google auth not available - fall through to PIN login
-      }
-
-      // No linked Google account - show PIN login form
-      if (typeof getMemberSelfServicePortalHtml === 'function') {
-        var authHtml = getMemberSelfServicePortalHtml();
-        return HtmlService.createHtmlOutput(authHtml)
-          .setTitle('Member Login')
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
-          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      }
-    }
-  }
-
-  // v4.5.1: Add authorization for sensitive pages (search, grievances, members)
-  var sensitivePages = ['search', 'grievances', 'members'];
-  if (sensitivePages.indexOf(page) >= 0) {
-    var pageAuthResult = checkWebAppAuthorization('steward');
-    if (!pageAuthResult.isAuthorized) {
-      secureLog('doGet', 'Unauthorized access to ' + page + ' page', {
-        email: pageAuthResult.email,
-        role: pageAuthResult.role
-      });
-      if (typeof recordSecurityEvent === 'function') {
-        recordSecurityEvent('UNAUTHORIZED_ACCESS', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.HIGH : 'HIGH',
-          'Unauthorized access to ' + page + ' page',
-          { email: pageAuthResult.email, role: pageAuthResult.role, page: page });
-      }
-      return getAccessDeniedPage(pageAuthResult.message || 'Steward authorization required to view ' + page);
-    }
-    secureLog('doGet', 'Authorized access to ' + page + ' page', { email: pageAuthResult.email });
-  }
-
-  var html;
-  switch (page) {
-    case 'search':
-      html = getWebAppSearchHtml();
-      break;
-    case 'grievances':
-      html = getWebAppGrievanceListHtml();
-      break;
-    case 'members':
-      html = getWebAppMemberListHtml();
-      break;
-    case 'links':
-      html = getWebAppLinksHtml();
-      break;
-    case 'selfservice':
-      // v4.5.2: Try Google account verification first, fall back to PIN
-      try {
-        var selfServiceUser = Session.getEffectiveUser();
-        var selfServiceEmail = selfServiceUser ? selfServiceUser.getEmail() : null;
-        if (selfServiceEmail && typeof getMemberIdByEmail === 'function') {
-          var linkedMemberId = getMemberIdByEmail(selfServiceEmail);
-          if (linkedMemberId && typeof buildMemberPortal === 'function') {
-            secureLog('doGet', 'Member authenticated via Google account', { email: selfServiceEmail });
-            return buildMemberPortal(linkedMemberId);
-          }
-        }
-      } catch (_googleAuthErr) {
-        // Google auth not available - fall through to PIN login
-      }
-      // No linked Google account found - show PIN login form
-      if (typeof getMemberSelfServicePortalHtml === 'function') {
-        html = getMemberSelfServicePortalHtml();
-      } else {
-        return getAccessDeniedPage('Member self-service portal not available');
-      }
-      break;
-    case 'workload':
-      // Workload tracker is now embedded in the SPA member dashboard.
-      // Redirect to the main dashboard which includes the workload tab.
-      html = getUnifiedDashboardHtml(false);
-      break;
-    case 'checkin':
-      // v4.11.0: Meeting check-in as standalone web page (mobile-friendly kiosk)
-      html = getWebAppCheckInHtml();
-      break;
-    case 'resources':
-      // v4.12.2: Route through SPA (educational hub with search, category pills)
-      if (typeof doGetWebDashboard === 'function') {
-        return doGetWebDashboard(e);
-      }
-      html = getWebAppResourcesHtml();
-      break;
-    case 'notifications':
-      // v4.12.2: Route through SPA (hero headers, type badges, compose form)
-      if (typeof doGetWebDashboard === 'function') {
-        return doGetWebDashboard(e);
-      }
-      html = getWebAppNotificationsHtml();
-      break;
-    case 'portal':
-      // Public portal without member ID
-      if (typeof buildPublicPortal === 'function') {
-        return buildPublicPortal();
-      }
-      // Fall through to SPA dashboard
-    case 'dashboard':
-    default:
-      // v4.12.1: Default to SPA web dashboard (SSO + magic link auth)
-      if (typeof doGetWebDashboard === 'function') {
-        return doGetWebDashboard(e);
-      }
-      html = getUnifiedDashboardHtml(false);
-      break;
-  }
-
-  if (!html) {
-    return getAccessDeniedPage('Unable to load the requested page');
-  }
-
-  return HtmlService.createHtmlOutput(html)
-    .setTitle('Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+/** Returns the shared bottom-nav CSS block used by all legacy mobile pages. */
+function _getBottomNavCSS_() {
+  return '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
+    '.nav-item.active{color:#7C3AED}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}';
 }
+
+/**
+ * Builds bottom-nav HTML from a nav items array.
+ * @param {string} baseUrl — web app base URL
+ * @param {Array<{icon:string,label:string,page:string}>} items — nav items (page='' for home)
+ * @param {string} activePage — which page to highlight as active
+ * @returns {string} HTML string
+ */
+function _getBottomNavHTML_(baseUrl, items, activePage) {
+  var html = '<nav class="bottom-nav">';
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var href = item.page ? escapeHtml(baseUrl) + '?page=' + escapeHtml(item.page) : escapeHtml(baseUrl);
+    var cls = item.page === activePage ? 'nav-item active' : 'nav-item';
+    html += '<a class="' + cls + '" href="' + href + '"><span class="nav-icon">' + item.icon + '</span>' + escapeHtml(item.label) + '</a>';
+  }
+  return html + '</nav>';
+}
+
+/** Standard steward nav: Home, Search, Cases, Members, Links */
+var _STEWARD_NAV_ = [
+  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
+  { icon: '\uD83D\uDD0D', label: 'Search', page: 'search' },
+  { icon: '\uD83D\uDCCB', label: 'Cases', page: 'grievances' },
+  { icon: '\uD83D\uDC65', label: 'Members', page: 'members' },
+  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
+];
+
+/** Member nav: Home, Check In, Learn, My Info, Links */
+var _MEMBER_NAV_ = [
+  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
+  { icon: '\u2705', label: 'Check In', page: 'checkin' },
+  { icon: '\uD83D\uDCDA', label: 'Learn', page: 'resources' },
+  { icon: '\uD83D\uDC64', label: 'My Info', page: 'selfservice' },
+  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
+];
+
+/** Deadline nav: Home, Cases, Deadlines, Search, Links */
+var _DEADLINE_NAV_ = [
+  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
+  { icon: '\uD83D\uDCCB', label: 'Cases', page: 'grievances' },
+  { icon: '\uD83D\uDCC5', label: 'Deadlines', page: 'deadlines' },
+  { icon: '\uD83D\uDD0D', label: 'Search', page: 'search' },
+  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
+];
+
+// ============================================================================
+// LEGACY MOBILE DASHBOARD PAGES
+// ============================================================================
 
 /**
  * Returns the main dashboard HTML for web app (enhanced with clickable stats, win rate, overdue preview)
@@ -1892,11 +1940,8 @@ function getWebAppDashboardHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
     '.spinner{display:inline-block;width:20px;height:20px;border:2px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     // Refresh indicator
     '.refresh-btn{position:absolute;right:15px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;color:white;width:40px;height:40px;border-radius:50%;font-size:20px;cursor:pointer}' +
@@ -1914,11 +1959,11 @@ function getWebAppDashboardHtml() {
 
     // Stats section - 6 clickable stats in 3x2 grid
     '<div class="stats">' +
-    '<a class="stat-card" href="' + baseUrl + '?page=members"><div class="stat-value">' + stats.totalMembers + '</div><div class="stat-label">Members</div></a>' +
-    '<a class="stat-card" href="' + baseUrl + '?page=grievances"><div class="stat-value">' + stats.totalGrievances + '</div><div class="stat-label">Grievances</div></a>' +
-    '<a class="stat-card" href="' + baseUrl + '?page=grievances&filter=open"><div class="stat-value success">' + stats.activeGrievances + '</div><div class="stat-label">Active</div></a>' +
-    '<a class="stat-card" href="' + baseUrl + '?page=grievances&filter=pending"><div class="stat-value warning">' + stats.pendingGrievances + '</div><div class="stat-label">Pending</div></a>' +
-    '<a class="stat-card" href="' + baseUrl + '?page=grievances&filter=overdue"><div class="stat-value danger">' + stats.overdueGrievances + '</div><div class="stat-label">Overdue</div></a>' +
+    '<a class="stat-card" href="' + escapeHtml(baseUrl) + '?page=members"><div class="stat-value">' + stats.totalMembers + '</div><div class="stat-label">Members</div></a>' +
+    '<a class="stat-card" href="' + escapeHtml(baseUrl) + '?page=grievances"><div class="stat-value">' + stats.totalGrievances + '</div><div class="stat-label">Grievances</div></a>' +
+    '<a class="stat-card" href="' + escapeHtml(baseUrl) + '?page=grievances&filter=open"><div class="stat-value success">' + stats.activeGrievances + '</div><div class="stat-label">Active</div></a>' +
+    '<a class="stat-card" href="' + escapeHtml(baseUrl) + '?page=grievances&filter=pending"><div class="stat-value warning">' + stats.pendingGrievances + '</div><div class="stat-label">Pending</div></a>' +
+    '<a class="stat-card" href="' + escapeHtml(baseUrl) + '?page=grievances&filter=overdue"><div class="stat-value danger">' + stats.overdueGrievances + '</div><div class="stat-label">Overdue</div></a>' +
     '<div class="stat-card"><div class="stat-value success">' + stats.winRate + '</div><div class="stat-label">Win Rate</div></div>' +
     '</div>' +
 
@@ -1929,22 +1974,22 @@ function getWebAppDashboardHtml() {
     '<div class="section-title">⚡ Quick Actions</div>' +
     '<div class="actions">' +
 
-    '<a class="action-btn" href="' + baseUrl + '?page=search">' +
+    '<a class="action-btn" href="' + escapeHtml(baseUrl) + '?page=search">' +
     '<div class="action-icon">🔍</div>' +
     '<div><div class="action-label">Search</div><div class="action-desc">Find members or grievances</div></div>' +
     '</a>' +
 
-    '<a class="action-btn" href="' + baseUrl + '?page=grievances">' +
+    '<a class="action-btn" href="' + escapeHtml(baseUrl) + '?page=grievances">' +
     '<div class="action-icon">📋</div>' +
     '<div><div class="action-label">All Grievances</div><div class="action-desc">Browse and filter grievances</div></div>' +
     '</a>' +
 
-    '<a class="action-btn" href="' + baseUrl + '?page=members">' +
+    '<a class="action-btn" href="' + escapeHtml(baseUrl) + '?page=members">' +
     '<div class="action-icon">👥</div>' +
     '<div><div class="action-label">Members</div><div class="action-desc">View member directory</div></div>' +
     '</a>' +
 
-    '<a class="action-btn" href="' + baseUrl + '?page=links">' +
+    '<a class="action-btn" href="' + escapeHtml(baseUrl) + '?page=links">' +
     '<div class="action-icon">🔗</div>' +
     '<div><div class="action-label">Links</div><div class="action-desc">Forms, resources, GitHub</div></div>' +
     '</a>' +
@@ -1952,19 +1997,8 @@ function getWebAppDashboardHtml() {
     '</div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item active" href="' + baseUrl + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, '') +
 
     // Script to load overdue preview
     '<script>' +
@@ -2049,11 +2083,8 @@ function getWebAppSearchHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
     '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     '</style></head><body>' +
 
@@ -2075,19 +2106,8 @@ function getWebAppSearchHtml() {
     '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Type to search members or grievances</div></div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + baseUrl + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item active" href="' + baseUrl + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, 'search') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -2228,11 +2248,8 @@ function getWebAppGrievanceListHtml() {
     // Count badge
     '.count-badge{background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;font-size:12px;display:inline-block;margin-top:8px}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     '</style></head><body>' +
 
@@ -2252,19 +2269,8 @@ function getWebAppGrievanceListHtml() {
     '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading grievances...</div></div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + baseUrl + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item active" href="' + baseUrl + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, 'grievances') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -2426,11 +2432,8 @@ function getWebAppMemberListHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
     '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     '</style></head><body>' +
 
@@ -2452,19 +2455,8 @@ function getWebAppMemberListHtml() {
     '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading members...</div></div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + baseUrl + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item active" href="' + baseUrl + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, 'members') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -2590,11 +2582,8 @@ function getWebAppLinksHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
     '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     '</style></head><body>' +
 
@@ -2607,19 +2596,8 @@ function getWebAppLinksHtml() {
     '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading links...</div></div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + baseUrl + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item" href="' + baseUrl + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item active" href="' + baseUrl + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, 'links') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -3183,20 +3161,25 @@ function exchangeConstantContactCode(code) {
     muteHttpExceptions: true
   };
 
-  var response = UrlFetchApp.fetch(CC_CONFIG.TOKEN_URL, options);
-  var responseCode = response.getResponseCode();
-  var body = JSON.parse(response.getContentText());
+  try {
+    var response = UrlFetchApp.fetch(CC_CONFIG.TOKEN_URL, options);
+    var responseCode = response.getResponseCode();
+    var body = JSON.parse(response.getContentText());
 
-  if (responseCode !== 200) {
-    var errorMsg = body.error_description || body.error || 'Unknown error';
-    throw new Error('Token exchange failed (' + responseCode + '): ' + errorMsg);
+    if (responseCode !== 200) {
+      var errorMsg = body.error_description || body.error || 'Unknown error';
+      throw new Error('Token exchange failed (' + responseCode + '): ' + errorMsg);
+    }
+
+    // Store tokens
+    storeConstantContactTokens_(body);
+
+    Logger.log('Constant Contact authorized successfully');
+    return 'Authorized Successfully!';
+  } catch (e) {
+    Logger.log('CC token exchange error: ' + e.message);
+    throw e;
   }
-
-  // Store tokens
-  storeConstantContactTokens_(body);
-
-  Logger.log('Constant Contact authorized successfully');
-  return 'Authorized Successfully!';
 }
 
 /**
@@ -3217,6 +3200,35 @@ function storeConstantContactTokens_(tokenResponse) {
   var expiresIn = (tokenResponse.expires_in || 7200) - 300;
   var expiry = new Date(Date.now() + expiresIn * 1000).toISOString();
   props.setProperty(CC_CONFIG.PROP_TOKEN_EXPIRY, expiry);
+}
+
+/**
+ * Proactive Constant Contact token health check.
+ * Validates that the stored token is still valid and shows a toast if not.
+ * Called from onOpenDeferred_() so the spreadsheet opens without blocking.
+ */
+function checkConstantContactHealth() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var token = props.getProperty(CC_CONFIG.PROP_ACCESS_TOKEN);
+    if (!token) return; // CC not configured — nothing to check
+
+    var expiry = props.getProperty(CC_CONFIG.PROP_TOKEN_EXPIRY);
+    if (expiry && new Date(expiry) > new Date()) return; // Still valid
+
+    // Token expired — try refresh
+    var refreshed = getConstantContactToken_();
+    if (!refreshed) {
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        'Constant Contact token expired. Re-authorize via Admin > Constant Contact.',
+        'CC Token Warning',
+        10
+      );
+    }
+  } catch (_e) {
+    // Non-blocking — swallow errors
+    Logger.log('CC health check skipped: ' + _e.message);
+  }
 }
 
 /**
@@ -3708,6 +3720,210 @@ function getWebAppResourcesList(audience) {
 }
 
 /**
+ * Get all resources including hidden ones (for steward manage tab).
+ * Same as getWebAppResourcesList but without Visible=Yes filtering.
+ * @returns {Object[]} All resources with visible status
+ */
+function getWebAppResourcesListAll() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) return [];
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return [];
+
+    var data = sheet.getRange(2, 1, lastRow - 1, RESOURCES_COLS.ADDED_BY).getValues();
+    var tz = Session.getScriptTimeZone();
+
+    return data.map(function(row) {
+      var dateAdded = row[RESOURCES_COLS.DATE_ADDED - 1];
+      return {
+        id: row[RESOURCES_COLS.RESOURCE_ID - 1] || '',
+        title: row[RESOURCES_COLS.TITLE - 1] || '',
+        category: row[RESOURCES_COLS.CATEGORY - 1] || 'General',
+        summary: row[RESOURCES_COLS.SUMMARY - 1] || '',
+        content: row[RESOURCES_COLS.CONTENT - 1] || '',
+        url: row[RESOURCES_COLS.URL - 1] || '',
+        icon: row[RESOURCES_COLS.ICON - 1] || '\uD83D\uDCC4',
+        sortOrder: row[RESOURCES_COLS.SORT_ORDER - 1] || 999,
+        visible: String(row[RESOURCES_COLS.VISIBLE - 1] || '').toLowerCase() === 'yes',
+        audience: row[RESOURCES_COLS.AUDIENCE - 1] || 'All',
+        dateAdded: dateAdded instanceof Date ? Utilities.formatDate(dateAdded, tz, 'MMM d, yyyy') : (dateAdded || ''),
+        addedBy: row[RESOURCES_COLS.ADDED_BY - 1] || ''
+      };
+    }).filter(function(r) { return r.id; });
+  } catch (e) {
+    logError_('getWebAppResourcesListAll', e);
+    return [];
+  }
+}
+
+
+/**
+ * Add a new resource to the 📚 Resources sheet.
+ * @param {Object} data — { title, category, summary, content, url, icon, sortOrder, visible, audience }
+ * @returns {Object} { success: boolean, resourceId: string, message: string }
+ */
+function addWebAppResource(data) {
+  try {
+    // CR-AUTH-6: Verify steward role before allowing resource creation
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) {
+      if (typeof createResourcesSheet === 'function') {
+        sheet = createResourcesSheet(ss);
+      }
+      if (!sheet) return { success: false, message: 'Resources sheet not found' };
+    }
+
+    if (!data.title) return { success: false, message: 'Title is required' };
+
+    // Generate next ID
+    var allData = sheet.getDataRange().getValues();
+    var maxNum = 0;
+    for (var i = 1; i < allData.length; i++) {
+      var existId = String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '');
+      var match = existId.match(/RES-(\d+)/);
+      if (match) {
+        var num = parseInt(match[1], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    var nextId = 'RES-' + String(maxNum + 1).padStart(3, '0');
+
+    var tz = Session.getScriptTimeZone();
+    var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    var addedBy = Session.getActiveUser().getEmail() || 'unknown';
+
+    // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
+    var newRow = [
+      nextId,
+      escapeForFormula(data.title),
+      escapeForFormula(data.category || 'General'),
+      escapeForFormula(data.summary || ''),
+      escapeForFormula(data.content || ''),
+      escapeForFormula(data.url || ''),
+      escapeForFormula(data.icon || '\uD83D\uDCC4'),
+      data.sortOrder || 999,
+      escapeForFormula(data.visible || 'Yes'),
+      escapeForFormula(data.audience || 'All'),
+      today,
+      addedBy
+    ];
+
+    sheet.appendRow(newRow);
+    return { success: true, resourceId: nextId, message: 'Resource added' };
+  } catch (e) {
+    logError_('addWebAppResource', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Update an existing resource by ID.
+ * @param {string} resourceId — e.g. "RES-001"
+ * @param {Object} data — fields to update (title, category, summary, content, url, icon, sortOrder, visible, audience)
+ * @returns {Object} { success: boolean, message: string }
+ */
+function updateWebAppResource(resourceId, data) {
+  try {
+    // CR-AUTH-6: Verify steward role before allowing resource updates
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) return { success: false, message: 'Resources sheet not found' };
+
+    var allData = sheet.getDataRange().getValues();
+    for (var i = 1; i < allData.length; i++) {
+      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+        // M-PERF: Batch write — modify row copy in-memory, write back in single call
+        var rowData = allData[i].slice();
+        // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
+        if (data.title !== undefined)     rowData[RESOURCES_COLS.TITLE - 1] = escapeForFormula(data.title);
+        if (data.category !== undefined)  rowData[RESOURCES_COLS.CATEGORY - 1] = escapeForFormula(data.category);
+        if (data.summary !== undefined)   rowData[RESOURCES_COLS.SUMMARY - 1] = escapeForFormula(data.summary);
+        if (data.content !== undefined)   rowData[RESOURCES_COLS.CONTENT - 1] = escapeForFormula(data.content);
+        if (data.url !== undefined)       rowData[RESOURCES_COLS.URL - 1] = escapeForFormula(data.url);
+        if (data.icon !== undefined)      rowData[RESOURCES_COLS.ICON - 1] = escapeForFormula(data.icon);
+        if (data.sortOrder !== undefined) rowData[RESOURCES_COLS.SORT_ORDER - 1] = data.sortOrder;
+        if (data.visible !== undefined)   rowData[RESOURCES_COLS.VISIBLE - 1] = escapeForFormula(data.visible);
+        if (data.audience !== undefined)  rowData[RESOURCES_COLS.AUDIENCE - 1] = escapeForFormula(data.audience);
+        sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
+        return { success: true, message: 'Resource updated' };
+      }
+    }
+    return { success: false, message: 'Resource not found' };
+  } catch (e) {
+    logError_('updateWebAppResource', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Soft-delete a resource (set Visible=No).
+ * @param {string} resourceId — e.g. "RES-001"
+ * @returns {Object} { success: boolean, message: string }
+ */
+function deleteWebAppResource(resourceId) {
+  try {
+    // CR-AUTH-6: Verify steward role before allowing resource deletion
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) return { success: false, message: 'Resources sheet not found' };
+
+    var allData = sheet.getDataRange().getValues();
+    for (var i = 1; i < allData.length; i++) {
+      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+        sheet.getRange(i + 1, RESOURCES_COLS.VISIBLE).setValue('No');
+        return { success: true, message: 'Resource hidden' };
+      }
+    }
+    return { success: false, message: 'Resource not found' };
+  } catch (e) {
+    logError_('deleteWebAppResource', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
+ * Restore a soft-deleted resource (set Visible=Yes).
+ * @param {string} resourceId — e.g. "RES-001"
+ * @returns {Object} { success: boolean, message: string }
+ */
+function restoreWebAppResource(resourceId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.RESOURCES);
+    if (!sheet) return { success: false, message: 'Resources sheet not found' };
+
+    var allData = sheet.getDataRange().getValues();
+    for (var i = 1; i < allData.length; i++) {
+      if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
+        sheet.getRange(i + 1, RESOURCES_COLS.VISIBLE).setValue('Yes');
+        return { success: true, message: 'Resource restored' };
+      }
+    }
+    return { success: false, message: 'Resource not found' };
+  } catch (e) {
+    logError_('restoreWebAppResource', e);
+    return { success: false, message: 'Error: ' + String(e) };
+  }
+}
+
+
+/**
  * Returns the educational resources hub HTML page.
  * Warm, welcoming design with categorized content cards.
  * Content is fully dynamic — reads from 📚 Resources sheet.
@@ -3807,18 +4023,7 @@ function getWebAppResourcesHtml() {
     '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">Loading resources...</div></div>' +
     '</div>' +
 
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=checkin">' +
-    '<span class="nav-icon">✅</span>Check In</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=resources">' +
-    '<span class="nav-icon">📚</span>Learn</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=selfservice">' +
-    '<span class="nav-icon">👤</span>My Info</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    _getBottomNavHTML_(baseUrl, _MEMBER_NAV_, 'resources') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -3989,18 +4194,7 @@ function getWebAppCheckInHtml() {
 
     '</div>' +
 
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=checkin">' +
-    '<span class="nav-icon">✅</span>Check In</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=resources">' +
-    '<span class="nav-icon">📚</span>Learn</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=selfservice">' +
-    '<span class="nav-icon">👤</span>My Info</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    _getBottomNavHTML_(baseUrl, _MEMBER_NAV_, 'checkin') +
 
     '<script>' +
     'var selectedMeetingId=null;' +
@@ -4069,6 +4263,494 @@ function getWebAppCheckInHtml() {
 
 
 // ============================================================================
+// DEADLINE CALENDAR VIEW (v4.13.0 — PHASE2)
+// ============================================================================
+// Visual calendar/list of grievance deadlines for stewards.
+// Route: ?page=deadlines (requires steward auth via sensitivePages).
+// ============================================================================
+
+/**
+ * Returns deadline data for all open grievances with upcoming due dates.
+ * Reads from the Grievance Log and computes urgency based on days remaining.
+ * @returns {Object} { deadlines: [{ grievanceId, memberName, currentStep, dueDate, daysRemaining, urgency, steward, issueCategory }] }
+ */
+function getDeadlineCalendarData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
+
+  if (!sheet || sheet.getLastRow() < 2) {
+    return { deadlines: [] };
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var today = new Date();
+  today.setHours(0, 0, 0, 0);
+  var deadlines = [];
+
+  for (var i = 1; i < data.length; i++) {
+    var status = String(data[i][GRIEVANCE_COLS.STATUS - 1] || '').trim();
+
+    // Only include open/active grievances (skip Closed, Won, Withdrawn, Denied, Settled)
+    var closedStatuses = ['Closed', 'Won', 'Withdrawn', 'Denied', 'Settled'];
+    if (closedStatuses.indexOf(status) !== -1) continue;
+
+    var grievanceId = String(data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1] || '').trim();
+    if (!grievanceId) continue;
+
+    var firstName = String(data[i][GRIEVANCE_COLS.FIRST_NAME - 1] || '').trim();
+    var lastName = String(data[i][GRIEVANCE_COLS.LAST_NAME - 1] || '').trim();
+    var memberName = (firstName + ' ' + lastName).trim() || 'Unknown Member';
+    var currentStep = String(data[i][GRIEVANCE_COLS.CURRENT_STEP - 1] || '').trim();
+    var steward = String(data[i][GRIEVANCE_COLS.STEWARD - 1] || '').trim();
+    var issueCategory = String(data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || '').trim();
+
+    // Determine the relevant due date based on the current step
+    var dueDate = null;
+    var nextActionDue = data[i][GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
+
+    // Prefer NEXT_ACTION_DUE if it's a valid date
+    if (nextActionDue instanceof Date && !isNaN(nextActionDue.getTime())) {
+      dueDate = nextActionDue;
+    } else {
+      // Fall back to step-specific due dates
+      var stepDueCols = [
+        GRIEVANCE_COLS.FILING_DEADLINE,
+        GRIEVANCE_COLS.STEP1_DUE,
+        GRIEVANCE_COLS.STEP2_APPEAL_DUE,
+        GRIEVANCE_COLS.STEP2_DUE,
+        GRIEVANCE_COLS.STEP3_APPEAL_DUE
+      ];
+
+      // Walk backwards to find the latest relevant due date
+      for (var s = stepDueCols.length - 1; s >= 0; s--) {
+        var candidate = data[i][stepDueCols[s] - 1];
+        if (candidate instanceof Date && !isNaN(candidate.getTime())) {
+          dueDate = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!dueDate) continue;
+
+    // Calculate days remaining
+    var dueDateClean = new Date(dueDate);
+    dueDateClean.setHours(0, 0, 0, 0);
+    var diffMs = dueDateClean.getTime() - today.getTime();
+    var daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    // Determine urgency color
+    var urgency = 'green';
+    if (daysRemaining < 3) {
+      urgency = 'red';
+    } else if (daysRemaining <= 7) {
+      urgency = 'orange';
+    }
+
+    // Also use pre-computed DAYS_TO_DEADLINE if available and dueDate wasn't from NEXT_ACTION_DUE
+    var daysToDeadline = data[i][GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
+    if (typeof daysToDeadline === 'number' && !isNaN(daysToDeadline) && !(nextActionDue instanceof Date)) {
+      daysRemaining = daysToDeadline;
+      urgency = daysRemaining < 3 ? 'red' : (daysRemaining <= 7 ? 'orange' : 'green');
+    }
+
+    // Format due date as YYYY-MM-DD for the calendar
+    var yyyy = dueDateClean.getFullYear();
+    var mm = ('0' + (dueDateClean.getMonth() + 1)).slice(-2);
+    var dd = ('0' + dueDateClean.getDate()).slice(-2);
+    var dueDateStr = yyyy + '-' + mm + '-' + dd;
+
+    deadlines.push({
+      grievanceId: escapeHtml(grievanceId),
+      memberName: escapeHtml(memberName),
+      currentStep: escapeHtml(currentStep || 'N/A'),
+      dueDate: dueDateStr,
+      daysRemaining: daysRemaining,
+      urgency: urgency,
+      steward: escapeHtml(steward),
+      issueCategory: escapeHtml(issueCategory),
+      status: escapeHtml(status)
+    });
+  }
+
+  // Sort by due date ascending (most urgent first)
+  deadlines.sort(function(a, b) {
+    return a.daysRemaining - b.daysRemaining;
+  });
+
+  return { deadlines: deadlines };
+}
+
+/**
+ * Returns a self-contained HTML page with a deadline calendar view.
+ * Steward-only page with month grid and list views, color-coded urgency.
+ * @returns {string} Complete HTML document
+ */
+function getDeadlineCalendarHtml() {
+  var baseUrl = '';
+  try { baseUrl = ScriptApp.getService().getUrl(); } catch (_e) { /* ignore */ }
+
+  // Pre-fetch deadline data server-side
+  var calData = { deadlines: [] };
+  try {
+    calData = getDeadlineCalendarData();
+  } catch (_e) {
+    calData = { deadlines: [] };
+  }
+  var deadlinesJson = JSON.stringify(calData.deadlines || []);
+
+  // Status colors from COMMAND_CONFIG
+  var statusColorsJson = '{}';
+  try {
+    if (typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.STATUS_COLORS) {
+      statusColorsJson = JSON.stringify(COMMAND_CONFIG.STATUS_COLORS);
+    }
+  } catch (_e) { /* ignore */ }
+
+  var html = '<!DOCTYPE html>' +
+    '<html lang="en"><head>' +
+    '<meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">' +
+    '<title>Deadline Calendar | SEIU 509</title>' +
+    '<style>' +
+
+    // Reset
+    '*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}' +
+
+    // Body
+    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;' +
+    'background:#fafaf9;min-height:100vh;padding-bottom:80px}' +
+
+    // Header
+    '.header{background:linear-gradient(135deg,#1e40af 0%,#1d4ed8 100%);color:white;' +
+    'padding:24px 20px 32px;text-align:center;position:relative;overflow:hidden}' +
+    '.header::after{content:"";position:absolute;bottom:-20px;left:-20px;right:-20px;' +
+    'height:40px;background:#fafaf9;border-radius:50% 50% 0 0}' +
+    '.header h1{font-size:clamp(20px,4.5vw,26px);font-weight:700;margin-bottom:4px}' +
+    '.header .subtitle{font-size:clamp(12px,2.5vw,14px);opacity:0.85}' +
+
+    // Container
+    '.container{max-width:960px;margin:0 auto;padding:16px}' +
+
+    // Summary stats bar
+    '.stats-bar{display:flex;gap:10px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px}' +
+    '.stat-pill{flex:0 0 auto;padding:10px 18px;border-radius:12px;text-align:center;' +
+    'font-weight:700;font-size:14px;min-width:100px}' +
+    '.stat-pill.red{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}' +
+    '.stat-pill.orange{background:#fff7ed;color:#ea580c;border:1px solid #fed7aa}' +
+    '.stat-pill.green{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}' +
+    '.stat-pill .num{font-size:22px;display:block}' +
+
+    // Toggle bar
+    '.toggle-bar{display:flex;background:white;border-radius:12px;padding:4px;' +
+    'box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;border:1px solid #e5e7eb}' +
+    '.toggle-btn{flex:1;padding:10px;border:none;border-radius:10px;font-size:14px;' +
+    'font-weight:600;cursor:pointer;background:transparent;color:#6b7280;transition:all 0.2s}' +
+    '.toggle-btn.active{background:#1d4ed8;color:white}' +
+
+    // ---- LIST VIEW ----
+    '.deadline-list{display:flex;flex-direction:column;gap:10px}' +
+    '.deadline-card{background:white;border-radius:14px;padding:16px;' +
+    'box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #f5f5f4;' +
+    'display:flex;align-items:center;gap:14px;cursor:pointer;transition:all 0.2s}' +
+    '.deadline-card:hover{box-shadow:0 3px 10px rgba(0,0,0,0.1);transform:translateY(-1px)}' +
+    '.urgency-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}' +
+    '.urgency-dot.red{background:#dc2626}' +
+    '.urgency-dot.orange{background:#ea580c}' +
+    '.urgency-dot.green{background:#16a34a}' +
+    '.deadline-info{flex:1;min-width:0}' +
+    '.deadline-case{font-weight:700;color:#1f2937;font-size:14px}' +
+    '.deadline-member{font-size:13px;color:#6b7280;margin-top:2px}' +
+    '.deadline-step{font-size:12px;color:#9ca3af;margin-top:1px}' +
+    '.deadline-days{text-align:right;flex-shrink:0}' +
+    '.days-num{font-size:22px;font-weight:700;line-height:1}' +
+    '.days-num.red{color:#dc2626}' +
+    '.days-num.orange{color:#ea580c}' +
+    '.days-num.green{color:#16a34a}' +
+    '.days-label{font-size:10px;color:#9ca3af;text-transform:uppercase;text-align:center}' +
+    '.overdue-badge{font-size:11px;font-weight:700;color:#dc2626;background:#fef2f2;' +
+    'padding:2px 8px;border-radius:6px;display:inline-block}' +
+
+    // ---- MONTH VIEW ----
+    '.month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}' +
+    '.month-title{font-size:18px;font-weight:700;color:#1f2937}' +
+    '.month-btn{padding:8px 14px;border:1px solid #e5e7eb;border-radius:8px;background:white;' +
+    'cursor:pointer;font-size:16px;transition:background 0.2s}' +
+    '.month-btn:hover{background:#f3f4f6}' +
+    '.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;background:white;' +
+    'border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);border:1px solid #e5e7eb}' +
+    '.cal-header{padding:10px 4px;text-align:center;font-size:12px;font-weight:600;' +
+    'color:#6b7280;background:#f9fafb}' +
+    '.cal-day{min-height:70px;padding:4px;border:1px solid #f3f4f6;position:relative;cursor:default}' +
+    '.cal-day.today{background:#eff6ff}' +
+    '.cal-day.other-month{background:#fafafa;color:#d1d5db}' +
+    '.cal-day-num{font-size:12px;font-weight:500;color:#374151;margin-bottom:2px}' +
+    '.cal-day.other-month .cal-day-num{color:#d1d5db}' +
+    '.cal-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin:1px}' +
+    '.cal-dot.red{background:#dc2626}.cal-dot.orange{background:#ea580c}.cal-dot.green{background:#16a34a}' +
+    '.cal-event{font-size:10px;padding:2px 4px;border-radius:4px;margin-top:1px;' +
+    'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}' +
+    '.cal-event.red{background:#fef2f2;color:#dc2626}' +
+    '.cal-event.orange{background:#fff7ed;color:#ea580c}' +
+    '.cal-event.green{background:#f0fdf4;color:#16a34a}' +
+
+    // ---- DETAIL PANEL ----
+    '.detail-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);' +
+    'display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}' +
+    '.detail-overlay.show{display:flex}' +
+    '.detail-panel{background:white;border-radius:16px;padding:24px;max-width:420px;width:100%;' +
+    'box-shadow:0 20px 40px rgba(0,0,0,0.15);animation:slideUp 0.25s ease}' +
+    '@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}' +
+    '.detail-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}' +
+    '.detail-id{font-size:18px;font-weight:700;color:#1f2937}' +
+    '.detail-close{width:32px;height:32px;border:none;background:#f3f4f6;border-radius:8px;' +
+    'cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}' +
+    '.detail-close:hover{background:#e5e7eb}' +
+    '.detail-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6}' +
+    '.detail-label{font-size:13px;color:#6b7280;font-weight:500}' +
+    '.detail-value{font-size:13px;color:#1f2937;font-weight:600;text-align:right;max-width:60%}' +
+    '.detail-urgency{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700}' +
+    '.detail-urgency.red{background:#fef2f2;color:#dc2626}' +
+    '.detail-urgency.orange{background:#fff7ed;color:#ea580c}' +
+    '.detail-urgency.green{background:#f0fdf4;color:#16a34a}' +
+
+    // Empty state
+    '.empty-state{text-align:center;padding:60px 20px;color:#9ca3af}' +
+    '.empty-state-icon{font-size:48px;margin-bottom:12px;opacity:0.5}' +
+
+    // Bottom navigation
+    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;' +
+    'display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));' +
+    'box-shadow:0 -2px 10px rgba(0,0,0,0.08);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;' +
+    'text-decoration:none;color:#a8a29e;font-size:10px;font-weight:500;min-width:60px;transition:color 0.2s}' +
+    '.nav-item.active{color:#1d4ed8}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+
+    // Responsive
+    '@media(min-width:768px){' +
+    '.container{padding:20px 24px}' +
+    '.cal-day{min-height:90px;padding:6px}' +
+    '.cal-event{font-size:11px}' +
+    '}' +
+
+    '</style></head><body>' +
+
+    // Detail overlay
+    '<div id="detailOverlay" class="detail-overlay" onclick="closeDetail(event)">' +
+    '<div class="detail-panel" id="detailPanel"></div>' +
+    '</div>' +
+
+    // Header
+    '<div class="header">' +
+    '<h1>Deadline Calendar</h1>' +
+    '<div class="subtitle">Grievance deadlines at a glance</div>' +
+    '</div>' +
+
+    '<div class="container">' +
+
+    // Stats bar
+    '<div class="stats-bar" id="statsBar"></div>' +
+
+    // View toggle
+    '<div class="toggle-bar">' +
+    '<button class="toggle-btn active" id="btnList" onclick="showView(\\x27list\\x27)">List View</button>' +
+    '<button class="toggle-btn" id="btnMonth" onclick="showView(\\x27month\\x27)">Month View</button>' +
+    '</div>' +
+
+    // List view container
+    '<div id="listView" class="deadline-list"></div>' +
+
+    // Month view container (hidden by default)
+    '<div id="monthView" style="display:none"></div>' +
+
+    '</div>' +
+
+    // Bottom navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _DEADLINE_NAV_, 'deadlines') +
+
+    '<script>' +
+
+    // Client-side escapeHtml (canonical helper from 00_Security.gs)
+    getClientSideEscapeHtml() +
+
+    // Data
+    'var deadlines=' + deadlinesJson + ';' +
+    'var statusColors=' + statusColorsJson + ';' +
+    'var currentMonth=new Date().getMonth();' +
+    'var currentYear=new Date().getFullYear();' +
+
+    // Render stats bar
+    'function renderStats(){' +
+    '  var red=0,orange=0,green=0,overdue=0;' +
+    '  deadlines.forEach(function(d){' +
+    '    if(d.daysRemaining<0)overdue++;' +
+    '    if(d.urgency==="red")red++;' +
+    '    else if(d.urgency==="orange")orange++;' +
+    '    else green++;' +
+    '  });' +
+    '  var el=document.getElementById("statsBar");' +
+    '  el.innerHTML=' +
+    '    "<div class=\\"stat-pill red\\"><span class=\\"num\\">"+red+"</span>Critical (&lt;3d)</div>"' +
+    '    +"<div class=\\"stat-pill orange\\"><span class=\\"num\\">"+orange+"</span>Soon (3-7d)</div>"' +
+    '    +"<div class=\\"stat-pill green\\"><span class=\\"num\\">"+green+"</span>On Track (&gt;7d)</div>";' +
+    '}' +
+    'renderStats();' +
+
+    // ---- LIST VIEW ----
+    'function renderList(){' +
+    '  var el=document.getElementById("listView");' +
+    '  if(deadlines.length===0){' +
+    '    el.innerHTML="<div class=\\"empty-state\\"><div class=\\"empty-state-icon\\">&#x2705;</div>' +
+    '<div style=\\"font-size:18px;margin-bottom:8px\\">No upcoming deadlines</div>' +
+    '<div style=\\"font-size:13px\\">All open grievances are on track</div></div>";' +
+    '    return;' +
+    '  }' +
+    '  var h="";' +
+    '  deadlines.forEach(function(d,i){' +
+    '    h+="<div class=\\"deadline-card\\" onclick=\\"showDetail("+i+")\\">"' +
+    '      +"<div class=\\"urgency-dot "+d.urgency+"\\"></div>"' +
+    '      +"<div class=\\"deadline-info\\">"' +
+    '        +"<div class=\\"deadline-case\\">"+escapeHtml(d.grievanceId)+"</div>"' +
+    '        +"<div class=\\"deadline-member\\">"+escapeHtml(d.memberName)+"</div>"' +
+    '        +"<div class=\\"deadline-step\\">"+escapeHtml(d.currentStep)+" &middot; Due "+escapeHtml(d.dueDate)+"</div>"' +
+    '      +"</div>"' +
+    '      +"<div class=\\"deadline-days\\">";' +
+    '    if(d.daysRemaining<0){' +
+    '      h+="<div class=\\"overdue-badge\\">"+Math.abs(d.daysRemaining)+"d overdue</div>";' +
+    '    }else if(d.daysRemaining===0){' +
+    '      h+="<div class=\\"days-num red\\">Today</div>";' +
+    '    }else{' +
+    '      h+="<div class=\\"days-num "+d.urgency+"\\">"+d.daysRemaining+"</div>"' +
+    '        +"<div class=\\"days-label\\">days</div>";' +
+    '    }' +
+    '    h+="</div></div>";' +
+    '  });' +
+    '  el.innerHTML=h;' +
+    '}' +
+    'renderList();' +
+
+    // ---- MONTH VIEW ----
+    'function renderMonth(){' +
+    '  var el=document.getElementById("monthView");' +
+    '  var monthNames=["January","February","March","April","May","June",' +
+    '    "July","August","September","October","November","December"];' +
+    '  var dayNames=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];' +
+
+    '  var firstDay=new Date(currentYear,currentMonth,1).getDay();' +
+    '  var daysInMonth=new Date(currentYear,currentMonth+1,0).getDate();' +
+    '  var today=new Date();today.setHours(0,0,0,0);' +
+
+    // Build deadline lookup by date
+    '  var dateMap={};' +
+    '  deadlines.forEach(function(d,i){' +
+    '    var key=d.dueDate;' +
+    '    if(!dateMap[key])dateMap[key]=[];' +
+    '    dateMap[key].push({idx:i,d:d});' +
+    '  });' +
+
+    // Month navigation
+    '  var h="<div class=\\"month-nav\\">"' +
+    '    +"<button class=\\"month-btn\\" onclick=\\"prevMonth()\\">&#x25C0;</button>"' +
+    '    +"<div class=\\"month-title\\">"+monthNames[currentMonth]+" "+currentYear+"</div>"' +
+    '    +"<button class=\\"month-btn\\" onclick=\\"nextMonth()\\">&#x25B6;</button>"' +
+    '    +"</div>";' +
+
+    // Calendar grid header
+    '  h+="<div class=\\"cal-grid\\">";' +
+    '  dayNames.forEach(function(dn){h+="<div class=\\"cal-header\\">"+dn+"</div>"});' +
+
+    // Days from previous month
+    '  var prevMonthDays=new Date(currentYear,currentMonth,0).getDate();' +
+    '  for(var p=firstDay-1;p>=0;p--){' +
+    '    h+="<div class=\\"cal-day other-month\\"><div class=\\"cal-day-num\\">"+(prevMonthDays-p)+"</div></div>";' +
+    '  }' +
+
+    // Days of current month
+    '  for(var d=1;d<=daysInMonth;d++){' +
+    '    var dateObj=new Date(currentYear,currentMonth,d);' +
+    '    var isToday=(dateObj.getTime()===today.getTime());' +
+    '    var mm=("0"+(currentMonth+1)).slice(-2);' +
+    '    var dd=("0"+d).slice(-2);' +
+    '    var key=currentYear+"-"+mm+"-"+dd;' +
+    '    var events=dateMap[key]||[];' +
+
+    '    h+="<div class=\\"cal-day"+(isToday?" today":"")+"\\"><div class=\\"cal-day-num\\">"+d+"</div>";' +
+    '    events.forEach(function(ev){' +
+    '      h+="<div class=\\"cal-event "+ev.d.urgency+"\\" onclick=\\"showDetail("+ev.idx+")\\" title=\\""+escapeHtml(ev.d.grievanceId)+"\\">"+escapeHtml(ev.d.grievanceId)+"</div>";' +
+    '    });' +
+    '    h+="</div>";' +
+    '  }' +
+
+    // Fill remaining cells to complete grid
+    '  var totalCells=firstDay+daysInMonth;' +
+    '  var remainder=totalCells%7;' +
+    '  if(remainder>0){' +
+    '    for(var r=1;r<=7-remainder;r++){' +
+    '      h+="<div class=\\"cal-day other-month\\"><div class=\\"cal-day-num\\">"+r+"</div></div>";' +
+    '    }' +
+    '  }' +
+
+    '  h+="</div>";' +
+    '  el.innerHTML=h;' +
+    '}' +
+    'renderMonth();' +
+
+    'function prevMonth(){' +
+    '  currentMonth--;if(currentMonth<0){currentMonth=11;currentYear--}' +
+    '  renderMonth();' +
+    '}' +
+    'function nextMonth(){' +
+    '  currentMonth++;if(currentMonth>11){currentMonth=0;currentYear++}' +
+    '  renderMonth();' +
+    '}' +
+
+    // ---- VIEW TOGGLE ----
+    'function showView(view){' +
+    '  document.getElementById("listView").style.display=view==="list"?"flex":"none";' +
+    '  document.getElementById("monthView").style.display=view==="month"?"block":"none";' +
+    '  document.getElementById("btnList").classList.toggle("active",view==="list");' +
+    '  document.getElementById("btnMonth").classList.toggle("active",view==="month");' +
+    '}' +
+
+    // ---- DETAIL PANEL ----
+    'function showDetail(idx){' +
+    '  var d=deadlines[idx];if(!d)return;' +
+    '  var urgLabel=d.urgency==="red"?"Critical":d.urgency==="orange"?"Approaching":"On Track";' +
+    '  var daysText=d.daysRemaining<0?Math.abs(d.daysRemaining)+" days overdue"' +
+    '    :d.daysRemaining===0?"Due today":d.daysRemaining+" days remaining";' +
+    '  var h="<div class=\\"detail-header\\">"' +
+    '    +"<div class=\\"detail-id\\">"+escapeHtml(d.grievanceId)+"</div>"' +
+    '    +"<button class=\\"detail-close\\" onclick=\\"closeDetail(event,true)\\">&#x2715;</button>"' +
+    '    +"</div>"' +
+    '    +"<div class=\\"detail-row\\"><span class=\\"detail-label\\">Member</span><span class=\\"detail-value\\">"+escapeHtml(d.memberName)+"</span></div>"' +
+    '    +"<div class=\\"detail-row\\"><span class=\\"detail-label\\">Current Step</span><span class=\\"detail-value\\">"+escapeHtml(d.currentStep)+"</span></div>"' +
+    '    +"<div class=\\"detail-row\\"><span class=\\"detail-label\\">Due Date</span><span class=\\"detail-value\\">"+escapeHtml(d.dueDate)+"</span></div>"' +
+    '    +"<div class=\\"detail-row\\"><span class=\\"detail-label\\">Time Remaining</span><span class=\\"detail-value\\">"+escapeHtml(daysText)+"</span></div>"' +
+    '    +"<div class=\\"detail-row\\"><span class=\\"detail-label\\">Urgency</span><span class=\\"detail-urgency "+d.urgency+"\\">"+urgLabel+"</span></div>"' +
+    '    +"<div class=\\"detail-row\\"><span class=\\"detail-label\\">Status</span><span class=\\"detail-value\\">"+escapeHtml(d.status)+"</span></div>"' +
+    '    +"<div class=\\"detail-row\\"><span class=\\"detail-label\\">Steward</span><span class=\\"detail-value\\">"+(d.steward||"Unassigned")+"</span></div>"' +
+    '    +"<div class=\\"detail-row\\"><span class=\\"detail-label\\">Category</span><span class=\\"detail-value\\">"+(d.issueCategory||"N/A")+"</span></div>";' +
+    '  document.getElementById("detailPanel").innerHTML=h;' +
+    '  document.getElementById("detailOverlay").classList.add("show");' +
+    '}' +
+
+    'function closeDetail(e,force){' +
+    '  if(force||e.target.id==="detailOverlay"){' +
+    '    document.getElementById("detailOverlay").classList.remove("show");' +
+    '  }' +
+    '}' +
+
+    // Keyboard: Escape closes detail
+    'document.addEventListener("keydown",function(e){if(e.key==="Escape")closeDetail(e,true)});' +
+
+    '</script></body></html>';
+
+  return html;
+}
+
+
+// ============================================================================
 // NOTIFICATIONS API (v4.12.0)
 // ============================================================================
 // Steward-composed, member-dismissable notifications.
@@ -4094,7 +4776,7 @@ function getWebAppNotifications(userEmail, userRole) {
     var data = sheet.getDataRange().getValues();
     if (data.length < 2) return [];
 
-    var headers = data[0];
+    var _headers = data[0];
     var C = NOTIFICATIONS_COLS;
     var now = new Date();
     var results = [];
@@ -4165,22 +4847,44 @@ function getWebAppNotifications(userEmail, userRole) {
 
 
 /**
+ * Lightweight notification count for SPA bell badge.
+ * Reuses same filtering logic as getWebAppNotifications but returns only count.
+ * @param {string} userEmail
+ * @param {string} userRole — 'member' or 'steward'
+ * @returns {Object} { count: number }
+ */
+function getWebAppNotificationCount(userEmail, userRole) {
+  try {
+    var results = getWebAppNotifications(userEmail, userRole);
+    return { count: results.length };
+  } catch (e) {
+    logError_('getWebAppNotificationCount', e);
+    return { count: 0 };
+  }
+}
+
+
+/**
  * Dismiss a notification for a specific user.
  * Appends user's email to the Dismissed_By column (comma-separated).
  * @param {string} notificationId — e.g. "NOTIF-001"
  * @param {string} userEmail — the user dismissing
  * @returns {Object} { success: boolean, message: string }
  */
-function dismissWebAppNotification(notificationId, userEmail) {
+function dismissWebAppNotification(notificationId) {
   try {
+    // CR-AUTH-4: Use server-side identity instead of client-supplied email (IDOR fix)
+    var userEmail = '';
+    try { userEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* SSO unavailable */ }
+    userEmail = (userEmail || '').toLowerCase().trim();
+    if (!userEmail) return { success: false, message: 'Authentication required' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
     if (!sheet) return { success: false, message: 'Notifications sheet not found' };
 
     var data = sheet.getDataRange().getValues();
     var C = NOTIFICATIONS_COLS;
-    userEmail = (userEmail || '').toLowerCase().trim();
-    if (!userEmail) return { success: false, message: 'No email provided' };
 
     for (var i = 1; i < data.length; i++) {
       var rowId = String(data[i][C.NOTIFICATION_ID - 1] || '').trim();
@@ -4211,6 +4915,10 @@ function dismissWebAppNotification(notificationId, userEmail) {
  */
 function sendWebAppNotification(data) {
   try {
+    // CR-AUTH-6: Verify steward role before allowing notification creation
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
     if (!sheet) {
@@ -4247,18 +4955,19 @@ function sendWebAppNotification(data) {
     var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
 
     // Build row (must match NOTIFICATIONS_HEADER_MAP_ order)
+    // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
     var newRow = [
       nextId,
-      data.recipient || 'All Members',
-      data.type || 'Steward Message',
-      data.title,
-      data.message,
-      data.priority || 'Normal',
+      escapeForFormula(data.recipient || 'All Members'),
+      escapeForFormula(data.type || 'Steward Message'),
+      escapeForFormula(data.title),
+      escapeForFormula(data.message),
+      escapeForFormula(data.priority || 'Normal'),
       stewardEmail,
-      stewardName,
+      escapeForFormula(stewardName),
       today,
-      data.expiresDate || '',   // blank = no expiry
-      '',                        // Dismissed_By starts empty
+      escapeForFormula(data.expiresDate || ''),
+      '',
       'Active'
     ];
 
@@ -4384,8 +5093,8 @@ function getWebAppNotificationsHtml() {
     isSteward = authResult.isAuthorized;
     userEmail = authResult.email || Session.getActiveUser().getEmail() || '';
     userName = userEmail.split('@')[0] || '';
-  } catch (authErr) {
-    try { userEmail = Session.getActiveUser().getEmail() || ''; } catch (e2) { userEmail = ''; }
+  } catch (_authErr) {
+    try { userEmail = Session.getActiveUser().getEmail() || ''; } catch (_e2) { userEmail = ''; }
   }
 
   var userRole = isSteward ? 'steward' : 'member';
@@ -4534,6 +5243,9 @@ function getWebAppNotificationsHtml() {
   p.push('var selGroup="All Members";');
   p.push('var selMems={};');
 
+  // CR-XSS-6: Client-side HTML escaping for dynamic content
+  p.push('function _esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#x27;");}');
+
   // Render notifications
   p.push('function renderN(){');
   p.push('var el=document.getElementById("nList");');
@@ -4547,14 +5259,14 @@ function getWebAppNotificationsHtml() {
   p.push('h+=\'<div class="nc\'+u+\'" style="animation-delay:\'+i*0.06+\'s" id="n-\'+n.id+\'">\';');
   p.push('h+=\'<button class="dbtn" onclick="dismissN(\\x27\'+n.id+\'\\x27)">\\u2715</button>\';');
   p.push('h+=\'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">\';');
-  p.push('h+=\'<div><span class="tbdg" style="background:\'+t.bg+\';color:\'+t.c+\'">\'+n.type+\'</span>\';');
+  p.push('h+=\'<div><span class="tbdg" style="background:\'+t.bg+\';color:\'+t.c+\'">\'+_esc(n.type)+\'</span>\';');
   p.push('if(n.priority==="Urgent")h+=\'<span class="tbdg" style="background:#fef2f2;color:#dc2626">URGENT</span>\';');
-  p.push('h+=\'</div><span style="font-size:11px;color:#a8a29e">\'+n.createdDate+\'</span></div>\';');
-  p.push('h+=\'<h3>\'+n.title+\'</h3>\';');
-  p.push('h+=\'<div class="msg">\'+n.message+\'</div>\';');
+  p.push('h+=\'</div><span style="font-size:11px;color:#a8a29e">\'+_esc(n.createdDate)+\'</span></div>\';');
+  p.push('h+=\'<h3>\'+_esc(n.title)+\'</h3>\';');
+  p.push('h+=\'<div class="msg">\'+_esc(n.message)+\'</div>\';');
   p.push('h+=\'<div class="meta">\';');
-  p.push('if(n.sentBy)h+=\'<span>From: \'+n.sentBy+\'</span>\';');
-  p.push('if(n.expiresDate)h+=\'<span>Expires: \'+n.expiresDate+\'</span>\';');
+  p.push('if(n.sentBy)h+=\'<span>From: \'+_esc(n.sentBy)+\'</span>\';');
+  p.push('if(n.expiresDate)h+=\'<span>Expires: \'+_esc(n.expiresDate)+\'</span>\';');
   p.push('h+=\'</div></div>\';');
   p.push('}');
   p.push('el.innerHTML=h;}');
@@ -4621,12 +5333,12 @@ function getWebAppNotificationsHtml() {
     p.push('var h="";');
     p.push('for(var j=0;j<fl.length;j++){');
     p.push('var m=fl[j];var s=!!selMems[m.email];');
-    p.push('h+=\'<div class="mrow\'+(s?" sel":"")+\'" onclick="togM(\\x27\'+m.email+\'\\x27,\\x27\'+m.name.replace(/\\x27/g,"\\\\\\x27")+\'\\x27)">\';');
+    p.push('h+=\'<div class="mrow\'+(s?" sel":"")+\'" onclick="togM(\\x27\'+_esc(m.email)+\'\\x27,\\x27\'+_esc(m.name).replace(/\\x27/g,"\\\\\\x27")+\'\\x27)">\';');
     p.push('h+=\'<div class="mchk\'+(s?" on":"")+"\">"+(s?"\\u2713":"")+"</div>";');
-    p.push('h+=\'<div style="flex:1;min-width:0"><div class="mname">\'+m.name+\'</div>\';');
-    p.push('h+=\'<div class="mdtl">\'+m.email;');
-    p.push('if(m.location)h+=" \\u00b7 "+m.location;');
-    p.push('if(m.department)h+=" \\u00b7 "+m.department;');
+    p.push('h+=\'<div style="flex:1;min-width:0"><div class="mname">\'+_esc(m.name)+\'</div>\';');
+    p.push('h+=\'<div class="mdtl">\'+_esc(m.email);');
+    p.push('if(m.location)h+=" \\u00b7 "+_esc(m.location);');
+    p.push('if(m.department)h+=" \\u00b7 "+_esc(m.department);');
     p.push('h+=\'</div></div></div>\';}');
     p.push('el.innerHTML=h;updCnt();}');
 

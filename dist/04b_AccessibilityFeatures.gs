@@ -720,7 +720,8 @@ function showExportDialog_UIService_() {
   var blob = Utilities.newBlob(csv, 'text/csv', fileName);
   var file = DriveApp.createFile(blob);
 
-  // File inherits default Drive sharing permissions
+  // C4: Restrict sharing to private — CSV contains member PII
+  file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
 
   // Show download link
   var html = HtmlService.createHtmlOutput(

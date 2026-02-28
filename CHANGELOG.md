@@ -5,6 +5,167 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.18.0] - 2026-02-26
+
+### Added
+- Split `SEED_SAMPLE_DATA` into 3 phased runners to avoid GAS 6-min timeout
+- 5 new seed functions: tasks, polls, minutes, check-ins, timeline events
+- Steward view: org-wide KPI fallback, all-contacts members tab, comma formatting, contact log autocomplete, survey tracking scope toggles, 6 new More menu items (Polls, Minutes, Timeline, Q&A, Feedback, Failsafe)
+- Member view: Know Your Rights card, Contact→Directory nav, 1hr localStorage notification dismiss, meetings+minutes merge, 7 new More menu items
+- Backend globals: `getAllMembers`, `startGrievanceDraft`, `createGrievanceDriveFolder`
+- Survey tracking scope parameter for steward/org-wide toggle
+- `07_DevTools.gs` expanded with comprehensive seed + diagnostic tooling
+
+### Changed
+- Broadcast system uses all contacts (not just active members)
+- `build.js` BUILD_ORDER updated to include `26_QAForum.gs`, `27_TimelineService.gs`, `28_FailsafeService.gs`
+
+## [4.17.0] - 2026-02-26
+
+### Added
+- **Q&A Forum** (`26_QAForum.gs`, 389 lines) — member-steward question/answer system with `_QA_Forum` and `_QA_Answers` hidden sheets
+- **Timeline Service** (`27_TimelineService.gs`, 317 lines) — chronological event records with `_Timeline_Events` hidden sheet
+- **Failsafe Service** (`28_FailsafeService.gs`, 425 lines) — member digest/backup preferences with `_Failsafe_Config` hidden sheet
+- `08a_SheetSetup.gs` updated to auto-create Q&A, Timeline, and Failsafe sheets in `CREATE_DASHBOARD()`
+- DataService methods for Q&A, Timeline, and Failsafe in `21_WebDashDataService.gs`
+
+## [4.16.0] - 2026-02-26
+
+### Added
+- 15 new DataService methods (541 lines) in `21_WebDashDataService.gs` wiring 7 previously unwired sheets to SPA
+- 15 global wrapper functions + 3 batch data fields
+- New SPA pages: Meetings (member), Polls (both roles), Minutes (both), Feedback (both)
+- Insights page: Performance KPIs + Satisfaction Trends sections
+- Case detail views: read-only checklist (member) / interactive checklist (steward)
+- Per-question text scores with color-coding in survey results page
+- `questionTexts` arrays added to all 11 `SATISFACTION_SECTIONS` scale sections
+- Expansion test suite (`test/expansion.test.js`, 332 lines)
+
+### Changed
+- Removed "Since N/A" text from member home header
+- Removed Dues Status doughnut chart and sort option from steward view
+- Removed Dues Status chart from member view membership stats
+- Fixed 122 test failures across 9 suites (1,363 tests now passing across 23 suites)
+
+### Wired Sheets
+1. `_Steward_Performance_Calc`
+2. `Case Checklist`
+3. `Meeting Check-In Log`
+4. `Member Satisfaction` (AVG columns)
+5. `Feedback & Development`
+6. `FlashPolls` + `PollResponses`
+7. `MeetingMinutes`
+
+## [4.15.0] - 2026-02-25
+
+### Added
+- In-app survey wizard: multi-step mobile-optimized form with localStorage progress, 1–10 scale buttons, anonymous SHA-256 submission
+- Chief steward task assignment in steward view
+- Steward Insights tab: Quick Insights + Filed vs Resolved chart
+- Steward Directory with vCard download
+- Member dashboard: actionable KPI strip, conditional grievance card, engagement/workload stats tabs
+- Broadcast: checkbox pill filters with recipient preview
+- Login UX: SSO loading state, `sso_failed` fallback, magic link clarification, resend cooldown
+- Seed data: calendar events, weekly questions, union stats
+- 634 new tests (`10d_SyncAndMaintenance.test.js`), expansion test coverage
+- `DocumentApp` mock in `test/gas-mock.js`
+
+### Changed
+- `API_VERSION` consolidated to derive from `COMMAND_CONFIG.VERSION` (single source of truth)
+- Infrastructure: batch fetch, Drive cleanup trigger, calendar dedup, CC health check, lazy-load help dialog, search pagination
+- Workload: removed Private option
+
+### Removed
+- `CODE_REVIEW.md`, `PHASE2_PLAN.md`, `docs/archived-reviews/` (all findings resolved in v4.14.0)
+
+## [4.14.0] - 2026-02-25
+
+### Security (130 code review findings resolved)
+- **15 CRITICAL XSS fixes**: `escapeHtml()` on all HTML contexts, `JSON.stringify()` for JS contexts, URL scheme validation
+- **26 HIGH fixes**: Input validation, rate limiting, email format checks, authorization gates, `withScriptLock_()` for concurrency
+- **50 MEDIUM fixes**: Formula injection protection (`escapeForFormula()`), column constant refactoring, batch write optimization, HMAC audit hashing, archive transaction patterns
+- **39 LOW fixes**: Narrowed `data:` URL pattern, consolidated `API_VERSION`, pinned GitHub Actions to commit SHAs, re-enabled `no-dupe-args` ESLint rule, architectural documentation
+
+### Added
+- **Grievance History for Members** — Past cases tab in SPA member view with color-coded outcome badges
+- **Meeting Check-In Kiosk** — Mobile-optimized `?page=checkin` with email+PIN auth, auto-refresh flow
+- **Welcome Experience** — Personalized first-visit greeting with role-appropriate quick-start action cards
+- **Bulk Actions** — Select All Open, Clear Selection, Bulk Flag/Email/Export CSV for grievances
+- **Deadline Calendar View** — Steward-only `?page=deadlines` with month/list views, color-coded urgency
+- **Engagement Sync Overhaul** — Dynamic headers, case-insensitive matching, data validation, debounce, 21 new sync tests
+- `withScriptLock_(fn, timeoutMs)` concurrency helper in `00_DataAccess.gs`
+- `safeSendEmail(options)` quota-checking email wrapper in `05_Integrations.gs`
+- `findColumnsByHeader_(sheet)` dynamic column resolver in `10d_SyncAndMaintenance.gs`
+- `DocumentApp` mock in test/gas-mock.js
+
+### Changed
+- `escapeHtml()` no longer escapes `/` and `=` (not XSS vectors, caused data corruption)
+- `API_VERSION` now derives from `COMMAND_CONFIG.VERSION` (single source of truth)
+- `onOpen()` defers heavy work to timed trigger for faster menu load
+- `onEdit()` fast-exits for irrelevant sheets
+- Formula setup functions use `getColumnLetter()` instead of hardcoded column letters
+- `addMember()` uses batch `setValues()` instead of individual `setValue()` calls
+
+### Removed
+- `CODE_REVIEW.md`, `PHASE2_PLAN.md`, `docs/archived-reviews/` (all findings resolved)
+
+## [4.13.0] - 2026-02-25
+
+### Added
+- **Notification bell badge** with unread count in SPA header
+- **Steward notification management** — compose/inbox/manage tabs in steward view
+- **EventBus auto-notifications** — automatic alerts for grievance deadlines and status changes
+- `src/25_WorkloadService.gs` (1,129 lines) — SPA-integrated workload tracking with SSO auth (separate from standalone PIN-auth portal)
+- Member notification view with dismiss functionality
+
+### Changed
+- **Build system rewritten** — `build.js` now copies individual `.gs` + `.html` files to `dist/` instead of concatenating into single `ConsolidatedDashboard.gs`
+- `dist/ConsolidatedDashboard.gs` **deleted** — replaced by 39 individual `.gs` + 8 `.html` files
+- `src/18_WorkloadTracker.gs` major refactor
+- HTML templates reworked for individual-file architecture (`createTemplateFromFile()` now supported)
+- All 3 branches (Main, dev, staging) synced
+
+## [4.12.2] - 2026-02-25
+
+### Added
+- **SPA Web Dashboard** (`19_WebDashAuth.gs`, `20_WebDashConfigReader.gs`, `21_WebDashDataService.gs`, `22_WebDashApp.gs`, `23_PortalSheets.gs`, `24_WeeklyQuestions.gs`) — full single-page app with Google SSO + magic link auth
+- 6 HTML files: `index.html`, `steward_view.html`, `member_view.html`, `auth_view.html`, `error_view.html`, `styles.html`
+- Hidden sheets: `_Weekly_Questions`, `_Contact_Log` (8 cols), `_Steward_Tasks` (10 cols)
+- `initWebDashboardAuth()` — auto-configures auth on first run, no manual ScriptProperties setup
+- Deep-link routing: `?page=X` → SPA with tab pre-selected via `PAGE_DATA.initialTab`
+- `doGet()` default now routes to SPA (`doGetWebDashboard`) with SSO/magic link
+
+### Changed
+- ConfigReader (`20_WebDashConfigReader.gs`) rewritten from row-based key-value to column-based Config tab using `CONFIG_COLS`
+- Default accent hue changed from 250 (blue) → 30 (amber)
+- `?page=resources` and `?page=notifications` now route through SPA instead of standalone HTML
+
+## [4.12.0] - 2026-02-24
+
+### Added
+- **📢 Notifications sheet** — 12 columns with data validation and 2 starter entries
+- `getWebAppNotifications(email, role)` — filters Active, non-expired, non-dismissed, audience-matched
+- `dismissWebAppNotification(id, email)` — per-member dismiss tracking via Dismissed_By column
+- `sendWebAppNotification(data)` — steward compose with auto-ID (NOTIF-XXX)
+- `getNotificationRecipientList()` / `getNotificationRecipientListFull()` — member directory + preset groups
+- `?page=notifications` route with dual-role page: member cards + steward inline compose
+- Notification types: Steward Message, Announcement, Deadline, System
+- Priority levels: Normal (default), Urgent (sorts first)
+- `NOTIFICATIONS_HEADER_MAP_` + `NOTIFICATIONS_COLS` registered in `syncColumnMaps()`
+
+## [4.11.0] - 2026-02-24
+
+### Added
+- **📚 Resources sheet** — 12 columns, data validation, 8 starter articles (Know Your Rights, Grievance Process, FAQ, Forms & Templates)
+- `?page=resources` route — educational content hub with search, category pills, expandable cards
+- `?page=checkin` route — meeting check-in as standalone web page (reuses `14_MeetingCheckIn.gs`)
+- `getWebAppResourcesList()` API — returns visible resources with audience filtering
+- `RESOURCES_HEADER_MAP_` + `RESOURCES_COLS` registered in `syncColumnMaps()`
+- `PHASE2_PLAN.md` — tracks parked features (bulk actions, deadline calendar, etc.)
+
+### Changed
+- Design refresh: DM Sans + Fraunces serif fonts, warm navy/earth tones (#1e3a5f, #fafaf9)
+
 ## [4.10.0] - 2026-02-23
 
 ### Added
@@ -236,6 +397,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 4.18.0 | 2026-02-26 | SPA fixes, seed phasing, steward/member view enhancements |
+| 4.17.0 | 2026-02-26 | Q&A Forum, Timeline Service, Failsafe Service (backend + sheets) |
+| 4.16.0 | 2026-02-26 | Wire 7 unwired sheets to SPA, new pages, expansion tests |
+| 4.15.0 | 2026-02-25 | Survey wizard, steward insights, member KPI strip, login UX |
+| 4.14.0 | 2026-02-25 | 130 code review findings, 5 new features, engagement sync |
+| 4.13.0 | 2026-02-25 | Notification bell/EventBus auto-alerts, individual-file build, WorkloadService SPA module |
+| 4.12.2 | 2026-02-25 | SPA web dashboard, SSO + magic link, deep-link routing, hidden sheets |
+| 4.12.0 | 2026-02-24 | Notifications system (sheet + API + dual-role page) |
+| 4.11.0 | 2026-02-24 | Resources hub, meeting check-in route, design refresh |
+| 4.10.0 | 2026-02-23 | Workload Tracker module |
+| 4.9.1 | 2026-02-23 | 15 security fixes (XSS, formula injection, URL validation) |
 | 4.9.0 | 2026-02-17 | Constant Contact v3 API integration, multi-select dropdowns, auto-discovery columns |
 | 4.8.2 | 2026-02-16 | State field added to member contacts |
 | 4.8.1 | 2026-02-15 | 5 new contact form fields, unified name-based Member IDs |

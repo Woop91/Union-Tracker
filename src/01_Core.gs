@@ -1,3 +1,4 @@
+// GAS_LIMITATION: All .gs files share a single global namespace. Function names must be globally unique.
 /**
  * ============================================================================
  * 01_Core.gs - Core Constants, Error Handling & Configuration
@@ -108,6 +109,7 @@ function isTruthyValue(value) {
  * @param {string} context - Where the error occurred
  * @param {string} [level] - Error severity level
  */
+// STANDARD: All new code should use handleError() for consistent error handling.
 function handleError(error, context, level) {
   level = level || ERROR_LEVEL.ERROR;
 
@@ -216,13 +218,13 @@ function sendCriticalErrorNotification_(errorInfo) {
     var subject;
     try {
       subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
-    } catch (e) {
+    } catch (_e) {
       subject = 'Critical Error: ' + (errorInfo.context || 'Unknown');
     }
     var systemName;
     try {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
-    } catch (e) {
+    } catch (_e) {
       systemName = 'Union Dashboard';
     }
     var body = 'A critical error occurred in the ' + systemName + ':\n\n' +
@@ -250,18 +252,6 @@ function sendCriticalErrorNotification_(errorInfo) {
 function sanitizeHtml(input) {
   // Delegate to escapeHtml in 00_Security.gs for consistent escaping
   return escapeHtml(input);
-}
-
-/**
- * Sanitize input for use in SQL-like queries
- * @param {string} input - Input string to sanitize
- * @returns {string} Sanitized string
- */
-function sanitizeForQuery(input) {
-  if (!input) return '';
-  return String(input)
-    .replace(/'/g, "''")
-    .replace(/\\/g, '\\\\');
 }
 
 /**
@@ -456,13 +446,12 @@ function runStartupValidation() {
 /**
  * API version information
  */
+// CONSOLIDATED: Derives version from COMMAND_CONFIG.VERSION (single source of truth)
 var API_VERSION = {
-  major: 4,
-  minor: 13,
-  patch: 0,
-  toString: function() {
-    return this.major + '.' + this.minor + '.' + this.patch;
-  }
+  get major() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[0], 10); },
+  get minor() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[1], 10); },
+  get patch() { var p = COMMAND_CONFIG.VERSION.split('.'); return parseInt(p[2], 10); },
+  toString: function() { return COMMAND_CONFIG.VERSION; }
 };
 
 /**
@@ -517,6 +506,13 @@ function clearErrorLog() {
     if (lastRow > 1) {
       sheet.deleteRows(2, lastRow - 1);
     }
+    // L-29: Log audit event for error log clearing (security-relevant action)
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('CLEAR_ERROR_LOG', {
+        sheet: ERROR_CONFIG.LOG_SHEET_NAME,
+        rowsCleared: lastRow > 1 ? lastRow - 1 : 0
+      });
+    }
     SpreadsheetApp.getActiveSpreadsheet().toast('Error log cleared', 'Success');
   }
 }
@@ -553,7 +549,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.12.0",
+  VERSION: "4.18.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -613,6 +609,8 @@ var COMMAND_CONFIG = {
  * @const {Object}
  */
 var DRIVE_CONFIG = {
+  // M-19: Ideally this would come from the Config tab, but acceptable as a constant
+  // since Drive folder names rarely change and renaming would break existing folder links.
   ROOT_FOLDER_NAME: 'Dashboard - Grievance Files',
   // Simplified template: Member Name and Date Filed
   // Template uses placeholders: {date}, {lastName}, {firstName}
@@ -627,18 +625,28 @@ var DRIVE_CONFIG = {
  * @private
  * @returns {string} Organization name (e.g., "SEIU Local")
  */
+// M-43: _cachedOrgName / _cachedSystemName / _cachedLocalNumber are intentionally
+// never invalidated. In Google Apps Script, each script execution is short-lived
+// (max 6 minutes) and runs in an isolated context, so module-level caches are
+// automatically cleared when the execution ends. No manual invalidation is needed.
+var _cachedOrgName = null;
 function getOrgNameFromConfig_() {
+  if (_cachedOrgName !== null) return _cachedOrgName;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       var orgName = configSheet.getRange(3, CONFIG_COLS.ORG_NAME).getValue();
-      if (orgName) return orgName;
+      if (orgName) {
+        _cachedOrgName = orgName;
+        return _cachedOrgName;
+      }
     }
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  return 'SEIU Local';
+  _cachedOrgName = 'SEIU Local';
+  return _cachedOrgName;
 }
 
 /**
@@ -648,28 +656,38 @@ function getOrgNameFromConfig_() {
  * @private
  * @returns {string} System name (e.g., "Strategic Command Center")
  */
+var _systemNameCache_ = null;
 function getSystemName_() {
-  return getLocalNumberFromConfig_() + ' Strategic Command Center';
+  if (_systemNameCache_ !== null) return _systemNameCache_;
+  _systemNameCache_ = getLocalNumberFromConfig_() + ' Strategic Command Center';
+  return _systemNameCache_;
 }
 
 /**
  * Get local number from Config sheet, falling back to default.
  * Used for UI elements like menu names.
+ * Memoized: reads from Config sheet once per execution, then returns cached value.
  * @private
  * @returns {string} Local number
  */
+var _cachedLocalNumber = null;
 function getLocalNumberFromConfig_() {
+  if (_cachedLocalNumber !== null) return _cachedLocalNumber;
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       var localNumber = configSheet.getRange(3, CONFIG_COLS.LOCAL_NUMBER).getValue();
-      if (localNumber) return String(localNumber);
+      if (localNumber) {
+        _cachedLocalNumber = String(localNumber);
+        return _cachedLocalNumber;
+      }
     }
   } catch (_e) {
     // Fallback silently during initialization or when spreadsheet is unavailable
   }
-  return '';
+  _cachedLocalNumber = '';
+  return _cachedLocalNumber;
 }
 
 // ============================================================================
@@ -677,17 +695,18 @@ function getLocalNumberFromConfig_() {
 // ============================================================================
 
 /**
- * Version information for build system and display
+ * Version information for build system and display.
+ * M-51: Derives version string from COMMAND_CONFIG.VERSION to avoid duplication.
  * @const {Object}
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 13,
-  PATCH: 0,
-  BUILD: 'v4.13.0',
-  CURRENT: '4.13.0',
-  BUILD_DATE: '2026-02-24',
-  CODENAME: 'Full Workload Tracker Migration'
+  MINOR: 18,
+  PATCH: 1,
+  BUILD: 'v4.18.1',
+  CURRENT: '4.18.1',
+  BUILD_DATE: '2026-02-26',
+  CODENAME: 'SPA Fixes, Seed Phasing & View Enhancements'
 };
 
 /**
@@ -697,10 +716,15 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
-  { version: '4.13.0', date: '2026-02-24', codename: 'Full Workload Tracker Migration', changes: 'Complete workload tracker migration to web dashboard SPA. New 25_WorkloadService.gs IIFE backend with correct 24-column Vault, full sub-category support (42 items), privacy reciprocity, overtime, leave tracking, employment status, weekly cases, CSV export, vault cleaning, enhanced analytics with sub-category/employment/plan/overtime breakdowns. Removed standalone 18_WorkloadTracker.gs and WorkloadTracker.html.' },
-  { version: '4.12.0', date: '2026-02-24', codename: 'Bug Fixes & Chart.js Enhancements', changes: 'Chart.js integration for steward and member views, bug fixes across web dashboard, steward and member view enhancements, workload tracker improvements, error view retry fix, portal sheet setup infrastructure.' },
-  { version: '4.11.0', date: '2026-02-24', codename: 'Web Dashboard SPA Enhancement', changes: 'Responsive layout (mobile/tablet/desktop), sidebar nav, member self-service (profile editor, steward picker, resources, survey results, workload tracker embedding), steward tools (members tab, broadcast, survey tracking), weekly questions engagement system, CSS-only bar charts, quarterly survey results with privacy threshold.' },
-  { version: '4.10.0', date: '2026-02-23', codename: 'Workload Tracker Integration', changes: 'Workload Tracker module (18_WorkloadTracker.gs + WorkloadTracker.html), web-dashboard SPA integration (19-22 .gs + 6 .html), multi-file build mode, 8 workload categories, privacy controls, reciprocity enforcement, email reminders, portal sheets infrastructure (23_PortalSheets.gs).' },
+  { version: '4.18.0', date: '2026-02-26', codename: 'SPA Fixes, Seed Phasing & View Enhancements', changes: 'Split SEED_SAMPLE_DATA into 3 phased runners to avoid GAS 6-min timeout. 5 new seed functions (tasks, polls, minutes, check-ins, timeline events). Steward view: org-wide KPI fallback, all-contacts members tab, comma formatting, contact log autocomplete, survey tracking scope toggles, 6 new More menu items. Member view: Know Your Rights card, Contact-Directory nav, 1hr localStorage notification dismiss, meetings+minutes merge, 7 new More menu items. Backend globals: getAllMembers, startGrievanceDraft, createGrievanceDriveFolder. Broadcast uses all contacts. build.js BUILD_ORDER updated for 26_QAForum.gs, 27_TimelineService.gs, 28_FailsafeService.gs.' },
+  { version: '4.17.0', date: '2026-02-26', codename: 'Q&A Forum, Timeline & Failsafe Services', changes: 'Q&A Forum (26_QAForum.gs, 389 lines) with _QA_Forum and _QA_Answers hidden sheets. Timeline Service (27_TimelineService.gs, 317 lines) with _Timeline_Events hidden sheet. Failsafe Service (28_FailsafeService.gs, 425 lines) with _Failsafe_Config hidden sheet. 08a_SheetSetup.gs updated for Q&A, Timeline, and Failsafe auto-creation. DataService methods for Q&A, Timeline, and Failsafe in 21_WebDashDataService.gs.' },
+  { version: '4.16.0', date: '2026-02-26', codename: 'Wire 7 Unwired Sheets to SPA', changes: '15 new DataService methods (541 lines) in 21_WebDashDataService.gs wiring 7 previously unwired sheets to SPA. 15 global wrapper functions + 3 batch data fields. New SPA pages: Meetings, Polls, Minutes, Feedback. Insights page with Performance KPIs + Satisfaction Trends. Case detail views with checklist support. Per-question text scores with color-coding. questionTexts arrays for all 11 SATISFACTION_SECTIONS. Expansion test suite (332 lines). Removed Since N/A text, Dues Status charts. Fixed 122 test failures (1,363 tests passing across 23 suites).' },
+  { version: '4.15.0', date: '2026-02-25', codename: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements', changes: 'Infrastructure: batch fetch, Drive cleanup trigger, calendar dedup, CC health check, lazy-load help dialog, search pagination, expansion test suite. Login UX: SSO loading state, sso_failed fallback, magic link clarification, resend cooldown. In-app survey wizard: multi-step mobile-optimized form with localStorage progress, 1-10 scale buttons, anonymous SHA-256 submission. Steward: chief steward task assignment, agency-wide grievance stats fallback, Insights tab (Quick Insights + Filed vs Resolved chart), Steward Directory with vCard download. Member dashboard: actionable KPI strip, conditional grievance card, engagement/workload stats tabs. Broadcast: checkbox pill filters with recipient preview. Workload: removed Private option. Seed data: calendar events, weekly questions, union stats.' },
+  { version: '4.14.0', date: '2026-02-25', codename: 'Technical Debt Resolution & PHASE2 Features', changes: '130 code review findings resolved (15 CRITICAL XSS, 26 HIGH security, 50 MEDIUM, 39 LOW). 5 new features: Grievance History, Meeting Check-In Kiosk, Welcome Experience, Bulk Actions, Deadline Calendar View. Engagement sync overhaul with dynamic headers and validation. withScriptLock_() concurrency helper. safeSendEmail() quota wrapper. Version derived from single COMMAND_CONFIG.VERSION source.' },
+  { version: '4.13.0', date: '2026-02-24', codename: 'Full Workload Tracker Migration', changes: 'Refactored 18_WorkloadTracker.gs to IIFE module (WorkloadService), enhanced getDashboardData with employment/plan/overtime breakdowns and sub-category aggregation, enhanced getUserHistory with all 24 columns, CSV export, vault deduplication, reciprocity blocking for Private users, multi-frequency reminders (daily/weekly/biweekly/monthly/quarterly), full leave tracking in portal, Weekly Cases dropdown, Clear All/Restore.' },
+  { version: '4.12.0', date: '2026-02-24', codename: 'Version Alignment', changes: 'API_VERSION, VERSION_INFO, VERSION_HISTORY normalized. README and CODE_REVIEW updated with correct file counts and version scope.' },
+  { version: '4.11.0', date: '2026-02-24', codename: 'Web Dashboard SPA Enhancement', changes: 'Responsive sidebar/bottom-nav layout, member and steward views with full render functions, WeeklyQuestions IIFE module, 12 new DataService functions, SSO workload wrappers, ConfigReader expansion.' },
+  { version: '4.10.0', date: '2026-02-24', codename: 'Workload Tracker Integration', changes: 'Workload Tracker module (18_WorkloadTracker.gs + WorkloadTracker.html), 8 workload categories with sub-breakdowns, privacy controls, reciprocity enforcement, email reminders, 24-month data retention, CSV backup, Workload Tracker submenu in Union Hub, ?page=workload web route, 5 new hidden sheets.' },
   { version: '4.9.1', date: '2026-02-23', codename: 'Security Vulnerability Fix Pass', changes: 'Fix 15 broken getClientSideEscapeHtml() includes, escape member data in grievance form HTML templates, URL scheme validation on Config URLs, escape steward contact data in Public Dashboard, replace unsafe onclick injection, add email format validation, formula injection protection, server-side input validation.' },
   { version: '4.9.0', date: '2026-02-17', codename: 'Constant Contact Integration', changes: 'Constant Contact v3 API integration with OAuth2, multi-select dropdown support for Grievance Log, auto-discovery column system, 151 column system tests, dynamic CONFIG_COLS and MEMBER_COLS constants.' },
   { version: '4.8.2', date: '2026-02-16', codename: 'State Field', changes: 'State field added to member contact update across all surfaces.' },
@@ -741,7 +765,11 @@ function getVersionDate(ver) {
 // ============================================================================
 
 /**
- * Sheet name constants - use these instead of hardcoded strings
+ * Sheet name constants - use these instead of hardcoded strings.
+ * L-05: Some sheet names contain emoji (e.g., "📅 Meeting Attendance").
+ * Emoji in sheet names may cause issues on some platforms/locales but is fully
+ * supported by Google Sheets. If cross-platform compatibility is needed, the
+ * emoji prefix can be removed without affecting functionality.
  * @const {Object}
  */
 var SHEETS = {
@@ -800,13 +828,24 @@ var SHEETS = {
   WORKLOAD_REMINDERS: 'Workload Reminders',  // hidden — email reminder prefs
   WORKLOAD_USERMETA:  'Workload UserMeta',   // hidden — sharing start dates
   WORKLOAD_ARCHIVE:   'Workload Archive',     // hidden — data older than 24 months
-  // Weekly Questions System (24_WeeklyQuestions.gs)
-  WEEKLY_QUESTIONS:   '_Weekly_Questions',   // hidden — active/past questions
-  WEEKLY_RESPONSES:   '_Weekly_Responses',   // hidden — hashed-email responses
-  QUESTION_POOL:      '_Question_Pool',      // hidden — member-submitted candidates
-  // Contact Log & Steward Tasks (v4.12.0)
-  CONTACT_LOG:        '_Contact_Log',        // hidden — steward-member contact history
-  STEWARD_TASKS:      '_Steward_Tasks'       // hidden — task assignments for stewards
+  // Resources & Education (v4.11.0 — content management for educational hub)
+  RESOURCES:          '📚 Resources',         // steward-managed educational content
+  // Weekly Questions (24_WeeklyQuestions.gs) — anonymous pulse surveys
+  WEEKLY_QUESTIONS:   '_Weekly_Questions',    // hidden — active/scheduled questions
+  WEEKLY_RESPONSES:   '_Weekly_Responses',    // hidden — SHA-256 hashed anonymous responses
+  QUESTION_POOL:      '_Question_Pool',       // hidden — reusable question bank
+  // Notifications (v4.13.0 — SPA in-app notification system)
+  NOTIFICATIONS:      '📢 Notifications',     // steward-to-member in-app messages
+  // Contact Log & Steward Tasks (v4.12.0) — steward activity tracking
+  CONTACT_LOG:        '_Contact_Log',         // hidden — steward-member contact history
+  STEWARD_TASKS:      '_Steward_Tasks',       // hidden — task assignments for stewards
+  // Q&A Forum (v4.17.0 — member-steward question/answer system)
+  QA_FORUM:           '_QA_Forum',            // hidden — member questions
+  QA_ANSWERS:         '_QA_Answers',          // hidden — steward/member answers
+  // Timeline of Events (v4.17.0 — chronological event records)
+  TIMELINE_EVENTS:    '_Timeline_Events',     // hidden — event timeline entries
+  // Data Failsafe (v4.17.0 — member digest preferences)
+  FAILSAFE_CONFIG:    '_Failsafe_Config'      // hidden — digest/backup preferences
 };
 
 // SHEET_NAMES alias for backward compatibility
@@ -1278,9 +1317,11 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'STREET_ADDRESS',     header: 'Street Address' },
   { key: 'CITY',               header: 'City' },
   { key: 'STATE',              header: 'State' },
-  { key: 'ZIP_CODE',           header: 'Zip Code' }
+  { key: 'ZIP_CODE',           header: 'Zip Code' },
+  { key: 'DUES_STATUS',        header: 'Dues Status' }
 ];
 
+// CONVENTION: Column constants are 1-indexed (Range API). Use COL - 1 for 0-indexed array access.
 var MEMBER_COLS = buildColsFromMap_(MEMBER_HEADER_MAP_, {
   LOCATION: 'WORK_LOCATION',
   DAYS_TO_DEADLINE: 'NEXT_DEADLINE'
@@ -1694,17 +1735,28 @@ var SURVEY_VAULT_COLS = buildColsFromMap_(SURVEY_VAULT_HEADER_MAP_);
  */
 var SATISFACTION_SECTIONS = {
   WORK_CONTEXT: { name: 'Work Context', questions: [2,3,4,5,6], scale: false },
-  OVERALL_SAT: { name: 'Overall Satisfaction', questions: [7,8,9,10], scale: true },
-  STEWARD_3A: { name: 'Steward Ratings', questions: [11,12,13,14,15,16,17], scale: true },
-  STEWARD_3B: { name: 'Steward Access', questions: [19,20,21], scale: true },
-  CHAPTER: { name: 'Chapter Effectiveness', questions: [22,23,24,25,26], scale: true },
-  LEADERSHIP: { name: 'Local Leadership', questions: [27,28,29,30,31,32], scale: true },
-  CONTRACT: { name: 'Contract Enforcement', questions: [33,34,35,36], scale: true },
-  REPRESENTATION: { name: 'Representation Process', questions: [38,39,40,41], scale: true },
-  COMMUNICATION: { name: 'Communication Quality', questions: [42,43,44,45,46], scale: true },
-  MEMBER_VOICE: { name: 'Member Voice & Culture', questions: [47,48,49,50,51], scale: true },
-  VALUE_ACTION: { name: 'Value & Collective Action', questions: [52,53,54,55,56], scale: true },
-  SCHEDULING: { name: 'Scheduling/Office Days', questions: [57,58,59,60,61,62,63], scale: true },
+  OVERALL_SAT: { name: 'Overall Satisfaction', questions: [7,8,9,10], scale: true,
+    questionTexts: ['Satisfied with representation', 'Trust union advocacy', 'Feel protected by union', 'Would recommend joining'] },
+  STEWARD_3A: { name: 'Steward Ratings', questions: [11,12,13,14,15,16,17], scale: true,
+    questionTexts: ['Timely response', 'Treated with respect', 'Explained options clearly', 'Followed through', 'Advocated effectively', 'Safe raising concerns', 'Maintained confidentiality'] },
+  STEWARD_3B: { name: 'Steward Access', questions: [19,20,21], scale: true,
+    questionTexts: ['Know how to contact', 'Confident steward would help', 'Easy to find steward'] },
+  CHAPTER: { name: 'Chapter Effectiveness', questions: [22,23,24,25,26], scale: true,
+    questionTexts: ['Understands workplace issues', 'Effective communication', 'Organizes well', 'Easy to reach chapter', 'Fair representation'] },
+  LEADERSHIP: { name: 'Local Leadership', questions: [27,28,29,30,31,32], scale: true,
+    questionTexts: ['Decisions are clear', 'Understand grievance process', 'Transparent finances', 'Accountable leadership', 'Fair processes', 'Welcomes opinions'] },
+  CONTRACT: { name: 'Contract Enforcement', questions: [33,34,35,36], scale: true,
+    questionTexts: ['Enforces contract', 'Realistic timelines', 'Clear updates', 'Frontline priority'] },
+  REPRESENTATION: { name: 'Representation Process', questions: [38,39,40,41], scale: true,
+    questionTexts: ['Understood the steps', 'Felt supported', 'Updated often enough', 'Outcome was justified'] },
+  COMMUNICATION: { name: 'Communication Quality', questions: [42,43,44,45,46], scale: true,
+    questionTexts: ['Clear and actionable', 'Enough information', 'Easy to find info', 'Reaches all shifts', 'Meetings worth attending'] },
+  MEMBER_VOICE: { name: 'Member Voice & Culture', questions: [47,48,49,50,51], scale: true,
+    questionTexts: ['Voice matters', 'Seeks member input', 'Treated with dignity', 'Newer members supported', 'Conflicts handled respectfully'] },
+  VALUE_ACTION: { name: 'Value & Collective Action', questions: [52,53,54,55,56], scale: true,
+    questionTexts: ['Good value for dues', 'Priorities match needs', 'Prepared to mobilize', 'Know how to get involved', 'Win together'] },
+  SCHEDULING: { name: 'Scheduling/Office Days', questions: [57,58,59,60,61,62,63], scale: true,
+    questionTexts: ['Understand changes', 'Adequately informed', 'Clear criteria', 'Reasonable expectations', 'Effective outcomes', 'Supports wellbeing', 'Concerns taken seriously'] },
   PRIORITIES: { name: 'Priorities & Close', questions: [65,66,67,68], scale: false }
 };
 
@@ -1790,6 +1842,42 @@ var FEEDBACK_HEADER_MAP_ = [
 ];
 
 var FEEDBACK_COLS = buildColsFromMap_(FEEDBACK_HEADER_MAP_);
+
+// Resources sheet — educational content management (v4.11.0)
+var RESOURCES_HEADER_MAP_ = [
+  { key: 'RESOURCE_ID',  header: 'Resource ID' },
+  { key: 'TITLE',        header: 'Title' },
+  { key: 'CATEGORY',     header: 'Category' },
+  { key: 'SUMMARY',      header: 'Summary' },
+  { key: 'CONTENT',      header: 'Content' },
+  { key: 'URL',          header: 'URL' },
+  { key: 'ICON',         header: 'Icon' },
+  { key: 'SORT_ORDER',   header: 'Sort Order' },
+  { key: 'VISIBLE',      header: 'Visible' },
+  { key: 'AUDIENCE',     header: 'Audience' },
+  { key: 'DATE_ADDED',   header: 'Date Added' },
+  { key: 'ADDED_BY',     header: 'Added By' }
+];
+
+var RESOURCES_COLS = buildColsFromMap_(RESOURCES_HEADER_MAP_);
+
+// Notifications sheet — in-app notification system (v4.13.0)
+var NOTIFICATIONS_HEADER_MAP_ = [
+  { key: 'NOTIFICATION_ID', header: 'Notification ID' },
+  { key: 'RECIPIENT',       header: 'Recipient' },
+  { key: 'TYPE',             header: 'Type' },
+  { key: 'TITLE',            header: 'Title' },
+  { key: 'MESSAGE',          header: 'Message' },
+  { key: 'PRIORITY',         header: 'Priority' },
+  { key: 'SENT_BY',          header: 'Sent_By' },
+  { key: 'SENT_BY_NAME',     header: 'Sent_By_Name' },
+  { key: 'CREATED_DATE',     header: 'Created_Date' },
+  { key: 'EXPIRES_DATE',     header: 'Expires_Date' },
+  { key: 'DISMISSED_BY',     header: 'Dismissed_By' },
+  { key: 'STATUS',           header: 'Status' }
+];
+
+var NOTIFICATIONS_COLS = buildColsFromMap_(NOTIFICATIONS_HEADER_MAP_);
 
 // ============================================================================
 // COLUMN AUTO-DISCOVERY SYSTEM
@@ -1897,7 +1985,8 @@ function syncColumnMaps() {
     { name: 'SURVEY_VAULT_COLS', sheet: SHEETS.SURVEY_VAULT, map: SURVEY_VAULT_HEADER_MAP_, target: SURVEY_VAULT_COLS },
     { name: 'SURVEY_TRACKING_COLS', sheet: SHEETS.SURVEY_TRACKING, map: SURVEY_TRACKING_HEADER_MAP_, target: SURVEY_TRACKING_COLS },
     { name: 'FEEDBACK_COLS', sheet: SHEETS.FEEDBACK, map: FEEDBACK_HEADER_MAP_, target: FEEDBACK_COLS },
-    { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS }
+    { name: 'CHECKLIST_COLS', sheet: SHEETS.CASE_CHECKLIST, map: CHECKLIST_HEADER_MAP_, target: CHECKLIST_COLS },
+    { name: 'RESOURCES_COLS', sheet: SHEETS.RESOURCES, map: RESOURCES_HEADER_MAP_, target: RESOURCES_COLS }
   ];
 
   for (var m = 0; m < maps.length; m++) {
@@ -2705,20 +2794,9 @@ function generateNameBasedId(prefix, firstName, lastName, existingIds) {
  * @private
  */
 function generateUUID_() {
-  var chars = '0123456789abcdef';
-  var uuid = '';
-  for (var i = 0; i < 36; i++) {
-    if (i === 8 || i === 13 || i === 18 || i === 23) {
-      uuid += '-';
-    } else if (i === 14) {
-      uuid += '4'; // UUID version 4
-    } else if (i === 19) {
-      uuid += chars.charAt((Math.random() * 4) | 8); // Variant bits
-    } else {
-      uuid += chars.charAt(Math.floor(Math.random() * 16));
-    }
-  }
-  return uuid;
+  // CR-OTHER-1: Use Utilities.getUuid() for cryptographically secure UUIDs
+  // instead of Math.random() which has insufficient entropy
+  return Utilities.getUuid();
 }
 
 // ============================================================================
@@ -3259,25 +3337,27 @@ function getHapticFeedbackScript() {
         'observer.observe(document.body,{childList:true,subtree:true});' +
       '}' +
 
-      '/* Provide success/error feedback for google.script.run callbacks */' +
+      '/* H-4 fix: Haptic feedback for google.script.run — preserves fluent chaining */' +
       'var origRun=google.script&&google.script.run;' +
       'if(origRun){' +
         'var origSuccess=origRun.withSuccessHandler;' +
         'var origFailure=origRun.withFailureHandler;' +
         'if(origSuccess){' +
           'google.script.run.withSuccessHandler=function(fn){' +
-            'return origSuccess.call(this,function(){' +
+            'var result=origSuccess.call(this,function(){' +
               'hapticFeedback("success");' +
               'if(fn)fn.apply(this,arguments);' +
             '});' +
+            'return result||this;' +
           '};' +
         '}' +
         'if(origFailure){' +
           'google.script.run.withFailureHandler=function(fn){' +
-            'return origFailure.call(this,function(){' +
+            'var result=origFailure.call(this,function(){' +
               'hapticFeedback("error");' +
               'if(fn)fn.apply(this,arguments);' +
             '});' +
+            'return result||this;' +
           '};' +
         '}' +
       '}' +

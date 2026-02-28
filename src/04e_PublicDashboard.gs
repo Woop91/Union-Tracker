@@ -1,3 +1,4 @@
+// NOTE: ~258KB file. HTML built via string concatenation (GAS has no template engine or module imports).
 // ============================================================================
 // 10. UNIFIED WEB APP DASHBOARDS (v4.4.0)
 // ============================================================================
@@ -23,8 +24,8 @@ function showPublicMemberDashboard() {
     '@media(max-width:480px){.btn-row{flex-direction:column;width:100%}a.open-link,.copy-btn{width:100%;text-align:center}}' +
     '</style></head><body><div class="icon">👥</div><h1>Member Dashboard</h1>' +
     '<p>Open the Member Dashboard web app. This version hides sensitive personal information while showing full analytics.</p>' +
-    '<div class="url" id="url">' + url + '</div>' +
-    '<div class="btn-row"><a class="open-link" href="' + url + '" target="_blank">Open Dashboard</a>' +
+    '<div class="url" id="url">' + escapeHtml(url) + '</div>' +
+    '<div class="btn-row"><a class="open-link" href="' + escapeHtml(url) + '" target="_blank">Open Dashboard</a>' +
     '<button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'url\').textContent);this.textContent=\'Copied!\';setTimeout(function(){document.querySelector(\'.copy-btn\').textContent=\'Copy URL\'},2000)">Copy URL</button></div>' +
     '</body></html>'
   ).setWidth(500).setHeight(350);
@@ -274,7 +275,7 @@ function getUnifiedDashboardData(includePII) {
 
     for (var m = 1; m < memberData.length; m++) {
       var memberId = memberData[m][MEMBER_COLS.MEMBER_ID - 1];
-      if (!memberId) continue;
+      if (!memberId || !memberId.toString().match(/^M/i)) continue;
 
       data.totalMembers++;
       var firstName = memberData[m][MEMBER_COLS.FIRST_NAME - 1] || '';
@@ -456,6 +457,21 @@ function getUnifiedDashboardData(includePII) {
     data.currentUserEmail = '';
   }
 
+  // Resolve current user's steward name for exact matching in My Cases
+  data.currentUserStewardName_ = '';
+  if (data.currentUserEmail && memberSheet && memberSheet.getLastRow() > 1) {
+    var memberLookup = memberSheet.getRange(2, 1, memberSheet.getLastRow() - 1, MEMBER_COLS.IS_STEWARD).getValues();
+    for (var ml = 0; ml < memberLookup.length; ml++) {
+      var mlEmail = (memberLookup[ml][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+      if (mlEmail === data.currentUserEmail.toLowerCase().trim() && isTruthyValue(memberLookup[ml][MEMBER_COLS.IS_STEWARD - 1])) {
+        var mlFirst = memberLookup[ml][MEMBER_COLS.FIRST_NAME - 1] || '';
+        var mlLast = memberLookup[ml][MEMBER_COLS.LAST_NAME - 1] || '';
+        data.currentUserStewardName_ = (mlFirst + ' ' + mlLast).trim().toLowerCase();
+        break;
+      }
+    }
+  }
+
   // Process Grievances
   var stewardCases = {};
   var locationCases = {};
@@ -598,12 +614,10 @@ function getUnifiedDashboardData(includePII) {
 
         // My Cases - check if current user is the assigned steward (v4.4.0)
         if (includePII && data.currentUserEmail && steward) {
-          var stewardLower = steward.toLowerCase();
-          var emailLower = data.currentUserEmail.toLowerCase();
-          var emailName = emailLower.split('@')[0].replace(/[._]/g, ' ');
-          // Match by full steward name, email prefix, or partial match
-          if (stewardLower.indexOf(emailName) >= 0 || emailLower.indexOf(stewardLower.replace(/\s+/g, '.')) >= 0 ||
-              stewardLower.split(' ').some(function(part) { return emailName.indexOf(part) >= 0 && part.length > 2; })) {
+          var stewardLower = steward.toLowerCase().trim();
+          var emailLower = data.currentUserEmail.toLowerCase().trim();
+          // Match by exact email first, then exact full name match
+          if (stewardLower === emailLower || stewardLower === data.currentUserStewardName_) {
             data.myCases.push({
               id: grievanceId,
               member: memberName,
@@ -650,7 +664,7 @@ function getUnifiedDashboardData(includePII) {
 
       // Settlement time
       if (dateFiled instanceof Date && dateClosed instanceof Date) {
-        var days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
+        days = Math.round((dateClosed - dateFiled) / (1000 * 60 * 60 * 24));
         if (days > 0) settlementDays.push(days);
       }
 
@@ -716,7 +730,7 @@ function getUnifiedDashboardData(includePII) {
   data.stewardWorkload.sort(function(a,b){return b.count - a.count;});
 
   // Build hot zones (locations with 3+ active cases)
-  for (var loc in locationCases) {
+  for (loc in locationCases) {
     if (locationCases[loc] >= 3) {
       data.hotZones.push({ location: loc, count: locationCases[loc] });
       data.hotSpots.grievance.push({ name: loc, type: 'location', count: locationCases[loc], reason: 'High grievance activity' });
@@ -800,91 +814,91 @@ function getUnifiedDashboardData(includePII) {
     };
 
     for (var i = 1; i < satData.length; i++) {
-      if (!satData[i][0]) continue;
+      if (!satData[i][SATISFACTION_COLS.TIMESTAMP - 1]) continue;
       data.satisfactionData.responseCount++;
 
       // Get worksite and role for breakdown
       var worksite = (satData[i][SATISFACTION_COLS.Q1_WORKSITE - 1] || 'Unknown').toString().trim();
       var role = (satData[i][SATISFACTION_COLS.Q2_ROLE - 1] || 'Unknown').toString().trim();
 
-      var trustVal = parseFloat(satData[i][7]);
-      var timestamp = satData[i][0];
+      var trustVal = parseFloat(satData[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]);
+      var timestamp = satData[i][SATISFACTION_COLS.TIMESTAMP - 1];
 
       if (!isNaN(trustVal) && trustVal >= 1 && trustVal <= 10) {
         trustScores.push(trustVal);
         if (timestamp) {
           var date = new Date(timestamp);
-          var monthKey = date.toLocaleString('default', { month: 'short' });
+          monthKey = date.toLocaleString('default', { month: 'short' });
           if (!monthlyTrust[monthKey]) monthlyTrust[monthKey] = { sum: 0, count: 0 };
           monthlyTrust[monthKey].sum += trustVal;
           monthlyTrust[monthKey].count++;
         }
       }
 
-      // Collect individual question scores (columns are 0-indexed, so Q6 is column 6)
+      // Collect individual question scores using SATISFACTION_COLS constants
       var qVal;
       // Overall Satisfaction questions
-      qVal = parseFloat(satData[i][6]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q6.push(qVal);
-      qVal = parseFloat(satData[i][7]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q7.push(qVal);
-      qVal = parseFloat(satData[i][8]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q8.push(qVal);
-      qVal = parseFloat(satData[i][9]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q9.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q6.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q7.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q8.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q9_RECOMMEND - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q9.push(qVal);
       // Steward questions
-      qVal = parseFloat(satData[i][10]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q10.push(qVal);
-      qVal = parseFloat(satData[i][11]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q11.push(qVal);
-      qVal = parseFloat(satData[i][12]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q12.push(qVal);
-      qVal = parseFloat(satData[i][13]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q13.push(qVal);
-      qVal = parseFloat(satData[i][14]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q14.push(qVal);
-      qVal = parseFloat(satData[i][15]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q15.push(qVal);
-      qVal = parseFloat(satData[i][16]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q16.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q10_TIMELY_RESPONSE - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q10.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q11_TREATED_RESPECT - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q11.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q12_EXPLAINED_OPTIONS - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q12.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q13_FOLLOWED_THROUGH - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q13.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q14_ADVOCATED - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q14.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q15_SAFE_CONCERNS - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q15.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q16_CONFIDENTIALITY - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q16.push(qVal);
       // Chapter questions
-      qVal = parseFloat(satData[i][21]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q21.push(qVal);
-      qVal = parseFloat(satData[i][22]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q22.push(qVal);
-      qVal = parseFloat(satData[i][23]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q23.push(qVal);
-      qVal = parseFloat(satData[i][24]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q24.push(qVal);
-      qVal = parseFloat(satData[i][25]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q25.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q21_UNDERSTAND_ISSUES - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q21.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q22_CHAPTER_COMM - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q22.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q23_ORGANIZES - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q23.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q24_REACH_CHAPTER - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q24.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q25_FAIR_REP - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q25.push(qVal);
       // Leadership questions
-      qVal = parseFloat(satData[i][26]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q26.push(qVal);
-      qVal = parseFloat(satData[i][27]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q27.push(qVal);
-      qVal = parseFloat(satData[i][28]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q28.push(qVal);
-      qVal = parseFloat(satData[i][29]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q29.push(qVal);
-      qVal = parseFloat(satData[i][30]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q30.push(qVal);
-      qVal = parseFloat(satData[i][31]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q31.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q26_DECISIONS_CLEAR - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q26.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q27_UNDERSTAND_PROCESS - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q27.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q28_TRANSPARENT_FINANCE - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q28.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q29_ACCOUNTABLE - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q29.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q30_FAIR_PROCESSES - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q30.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q31_WELCOMES_OPINIONS - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q31.push(qVal);
       // Contract questions
-      qVal = parseFloat(satData[i][32]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q32.push(qVal);
-      qVal = parseFloat(satData[i][33]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q33.push(qVal);
-      qVal = parseFloat(satData[i][34]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q34.push(qVal);
-      qVal = parseFloat(satData[i][35]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q35.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q32_ENFORCES_CONTRACT - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q32.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q33_REALISTIC_TIMELINES - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q33.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q34_CLEAR_UPDATES - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q34.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q35_FRONTLINE_PRIORITY - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q35.push(qVal);
       // Communication questions
-      qVal = parseFloat(satData[i][41]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q41.push(qVal);
-      qVal = parseFloat(satData[i][42]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q42.push(qVal);
-      qVal = parseFloat(satData[i][43]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q43.push(qVal);
-      qVal = parseFloat(satData[i][44]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q44.push(qVal);
-      qVal = parseFloat(satData[i][45]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q45.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q41_CLEAR_ACTIONABLE - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q41.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q42_ENOUGH_INFO - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q42.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q43_FIND_EASILY - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q43.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q44_ALL_SHIFTS - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q44.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q45_MEETINGS_WORTH - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q45.push(qVal);
       // Voice questions
-      qVal = parseFloat(satData[i][46]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q46.push(qVal);
-      qVal = parseFloat(satData[i][47]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q47.push(qVal);
-      qVal = parseFloat(satData[i][48]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q48.push(qVal);
-      qVal = parseFloat(satData[i][49]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q49.push(qVal);
-      qVal = parseFloat(satData[i][50]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q50.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q46_VOICE_MATTERS - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q46.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q47_SEEKS_INPUT - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q47.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q48_DIGNITY - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q48.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q49_NEWER_SUPPORTED - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q49.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q50_CONFLICT_RESPECT - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q50.push(qVal);
       // Value questions
-      qVal = parseFloat(satData[i][51]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q51.push(qVal);
-      qVal = parseFloat(satData[i][52]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q52.push(qVal);
-      qVal = parseFloat(satData[i][53]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q53.push(qVal);
-      qVal = parseFloat(satData[i][55]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q55.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q51_GOOD_VALUE - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q51.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q52_PRIORITIES_NEEDS - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q52.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q53_PREPARED_MOBILIZE - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q53.push(qVal);
+      qVal = parseFloat(satData[i][SATISFACTION_COLS.Q55_WIN_TOGETHER - 1]); if (!isNaN(qVal) && qVal >= 1 && qVal <= 10) questionScores.q55.push(qVal);
 
-      // Section averages
-      var avgOverall = parseFloat(satData[i][71]) || 0;
-      var avgSteward = parseFloat(satData[i][72]) || 0;
-      var avgChapter = parseFloat(satData[i][74]) || 0;
-      var avgLeadership = parseFloat(satData[i][75]) || 0;
-      var avgContract = parseFloat(satData[i][76]) || 0;
-      var avgComm = parseFloat(satData[i][78]) || 0;
-      var avgVoice = parseFloat(satData[i][79]) || 0;
-      var avgValue = parseFloat(satData[i][80]) || 0;
+      // Section averages (using SATISFACTION_COLS constants)
+      var avgOverall = parseFloat(satData[i][SATISFACTION_COLS.AVG_OVERALL_SAT - 1]) || 0;
+      var avgSteward = parseFloat(satData[i][SATISFACTION_COLS.AVG_STEWARD_RATING - 1]) || 0;
+      var avgChapter = parseFloat(satData[i][SATISFACTION_COLS.AVG_CHAPTER - 1]) || 0;
+      var avgLeadership = parseFloat(satData[i][SATISFACTION_COLS.AVG_LEADERSHIP - 1]) || 0;
+      var avgContract = parseFloat(satData[i][SATISFACTION_COLS.AVG_CONTRACT - 1]) || 0;
+      var avgComm = parseFloat(satData[i][SATISFACTION_COLS.AVG_COMMUNICATION - 1]) || 0;
+      var avgVoice = parseFloat(satData[i][SATISFACTION_COLS.AVG_MEMBER_VOICE - 1]) || 0;
+      var avgValue = parseFloat(satData[i][SATISFACTION_COLS.AVG_VALUE_ACTION - 1]) || 0;
 
       if (avgOverall === 0) {
-        var q6 = parseFloat(satData[i][6]) || 0, q7 = parseFloat(satData[i][7]) || 0;
-        var q8 = parseFloat(satData[i][8]) || 0, q9 = parseFloat(satData[i][9]) || 0;
+        var q6 = parseFloat(satData[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]) || 0, q7 = parseFloat(satData[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]) || 0;
+        var q8 = parseFloat(satData[i][SATISFACTION_COLS.Q8_FEEL_PROTECTED - 1]) || 0, q9 = parseFloat(satData[i][SATISFACTION_COLS.Q9_RECOMMEND - 1]) || 0;
         avgOverall = (q6 + q7 + q8 + q9) / 4;
       }
 
@@ -1123,7 +1137,7 @@ function getUnifiedDashboardData(includePII) {
 
   // Populate Resource Links from Config sheet
   try {
-    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    configSheet = ss.getSheetByName(SHEETS.CONFIG);
     if (configSheet) {
       data.resourceLinks.surveyUrl = String(configSheet.getRange(3, CONFIG_COLS.SATISFACTION_FORM_URL).getValue() || '').trim();
       data.resourceLinks.contactFormUrl = String(configSheet.getRange(3, CONFIG_COLS.CONTACT_FORM_URL).getValue() || '').trim();
@@ -1180,6 +1194,60 @@ function getUnifiedDashboardData(includePII) {
   }
 
   return JSON.stringify(data);
+}
+
+/**
+ * Batch fetch for the SPA — bundles multiple data calls into one round-trip.
+ * Reduces latency by avoiding separate google.script.run calls.
+ * @param {string} email - User email
+ * @param {string} role  - 'member' | 'steward' | 'both'
+ * @returns {Object} Bundled data: grievances, kpis, events, surveyStatus, notifications, etc.
+ */
+function getWebDashBatchData(email, role) {
+  var result = {};
+  var isSteward = (role === 'steward' || role === 'both');
+
+  try {
+    // Always fetch for all roles
+    result.profile       = DataService.findUserByEmail(email);
+    result.events        = DataService.getUpcomingEvents(5);
+    result.surveyStatus  = DataService.getMemberSurveyStatus(email);
+    result.notifications = DataService.getMemberNotifications ? DataService.getMemberNotifications(email) : [];
+    result.orgLinks      = DataService.getOrgLinks();
+    result.welcome       = dataGetWelcomeData(email);
+
+    if (isSteward) {
+      result.cases          = DataService.getStewardCases(email);
+      result.stewardKPIs    = DataService.getStewardKPIs(email);
+      result.memberStats    = DataService.getStewardMemberStats(email);
+    } else {
+      result.grievances     = DataService.getMemberGrievances(email);
+      result.grievanceHistory = DataService.getMemberGrievanceHistory(email);
+      result.stewardContact = DataService.getStewardContact(email);
+    }
+
+    // Non-critical supplemental data — errors here should not break the batch
+    try {
+      result.grievanceStats = DataService.getGrievanceStats();
+    } catch (_e) { result.grievanceStats = null; }
+
+    try {
+      result.membershipStats = DataService.getMembershipStats();
+    } catch (_e) { result.membershipStats = null; }
+
+    // v4.16.0 — supplemental data from newly-wired sheets
+    try { result.activePolls = DataService.getActivePolls(email); } catch (_e) { result.activePolls = null; }
+    try { result.meetingMinutes = DataService.getMeetingMinutes(3); } catch (_e) { result.meetingMinutes = null; }
+    if (isSteward) {
+      try { result.satisfactionTrends = DataService.getSatisfactionTrends(); } catch (_e) { result.satisfactionTrends = null; }
+    }
+
+  } catch (e) {
+    Logger.log('getWebDashBatchData error: ' + e.message);
+    result.error = e.message;
+  }
+
+  return result;
 }
 
 /**
@@ -1261,6 +1329,8 @@ function getUnifiedDashboardDataWithDateRange(isPII, days, fromDate, toDate) {
  * @returns {string} Complete HTML for the web app
  */
 function getUnifiedDashboardHtml(isPII) {
+  // NOTE: This function builds a large HTML string via concatenation. This is an inherent
+  // GAS limitation (no template engine / no file bundler). Keep total size under ~500KB.
   var _mode = isPII ? 'steward' : 'member';
   var title = isPII ? 'STEWARD COMMAND CENTER' : 'MEMBER DASHBOARD';
   var badge = isPII ? '<span class="pii-badge">INTERNAL USE - CONTAINS PII</span>' : '<span class="member-badge">MEMBER VIEW</span>';
@@ -1832,9 +1902,9 @@ function getUnifiedDashboardHtml(isPII) {
     'if(d.myCases.length===0){html+="<div class=\\"chart-card\\" style=\\"text-align:center;padding:60px\\"><i class=\\"material-icons\\" style=\\"font-size:48px;color:#22c55e\\">check_circle</i><p style=\\"color:#94a3b8;margin-top:16px\\">No active cases assigned to you. Great job!</p></div>"}' +
     'else{html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">folder_open</i>My Assigned Cases</div><div id=\\"myCasesList\\" class=\\"list-container\\" style=\\"max-height:400px\\">";' +
     'd.myCases.forEach(function(c){var statusColor=c.status.toLowerCase()==="open"?"#f59e0b":c.status.toLowerCase().indexOf("pending")>=0?"#ef4444":"#64748b";var isOverdue=c.daysOpen>30||c.status.toLowerCase().indexOf("pending")>=0;' +
-    'html+="<div class=\\"my-case-item list-item\\" data-status=\\""+c.status+"\\" data-overdue=\\""+(isOverdue?"yes":"no")+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+c.id+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+c.status+(isOverdue?" ⚠":"")+"</span></div>";' +
-    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#cbd5e1\\">"+c.member+" | "+c.category+"</div>";' +
-    'html+="<div style=\\"width:100%;display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#94a3b8\\"><span>"+c.step+" | "+c.location+"</span><span>"+c.daysOpen+" days</span></div></div>"});' +
+    'html+="<div class=\\"my-case-item list-item\\" data-status=\\""+escapeHtml(c.status)+"\\" data-overdue=\\""+(isOverdue?"yes":"no")+"\\" style=\\"flex-wrap:wrap\\"><div style=\\"display:flex;justify-content:space-between;width:100%\\"><span style=\\"font-weight:600\\">"+escapeHtml(c.id)+"</span><span class=\\"badge\\" style=\\"background:"+statusColor+";color:white\\">"+escapeHtml(c.status)+(isOverdue?" ⚠":"")+"</span></div>";' +
+    'html+="<div style=\\"width:100%;margin-top:6px;font-size:12px;color:#cbd5e1\\">"+escapeHtml(c.member)+" | "+escapeHtml(c.category)+"</div>";' +
+    'html+="<div style=\\"width:100%;display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#94a3b8\\"><span>"+escapeHtml(c.step)+" | "+escapeHtml(c.location)+"</span><span>"+c.daysOpen+" days</span></div></div>"});' +
     'html+="</div></div>"}' +
     'document.getElementById("main-content").innerHTML=html' +
     '}' +
@@ -1850,11 +1920,11 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"kpi-card\\"><div class=\\"kpi-label\\">Avg per Steward</div><div class=\\"kpi-value green\\">"+avgCases+"</div></div>";' +
     'html+="<div class=\\"kpi-card "+(overloaded>0?"alert":"")+"\\"><div class=\\"kpi-label\\">Overloaded</div><div class=\\"kpi-value red\\">"+overloaded+"</div></div></div>";' +
     'html+="<div class=\\"charts-row\\"><div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">assignment_ind</i>Steward Caseload</div><div class=\\"list-container\\">";' +
-    'd.stewardWorkload.forEach(function(w){html+="<div class=\\"list-item\\"><span>"+w.name+"</span><span class=\\"badge\\" style=\\"background:"+w.color+";color:white\\">"+w.count+" cases - "+w.status+"</span></div>"});' +
+    'd.stewardWorkload.forEach(function(w){html+="<div class=\\"list-item\\"><span>"+escapeHtml(w.name)+"</span><span class=\\"badge\\" style=\\"background:"+w.color+";color:white\\">"+w.count+" cases - "+escapeHtml(w.status)+"</span></div>"});' +
     'html+="</div></div>";' +
     // Top Performers section
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">emoji_events</i>Top Performers</div><div class=\\"list-container\\">";' +
-    'if(d.topPerformers&&d.topPerformers.length>0){d.topPerformers.forEach(function(p,i){html+="<div class=\\"list-item\\"><span>"+(i+1)+". "+p.name+"</span><span class=\\"badge\\" style=\\"background:#22c55e;color:white\\">Score: "+p.score+" | Win: "+p.winRate+"%</span></div>"})}' +
+    'if(d.topPerformers&&d.topPerformers.length>0){d.topPerformers.forEach(function(p,i){html+="<div class=\\"list-item\\"><span>"+(i+1)+". "+escapeHtml(p.name)+"</span><span class=\\"badge\\" style=\\"background:#22c55e;color:white\\">Score: "+p.score+" | Win: "+p.winRate+"%</span></div>"})}' +
     'else{html+="<p style=\\"color:#94a3b8;text-align:center;padding:20px\\">Performance data not yet calculated</p>"}' +
     'html+="</div></div></div>";' +
     'document.getElementById("main-content").innerHTML=html' +
@@ -1926,9 +1996,9 @@ function getUnifiedDashboardHtml(isPII) {
     'var satUnits=Object.keys(d.satisfactionByUnit).slice(0,8);var satLocs=Object.keys(d.satisfactionByLocation).slice(0,8);' +
     'if(satUnits.length>0&&satLocs.length>0){' +
     'html+="<div style=\\"overflow-x:auto;margin-top:12px\\"><table style=\\"width:100%;border-collapse:collapse;font-size:11px\\"><tr><th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:left\\">Unit / Location</th>";' +
-    'satLocs.forEach(function(l){html+="<th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:center;min-width:80px\\">"+l.substring(0,12)+"</th>"});' +
+    'satLocs.forEach(function(l){html+="<th style=\\"padding:8px;background:#1e293b;color:#94a3b8;text-align:center;min-width:80px\\">"+escapeHtml(l.substring(0,12))+"</th>"});' +
     'html+="</tr>";' +
-    'satUnits.forEach(function(u){html+="<tr><td style=\\"padding:8px;background:#0f172a;color:#e2e8f0;font-weight:500\\">"+u+"</td>";satLocs.forEach(function(l){var uScore=d.satisfactionByUnit[u]?d.satisfactionByUnit[u].score:0;var lScore=d.satisfactionByLocation[l]?d.satisfactionByLocation[l].score:0;var avgS=(uScore+lScore)/2;var cellBg=avgS>=7?"rgba(34,197,94,0.3)":avgS>=5?"rgba(245,158,11,0.3)":"rgba(239,68,68,0.3)";var cellCol=avgS>=7?"#22c55e":avgS>=5?"#f59e0b":"#ef4444";html+="<td style=\\"padding:8px;background:"+cellBg+";color:"+cellCol+";text-align:center;font-weight:600\\">"+avgS.toFixed(1)+"</td>"});html+="</tr>"});' +
+    'satUnits.forEach(function(u){html+="<tr><td style=\\"padding:8px;background:#0f172a;color:#e2e8f0;font-weight:500\\">"+escapeHtml(u)+"</td>";satLocs.forEach(function(l){var uScore=d.satisfactionByUnit[u]?d.satisfactionByUnit[u].score:0;var lScore=d.satisfactionByLocation[l]?d.satisfactionByLocation[l].score:0;var avgS=(uScore+lScore)/2;var cellBg=avgS>=7?"rgba(34,197,94,0.3)":avgS>=5?"rgba(245,158,11,0.3)":"rgba(239,68,68,0.3)";var cellCol=avgS>=7?"#22c55e":avgS>=5?"#f59e0b":"#ef4444";html+="<td style=\\"padding:8px;background:"+cellBg+";color:"+cellCol+";text-align:center;font-weight:600\\">"+avgS.toFixed(1)+"</td>"});html+="</tr>"});' +
     'html+="</table></div>"}' +
     'else{html+="<p style=\\"color:#64748b;text-align:center;padding:30px\\">Not enough satisfaction data for matrix view</p>"}' +
     'html+="</div>";' +
@@ -1936,16 +2006,16 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<h3 style=\\"color:#e2e8f0;font-size:14px;margin:24px 0 12px;display:flex;align-items:center;gap:8px\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">contact_phone</i>Contact Updates</h3>";' +
     'html+="<div class=\\"charts-row\\">";' +
     'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#22c55e\\">update</i>Recent Updates (30 days)</span><span class=\\"trend-value green\\">"+fmt(dt.recentUpdates.length)+"</span></div><div class=\\"trend-list\\">";' +
-    'dt.recentUpdates.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.date).toLocaleDateString()+"</span></div>"});' +
+    'dt.recentUpdates.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+escapeHtml(m.name)+" ("+escapeHtml(m.id)+")</span><span style=\\"color:#64748b\\">"+new Date(m.date).toLocaleDateString()+"</span></div>"});' +
     'if(dt.recentUpdates.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent updates</p>";' +
     'html+="</div></div>";' +
     'html+="<div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">warning</i>Stale Contacts (90+ days)</span><span class=\\"trend-value yellow\\">"+fmt(dt.staleContacts.length)+"</span></div><div class=\\"trend-list\\">";' +
-    'dt.staleContacts.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+" ("+m.id+")</span><span style=\\"color:#64748b\\">"+new Date(m.lastUpdate).toLocaleDateString()+"</span></div>"});' +
+    'dt.staleContacts.slice(0,10).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+escapeHtml(m.name)+" ("+escapeHtml(m.id)+")</span><span style=\\"color:#64748b\\">"+new Date(m.lastUpdate).toLocaleDateString()+"</span></div>"});' +
     'if(dt.staleContacts.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">All contacts up to date!</p>";' +
     'html+="</div></div></div>";' +
     // Meeting Attendees
     'html+="<div class=\\"charts-row\\"><div class=\\"trend-card\\"><div class=\\"trend-header\\"><span class=\\"trend-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">groups</i>Recent Meeting Attendees</span><span class=\\"trend-value purple\\">"+fmt(eng.recentMeetingAttendees.length)+"</span></div><div class=\\"trend-list\\">";' +
-    'eng.recentMeetingAttendees.slice(0,8).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+m.name+"</span><span style=\\"color:"+(m.type==="Virtual"?"#60a5fa":"#22c55e")+"\\">"+m.type+"</span></div>"});' +
+    'eng.recentMeetingAttendees.slice(0,8).forEach(function(m){html+="<div class=\\"trend-item\\"><span>"+escapeHtml(m.name)+"</span><span style=\\"color:"+(m.type==="Virtual"?"#60a5fa":"#22c55e")+"\\">"+escapeHtml(m.type)+"</span></div>"});' +
     'if(eng.recentMeetingAttendees.length===0)html+="<p style=\\"color:#64748b;text-align:center;padding:20px\\">No recent meeting attendance data</p>";' +
     'html+="</div></div><div class=\\"chart-card\\"></div></div>";' +
     'document.getElementById("main-content").innerHTML=html;renderDirectoryCharts()' +
@@ -1978,17 +2048,17 @@ function getUnifiedDashboardHtml(isPII) {
     'html+="<div class=\\"chart-card\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#ef4444\\">local_fire_department</i>Grievance Hot Zones (3+ Active Cases)</div>";' +
     'html+="<div style=\\"display:flex;gap:4px;margin:12px 0;font-size:10px;align-items:center\\"><span style=\\"color:#94a3b8\\">Low</span><div style=\\"display:flex;height:12px\\"><div style=\\"width:20px;background:#D1FAE5\\"></div><div style=\\"width:20px;background:#FEF3C7\\"></div><div style=\\"width:20px;background:#FCA5A5\\"></div></div><span style=\\"color:#94a3b8\\">High</span></div>";' +
     'if(d.hotZones.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">check_circle</i><p style=\\"margin-top:8px;font-size:13px\\">No grievance hot zones - All clear!</p></div>"}' +
-    'else{d.hotZones.sort(function(a,b){return b.count-a.count}).forEach(function(h){var bgColor=getHeatColor(h.count);var textColor=(h.count-minCases)/(maxCases-minCases||1)>0.6?"#fff":"#1e293b";html+="<div class=\\"hot-zone\\" style=\\"background:"+bgColor+";border-left-color:"+bgColor+"\\"><span style=\\"color:"+textColor+"\\">"+h.location+"</span><span class=\\"badge\\" style=\\"background:rgba(0,0,0,0.2);color:"+textColor+"\\">"+h.count+" cases</span></div>"})}' +
+    'else{d.hotZones.sort(function(a,b){return b.count-a.count}).forEach(function(h){var bgColor=getHeatColor(h.count);var textColor=(h.count-minCases)/(maxCases-minCases||1)>0.6?"#fff":"#1e293b";html+="<div class=\\"hot-zone\\" style=\\"background:"+bgColor+";border-left-color:"+bgColor+"\\"><span style=\\"color:"+textColor+"\\">"+escapeHtml(h.location)+"</span><span class=\\"badge\\" style=\\"background:rgba(0,0,0,0.2);color:"+textColor+"\\">"+h.count+" cases</span></div>"})}' +
     'html+="</div>";' +
     // Dissatisfaction Hot Spots
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#f59e0b\\">sentiment_dissatisfied</i>Dissatisfaction Hot Spots (Score < 5)</div>";' +
     'if(!hs.dissatisfaction||hs.dissatisfaction.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">sentiment_satisfied</i><p style=\\"margin-top:8px;font-size:13px\\">No dissatisfaction hot spots - Members are satisfied!</p></div>"}' +
-    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.dissatisfaction.forEach(function(h){var scoreColor=h.score<3?"#ef4444":"#f59e0b";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+scoreColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+h.name+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" responses</span><span style=\\"color:"+scoreColor+";font-weight:700\\">"+h.score+"/10</span></div></div>"});html+="</div>"}' +
+    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.dissatisfaction.forEach(function(h){var scoreColor=h.score<3?"#ef4444":"#f59e0b";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+scoreColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+escapeHtml(h.name)+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" responses</span><span style=\\"color:"+scoreColor+";font-weight:700\\">"+h.score+"/10</span></div></div>"});html+="</div>"}' +
     'html+="</div>";' +
     // Low Engagement Hot Spots
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\" style=\\"color:#a78bfa\\">trending_down</i>Low Engagement Hot Spots (< 30%)</div>";' +
     'if(!hs.lowEngagement||hs.lowEngagement.length===0){html+="<div style=\\"text-align:center;padding:30px;color:#22c55e\\"><i class=\\"material-icons\\" style=\\"font-size:36px\\">groups</i><p style=\\"margin-top:8px;font-size:13px\\">No low engagement areas - Good outreach!</p></div>"}' +
-    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.lowEngagement.forEach(function(h){var engColor=h.engagement<15?"#ef4444":"#a78bfa";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+engColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+h.name+"</div><div style=\\"color:#64748b;font-size:10px\\">"+h.type+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" members</span><span style=\\"color:"+engColor+";font-weight:700\\">"+h.engagement+"%</span></div></div>"});html+="</div>"}' +
+    'else{html+="<div style=\\"display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px\\">";hs.lowEngagement.forEach(function(h){var engColor=h.engagement<15?"#ef4444":"#a78bfa";html+="<div style=\\"background:#1e293b;padding:12px;border-radius:8px;border-left:3px solid "+engColor+"\\"><div style=\\"font-weight:600;color:#e2e8f0;font-size:13px\\">"+escapeHtml(h.name)+"</div><div style=\\"color:#64748b;font-size:10px\\">"+escapeHtml(h.type)+"</div><div style=\\"display:flex;justify-content:space-between;margin-top:6px\\"><span style=\\"color:#94a3b8;font-size:11px\\">"+h.count+" members</span><span style=\\"color:"+engColor+";font-weight:700\\">"+h.engagement+"%</span></div></div>"});html+="</div>"}' +
     'html+="</div>";' +
     // Cases by Location chart
     'html+="<div class=\\"chart-card\\" style=\\"margin-top:16px\\"><div class=\\"chart-title\\"><i class=\\"material-icons\\">location_on</i>Cases by Location</div><canvas id=\\"hotspotChart\\"></canvas></div>";' +

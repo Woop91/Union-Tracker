@@ -3,17 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <!-- H-52: CSP — GAS requires 'unsafe-inline' and 'unsafe-eval' for google.script.run -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://apis.google.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:;">
   <title>Dashboard</title>
 
-  <!-- Fonts -->
+  <!-- Fonts — load only weights used (400, 600) to reduce payload -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
 
   <?!= include('styles') ?>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <!-- Chart.js — deferred until actually needed (lazy-loaded by ChartHelper) -->
 </head>
 <body>
   <div id="app"></div>
@@ -22,6 +23,9 @@
     // ═══════════════════════════════════════
     // BOOTSTRAP — Parse server-injected data
     // ═══════════════════════════════════════
+    // H-50: pageData is JSON.stringify'd server-side before injection.
+    // Safety depends on server-side serialization via JSON.stringify() which
+    // escapes </script> sequences. Do not change to <?= ?> (double-escape).
     var PAGE_DATA = <?!= pageData ?>;
     var CONFIG = PAGE_DATA.config;
     var CURRENT_VIEW = PAGE_DATA.view;
@@ -30,13 +34,25 @@
     var SESSION_TOKEN = PAGE_DATA.sessionToken || null;
     var INITIAL_TAB = PAGE_DATA.initialTab || null;
 
+    // Web app URL for redirects (injected server-side, avoids iframe URL issues)
+    var WEB_APP_URL = PAGE_DATA.webAppUrl || '';
+
     // Store session token in localStorage if provided
     if (SESSION_TOKEN) {
       localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
     }
 
-    // Check for existing session token
-    var storedToken = localStorage.getItem('dashboardSessionToken');
+    // On auth page: try to restore session from localStorage
+    if (CURRENT_VIEW === 'auth' && WEB_APP_URL) {
+      var storedToken = localStorage.getItem('dashboardSessionToken');
+      if (storedToken && !PAGE_DATA.tokenChecked) {
+        // Redirect to web app URL with stored session token so server can validate
+        window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
+      } else if (PAGE_DATA.tokenChecked && storedToken) {
+        // Server already rejected this token — clear it
+        localStorage.removeItem('dashboardSessionToken');
+      }
+    }
 
     // ═══════════════════════════════════════
     // THEME ENGINE
@@ -100,7 +116,10 @@
 
       function getTheme(role, isDark) {
         var base = themes[role] || themes.member;
-        var t = isDark ? base.dark : base.light;
+        // H-5 fix: Shallow copy to avoid mutating shared theme objects
+        var src = isDark ? base.dark : base.light;
+        var t = {};
+        for (var k in src) { if (src.hasOwnProperty(k)) t[k] = src[k]; }
         // Merge accent colors
         for (var key in palette) {
           t[key] = palette[key];
@@ -118,6 +137,10 @@
         document.body.style.background = t.bg;
         document.body.style.color = t.text;
         document.body.style.fontFamily = t.fontBody;
+        // Invalidate chart color cache on theme change
+        if (typeof ChartHelper !== 'undefined' && ChartHelper.invalidateColorCache) {
+          ChartHelper.invalidateColorCache();
+        }
       }
 
       return {
@@ -125,6 +148,53 @@
         applyTheme: applyTheme,
         palette: palette,
       };
+    })();
+
+    // ═══════════════════════════════════════
+    // CLIENT-SIDE DATA CACHE — prevents redundant server calls on tab switches
+    // ═══════════════════════════════════════
+    var DataCache = (function() {
+      var _cache = {};
+      var DEFAULT_TTL = 120000; // 2 minutes
+
+      function get(key) {
+        var entry = _cache[key];
+        if (!entry) return undefined;
+        if (Date.now() > entry.expires) { delete _cache[key]; return undefined; }
+        return entry.value;
+      }
+
+      function set(key, value, ttlMs) {
+        _cache[key] = { value: value, expires: Date.now() + (ttlMs || DEFAULT_TTL) };
+      }
+
+      function invalidate(key) { if (key) delete _cache[key]; else _cache = {}; }
+
+      /**
+       * Wraps a google.script.run call with caching.
+       * @param {string} cacheKey - Cache key
+       * @param {string} fnName - server function name
+       * @param {Array} args - arguments to pass
+       * @param {Function} onSuccess - success callback
+       * @param {Function} [onFailure] - failure callback
+       * @param {number} [ttlMs] - cache TTL in ms
+       */
+      function cachedCall(cacheKey, fnName, args, onSuccess, onFailure, ttlMs) {
+        var cached = get(cacheKey);
+        if (cached !== undefined) {
+          onSuccess(cached);
+          return;
+        }
+        var runner = google.script.run
+          .withSuccessHandler(function(result) {
+            set(cacheKey, result, ttlMs);
+            onSuccess(result);
+          });
+        if (onFailure) runner = runner.withFailureHandler(onFailure);
+        runner[fnName].apply(runner, args || []);
+      }
+
+      return { get: get, set: set, invalidate: invalidate, cachedCall: cachedCall };
     })();
 
     // ═══════════════════════════════════════
@@ -141,10 +211,11 @@
       grievances: [],
       loading: true,
       initialTab: INITIAL_TAB, // deep-link: ?page=xxx from URL
+      notificationCount: 0,
     };
 
     // ═══════════════════════════════════════
-    // ROUTER
+    // ROUTER (with optional batch pre-fetch)
     // ═══════════════════════════════════════
     function initApp() {
       var app = document.getElementById('app');
@@ -154,10 +225,27 @@
           renderAuth(app);
           break;
         case 'steward':
-          initStewardView(app);
-          break;
         case 'member':
-          initMemberView(app);
+          // Pre-fetch batch data in a single round-trip, then init the view.
+          // Falls back to per-view init if batch fails.
+          if (CURRENT_USER && CURRENT_USER.email) {
+            google.script.run
+              .withSuccessHandler(function(batch) {
+                AppState.batchData = batch || {};
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
+              })
+              .withFailureHandler(function() {
+                // Batch unavailable — views will make individual calls
+                AppState.batchData = null;
+                if (CURRENT_VIEW === 'steward') initStewardView(app);
+                else initMemberView(app);
+              })
+              .dataGetBatchData(CURRENT_USER.email, CURRENT_VIEW);
+          } else {
+            if (CURRENT_VIEW === 'steward') initStewardView(app);
+            else initMemberView(app);
+          }
           break;
         case 'error':
           renderError(app, PAGE_DATA.error);
@@ -205,6 +293,11 @@
       return elem;
     }
 
+    /**
+     * H-49: Parses an HTML string into a DOM element. WARNING: Only pass trusted/
+     * pre-escaped HTML strings to this function. Never pass unsanitized user input
+     * — use el() with textContent or escapeHtml() for dynamic data instead.
+     */
     function html(str) {
       var div = document.createElement('div');
       div.innerHTML = str;
@@ -219,18 +312,32 @@
     }
 
     function handleLogout() {
+      // H-3 fix: Remove duplicate authLogout call — use only the async version with handlers
       var token = localStorage.getItem('dashboardSessionToken');
-      if (token) {
-        google.script.run.authLogout(token);
-        localStorage.removeItem('dashboardSessionToken');
+      localStorage.removeItem('dashboardSessionToken');
+
+      function _doReload() {
+        // Try multiple reload strategies for GAS iframe compatibility
+        try { window.top.location.reload(); } catch (_e) {}
+        try { window.location.reload(); } catch (_e2) {}
+        // Final fallback: navigate to the published web app URL (strips auth params)
+        try {
+          google.script.run.withSuccessHandler(function(url) {
+            if (url) { window.top.location.href = url; }
+          }).getWebAppUrl();
+        } catch (_e3) {}
       }
-      // Reload the page — will show auth screen since no valid session
-      google.script.run
-        .withSuccessHandler(function() { window.top.location.reload(); })
-        .withFailureHandler(function() { window.top.location.reload(); })
-        .authLogout(token || '');
-      // Fallback reload
-      setTimeout(function() { window.top.location.reload(); }, 1000);
+
+      if (token) {
+        google.script.run
+          .withSuccessHandler(function() { _doReload(); })
+          .withFailureHandler(function() { _doReload(); })
+          .authLogout(token);
+      } else {
+        _doReload();
+      }
+      // Final fallback timer
+      setTimeout(_doReload, 1500);
     }
 
     // ═══════════════════════════════════════
@@ -279,11 +386,21 @@
     }
 
     function renderSidebarItems(sidebar, role, activeTab) {
-      var header = el('div', { className: 'sidebar-header' });
-      header.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
+      var header = el('div', { className: 'sidebar-header', style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' } });
+      var headerText = el('div');
+      headerText.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
       if (CURRENT_USER) {
-        header.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
+        headerText.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
       }
+      header.appendChild(headerText);
+      var bellWrap = el('div', { className: 'notif-bell-wrap', onClick: function() {
+        _handleTabNav(role, 'notifications');
+      }});
+      bellWrap.appendChild(el('span', { className: 'notif-bell-icon' }, '\uD83D\uDD14'));
+      if (AppState.notificationCount > 0) {
+        bellWrap.appendChild(el('span', { className: 'notif-bell-badge' }, String(AppState.notificationCount)));
+      }
+      header.appendChild(bellWrap);
       sidebar.appendChild(header);
 
       var tabs = _getSidebarTabs(role);
@@ -345,29 +462,49 @@
       if (role === 'steward') return [
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
         { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
+        { id: 'insights', icon: '\uD83D\uDCCA', label: 'Insights' },
         { id: 'tasks', icon: '\u2705', label: 'Tasks' },
         { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
         { divider: true },
         { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org Chart' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
+        { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+        { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
+        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
+        { divider: true },
+        { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
+        { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
+        { id: 'failsafe', icon: '\uD83D\uDEE1', label: 'Data Failsafe' },
       ];
       return [
         { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
         { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
-        { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
+        { id: 'contact', icon: '\uD83D\uDC65', label: 'Directory' },
         { divider: true },
+        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
+        { id: 'meetings', icon: '\uD83D\uDCC5', label: 'My Meetings' },
+        { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
+        { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org Chart' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
+      ].concat(typeof renderWorkloadTracker === 'function' ? [{ id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' }] : []).concat([
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
-      ];
+        { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
+        { divider: true },
+        { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
+        { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
+        { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
+      ]);
     }
 
     function _handleTabNav(role, tabId) {
@@ -375,33 +512,52 @@
       // Handle "More" menus for both roles (mobile bottom-nav)
       if (tabId === '_member_more') { renderMemberMore(app); return; }
       if (tabId === '_steward_more') { renderStewardMore(app); return; }
+      // Shared tabs (available in both roles)
+      if (tabId === 'orgchart') { renderOrgChart(app, role); return; }
+
       if (role === 'member') {
         switch(tabId) {
           case 'home': renderMemberHome(app); break;
           case 'cases': renderMyCases(app); break;
-          case 'contact': renderStewardContact(app); break;
+          case 'contact': renderStewardDirectory(app); break;
           case 'profile': renderUpdateProfile(app); break;
           case 'resources': renderMemberResources(app); break;
-          case 'workload': renderWorkloadTracker(app); break;
+          case 'workload': if (typeof renderWorkloadTracker === 'function') renderWorkloadTracker(app); break;
           case 'weeklyq': renderWeeklyQuestionsPage(app, 'member'); break;
           case 'survey': renderSurveyResultsPage(app); break;
           case 'unionstats': renderUnionStatsPage(app); break;
           case 'events': renderEventsPage(app); break;
           case 'stewarddirectory': renderStewardDirectory(app); break;
+          case 'notifications': renderMemberNotifications(app); break;
+          case 'meetings': renderMeetingsPage(app); break;
+          case 'polls': renderPollsPage(app); break;
+          case 'minutes': renderMinutesPage(app); break;
+          case 'feedback': renderFeedbackPage(app, 'member'); break;
+          case 'mytasks': renderMemberTasks(app); break;
+          case 'qaforum': renderQAForum(app, 'member'); break;
+          case 'timeline': renderTimelinePage(app); break;
           default: renderMemberHome(app);
         }
       } else {
         switch(tabId) {
           case 'cases': renderStewardDashboard(app); break;
           case 'members': renderStewardMembers(app); break;
-          case 'deadlines': renderStewardDashboard(app); break;
+          case 'insights': renderInsightsPage(app); break;
+          case 'stewarddirectory': renderStewardDirectoryPage(app); break;
           case 'broadcast': renderBroadcast(app); break;
+          case 'notifications': renderStewardNotifications(app); break;
           case 'resources': renderStewardResources(app); break;
           case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); break;
           case 'surveytrack': renderSurveyTracking(app); break;
           case 'contactlog': renderContactLog(app); break;
           case 'tasks': renderStewardTasks(app); break;
           case 'events': renderEventsPage(app); break;
+          case 'polls': renderManagePolls(app); break;
+          case 'minutes': renderStewardMinutes(app); break;
+          case 'feedback': renderFeedbackPage(app, 'steward'); break;
+          case 'qaforum': renderQAForum(app, 'steward'); break;
+          case 'timeline': renderTimelinePage(app); break;
+          case 'failsafe': renderFailsafePage(app); break;
           default: renderStewardDashboard(app);
         }
       }
@@ -436,14 +592,40 @@
     });
 
     // ═══════════════════════════════════════
-    // CHART HELPER (requires Chart.js CDN)
+    // CHART HELPER — lazy-loads Chart.js on first use
     // ═══════════════════════════════════════
     var ChartHelper = (function() {
       var _charts = {};
+      var _chartJsLoaded = typeof Chart !== 'undefined';
+      var _chartJsLoading = false;
+      var _pendingCallbacks = [];
+      var _cachedColors = null;
+
+      function _ensureChartJs(callback) {
+        if (_chartJsLoaded) { callback(); return; }
+        _pendingCallbacks.push(callback);
+        if (_chartJsLoading) return;
+        _chartJsLoading = true;
+        var script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+        script.onload = function() {
+          _chartJsLoaded = true;
+          _chartJsLoading = false;
+          var cbs = _pendingCallbacks.slice();
+          _pendingCallbacks = [];
+          cbs.forEach(function(cb) { cb(); });
+        };
+        script.onerror = function() {
+          _chartJsLoading = false;
+          _pendingCallbacks = [];
+        };
+        document.head.appendChild(script);
+      }
 
       function _getColors() {
+        if (_cachedColors) return _cachedColors;
         var cs = getComputedStyle(document.documentElement);
-        return {
+        _cachedColors = {
           accent:  cs.getPropertyValue('--accent').trim() || '#7c6ef6',
           success: cs.getPropertyValue('--success').trim() || '#4ade80',
           warning: cs.getPropertyValue('--warning').trim() || '#facc15',
@@ -454,7 +636,10 @@
           border:  cs.getPropertyValue('--border').trim() || '#2a2a2a',
           surface: cs.getPropertyValue('--surface').trim() || '#1e1e1e',
         };
+        return _cachedColors;
       }
+
+      function invalidateColorCache() { _cachedColors = null; }
 
       function _palette(count) {
         var c = _getColors();
@@ -483,73 +668,85 @@
         return _charts[id];
       }
 
+      function _lazyCreate(container, id, cfgFn) {
+        _ensureChartJs(function() { cfgFn(); });
+      }
+
       function createBarChart(container, id, labels, datasets, opts) {
-        var c = _getColors();
-        var dsList = datasets.map(function(ds, i) {
-          return Object.assign({
-            backgroundColor: ds.color || _palette(datasets.length)[i],
-            borderRadius: 4,
-            maxBarThickness: 40,
-          }, ds);
-        });
-        return _create(container, id, {
-          type: 'bar',
-          data: { labels: labels, datasets: dsList },
-          options: Object.assign({
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
-            scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
-          }, opts || {}),
+        _ensureChartJs(function() {
+          var c = _getColors();
+          var dsList = datasets.map(function(ds, i) {
+            return Object.assign({
+              backgroundColor: ds.color || _palette(datasets.length)[i],
+              borderRadius: 4,
+              maxBarThickness: 40,
+            }, ds);
+          });
+          _create(container, id, {
+            type: 'bar',
+            data: { labels: labels, datasets: dsList },
+            options: Object.assign({
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
+              scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
+            }, opts || {}),
+          });
         });
       }
 
       function createHorizontalBarChart(container, id, labels, data, colors) {
-        var c = _getColors();
-        return _create(container, id, {
-          type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderRadius: 4, maxBarThickness: 28 }],
-          },
-          options: {
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, grid: { color: c.border } }, y: { grid: { display: false } } },
-          },
+        _ensureChartJs(function() {
+          var c = _getColors();
+          _create(container, id, {
+            type: 'bar',
+            data: {
+              labels: labels,
+              datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderRadius: 4, maxBarThickness: 28 }],
+            },
+            options: {
+              indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false } },
+              scales: { x: { beginAtZero: true, grid: { color: c.border } }, y: { grid: { display: false } } },
+            },
+          });
         });
       }
 
       function createDoughnutChart(container, id, labels, data, colors) {
-        return _create(container, id, {
-          type: 'doughnut',
-          data: {
-            labels: labels,
-            datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderWidth: 0, spacing: 2 }],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, cutout: '65%',
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } } },
-          },
+        _ensureChartJs(function() {
+          _create(container, id, {
+            type: 'doughnut',
+            data: {
+              labels: labels,
+              datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderWidth: 0, spacing: 2 }],
+            },
+            options: {
+              responsive: true, maintainAspectRatio: false, cutout: '65%',
+              plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } } },
+            },
+          });
         });
       }
 
       function createLineChart(container, id, labels, datasets, opts) {
-        var c = _getColors();
-        var dsList = datasets.map(function(ds, i) {
-          return Object.assign({
-            borderColor: ds.color || _palette(datasets.length)[i],
-            backgroundColor: (ds.color || _palette(datasets.length)[i]) + '20',
-            fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2,
-          }, ds);
-        });
-        return _create(container, id, {
-          type: 'line',
-          data: { labels: labels, datasets: dsList },
-          options: Object.assign({
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
-            scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
-          }, opts || {}),
+        _ensureChartJs(function() {
+          var c = _getColors();
+          var dsList = datasets.map(function(ds, i) {
+            return Object.assign({
+              borderColor: ds.color || _palette(datasets.length)[i],
+              backgroundColor: (ds.color || _palette(datasets.length)[i]) + '20',
+              fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2,
+            }, ds);
+          });
+          _create(container, id, {
+            type: 'line',
+            data: { labels: labels, datasets: dsList },
+            options: Object.assign({
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
+              scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
+            }, opts || {}),
+          });
         });
       }
 
@@ -559,6 +756,7 @@
         createDoughnutChart: createDoughnutChart,
         createLineChart: createLineChart,
         destroyChart: destroyChart,
+        invalidateColorCache: invalidateColorCache,
       };
     })();
 
@@ -572,10 +770,14 @@
     });
   </script>
 
-  <?!= include('auth_view') ?>
-  <?!= include('steward_view') ?>
-  <?!= include('member_view') ?>
-  <?!= include('error_view') ?>
+  <? if (view === 'auth') { ?>
+    <?!= include('auth_view') ?>
+  <? } else if (view === 'steward' || view === 'member' || view === 'both') { ?>
+    <?!= include('steward_view') ?>
+    <?!= include('member_view') ?>
+  <? } else { ?>
+    <?!= include('error_view') ?>
+  <? } ?>
 
 </body>
 </html>

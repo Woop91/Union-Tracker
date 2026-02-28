@@ -34,19 +34,19 @@ function statMean_(arr) {
 }
 
 /**
- * Calculates the standard deviation of a numeric array
+ * Calculates the sample standard deviation of a numeric array (Bessel's correction).
  * @param {number[]} arr - Input values
- * @returns {number} Population standard deviation
+ * @returns {number} Sample standard deviation, or 0 if n <= 1
  */
 function statStdDev_(arr) {
-  if (!arr || arr.length < 2) return 0;
+  if (!arr || arr.length <= 1) return 0;
   var mean = statMean_(arr);
   var sumSq = 0;
   for (var i = 0; i < arr.length; i++) {
     var diff = arr[i] - mean;
     sumSq += diff * diff;
   }
-  return Math.sqrt(sumSq / arr.length);
+  return Math.sqrt(sumSq / (arr.length - 1));
 }
 
 /**
@@ -59,7 +59,7 @@ function statStdDev_(arr) {
  */
 function pearsonCorrelation_(x, y) {
   var n = Math.min(x.length, y.length);
-  if (n < 3) return 0; // Need at least 3 pairs for meaningful correlation
+  if (n < 5) return 0; // Need at least 5 pairs for meaningful correlation
 
   var meanX = statMean_(x.slice(0, n));
   var meanY = statMean_(y.slice(0, n));
@@ -187,6 +187,8 @@ function chiSquareTest_(contingency) {
 
 /**
  * Classifies correlation strength and returns a plain-language label.
+ * Minimum sample size guard: N < 5 returns confidence='insufficient', reliable=false.
+ * This prevents spurious correlations from tiny datasets from surfacing as actionable.
  *
  * @param {number} r - Correlation coefficient (Pearson r or Spearman rho)
  * @param {number} n - Sample size
@@ -271,8 +273,8 @@ function extractPairs_(groupedData, fieldX, fieldY, minCount) {
  * @param {boolean} isPII - Whether to include PII in drill-down details
  * @returns {string} JSON array of correlation results
  */
-function getCorrelationInsights(isPII) {
-  var data = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+function getCorrelationInsights(isPII, cachedData) {
+  var data = cachedData || JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   var insights = [];
 
   // 1. Location Satisfaction vs Grievance Rate
@@ -359,7 +361,7 @@ function correlateLocationSatVsGrievance_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('satisfaction', 'grievance filing rate', r, cls, 'location')
+    insight: generateInsight_('satisfaction', 'grievance filing rate', r, cls, 'location', x.length)
   };
 }
 
@@ -410,7 +412,7 @@ function correlateStewardWinVsEngagement_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('steward win rate', 'member engagement', r, cls, 'steward')
+    insight: generateInsight_('steward win rate', 'member engagement', r, cls, 'steward', x.length)
   };
 }
 
@@ -473,7 +475,7 @@ function correlateCategoryVsResolutionTime_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     categoryBreakdown: catData,
-    insight: generateInsight_('case volume', 'resolution time', r, cls, 'category')
+    insight: generateInsight_('case volume', 'resolution time', r, cls, 'category', x.length)
   };
 }
 
@@ -519,7 +521,7 @@ function correlateEngagementVsSatisfaction_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('member engagement', 'satisfaction', r, cls, 'location')
+    insight: generateInsight_('member engagement', 'satisfaction', r, cls, 'location', x.length)
   };
 }
 
@@ -567,7 +569,7 @@ function correlateEngagementVsGrievance_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('engagement rate', 'grievance concentration', r, cls, 'location')
+    insight: generateInsight_('engagement rate', 'grievance concentration', r, cls, 'location', x.length)
   };
 }
 
@@ -650,7 +652,7 @@ function correlateArticleVsOutcome_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     articleBreakdown: articleOutcomes,
-    insight: generateInsight_('violation frequency', 'win rate', r, cls, 'contract article')
+    insight: generateInsight_('violation frequency', 'win rate', r, cls, 'contract article', x.length)
   };
 }
 
@@ -697,7 +699,7 @@ function correlateStepVsTime_(data) {
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
     stepBreakdown: stepMap,
-    insight: generateInsight_('step level', 'resolution time', r, cls, 'grievance step')
+    insight: generateInsight_('step level', 'resolution time', r, cls, 'grievance step', x.length)
   };
 }
 
@@ -742,7 +744,7 @@ function correlateUnitSizeVsSatisfaction_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('unit size', 'satisfaction', r, cls, 'unit')
+    insight: generateInsight_('unit size', 'satisfaction', r, cls, 'unit', x.length)
   };
 }
 
@@ -782,7 +784,7 @@ function correlateCaseloadVsWinRate_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('caseload size', 'win rate', r, cls, 'steward')
+    insight: generateInsight_('caseload size', 'win rate', r, cls, 'steward', x.length)
   };
 }
 
@@ -828,7 +830,7 @@ function correlateVolunteerVsEngagement_(data) {
     reliable: cls.reliable,
     sampleSize: x.length,
     dataPoints: buildDataPoints_(labels, x, y),
-    insight: generateInsight_('email engagement', 'meeting attendance', r, cls, 'location')
+    insight: generateInsight_('email engagement', 'meeting attendance', r, cls, 'location', x.length)
   };
 }
 
@@ -845,16 +847,19 @@ function correlateVolunteerVsEngagement_(data) {
  * @param {number} r - Correlation coefficient
  * @param {Object} cls - Classification from classifyCorrelation_()
  * @param {string} dimension - Grouping dimension (e.g., 'location', 'steward')
+ * @param {number} n - Sample size (number of data points)
  * @returns {string} Plain-language insight
  * @private
  */
-function generateInsight_(varX, varY, r, cls, dimension) {
+function generateInsight_(varX, varY, r, cls, dimension, n) {
+  var nLabel = typeof n === 'number' ? ' (N=' + n + ')' : '';
+
   if (!cls.reliable) {
     if (cls.confidence === 'insufficient') {
-      return 'Not enough data points across ' + dimension + 's to draw conclusions. Revisit when more data is available.';
+      return 'Not enough data points across ' + dimension + 's to draw conclusions' + nLabel + '. Revisit when more data is available.';
     }
     return 'The association between ' + varX + ' and ' + varY + ' across ' + dimension +
-           's is too weak (r=' + (Math.round(r * 100) / 100) + ') or sample too small (n=' +
+           's is too weak (r=' + (Math.round(r * 100) / 100) + ', N=' + (n || '?') +
            ') to be meaningful.';
   }
 
@@ -864,18 +869,18 @@ function generateInsight_(varX, varY, r, cls, dimension) {
   if (cls.strength === 'strong') {
     return 'Strong pattern: ' + dimension + 's with ' + direction + ' ' + varX +
            ' ' + assoc + ' ' + varY + '. This is one of the clearest relationships in the data (' +
-           cls.confidence + ' confidence).';
+           cls.confidence + ' confidence, N=' + (n || '?') + ').';
   }
 
   if (cls.strength === 'moderate') {
     return 'Notable trend: ' + dimension + 's with ' + direction + ' ' + varX +
            ' are generally associated with ' + (r > 0 ? 'higher' : 'lower') + ' ' + varY +
-           '. Worth monitoring (' + cls.confidence + ' confidence).';
+           '. Worth monitoring (' + cls.confidence + ' confidence, N=' + (n || '?') + ').';
   }
 
   return 'Slight tendency: ' + dimension + 's with ' + direction + ' ' + varX +
          ' show a weak association with ' + (r > 0 ? 'higher' : 'lower') + ' ' + varY +
-         '. Not strong enough to act on alone (' + cls.confidence + ' confidence).';
+         '. Not strong enough to act on alone (' + cls.confidence + ' confidence, N=' + (n || '?') + ').';
 }
 
 /**
@@ -912,7 +917,9 @@ function buildDataPoints_(labels, x, y) {
  * @returns {string} JSON array of alert objects
  */
 function getCorrelationAlerts(isPII) {
-  var insightsJson = getCorrelationInsights(isPII);
+  // Fetch data once and reuse for insights to avoid redundant dashboard fetches
+  var dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  var insightsJson = getCorrelationInsights(isPII, dashboardData);
   var insights = JSON.parse(insightsJson);
   var alerts = [];
 
@@ -956,7 +963,9 @@ function getCorrelationAlerts(isPII) {
  * @returns {string} JSON summary object
  */
 function getCorrelationSummary(isPII) {
-  var insights = JSON.parse(getCorrelationInsights(isPII));
+  // Fetch data once and reuse for insights to avoid redundant dashboard fetches
+  var dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  var insights = JSON.parse(getCorrelationInsights(isPII, dashboardData));
 
   var summary = {
     total: insights.length,

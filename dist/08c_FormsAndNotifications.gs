@@ -1,3 +1,5 @@
+// NOTE(F42): Form submission volume is acceptable for typical union usage (~100-5000 members).
+// No throttling is needed at current scale.
 
 // ============================================================================
 // FORM URL CONFIGURATION
@@ -32,14 +34,9 @@ function getFormUrlFromConfig(formType) {
       return '';
   }
 
-  // Try to get from Config sheet (row 2 contains data, row 3 for newer format)
+  // M-15: Config data starts at row 3 (row 1 = section headers, row 2 = column headers)
   if (configSheet) {
-    // Check row 2 first (original format)
-    var url = configSheet.getRange(2, configCol).getValue();
-    if (!url || url === '') {
-      // Check row 3 (newer format with section headers)
-      url = configSheet.getRange(3, configCol).getValue();
-    }
+    var url = configSheet.getRange(3, configCol).getValue();
     if (url && url !== '' && url.indexOf('http') === 0) {
       return url;
     }
@@ -314,7 +311,7 @@ function onContactFormSubmit(e) {
         var id = data[k][MEMBER_COLS.MEMBER_ID - 1];
         if (id) existingIds[id] = true;
       }
-      var memberId = generateNameBasedId('M', firstName, lastName, existingIds);
+      memberId = generateNameBasedId('M', firstName, lastName, existingIds);
 
       // Build new row array (escapeForFormula on all user-supplied strings to prevent formula injection)
       var newRow = [];
@@ -369,30 +366,34 @@ function onContactFormSubmit(e) {
       var updates = [];
 
       // Update all fields from form (even if they change existing values)
-      if (jobTitle) updates.push({ col: MEMBER_COLS.JOB_TITLE, value: jobTitle });
-      if (unit) updates.push({ col: MEMBER_COLS.UNIT, value: unit });
-      if (workLocation) updates.push({ col: MEMBER_COLS.WORK_LOCATION, value: workLocation });
-      if (officeDays) updates.push({ col: MEMBER_COLS.OFFICE_DAYS, value: officeDays });
-      if (preferredComm) updates.push({ col: MEMBER_COLS.PREFERRED_COMM, value: preferredComm });
-      if (bestTime) updates.push({ col: MEMBER_COLS.BEST_TIME, value: bestTime });
-      if (supervisor) updates.push({ col: MEMBER_COLS.SUPERVISOR, value: supervisor });
-      if (manager) updates.push({ col: MEMBER_COLS.MANAGER, value: manager });
-      if (email) updates.push({ col: MEMBER_COLS.EMAIL, value: email });
-      if (phone) updates.push({ col: MEMBER_COLS.PHONE, value: phone });
-      if (interestLocal) updates.push({ col: MEMBER_COLS.INTEREST_LOCAL, value: interestLocal });
-      if (interestChapter) updates.push({ col: MEMBER_COLS.INTEREST_CHAPTER, value: interestChapter });
-      if (interestAllied) updates.push({ col: MEMBER_COLS.INTEREST_ALLIED, value: interestAllied });
+      // CR-18: Apply escapeForFormula() to all string values (matches new-member branch)
+      if (jobTitle) updates.push({ col: MEMBER_COLS.JOB_TITLE, value: escapeForFormula(jobTitle) });
+      if (unit) updates.push({ col: MEMBER_COLS.UNIT, value: escapeForFormula(unit) });
+      if (workLocation) updates.push({ col: MEMBER_COLS.WORK_LOCATION, value: escapeForFormula(workLocation) });
+      if (officeDays) updates.push({ col: MEMBER_COLS.OFFICE_DAYS, value: escapeForFormula(officeDays) });
+      if (preferredComm) updates.push({ col: MEMBER_COLS.PREFERRED_COMM, value: escapeForFormula(preferredComm) });
+      if (bestTime) updates.push({ col: MEMBER_COLS.BEST_TIME, value: escapeForFormula(bestTime) });
+      if (supervisor) updates.push({ col: MEMBER_COLS.SUPERVISOR, value: escapeForFormula(supervisor) });
+      if (manager) updates.push({ col: MEMBER_COLS.MANAGER, value: escapeForFormula(manager) });
+      if (email) updates.push({ col: MEMBER_COLS.EMAIL, value: escapeForFormula(email) });
+      if (phone) updates.push({ col: MEMBER_COLS.PHONE, value: escapeForFormula(phone) });
+      if (interestLocal) updates.push({ col: MEMBER_COLS.INTEREST_LOCAL, value: escapeForFormula(interestLocal) });
+      if (interestChapter) updates.push({ col: MEMBER_COLS.INTEREST_CHAPTER, value: escapeForFormula(interestChapter) });
+      if (interestAllied) updates.push({ col: MEMBER_COLS.INTEREST_ALLIED, value: escapeForFormula(interestAllied) });
       if (hireDate) updates.push({ col: MEMBER_COLS.HIRE_DATE, value: parseFormDate_(hireDate) });
-      if (employeeId) updates.push({ col: MEMBER_COLS.EMPLOYEE_ID, value: employeeId });
-      if (streetAddress) updates.push({ col: MEMBER_COLS.STREET_ADDRESS, value: streetAddress });
-      if (city) updates.push({ col: MEMBER_COLS.CITY, value: city });
-      if (state) updates.push({ col: MEMBER_COLS.STATE, value: state });
-      if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: zipCode });
+      if (employeeId) updates.push({ col: MEMBER_COLS.EMPLOYEE_ID, value: escapeForFormula(employeeId) });
+      if (streetAddress) updates.push({ col: MEMBER_COLS.STREET_ADDRESS, value: escapeForFormula(streetAddress) });
+      if (city) updates.push({ col: MEMBER_COLS.CITY, value: escapeForFormula(city) });
+      if (state) updates.push({ col: MEMBER_COLS.STATE, value: escapeForFormula(state) });
+      if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: escapeForFormula(zipCode) });
 
-      // Apply updates
+      // M-PERF: Batch write — read row, apply all updates, write back in single call
+      var totalCols = memberSheet.getLastColumn();
+      var rowData = memberSheet.getRange(memberRow, 1, 1, totalCols).getValues()[0];
       for (var j = 0; j < updates.length; j++) {
-        memberSheet.getRange(memberRow, updates[j].col).setValue(updates[j].value);
+        rowData[updates[j].col - 1] = updates[j].value;
       }
+      memberSheet.getRange(memberRow, 1, 1, totalCols).setValues([rowData]);
 
       // Mask name in logs for privacy
       var maskedUpdateName = typeof maskName === 'function' ? maskName(firstName + ' ' + lastName) : '[REDACTED]';
@@ -551,7 +552,7 @@ function setupGrievanceFormTrigger() {
     } else {
       // Use configured form
       var configFormUrl = GRIEVANCE_FORM_CONFIG.FORM_URL;
-      var match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+      match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
       if (!match) {
         ui.alert('No Form Configured',
           'No form URL provided and could not extract ID from config.\n\n' +
@@ -803,8 +804,17 @@ function onSatisfactionFormSubmit(e) {
     }
 
     // ── Append ANONYMOUS response to Satisfaction sheet ──
-    satSheet.appendRow(newRow);
-    var newRowNum = satSheet.getLastRow();
+    // Use a lock around appendRow + getLastRow to prevent race conditions
+    // when two form submissions arrive simultaneously (F34d fix)
+    var formLock = LockService.getScriptLock();
+    formLock.waitLock(10000);
+    try {
+      satSheet.appendRow(newRow);
+      SpreadsheetApp.flush(); // ensure row is committed before reading back
+      var newRowNum = satSheet.getLastRow();
+    } finally {
+      formLock.releaseLock();
+    }
 
     // ── Write hashed PII to vault (separate protected sheet) ──
     // Supersede any previous entry from same email+quarter
@@ -1044,7 +1054,6 @@ function checkDeadlinesAndNotify_() {
 
   var data = sheet.getDataRange().getValues();
   var today = new Date();
-  var _threeDaysAhead = new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000);
   var urgent = [];
 
   for (var i = 1; i < data.length; i++) {
@@ -1062,6 +1071,15 @@ function checkDeadlinesAndNotify_() {
         step: currentStep,
         days: daysToDeadline
       });
+
+      // Emit EventBus notification for SPA bell alerts
+      if (typeof EventBus !== 'undefined' && EventBus.emit) {
+        EventBus.emit('grievance:deadline:approaching', {
+          grievanceId: grievanceId,
+          memberName: String(data[i][GRIEVANCE_COLS.MEMBER_ID - 1] || ''),
+          daysLeft: daysToDeadline === 'Overdue' ? 0 : daysToDeadline
+        });
+      }
     }
   }
 
@@ -1152,7 +1170,7 @@ function sendStewardDeadlineAlerts() {
   for (var i = 1; i < grievanceData.length; i++) {
     var row = grievanceData[i];
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
     var status = row[GRIEVANCE_COLS.STATUS - 1];
     var currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
     var nextDue = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];
@@ -1191,6 +1209,15 @@ function sendStewardDeadlineAlerts() {
       daysRemaining: daysRemaining,
       nextDue: nextDue
     });
+
+    // Emit EventBus notification for SPA bell alerts
+    if (typeof EventBus !== 'undefined' && EventBus.emit) {
+      EventBus.emit('grievance:deadline:approaching', {
+        grievanceId: grievanceId,
+        memberName: memberInfo.name,
+        daysLeft: daysRemaining
+      });
+    }
   }
 
   // Get steward emails from Member Directory (stewards are members with IS_STEWARD = Yes)
@@ -1361,7 +1388,6 @@ function configureAlertSettings() {
  */
 function sendRandomSurveyEmails() {
   var ui = SpreadsheetApp.getUi();
-  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // Show configuration dialog
   var html = HtmlService.createHtmlOutput(
@@ -1428,7 +1454,6 @@ function executeSendRandomSurveyEmails(opts) {
 
   // Get all members with valid emails
   var memberData = memberSheet.getDataRange().getValues();
-  var _headers = memberData[0];
   var emailCol = MEMBER_COLS.EMAIL - 1;
   var memberIdCol = MEMBER_COLS.MEMBER_ID - 1;
   var firstNameCol = MEMBER_COLS.FIRST_NAME - 1;
@@ -1441,7 +1466,10 @@ function executeSendRandomSurveyEmails(opts) {
     if (configSheet && configSheet.getLastRow() > 1) {
       var logData = configSheet.getRange(2, surveyLogCol, configSheet.getLastRow() - 1, 2).getValues();
       logData.forEach(function(row) {
-        if (row[0]) surveyLog[row[0]] = new Date(row[1]);
+        if (row[0]) {
+          var parsed = new Date(row[1]);
+          if (!isNaN(parsed.getTime())) surveyLog[row[0]] = parsed;
+        }
       });
     }
   } catch(_e) { /* No log yet */ }
@@ -1605,6 +1633,7 @@ function getCurrentQuarter() {
  */
 function getQuarterFromDate(date) {
   var d = new Date(date);
+  if (isNaN(d.getTime())) return '';
   var quarter = Math.floor(d.getMonth() / 3) + 1;
   return d.getFullYear() + '-Q' + quarter;
 }
@@ -1696,8 +1725,23 @@ function populateSurveyTrackingFromMembers() {
     return;
   }
 
-  // Clear existing data (preserve header)
+  // M-39: Only clear tracking data if no existing survey responses exist.
+  // If any rows have a Completed Date (response timestamp), warn and skip the clear
+  // to avoid destroying manually entered or response-driven data.
   if (trackingSheet.getLastRow() > 1) {
+    var existingData = trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).getValues();
+    var hasResponseData = false;
+    for (var chk = 0; chk < existingData.length; chk++) {
+      // Check Completed Date column for any response timestamps
+      if (existingData[chk][SURVEY_TRACKING_COLS.COMPLETED_DATE - 1]) {
+        hasResponseData = true;
+        break;
+      }
+    }
+    if (hasResponseData) {
+      Logger.log('populateSurveyTracking: Existing survey response data found — skipping clear to avoid data loss. Use startNewSurveyRound() to reset.');
+      return;
+    }
     trackingSheet.getRange(2, 1, trackingSheet.getLastRow() - 1, SURVEY_TRACKING_HEADER_MAP_.length).clear();
   }
 
@@ -1746,11 +1790,15 @@ function updateSurveyTrackingOnSubmit_(matchedMemberId) {
   var data = trackingSheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (data[i][SURVEY_TRACKING_COLS.MEMBER_ID - 1] === matchedMemberId) {
+      // M-PERF: Batch write — read row, modify 3 cells, write back in single call
       var rowNum = i + 1;
-      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.CURRENT_STATUS).setValue('Completed');
-      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.COMPLETED_DATE).setValue(new Date());
+      var totalCols = trackingSheet.getLastColumn();
+      var rowData = trackingSheet.getRange(rowNum, 1, 1, totalCols).getValues()[0];
+      rowData[SURVEY_TRACKING_COLS.CURRENT_STATUS - 1] = 'Completed';
+      rowData[SURVEY_TRACKING_COLS.COMPLETED_DATE - 1] = new Date();
       var prevCompleted = parseInt(data[i][SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1]) || 0;
-      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.TOTAL_COMPLETED).setValue(prevCompleted + 1);
+      rowData[SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1] = prevCompleted + 1;
+      trackingSheet.getRange(rowNum, 1, 1, totalCols).setValues([rowData]);
       Logger.log('Survey tracking updated for member: ' + matchedMemberId);
       return;
     }
@@ -1886,7 +1934,13 @@ function sendSurveyCompletionReminders() {
       trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.LAST_REMINDER_SENT).setValue(now);
       sentCount++;
     } catch (emailError) {
-      Logger.log('Reminder email failed for ' + email + ': ' + emailError.message);
+      // M-14: Use secureLog/maskEmail instead of logging raw email
+      if (typeof secureLog === 'function') {
+        secureLog('sendSurveyCompletionReminders', 'Reminder email failed', { email: email, error: emailError.message });
+      } else {
+        var masked = typeof maskEmail === 'function' ? maskEmail(email) : '[REDACTED]';
+        Logger.log('Reminder email failed for ' + masked + ': ' + emailError.message);
+      }
     }
   }
 
@@ -2007,4 +2061,122 @@ function showSurveyTrackingDialog() {
  * @version 1.0.0
  * ============================================================================
  */
+
+// ============================================================================
+// IN-APP SURVEY (v4.15.0) — Mobile-optimized questionnaire
+// ============================================================================
+
+/**
+ * Returns structured survey questions derived from Member Satisfaction headers.
+ * Groups questions into sections for the multi-step wizard.
+ * @returns {Object} { sections: [{title, questions: [{id, text, type}]}] }
+ */
+function getSurveyQuestions() {
+  var sections = [
+    { title: 'Work Context', questions: [
+      { id: 'q1', text: 'What is your worksite?', type: 'text' },
+      { id: 'q2', text: 'What is your role?', type: 'text' },
+      { id: 'q3', text: 'What shift do you work?', type: 'text' },
+      { id: 'q4', text: 'How long have you been in your current role?', type: 'text' },
+      { id: 'q5', text: 'Have you had contact with a steward in the past year?', type: 'text' },
+    ]},
+    { title: 'Overall Satisfaction', questions: [
+      { id: 'q6', text: 'How satisfied are you with your union representation?', type: 'scale' },
+      { id: 'q7', text: 'How much do you trust the union to advocate for you?', type: 'scale' },
+      { id: 'q8', text: 'How protected do you feel by the union?', type: 'scale' },
+      { id: 'q9', text: 'How likely are you to recommend joining the union?', type: 'scale' },
+    ]},
+    { title: 'Steward Experience', questions: [
+      { id: 'q10', text: 'Steward responded in a timely manner', type: 'scale' },
+      { id: 'q11', text: 'Steward treated me with respect', type: 'scale' },
+      { id: 'q12', text: 'Steward explained my options clearly', type: 'scale' },
+      { id: 'q13', text: 'Steward followed through on commitments', type: 'scale' },
+      { id: 'q14', text: 'Steward advocated effectively for me', type: 'scale' },
+      { id: 'q15', text: 'I felt safe raising concerns', type: 'scale' },
+      { id: 'q16', text: 'Steward maintained confidentiality', type: 'scale' },
+    ]},
+    { title: 'Chapter & Leadership', questions: [
+      { id: 'q21', text: 'The chapter understands workplace issues', type: 'scale' },
+      { id: 'q22', text: 'Communication from the chapter is effective', type: 'scale' },
+      { id: 'q23', text: 'The chapter organizes well', type: 'scale' },
+      { id: 'q26', text: 'Leadership decisions are clear', type: 'scale' },
+      { id: 'q27', text: 'I understand the grievance process', type: 'scale' },
+      { id: 'q31', text: 'The union welcomes member opinions', type: 'scale' },
+    ]},
+    { title: 'Final Thoughts', questions: [
+      { id: 'q_comment', text: 'Any additional comments or suggestions?', type: 'freetext' },
+    ]},
+  ];
+  return { sections: sections };
+}
+
+/**
+ * Submits an in-app survey response.
+ * Hashes the email with SHA-256 for anonymity, writes to satisfaction sheet.
+ * @param {string} hashedEmail - Pre-hashed email from client (or raw email to hash server-side)
+ * @param {Object} responses - { q1: val, q2: val, ... }
+ * @returns {Object} { success, message }
+ */
+function submitSurveyResponse(hashedEmail, responses) {
+  if (!hashedEmail || !responses) return { success: false, message: 'Missing data.' };
+
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
+    if (!sheet) return { success: false, message: 'Survey sheet not found.' };
+
+    // CR-DATA-2: Use standard hashForVault_() instead of ad-hoc SHA-256
+    // to match the hash algorithm used elsewhere (HMAC-style double hash with salt)
+    var emailHash = hashForVault_(hashedEmail);
+
+    // Check vault for duplicate
+    var vaultSheet = ss.getSheetByName(SHEETS.SURVEY_VAULT || '_Survey_Vault');
+    if (vaultSheet && vaultSheet.getLastRow() > 1) {
+      var vaultData = vaultSheet.getRange(2, 1, vaultSheet.getLastRow() - 1, 1).getValues();
+      for (var v = 0; v < vaultData.length; v++) {
+        if (String(vaultData[v][0]) === emailHash) {
+          return { success: false, message: 'You have already submitted a survey this quarter.' };
+        }
+      }
+    }
+
+    // Build response row — Timestamp + question values in order
+    // CR-FORMULA: Escape all user responses to prevent formula injection
+    var row = [new Date()];
+    var questionIds = ['q1','q2','q3','q4','q5','q6','q7','q8','q9','q10','q11','q12','q13','q14','q15','q16','q17','q18','q19','q20','q21','q22','q23','q26','q27','q31','q_comment'];
+    for (var i = 0; i < questionIds.length; i++) {
+      row.push(escapeForFormula(responses[questionIds[i]] || ''));
+    }
+
+    sheet.appendRow(row);
+
+    // Record hash in vault
+    if (vaultSheet) {
+      vaultSheet.appendRow([emailHash, new Date()]);
+    }
+
+    // Update tracking
+    var trackSheet = ss.getSheetByName(SHEETS.SURVEY_TRACKING || '_Survey_Tracking');
+    if (trackSheet && trackSheet.getLastRow() > 1) {
+      var trackData = trackSheet.getDataRange().getValues();
+      for (var t = 1; t < trackData.length; t++) {
+        var tEmail = String(trackData[t][1] || '').toLowerCase().trim();
+        if (tEmail === hashedEmail.toLowerCase().trim()) {
+          // M-PERF: Batch write — read row, modify 2 cells, write back
+          var ttotalCols = trackSheet.getLastColumn();
+          var trowData = trackSheet.getRange(t + 1, 1, 1, ttotalCols).getValues()[0];
+          trowData[2] = 'Completed';
+          trowData[3] = new Date();
+          trackSheet.getRange(t + 1, 1, 1, ttotalCols).setValues([trowData]);
+          break;
+        }
+      }
+    }
+
+    return { success: true, message: 'Thank you! Your anonymous response has been recorded.' };
+  } catch (e) {
+    Logger.log('submitSurveyResponse error: ' + e.message);
+    return { success: false, message: 'Error submitting survey. Please try again.' };
+  }
+}
 

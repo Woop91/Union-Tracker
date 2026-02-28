@@ -17,6 +17,7 @@
  * @requires 01_Core.gs
  */
 
+// ACCEPTABLE: 40+ menu items match feature breadth for power-user audience
 // ============================================================================
 // MENU CREATION
 // ============================================================================
@@ -658,7 +659,7 @@ function getMultiSelectHtml(items, callback) {
         <div class="action-bar">
           <span class="selection-count" id="selectionCount">0 selected</span>
           <div>
-            <button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>
+            <button class="btn btn-secondary" onclick="cancelSelection()">Cancel</button>
             <button class="btn btn-primary" onclick="submitSelection()">Apply</button>
           </div>
         </div>
@@ -701,6 +702,11 @@ function getMultiSelectHtml(items, callback) {
         function updateCount() {
           const count = document.querySelectorAll('.item-checkbox:checked').length;
           document.getElementById('selectionCount').textContent = count + ' selected';
+        }
+
+        function cancelSelection() {
+          google.script.run.clearMultiSelectState();
+          google.script.host.close();
         }
 
         function submitSelection() {

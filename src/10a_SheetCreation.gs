@@ -134,7 +134,7 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.ORG_NAME, ['Your Union Name'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.LOCAL_NUMBER, ['000'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAIN_ADDRESS, ['123 Main Street, Suite 100, City, ST 00000'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_PHONE, ['555-000-0000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_PHONE, ['(000) 000-0000'], isExistingSheet);
 
   // Deadline defaults (in days) — values from DEADLINE_DEFAULTS (01_Core.gs)
   seedConfigDefault_(sheet, CONFIG_COLS.FILING_DEADLINE_DAYS, [DEADLINE_DEFAULTS.FILING_DAYS], isExistingSheet);
@@ -158,9 +158,9 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.ORG_WEBSITE, ['https://www.example.org/'], isExistingSheet);
 
   // Extended contact
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_FAX, ['555-000-0001'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_NAME, ['Contact Name'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_EMAIL, ['contact@example.org'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_FAX, ['(000) 000-0000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_NAME, ['Your Contact Name'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_EMAIL, ['your-email@your-org.org'], isExistingSheet);
 
   // Escalation triggers (comma-separated values read at runtime)
   var escalationStatuses = COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
@@ -540,7 +540,9 @@ function createConfigGuideSheet(ss) {
   ss = ss || SpreadsheetApp.getActiveSpreadsheet();
   var sheetName = SHEETS.CONFIG_GUIDE || '📖 Config Guide';
 
+  // CR-11: This sheet is fully system-generated (no user data), so clearing is safe.
   var sheet = ss.getSheetByName(sheetName);
+  var isNew = !sheet;
   if (sheet) {
     sheet.clear();
   } else {
@@ -1379,7 +1381,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Location values - alternate row coloring
-  for (var r = 35; r <= 39; r++) {
+  for (r = 35; r <= 39; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_BLUE);
@@ -1501,7 +1503,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Busiest stewards values - alternate row coloring with gradient effect
-  for (var r = 59; r <= 88; r++) {
+  for (r = 59; r <= 88; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);
@@ -1530,7 +1532,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Top performers values - gradient green rows
-  for (var r = 93; r <= 102; r++) {
+  for (r = 93; r <= 102; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_GREEN);
@@ -1564,7 +1566,7 @@ function createDashboard(ss) {
     .setHorizontalAlignment('center');
 
   // Stewards needing support - gradient red rows
-  for (var r = 107; r <= 116; r++) {
+  for (r = 107; r <= 116; r++) {
     sheet.getRange('A' + r + ':F' + r).setHorizontalAlignment('center');
     if (r % 2 === 1) {
       sheet.getRange('A' + r + ':F' + r).setBackground(COLORS.ROW_ALT_RED);
@@ -1809,7 +1811,7 @@ function createVolunteerHoursSheet(ss) {
 
   // Add data type hints (row 2)
   var hints = [
-    'Auto-ID', 'Dropdown', 'Auto-lookup', 'MM/DD/YYYY', 'Dropdown', 'Number', 'Text', 'Text', 'Text'
+    'Auto-ID', 'Text', 'Auto-lookup', 'MM/DD/YYYY', 'Dropdown', 'Number', 'Text', 'Text', 'Text'
   ];
 
   sheet.getRange(2, 1, 1, hints.length).setValues([hints])
@@ -1889,7 +1891,7 @@ function createMeetingAttendanceSheet(ss) {
 
   // Add data type hints (row 2)
   var hints = [
-    'Auto-ID', 'MM/DD/YYYY', 'Dropdown', 'Text', 'Dropdown', 'Auto-lookup', 'Checkbox', 'Text'
+    'Auto-ID', 'MM/DD/YYYY', 'Dropdown', 'Text', 'Text', 'Auto-lookup', 'Checkbox', 'Text'
   ];
 
   sheet.getRange(2, 1, 1, hints.length).setValues([hints])
@@ -1911,6 +1913,13 @@ function createMeetingAttendanceSheet(ss) {
 
   // Format columns
   sheet.getRange(3, 2, 998, 1).setNumberFormat('MM/DD/YYYY');  // B - Meeting Date
+
+  // Meeting Type dropdown (column C)
+  var meetingTypeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Virtual', 'In-Person'], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange('C3:C1000').setDataValidation(meetingTypeRule);
 
   // Add checkboxes for Attended column
   sheet.getRange('G3:G1000').insertCheckboxes();

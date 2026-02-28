@@ -75,6 +75,11 @@ function loadSource(filename) {
   // --- Phase 2: Evaluate the full file ---
   // Rewrite top-level var declarations to global assignments
   // Match lines starting with `var IDENTIFIER =` (possibly with leading whitespace at indent 0)
+  // NOTE: These regexes use ^...gm which matches start-of-line, not start-of-string.
+  // This means nested function/var declarations inside IIFEs or blocks that happen to
+  // start at column 0 will ALSO be rewritten. For the current codebase this works
+  // because IIFE bodies are indented, but it could break if formatting changes.
+  // A proper AST-based approach (e.g., babel transform) would be more robust.
   code = code.replace(/^var\s+(\w+)\s*=/gm, 'global.$1 =');
 
   // Rewrite top-level function declarations to global assignments

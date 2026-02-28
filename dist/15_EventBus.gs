@@ -169,6 +169,7 @@ var EventBus = (function() {
             result.handled++;
           } catch (err) {
             result.errors.push(parentEvent + '[' + parentSubs[j].id + ']: ' + err.message);
+            console.log('EventBus error in ' + parentEvent + ' (parent of ' + eventName + '): ' + err.message);
           }
           if (parentSubs[j].once) {
             toRemove.push(parentSubs[j].id);
@@ -251,9 +252,17 @@ var EventBus = (function() {
  * Called once during initialization (onOpen or trigger setup).
  * Each module registers its own listeners here.
  */
+var eventBusSubscribersRegistered_ = false;
+
 function registerEventBusSubscribers() {
-  // Clear previous subscriptions (safe for re-init)
-  EventBus.reset();
+  // Only reset if this is the first registration to avoid wiping prior subscribers
+  if (!eventBusSubscribersRegistered_) {
+    EventBus.reset();
+    eventBusSubscribersRegistered_ = true;
+  } else {
+    // Already registered — skip to avoid duplicate listeners
+    return;
+  }
 
   // --- Grievance Log edit handlers ---
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {
@@ -339,6 +348,40 @@ function registerEventBusSubscribers() {
   EventBus.on('data:changed', function(data) {
     Logger.log('Data changed: ' + (data && data.source ? data.source : 'unknown'));
   }, { priority: 0, id: 'data_change_logger' });
+
+  // --- Auto-notification: Grievance deadline approaching ---
+  EventBus.on('grievance:deadline:approaching', function(data) {
+    try {
+      if (typeof sendWebAppNotification === 'function') {
+        sendWebAppNotification({
+          recipient: data.memberEmail || 'All Stewards',
+          type: 'Deadline',
+          title: 'Grievance Deadline Approaching',
+          message: data.grievanceId + ' (' + (data.memberName || 'Unknown') + ') \u2014 ' + data.daysLeft + ' day(s) remaining',
+          priority: data.daysLeft <= 1 ? 'Urgent' : 'Normal'
+        });
+      }
+    } catch (err) {
+      Logger.log('EventBus notification error (deadline): ' + err);
+    }
+  }, { priority: 30, id: 'notif_deadline_approaching' });
+
+  // --- Auto-notification: Grievance status changed ---
+  EventBus.on('grievance:status:changed', function(data) {
+    try {
+      if (data.memberEmail && typeof sendWebAppNotification === 'function') {
+        sendWebAppNotification({
+          recipient: data.memberEmail,
+          type: 'System',
+          title: 'Grievance Update: ' + (data.grievanceId || ''),
+          message: 'Status changed to ' + (data.newStatus || 'Unknown'),
+          priority: 'Normal'
+        });
+      }
+    } catch (err) {
+      Logger.log('EventBus notification error (status): ' + err);
+    }
+  }, { priority: 30, id: 'notif_status_changed' });
 
   Logger.log('EventBus: ' + EventBus.listenerCount() + ' subscribers registered');
 }

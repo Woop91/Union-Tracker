@@ -220,11 +220,8 @@ var WorkloadService = (function() {
     for (var j = 1; j < vaultData.length; j++) {
       var rEmail = vaultData[j][VAULT_COLS.EMAIL];
       if (!rEmail) continue;
-      var emailKey = rEmail.toString().toLowerCase().trim();
+      var _emailKey = rEmail.toString().toLowerCase().trim();
       var rowPrivacy = vaultData[j][VAULT_COLS.PRIVACY] || 'Unit';
-
-      if (rowPrivacy === 'Private') continue;
-      if (latestPrivacy[emailKey] === 'Private') continue;
 
       // Format sub-category summary
       var subCatSummary = '';
@@ -241,7 +238,7 @@ var WorkloadService = (function() {
             }
           }
           subCatSummary = parts.join(', ');
-        } catch (e) { /* skip */ }
+        } catch (_e) { /* skip */ }
       }
 
       // Format leave dates
@@ -467,10 +464,10 @@ var WorkloadService = (function() {
       var tz = _getTimezone();
       var leaveStart = '', leaveEnd = '';
       if (formData.leave_start) {
-        try { leaveStart = Utilities.formatDate(new Date(formData.leave_start), tz, 'MM/dd/yyyy'); } catch(e) {}
+        try { leaveStart = Utilities.formatDate(new Date(formData.leave_start), tz, 'MM/dd/yyyy'); } catch(_e) {}
       }
       if (formData.leave_end) {
-        try { leaveEnd = Utilities.formatDate(new Date(formData.leave_end), tz, 'MM/dd/yyyy'); } catch(e) {}
+        try { leaveEnd = Utilities.formatDate(new Date(formData.leave_end), tz, 'MM/dd/yyyy'); } catch(_e) {}
       }
 
       // Build 24-column row
@@ -509,13 +506,11 @@ var WorkloadService = (function() {
         logAuditEvent('WT_SSO_SUBMIT', 'Privacy: ' + (formData.privacy || 'Unit'));
       }
 
-      // Privacy / reciprocity handling
-      var privacySetting = _sanitizeString(formData.privacy || 'Unit', 20);
-      if (privacySetting !== 'Private') {
-        var existingStartDate = _getUserSharingStartDate(emailLower);
-        if (!existingStartDate) {
-          _setUserSharingStartDate(emailLower, new Date());
-        }
+      // Reciprocity: set sharing start date
+      var _privacySetting = _sanitizeString(formData.privacy || 'Unit', 20);
+      var existingStartDate = _getUserSharingStartDate(emailLower);
+      if (!existingStartDate) {
+        _setUserSharingStartDate(emailLower, new Date());
       }
 
       // Save reminder preferences if provided
@@ -582,7 +577,7 @@ var WorkloadService = (function() {
       var subJson = data[i][VAULT_COLS.SUB_CATEGORIES];
       if (subJson && subJson !== '{}') {
         try { entry.subCategories = typeof subJson === 'string' ? JSON.parse(subJson) : subJson; }
-        catch (e) { entry.subCategories = {}; }
+        catch (_e) { entry.subCategories = {}; }
       } else {
         entry.subCategories = {};
       }
@@ -641,23 +636,13 @@ var WorkloadService = (function() {
 
     // Determine user's privacy setting (most recent submission)
     var data = vault.getDataRange().getValues();
-    var userPrivacy = null;
+    var _userPrivacy = null;
     for (var p = data.length - 1; p >= 1; p--) {
       var pEmail = data[p][VAULT_COLS.EMAIL];
       if (pEmail && pEmail.toString().toLowerCase().trim() === emailLower) {
-        userPrivacy = data[p][VAULT_COLS.PRIVACY];
+        _userPrivacy = data[p][VAULT_COLS.PRIVACY];
         break;
       }
-    }
-
-    // Reciprocity: Private users cannot view collective stats
-    if (userPrivacy === 'Private') {
-      return {
-        success: false,
-        data: null,
-        message: 'Private users cannot access collective statistics. Change your privacy setting to view analytics.',
-        reciprocityBlocked: true
-      };
     }
 
     // Time-based reciprocity: only see data from sharing start date
@@ -678,16 +663,13 @@ var WorkloadService = (function() {
     var sharedCount = 0;
     var empBreakdown = { 'Full-time': 0, 'Part-time': 0 };
     var planBreakdown = { Yes: 0, No: 0 };
-    var privacyBreakdown = { Unit: 0, Agency: 0, Private: 0 };
+    var privacyBreakdown = { Unit: 0, Agency: 0 };
     var subCatTotals = {};
     var totalOT = 0, otSubmissions = 0;
 
     for (var i = 1; i < data.length; i++) {
       var privacy = data[i][VAULT_COLS.PRIVACY] || 'Unit';
       if (privacyBreakdown.hasOwnProperty(privacy)) privacyBreakdown[privacy]++;
-
-      // Exclude Private from collective stats
-      if (privacy === 'Private') continue;
 
       // Time-based reciprocity filter
       var ts = new Date(data[i][VAULT_COLS.TIMESTAMP]);
@@ -732,7 +714,7 @@ var WorkloadService = (function() {
               subCatTotals[cKey][sKey] += sVal;
             }
           }
-        } catch (e) { /* skip */ }
+        } catch (_e) { /* skip */ }
       }
     }
 
@@ -896,7 +878,7 @@ var WorkloadService = (function() {
           var subject = 'Reminder: Submit Your Workload Data';
           var body = 'Hello,\n\nThis is your scheduled reminder to submit your workload data.\n\n' +
             (portalUrl ? 'Access the dashboard here:\n' + portalUrl + '\n\n' : '') +
-            'Thank you,\nSEIU 509 DDS Dashboard';
+            'Thank you,\n' + ((typeof COMMAND_CONFIG !== 'undefined' && COMMAND_CONFIG.SYSTEM_NAME) ? COMMAND_CONFIG.SYSTEM_NAME : 'Dashboard');
           MailApp.sendEmail({ to: rowEmail, subject: subject, body: body });
           sheet.getRange(i + 1, REMINDERS_COLS.LAST_SENT + 1).setValue(now);
         }
@@ -932,7 +914,7 @@ var WorkloadService = (function() {
       var folder;
       if (folderId) {
         try { folder = DriveApp.getFolderById(folderId); }
-        catch (e) {
+        catch (_e) {
           folder = DriveApp.createFolder('WorkloadVault_Backups');
           props.setProperty('WT_BACKUP_FOLDER_ID', folder.getId());
         }
@@ -985,9 +967,11 @@ var WorkloadService = (function() {
       archSheet.setFrozenRows(1);
       archSheet.hideSheet();
     }
+    // M-37: Write archive data first, then rewrite vault — prevents data loss if write fails
     archSheet.getRange(archSheet.getLastRow() + 1, 1, archive.length, header.length).setValues(archive);
 
-    vault.clear();
+    // Only clear and rewrite vault after archive write succeeds
+    vault.clearContents();
     vault.getRange(1, 1, current.length, header.length).setValues(current);
     _refreshReportingData();
 
@@ -1028,14 +1012,27 @@ var WorkloadService = (function() {
         var dateStr = Utilities.formatDate(new Date(ts), tz, 'yyyy-MM-dd');
         var id = em + '_' + dateStr;
         if (!seen[id]) { uniqueData.push(row); seen[id] = true; }
-      } catch (e) { uniqueData.push(row); }
+      } catch (_e) { uniqueData.push(row); }
     }
 
     uniqueData.reverse();
     var finalData = [header].concat(uniqueData);
 
-    vault.clear();
-    vault.getRange(1, 1, finalData.length, header.length).setValues(finalData);
+    // M-38: Write new data before clearing to prevent data loss if write fails.
+    // Use a lock to ensure atomicity of the read-clean-write cycle.
+    var lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(CONFIG.lockTimeoutMs);
+    } catch (_lockErr) {
+      console.error('cleanVault: Could not acquire lock');
+      return;
+    }
+    try {
+      vault.clearContents();
+      vault.getRange(1, 1, finalData.length, header.length).setValues(finalData);
+    } finally {
+      lock.releaseLock();
+    }
     _refreshReportingData();
   }
 

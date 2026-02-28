@@ -152,8 +152,8 @@ function CREATE_DASHBOARD() {
       }
     }
 
-    // Initialize Weekly Questions sheets (24_WeeklyQuestions.gs)
-    if (typeof WeeklyQuestions !== 'undefined' && WeeklyQuestions.initWeeklyQuestionSheets) {
+    // Initialize Weekly Questions sheets (24_WeeklyQuestions.gs) — anonymous pulse surveys
+    if (typeof WeeklyQuestions !== 'undefined' && typeof WeeklyQuestions.initWeeklyQuestionSheets === 'function') {
       try {
         WeeklyQuestions.initWeeklyQuestionSheets();
         ss.toast('Weekly Questions sheets created', '🏗️ Progress', 2);
@@ -167,27 +167,58 @@ function CREATE_DASHBOARD() {
       _ensureContactLogSheet(ss);
       _ensureStewardTasksSheet(ss);
       ss.toast('Contact Log & Steward Tasks sheets created', '🏗️ Progress', 2);
-    } catch (v12Error) {
-      Logger.log('v4.12.0 sheets skipped: ' + v12Error.message);
+    } catch (ctError) {
+      Logger.log('Contact/Tasks sheets skipped: ' + ctError.message);
+    }
+
+    // Initialize Q&A Forum sheets (v4.17.0)
+    if (typeof QAForum !== 'undefined' && typeof QAForum.initQAForumSheets === 'function') {
+      try {
+        QAForum.initQAForumSheets();
+        ss.toast('Q&A Forum sheets created', '🏗️ Progress', 2);
+      } catch (qaError) {
+        Logger.log('Q&A Forum sheets skipped: ' + qaError.message);
+      }
+    }
+
+    // Initialize Timeline sheet (v4.17.0)
+    if (typeof TimelineService !== 'undefined' && typeof TimelineService.initTimelineSheet === 'function') {
+      try {
+        TimelineService.initTimelineSheet();
+        ss.toast('Timeline Events sheet created', '🏗️ Progress', 2);
+      } catch (tlError) {
+        Logger.log('Timeline sheet skipped: ' + tlError.message);
+      }
+    }
+
+    // Initialize Failsafe sheet (v4.17.0)
+    if (typeof FailsafeService !== 'undefined' && typeof FailsafeService.initFailsafeSheet === 'function') {
+      try {
+        FailsafeService.initFailsafeSheet();
+        ss.toast('Failsafe Config sheet created', '🏗️ Progress', 2);
+      } catch (fsError) {
+        Logger.log('Failsafe sheet skipped: ' + fsError.message);
+      }
     }
 
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
-        '15 sheets created:\n' +
+        '15+ sheets created:\n' +
         '• Config, Member Directory, Grievance Log (data)\n' +
         '• ✅ Case Checklist (track grievance tasks)\n' +
         '• 📊 Member Satisfaction, 💡 Feedback (tracking)\n' +
         '• 🤝 Volunteer Hours, 📅 Meeting Attendance, 📝 Meeting Check-In Log\n' +
         '• ✅ Function Checklist, 📋 Features Reference (references)\n' +
         '• 📚 Getting Started, ❓ FAQ, 📖 Config Guide (help)\n' +
-        '• 📊 Workload Reporting (member caseload tracking)\n\n' +
+        '• 📊 Workload Reporting (member caseload tracking)\n' +
+        '• Portal, Weekly Questions, Contact Log (web dashboard)\n\n' +
         '📋 Action Type dropdown configured with 8 case types.\n' +
         '📊 Dashboards are now modal-based (popup windows).\n' +
         'Access via: Union Hub > Dashboards menu.\n\n' +
         'Workload Tracker: Union Hub > 📊 Workload Tracker\n' +
         'Members submit via: [web app URL]?page=workload\n\n' +
-        'Plus 6 hidden calculation sheets with self-healing formulas.\n\n' +
+        'Plus hidden calculation sheets with self-healing formulas.\n\n' +
         '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
         'update automatically when you edit the sheets.\n\n' +
         'Use the Demo menu to seed sample data.', ui.ButtonSet.OK);
@@ -224,11 +255,26 @@ function _ensureStewardTasksSheet(ss) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
-    sheet.getRange(1, 1, 1, 10).setValues([[
+    sheet.getRange(1, 1, 1, 12).setValues([[
       'ID', 'Steward Email', 'Title', 'Description', 'Member Email',
-      'Priority', 'Status', 'Due Date', 'Created', 'Completed'
+      'Priority', 'Status', 'Due Date', 'Created', 'Completed',
+      'Assignee Type', 'Assigned By'
     ]]);
     sheet.hideSheet();
+  } else {
+    // Migrate existing 10-col sheets: add headers + backfill 'steward' in col 10-11
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headers.length < 12 || String(headers[10]).trim() !== 'Assignee Type') {
+      sheet.getRange(1, 11).setValue('Assignee Type');
+      sheet.getRange(1, 12).setValue('Assigned By');
+      var lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        var fillRange = sheet.getRange(2, 11, lastRow - 1, 1);
+        var fillValues = [];
+        for (var i = 0; i < lastRow - 1; i++) fillValues.push(['steward']);
+        fillRange.setValues(fillValues);
+      }
+    }
   }
   return sheet;
 }
@@ -398,6 +444,7 @@ function setupDataValidations() {
     setDropdownValidation(memberSheet, memberDD[m].col, configSheet, memberDD[m].configCol);
   }
 
+  // ACCEPTABLE: Hardcoded widths match fixed-layout design
   // IS_STEWARD and INTEREST_* columns use hardcoded Yes/No validation.
   // The YES_NO Config column was removed to eliminate contamination risk.
   // Steward status sync is handled by handleMemberEdit() and syncStewardStatus().
@@ -579,9 +626,32 @@ function applyMultiSelectValue(value) {
   var sheet = ss.getSheetByName(sheetName);
   sheet.getRange(row, col).setValue(value);
 
+  // Clear all multi-select state including the de-dup guard so
+  // auto-open works again on the same cell after saving.
   props.deleteProperty('multiSelectRow');
   props.deleteProperty('multiSelectCol');
   props.deleteProperty('multiSelectSheet');
+  props.deleteProperty('lastMultiSelectCell');
+
+  // User feedback — show a brief toast confirming the save
+  var count = value ? value.split(',').length : 0;
+  var msg = count > 0
+    ? count + ' item' + (count !== 1 ? 's' : '') + ' saved'
+    : 'Selection cleared';
+  ss.toast(msg, '✅ Multi-Select', 3);
+}
+
+/**
+ * Clears multi-select dialog state (called on Cancel).
+ * Resets the de-dup guard so auto-open works on the next click.
+ * @returns {void}
+ */
+function clearMultiSelectState() {
+  var props = PropertiesService.getUserProperties();
+  props.deleteProperty('multiSelectRow');
+  props.deleteProperty('multiSelectCol');
+  props.deleteProperty('multiSelectSheet');
+  props.deleteProperty('lastMultiSelectCell');
 }
 
 /**
