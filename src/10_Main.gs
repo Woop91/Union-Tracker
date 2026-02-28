@@ -34,6 +34,9 @@
  */
 function onOpen() {
   try {
+    // Clear memoized caches so fresh config values are picked up
+    if (typeof _systemNameCache_ !== 'undefined') _systemNameCache_ = null;
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
     // Create the dashboard menu
@@ -2127,6 +2130,12 @@ function showExportDialog() {
  * @returns {Object} Result with success message
  */
 function exportMemberDirectory(format) {
+  // F20-21: PII export requires steward authorization
+  var authResult = checkWebAppAuthorization('steward');
+  if (!authResult.isAuthorized) {
+    return errorResponse(authResult.message || 'Unauthorized: steward access required for export', 'exportMemberDirectory');
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 

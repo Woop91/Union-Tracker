@@ -648,8 +648,11 @@ function getOrgNameFromConfig_() {
  * @private
  * @returns {string} System name (e.g., "Strategic Command Center")
  */
+var _systemNameCache_ = null;
 function getSystemName_() {
-  return getLocalNumberFromConfig_() + ' Strategic Command Center';
+  if (_systemNameCache_ !== null) return _systemNameCache_;
+  _systemNameCache_ = getLocalNumberFromConfig_() + ' Strategic Command Center';
+  return _systemNameCache_;
 }
 
 /**
