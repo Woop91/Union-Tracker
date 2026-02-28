@@ -444,3 +444,15 @@ DDS Main → UT staging → (user manages) → UT dev → UT main
 - **DDS Script ID must NEVER appear in this repo** (public).
 - **Read before act.** Never assume repo state, file contents, or function behavior.
 - **Workload Tracker excluded:** `18_WorkloadTracker.gs` and `WorkloadTracker.html` are DDS-only.
+
+## 2026-02-28 — Workflow Correction (v4.18.2)
+
+### Error Found & Corrected
+- **v4.18.1 incorrectly deleted staging and dev branches.** Recreated both from current Main (in parity).
+- Correct flow: `DDS Main → UT staging → [user promotes] → UT dev → UT Main`
+
+### Actions Taken
+- Recreated `staging` and `dev` branches from Main
+- Updated CLAUDE.md with correct sync flow and branch ownership
+- Added Code Review strict rules
+- Clarified: Claude pushes to staging only, user manages dev and Main

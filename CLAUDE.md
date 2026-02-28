@@ -11,12 +11,23 @@
 
 ## Repos & Sync
 
-- **Union-Tracker** (public): This repo. Receives syncs from DDS `Main` directly into UT `Main`.
+- **Union-Tracker** (public): This repo. Receives syncs from DDS `Main` into UT `staging`.
 - **DDS-Dashboard** (private): Primary/source repo. Single branch: `Main`.
-- Sync flow: `DDS Main → UT Main` (with exclusions applied). No intermediate branches.
-- **Single branch: `Main` only.** Do NOT create feature/dev/staging branches.
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in this repo.**
+
+### Sync Flow
+```
+DDS Main (GitHub) → UT staging → [USER promotes] → UT dev → UT Main
+```
+- **Claude manages:** DDS Main → UT staging. Workload Tracker exclusions applied on every sync.
+- **User manages:** UT staging → UT dev → UT Main. Claude never pushes to UT dev or UT Main.
+
+### Repo Differences
+DDS and UT are **identical** except:
+- UT excludes `src/18_WorkloadTracker.gs` and `src/WorkloadTracker.html`.
+- Files referencing WT use `typeof` guards. See `SYNC-LOG.md` for full exclusion registry.
+- No other differences should exist. Drift = bug → fix it.
 
 ### Version Tracking — MANDATORY
 - Semver tagging on every meaningful commit. Update `VERSION_INFO` in `src/01_Core.gs`, `package.json`, and `CHANGELOG.md` together.
@@ -24,12 +35,15 @@
 
 ### Parity Enforcement
 - After every push: verify GitHub remote and local clone match.
-- Both surfaces (GitHub + local + Google Apps Script) must reflect the same state after every operation.
+- UT staging must match DDS Main (minus WT exclusions) after every sync.
 
 ### No-Assumptions Policy
 - Never assume file contents, function behavior, config values, or repo state. Read first, then act.
 - If prior work contains assumptions: re-examine, correct, and document in `AI_REFERENCE.md`.
 - Every repo-altering action must be logged: what changed, why, and resulting version.
+
+### Fallback (GitHub unreachable)
+Work on local repo. Add a timestamped note in `AI_REFERENCE.md`: what was done, what needs pushing, enough context for a follow-on agent to resume.
 
 ### What's Excluded from UT
 - `src/18_WorkloadTracker.gs` — DDS-only member caseload module
@@ -135,12 +149,13 @@ npm run deploy         # lint + test:unit + build:prod + clasp push
 ## Git Conventions
 
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
-- **Single branch: `Main` (capital M). No feature branches.** All commits go directly to Main.
+- **Claude pushes only to `staging`.** User manages `dev` and `Main`.
 - Every commit must include version bump if code changed.
 
-## Code Review
+## Code Review — STRICT
 
-Canonical review: `CODE_REVIEW.md`. Never claim "FIXED" without citing proof.
+Canonical review: `CODE_REVIEW.md`. Never claim "FIXED" without citing exact file, line, and corrected code.
+Search entire codebase for every vulnerability pattern found. No inflated scores — state findings plainly.
 
 ## Reference Documents
 
