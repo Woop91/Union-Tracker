@@ -3030,10 +3030,12 @@ function showTestDashboard() {
 
   var testRows = results.results.map(function(r) {
     var status = r.passed ? '✅' : '❌';
-    var errorMsg = r.error ? '<span style="color:#ef4444">' + r.error + '</span>' : '-';
+    var safeName = escapeHtml(String(r.name || ''));
+    var safeError = r.error ? escapeHtml(String(r.error)) : '';
+    var errorMsg = safeError ? '<span style="color:#ef4444">' + safeError + '</span>' : '-';
     return '<tr>' +
       '<td>' + status + '</td>' +
-      '<td>' + r.name + '</td>' +
+      '<td>' + safeName + '</td>' +
       '<td>' + r.duration + 'ms</td>' +
       '<td>' + errorMsg + '</td>' +
       '</tr>';

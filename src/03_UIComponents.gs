@@ -508,6 +508,11 @@ function APPLY_SYSTEM_THEME() {
  * @returns {void}
  * @private
  */
+function clampFontSize_(size) {
+  var n = Number(size) || 10;
+  return Math.max(8, Math.min(24, n));
+}
+
 function applyThemeToSheet_(sheet) {
   var lastCol = sheet.getLastColumn();
   var lastRow = sheet.getLastRow();
@@ -524,7 +529,7 @@ function applyThemeToSheet_(sheet) {
     .setFontColor(theme.headerText)
     .setFontWeight('bold')
     .setFontFamily(theme.font)
-    .setFontSize(theme.headerSize)
+    .setFontSize(clampFontSize_(theme.headerSize))
     .setHorizontalAlignment('center');
 
   // Apply data row styling
@@ -532,17 +537,15 @@ function applyThemeToSheet_(sheet) {
     var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
     dataRange
       .setFontFamily(theme.font)
-      .setFontSize(theme.fontSize);
+      .setFontSize(clampFontSize_(theme.fontSize));
 
-    // Apply alternating row colors
+    // F23b: Apply alternating row colors in single setBackgrounds call
+    var backgrounds = [];
     for (var row = 2; row <= lastRow; row++) {
-      var rowRange = sheet.getRange(row, 1, 1, lastCol);
-      if (row % 2 === 0) {
-        rowRange.setBackground(theme.altRow);
-      } else {
-        rowRange.setBackground('#ffffff');
-      }
+      var color = (row % 2 === 0) ? theme.altRow : '#ffffff';
+      backgrounds.push(new Array(lastCol).fill(color));
     }
+    dataRange.setBackgrounds(backgrounds);
   }
 }
 
@@ -871,14 +874,14 @@ function applyZebraStripes(sheet) {
 
   if (lastRow < 2 || lastCol < 1) return;
 
+  // F23b: Build backgrounds array and apply in single setBackgrounds call
+  var backgrounds = [];
   for (var row = 2; row <= lastRow; row++) {
-    var rowRange = sheet.getRange(row, 1, 1, lastCol);
-    if (row % 2 === 0) {
-      rowRange.setBackground('#f1f5f9');
-    } else {
-      rowRange.setBackground('#ffffff');
-    }
+    var color = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
+    var rowColors = new Array(lastCol).fill(color);
+    backgrounds.push(rowColors);
   }
+  sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(backgrounds);
 }
 
 /**
