@@ -122,7 +122,14 @@ function syncAllDashboardData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
 
+  // F44: Prevent concurrent syncs
+  var lock = LockService.getScriptLock();
   try {
+    if (!lock.tryLock(10000)) {
+      ss.toast('Another sync is already running. Try again shortly.', '⏳ Busy', 5);
+      return;
+    }
+
     // Sync hidden calculation sheets first
     if (typeof syncGrievanceCalcSheet === 'function') syncGrievanceCalcSheet();
     if (typeof syncDashboardCalcValues === 'function') syncDashboardCalcValues();
@@ -136,6 +143,8 @@ function syncAllDashboardData() {
   } catch (e) {
     ss.toast('Error syncing: ' + e.message, '❌ Error', 5);
     Logger.log('syncAllDashboardData error: ' + e.toString());
+  } finally {
+    lock.releaseLock();
   }
 }
 

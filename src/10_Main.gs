@@ -37,51 +37,20 @@ function onOpen() {
     // Clear memoized caches so fresh config values are picked up
     if (typeof _systemNameCache_ !== 'undefined') _systemNameCache_ = null;
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    // Create the dashboard menu
+    // Only menu creation runs synchronously — keep onOpen fast
     createDashboardMenu();
 
-    // Sync column maps from actual sheet headers so that column constants
-    // (MEMBER_COLS, GRIEVANCE_COLS, CONFIG_COLS, etc.) reflect the real
-    // spreadsheet layout — even if columns were reordered manually.
+    // F41: Defer heavy init to a 1-second timed trigger so the UI isn't blocked
     try {
-      syncColumnMaps();
-    } catch (syncError) {
-      console.log('Column sync skipped: ' + syncError.message);
+      ScriptApp.newTrigger('onOpenDeferred_')
+        .timeBased()
+        .after(1000)
+        .create();
+    } catch (trigErr) {
+      // Installable trigger unavailable (e.g., simple trigger context) — run inline
+      console.log('Deferred trigger failed, running inline: ' + trigErr.message);
+      onOpenDeferred_();
     }
-
-    // Ensure all primary sheets have enough columns for current header maps.
-    // This prevents "columns are out of bounds" errors when sheets were
-    // created by an older version with fewer columns.
-    try {
-      ensureAllSheetColumns_();
-    } catch (colError) {
-      console.log('Column check skipped: ' + colError.message);
-    }
-
-    // Apply tab colors automatically on open
-    try {
-      if (typeof applyTabColors_ === 'function') {
-        applyTabColors_(ss);
-      }
-    } catch (tabError) {
-      console.log('Tab colors not applied: ' + tabError.message);
-    }
-
-    // Enforce hidden sheets on every open (prevents mobile visibility)
-    try {
-      enforceHiddenSheets();
-    } catch (hideError) {
-      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
-    }
-
-    // Show welcome toast
-    ss.toast(
-      'Dashboard loaded successfully',
-      '🏛️ Union Dashboard',
-      3
-    );
 
   } catch (error) {
     console.error('Error in onOpen:', error);
@@ -91,6 +60,53 @@ function onOpen() {
       .addItem('Initialize Dashboard', 'initializeDashboard')
       .addToUi();
   }
+}
+
+/**
+ * Deferred onOpen tasks — runs heavy init after the UI is responsive.
+ * Called by a 1-second timed trigger created in onOpen().
+ * @private
+ */
+function onOpenDeferred_() {
+  try {
+    // Delete this one-shot trigger so it doesn't accumulate
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var t = 0; t < triggers.length; t++) {
+      if (triggers[t].getHandlerFunction() === 'onOpenDeferred_') {
+        ScriptApp.deleteTrigger(triggers[t]);
+      }
+    }
+  } catch (_e) { /* skip cleanup if unavailable */ }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    syncColumnMaps();
+  } catch (syncError) {
+    console.log('Column sync skipped: ' + syncError.message);
+  }
+
+  try {
+    ensureAllSheetColumns_();
+  } catch (colError) {
+    console.log('Column check skipped: ' + colError.message);
+  }
+
+  try {
+    if (typeof applyTabColors_ === 'function') {
+      applyTabColors_(ss);
+    }
+  } catch (tabError) {
+    console.log('Tab colors not applied: ' + tabError.message);
+  }
+
+  try {
+    enforceHiddenSheets();
+  } catch (hideError) {
+    console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+  }
+
+  ss.toast('Dashboard loaded successfully', '🏛️ Union Dashboard', 3);
 }
 
 /**
