@@ -22,7 +22,7 @@ For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos,
 ## Repos & Sync
 
 - **DDS-Dashboard** (private): Primary repo. **Single branch: `Main` only.** All work happens here first.
-- **Union-Tracker** (public): Mirror minus Workload Tracker. Has 3 branches: `staging`, `dev`, `Main`.
+- **Union-Tracker** (public): Mirror minus Workload Tracker. **Single branch: `Main` only.**
 - DDS Apps Script ID: `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in UT** (public repo).
@@ -30,15 +30,14 @@ For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos,
 ### Default Working Directory
 DDS `Main` on GitHub is always the default working branch. All code changes start here.
 
-### Sync Flow (strict order)
+### Sync Flow
 ```
-DDS Main (GitHub) → UT staging (GitHub) → [USER promotes] → UT dev → UT Main
-                 ↕
-          Local DDS repo (fallback)
+DDS Main (GitHub) → UT Main (GitHub)
+         ↕
+  Local DDS repo (fallback)
 ```
-- **Claude manages:** DDS Main → UT staging. Every commit to DDS Main must be synced to UT staging with Workload Tracker exclusions applied.
-- **User manages:** UT staging → UT dev → UT Main. Claude never pushes to UT dev or UT Main.
-- **Local DDS repo:** Before any push, check the local DDS repo for changes not yet on GitHub. If found, pull or merge them first.
+- Every commit to DDS Main must be synced to UT Main with Workload Tracker exclusions applied.
+- Before any push, check the local DDS repo for changes not yet on GitHub. If found, pull or merge them first.
 
 ### Repo Differences
 DDS and UT are **identical** except:
@@ -50,7 +49,7 @@ DDS and UT are **identical** except:
 Work on local DDS repo. **Mandatory:** add a timestamped note in `AI_REFERENCE.md` explaining:
 - What was done and why
 - What still needs pushing to GitHub
-- What still needs syncing to UT staging
+- What still needs syncing to UT Main
 - Enough context for a follow-on agent to pick up exactly where work stopped
 
 ### Version Tracking — MANDATORY
@@ -62,7 +61,7 @@ Work on local DDS repo. **Mandatory:** add a timestamped note in `AI_REFERENCE.m
 - After every push: verify GitHub remote and local clone are identical (`git status`, `git log --oneline -3`).
 - If a merge conflict cannot be resolved immediately: add a `TODO-MERGE` entry in `AI_REFERENCE.md` with conflict description and timestamp. Resolve at the earliest possible point.
 - **DDS GitHub, DDS local, and Google Apps Script must reflect the same state after every operation.**
-- **UT staging must match DDS Main** (minus Workload Tracker exclusions) after every sync.
+- **UT Main must match DDS Main** (minus Workload Tracker exclusions) after every sync.
 
 ### No-Assumptions Policy
 - Never assume file contents, function behavior, config values, or repo state. **Read first, then act.**
@@ -177,8 +176,7 @@ Multiple code paths write to Config. When modifying any Config-writing code, che
 
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
 - Pre-commit hook: `.husky/pre-commit` runs lint-staged + build verification
-- **DDS: Single branch `Main` (capital M). No feature branches.** All commits go directly to Main.
-- **UT: Claude pushes only to `staging`.** User manages promotion to `dev` and `Main`.
+- **Both repos: Single branch `Main` (capital M). No feature/dev/staging branches.**
 - Every commit must include version bump if code changed.
 
 ## Code Review — STRICT

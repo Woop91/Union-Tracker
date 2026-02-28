@@ -297,3 +297,10 @@ See `PHASE2_PLAN.md` for details.
 - Added Code Review rules: no false "FIXED" claims, full codebase pattern search, no inflated scores
 - Clarified: DDS = single branch (Main only), UT = 3 branches (staging=Claude, dev/Main=user)
 - Added fallback handoff protocol: timestamped notes for follow-on agents
+
+## 2026-02-28 — Final Branch Simplification
+
+### Actions Taken
+- Deleted UT `staging` and `dev` branches (confirmed Main was not behind either — 0 behind staging, 1 ahead of dev)
+- Reverted sync flow to direct: `DDS Main → UT Main`
+- Updated CLAUDE.md in both repos to reflect single-branch policy on both repos
