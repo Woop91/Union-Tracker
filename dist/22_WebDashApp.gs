@@ -220,3 +220,12 @@ function include(filename) {
 function getOrgChartHtml() {
   return HtmlService.createHtmlOutputFromFile('org_chart').getContent();
 }
+
+/**
+ * Returns the published web app URL. Used by client-side logout
+ * as a reload fallback when window.top.location.reload() is blocked.
+ * @returns {string}
+ */
+function getWebAppUrl() {
+  return ScriptApp.getService().getUrl();
+}

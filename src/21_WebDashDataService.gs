@@ -1569,7 +1569,7 @@ var DataService = (function () {
     if (data.length <= 1) return { available: false };
     var colMap = cached.colMap;
     var total = data.length - 1;
-    if (total < 10) return { available: false, count: total, threshold: 10 };
+    if (total < 3) return { available: false, count: total, threshold: 3 };
 
     var byStatus = {};
     var byStep = {};
@@ -1578,6 +1578,7 @@ var DataService = (function () {
     var monthly = {};
     var monthlyResolved = {};
     var openCount = 0, wonCount = 0, deniedCount = 0, settledCount = 0;
+    var overdueCount = 0, dueSoonCount = 0;
     for (var i = 1; i < data.length; i++) {
       var rec = _buildGrievanceRecord(data[i], colMap);
       var s = rec.status || 'unknown';
@@ -1593,6 +1594,13 @@ var DataService = (function () {
       else if (s === 'denied') deniedCount++;
       else if (s === 'settled') settledCount++;
       else if (s !== 'resolved' && s !== 'withdrawn' && s !== 'closed') openCount++;
+      // Deadline-based counts for org KPI cards
+      if (s === 'overdue') {
+        overdueCount++;
+      } else if (rec.deadlineDays !== null && rec.deadlineDays > 0 && rec.deadlineDays <= 7 &&
+                 s !== 'resolved' && s !== 'withdrawn' && s !== 'closed' && s !== 'won' && s !== 'denied' && s !== 'settled') {
+        dueSoonCount++;
+      }
       // Monthly filings
       if (rec.filedTimestamp) {
         var d = new Date(rec.filedTimestamp);
@@ -1618,6 +1626,7 @@ var DataService = (function () {
       byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory,
       monthly: monthlyArr, monthlyResolved: monthlyResolvedArr,
       openCount: openCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount,
+      overdueCount: overdueCount, dueSoonCount: dueSoonCount,
     };
   }
 
@@ -1867,6 +1876,237 @@ var DataService = (function () {
       }
     }
     return { totalCases: total, activeCases: active, overdue: overdue, dueSoon: dueSoon, resolved: resolved };
+  }
+
+  function getMyFeedback(email) {
+    if (!email) return [];
+    email = String(email).trim().toLowerCase();
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
+    if (!sheet || sheet.getLastRow() <= 1) return [];
+
+    var data = sheet.getDataRange().getValues();
+    var items = [];
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][FEEDBACK_COLS.SUBMITTED_BY - 1]).trim().toLowerCase();
+      if (rowEmail !== email) continue;
+
+      var ts = data[i][FEEDBACK_COLS.TIMESTAMP - 1];
+      items.push({
+        date: ts instanceof Date ? _formatDate(ts) : String(ts || ''),
+        category: String(data[i][FEEDBACK_COLS.CATEGORY - 1] || ''),
+        type: String(data[i][FEEDBACK_COLS.TYPE - 1] || ''),
+        priority: String(data[i][FEEDBACK_COLS.PRIORITY - 1] || ''),
+        title: String(data[i][FEEDBACK_COLS.TITLE - 1] || ''),
+        description: String(data[i][FEEDBACK_COLS.DESCRIPTION - 1] || ''),
+        status: String(data[i][FEEDBACK_COLS.STATUS - 1] || 'New'),
+        resolution: String(data[i][FEEDBACK_COLS.RESOLUTION - 1] || ''),
+      });
+    }
+    items.reverse(); // newest first
+    return items;
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Polls (v4.16.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns active polls with vote status for the user.
+   * @param {string} email
+   * @returns {Object[]}
+   */
+  function getActivePolls(email) {
+    try {
+    email = email ? String(email).trim().toLowerCase() : '';
+
+    var pollSheet = (typeof getOrCreatePollsSheet === 'function') ? getOrCreatePollsSheet() : null;
+    if (!pollSheet || pollSheet.getLastRow() <= 1) return [];
+
+    var respSheet = (typeof getOrCreatePollResponsesSheet === 'function') ? getOrCreatePollResponsesSheet() : null;
+
+    // Build response index
+    var myVotes = {};
+    var voteCounts = {};
+    if (respSheet && respSheet.getLastRow() > 1) {
+      var respData = respSheet.getDataRange().getValues();
+      for (var r = 1; r < respData.length; r++) {
+        var pollId = String(respData[r][PORTAL_POLL_RESPONSE_COLS.POLL_ID]);
+        var voter = String(respData[r][PORTAL_POLL_RESPONSE_COLS.EMAIL]).trim().toLowerCase();
+        var resp = String(respData[r][PORTAL_POLL_RESPONSE_COLS.RESPONSE]);
+
+        if (!voteCounts[pollId]) voteCounts[pollId] = {};
+        voteCounts[pollId][resp] = (voteCounts[pollId][resp] || 0) + 1;
+
+        if (voter === email) myVotes[pollId] = resp;
+      }
+    }
+
+    var pollData = pollSheet.getDataRange().getValues();
+    var polls = [];
+    for (var i = 1; i < pollData.length; i++) {
+      var active = String(pollData[i][PORTAL_POLL_COLS.ACTIVE]).trim().toLowerCase();
+      if (active !== 'true' && active !== 'yes') continue;
+
+      var id = String(pollData[i][PORTAL_POLL_COLS.ID]);
+      var optionsRaw = String(pollData[i][PORTAL_POLL_COLS.OPTIONS] || '');
+      var options = optionsRaw.split(',').map(function(o) { return o.trim(); }).filter(function(o) { return o; });
+
+      var results = {};
+      var totalVotes = 0;
+      options.forEach(function(o) {
+        var c = (voteCounts[id] && voteCounts[id][o]) || 0;
+        results[o] = c;
+        totalVotes += c;
+      });
+
+      polls.push({
+        id: id,
+        question: String(pollData[i][PORTAL_POLL_COLS.QUESTION] || ''),
+        options: options,
+        hasVoted: myVotes.hasOwnProperty(id),
+        myVote: myVotes[id] || null,
+        results: results,
+        totalVotes: totalVotes,
+        unit: String(pollData[i][PORTAL_POLL_COLS.UNIT] || ''),
+      });
+    }
+    return polls;
+    } catch (e) {
+      Logger.log('getActivePolls error: ' + e.message);
+      return [];
+    }
+  }
+
+  /**
+   * Submits a poll vote, guarding against double-voting.
+   * @param {string} email
+   * @param {string} pollId
+   * @param {string} response
+   * @returns {Object}
+   */
+  function submitPollVote(email, pollId, response) {
+    if (!email || !pollId || !response) return { success: false, message: 'Missing fields.' };
+    email = String(email).trim().toLowerCase();
+
+    var respSheet = (typeof getOrCreatePollResponsesSheet === 'function') ? getOrCreatePollResponsesSheet() : null;
+    if (!respSheet) return { success: false, message: 'Poll system unavailable.' };
+
+    // Check for existing vote
+    if (respSheet.getLastRow() > 1) {
+      var data = respSheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][PORTAL_POLL_RESPONSE_COLS.POLL_ID]) === pollId &&
+            String(data[i][PORTAL_POLL_RESPONSE_COLS.EMAIL]).trim().toLowerCase() === email) {
+          return { success: false, message: 'Already voted on this poll.' };
+        }
+      }
+    }
+
+    respSheet.appendRow([pollId, email, response, new Date()]);
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('POLL_VOTE', { email: email, pollId: pollId });
+    }
+    return { success: true, message: 'Vote recorded.' };
+  }
+
+  // ═══════════════════════════════════════
+  // PUBLIC: Meeting Minutes (v4.16.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns meeting minutes, most recent first.
+   * @param {number} limit
+   * @returns {Object[]}
+   */
+  function getMeetingMinutes(limit) {
+    try {
+    limit = limit || 20;
+    var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
+    if (!sheet || sheet.getLastRow() <= 1) return [];
+
+    var data = sheet.getDataRange().getValues();
+    var minutes = [];
+    for (var i = 1; i < data.length; i++) {
+      var meetingDate = data[i][PORTAL_MINUTES_COLS.MEETING_DATE];
+      var dateStr = meetingDate instanceof Date ? _formatDate(meetingDate) : String(meetingDate || '');
+      var dateTs = meetingDate instanceof Date ? meetingDate.getTime() : 0;
+
+      minutes.push({
+        id: String(data[i][PORTAL_MINUTES_COLS.ID] || ''),
+        meetingDate: dateStr,
+        meetingDateTs: dateTs,
+        title: String(data[i][PORTAL_MINUTES_COLS.TITLE] || ''),
+        bullets: String(data[i][PORTAL_MINUTES_COLS.BULLETS] || ''),
+        fullMinutes: String(data[i][PORTAL_MINUTES_COLS.FULL_MINUTES] || ''),
+        createdBy: String(data[i][PORTAL_MINUTES_COLS.CREATED_BY] || ''),
+        createdDate: data[i][PORTAL_MINUTES_COLS.CREATED_DATE] instanceof Date
+          ? _formatDate(data[i][PORTAL_MINUTES_COLS.CREATED_DATE]) : '',
+      });
+    }
+    minutes.sort(function(a, b) { return (b.meetingDateTs || 0) - (a.meetingDateTs || 0); });
+    minutes.forEach(function(m) { delete m.meetingDateTs; });
+    return minutes.slice(0, limit);
+    } catch (e) {
+      Logger.log('getMeetingMinutes error: ' + e.message);
+      return [];
+    }
+  }
+
+  /**
+   * Adds new meeting minutes (steward-only).
+   * @param {string} stewardEmail
+   * @param {Object} data - { title, meetingDate, bullets, fullMinutes }
+   * @returns {Object}
+   */
+  function addMeetingMinutes(stewardEmail, minutesData) {
+    if (!stewardEmail || !minutesData || !minutesData.title) {
+      return { success: false, message: 'Missing required fields.' };
+    }
+    var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
+    if (!sheet) return { success: false, message: 'Minutes sheet unavailable.' };
+
+    var id = 'MIN_' + Date.now().toString(36);
+    var meetingDate = minutesData.meetingDate ? new Date(minutesData.meetingDate) : new Date();
+    if (isNaN(meetingDate.getTime())) meetingDate = new Date();
+
+    sheet.appendRow([
+      id,
+      meetingDate,
+      String(minutesData.title).substring(0, 200),
+      String(minutesData.bullets || '').substring(0, 2000),
+      String(minutesData.fullMinutes || '').substring(0, 5000),
+      String(stewardEmail).trim().toLowerCase(),
+      new Date(),
+    ]);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('MINUTES_ADDED', { steward: stewardEmail, title: minutesData.title });
+    }
+    return { success: true, message: 'Minutes added.', id: id };
+  }
+
+  /**
+   * Creates a new poll (steward-only).
+   * @param {string} stewardEmail
+   * @param {string} question
+   * @param {string} options - comma-separated
+   * @param {string} unit - target unit or empty for all
+   * @returns {Object}
+   */
+  function addPoll(stewardEmail, question, options, unit) {
+    if (!stewardEmail || !question || !options) return { success: false, message: 'Missing fields.' };
+    var sheet = (typeof getOrCreatePollsSheet === 'function') ? getOrCreatePollsSheet() : null;
+    if (!sheet) return { success: false, message: 'Polls sheet unavailable.' };
+
+    var id = 'POLL_' + Date.now().toString(36);
+    sheet.appendRow([id, question.substring(0, 500), options.substring(0, 500), 'true', (unit || '').substring(0, 100), String(stewardEmail).trim().toLowerCase(), new Date()]);
+
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('POLL_CREATED', { steward: stewardEmail, question: question.substring(0, 100) });
+    }
+    return { success: true, message: 'Poll created.', id: id };
   }
 
   // Public API

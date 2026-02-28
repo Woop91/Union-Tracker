@@ -315,12 +315,29 @@
       // H-3 fix: Remove duplicate authLogout call — use only the async version with handlers
       var token = localStorage.getItem('dashboardSessionToken');
       localStorage.removeItem('dashboardSessionToken');
-      google.script.run
-        .withSuccessHandler(function() { window.top.location.reload(); })
-        .withFailureHandler(function() { window.top.location.reload(); })
-        .authLogout(token || '');
-      // Fallback reload
-      setTimeout(function() { window.top.location.reload(); }, 1000);
+
+      function _doReload() {
+        // Try multiple reload strategies for GAS iframe compatibility
+        try { window.top.location.reload(); } catch (_e) {}
+        try { window.location.reload(); } catch (_e2) {}
+        // Final fallback: navigate to the published web app URL (strips auth params)
+        try {
+          google.script.run.withSuccessHandler(function(url) {
+            if (url) { window.top.location.href = url; }
+          }).getWebAppUrl();
+        } catch (_e3) {}
+      }
+
+      if (token) {
+        google.script.run
+          .withSuccessHandler(function() { _doReload(); })
+          .withFailureHandler(function() { _doReload(); })
+          .authLogout(token);
+      } else {
+        _doReload();
+      }
+      // Final fallback timer
+      setTimeout(_doReload, 1500);
     }
 
     // ═══════════════════════════════════════
@@ -755,11 +772,7 @@
 
   <? if (view === 'auth') { ?>
     <?!= include('auth_view') ?>
-  <? } else if (view === 'steward') { ?>
-    <?!= include('steward_view') ?>
-  <? } else if (view === 'member') { ?>
-    <?!= include('member_view') ?>
-  <? } else if (view === 'both') { ?>
+  <? } else if (view === 'steward' || view === 'member' || view === 'both') { ?>
     <?!= include('steward_view') ?>
     <?!= include('member_view') ?>
   <? } else { ?>

@@ -549,7 +549,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.18.0",
+  VERSION: "4.18.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -702,9 +702,9 @@ function getLocalNumberFromConfig_() {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 18,
-  PATCH: 0,
-  BUILD: 'v4.18.0',
-  CURRENT: '4.18.0',
+  PATCH: 1,
+  BUILD: 'v4.18.1',
+  CURRENT: '4.18.1',
   BUILD_DATE: '2026-02-26',
   CODENAME: 'SPA Fixes, Seed Phasing & View Enhancements'
 };
