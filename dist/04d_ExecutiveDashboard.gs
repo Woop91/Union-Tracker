@@ -94,17 +94,26 @@ function getDashboardStats() {
         }
       }
 
-      // Check for overdue
-      var step1Due = row[GRIEVANCE_COLS.STEP1_DUE - 1];
-      if (step1Due && new Date(step1Due) < new Date() && (status === 'open' || status === 'pending info')) {
-        stats.overdueCount++;
+      // Check for overdue — use deadline matching the current step
+      if (status === 'open' || status === 'pending info') {
+        var dueDate = null;
+        if (currentStep.indexOf('step 2') !== -1 || currentStep === '2') {
+          dueDate = row[GRIEVANCE_COLS.STEP2_DUE - 1];
+        } else if (currentStep.indexOf('arbitration') !== -1 || currentStep.indexOf('step 3') !== -1) {
+          dueDate = row[GRIEVANCE_COLS.STEP3_APPEAL_DUE - 1];
+        } else {
+          dueDate = row[GRIEVANCE_COLS.STEP1_DUE - 1];
+        }
+        if (dueDate && new Date(dueDate) < new Date()) {
+          stats.overdueCount++;
+        }
       }
     });
 
-    // Calculate win rate
-    var totalClosed = stats.outcomes.wins + stats.outcomes.losses + stats.outcomes.settled;
-    if (totalClosed > 0) {
-      stats.winRate = Math.round((stats.outcomes.wins / totalClosed) * 100);
+    // Calculate win rate — only resolved outcomes in denominator
+    var totalResolved = stats.outcomes.wins + stats.outcomes.losses + stats.outcomes.settled + stats.outcomes.withdrawn;
+    if (totalResolved > 0) {
+      stats.winRate = Math.round((stats.outcomes.wins / totalResolved) * 100);
     }
 
     // Sort steward workload

@@ -220,7 +220,7 @@ var WorkloadService = (function() {
     for (var j = 1; j < vaultData.length; j++) {
       var rEmail = vaultData[j][VAULT_COLS.EMAIL];
       if (!rEmail) continue;
-      var emailKey = rEmail.toString().toLowerCase().trim();
+      var _emailKey = rEmail.toString().toLowerCase().trim();
       var rowPrivacy = vaultData[j][VAULT_COLS.PRIVACY] || 'Unit';
 
       // Format sub-category summary
@@ -238,7 +238,7 @@ var WorkloadService = (function() {
             }
           }
           subCatSummary = parts.join(', ');
-        } catch (e) { /* skip */ }
+        } catch (_e) { /* skip */ }
       }
 
       // Format leave dates
@@ -464,10 +464,10 @@ var WorkloadService = (function() {
       var tz = _getTimezone();
       var leaveStart = '', leaveEnd = '';
       if (formData.leave_start) {
-        try { leaveStart = Utilities.formatDate(new Date(formData.leave_start), tz, 'MM/dd/yyyy'); } catch(e) {}
+        try { leaveStart = Utilities.formatDate(new Date(formData.leave_start), tz, 'MM/dd/yyyy'); } catch(_e) {}
       }
       if (formData.leave_end) {
-        try { leaveEnd = Utilities.formatDate(new Date(formData.leave_end), tz, 'MM/dd/yyyy'); } catch(e) {}
+        try { leaveEnd = Utilities.formatDate(new Date(formData.leave_end), tz, 'MM/dd/yyyy'); } catch(_e) {}
       }
 
       // Build 24-column row
@@ -507,7 +507,7 @@ var WorkloadService = (function() {
       }
 
       // Reciprocity: set sharing start date
-      var privacySetting = _sanitizeString(formData.privacy || 'Unit', 20);
+      var _privacySetting = _sanitizeString(formData.privacy || 'Unit', 20);
       var existingStartDate = _getUserSharingStartDate(emailLower);
       if (!existingStartDate) {
         _setUserSharingStartDate(emailLower, new Date());
@@ -577,7 +577,7 @@ var WorkloadService = (function() {
       var subJson = data[i][VAULT_COLS.SUB_CATEGORIES];
       if (subJson && subJson !== '{}') {
         try { entry.subCategories = typeof subJson === 'string' ? JSON.parse(subJson) : subJson; }
-        catch (e) { entry.subCategories = {}; }
+        catch (_e) { entry.subCategories = {}; }
       } else {
         entry.subCategories = {};
       }
@@ -636,11 +636,11 @@ var WorkloadService = (function() {
 
     // Determine user's privacy setting (most recent submission)
     var data = vault.getDataRange().getValues();
-    var userPrivacy = null;
+    var _userPrivacy = null;
     for (var p = data.length - 1; p >= 1; p--) {
       var pEmail = data[p][VAULT_COLS.EMAIL];
       if (pEmail && pEmail.toString().toLowerCase().trim() === emailLower) {
-        userPrivacy = data[p][VAULT_COLS.PRIVACY];
+        _userPrivacy = data[p][VAULT_COLS.PRIVACY];
         break;
       }
     }
@@ -714,7 +714,7 @@ var WorkloadService = (function() {
               subCatTotals[cKey][sKey] += sVal;
             }
           }
-        } catch (e) { /* skip */ }
+        } catch (_e) { /* skip */ }
       }
     }
 
@@ -914,7 +914,7 @@ var WorkloadService = (function() {
       var folder;
       if (folderId) {
         try { folder = DriveApp.getFolderById(folderId); }
-        catch (e) {
+        catch (_e) {
           folder = DriveApp.createFolder('WorkloadVault_Backups');
           props.setProperty('WT_BACKUP_FOLDER_ID', folder.getId());
         }
@@ -1010,7 +1010,7 @@ var WorkloadService = (function() {
         var dateStr = Utilities.formatDate(new Date(ts), tz, 'yyyy-MM-dd');
         var id = em + '_' + dateStr;
         if (!seen[id]) { uniqueData.push(row); seen[id] = true; }
-      } catch (e) { uniqueData.push(row); }
+      } catch (_e) { uniqueData.push(row); }
     }
 
     uniqueData.reverse();

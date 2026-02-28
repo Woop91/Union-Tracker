@@ -306,7 +306,7 @@ var WorkloadPortal = (function () {
     for (var j = 1; j < vaultData.length; j++) {
       var rowE = vaultData[j][VAULT_COLS.EMAIL];
       if (!rowE) continue;
-      var emailKey = rowE.toString().toLowerCase().trim();
+      var _emailKey = rowE.toString().toLowerCase().trim();
       var rowPrivacy = vaultData[j][VAULT_COLS.PRIVACY];
 
       var identity = 'REDACTED';
@@ -573,7 +573,7 @@ var WorkloadPortal = (function () {
           }
 
           // Reciprocity: set sharing start date
-          var privacySetting = _sanitizeString(formObj.privacy || 'Unit', 20);
+          var _privacySetting = _sanitizeString(formObj.privacy || 'Unit', 20);
           if (!_getUserSharingStartDate(email)) {
             _setUserSharingStartDate(email, new Date());
           }
@@ -667,7 +667,7 @@ var WorkloadPortal = (function () {
                 subCatTotals[catKey][subName] = (subCatTotals[catKey][subName] || 0) + (Number(sc[catKey][subName]) || 0);
               }
             }
-          } catch (e) { /* skip malformed JSON */ }
+          } catch (_e) { /* skip malformed JSON */ }
         }
       }
 
@@ -743,7 +743,7 @@ var WorkloadPortal = (function () {
         // Parse sub-categories
         var scJson = data[i][VAULT_COLS.SUB_CATEGORIES];
         if (scJson) {
-          try { entry.subCategories = JSON.parse(scJson); } catch (e) { entry.subCategories = {}; }
+          try { entry.subCategories = JSON.parse(scJson); } catch (_e) { entry.subCategories = {}; }
         } else {
           entry.subCategories = {};
         }
@@ -830,7 +830,7 @@ var WorkloadPortal = (function () {
         var folder;
         if (folderId) {
           try { folder = DriveApp.getFolderById(folderId); }
-          catch (e) { folder = DriveApp.createFolder('WorkloadVault_Backups'); props.setProperty('WT_BACKUP_FOLDER_ID', folder.getId()); }
+          catch (_e) { folder = DriveApp.createFolder('WorkloadVault_Backups'); props.setProperty('WT_BACKUP_FOLDER_ID', folder.getId()); }
         } else {
           folder = DriveApp.createFolder('WorkloadVault_Backups');
           props.setProperty('WT_BACKUP_FOLDER_ID', folder.getId());
@@ -976,7 +976,7 @@ var WorkloadPortal = (function () {
     getPortalHtml: function () {
       try {
         return HtmlService.createHtmlOutputFromFile('WorkloadTracker').getContent();
-      } catch (err) {
+      } catch (_err) {
         return '<html><body style="font-family:sans-serif;padding:2rem;">' +
           '<h2>Workload Tracker</h2>' +
           '<p>Portal not yet configured. Please run <strong>Initialize Dashboard</strong> first.</p>' +

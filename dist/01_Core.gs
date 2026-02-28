@@ -218,13 +218,13 @@ function sendCriticalErrorNotification_(errorInfo) {
     var subject;
     try {
       subject = COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' Critical Error: ' + errorInfo.context;
-    } catch (e) {
+    } catch (_e) {
       subject = 'Critical Error: ' + (errorInfo.context || 'Unknown');
     }
     var systemName;
     try {
       systemName = COMMAND_CONFIG.SYSTEM_NAME;
-    } catch (e) {
+    } catch (_e) {
       systemName = 'Union Dashboard';
     }
     var body = 'A critical error occurred in the ' + systemName + ':\n\n' +
