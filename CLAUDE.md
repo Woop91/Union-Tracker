@@ -21,13 +21,52 @@ For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos,
 
 ## Repos & Sync
 
-- **DDS-Dashboard** (private): Primary repo. Default branch: `Main` (capital M). Branches: Main, dev, staging.
-- **Union-Tracker** (public): Mirror minus Workload Tracker. Target branch: `staging`.
-- All commits to DDS `Main` must sync to UT `staging` with exclusions applied.
-- Sync flow: `DDS Main → UT staging → (user manages) → UT dev → UT main`
+- **DDS-Dashboard** (private): Primary repo. **Single branch: `Main` only.** All work happens here first.
+- **Union-Tracker** (public): Mirror minus Workload Tracker. **Single branch: `Main` only.**
 - DDS Apps Script ID: `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in UT** (public repo).
+
+### Default Working Directory
+DDS `Main` on GitHub is always the default working branch. All code changes start here.
+
+### Sync Flow
+```
+DDS Main (GitHub) → UT Main (GitHub)
+         ↕
+  Local DDS repo (fallback)
+```
+- Every commit to DDS Main must be synced to UT Main with Workload Tracker exclusions applied.
+- Before any push, check the local DDS repo for changes not yet on GitHub. If found, pull or merge them first.
+
+### Repo Differences
+DDS and UT are **identical** except:
+- DDS includes `src/18_WorkloadTracker.gs` and `src/WorkloadTracker.html` (Workload Tracker module).
+- UT excludes these files and uses `typeof` guards where they're referenced.
+- No other differences should exist. If drift is found, it's a bug — fix it.
+
+### Fallback (GitHub unreachable)
+Work on local DDS repo. **Mandatory:** add a timestamped note in `AI_REFERENCE.md` explaining:
+- What was done and why
+- What still needs pushing to GitHub
+- What still needs syncing to UT Main
+- Enough context for a follow-on agent to pick up exactly where work stopped
+
+### Version Tracking — MANDATORY
+- **Semver tagging on every meaningful commit.** Update `VERSION_INFO` in `src/01_Core.gs`, `package.json`, and `CHANGELOG.md` together.
+- **Tag the commit** (e.g., `git tag v4.18.2`). Push tags: `git push origin --tags`.
+- If version is not updated, the commit is incomplete.
+
+### Parity Enforcement
+- After every push: verify GitHub remote and local clone are identical (`git status`, `git log --oneline -3`).
+- If a merge conflict cannot be resolved immediately: add a `TODO-MERGE` entry in `AI_REFERENCE.md` with conflict description and timestamp. Resolve at the earliest possible point.
+- **DDS GitHub, DDS local, and Google Apps Script must reflect the same state after every operation.**
+- **UT Main must match DDS Main** (minus Workload Tracker exclusions) after every sync.
+
+### No-Assumptions Policy
+- Never assume file contents, function behavior, config values, or repo state. **Read first, then act.**
+- If prior work (by this agent or a previous one) contains assumptions: re-examine, correct, and document in `AI_REFERENCE.md`.
+- Every repo-altering action must be logged: what changed, why, and resulting version.
 
 ### Workload Tracker Exclusion (UT only)
 - **EXCLUDE from UT:** `src/18_WorkloadTracker.gs`, `src/WorkloadTracker.html`
@@ -37,7 +76,7 @@ For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos,
 - If excluding WT would cause errors in UT, include the minimum needed to prevent breakage.
 
 ### Fallback
-If GitHub is unreachable, work on local repo. Add a note in AI-REFERENCE.md: what was done, what needs pushing, which branches affected.
+If GitHub is unreachable, work on local repo. Add a note in `AI_REFERENCE.md`: what was done, what needs pushing. Resolve on reconnection.
 
 ## Commands
 
@@ -137,15 +176,17 @@ Multiple code paths write to Config. When modifying any Config-writing code, che
 
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
 - Pre-commit hook: `.husky/pre-commit` runs lint-staged + build verification
-- Main branch: `Main` (capital M)
-- Feature branches: `claude/<description>-<id>`
+- **Both repos: Single branch `Main` (capital M). No feature/dev/staging branches.**
+- Every commit must include version bump if code changed.
 
-## Code Review
+## Code Review — STRICT
 
-Canonical review: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/` are outdated.
-- Never claim "FIXED" without citing exact file, line, and code proof.
-- Search entire codebase for every vulnerability pattern found.
-- No inflated scores — state findings plainly.
+Canonical review: `CODE_REVIEW.md`. Archived reviews in `docs/archived-reviews/` are **outdated — do not reference them**.
+
+Rules:
+1. **Never claim "FIXED" without proof.** Cite exact file, line number, and the corrected code. If you can't point to it, it's not fixed.
+2. **Search the entire codebase** for every vulnerability pattern found — not just the file where it was first spotted.
+3. **No inflated scores.** State findings plainly. If something is broken, say it's broken.
 
 ## Reference Documents
 
