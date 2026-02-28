@@ -456,3 +456,10 @@ DDS Main → UT staging → (user manages) → UT dev → UT main
 - Updated CLAUDE.md with correct sync flow and branch ownership
 - Added Code Review strict rules
 - Clarified: Claude pushes to staging only, user manages dev and Main
+
+## 2026-02-28 — Final Branch Simplification
+
+### Actions Taken
+- Deleted `staging` and `dev` branches (Main was not behind either)
+- Sync flow finalized: `DDS Main → UT Main` (direct)
+- Single-branch policy: `Main` only on both repos

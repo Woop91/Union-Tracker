@@ -11,17 +11,16 @@
 
 ## Repos & Sync
 
-- **Union-Tracker** (public): This repo. Receives syncs from DDS `Main` into UT `staging`.
+- **Union-Tracker** (public): This repo. Receives syncs from DDS `Main` directly into UT `Main`.
 - **DDS-Dashboard** (private): Primary/source repo. Single branch: `Main`.
+- **Single branch: `Main` only.** No staging/dev/feature branches.
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in this repo.**
 
 ### Sync Flow
 ```
-DDS Main (GitHub) → UT staging → [USER promotes] → UT dev → UT Main
+DDS Main → UT Main (with Workload Tracker exclusions)
 ```
-- **Claude manages:** DDS Main → UT staging. Workload Tracker exclusions applied on every sync.
-- **User manages:** UT staging → UT dev → UT Main. Claude never pushes to UT dev or UT Main.
 
 ### Repo Differences
 DDS and UT are **identical** except:
@@ -35,7 +34,7 @@ DDS and UT are **identical** except:
 
 ### Parity Enforcement
 - After every push: verify GitHub remote and local clone match.
-- UT staging must match DDS Main (minus WT exclusions) after every sync.
+- UT Main must match DDS Main (minus WT exclusions) after every sync.
 
 ### No-Assumptions Policy
 - Never assume file contents, function behavior, config values, or repo state. Read first, then act.
@@ -149,7 +148,7 @@ npm run deploy         # lint + test:unit + build:prod + clasp push
 ## Git Conventions
 
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
-- **Claude pushes only to `staging`.** User manages `dev` and `Main`.
+- **Single branch: `Main` (capital M). No other branches.**
 - Every commit must include version bump if code changed.
 
 ## Code Review — STRICT
