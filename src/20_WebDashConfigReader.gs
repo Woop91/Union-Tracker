@@ -30,7 +30,7 @@ var ConfigReader = (function () {
       if (cached) {
         try {
           return JSON.parse(cached);
-        } catch (e) {
+        } catch (_e) {
           // Cache corrupted, fall through to read from sheet
         }
       }
@@ -121,7 +121,7 @@ var ConfigReader = (function () {
     if (!col) return '';
     try {
       return sheet.getRange(3, col).getValue();
-    } catch (e) {
+    } catch (_e) {
       return '';
     }
   }

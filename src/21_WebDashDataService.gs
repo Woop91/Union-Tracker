@@ -159,9 +159,6 @@ var DataService = (function () {
   function getStewardKPIs(stewardEmail) {
     var cases = getStewardCases(stewardEmail);
 
-    var now = new Date();
-    var sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-
     var total = cases.length;
     var overdue = 0;
     var dueSoon = 0;
@@ -423,15 +420,7 @@ var DataService = (function () {
   function getAssignedStewardInfo(email) {
     var user = findUserByEmail(email);
     if (!user || !user.assignedSteward) return null;
-
-    // Try email lookup first
     var steward = findUserByEmail(user.assignedSteward);
-
-    // Fallback: if assignedSteward is a name (no '@'), scan by name
-    if (!steward && user.assignedSteward.indexOf('@') === -1) {
-      steward = _findUserByName(user.assignedSteward);
-    }
-
     if (!steward) return null;
     return {
       name: steward.name,
@@ -457,9 +446,6 @@ var DataService = (function () {
 
     var data = sheet.getDataRange().getValues();
     var colMap = _buildColumnMap(data[0]);
-    var isStewardCol = _findColumn(colMap, HEADERS.memberIsSteward);
-    var roleCol = _findColumn(colMap, HEADERS.memberRole);
-    var locationCol = _findColumn(colMap, HEADERS.memberWorkLocation);
 
     var stewards = [];
     for (var i = 1; i < data.length; i++) {
@@ -581,59 +567,7 @@ var DataService = (function () {
   }
 
   /**
-   * Get or create a restricted Drive folder named after the spreadsheet.
-   * Users shared on this folder cannot browse outside it.
-   * The folder ID is cached in Script Properties for reuse.
-   * @private
-   * @returns {string} Folder URL (empty string on failure)
-   */
-  function getOrCreateSheetFolder_() {
-    var props = PropertiesService.getScriptProperties();
-    var storedId = props.getProperty('SHEET_DRIVE_FOLDER_ID');
-
-    if (storedId) {
-      try {
-        var existing = DriveApp.getFolderById(storedId);
-        return 'https://drive.google.com/drive/folders/' + existing.getId();
-      } catch (_e) {
-        // Stored ID invalid, fall through to create
-      }
-    }
-
-    try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      var folderName = ss.getName();
-
-      // Search for existing folder with same name owned by this user
-      var folders = DriveApp.getFoldersByName(folderName);
-      if (folders.hasNext()) {
-        var found = folders.next();
-        props.setProperty('SHEET_DRIVE_FOLDER_ID', found.getId());
-        return 'https://drive.google.com/drive/folders/' + found.getId();
-      }
-
-      // Create new folder
-      var newFolder = DriveApp.createFolder(folderName);
-      newFolder.setDescription('Restricted shared folder for ' + folderName + ' — auto-managed by Dashboard');
-      props.setProperty('SHEET_DRIVE_FOLDER_ID', newFolder.getId());
-
-      if (typeof logAuditEvent === 'function') {
-        logAuditEvent('SHEET_DRIVE_FOLDER_CREATED', {
-          folderId: newFolder.getId(),
-          folderName: folderName
-        });
-      }
-
-      return 'https://drive.google.com/drive/folders/' + newFolder.getId();
-    } catch (e) {
-      Logger.log('getOrCreateSheetFolder_ error: ' + e.message);
-      return '';
-    }
-  }
-
-  /**
    * Returns org-wide links (calendar, drive, survey form, etc.)
-   * Drive link points to a restricted folder named after the spreadsheet.
    * @returns {Object}
    */
   function getOrgLinks() {
@@ -641,11 +575,11 @@ var DataService = (function () {
       var config = ConfigReader.getConfig();
       return {
         calendarUrl: config.calendarId ? 'https://calendar.google.com/calendar/embed?src=' + encodeURIComponent(config.calendarId) : '',
-        driveFolderUrl: getOrCreateSheetFolder_(),
+        driveFolderUrl: config.driveFolderId ? 'https://drive.google.com/drive/folders/' + config.driveFolderId : '',
         surveyFormUrl: config.satisfactionFormUrl || '',
         orgWebsite: config.orgWebsite || '',
       };
-    } catch (e) {
+    } catch (_e) {
       return { calendarUrl: '', driveFolderUrl: '', surveyFormUrl: '', orgWebsite: '' };
     }
   }
@@ -691,67 +625,13 @@ var DataService = (function () {
   }
 
   /**
-   * Returns ALL members from the directory (not filtered by steward assignment).
-   * Same shape as getStewardMembers() for interchangeability.
-   * @returns {Object[]} Array of member summaries
-   */
-  function getAllMembers() {
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return [];
-
-    var data = sheet.getDataRange().getValues();
-    var colMap = _buildColumnMap(data[0]);
-    var members = [];
-    for (var i = 1; i < data.length; i++) {
-      var rec = _buildUserRecord(data[i], colMap);
-      if (!rec.email) continue;
-      var stewardCol = _findColumn(colMap, HEADERS.memberAssignedSteward);
-      members.push({
-        name: rec.name,
-        email: rec.email,
-        workLocation: rec.workLocation,
-        officeDays: rec.officeDays,
-        hasOpenGrievance: rec.hasOpenGrievance,
-        duesStatus: rec.duesStatus,
-        assignedSteward: stewardCol !== -1 ? String(data[i][stewardCol]).trim() : '',
-      });
-    }
-    members.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
-    return members;
-  }
-
-  /**
    * Returns survey completion tracking for a steward's assigned members.
    * Does NOT return actual survey responses — only completion status.
    * @param {string} stewardEmail
-   * @param {string} [scope] - 'assigned' (default), 'location', or 'all'
    * @returns {Object} { total, completed, members: [{name, email, completed}] }
    */
-  function getStewardSurveyTracking(stewardEmail, scope) {
-    scope = scope || 'assigned';
-    var members;
-    if (scope === 'all') {
-      members = getAllMembers();
-    } else if (scope === 'location') {
-      var allMembers = getAllMembers();
-      // Find steward's location
-      var stewardLoc = '';
-      for (var l = 0; l < allMembers.length; l++) {
-        if (String(allMembers[l].email).toLowerCase() === String(stewardEmail).toLowerCase()) {
-          stewardLoc = allMembers[l].workLocation || '';
-          break;
-        }
-      }
-      if (stewardLoc) {
-        members = allMembers.filter(function(m) {
-          return m.workLocation && m.workLocation.toLowerCase() === stewardLoc.toLowerCase();
-        });
-      } else {
-        members = getStewardMembers(stewardEmail);
-      }
-    } else {
-      members = getStewardMembers(stewardEmail);
-    }
+  function getStewardSurveyTracking(stewardEmail) {
+    var members = getStewardMembers(stewardEmail);
     if (members.length === 0) return { total: 0, completed: 0, members: [] };
 
     var tracking = [];
@@ -781,9 +661,8 @@ var DataService = (function () {
   function sendBroadcastMessage(stewardEmail, filter, message) {
     if (!stewardEmail || !message) return { success: false, sentCount: 0, message: 'Missing required fields.' };
 
-    // Use all members when no specific steward filter, otherwise use assigned members
-    var members = getAllMembers();
-    if (members.length === 0) return { success: false, sentCount: 0, message: 'No members found.' };
+    var members = getStewardMembers(stewardEmail);
+    if (members.length === 0) return { success: false, sentCount: 0, message: 'No assigned members found.' };
 
     // Apply filters
     var filtered = members.filter(function(m) {
@@ -868,8 +747,7 @@ var DataService = (function () {
               }
             }
             var avg = qCount > 0 ? qSum / qCount : 0;
-            var text = sec.questionTexts && sec.questionTexts[q] ? sec.questionTexts[q] : '';
-            questionAvgs.push({ question: colIdx + 1, text: text, avg: Math.round(avg * 10) / 10 });
+            questionAvgs.push({ question: colIdx + 1, avg: Math.round(avg * 10) / 10 });
             totalScore += qSum;
             totalCount += qCount;
           }
@@ -988,12 +866,6 @@ var DataService = (function () {
     if (roleRaw === 'steward' || roleRaw === 'rep' || roleRaw === 'representative') role = 'steward';
     if (roleRaw === 'both' || roleRaw === 'steward/member') role = 'both';
 
-    // Also check the IS_STEWARD column (set by seed and manual entry)
-    var isStewardRaw = String(_getVal(row, colMap, HEADERS.memberIsSteward, '')).trim().toLowerCase();
-    if (isStewardRaw === 'yes' || isStewardRaw === 'true' || isStewardRaw === '1') {
-      if (role === 'member') role = 'steward';  // Upgrade role if only 'member'
-    }
-
     var hasGrievance = String(_getVal(row, colMap, HEADERS.memberHasOpenGrievance, '')).trim().toLowerCase();
 
     return {
@@ -1019,41 +891,6 @@ var DataService = (function () {
       supervisor: String(_getVal(row, colMap, HEADERS.memberSupervisor, '')).trim(),
       jobTitle: String(_getVal(row, colMap, HEADERS.memberJobTitle, '')).trim(),
     };
-  }
-
-  /**
-   * Finds a user by full name (case-insensitive).
-   * Used as fallback when assignedSteward contains a name instead of email.
-   * @param {string} name - Full name to search for
-   * @returns {Object|null} User record or null
-   */
-  function _findUserByName(name) {
-    if (!name) return null;
-    name = String(name).trim().toLowerCase();
-
-    var sheet = _getSheet(MEMBER_SHEET);
-    if (!sheet) return null;
-
-    var data = sheet.getDataRange().getValues();
-    var colMap = _buildColumnMap(data[0]);
-    var firstNameCol = _findColumn(colMap, HEADERS.memberFirstName);
-    var lastNameCol = _findColumn(colMap, HEADERS.memberLastName);
-    var fullNameCol = _findColumn(colMap, HEADERS.memberName);
-
-    for (var i = 1; i < data.length; i++) {
-      // Check full name column first
-      if (fullNameCol !== -1) {
-        var full = String(data[i][fullNameCol]).trim().toLowerCase();
-        if (full === name) return _buildUserRecord(data[i], colMap);
-      }
-      // Check first+last name combination
-      if (firstNameCol !== -1 && lastNameCol !== -1) {
-        var combined = (String(data[i][firstNameCol]).trim() + ' ' + String(data[i][lastNameCol]).trim()).toLowerCase();
-        if (combined === name) return _buildUserRecord(data[i], colMap);
-      }
-    }
-
-    return null;
   }
 
   function _buildGrievanceRecord(row, colMap) {
@@ -1097,18 +934,6 @@ var DataService = (function () {
       status = 'overdue';
     }
 
-    // Parse closed date (same pattern as filed date above)
-    var closedRaw = _getVal(row, colMap, HEADERS.grievanceDateClosed, null);
-    var closedTimestamp = 0;
-    if (closedRaw instanceof Date) {
-      closedTimestamp = closedRaw.getTime();
-    } else if (closedRaw) {
-      var parsedClosed = new Date(closedRaw);
-      if (!isNaN(parsedClosed.getTime())) {
-        closedTimestamp = parsedClosed.getTime();
-      }
-    }
-
     return {
       id: String(_getVal(row, colMap, HEADERS.grievanceId, '')).trim(),
       memberEmail: String(_getVal(row, colMap, HEADERS.grievanceMemberEmail, '')).trim().toLowerCase(),
@@ -1118,12 +943,10 @@ var DataService = (function () {
       deadlineDays: deadlineDays,
       filed: filedFormatted,
       filedTimestamp: filedTimestamp,
-      closedTimestamp: closedTimestamp,
       steward: String(_getVal(row, colMap, HEADERS.grievanceSteward, '')).trim().toLowerCase(),
       unit: String(_getVal(row, colMap, HEADERS.grievanceUnit, '')).trim(),
       priority: String(_getVal(row, colMap, HEADERS.grievancePriority, 'medium')).trim().toLowerCase(),
       notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
-      issueCategory: String(_getVal(row, colMap, HEADERS.grievanceIssueCategory, '')).trim(),
     };
   }
 
@@ -1275,102 +1098,6 @@ var DataService = (function () {
   }
 
   // ═══════════════════════════════════════
-  // Member Task Assignment (v4.17.0)
-  // ═══════════════════════════════════════
-
-  function createMemberTask(stewardEmail, memberEmail, title, desc, priority, dueDate) {
-    if (!stewardEmail || !memberEmail || !title) return { success: false, message: 'Missing required fields.' };
-    var sheet = _ensureStewardTasks();
-    // Migrate headers if needed
-    var headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 12)).getValues()[0];
-    if (!headers[10] || String(headers[10]).trim() !== 'Assignee Type') {
-      sheet.getRange(1, 11).setValue('Assignee Type');
-      sheet.getRange(1, 12).setValue('Assigned By');
-    }
-    var id = 'MT_' + Date.now().toString(36);
-    sheet.appendRow([
-      id, memberEmail.toLowerCase().trim(), title.substring(0, 200),
-      (desc || '').substring(0, 500), memberEmail.toLowerCase().trim(),
-      priority || 'medium', 'open', dueDate || '', new Date(), '',
-      'member', stewardEmail.toLowerCase().trim()
-    ]);
-    logAuditEvent('MEMBER_TASK_CREATED', 'Task ' + id + ' assigned to ' + memberEmail + ' by ' + stewardEmail);
-    return { success: true, message: 'Task assigned to member.', taskId: id };
-  }
-
-  function getMemberTasks(memberEmail, statusFilter) {
-    var sheet = _ensureStewardTasks();
-    if (sheet.getLastRow() <= 1) return [];
-    var data = sheet.getDataRange().getValues();
-    var tasks = [];
-    var mEmail = memberEmail.toLowerCase().trim();
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][10]).toLowerCase().trim() !== 'member') continue;
-      if (String(data[i][4]).toLowerCase().trim() !== mEmail) continue;
-      var status = String(data[i][6]).toLowerCase().trim();
-      if (statusFilter && status !== statusFilter) continue;
-      var dueDateRaw = data[i][7];
-      var dueStr = dueDateRaw instanceof Date ? _formatDate(dueDateRaw) : String(dueDateRaw || '');
-      var dueDays = null;
-      if (dueDateRaw instanceof Date) dueDays = Math.ceil((dueDateRaw.getTime() - Date.now()) / 86400000);
-      tasks.push({
-        id: data[i][0], title: data[i][2], description: data[i][3],
-        priority: data[i][5], status: status, dueDate: dueStr, dueDays: dueDays,
-        assignedBy: String(data[i][11] || ''),
-        created: data[i][8] instanceof Date ? _formatDate(data[i][8]) : ''
-      });
-    }
-    tasks.sort(function(a, b) {
-      var pa = a.priority === 'high' ? 0 : a.priority === 'medium' ? 1 : 2;
-      var pb = b.priority === 'high' ? 0 : b.priority === 'medium' ? 1 : 2;
-      if (pa !== pb) return pa - pb;
-      return (a.dueDays || 999) - (b.dueDays || 999);
-    });
-    return tasks;
-  }
-
-  function completeMemberTask(memberEmail, taskId) {
-    var sheet = _ensureStewardTasks();
-    if (sheet.getLastRow() <= 1) return { success: false, message: 'No tasks.' };
-    var data = sheet.getDataRange().getValues();
-    var mEmail = memberEmail.toLowerCase().trim();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] === taskId && String(data[i][10]).toLowerCase().trim() === 'member' &&
-          String(data[i][4]).toLowerCase().trim() === mEmail) {
-        sheet.getRange(i + 1, 7).setValue('completed');
-        sheet.getRange(i + 1, 10).setValue(new Date());
-        logAuditEvent('MEMBER_TASK_COMPLETED', 'Task ' + taskId + ' completed by ' + memberEmail);
-        return { success: true };
-      }
-    }
-    return { success: false, message: 'Task not found.' };
-  }
-
-  function getStewardAssignedMemberTasks(stewardEmail) {
-    var sheet = _ensureStewardTasks();
-    if (sheet.getLastRow() <= 1) return [];
-    var data = sheet.getDataRange().getValues();
-    var tasks = [];
-    var sEmail = stewardEmail.toLowerCase().trim();
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][10]).toLowerCase().trim() !== 'member') continue;
-      if (String(data[i][11]).toLowerCase().trim() !== sEmail) continue;
-      var status = String(data[i][6]).toLowerCase().trim();
-      var dueDateRaw = data[i][7];
-      var dueStr = dueDateRaw instanceof Date ? _formatDate(dueDateRaw) : String(dueDateRaw || '');
-      var dueDays = null;
-      if (dueDateRaw instanceof Date) dueDays = Math.ceil((dueDateRaw.getTime() - Date.now()) / 86400000);
-      tasks.push({
-        id: data[i][0], title: data[i][2], description: data[i][3],
-        memberEmail: String(data[i][4] || ''), priority: data[i][5],
-        status: status, dueDate: dueStr, dueDays: dueDays,
-        created: data[i][8] instanceof Date ? _formatDate(data[i][8]) : ''
-      });
-    }
-    return tasks;
-  }
-
-  // ═══════════════════════════════════════
   // Chief Steward Task View (v4.15.0)
   // ═══════════════════════════════════════
 
@@ -1444,30 +1171,25 @@ var DataService = (function () {
   // ═══════════════════════════════════════
 
   function getStewardDirectory() {
-    try {
-      var sheet = _getSheet(MEMBER_SHEET);
-      if (!sheet) return [];
-      var data = sheet.getDataRange().getValues();
-      var colMap = _buildColumnMap(data[0]);
-      var stewards = [];
-      for (var i = 1; i < data.length; i++) {
-        var rec = _buildUserRecord(data[i], colMap);
-        if (!rec.isSteward) continue;
-        stewards.push({
-          name: rec.name,
-          email: rec.email,
-          workLocation: rec.workLocation,
-          officeDays: rec.officeDays,
-          phone: rec.phone,
-          unit: rec.unit,
-        });
-      }
-      stewards.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
-      return stewards;
-    } catch (e) {
-      Logger.log('getStewardDirectory error: ' + e.message);
-      throw e;
+    var sheet = _getSheet(MEMBER_SHEET);
+    if (!sheet) return [];
+    var data = sheet.getDataRange().getValues();
+    var colMap = _buildColumnMap(data[0]);
+    var stewards = [];
+    for (var i = 1; i < data.length; i++) {
+      var rec = _buildUserRecord(data[i], colMap);
+      if (!rec.isSteward) continue;
+      stewards.push({
+        name: rec.name,
+        email: rec.email,
+        workLocation: rec.workLocation,
+        officeDays: rec.officeDays,
+        phone: rec.phone,
+        unit: rec.unit,
+      });
     }
+    stewards.sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
+    return stewards;
   }
 
   // ═══════════════════════════════════════
@@ -1481,16 +1203,13 @@ var DataService = (function () {
     if (data.length <= 1) return { available: false };
     var colMap = _buildColumnMap(data[0]);
     var total = data.length - 1;
-    if (total < 3) return { available: false, count: total, threshold: 3 };
+    if (total < 10) return { available: false, count: total, threshold: 10 };
 
     var byStatus = {};
     var byStep = {};
     var byUnit = {};
     var byCategory = {};
     var monthly = {};
-    var monthlyResolved = {};
-    var openCount = 0, wonCount = 0, deniedCount = 0, settledCount = 0;
-    var overdueCount = 0, dueSoonCount = 0;
     for (var i = 1; i < data.length; i++) {
       var rec = _buildGrievanceRecord(data[i], colMap);
       var s = rec.status || 'unknown';
@@ -1501,45 +1220,14 @@ var DataService = (function () {
       byUnit[u] = (byUnit[u] || 0) + 1;
       var cat = rec.issueCategory || 'Uncategorized';
       byCategory[cat] = (byCategory[cat] || 0) + 1;
-      // Summary counts
-      if (s === 'won') wonCount++;
-      else if (s === 'denied') deniedCount++;
-      else if (s === 'settled') settledCount++;
-      else if (s !== 'resolved' && s !== 'withdrawn' && s !== 'closed') openCount++;
-      // Deadline-based counts for org KPI cards
-      if (s === 'overdue') {
-        overdueCount++;
-      } else if (rec.deadlineDays !== null && rec.deadlineDays > 0 && rec.deadlineDays <= 7 &&
-                 s !== 'resolved' && s !== 'withdrawn' && s !== 'closed' && s !== 'won' && s !== 'denied' && s !== 'settled') {
-        dueSoonCount++;
-      }
-      // Monthly filings
       if (rec.filedTimestamp) {
         var d = new Date(rec.filedTimestamp);
         var key = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
         monthly[key] = (monthly[key] || 0) + 1;
       }
-      // Monthly resolutions
-      if (rec.closedTimestamp) {
-        var dc = new Date(rec.closedTimestamp);
-        var rKey = dc.getFullYear() + '-' + ('0' + (dc.getMonth() + 1)).slice(-2);
-        monthlyResolved[rKey] = (monthlyResolved[rKey] || 0) + 1;
-      }
     }
-    // Merge month keys from both maps, sort, take last 12
-    var allMonths = {};
-    Object.keys(monthly).forEach(function(k) { allMonths[k] = true; });
-    Object.keys(monthlyResolved).forEach(function(k) { allMonths[k] = true; });
-    var sortedMonths = Object.keys(allMonths).sort().slice(-12);
-    var monthlyArr = sortedMonths.map(function(k) { return { month: k, count: monthly[k] || 0 }; });
-    var monthlyResolvedArr = sortedMonths.map(function(k) { return { month: k, count: monthlyResolved[k] || 0 }; });
-    return {
-      available: true, total: total,
-      byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory,
-      monthly: monthlyArr, monthlyResolved: monthlyResolvedArr,
-      openCount: openCount, wonCount: wonCount, deniedCount: deniedCount, settledCount: settledCount,
-      overdueCount: overdueCount, dueSoonCount: dueSoonCount,
-    };
+    var monthlyArr = Object.keys(monthly).sort().map(function(k) { return { month: k, count: monthly[k] }; });
+    return { available: true, total: total, byStatus: byStatus, byStep: byStep, byUnit: byUnit, byCategory: byCategory, monthly: monthlyArr };
   }
 
   function getGrievanceHotSpots() {
@@ -1630,692 +1318,6 @@ var DataService = (function () {
     }
   }
 
-  // ═══════════════════════════════════════
-  // PUBLIC: Steward Performance (v4.16.0)
-  // ═══════════════════════════════════════
-
-  /**
-   * Returns performance data for a single steward by email.
-   * Reads _Steward_Performance_Calc and cross-refs Member Directory for name→email.
-   * @param {string} email
-   * @returns {Object|null}
-   */
-  function getStewardPerformance(email) {
-    if (!email) return null;
-    email = String(email).trim().toLowerCase();
-
-    var user = findUserByEmail(email);
-    if (!user) return null;
-    var stewardName = user.name;
-    if (!stewardName) return null;
-
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
-    if (!sheet || sheet.getLastRow() <= 1) return null;
-
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      var rowName = String(data[i][STEWARD_PERF_COLS.STEWARD - 1]).trim();
-      if (rowName.toLowerCase() === stewardName.toLowerCase()) {
-        return {
-          steward: rowName,
-          totalCases: Number(data[i][STEWARD_PERF_COLS.TOTAL_CASES - 1]) || 0,
-          active: Number(data[i][STEWARD_PERF_COLS.ACTIVE - 1]) || 0,
-          closed: Number(data[i][STEWARD_PERF_COLS.CLOSED - 1]) || 0,
-          won: Number(data[i][STEWARD_PERF_COLS.WON - 1]) || 0,
-          winRate: Number(data[i][STEWARD_PERF_COLS.WIN_RATE - 1]) || 0,
-          avgDays: Number(data[i][STEWARD_PERF_COLS.AVG_DAYS - 1]) || 0,
-          overdue: Number(data[i][STEWARD_PERF_COLS.OVERDUE - 1]) || 0,
-          dueThisWeek: Number(data[i][STEWARD_PERF_COLS.DUE_THIS_WEEK - 1]) || 0,
-          performanceScore: Number(data[i][STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]) || 0,
-        };
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Returns all steward performance rows (for chief steward / insights).
-   * @returns {Object[]}
-   */
-  function getAllStewardPerformance() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
-    if (!sheet || sheet.getLastRow() <= 1) return [];
-
-    var data = sheet.getDataRange().getValues();
-    var results = [];
-    for (var i = 1; i < data.length; i++) {
-      var name = String(data[i][STEWARD_PERF_COLS.STEWARD - 1]).trim();
-      if (!name) continue;
-      results.push({
-        steward: name,
-        totalCases: Number(data[i][STEWARD_PERF_COLS.TOTAL_CASES - 1]) || 0,
-        active: Number(data[i][STEWARD_PERF_COLS.ACTIVE - 1]) || 0,
-        closed: Number(data[i][STEWARD_PERF_COLS.CLOSED - 1]) || 0,
-        won: Number(data[i][STEWARD_PERF_COLS.WON - 1]) || 0,
-        winRate: Number(data[i][STEWARD_PERF_COLS.WIN_RATE - 1]) || 0,
-        avgDays: Number(data[i][STEWARD_PERF_COLS.AVG_DAYS - 1]) || 0,
-        overdue: Number(data[i][STEWARD_PERF_COLS.OVERDUE - 1]) || 0,
-        dueThisWeek: Number(data[i][STEWARD_PERF_COLS.DUE_THIS_WEEK - 1]) || 0,
-        performanceScore: Number(data[i][STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]) || 0,
-      });
-    }
-    results.sort(function(a, b) { return b.performanceScore - a.performanceScore; });
-    return results;
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Case Checklist (v4.16.0)
-  // ═══════════════════════════════════════
-
-  /**
-   * Returns checklist items for a case. Wraps 12_Features.gs function.
-   * @param {string} caseId
-   * @returns {Object[]}
-   */
-  function getCaseChecklist(caseId) {
-    if (!caseId) return [];
-    if (typeof getChecklistItems === 'function') return getChecklistItems(caseId);
-    return [];
-  }
-
-  /**
-   * Returns checklist progress for a case. Wraps 12_Features.gs function.
-   * @param {string} caseId
-   * @returns {Object}
-   */
-  function getCaseChecklistProgress(caseId) {
-    if (!caseId) return { completed: 0, total: 0, percentage: 0, display: 'No checklist' };
-    if (typeof getChecklistProgress === 'function') return getChecklistProgress(caseId);
-    return { completed: 0, total: 0, percentage: 0, display: 'No checklist' };
-  }
-
-  /**
-   * Toggles a checklist item. Wraps 12_Features.gs function.
-   * @param {string} checklistId
-   * @param {boolean} completed
-   * @param {string} userEmail
-   * @returns {Object}
-   */
-  function toggleChecklistItem(checklistId, completed, userEmail) {
-    if (typeof setChecklistItemCompleted === 'function') {
-      return setChecklistItemCompleted(checklistId, completed, userEmail);
-    }
-    return { success: false, message: 'Checklist feature unavailable.' };
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Grievance Draft & Drive (v4.18.0)
-  // ═══════════════════════════════════════
-
-  /**
-   * Creates a grievance draft row so a member can start uploading docs
-   * before the steward formally files.
-   * @param {string} email - Member email
-   * @param {Object} data - { title, category, description }
-   * @returns {Object} { success, grievanceId, message }
-   */
-  function startGrievanceDraft(email, data) {
-    if (!email) return { success: false, message: 'Missing email.' };
-    email = String(email).trim().toLowerCase();
-    data = data || {};
-
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var gSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
-    if (!gSheet) return { success: false, message: 'Grievance Log not found.' };
-
-    // Lookup member info
-    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-    var firstName = '', lastName = '', memberId = '', location = '', steward = '';
-    if (memberSheet && memberSheet.getLastRow() > 1) {
-      var mData = memberSheet.getDataRange().getValues();
-      for (var i = 1; i < mData.length; i++) {
-        if (String(mData[i][MEMBER_COLS.EMAIL - 1]).trim().toLowerCase() === email) {
-          firstName = String(mData[i][MEMBER_COLS.FIRST_NAME - 1] || '');
-          lastName = String(mData[i][MEMBER_COLS.LAST_NAME - 1] || '');
-          memberId = String(mData[i][MEMBER_COLS.MEMBER_ID - 1] || '');
-          location = String(mData[i][MEMBER_COLS.WORK_LOCATION - 1] || '');
-          steward = String(mData[i][MEMBER_COLS.ASSIGNED_STEWARD - 1] || '');
-          break;
-        }
-      }
-    }
-
-    var grievanceId = 'DRAFT-' + Date.now().toString(36).toUpperCase();
-    var maxCol = GRIEVANCE_COLS.LAST_UPDATED || 37;
-    var row = [];
-    for (var c = 0; c < maxCol; c++) { row.push(''); }
-
-    row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId;
-    row[GRIEVANCE_COLS.MEMBER_ID - 1] = memberId;
-    row[GRIEVANCE_COLS.FIRST_NAME - 1] = firstName;
-    row[GRIEVANCE_COLS.LAST_NAME - 1] = lastName;
-    row[GRIEVANCE_COLS.STATUS - 1] = 'Draft';
-    row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = data.category || '';
-    row[GRIEVANCE_COLS.MEMBER_EMAIL - 1] = email;
-    row[GRIEVANCE_COLS.LOCATION - 1] = location;
-    row[GRIEVANCE_COLS.STEWARD - 1] = steward;
-    row[GRIEVANCE_COLS.INCIDENT_DATE - 1] = new Date();
-
-    gSheet.appendRow(row);
-
-    // Auto-sort so new draft appears in correct priority position
-    if (typeof sortGrievanceLogByStatus === 'function') {
-      try { sortGrievanceLogByStatus(); } catch (_e) { /* non-critical */ }
-    }
-
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('GRIEVANCE_DRAFT_CREATED', { email: email, grievanceId: grievanceId });
-    }
-
-    return { success: true, grievanceId: grievanceId, message: 'Draft created. Your steward will be notified.' };
-  }
-
-  /**
-   * Creates a Google Drive folder for grievance documents.
-   * @param {string} email - Member email
-   * @returns {Object} { success, folderUrl, message }
-   */
-  function createGrievanceDriveFolder(email) {
-    if (!email) return { success: false, folderUrl: null, message: 'Missing email.' };
-    email = String(email).trim().toLowerCase();
-
-    // Lookup member name
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
-    var memberName = email.split('@')[0];
-    if (memberSheet && memberSheet.getLastRow() > 1) {
-      var mData = memberSheet.getDataRange().getValues();
-      for (var i = 1; i < mData.length; i++) {
-        if (String(mData[i][MEMBER_COLS.EMAIL - 1]).trim().toLowerCase() === email) {
-          memberName = String(mData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + String(mData[i][MEMBER_COLS.LAST_NAME - 1] || '');
-          memberName = memberName.trim() || email.split('@')[0];
-          break;
-        }
-      }
-    }
-
-    try {
-      // Create inside the restricted sheet folder (not Drive root)
-      var parentUrl = getOrCreateSheetFolder_();
-      var parentId = PropertiesService.getScriptProperties().getProperty('SHEET_DRIVE_FOLDER_ID');
-      var parentFolder = parentId ? DriveApp.getFolderById(parentId) : DriveApp.getRootFolder();
-
-      var folderName = memberName + ' - Grievance Docs';
-      var folder = parentFolder.createFolder(folderName);
-      folder.addEditor(email);
-      var folderUrl = folder.getUrl();
-
-      if (typeof logAuditEvent === 'function') {
-        logAuditEvent('GRIEVANCE_DRIVE_FOLDER_CREATED', { email: email, folderUrl: folderUrl });
-      }
-
-      return { success: true, folderUrl: folderUrl, message: 'Folder created.' };
-    } catch (e) {
-      Logger.log('createGrievanceDriveFolder error: ' + e.message);
-      return { success: false, folderUrl: null, message: 'Failed to create folder: ' + e.message };
-    }
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Member Meetings (v4.16.0)
-  // ═══════════════════════════════════════
-
-  /**
-   * Returns meeting check-in records for a member, merged with meeting minutes.
-   * Minutes entries that match a check-in by date get their title/bullets attached;
-   * unmatched minutes appear as standalone entries.
-   * @param {string} email
-   * @returns {Object[]}
-   */
-  function getMemberMeetings(email) {
-    if (!email) return [];
-    email = String(email).trim().toLowerCase();
-
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
-    var meetings = [];
-
-    if (sheet && sheet.getLastRow() > 1) {
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      var rowEmail = String(data[i][MEETING_CHECKIN_COLS.EMAIL - 1]).trim().toLowerCase();
-      if (rowEmail !== email) continue;
-
-      var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
-      var dateStr = meetingDate instanceof Date ? _formatDate(meetingDate) : String(meetingDate || '');
-      var dateTs = meetingDate instanceof Date ? meetingDate.getTime() : 0;
-
-      meetings.push({
-        meetingId: String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || ''),
-        meetingName: String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || ''),
-        meetingDate: dateStr,
-        meetingDateTs: dateTs,
-        meetingType: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || ''),
-        checkInTime: data[i][MEETING_CHECKIN_COLS.CHECKIN_TIME - 1] instanceof Date
-          ? _formatDate(data[i][MEETING_CHECKIN_COLS.CHECKIN_TIME - 1]) : '',
-        duration: String(data[i][MEETING_CHECKIN_COLS.MEETING_DURATION - 1] || ''),
-        notesUrl: String(data[i][MEETING_CHECKIN_COLS.NOTES_DOC_URL - 1] || ''),
-        agendaUrl: String(data[i][MEETING_CHECKIN_COLS.AGENDA_DOC_URL - 1] || ''),
-      });
-    }
-    } // end if (sheet && sheet.getLastRow() > 1)
-
-    // Merge meeting minutes — attach to matching check-ins by date,
-    // or add as standalone entries if no check-in match
-    try {
-      var minutesSheet = ss.getSheetByName('MeetingMinutes');
-      if (minutesSheet && minutesSheet.getLastRow() > 1) {
-        var mData = minutesSheet.getDataRange().getValues();
-        // Build lookup of check-in dates (YYYY-MM-DD)
-        var checkinDates = {};
-        meetings.forEach(function(m, idx) {
-          if (m.meetingDate) {
-            var normalized = m.meetingDate.replace(/\//g, '-');
-            checkinDates[normalized] = idx;
-          }
-        });
-
-        for (var mi = 1; mi < mData.length; mi++) {
-          var minDate = mData[mi][PORTAL_MINUTES_COLS.MEETING_DATE];
-          var minDateStr = minDate instanceof Date ? _formatDate(minDate) : String(minDate || '');
-          var minDateTs = minDate instanceof Date ? minDate.getTime() : 0;
-          var minTitle = String(mData[mi][PORTAL_MINUTES_COLS.TITLE] || '');
-          var minBullets = String(mData[mi][PORTAL_MINUTES_COLS.BULLETS] || '');
-
-          // Try to match by date
-          var normalizedMinDate = minDateStr.replace(/\//g, '-');
-          if (checkinDates[normalizedMinDate] !== undefined) {
-            // Attach to existing check-in
-            var idx = checkinDates[normalizedMinDate];
-            meetings[idx].minutesTitle = minTitle;
-            meetings[idx].minutesBullets = minBullets;
-          } else {
-            // Add as standalone minutes entry
-            meetings.push({
-              meetingId: '',
-              meetingName: minTitle || 'Meeting Minutes',
-              meetingDate: minDateStr,
-              meetingDateTs: minDateTs,
-              meetingType: 'Minutes',
-              checkInTime: '',
-              duration: '',
-              notesUrl: '',
-              agendaUrl: '',
-              minutesTitle: minTitle,
-              minutesBullets: minBullets,
-            });
-          }
-        }
-      }
-    } catch (e) {
-      Logger.log('getMemberMeetings minutes merge error: ' + e.message);
-    }
-
-    meetings.sort(function(a, b) { return (b.meetingDateTs || 0) - (a.meetingDateTs || 0); });
-    meetings.forEach(function(m) { delete m.meetingDateTs; });
-    return meetings;
-  }
-
-  /**
-   * Returns aggregate meeting stats.
-   * @returns {Object}
-   */
-  function getMeetingStats() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
-    if (!sheet || sheet.getLastRow() <= 1) return { total: 0, byType: {}, recent: [] };
-
-    var data = sheet.getDataRange().getValues();
-    var byType = {};
-    var meetingIds = {};
-    for (var i = 1; i < data.length; i++) {
-      var type = String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || 'Other').trim();
-      byType[type] = (byType[type] || 0) + 1;
-      var mid = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || '');
-      if (mid) meetingIds[mid] = true;
-    }
-
-    return { total: Object.keys(meetingIds).length, attendanceCount: data.length - 1, byType: byType };
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Satisfaction Trends (v4.16.0)
-  // ═══════════════════════════════════════
-
-  /**
-   * Returns satisfaction trend data from the AVG columns (BT-CD).
-   * @returns {Object}
-   */
-  function getSatisfactionTrends() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
-    if (!sheet || sheet.getLastRow() <= 1) return { categories: [], overall: 0, responseCount: 0 };
-
-    var data = sheet.getDataRange().getValues();
-    var responseCount = data.length - 1;
-    if (responseCount < 3) return { categories: [], overall: 0, responseCount: responseCount };
-
-    var avgCols = [
-      { key: 'AVG_OVERALL_SAT',    name: 'Overall Satisfaction', col: SATISFACTION_COLS.AVG_OVERALL_SAT },
-      { key: 'AVG_STEWARD_RATING', name: 'Steward Ratings',     col: SATISFACTION_COLS.AVG_STEWARD_RATING },
-      { key: 'AVG_STEWARD_ACCESS', name: 'Steward Access',      col: SATISFACTION_COLS.AVG_STEWARD_ACCESS },
-      { key: 'AVG_CHAPTER',        name: 'Chapter Effectiveness', col: SATISFACTION_COLS.AVG_CHAPTER },
-      { key: 'AVG_LEADERSHIP',     name: 'Local Leadership',    col: SATISFACTION_COLS.AVG_LEADERSHIP },
-      { key: 'AVG_CONTRACT',       name: 'Contract Enforcement', col: SATISFACTION_COLS.AVG_CONTRACT },
-      { key: 'AVG_REPRESENTATION', name: 'Representation',      col: SATISFACTION_COLS.AVG_REPRESENTATION },
-      { key: 'AVG_COMMUNICATION',  name: 'Communication',       col: SATISFACTION_COLS.AVG_COMMUNICATION },
-      { key: 'AVG_MEMBER_VOICE',   name: 'Member Voice',        col: SATISFACTION_COLS.AVG_MEMBER_VOICE },
-      { key: 'AVG_VALUE_ACTION',   name: 'Value & Action',      col: SATISFACTION_COLS.AVG_VALUE_ACTION },
-      { key: 'AVG_SCHEDULING',     name: 'Scheduling',          col: SATISFACTION_COLS.AVG_SCHEDULING },
-    ];
-
-    var categories = [];
-    var overallSum = 0;
-    var overallCount = 0;
-
-    for (var c = 0; c < avgCols.length; c++) {
-      var colIdx = avgCols[c].col - 1; // 0-indexed
-      if (colIdx < 0) continue;
-      var sum = 0;
-      var count = 0;
-      for (var r = 1; r < data.length; r++) {
-        if (colIdx < data[r].length) {
-          var val = Number(data[r][colIdx]);
-          if (!isNaN(val) && val > 0) {
-            sum += val;
-            count++;
-          }
-        }
-      }
-      var avg = count > 0 ? Math.round((sum / count) * 10) / 10 : 0;
-      categories.push({ key: avgCols[c].key, name: avgCols[c].name, avg: avg, count: count });
-      overallSum += sum;
-      overallCount += count;
-    }
-
-    return {
-      categories: categories,
-      overall: overallCount > 0 ? Math.round((overallSum / overallCount) * 10) / 10 : 0,
-      responseCount: responseCount,
-    };
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Feedback (v4.16.0)
-  // ═══════════════════════════════════════
-
-  /**
-   * Submits a feedback entry.
-   * @param {string} email
-   * @param {Object} data - { category, type, priority, title, description }
-   * @returns {Object}
-   */
-  function submitFeedback(email, feedbackData) {
-    if (!email || !feedbackData || !feedbackData.title) {
-      return { success: false, message: 'Missing required fields.' };
-    }
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
-    if (!sheet) return { success: false, message: 'Feedback sheet not found.' };
-
-    sheet.appendRow([
-      new Date(),
-      String(email).trim().toLowerCase(),
-      String(feedbackData.category || 'Other').substring(0, 50),
-      String(feedbackData.type || '').substring(0, 50),
-      String(feedbackData.priority || 'Medium').substring(0, 20),
-      String(feedbackData.title).substring(0, 200),
-      String(feedbackData.description || '').substring(0, 1000),
-      'New',
-      '',
-      '',
-      '',
-    ]);
-
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('FEEDBACK_SUBMITTED', { email: email, category: feedbackData.category });
-    }
-    return { success: true, message: 'Feedback submitted.' };
-  }
-
-  /**
-   * Returns user's submitted feedback.
-   * @param {string} email
-   * @returns {Object[]}
-   */
-  function getMyFeedback(email) {
-    if (!email) return [];
-    email = String(email).trim().toLowerCase();
-
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
-    if (!sheet || sheet.getLastRow() <= 1) return [];
-
-    var data = sheet.getDataRange().getValues();
-    var items = [];
-    for (var i = 1; i < data.length; i++) {
-      var rowEmail = String(data[i][FEEDBACK_COLS.SUBMITTED_BY - 1]).trim().toLowerCase();
-      if (rowEmail !== email) continue;
-
-      var ts = data[i][FEEDBACK_COLS.TIMESTAMP - 1];
-      items.push({
-        date: ts instanceof Date ? _formatDate(ts) : String(ts || ''),
-        category: String(data[i][FEEDBACK_COLS.CATEGORY - 1] || ''),
-        type: String(data[i][FEEDBACK_COLS.TYPE - 1] || ''),
-        priority: String(data[i][FEEDBACK_COLS.PRIORITY - 1] || ''),
-        title: String(data[i][FEEDBACK_COLS.TITLE - 1] || ''),
-        description: String(data[i][FEEDBACK_COLS.DESCRIPTION - 1] || ''),
-        status: String(data[i][FEEDBACK_COLS.STATUS - 1] || 'New'),
-        resolution: String(data[i][FEEDBACK_COLS.RESOLUTION - 1] || ''),
-      });
-    }
-    items.reverse(); // newest first
-    return items;
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Polls (v4.16.0)
-  // ═══════════════════════════════════════
-
-  /**
-   * Returns active polls with vote status for the user.
-   * @param {string} email
-   * @returns {Object[]}
-   */
-  function getActivePolls(email) {
-    try {
-    email = email ? String(email).trim().toLowerCase() : '';
-
-    var pollSheet = (typeof getOrCreatePollsSheet === 'function') ? getOrCreatePollsSheet() : null;
-    if (!pollSheet || pollSheet.getLastRow() <= 1) return [];
-
-    var respSheet = (typeof getOrCreatePollResponsesSheet === 'function') ? getOrCreatePollResponsesSheet() : null;
-
-    // Build response index
-    var myVotes = {};
-    var voteCounts = {};
-    if (respSheet && respSheet.getLastRow() > 1) {
-      var respData = respSheet.getDataRange().getValues();
-      for (var r = 1; r < respData.length; r++) {
-        var pollId = String(respData[r][PORTAL_POLL_RESPONSE_COLS.POLL_ID]);
-        var voter = String(respData[r][PORTAL_POLL_RESPONSE_COLS.EMAIL]).trim().toLowerCase();
-        var resp = String(respData[r][PORTAL_POLL_RESPONSE_COLS.RESPONSE]);
-
-        if (!voteCounts[pollId]) voteCounts[pollId] = {};
-        voteCounts[pollId][resp] = (voteCounts[pollId][resp] || 0) + 1;
-
-        if (voter === email) myVotes[pollId] = resp;
-      }
-    }
-
-    var pollData = pollSheet.getDataRange().getValues();
-    var polls = [];
-    for (var i = 1; i < pollData.length; i++) {
-      var active = String(pollData[i][PORTAL_POLL_COLS.ACTIVE]).trim().toLowerCase();
-      if (active !== 'true' && active !== 'yes') continue;
-
-      var id = String(pollData[i][PORTAL_POLL_COLS.ID]);
-      var optionsRaw = String(pollData[i][PORTAL_POLL_COLS.OPTIONS] || '');
-      var options = optionsRaw.split(',').map(function(o) { return o.trim(); }).filter(function(o) { return o; });
-
-      var results = {};
-      var totalVotes = 0;
-      options.forEach(function(o) {
-        var c = (voteCounts[id] && voteCounts[id][o]) || 0;
-        results[o] = c;
-        totalVotes += c;
-      });
-
-      polls.push({
-        id: id,
-        question: String(pollData[i][PORTAL_POLL_COLS.QUESTION] || ''),
-        options: options,
-        hasVoted: myVotes.hasOwnProperty(id),
-        myVote: myVotes[id] || null,
-        results: results,
-        totalVotes: totalVotes,
-        unit: String(pollData[i][PORTAL_POLL_COLS.UNIT] || ''),
-      });
-    }
-    return polls;
-    } catch (e) {
-      Logger.log('getActivePolls error: ' + e.message);
-      return [];
-    }
-  }
-
-  /**
-   * Submits a poll vote, guarding against double-voting.
-   * @param {string} email
-   * @param {string} pollId
-   * @param {string} response
-   * @returns {Object}
-   */
-  function submitPollVote(email, pollId, response) {
-    if (!email || !pollId || !response) return { success: false, message: 'Missing fields.' };
-    email = String(email).trim().toLowerCase();
-
-    var respSheet = (typeof getOrCreatePollResponsesSheet === 'function') ? getOrCreatePollResponsesSheet() : null;
-    if (!respSheet) return { success: false, message: 'Poll system unavailable.' };
-
-    // Check for existing vote
-    if (respSheet.getLastRow() > 1) {
-      var data = respSheet.getDataRange().getValues();
-      for (var i = 1; i < data.length; i++) {
-        if (String(data[i][PORTAL_POLL_RESPONSE_COLS.POLL_ID]) === pollId &&
-            String(data[i][PORTAL_POLL_RESPONSE_COLS.EMAIL]).trim().toLowerCase() === email) {
-          return { success: false, message: 'Already voted on this poll.' };
-        }
-      }
-    }
-
-    respSheet.appendRow([pollId, email, response, new Date()]);
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('POLL_VOTE', { email: email, pollId: pollId });
-    }
-    return { success: true, message: 'Vote recorded.' };
-  }
-
-  // ═══════════════════════════════════════
-  // PUBLIC: Meeting Minutes (v4.16.0)
-  // ═══════════════════════════════════════
-
-  /**
-   * Returns meeting minutes, most recent first.
-   * @param {number} limit
-   * @returns {Object[]}
-   */
-  function getMeetingMinutes(limit) {
-    try {
-    limit = limit || 20;
-    var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
-    if (!sheet || sheet.getLastRow() <= 1) return [];
-
-    var data = sheet.getDataRange().getValues();
-    var minutes = [];
-    for (var i = 1; i < data.length; i++) {
-      var meetingDate = data[i][PORTAL_MINUTES_COLS.MEETING_DATE];
-      var dateStr = meetingDate instanceof Date ? _formatDate(meetingDate) : String(meetingDate || '');
-      var dateTs = meetingDate instanceof Date ? meetingDate.getTime() : 0;
-
-      minutes.push({
-        id: String(data[i][PORTAL_MINUTES_COLS.ID] || ''),
-        meetingDate: dateStr,
-        meetingDateTs: dateTs,
-        title: String(data[i][PORTAL_MINUTES_COLS.TITLE] || ''),
-        bullets: String(data[i][PORTAL_MINUTES_COLS.BULLETS] || ''),
-        fullMinutes: String(data[i][PORTAL_MINUTES_COLS.FULL_MINUTES] || ''),
-        createdBy: String(data[i][PORTAL_MINUTES_COLS.CREATED_BY] || ''),
-        createdDate: data[i][PORTAL_MINUTES_COLS.CREATED_DATE] instanceof Date
-          ? _formatDate(data[i][PORTAL_MINUTES_COLS.CREATED_DATE]) : '',
-      });
-    }
-    minutes.sort(function(a, b) { return (b.meetingDateTs || 0) - (a.meetingDateTs || 0); });
-    minutes.forEach(function(m) { delete m.meetingDateTs; });
-    return minutes.slice(0, limit);
-    } catch (e) {
-      Logger.log('getMeetingMinutes error: ' + e.message);
-      return [];
-    }
-  }
-
-  /**
-   * Adds new meeting minutes (steward-only).
-   * @param {string} stewardEmail
-   * @param {Object} data - { title, meetingDate, bullets, fullMinutes }
-   * @returns {Object}
-   */
-  function addMeetingMinutes(stewardEmail, minutesData) {
-    if (!stewardEmail || !minutesData || !minutesData.title) {
-      return { success: false, message: 'Missing required fields.' };
-    }
-    var sheet = (typeof getOrCreateMinutesSheet === 'function') ? getOrCreateMinutesSheet() : null;
-    if (!sheet) return { success: false, message: 'Minutes sheet unavailable.' };
-
-    var id = 'MIN_' + Date.now().toString(36);
-    var meetingDate = minutesData.meetingDate ? new Date(minutesData.meetingDate) : new Date();
-    if (isNaN(meetingDate.getTime())) meetingDate = new Date();
-
-    sheet.appendRow([
-      id,
-      meetingDate,
-      String(minutesData.title).substring(0, 200),
-      String(minutesData.bullets || '').substring(0, 2000),
-      String(minutesData.fullMinutes || '').substring(0, 5000),
-      String(stewardEmail).trim().toLowerCase(),
-      new Date(),
-    ]);
-
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('MINUTES_ADDED', { steward: stewardEmail, title: minutesData.title });
-    }
-    return { success: true, message: 'Minutes added.', id: id };
-  }
-
-  /**
-   * Creates a new poll (steward-only).
-   * @param {string} stewardEmail
-   * @param {string} question
-   * @param {string} options - comma-separated
-   * @param {string} unit - target unit or empty for all
-   * @returns {Object}
-   */
-  function addPoll(stewardEmail, question, options, unit) {
-    if (!stewardEmail || !question || !options) return { success: false, message: 'Missing fields.' };
-    var sheet = (typeof getOrCreatePollsSheet === 'function') ? getOrCreatePollsSheet() : null;
-    if (!sheet) return { success: false, message: 'Polls sheet unavailable.' };
-
-    var id = 'POLL_' + Date.now().toString(36);
-    sheet.appendRow([id, question.substring(0, 500), options.substring(0, 500), 'true', (unit || '').substring(0, 100), String(stewardEmail).trim().toLowerCase(), new Date()]);
-
-    if (typeof logAuditEvent === 'function') {
-      logAuditEvent('POLL_CREATED', { steward: stewardEmail, question: question.substring(0, 100) });
-    }
-    return { success: true, message: 'Poll created.', id: id };
-  }
-
   // Public API
   return {
     findUserByEmail: findUserByEmail,
@@ -2335,11 +1337,8 @@ var DataService = (function () {
     getMemberSurveyStatus: getMemberSurveyStatus,
     getOrgLinks: getOrgLinks,
     getStewardMembers: getStewardMembers,
-    getAllMembers: getAllMembers,
     getStewardSurveyTracking: getStewardSurveyTracking,
     sendBroadcastMessage: sendBroadcastMessage,
-    startGrievanceDraft: startGrievanceDraft,
-    createGrievanceDriveFolder: createGrievanceDriveFolder,
     getSurveyResults: getSurveyResults,
     // v4.12.0
     logMemberContact: logMemberContact,
@@ -2358,27 +1357,6 @@ var DataService = (function () {
     // v4.15.0
     isChiefSteward: isChiefSteward,
     getChiefStewardTaskView: getChiefStewardTaskView,
-    // v4.17.0 — member task assignment
-    createMemberTask: createMemberTask,
-    getMemberTasks: getMemberTasks,
-    completeMemberTask: completeMemberTask,
-    getStewardAssignedMemberTasks: getStewardAssignedMemberTasks,
-    // v4.16.0 — unwired sheets
-    getStewardPerformance: getStewardPerformance,
-    getAllStewardPerformance: getAllStewardPerformance,
-    getCaseChecklist: getCaseChecklist,
-    getCaseChecklistProgress: getCaseChecklistProgress,
-    toggleChecklistItem: toggleChecklistItem,
-    getMemberMeetings: getMemberMeetings,
-    getMeetingStats: getMeetingStats,
-    getSatisfactionTrends: getSatisfactionTrends,
-    submitFeedback: submitFeedback,
-    getMyFeedback: getMyFeedback,
-    getActivePolls: getActivePolls,
-    submitPollVote: submitPollVote,
-    getMeetingMinutes: getMeetingMinutes,
-    addMeetingMinutes: addMeetingMinutes,
-    addPoll: addPoll,
   };
 
 })();
@@ -2404,13 +1382,10 @@ function dataGetAssignedSteward(email) { return DataService.getAssignedStewardIn
 function dataGetAvailableStewards(email) { return DataService.getAvailableStewards(email); }
 function dataAssignSteward(memberEmail, stewardEmail) { return DataService.assignStewardToMember(memberEmail, stewardEmail); }
 function dataGetGrievanceDriveUrl(email) { return DataService.getMemberGrievanceDriveUrl(email); }
-function dataStartGrievanceDraft(email, data) { return DataService.startGrievanceDraft(email, data); }
-function dataCreateGrievanceDrive(email) { return DataService.createGrievanceDriveFolder(email); }
 function dataGetSurveyStatus(email) { return DataService.getMemberSurveyStatus(email); }
 function dataGetOrgLinks() { return DataService.getOrgLinks(); }
 function dataGetStewardMembers(email) { return DataService.getStewardMembers(email); }
-function dataGetAllMembers() { return DataService.getAllMembers(); }
-function dataGetStewardSurveyTracking(email, scope) { return DataService.getStewardSurveyTracking(email, scope); }
+function dataGetStewardSurveyTracking(email) { return DataService.getStewardSurveyTracking(email); }
 function dataSendBroadcast(email, filter, msg) { return DataService.sendBroadcastMessage(email, filter, msg); }
 function dataGetSurveyResults() { return DataService.getSurveyResults(); }
 
@@ -2435,35 +1410,12 @@ function dataIsChiefSteward(email) { return DataService.isChiefSteward(email); }
 function dataGetChiefStewardTaskView(email) { return DataService.getChiefStewardTaskView(email); }
 function dataGetAgencyGrievanceStats() { return DataService.getGrievanceStats(); }
 
-// v4.17.0 — member task assignment wrappers
-function dataCreateMemberTask(stewardEmail, memberEmail, title, desc, priority, dueDate) { return DataService.createMemberTask(stewardEmail, memberEmail, title, desc, priority, dueDate); }
-function dataGetMemberTasks(memberEmail, statusFilter) { return DataService.getMemberTasks(memberEmail, statusFilter); }
-function dataCompleteMemberTask(memberEmail, taskId) { return DataService.completeMemberTask(memberEmail, taskId); }
-function dataGetStewardAssignedMemberTasks(stewardEmail) { return DataService.getStewardAssignedMemberTasks(stewardEmail); }
-
-// v4.16.0 — unwired sheet wrappers
-function dataGetStewardPerformance(email) { return DataService.getStewardPerformance(email); }
-function dataGetAllStewardPerformance() { return DataService.getAllStewardPerformance(); }
-function dataGetCaseChecklist(caseId) { return DataService.getCaseChecklist(caseId); }
-function dataGetCaseChecklistProgress(caseId) { return DataService.getCaseChecklistProgress(caseId); }
-function dataToggleChecklistItem(checklistId, completed, userEmail) { return DataService.toggleChecklistItem(checklistId, completed, userEmail); }
-function dataGetMemberMeetings(email) { return DataService.getMemberMeetings(email); }
-function dataGetMeetingStats() { return DataService.getMeetingStats(); }
-function dataGetSatisfactionTrends() { return DataService.getSatisfactionTrends(); }
-function dataSubmitFeedback(email, data) { return DataService.submitFeedback(email, data); }
-function dataGetMyFeedback(email) { return DataService.getMyFeedback(email); }
-function dataGetActivePolls(email) { return DataService.getActivePolls(email); }
-function dataSubmitPollVote(email, pollId, response) { return DataService.submitPollVote(email, pollId, response); }
-function dataGetMeetingMinutes(limit) { return DataService.getMeetingMinutes(limit); }
-function dataAddMeetingMinutes(stewardEmail, data) { return DataService.addMeetingMinutes(stewardEmail, data); }
-function dataAddPoll(stewardEmail, question, options, unit) { return DataService.addPoll(stewardEmail, question, options, unit); }
-
 // Batch data fetch — single round-trip for SPA init
 function dataGetBatchData(email, role) { return getWebDashBatchData(email, role); }
 
-// Broadcast filter options — returns unique values from ALL members (not just assigned)
+// Broadcast filter options — returns unique values from steward's members
 function dataGetBroadcastFilterOptions(stewardEmail) {
-  var members = DataService.getAllMembers();
+  var members = DataService.getStewardMembers(stewardEmail);
   var locations = {};
   var officeDays = {};
   var duesStatuses = {};

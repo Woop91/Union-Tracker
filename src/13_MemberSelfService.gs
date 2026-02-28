@@ -675,6 +675,16 @@ function validateMemberSession(token) {
   }
 }
 
+/**
+ * Invalidate a member session on the server side (called on logout)
+ * @param {string} token - The session token to invalidate
+ */
+function invalidateMemberSession(token) {
+  if (!token) return;
+  var cache = CacheService.getScriptCache();
+  cache.remove('member_session_' + token);
+}
+
 // ============================================================================
 // PIN MANAGEMENT (Steward Functions)
 // ============================================================================
@@ -1488,7 +1498,7 @@ function getMemberSelfServicePortalHtml() {
     '<p style="text-align:center;color:#666;margin-bottom:20px;font-size:14px">Enter the reset code from your email and choose a new PIN.</p>' +
     '<div class="field">' +
     '<label for="resetToken">Reset Code</label>' +
-    '<input type="text" id="resetToken" placeholder="8-character code from email" maxlength="8" style="text-transform:uppercase">' +
+    '<input type="text" id="resetToken" placeholder="16-character code from email" maxlength="16" style="text-transform:uppercase">' +
     '</div>' +
     '<div class="field">' +
     '<label for="newPin">New PIN</label>' +
@@ -1578,8 +1588,9 @@ function getMemberSelfServicePortalHtml() {
     '  document.getElementById("loginBtn").textContent="Login";' +
     '}' +
 
-    // Logout
+    // Logout — invalidate server session then clear client state
     'function logout(){' +
+    '  if(sessionToken){google.script.run.invalidateMemberSession(sessionToken)}' +
     '  sessionToken=null;' +
     '  profileData=null;' +
     '  document.getElementById("loginView").style.display="block";' +
