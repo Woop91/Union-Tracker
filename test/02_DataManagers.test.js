@@ -444,19 +444,18 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
   });
 
   test('counts open, pending, won, and resolved grievances correctly', () => {
-    // Build data matching GRIEVANCE_COLUMNS (0-indexed)
-    // STATUS is index 4, LAST_UPDATED varies, ISSUE_CATEGORY varies
-    const headerRow = new Array(30).fill('');
-    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
-    headerRow[GRIEVANCE_COLUMNS.STATUS] = 'Status';
-    headerRow[GRIEVANCE_COLUMNS.LAST_UPDATED] = 'Last Updated';
-    headerRow[GRIEVANCE_COLUMNS.ISSUE_CATEGORY] = 'Category';
+    // Build data matching GRIEVANCE_COLS (1-indexed, subtract 1 for array)
+    const headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
+    headerRow[GRIEVANCE_COLS.LAST_UPDATED - 1] = 'Last Updated';
+    headerRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = 'Category';
 
     const makeRow = (status, category) => {
-      const row = new Array(30).fill('');
-      row[GRIEVANCE_COLUMNS.STATUS] = status;
-      row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY] = category || 'General';
-      row[GRIEVANCE_COLUMNS.LAST_UPDATED] = new Date();
+      const row = new Array(41).fill('');
+      row[GRIEVANCE_COLS.STATUS - 1] = status;
+      row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = category || 'General';
+      row[GRIEVANCE_COLS.LAST_UPDATED - 1] = new Date();
       return row;
     };
 
@@ -489,15 +488,15 @@ describe('getGrievanceStats (mock spreadsheet)', () => {
   });
 
   test('categoryData includes header row and category entries', () => {
-    const headerRow = new Array(30).fill('');
-    headerRow[GRIEVANCE_COLUMNS.STATUS] = 'Status';
-    headerRow[GRIEVANCE_COLUMNS.ISSUE_CATEGORY] = 'Category';
+    const headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
+    headerRow[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = 'Category';
 
     const makeRow = (status, category) => {
-      const row = new Array(30).fill('');
-      row[GRIEVANCE_COLUMNS.STATUS] = status;
-      row[GRIEVANCE_COLUMNS.ISSUE_CATEGORY] = category;
-      row[GRIEVANCE_COLUMNS.LAST_UPDATED] = new Date();
+      const row = new Array(41).fill('');
+      row[GRIEVANCE_COLS.STATUS - 1] = status;
+      row[GRIEVANCE_COLS.ISSUE_CATEGORY - 1] = category;
+      row[GRIEVANCE_COLS.LAST_UPDATED - 1] = new Date();
       return row;
     };
 
@@ -736,11 +735,11 @@ describe('startNewGrievance', () => {
   beforeEach(() => jest.clearAllMocks());
 
   function setupGrievanceMock() {
-    const headerRow = new Array(40).fill('');
-    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
+    const headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
 
-    const existingRow = new Array(40).fill('');
-    existingRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'GRV-2026-0001';
+    const existingRow = new Array(41).fill('');
+    existingRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'GRV-2026-0001';
 
     const data = [headerRow, existingRow];
 
@@ -783,7 +782,7 @@ describe('startNewGrievance', () => {
     expect(sheet.appendRow).toHaveBeenCalledTimes(1);
   });
 
-  test('row data includes GRIEVANCE_OUTCOMES.PENDING as outcome', () => {
+  test('row data includes GRIEVANCE_STATUS.OPEN as status', () => {
     const { sheet } = setupGrievanceMock();
 
     startNewGrievance({
@@ -794,9 +793,8 @@ describe('startNewGrievance', () => {
     });
 
     const appendedRow = sheet.appendRow.mock.calls[0][0];
-    // The outcome should be GRIEVANCE_OUTCOMES.PENDING (not undefined)
-    expect(appendedRow).toContain(GRIEVANCE_OUTCOMES.PENDING);
     expect(appendedRow).toContain(GRIEVANCE_STATUS.OPEN);
+    expect(appendedRow[GRIEVANCE_COLS.CURRENT_STEP - 1]).toBe(1);
   });
 
   test('returns error for invalid grievance data', () => {
@@ -855,15 +853,15 @@ describe('resolveGrievance', () => {
   beforeEach(() => jest.clearAllMocks());
 
   function setupResolveMock(grievanceId, currentStep) {
-    const headerRow = new Array(40).fill('');
-    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
-    headerRow[GRIEVANCE_COLUMNS.STATUS] = 'Status';
+    const headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
+    headerRow[GRIEVANCE_COLS.STATUS - 1] = 'Status';
 
-    const grievanceRow = new Array(40).fill('');
-    grievanceRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = grievanceId || 'GRV-2026-0001';
-    grievanceRow[GRIEVANCE_COLUMNS.STATUS] = GRIEVANCE_STATUS.OPEN;
-    grievanceRow[GRIEVANCE_COLUMNS.CURRENT_STEP] = currentStep || 1;
-    grievanceRow[GRIEVANCE_COLUMNS.NOTES] = '';
+    const grievanceRow = new Array(41).fill('');
+    grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId || 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.OPEN;
+    grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = currentStep || 1;
+    grievanceRow[GRIEVANCE_COLS.RESOLUTION - 1] = '';
 
     const data = [headerRow, grievanceRow];
 
@@ -918,9 +916,9 @@ describe('resolveGrievance', () => {
     resolveGrievance('GRV-2026-0001', 'Settled', 'Partial agreement reached', '');
 
     const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    expect(setValueArgs).toContain('Partial agreement reached'); // resolution
-    expect(setValueArgs).toContain('Settled');                    // outcome
-    expect(setValueArgs).toContain(GRIEVANCE_STATUS.RESOLVED);   // status
+    // Source writes combined resolution text: "Settled: Partial agreement reached"
+    expect(setValueArgs).toContainEqual(expect.stringContaining('Partial agreement reached'));
+    expect(setValueArgs).toContain(GRIEVANCE_STATUS.RESOLVED);   // status = 'Settled'
   });
 
   test('returns error when grievance ID not found', () => {
@@ -953,9 +951,10 @@ describe('resolveGrievance', () => {
     resolveGrievance('GRV-2026-0001', 'Won', 'Full remedy', 'Victory!');
 
     const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    const notesArg = setValueArgs.find(v => typeof v === 'string' && v.includes('RESOLVED'));
-    expect(notesArg).toContain('Won');
-    expect(notesArg).toContain('Victory!');
+    // Source builds combined text: "Won: Full remedy\n[timestamp] Victory!"
+    const resolutionArg = setValueArgs.find(v => typeof v === 'string' && v.includes('Victory!'));
+    expect(resolutionArg).toContain('Won');
+    expect(resolutionArg).toContain('Victory!');
   });
 });
 
@@ -967,14 +966,14 @@ describe('advanceGrievanceStep', () => {
   beforeEach(() => jest.clearAllMocks());
 
   function setupAdvanceMock(grievanceId, currentStep) {
-    const headerRow = new Array(40).fill('');
-    headerRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = 'Grievance ID';
+    const headerRow = new Array(41).fill('');
+    headerRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = 'Grievance ID';
 
-    const grievanceRow = new Array(40).fill('');
-    grievanceRow[GRIEVANCE_COLUMNS.GRIEVANCE_ID] = grievanceId || 'GRV-2026-0001';
-    grievanceRow[GRIEVANCE_COLUMNS.CURRENT_STEP] = currentStep || 1;
-    grievanceRow[GRIEVANCE_COLUMNS.STATUS] = GRIEVANCE_STATUS.OPEN;
-    grievanceRow[GRIEVANCE_COLUMNS.NOTES] = '';
+    const grievanceRow = new Array(41).fill('');
+    grievanceRow[GRIEVANCE_COLS.GRIEVANCE_ID - 1] = grievanceId || 'GRV-2026-0001';
+    grievanceRow[GRIEVANCE_COLS.CURRENT_STEP - 1] = currentStep || 1;
+    grievanceRow[GRIEVANCE_COLS.STATUS - 1] = GRIEVANCE_STATUS.OPEN;
+    grievanceRow[GRIEVANCE_COLS.RESOLUTION - 1] = '';
 
     const data = [headerRow, grievanceRow];
 

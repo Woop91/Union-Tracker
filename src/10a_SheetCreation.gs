@@ -1809,7 +1809,7 @@ function createVolunteerHoursSheet(ss) {
 
   // Add data type hints (row 2)
   var hints = [
-    'Auto-ID', 'Dropdown', 'Auto-lookup', 'MM/DD/YYYY', 'Dropdown', 'Number', 'Text', 'Text', 'Text'
+    'Auto-ID', 'Text', 'Auto-lookup', 'MM/DD/YYYY', 'Dropdown', 'Number', 'Text', 'Text', 'Text'
   ];
 
   sheet.getRange(2, 1, 1, hints.length).setValues([hints])
@@ -1889,7 +1889,7 @@ function createMeetingAttendanceSheet(ss) {
 
   // Add data type hints (row 2)
   var hints = [
-    'Auto-ID', 'MM/DD/YYYY', 'Dropdown', 'Text', 'Dropdown', 'Auto-lookup', 'Checkbox', 'Text'
+    'Auto-ID', 'MM/DD/YYYY', 'Dropdown', 'Text', 'Text', 'Auto-lookup', 'Checkbox', 'Text'
   ];
 
   sheet.getRange(2, 1, 1, hints.length).setValues([hints])
@@ -1911,6 +1911,13 @@ function createMeetingAttendanceSheet(ss) {
 
   // Format columns
   sheet.getRange(3, 2, 998, 1).setNumberFormat('MM/DD/YYYY');  // B - Meeting Date
+
+  // Meeting Type dropdown (column C)
+  var meetingTypeRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['Virtual', 'In-Person'], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange('C3:C1000').setDataValidation(meetingTypeRule);
 
   // Add checkboxes for Attended column
   sheet.getRange('G3:G1000').insertCheckboxes();

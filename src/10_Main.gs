@@ -1237,8 +1237,11 @@ function showHelpDialog() {
             </div>
           </div>
 
-          <!-- FEATURES TAB (NEW) -->
+          <!-- FEATURES TAB (lazy-loaded) -->
           <div id="features-tab" class="tab-content hidden">
+            <div class="lazy-placeholder" style="text-align:center;padding:40px 0;color:#64748b;">Loading features...</div>
+          </div>
+          <template id="tmpl-features">
             <div class="section">
               <div class="section-title"><span class="material-icons">apps</span>Complete Features Reference</div>
 
@@ -1317,10 +1320,13 @@ function showHelpDialog() {
             <div style="margin-top: 12px; padding: 10px; background: rgba(59,130,246,0.1); border-radius: 8px; font-size: 11px; color: #94a3b8;">
               <strong style="color: #60a5fa;">Tip:</strong> For a printable reference, go to Admin > Setup > Create Features Reference Sheet
             </div>
-          </div>
+          </template>
 
-          <!-- MENU REFERENCE TAB -->
+          <!-- MENU REFERENCE TAB (lazy-loaded) -->
           <div id="menus-tab" class="tab-content hidden">
+            <div class="lazy-placeholder" style="text-align:center;padding:40px 0;color:#64748b;">Loading menus...</div>
+          </div>
+          <template id="tmpl-menus">
             <div class="section">
               <div class="section-title"><span class="material-icons">menu</span>Union Hub Menu</div>
               <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">Member Dashboard</div><div class="menu-desc">Public-safe dashboard with aggregate stats</div></div></div>
@@ -1356,10 +1362,13 @@ function showHelpDialog() {
               <div class="menu-item"><div><div class="menu-path">Field Portal > Analytics</div><div class="menu-name">Unit Health, Trends, Precedents</div><div class="menu-desc">Field analytics</div></div></div>
               <div class="menu-item"><div><div class="menu-path">Field Portal > Web App</div><div class="menu-name">Deploy, Portals, Email Links</div><div class="menu-desc">Web app management</div></div></div>
             </div>
-          </div>
+          </template>
 
-          <!-- FAQ TAB (ENHANCED - ALL 15+ FAQs) -->
+          <!-- FAQ TAB (lazy-loaded) -->
           <div id="faq-tab" class="tab-content hidden">
+            <div class="lazy-placeholder" style="text-align:center;padding:40px 0;color:#64748b;">Loading FAQ...</div>
+          </div>
+          <template id="tmpl-faq">
             <div class="section">
               <div class="section-title"><span class="material-icons">help</span>Frequently Asked Questions</div>
 
@@ -1488,10 +1497,13 @@ function showHelpDialog() {
               <span class="material-icons" style="font-size: 16px;">open_in_new</span>
               Organization Website
             </a>
-          </div>
+          </template>
 
-          <!-- SHORTCUTS TAB -->
+          <!-- SHORTCUTS TAB (lazy-loaded) -->
           <div id="shortcuts-tab" class="tab-content hidden">
+            <div class="lazy-placeholder" style="text-align:center;padding:40px 0;color:#64748b;">Loading tips...</div>
+          </div>
+          <template id="tmpl-shortcuts">
             <div class="section">
               <div class="section-title"><span class="material-icons">bolt</span>Quick Tips</div>
 
@@ -1535,7 +1547,7 @@ function showHelpDialog() {
                 <div class="card-desc">Use <strong>Ctrl+F</strong> (Cmd+F on Mac) in any sheet to search within the spreadsheet itself.</div>
               </div>
             </div>
-          </div>
+          </template>
         </div>
 
         <div class="version">
@@ -1544,7 +1556,11 @@ function showHelpDialog() {
       </div>
 
       <script>
+        // Lazy-load: track which tabs have been rendered
+        var loadedTabs = { overview: true }; // overview loads eagerly
+
         function showTab(tabName) {
+          _ensureTabLoaded(tabName);
           document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
           document.getElementById(tabName + '-tab').classList.remove('hidden');
@@ -1552,12 +1568,29 @@ function showHelpDialog() {
           document.getElementById('resultCount').textContent = '';
         }
 
+        function _ensureTabLoaded(tabName) {
+          if (loadedTabs[tabName]) return;
+          var container = document.getElementById(tabName + '-tab');
+          if (!container) return;
+          var placeholder = container.querySelector('.lazy-placeholder');
+          if (placeholder) {
+            var tmpl = document.getElementById('tmpl-' + tabName);
+            if (tmpl) {
+              container.innerHTML = tmpl.innerHTML;
+              loadedTabs[tabName] = true;
+            }
+          }
+        }
+
+        function _ensureAllTabsLoaded() {
+          ['features', 'menus', 'faq', 'shortcuts'].forEach(_ensureTabLoaded);
+        }
+
         function filterContent() {
           const query = document.getElementById('searchInput').value.toLowerCase().trim();
-          const allItems = document.querySelectorAll('.card, .menu-item, .faq-item, .feature-row');
-          let visibleCount = 0;
 
           if (query === '') {
+            const allItems = document.querySelectorAll('.card, .menu-item, .faq-item, .feature-row');
             allItems.forEach(item => {
               item.classList.remove('hidden');
               item.style.borderLeft = '';
@@ -1566,10 +1599,15 @@ function showHelpDialog() {
             return;
           }
 
+          // Load all tabs before searching across them
+          _ensureAllTabsLoaded();
+
           // Show all tabs when searching
           document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('hidden'));
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
+          const allItems = document.querySelectorAll('.card, .menu-item, .faq-item, .feature-row');
+          let visibleCount = 0;
           allItems.forEach(item => {
             const text = item.textContent.toLowerCase();
             if (text.includes(query)) {

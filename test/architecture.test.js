@@ -53,7 +53,18 @@ loadSources([
   '14_MeetingCheckIn.gs',
   '15_EventBus.gs',
   '16_DashboardEnhancements.gs',
-  '17_CorrelationEngine.gs'
+  '17_CorrelationEngine.gs',
+  '18_WorkloadTracker.gs',
+  '19_WebDashAuth.gs',
+  '20_WebDashConfigReader.gs',
+  '21_WebDashDataService.gs',
+  '22_WebDashApp.gs',
+  '23_PortalSheets.gs',
+  '24_WeeklyQuestions.gs',
+  '25_WorkloadService.gs',
+  '26_QAForum.gs',
+  '27_TimelineService.gs',
+  '28_FailsafeService.gs'
 ]);
 
 // ============================================================================
@@ -192,7 +203,11 @@ describe('A1: Build order integrity', () => {
     '10c_FormHandlers.gs', '10d_SyncAndMaintenance.gs', '10_Main.gs',
     '11_CommandHub.gs', '12_Features.gs', '13_MemberSelfService.gs',
     '14_MeetingCheckIn.gs', '15_EventBus.gs', '16_DashboardEnhancements.gs',
-    '17_CorrelationEngine.gs'
+    '17_CorrelationEngine.gs', '18_WorkloadTracker.gs', '19_WebDashAuth.gs',
+    '20_WebDashConfigReader.gs', '21_WebDashDataService.gs',
+    '22_WebDashApp.gs', '23_PortalSheets.gs', '24_WeeklyQuestions.gs',
+    '25_WorkloadService.gs', '26_QAForum.gs', '27_TimelineService.gs',
+    '28_FailsafeService.gs'
   ];
 
   test('all source files in BUILD_ORDER exist on disk', () => {

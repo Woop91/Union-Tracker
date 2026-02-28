@@ -449,8 +449,9 @@ function sortGrievanceLogByStatus() {
     var daysA = a[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
     var daysB = b[GRIEVANCE_COLS.DAYS_TO_DEADLINE - 1];
 
-    if (daysA === '' || daysA === null) daysA = 9999;
-    if (daysB === '' || daysB === null) daysB = 9999;
+    // Handle non-numeric values: 'Overdue' → -1 (most urgent), blank/null → 9999 (least urgent)
+    if (typeof daysA !== 'number' || isNaN(daysA)) daysA = (daysA === 'Overdue' ? -1 : 9999);
+    if (typeof daysB !== 'number' || isNaN(daysB)) daysB = (daysB === 'Overdue' ? -1 : 9999);
 
     return daysA - daysB;
   });

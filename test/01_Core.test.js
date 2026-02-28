@@ -1,9 +1,9 @@
 /**
  * Tests for 01_Core.gs
  *
- * Covers column constant validation (MEMBER_COLS ↔ MEMBER_COLUMNS,
- * GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS), version consistency,
- * DEADLINE_RULES, header arrays, sanitize functions, and error handling.
+ * Covers column constant validation (MEMBER_COLS, GRIEVANCE_COLS),
+ * version consistency, DEADLINE_RULES, header arrays, sanitize functions,
+ * and error handling.
  */
 
 require('./gas-mock');
@@ -11,6 +11,14 @@ const { loadSources } = require('./load-source');
 
 // Load files in GAS load order
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs']);
+
+// Derive 0-indexed legacy constants for offset validation tests
+const MEMBER_COLUMNS = Object.fromEntries(
+  Object.entries(MEMBER_COLS).map(([k, v]) => [k, v - 1])
+);
+const GRIEVANCE_COLUMNS = Object.fromEntries(
+  Object.entries(GRIEVANCE_COLS).map(([k, v]) => [k, v - 1])
+);
 
 // ============================================================================
 // Version consistency
@@ -125,8 +133,9 @@ describe('GRIEVANCE_COLS ↔ GRIEVANCE_COLUMNS (1-indexed vs 0-indexed)', () => 
     expect(GRIEVANCE_COLUMNS.GRIEVANCE_ID).toBe(0);
   });
 
-  test('GRIEVANCE_COLUMNS.RESOLUTION and OUTCOME are same column', () => {
-    expect(GRIEVANCE_COLUMNS.RESOLUTION).toBe(GRIEVANCE_COLUMNS.OUTCOME);
+  test('GRIEVANCE_COLS.RESOLUTION is defined', () => {
+    expect(GRIEVANCE_COLS.RESOLUTION).toBeDefined();
+    expect(typeof GRIEVANCE_COLS.RESOLUTION).toBe('number');
   });
 });
 
@@ -172,19 +181,19 @@ describe('DEADLINE_RULES ↔ TIME_CONSTANTS.DEADLINE_DAYS consistency', () => {
 // ============================================================================
 
 describe('getMemberHeaders', () => {
-  test('returns correct number of headers (matches ZIP_CODE column)', () => {
+  test('returns correct number of headers (matches DUES_STATUS column)', () => {
     const headers = getMemberHeaders();
-    // Headers should cover columns up to ZIP_CODE (40) - includes Employee ID, Department, Hire Date, Street Address, City, State, Zip Code
-    expect(headers.length).toBe(MEMBER_COLS.ZIP_CODE);
+    // Headers should cover columns up to DUES_STATUS (41) - includes address fields and Dues Status
+    expect(headers.length).toBe(MEMBER_COLS.DUES_STATUS);
   });
 
   test('first header is Member ID', () => {
     expect(getMemberHeaders()[0]).toBe('Member ID');
   });
 
-  test('last header is Zip Code', () => {
+  test('last header is Dues Status', () => {
     const headers = getMemberHeaders();
-    expect(headers[headers.length - 1]).toBe('Zip Code');
+    expect(headers[headers.length - 1]).toBe('Dues Status');
   });
 
   test('header position matches MEMBER_COLS for key fields', () => {

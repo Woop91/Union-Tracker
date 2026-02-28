@@ -62,6 +62,9 @@ const BUILD_ORDER = [
   '23_PortalSheets.gs',
   '24_WeeklyQuestions.gs',
   '25_WorkloadService.gs',
+  '26_QAForum.gs',
+  '27_TimelineService.gs',
+  '28_FailsafeService.gs',
 ];
 
 // .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)

@@ -81,7 +81,7 @@ function _getGreeting() {
 function renderMemberHome(appContainer) {
   renderPageLayout(appContainer, 'member', 'home', function(container) {
     var firstName = CURRENT_USER.firstName || CURRENT_USER.name.split(' ')[0] || 'there';
-    _memberHeader(container, _getGreeting() + ', ' + firstName, CURRENT_USER.unit + ' \u00B7 Since ' + (CURRENT_USER.joined || 'N/A'));
+    _memberHeader(container, _getGreeting() + ', ' + firstName, CURRENT_USER.unit);
 
     // Welcome card placeholder — shows on first visit
     var welcomeSlot = el('div');
@@ -142,7 +142,7 @@ function renderMemberHome(appContainer) {
       pastPreview.appendChild(previewCard);
     }).dataGetMemberGrievanceHistory(CURRENT_USER.email);
 
-    // Steward card (single card, no dues)
+    // Steward card
     var stewardCard = el('div', { className: 'card card-glass', style: { margin: '0 16px 14px', padding: '16px' } });
     stewardCard.appendChild(el('div', { style: { fontSize: '9px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' } }, 'Your ' + CONFIG.stewardLabel));
     var stewardName = el('div', { style: { fontSize: '13px', fontFamily: 'var(--fontDisplay)', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Loading...');
@@ -373,6 +373,9 @@ function renderGrievanceDetail(appContainer, g) {
     });
     container.appendChild(timelineSection);
 
+    // Case checklist (read-only for members, v4.16.0)
+    _renderMemberCaseChecklist(container, g.id);
+
     // Steward contact in detail view
     if (g.steward) {
       var contactSection = el('div', { style: { padding: '12px 16px' } });
@@ -413,7 +416,45 @@ function renderMyCases(appContainer) {
 
     var content = el('div', { className: 'content' });
     if (AppState.grievances.length === 0) {
-      content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No grievances on file.'));
+      // Know Your Rights card
+      var kyrCard = el('div', { className: 'card card-glass', style: { padding: '20px', marginBottom: '12px' } });
+      kyrCard.appendChild(el('div', { style: { fontSize: '28px', marginBottom: '8px', textAlign: 'center' } }, '\u2696\uFE0F'));
+      kyrCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)', textAlign: 'center', marginBottom: '10px' } }, 'Know Your Rights'));
+      var rights = [
+        'You have the right to union representation during investigatory interviews (Weingarten Rights)',
+        'Management must follow the grievance procedure outlined in the collective bargaining agreement',
+        'You cannot be retaliated against for filing a grievance or participating in union activity',
+        'Grievances must be filed within the contractual time limits — act promptly',
+      ];
+      rights.forEach(function(r) {
+        var row = el('div', { style: { display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '8px' } });
+        row.appendChild(el('span', { style: { color: 'var(--success)', fontSize: '14px', flexShrink: '0' } }, '\u2713'));
+        row.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4' } }, r));
+        kyrCard.appendChild(row);
+      });
+      content.appendChild(kyrCard);
+
+      // Action buttons
+      var btnRow = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } });
+      var startBtn = el('button', { className: 'btn btn-primary', style: { flex: '1', fontSize: '13px', padding: '12px' }, onClick: function() {
+        _showGrievanceIntakeForm(content);
+      } }, '\uD83D\uDCDD Start a Grievance');
+      var folderBtn = el('button', { className: 'btn', style: { flex: '1', fontSize: '13px', padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }, onClick: function() {
+        folderBtn.textContent = 'Creating...'; folderBtn.disabled = true;
+        google.script.run.withSuccessHandler(function(result) {
+          if (result && result.url) {
+            folderBtn.textContent = '\u2705 Folder Created';
+            window.open(result.url, '_blank');
+          } else {
+            folderBtn.textContent = '\uD83D\uDCC1 Create Case Folder'; folderBtn.disabled = false;
+          }
+        }).withFailureHandler(function() {
+          folderBtn.textContent = '\uD83D\uDCC1 Create Case Folder'; folderBtn.disabled = false;
+        }).dataCreateGrievanceDrive(CURRENT_USER.email);
+      } }, '\uD83D\uDCC1 Create Case Folder');
+      btnRow.appendChild(startBtn);
+      btnRow.appendChild(folderBtn);
+      content.appendChild(btnRow);
     } else {
       AppState.grievances.forEach(function(g) {
         renderGrievanceCard(content, g);
@@ -424,6 +465,76 @@ function renderMyCases(appContainer) {
     // Past Cases section
     _renderPastCasesSection(container);
   });
+}
+
+// ───────────────────────────────────────
+// Grievance intake mini-form (draft mode)
+// ───────────────────────────────────────
+
+function _showGrievanceIntakeForm(parentContent) {
+  parentContent.innerHTML = '';
+  var form = el('div', { className: 'card card-glass', style: { padding: '18px' } });
+  form.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '700', color: 'var(--text)', marginBottom: '14px' } }, 'Start a Grievance Draft'));
+
+  var fields = {};
+  var fieldDefs = [
+    { key: 'title', label: 'Title', type: 'text', placeholder: 'Brief description of the issue' },
+    { key: 'category', label: 'Category', type: 'select', options: ['Contract Violation', 'Discipline', 'Safety/Health', 'Discrimination', 'Workload', 'Other'] },
+    { key: 'description', label: 'Description', type: 'textarea', placeholder: 'Describe what happened, when, and who was involved' },
+  ];
+
+  fieldDefs.forEach(function(f) {
+    form.appendChild(el('label', { style: { display: 'block', fontSize: '12px', color: 'var(--muted)', marginBottom: '4px', marginTop: '10px' } }, f.label));
+    var input;
+    if (f.type === 'textarea') {
+      input = el('textarea', { style: { width: '100%', minHeight: '80px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text)', resize: 'vertical', boxSizing: 'border-box' }, placeholder: f.placeholder || '' });
+    } else if (f.type === 'select') {
+      input = el('select', { style: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text)' } });
+      input.appendChild(el('option', { value: '' }, '-- Select --'));
+      f.options.forEach(function(opt) { input.appendChild(el('option', { value: opt }, opt)); });
+    } else {
+      input = el('input', { type: 'text', style: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', fontSize: '13px', color: 'var(--text)', boxSizing: 'border-box' }, placeholder: f.placeholder || '' });
+    }
+    fields[f.key] = input;
+    form.appendChild(input);
+  });
+
+  var statusMsg = el('div', { style: { fontSize: '12px', marginTop: '8px', minHeight: '16px' } });
+  form.appendChild(statusMsg);
+
+  var btnRow = el('div', { style: { display: 'flex', gap: '8px', marginTop: '14px' } });
+  var submitBtn = el('button', { className: 'btn btn-primary', style: { flex: '1' }, onClick: function() {
+    var title = fields.title.value.trim();
+    var category = fields.category.value;
+    var description = fields.description.value.trim();
+    if (!title) { statusMsg.textContent = 'Please enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
+    submitBtn.textContent = 'Submitting...'; submitBtn.disabled = true;
+    google.script.run.withSuccessHandler(function(r) {
+      if (r && r.success) {
+        parentContent.innerHTML = '';
+        var done = el('div', { className: 'card card-glass', style: { padding: '24px', textAlign: 'center' } });
+        done.appendChild(el('div', { style: { fontSize: '32px', marginBottom: '8px' } }, '\u2705'));
+        done.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)' } }, 'Draft Submitted'));
+        done.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginTop: '6px' } }, 'Your steward will be notified to follow up.'));
+        done.appendChild(el('button', { className: 'btn btn-primary', style: { marginTop: '14px' }, onClick: function() { renderMyCases(document.getElementById('app')); } }, 'Back to My Cases'));
+        parentContent.appendChild(done);
+      } else {
+        statusMsg.textContent = (r && r.message) || 'Error submitting draft.'; statusMsg.style.color = 'var(--danger)';
+        submitBtn.textContent = 'Submit Draft'; submitBtn.disabled = false;
+      }
+    }).withFailureHandler(function() {
+      statusMsg.textContent = 'Error submitting. Please try again.'; statusMsg.style.color = 'var(--danger)';
+      submitBtn.textContent = 'Submit Draft'; submitBtn.disabled = false;
+    }).dataStartGrievanceDraft(CURRENT_USER.email, { title: title, category: category, description: description });
+  } }, 'Submit Draft');
+  var cancelBtn = el('button', { className: 'btn', style: { flex: '1', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }, onClick: function() {
+    renderMyCases(document.getElementById('app'));
+  } }, 'Cancel');
+  btnRow.appendChild(submitBtn);
+  btnRow.appendChild(cancelBtn);
+  form.appendChild(btnRow);
+
+  parentContent.appendChild(form);
 }
 
 // ═══════════════════════════════════════
@@ -915,6 +1026,9 @@ function renderUpdateProfile(appContainer) {
       form.appendChild(saveBtn);
 
       content.appendChild(form);
+
+      // Digest settings section (v4.17.0)
+      _renderDigestSettings(content);
     }).dataGetFullProfile(CURRENT_USER.email);
   });
 }
@@ -941,8 +1055,24 @@ function renderMemberNotifications(appContainer) {
         return;
       }
 
+      // Filter out temporarily dismissed notifications (1-hour localStorage TTL)
+      var DISMISS_TTL = 3600000; // 1 hour
+      var visible = notifications.filter(function(n) {
+        var dismissedAt = localStorage.getItem('dismissed_notif_' + n.id);
+        return !dismissedAt || (Date.now() - parseInt(dismissedAt, 10)) >= DISMISS_TTL;
+      });
+
+      if (visible.length === 0) {
+        var empty2 = el('div', { style: { textAlign: 'center', padding: '48px 16px' } });
+        empty2.appendChild(el('div', { style: { fontSize: '48px', marginBottom: '12px' } }, '\uD83D\uDD14'));
+        empty2.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '16px', fontWeight: '700', color: 'var(--text)' } }, 'All caught up!'));
+        empty2.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '6px' } }, 'Dismissed notifications will reappear in up to 1 hour'));
+        content.appendChild(empty2);
+        return;
+      }
+
       var typeColors = { System: 'system', Announcement: 'announcement', 'Steward Message': 'steward', Deadline: 'deadline' };
-      notifications.forEach(function(n, idx) {
+      visible.forEach(function(n, idx) {
         var card = el('div', {
           className: 'card card-glass notif-card card-fade-in' + (n.priority === 'Urgent' ? ' notif-urgent-border' : ''),
           style: { animationDelay: (idx * 60) + 'ms' }
@@ -966,17 +1096,12 @@ function renderMemberNotifications(appContainer) {
         card.appendChild(meta);
 
         var dismissBtn = el('button', { className: 'notif-dismiss', onClick: function() {
-          dismissBtn.textContent = '...';
-          google.script.run.withSuccessHandler(function(r) {
-            if (r && r.success) {
-              card.style.opacity = '0';
-              card.style.transition = 'opacity 0.3s';
-              setTimeout(function() { card.remove(); }, 300);
-              AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
-            }
-          }).withFailureHandler(function() {
-            dismissBtn.textContent = '\u2715';
-          }).dismissWebAppNotification(n.id, CURRENT_USER.email);
+          // Use localStorage with 1-hour TTL instead of permanent backend dismiss
+          localStorage.setItem('dismissed_notif_' + n.id, String(Date.now()));
+          card.style.opacity = '0';
+          card.style.transition = 'opacity 0.3s';
+          setTimeout(function() { card.remove(); }, 300);
+          AppState.notificationCount = Math.max(0, AppState.notificationCount - 1);
         }}, '\u2715');
         card.appendChild(dismissBtn);
 
@@ -1008,6 +1133,13 @@ function renderMemberMore(appContainer) {
       { icon: '\u2753', label: 'Weekly Questions', desc: 'Vote on this week\'s questions', action: function() { renderWeeklyQuestionsPage(document.getElementById('app'), 'member'); } },
       { icon: '\uD83D\uDCDD', label: 'Take Survey', desc: 'Anonymous quarterly questionnaire', action: function() { renderSurveyFormPage(document.getElementById('app')); } },
       { icon: '\uD83D\uDCC8', label: 'Survey Results', desc: 'Quarterly satisfaction overview', action: function() { renderSurveyResultsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCCB', label: 'My Tasks', desc: 'View your assigned tasks', action: function() { renderMemberTasks(document.getElementById('app')); } },
+      { icon: '\uD83D\uDDF3\uFE0F', label: 'Polls', desc: 'Vote on active polls', action: function() { renderPollsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDD', label: 'Minutes', desc: 'Meeting minutes and notes', action: function() { renderMinutesPage(document.getElementById('app')); } },
+      { icon: '\uD83E\uDD1D', label: 'My Meetings', desc: 'Your meeting attendance', action: function() { renderMeetingsPage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCDC', label: 'Timeline', desc: 'View event timeline', action: function() { renderTimelinePage(document.getElementById('app')); } },
+      { icon: '\uD83D\uDCAC', label: 'Q&A Forum', desc: 'Ask and answer questions', action: function() { renderQAForum(document.getElementById('app'), 'member'); } },
+      { icon: '\uD83D\uDCE3', label: 'Feedback', desc: 'Submit and review feedback', action: function() { renderFeedbackPage(document.getElementById('app'), 'member'); } },
     ];
 
     menuItems.forEach(function(m) {
@@ -1351,15 +1483,31 @@ function renderSurveyResultsPage(appContainer) {
         content.appendChild(chartCard);
       }
 
-      // Individual section cards with numeric display
+      // Individual section cards with question breakout
       (data.sections || []).forEach(function(sec) {
         var secCard = el('div', { className: 'card card-glass card-accent-border', style: { padding: '16px', marginBottom: '10px' } });
         var avg = sec.avg || 0;
         var color = avg < 4 ? 'var(--danger)' : avg < 6 ? 'var(--warning)' : avg < 8 ? 'var(--success)' : '#22c55e';
-        var row = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } });
-        row.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, sec.name));
-        row.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '20px', fontWeight: '700', color: color } }, avg.toFixed(1)));
-        secCard.appendChild(row);
+
+        // Section header row with overall average
+        var headerRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: (sec.questions && sec.questions.length) ? '10px' : '0' } });
+        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, sec.name));
+        headerRow.appendChild(el('div', { style: { fontFamily: 'var(--fontBody)', fontSize: '20px', fontWeight: '700', color: color } }, avg.toFixed(1)));
+        secCard.appendChild(headerRow);
+
+        // Individual question breakout
+        if (sec.questions && sec.questions.length > 0) {
+          sec.questions.forEach(function(q) {
+            if (!q.text) return;
+            var qAvg = q.avg || 0;
+            var qColor = qAvg < 4 ? 'var(--danger)' : qAvg < 6 ? 'var(--warning)' : qAvg < 8 ? 'var(--success)' : '#22c55e';
+            var qRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.05)' } });
+            qRow.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', flex: '1' } }, q.text));
+            qRow.appendChild(el('div', { style: { fontSize: '14px', fontWeight: '600', color: qColor, marginLeft: '12px', minWidth: '32px', textAlign: 'right' } }, qAvg.toFixed(1)));
+            secCard.appendChild(qRow);
+          });
+        }
+
         content.appendChild(secCard);
       });
     }).dataGetSurveyResults();
@@ -2415,14 +2563,6 @@ function _renderMembershipStats(container) {
     container.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '14px' } }, data.total + ' total members'));
 
     if (typeof ChartHelper !== 'undefined') {
-      // Dues pie
-      var dLabels = Object.keys(data.byDues);
-      var dData = dLabels.map(function(k) { return data.byDues[k]; });
-      var dCard = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
-      dCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'Dues Status'));
-      ChartHelper.createDoughnutChart(dCard, 'membership-dues-chart', dLabels, dData);
-      container.appendChild(dCard);
-
       // Location bar
       var lLabels = Object.keys(data.byLocation);
       var lData = lLabels.map(function(k) { return data.byLocation[k]; });
@@ -2604,5 +2744,908 @@ function _renderQuestionSubmission(container) {
       }).wqSubmitPoolQuestion(CURRENT_USER.email, text);
     }
   }, 'Submit Question'));
+}
+
+// ═══════════════════════════════════════
+// MEMBER CASE CHECKLIST (read-only, v4.16.0)
+// ═══════════════════════════════════════
+
+function _renderMemberCaseChecklist(container, caseId) {
+  var section = el('div', { style: { padding: '0 16px 12px' } });
+  section.appendChild(el('h3', { className: 'section-title' }, 'Case Checklist'));
+  var checklistContent = el('div');
+  showLoading(checklistContent);
+  section.appendChild(checklistContent);
+  container.appendChild(section);
+
+  google.script.run.withSuccessHandler(function(items) {
+    checklistContent.innerHTML = '';
+    if (!items || items.length === 0) {
+      checklistContent.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', padding: '8px 0' } }, 'No checklist items for this case.'));
+      return;
+    }
+
+    // Progress bar
+    var completed = items.filter(function(i) { return i.completed; }).length;
+    var pct = Math.round((completed / items.length) * 100);
+    var progRow = el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' } });
+    var progBar = el('div', { style: { flex: '1', height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
+    progBar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: pct === 100 ? 'var(--success)' : 'var(--accent)', borderRadius: '4px' } }));
+    progRow.appendChild(progBar);
+    progRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)', whiteSpace: 'nowrap' } }, completed + '/' + items.length + ' (' + pct + '%)'));
+    checklistContent.appendChild(progRow);
+
+    // Group by category
+    var grouped = {};
+    items.forEach(function(item) {
+      var cat = item.category || 'General';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(item);
+    });
+
+    Object.keys(grouped).forEach(function(cat) {
+      checklistContent.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '10px 0 4px', fontWeight: '600' } }, cat));
+      grouped[cat].forEach(function(item) {
+        var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0' } });
+        row.appendChild(el('span', { style: { fontSize: '16px', color: item.completed ? 'var(--success)' : 'var(--muted)' } }, item.completed ? '\u2611' : '\u2610'));
+        row.appendChild(el('span', { style: { fontSize: '12px', color: item.completed ? 'var(--muted)' : 'var(--text)', textDecoration: item.completed ? 'line-through' : 'none', flex: '1' } }, item.itemText));
+        if (item.required) row.appendChild(el('span', { style: { fontSize: '9px', color: 'var(--danger)', fontWeight: '600' } }, 'REQ'));
+        checklistContent.appendChild(row);
+      });
+    });
+  }).withFailureHandler(function() {
+    checklistContent.innerHTML = '';
+    checklistContent.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', padding: '8px 0' } }, 'Failed to load checklist.'));
+  }).dataGetCaseChecklist(caseId);
+}
+
+// ═══════════════════════════════════════
+// MEETINGS PAGE (member, v4.16.0)
+// ═══════════════════════════════════════
+
+function renderMeetingsPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'meetings', function(container) {
+    _memberHeader(container, 'My Meetings', 'Your meeting attendance history');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(meetings) {
+      content.innerHTML = '';
+      if (!meetings || meetings.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting attendance recorded yet.'));
+        return;
+      }
+
+      content.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, meetings.length + ' meeting' + (meetings.length !== 1 ? 's' : '') + ' attended'));
+
+      meetings.forEach(function(m, idx) {
+        var card = el('div', { className: 'card card-glass card-fade-in card-clickable', style: { padding: '14px', marginBottom: '8px', animationDelay: (idx * 40) + 'ms' } });
+        var topRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
+        topRow.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, m.meetingName || 'Meeting'));
+        topRow.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, m.meetingDate));
+        card.appendChild(topRow);
+
+        var details = el('div', { style: { fontSize: '11px', color: 'var(--muted)' } });
+        var parts = [];
+        if (m.meetingType) parts.push(m.meetingType);
+        if (m.duration) parts.push(m.duration);
+        details.textContent = parts.join(' \u00B7 ');
+        card.appendChild(details);
+
+        // Expandable details section (links + minutes)
+        var hasExpand = m.notesUrl || m.agendaUrl || m.minutesTitle || m.minutesBullets;
+        if (hasExpand) {
+          var expandDiv = el('div', { style: { display: 'none', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' } });
+          if (m.minutesTitle) {
+            expandDiv.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, m.minutesTitle));
+          }
+          if (m.minutesBullets) {
+            var bullets = m.minutesBullets.split('\n');
+            bullets.forEach(function(b) {
+              if (b.trim()) expandDiv.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', paddingLeft: '8px', marginBottom: '2px' } }, '\u2022 ' + b.trim()));
+            });
+          }
+          if (m.notesUrl) expandDiv.appendChild(el('a', { href: m.notesUrl, target: '_blank', style: { display: 'block', fontSize: '12px', color: 'var(--accent)', marginTop: '6px', marginBottom: '4px' } }, 'View Notes'));
+          if (m.agendaUrl) expandDiv.appendChild(el('a', { href: m.agendaUrl, target: '_blank', style: { display: 'block', fontSize: '12px', color: 'var(--accent)' } }, 'View Agenda'));
+          card.appendChild(expandDiv);
+          card.addEventListener('click', function() {
+            expandDiv.style.display = expandDiv.style.display === 'none' ? 'block' : 'none';
+          });
+        }
+
+        content.appendChild(card);
+      });
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load meetings.'));
+    }).dataGetMemberMeetings(CURRENT_USER.email);
+  });
+}
+
+// ═══════════════════════════════════════
+// POLLS PAGE (member, v4.16.0)
+// ═══════════════════════════════════════
+
+function renderPollsPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'polls', function(container) {
+    _memberHeader(container, 'Polls', 'Vote on active polls');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    function loadPolls() {
+      showLoading(content);
+      google.script.run.withSuccessHandler(function(polls) {
+        content.innerHTML = '';
+        if (!polls || polls.length === 0) {
+          content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No active polls right now.'));
+          return;
+        }
+
+        polls.forEach(function(poll) {
+          var card = el('div', { className: 'card card-glass', style: { padding: '16px', marginBottom: '10px' } });
+          card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '10px' } }, poll.question));
+
+          if (poll.hasVoted) {
+            // Show results
+            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--success)', marginBottom: '8px', fontWeight: '600' } }, 'You voted: ' + poll.myVote));
+            poll.options.forEach(function(opt) {
+              var count = poll.results[opt] || 0;
+              var pct = poll.totalVotes > 0 ? Math.round((count / poll.totalVotes) * 100) : 0;
+              var isMyVote = opt === poll.myVote;
+              var row = el('div', { style: { marginBottom: '6px' } });
+              var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '2px' } });
+              header.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: isMyVote ? '600' : '400' } }, opt));
+              header.appendChild(el('span', { style: { color: 'var(--muted)' } }, count + ' (' + pct + '%)'));
+              row.appendChild(header);
+              var bar = el('div', { style: { height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' } });
+              bar.appendChild(el('div', { style: { height: '100%', width: pct + '%', background: isMyVote ? 'var(--accent)' : 'var(--info)', borderRadius: '4px', transition: 'width 0.6s ease' } }));
+              row.appendChild(bar);
+              card.appendChild(row);
+            });
+            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '6px' } }, poll.totalVotes + ' total vote' + (poll.totalVotes !== 1 ? 's' : '')));
+          } else {
+            // Show vote buttons
+            poll.options.forEach(function(opt) {
+              var btn = el('button', { className: 'btn', style: { display: 'block', width: '100%', marginBottom: '6px', textAlign: 'left', padding: '10px 14px', fontSize: '13px' },
+                onClick: function() {
+                  btn.textContent = 'Voting...'; btn.disabled = true;
+                  google.script.run.withSuccessHandler(function(result) {
+                    if (result && result.success) loadPolls();
+                    else { btn.textContent = opt; btn.disabled = false; }
+                  }).withFailureHandler(function() {
+                    btn.textContent = opt; btn.disabled = false;
+                  }).dataSubmitPollVote(CURRENT_USER.email, poll.id, opt);
+                }
+              }, opt);
+              card.appendChild(btn);
+            });
+          }
+          content.appendChild(card);
+        });
+      }).withFailureHandler(function() {
+        content.innerHTML = '';
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load polls.'));
+      }).dataGetActivePolls(CURRENT_USER.email);
+    }
+
+    loadPolls();
+  });
+}
+
+// ═══════════════════════════════════════
+// MINUTES PAGE (member, v4.16.0)
+// ═══════════════════════════════════════
+
+function renderMinutesPage(appContainer) {
+  renderPageLayout(appContainer, 'member', 'minutes', function(container) {
+    _memberHeader(container, 'Meeting Minutes', 'Notes from recent meetings');
+    var content = el('div', { className: 'content' });
+    showLoading(content);
+    container.appendChild(content);
+
+    google.script.run.withSuccessHandler(function(minutes) {
+      content.innerHTML = '';
+      if (!minutes || minutes.length === 0) {
+        content.appendChild(el('div', { style: { textAlign: 'center', padding: '40px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No meeting minutes posted yet.'));
+        return;
+      }
+
+      // Search filter
+      var filterInput = el('input', { type: 'text', className: 'msg-textarea', placeholder: 'Search minutes...', style: { marginBottom: '10px', minHeight: '36px' } });
+      content.appendChild(filterInput);
+
+      var listArea = el('div');
+      content.appendChild(listArea);
+
+      function renderFiltered(query) {
+        listArea.innerHTML = '';
+        var q = (query || '').toLowerCase();
+        var filtered = minutes.filter(function(m) {
+          if (!q) return true;
+          return (m.title || '').toLowerCase().indexOf(q) !== -1 || (m.meetingDate || '').toLowerCase().indexOf(q) !== -1 || (m.bullets || '').toLowerCase().indexOf(q) !== -1;
+        });
+
+        if (filtered.length === 0) {
+          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: '13px' } }, 'No matching minutes.'));
+          return;
+        }
+
+        filtered.forEach(function(m) {
+          var card = el('div', { className: 'card card-glass card-clickable', style: { padding: '14px', marginBottom: '8px' } });
+          var header = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '6px' } });
+          header.appendChild(el('span', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '14px', fontWeight: '600', color: 'var(--text)' } }, m.title));
+          header.appendChild(el('span', { style: { fontSize: '11px', color: 'var(--muted)' } }, m.meetingDate));
+          card.appendChild(header);
+          if (m.bullets) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', lineHeight: '1.5', whiteSpace: 'pre-wrap' } }, m.bullets));
+
+          if (m.fullMinutes) {
+            var fullDiv = el('div', { style: { display: 'none', fontSize: '12px', color: 'var(--text)', lineHeight: '1.5', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)', whiteSpace: 'pre-wrap' } }, m.fullMinutes);
+            card.appendChild(fullDiv);
+            card.addEventListener('click', function() {
+              fullDiv.style.display = fullDiv.style.display === 'none' ? 'block' : 'none';
+            });
+          }
+
+          listArea.appendChild(card);
+        });
+      }
+
+      filterInput.addEventListener('input', function() { renderFiltered(filterInput.value); });
+      renderFiltered('');
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load minutes.'));
+    }).dataGetMeetingMinutes(20);
+  });
+}
+
+// ═══════════════════════════════════════
+// MY TASKS PAGE (v4.17.0 — member task assignment)
+// ═══════════════════════════════════════
+
+function renderMemberTasks(appContainer) {
+  renderPageLayout(appContainer, 'member', 'mytasks', function(container) {
+    _memberHeader(container, 'My Tasks', 'Tasks assigned to you');
+    var content = el('div', { className: 'content' });
+
+    var activeSubTab = 'open';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      [{ id: 'open', label: 'Open' }, { id: 'completed', label: 'Completed' }].forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderSubContent(); }
+        }, tab.label));
+      });
+    }
+
+    function renderSubContent() {
+      subContent.innerHTML = '';
+      showLoading(subContent);
+      var statusFilter = activeSubTab === 'completed' ? 'completed' : null;
+      google.script.run.withSuccessHandler(function(tasks) {
+        subContent.innerHTML = '';
+        var filtered = statusFilter ? tasks.filter(function(t) { return t.status === 'completed'; }) : tasks.filter(function(t) { return t.status !== 'completed'; });
+
+        if (filtered.length === 0) {
+          subContent.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, statusFilter === 'completed' ? 'No completed tasks.' : 'No open tasks assigned to you.'));
+          return;
+        }
+
+        // KPI strip
+        var highPri = filtered.filter(function(t) { return t.priority === 'high'; }).length;
+        var overdue = filtered.filter(function(t) { return t.dueDays !== null && t.dueDays < 0; }).length;
+        var kpiStrip = el('div', { className: 'kpi-grid', style: { gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: '10px' } });
+        [
+          { label: 'Total', value: filtered.length },
+          { label: 'High Priority', value: highPri, color: highPri > 0 ? 'var(--danger)' : null },
+          { label: 'Overdue', value: overdue, color: overdue > 0 ? 'var(--warning)' : null }
+        ].forEach(function(kpi) {
+          var card = el('div', { className: 'kpi-card' });
+          card.appendChild(el('div', { className: 'kpi-label' }, kpi.label));
+          var val = el('div', { className: 'kpi-value' }, String(kpi.value));
+          if (kpi.color) val.style.color = kpi.color;
+          card.appendChild(val);
+          kpiStrip.appendChild(card);
+        });
+        subContent.appendChild(kpiStrip);
+
+        filtered.forEach(function(task) {
+          var priColors = { high: 'var(--danger)', medium: 'var(--warning)', low: 'var(--muted)' };
+          var card = el('div', { className: 'card card-accent-border', style: { padding: '12px 16px', marginBottom: '6px', borderLeftColor: priColors[task.priority] || 'var(--accent)' } });
+          var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+          top.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, task.title));
+          if (task.dueDate) top.appendChild(el('span', { style: { fontSize: '10px', color: task.dueDays !== null && task.dueDays < 0 ? 'var(--danger)' : 'var(--muted)' } }, task.dueDate));
+          card.appendChild(top);
+          if (task.assignedBy) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)' } }, 'Assigned by: ' + task.assignedBy.split('@')[0]));
+          if (task.description) card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '4px' } }, task.description.substring(0, 100)));
+
+          if (task.status !== 'completed') {
+            var actions = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px' } });
+            actions.appendChild(el('button', {
+              style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
+              onClick: function() {
+                google.script.run.withSuccessHandler(function() { renderMemberTasks(document.getElementById('app')); }).dataCompleteMemberTask(CURRENT_USER.email, task.id);
+              }
+            }, '\u2705 Complete'));
+            card.appendChild(actions);
+          }
+          subContent.appendChild(card);
+        });
+      }).withFailureHandler(function() {
+        subContent.innerHTML = '';
+        subContent.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load tasks.'));
+      }).dataGetMemberTasks(CURRENT_USER.email, statusFilter);
+    }
+
+    refreshSubTabs();
+    renderSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// Q&A FORUM PAGE (v4.17.0 — shared by both roles)
+// ═══════════════════════════════════════
+
+function renderQAForum(appContainer, role) {
+  var isMember = role === 'member';
+  var isSteward = role === 'steward';
+  renderPageLayout(appContainer, role, 'qaforum', function(container) {
+    if (isMember) _memberHeader(container, 'Q&A Forum', 'Ask questions, get answers');
+    else container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title' }, 'Q&A Forum')));
+
+    var content = el('div', { className: 'content' });
+
+    var activeSubTab = 'browse';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+    var currentPage = 1;
+    var currentSort = 'recent';
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      var tabs = [{ id: 'browse', label: 'Browse' }, { id: 'ask', label: 'Ask' }];
+      if (isSteward) tabs.push({ id: 'moderate', label: 'Moderate' });
+      tabs.forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          onClick: function() { activeSubTab = tab.id; currentPage = 1; refreshSubTabs(); renderQASubContent(); }
+        }, tab.label));
+      });
+    }
+
+    function renderQASubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'ask') { _renderAskForm(subContent); return; }
+      if (activeSubTab === 'moderate') { _renderModQueue(subContent); return; }
+      _renderQABrowse(subContent);
+    }
+
+    function _renderQABrowse(cont) {
+      // Sort toggle
+      var sortBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px' } });
+      ['recent', 'popular'].forEach(function(s) {
+        sortBar.appendChild(el('button', {
+          className: 'sub-tab' + (currentSort === s ? ' active' : ''),
+          style: { fontSize: '11px', padding: '4px 12px' },
+          onClick: function() { currentSort = s; currentPage = 1; _renderQABrowse(cont); }
+        }, s.charAt(0).toUpperCase() + s.slice(1)));
+      });
+      cont.innerHTML = '';
+      cont.appendChild(sortBar);
+
+      var listArea = el('div');
+      cont.appendChild(listArea);
+      showLoading(listArea);
+
+      google.script.run.withSuccessHandler(function(result) {
+        listArea.innerHTML = '';
+        if (!result || !result.questions || result.questions.length === 0) {
+          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No questions yet. Be the first to ask!'));
+          return;
+        }
+        result.questions.forEach(function(q) {
+          var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '8px', cursor: 'pointer' } });
+          card.addEventListener('click', function() { _renderQuestionDetail(cont, q.id); });
+          var top = el('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } });
+          top.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', flex: '1' } }, q.questionText.substring(0, 120) + (q.questionText.length > 120 ? '...' : '')));
+          card.appendChild(top);
+
+          var meta = el('div', { style: { display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--muted)', alignItems: 'center' } });
+          if (q.isAnonymous) meta.appendChild(el('span', { className: 'privacy-badge', style: { fontSize: '10px', padding: '1px 6px' } }, 'Anonymous'));
+          else meta.appendChild(el('span', {}, q.authorName));
+          meta.appendChild(el('span', {}, q.created));
+          meta.appendChild(el('span', {}, '\u25B2 ' + q.upvoteCount));
+          meta.appendChild(el('span', {}, q.answerCount + ' answer' + (q.answerCount !== 1 ? 's' : '')));
+          card.appendChild(meta);
+          listArea.appendChild(card);
+        });
+
+        // Pagination
+        if (result.total > result.pageSize) {
+          var totalPages = Math.ceil(result.total / result.pageSize);
+          var pageBar = el('div', { style: { display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '12px' } });
+          if (currentPage > 1) pageBar.appendChild(el('button', { className: 'sub-tab', onClick: function() { currentPage--; _renderQABrowse(cont); } }, 'Prev'));
+          pageBar.appendChild(el('span', { style: { fontSize: '12px', color: 'var(--muted)', padding: '4px 8px' } }, currentPage + ' / ' + totalPages));
+          if (currentPage < totalPages) pageBar.appendChild(el('button', { className: 'sub-tab', onClick: function() { currentPage++; _renderQABrowse(cont); } }, 'Next'));
+          listArea.appendChild(pageBar);
+        }
+      }).withFailureHandler(function() {
+        listArea.innerHTML = '';
+        listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load questions.'));
+      }).qaGetQuestions(CURRENT_USER.email, currentPage, 20, currentSort);
+    }
+
+    function _renderQuestionDetail(cont, questionId) {
+      cont.innerHTML = '';
+      var backBtn = el('button', { className: 'sub-tab', style: { marginBottom: '12px' }, onClick: function() { _renderQABrowse(cont); } }, '\u2190 Back');
+      cont.appendChild(backBtn);
+      showLoading(cont);
+
+      google.script.run.withSuccessHandler(function(q) {
+        // Keep back button, remove loading
+        while (cont.children.length > 1) cont.removeChild(cont.lastChild);
+        if (!q) { cont.appendChild(el('div', { style: { color: 'var(--danger)', padding: '20px 0' } }, 'Question not found.')); return; }
+
+        // Question card
+        var qCard = el('div', { className: 'card', style: { padding: '16px', marginBottom: '12px' } });
+        qCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '15px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, q.questionText));
+        var qMeta = el('div', { style: { display: 'flex', gap: '12px', fontSize: '11px', color: 'var(--muted)', marginBottom: '8px', alignItems: 'center' } });
+        if (q.isAnonymous) qMeta.appendChild(el('span', { className: 'privacy-badge', style: { fontSize: '10px', padding: '1px 6px' } }, 'Anonymous'));
+        else qMeta.appendChild(el('span', {}, q.authorName));
+        qMeta.appendChild(el('span', {}, q.created));
+        qCard.appendChild(qMeta);
+
+        // Upvote + Flag buttons
+        var actions = el('div', { style: { display: 'flex', gap: '8px' } });
+        actions.appendChild(el('button', {
+          style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600' },
+          onClick: function() {
+            google.script.run.withSuccessHandler(function(r) {
+              if (r && r.success) _renderQuestionDetail(cont, questionId);
+            }).qaUpvoteQuestion(CURRENT_USER.email, questionId);
+          }
+        }, '\u25B2 ' + q.upvoteCount));
+        if (isSteward && q.status !== 'flagged') {
+          actions.appendChild(el('button', {
+            style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
+            onClick: function() { google.script.run.withSuccessHandler(function() { _renderQuestionDetail(cont, questionId); }).qaModerateQuestion(CURRENT_USER.email, questionId, 'flag'); }
+          }, 'Flag'));
+        }
+        qCard.appendChild(actions);
+        cont.appendChild(qCard);
+
+        // Answers
+        cont.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '8px' } }, q.answerCount + ' Answer' + (q.answerCount !== 1 ? 's' : '')));
+
+        if (q.answers && q.answers.length > 0) {
+          q.answers.forEach(function(a) {
+            if (a.status === 'deleted') return;
+            var aCard = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px', borderLeft: a.isSteward ? '3px solid var(--accent)' : 'none' } });
+            aCard.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', lineHeight: '1.5', marginBottom: '6px' } }, a.answerText));
+            var aMeta = el('div', { style: { display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--muted)', alignItems: 'center' } });
+            aMeta.appendChild(el('span', {}, a.authorName));
+            if (a.isSteward) aMeta.appendChild(el('span', { style: { color: 'var(--accent)', fontWeight: '600' } }, CONFIG.stewardLabel || 'Steward'));
+            aMeta.appendChild(el('span', {}, a.created));
+            aCard.appendChild(aMeta);
+            cont.appendChild(aCard);
+          });
+        }
+
+        // Reply form
+        cont.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginTop: '16px', marginBottom: '8px' } }, 'Your Answer'));
+        var ansInput = el('textarea', { className: 'msg-textarea', placeholder: 'Write your answer...', style: { minHeight: '60px' } });
+        cont.appendChild(ansInput);
+        var ansStatus = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+        cont.appendChild(ansStatus);
+        cont.appendChild(el('button', {
+          className: 'btn btn-primary', style: { marginTop: '8px' },
+          onClick: function() {
+            var text = ansInput.value.trim();
+            if (!text) { ansStatus.textContent = 'Write an answer first.'; ansStatus.style.color = 'var(--danger)'; return; }
+            ansStatus.textContent = 'Posting...'; ansStatus.style.color = 'var(--muted)';
+            google.script.run.withSuccessHandler(function(r) {
+              if (r && r.success) _renderQuestionDetail(cont, questionId);
+              else { ansStatus.textContent = r ? r.message : 'Error.'; ansStatus.style.color = 'var(--danger)'; }
+            }).qaSubmitAnswer(CURRENT_USER.email, CURRENT_USER.name || '', questionId, text, isSteward);
+          }
+        }, 'Post Answer'));
+      }).qaGetQuestionDetail(CURRENT_USER.email, questionId);
+    }
+
+    function _renderAskForm(cont) {
+      cont.appendChild(el('h3', { className: 'section-title' }, 'Ask a Question'));
+
+      var textGroup = el('div', { className: 'form-group' });
+      textGroup.appendChild(el('label', { className: 'form-label' }, 'Your Question'));
+      var textInput = el('textarea', { className: 'msg-textarea', placeholder: 'What would you like to know?', style: { minHeight: '80px' } });
+      textGroup.appendChild(textInput);
+      cont.appendChild(textGroup);
+
+      var anonGroup = el('div', { className: 'form-group', style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+      var anonCheck = el('input', { type: 'checkbox' });
+      anonGroup.appendChild(anonCheck);
+      anonGroup.appendChild(el('label', { style: { fontSize: '13px', color: 'var(--text)' } }, 'Post anonymously'));
+      cont.appendChild(anonGroup);
+
+      var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+      cont.appendChild(statusMsg);
+
+      cont.appendChild(el('button', {
+        className: 'btn btn-primary',
+        onClick: function() {
+          var text = textInput.value.trim();
+          if (!text) { statusMsg.textContent = 'Write your question first.'; statusMsg.style.color = 'var(--danger)'; return; }
+          statusMsg.textContent = 'Posting...'; statusMsg.style.color = 'var(--muted)';
+          google.script.run.withSuccessHandler(function(r) {
+            if (r && r.success) { activeSubTab = 'browse'; refreshSubTabs(); renderQASubContent(); }
+            else { statusMsg.textContent = r ? r.message : 'Error posting.'; statusMsg.style.color = 'var(--danger)'; }
+          }).qaSubmitQuestion(CURRENT_USER.email, CURRENT_USER.name || '', text, anonCheck.checked);
+        }
+      }, 'Post Question'));
+    }
+
+    function _renderModQueue(cont) {
+      showLoading(cont);
+      google.script.run.withSuccessHandler(function(flagged) {
+        cont.innerHTML = '';
+        if (!flagged || (flagged.questions.length === 0 && flagged.answers.length === 0)) {
+          cont.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No flagged content. All clear!'));
+          return;
+        }
+
+        if (flagged.questions.length > 0) {
+          cont.appendChild(el('h3', { className: 'section-title' }, 'Flagged Questions'));
+          flagged.questions.forEach(function(q) {
+            var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px', borderLeft: '3px solid var(--warning)' } });
+            card.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)', marginBottom: '4px' } }, q.questionText));
+            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } }, q.authorName + ' \u00B7 ' + q.created));
+            var acts = el('div', { style: { display: 'flex', gap: '6px' } });
+            acts.appendChild(el('button', {
+              style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
+              onClick: function() { google.script.run.withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(CURRENT_USER.email, q.id, 'approve'); }
+            }, 'Approve'));
+            acts.appendChild(el('button', {
+              style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
+              onClick: function() { google.script.run.withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateQuestion(CURRENT_USER.email, q.id, 'delete'); }
+            }, 'Delete'));
+            card.appendChild(acts);
+            cont.appendChild(card);
+          });
+        }
+
+        if (flagged.answers.length > 0) {
+          cont.appendChild(el('h3', { className: 'section-title', style: { marginTop: '16px' } }, 'Flagged Answers'));
+          flagged.answers.forEach(function(a) {
+            var card = el('div', { className: 'card', style: { padding: '12px 16px', marginBottom: '6px', borderLeft: '3px solid var(--warning)' } });
+            card.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', marginBottom: '4px' } }, a.answerText));
+            card.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginBottom: '8px' } }, a.authorName + ' \u00B7 ' + a.created));
+            var acts = el('div', { style: { display: 'flex', gap: '6px' } });
+            acts.appendChild(el('button', {
+              style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--successBg, #f0fdf4)', border: '1px solid var(--success)', color: 'var(--success)', fontWeight: '600' },
+              onClick: function() { google.script.run.withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(CURRENT_USER.email, a.id, 'approve'); }
+            }, 'Approve'));
+            acts.appendChild(el('button', {
+              style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
+              onClick: function() { google.script.run.withSuccessHandler(function() { _renderModQueue(cont); }).qaModerateAnswer(CURRENT_USER.email, a.id, 'delete'); }
+            }, 'Delete'));
+            card.appendChild(acts);
+            cont.appendChild(card);
+          });
+        }
+      }).qaGetFlaggedContent(CURRENT_USER.email);
+    }
+
+    refreshSubTabs();
+    renderQASubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// TIMELINE PAGE (v4.17.0 — shared by both roles)
+// ═══════════════════════════════════════
+
+function renderTimelinePage(appContainer) {
+  var role = CURRENT_VIEW;
+  var isSteward = role === 'steward';
+  renderPageLayout(appContainer, role, 'timeline', function(container) {
+    if (!isSteward) _memberHeader(container, 'Timeline', 'Union events & milestones');
+    else container.appendChild(el('div', { className: 'page-header' }, el('div', { className: 'page-title' }, 'Timeline')));
+
+    var content = el('div', { className: 'content' });
+
+    var activeSubTab = 'timeline';
+    var subTabBar = el('div', { className: 'sub-tabs' });
+    var subContent = el('div');
+    var filterYear = '';
+    var filterCategory = '';
+
+    function refreshSubTabs() {
+      subTabBar.innerHTML = '';
+      var tabs = [{ id: 'timeline', label: 'Timeline' }];
+      if (isSteward) {
+        tabs.push({ id: 'add', label: 'Add Event' });
+        tabs.push({ id: 'import', label: 'Import' });
+      }
+      tabs.forEach(function(tab) {
+        subTabBar.appendChild(el('button', {
+          className: 'sub-tab' + (activeSubTab === tab.id ? ' active' : ''),
+          onClick: function() { activeSubTab = tab.id; refreshSubTabs(); renderTLSubContent(); }
+        }, tab.label));
+      });
+    }
+
+    function renderTLSubContent() {
+      subContent.innerHTML = '';
+      if (activeSubTab === 'add') { _renderAddEventForm(subContent); return; }
+      if (activeSubTab === 'import') { _renderImportForm(subContent); return; }
+      _renderTimeline(subContent);
+    }
+
+    function _renderTimeline(cont) {
+      // Filters
+      var filterBar = el('div', { style: { display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' } });
+      var yearSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '100px' } });
+      yearSelect.appendChild(el('option', { value: '' }, 'All Years'));
+      var thisYear = new Date().getFullYear();
+      for (var y = thisYear; y >= thisYear - 5; y--) yearSelect.appendChild(el('option', { value: String(y) }, String(y)));
+      yearSelect.value = filterYear;
+      yearSelect.addEventListener('change', function() { filterYear = yearSelect.value; _renderTimeline(cont); });
+
+      var catSelect = el('select', { className: 'form-select', style: { width: 'auto', minWidth: '120px' } });
+      catSelect.appendChild(el('option', { value: '' }, 'All Categories'));
+      ['meeting', 'announcement', 'milestone', 'action', 'decision', 'other'].forEach(function(c) {
+        catSelect.appendChild(el('option', { value: c }, c.charAt(0).toUpperCase() + c.slice(1)));
+      });
+      catSelect.value = filterCategory;
+      catSelect.addEventListener('change', function() { filterCategory = catSelect.value; _renderTimeline(cont); });
+
+      filterBar.appendChild(yearSelect);
+      filterBar.appendChild(catSelect);
+      cont.innerHTML = '';
+      cont.appendChild(filterBar);
+
+      var listArea = el('div');
+      cont.appendChild(listArea);
+      showLoading(listArea);
+
+      google.script.run.withSuccessHandler(function(result) {
+        listArea.innerHTML = '';
+        if (!result || !result.events || result.events.length === 0) {
+          listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--muted)' } }, 'No events to display.'));
+          return;
+        }
+
+        var tlContainer = el('div', { className: 'timeline-container' });
+        tlContainer.appendChild(el('div', { className: 'timeline-line' }));
+
+        result.events.forEach(function(evt) {
+          var item = el('div', { className: 'timeline-event' });
+          item.appendChild(el('div', { className: 'timeline-dot' }));
+          item.appendChild(el('div', { className: 'timeline-date' }, evt.eventDate));
+
+          var card = el('div', { className: 'card', style: { padding: '12px 16px' } });
+          var titleRow = el('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' } });
+          titleRow.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '13px', fontWeight: '600', color: 'var(--text)' } }, evt.title));
+          titleRow.appendChild(el('span', { className: 'category-badge ' + evt.category }, evt.category));
+          card.appendChild(titleRow);
+
+          if (evt.description) card.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--text)', lineHeight: '1.4', marginTop: '4px' } }, evt.description.substring(0, 300)));
+
+          // Drive file links
+          if (evt.driveFiles && evt.driveFiles.length > 0) {
+            var filesDiv = el('div', { style: { marginTop: '8px', fontSize: '11px' } });
+            filesDiv.appendChild(el('span', { style: { color: 'var(--muted)' } }, 'Files: '));
+            evt.driveFiles.forEach(function(f, idx) {
+              if (idx > 0) filesDiv.appendChild(document.createTextNode(', '));
+              var link = el('a', { href: 'https://drive.google.com/file/d/' + f.id + '/view', target: '_blank', style: { color: 'var(--accent)' } }, f.name);
+              filesDiv.appendChild(link);
+            });
+            card.appendChild(filesDiv);
+          }
+
+          if (isSteward) {
+            var acts = el('div', { style: { display: 'flex', gap: '6px', marginTop: '8px' } });
+            acts.appendChild(el('button', {
+              style: { fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'var(--dangerBg, #fef2f2)', border: '1px solid var(--danger)', color: 'var(--danger)', fontWeight: '600' },
+              onClick: function() {
+                google.script.run.withSuccessHandler(function() { _renderTimeline(cont); }).tlDeleteTimelineEvent(CURRENT_USER.email, evt.id);
+              }
+            }, 'Delete'));
+            card.appendChild(acts);
+          }
+
+          item.appendChild(card);
+          tlContainer.appendChild(item);
+        });
+
+        listArea.appendChild(tlContainer);
+      }).withFailureHandler(function() {
+        listArea.innerHTML = '';
+        listArea.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load timeline.'));
+      }).tlGetTimelineEvents(1, 50, filterYear || null, filterCategory || null);
+    }
+
+    function _renderAddEventForm(cont) {
+      cont.appendChild(el('h3', { className: 'section-title' }, 'Add Event'));
+
+      var titleGroup = el('div', { className: 'form-group' });
+      titleGroup.appendChild(el('label', { className: 'form-label' }, 'Title'));
+      var titleInput = el('input', { className: 'form-input', placeholder: 'Event title' });
+      titleGroup.appendChild(titleInput);
+      cont.appendChild(titleGroup);
+
+      var dateGroup = el('div', { className: 'form-group' });
+      dateGroup.appendChild(el('label', { className: 'form-label' }, 'Event Date'));
+      var dateInput = el('input', { className: 'form-input', type: 'date' });
+      dateGroup.appendChild(dateInput);
+      cont.appendChild(dateGroup);
+
+      var descGroup = el('div', { className: 'form-group' });
+      descGroup.appendChild(el('label', { className: 'form-label' }, 'Description'));
+      var descInput = el('textarea', { className: 'msg-textarea', placeholder: 'Event details...', style: { minHeight: '60px' } });
+      descGroup.appendChild(descInput);
+      cont.appendChild(descGroup);
+
+      var catGroup = el('div', { className: 'form-group' });
+      catGroup.appendChild(el('label', { className: 'form-label' }, 'Category'));
+      var catSelect = el('select', { className: 'form-select' });
+      ['meeting', 'announcement', 'milestone', 'action', 'decision', 'other'].forEach(function(c) {
+        catSelect.appendChild(el('option', { value: c }, c.charAt(0).toUpperCase() + c.slice(1)));
+      });
+      catGroup.appendChild(catSelect);
+      cont.appendChild(catGroup);
+
+      var driveGroup = el('div', { className: 'form-group' });
+      driveGroup.appendChild(el('label', { className: 'form-label' }, 'Drive File IDs (optional, comma-separated)'));
+      var driveInput = el('input', { className: 'form-input', placeholder: 'file_id_1, file_id_2' });
+      driveGroup.appendChild(driveInput);
+      cont.appendChild(driveGroup);
+
+      var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+      cont.appendChild(statusMsg);
+
+      cont.appendChild(el('button', {
+        className: 'btn btn-primary',
+        onClick: function() {
+          var title = titleInput.value.trim();
+          if (!title) { statusMsg.textContent = 'Enter a title.'; statusMsg.style.color = 'var(--danger)'; return; }
+          statusMsg.textContent = 'Creating...'; statusMsg.style.color = 'var(--muted)';
+          var eventData = {
+            title: title, eventDate: dateInput.value || '', description: descInput.value.trim(),
+            category: catSelect.value, driveFileIds: driveInput.value.trim()
+          };
+          google.script.run.withSuccessHandler(function(r) {
+            if (r && r.success) { activeSubTab = 'timeline'; refreshSubTabs(); renderTLSubContent(); }
+            else { statusMsg.textContent = r ? r.message : 'Error.'; statusMsg.style.color = 'var(--danger)'; }
+          }).tlAddTimelineEvent(CURRENT_USER.email, eventData);
+        }
+      }, 'Create Event'));
+    }
+
+    function _renderImportForm(cont) {
+      cont.appendChild(el('h3', { className: 'section-title' }, 'Import from Google Calendar'));
+      cont.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Import events from your Google Calendar into the timeline.'));
+
+      var startGroup = el('div', { className: 'form-group' });
+      startGroup.appendChild(el('label', { className: 'form-label' }, 'Start Date'));
+      var startInput = el('input', { className: 'form-input', type: 'date' });
+      startGroup.appendChild(startInput);
+      cont.appendChild(startGroup);
+
+      var endGroup = el('div', { className: 'form-group' });
+      endGroup.appendChild(el('label', { className: 'form-label' }, 'End Date'));
+      var endInput = el('input', { className: 'form-input', type: 'date' });
+      endGroup.appendChild(endInput);
+      cont.appendChild(endGroup);
+
+      var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px' } });
+      cont.appendChild(statusMsg);
+
+      cont.appendChild(el('button', {
+        className: 'btn btn-primary',
+        onClick: function() {
+          if (!startInput.value || !endInput.value) { statusMsg.textContent = 'Select both dates.'; statusMsg.style.color = 'var(--danger)'; return; }
+          statusMsg.textContent = 'Importing...'; statusMsg.style.color = 'var(--muted)';
+          google.script.run.withSuccessHandler(function(r) {
+            if (r && r.success) { statusMsg.textContent = r.imported + ' events imported!'; statusMsg.style.color = 'var(--success)'; }
+            else { statusMsg.textContent = r ? r.message : 'Error.'; statusMsg.style.color = 'var(--danger)'; }
+          }).tlImportCalendarEvents(CURRENT_USER.email, startInput.value, endInput.value);
+        }
+      }, 'Import Events'));
+    }
+
+    refreshSubTabs();
+    renderTLSubContent();
+    content.appendChild(subTabBar);
+    content.appendChild(subContent);
+    container.appendChild(content);
+  });
+}
+
+// ═══════════════════════════════════════
+// DIGEST SETTINGS (v4.17.0 — embedded in Profile page)
+// ═══════════════════════════════════════
+
+function _renderDigestSettings(container) {
+  var section = el('div', { style: { marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' } });
+  section.appendChild(el('h3', { className: 'section-title' }, 'Email Digest Settings'));
+  section.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--muted)', marginBottom: '12px' } }, 'Receive periodic email summaries of your union data.'));
+
+  var formArea = el('div');
+  showLoading(formArea);
+  section.appendChild(formArea);
+
+  google.script.run.withSuccessHandler(function(config) {
+    formArea.innerHTML = '';
+    if (!config) config = { enabled: false, frequency: 'weekly', includeGrievances: true, includeWorkload: true, includeTasks: true };
+
+    var enableGroup = el('div', { className: 'form-group', style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+    var enableCheck = el('input', { type: 'checkbox' });
+    enableCheck.checked = config.enabled;
+    enableGroup.appendChild(enableCheck);
+    enableGroup.appendChild(el('label', { style: { fontSize: '13px', color: 'var(--text)' } }, 'Enable email digest'));
+    formArea.appendChild(enableGroup);
+
+    var freqGroup = el('div', { className: 'form-group' });
+    freqGroup.appendChild(el('label', { className: 'form-label' }, 'Frequency'));
+    var freqDiv = el('div', { style: { display: 'flex', gap: '16px' } });
+    var weeklyRadio = el('input', { type: 'radio', name: 'digestFreq', value: 'weekly' });
+    weeklyRadio.checked = config.frequency === 'weekly';
+    var monthlyRadio = el('input', { type: 'radio', name: 'digestFreq', value: 'monthly' });
+    monthlyRadio.checked = config.frequency === 'monthly';
+    freqDiv.appendChild(el('label', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' } }, [weeklyRadio, document.createTextNode(' Weekly')]));
+    freqDiv.appendChild(el('label', { style: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px' } }, [monthlyRadio, document.createTextNode(' Monthly')]));
+    freqGroup.appendChild(freqDiv);
+    formArea.appendChild(freqGroup);
+
+    var includeLabel = el('div', { className: 'form-label', style: { marginBottom: '6px' } }, 'Include in digest:');
+    formArea.appendChild(includeLabel);
+
+    var grievCheck = el('input', { type: 'checkbox' }); grievCheck.checked = config.includeGrievances;
+    var workCheck = el('input', { type: 'checkbox' }); workCheck.checked = config.includeWorkload;
+    var taskCheck = el('input', { type: 'checkbox' }); taskCheck.checked = config.includeTasks;
+
+    [{ check: grievCheck, label: 'Grievances' }, { check: workCheck, label: 'Workload' }, { check: taskCheck, label: 'Tasks' }].forEach(function(item) {
+      var row = el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } });
+      row.appendChild(item.check);
+      row.appendChild(el('label', { style: { fontSize: '13px', color: 'var(--text)' } }, item.label));
+      formArea.appendChild(row);
+    });
+
+    var statusMsg = el('div', { style: { fontSize: '13px', minHeight: '20px', marginTop: '8px' } });
+    formArea.appendChild(statusMsg);
+
+    formArea.appendChild(el('button', {
+      className: 'btn btn-primary', style: { marginTop: '8px' },
+      onClick: function() {
+        statusMsg.textContent = 'Saving...'; statusMsg.style.color = 'var(--muted)';
+        var digestConfig = {
+          enabled: enableCheck.checked,
+          frequency: monthlyRadio.checked ? 'monthly' : 'weekly',
+          includeGrievances: grievCheck.checked,
+          includeWorkload: workCheck.checked,
+          includeTasks: taskCheck.checked
+        };
+        google.script.run.withSuccessHandler(function(r) {
+          statusMsg.textContent = r && r.success ? 'Digest settings saved!' : (r && r.message) || 'Error.';
+          statusMsg.style.color = r && r.success ? 'var(--success)' : 'var(--danger)';
+        }).fsUpdateDigestConfig(CURRENT_USER.email, digestConfig);
+      }
+    }, 'Save Digest Settings'));
+  }).fsGetDigestConfig(CURRENT_USER.email);
+
+  container.appendChild(section);
 }
 </script>

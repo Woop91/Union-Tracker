@@ -5,6 +5,79 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.18.0] - 2026-02-26
+
+### Added
+- Split `SEED_SAMPLE_DATA` into 3 phased runners to avoid GAS 6-min timeout
+- 5 new seed functions: tasks, polls, minutes, check-ins, timeline events
+- Steward view: org-wide KPI fallback, all-contacts members tab, comma formatting, contact log autocomplete, survey tracking scope toggles, 6 new More menu items (Polls, Minutes, Timeline, Q&A, Feedback, Failsafe)
+- Member view: Know Your Rights card, Contact→Directory nav, 1hr localStorage notification dismiss, meetings+minutes merge, 7 new More menu items
+- Backend globals: `getAllMembers`, `startGrievanceDraft`, `createGrievanceDriveFolder`
+- Survey tracking scope parameter for steward/org-wide toggle
+- `07_DevTools.gs` expanded with comprehensive seed + diagnostic tooling
+
+### Changed
+- Broadcast system uses all contacts (not just active members)
+- `build.js` BUILD_ORDER updated to include `26_QAForum.gs`, `27_TimelineService.gs`, `28_FailsafeService.gs`
+
+## [4.17.0] - 2026-02-26
+
+### Added
+- **Q&A Forum** (`26_QAForum.gs`, 389 lines) — member-steward question/answer system with `_QA_Forum` and `_QA_Answers` hidden sheets
+- **Timeline Service** (`27_TimelineService.gs`, 317 lines) — chronological event records with `_Timeline_Events` hidden sheet
+- **Failsafe Service** (`28_FailsafeService.gs`, 425 lines) — member digest/backup preferences with `_Failsafe_Config` hidden sheet
+- `08a_SheetSetup.gs` updated to auto-create Q&A, Timeline, and Failsafe sheets in `CREATE_DASHBOARD()`
+- DataService methods for Q&A, Timeline, and Failsafe in `21_WebDashDataService.gs`
+
+## [4.16.0] - 2026-02-26
+
+### Added
+- 15 new DataService methods (541 lines) in `21_WebDashDataService.gs` wiring 7 previously unwired sheets to SPA
+- 15 global wrapper functions + 3 batch data fields
+- New SPA pages: Meetings (member), Polls (both roles), Minutes (both), Feedback (both)
+- Insights page: Performance KPIs + Satisfaction Trends sections
+- Case detail views: read-only checklist (member) / interactive checklist (steward)
+- Per-question text scores with color-coding in survey results page
+- `questionTexts` arrays added to all 11 `SATISFACTION_SECTIONS` scale sections
+- Expansion test suite (`test/expansion.test.js`, 332 lines)
+
+### Changed
+- Removed "Since N/A" text from member home header
+- Removed Dues Status doughnut chart and sort option from steward view
+- Removed Dues Status chart from member view membership stats
+- Fixed 122 test failures across 9 suites (1,363 tests now passing across 23 suites)
+
+### Wired Sheets
+1. `_Steward_Performance_Calc`
+2. `Case Checklist`
+3. `Meeting Check-In Log`
+4. `Member Satisfaction` (AVG columns)
+5. `Feedback & Development`
+6. `FlashPolls` + `PollResponses`
+7. `MeetingMinutes`
+
+## [4.15.0] - 2026-02-25
+
+### Added
+- In-app survey wizard: multi-step mobile-optimized form with localStorage progress, 1–10 scale buttons, anonymous SHA-256 submission
+- Chief steward task assignment in steward view
+- Steward Insights tab: Quick Insights + Filed vs Resolved chart
+- Steward Directory with vCard download
+- Member dashboard: actionable KPI strip, conditional grievance card, engagement/workload stats tabs
+- Broadcast: checkbox pill filters with recipient preview
+- Login UX: SSO loading state, `sso_failed` fallback, magic link clarification, resend cooldown
+- Seed data: calendar events, weekly questions, union stats
+- 634 new tests (`10d_SyncAndMaintenance.test.js`), expansion test coverage
+- `DocumentApp` mock in `test/gas-mock.js`
+
+### Changed
+- `API_VERSION` consolidated to derive from `COMMAND_CONFIG.VERSION` (single source of truth)
+- Infrastructure: batch fetch, Drive cleanup trigger, calendar dedup, CC health check, lazy-load help dialog, search pagination
+- Workload: removed Private option
+
+### Removed
+- `CODE_REVIEW.md`, `PHASE2_PLAN.md`, `docs/archived-reviews/` (all findings resolved in v4.14.0)
+
 ## [4.14.0] - 2026-02-25
 
 ### Security (130 code review findings resolved)
@@ -324,6 +397,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 4.18.0 | 2026-02-26 | SPA fixes, seed phasing, steward/member view enhancements |
+| 4.17.0 | 2026-02-26 | Q&A Forum, Timeline Service, Failsafe Service (backend + sheets) |
+| 4.16.0 | 2026-02-26 | Wire 7 unwired sheets to SPA, new pages, expansion tests |
+| 4.15.0 | 2026-02-25 | Survey wizard, steward insights, member KPI strip, login UX |
+| 4.14.0 | 2026-02-25 | 130 code review findings, 5 new features, engagement sync |
 | 4.13.0 | 2026-02-25 | Notification bell/EventBus auto-alerts, individual-file build, WorkloadService SPA module |
 | 4.12.2 | 2026-02-25 | SPA web dashboard, SSO + magic link, deep-link routing, hidden sheets |
 | 4.12.0 | 2026-02-24 | Notifications system (sheet + API + dual-role page) |

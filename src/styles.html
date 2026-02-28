@@ -1274,4 +1274,20 @@ input { font: inherit; }
   .kpi-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
   .info-grid-responsive { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ═══════════════════════════════════════
+   TIMELINE (v4.17.0)
+   ═══════════════════════════════════════ */
+.timeline-container { position: relative; padding-left: 28px; }
+.timeline-line { position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+.timeline-event { position: relative; margin-bottom: 20px; }
+.timeline-dot { position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); z-index: 1; }
+.timeline-date { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-family: var(--fontBody); }
+.category-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 8px; text-transform: capitalize; }
+.category-badge.meeting { background: #e3f2fd; color: #1565c0; }
+.category-badge.announcement { background: #fff3e0; color: #e65100; }
+.category-badge.milestone { background: #e8f5e9; color: #2e7d32; }
+.category-badge.action { background: #fce4ec; color: #c62828; }
+.category-badge.decision { background: #f3e5f5; color: #6a1b9a; }
+.category-badge.other { background: var(--surfaceAlt); color: var(--muted); }
 </style>
