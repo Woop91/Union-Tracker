@@ -4,20 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <title>Dashboard</title>
-
+  
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
-
+  
   <?!= include('styles') ?>
-
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div id="app"></div>
-
+  
   <script>
     // ═══════════════════════════════════════
     // BOOTSTRAP — Parse server-injected data
@@ -28,21 +25,29 @@
     var CURRENT_USER = PAGE_DATA.user || null;
     var IS_DUAL_ROLE = PAGE_DATA.isDualRole || false;
     var SESSION_TOKEN = PAGE_DATA.sessionToken || null;
-    var INITIAL_TAB = PAGE_DATA.initialTab || null;
-
+    
     // Store session token in localStorage if provided
     if (SESSION_TOKEN) {
       localStorage.setItem('dashboardSessionToken', SESSION_TOKEN);
     }
-
-    // Check for existing session token
+    
+    // Check for existing session token — redirect with it if on the auth page
     var storedToken = localStorage.getItem('dashboardSessionToken');
-
+    if (storedToken && CURRENT_VIEW === 'auth') {
+      if (PAGE_DATA.sessionFailed) {
+        // Stored token was tried and is invalid — clear it
+        localStorage.removeItem('dashboardSessionToken');
+      } else if (PAGE_DATA.webAppUrl) {
+        // Redirect with the stored token so the server can validate it
+        window.top.location.href = PAGE_DATA.webAppUrl + '?sessionToken=' + encodeURIComponent(storedToken);
+      }
+    }
+    
     // ═══════════════════════════════════════
     // THEME ENGINE
     // ═══════════════════════════════════════
     var ThemeEngine = (function() {
-
+      
       function generatePalette(hue) {
         return {
           accent:       'hsl(' + hue + ', 70%, 68%)',
@@ -52,9 +57,9 @@
           accentBorder: 'hsla(' + hue + ', 70%, 68%, 0.25)',
         };
       }
-
+      
       var palette = generatePalette(CONFIG.accentHue || 250);
-
+      
       var themes = {
         steward: {
           dark: {
@@ -97,7 +102,7 @@
           }
         }
       };
-
+      
       function getTheme(role, isDark) {
         var base = themes[role] || themes.member;
         var t = isDark ? base.dark : base.light;
@@ -107,7 +112,7 @@
         }
         return t;
       }
-
+      
       function applyTheme(t) {
         var root = document.documentElement;
         for (var key in t) {
@@ -119,14 +124,14 @@
         document.body.style.color = t.text;
         document.body.style.fontFamily = t.fontBody;
       }
-
+      
       return {
         getTheme: getTheme,
         applyTheme: applyTheme,
         palette: palette,
       };
     })();
-
+    
     // ═══════════════════════════════════════
     // APP STATE
     // ═══════════════════════════════════════
@@ -140,42 +145,23 @@
       kpis: null,
       grievances: [],
       loading: true,
-      initialTab: INITIAL_TAB, // deep-link: ?page=xxx from URL
-      notificationCount: 0,
     };
-
+    
     // ═══════════════════════════════════════
-    // ROUTER (with optional batch pre-fetch)
+    // ROUTER
     // ═══════════════════════════════════════
     function initApp() {
       var app = document.getElementById('app');
-
+      
       switch (CURRENT_VIEW) {
         case 'auth':
           renderAuth(app);
           break;
         case 'steward':
+          initStewardView(app);
+          break;
         case 'member':
-          // Pre-fetch batch data in a single round-trip, then init the view.
-          // Falls back to per-view init if batch fails.
-          if (CURRENT_USER && CURRENT_USER.email) {
-            google.script.run
-              .withSuccessHandler(function(batch) {
-                AppState.batchData = batch || {};
-                if (CURRENT_VIEW === 'steward') initStewardView(app);
-                else initMemberView(app);
-              })
-              .withFailureHandler(function() {
-                // Batch unavailable — views will make individual calls
-                AppState.batchData = null;
-                if (CURRENT_VIEW === 'steward') initStewardView(app);
-                else initMemberView(app);
-              })
-              .dataGetBatchData(CURRENT_USER.email, CURRENT_VIEW);
-          } else {
-            if (CURRENT_VIEW === 'steward') initStewardView(app);
-            else initMemberView(app);
-          }
+          initMemberView(app);
           break;
         case 'error':
           renderError(app, PAGE_DATA.error);
@@ -184,7 +170,7 @@
           renderAuth(app);
       }
     }
-
+    
     // ═══════════════════════════════════════
     // UTILITY FUNCTIONS
     // ═══════════════════════════════════════
@@ -222,20 +208,20 @@
       }
       return elem;
     }
-
+    
     function html(str) {
       var div = document.createElement('div');
       div.innerHTML = str;
       return div.firstChild;
     }
-
+    
     function showLoading(container) {
       container.innerHTML = '';
       var loader = el('div', { className: 'loading-spinner' });
       loader.innerHTML = '<div class="spinner"></div><div class="loading-text">Loading...</div>';
       container.appendChild(loader);
     }
-
+    
     function handleLogout() {
       var token = localStorage.getItem('dashboardSessionToken');
       if (token) {
@@ -250,364 +236,17 @@
       // Fallback reload
       setTimeout(function() { window.top.location.reload(); }, 1000);
     }
-
-    // ═══════════════════════════════════════
-    // LAYOUT DETECTION
-    // ═══════════════════════════════════════
-    var LayoutState = { mode: 'mobile', width: 0 };
-
-    function getLayoutMode() {
-      var w = window.innerWidth || document.documentElement.clientWidth;
-      LayoutState.width = w;
-      if (w >= 1024) { LayoutState.mode = 'desktop'; }
-      else if (w >= 640) { LayoutState.mode = 'tablet'; }
-      else { LayoutState.mode = 'mobile'; }
-      return LayoutState.mode;
-    }
-
-    function isSidebarLayout() {
-      return LayoutState.mode !== 'mobile';
-    }
-
-    /**
-     * Renders the page with sidebar nav on tablet+ or bottom nav on mobile.
-     * @param {Element} container - The #app element
-     * @param {string} role - 'member' or 'steward'
-     * @param {string} activeTab - The currently active tab id
-     * @param {Function} contentFn - Called with contentContainer to render page content
-     */
-    function renderPageLayout(container, role, activeTab, contentFn) {
-      container.innerHTML = '';
-      getLayoutMode();
-
-      if (isSidebarLayout()) {
-        var layout = el('div', { className: 'page-layout' });
-        var sidebar = el('nav', { className: 'sidebar-nav' });
-        renderSidebarItems(sidebar, role, activeTab);
-        layout.appendChild(sidebar);
-
-        var content = el('div', { className: 'page-layout-content' });
-        contentFn(content);
-        layout.appendChild(content);
-        container.appendChild(layout);
-      } else {
-        contentFn(container);
-        renderBottomNav(container, role, activeTab);
-      }
-    }
-
-    function renderSidebarItems(sidebar, role, activeTab) {
-      var header = el('div', { className: 'sidebar-header', style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' } });
-      var headerText = el('div');
-      headerText.appendChild(el('div', { className: 'sidebar-header-title' }, CONFIG.orgAbbrev || CONFIG.orgName));
-      if (CURRENT_USER) {
-        headerText.appendChild(el('div', { className: 'sidebar-header-sub' }, CURRENT_USER.name));
-      }
-      header.appendChild(headerText);
-      var bellWrap = el('div', { className: 'notif-bell-wrap', onClick: function() {
-        _handleTabNav(role, 'notifications');
-      }});
-      bellWrap.appendChild(el('span', { className: 'notif-bell-icon' }, '\uD83D\uDD14'));
-      if (AppState.notificationCount > 0) {
-        bellWrap.appendChild(el('span', { className: 'notif-bell-badge' }, String(AppState.notificationCount)));
-      }
-      header.appendChild(bellWrap);
-      sidebar.appendChild(header);
-
-      var tabs = _getSidebarTabs(role);
-      tabs.forEach(function(tab) {
-        if (tab.divider) {
-          sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
-          return;
-        }
-        var item = el('div', {
-          className: 'sidebar-item' + (tab.id === activeTab ? ' active' : ''),
-          onClick: function() { _handleTabNav(role, tab.id); }
-        }, [
-          el('span', { className: 'sidebar-item-icon' }, tab.icon),
-          el('span', null, tab.label)
-        ]);
-        sidebar.appendChild(item);
-      });
-
-      // Bottom utility items
-      sidebar.appendChild(el('div', { className: 'sidebar-divider' }));
-      if (IS_DUAL_ROLE) {
-        var switchRole = role === 'steward' ? 'member' : 'steward';
-        var switchLabel = role === 'steward' ? CONFIG.memberLabel : CONFIG.stewardLabel;
-        sidebar.appendChild(el('div', {
-          className: 'sidebar-item',
-          onClick: function() {
-            AppState.activeRole = switchRole;
-            var app = document.getElementById('app');
-            if (switchRole === 'steward') initStewardView(app);
-            else initMemberView(app);
-          }
-        }, [
-          el('span', { className: 'sidebar-item-icon' }, role === 'steward' ? '\uD83D\uDC64' : '\uD83D\uDD27'),
-          el('span', null, 'Switch to ' + switchLabel)
-        ]));
-      }
-      sidebar.appendChild(el('div', {
-        className: 'sidebar-item',
-        onClick: function() {
-          AppState.isDark = !AppState.isDark;
-          var t = ThemeEngine.getTheme(AppState.activeRole || 'member', AppState.isDark);
-          ThemeEngine.applyTheme(t);
-          _handleTabNav(role, activeTab);
-        }
-      }, [
-        el('span', { className: 'sidebar-item-icon' }, AppState.isDark ? '\u2600\uFE0F' : '\uD83C\uDF19'),
-        el('span', null, AppState.isDark ? 'Light Mode' : 'Dark Mode')
-      ]));
-      sidebar.appendChild(el('div', {
-        className: 'sidebar-item',
-        onClick: handleLogout
-      }, [
-        el('span', { className: 'sidebar-item-icon' }, '\u21A9'),
-        el('span', null, 'Sign Out')
-      ]));
-    }
-
-    function _getSidebarTabs(role) {
-      if (role === 'steward') return [
-        { id: 'cases', icon: '\uD83D\uDCCB', label: 'Cases' },
-        { id: 'members', icon: '\uD83D\uDC65', label: 'Members' },
-        { id: 'tasks', icon: '\u2705', label: 'Tasks' },
-        { id: 'contactlog', icon: '\uD83D\uDCDE', label: 'Contact Log' },
-        { divider: true },
-        { id: 'broadcast', icon: '\uD83D\uDCE2', label: 'Broadcast' },
-        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
-        { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
-        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-        { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
-        { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
-      ];
-      return [
-        { id: 'home', icon: '\uD83C\uDFE0', label: 'Home' },
-        { id: 'cases', icon: '\uD83D\uDCCB', label: 'My Cases' },
-        { id: 'contact', icon: '\uD83D\uDCAC', label: 'Contact' },
-        { divider: true },
-        { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
-        { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
-        { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
-        { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
-        { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
-        { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
-        { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
-        { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
-      ];
-    }
-
-    function _handleTabNav(role, tabId) {
-      var app = document.getElementById('app');
-      // Handle "More" menus for both roles (mobile bottom-nav)
-      if (tabId === '_member_more') { renderMemberMore(app); return; }
-      if (tabId === '_steward_more') { renderStewardMore(app); return; }
-      if (role === 'member') {
-        switch(tabId) {
-          case 'home': renderMemberHome(app); break;
-          case 'cases': renderMyCases(app); break;
-          case 'contact': renderStewardContact(app); break;
-          case 'profile': renderUpdateProfile(app); break;
-          case 'resources': renderMemberResources(app); break;
-          case 'workload': renderWorkloadTracker(app); break;
-          case 'weeklyq': renderWeeklyQuestionsPage(app, 'member'); break;
-          case 'survey': renderSurveyResultsPage(app); break;
-          case 'unionstats': renderUnionStatsPage(app); break;
-          case 'events': renderEventsPage(app); break;
-          case 'stewarddirectory': renderStewardDirectory(app); break;
-          case 'notifications': renderMemberNotifications(app); break;
-          default: renderMemberHome(app);
-        }
-      } else {
-        switch(tabId) {
-          case 'cases': renderStewardDashboard(app); break;
-          case 'members': renderStewardMembers(app); break;
-          case 'deadlines': renderStewardDashboard(app); break;
-          case 'broadcast': renderBroadcast(app); break;
-          case 'notifications': renderStewardNotifications(app); break;
-          case 'resources': renderStewardResources(app); break;
-          case 'weeklyq': renderWeeklyQuestionsPage(app, 'steward'); break;
-          case 'surveytrack': renderSurveyTracking(app); break;
-          case 'contactlog': renderContactLog(app); break;
-          case 'tasks': renderStewardTasks(app); break;
-          case 'events': renderEventsPage(app); break;
-          default: renderStewardDashboard(app);
-        }
-      }
-    }
-
-    /**
-     * Deep-link handler — if ?page=xxx was in the URL, navigate to that tab
-     * once data has loaded. Called once, then clears to prevent re-triggering.
-     */
-    function _checkDeepLink(role) {
-      if (!AppState.initialTab) return;
-      var tab = AppState.initialTab;
-      AppState.initialTab = null; // one-shot
-      _handleTabNav(role, tab);
-    }
-
-    // Debounced resize handler — re-renders on breakpoint change
-    var _resizeTimer = null;
-    var _prevMode = '';
-    window.addEventListener('resize', function() {
-      clearTimeout(_resizeTimer);
-      _resizeTimer = setTimeout(function() {
-        var newMode = getLayoutMode();
-        if (newMode !== _prevMode) {
-          _prevMode = newMode;
-          // Re-render current view
-          var app = document.getElementById('app');
-          if (AppState.activeRole === 'steward') renderStewardDashboard(app);
-          else if (AppState.activeRole === 'member') renderMemberHome(app);
-        }
-      }, 200);
-    });
-
-    // ═══════════════════════════════════════
-    // CHART HELPER (requires Chart.js CDN)
-    // ═══════════════════════════════════════
-    var ChartHelper = (function() {
-      var _charts = {};
-
-      function _getColors() {
-        var cs = getComputedStyle(document.documentElement);
-        return {
-          accent:  cs.getPropertyValue('--accent').trim() || '#7c6ef6',
-          success: cs.getPropertyValue('--success').trim() || '#4ade80',
-          warning: cs.getPropertyValue('--warning').trim() || '#facc15',
-          danger:  cs.getPropertyValue('--danger').trim() || '#ef4444',
-          info:    cs.getPropertyValue('--info').trim() || '#60a5fa',
-          text:    cs.getPropertyValue('--text').trim() || '#e0e0e0',
-          muted:   cs.getPropertyValue('--muted').trim() || '#6b6b6b',
-          border:  cs.getPropertyValue('--border').trim() || '#2a2a2a',
-          surface: cs.getPropertyValue('--surface').trim() || '#1e1e1e',
-        };
-      }
-
-      function _palette(count) {
-        var c = _getColors();
-        var pool = [c.accent, c.success, c.warning, c.info, c.danger, '#a78bfa', '#f472b6', '#38bdf8'];
-        var out = [];
-        for (var i = 0; i < count; i++) out.push(pool[i % pool.length]);
-        return out;
-      }
-
-      function destroyChart(id) {
-        if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
-      }
-
-      function _create(container, id, cfg) {
-        destroyChart(id);
-        var wrap = el('div', { className: 'chart-container' });
-        var canvas = document.createElement('canvas');
-        canvas.id = id;
-        wrap.appendChild(canvas);
-        container.appendChild(wrap);
-        var c = _getColors();
-        Chart.defaults.color = c.muted;
-        Chart.defaults.borderColor = c.border;
-        Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
-        _charts[id] = new Chart(canvas, cfg);
-        return _charts[id];
-      }
-
-      function createBarChart(container, id, labels, datasets, opts) {
-        var c = _getColors();
-        var dsList = datasets.map(function(ds, i) {
-          return Object.assign({
-            backgroundColor: ds.color || _palette(datasets.length)[i],
-            borderRadius: 4,
-            maxBarThickness: 40,
-          }, ds);
-        });
-        return _create(container, id, {
-          type: 'bar',
-          data: { labels: labels, datasets: dsList },
-          options: Object.assign({
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
-            scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
-          }, opts || {}),
-        });
-      }
-
-      function createHorizontalBarChart(container, id, labels, data, colors) {
-        var c = _getColors();
-        return _create(container, id, {
-          type: 'bar',
-          data: {
-            labels: labels,
-            datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderRadius: 4, maxBarThickness: 28 }],
-          },
-          options: {
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { x: { beginAtZero: true, grid: { color: c.border } }, y: { grid: { display: false } } },
-          },
-        });
-      }
-
-      function createDoughnutChart(container, id, labels, data, colors) {
-        return _create(container, id, {
-          type: 'doughnut',
-          data: {
-            labels: labels,
-            datasets: [{ data: data, backgroundColor: colors || _palette(labels.length), borderWidth: 0, spacing: 2 }],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, cutout: '65%',
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } } },
-          },
-        });
-      }
-
-      function createLineChart(container, id, labels, datasets, opts) {
-        var c = _getColors();
-        var dsList = datasets.map(function(ds, i) {
-          return Object.assign({
-            borderColor: ds.color || _palette(datasets.length)[i],
-            backgroundColor: (ds.color || _palette(datasets.length)[i]) + '20',
-            fill: true, tension: 0.3, pointRadius: 3, borderWidth: 2,
-          }, ds);
-        });
-        return _create(container, id, {
-          type: 'line',
-          data: { labels: labels, datasets: dsList },
-          options: Object.assign({
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12 } } },
-            scales: { y: { beginAtZero: true, grid: { color: c.border } }, x: { grid: { display: false } } },
-          }, opts || {}),
-        });
-      }
-
-      return {
-        createBarChart: createBarChart,
-        createHorizontalBarChart: createHorizontalBarChart,
-        createDoughnutChart: createDoughnutChart,
-        createLineChart: createLineChart,
-        destroyChart: destroyChart,
-      };
-    })();
-
+    
     // ═══════════════════════════════════════
     // INIT
     // ═══════════════════════════════════════
-    document.addEventListener('DOMContentLoaded', function() {
-      getLayoutMode();
-      _prevMode = LayoutState.mode;
-      initApp();
-    });
+    document.addEventListener('DOMContentLoaded', initApp);
   </script>
-
+  
   <?!= include('auth_view') ?>
   <?!= include('steward_view') ?>
   <?!= include('member_view') ?>
   <?!= include('error_view') ?>
-
+  
 </body>
 </html>

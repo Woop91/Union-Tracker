@@ -1492,25 +1492,8 @@ function logAuditEvent(eventType, details) {
     // Build log entry
     const timestamp = new Date();
     const rawEmail = Session.getActiveUser().getEmail() || 'Unknown';
-    // Mask email in visible audit column; integrity hash uses full email for verification
     const user = (typeof maskEmail === 'function') ? maskEmail(rawEmail) : rawEmail;
-
-    // Mask email addresses in details object before logging
-    var sanitizedDetails = details;
-    if (details && typeof details === 'object') {
-      sanitizedDetails = {};
-      var emailKeys = ['runBy', 'performedBy', 'createdBy', 'changedBy', 'email', 'userEmail'];
-      for (var dk in details) {
-        if (details.hasOwnProperty(dk)) {
-          if (emailKeys.indexOf(dk) !== -1 && typeof details[dk] === 'string' && details[dk].indexOf('@') !== -1) {
-            sanitizedDetails[dk] = (typeof maskEmail === 'function') ? maskEmail(details[dk]) : details[dk];
-          } else {
-            sanitizedDetails[dk] = details[dk];
-          }
-        }
-      }
-    }
-    const detailsJson = JSON.stringify(sanitizedDetails);
+    const detailsJson = JSON.stringify(details);
     const sessionId = Session.getTemporaryActiveUserKey() || '';
 
     // Compute integrity hash chained to previous row
@@ -3089,11 +3072,22 @@ function archiveClosedGrievances(daysOld) {
     { count: rowsToArchive.length, daysOld: daysOld, deleteFailed: failedDeletes.length }
   );
 
+  // F141: Include failedGrievanceIds in return for error reporting
+  var failedGrievanceIds = [];
+  if (failedDeletes.length > 0) {
+    failedDeletes.forEach(function(rowIdx) {
+      var dataIdx = rowIdx - 2;
+      if (dataIdx >= 0 && dataIdx < data.length) {
+        var gId = data[dataIdx][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+        if (gId) failedGrievanceIds.push(String(gId));
+      }
+    });
+  }
+
   return {
     archived: rowsToArchive.length,
-    deleted: successfulDeletes,
     failedDeletes: failedDeletes.length,
-    failedRows: failedDeletes.length > 0 ? failedDeletes : undefined
+    failedGrievanceIds: failedGrievanceIds
   };
 }
 

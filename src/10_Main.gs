@@ -34,90 +34,23 @@
  */
 function onOpen() {
   try {
-    // Create the dashboard menu immediately — this is the critical path (F47 perf fix)
+    // Clear memoized caches so fresh config values are picked up
+    if (typeof _systemNameCache_ !== 'undefined') _systemNameCache_ = null;
+
+    // Only menu creation runs synchronously — keep onOpen fast
     createDashboardMenu();
 
-    // Defer non-critical initialization to a 1-second timed trigger so the
-    // spreadsheet UI is not blocked by heavy I/O (column sync, tab colors,
-    // hidden-sheet enforcement, etc.)
+    // F41: Defer heavy init to a 1-second timed trigger so the UI isn't blocked
     try {
       ScriptApp.newTrigger('onOpenDeferred_')
         .timeBased()
         .after(1000)
         .create();
-    } catch (triggerError) {
-      // If trigger creation fails (quota, permissions), run inline as fallback
-      console.log('Deferred trigger failed, running inline: ' + triggerError.message);
+    } catch (trigErr) {
+      // Installable trigger unavailable (e.g., simple trigger context) — run inline
+      console.log('Deferred trigger failed, running inline: ' + trigErr.message);
       onOpenDeferred_();
     }
-
-  } catch (error) {
-    console.error('Error in onOpen:', error);
-    // Still try to create a basic menu
-    SpreadsheetApp.getUi()
-      .createMenu('Union Dashboard')
-      .addItem('Initialize Dashboard', 'initializeDashboard')
-      .addToUi();
-  }
-}
-
-/**
- * Deferred onOpen work — runs via a one-shot timed trigger so the
- * spreadsheet opens fast. Handles column sync, sheet validation,
- * tab colors, and hidden-sheet enforcement. (F47)
- * @private
- */
-function onOpenDeferred_() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    // Sync column maps from actual sheet headers so that column constants
-    // (MEMBER_COLS, GRIEVANCE_COLS, CONFIG_COLS, etc.) reflect the real
-    // spreadsheet layout — even if columns were reordered manually.
-    try {
-      syncColumnMaps();
-    } catch (syncError) {
-      console.log('Column sync skipped: ' + syncError.message);
-    }
-
-    // Ensure all primary sheets have enough columns for current header maps.
-    // This prevents "columns are out of bounds" errors when sheets were
-    // created by an older version with fewer columns.
-    try {
-      ensureAllSheetColumns_();
-    } catch (colError) {
-      console.log('Column check skipped: ' + colError.message);
-    }
-
-    // Apply tab colors automatically on open
-    try {
-      if (typeof applyTabColors_ === 'function') {
-        applyTabColors_(ss);
-      }
-    } catch (tabError) {
-      console.log('Tab colors not applied: ' + tabError.message);
-    }
-
-    // Enforce hidden sheets on every open (prevents mobile visibility)
-    try {
-      enforceHiddenSheets();
-    } catch (hideError) {
-      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
-    }
-
-    // Proactive Constant Contact token health check (non-blocking toast)
-    try {
-      checkConstantContactHealth();
-    } catch (ccError) {
-      console.log('CC health check skipped: ' + ccError.message);
-    }
-
-    // Show welcome toast
-    ss.toast(
-      'Dashboard loaded successfully',
-      '🏛️ Union Dashboard',
-      3
-    );
 
   } catch (error) {
     console.error('Error in onOpenDeferred_:', error);
@@ -143,6 +76,53 @@ function cleanUpOnOpenTrigger_() {
   } catch (e) {
     console.log('Trigger cleanup error: ' + e.message);
   }
+}
+
+/**
+ * Deferred onOpen tasks — runs heavy init after the UI is responsive.
+ * Called by a 1-second timed trigger created in onOpen().
+ * @private
+ */
+function onOpenDeferred_() {
+  try {
+    // Delete this one-shot trigger so it doesn't accumulate
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var t = 0; t < triggers.length; t++) {
+      if (triggers[t].getHandlerFunction() === 'onOpenDeferred_') {
+        ScriptApp.deleteTrigger(triggers[t]);
+      }
+    }
+  } catch (_e) { /* skip cleanup if unavailable */ }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    syncColumnMaps();
+  } catch (syncError) {
+    console.log('Column sync skipped: ' + syncError.message);
+  }
+
+  try {
+    ensureAllSheetColumns_();
+  } catch (colError) {
+    console.log('Column check skipped: ' + colError.message);
+  }
+
+  try {
+    if (typeof applyTabColors_ === 'function') {
+      applyTabColors_(ss);
+    }
+  } catch (tabError) {
+    console.log('Tab colors not applied: ' + tabError.message);
+  }
+
+  try {
+    enforceHiddenSheets();
+  } catch (hideError) {
+    console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+  }
+
+  ss.toast('Dashboard loaded successfully', '🏛️ Union Dashboard', 3);
 }
 
 /**
@@ -2190,6 +2170,12 @@ function showExportDialog() {
  * @returns {Object} Result with success message
  */
 function exportMemberDirectory(format) {
+  // F20-21: PII export requires steward authorization
+  var authResult = checkWebAppAuthorization('steward');
+  if (!authResult.isAuthorized) {
+    return errorResponse(authResult.message || 'Unauthorized: steward access required for export', 'exportMemberDirectory');
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 

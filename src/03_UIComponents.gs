@@ -159,6 +159,18 @@ function createDashboardMenu() {
       .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
       .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'))
 
+    .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('📊 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'archiveWorkloadData')
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
+      .addSeparator()
+      .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem')
+      .addItem('🔗 Show Portal URL', 'showWorkloadPortalUrl')
+      .addItem('📋 Save Portal Link', 'shareWorkloadPortalLink')
+      .addSeparator()
+      .addItem('⚙️ Initialize Sheets', 'initWorkloadTrackerSheets'))
+
     .addSubMenu(ui.createMenu('🔄 Maintenance')
       .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
       .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
@@ -504,7 +516,12 @@ function APPLY_SYSTEM_THEME() {
  * @returns {void}
  * @private
  */
-function applyThemeToSheet_(sheet, themeKey) {
+function clampFontSize_(size) {
+  var n = Number(size) || 10;
+  return Math.max(8, Math.min(24, n));
+}
+
+function applyThemeToSheet_(sheet) {
   var lastCol = sheet.getLastColumn();
   var lastRow = sheet.getLastRow();
 
@@ -520,7 +537,7 @@ function applyThemeToSheet_(sheet, themeKey) {
     .setFontColor(theme.headerText)
     .setFontWeight('bold')
     .setFontFamily(theme.font)
-    .setFontSize(theme.headerSize)
+    .setFontSize(clampFontSize_(theme.headerSize))
     .setHorizontalAlignment('center');
 
   // Apply data row styling
@@ -528,19 +545,15 @@ function applyThemeToSheet_(sheet, themeKey) {
     var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
     dataRange
       .setFontFamily(theme.font)
-      .setFontSize(theme.fontSize);
+      .setFontSize(clampFontSize_(theme.fontSize));
 
-    // Apply alternating row colors in a single batch call
-    var bgColors = [];
+    // F23b: Apply alternating row colors in single setBackgrounds call
+    var backgrounds = [];
     for (var row = 2; row <= lastRow; row++) {
-      var rowColors = [];
       var color = (row % 2 === 0) ? theme.altRow : '#ffffff';
-      for (var c = 0; c < lastCol; c++) {
-        rowColors.push(color);
-      }
-      bgColors.push(rowColors);
+      backgrounds.push(new Array(lastCol).fill(color));
     }
-    sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(bgColors);
+    dataRange.setBackgrounds(backgrounds);
   }
 }
 
@@ -869,17 +882,14 @@ function applyZebraStripes(sheet) {
 
   if (lastRow < 2 || lastCol < 1) return;
 
-  // Build 2D color array and apply in a single batch call
-  var bgColors = [];
+  // F23b: Build backgrounds array and apply in single setBackgrounds call
+  var backgrounds = [];
   for (var row = 2; row <= lastRow; row++) {
-    var rowColors = [];
     var color = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
-    for (var c = 0; c < lastCol; c++) {
-      rowColors.push(color);
-    }
-    bgColors.push(rowColors);
+    var rowColors = new Array(lastCol).fill(color);
+    backgrounds.push(rowColors);
   }
-  sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(bgColors);
+  sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(backgrounds);
 }
 
 /**

@@ -203,7 +203,9 @@ function showAuthSent(container, email, rememberMe) {
   wrapper.appendChild(el('div', { className: 'auth-title' }, 'Check your email'));
 
   var desc = el('div', { style: { fontSize: '13px', color: 'var(--muted)', marginTop: '8px', lineHeight: '1.6' } });
-  desc.innerHTML = 'We sent a <strong style="color:var(--text)">sign-in link</strong> (not a PIN) to<br><span style="color: var(--accent); font-weight: 600;">' + email + '</span>';
+  desc.appendChild(document.createTextNode('Sign-in link sent to'));
+  desc.appendChild(document.createElement('br'));
+  desc.appendChild(el('span', { style: { color: 'var(--accent)', fontWeight: '600' } }, email));
   wrapper.appendChild(desc);
 
   // Helpful tips
@@ -217,9 +219,14 @@ function showAuthSent(container, email, rememberMe) {
     className: 'card card-glass',
     style: { marginTop: '16px', fontSize: '12px', color: 'var(--muted)', lineHeight: '1.6', textAlign: 'center', maxWidth: '280px' }
   });
-  info.innerHTML = 'Link expires in <span style="color: var(--text); font-weight: 600;">' + CONFIG.magicLinkExpiryDays + ' days</span>.';
+  info.appendChild(document.createTextNode('Link expires in '));
+  info.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: '600' } }, CONFIG.magicLinkExpiryDays + ' days'));
+  info.appendChild(document.createTextNode('.'));
   if (rememberMe) {
-    info.innerHTML += '<br>You\'ll stay signed in for <span style="color: var(--text); font-weight: 600;">' + CONFIG.cookieDurationDays + ' days</span>.';
+    info.appendChild(document.createElement('br'));
+    info.appendChild(document.createTextNode("You'll stay signed in for "));
+    info.appendChild(el('span', { style: { color: 'var(--text)', fontWeight: '600' } }, CONFIG.cookieDurationDays + ' days'));
+    info.appendChild(document.createTextNode('.'));
   }
   wrapper.appendChild(info);
 

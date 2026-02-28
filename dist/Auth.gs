@@ -1,14 +1,14 @@
 /**
  * Auth.gs
  * Handles authentication for the web app dashboard.
- *
+ * 
  * Two auth paths:
  *   1. Google SSO — Session.getActiveUser().getEmail()
  *   2. Magic Link — email-based token sent via MailApp
- *
+ * 
  * Token storage: ScriptProperties (server-side)
  * Client persistence: localStorage token (acts as "cookie")
- *
+ * 
  * Flow:
  *   doGet() → Auth.resolveUser(e) → returns { email, method } or null
  *   If null → serve login page
@@ -16,11 +16,11 @@
  */
 
 var Auth = (function () {
-
+  
   var TOKEN_PREFIX = 'MAGIC_TOKEN_';
   var SESSION_PREFIX = 'SESSION_';
   var HMAC_SECRET_KEY = 'AUTH_HMAC_SECRET';
-
+  
   /**
    * Attempts to resolve the current user from available auth signals.
    * Priority: (1) session token in URL, (2) SSO, (3) magic link token in URL
@@ -29,7 +29,7 @@ var Auth = (function () {
    */
   function resolveUser(e) {
     var params = e ? e.parameter || {} : {};
-
+    
     // 1. Check for session token (returning user with "remember me")
     if (params.sessionToken) {
       var sessionEmail = _validateSessionToken(params.sessionToken);
@@ -37,17 +37,17 @@ var Auth = (function () {
         return { email: sessionEmail, method: 'session' };
       }
     }
-
+    
     // 2. Check Google SSO
     try {
       var ssoUser = Session.getActiveUser().getEmail();
       if (ssoUser && ssoUser !== '') {
         return { email: ssoUser.toLowerCase(), method: 'sso' };
       }
-    } catch (_err) {
+    } catch (err) {
       // SSO not available — continue
     }
-
+    
     // 3. Check magic link token in URL
     if (params.token) {
       var magicEmail = _validateMagicToken(params.token);
@@ -55,10 +55,10 @@ var Auth = (function () {
         return { email: magicEmail, method: 'magic' };
       }
     }
-
+    
     return null;
   }
-
+  
   /**
    * Generates a magic link and sends it to the given email.
    * Called from the client via google.script.run.
@@ -68,7 +68,7 @@ var Auth = (function () {
    */
   function sendMagicLink(email, rememberMe) {
     email = String(email).trim().toLowerCase();
-
+    
     // Validate email exists in directory
     var userRecord = DataService.findUserByEmail(email);
     if (!userRecord) {
@@ -76,32 +76,21 @@ var Auth = (function () {
       // But still return success to prevent enumeration
       return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
     }
-
+    
     var config = ConfigReader.getConfig();
     var token = _generateMagicToken(email);
     var webAppUrl = ScriptApp.getService().getUrl();
-
+    
     var linkParams = '?token=' + encodeURIComponent(token);
     if (rememberMe) {
       linkParams += '&remember=1';
     }
-
+    
     var signInUrl = webAppUrl + linkParams;
-
+    
     var subject = 'Sign in to ' + config.orgName + ' Dashboard';
     var htmlBody = _buildEmailHtml(config, signInUrl, email);
-
-    // Check remaining email quota before attempting to send
-    try {
-      var remaining = MailApp.getRemainingDailyQuota();
-      if (remaining <= 0) {
-        Logger.log('Auth: Daily email quota exhausted');
-        return { success: false, message: 'Email quota reached for today. Please use Google Sign-In or try again tomorrow.' };
-      }
-    } catch (_quotaErr) {
-      // If quota check fails, proceed with send attempt anyway
-    }
-
+    
     try {
       MailApp.sendEmail({
         to: email,
@@ -109,22 +98,14 @@ var Auth = (function () {
         htmlBody: htmlBody,
         noReply: true,
       });
-
+      
       return { success: true, message: 'Sign-in link sent to ' + email };
     } catch (err) {
-      Logger.log('Auth: Failed to send magic link to ' + email + ': ' + err.message);
-      var msg = 'Failed to send email. ';
-      if (err.message && err.message.indexOf('quota') >= 0) {
-        msg += 'Email quota exhausted. Please use Google Sign-In.';
-      } else if (err.message && err.message.indexOf('invalid') >= 0) {
-        msg += 'The email address may be invalid. Please check and try again.';
-      } else {
-        msg += 'Please try again or use Google Sign-In.';
-      }
-      return { success: false, message: msg };
+      Logger.log('Auth: Failed to send magic link: ' + err.message);
+      return { success: false, message: 'Failed to send email. Please try again or use Google Sign-In.' };
     }
   }
-
+  
   /**
    * Creates a session token for "remember me" functionality.
    * Called after successful auth if remember=1.
@@ -135,17 +116,17 @@ var Auth = (function () {
     var config = ConfigReader.getConfig();
     var token = _generateToken();
     var expiry = Date.now() + config.cookieDurationMs;
-
+    
     var props = PropertiesService.getScriptProperties();
     props.setProperty(SESSION_PREFIX + token, JSON.stringify({
       email: email.toLowerCase(),
       expiry: expiry,
       created: Date.now(),
     }));
-
+    
     return token;
   }
-
+  
   /**
    * Invalidates a session token (logout).
    * @param {string} token
@@ -155,7 +136,7 @@ var Auth = (function () {
     var props = PropertiesService.getScriptProperties();
     props.deleteProperty(SESSION_PREFIX + token);
   }
-
+  
   /**
    * Cleans up expired tokens from ScriptProperties.
    * Should be run periodically via a time-based trigger.
@@ -165,7 +146,7 @@ var Auth = (function () {
     var all = props.getProperties();
     var now = Date.now();
     var cleaned = 0;
-
+    
     for (var key in all) {
       if (key.indexOf(TOKEN_PREFIX) === 0 || key.indexOf(SESSION_PREFIX) === 0) {
         try {
@@ -174,27 +155,27 @@ var Auth = (function () {
             props.deleteProperty(key);
             cleaned++;
           }
-        } catch (_e) {
+        } catch (e) {
           // Malformed entry — delete it
           props.deleteProperty(key);
           cleaned++;
         }
       }
     }
-
+    
     Logger.log('Auth: Cleaned up ' + cleaned + ' expired tokens.');
     return cleaned;
   }
-
+  
   // ═══════════════════════════════════════
   // PRIVATE METHODS
   // ═══════════════════════════════════════
-
+  
   function _generateMagicToken(email) {
     var config = ConfigReader.getConfig();
     var token = _generateToken();
     var expiry = Date.now() + config.magicLinkExpiryMs;
-
+    
     var props = PropertiesService.getScriptProperties();
     props.setProperty(TOKEN_PREFIX + token, JSON.stringify({
       email: email.toLowerCase(),
@@ -202,64 +183,64 @@ var Auth = (function () {
       created: Date.now(),
       used: false,
     }));
-
+    
     return token;
   }
-
+  
   function _validateMagicToken(token) {
     var props = PropertiesService.getScriptProperties();
     var raw = props.getProperty(TOKEN_PREFIX + token);
-
+    
     if (!raw) return null;
-
+    
     try {
       var data = JSON.parse(raw);
-
+      
       // Check expiry
       if (data.expiry < Date.now()) {
         props.deleteProperty(TOKEN_PREFIX + token);
         return null;
       }
-
+      
       // Mark as used (one-time use)
       data.used = true;
       props.setProperty(TOKEN_PREFIX + token, JSON.stringify(data));
-
+      
       // Delete after short delay to prevent replay but allow page load
       // Token will be cleaned up by cleanupExpiredTokens()
-
+      
       return data.email;
-    } catch (_e) {
+    } catch (e) {
       return null;
     }
   }
-
+  
   function _validateSessionToken(token) {
     var props = PropertiesService.getScriptProperties();
     var raw = props.getProperty(SESSION_PREFIX + token);
-
+    
     if (!raw) return null;
-
+    
     try {
       var data = JSON.parse(raw);
-
+      
       if (data.expiry < Date.now()) {
         props.deleteProperty(SESSION_PREFIX + token);
         return null;
       }
-
+      
       return data.email;
-    } catch (_e) {
+    } catch (e) {
       return null;
     }
   }
-
+  
   function _generateToken() {
     // Generate a random token using Utilities
     var bytes = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
     return Utilities.base64EncodeWebSafe(bytes).replace(/[=]+$/, '');
   }
-
+  
   function _getHmacSecret() {
     var props = PropertiesService.getScriptProperties();
     var secret = props.getProperty(HMAC_SECRET_KEY);
@@ -269,12 +250,12 @@ var Auth = (function () {
     }
     return secret;
   }
-
+  
   function _buildEmailHtml(config, signInUrl, email) {
     // Dynamic accent color from config
     var hue = config.accentHue || 250;
     var accent = 'hsl(' + hue + ', 70%, 55%)';
-    var _accentLight = 'hsl(' + hue + ', 70%, 95%)';
+    var accentLight = 'hsl(' + hue + ', 70%, 95%)';
     
     return '<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin:0; padding:40px 20px; background:#f5f5f5;">'
       + '<div style="max-width:480px; margin:0 auto; background:#fff; border-radius:16px; padding:40px 32px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
@@ -294,7 +275,7 @@ var Auth = (function () {
       + '<p style="color:#bbb; font-size:11px; text-align:center;">' + config.orgName + ' Grievance Dashboard</p>'
       + '</div></body></html>';
   }
-
+  
   // Public API
   return {
     resolveUser: resolveUser,
@@ -303,7 +284,7 @@ var Auth = (function () {
     invalidateSession: invalidateSession,
     cleanupExpiredTokens: cleanupExpiredTokens,
   };
-
+  
 })();
 
 
@@ -331,22 +312,4 @@ function authCreateSessionToken(email) {
 function authLogout(sessionToken) {
   Auth.invalidateSession(sessionToken);
   return { success: true };
-}
-
-/**
- * Script-editor verification: checks SSO, ScriptProperties, and Config tab.
- * Run from the Apps Script editor to confirm the auth module is ready.
- */
-function initWebDashboardAuth() {
-  var email = Session.getActiveUser().getEmail();
-  Logger.log('SSO email: ' + (email || '(not available — deploy as web app to test SSO)'));
-
-  var props = PropertiesService.getScriptProperties();
-  Logger.log('ScriptProperties accessible: ' + (props !== null));
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var configSheet = ss.getSheetByName(SHEETS.CONFIG);
-  Logger.log('Config tab found: ' + (configSheet !== null));
-
-  Logger.log('Auth module ready.');
 }

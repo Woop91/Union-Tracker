@@ -16,6 +16,27 @@
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
+/**
+ * Validates a self-service input field using isValidSafeString and length checks.
+ * @param {string} field - Field name for error messages
+ * @param {*} value - Value to validate
+ * @param {number} [maxLength=500] - Maximum allowed length
+ * @returns {{ valid: boolean, error?: string }}
+ * @private
+ */
+function validateSelfServiceInput_(field, value, maxLength) {
+  maxLength = maxLength || 500;
+  if (value === null || value === undefined || value === '') return { valid: true };
+  var str = String(value);
+  if (str.length > maxLength) {
+    return { valid: false, error: field + ' exceeds maximum length (' + maxLength + ')' };
+  }
+  if (typeof isValidSafeString === 'function' && !isValidSafeString(str, maxLength)) {
+    return { valid: false, error: field + ' contains disallowed content' };
+  }
+  return { valid: true };
+}
+
 // ============================================================================
 // PIN SYSTEM CONSTANTS
 // ============================================================================
@@ -1146,10 +1167,10 @@ function updateMemberContact(sessionToken, updates) {
     if (allowedFields.indexOf(field) >= 0 && fieldMapping[field]) {
       var value = String(updates[field] || '').trim();
 
-      // Validate safe string (reject injection patterns and enforce max length)
-      var maxLen = fieldMaxLengths[field] || 100;
-      if (typeof isValidSafeString === 'function' && value && !isValidSafeString(value, maxLen)) {
-        return errorResponse('Invalid value for ' + field + ': contains disallowed characters or exceeds max length.');
+      // F58: Validate input using isValidSafeString
+      var inputCheck = validateSelfServiceInput_(field, value, 200);
+      if (!inputCheck.valid) {
+        return errorResponse(inputCheck.error);
       }
 
       // Basic validation
@@ -1295,7 +1316,7 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
     memberId = session.memberId;
   }
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) return { success: true, history: [] };
 

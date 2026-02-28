@@ -25,9 +25,14 @@
  * @returns {string} The generated Member ID
  */
 function addMember(memberData) {
-  return withScriptLock_(function() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var lock = LockService.getScriptLock();
+  try {
+    if (!lock.tryLock(10000)) {
+      throw new Error('Could not acquire lock for addMember — another operation in progress');
+    }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!sheet) {
       throw new Error('Member Directory sheet not found');
@@ -40,30 +45,24 @@ function addMember(memberData) {
     var lastRow = sheet.getLastRow();
     var newRow = lastRow + 1;
 
-    // Build row array and batch-write all fields in a single setValues() call (F15 perf fix)
-    // Determine the highest column index used so the array covers all positions
-    var maxCol = Math.max(
-      MEMBER_COLS.MEMBER_ID, MEMBER_COLS.FIRST_NAME, MEMBER_COLS.LAST_NAME,
-      MEMBER_COLS.EMAIL, MEMBER_COLS.PHONE, MEMBER_COLS.JOB_TITLE,
-      MEMBER_COLS.WORK_LOCATION, MEMBER_COLS.UNIT
-    );
-    var rowData = [];
-    for (var c = 0; c < maxCol; c++) { rowData[c] = ''; }
+  // Build row array and write with single setValues call (F1: batch write)
+  var totalCols = sheet.getLastColumn() || Object.keys(MEMBER_COLS).length;
+  var rowData = new Array(totalCols).fill('');
+  rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
+  rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
+  rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
+  rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
+  rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
+  rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
+  rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
+  rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+  sheet.getRange(newRow, 1, 1, totalCols).setValues([rowData]);
 
-    // Place values at correct 0-indexed positions (MEMBER_COLS are 1-indexed)
-    rowData[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
-    rowData[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(memberData.firstName || '');
-    rowData[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(memberData.lastName || '');
-    rowData[MEMBER_COLS.EMAIL - 1] = escapeForFormula(memberData.email || '');
-    rowData[MEMBER_COLS.PHONE - 1] = escapeForFormula(memberData.phone || '');
-    rowData[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(memberData.jobTitle || '');
-    rowData[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(memberData.workLocation || '');
-    rowData[MEMBER_COLS.UNIT - 1] = escapeForFormula(memberData.unit || '');
+  return memberId;
 
-    sheet.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
-
-    return memberId;
-  });
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -72,9 +71,14 @@ function addMember(memberData) {
  * @param {Object} updateData - Fields to update
  */
 function updateMember(memberId, updateData) {
-  return withScriptLock_(function() {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  var lock = LockService.getScriptLock();
+  try {
+    if (!lock.tryLock(10000)) {
+      throw new Error('Could not acquire lock for updateMember — another operation in progress');
+    }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
     if (!sheet) {
       throw new Error('Member Directory sheet not found');
@@ -84,26 +88,24 @@ function updateMember(memberId, updateData) {
     var data = sheet.getDataRange().getValues();
     var memberRow = -1;
 
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
-        memberRow = i + 1;
-        break;
-      }
-    }
+  // Read current row, modify requested fields, write back in single setValues call (F1: batch write)
+  var totalCols = sheet.getLastColumn();
+  var currentRow = sheet.getRange(memberRow, 1, 1, totalCols).getValues()[0];
 
-    if (memberRow === -1) {
-      throw new Error('Member not found: ' + memberId);
-    }
+  // F11-12: Use !== undefined instead of truthiness to allow clearing fields with empty strings
+  if (updateData.firstName !== undefined) currentRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(updateData.firstName);
+  if (updateData.lastName !== undefined) currentRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(updateData.lastName);
+  if (updateData.email !== undefined) currentRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(updateData.email);
+  if (updateData.phone !== undefined) currentRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(updateData.phone);
+  if (updateData.jobTitle !== undefined) currentRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(updateData.jobTitle);
+  if (updateData.workLocation !== undefined) currentRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(updateData.workLocation);
+  if (updateData.unit !== undefined) currentRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(updateData.unit);
 
-    // Update fields — use !== undefined so legitimate empty-string updates are not skipped (F16 fix)
-    if (updateData.firstName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.FIRST_NAME).setValue(escapeForFormula(updateData.firstName));
-    if (updateData.lastName !== undefined) sheet.getRange(memberRow, MEMBER_COLS.LAST_NAME).setValue(escapeForFormula(updateData.lastName));
-    if (updateData.email !== undefined) sheet.getRange(memberRow, MEMBER_COLS.EMAIL).setValue(escapeForFormula(updateData.email));
-    if (updateData.phone !== undefined) sheet.getRange(memberRow, MEMBER_COLS.PHONE).setValue(escapeForFormula(updateData.phone));
-    if (updateData.jobTitle !== undefined) sheet.getRange(memberRow, MEMBER_COLS.JOB_TITLE).setValue(escapeForFormula(updateData.jobTitle));
-    if (updateData.workLocation !== undefined) sheet.getRange(memberRow, MEMBER_COLS.WORK_LOCATION).setValue(escapeForFormula(updateData.workLocation));
-    if (updateData.unit !== undefined) sheet.getRange(memberRow, MEMBER_COLS.UNIT).setValue(escapeForFormula(updateData.unit));
-  });
+  sheet.getRange(memberRow, 1, 1, totalCols).setValues([currentRow]);
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /**
@@ -138,6 +140,8 @@ function getMemberById(memberId) {
  * @param {string} query - Search query
  * @returns {Array} Array of matching member objects
  */
+var MAX_SEARCH_RESULTS = 200;
+
 function searchMembers(query) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
@@ -150,6 +154,8 @@ function searchMembers(query) {
   var queryLower = query.toLowerCase();
 
   for (var i = 1; i < data.length; i++) {
+    if (results.length >= MAX_SEARCH_RESULTS) break;
+
     var row = data[i];
     var firstName = String(row[MEMBER_COLS.FIRST_NAME - 1] || '').toLowerCase();
     var lastName = String(row[MEMBER_COLS.LAST_NAME - 1] || '').toLowerCase();
@@ -333,7 +339,7 @@ function syncMemberGrievanceData() {
   // Update member rows (if grievance count columns exist)
   if (MEMBER_COLS.TOTAL_GRIEVANCES && MEMBER_COLS.ACTIVE_GRIEVANCES) {
     for (var j = 1; j < members.length; j++) {
-      var memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
+      memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
       var counts = grievanceCounts[memberId] || { total: 0, active: 0 };
       memberSheet.getRange(j + 1, MEMBER_COLS.TOTAL_GRIEVANCES).setValue(counts.total);
       memberSheet.getRange(j + 1, MEMBER_COLS.ACTIVE_GRIEVANCES).setValue(counts.active);
@@ -831,7 +837,7 @@ function syncStewardStatus() {
   }
 
   // If IS_STEWARD != Yes but name IS in Config, remove from Config
-  for (var name in configNameSet) {
+  for (name in configNameSet) {
     if (memberMap[name] && !memberMap[name].isSteward) {
       configSheet.getRange(configNameSet[name], CONFIG_COLS.STEWARDS).clearContent();
       changes++;
@@ -1269,112 +1275,105 @@ function getImportMembersHtml_() {
  * @returns {Object} Result with imported count and any errors
  */
 function importMembersFromData(data, mapping) {
-  var caller = Session.getEffectiveUser().getEmail();
-  if (!caller) {
-    Logger.log('Unauthorized import attempt');
-    return { success: false, message: 'Not authorized' };
-  }
-  return withScriptLock_(function() {
-    try {
-      var ss = SpreadsheetApp.getActiveSpreadsheet();
-      var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
 
-      if (!sheet) {
-        return errorResponse('Member Directory sheet not found', 'bulkImportMembers');
-      }
-
-      // Get existing data for duplicate checking
-      var existingData = sheet.getDataRange().getValues();
-      var existingEmails = {};
-      var existingNames = {};
-
-      for (var i = 1; i < existingData.length; i++) {
-        var email = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
-        var name = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
-        if (email) existingEmails[email] = true;
-        if (name) existingNames[name] = true;
-      }
-
-      var imported = 0;
-      var skipped = 0;
-      var newRows = [];
-
-      for (var j = 0; j < data.length; j++) {
-        var row = data[j];
-
-        var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
-        var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
-        var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
-
-        // Skip if no name
-        if (!firstName && !lastName) {
-          skipped++;
-          continue;
-        }
-
-        // Check for duplicates
-        var emailLower = email.toLowerCase();
-        var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
-
-        if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
-          skipped++;
-          continue;
-        }
-
-        // Mark as existing to prevent duplicates within import batch
-        if (emailLower) existingEmails[emailLower] = true;
-        existingNames[nameLower] = true;
-
-        // Generate Member ID
-        var memberId = generateMemberID_(firstName, lastName);
-
-        // Build new row with empty values for all columns
-        var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
-        newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-        newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
-        newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
-
-        if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
-        if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
-        if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
-        if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
-        if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
-        if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
-        if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
-
-        // Default Is Steward to No
-        newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
-
-        newRows.push(newRow);
-        imported++;
-      }
-
-      // Batch write all new rows
-      if (newRows.length > 0) {
-        var lastRow = sheet.getLastRow();
-        sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
-      }
-
-      // Log the import
-      logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
-        action: 'BULK_IMPORT',
-        importedCount: imported,
-        skippedCount: skipped,
-        importedBy: caller
-      });
-
-      return {
-        success: true,
-        imported: imported,
-        skipped: skipped,
-        message: 'Import completed'
-      };
-
-    } catch (e) {
-      console.error('Import error: ' + e.message);
-      return errorResponse(e.message, 'bulkImportMembers');
+    if (!sheet) {
+      return errorResponse('Member Directory sheet not found', 'bulkImportMembers');
     }
-  });
+
+    // Get existing data for duplicate checking
+    var existingData = sheet.getDataRange().getValues();
+    var existingEmails = {};
+    var existingNames = {};
+
+    for (var i = 1; i < existingData.length; i++) {
+      var email = (existingData[i][MEMBER_COLS.EMAIL - 1] || '').toString().toLowerCase().trim();
+      var name = ((existingData[i][MEMBER_COLS.FIRST_NAME - 1] || '') + ' ' + (existingData[i][MEMBER_COLS.LAST_NAME - 1] || '')).toLowerCase().trim();
+      if (email) existingEmails[email] = true;
+      if (name) existingNames[name] = true;
+    }
+
+    var imported = 0;
+    var skipped = 0;
+    var newRows = [];
+
+    for (var j = 0; j < data.length; j++) {
+      var row = data[j];
+
+      var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
+      var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
+      email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+
+      // Skip if no name
+      if (!firstName && !lastName) {
+        skipped++;
+        continue;
+      }
+
+      // Check for duplicates
+      var emailLower = email.toLowerCase();
+      var nameLower = (firstName + ' ' + lastName).toLowerCase().trim();
+
+      if ((emailLower && existingEmails[emailLower]) || existingNames[nameLower]) {
+        skipped++;
+        continue;
+      }
+
+      // Mark as existing to prevent duplicates within import batch
+      if (emailLower) existingEmails[emailLower] = true;
+      existingNames[nameLower] = true;
+
+      // Generate Member ID
+      var memberId = generateMemberID_(firstName, lastName);
+
+      // Build new row with empty values for all columns
+      var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
+      newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
+      newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+
+      if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
+      if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
+      if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
+      if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
+      if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
+      if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
+      if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
+
+      // Default Is Steward to No
+      newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
+
+      newRows.push(newRow);
+      imported++;
+    }
+
+    // Batch write all new rows
+    if (newRows.length > 0) {
+      var lastRow = sheet.getLastRow();
+      sheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+    }
+
+    // Log the import
+    logAuditEvent(AUDIT_EVENTS.MEMBER_ADDED, {
+      action: 'BULK_IMPORT',
+      importedCount: imported,
+      skippedCount: skipped,
+      importedBy: Session.getActiveUser().getEmail()
+    });
+
+    return {
+      success: true,
+      imported: imported,
+      skipped: skipped,
+      message: 'Import completed'
+    };
+
+  } catch (e) {
+    console.error('Import error: ' + e.message);
+    return errorResponse(e.message, 'bulkImportMembers');
+  }
 }
 
 /**
@@ -1586,7 +1585,12 @@ function showExportMembersDialog() {
  * @return {Object} Result with grievance ID or error
  */
 function startNewGrievance(grievanceData) {
+  var lock = LockService.getScriptLock();
   try {
+    if (!lock.tryLock(10000)) {
+      return errorResponse('Could not acquire lock — another operation in progress', 'createGrievance');
+    }
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
 
@@ -1642,6 +1646,8 @@ function startNewGrievance(grievanceData) {
   } catch (error) {
     console.error('Error creating grievance:', error);
     return errorResponse(error.message, 'createGrievance');
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1895,7 +1901,12 @@ function getDaysUntilDeadline(deadline) {
  * @return {Object} Result object
  */
 function advanceGrievanceStep(grievanceId, options) {
+  var lock = LockService.getScriptLock();
   try {
+    if (!lock.tryLock(10000)) {
+      return errorResponse('Could not acquire lock — another operation in progress', 'advanceGrievanceStep');
+    }
+
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
     const data = sheet.getDataRange().getValues();
@@ -1933,12 +1944,19 @@ function advanceGrievanceStep(grievanceId, options) {
     updates.push({ col: GRIEVANCE_COLS.LAST_UPDATED, val: today });
 
     if (nextStep <= 3) {
-      const stepCols = getStepColumnSet(nextStep);
-      updates.push({ col: stepCols.filed, val: today });
-      updates.push({ col: stepCols.due, val: responseDue });
-      if (stepCols.rcvd) {
-        updates.push({ col: stepCols.rcvd, val: 'Pending' });
+      // F137: Use explicit column map instead of +1/+2 arithmetic.
+      // The old code wrote responseDue to DATE_CLOSED and 'Pending' to DAYS_OPEN for Step 3.
+      // TODO(human): Verify this column map matches your sheet layout
+      var ADVANCE_STEP_COLS_ = {
+        2: { date: GRIEVANCE_COLS.STEP2_APPEAL_FILED, due: GRIEVANCE_COLS.STEP2_DUE },
+        3: { date: GRIEVANCE_COLS.STEP3_APPEAL_FILED, due: GRIEVANCE_COLS.STEP3_APPEAL_DUE }
+      };
+      var stepCols = ADVANCE_STEP_COLS_[nextStep];
+      if (stepCols) {
+        updates.push({ col: stepCols.date, val: today });
+        updates.push({ col: stepCols.due, val: responseDue });
       }
+      // Removed erroneous 'Pending' write — STATUS is already set above
     } else {
       updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
@@ -1975,6 +1993,8 @@ function advanceGrievanceStep(grievanceId, options) {
   } catch (error) {
     console.error('Error advancing grievance:', error);
     return errorResponse(error.message, 'advanceGrievanceStep');
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -2101,6 +2121,12 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
     return errorResponse(authResult.message || 'Unauthorized: steward access required', 'bulkUpdateGrievanceStatus');
   }
 
+  var lock = LockService.getScriptLock();
+  try {
+    if (!lock.tryLock(10000)) {
+      return errorResponse('Could not acquire lock — another operation in progress', 'bulkUpdateGrievanceStatus');
+    }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
   ensureMinimumColumns(sheet, getGrievanceHeaders().length);
@@ -2137,6 +2163,10 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
     updatedCount: updatedCount,
     message: `Updated status for ${updatedCount} grievances`
   };
+
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ============================================================================
