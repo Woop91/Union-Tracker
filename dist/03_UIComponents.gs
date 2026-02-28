@@ -89,6 +89,9 @@ function createDashboardMenu() {
     .addItem('📖 Help & Documentation', 'showHelpDialog')
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('📋 Open Workload Portal', 'showWorkloadPortalUrl')
+      .addItem('🔗 Save Portal Link', 'shareWorkloadPortalLink')
+      .addSeparator()
       .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
       .addItem('💾 Create Backup', 'createWorkloadBackup')
       .addItem('🗄️ Archive Old Data', 'wtArchiveOldData_')
@@ -101,7 +104,7 @@ function createDashboardMenu() {
   // ============================================================================
   // MENU 2: Tools - Supporting Features
   // ============================================================================
-  ui.createMenu('🔧 Tools')
+  var toolsMenu_ = ui.createMenu('🔧 Tools')
     .addSubMenu(ui.createMenu('📧 Communication')
       .addItem('📧 Send Contact Form', 'sendContactInfoForm')
       .addItem('📊 Send Satisfaction Survey', 'getSatisfactionSurveyLink')
@@ -154,13 +157,27 @@ function createDashboardMenu() {
       .addSeparator()
       .addItem('🔑 Generate Member PIN', 'showGeneratePINDialog')
       .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
-      .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'))
+      .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'));
 
-    .addSubMenu(ui.createMenu('🔄 Maintenance')
-      .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
-      .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
-      .addItem('🔄 Refresh View', 'refreshMemberView'))
+  // Workload Tracker submenu — DDS-only module (typeof guard for UT)
+  if (typeof initWorkloadTrackerSheets === 'function') {
+    toolsMenu_.addSubMenu(ui.createMenu('📊 Workload Tracker')
+      .addItem('📊 Refresh Ledger', 'refreshWorkloadLedger')
+      .addItem('💾 Create Backup', 'createWorkloadBackup')
+      .addItem('🗄️ Archive Old Data', 'archiveWorkloadData')
+      .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
+      .addSeparator()
+      .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem')
+      .addItem('🔗 Show Portal URL', 'showWorkloadPortalUrl')
+      .addItem('📋 Save Portal Link', 'shareWorkloadPortalLink')
+      .addSeparator()
+      .addItem('⚙️ Initialize Sheets', 'initWorkloadTrackerSheets'));
+  }
 
+  toolsMenu_.addSubMenu(ui.createMenu('🔄 Maintenance')
+    .addItem('🔄 Refresh All Formulas', 'refreshAllFormulas')
+    .addItem('🔄 Refresh Member Data', 'refreshMemberDirectoryFormulas')
+    .addItem('🔄 Refresh View', 'refreshMemberView'))
     .addToUi();
 
   // ============================================================================
@@ -501,7 +518,12 @@ function APPLY_SYSTEM_THEME() {
  * @returns {void}
  * @private
  */
-function applyThemeToSheet_(sheet, themeKey) {
+function clampFontSize_(size) {
+  var n = Number(size) || 10;
+  return Math.max(8, Math.min(24, n));
+}
+
+function applyThemeToSheet_(sheet) {
   var lastCol = sheet.getLastColumn();
   var lastRow = sheet.getLastRow();
 
@@ -517,7 +539,7 @@ function applyThemeToSheet_(sheet, themeKey) {
     .setFontColor(theme.headerText)
     .setFontWeight('bold')
     .setFontFamily(theme.font)
-    .setFontSize(theme.headerSize)
+    .setFontSize(clampFontSize_(theme.headerSize))
     .setHorizontalAlignment('center');
 
   // Apply data row styling
@@ -525,19 +547,15 @@ function applyThemeToSheet_(sheet, themeKey) {
     var dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
     dataRange
       .setFontFamily(theme.font)
-      .setFontSize(theme.fontSize);
+      .setFontSize(clampFontSize_(theme.fontSize));
 
-    // Apply alternating row colors in a single batch call
-    var bgColors = [];
+    // F23b: Apply alternating row colors in single setBackgrounds call
+    var backgrounds = [];
     for (var row = 2; row <= lastRow; row++) {
-      var rowColors = [];
       var color = (row % 2 === 0) ? theme.altRow : '#ffffff';
-      for (var c = 0; c < lastCol; c++) {
-        rowColors.push(color);
-      }
-      bgColors.push(rowColors);
+      backgrounds.push(new Array(lastCol).fill(color));
     }
-    sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(bgColors);
+    dataRange.setBackgrounds(backgrounds);
   }
 }
 
@@ -866,17 +884,14 @@ function applyZebraStripes(sheet) {
 
   if (lastRow < 2 || lastCol < 1) return;
 
-  // Build 2D color array and apply in a single batch call
-  var bgColors = [];
+  // F23b: Build backgrounds array and apply in single setBackgrounds call
+  var backgrounds = [];
   for (var row = 2; row <= lastRow; row++) {
-    var rowColors = [];
     var color = (row % 2 === 0) ? '#f1f5f9' : '#ffffff';
-    for (var c = 0; c < lastCol; c++) {
-      rowColors.push(color);
-    }
-    bgColors.push(rowColors);
+    var rowColors = new Array(lastCol).fill(color);
+    backgrounds.push(rowColors);
   }
-  sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(bgColors);
+  sheet.getRange(2, 1, lastRow - 1, lastCol).setBackgrounds(backgrounds);
 }
 
 /**
@@ -1264,15 +1279,14 @@ function getRecentGrievancesForMobile(limit) {
   }).slice(0, limit);
 }
 
-// TODO: Add pagination for large result sets (future enhancement)
 // ============================================================================
-// MOBILE GRIEVANCE LIST
+// MOBILE GRIEVANCE LIST (with client-side pagination)
 // ============================================================================
 
 /**
  * Shows mobile-optimized grievance list interface
  * Features:
- * - Card-based layout
+ * - Card-based layout with pagination (20 per page)
  * - Status filters
  * - Search functionality
  * - Responsive grid
@@ -1297,13 +1311,18 @@ function showMobileGrievanceList() {
     '.card-id{font-weight:bold;color:#1a73e8;font-size:clamp(14px,3vw,16px)}' +
     '.card-status{padding:4px 10px;border-radius:12px;font-size:clamp(10px,2vw,12px);font-weight:bold;background:#e8f0fe}' +
     '.card-row{font-size:clamp(12px,2.5vw,14px);margin:5px 0;color:#666}' +
+    '.pagination{display:flex;justify-content:center;align-items:center;gap:12px;padding:16px;background:white;border-top:1px solid #e0e0e0;position:sticky;bottom:0}' +
+    '.pg-btn{padding:10px 20px;border-radius:8px;border:1px solid #1a73e8;color:#1a73e8;background:white;font-size:14px;cursor:pointer;min-height:44px}' +
+    '.pg-btn:disabled{opacity:.4;cursor:default}' +
+    '.pg-info{font-size:13px;color:#666}' +
     '@media (min-width:768px){.list{grid-template-columns:repeat(2,1fr)}}' +
     '@media (min-width:1024px){.list{grid-template-columns:repeat(3,1fr)}}' +
     '</style></head><body>' +
     '<div class="header"><h2>📋 Grievances</h2><input type="text" class="search" placeholder="Search..." oninput="filter(this.value)"></div>' +
     '<div class="filters"><button class="filter active" onclick="filterStatus(\'all\',this)">All</button><button class="filter" onclick="filterStatus(\'Open\',this)">Open</button><button class="filter" onclick="filterStatus(\'Pending Info\',this)">Pending</button><button class="filter" onclick="filterStatus(\'Resolved\',this)">Resolved</button></div>' +
     '<div class="list" id="list"><div style="text-align:center;padding:40px;color:#666;grid-column:1/-1">Loading...</div></div>' +
-    '<script>' + getClientSideEscapeHtml() + 'var all=[];google.script.run.withSuccessHandler(function(data){all=data;render(data)}).getRecentGrievancesForMobile(100);function render(data){var c=document.getElementById("list");if(!data||data.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";return}c.innerHTML=data.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+escapeHtml(g.id)+"</div><div class=\'card-status\'>"+escapeHtml(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class=\'card-row\'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("")}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");render(s==="all"?all:all.filter(function(g){return g.status===s}))}function filter(q){render(all.filter(function(g){q=q.toLowerCase();return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0}))}</script></body></html>'
+    '<div class="pagination" id="pager" style="display:none"><button class="pg-btn" id="prevBtn" onclick="changePage(-1)">Prev</button><span class="pg-info" id="pgInfo"></span><button class="pg-btn" id="nextBtn" onclick="changePage(1)">Next</button></div>' +
+    '<script>' + getClientSideEscapeHtml() + 'var all=[],filtered=[],PAGE_SIZE=20,curPage=0;google.script.run.withSuccessHandler(function(data){all=data;filtered=data;curPage=0;renderPage()}).getRecentGrievancesForMobile(500);function renderPage(){var c=document.getElementById("list");var pg=document.getElementById("pager");if(!filtered||filtered.length===0){c.innerHTML="<div style=\'text-align:center;padding:40px;color:#999;grid-column:1/-1\'>No grievances</div>";pg.style.display="none";return}var totalPages=Math.ceil(filtered.length/PAGE_SIZE);if(curPage>=totalPages)curPage=totalPages-1;if(curPage<0)curPage=0;var start=curPage*PAGE_SIZE;var page=filtered.slice(start,start+PAGE_SIZE);c.innerHTML=page.map(function(g){return"<div class=\'card\'><div class=\'card-header\'><div class=\'card-id\'>#"+escapeHtml(g.id)+"</div><div class=\'card-status\'>"+escapeHtml(g.status||"Filed")+"</div></div><div class=\'card-row\'><strong>Member:</strong> "+escapeHtml(g.memberName)+"</div><div class=\'card-row\'><strong>Issue:</strong> "+escapeHtml(g.issueType||"N/A")+"</div><div class=\'card-row\'><strong>Filed:</strong> "+escapeHtml(g.filedDate)+"</div></div>"}).join("");if(filtered.length>PAGE_SIZE){pg.style.display="flex";document.getElementById("prevBtn").disabled=curPage===0;document.getElementById("nextBtn").disabled=curPage>=totalPages-1;document.getElementById("pgInfo").textContent="Page "+(curPage+1)+" of "+totalPages+" ("+filtered.length+" results)"}else{pg.style.display="none"}}function changePage(dir){curPage+=dir;renderPage();document.getElementById("list").scrollIntoView({behavior:"smooth"})}function filterStatus(s,btn){document.querySelectorAll(".filter").forEach(function(f){f.classList.remove("active")});btn.classList.add("active");filtered=s==="all"?all:all.filter(function(g){return g.status===s});curPage=0;renderPage()}function filter(q){q=q.toLowerCase();filtered=all.filter(function(g){return g.id.toLowerCase().indexOf(q)>=0||g.memberName.toLowerCase().indexOf(q)>=0||(g.issueType||"").toLowerCase().indexOf(q)>=0});curPage=0;renderPage()}</script></body></html>'
   ).setWidth(800).setHeight(700);
   SpreadsheetApp.getUi().showModalDialog(html, '📋 Grievance List');
 }

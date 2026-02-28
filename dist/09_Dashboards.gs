@@ -1033,8 +1033,8 @@ function getSatisfactionTrendData(period) {
   try {
     var prioritiesData = sheet.getRange(2, SATISFACTION_COLS.Q64_TOP_PRIORITIES, numRows, 1).getValues();
     var issueMap = {};
-    for (var i = 0; i < numRows; i++) {
-      var ts = timestamps[i][0];
+    for (i = 0; i < numRows; i++) {
+      ts = timestamps[i][0];
       if (!(ts instanceof Date)) continue;
       if (cutoff && ts < cutoff) continue;
 
@@ -1254,7 +1254,7 @@ function getSatisfactionAnalyticsData() {
 
   // By Worksite analysis
   var worksiteMap = {};
-  for (var i = 0; i < numRows; i++) {
+  for (i = 0; i < numRows; i++) {
     var ws = worksiteData[i][0] || 'Unknown';
     if (!worksiteMap[ws]) worksiteMap[ws] = { sum: 0, count: 0 };
     if (scores[i] > 0) {
@@ -1263,7 +1263,7 @@ function getSatisfactionAnalyticsData() {
     }
   }
 
-  for (var ws in worksiteMap) {
+  for (ws in worksiteMap) {
     if (worksiteMap[ws].count > 0) {
       result.byWorksite.push({
         name: ws,
@@ -1276,7 +1276,7 @@ function getSatisfactionAnalyticsData() {
 
   // By Role analysis
   var roleMap = {};
-  for (var i = 0; i < numRows; i++) {
+  for (i = 0; i < numRows; i++) {
     var role = roleData[i][0] || 'Unknown';
     if (!roleMap[role]) roleMap[role] = { sum: 0, count: 0 };
     if (scores[i] > 0) {
@@ -1285,7 +1285,7 @@ function getSatisfactionAnalyticsData() {
     }
   }
 
-  for (var role in roleMap) {
+  for (role in roleMap) {
     if (roleMap[role].count > 0) {
       result.byRole.push({
         name: role,
@@ -1300,7 +1300,7 @@ function getSatisfactionAnalyticsData() {
   var withContactSum = 0, withContactCount = 0;
   var withoutContactSum = 0, withoutContactCount = 0;
 
-  for (var i = 0; i < numRows; i++) {
+  for (i = 0; i < numRows; i++) {
     var contact = String(stewardContactData[i][0]).toLowerCase();
     if (scores[i] > 0) {
       if (contact === 'yes') {
@@ -1324,7 +1324,7 @@ function getSatisfactionAnalyticsData() {
 
   // Top priorities analysis
   var priorityMap = {};
-  for (var i = 0; i < numRows; i++) {
+  for (i = 0; i < numRows; i++) {
     var priorities = String(prioritiesData[i][0] || '');
     if (priorities) {
       // Split by comma and count each priority
@@ -1735,7 +1735,8 @@ function syncGrievanceToMemberDirectory() {
   var grievanceData = grievanceSheet.getDataRange().getValues();
   if (grievanceData.length < 2) return;
 
-  // Closed statuses - grievances with these statuses don't count as "open"
+  // M-26: Closed statuses - grievances with these statuses don't count as "open"
+  // TODO: Centralize to 01_Core.gs as GRIEVANCE_STATUS.CLOSED_STATUSES to avoid duplication
   var closedStatuses = ['Closed', 'Settled', 'Withdrawn', 'Denied', 'Won'];
 
   // Build lookup map: memberId -> {hasOpen, status, deadline}
@@ -1803,7 +1804,7 @@ function syncGrievanceToMemberDirectory() {
   // Update columns AB-AD (Has Open Grievance?, Grievance Status, Days to Deadline)
   var updates = [];
   for (var j = 1; j < memberData.length; j++) {
-    var memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
+    memberId = memberData[j][MEMBER_COLS.MEMBER_ID - 1];
     var memberInfo = lookup[memberId] || {hasOpen: 'No', status: '', deadline: ''};
     updates.push([memberInfo.hasOpen, memberInfo.status, memberInfo.deadline]);
   }
@@ -1854,7 +1855,8 @@ function syncGrievanceFormulasToLog() {
   var today = new Date();
   today.setHours(0, 0, 0, 0); // Normalize to start of day
 
-  // Closed statuses that should not have Next Action Due
+  // M-26: Closed statuses that should not have Next Action Due
+  // TODO: Centralize to 01_Core.gs as GRIEVANCE_STATUS.CLOSED_STATUSES to avoid duplication
   var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
 
   // Prepare updates
@@ -1869,7 +1871,7 @@ function syncGrievanceFormulasToLog() {
 
   for (var j = 1; j < grievanceData.length; j++) {
     var row = grievanceData[j];
-    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] || ('Row ' + (j + 1));
 
     // Track data quality issues
@@ -1982,6 +1984,17 @@ function syncGrievanceFormulasToLog() {
 
   // Apply updates to Grievance Log
   if (nameUpdates.length > 0) {
+    // CR-10: Before writing names and contact info, check existing cell data.
+    // Never overwrite a non-empty cell with an empty string (would blank manually entered data).
+    var existingNames = grievanceSheet.getRange(2, GRIEVANCE_COLS.FIRST_NAME, nameUpdates.length, 2).getValues();
+    for (var ni = 0; ni < nameUpdates.length; ni++) {
+      for (var nc = 0; nc < 2; nc++) {
+        // Only write if: new value is non-empty, OR existing cell is empty
+        if (!nameUpdates[ni][nc] && existingNames[ni][nc]) {
+          nameUpdates[ni][nc] = existingNames[ni][nc];
+        }
+      }
+    }
     // C-D: First Name, Last Name
     grievanceSheet.getRange(2, GRIEVANCE_COLS.FIRST_NAME, nameUpdates.length, 2).setValues(nameUpdates);
 
@@ -2022,6 +2035,15 @@ function syncGrievanceFormulasToLog() {
     grievanceSheet.getRange(2, GRIEVANCE_COLS.NEXT_ACTION_DUE, metricsUpdates.length, 1).setNumberFormat('MM/dd/yyyy');
     grievanceSheet.getRange(2, GRIEVANCE_COLS.DAYS_TO_DEADLINE, metricsUpdates.length, 1).setNumberFormat('General');
 
+    // CR-10: Preserve existing contact info — never overwrite non-empty cells with empty strings
+    var existingContact = grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_EMAIL, contactUpdates.length, 4).getValues();
+    for (var ci = 0; ci < contactUpdates.length; ci++) {
+      for (var cc = 0; cc < 4; cc++) {
+        if (!contactUpdates[ci][cc] && existingContact[ci][cc]) {
+          contactUpdates[ci][cc] = existingContact[ci][cc];
+        }
+      }
+    }
     // X, Y, Z, AA: Email, Unit, Location, Steward
     grievanceSheet.getRange(2, GRIEVANCE_COLS.MEMBER_EMAIL, contactUpdates.length, 4).setValues(contactUpdates);
   }
@@ -2090,7 +2112,7 @@ function syncMemberToGrievanceLog() {
   var infoUpdates = [];
 
   for (var j = 1; j < grievanceData.length; j++) {
-    var memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
+    memberId = grievanceData[j][GRIEVANCE_COLS.MEMBER_ID - 1];
     var data = lookup[memberId] || {firstName: '', lastName: '', email: '', unit: '', location: '', steward: ''};
     nameUpdates.push([data.firstName, data.lastName]);
     infoUpdates.push([data.email, data.unit, data.location, data.steward]);

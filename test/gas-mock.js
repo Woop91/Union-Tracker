@@ -60,17 +60,23 @@ global.PropertiesService = {
   getScriptProperties: jest.fn(() => ({
     getProperty: jest.fn(key => _scriptProperties[key] || null),
     setProperty: jest.fn((key, val) => { _scriptProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; })
+    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; }),
+    deleteAllProperties: jest.fn(() => { for (var k in _scriptProperties) delete _scriptProperties[k]; }),
+    getProperties: jest.fn(() => Object.assign({}, _scriptProperties)),
   })),
   getUserProperties: jest.fn(() => ({
     getProperty: jest.fn(key => _userProperties[key] || null),
     setProperty: jest.fn((key, val) => { _userProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _userProperties[key]; })
+    deleteProperty: jest.fn(key => { delete _userProperties[key]; }),
+    deleteAllProperties: jest.fn(() => { for (var k in _userProperties) delete _userProperties[k]; }),
+    getProperties: jest.fn(() => Object.assign({}, _userProperties)),
   })),
   getDocumentProperties: jest.fn(() => ({
     getProperty: jest.fn(key => _scriptProperties[key] || null),
     setProperty: jest.fn((key, val) => { _scriptProperties[key] = val; }),
-    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; })
+    deleteProperty: jest.fn(key => { delete _scriptProperties[key]; }),
+    deleteAllProperties: jest.fn(() => { for (var k in _scriptProperties) delete _scriptProperties[k]; }),
+    getProperties: jest.fn(() => Object.assign({}, _scriptProperties)),
   }))
 };
 

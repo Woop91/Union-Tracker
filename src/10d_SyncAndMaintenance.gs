@@ -51,9 +51,16 @@ function applyGradientHeatmaps() {
     .setRanges([deadlineRange])
     .build();
 
-  // Add gradient rules to existing rules
-  existingRules.push(daysOpenGradient, deadlineGradient);
-  sheet.setConditionalFormatRules(existingRules);
+  // H14: Filter out existing gradient rules targeting our columns before adding new ones
+  var heatmapCols = [GRIEVANCE_COLS.DAYS_OPEN, GRIEVANCE_COLS.DAYS_TO_DEADLINE];
+  var filtered = existingRules.filter(function(r) {
+    var ranges = r.getRanges();
+    if (!ranges || ranges.length === 0) return true;
+    var col = ranges[0].getColumn();
+    return heatmapCols.indexOf(col) === -1;
+  });
+  filtered.push(daysOpenGradient, deadlineGradient);
+  sheet.setConditionalFormatRules(filtered);
 
   ss.toast('Gradient heatmaps applied to Days Open & Days to Deadline columns!', '🎨 Heatmaps Applied', 5);
 }
@@ -119,11 +126,16 @@ function applyWinRateGradients() {
  * Called from Visual Control Panel
  */
 function syncAllDashboardData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
+
+  // F44: Prevent concurrent syncs
   var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    ss.toast('Syncing all dashboard data...', '🔄 Syncing', 2);
+    if (!lock.tryLock(10000)) {
+      ss.toast('Another sync is already running. Try again shortly.', '⏳ Busy', 5);
+      return;
+    }
 
     // Sync hidden calculation sheets first
     if (typeof syncGrievanceCalcSheet === 'function') syncGrievanceCalcSheet();
@@ -219,7 +231,7 @@ function showGrievanceFiles() {
     }
 
     if (fileList.length === 0) {
-      var response = ui.alert('📁 ' + grievanceId + ' Files',
+      response = ui.alert('📁 ' + grievanceId + ' Files',
         'Folder is empty.\n\nWould you like to open the folder to add files?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
@@ -229,11 +241,11 @@ function showGrievanceFiles() {
         ui.showModalDialog(html, 'Opening folder...');
       }
     } else {
-      var response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
+      response = ui.alert('📁 ' + grievanceId + ' Files (' + fileList.length + ')',
         fileList.join('\n') + '\n\nOpen folder in Drive?',
         ui.ButtonSet.YES_NO);
       if (response === ui.Button.YES) {
-        var html = HtmlService.createHtmlOutput(
+        html = HtmlService.createHtmlOutput(
           '<script>window.open(' + JSON.stringify(folderUrl) + ', "_blank");google.script.host.close();</script>'
         ).setWidth(1).setHeight(1);
         ui.showModalDialog(html, 'Opening folder...');
@@ -253,7 +265,6 @@ function showGrievanceFiles() {
  */
 function showUpcomingDeadlinesFromCalendar() {
   var ui = SpreadsheetApp.getUi();
-  var _ss = SpreadsheetApp.getActiveSpreadsheet();
 
   try {
     var calendar = CalendarApp.getDefaultCalendar();
@@ -509,7 +520,6 @@ function autoCreateMissingGrievanceFolders_() {
     var grievanceId = data[i][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
     var firstName = data[i][GRIEVANCE_COLS.FIRST_NAME - 1];
     var lastName = data[i][GRIEVANCE_COLS.LAST_NAME - 1];
-    var _issueCategory = data[i][GRIEVANCE_COLS.ISSUE_CATEGORY - 1] || 'General';
     var dateFiled = data[i][GRIEVANCE_COLS.DATE_FILED - 1];
     var existingFolderId = data[i][GRIEVANCE_COLS.DRIVE_FOLDER_ID - 1];
 
@@ -669,7 +679,6 @@ function checkDataQuality() {
  * Fix data quality issues with interactive dialog
  */
 function fixDataQualityIssues() {
-  var _ss = SpreadsheetApp.getActiveSpreadsheet();
   var ui = SpreadsheetApp.getUi();
 
   var issues = checkDataQuality();
@@ -854,12 +863,17 @@ function isSyncDebounced_(syncName) {
 }
 /** Returns true only for real, non-NaN Date objects. */
 function isValidDate_(val) { return (val instanceof Date) && !isNaN(val.getTime()); }
-/** Builds {memberId: true} lookup from Member Directory data (skips header row). */
+/** Builds {memberId: true} lookup from Member Directory data (skips header row).
+ *  M-68: Explicitly starts at index 1 to skip the header row. Also validates
+ *  that the value looks like a member ID (not a header label) as a safeguard. */
 function buildMemberIdSet_(memberData) {
   var set = {};
+  // Start at 1 to skip header row (index 0)
   for (var i = 1; i < memberData.length; i++) {
     var id = String(memberData[i][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
-    if (id !== '') set[id] = true;
+    // Skip empty values and the header label itself (safeguard against
+    // data arrays that don't include a header at index 0)
+    if (id !== '' && id !== 'Member ID') set[id] = true;
   }
   return set;
 }
@@ -924,13 +938,19 @@ function syncVolunteerHoursToMemberDirectory() {
     var invalidIds = Object.keys(badIds);
     if (invalidIds.length > 0) Logger.log('syncVH: ' + invalidIds.length + ' bad ID(s): ' + invalidIds.slice(0, 10).join(', '));
 
-    // Write to Member Directory with array length validation
+    // M-25: Only update hours for members found in the volunteer sheet.
+    // Members with no volunteer data retain their existing hours value.
     var updates = [], membersUpdated = 0;
+    var existingHours = memberSheet.getRange(2, MEMBER_COLS.VOLUNTEER_HOURS, memberData.length - 1, 1).getValues();
     for (var j = 1; j < memberData.length; j++) {
       var mid = String(memberData[j][MEMBER_COLS.MEMBER_ID - 1] || '').trim();
-      var tot = hoursLookup[mid] || 0;
-      if (tot > 0) membersUpdated++;
-      updates.push([tot]);
+      if (hoursLookup[mid] !== undefined) {
+        membersUpdated++;
+        updates.push([hoursLookup[mid]]);
+      } else {
+        // Keep existing value — don't zero out members without volunteer data
+        updates.push([existingHours[j - 1][0]]);
+      }
     }
     var expected = memberData.length - 1;
     if (updates.length !== expected) {

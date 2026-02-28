@@ -24,6 +24,8 @@ function setupAuditLogSheet() {
     return;
   }
 
+  // H-43: CANONICAL AUDIT SCHEMA — this 10-column layout is the authoritative schema.
+  // If 06_Maintenance.gs has a different audit schema, it should be updated to match this one.
   // Headers — auto-derived from AUDIT_LOG_HEADER_MAP_
   var headers = getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_);
 
@@ -117,6 +119,22 @@ function onEditAudit(e) {
 
   // Skip header row
   if (row < 2) return;
+
+  // M-40: Handle multi-cell edits (e.oldValue/e.value are undefined for range edits)
+  if (e.range.getNumRows() > 1 || e.range.getNumColumns() > 1) {
+    var numRows = e.range.getNumRows();
+    var numCols = e.range.getNumColumns();
+    logAuditEvent('BULK_EDIT_' + sheetName.toUpperCase().replace(/\s+/g, '_'), {
+      sheet: sheetName,
+      row: row,
+      col: col,
+      field: 'Multi-cell edit (' + numRows + ' rows x ' + numCols + ' cols)',
+      oldValue: '(bulk edit)',
+      newValue: '(bulk edit)',
+      recordId: sheet.getRange(row, 1).getValue() || ''
+    });
+    return;
+  }
 
   var oldValue = e.oldValue || '';
   var newValue = e.value || '';
@@ -545,14 +563,20 @@ function setupGrievanceFormulasSheet() {
     '=ARRAYFORMULA(IF(A2:A="","",INDEX(\'' + SHEETS.GRIEVANCE_LOG + '\'!' + gMemberIdCol + ':' + gMemberIdCol + ',A2:A+1)))'
   );
 
+  // H-35: VLOOKUP index must be relative to the lookup range, not absolute column number.
+  // The range starts at MEMBER_ID, so offset = target_col - MEMBER_ID + 1.
+  var vlookupOffset = function(targetCol) {
+    return targetCol - MEMBER_COLS.MEMBER_ID + 1;
+  };
+
   // Column C: First Name (VLOOKUP from Member Directory)
   sheet.getRange('C2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.FIRST_NAME + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.FIRST_NAME) + ',FALSE),"")))'
   );
 
   // Column D: Last Name (VLOOKUP from Member Directory)
   sheet.getRange('D2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.LAST_NAME + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.LAST_NAME) + ',FALSE),"")))'
   );
 
   // Column E: Incident Date (from Grievance Log)
@@ -647,22 +671,22 @@ function setupGrievanceFormulasSheet() {
 
   // Column U: Member Email (VLOOKUP from Member Directory)
   sheet.getRange('U2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.EMAIL + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.EMAIL) + ',FALSE),"")))'
   );
 
   // Column V: Unit (VLOOKUP from Member Directory)
   sheet.getRange('V2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.UNIT + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.UNIT) + ',FALSE),"")))'
   );
 
   // Column W: Location (VLOOKUP from Member Directory)
   sheet.getRange('W2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.WORK_LOCATION + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.WORK_LOCATION) + ',FALSE),"")))'
   );
 
   // Column X: Steward (VLOOKUP from Member Directory)
   sheet.getRange('X2').setFormula(
-    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + MEMBER_COLS.ASSIGNED_STEWARD + ',FALSE),"")))'
+    '=ARRAYFORMULA(IF(B2:B="","",IFERROR(VLOOKUP(B2:B,' + memberRange + ',' + vlookupOffset(MEMBER_COLS.ASSIGNED_STEWARD) + ',FALSE),"")))'
   );
 
   // Format date columns (MM/dd/yyyy)

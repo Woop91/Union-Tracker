@@ -93,11 +93,14 @@ function doGetWebDashboard(e) {
  */
 function _serveAuth(config, e, authError) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = 'auth';
 
   template.pageData = JSON.stringify({
     view: 'auth',
     config: _sanitizeConfig(config),
     error: e.parameter.authError || authError || null,
+    webAppUrl: ScriptApp.getService().getUrl(),
+    tokenChecked: !!(e.parameter.sessionToken),
   });
 
   return template.evaluate()
@@ -111,6 +114,7 @@ function _serveAuth(config, e, authError) {
  */
 function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = role; // 'steward', 'member', or 'both'
 
   // Sanitize user record — strip sensitive fields
   var safeUser = {
@@ -136,6 +140,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
     isDualRole: role === 'both',
     sessionToken: sessionToken || null,
     initialTab: initialTab || null,
+    webAppUrl: ScriptApp.getService().getUrl(),
   });
 
   return template.evaluate()
@@ -149,6 +154,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
  */
 function _serveError(config, type, detail) {
   var template = HtmlService.createTemplateFromFile('index');
+  template.view = 'error';
 
   var messages = {
     'not_found': 'Your email was not found in the member directory. Please contact your steward for access.',
@@ -156,13 +162,17 @@ function _serveError(config, type, detail) {
     'error': 'Something went wrong. Please try again.',
   };
 
+  // Log the actual error detail server-side; never expose raw error messages to the client
+  if (type === 'error' && detail) {
+    Logger.log('WebApp _serveError: ' + detail);
+  }
+
   template.pageData = JSON.stringify({
     view: 'error',
     config: _sanitizeConfig(config),
     error: {
       type: type,
       message: messages[type] || messages['error'],
-      detail: type === 'error' ? detail : null,
     },
   });
 
@@ -200,4 +210,22 @@ function _sanitizeConfig(config) {
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/**
+ * Client-callable: Returns the org chart HTML content for lazy-loading.
+ * Loaded on-demand when the user navigates to the Org Chart tab.
+ * @returns {string} Raw HTML content (CSS-scoped under .oc-wrap)
+ */
+function getOrgChartHtml() {
+  return HtmlService.createHtmlOutputFromFile('org_chart').getContent();
+}
+
+/**
+ * Returns the published web app URL. Used by client-side logout
+ * as a reload fallback when window.top.location.reload() is blocked.
+ * @returns {string}
+ */
+function getWebAppUrl() {
+  return ScriptApp.getService().getUrl();
 }

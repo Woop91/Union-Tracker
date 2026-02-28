@@ -105,7 +105,7 @@ function getFormFieldIds_(formType) {
       for (var key in defaultFields) {
         result[key] = defaultFields[key];
       }
-      for (var key in parsed) {
+      for (key in parsed) {
         result[key] = parsed[key];
       }
       return result;
@@ -518,7 +518,22 @@ function applyStepHighlighting() {
   ss.toast('Applying step highlighting...', '🎨 Format', 3);
 
   var lastRow = Math.max(sheet.getLastRow(), 2);
-  var rules = sheet.getConditionalFormatRules();
+
+  // M-47: Clear existing step highlighting rules before re-applying to prevent
+  // duplicate rules from accumulating on repeated calls. Filter out rules that
+  // target the step/deadline/status columns we're about to re-create.
+  var existingRules = sheet.getConditionalFormatRules();
+  var stepHighlightCols = [
+    GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_APPEAL_DUE,
+    GRIEVANCE_COLS.STEP3_APPEAL_DUE, GRIEVANCE_COLS.DAYS_TO_DEADLINE,
+    GRIEVANCE_COLS.NEXT_ACTION_DUE, GRIEVANCE_COLS.STATUS
+  ];
+  var rules = existingRules.filter(function(rule) {
+    var ranges = rule.getRanges();
+    if (!ranges || ranges.length === 0) return true;
+    var ruleCol = ranges[0].getColumn();
+    return stepHighlightCols.indexOf(ruleCol) === -1;
+  });
 
   // Dynamic column letters from constants
   var grColStep = getColumnLetter(GRIEVANCE_COLS.CURRENT_STEP);
@@ -644,9 +659,21 @@ function applyStepHighlighting() {
     .setRanges([statusRange])
     .build();
 
-  // Add new rules (keep existing rules)
-  rules.push(rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12);
-  sheet.setConditionalFormatRules(rules);
+  // H14: Filter out existing step-highlighting rules targeting our columns before adding new ones.
+  // This prevents rule accumulation when the function is called multiple times.
+  stepHighlightCols = [
+    GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_APPEAL_DUE,
+    GRIEVANCE_COLS.STEP3_APPEAL_DUE, GRIEVANCE_COLS.DAYS_TO_DEADLINE,
+    GRIEVANCE_COLS.NEXT_ACTION_DUE, GRIEVANCE_COLS.STATUS
+  ];
+  var filtered = rules.filter(function(r) {
+    var ranges = r.getRanges();
+    if (!ranges || ranges.length === 0) return true;
+    var col = ranges[0].getColumn();
+    return stepHighlightCols.indexOf(col) === -1;
+  });
+  filtered.push(rule1, rule2, rule3, rule4, rule5, rule6, rule7, rule8, rule9, rule10, rule11, rule12);
+  sheet.setConditionalFormatRules(filtered);
 
   ss.toast('Formatting applied! Deadline colors (🟢🟡🟠🔴) and outcome status (Won/Denied/Settled)', '✅ Done', 5);
 }
@@ -664,12 +691,14 @@ function freezeKeyColumns() {
     return;
   }
 
-  // Freeze first 6 columns (A-F: ID, Member ID, Name, Status, Step)
-  sheet.setFrozenColumns(6);
+  // M-20: Use GRIEVANCE_COLS.CURRENT_STEP as the freeze boundary instead of
+  // hardcoding column 6. This freezes through the identity and status columns.
+  var freezeUpToCol = GRIEVANCE_COLS.CURRENT_STEP || 6;
+  sheet.setFrozenColumns(freezeUpToCol);
   // Freeze header row
   sheet.setFrozenRows(1);
 
-  ss.toast('Frozen columns A-F and header row. Scroll right to see timeline.', '❄️ Frozen', 3);
+  ss.toast('Frozen columns A-' + getColumnLetter(freezeUpToCol) + ' and header row. Scroll right to see timeline.', '❄️ Frozen', 3);
 }
 
 /**

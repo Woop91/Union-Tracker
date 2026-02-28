@@ -160,6 +160,19 @@ function sanitizeObjectForHtml(obj) {
     return obj;
   }
 
+  // Handle arrays separately to preserve array type (for...in on arrays
+  // returns indices as strings and produces a plain object, corrupting the array)
+  if (Array.isArray(obj)) {
+    return obj.map(function(item) {
+      if (typeof item === 'string') {
+        return escapeHtml(item);
+      } else if (typeof item === 'object' && item !== null) {
+        return sanitizeObjectForHtml(item);
+      }
+      return item;
+    });
+  }
+
   var result = {};
   for (var key in obj) {
     if (obj.hasOwnProperty(key)) {
@@ -197,14 +210,18 @@ function escapeForFormula(input) {
   }
   var str = String(input);
 
-  // Remove or escape characters that could be used in formula injection
+  // Remove or escape characters that could be used in formula injection.
+  // NOTE: GAS only interprets formulas starting with =, +, -, @, or tab at the
+  // beginning of a cell value. We also guard against formula chars appearing after
+  // leading whitespace, since some spreadsheet engines trim before evaluating.
   return str
     .replace(/'/g, "''")       // Escape single quotes
     .replace(/"/g, '""')       // Escape double quotes
     .replace(/\\/g, '\\\\')    // Escape backslashes
     .replace(/[\r\n]/g, ' ')   // Replace newlines with spaces
-    .replace(/^[=+\-@]/, function(match) {
-      // Prefix formula-starting characters with a single quote only at start of string
+    .replace(/\t/g, ' ')       // Replace tab characters (tab can trigger formula interpretation)
+    .replace(/^(\s*)[=+\-@]/, function(match, leadingSpace) {
+      // Prefix formula-starting characters with a single quote, even after leading whitespace
       return "'" + match;
     });
 }
@@ -228,27 +245,70 @@ function safeSheetNameForFormula(sheetName) {
 }
 
 /**
+ * Sanitizes a value for use inside a Google Visualization API query string.
+ * Escapes single quotes (doubled) and backslashes (doubled).
+ * @param {*} value - The value to sanitize
+ * @returns {string} Sanitized string safe for query embedding
+ */
+function sanitizeForQuery(value) {
+  if (value === null || value === undefined) return '';
+  var str = String(value);
+  if (!str) return '';
+  // Google Visualization API: escape backslashes first, then single quotes
+  str = str.replace(/\\/g, '\\\\');
+  str = str.replace(/'/g, "''");
+  return str;
+}
+
+/**
  * Safely creates a QUERY formula with sanitized parameters
  * @param {string} sheetName - The sheet name
  * @param {string} query - The query string
  * @param {number} headers - Number of header rows
  * @returns {string} Safe QUERY formula
  */
-function buildSafeQuery(sheetName, query, headers) {
+function buildSafeQuery(sheetName, query, headers, range) {
   var safeSheet = safeSheetNameForFormula(sheetName);
   var safeHeaders = parseInt(headers, 10) || 1;
 
+  // Determine the data range dynamically instead of hardcoding A:Z.
+  // If no range is provided, compute it from the actual sheet's last column.
+  var safeRange = 'A:Z'; // fallback
+  if (range) {
+    // Validate provided range format (e.g. "A:Z", "A1:Z100", "A:AZ")
+    if (/^[A-Z]+[0-9]*:[A-Z]+[0-9]*$/.test(String(range))) {
+      safeRange = String(range);
+    }
+  } else {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(sheetName);
+      if (sheet) {
+        var lastCol = sheet.getLastColumn();
+        if (lastCol > 0) {
+          var lastColLetter = sheet.getRange(1, lastCol).getA1Notation().replace(/[0-9]/g, '');
+          safeRange = 'A:' + lastColLetter;
+        }
+      }
+    } catch (_e) {
+      // Fall back to A:Z if sheet lookup fails
+    }
+  }
+
   // Sanitize the query - remove potentially dangerous characters
+  // CR-DATA-4: Google Visualization API QUERY strings use doubled-quote ("") escaping,
+  // not backslash-quote (\") which would produce a literal backslash in the formula.
   var safeQuery = String(query)
     .replace(/'/g, "''")
-    .replace(/"/g, '\\"');
+    .replace(/"/g, '""');
 
   // Reject queries that could break out of the QUERY string context
-  if (/["\)]\s*[\+\&,]/.test(safeQuery) || /IMPORTRANGE|IMPORTDATA|IMPORTFEED|IMPORTHTML|IMAGE/i.test(safeQuery)) {
+  // Blocks: IMPORTRANGE, IMPORTDATA, IMPORTFEED, IMPORTHTML, IMAGE, QUERY, INDIRECT, OFFSET
+  if (/["\)]\s*[\+\&,]/.test(safeQuery) || /IMPORTRANGE|IMPORTDATA|IMPORTFEED|IMPORTHTML|IMAGE|QUERY|INDIRECT|OFFSET/i.test(safeQuery)) {
     throw new Error('Query contains disallowed patterns');
   }
 
-  return '=QUERY(' + safeSheet + '!A:Z, "' + safeQuery + '", ' + safeHeaders + ')';
+  return '=QUERY(' + safeSheet + '!' + safeRange + ', "' + safeQuery + '", ' + safeHeaders + ')';
 }
 
 // ============================================================================
@@ -299,8 +359,10 @@ function checkWebAppAuthorization(requiredRole) {
   };
 
   try {
-    // Get the effective user (the user accessing the web app)
-    var user = Session.getEffectiveUser();
+    // Use getActiveUser() — NOT getEffectiveUser(). In "Execute as me" web apps,
+    // getEffectiveUser() returns the script owner, not the actual accessing user.
+    // getActiveUser() returns the real user who is making the request.
+    var user = Session.getActiveUser();
     var email = user ? user.getEmail() : null;
 
     if (!email) {
@@ -485,7 +547,7 @@ function getAccessDeniedPage(message) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Access Denied')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
 }
 
 // ============================================================================
@@ -594,12 +656,17 @@ function secureLog(context, message, data) {
       if (data.hasOwnProperty(key)) {
         var value = data[key];
         // Check for PII fields and mask them
-        if (key.toLowerCase().indexOf('email') !== -1) {
+        var keyLower = key.toLowerCase();
+        if (keyLower.indexOf('email') !== -1) {
           maskedData[key] = maskEmail(value);
-        } else if (key.toLowerCase().indexOf('phone') !== -1) {
+        } else if (keyLower.indexOf('phone') !== -1) {
           maskedData[key] = maskPhone(value);
         } else if (key === 'firstName' || key === 'lastName' || key === 'name') {
           maskedData[key] = value ? String(value).charAt(0) + '.' : '';
+        } else if (keyLower.indexOf('address') !== -1 || keyLower.indexOf('ssn') !== -1 ||
+                   keyLower.indexOf('social') !== -1 || keyLower.indexOf('dob') !== -1 ||
+                   keyLower.indexOf('birthdate') !== -1) {
+          maskedData[key] = '[REDACTED]';
         } else {
           maskedData[key] = value;
         }
@@ -622,7 +689,8 @@ function secureLog(context, message, data) {
  * @returns {boolean} True if valid
  */
 function isValidSafeString(input, maxLength) {
-  if (input === null || input === undefined) return true;
+  // null/undefined are not valid safe strings — callers should handle them explicitly
+  if (input === null || input === undefined) return false;
   if (typeof input !== 'string') return false;
 
   maxLength = maxLength || 1000;
@@ -633,7 +701,7 @@ function isValidSafeString(input, maxLength) {
     /<script/i,
     /javascript:/i,
     /on\w+\s*=/i,  // onclick=, onerror=, etc.
-    /^data:/i,
+    /^\s*data:/i,
     /vbscript:/i
   ];
 
@@ -721,28 +789,15 @@ function getClientSecurityScript() {
 function safeJsonForHtml(data) {
   if (!data) return '{}';
 
-  // Recursively escape all string values AND object keys before serializing.
-  // JSON.stringify's replacer cannot transform keys, so we pre-process the data.
-  function escapeDeep_(obj) {
-    if (obj === null || obj === undefined) return obj;
-    if (typeof obj === 'string') return escapeHtml(obj);
-    if (Array.isArray(obj)) return obj.map(escapeDeep_);
-    if (typeof obj === 'object') {
-      var out = {};
-      for (var k in obj) {
-        if (obj.hasOwnProperty(k)) {
-          out[escapeHtml(k)] = escapeDeep_(obj[k]);
-        }
-      }
-      return out;
-    }
-    return obj;
-  }
-
-  var json = JSON.stringify(escapeDeep_(data));
-
-  // Escape </script> tags that could break out of script context
-  return json.replace(/<\/script>/gi, '<\\/script>');
+  // Convert to JSON then use Unicode escapes for characters dangerous in <script> context.
+  // HTML entities don't work inside <script> — only Unicode escapes are interpreted by the JS engine.
+  var json = JSON.stringify(data);
+  return json
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 /**
@@ -876,8 +931,17 @@ function sendSecurityAlertEmail_(eventType, description, details) {
     for (var key in details) {
       if (details.hasOwnProperty(key) && key.charAt(0) !== '_') {
         var val = details[key];
-        if (key.toLowerCase().indexOf('email') !== -1 && typeof val === 'string') {
+        var keyLower = key.toLowerCase();
+        if (keyLower.indexOf('email') !== -1 && typeof val === 'string') {
           safeDetails[key] = maskEmail(val);
+        } else if (keyLower.indexOf('phone') !== -1 && typeof val === 'string') {
+          safeDetails[key] = maskPhone(val);
+        } else if ((key === 'firstName' || key === 'lastName' || key === 'name') && typeof val === 'string') {
+          safeDetails[key] = val ? String(val).charAt(0) + '.' : '';
+        } else if ((keyLower.indexOf('address') !== -1 || keyLower.indexOf('ssn') !== -1 ||
+                    keyLower.indexOf('social') !== -1 || keyLower.indexOf('dob') !== -1 ||
+                    keyLower.indexOf('birthdate') !== -1) && typeof val === 'string') {
+          safeDetails[key] = '[REDACTED]';
         } else {
           safeDetails[key] = val;
         }
@@ -938,8 +1002,17 @@ function queueSecurityDigestEvent_(eventType, description, details) {
     for (var key in details) {
       if (details.hasOwnProperty(key) && key.charAt(0) !== '_') {
         var val = details[key];
-        if (key.toLowerCase().indexOf('email') !== -1 && typeof val === 'string') {
+        var keyLower = key.toLowerCase();
+        if (keyLower.indexOf('email') !== -1 && typeof val === 'string') {
           safeDetails[key] = maskEmail(val);
+        } else if (keyLower.indexOf('phone') !== -1 && typeof val === 'string') {
+          safeDetails[key] = maskPhone(val);
+        } else if ((key === 'firstName' || key === 'lastName' || key === 'name') && typeof val === 'string') {
+          safeDetails[key] = val ? String(val).charAt(0) + '.' : '';
+        } else if ((keyLower.indexOf('address') !== -1 || keyLower.indexOf('ssn') !== -1 ||
+                    keyLower.indexOf('social') !== -1 || keyLower.indexOf('dob') !== -1 ||
+                    keyLower.indexOf('birthdate') !== -1) && typeof val === 'string') {
+          safeDetails[key] = '[REDACTED]';
         } else {
           safeDetails[key] = val;
         }
@@ -976,6 +1049,11 @@ function sendDailySecurityDigest() {
     var queue = JSON.parse(existing);
 
     if (queue.length === 0) return; // Nothing to report
+
+    // TOCTOU fix: Clear the queue immediately after reading to prevent duplicate
+    // sends if another trigger fires concurrently. If the email send fails below,
+    // events are lost — but this is preferable to sending duplicate digest emails.
+    props.setProperty('SECURITY_DIGEST_QUEUE', '[]');
 
     // Also run integrity checks
     var auditIntegrity = null;
@@ -1079,9 +1157,6 @@ function sendDailySecurityDigest() {
       subject: subjectPrefix + ' Daily Security Digest — ' + queue.length + ' event(s)',
       body: body
     });
-
-    // Clear the queue
-    props.setProperty('SECURITY_DIGEST_QUEUE', '[]');
 
     Logger.log('Security digest sent with ' + queue.length + ' events');
 
@@ -1188,4 +1263,46 @@ function showSecurityStatusDialog() {
     '  Run: installSecurityDigestTrigger()';
 
   ui.alert('🛡️ Security Status', message, ui.ButtonSet.OK);
+}
+
+// ============================================================================
+// SAFE EMAIL WRAPPER
+// ============================================================================
+
+/**
+ * Sends an email with quota check and basic validation.
+ * Drop-in replacement for MailApp.sendEmail() that prevents quota exhaustion.
+ *
+ * @param {Object} options - MailApp.sendEmail() options (to, subject, body, etc.)
+ * @returns {{ success: boolean, error?: string }}
+ * @private
+ */
+function safeSendEmail_(options) {
+  if (!options || !options.to || !options.subject) {
+    return { success: false, error: 'Missing required email fields (to, subject)' };
+  }
+
+  // Validate email format
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var recipients = String(options.to).split(',');
+  for (var i = 0; i < recipients.length; i++) {
+    if (!emailRegex.test(recipients[i].trim())) {
+      return { success: false, error: 'Invalid email address: ' + maskEmail(recipients[i].trim()) };
+    }
+  }
+
+  // Check quota before sending
+  var remaining = MailApp.getRemainingDailyQuota();
+  if (remaining < 1) {
+    secureLog('safeSendEmail_', 'Email quota exhausted, skipping send', { to: maskEmail(String(options.to)) });
+    return { success: false, error: 'Daily email quota exhausted' };
+  }
+
+  try {
+    MailApp.sendEmail(options);
+    return { success: true };
+  } catch (e) {
+    secureLog('safeSendEmail_', 'Email send failed: ' + e.message, { to: maskEmail(String(options.to)) });
+    return { success: false, error: e.message };
+  }
 }

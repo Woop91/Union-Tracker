@@ -255,18 +255,6 @@ function sanitizeHtml(input) {
 }
 
 /**
- * Sanitize input for use in SQL-like queries
- * @param {string} input - Input string to sanitize
- * @returns {string} Sanitized string
- */
-function sanitizeForQuery(input) {
-  if (!input) return '';
-  return String(input)
-    .replace(/'/g, "''")
-    .replace(/\\/g, '\\\\');
-}
-
-/**
  * Validate and sanitize email address
  * @param {string} email - Email to validate
  * @returns {string|null} Sanitized email or null if invalid
@@ -518,6 +506,13 @@ function clearErrorLog() {
     if (lastRow > 1) {
       sheet.deleteRows(2, lastRow - 1);
     }
+    // L-29: Log audit event for error log clearing (security-relevant action)
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('CLEAR_ERROR_LOG', {
+        sheet: ERROR_CONFIG.LOG_SHEET_NAME,
+        rowsCleared: lastRow > 1 ? lastRow - 1 : 0
+      });
+    }
     SpreadsheetApp.getActiveSpreadsheet().toast('Error log cleared', 'Success');
   }
 }
@@ -554,7 +549,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.15.0",
+  VERSION: "4.18.1",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -614,6 +609,8 @@ var COMMAND_CONFIG = {
  * @const {Object}
  */
 var DRIVE_CONFIG = {
+  // M-19: Ideally this would come from the Config tab, but acceptable as a constant
+  // since Drive folder names rarely change and renaming would break existing folder links.
   ROOT_FOLDER_NAME: 'Dashboard - Grievance Files',
   // Simplified template: Member Name and Date Filed
   // Template uses placeholders: {date}, {lastName}, {firstName}
@@ -628,6 +625,10 @@ var DRIVE_CONFIG = {
  * @private
  * @returns {string} Organization name (e.g., "SEIU Local")
  */
+// M-43: _cachedOrgName / _cachedSystemName / _cachedLocalNumber are intentionally
+// never invalidated. In Google Apps Script, each script execution is short-lived
+// (max 6 minutes) and runs in an isolated context, so module-level caches are
+// automatically cleared when the execution ends. No manual invalidation is needed.
 var _cachedOrgName = null;
 function getOrgNameFromConfig_() {
   if (_cachedOrgName !== null) return _cachedOrgName;
@@ -655,11 +656,11 @@ function getOrgNameFromConfig_() {
  * @private
  * @returns {string} System name (e.g., "Strategic Command Center")
  */
-var _cachedSystemName = null;
+var _systemNameCache_ = null;
 function getSystemName_() {
-  if (_cachedSystemName !== null) return _cachedSystemName;
-  _cachedSystemName = getLocalNumberFromConfig_() + ' Strategic Command Center';
-  return _cachedSystemName;
+  if (_systemNameCache_ !== null) return _systemNameCache_;
+  _systemNameCache_ = getLocalNumberFromConfig_() + ' Strategic Command Center';
+  return _systemNameCache_;
 }
 
 /**
@@ -694,17 +695,18 @@ function getLocalNumberFromConfig_() {
 // ============================================================================
 
 /**
- * Version information for build system and display
+ * Version information for build system and display.
+ * M-51: Derives version string from COMMAND_CONFIG.VERSION to avoid duplication.
  * @const {Object}
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 15,
-  PATCH: 0,
-  BUILD: 'v4.15.0',
-  CURRENT: '4.15.0',
-  BUILD_DATE: '2026-02-25',
-  CODENAME: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements'
+  MINOR: 18,
+  PATCH: 1,
+  BUILD: 'v4.18.1',
+  CURRENT: '4.18.1',
+  BUILD_DATE: '2026-02-26',
+  CODENAME: 'SPA Fixes, Seed Phasing & View Enhancements'
 };
 
 /**
@@ -714,7 +716,10 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
-  { version: '4.15.0', date: '2026-02-25', codename: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements', changes: '7 TODOs resolved (batch fetch, Drive cleanup, calendar dedup, CC health check, lazy-load help, search pagination, expansion tests). Login UX: SSO loading state, sso_failed fallback, magic link clarification, resend cooldown. In-app survey wizard: multi-step mobile-optimized form with localStorage progress, 1-10 scale buttons, anonymous SHA-256 submission. Steward: chief steward task assignment, agency-wide grievance stats fallback. Member dashboard: actionable KPI strip, conditional grievance card, engagement/workload stats tabs. Broadcast: checkbox pill filters with recipient preview. Workload: removed Private option. Seed data: calendar events, weekly questions, union stats.' },
+  { version: '4.18.0', date: '2026-02-26', codename: 'SPA Fixes, Seed Phasing & View Enhancements', changes: 'Split SEED_SAMPLE_DATA into 3 phased runners to avoid GAS 6-min timeout. 5 new seed functions (tasks, polls, minutes, check-ins, timeline events). Steward view: org-wide KPI fallback, all-contacts members tab, comma formatting, contact log autocomplete, survey tracking scope toggles, 6 new More menu items. Member view: Know Your Rights card, Contact-Directory nav, 1hr localStorage notification dismiss, meetings+minutes merge, 7 new More menu items. Backend globals: getAllMembers, startGrievanceDraft, createGrievanceDriveFolder. Broadcast uses all contacts. build.js BUILD_ORDER updated for 26_QAForum.gs, 27_TimelineService.gs, 28_FailsafeService.gs.' },
+  { version: '4.17.0', date: '2026-02-26', codename: 'Q&A Forum, Timeline & Failsafe Services', changes: 'Q&A Forum (26_QAForum.gs, 389 lines) with _QA_Forum and _QA_Answers hidden sheets. Timeline Service (27_TimelineService.gs, 317 lines) with _Timeline_Events hidden sheet. Failsafe Service (28_FailsafeService.gs, 425 lines) with _Failsafe_Config hidden sheet. 08a_SheetSetup.gs updated for Q&A, Timeline, and Failsafe auto-creation. DataService methods for Q&A, Timeline, and Failsafe in 21_WebDashDataService.gs.' },
+  { version: '4.16.0', date: '2026-02-26', codename: 'Wire 7 Unwired Sheets to SPA', changes: '15 new DataService methods (541 lines) in 21_WebDashDataService.gs wiring 7 previously unwired sheets to SPA. 15 global wrapper functions + 3 batch data fields. New SPA pages: Meetings, Polls, Minutes, Feedback. Insights page with Performance KPIs + Satisfaction Trends. Case detail views with checklist support. Per-question text scores with color-coding. questionTexts arrays for all 11 SATISFACTION_SECTIONS. Expansion test suite (332 lines). Removed Since N/A text, Dues Status charts. Fixed 122 test failures (1,363 tests passing across 23 suites).' },
+  { version: '4.15.0', date: '2026-02-25', codename: 'Phase 7: Login, Surveys, Steward Management & Seed Enhancements', changes: 'Infrastructure: batch fetch, Drive cleanup trigger, calendar dedup, CC health check, lazy-load help dialog, search pagination, expansion test suite. Login UX: SSO loading state, sso_failed fallback, magic link clarification, resend cooldown. In-app survey wizard: multi-step mobile-optimized form with localStorage progress, 1-10 scale buttons, anonymous SHA-256 submission. Steward: chief steward task assignment, agency-wide grievance stats fallback, Insights tab (Quick Insights + Filed vs Resolved chart), Steward Directory with vCard download. Member dashboard: actionable KPI strip, conditional grievance card, engagement/workload stats tabs. Broadcast: checkbox pill filters with recipient preview. Workload: removed Private option. Seed data: calendar events, weekly questions, union stats.' },
   { version: '4.14.0', date: '2026-02-25', codename: 'Technical Debt Resolution & PHASE2 Features', changes: '130 code review findings resolved (15 CRITICAL XSS, 26 HIGH security, 50 MEDIUM, 39 LOW). 5 new features: Grievance History, Meeting Check-In Kiosk, Welcome Experience, Bulk Actions, Deadline Calendar View. Engagement sync overhaul with dynamic headers and validation. withScriptLock_() concurrency helper. safeSendEmail() quota wrapper. Version derived from single COMMAND_CONFIG.VERSION source.' },
   { version: '4.13.0', date: '2026-02-24', codename: 'Full Workload Tracker Migration', changes: 'Refactored 18_WorkloadTracker.gs to IIFE module (WorkloadService), enhanced getDashboardData with employment/plan/overtime breakdowns and sub-category aggregation, enhanced getUserHistory with all 24 columns, CSV export, vault deduplication, reciprocity blocking for Private users, multi-frequency reminders (daily/weekly/biweekly/monthly/quarterly), full leave tracking in portal, Weekly Cases dropdown, Clear All/Restore.' },
   { version: '4.12.0', date: '2026-02-24', codename: 'Version Alignment', changes: 'API_VERSION, VERSION_INFO, VERSION_HISTORY normalized. README and CODE_REVIEW updated with correct file counts and version scope.' },
@@ -760,7 +765,11 @@ function getVersionDate(ver) {
 // ============================================================================
 
 /**
- * Sheet name constants - use these instead of hardcoded strings
+ * Sheet name constants - use these instead of hardcoded strings.
+ * L-05: Some sheet names contain emoji (e.g., "📅 Meeting Attendance").
+ * Emoji in sheet names may cause issues on some platforms/locales but is fully
+ * supported by Google Sheets. If cross-platform compatibility is needed, the
+ * emoji prefix can be removed without affecting functionality.
  * @const {Object}
  */
 var SHEETS = {
@@ -829,7 +838,14 @@ var SHEETS = {
   NOTIFICATIONS:      '📢 Notifications',     // steward-to-member in-app messages
   // Contact Log & Steward Tasks (v4.12.0) — steward activity tracking
   CONTACT_LOG:        '_Contact_Log',         // hidden — steward-member contact history
-  STEWARD_TASKS:      '_Steward_Tasks'        // hidden — task assignments for stewards
+  STEWARD_TASKS:      '_Steward_Tasks',       // hidden — task assignments for stewards
+  // Q&A Forum (v4.17.0 — member-steward question/answer system)
+  QA_FORUM:           '_QA_Forum',            // hidden — member questions
+  QA_ANSWERS:         '_QA_Answers',          // hidden — steward/member answers
+  // Timeline of Events (v4.17.0 — chronological event records)
+  TIMELINE_EVENTS:    '_Timeline_Events',     // hidden — event timeline entries
+  // Data Failsafe (v4.17.0 — member digest preferences)
+  FAILSAFE_CONFIG:    '_Failsafe_Config'      // hidden — digest/backup preferences
 };
 
 // SHEET_NAMES alias for backward compatibility
@@ -1301,7 +1317,8 @@ var MEMBER_HEADER_MAP_ = [
   { key: 'STREET_ADDRESS',     header: 'Street Address' },
   { key: 'CITY',               header: 'City' },
   { key: 'STATE',              header: 'State' },
-  { key: 'ZIP_CODE',           header: 'Zip Code' }
+  { key: 'ZIP_CODE',           header: 'Zip Code' },
+  { key: 'DUES_STATUS',        header: 'Dues Status' }
 ];
 
 // CONVENTION: Column constants are 1-indexed (Range API). Use COL - 1 for 0-indexed array access.
@@ -1718,17 +1735,28 @@ var SURVEY_VAULT_COLS = buildColsFromMap_(SURVEY_VAULT_HEADER_MAP_);
  */
 var SATISFACTION_SECTIONS = {
   WORK_CONTEXT: { name: 'Work Context', questions: [2,3,4,5,6], scale: false },
-  OVERALL_SAT: { name: 'Overall Satisfaction', questions: [7,8,9,10], scale: true },
-  STEWARD_3A: { name: 'Steward Ratings', questions: [11,12,13,14,15,16,17], scale: true },
-  STEWARD_3B: { name: 'Steward Access', questions: [19,20,21], scale: true },
-  CHAPTER: { name: 'Chapter Effectiveness', questions: [22,23,24,25,26], scale: true },
-  LEADERSHIP: { name: 'Local Leadership', questions: [27,28,29,30,31,32], scale: true },
-  CONTRACT: { name: 'Contract Enforcement', questions: [33,34,35,36], scale: true },
-  REPRESENTATION: { name: 'Representation Process', questions: [38,39,40,41], scale: true },
-  COMMUNICATION: { name: 'Communication Quality', questions: [42,43,44,45,46], scale: true },
-  MEMBER_VOICE: { name: 'Member Voice & Culture', questions: [47,48,49,50,51], scale: true },
-  VALUE_ACTION: { name: 'Value & Collective Action', questions: [52,53,54,55,56], scale: true },
-  SCHEDULING: { name: 'Scheduling/Office Days', questions: [57,58,59,60,61,62,63], scale: true },
+  OVERALL_SAT: { name: 'Overall Satisfaction', questions: [7,8,9,10], scale: true,
+    questionTexts: ['Satisfied with representation', 'Trust union advocacy', 'Feel protected by union', 'Would recommend joining'] },
+  STEWARD_3A: { name: 'Steward Ratings', questions: [11,12,13,14,15,16,17], scale: true,
+    questionTexts: ['Timely response', 'Treated with respect', 'Explained options clearly', 'Followed through', 'Advocated effectively', 'Safe raising concerns', 'Maintained confidentiality'] },
+  STEWARD_3B: { name: 'Steward Access', questions: [19,20,21], scale: true,
+    questionTexts: ['Know how to contact', 'Confident steward would help', 'Easy to find steward'] },
+  CHAPTER: { name: 'Chapter Effectiveness', questions: [22,23,24,25,26], scale: true,
+    questionTexts: ['Understands workplace issues', 'Effective communication', 'Organizes well', 'Easy to reach chapter', 'Fair representation'] },
+  LEADERSHIP: { name: 'Local Leadership', questions: [27,28,29,30,31,32], scale: true,
+    questionTexts: ['Decisions are clear', 'Understand grievance process', 'Transparent finances', 'Accountable leadership', 'Fair processes', 'Welcomes opinions'] },
+  CONTRACT: { name: 'Contract Enforcement', questions: [33,34,35,36], scale: true,
+    questionTexts: ['Enforces contract', 'Realistic timelines', 'Clear updates', 'Frontline priority'] },
+  REPRESENTATION: { name: 'Representation Process', questions: [38,39,40,41], scale: true,
+    questionTexts: ['Understood the steps', 'Felt supported', 'Updated often enough', 'Outcome was justified'] },
+  COMMUNICATION: { name: 'Communication Quality', questions: [42,43,44,45,46], scale: true,
+    questionTexts: ['Clear and actionable', 'Enough information', 'Easy to find info', 'Reaches all shifts', 'Meetings worth attending'] },
+  MEMBER_VOICE: { name: 'Member Voice & Culture', questions: [47,48,49,50,51], scale: true,
+    questionTexts: ['Voice matters', 'Seeks member input', 'Treated with dignity', 'Newer members supported', 'Conflicts handled respectfully'] },
+  VALUE_ACTION: { name: 'Value & Collective Action', questions: [52,53,54,55,56], scale: true,
+    questionTexts: ['Good value for dues', 'Priorities match needs', 'Prepared to mobilize', 'Know how to get involved', 'Win together'] },
+  SCHEDULING: { name: 'Scheduling/Office Days', questions: [57,58,59,60,61,62,63], scale: true,
+    questionTexts: ['Understand changes', 'Adequately informed', 'Clear criteria', 'Reasonable expectations', 'Effective outcomes', 'Supports wellbeing', 'Concerns taken seriously'] },
   PRIORITIES: { name: 'Priorities & Close', questions: [65,66,67,68], scale: false }
 };
 
@@ -2766,20 +2794,9 @@ function generateNameBasedId(prefix, firstName, lastName, existingIds) {
  * @private
  */
 function generateUUID_() {
-  var chars = '0123456789abcdef';
-  var uuid = '';
-  for (var i = 0; i < 36; i++) {
-    if (i === 8 || i === 13 || i === 18 || i === 23) {
-      uuid += '-';
-    } else if (i === 14) {
-      uuid += '4'; // UUID version 4
-    } else if (i === 19) {
-      uuid += chars.charAt((Math.random() * 4) | 8); // Variant bits
-    } else {
-      uuid += chars.charAt(Math.floor(Math.random() * 16));
-    }
-  }
-  return uuid;
+  // CR-OTHER-1: Use Utilities.getUuid() for cryptographically secure UUIDs
+  // instead of Math.random() which has insufficient entropy
+  return Utilities.getUuid();
 }
 
 // ============================================================================
@@ -3320,25 +3337,27 @@ function getHapticFeedbackScript() {
         'observer.observe(document.body,{childList:true,subtree:true});' +
       '}' +
 
-      '/* Provide success/error feedback for google.script.run callbacks */' +
+      '/* H-4 fix: Haptic feedback for google.script.run — preserves fluent chaining */' +
       'var origRun=google.script&&google.script.run;' +
       'if(origRun){' +
         'var origSuccess=origRun.withSuccessHandler;' +
         'var origFailure=origRun.withFailureHandler;' +
         'if(origSuccess){' +
           'google.script.run.withSuccessHandler=function(fn){' +
-            'return origSuccess.call(this,function(){' +
+            'var result=origSuccess.call(this,function(){' +
               'hapticFeedback("success");' +
               'if(fn)fn.apply(this,arguments);' +
             '});' +
+            'return result||this;' +
           '};' +
         '}' +
         'if(origFailure){' +
           'google.script.run.withFailureHandler=function(fn){' +
-            'return origFailure.call(this,function(){' +
+            'var result=origFailure.call(this,function(){' +
               'hapticFeedback("error");' +
               'if(fn)fn.apply(this,arguments);' +
             '});' +
+            'return result||this;' +
           '};' +
         '}' +
       '}' +

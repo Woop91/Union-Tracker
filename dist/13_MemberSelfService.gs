@@ -16,6 +16,27 @@
  * @license Free for use by non-profit collective bargaining groups and unions
  */
 
+/**
+ * Validates a self-service input field using isValidSafeString and length checks.
+ * @param {string} field - Field name for error messages
+ * @param {*} value - Value to validate
+ * @param {number} [maxLength=500] - Maximum allowed length
+ * @returns {{ valid: boolean, error?: string }}
+ * @private
+ */
+function validateSelfServiceInput_(field, value, maxLength) {
+  maxLength = maxLength || 500;
+  if (value === null || value === undefined || value === '') return { valid: true };
+  var str = String(value);
+  if (str.length > maxLength) {
+    return { valid: false, error: field + ' exceeds maximum length (' + maxLength + ')' };
+  }
+  if (typeof isValidSafeString === 'function' && !isValidSafeString(str, maxLength)) {
+    return { valid: false, error: field + ' contains disallowed content' };
+  }
+  return { valid: true };
+}
+
 // ============================================================================
 // PIN SYSTEM CONSTANTS
 // ============================================================================
@@ -29,7 +50,7 @@ var PIN_CONFIG = {
   MAX_ATTEMPTS: 5,                  // Max failed attempts before lockout
   LOCKOUT_MINUTES: 15,              // Lockout duration in minutes
   SESSION_DURATION_MINUTES: 30,     // Session duration before re-auth required
-  PIN_COLUMN: 33,                   // AG column for PIN hash storage
+  get PIN_COLUMN() { return (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.PIN_HASH) ? MEMBER_COLS.PIN_HASH : 33; },
   SALT_PROPERTY: 'MEMBER_PIN_SALT', // Property key for salt storage
   RESET_TOKEN_EXPIRY_MINUTES: 30,   // Reset token expiration time
   RESET_TOKEN_PREFIX: 'pin_reset_'  // Cache key prefix for reset tokens
@@ -41,7 +62,7 @@ var PIN_CONFIG = {
  * @const {Object}
  */
 var MEMBER_PIN_COLS = {
-  PIN_HASH: 33  // AG - Hashed PIN (never store plaintext)
+  get PIN_HASH() { return (typeof MEMBER_COLS !== 'undefined' && MEMBER_COLS.PIN_HASH) ? MEMBER_COLS.PIN_HASH : 33; }
 };
 
 // ============================================================================
@@ -53,9 +74,9 @@ var MEMBER_PIN_COLS = {
  * @returns {string} 6-digit PIN
  */
 function generateMemberPIN() {
-  // Use Utilities.getUuid() for better randomness than Math.random()
-  var uuid = Utilities.getUuid().replace(/[^0-9]/g, '');
-  return uuid.substring(0, PIN_CONFIG.PIN_LENGTH).padEnd(PIN_CONFIG.PIN_LENGTH, '0');
+  // Guarantee a full 6-digit PIN (100000-999999) for consistent entropy
+  var pin = Math.floor(100000 + Math.random() * 900000);
+  return String(pin);
 }
 
 /**
@@ -910,14 +931,42 @@ function showResetPINDialog() {
       secureLog('PINReset', 'PIN reset for member', { memberId: memberId });
     }
 
-    ui.alert(
-      'PIN Reset Successful',
-      'New PIN for ' + result.memberName + ':\n\n' +
-      '    ' + result.pin + '\n\n' +
-      'Please provide this new PIN to the member securely.\n' +
-      'Their old PIN will no longer work.',
-      ui.ButtonSet.OK
-    );
+    // Send new PIN via email instead of displaying in plaintext UI alert
+    var memberEmail = sheet.getRange(row, MEMBER_COLS.EMAIL).getValue();
+    if (memberEmail && String(memberEmail).includes('@')) {
+      try {
+        var orgName = '';
+        try { orgName = getConfigValue_(CONFIG_COLS.ORG_NAME) || 'Union Dashboard'; } catch (_e) { orgName = 'Union Dashboard'; }
+        MailApp.sendEmail({
+          to: String(memberEmail),
+          subject: orgName + ' - Your PIN Has Been Reset',
+          body: 'Hello ' + result.memberName + ',\n\n' +
+                'Your self-service portal PIN has been reset.\n\n' +
+                'Your new PIN is: ' + result.pin + '\n\n' +
+                'Use this PIN along with your Member ID (' + result.memberId + ') to access the member portal.\n\n' +
+                'If you did not request this reset, please contact your steward immediately.\n\n' +
+                '- ' + orgName
+        });
+        ui.alert('PIN Reset Successful',
+          'A new PIN for ' + result.memberName + ' has been generated and emailed to ' + memberEmail + '.\n\n' +
+          'The PIN was NOT displayed here for security. Their old PIN will no longer work.',
+          ui.ButtonSet.OK);
+      } catch (emailErr) {
+        // Fall back to showing PIN if email fails
+        ui.alert('PIN Reset (Email Failed)',
+          'New PIN for ' + result.memberName + ': ' + result.pin + '\n\n' +
+          'Email delivery failed (' + emailErr.message + '). Please provide this PIN securely.\n' +
+          'Their old PIN will no longer work.',
+          ui.ButtonSet.OK);
+      }
+    } else {
+      // No email on file - must show PIN
+      ui.alert('PIN Reset (No Email)',
+        'New PIN for ' + result.memberName + ': ' + result.pin + '\n\n' +
+        'No email address on file. Please provide this PIN to the member securely.\n' +
+        'Their old PIN will no longer work.',
+        ui.ButtonSet.OK);
+    }
   } else {
     ui.alert('Error', result.error, ui.ButtonSet.OK);
   }
@@ -1146,10 +1195,10 @@ function updateMemberContact(sessionToken, updates) {
     if (allowedFields.indexOf(field) >= 0 && fieldMapping[field]) {
       var value = String(updates[field] || '').trim();
 
-      // Validate safe string (reject injection patterns and enforce max length)
-      var maxLen = fieldMaxLengths[field] || 100;
-      if (typeof isValidSafeString === 'function' && value && !isValidSafeString(value, maxLen)) {
-        return errorResponse('Invalid value for ' + field + ': contains disallowed characters or exceeds max length.');
+      // F58: Validate input using isValidSafeString
+      var inputCheck = validateSelfServiceInput_(field, value, 200);
+      if (!inputCheck.valid) {
+        return errorResponse(inputCheck.error);
       }
 
       // Basic validation
@@ -1265,8 +1314,19 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
   // Determine if input is a session token or email
   var memberId;
   if (sessionTokenOrEmail && sessionTokenOrEmail.indexOf('@') !== -1) {
-    // Email-based lookup (SPA context)
+    // Email-based lookup (SPA context) — verify caller authorization
     var email = String(sessionTokenOrEmail).trim().toLowerCase();
+    var callerEmail = '';
+    try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { /* web app context */ }
+
+    // If caller email is available, verify they match or have elevated role
+    if (callerEmail && callerEmail !== email) {
+      var callerRole = typeof getUserRole_ === 'function' ? getUserRole_(callerEmail) : 'member';
+      if (callerRole !== 'admin' && callerRole !== 'steward') {
+        return { success: false, history: [], error: 'Not authorized to view another member\'s history.' };
+      }
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var memberSheet = ss.getSheetByName(SHEETS.MEMBER_DIR);
     if (!memberSheet) return { success: true, history: [] };
@@ -1295,7 +1355,7 @@ function getMemberGrievanceHistory(sessionTokenOrEmail) {
     memberId = session.memberId;
   }
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
   if (!sheet) return { success: true, history: [] };
 

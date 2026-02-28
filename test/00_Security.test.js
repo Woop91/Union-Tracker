@@ -242,8 +242,9 @@ describe('isValidSafeString', () => {
     expect(isValidSafeString('a'.repeat(1001))).toBe(false);
   });
 
-  test('accepts null/undefined', () => {
-    expect(isValidSafeString(null)).toBe(true);
+  test('rejects null/undefined', () => {
+    expect(isValidSafeString(null)).toBe(false);
+    expect(isValidSafeString(undefined)).toBe(false);
   });
 });
 

@@ -171,6 +171,36 @@ function CREATE_DASHBOARD() {
       Logger.log('Contact/Tasks sheets skipped: ' + ctError.message);
     }
 
+    // Initialize Q&A Forum sheets (v4.17.0)
+    if (typeof QAForum !== 'undefined' && typeof QAForum.initQAForumSheets === 'function') {
+      try {
+        QAForum.initQAForumSheets();
+        ss.toast('Q&A Forum sheets created', '🏗️ Progress', 2);
+      } catch (qaError) {
+        Logger.log('Q&A Forum sheets skipped: ' + qaError.message);
+      }
+    }
+
+    // Initialize Timeline sheet (v4.17.0)
+    if (typeof TimelineService !== 'undefined' && typeof TimelineService.initTimelineSheet === 'function') {
+      try {
+        TimelineService.initTimelineSheet();
+        ss.toast('Timeline Events sheet created', '🏗️ Progress', 2);
+      } catch (tlError) {
+        Logger.log('Timeline sheet skipped: ' + tlError.message);
+      }
+    }
+
+    // Initialize Failsafe sheet (v4.17.0)
+    if (typeof FailsafeService !== 'undefined' && typeof FailsafeService.initFailsafeSheet === 'function') {
+      try {
+        FailsafeService.initFailsafeSheet();
+        ss.toast('Failsafe Config sheet created', '🏗️ Progress', 2);
+      } catch (fsError) {
+        Logger.log('Failsafe sheet skipped: ' + fsError.message);
+      }
+    }
+
     ss.toast('Dashboard creation complete!', '✅ Success', 5);
     if (ui) {
       ui.alert('✅ Success', 'Dashboard has been created successfully!\n\n' +
@@ -225,11 +255,26 @@ function _ensureStewardTasksSheet(ss) {
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
-    sheet.getRange(1, 1, 1, 10).setValues([[
+    sheet.getRange(1, 1, 1, 12).setValues([[
       'ID', 'Steward Email', 'Title', 'Description', 'Member Email',
-      'Priority', 'Status', 'Due Date', 'Created', 'Completed'
+      'Priority', 'Status', 'Due Date', 'Created', 'Completed',
+      'Assignee Type', 'Assigned By'
     ]]);
     sheet.hideSheet();
+  } else {
+    // Migrate existing 10-col sheets: add headers + backfill 'steward' in col 10-11
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headers.length < 12 || String(headers[10]).trim() !== 'Assignee Type') {
+      sheet.getRange(1, 11).setValue('Assignee Type');
+      sheet.getRange(1, 12).setValue('Assigned By');
+      var lastRow = sheet.getLastRow();
+      if (lastRow > 1) {
+        var fillRange = sheet.getRange(2, 11, lastRow - 1, 1);
+        var fillValues = [];
+        for (var i = 0; i < lastRow - 1; i++) fillValues.push(['steward']);
+        fillRange.setValues(fillValues);
+      }
+    }
   }
   return sheet;
 }

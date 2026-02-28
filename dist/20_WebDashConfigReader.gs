@@ -71,7 +71,7 @@ var ConfigReader = (function () {
 
     // Cache it
     try {
-      var cache = CacheService.getScriptCache();
+      cache = CacheService.getScriptCache();
       cache.put(CACHE_KEY, JSON.stringify(config), CACHE_TTL);
     } catch (e) {
       // Cache write failed — non-fatal, will just re-read next time
@@ -124,11 +124,6 @@ var ConfigReader = (function () {
     } catch (_e) {
       return '';
     }
-  }
-
-  function _parseInt(val, defaultVal) {
-    var parsed = parseInt(val, 10);
-    return isNaN(parsed) ? defaultVal : parsed;
   }
 
   function _deriveInitials(name) {

@@ -34,83 +34,23 @@
  */
 function onOpen() {
   try {
-    // Create the dashboard menu immediately — this is the critical path (F47 perf fix)
+    // Clear memoized caches so fresh config values are picked up
+    if (typeof _systemNameCache_ !== 'undefined') _systemNameCache_ = null;
+
+    // Only menu creation runs synchronously — keep onOpen fast
     createDashboardMenu();
 
-    // Defer non-critical initialization to a 1-second timed trigger so the
-    // spreadsheet UI is not blocked by heavy I/O (column sync, tab colors,
-    // hidden-sheet enforcement, etc.)
+    // F41: Defer heavy init to a 1-second timed trigger so the UI isn't blocked
     try {
       ScriptApp.newTrigger('onOpenDeferred_')
         .timeBased()
         .after(1000)
         .create();
-    } catch (triggerError) {
-      // If trigger creation fails (quota, permissions), run inline as fallback
-      console.log('Deferred trigger failed, running inline: ' + triggerError.message);
+    } catch (trigErr) {
+      // Installable trigger unavailable (e.g., simple trigger context) — run inline
+      console.log('Deferred trigger failed, running inline: ' + trigErr.message);
       onOpenDeferred_();
     }
-
-  } catch (error) {
-    console.error('Error in onOpen:', error);
-    // Still try to create a basic menu
-    SpreadsheetApp.getUi()
-      .createMenu('Union Dashboard')
-      .addItem('Initialize Dashboard', 'initializeDashboard')
-      .addToUi();
-  }
-}
-
-/**
- * Deferred onOpen work — runs via a one-shot timed trigger so the
- * spreadsheet opens fast. Handles column sync, sheet validation,
- * tab colors, and hidden-sheet enforcement. (F47)
- * @private
- */
-function onOpenDeferred_() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-    // Sync column maps from actual sheet headers so that column constants
-    // (MEMBER_COLS, GRIEVANCE_COLS, CONFIG_COLS, etc.) reflect the real
-    // spreadsheet layout — even if columns were reordered manually.
-    try {
-      syncColumnMaps();
-    } catch (syncError) {
-      console.log('Column sync skipped: ' + syncError.message);
-    }
-
-    // Ensure all primary sheets have enough columns for current header maps.
-    // This prevents "columns are out of bounds" errors when sheets were
-    // created by an older version with fewer columns.
-    try {
-      ensureAllSheetColumns_();
-    } catch (colError) {
-      console.log('Column check skipped: ' + colError.message);
-    }
-
-    // Apply tab colors automatically on open
-    try {
-      if (typeof applyTabColors_ === 'function') {
-        applyTabColors_(ss);
-      }
-    } catch (tabError) {
-      console.log('Tab colors not applied: ' + tabError.message);
-    }
-
-    // Enforce hidden sheets on every open (prevents mobile visibility)
-    try {
-      enforceHiddenSheets();
-    } catch (hideError) {
-      console.log('Hidden sheet enforcement skipped: ' + hideError.message);
-    }
-
-    // Show welcome toast
-    ss.toast(
-      'Dashboard loaded successfully',
-      '🏛️ Union Dashboard',
-      3
-    );
 
   } catch (error) {
     console.error('Error in onOpenDeferred_:', error);
@@ -136,6 +76,53 @@ function cleanUpOnOpenTrigger_() {
   } catch (e) {
     console.log('Trigger cleanup error: ' + e.message);
   }
+}
+
+/**
+ * Deferred onOpen tasks — runs heavy init after the UI is responsive.
+ * Called by a 1-second timed trigger created in onOpen().
+ * @private
+ */
+function onOpenDeferred_() {
+  try {
+    // Delete this one-shot trigger so it doesn't accumulate
+    var triggers = ScriptApp.getProjectTriggers();
+    for (var t = 0; t < triggers.length; t++) {
+      if (triggers[t].getHandlerFunction() === 'onOpenDeferred_') {
+        ScriptApp.deleteTrigger(triggers[t]);
+      }
+    }
+  } catch (_e) { /* skip cleanup if unavailable */ }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    syncColumnMaps();
+  } catch (syncError) {
+    console.log('Column sync skipped: ' + syncError.message);
+  }
+
+  try {
+    ensureAllSheetColumns_();
+  } catch (colError) {
+    console.log('Column check skipped: ' + colError.message);
+  }
+
+  try {
+    if (typeof applyTabColors_ === 'function') {
+      applyTabColors_(ss);
+    }
+  } catch (tabError) {
+    console.log('Tab colors not applied: ' + tabError.message);
+  }
+
+  try {
+    enforceHiddenSheets();
+  } catch (hideError) {
+    console.log('Hidden sheet enforcement skipped: ' + hideError.message);
+  }
+
+  ss.toast('Dashboard loaded successfully', '🏛️ Union Dashboard', 3);
 }
 
 /**
@@ -212,8 +199,14 @@ function onEdit(e) {
         catch (sortError) { Logger.log('Auto-sort error: ' + sortError.message); }
       }
 
+      // M-48: onEditAutoSync calls syncGrievanceFormulasToLog internally.
+      // Mark the event so onEditAutoSync can skip redundant formula sync
+      // since handleGrievanceEdit already computed deadline values for this row.
       if (typeof onEditAutoSync === 'function') {
-        try { onEditAutoSync(e); }
+        try {
+          e._grievanceEditHandled = true;
+          onEditAutoSync(e);
+        }
         catch (syncError) { console.log('AutoSync handler error: ' + syncError.message); }
       }
 
@@ -340,8 +333,11 @@ function handleSecurityAudit_(e) {
         // Config not available
       }
 
-      if (chiefEmail && MailApp.getRemainingDailyQuota() > 0) {
-        try {
+      // L-41: MailApp methods are not available in simple trigger context.
+      // Wrap the entire email block (including quota check) in try/catch
+      // so failures are logged rather than silently dropped.
+      try {
+        if (chiefEmail && MailApp.getRemainingDailyQuota() > 0) {
           MailApp.sendEmail({
             to: chiefEmail,
             subject: COMMAND_CONFIG.EMAIL.SUBJECT_PREFIX + ' SABOTAGE ALERT',
@@ -354,9 +350,9 @@ function handleSecurityAudit_(e) {
                   'Please review immediately.' +
                   COMMAND_CONFIG.EMAIL.FOOTER
           });
-        } catch (emailError) {
-          Logger.log('Sabotage alert email failed (simple onEdit limit): ' + emailError.message);
         }
+      } catch (emailError) {
+        Logger.log('Sabotage alert email failed (simple onEdit trigger cannot send email): ' + emailError.message);
       }
 
       // Log to console for visibility (PII-safe)
@@ -465,7 +461,12 @@ function handleStageGateWorkflow_(e) {
       // Only update Date Closed timestamp for closed statuses
       var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
       if (closedStatuses.indexOf(newValue) !== -1) {
-        sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).setValue(new Date());
+        // CR-12: Only set DATE_CLOSED if the cell is currently empty,
+        // preserving any manually entered close date.
+        var existingCloseDate = sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).getValue();
+        if (!existingCloseDate) {
+          sheet.getRange(row, GRIEVANCE_COLS.DATE_CLOSED).setValue(new Date());
+        }
       }
 
       // Check if this is an escalation status (reads from Config or falls back to default)
@@ -618,7 +619,36 @@ function getUnitCodes_() {
     }
   }
 
-  // Fall back to default codes
+  // H-12: Fall back to reading unit names from Config tab's UNITS column.
+  // If Config has units, derive codes from the first two chars of each name.
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var configSheet = ss.getSheetByName(SHEETS.CONFIG);
+    if (configSheet && CONFIG_COLS.UNITS) {
+      var unitValues = getConfigValues(configSheet, CONFIG_COLS.UNITS);
+      if (unitValues.length > 0) {
+        var dynamicCodes = {};
+        for (var u = 0; u < unitValues.length; u++) {
+          var unitName = unitValues[u].toString().trim();
+          if (unitName) {
+            // Generate 2-char code from first letters of each word, or first 2 chars
+            var words = unitName.split(/\s+/);
+            var code = words.length >= 2
+              ? (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+              : unitName.substring(0, 2).toUpperCase();
+            dynamicCodes[unitName] = code;
+          }
+        }
+        if (Object.keys(dynamicCodes).length > 0) {
+          return dynamicCodes;
+        }
+      }
+    }
+  } catch (configErr) {
+    console.log('Error reading units from Config: ' + configErr.message);
+  }
+
+  // Last resort: default codes (should be configured in Config tab UNIT_CODES column)
   return {
     "Main Station": "MS",
     "Field Ops": "FO",
@@ -745,13 +775,15 @@ function handleGrievanceEdit(e) {
   }
 
   // If step dates changed, recalculate deadlines (using dynamic column references)
+  // H-36: Skip downstream recalculation if the edited column IS itself a deadline
+  // column — that would overwrite the steward's manual edit.
   const stepDateColumns = [
     GRIEVANCE_COLS.DATE_FILED,      // Step 1 filing
     GRIEVANCE_COLS.STEP2_APPEAL_FILED,  // Step 2 appeal
     GRIEVANCE_COLS.STEP3_APPEAL_FILED   // Step 3 appeal
   ];
 
-  if (stepDateColumns.includes(col)) {
+  if (stepDateColumns.includes(col) && calculatedDateCols.indexOf(col) === -1) {
     const step = stepDateColumns.indexOf(col) + 1;
     const stepDate = e.value;
 
@@ -803,6 +835,34 @@ function recalculateDownstreamDeadlines_(sheet, row, overriddenCol, overrideDate
     }
   }
   if (startIdx === -1) return;
+
+  // M-32: Actually cascade downstream — for each deadline after the overridden one,
+  // check if its source date is empty. If so, use the previous calculated date
+  // as the basis and write the new downstream deadline.
+  var previousDate = overrideDate;
+  for (var d = startIdx + 1; d < deadlineChain.length; d++) {
+    var downstream = deadlineChain[d];
+    var sourceValue = sheet.getRange(row, downstream.sourceCol).getValue();
+
+    // If the downstream step has its own source date, it will be calculated from that
+    // source by syncGrievanceFormulasToLog — skip it.
+    if (sourceValue instanceof Date) {
+      previousDate = new Date(sourceValue.getTime() + downstream.days * 86400000);
+      continue;
+    }
+
+    // No source date entered — cascade from the previous calculated date
+    var downstreamNote = sheet.getRange(row, downstream.calcCol).getNote();
+    // Don't overwrite a steward override on a downstream column
+    if (downstreamNote === 'Steward override') {
+      previousDate = sheet.getRange(row, downstream.calcCol).getValue();
+      if (previousDate instanceof Date) continue;
+    }
+
+    var newDeadline = new Date(previousDate.getTime() + downstream.days * 86400000);
+    sheet.getRange(row, downstream.calcCol).setValue(newDeadline);
+    previousDate = newDeadline;
+  }
 
   // Recalculate Next Action Due and Days to Deadline based on current step
   var currentStep = sheet.getRange(row, GRIEVANCE_COLS.CURRENT_STEP).getValue();
@@ -1250,8 +1310,11 @@ function showHelpDialog() {
             </div>
           </div>
 
-          <!-- FEATURES TAB (NEW) -->
+          <!-- FEATURES TAB (lazy-loaded) -->
           <div id="features-tab" class="tab-content hidden">
+            <div class="lazy-placeholder" style="text-align:center;padding:40px 0;color:#64748b;">Loading features...</div>
+          </div>
+          <template id="tmpl-features">
             <div class="section">
               <div class="section-title"><span class="material-icons">apps</span>Complete Features Reference</div>
 
@@ -1330,10 +1393,13 @@ function showHelpDialog() {
             <div style="margin-top: 12px; padding: 10px; background: rgba(59,130,246,0.1); border-radius: 8px; font-size: 11px; color: #94a3b8;">
               <strong style="color: #60a5fa;">Tip:</strong> For a printable reference, go to Admin > Setup > Create Features Reference Sheet
             </div>
-          </div>
+          </template>
 
-          <!-- MENU REFERENCE TAB -->
+          <!-- MENU REFERENCE TAB (lazy-loaded) -->
           <div id="menus-tab" class="tab-content hidden">
+            <div class="lazy-placeholder" style="text-align:center;padding:40px 0;color:#64748b;">Loading menus...</div>
+          </div>
+          <template id="tmpl-menus">
             <div class="section">
               <div class="section-title"><span class="material-icons">menu</span>Union Hub Menu</div>
               <div class="menu-item"><div><div class="menu-path">Union Hub > Dashboards</div><div class="menu-name">Member Dashboard</div><div class="menu-desc">Public-safe dashboard with aggregate stats</div></div></div>
@@ -1369,10 +1435,13 @@ function showHelpDialog() {
               <div class="menu-item"><div><div class="menu-path">Field Portal > Analytics</div><div class="menu-name">Unit Health, Trends, Precedents</div><div class="menu-desc">Field analytics</div></div></div>
               <div class="menu-item"><div><div class="menu-path">Field Portal > Web App</div><div class="menu-name">Deploy, Portals, Email Links</div><div class="menu-desc">Web app management</div></div></div>
             </div>
-          </div>
+          </template>
 
-          <!-- FAQ TAB (ENHANCED - ALL 15+ FAQs) -->
+          <!-- FAQ TAB (lazy-loaded) -->
           <div id="faq-tab" class="tab-content hidden">
+            <div class="lazy-placeholder" style="text-align:center;padding:40px 0;color:#64748b;">Loading FAQ...</div>
+          </div>
+          <template id="tmpl-faq">
             <div class="section">
               <div class="section-title"><span class="material-icons">help</span>Frequently Asked Questions</div>
 
@@ -1501,10 +1570,13 @@ function showHelpDialog() {
               <span class="material-icons" style="font-size: 16px;">open_in_new</span>
               Organization Website
             </a>
-          </div>
+          </template>
 
-          <!-- SHORTCUTS TAB -->
+          <!-- SHORTCUTS TAB (lazy-loaded) -->
           <div id="shortcuts-tab" class="tab-content hidden">
+            <div class="lazy-placeholder" style="text-align:center;padding:40px 0;color:#64748b;">Loading tips...</div>
+          </div>
+          <template id="tmpl-shortcuts">
             <div class="section">
               <div class="section-title"><span class="material-icons">bolt</span>Quick Tips</div>
 
@@ -1548,7 +1620,7 @@ function showHelpDialog() {
                 <div class="card-desc">Use <strong>Ctrl+F</strong> (Cmd+F on Mac) in any sheet to search within the spreadsheet itself.</div>
               </div>
             </div>
-          </div>
+          </template>
         </div>
 
         <div class="version">
@@ -1557,7 +1629,11 @@ function showHelpDialog() {
       </div>
 
       <script>
+        // Lazy-load: track which tabs have been rendered
+        var loadedTabs = { overview: true }; // overview loads eagerly
+
         function showTab(tabName) {
+          _ensureTabLoaded(tabName);
           document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
           document.getElementById(tabName + '-tab').classList.remove('hidden');
@@ -1565,12 +1641,29 @@ function showHelpDialog() {
           document.getElementById('resultCount').textContent = '';
         }
 
+        function _ensureTabLoaded(tabName) {
+          if (loadedTabs[tabName]) return;
+          var container = document.getElementById(tabName + '-tab');
+          if (!container) return;
+          var placeholder = container.querySelector('.lazy-placeholder');
+          if (placeholder) {
+            var tmpl = document.getElementById('tmpl-' + tabName);
+            if (tmpl) {
+              container.innerHTML = tmpl.innerHTML;
+              loadedTabs[tabName] = true;
+            }
+          }
+        }
+
+        function _ensureAllTabsLoaded() {
+          ['features', 'menus', 'faq', 'shortcuts'].forEach(_ensureTabLoaded);
+        }
+
         function filterContent() {
           const query = document.getElementById('searchInput').value.toLowerCase().trim();
-          const allItems = document.querySelectorAll('.card, .menu-item, .faq-item, .feature-row');
-          let visibleCount = 0;
 
           if (query === '') {
+            const allItems = document.querySelectorAll('.card, .menu-item, .faq-item, .feature-row');
             allItems.forEach(item => {
               item.classList.remove('hidden');
               item.style.borderLeft = '';
@@ -1579,10 +1672,15 @@ function showHelpDialog() {
             return;
           }
 
+          // Load all tabs before searching across them
+          _ensureAllTabsLoaded();
+
           // Show all tabs when searching
           document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('hidden'));
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
 
+          const allItems = document.querySelectorAll('.card, .menu-item, .faq-item, .feature-row');
+          let visibleCount = 0;
           allItems.forEach(item => {
             const text = item.textContent.toLowerCase();
             if (text.includes(query)) {
@@ -1895,8 +1993,16 @@ function addNewMember(memberData) {
     const timestamp = Date.now().toString(36).toUpperCase();
     const newId = `MEM-${timestamp}`;
 
+    // M-33: Size row by the maximum column index in MEMBER_COLS (not just STATE,
+    // which may not be the last column).
+    var maxMemberCol = 0;
+    for (var colKey in MEMBER_COLS) {
+      if (MEMBER_COLS.hasOwnProperty(colKey) && MEMBER_COLS[colKey] > maxMemberCol) {
+        maxMemberCol = MEMBER_COLS[colKey];
+      }
+    }
     // Prepare row data using MEMBER_COLS constants (1-indexed)
-    var rowData = new Array(MEMBER_COLS.STATE).fill('');
+    var rowData = new Array(maxMemberCol).fill('');
     rowData[MEMBER_COLS.MEMBER_ID - 1] = newId;
     rowData[MEMBER_COLS.FIRST_NAME - 1] = memberData.firstName || '';
     rowData[MEMBER_COLS.LAST_NAME - 1] = memberData.lastName || '';
@@ -2061,20 +2167,28 @@ function importMembersFromText(text) {
   const lines = text.split('\n').filter(line => line.trim());
   let imported = 0;
 
+  // CR-24: Use MEMBER_COLS constants to build the row array at correct positions
+  // instead of hardcoded 9-element array with hardcoded column order.
+  // M-33: Size row by the maximum column index in MEMBER_COLS.
+  var maxImportCol = 0;
+  for (var colKey in MEMBER_COLS) {
+    if (MEMBER_COLS.hasOwnProperty(colKey) && MEMBER_COLS[colKey] > maxImportCol) {
+      maxImportCol = MEMBER_COLS[colKey];
+    }
+  }
+
   for (const line of lines) {
     const parts = line.split(',').map(p => p.trim());
     if (parts.length >= 2) {
-      const newRow = [
-        '',                    // ID (will be auto-generated)
-        parts[0] || '',        // First Name
-        parts[1] || '',        // Last Name
-        parts[2] || '',        // Employee ID
-        parts[3] || '',        // Department
-        parts[4] || '',        // Job Title
-        '',                    // Hire Date
-        parts[5] || '',        // Email
-        parts[6] || ''         // Phone
-      ];
+      var newRow = new Array(maxImportCol).fill('');
+      // M-05: Apply escapeForFormula() to all imported values to prevent formula injection
+      newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(parts[0] || '');
+      newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(parts[1] || '');
+      newRow[MEMBER_COLS.EMPLOYEE_ID - 1] = escapeForFormula(parts[2] || '');
+      newRow[MEMBER_COLS.DEPARTMENT - 1] = escapeForFormula(parts[3] || '');
+      newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(parts[4] || '');
+      newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(parts[5] || '');
+      newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(parts[6] || '');
       sheet.appendRow(newRow);
       imported++;
     }
@@ -2183,6 +2297,12 @@ function showExportDialog() {
  * @returns {Object} Result with success message
  */
 function exportMemberDirectory(format) {
+  // F20-21: PII export requires steward authorization
+  var authResult = checkWebAppAuthorization('steward');
+  if (!authResult.isAuthorized) {
+    return errorResponse(authResult.message || 'Unauthorized: steward access required for export', 'exportMemberDirectory');
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_NAMES.MEMBER_DIRECTORY);
 
@@ -2211,9 +2331,13 @@ function exportMemberDirectory(format) {
       }).join(',')).join('\n');
       const blob = Utilities.newBlob(csv, 'text/csv', 'MemberDirectory.csv');
       const file = DriveApp.createFile(blob);
+      // M-60: CSV export creates a file in Drive that is never automatically cleaned up.
+      // TODO: Consider adding a time-driven trigger to delete export files older than
+      // 7 days, or move exports to a dedicated "Exports" folder and purge periodically.
+      // For now, users must manually delete old exports from their Drive.
       return {
         success: true,
-        message: 'CSV file created! Opening...',
+        message: 'CSV file created! Opening... (Note: remember to delete from Drive when done)',
         url: file.getUrl()
       };
 

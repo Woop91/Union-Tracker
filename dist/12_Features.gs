@@ -1714,7 +1714,7 @@ function repairDynamicFormulas() {
 /**
  * Gets expansion column data with optional member data.
  * Optimized to minimize sheet reads.
- * TODO(F55): Add integration tests for expansion columns (add/remove/rename columns, data round-trip).
+ * Integration tests: see __tests__/12_Features.test.js
  * @param {string} memberId - Optional member ID to fetch data for
  * @returns {Object} Object with extraHeaders and memberData
  */

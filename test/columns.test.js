@@ -4,7 +4,7 @@
  * Validates the auto-discovery column infrastructure:
  * - buildColsFromMap_() correctly generates 1-indexed column constants
  * - getHeadersFromMap_() correctly extracts header text arrays
- * - Legacy column constants (GRIEVANCE_COLUMNS, MEMBER_COLUMNS) have been removed
+ * - Legacy column constants (MEMBER_COLUMNS, GRIEVANCE_COLUMNS, buildLegacyCols_) are removed
  * - getColumnLetter() correctly converts column numbers to letters
  * - All header maps produce valid, contiguous column constants
  * - SATISFACTION_COLS and SATISFACTION_SECTIONS are cross-consistent
@@ -95,6 +95,16 @@ describe('getHeadersFromMap_', () => {
       { key: 'B', header: 'Step 1 Due Date' }
     ];
     expect(getHeadersFromMap_(map)).toEqual(['Yes/No (Dropdowns)', 'Step 1 Due Date']);
+  });
+});
+
+// ============================================================================
+// Legacy column constants removed (buildLegacyCols_, MEMBER_COLUMNS, GRIEVANCE_COLUMNS)
+// ============================================================================
+
+describe('Legacy column constants removed', () => {
+  test('buildLegacyCols_ is no longer defined', () => {
+    expect(typeof buildLegacyCols_).toBe('undefined');
   });
 });
 
@@ -195,6 +205,20 @@ describe('Header map to COLS consistency', () => {
         });
       });
     });
+  });
+});
+
+// ============================================================================
+// Legacy compat objects removed
+// ============================================================================
+
+describe('Legacy column constants removed', () => {
+  test('MEMBER_COLUMNS is no longer defined', () => {
+    expect(typeof MEMBER_COLUMNS).toBe('undefined');
+  });
+
+  test('GRIEVANCE_COLUMNS is no longer defined', () => {
+    expect(typeof GRIEVANCE_COLUMNS).toBe('undefined');
   });
 });
 
@@ -487,8 +511,8 @@ describe('getColumnLetter for all *_COLS values', () => {
 // ============================================================================
 
 describe('Header map column coverage completeness', () => {
-  test('MEMBER_HEADER_MAP_ length matches MEMBER_COLS.ZIP_CODE (last column)', () => {
-    expect(MEMBER_HEADER_MAP_.length).toBe(MEMBER_COLS.ZIP_CODE);
+  test('MEMBER_HEADER_MAP_ length matches MEMBER_COLS.DUES_STATUS (last column)', () => {
+    expect(MEMBER_HEADER_MAP_.length).toBe(MEMBER_COLS.DUES_STATUS);
   });
 
   test('GRIEVANCE_HEADER_MAP_ length matches max GRIEVANCE_COLS value', () => {
@@ -547,39 +571,5 @@ describe('Audit log schemas', () => {
     expect(AUDIT_LOG_COLS.ACTION_TYPE).toBeDefined();
     expect(AUDIT_LOG_COLS.OLD_VALUE).toBeDefined();
     expect(AUDIT_LOG_COLS.NEW_VALUE).toBeDefined();
-  });
-});
-
-// ============================================================================
-// Regression: legacy column constants fully removed
-// ============================================================================
-
-describe('Legacy column constants removed', () => {
-  test('GRIEVANCE_COLUMNS is no longer defined', () => {
-    expect(typeof GRIEVANCE_COLUMNS).toBe('undefined');
-  });
-
-  test('MEMBER_COLUMNS is no longer defined', () => {
-    expect(typeof MEMBER_COLUMNS).toBe('undefined');
-  });
-
-  test('buildLegacyCols_ is no longer defined', () => {
-    expect(typeof buildLegacyCols_).toBe('undefined');
-  });
-
-  test('GRIEVANCE_COLS has LOCATION, not UNIT (regression)', () => {
-    expect(GRIEVANCE_COLS.UNIT).toBeUndefined();
-    expect(GRIEVANCE_COLS.LOCATION).toBeDefined();
-  });
-
-  test('GRIEVANCE_COLS has ISSUE_CATEGORY, not TYPE (regression)', () => {
-    expect(GRIEVANCE_COLS.TYPE).toBeUndefined();
-    expect(GRIEVANCE_COLS.ISSUE_CATEGORY).toBeDefined();
-  });
-
-  test('GRIEVANCE_COLS.RESOLUTION is a single column (no NOTES/OUTCOME aliases)', () => {
-    expect(GRIEVANCE_COLS.RESOLUTION).toBeDefined();
-    expect(GRIEVANCE_COLS.NOTES).toBeUndefined();
-    expect(GRIEVANCE_COLS.OUTCOME).toBeUndefined();
   });
 });

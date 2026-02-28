@@ -535,7 +535,7 @@ describe('getQuarter_', () => {
   });
 
   test('April -> Q2', () => {
-    expect(getQuarter_(new Date('2026-04-01'))).toBe('2026-Q2');
+    expect(getQuarter_(new Date(2026, 3, 1))).toBe('2026-Q2');
   });
 
   test('June -> Q2', () => {
@@ -547,7 +547,7 @@ describe('getQuarter_', () => {
   });
 
   test('October -> Q4', () => {
-    expect(getQuarter_(new Date('2026-10-01'))).toBe('2026-Q4');
+    expect(getQuarter_(new Date(2026, 9, 1))).toBe('2026-Q4');
   });
 
   test('December -> Q4', () => {
@@ -642,5 +642,144 @@ describe('invalidateHeaderCache', () => {
   test('invalidateHeaderCache is callable and does not throw', () => {
     expect(typeof invalidateHeaderCache).toBe('function');
     expect(() => invalidateHeaderCache('Member Directory')).not.toThrow();
+  });
+});
+
+// ============================================================================
+// Expansion Column Engine — integration-style tests
+// ============================================================================
+
+describe('Expansion Column Engine', () => {
+  // Helper: create a mock sheet where getRange returns the actual headers
+  function setupExpansionMock(headers) {
+    const mockSheet = createMockSheet('Member Directory', [headers]);
+    // Override getRange to return proper header data for getHeaderMap
+    mockSheet.getRange = jest.fn(() => ({
+      getValues: jest.fn(() => [headers]),
+      getValue: jest.fn(),
+      setValue: jest.fn(),
+      setValues: jest.fn(),
+      setFontWeight: jest.fn(function() { return this; }),
+      setBackground: jest.fn(function() { return this; }),
+      setFontColor: jest.fn(function() { return this; })
+    }));
+    const mockSS = createMockSpreadsheet([mockSheet]);
+    globalThis.SpreadsheetApp.getActiveSpreadsheet = () => mockSS;
+    invalidateHeaderCache('Member Directory');
+    return mockSheet;
+  }
+
+  describe('getExpansionColumnData', () => {
+    test('is a function', () => {
+      expect(typeof getExpansionColumnData).toBe('function');
+    });
+
+    test('returns object with extraHeaders, memberData, coreColumnCount', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('Col' + i);
+      }
+      headers.push('Custom Field A');
+      headers.push('Custom Field B');
+
+      setupExpansionMock(headers);
+
+      const result = getExpansionColumnData();
+      expect(result).toHaveProperty('extraHeaders');
+      expect(result).toHaveProperty('memberData');
+      expect(result).toHaveProperty('coreColumnCount');
+      expect(result.coreColumnCount).toBe(EXTENSION_CONFIG.CORE_COLUMN_COUNT);
+    });
+
+    test('identifies extra columns beyond core count', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+      headers.push('Extra1');
+      headers.push('Extra2');
+      headers.push('Extra3');
+
+      setupExpansionMock(headers);
+
+      const result = getExpansionColumnData();
+      const extraNames = result.extraHeaders.map(h => h.name);
+      expect(extraNames).toContain('Extra1');
+      expect(extraNames).toContain('Extra2');
+      expect(extraNames).toContain('Extra3');
+      expect(result.extraHeaders.length).toBe(3);
+    });
+
+    test('returns empty extraHeaders when no extra columns exist', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+
+      setupExpansionMock(headers);
+
+      const result = getExpansionColumnData();
+      expect(result.extraHeaders).toEqual([]);
+      expect(result.memberData).toEqual({});
+    });
+
+    test('extra headers are sorted by column position', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+      headers.push('Zebra Field');
+      headers.push('Alpha Field');
+
+      setupExpansionMock(headers);
+
+      const result = getExpansionColumnData();
+      for (let i = 1; i < result.extraHeaders.length; i++) {
+        expect(result.extraHeaders[i].column).toBeGreaterThan(result.extraHeaders[i - 1].column);
+      }
+    });
+  });
+
+  describe('generateExpansionFieldsHtml', () => {
+    test('returns no-columns comment when no extra columns', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+
+      setupExpansionMock(headers);
+
+      const html = generateExpansionFieldsHtml();
+      expect(html).toContain('No custom columns');
+    });
+
+    test('generates input fields for each extra column', () => {
+      const headers = [];
+      for (let i = 1; i <= EXTENSION_CONFIG.CORE_COLUMN_COUNT; i++) {
+        headers.push('CoreCol' + i);
+      }
+      headers.push('Favorite Color');
+      headers.push('Badge Number');
+
+      setupExpansionMock(headers);
+
+      const html = generateExpansionFieldsHtml();
+      expect(html).toContain('Favorite Color');
+      expect(html).toContain('Badge Number');
+      expect(html).toContain('Custom Fields');
+      expect(html).toContain('<input');
+    });
+  });
+
+  describe('saveExpansionData', () => {
+    test('rejects missing memberId', () => {
+      const result = saveExpansionData(null, { field: 'val' });
+      expect(result.success).toBe(false);
+    });
+
+    test('rejects missing customData', () => {
+      const result = saveExpansionData('M001', null);
+      expect(result.success).toBe(false);
+    });
   });
 });

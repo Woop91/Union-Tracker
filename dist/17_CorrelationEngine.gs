@@ -34,19 +34,19 @@ function statMean_(arr) {
 }
 
 /**
- * Calculates the standard deviation of a numeric array
+ * Calculates the sample standard deviation of a numeric array (Bessel's correction).
  * @param {number[]} arr - Input values
- * @returns {number} Population standard deviation
+ * @returns {number} Sample standard deviation, or 0 if n <= 1
  */
 function statStdDev_(arr) {
-  if (!arr || arr.length < 2) return 0;
+  if (!arr || arr.length <= 1) return 0;
   var mean = statMean_(arr);
   var sumSq = 0;
   for (var i = 0; i < arr.length; i++) {
     var diff = arr[i] - mean;
     sumSq += diff * diff;
   }
-  return Math.sqrt(sumSq / arr.length);
+  return Math.sqrt(sumSq / (arr.length - 1));
 }
 
 /**
@@ -59,7 +59,7 @@ function statStdDev_(arr) {
  */
 function pearsonCorrelation_(x, y) {
   var n = Math.min(x.length, y.length);
-  if (n < 3) return 0; // Need at least 3 pairs for meaningful correlation
+  if (n < 5) return 0; // Need at least 5 pairs for meaningful correlation
 
   var meanX = statMean_(x.slice(0, n));
   var meanY = statMean_(y.slice(0, n));
@@ -273,8 +273,8 @@ function extractPairs_(groupedData, fieldX, fieldY, minCount) {
  * @param {boolean} isPII - Whether to include PII in drill-down details
  * @returns {string} JSON array of correlation results
  */
-function getCorrelationInsights(isPII) {
-  var data = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+function getCorrelationInsights(isPII, cachedData) {
+  var data = cachedData || JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
   var insights = [];
 
   // 1. Location Satisfaction vs Grievance Rate
@@ -917,7 +917,9 @@ function buildDataPoints_(labels, x, y) {
  * @returns {string} JSON array of alert objects
  */
 function getCorrelationAlerts(isPII) {
-  var insightsJson = getCorrelationInsights(isPII);
+  // Fetch data once and reuse for insights to avoid redundant dashboard fetches
+  var dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  var insightsJson = getCorrelationInsights(isPII, dashboardData);
   var insights = JSON.parse(insightsJson);
   var alerts = [];
 
@@ -961,7 +963,9 @@ function getCorrelationAlerts(isPII) {
  * @returns {string} JSON summary object
  */
 function getCorrelationSummary(isPII) {
-  var insights = JSON.parse(getCorrelationInsights(isPII));
+  // Fetch data once and reuse for insights to avoid redundant dashboard fetches
+  var dashboardData = JSON.parse(getUnifiedDashboardData(isTruthyValue(isPII)));
+  var insights = JSON.parse(getCorrelationInsights(isPII, dashboardData));
 
   var summary = {
     total: insights.length,
