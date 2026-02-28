@@ -51,9 +51,16 @@ function applyGradientHeatmaps() {
     .setRanges([deadlineRange])
     .build();
 
-  // Add gradient rules to existing rules
-  existingRules.push(daysOpenGradient, deadlineGradient);
-  sheet.setConditionalFormatRules(existingRules);
+  // H14: Filter out existing gradient rules targeting our columns before adding new ones
+  var heatmapCols = [GRIEVANCE_COLS.DAYS_OPEN, GRIEVANCE_COLS.DAYS_TO_DEADLINE];
+  var filtered = existingRules.filter(function(r) {
+    var ranges = r.getRanges();
+    if (!ranges || ranges.length === 0) return true;
+    var col = ranges[0].getColumn();
+    return heatmapCols.indexOf(col) === -1;
+  });
+  filtered.push(daysOpenGradient, deadlineGradient);
+  sheet.setConditionalFormatRules(filtered);
 
   ss.toast('Gradient heatmaps applied to Days Open & Days to Deadline columns!', '🎨 Heatmaps Applied', 5);
 }

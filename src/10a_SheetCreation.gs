@@ -134,7 +134,7 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.ORG_NAME, ['Your Union Name'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.LOCAL_NUMBER, ['000'], isExistingSheet);
   seedConfigDefault_(sheet, CONFIG_COLS.MAIN_ADDRESS, ['123 Main Street, Suite 100, City, ST 00000'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_PHONE, ['555-000-0000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_PHONE, ['(000) 000-0000'], isExistingSheet);
 
   // Deadline defaults (in days) — values from DEADLINE_DEFAULTS (01_Core.gs)
   seedConfigDefault_(sheet, CONFIG_COLS.FILING_DEADLINE_DAYS, [DEADLINE_DEFAULTS.FILING_DAYS], isExistingSheet);
@@ -158,9 +158,9 @@ function createConfigSheet(ss) {
   seedConfigDefault_(sheet, CONFIG_COLS.ORG_WEBSITE, ['https://www.example.org/'], isExistingSheet);
 
   // Extended contact
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_FAX, ['555-000-0001'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_NAME, ['Contact Name'], isExistingSheet);
-  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_EMAIL, ['contact@example.org'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_FAX, ['(000) 000-0000'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_NAME, ['Your Contact Name'], isExistingSheet);
+  seedConfigDefault_(sheet, CONFIG_COLS.MAIN_CONTACT_EMAIL, ['your-email@your-org.org'], isExistingSheet);
 
   // Escalation triggers (comma-separated values read at runtime)
   var escalationStatuses = COMMAND_CONFIG.ESCALATION_STATUSES || ['In Arbitration', 'Appealed'];
