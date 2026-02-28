@@ -949,7 +949,8 @@ function renderMemberResources(appContainer) {
         // Expandable content
         var expandContent = el('div', { className: 'res-card-content' });
         if (r.content) expandContent.appendChild(el('div', null, r.content));
-        if (r.url) {
+        // H-53: Validate URL protocol to prevent javascript: XSS
+        if (r.url && /^https?:\/\//i.test(r.url)) {
           expandContent.appendChild(el('a', { className: 'res-card-link', href: r.url, target: '_blank' }, '\uD83D\uDD17 Open Resource'));
         }
         if (r.dateAdded) expandContent.appendChild(el('div', { style: { fontSize: '11px', color: 'var(--muted)', marginTop: '8px' } }, 'Added: ' + r.dateAdded));

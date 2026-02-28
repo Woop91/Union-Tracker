@@ -119,8 +119,9 @@ var DataAccess = {
 
       if (options) {
         if (options.headers && Array.isArray(options.headers)) {
-          sheet.getRange(1, 1, 1, options.headers.length).setValues([options.headers]);
-          sheet.getRange(1, 1, 1, options.headers.length).setFontWeight('bold');
+          var headerRange = sheet.getRange(1, 1, 1, options.headers.length);
+          headerRange.setValues([options.headers]);
+          headerRange.setFontWeight('bold');
         }
         if (options.hidden) {
           setSheetVeryHidden_(sheet);
@@ -176,6 +177,9 @@ var DataAccess = {
   getRow: function(sheetName, rowNumber) {
     var sheet = this.getSheet(sheetName);
     if (!sheet) return [];
+
+    // Bounds validation — rowNumber must be within the sheet's used range
+    if (rowNumber < 1 || rowNumber > sheet.getLastRow()) return [];
 
     var lastCol = sheet.getLastColumn();
     if (lastCol === 0) return [];
@@ -283,35 +287,44 @@ var DataAccess = {
     var sheet = this.getSheet(sheetName);
     if (!sheet) return;
 
-    // Group cells by row for efficiency
-    var rowUpdates = {};
-    for (var i = 0; i < cells.length; i++) {
-      var cell = cells[i];
-      if (!rowUpdates[cell.row]) {
-        rowUpdates[cell.row] = {};
+    // Wrap in lock to prevent concurrent read-modify-write races (H-17)
+    withScriptLock_(function() {
+      // Group cells by row for efficiency
+      var rowUpdates = {};
+      for (var i = 0; i < cells.length; i++) {
+        var cell = cells[i];
+        if (!rowUpdates[cell.row]) {
+          rowUpdates[cell.row] = {};
+        }
+        rowUpdates[cell.row][cell.col] = cell.value;
       }
-      rowUpdates[cell.row][cell.col] = cell.value;
-    }
 
-    // Apply updates — batch each row into a single setValues() call
-    for (var row in rowUpdates) {
-      var updates = rowUpdates[row];
-      var cols = Object.keys(updates).map(function(c) { return parseInt(c); }).sort(function(a, b) { return a - b; });
-      var minCol = cols[0];
-      var maxCol = cols[cols.length - 1];
-      var span = maxCol - minCol + 1;
+      // Apply updates — batch each row into a single setValues() call
+      for (var row in rowUpdates) {
+        var updates = rowUpdates[row];
+        var cols = Object.keys(updates).map(function(c) { return parseInt(c); }).sort(function(a, b) { return a - b; });
+        var minCol = cols[0];
+        var maxCol = cols[cols.length - 1];
+        var span = maxCol - minCol + 1;
 
-      // Read current row values for the span so non-updated columns are preserved
-      var existing = sheet.getRange(parseInt(row), minCol, 1, span).getValues()[0];
-      for (var ci = 0; ci < cols.length; ci++) {
-        existing[cols[ci] - minCol] = updates[cols[ci]];
+        // Read current row values for the span so non-updated columns are preserved
+        var existing = sheet.getRange(parseInt(row), minCol, 1, span).getValues()[0];
+        for (var ci = 0; ci < cols.length; ci++) {
+          existing[cols[ci] - minCol] = updates[cols[ci]];
+        }
+        sheet.getRange(parseInt(row), minCol, 1, span).setValues([existing]);
       }
-      sheet.getRange(parseInt(row), minCol, 1, span).setValues([existing]);
-    }
+    });
   },
 
   /**
-   * Updates an entire row
+   * Updates an entire row.
+   *
+   * NOTE (CR-07): This is a low-level DAL function. It can overwrite ANY data,
+   * including manually entered data. Callers MUST ensure they have the right to
+   * overwrite the target row. Protection against overwriting user-entered data
+   * belongs in the calling code, not here.
+   *
    * @param {string} sheetName - Name of the sheet
    * @param {number} rowNumber - Row number (1-indexed)
    * @param {Array} values - Values for the row
@@ -335,18 +348,33 @@ var DataAccess = {
     var sheet = this.getSheet(sheetName);
     if (!sheet || !values || values.length === 0) return -1;
 
-    sheet.appendRow(values);
-    return sheet.getLastRow();
+    // Wrap in lock so appendRow + getLastRow are atomic — without this,
+    // a concurrent append could make getLastRow() return the wrong row number (H-18)
+    return withScriptLock_(function() {
+      sheet.appendRow(values);
+      return sheet.getLastRow();
+    });
   },
 
   /**
-   * Deletes a row
+   * Deletes a row.
+   *
+   * NOTE (CR-06): This is a low-level DAL function with NO protection for
+   * manually entered data. Callers MUST validate that the row is safe to delete
+   * before calling this function. Manually entered data must never be deleted
+   * without explicit user confirmation at the calling layer.
+   *
    * @param {string} sheetName - Name of the sheet
    * @param {number} rowNumber - Row number (1-indexed)
    */
   deleteRow: function(sheetName, rowNumber) {
     var sheet = this.getSheet(sheetName);
     if (!sheet) return;
+
+    // Log audit event before deletion so there is a record (CR-06)
+    if (typeof logAuditEvent === 'function') {
+      logAuditEvent('ROW_DELETE', { sheetName: sheetName, rowNumber: rowNumber });
+    }
 
     sheet.deleteRow(rowNumber);
   },
@@ -363,6 +391,9 @@ var DataAccess = {
   getMemberById: function(memberId) {
     if (!memberId) return null;
 
+    // Load-order fallback (H-37): This file (00_) loads before 01_Core.gs where
+    // SHEETS is defined. The hardcoded 'Member Directory' matches the actual sheet
+    // name and is only used if SHEETS is not yet available.
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
                     SHEETS.MEMBER_DIR : 'Member Directory';
 
@@ -399,6 +430,9 @@ var DataAccess = {
   getAllMembers: function(options) {
     options = options || {};
 
+    // Load-order fallback (H-37): This file (00_) loads before 01_Core.gs where
+    // SHEETS is defined. The hardcoded 'Member Directory' matches the actual sheet
+    // name and is only used if SHEETS is not yet available.
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.MEMBER_DIR) ?
                     SHEETS.MEMBER_DIR : 'Member Directory';
 
@@ -449,6 +483,9 @@ var DataAccess = {
   getGrievanceById: function(grievanceId) {
     if (!grievanceId) return null;
 
+    // Load-order fallback (H-37): This file (00_) loads before 01_Core.gs where
+    // SHEETS is defined. The hardcoded 'Grievance Log' matches the actual sheet
+    // name and is only used if SHEETS is not yet available.
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
                     SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
@@ -490,6 +527,9 @@ var DataAccess = {
   getAllGrievances: function(options) {
     options = options || {};
 
+    // Load-order fallback (H-37): This file (00_) loads before 01_Core.gs where
+    // SHEETS is defined. The hardcoded 'Grievance Log' matches the actual sheet
+    // name and is only used if SHEETS is not yet available.
     var sheetName = (typeof SHEETS !== 'undefined' && SHEETS.GRIEVANCE_LOG) ?
                     SHEETS.GRIEVANCE_LOG : 'Grievance Log';
 
@@ -601,7 +641,10 @@ function calculateDeadline(startDate, days) {
   if (!startDate || !(startDate instanceof Date)) {
     startDate = new Date();
   }
-  return new Date(startDate.getTime() + (days * TIME_CONSTANTS.MS_PER_DAY));
+  var result = new Date(startDate.getTime() + (days * TIME_CONSTANTS.MS_PER_DAY));
+  // Guard against NaN dates from invalid inputs (L-26)
+  if (isNaN(result.getTime())) return null;
+  return result;
 }
 
 /**
@@ -616,7 +659,11 @@ function daysBetween(startDate, endDate) {
   var start = startDate instanceof Date ? startDate : new Date(startDate);
   var end = endDate instanceof Date ? endDate : new Date(endDate);
 
-  return Math.floor((end.getTime() - start.getTime()) / TIME_CONSTANTS.MS_PER_DAY);
+  // Normalize both dates to midnight UTC to avoid DST off-by-one errors (L-27)
+  var startUtc = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  var endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+
+  return Math.floor((endUtc - startUtc) / TIME_CONSTANTS.MS_PER_DAY);
 }
 
 /**

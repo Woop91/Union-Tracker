@@ -2,9 +2,9 @@ name: Build and Lint
 
 on:
   push:
-    branches: [ main, master, develop, 'claude/**' ]
+    branches: [ Main, master, develop, 'claude/**' ]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [ Main, master, develop ]
 
 jobs:
   lint-and-build:

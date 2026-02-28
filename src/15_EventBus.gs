@@ -169,6 +169,7 @@ var EventBus = (function() {
             result.handled++;
           } catch (err) {
             result.errors.push(parentEvent + '[' + parentSubs[j].id + ']: ' + err.message);
+            console.log('EventBus error in ' + parentEvent + ' (parent of ' + eventName + '): ' + err.message);
           }
           if (parentSubs[j].once) {
             toRemove.push(parentSubs[j].id);
@@ -251,9 +252,17 @@ var EventBus = (function() {
  * Called once during initialization (onOpen or trigger setup).
  * Each module registers its own listeners here.
  */
+var eventBusSubscribersRegistered_ = false;
+
 function registerEventBusSubscribers() {
-  // Clear previous subscriptions (safe for re-init)
-  EventBus.reset();
+  // Only reset if this is the first registration to avoid wiping prior subscribers
+  if (!eventBusSubscribersRegistered_) {
+    EventBus.reset();
+    eventBusSubscribersRegistered_ = true;
+  } else {
+    // Already registered — skip to avoid duplicate listeners
+    return;
+  }
 
   // --- Grievance Log edit handlers ---
   EventBus.on('sheet:edit:GRIEVANCE_LOG', function(e) {

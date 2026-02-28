@@ -126,11 +126,6 @@ var ConfigReader = (function () {
     }
   }
 
-  function _parseInt(val, defaultVal) {
-    var parsed = parseInt(val, 10);
-    return isNaN(parsed) ? defaultVal : parsed;
-  }
-
   function _deriveInitials(name) {
     if (!name) return 'ORG';
     var words = String(name).trim().split(/\s+/);

@@ -162,13 +162,17 @@ function _serveError(config, type, detail) {
     'error': 'Something went wrong. Please try again.',
   };
 
+  // Log the actual error detail server-side; never expose raw error messages to the client
+  if (type === 'error' && detail) {
+    Logger.log('WebApp _serveError: ' + detail);
+  }
+
   template.pageData = JSON.stringify({
     view: 'error',
     config: _sanitizeConfig(config),
     error: {
       type: type,
       message: messages[type] || messages['error'],
-      detail: type === 'error' ? detail : null,
     },
   });
 

@@ -19,7 +19,6 @@ var Auth = (function () {
 
   var TOKEN_PREFIX = 'MAGIC_TOKEN_';
   var SESSION_PREFIX = 'SESSION_';
-  var HMAC_SECRET_KEY = 'AUTH_HMAC_SECRET';
 
   /**
    * Attempts to resolve the current user from available auth signals.
@@ -215,6 +214,12 @@ var Auth = (function () {
     try {
       var data = JSON.parse(raw);
 
+      // CR-03: Reject already-used tokens (prevent replay)
+      if (data.used === true) {
+        props.deleteProperty(TOKEN_PREFIX + token);
+        return null;
+      }
+
       // Check expiry
       if (data.expiry < Date.now()) {
         props.deleteProperty(TOKEN_PREFIX + token);
@@ -262,18 +267,11 @@ var Auth = (function () {
 
   function _generateToken() {
     // Generate a random token using Utilities
+    // M-66: Note — base64-encodes the UUID string chars (not raw bytes), producing an
+    // inflated token. This is acceptable because two concatenated UUIDs (64 hex chars)
+    // still provide sufficient entropy (~128 bits) for token security.
     var bytes = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
     return Utilities.base64EncodeWebSafe(bytes).replace(/[=]+$/, '');
-  }
-
-  function _getHmacSecret() {
-    var props = PropertiesService.getScriptProperties();
-    var secret = props.getProperty(HMAC_SECRET_KEY);
-    if (!secret) {
-      secret = Utilities.getUuid() + '-' + Utilities.getUuid();
-      props.setProperty(HMAC_SECRET_KEY, secret);
-    }
-    return secret;
   }
 
   function _buildEmailHtml(config, signInUrl, email) {
@@ -329,9 +327,17 @@ function authSendMagicLink(email, rememberMe) {
 }
 
 /**
- * Client-callable: Create a session token after successful auth
+ * Client-callable: Create a session token after successful auth.
+ * CR-02: email is resolved server-side — never trust client-supplied email.
  */
-function authCreateSessionToken(email) {
+function authCreateSessionToken() {
+  var email = '';
+  try {
+    email = Session.getActiveUser().getEmail();
+  } catch (_e) { /* SSO not available */ }
+  if (!email) {
+    return { error: 'Unable to resolve authenticated user. Please sign in again.' };
+  }
   return Auth.createSessionToken(email);
 }
 

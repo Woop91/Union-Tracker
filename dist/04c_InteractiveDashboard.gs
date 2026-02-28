@@ -1269,12 +1269,12 @@ function getMyStewardCases() {
     var steward = row[GRIEVANCE_COLS.STEWARD - 1] || '';
     var isMyCase = false;
 
-    // Match by email
-    if (steward && steward.toLowerCase().indexOf(email.toLowerCase()) >= 0) {
+    // Match by exact email (case-insensitive)
+    if (steward && steward.toLowerCase() === email.toLowerCase()) {
       isMyCase = true;
     }
-    // Match by name if we found the user's steward name
-    if (!isMyCase && userStewardName && steward && steward.toLowerCase().indexOf(userStewardName.toLowerCase()) >= 0) {
+    // Match by exact full name if we found the user's steward name (case-insensitive)
+    if (!isMyCase && userStewardName && steward && steward.toLowerCase() === userStewardName.toLowerCase()) {
       isMyCase = true;
     }
 

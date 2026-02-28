@@ -138,6 +138,7 @@ function getMemberById(memberId) {
 /**
  * Searches members by name, email, or other fields
  * @param {string} query - Search query
+ * @param {number} [maxResults=100] - Maximum number of results to return
  * @returns {Array} Array of matching member objects
  */
 var MAX_SEARCH_RESULTS = 200;
@@ -216,8 +217,8 @@ function generateMemberID_(firstName, lastName) {
     }
   }
 
-  // Fallback with timestamp
-  return namePrefix + String(Date.now()).slice(-3);
+  // Fallback with timestamp (last 6 digits) + random component to reduce collision risk
+  return namePrefix + String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 100)).padStart(2, '0');
 }
 
 // ============================================================================
@@ -281,10 +282,10 @@ function getStewardWorkloadDetailed() {
       if (assignedSteward === fullName) {
         totalCases++;
         var status = grievances[i][GRIEVANCE_COLS.STATUS - 1];
-        if (status === 'Open' || status === 'Pending Info') {
+        if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING_INFO) {
           activeCases++;
         }
-        if (status === 'Won') {
+        if (status === GRIEVANCE_STATUS.WON) {
           wonCases++;
         }
       }
@@ -330,13 +331,14 @@ function syncMemberGrievanceData() {
       }
       grievanceCounts[memberId].total++;
       var status = grievances[i][GRIEVANCE_COLS.STATUS - 1];
-      if (status === 'Open' || status === 'Pending Info') {
+      if (status === GRIEVANCE_STATUS.OPEN || status === GRIEVANCE_STATUS.PENDING_INFO) {
         grievanceCounts[memberId].active++;
       }
     }
   }
 
   // Update member rows (if grievance count columns exist)
+  // H-48: Collect all updates and batch them using setValues() instead of per-row setValue()
   if (MEMBER_COLS.TOTAL_GRIEVANCES && MEMBER_COLS.ACTIVE_GRIEVANCES) {
     for (var j = 1; j < members.length; j++) {
       memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
@@ -923,25 +925,25 @@ function updateMemberDataBatch(memberId, newValuesObj) {
     if (data[i][MEMBER_COLS.MEMBER_ID - 1] === memberId) {
       // Modify array in memory
       if (newValuesObj.email !== undefined) {
-        data[i][MEMBER_COLS.EMAIL - 1] = newValuesObj.email;
+        data[i][MEMBER_COLS.EMAIL - 1] = typeof newValuesObj.email === 'string' ? escapeForFormula(newValuesObj.email) : newValuesObj.email;
       }
       if (newValuesObj.phone !== undefined) {
-        data[i][MEMBER_COLS.PHONE - 1] = newValuesObj.phone;
+        data[i][MEMBER_COLS.PHONE - 1] = typeof newValuesObj.phone === 'string' ? escapeForFormula(newValuesObj.phone) : newValuesObj.phone;
       }
       if (newValuesObj.firstName !== undefined) {
-        data[i][MEMBER_COLS.FIRST_NAME - 1] = newValuesObj.firstName;
+        data[i][MEMBER_COLS.FIRST_NAME - 1] = typeof newValuesObj.firstName === 'string' ? escapeForFormula(newValuesObj.firstName) : newValuesObj.firstName;
       }
       if (newValuesObj.lastName !== undefined) {
-        data[i][MEMBER_COLS.LAST_NAME - 1] = newValuesObj.lastName;
+        data[i][MEMBER_COLS.LAST_NAME - 1] = typeof newValuesObj.lastName === 'string' ? escapeForFormula(newValuesObj.lastName) : newValuesObj.lastName;
       }
       if (newValuesObj.unit !== undefined) {
-        data[i][MEMBER_COLS.UNIT - 1] = newValuesObj.unit;
+        data[i][MEMBER_COLS.UNIT - 1] = typeof newValuesObj.unit === 'string' ? escapeForFormula(newValuesObj.unit) : newValuesObj.unit;
       }
       if (newValuesObj.workLocation !== undefined) {
-        data[i][MEMBER_COLS.WORK_LOCATION - 1] = newValuesObj.workLocation;
+        data[i][MEMBER_COLS.WORK_LOCATION - 1] = typeof newValuesObj.workLocation === 'string' ? escapeForFormula(newValuesObj.workLocation) : newValuesObj.workLocation;
       }
       if (newValuesObj.isSteward !== undefined) {
-        data[i][MEMBER_COLS.IS_STEWARD - 1] = newValuesObj.isSteward;
+        data[i][MEMBER_COLS.IS_STEWARD - 1] = typeof newValuesObj.isSteward === 'string' ? escapeForFormula(newValuesObj.isSteward) : newValuesObj.isSteward;
       }
 
       // Write the specific row back in one shot
@@ -1463,17 +1465,17 @@ function importMembersBatch(batchData, mapping) {
 
         // Build new row
         var newRow = new Array(MEMBER_HEADER_MAP_.length).fill('');
-        newRow[MEMBER_COLS.MEMBER_ID - 1] = memberId;
-        newRow[MEMBER_COLS.FIRST_NAME - 1] = firstName;
-        newRow[MEMBER_COLS.LAST_NAME - 1] = lastName;
+        newRow[MEMBER_COLS.MEMBER_ID - 1] = escapeForFormula(memberId);
+        newRow[MEMBER_COLS.FIRST_NAME - 1] = escapeForFormula(firstName);
+        newRow[MEMBER_COLS.LAST_NAME - 1] = escapeForFormula(lastName);
 
-        if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = row[mapping.email] || '';
-        if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = row[mapping.phone] || '';
-        if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = row[mapping.jobTitle] || '';
-        if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = row[mapping.workLocation] || '';
-        if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = row[mapping.unit] || '';
-        if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = row[mapping.supervisor] || '';
-        if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = row[mapping.manager] || '';
+        if (mapping.email !== undefined) newRow[MEMBER_COLS.EMAIL - 1] = escapeForFormula(row[mapping.email] || '');
+        if (mapping.phone !== undefined) newRow[MEMBER_COLS.PHONE - 1] = escapeForFormula(row[mapping.phone] || '');
+        if (mapping.jobTitle !== undefined) newRow[MEMBER_COLS.JOB_TITLE - 1] = escapeForFormula(row[mapping.jobTitle] || '');
+        if (mapping.workLocation !== undefined) newRow[MEMBER_COLS.WORK_LOCATION - 1] = escapeForFormula(row[mapping.workLocation] || '');
+        if (mapping.unit !== undefined) newRow[MEMBER_COLS.UNIT - 1] = escapeForFormula(row[mapping.unit] || '');
+        if (mapping.supervisor !== undefined) newRow[MEMBER_COLS.SUPERVISOR - 1] = escapeForFormula(row[mapping.supervisor] || '');
+        if (mapping.manager !== undefined) newRow[MEMBER_COLS.MANAGER - 1] = escapeForFormula(row[mapping.manager] || '');
 
         newRow[MEMBER_COLS.IS_STEWARD - 1] = 'No';
 
@@ -1594,8 +1596,70 @@ function startNewGrievance(grievanceData) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const grievanceSheet = ss.getSheetByName(SHEET_NAMES.GRIEVANCE_TRACKER);
 
-    if (!grievanceSheet) {
-      throw new Error('Grievance Tracker sheet not found');
+      if (!grievanceSheet) {
+        throw new Error('Grievance Tracker sheet not found');
+      }
+
+      // Validate required fields
+      const validation = validateGrievanceData(grievanceData);
+      if (!validation.valid) {
+        return errorResponse(validation.error, 'createGrievance');
+      }
+
+      // Generate new grievance ID
+      const grievanceId = getNextGrievanceId(grievanceSheet);
+
+      // Calculate initial deadlines
+      const filingDate = grievanceData.filingDate ? new Date(grievanceData.filingDate) : new Date();
+      const deadlines = calculateInitialDeadlines(filingDate);
+
+      // Prepare row data using GRIEVANCE_COLS constants (1-indexed; subtract 1 for array)
+      const totalCols = getGrievanceHeaders().length;
+      const rowData = new Array(totalCols).fill('');
+
+      // H-46: Split memberName into first/last if both fields not provided separately
+      var firstName = grievanceData.firstName || '';
+      var lastName = grievanceData.lastName || '';
+      if (!firstName && !lastName && grievanceData.memberName) {
+        var nameParts = grievanceData.memberName.trim().split(/\s+/);
+        firstName = nameParts[0] || '';
+        lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      }
+
+      rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1]   = grievanceId;
+      rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = escapeForFormula(grievanceData.memberId || '');
+      rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = escapeForFormula(firstName);
+      if (GRIEVANCE_COLS.LAST_NAME) {
+        rowData[GRIEVANCE_COLS.LAST_NAME - 1]     = escapeForFormula(lastName);
+      }
+      rowData[GRIEVANCE_COLS.STATUS - 1]          = GRIEVANCE_STATUS.OPEN;
+      rowData[GRIEVANCE_COLS.CURRENT_STEP - 1]    = 1;
+      rowData[GRIEVANCE_COLS.DATE_FILED - 1]      = filingDate;
+      rowData[GRIEVANCE_COLS.STEP1_DUE - 1]       = deadlines.step1Due;
+      rowData[GRIEVANCE_COLS.ARTICLES - 1]        = escapeForFormula(grievanceData.articleViolated || '');
+      rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = escapeForFormula(grievanceData.grievanceType || '');
+      rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = escapeForFormula(grievanceData.notes || '');
+      rowData[GRIEVANCE_COLS.LAST_UPDATED - 1]    = new Date();
+
+      // Append to sheet
+      grievanceSheet.appendRow(rowData);
+
+      // Log the creation
+      logAuditEvent(AUDIT_EVENTS.GRIEVANCE_CREATED, {
+        grievanceId: grievanceId,
+        memberId: grievanceData.memberId,
+        createdBy: Session.getActiveUser().getEmail()
+      });
+
+      return {
+        success: true,
+        grievanceId: grievanceId,
+        message: `Grievance ${grievanceId} created successfully`
+      };
+
+    } catch (error) {
+      console.error('Error creating grievance:', error);
+      return errorResponse(error.message, 'createGrievance');
     }
 
     // Validate required fields
@@ -1961,12 +2025,12 @@ function advanceGrievanceStep(grievanceId, options) {
       updates.push({ col: GRIEVANCE_COLS.DATE_CLOSED, val: today });
     }
 
-    // Add notes if provided
+    // Add notes if provided — escape once at the final write point only
     if (options.notes) {
       const existingResolution = data[rowIndex - 1][GRIEVANCE_COLS.RESOLUTION - 1] || '';
       const timestamp = Utilities.formatDate(today, Session.getScriptTimeZone(), 'MM/dd/yyyy HH:mm');
       const newResolution = existingResolution + (existingResolution ? '\n' : '') +
-                       `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${escapeForFormula(options.notes)}`;
+                       `[${timestamp}] Step ${currentStep} -> ${nextStep}: ${options.notes}`;
       updates.push({ col: GRIEVANCE_COLS.RESOLUTION, val: escapeForFormula(newResolution) });
     }
 
@@ -2147,10 +2211,11 @@ function bulkUpdateGrievanceStatus(grievanceIds, newStatus, notes) {
       sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
 
       // Add notes if provided (NOTES aliases to RESOLUTION — use directly)
+      // Escape once at the final write point only to avoid double-escaping
       if (notes) {
         const existingResolution = data[i][GRIEVANCE_COLS.RESOLUTION - 1] || '';
         const newResolution = existingResolution + (existingResolution ? '\n' : '') +
-                         `[${timestamp}] Bulk status update to "${escapeForFormula(newStatus)}": ${escapeForFormula(notes)}`;
+                         `[${timestamp}] Bulk status update to "${newStatus}": ${notes}`;
         sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(newResolution));
       }
 
@@ -2245,20 +2310,21 @@ function getUpcomingDeadlines(daysAhead) {
 
   const upcoming = [];
 
+  // Use header strings matching GRIEVANCE_HEADER_MAP_ (Roman numerals)
   openGrievances.forEach(g => {
     const currentStep = g['Current Step'];
     let deadline;
 
-    // Get the due date for current step
+    // Get the due date for current step using actual header names
     switch (currentStep) {
       case 1:
-        deadline = g['Step 1 Due'];
+        deadline = g['Step I Due'];
         break;
       case 2:
-        deadline = g['Step 2 Due'];
+        deadline = g['Step II Due'];
         break;
       case 3:
-        deadline = g['Step 3 Due'];
+        deadline = g['Step III Appeal Due'];
         break;
     }
 
@@ -2268,9 +2334,10 @@ function getUpcomingDeadlines(daysAhead) {
 
       if (deadlineDate <= cutoffDate) {
         const daysLeft = Math.ceil((deadlineDate - today) / (1000 * 60 * 60 * 24));
+        const memberName = (g['First Name'] || '') + (g['Last Name'] ? ' ' + g['Last Name'] : '');
         upcoming.push({
           grievanceId: g['Grievance ID'],
-          memberName: g['Member Name'],
+          memberName: memberName,
           step: `Step ${currentStep}`,
           deadline: deadline,
           date: Utilities.formatDate(deadline, Session.getScriptTimeZone(), 'MM/dd/yyyy'),
@@ -2331,6 +2398,7 @@ function getGrievanceStats() {
         break;
       case GRIEVANCE_STATUS.PENDING:
       case GRIEVANCE_STATUS.APPEALED:
+      case GRIEVANCE_STATUS.IN_ARBITRATION:
         pending++;
         break;
       case GRIEVANCE_STATUS.WON:
@@ -2340,6 +2408,8 @@ function getGrievanceStats() {
           closedThisYear++;
         }
         break;
+      case GRIEVANCE_STATUS.DENIED:
+      case GRIEVANCE_STATUS.WITHDRAWN:
       case GRIEVANCE_STATUS.RESOLVED:
       case GRIEVANCE_STATUS.SETTLED:
       case GRIEVANCE_STATUS.CLOSED:
@@ -2422,7 +2492,17 @@ function resolveGrievance(grievanceId, outcome, resolution, notes) {
                         '[' + timestamp + '] ' + notes;
     }
     sheet.getRange(rowIndex, GRIEVANCE_COLS.RESOLUTION).setValue(escapeForFormula(resolutionText));
-    sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(GRIEVANCE_STATUS.RESOLVED);
+
+    // H-29: Use outcome parameter to determine status instead of always 'Settled'
+    var validOutcomes = {
+      'Won': GRIEVANCE_STATUS.WON,
+      'Denied': GRIEVANCE_STATUS.DENIED,
+      'Settled': GRIEVANCE_STATUS.SETTLED,
+      'Withdrawn': GRIEVANCE_STATUS.WITHDRAWN,
+      'Closed': GRIEVANCE_STATUS.CLOSED
+    };
+    var resolvedStatus = (outcome && validOutcomes[outcome]) ? validOutcomes[outcome] : GRIEVANCE_STATUS.SETTLED;
+    sheet.getRange(rowIndex, GRIEVANCE_COLS.STATUS).setValue(resolvedStatus);
     sheet.getRange(rowIndex, GRIEVANCE_COLS.DATE_CLOSED).setValue(today);
     sheet.getRange(rowIndex, GRIEVANCE_COLS.LAST_UPDATED).setValue(today);
 
@@ -2498,11 +2578,14 @@ function showBulkStatusUpdate() {
   }
 
   const openGrievances = getOpenGrievances();
-  const items = openGrievances.map(g => ({
-    id: g['Grievance ID'],
-    label: `${g['Grievance ID']} - ${g['Member Name']}`,
-    selected: false
-  }));
+  const items = openGrievances.map(g => {
+    var memberName = ((g['First Name'] || '') + ' ' + (g['Last Name'] || '')).trim() || 'Unknown';
+    return {
+      id: g['Grievance ID'],
+      label: `${g['Grievance ID']} - ${memberName}`,
+      selected: false
+    };
+  });
 
   showMultiSelectDialog('Select Grievances to Update', items, 'handleBulkStatusSelection');
 }
@@ -3125,9 +3208,11 @@ function selectAllOpenCases() {
       var checkboxValues = [];
       var count = 0;
 
+      var openLower = GRIEVANCE_STATUS.OPEN.toLowerCase();
+      var pendingLower = GRIEVANCE_STATUS.PENDING_INFO.toLowerCase();
       for (var i = 0; i < statusData.length; i++) {
         var status = String(statusData[i][0]).trim().toLowerCase();
-        var isOpen = (status === 'open' || status === 'pending info');
+        var isOpen = (status === openLower || status === pendingLower);
         if (isOpen) count++;
         checkboxValues.push([isOpen]);
       }

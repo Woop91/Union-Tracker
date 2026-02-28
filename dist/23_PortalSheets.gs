@@ -20,6 +20,18 @@
 // ═══════════════════════════════════════════════════════
 // COLUMN CONSTANTS (PORTAL_ prefix to avoid global conflicts)
 // ═══════════════════════════════════════════════════════
+//
+// *** IMPORTANT: 0-INDEXED CONSTANTS ***
+// Unlike the rest of the codebase (GRIEVANCE_COLS, MEMBER_COLS, CONFIG_COLS)
+// which use 1-indexed values for getRange(), the PORTAL_*_COLS below are
+// 0-indexed for direct array access on getValues() data.
+//
+// Usage:  row[PORTAL_EVENT_COLS.TITLE]          — correct (array access)
+// Do NOT: sheet.getRange(r, PORTAL_EVENT_COLS.TITLE) — wrong (off by one)
+//
+// This convention exists because portal modules exclusively work with
+// getValues() arrays rather than individual getRange() calls.
+// ═══════════════════════════════════════════════════════
 
 var PORTAL_MEMBER_DIR_COLS = {
   EMAIL: 0, NAME: 1, PERSONAL_EMAIL: 2, PHONE: 3, ROLE: 4,
@@ -62,6 +74,23 @@ var PORTAL_MEGA_SURVEY_COLS = {
 };
 
 // ═══════════════════════════════════════════════════════
+// PORTAL SHEET NAME HELPERS
+// Use SHEETS.* constants from 01_Core.gs when available;
+// fall back to hardcoded names if SHEETS is not yet loaded.
+// ═══════════════════════════════════════════════════════
+
+var PORTAL_SHEET_NAMES_ = {
+  MEMBER_DIR:      (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_MEMBER_DIR)     ? SHEETS.PORTAL_MEMBER_DIR     : 'PortalMemberDirectory',
+  EVENTS:          (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_EVENTS)         ? SHEETS.PORTAL_EVENTS         : 'Events',
+  MINUTES:         (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_MINUTES)        ? SHEETS.PORTAL_MINUTES        : 'MeetingMinutes',
+  POLLS:           (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_POLLS)          ? SHEETS.PORTAL_POLLS          : 'FlashPolls',
+  POLL_RESPONSES:  (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_POLL_RESPONSES) ? SHEETS.PORTAL_POLL_RESPONSES : 'PollResponses',
+  GRIEVANCES:      (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_GRIEVANCES)     ? SHEETS.PORTAL_GRIEVANCES     : 'PortalGrievances',
+  STEWARD_LOG:     (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_STEWARD_LOG)    ? SHEETS.PORTAL_STEWARD_LOG    : 'StewardLog',
+  MEGA_SURVEY:     (typeof SHEETS !== 'undefined' && SHEETS.PORTAL_MEGA_SURVEY)    ? SHEETS.PORTAL_MEGA_SURVEY    : 'MegaSurvey'
+};
+
+// ═══════════════════════════════════════════════════════
 // SHEET SETUP FUNCTIONS
 // ═══════════════════════════════════════════════════════
 
@@ -87,7 +116,7 @@ function portalGetOrCreateSheet_(name, headers, hidden) {
 }
 
 function getOrCreatePortalMemberDirectory() {
-  return portalGetOrCreateSheet_('PortalMemberDirectory', [
+  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MEMBER_DIR, [
     'Email', 'Name', 'Personal Email', 'Phone', 'Role',
     'Office', 'Unit', 'Join Date', 'Office Days', 'Badges',
     'Grievance Mode', 'Last Active'
@@ -95,34 +124,34 @@ function getOrCreatePortalMemberDirectory() {
 }
 
 function getOrCreateEventsSheet() {
-  return portalGetOrCreateSheet_('Events', [
+  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.EVENTS, [
     'ID', 'Title', 'Type', 'DateTime', 'EndTime',
     'Location', 'Description', 'ZoomLink', 'CreatedBy', 'CreatedDate'
   ], false);
 }
 
 function getOrCreateMinutesSheet() {
-  return portalGetOrCreateSheet_('MeetingMinutes', [
+  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MINUTES, [
     'ID', 'MeetingDate', 'Title', 'Bullets', 'FullMinutes',
     'CreatedBy', 'CreatedDate'
   ], false);
 }
 
 function getOrCreatePollsSheet() {
-  return portalGetOrCreateSheet_('FlashPolls', [
+  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.POLLS, [
     'ID', 'Question', 'Options', 'Active', 'Unit',
     'CreatedBy', 'CreatedDate'
   ], false);
 }
 
 function getOrCreatePollResponsesSheet() {
-  return portalGetOrCreateSheet_('PollResponses', [
+  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.POLL_RESPONSES, [
     'PollID', 'Email', 'Response', 'Timestamp'
   ], true);
 }
 
 function getOrCreatePortalGrievanceSheet() {
-  return portalGetOrCreateSheet_('PortalGrievances', [
+  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.GRIEVANCES, [
     'ID', 'MemberEmail', 'StewardEmail', 'Step', 'Status',
     'Description', 'GDriveLink', 'ZoomLink', 'Deadlines',
     'Notes', 'CreatedDate', 'UpdatedDate'
@@ -130,14 +159,14 @@ function getOrCreatePortalGrievanceSheet() {
 }
 
 function getOrCreateStewardLogSheet() {
-  return portalGetOrCreateSheet_('StewardLog', [
+  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.STEWARD_LOG, [
     'ID', 'StewardEmail', 'MemberEmail', 'Type',
     'Notes', 'Office', 'Timestamp'
   ], true);
 }
 
 function getOrCreateMegaSurveySheet() {
-  return portalGetOrCreateSheet_('MegaSurvey', [
+  return portalGetOrCreateSheet_(PORTAL_SHEET_NAMES_.MEGA_SURVEY, [
     'Email', 'Responses', 'Progress', 'LastUpdated', 'Completed'
   ], true);
 }

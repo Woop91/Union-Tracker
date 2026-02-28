@@ -144,6 +144,17 @@ function scheduleEmailReport(config) {
     return { success: false, error: 'Invalid email address format' };
   }
 
+  // Authorization check — PII reports may only be sent to stewards or admins
+  var recipientRole = typeof getUserRole_ === 'function' ? getUserRole_(config.email) : null;
+  if (recipientRole !== 'admin' && recipientRole !== 'steward') {
+    var callerEmail = '';
+    try { callerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* */ }
+    // Allow sending to self even if not steward/admin (non-PII only)
+    if (callerEmail.toLowerCase() !== config.email.toLowerCase() || config.includePII) {
+      return { success: false, error: 'Reports containing PII can only be sent to stewards or admins.' };
+    }
+  }
+
   // Store report config in script properties
   var props = PropertiesService.getScriptProperties();
   var schedules = JSON.parse(props.getProperty('report_schedules') || '[]');
@@ -319,8 +330,11 @@ function removeScheduledReport(scheduleId) {
  * @returns {string} JSON array of notifications
  */
 function getUserNotifications() {
-  var props = PropertiesService.getUserProperties();
-  var notifications = JSON.parse(props.getProperty('dashboard_notifications') || '[]');
+  // Use ScriptProperties with user-scoped key (matches pushNotification's write store)
+  var userEmail = Session.getActiveUser().getEmail();
+  var scriptProps = PropertiesService.getScriptProperties();
+  var key = 'notifications_' + userEmail.replace(/[^a-zA-Z0-9]/g, '_');
+  var notifications = JSON.parse(scriptProps.getProperty(key) || '[]');
 
   // Prune notifications older than 30 days
   var cutoff = new Date();
@@ -329,7 +343,7 @@ function getUserNotifications() {
     return new Date(n.timestamp) > cutoff;
   });
 
-  props.setProperty('dashboard_notifications', JSON.stringify(notifications));
+  scriptProps.setProperty(key, JSON.stringify(notifications));
   return JSON.stringify(notifications);
 }
 
@@ -344,6 +358,16 @@ function getUserNotifications() {
  * @returns {Object} Push result
  */
 function pushNotification(userEmail, notification) {
+  // Authorization check — only stewards/admins can push notifications to other users
+  var callerEmail = '';
+  try { callerEmail = Session.getActiveUser().getEmail().toLowerCase(); } catch (_e) { /* trigger/web app context */ }
+  if (callerEmail && callerEmail !== userEmail.toLowerCase()) {
+    var callerRole = typeof getUserRole_ === 'function' ? getUserRole_(callerEmail) : 'member';
+    if (callerRole !== 'admin' && callerRole !== 'steward') {
+      return { success: false, error: 'Not authorized to push notifications to other users.' };
+    }
+  }
+
   // For cross-user notifications, use ScriptProperties with user key
   var scriptProps = PropertiesService.getScriptProperties();
   var key = 'notifications_' + userEmail.replace(/[^a-zA-Z0-9]/g, '_');
@@ -435,7 +459,7 @@ function saveSharedView(view) {
 
   var sharedView = {
     id: 'view_' + Date.now(),
-    name: view.name || 'Untitled View',
+    name: escapeForFormula(view.name || 'Untitled View'),
     selectedCharts: view.selectedCharts || [],
     filters: view.filters || {},
     dateRange: view.dateRange || null,
@@ -492,10 +516,16 @@ function addViewComment(viewId, commentText) {
 
   for (var i = 0; i < views.length; i++) {
     if (views[i].id === viewId) {
+      // Authorization check — only the view owner or shared users can comment
+      if (views[i].createdBy !== userEmail &&
+          (!views[i].sharedWith || views[i].sharedWith.indexOf(userEmail) === -1)) {
+        return { success: false, error: 'Not authorized to comment on this view.' };
+      }
+
       var comment = {
         id: 'cmt_' + Date.now(),
         author: userEmail,
-        text: commentText,
+        text: escapeHtml(commentText),
         timestamp: new Date().toISOString()
       };
       views[i].comments.push(comment);

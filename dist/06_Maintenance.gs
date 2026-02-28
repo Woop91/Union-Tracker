@@ -891,11 +891,12 @@ function showCacheStatusDashboard() {
       } catch (_e) { /* cached value may not be valid JSON; skip age display */ }
     }
 
+    // M-13: Apply escapeHtml() to dynamic values embedded in HTML
     return '<tr>' +
-      '<td>' + name + '</td>' +
+      '<td>' + escapeHtml(String(name)) + '</td>' +
       '<td>' + (inMem ? '✅' : '❌') + '</td>' +
       '<td>' + (inProps ? '✅' : '❌') + '</td>' +
-      '<td>' + age + '</td>' +
+      '<td>' + escapeHtml(String(age)) + '</td>' +
       '</tr>';
   }).join('');
 
@@ -1246,10 +1247,12 @@ function createGrievanceSnapshot() {
 
 /**
  * Restores the grievance log from a snapshot
+ * CR-14: Requires explicit confirmed=true parameter and creates a persistent backup first
  * @param {Object} snapshot - Snapshot to restore
+ * @param {boolean} confirmed - Must be true to proceed; adds programmatic confirmation gate
  * @returns {void}
  */
-function restoreFromSnapshot(snapshot) {
+function restoreFromSnapshot(snapshot, confirmed) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG);
 
@@ -1265,26 +1268,41 @@ function restoreFromSnapshot(snapshot) {
     }
   }
 
-  // Confirm with user before proceeding
-  var ui = SpreadsheetApp.getUi();
-  var response = ui.alert(
-    'Restore Snapshot',
-    'This will replace all current grievance data with the snapshot from ' +
-    snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
-    ui.ButtonSet.YES_NO
-  );
-  if (response !== ui.Button.YES) {
-    return;
+  // CR-14: Require explicit confirmed parameter as a programmatic safety gate
+  if (confirmed !== true) {
+    // Confirm with user via UI dialog
+    var ui = SpreadsheetApp.getUi();
+    var response = ui.alert(
+      'Restore Snapshot',
+      'This will replace all current grievance data with the snapshot from ' +
+      snapshot.timestamp + '. A backup of current data will be created first.\n\nContinue?',
+      ui.ButtonSet.YES_NO
+    );
+    if (response !== ui.Button.YES) {
+      return;
+    }
   }
 
-  // Create a backup of current data before restoring
+  // CR-14: Create a persistent backup of current data to a hidden sheet before restoring
+  var backupSheetName = '';
   try {
-    // NOTE: Backup is ephemeral (in-memory only). Persisting to hidden sheet would add complexity for rare usage.
-    var preRestoreBackup = createGrievanceSnapshot();
-    preRestoreBackup.label = 'Pre-Restore Backup';
-    Logger.log('Pre-restore backup created at ' + preRestoreBackup.timestamp);
+    var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    backupSheetName = '_PreRestore_Backup_' + timestamp;
+    if (sheet.getLastRow() > 1) {
+      var backupSheet = ss.insertSheet(backupSheetName);
+      var currentData = sheet.getDataRange().getValues();
+      backupSheet.getRange(1, 1, currentData.length, currentData[0].length).setValues(currentData);
+      try {
+        setSheetVeryHidden_(backupSheet);
+      } catch (_hideErr) {
+        backupSheet.hideSheet();
+      }
+      Logger.log('Pre-restore backup saved to hidden sheet: ' + backupSheetName);
+    }
   } catch (_backupErr) {
-    Logger.log('Warning: Could not create pre-restore backup: ' + _backupErr.message);
+    Logger.log('Warning: Could not create pre-restore backup sheet: ' + _backupErr.message);
+    // Continue with restore — backup failure should not block the operation,
+    // but log a warning for audit trail
   }
 
   // Clear existing data (keep header)
@@ -1297,6 +1315,12 @@ function restoreFromSnapshot(snapshot) {
     sheet.getRange(2, 1, snapshot.data.length - 1, snapshot.data[0].length)
       .setValues(snapshot.data.slice(1));
   }
+
+  logAuditEvent(AUDIT_EVENTS.SYSTEM_REPAIR || 'SNAPSHOT_RESTORED', {
+    snapshotTimestamp: snapshot.timestamp,
+    backupSheet: backupSheetName || 'N/A',
+    restoredBy: Session.getActiveUser().getEmail()
+  });
 
   SpreadsheetApp.getActiveSpreadsheet().toast('Snapshot restored', 'Undo/Redo', 3);
 }
@@ -1313,11 +1337,16 @@ function exportUndoHistoryToSheet() {
   var history = getUndoHistory();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var sheet = ss.getSheetByName('Undo_History_Export');
+  // M-17: Use a constant for the export sheet name instead of hardcoded string
+  var UNDO_EXPORT_SHEET_NAME = (typeof SHEETS !== 'undefined' && SHEETS.UNDO_HISTORY_EXPORT)
+    ? SHEETS.UNDO_HISTORY_EXPORT
+    : 'Undo_History_Export';
+
+  var sheet = ss.getSheetByName(UNDO_EXPORT_SHEET_NAME);
   if (sheet) {
     sheet.clear();
   } else {
-    sheet = ss.insertSheet('Undo_History_Export');
+    sheet = ss.insertSheet(UNDO_EXPORT_SHEET_NAME);
   }
 
   var headers = ['#', 'Action Type', 'Description', 'Timestamp', 'Status'];
@@ -1468,10 +1497,16 @@ function logAuditEvent(eventType, details) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let auditSheet = ss.getSheetByName(SHEET_NAMES.AUDIT_LOG);
 
-    // Create audit sheet if it doesn't exist
+    // Create audit sheet if it doesn't exist — use the canonical 10-col schema
+    // H-43: Standardize to the 10-col AUDIT_LOG_HEADER_MAP_ schema used by
+    // 08d_AuditAndFormulas.gs, plus an Integrity Hash column (col 11).
     if (!auditSheet) {
       auditSheet = ss.insertSheet(SHEET_NAMES.AUDIT_LOG);
-      auditSheet.appendRow(['Timestamp', 'Event Type', 'User', 'Details', 'Session ID', 'Integrity Hash']);
+      var headerRow = (typeof getHeadersFromMap_ === 'function' && typeof AUDIT_LOG_HEADER_MAP_ !== 'undefined')
+        ? getHeadersFromMap_(AUDIT_LOG_HEADER_MAP_)
+        : ['Timestamp', 'User Email', 'Sheet', 'Row', 'Column', 'Field Name', 'Old Value', 'New Value', 'Record ID', 'Action Type'];
+      headerRow.push('Integrity Hash');
+      auditSheet.appendRow(headerRow);
       auditSheet.setFrozenRows(1);
     } else {
       // Ensure Integrity Hash header exists (upgrade path for existing sheets)
@@ -1500,11 +1535,11 @@ function logAuditEvent(eventType, details) {
     var previousHash = '';
     var lastRow = auditSheet.getLastRow();
     if (lastRow >= 2) {
-      // Find Integrity Hash column index
-      var headerRow = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+      // Find Integrity Hash column index dynamically
+      var hdrRow = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
       var integrityColIdx = -1;
-      for (var i = 0; i < headerRow.length; i++) {
-        if (String(headerRow[i]).trim() === 'Integrity Hash') {
+      for (var i = 0; i < hdrRow.length; i++) {
+        if (String(hdrRow[i]).trim() === 'Integrity Hash') {
           integrityColIdx = i + 1; // 1-indexed
           break;
         }
@@ -1520,12 +1555,56 @@ function logAuditEvent(eventType, details) {
       integrityHash = computeAuditRowHash_(previousHash, timestamp, eventType, rawEmail, detailsJson, sessionId);
     }
 
-    auditSheet.appendRow([timestamp, eventType, user, detailsJson, sessionId, integrityHash]);
+    // H-43: Write in 10-col schema: Timestamp, User Email, Sheet, Row, Column,
+    // Field Name, Old Value, New Value, Record ID, Action Type, Integrity Hash.
+    // For event-level logging, Sheet/Row/Column/Field Name are empty; details go
+    // in New Value, sessionId in Record ID, eventType in Action Type.
+    auditSheet.appendRow([
+      timestamp,           // Timestamp
+      user,                // User Email
+      '',                  // Sheet (N/A for events)
+      '',                  // Row (N/A for events)
+      '',                  // Column (N/A for events)
+      '',                  // Field Name (N/A for events)
+      '',                  // Old Value (N/A for events)
+      detailsJson,         // New Value (event details JSON)
+      sessionId,           // Record ID (session key)
+      eventType,           // Action Type (event type)
+      integrityHash        // Integrity Hash
+    ]);
 
     // Trim old entries if sheet gets too large (keep last 10,000)
+    // CR-30 WARNING: Deleting rows breaks the integrity hash chain because each
+    // row's hash is chained to the previous row. Before trimming, save the hash
+    // of the last row being deleted as a "chain checkpoint" in ScriptProperties
+    // so that verifyAuditLogIntegrity() can start verification from this checkpoint.
     const rowCount = auditSheet.getLastRow();
     if (rowCount > 10000) {
-      auditSheet.deleteRows(2, rowCount - 10000);
+      var rowsToDelete = rowCount - 10000;
+      // Save the hash of the last deleted row as a chain checkpoint
+      try {
+        var checkpointRow = 1 + rowsToDelete; // last row being deleted (1-indexed, row 1 is header)
+        var trimHeaders = auditSheet.getRange(1, 1, 1, auditSheet.getLastColumn()).getValues()[0];
+        var hashColIdx = -1;
+        for (var ci = 0; ci < trimHeaders.length; ci++) {
+          if (String(trimHeaders[ci]).trim() === 'Integrity Hash') {
+            hashColIdx = ci + 1;
+            break;
+          }
+        }
+        if (hashColIdx > 0) {
+          var checkpointHash = String(auditSheet.getRange(checkpointRow, hashColIdx).getValue() || '');
+          PropertiesService.getScriptProperties().setProperty(
+            'AUDIT_CHAIN_CHECKPOINT_HASH', checkpointHash
+          );
+          PropertiesService.getScriptProperties().setProperty(
+            'AUDIT_CHAIN_CHECKPOINT_TIMESTAMP', new Date().toISOString()
+          );
+        }
+      } catch (cpErr) {
+        Logger.log('Warning: Could not save audit chain checkpoint: ' + cpErr.message);
+      }
+      auditSheet.deleteRows(2, rowsToDelete);
     }
 
   } catch (error) {
@@ -1635,6 +1714,17 @@ function NUCLEAR_RESET_HIDDEN_SHEETS() {
  * For testing/development use only
  */
 function NUCLEAR_WIPE_GRIEVANCES() {
+  // H-23: Authorization check — only admins may perform destructive data wipe
+  if (typeof getUserRole_ === 'function') {
+    var callerEmail = Session.getActiveUser().getEmail();
+    var callerRole = getUserRole_(callerEmail);
+    if (callerRole !== 'admin') {
+      SpreadsheetApp.getUi().alert('Access Denied',
+        'Only administrators may perform this destructive action.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return errorResponse('Unauthorized: admin role required');
+    }
+  }
+
   var isDev = typeof IS_DEV_ENVIRONMENT !== 'undefined' && IS_DEV_ENVIRONMENT === true;
   if (!isDev) {
     var _ui = SpreadsheetApp.getUi();
@@ -1750,7 +1840,9 @@ function createWeeklySnapshot() {
     } catch (createErr) {
       ui.alert('Archive Folder Error',
         'Could not auto-create archive folder: ' + createErr.message + '\n\n' +
-        'You can manually set the Archive Folder ID in the Config sheet (column AS).',
+        'You can manually set the Archive Folder ID in the Config sheet (column ' +
+        (typeof getColumnLetter === 'function' && typeof CONFIG_COLS !== 'undefined' && CONFIG_COLS.ARCHIVE_FOLDER_ID
+          ? getColumnLetter(CONFIG_COLS.ARCHIVE_FOLDER_ID) : 'ARCHIVE_FOLDER_ID') + ').',
         ui.ButtonSet.OK);
       return;
     }
@@ -2050,15 +2142,42 @@ function getSettings() {
  * @param {Object} settings - Settings to save
  */
 function saveSettings(settings) {
+  // M-58: Whitelist of allowed setting keys to prevent arbitrary property writes
+  var ALLOWED_SETTINGS = {
+    autoSyncCalendar: 'boolean',
+    emailReminders: 'boolean',
+    reminderDays: 'number',
+    autoCreateFolders: 'boolean'
+  };
+
+  if (!settings || typeof settings !== 'object') {
+    throw new Error('Invalid settings object');
+  }
+
   const props = PropertiesService.getDocumentProperties();
 
-  props.setProperty('autoSyncCalendar', String(settings.autoSyncCalendar));
-  props.setProperty('emailReminders', String(settings.emailReminders));
-  props.setProperty('reminderDays', String(settings.reminderDays));
-  props.setProperty('autoCreateFolders', String(settings.autoCreateFolders));
+  // Only write whitelisted keys, validate types
+  var savedKeys = [];
+  for (var key in ALLOWED_SETTINGS) {
+    if (ALLOWED_SETTINGS.hasOwnProperty(key) && settings.hasOwnProperty(key)) {
+      var expectedType = ALLOWED_SETTINGS[key];
+      var value = settings[key];
+      // Coerce to expected type for safety
+      if (expectedType === 'boolean') {
+        props.setProperty(key, String(!!value));
+      } else if (expectedType === 'number') {
+        var numVal = parseInt(value, 10);
+        if (isNaN(numVal) || numVal < 0) numVal = 7; // safe default for reminderDays
+        props.setProperty(key, String(numVal));
+      } else {
+        props.setProperty(key, String(value));
+      }
+      savedKeys.push(key);
+    }
+  }
 
   logAuditEvent(AUDIT_EVENTS.SETTINGS_CHANGED, {
-    settings: settings,
+    settingsKeys: savedKeys,
     changedBy: Session.getActiveUser().getEmail()
   });
 }
@@ -2106,29 +2225,33 @@ function saveSettings(settings) {
 function batchSetValues(sheet, updates) {
   if (!updates || updates.length === 0) return;
 
-  // Group updates by row for efficient writing
-  var rowGroups = {};
-  updates.forEach(function(update) {
-    if (!rowGroups[update.row]) {
-      rowGroups[update.row] = [];
-    }
-    rowGroups[update.row].push(update);
+  // CR-13: Wrap entire read-modify-write cycle in a script lock to prevent
+  // concurrent writes from overwriting each other's changes
+  withScriptLock_(function() {
+    // Group updates by row for efficient writing
+    var rowGroups = {};
+    updates.forEach(function(update) {
+      if (!rowGroups[update.row]) {
+        rowGroups[update.row] = [];
+      }
+      rowGroups[update.row].push(update);
+    });
+
+    // Get current sheet data for merging
+    var lastRow = Math.max.apply(null, updates.map(function(u) { return u.row; }));
+    var lastCol = Math.max.apply(null, updates.map(function(u) { return u.col; }));
+
+    // Read current data
+    var currentData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+
+    // Apply updates to the array
+    updates.forEach(function(update) {
+      currentData[update.row - 1][update.col - 1] = update.value;
+    });
+
+    // Write back in single operation
+    sheet.getRange(1, 1, lastRow, lastCol).setValues(currentData);
   });
-
-  // Get current sheet data for merging
-  var lastRow = Math.max.apply(null, updates.map(function(u) { return u.row; }));
-  var lastCol = Math.max.apply(null, updates.map(function(u) { return u.col; }));
-
-  // Read current data
-  var currentData = sheet.getRange(1, 1, lastRow, lastCol).getValues();
-
-  // Apply updates to the array
-  updates.forEach(function(update) {
-    currentData[update.row - 1][update.col - 1] = update.value;
-  });
-
-  // Write back in single operation
-  sheet.getRange(1, 1, lastRow, lastCol).setValues(currentData);
 }
 
 /**
