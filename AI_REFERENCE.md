@@ -418,3 +418,29 @@ DDS Main → UT staging → (user manages) → UT dev → UT main
 - Files excluded: `src/18_WorkloadTracker.gs`, `src/WorkloadTracker.html`
 - Files with typeof guards handle WT absence gracefully.
 - See SYNC-LOG.md for full exclusion registry.
+
+---
+
+## 2026-02-28 — Branch Cleanup & Version Alignment (v4.18.1)
+
+### Actions Taken
+- **Deleted stale branches:** `dev` (13 behind Main), `staging` (16 behind Main), `main` lowercase (9 behind, 2 ahead — only merge commits, no unique content).
+- **Version alignment:** `package.json` updated from 4.12.0 → 4.18.1 to match DDS `VERSION_INFO`.
+- **CLAUDE.md updated:** Replaced multi-branch workflow with single-branch `Main` policy. Added version tagging, parity enforcement, no-assumptions policy.
+- **Sync flow simplified:** `DDS Main → UT Main` (direct, no intermediate staging/dev).
+
+### Errors Found & Fixed
+- **package.json drift:** Was at 4.12.0 while DDS code version was 4.18.1. Fixed.
+- **Main/main collision:** Both `Main` (capital) and `main` (lowercase) branches existed. Lowercase `main` was stale (9 commits behind, 2 merge-only commits ahead). Deleted lowercase `main`.
+- **Branch accumulation:** `dev` and `staging` had fallen 13 and 16 commits behind respectively. Deleted.
+
+### Version History
+- v4.18.1 — Current. Branch cleanup, version alignment, CLAUDE.md overhaul.
+
+### Reminders for LLMs
+- **Everything must be dynamic.** Never hardcode sheet names, column positions, org names, unit names, or config values.
+- **Single branch: Main only.** Never create dev/staging/feature branches.
+- **Version bump is mandatory** on every code change: `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
+- **DDS Script ID must NEVER appear in this repo** (public).
+- **Read before act.** Never assume repo state, file contents, or function behavior.
+- **Workload Tracker excluded:** `18_WorkloadTracker.gs` and `WorkloadTracker.html` are DDS-only.

@@ -11,11 +11,25 @@
 
 ## Repos & Sync
 
-- **Union-Tracker** (public): This repo. Receives syncs from DDS `Main` into UT `staging`.
-- **DDS-Dashboard** (private): Primary/source repo. Default branch: `Main`.
-- Sync flow: `DDS Main → UT staging → (user manages) → UT dev → UT main`
+- **Union-Tracker** (public): This repo. Receives syncs from DDS `Main` directly into UT `Main`.
+- **DDS-Dashboard** (private): Primary/source repo. Single branch: `Main`.
+- Sync flow: `DDS Main → UT Main` (with exclusions applied). No intermediate branches.
+- **Single branch: `Main` only.** Do NOT create feature/dev/staging branches.
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in this repo.**
+
+### Version Tracking — MANDATORY
+- Semver tagging on every meaningful commit. Update `VERSION_INFO` in `src/01_Core.gs`, `package.json`, and `CHANGELOG.md` together.
+- Tag the commit. Push tags: `git push origin --tags`.
+
+### Parity Enforcement
+- After every push: verify GitHub remote and local clone match.
+- Both surfaces (GitHub + local + Google Apps Script) must reflect the same state after every operation.
+
+### No-Assumptions Policy
+- Never assume file contents, function behavior, config values, or repo state. Read first, then act.
+- If prior work contains assumptions: re-examine, correct, and document in `AI_REFERENCE.md`.
+- Every repo-altering action must be logged: what changed, why, and resulting version.
 
 ### What's Excluded from UT
 - `src/18_WorkloadTracker.gs` — DDS-only member caseload module
@@ -25,7 +39,7 @@
 - See `SYNC-LOG.md` for full exclusion registry.
 
 ### Fallback
-If GitHub is unreachable, work on local repo. Add a note in AI-REFERENCE.md: what was done, what needs pushing, which branches affected.
+If GitHub is unreachable, work on local repo. Add a note in `AI_REFERENCE.md`: what was done, what needs pushing. Resolve on reconnection.
 
 ## Commands
 
@@ -121,7 +135,8 @@ npm run deploy         # lint + test:unit + build:prod + clasp push
 ## Git Conventions
 
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
-- Main branch: `Main` (capital M)
+- **Single branch: `Main` (capital M). No feature branches.** All commits go directly to Main.
+- Every commit must include version bump if code changed.
 
 ## Code Review
 
