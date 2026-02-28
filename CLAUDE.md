@@ -21,13 +21,28 @@ For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos,
 
 ## Repos & Sync
 
-- **DDS-Dashboard** (private): Primary repo. Default branch: `Main` (capital M). Branches: Main, dev, staging.
-- **Union-Tracker** (public): Mirror minus Workload Tracker. Target branch: `staging`.
-- All commits to DDS `Main` must sync to UT `staging` with exclusions applied.
-- Sync flow: `DDS Main → UT staging → (user manages) → UT dev → UT main`
+- **DDS-Dashboard** (private): Primary repo. **Single branch: `Main` only.** Do NOT create feature/dev/staging branches.
+- **Union-Tracker** (public): Mirror minus Workload Tracker. **Single branch: `Main` only.**
+- Sync flow: `DDS Main → UT Main` (with exclusions applied). No intermediate branches.
+- After ANY code change: push to GitHub → deploy via `clasp push` to Google Apps Script.
 - DDS Apps Script ID: `18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`
 - UT Apps Script ID: `1V6vzrczxUSYuiobdkKE64mbsZYznZHZwcI51juAtqQojy5Tz8q5zbiTl`
 - **DDS Script ID must NEVER appear in UT** (public repo).
+
+### Version Tracking — MANDATORY
+- **Semver tagging on every meaningful commit.** Update `VERSION_INFO` in `src/01_Core.gs`, `package.json`, and `CHANGELOG.md` together.
+- **Tag the commit** (e.g., `git tag v4.18.2`). Push tags: `git push origin --tags`.
+- If version is not updated, the commit is incomplete.
+
+### Parity Enforcement
+- After every push: verify GitHub remote and local clone are identical (`git status`, `git log --oneline -3`).
+- If a merge conflict cannot be resolved immediately: add a `TODO-MERGE` entry in `AI_REFERENCE.md` with conflict description and timestamp. Resolve at the earliest possible point.
+- **Both repos (GitHub + local + Google Apps Script) must reflect the same state after every operation.**
+
+### No-Assumptions Policy
+- Never assume file contents, function behavior, config values, or repo state. **Read first, then act.**
+- If prior work contains assumptions: re-examine, correct, and document in `AI_REFERENCE.md`.
+- Every repo-altering action must be logged: what changed, why, and resulting version.
 
 ### Workload Tracker Exclusion (UT only)
 - **EXCLUDE from UT:** `src/18_WorkloadTracker.gs`, `src/WorkloadTracker.html`
@@ -37,7 +52,7 @@ For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos,
 - If excluding WT would cause errors in UT, include the minimum needed to prevent breakage.
 
 ### Fallback
-If GitHub is unreachable, work on local repo. Add a note in AI-REFERENCE.md: what was done, what needs pushing, which branches affected.
+If GitHub is unreachable, work on local repo. Add a note in `AI_REFERENCE.md`: what was done, what needs pushing. Resolve on reconnection.
 
 ## Commands
 
@@ -137,8 +152,8 @@ Multiple code paths write to Config. When modifying any Config-writing code, che
 
 - Conventional Commits: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
 - Pre-commit hook: `.husky/pre-commit` runs lint-staged + build verification
-- Main branch: `Main` (capital M)
-- Feature branches: `claude/<description>-<id>`
+- **Single branch: `Main` (capital M). No feature branches.** All commits go directly to Main.
+- Every commit must include version bump if code changed.
 
 ## Code Review
 

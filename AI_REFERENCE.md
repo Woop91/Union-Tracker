@@ -260,3 +260,27 @@ See `PHASE2_PLAN.md` for details.
 8. **Build is 39 `.gs` + 8 `.html` individual files in `dist/`.** GAS has a 6MB per-file limit. Monitor individual file sizes.
 9. **The `doGet()` source is in `src/05_Integrations.gs`** (routes) and `src/22_WebDashApp.gs` (SPA entry).
 10. **Do not duplicate information across reference docs.** Each doc has one canonical purpose (see table at top).
+
+---
+
+## 2026-02-28 — Branch Cleanup & Version Alignment (v4.18.1)
+
+### Actions Taken
+- **Deleted stale branches:** `dev` (1 behind Main, 0 ahead), `staging` (1 behind Main, 0 ahead). No unique content lost.
+- **Version alignment:** `package.json` updated from 4.10.0 → 4.18.1 to match `VERSION_INFO` in `01_Core.gs`.
+- **CLAUDE.md updated:** Replaced multi-branch workflow with single-branch `Main` policy. Added mandatory version tagging, parity enforcement, and no-assumptions policy.
+- **Sync flow simplified:** `DDS Main → UT Main` (direct, no intermediate staging).
+
+### Errors Found & Fixed
+- **package.json drift:** Was stuck at 4.10.0 while code was at 4.18.1. Root cause: version bump in `01_Core.gs` and `CHANGELOG.md` but `package.json` was never updated after v4.10.0. Fixed by updating to 4.18.1.
+- **Branch accumulation:** `dev` and `staging` branches existed on remote but were just behind `Main` with no unique content. Deleted to enforce single-branch policy.
+
+### Version History
+- v4.18.1 — Current. Branch cleanup, version alignment, CLAUDE.md overhaul.
+
+### Reminders for LLMs
+- **Everything must be dynamic.** Never hardcode sheet names, column positions, org names, unit names, or config values.
+- **Single branch: Main only.** Never create dev/staging/feature branches.
+- **Version bump is mandatory** on every code change: `VERSION_INFO` + `package.json` + `CHANGELOG.md` + git tag.
+- **DDS Script ID must NEVER appear in Union-Tracker** (public repo).
+- **Read before act.** Never assume repo state, file contents, or function behavior.
