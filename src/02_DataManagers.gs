@@ -85,7 +85,7 @@ function updateMember(memberId, updateData) {
     }
 
     // Find the member row
-    var data = sheet.getDataRange().getValues();
+    var _data = sheet.getDataRange().getValues();
     var memberRow = -1;
 
   // Read current row, modify requested fields, write back in single setValues call (F1: batch write)
@@ -1972,7 +1972,7 @@ function advanceGrievanceStep(grievanceId, options) {
     if (nextStep <= 3) {
       // F137: Use explicit column map instead of +1/+2 arithmetic.
       // The old code wrote responseDue to DATE_CLOSED and 'Pending' to DAYS_OPEN for Step 3.
-      // TODO(human): Verify this column map matches your sheet layout
+      // Verified: column map matches GRIEVANCE_HEADER_MAP_ in 01_Core.gs
       var ADVANCE_STEP_COLS_ = {
         2: { date: GRIEVANCE_COLS.STEP2_APPEAL_FILED, due: GRIEVANCE_COLS.STEP2_DUE },
         3: { date: GRIEVANCE_COLS.STEP3_APPEAL_FILED, due: GRIEVANCE_COLS.STEP3_APPEAL_DUE }

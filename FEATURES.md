@@ -317,6 +317,12 @@ This document provides a comprehensive, searchable reference of all features in 
 | **Safety Valve PII Scrubbing** | Auto-redacts phone numbers and SSN patterns from public dashboards. | Automatic in Member Dashboard | PII, scrub, redact, privacy |
 | **Weingarten Rights Utility** | Emergency rights statement with tap-to-expand for member protection. | Within Member Dashboard | Weingarten, rights, legal |
 | **Version History** | Access Google Sheets' built-in version history. | File > Version history | undo, history, restore |
+| **Dashboard Auth Default ON** | All dashboard pages require authentication by default. Admin must explicitly disable. | ScriptProperties | auth, default, deny-by-default |
+| **Magic Link Rate Limiting** | Max 3 magic links per email per 15-minute window. Prevents inbox flooding and enumeration. | Automatic | rate limit, magic link, throttle |
+| **Token Cleanup Trigger** | Daily auto-cleanup of expired auth/session tokens at 2 AM. Install via `installTokenCleanupTrigger()`. | Apps Script Triggers | cleanup, tokens, trigger |
+| **Timing Attack Prevention** | Random 500-1000ms delay on email not-found path prevents timing-based email enumeration. | Automatic | timing, enumeration, delay |
+| **Durable PIN Reset Tokens** | PIN reset tokens stored in PropertiesService with `expiresAt` field — survives cache eviction. | Automatic | PIN, reset, token, durable |
+| **Formula Injection Prevention** | `escapeForFormula()` applied at all spreadsheet write boundaries including steward task updates. | Automatic | formula, injection, escape |
 
 ---
 
@@ -795,7 +801,7 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 | Feature | Description | Function | Keywords |
 |---------|-------------|----------|----------|
 | **SSO Authentication** | Google SSO with automatic role detection | `initWebDashboardAuth()` | SSO, Google, auth |
-| **Magic Link Auth** | Email-based authentication for non-Google users | `verifyMagicLink(token)` | magic link, email, token |
+| **Magic Link Auth** | Email-based authentication with rate limiting (3/email/15min) and timing attack prevention | `authSendMagicLink(email)` | magic link, email, token, rate limit |
 | **Steward View** | Full steward dashboard in SPA format | `steward_view.html` | steward, dashboard, SPA |
 | **Member View** | Member-facing dashboard in SPA format | `member_view.html` | member, dashboard, SPA |
 | **Deep-Link Routing** | `?page=X` pre-selects tabs via `PAGE_DATA.initialTab` | `doGetWebDashboard(e)` | deep-link, routing, tabs |
@@ -830,6 +836,7 @@ Pulls email engagement metrics from Constant Contact v3 API into the Member Dire
 
 | Version | Features Added |
 |---------|----------------|
+| **4.18.1** | Security hardening — auth default ON, magic link rate limiting, token cleanup trigger, timing attack fix, PIN token migration, formula injection coverage |
 | **4.13.0** | Notification bell with unread badge, EventBus auto-notifications, WorkloadService SPA module |
 | **4.12.2** | SPA web dashboard — SSO + magic link auth, steward/member views, deep-link routing |
 | **4.12.0** | Notifications system — sheet, API, dual-role page, steward compose |

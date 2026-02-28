@@ -121,16 +121,16 @@ function showAuthEmail(container) {
   wrapper.appendChild(emailInput);
 
   // Remember me toggle
-  var rememberMe = { value: true };
+  var rememberMe = { value: false };
   var toggleContainer = el('div', { className: 'auth-toggle', style: { margin: '14px 0' } });
 
   var track = el('div', {
     className: 'auth-toggle-track',
-    style: { background: 'var(--accent)' }
+    style: { background: '#333' }
   });
   var thumb = el('div', {
     className: 'auth-toggle-thumb',
-    style: { left: '18px' }
+    style: { left: '2px' }
   });
   track.appendChild(thumb);
   toggleContainer.appendChild(track);

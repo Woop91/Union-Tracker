@@ -5,6 +5,23 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.18.1-security] - 2026-02-28
+
+### Security
+- **CRITICAL:** Dashboard auth default changed from OFF to ON — `isDashboardMemberAuthRequired()` now returns `true` unless explicitly set to `'false'` (`src/00_Security.gs`)
+- **HIGH:** Added rate limiting to `sendMagicLink()` — max 3 magic links per email per 15-minute window via `CacheService` (`src/19_WebDashAuth.gs`)
+- **HIGH:** Added `installTokenCleanupTrigger()` — daily auto-cleanup of expired auth tokens at 2 AM (`src/19_WebDashAuth.gs`)
+- **MEDIUM:** Fixed email enumeration timing attack — added random 500-1000ms delay on not-found path in `sendMagicLink()` (`src/19_WebDashAuth.gs`)
+- **MEDIUM:** Migrated PIN reset tokens from `CacheService` to `PropertiesService` with `expiresAt` field — tokens now survive cache eviction (`src/13_MemberSelfService.gs`)
+- **LOW:** Converted static `innerHTML` to `createElement`/`textContent` in meeting check-in dialog (`src/14_MeetingCheckIn.gs`)
+- **LOW:** Added `escapeForFormula()` wrapping on steward task `setValue()` calls (`src/21_WebDashDataService.gs`)
+
+### Verified Safe (assessment confirmed)
+- All steward wrappers use `_resolveCallerEmail()` (server-resolved identity)
+- Build pipeline auto-cleans `dist/` before every build (no stale file risk)
+- No `eval()`, `document.write()`, or template literal HTML
+- PII masking, formula injection, XSS prevention all consistently applied
+
 ## [4.18.0] - 2026-02-26
 
 ### Added

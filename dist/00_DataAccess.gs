@@ -631,53 +631,6 @@ var TIME_CONSTANTS = {
   }
 };
 
-/**
- * Calculates a deadline date from a start date
- * @param {Date} startDate - The start date
- * @param {number} days - Number of days to add
- * @returns {Date} The deadline date
- */
-function calculateDeadline(startDate, days) {
-  if (!startDate || !(startDate instanceof Date)) {
-    startDate = new Date();
-  }
-  var result = new Date(startDate.getTime() + (days * TIME_CONSTANTS.MS_PER_DAY));
-  // Guard against NaN dates from invalid inputs (L-26)
-  if (isNaN(result.getTime())) return null;
-  return result;
-}
-
-/**
- * Calculates days between two dates
- * @param {Date} startDate - Start date
- * @param {Date} endDate - End date
- * @returns {number} Number of days (can be negative)
- */
-function daysBetween(startDate, endDate) {
-  if (!startDate || !endDate) return 0;
-
-  var start = startDate instanceof Date ? startDate : new Date(startDate);
-  var end = endDate instanceof Date ? endDate : new Date(endDate);
-
-  // Normalize both dates to midnight UTC to avoid DST off-by-one errors (L-27)
-  var startUtc = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
-  var endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
-
-  return Math.floor((endUtc - startUtc) / TIME_CONSTANTS.MS_PER_DAY);
-}
-
-/**
- * Gets the urgency level based on days to deadline
- * @param {number} daysToDeadline - Days until deadline
- * @returns {string} Urgency level ('critical', 'warning', 'normal', 'overdue')
- */
-function getDeadlineUrgency(daysToDeadline) {
-  if (daysToDeadline < 0) return 'overdue';
-  if (daysToDeadline <= TIME_CONSTANTS.DEADLINE_DAYS.CRITICAL_THRESHOLD) return 'critical';
-  if (daysToDeadline <= TIME_CONSTANTS.DEADLINE_DAYS.WARNING_THRESHOLD) return 'warning';
-  return 'normal';
-}
-
 // ============================================================================
 // LOCKSERVICE HELPER
 // ============================================================================

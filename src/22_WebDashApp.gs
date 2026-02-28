@@ -15,7 +15,37 @@
  */
 
 /**
- * Main GET handler — serves the single-page app.
+ * GAS web app entry point — routes to the correct handler.
+ * @param {Object} e - Event object with URL parameters
+ * @returns {HtmlOutput}
+ */
+function doGet(e) {
+  e = e || { parameter: {} };
+
+  // Workload portal — standalone, PIN-authenticated (no session required)
+  if (e.parameter.page === 'workload') {
+    var cfg = ConfigReader.getConfig();
+    return _serveWorkloadPortal(cfg);
+  }
+
+  return doGetWebDashboard(e);
+}
+
+/**
+ * Serves the Workload Tracker standalone portal.
+ * @param {Object} config
+ * @returns {HtmlOutput}
+ */
+function _serveWorkloadPortal(config) {
+  var htmlStr = getWorkloadTrackerPortalHtml();
+  return HtmlService.createHtmlOutput(htmlStr)
+    .setTitle((config.orgName || 'DDS') + ' — Workload Tracker')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+}
+
+/**
+ * Main dashboard handler — serves the single-page app.
  * @param {Object} e - Event object with URL parameters
  * @returns {HtmlOutput}
  */

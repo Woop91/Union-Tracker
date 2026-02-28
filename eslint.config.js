@@ -62,7 +62,6 @@ module.exports = [
 
         // Security functions (00_Security.gs)
         escapeHtml: 'readonly',
-        sanitizeForHtml: 'readonly',
         sanitizeObjectForHtml: 'readonly',
         escapeForFormula: 'readonly',
         safeSheetNameForFormula: 'readonly',
@@ -80,11 +79,6 @@ module.exports = [
         isValidMemberId: 'readonly',
         isValidGrievanceId: 'readonly',
 
-        // Time utilities
-        calculateDeadline: 'readonly',
-        daysBetween: 'readonly',
-        getDeadlineUrgency: 'readonly',
-
         // Error handling (01_Core.gs)
         handleError: 'readonly',
         withErrorHandling: 'readonly',
@@ -92,11 +86,7 @@ module.exports = [
         errorResponse: 'readonly',
         isTruthyValue: 'readonly',
         PerformanceTimer: 'readonly',
-        sanitizeHtml: 'readonly',
-        sanitizeForQuery: 'readonly',
-        sanitizeEmail: 'readonly',
-        sanitizePhone: 'readonly',
-        sanitizeSheetName: 'readonly'
+        sanitizeForQuery: 'readonly'
       }
     },
 

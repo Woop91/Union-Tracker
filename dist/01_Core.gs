@@ -241,54 +241,6 @@ function sendCriticalErrorNotification_(errorInfo) {
 }
 
 // ============================================================================
-// INPUT SANITIZATION
-// ============================================================================
-
-/**
- * Sanitize HTML to prevent XSS attacks
- * @param {string} input - Input string to sanitize
- * @returns {string} Sanitized string
- */
-function sanitizeHtml(input) {
-  // Delegate to escapeHtml in 00_Security.gs for consistent escaping
-  return escapeHtml(input);
-}
-
-/**
- * Validate and sanitize email address
- * @param {string} email - Email to validate
- * @returns {string|null} Sanitized email or null if invalid
- */
-function sanitizeEmail(email) {
-  if (!email) return null;
-  var trimmed = String(email).trim().toLowerCase();
-  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(trimmed) ? trimmed : null;
-}
-
-/**
- * Sanitize phone number (US format)
- * @param {string} phone - Phone number to sanitize
- * @returns {string} Sanitized phone number (digits only)
- */
-function sanitizePhone(phone) {
-  if (!phone) return '';
-  return String(phone).replace(/\D/g, '').slice(0, 10);
-}
-
-/**
- * Sanitize sheet name for Google Sheets
- * @param {string} name - Sheet name to sanitize
- * @returns {string} Sanitized sheet name
- */
-function sanitizeSheetName(name) {
-  if (!name) return 'Sheet';
-  return String(name)
-    .replace(/[\\\/\?\*\[\]\']/g, '')
-    .substring(0, 100);
-}
-
-// ============================================================================
 // PERFORMANCE MONITORING
 // ============================================================================
 
@@ -817,7 +769,6 @@ var SHEETS = {
   GETTING_STARTED: '📚 Getting Started',
   FAQ: '❓ FAQ',
   CONFIG_GUIDE: '📖 Config Guide',
-  FEATURES_REFERENCE: '📋 Features Reference',
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
@@ -1960,6 +1911,7 @@ function resolveColumnsFromSheet_(sheetName, headerMap, options) {
 
     return cols;
   } catch (_e) {
+    Logger.log('detectColumnLayout_ error: ' + _e.message);
     return null;
   }
 }
@@ -2423,6 +2375,20 @@ var GRIEVANCE_STATUS = {
   CLOSED: 'Closed',
   RESOLVED: 'Settled'  // Alias for backward compatibility
 };
+
+/**
+ * Statuses that indicate a grievance is no longer active.
+ * Used to filter open/closed grievances across dashboards and web views.
+ * Values are Title Case for sheet comparisons; lowercase with .map(s => s.toLowerCase()) when needed.
+ * @const {string[]}
+ */
+var GRIEVANCE_CLOSED_STATUSES = [
+  GRIEVANCE_STATUS.CLOSED,
+  GRIEVANCE_STATUS.SETTLED,
+  GRIEVANCE_STATUS.WITHDRAWN,
+  GRIEVANCE_STATUS.DENIED,
+  GRIEVANCE_STATUS.WON
+];
 
 /**
  * Grievance outcome constants for programmatic access

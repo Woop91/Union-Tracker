@@ -1965,6 +1965,72 @@ function setupWeeklyDriveCleanupTrigger() {
 }
 
 /**
+ * Cleans up old export files from Drive.
+ * Called by a weekly trigger (set up via setupWeeklyExportCleanupTrigger).
+ * Searches the user's Drive root for CSV/export files older than the retention period
+ * and moves them to trash.
+ */
+function cleanupOldExportFiles() {
+  var RETENTION_DAYS = 7;
+  var cutoff = new Date(Date.now() - RETENTION_DAYS * 86400000);
+  var trashed = 0;
+
+  // Export file name patterns used across the codebase
+  var patterns = [
+    'title contains "grievance_export_" and mimeType = "text/csv"',
+    'title contains "MemberDirectory_Export_" and mimeType = "text/csv"',
+    'title contains "AUDIT_LOG_BACKUP_" and mimeType = "text/csv"',
+    'title = "MemberDirectory.csv" and mimeType = "text/csv"'
+  ];
+
+  for (var p = 0; p < patterns.length; p++) {
+    var query = patterns[p] + ' and trashed = false';
+    try {
+      var files = DriveApp.searchFiles(query);
+      while (files.hasNext()) {
+        var file = files.next();
+        if (file.getDateCreated() < cutoff) {
+          file.setTrashed(true);
+          trashed++;
+        }
+      }
+    } catch (_e) {
+      Logger.log('Export cleanup search error (' + patterns[p] + '): ' + _e.message);
+    }
+  }
+
+  if (trashed > 0) {
+    logAuditEvent('EXPORT_FILES_CLEANED', 'Trashed ' + trashed + ' export file(s) older than ' + RETENTION_DAYS + ' days');
+  }
+  Logger.log('cleanupOldExportFiles: trashed ' + trashed + ' file(s)');
+}
+
+/**
+ * Sets up weekly export file cleanup trigger.
+ * Runs every Sunday at 4am to remove old CSV exports from Drive.
+ */
+function setupWeeklyExportCleanupTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === 'cleanupOldExportFiles') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  ScriptApp.newTrigger('cleanupOldExportFiles')
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .atHour(4)
+    .create();
+
+  SpreadsheetApp.getUi().alert(
+    'Export Cleanup Enabled',
+    'Old export files will be cleaned up every Sunday at 4:00 AM.',
+    SpreadsheetApp.getUi().ButtonSet.OK
+  );
+}
+
+/**
  * Navigates to the Audit Log sheet
  */
 function navigateToAuditLog() {
@@ -3174,11 +3240,11 @@ function archiveClosedGrievances(daysOld) {
   // Delete from main sheet (in reverse order to maintain row indices)
   // Transaction pattern: track individual failures and report at the end
   var failedDeletes = [];
-  var successfulDeletes = 0;
+  var _successfulDeletes = 0;
   rowIndicesToDelete.reverse().forEach(function(rowIndex) {
     try {
       grievanceSheet.deleteRow(rowIndex);
-      successfulDeletes++;
+      _successfulDeletes++;
     } catch (deleteErr) {
       failedDeletes.push({ row: rowIndex, error: deleteErr.message });
       Logger.log('Failed to delete row ' + rowIndex + ': ' + deleteErr.message);

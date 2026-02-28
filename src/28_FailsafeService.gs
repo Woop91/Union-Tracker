@@ -172,7 +172,7 @@ var FailsafeService = (function () {
         if (grievances && grievances.length > 0) {
           var gHtml = '<h3>Your Grievances (' + grievances.length + ')</h3><ul>';
           grievances.forEach(function (g) {
-            gHtml += '<li><strong>' + _escHtml(g.status || 'Open') + '</strong> — ' + _escHtml(g.issueType || g.type || 'Case') + ' (Filed: ' + _escHtml(g.dateFiled || '') + ')</li>';
+            gHtml += '<li><strong>' + escapeHtml(g.status || 'Open') + '</strong> — ' + escapeHtml(g.issueType || g.type || 'Case') + ' (Filed: ' + escapeHtml(g.dateFiled || '') + ')</li>';
           });
           gHtml += '</ul>';
           sections.push(gHtml);
@@ -214,7 +214,7 @@ var FailsafeService = (function () {
           var openTasks = tasks.filter(function (t) { return t.status !== 'completed'; });
           var tHtml = '<h3>Your Assigned Tasks (' + openTasks.length + ' open)</h3><ul>';
           openTasks.forEach(function (t) {
-            tHtml += '<li><strong>' + _escHtml(t.title) + '</strong> — ' + _escHtml(t.priority) + ' priority' + (t.dueDate ? ', due ' + _escHtml(t.dueDate) : '') + '</li>';
+            tHtml += '<li><strong>' + escapeHtml(t.title) + '</strong> — ' + escapeHtml(t.priority) + ' priority' + (t.dueDate ? ', due ' + escapeHtml(t.dueDate) : '') + '</li>';
           });
           tHtml += '</ul>';
           sections.push(tHtml);
@@ -387,10 +387,6 @@ var FailsafeService = (function () {
   function _fmtDate(date) {
     var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
-  }
-
-  function _escHtml(str) {
-    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   // ═══════════════════════════════════════

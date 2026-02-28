@@ -1050,7 +1050,7 @@ function getSatisfactionTrendData(period) {
       result.issuesTrend.push({ name: issue, count: issueMap[issue] });
     }
     result.issuesTrend.sort(function(a, b) { return b.count - a.count; });
-  } catch(_e) { /* ignore if column doesn't exist */ }
+  } catch(_e) { Logger.log('Issue trend skipped: ' + _e.message); }
 
   return result;
 }
@@ -1736,8 +1736,7 @@ function syncGrievanceToMemberDirectory() {
   if (grievanceData.length < 2) return;
 
   // M-26: Closed statuses - grievances with these statuses don't count as "open"
-  // TODO: Centralize to 01_Core.gs as GRIEVANCE_STATUS.CLOSED_STATUSES to avoid duplication
-  var closedStatuses = ['Closed', 'Settled', 'Withdrawn', 'Denied', 'Won'];
+  var closedStatuses = GRIEVANCE_CLOSED_STATUSES;
 
   // Build lookup map: memberId -> {hasOpen, status, deadline}
   // Calculate directly from grievance data (handles "Overdue" text properly)
@@ -1856,8 +1855,7 @@ function syncGrievanceFormulasToLog() {
   today.setHours(0, 0, 0, 0); // Normalize to start of day
 
   // M-26: Closed statuses that should not have Next Action Due
-  // TODO: Centralize to 01_Core.gs as GRIEVANCE_STATUS.CLOSED_STATUSES to avoid duplication
-  var closedStatuses = ['Settled', 'Withdrawn', 'Denied', 'Won', 'Closed'];
+  var closedStatuses = GRIEVANCE_CLOSED_STATUSES;
 
   // Prepare updates
   var nameUpdates = [];           // Columns C-D
@@ -3467,7 +3465,7 @@ function getFlaggedSubmissionsData() {
     var timestamp = '';
     try {
       timestamp = satSheet.getRange(satRow, SATISFACTION_COLS.TIMESTAMP).getValue();
-    } catch (_e) { /* row may not exist */ }
+    } catch (_e) { Logger.log('Satisfaction row read skipped: ' + _e.message); }
 
     if (entry.verified === 'Yes') {
       result.verifiedCount++;

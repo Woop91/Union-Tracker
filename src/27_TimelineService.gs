@@ -238,7 +238,7 @@ var TimelineService = (function () {
       try {
         var file = DriveApp.getFileById(idsArr[f]);
         namesArr.push(file.getName());
-      } catch (e) {
+      } catch (_e) {
         namesArr.push('Unknown');
       }
     }

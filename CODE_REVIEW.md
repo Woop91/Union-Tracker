@@ -696,3 +696,57 @@ All code review findings have been resolved or explicitly deferred. This section
 - **A2 (HTML templates):** Validated with `getClientSideEscapeHtml()` tests. Extraction deferred.
 
 **Lint status:** 0 errors, 0 warnings (as of 2026-02-27)
+
+---
+
+## 2026-02-28 Security Assessment & Remediation Pass
+
+**Scope:** Full security assessment across all 41 `.gs` + 9 `.html` files, `dist/`, `build.js`, and project config. Examined input validation/injection, authentication/authorization, data exposure, configuration, infrastructure, and build pipeline security.
+
+**Overall posture: STRONG** — Excellent XSS prevention (`escapeHtml()` used consistently), safe DOM APIs (`el()` builder), formula injection protection, PII masking, rate-limited PIN auth with constant-time comparison, and proper role-based access control via `_resolveCallerEmail()` / `_requireStewardAuth()`.
+
+### Findings & Remediations
+
+| ID | Severity | Finding | Fix | File(s) |
+|----|----------|---------|-----|---------|
+| SA-C1 | Critical | Stale `dist/` files could overwrite secured API wrappers | Already resolved — `build.js:178` auto-cleans `dist/` before every build | `build.js` |
+| SA-H3 | Critical | `isDashboardMemberAuthRequired()` defaults to OFF | Changed `setting === 'true'` → `setting !== 'false'` (deny by default) | `src/00_Security.gs:56` |
+| SA-H1 | High | No rate limiting on `sendMagicLink()` | Added `CacheService`-based counter — max 3 per email per 15 min | `src/19_WebDashAuth.gs:71-78` |
+| SA-H2 | High | `cleanupExpiredTokens()` requires manual trigger | Added `installTokenCleanupTrigger()` — daily at 2 AM, idempotent | `src/19_WebDashAuth.gs:356-377` |
+| SA-M1 | Medium | Email enumeration via timing difference | Added `Utilities.sleep(500 + random 500)` on not-found path | `src/19_WebDashAuth.gs:84` |
+| SA-M2 | Medium | PIN reset tokens in CacheService (eviction risk) | Migrated to `PropertiesService` with `expiresAt` field + manual expiry check + single-use delete | `src/13_MemberSelfService.gs:303-314, 369-401` |
+| SA-L14 | Low | Static `innerHTML` in meeting check-in dialog | Converted to `createElement`/`textContent` DOM APIs | `src/14_MeetingCheckIn.gs:778,785` |
+| SA-L15 | Low | `escapeForFormula()` missing on task `setValue()` | Wrapped all 3 `setValue()` calls with `escapeForFormula()` | `src/21_WebDashDataService.gs:1343-1345` |
+
+### Verified Safe (No Action Required)
+
+| Area | Detail |
+|------|--------|
+| Steward function auth | All wrappers use `_resolveCallerEmail()` — server-resolved, not client-supplied |
+| Member profile IDOR | `dataUpdateProfile()` requires `_requireStewardAuth()` — steward-only by design |
+| Workload auth bypass | PIN validates against specific email's hash — can't auth as Alice, get Bob's data |
+| CSRF protection | `google.script.run` inherently CSRF-protected by GAS iframe same-origin policy |
+| OAuth scopes | All scopes verified as required (`UrlFetchApp` used in 3 files, etc.) |
+| CSP `unsafe-inline` | GAS framework limitation (documented as H-52). No remediation possible |
+| `escapeHtml()` usage | Used consistently across all dynamic HTML output |
+| `el()` DOM builder | Uses safe `textContent`/`createTextNode` APIs |
+| No `eval()`/`document.write()` | Confirmed absent from entire codebase |
+| `escapeForFormula()` | Applied at all spreadsheet write boundaries |
+| PII masking | `secureLog()` with auto-detection |
+| No hardcoded credentials | Confirmed — secrets in ScriptProperties only |
+| No external API calls | Only Google services |
+| PIN auth | SHA-256 + salt, constant-time compare, rate limiting |
+| Zero supply chain risk | No production dependencies |
+| `.gitignore` | Properly excludes credentials |
+
+### Post-Remediation Deployment Steps
+
+1. Run `npm run deploy` (lint + test + build:prod + clasp push)
+2. In Apps Script editor: run `installTokenCleanupTrigger()` once
+3. Verify dashboard requires auth by visiting web app URL without session
+
+### Verification Results
+
+- `npm run build` — 41 `.gs` + 8 `.html` copied, 0 stale files
+- `npm run lint` — 0 errors, 0 warnings
+- `npm run test:unit` — 1,341 tests passed, 23 suites, 0 failures

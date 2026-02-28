@@ -69,7 +69,6 @@ const BUILD_ORDER = [
 
 // .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)
 const HTML_FILES = [
-  'MultiSelectDialog.html',
   'WorkloadTracker.html',
   // Web-dashboard SPA templates
   'index.html',
@@ -174,5 +173,7 @@ if (shouldClean) {
     console.log('Production build: Excluding DevTools...\n');
   }
 
+  // Auto-clean before build to prevent orphaned files from persisting
+  clean();
   build(fileList);
 }

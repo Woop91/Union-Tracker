@@ -606,8 +606,7 @@ function getConfigValues(configSheet, col) {
  * @returns {void}
  */
 function applyMultiSelectValue(value) {
-  // The inline dialog (getMultiSelectHtml) passes an array of selected IDs,
-  // while MultiSelectDialog.html passes a pre-joined comma string.
+  // The inline dialog (getMultiSelectHtml) may pass an array of selected IDs.
   // Normalise to a comma-separated string so all selections are saved.
   if (Array.isArray(value)) {
     value = value.join(', ');

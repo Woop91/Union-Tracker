@@ -1987,7 +1987,7 @@ function seedCalendarEvents() {
   try {
     cal = CalendarApp.getCalendarById(calId);
     if (!cal) cal = CalendarApp.getDefaultCalendar();
-  } catch (e) {
+  } catch (_e) {
     cal = null; // CalendarApp unavailable (e.g., web app context)
   }
 
@@ -2033,7 +2033,7 @@ function seedCalendarEvents() {
     var tlSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!tlSheet) {
       if (typeof TimelineService !== 'undefined' && TimelineService.initSheet) {
-        try { TimelineService.initSheet(); } catch (e) { /* ok */ }
+        try { TimelineService.initSheet(); } catch (_e) { /* ok */ }
       }
       tlSheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     }
@@ -2563,7 +2563,7 @@ function seedStewardTasksData() {
   }
 
   var ownerEmail = '';
-  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (e) { /* headless */ }
+  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
   if (!ownerEmail) ownerEmail = 'steward@example.org';
 
   var now = new Date();
@@ -2600,7 +2600,7 @@ function seedPollsData() {
 
   var now = new Date();
   var ownerEmail = '';
-  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (e) { /* headless */ }
+  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
   if (!ownerEmail) ownerEmail = 'steward@example.org';
 
   var polls = [
@@ -2645,7 +2645,7 @@ function seedMinutesData() {
 
   var now = new Date();
   var ownerEmail = '';
-  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (e) { /* headless */ }
+  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
   if (!ownerEmail) ownerEmail = 'steward@example.org';
 
   var minutes = [
@@ -2706,7 +2706,7 @@ function seedMeetingCheckinData() {
   try {
     var ownerEmail = Session.getActiveUser().getEmail();
     if (ownerEmail && emails.indexOf(ownerEmail) === -1) emails.unshift(ownerEmail);
-  } catch (e) { /* headless */ }
+  } catch (_e) { /* headless */ }
 
   if (emails.length === 0) {
     Logger.log('No members found for meeting check-in seed.');
@@ -2764,7 +2764,7 @@ function seedTimelineData() {
   var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
   if (!sheet) {
     if (typeof TimelineService !== 'undefined' && TimelineService.initSheet) {
-      try { TimelineService.initSheet(); } catch (e) { /* ok */ }
+      try { TimelineService.initSheet(); } catch (_e) { /* ok */ }
     }
     sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
     if (!sheet) {
@@ -2780,7 +2780,7 @@ function seedTimelineData() {
 
   var now = new Date();
   var ownerEmail = '';
-  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (e) { /* headless */ }
+  try { ownerEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* headless */ }
   if (!ownerEmail) ownerEmail = 'system';
 
   var events = [

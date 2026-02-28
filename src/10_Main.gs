@@ -2331,10 +2331,8 @@ function exportMemberDirectory(format) {
       }).join(',')).join('\n');
       const blob = Utilities.newBlob(csv, 'text/csv', 'MemberDirectory.csv');
       const file = DriveApp.createFile(blob);
-      // M-60: CSV export creates a file in Drive that is never automatically cleaned up.
-      // TODO: Consider adding a time-driven trigger to delete export files older than
-      // 7 days, or move exports to a dedicated "Exports" folder and purge periodically.
-      // For now, users must manually delete old exports from their Drive.
+      // M-60: Export files can be auto-cleaned by running setupWeeklyExportCleanupTrigger()
+      // from the Tools menu. See cleanupOldExportFiles() in 06_Maintenance.gs.
       return {
         success: true,
         message: 'CSV file created! Opening... (Note: remember to delete from Drive when done)',

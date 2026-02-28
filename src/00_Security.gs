@@ -47,13 +47,14 @@ var ACCESS_CONTROL = {
 
 /**
  * Check if member authentication is required for dashboard access
- * Default: OFF (dashboards accessible without member login)
+ * Default: ON (all dashboards require authentication)
+ * Only returns false if explicitly set to 'false' by admin
  * @returns {boolean} True if member auth is required
  */
 function isDashboardMemberAuthRequired() {
   var props = PropertiesService.getScriptProperties();
   var setting = props.getProperty(ACCESS_CONTROL.DASHBOARD_AUTH_PROPERTY);
-  return setting === 'true';
+  return setting !== 'false';
 }
 
 /**
@@ -139,15 +140,6 @@ function escapeHtml(input) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#x27;')
     .replace(/`/g, '&#x60;');
-}
-
-/**
- * Alias for escapeHtml - use in innerHTML contexts
- * @param {*} input - The input to sanitize
- * @returns {string} HTML-safe string
- */
-function sanitizeForHtml(input) {
-  return escapeHtml(input);
 }
 
 /**
@@ -777,11 +769,16 @@ function getClientSecurityScript() {
 }
 
 /**
- * Sanitizes data for embedding in JSON within HTML.
- * Use this when passing server data to client-side JavaScript.
+ * Sanitizes data for embedding in JSON within an HTML <script> tag.
+ * Use this when passing server data to client-side JavaScript via template output.
  *
- * WARNING: This function double-escapes string values (escapeHtml inside JSON.stringify).
- * This is intentional for safe HTML embedding. Do NOT apply escapeHtml again on the output.
+ * How it works: JSON.stringify() first, then replaces <, >, & and line separators
+ * with Unicode escapes (\u003c, \u003e, \u0026, \u2028, \u2029). This prevents
+ * the browser from interpreting these characters as HTML while keeping the JSON
+ * parseable by the JS engine.
+ *
+ * Usage: var data = JSON.parse('<?= safeJsonForHtml(serverData) ?>');
+ * No additional unescaping is needed — JSON.parse handles Unicode escapes natively.
  *
  * @param {Object} data - Data to sanitize
  * @returns {string} JSON string safe for HTML embedding

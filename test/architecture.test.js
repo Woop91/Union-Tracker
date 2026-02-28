@@ -109,7 +109,6 @@ describe('A1: Cross-file dependencies', () => {
   describe('key utility functions exist (used cross-file)', () => {
     const utilities = [
       'escapeHtml',
-      'sanitizeForHtml',
       'getClientSideEscapeHtml',
       'getClientSecurityScript',
       'getConfigValue_',

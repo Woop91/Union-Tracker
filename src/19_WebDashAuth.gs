@@ -68,11 +68,21 @@ var Auth = (function () {
   function sendMagicLink(email, rememberMe) {
     email = String(email).trim().toLowerCase();
 
+    // Rate limiting — max 3 magic links per email per 15 minutes
+    var cache = CacheService.getScriptCache();
+    var rateKey = 'MAGIC_RATE_' + email;
+    var count = parseInt(cache.get(rateKey) || '0', 10);
+    if (count >= 3) {
+      return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
+    }
+    cache.put(rateKey, String(count + 1), 900);
+
     // Validate email exists in directory
     var userRecord = DataService.findUserByEmail(email);
     if (!userRecord) {
       // Don't reveal whether email exists — security best practice
-      // But still return success to prevent enumeration
+      // Simulate processing time to prevent timing-based enumeration
+      Utilities.sleep(500 + Math.floor(Math.random() * 500));
       return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
     }
 
@@ -272,8 +282,6 @@ var Auth = (function () {
     // Dynamic accent color from config
     var hue = config.accentHue || 250;
     var accent = 'hsl(' + hue + ', 70%, 55%)';
-    var accentLight = 'hsl(' + hue + ', 70%, 95%)';
-
     var safeInitials = escapeHtml(String(config.logoInitials || ''));
     var safeOrgName = escapeHtml(String(config.orgName || ''));
     var safeExpiry = escapeHtml(String(config.magicLinkExpiryDays || 7));
@@ -341,6 +349,37 @@ function authCreateSessionToken() {
 function authLogout(sessionToken) {
   Auth.invalidateSession(sessionToken);
   return { success: true };
+}
+
+/**
+ * Global wrapper: Clean up expired auth tokens.
+ * Called by daily time-based trigger.
+ */
+function authCleanupExpiredTokens() {
+  return Auth.cleanupExpiredTokens();
+}
+
+/**
+ * Installs a daily trigger to auto-clean expired auth tokens.
+ * Run once from the Apps Script editor. Idempotent — removes existing trigger first.
+ */
+function installTokenCleanupTrigger() {
+  // Remove any existing cleanup triggers to prevent duplicates
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'authCleanupExpiredTokens') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  // Create new daily trigger (runs between 2-3 AM in script timezone)
+  ScriptApp.newTrigger('authCleanupExpiredTokens')
+    .timeBased()
+    .everyDays(1)
+    .atHour(2)
+    .create();
+
+  Logger.log('Token cleanup trigger installed — runs daily at ~2 AM.');
 }
 
 /**
