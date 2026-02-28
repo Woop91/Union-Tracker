@@ -1119,7 +1119,6 @@ var DataService = (function () {
       issueCategory: String(_getVal(row, colMap, HEADERS.grievanceIssueCategory, '')).trim(),
       priority: String(_getVal(row, colMap, HEADERS.grievancePriority, 'medium')).trim().toLowerCase(),
       notes: String(_getVal(row, colMap, HEADERS.grievanceNotes, '')).trim(),
-      issueCategory: String(_getVal(row, colMap, HEADERS.grievanceIssueCategory, '')).trim(),
     };
   }
 

@@ -1660,59 +1660,9 @@ function startNewGrievance(grievanceData) {
     } catch (error) {
       console.error('Error creating grievance:', error);
       return errorResponse(error.message, 'createGrievance');
+    } finally {
+      lock.releaseLock();
     }
-
-    // Validate required fields
-    const validation = validateGrievanceData(grievanceData);
-    if (!validation.valid) {
-      return errorResponse(validation.error, 'createGrievance');
-    }
-
-    // Generate new grievance ID
-    const grievanceId = getNextGrievanceId(grievanceSheet);
-
-    // Calculate initial deadlines
-    const filingDate = grievanceData.filingDate ? new Date(grievanceData.filingDate) : new Date();
-    const deadlines = calculateInitialDeadlines(filingDate);
-
-    // Prepare row data using GRIEVANCE_COLS constants (1-indexed; subtract 1 for array)
-    const totalCols = getGrievanceHeaders().length;
-    const rowData = new Array(totalCols).fill('');
-
-    rowData[GRIEVANCE_COLS.GRIEVANCE_ID - 1]   = grievanceId;
-    rowData[GRIEVANCE_COLS.MEMBER_ID - 1]       = escapeForFormula(grievanceData.memberId || '');
-    rowData[GRIEVANCE_COLS.FIRST_NAME - 1]      = escapeForFormula(grievanceData.memberName || '');
-    rowData[GRIEVANCE_COLS.STATUS - 1]          = GRIEVANCE_STATUS.OPEN;
-    rowData[GRIEVANCE_COLS.CURRENT_STEP - 1]    = 1;
-    rowData[GRIEVANCE_COLS.DATE_FILED - 1]      = filingDate;
-    rowData[GRIEVANCE_COLS.STEP1_DUE - 1]       = deadlines.step1Due;
-    rowData[GRIEVANCE_COLS.ARTICLES - 1]        = escapeForFormula(grievanceData.articleViolated || '');
-    rowData[GRIEVANCE_COLS.ISSUE_CATEGORY - 1]  = escapeForFormula(grievanceData.grievanceType || '');
-    rowData[GRIEVANCE_COLS.RESOLUTION - 1]      = escapeForFormula(grievanceData.notes || '');
-    rowData[GRIEVANCE_COLS.LAST_UPDATED - 1]    = new Date();
-
-    // Append to sheet
-    grievanceSheet.appendRow(rowData);
-
-    // Log the creation
-    logAuditEvent(AUDIT_EVENTS.GRIEVANCE_CREATED, {
-      grievanceId: grievanceId,
-      memberId: grievanceData.memberId,
-      createdBy: Session.getActiveUser().getEmail()
-    });
-
-    return {
-      success: true,
-      grievanceId: grievanceId,
-      message: `Grievance ${grievanceId} created successfully`
-    };
-
-  } catch (error) {
-    console.error('Error creating grievance:', error);
-    return errorResponse(error.message, 'createGrievance');
-  } finally {
-    lock.releaseLock();
-  }
 }
 
 /**

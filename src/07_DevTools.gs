@@ -169,7 +169,7 @@ function SEED_SAMPLE_DATA() {
   ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var response = ui.alert(
+  response = ui.alert(
     '🚀 Seed Sample Data (3-Phase)',
     'This will seed in 3 phases:\n\n' +
     'Phase 1: Config + 500 members + script owner (~2 min)\n' +
