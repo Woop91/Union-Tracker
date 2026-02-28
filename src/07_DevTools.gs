@@ -897,6 +897,7 @@ function restoreConfigFromSheetData_() {
  * @param {number} grievancePercent - Percentage of members to give grievances (0-100, default 30)
  */
 function SEED_MEMBERS(count, grievancePercent) {
+  if (!isDemoSafeToRun_()) return;
   count = Math.min(count || 50, 2000);
   grievancePercent = (grievancePercent !== undefined) ? grievancePercent : 30; // Default 30% get grievances
 
@@ -1067,6 +1068,7 @@ function SEED_MEMBERS(count, grievancePercent) {
  * @param {number} count - Number of members to seed (max 2000)
  */
 function SEED_MEMBERS_ONLY(count) {
+  if (!isDemoSafeToRun_()) return;
   count = Math.min(count || 50, 2000);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1266,6 +1268,7 @@ function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, locati
  * @param {number} count - Number of grievances to seed (max 300)
  */
 function SEED_GRIEVANCES(count) {
+  if (!isDemoSafeToRun_()) return;
   count = Math.min(count || 25, 300);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1662,6 +1665,16 @@ function NUKE_SEEDED_DATA() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  // F39: Create backup before destructive operation
+  try {
+    if (typeof createGrievanceSnapshot === 'function') {
+      var preNukeBackup = createGrievanceSnapshot();
+      PropertiesService.getScriptProperties().setProperty('PRE_NUKE_SNAPSHOT', JSON.stringify(preNukeBackup));
+    }
+  } catch (_backupErr) {
+    Logger.log('Pre-nuke backup skipped: ' + _backupErr.message);
+  }
+
   // Check if already disabled
   if (isDemoModeDisabled()) {
     ui.alert('Demo Mode Disabled', 'Demo mode has already been disabled. The Demo menu will be removed on next refresh.', ui.ButtonSet.OK);
@@ -1914,6 +1927,7 @@ function NUKE_SEEDED_DATA() {
  * Clear only Config dropdown values (user-populated columns)
  */
 function NUKE_CONFIG_DROPDOWNS() {
+  if (!isDemoSafeToRun_()) return;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
 

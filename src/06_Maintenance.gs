@@ -3011,7 +3011,23 @@ function archiveClosedGrievances(daysOld) {
     { count: rowsToArchive.length, daysOld: daysOld }
   );
 
-  return { archived: rowsToArchive.length };
+  // F141: Include failedGrievanceIds in return for error reporting
+  var failedGrievanceIds = [];
+  if (failedDeletes.length > 0) {
+    failedDeletes.forEach(function(rowIdx) {
+      var dataIdx = rowIdx - 2;
+      if (dataIdx >= 0 && dataIdx < data.length) {
+        var gId = data[dataIdx][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
+        if (gId) failedGrievanceIds.push(String(gId));
+      }
+    });
+  }
+
+  return {
+    archived: rowsToArchive.length,
+    failedDeletes: failedDeletes.length,
+    failedGrievanceIds: failedGrievanceIds
+  };
 }
 
 /**
