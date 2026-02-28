@@ -1473,7 +1473,8 @@ function logAuditEvent(eventType, details) {
 
     // Build log entry
     const timestamp = new Date();
-    const user = Session.getActiveUser().getEmail() || 'Unknown';
+    const rawEmail = Session.getActiveUser().getEmail() || 'Unknown';
+    const user = (typeof maskEmail === 'function') ? maskEmail(rawEmail) : rawEmail;
     const detailsJson = JSON.stringify(details);
     const sessionId = Session.getTemporaryActiveUserKey() || '';
 

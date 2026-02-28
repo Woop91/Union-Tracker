@@ -622,7 +622,7 @@ function isValidSafeString(input, maxLength) {
     /<script/i,
     /javascript:/i,
     /on\w+\s*=/i,  // onclick=, onerror=, etc.
-    /data:/i,
+    /^\s*data:/i,
     /vbscript:/i
   ];
 
@@ -709,16 +709,15 @@ function getClientSecurityScript() {
 function safeJsonForHtml(data) {
   if (!data) return '{}';
 
-  // Convert to JSON and escape HTML entities in strings
-  var json = JSON.stringify(data, function(key, value) {
-    if (typeof value === 'string') {
-      return escapeHtml(value);
-    }
-    return value;
-  });
-
-  // Escape </script> tags that could break out of script context
-  return json.replace(/<\/script>/gi, '<\\/script>');
+  // Convert to JSON then use Unicode escapes for characters dangerous in <script> context.
+  // HTML entities don't work inside <script> — only Unicode escapes are interpreted by the JS engine.
+  var json = JSON.stringify(data);
+  return json
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
 }
 
 /**
@@ -1164,4 +1163,46 @@ function showSecurityStatusDialog() {
     '  Run: installSecurityDigestTrigger()';
 
   ui.alert('🛡️ Security Status', message, ui.ButtonSet.OK);
+}
+
+// ============================================================================
+// SAFE EMAIL WRAPPER
+// ============================================================================
+
+/**
+ * Sends an email with quota check and basic validation.
+ * Drop-in replacement for MailApp.sendEmail() that prevents quota exhaustion.
+ *
+ * @param {Object} options - MailApp.sendEmail() options (to, subject, body, etc.)
+ * @returns {{ success: boolean, error?: string }}
+ * @private
+ */
+function safeSendEmail_(options) {
+  if (!options || !options.to || !options.subject) {
+    return { success: false, error: 'Missing required email fields (to, subject)' };
+  }
+
+  // Validate email format
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var recipients = String(options.to).split(',');
+  for (var i = 0; i < recipients.length; i++) {
+    if (!emailRegex.test(recipients[i].trim())) {
+      return { success: false, error: 'Invalid email address: ' + maskEmail(recipients[i].trim()) };
+    }
+  }
+
+  // Check quota before sending
+  var remaining = MailApp.getRemainingDailyQuota();
+  if (remaining < 1) {
+    secureLog('safeSendEmail_', 'Email quota exhausted, skipping send', { to: maskEmail(String(options.to)) });
+    return { success: false, error: 'Daily email quota exhausted' };
+  }
+
+  try {
+    MailApp.sendEmail(options);
+    return { success: true };
+  } catch (e) {
+    secureLog('safeSendEmail_', 'Email send failed: ' + e.message, { to: maskEmail(String(options.to)) });
+    return { success: false, error: e.message };
+  }
 }
