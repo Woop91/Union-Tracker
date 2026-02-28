@@ -34,7 +34,7 @@ var ConfigReader = (function () {
         if (cached) {
           return JSON.parse(cached);
         }
-      } catch (e) {
+      } catch (_e) {
         // Cache read failed — non-fatal
       }
     }

@@ -4113,7 +4113,7 @@ function getWebAppNotifications(userEmail, userRole) {
     var data = sheet.getDataRange().getValues();
     if (data.length < 2) return [];
 
-    var headers = data[0];
+    var _headers = data[0];
     var C = NOTIFICATIONS_COLS;
     var now = new Date();
     var results = [];
@@ -4403,8 +4403,8 @@ function getWebAppNotificationsHtml() {
     isSteward = authResult.isAuthorized;
     userEmail = authResult.email || Session.getActiveUser().getEmail() || '';
     userName = userEmail.split('@')[0] || '';
-  } catch (authErr) {
-    try { userEmail = Session.getActiveUser().getEmail() || ''; } catch (e2) { userEmail = ''; }
+  } catch (_authErr) {
+    try { userEmail = Session.getActiveUser().getEmail() || ''; } catch (_e2) { userEmail = ''; }
   }
 
   var userRole = isSteward ? 'steward' : 'member';

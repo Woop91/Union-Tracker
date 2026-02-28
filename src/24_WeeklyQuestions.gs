@@ -339,7 +339,6 @@ var WeeklyQuestions = (function() {
   function getHistory(email, page, pageSize) {
     page = page || 1;
     pageSize = pageSize || 10;
-    var emailHash = _hashEmail(email);
 
     var qSheet = _getSheet(SHEETS.WEEKLY_QUESTIONS);
     if (!qSheet || qSheet.getLastRow() <= 1) return { questions: [], hasMore: false };

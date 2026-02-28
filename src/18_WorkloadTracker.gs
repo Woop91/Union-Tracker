@@ -847,7 +847,7 @@ function getWorkloadTrackerPortalHtml() {
     }
     // Fallback for development (before build)
     return HtmlService.createHtmlOutputFromFile('WorkloadTracker').getContent();
-  } catch (err) {
+  } catch (_err) {
     return '<html><body style="font-family:sans-serif;padding:2rem;">' +
       '<h2>Workload Tracker</h2>' +
       '<p>Portal not yet configured. Please run <strong>Initialize Dashboard</strong> first.</p>' +
@@ -887,7 +887,7 @@ function createWorkloadBackup() {
     var folder;
     if (backupFolderId) {
       try { folder = DriveApp.getFolderById(backupFolderId); }
-      catch (e) {
+      catch (_e) {
         folder = DriveApp.createFolder('WorkloadVault_Backups');
         props.setProperty('WT_BACKUP_FOLDER_ID', folder.getId());
       }

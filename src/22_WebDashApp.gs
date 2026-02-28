@@ -53,7 +53,7 @@ function doGetWebDashboard(e) {
             isBootstrapAdmin: true,
           };
         }
-      } catch (ownerErr) { /* SSO not available � fall through */ }
+      } catch (_ownerErr) { /* SSO not available — fall through */ }
     }
 
     if (!userRecord) {
@@ -95,7 +95,7 @@ function _serveAuth(config, e) {
   
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -133,7 +133,7 @@ function _serveDashboard(config, userRecord, role, sessionToken, initialTab) {
   
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -161,7 +161,7 @@ function _serveError(config, type, detail) {
   
   return template.evaluate()
     .setTitle(config.orgName + ' Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 

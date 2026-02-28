@@ -2647,23 +2647,29 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
     // Category stats
     if (category) {
       if (!categoryStats[category]) {
-        categoryStats[category] = { total: 0, open: 0, resolved: 0, won: 0, daysOpen: [] };
+        categoryStats[category] = { total: 0, open: 0, resolved: 0, won: 0, denied: 0, settled: 0, withdrawn: 0, daysOpen: [] };
       }
       categoryStats[category].total++;
       if (status === 'Open') categoryStats[category].open++;
       if (status !== 'Open' && status !== 'Pending Info') categoryStats[category].resolved++;
       if (status === 'Won') categoryStats[category].won++;
+      if (status === 'Denied') categoryStats[category].denied++;
+      if (status === 'Settled') categoryStats[category].settled++;
+      if (status === 'Withdrawn') categoryStats[category].withdrawn++;
       if (typeof daysOpen === 'number') categoryStats[category].daysOpen.push(daysOpen);
     }
 
     // Location stats
     if (location) {
       if (!locationStats[location]) {
-        locationStats[location] = { members: 0, grievances: 0, open: 0, won: 0 };
+        locationStats[location] = { members: 0, grievances: 0, open: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 };
       }
       locationStats[location].grievances++;
       if (status === 'Open') locationStats[location].open++;
       if (status === 'Won') locationStats[location].won++;
+      if (status === 'Denied') locationStats[location].denied++;
+      if (status === 'Settled') locationStats[location].settled++;
+      if (status === 'Withdrawn') locationStats[location].withdrawn++;
     }
 
     // Steward stats
@@ -2756,8 +2762,9 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
   var defaultCategories = ['Contract Violation', 'Discipline', 'Workload', 'Safety', 'Discrimination'];
   for (var c = 0; c < defaultCategories.length; c++) {
     var cat = defaultCategories[c];
-    var catData = categoryStats[cat] || { total: 0, open: 0, resolved: 0, won: 0, daysOpen: [] };
-    var catWinRate = catData.total > 0 ? Math.round(catData.won / catData.total * 100) + '%' : '-';
+    var catData = categoryStats[cat] || { total: 0, open: 0, resolved: 0, won: 0, denied: 0, settled: 0, withdrawn: 0, daysOpen: [] };
+    var catResolved = catData.won + catData.denied + catData.settled + catData.withdrawn;
+    var catWinRate = catResolved > 0 ? Math.round(catData.won / catResolved * 100) + '%' : '-';
     var avgDays = catData.daysOpen.length > 0 ?
       Math.round(catData.daysOpen.reduce(function(a, b) { return a + b; }, 0) / catData.daysOpen.length * 10) / 10 : '-';
 
@@ -2798,9 +2805,10 @@ function computeDashboardMetrics_(memberData, grievanceData, configData) {
   var topLocations = configLocations.slice(0, 5);
   for (var l = 0; l < topLocations.length; l++) {
     var locName = topLocations[l];
-    var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0 };
+    var locData = locationStats[locName] || { members: 0, grievances: 0, open: 0, won: 0, denied: 0, settled: 0, withdrawn: 0 };
     locData.members = memberLocations[locName] || 0;
-    var locWinRate = locData.grievances > 0 ? Math.round(locData.won / locData.grievances * 100) + '%' : '-';
+    var locResolved = locData.won + locData.denied + locData.settled + locData.withdrawn;
+    var locWinRate = locResolved > 0 ? Math.round(locData.won / locResolved * 100) + '%' : '-';
 
     metrics.locations.push({
       name: locName,
@@ -3733,21 +3741,23 @@ function getPublicOverviewData() {
   // Count grievances and win rate
   if (grievanceSheet) {
     var grievanceData = grievanceSheet.getDataRange().getValues();
-    var won = 0, total = 0;
+    var won = 0, denied = 0, settled = 0, withdrawn = 0, total = 0;
 
     for (var j = 1; j < grievanceData.length; j++) {
       var grievanceId = grievanceData[j][GRIEVANCE_COLS.GRIEVANCE_ID - 1];
       if (!grievanceId) continue;
 
       total++;
-      var resolution = (grievanceData[j][GRIEVANCE_COLS.RESOLUTION - 1] || '').toString().toLowerCase();
-      if (resolution.includes('won') || resolution.includes('favor')) {
-        won++;
-      }
+      var gStatus = (grievanceData[j][GRIEVANCE_COLS.STATUS - 1] || '').toString().toLowerCase();
+      if (gStatus === 'won' || gStatus === 'sustained') won++;
+      else if (gStatus === 'denied' || gStatus === 'lost') denied++;
+      else if (gStatus === 'settled') settled++;
+      else if (gStatus === 'withdrawn') withdrawn++;
     }
 
     result.totalGrievances = total;
-    result.winRate = total > 0 ? Math.round(won / total * 100) : 0;
+    var resolvedTotal = won + denied + settled + withdrawn;
+    result.winRate = resolvedTotal > 0 ? Math.round(won / resolvedTotal * 100) : 0;
   }
 
   return result;

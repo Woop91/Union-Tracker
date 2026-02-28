@@ -156,9 +156,6 @@ var DataService = (function () {
   function getStewardKPIs(stewardEmail) {
     var cases = getStewardCases(stewardEmail);
     
-    var now = new Date();
-    var sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-    
     var total = cases.length;
     var overdue = 0;
     var dueSoon = 0;
@@ -368,9 +365,6 @@ var DataService = (function () {
 
     var data = sheet.getDataRange().getValues();
     var colMap = _buildColumnMap(data[0]);
-    var isStewardCol = _findColumn(colMap, HEADERS.memberIsSteward);
-    var roleCol = _findColumn(colMap, HEADERS.memberRole);
-    var locationCol = _findColumn(colMap, HEADERS.memberWorkLocation);
 
     var stewards = [];
     for (var i = 1; i < data.length; i++) {
@@ -504,7 +498,7 @@ var DataService = (function () {
         surveyFormUrl: config.satisfactionFormUrl || '',
         orgWebsite: config.orgWebsite || '',
       };
-    } catch (e) {
+    } catch (_e) {
       return { calendarUrl: '', driveFolderUrl: '', surveyFormUrl: '', orgWebsite: '' };
     }
   }

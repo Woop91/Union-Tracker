@@ -400,7 +400,7 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (row[MEMBER_COLS.MEMBER_ID - 1] === '' || row[MEMBER_COLS.MEMBER_ID - 1] == null) continue;
+      if (row[MEMBER_COLS.MEMBER_ID - 1] === '' || row[MEMBER_COLS.MEMBER_ID - 1] === null || row[MEMBER_COLS.MEMBER_ID - 1] === undefined) continue;
 
       // Apply filters (use String() coercion for type-safe comparison)
       if (options.unit && String(row[MEMBER_COLS.UNIT - 1]) !== String(options.unit)) continue;
@@ -491,7 +491,7 @@ var DataAccess = {
       var row = data[i];
 
       // Skip empty rows
-      if (row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] === '' || row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] == null) continue;
+      if (row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] === '' || row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] === null || row[GRIEVANCE_COLS.GRIEVANCE_ID - 1] === undefined) continue;
 
       // Apply filters (use String() coercion for type-safe comparison)
       if (options.status && String(row[GRIEVANCE_COLS.STATUS - 1]) !== String(options.status)) continue;
