@@ -314,7 +314,7 @@ function onContactFormSubmit(e) {
         var id = data[k][MEMBER_COLS.MEMBER_ID - 1];
         if (id) existingIds[id] = true;
       }
-      var memberId = generateNameBasedId('M', firstName, lastName, existingIds);
+      memberId = generateNameBasedId('M', firstName, lastName, existingIds);
 
       // Build new row array (escapeForFormula on all user-supplied strings to prevent formula injection)
       var newRow = [];
@@ -551,7 +551,7 @@ function setupGrievanceFormTrigger() {
     } else {
       // Use configured form
       var configFormUrl = GRIEVANCE_FORM_CONFIG.FORM_URL;
-      var match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+      match = configFormUrl.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
       if (!match) {
         ui.alert('No Form Configured',
           'No form URL provided and could not extract ID from config.\n\n' +
@@ -1152,7 +1152,7 @@ function sendStewardDeadlineAlerts() {
   for (var i = 1; i < grievanceData.length; i++) {
     var row = grievanceData[i];
     var grievanceId = row[GRIEVANCE_COLS.GRIEVANCE_ID - 1];
-    var memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
+    memberId = row[GRIEVANCE_COLS.MEMBER_ID - 1];
     var status = row[GRIEVANCE_COLS.STATUS - 1];
     var currentStep = row[GRIEVANCE_COLS.CURRENT_STEP - 1];
     var nextDue = row[GRIEVANCE_COLS.NEXT_ACTION_DUE - 1];

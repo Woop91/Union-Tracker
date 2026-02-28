@@ -111,7 +111,7 @@ var ConfigReader = (function () {
     
     // Cache it
     try {
-      var cache = CacheService.getScriptCache();
+      cache = CacheService.getScriptCache();
       cache.put(CACHE_KEY, JSON.stringify(config), CACHE_TTL);
     } catch (e) {
       Logger.log('ConfigReader: Cache write failed: ' + e.message);

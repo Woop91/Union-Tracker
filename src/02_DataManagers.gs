@@ -350,7 +350,7 @@ function syncMemberGrievanceData() {
   // Update member rows (if grievance count columns exist)
   if (MEMBER_COLS.TOTAL_GRIEVANCES && MEMBER_COLS.ACTIVE_GRIEVANCES) {
     for (var j = 1; j < members.length; j++) {
-      var memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
+      memberId = members[j][MEMBER_COLS.MEMBER_ID - 1];
       var counts = grievanceCounts[memberId] || { total: 0, active: 0 };
       memberSheet.getRange(j + 1, MEMBER_COLS.TOTAL_GRIEVANCES).setValue(counts.total);
       memberSheet.getRange(j + 1, MEMBER_COLS.ACTIVE_GRIEVANCES).setValue(counts.active);
@@ -848,7 +848,7 @@ function syncStewardStatus() {
   }
 
   // If IS_STEWARD != Yes but name IS in Config, remove from Config
-  for (var name in configNameSet) {
+  for (name in configNameSet) {
     if (memberMap[name] && !memberMap[name].isSteward) {
       configSheet.getRange(configNameSet[name], CONFIG_COLS.STEWARDS).clearContent();
       changes++;
@@ -1315,7 +1315,7 @@ function importMembersFromData(data, mapping) {
 
       var firstName = mapping.firstName !== undefined ? (row[mapping.firstName] || '').trim() : '';
       var lastName = mapping.lastName !== undefined ? (row[mapping.lastName] || '').trim() : '';
-      var email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
+      email = mapping.email !== undefined ? (row[mapping.email] || '').trim() : '';
 
       // Skip if no name
       if (!firstName && !lastName) {
