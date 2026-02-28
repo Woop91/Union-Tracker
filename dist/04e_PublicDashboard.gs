@@ -814,7 +814,7 @@ function getUnifiedDashboardData(includePII) {
     };
 
     for (var i = 1; i < satData.length; i++) {
-      if (!satData[i][0]) continue;
+      if (!satData[i][SATISFACTION_COLS.TIMESTAMP - 1]) continue;
       data.satisfactionData.responseCount++;
 
       // Get worksite and role for breakdown

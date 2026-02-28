@@ -1812,225 +1812,68 @@ function showUpcomingDeadlines() {
  * 7. Bookmark this URL on your mobile device for easy access
  */
 
-/**
- * Web app entry point - serves the mobile dashboard and member portal
- * Consolidated to handle both mobile dashboard pages and member portal requests
- * @param {Object} e - Event object with query parameters
- * @returns {HtmlOutput} The HTML page to display
- *
- * URL Parameters:
- * - id=<memberId> - Returns personalized member portal
- * - page=search|grievances|members|links|dashboard|portal - Returns specific page
- * - (no params) - Returns default dashboard
- */
-function doGetLegacy(e) {
-  // v4.5.0: Add access control and input validation
-  // NOTE: Renamed from doGet → doGetLegacy. The web-dashboard WebApp.gs now owns doGet().
+// Dead code removed: doGetLegacy() (207 lines) — replaced by web-dashboard/WebApp.gs doGet()
 
-  // Step 1: Validate request parameters (prevents injection attacks)
-  var validation = validateWebAppRequest(e);
-  if (!validation.isValid) {
-    secureLog('doGet', 'Invalid request parameters', { errors: validation.errors });
-    if (typeof recordSecurityEvent === 'function') {
-      recordSecurityEvent('INVALID_REQUEST', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.MEDIUM : 'MEDIUM',
-        'Invalid web app request parameters detected',
-        { errors: validation.errors });
-    }
-    return getAccessDeniedPage('Invalid request: ' + validation.errors.join(', '));
-  }
+// ============================================================================
+// BOTTOM NAV HELPERS (M-DUP-1: extracted from 8 duplicate instances)
+// ============================================================================
 
-  // Step 2: Check for unified dashboard mode parameter
-  var mode = validation.params.mode || (e && e.parameter && e.parameter.mode) || '';
-  if (mode === 'steward' || mode === 'member') {
-    // v4.5.2: isPII is determined by auth result, NOT the URL parameter.
-    // Default to false; only grant PII access after confirmed steward/admin authorization.
-    var isPII = false;
-
-    if (mode === 'steward') {
-      // Steward mode requires authorization (contains PII)
-      var authResult = checkWebAppAuthorization('steward');
-      if (!authResult.isAuthorized) {
-        secureLog('doGet', 'Unauthorized steward access attempt', {
-          email: authResult.email,
-          role: authResult.role
-        });
-        if (typeof recordSecurityEvent === 'function') {
-          recordSecurityEvent('UNAUTHORIZED_ACCESS', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.HIGH : 'HIGH',
-            'Unauthorized steward mode access attempt',
-            { email: authResult.email, role: authResult.role, page: 'steward' });
-        }
-        return getAccessDeniedPage(authResult.message || 'Steward access required');
-      }
-      // PII access granted ONLY after successful authorization check
-      isPII = true;
-      secureLog('doGet', 'Steward access granted', { email: authResult.email });
-    }
-
-    var title = isPII ? 'STEWARD COMMAND CENTER' : 'MEMBER DASHBOARD';
-    var html = getUnifiedDashboardHtml(isPII);
-    return HtmlService.createHtmlOutput(html)
-      .setTitle(title)
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-  }
-
-  // Step 3: (Removed in v4.5.2) The ?id= member portal route has been removed.
-  // Members access their portal via ?page=selfservice using either Google account
-  // verification or PIN authentication. This eliminates IDOR risk from URL-based member IDs.
-
-  // Step 4: Standard page routing for mobile dashboard (legacy support)
-  var page = validation.params.page || (e && e.parameter && e.parameter.page) || 'dashboard';
-
-  // v4.5.2: Check if dashboard member authentication is required (toggled via Admin menu)
-  // When enabled, redirect to selfservice portal for public dashboard pages
-  if (typeof isDashboardMemberAuthRequired === 'function' && isDashboardMemberAuthRequired()) {
-    var publicPages = ['dashboard', 'portal'];
-    if (publicPages.indexOf(page) >= 0 || !page) {
-      secureLog('doGet', 'Dashboard auth required - checking member auth', { requestedPage: page });
-
-      // Try Google account verification first
-      try {
-        var dashAuthUser = Session.getEffectiveUser();
-        var dashAuthEmail = dashAuthUser ? dashAuthUser.getEmail() : null;
-        if (dashAuthEmail && typeof getMemberIdByEmail === 'function') {
-          var dashLinkedId = getMemberIdByEmail(dashAuthEmail);
-          if (dashLinkedId && typeof buildMemberPortal === 'function') {
-            secureLog('doGet', 'Dashboard auth - member verified via Google account', { email: dashAuthEmail });
-            return buildMemberPortal(dashLinkedId);
-          }
-        }
-      } catch (_dashGoogleErr) {
-        // Google auth not available - fall through to PIN login
-      }
-
-      // No linked Google account - show PIN login form
-      if (typeof getMemberSelfServicePortalHtml === 'function') {
-        var authHtml = getMemberSelfServicePortalHtml();
-        return HtmlService.createHtmlOutput(authHtml)
-          .setTitle('Member Login')
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
-          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      }
-    }
-  }
-
-  // v4.5.1: Add authorization for sensitive pages (search, grievances, members)
-  var sensitivePages = ['search', 'grievances', 'members', 'deadlines'];
-  if (sensitivePages.indexOf(page) >= 0) {
-    var pageAuthResult = checkWebAppAuthorization('steward');
-    if (!pageAuthResult.isAuthorized) {
-      secureLog('doGet', 'Unauthorized access to ' + page + ' page', {
-        email: pageAuthResult.email,
-        role: pageAuthResult.role
-      });
-      if (typeof recordSecurityEvent === 'function') {
-        recordSecurityEvent('UNAUTHORIZED_ACCESS', typeof SECURITY_SEVERITY !== 'undefined' ? SECURITY_SEVERITY.HIGH : 'HIGH',
-          'Unauthorized access to ' + page + ' page',
-          { email: pageAuthResult.email, role: pageAuthResult.role, page: page });
-      }
-      return getAccessDeniedPage(pageAuthResult.message || 'Steward authorization required to view ' + page);
-    }
-    secureLog('doGet', 'Authorized access to ' + page + ' page', { email: pageAuthResult.email });
-  }
-
-  html = undefined;
-  switch (page) {
-    case 'search':
-      html = getWebAppSearchHtml();
-      break;
-    case 'grievances':
-      html = getWebAppGrievanceListHtml();
-      break;
-    case 'members':
-      html = getWebAppMemberListHtml();
-      break;
-    case 'links':
-      html = getWebAppLinksHtml();
-      break;
-    case 'selfservice':
-      // v4.5.2: Try Google account verification first, fall back to PIN
-      try {
-        var selfServiceUser = Session.getEffectiveUser();
-        var selfServiceEmail = selfServiceUser ? selfServiceUser.getEmail() : null;
-        if (selfServiceEmail && typeof getMemberIdByEmail === 'function') {
-          var linkedMemberId = getMemberIdByEmail(selfServiceEmail);
-          if (linkedMemberId && typeof buildMemberPortal === 'function') {
-            secureLog('doGet', 'Member authenticated via Google account', { email: selfServiceEmail });
-            return buildMemberPortal(linkedMemberId);
-          }
-        }
-      } catch (_googleAuthErr) {
-        // Google auth not available - fall through to PIN login
-      }
-      // No linked Google account found - show PIN login form
-      if (typeof getMemberSelfServicePortalHtml === 'function') {
-        html = getMemberSelfServicePortalHtml();
-      } else {
-        return getAccessDeniedPage('Member self-service portal not available');
-      }
-      break;
-    case 'workload':
-      // Workload Tracker portal — member PIN auth handled client-side
-      if (typeof getWorkloadTrackerPortalHtml === 'function') {
-        return HtmlService.createHtmlOutput(getWorkloadTrackerPortalHtml())
-          .setTitle('Workload Tracker | SEIU 509')
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
-          .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-      }
-      html = getUnifiedDashboardHtml(false);
-      break;
-    case 'checkin':
-      // v4.11.0: Meeting check-in as standalone web page (mobile-friendly kiosk)
-      // v4.13.0: Delegated to getCheckInPageHtml() in 14_MeetingCheckIn.gs
-      if (typeof getCheckInPageHtml === 'function') {
-        html = getCheckInPageHtml();
-      } else {
-        html = getWebAppCheckInHtml();
-      }
-      break;
-    case 'deadlines':
-      // v4.13.0: Deadline calendar view for stewards (requires steward auth via sensitivePages)
-      html = getDeadlineCalendarHtml();
-      break;
-    case 'resources':
-      // v4.12.2: Route through SPA (educational hub with search, category pills)
-      if (typeof doGetWebDashboard === 'function') {
-        return doGetWebDashboard(e);
-      }
-      html = getWebAppResourcesHtml();
-      break;
-    case 'notifications':
-      // v4.12.2: Route through SPA (hero headers, type badges, compose form)
-      if (typeof doGetWebDashboard === 'function') {
-        return doGetWebDashboard(e);
-      }
-      html = getWebAppNotificationsHtml();
-      break;
-    case 'portal':
-      // Public portal without member ID
-      if (typeof buildPublicPortal === 'function') {
-        return buildPublicPortal();
-      }
-      // Fall through to SPA dashboard
-    case 'dashboard':
-    default:
-      // v4.12.2: Default to SPA web dashboard (SSO + magic link auth)
-      if (typeof doGetWebDashboard === 'function') {
-        return doGetWebDashboard(e);
-      }
-      html = getUnifiedDashboardHtml(false);
-      break;
-  }
-
-  if (!html) {
-    return getAccessDeniedPage('Unable to load the requested page');
-  }
-
-  return HtmlService.createHtmlOutput(html)
-    .setTitle('Dashboard')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+/** Returns the shared bottom-nav CSS block used by all legacy mobile pages. */
+function _getBottomNavCSS_() {
+  return '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
+    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
+    '.nav-item.active{color:#7C3AED}' +
+    '.nav-icon{font-size:22px;margin-bottom:3px}';
 }
+
+/**
+ * Builds bottom-nav HTML from a nav items array.
+ * @param {string} baseUrl — web app base URL
+ * @param {Array<{icon:string,label:string,page:string}>} items — nav items (page='' for home)
+ * @param {string} activePage — which page to highlight as active
+ * @returns {string} HTML string
+ */
+function _getBottomNavHTML_(baseUrl, items, activePage) {
+  var html = '<nav class="bottom-nav">';
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    var href = item.page ? escapeHtml(baseUrl) + '?page=' + escapeHtml(item.page) : escapeHtml(baseUrl);
+    var cls = item.page === activePage ? 'nav-item active' : 'nav-item';
+    html += '<a class="' + cls + '" href="' + href + '"><span class="nav-icon">' + item.icon + '</span>' + escapeHtml(item.label) + '</a>';
+  }
+  return html + '</nav>';
+}
+
+/** Standard steward nav: Home, Search, Cases, Members, Links */
+var _STEWARD_NAV_ = [
+  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
+  { icon: '\uD83D\uDD0D', label: 'Search', page: 'search' },
+  { icon: '\uD83D\uDCCB', label: 'Cases', page: 'grievances' },
+  { icon: '\uD83D\uDC65', label: 'Members', page: 'members' },
+  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
+];
+
+/** Member nav: Home, Check In, Learn, My Info, Links */
+var _MEMBER_NAV_ = [
+  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
+  { icon: '\u2705', label: 'Check In', page: 'checkin' },
+  { icon: '\uD83D\uDCDA', label: 'Learn', page: 'resources' },
+  { icon: '\uD83D\uDC64', label: 'My Info', page: 'selfservice' },
+  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
+];
+
+/** Deadline nav: Home, Cases, Deadlines, Search, Links */
+var _DEADLINE_NAV_ = [
+  { icon: '\uD83D\uDCCA', label: 'Home', page: '' },
+  { icon: '\uD83D\uDCCB', label: 'Cases', page: 'grievances' },
+  { icon: '\uD83D\uDCC5', label: 'Deadlines', page: 'deadlines' },
+  { icon: '\uD83D\uDD0D', label: 'Search', page: 'search' },
+  { icon: '\uD83D\uDD17', label: 'Links', page: 'links' }
+];
+
+// ============================================================================
+// LEGACY MOBILE DASHBOARD PAGES
+// ============================================================================
 
 /**
  * Returns the main dashboard HTML for web app (enhanced with clickable stats, win rate, overdue preview)
@@ -2097,11 +1940,8 @@ function getWebAppDashboardHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
     '.spinner{display:inline-block;width:20px;height:20px;border:2px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     // Refresh indicator
     '.refresh-btn{position:absolute;right:15px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.2);border:none;color:white;width:40px;height:40px;border-radius:50%;font-size:20px;cursor:pointer}' +
@@ -2157,19 +1997,8 @@ function getWebAppDashboardHtml() {
     '</div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, '') +
 
     // Script to load overdue preview
     '<script>' +
@@ -2254,11 +2083,8 @@ function getWebAppSearchHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
     '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     '</style></head><body>' +
 
@@ -2280,19 +2106,8 @@ function getWebAppSearchHtml() {
     '<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">Type to search members or grievances</div></div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, 'search') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -2433,11 +2248,8 @@ function getWebAppGrievanceListHtml() {
     // Count badge
     '.count-badge{background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;font-size:12px;display:inline-block;margin-top:8px}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     '</style></head><body>' +
 
@@ -2457,19 +2269,8 @@ function getWebAppGrievanceListHtml() {
     '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading grievances...</div></div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, 'grievances') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -2631,11 +2432,8 @@ function getWebAppMemberListHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
     '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     '</style></head><body>' +
 
@@ -2657,19 +2455,8 @@ function getWebAppMemberListHtml() {
     '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading members...</div></div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, 'members') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -2795,11 +2582,8 @@ function getWebAppLinksHtml() {
     '@keyframes spin{to{transform:rotate(360deg)}}' +
     '.spinner{display:inline-block;width:24px;height:24px;border:3px solid #e0e0e0;border-top-color:#7C3AED;border-radius:50%;animation:spin 0.8s linear infinite}' +
 
-    // Bottom nav - 5 items
-    '.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:space-around;padding:8px 0 max(8px,env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,0.1);z-index:100}' +
-    '.nav-item{display:flex;flex-direction:column;align-items:center;padding:6px 10px;text-decoration:none;color:#666;font-size:10px;min-width:60px}' +
-    '.nav-item.active{color:#7C3AED}' +
-    '.nav-icon{font-size:22px;margin-bottom:3px}' +
+    // Bottom nav (M-DUP-1: extracted to helper)
+    _getBottomNavCSS_() +
 
     '</style></head><body>' +
 
@@ -2812,19 +2596,8 @@ function getWebAppLinksHtml() {
     '<div class="loading"><div class="spinner"></div><div style="margin-top:15px">Loading links...</div></div>' +
     '</div>' +
 
-    // Bottom Navigation - 5 items
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=search">' +
-    '<span class="nav-icon">🔍</span>Search</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=grievances">' +
-    '<span class="nav-icon">📋</span>Cases</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=members">' +
-    '<span class="nav-icon">👥</span>Members</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    // Bottom Navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _STEWARD_NAV_, 'links') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -3994,6 +3767,10 @@ function getWebAppResourcesListAll() {
  */
 function addWebAppResource(data) {
   try {
+    // CR-AUTH-6: Verify steward role before allowing resource creation
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.RESOURCES);
     if (!sheet) {
@@ -4022,17 +3799,18 @@ function addWebAppResource(data) {
     var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
     var addedBy = Session.getActiveUser().getEmail() || 'unknown';
 
+    // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
     var newRow = [
       nextId,
-      data.title,
-      data.category || 'General',
-      data.summary || '',
-      data.content || '',
-      data.url || '',
-      data.icon || '\uD83D\uDCC4',
+      escapeForFormula(data.title),
+      escapeForFormula(data.category || 'General'),
+      escapeForFormula(data.summary || ''),
+      escapeForFormula(data.content || ''),
+      escapeForFormula(data.url || ''),
+      escapeForFormula(data.icon || '\uD83D\uDCC4'),
       data.sortOrder || 999,
-      data.visible || 'Yes',
-      data.audience || 'All',
+      escapeForFormula(data.visible || 'Yes'),
+      escapeForFormula(data.audience || 'All'),
       today,
       addedBy
     ];
@@ -4054,6 +3832,10 @@ function addWebAppResource(data) {
  */
 function updateWebAppResource(resourceId, data) {
   try {
+    // CR-AUTH-6: Verify steward role before allowing resource updates
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.RESOURCES);
     if (!sheet) return { success: false, message: 'Resources sheet not found' };
@@ -4061,16 +3843,19 @@ function updateWebAppResource(resourceId, data) {
     var allData = sheet.getDataRange().getValues();
     for (var i = 1; i < allData.length; i++) {
       if (String(allData[i][RESOURCES_COLS.RESOURCE_ID - 1] || '').trim() === resourceId) {
-        var row = i + 1;
-        if (data.title !== undefined)     sheet.getRange(row, RESOURCES_COLS.TITLE).setValue(data.title);
-        if (data.category !== undefined)  sheet.getRange(row, RESOURCES_COLS.CATEGORY).setValue(data.category);
-        if (data.summary !== undefined)   sheet.getRange(row, RESOURCES_COLS.SUMMARY).setValue(data.summary);
-        if (data.content !== undefined)   sheet.getRange(row, RESOURCES_COLS.CONTENT).setValue(data.content);
-        if (data.url !== undefined)       sheet.getRange(row, RESOURCES_COLS.URL).setValue(data.url);
-        if (data.icon !== undefined)      sheet.getRange(row, RESOURCES_COLS.ICON).setValue(data.icon);
-        if (data.sortOrder !== undefined) sheet.getRange(row, RESOURCES_COLS.SORT_ORDER).setValue(data.sortOrder);
-        if (data.visible !== undefined)   sheet.getRange(row, RESOURCES_COLS.VISIBLE).setValue(data.visible);
-        if (data.audience !== undefined)  sheet.getRange(row, RESOURCES_COLS.AUDIENCE).setValue(data.audience);
+        // M-PERF: Batch write — modify row copy in-memory, write back in single call
+        var rowData = allData[i].slice();
+        // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
+        if (data.title !== undefined)     rowData[RESOURCES_COLS.TITLE - 1] = escapeForFormula(data.title);
+        if (data.category !== undefined)  rowData[RESOURCES_COLS.CATEGORY - 1] = escapeForFormula(data.category);
+        if (data.summary !== undefined)   rowData[RESOURCES_COLS.SUMMARY - 1] = escapeForFormula(data.summary);
+        if (data.content !== undefined)   rowData[RESOURCES_COLS.CONTENT - 1] = escapeForFormula(data.content);
+        if (data.url !== undefined)       rowData[RESOURCES_COLS.URL - 1] = escapeForFormula(data.url);
+        if (data.icon !== undefined)      rowData[RESOURCES_COLS.ICON - 1] = escapeForFormula(data.icon);
+        if (data.sortOrder !== undefined) rowData[RESOURCES_COLS.SORT_ORDER - 1] = data.sortOrder;
+        if (data.visible !== undefined)   rowData[RESOURCES_COLS.VISIBLE - 1] = escapeForFormula(data.visible);
+        if (data.audience !== undefined)  rowData[RESOURCES_COLS.AUDIENCE - 1] = escapeForFormula(data.audience);
+        sheet.getRange(i + 1, 1, 1, rowData.length).setValues([rowData]);
         return { success: true, message: 'Resource updated' };
       }
     }
@@ -4089,6 +3874,10 @@ function updateWebAppResource(resourceId, data) {
  */
 function deleteWebAppResource(resourceId) {
   try {
+    // CR-AUTH-6: Verify steward role before allowing resource deletion
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.RESOURCES);
     if (!sheet) return { success: false, message: 'Resources sheet not found' };
@@ -4234,18 +4023,7 @@ function getWebAppResourcesHtml() {
     '<div class="loading"><div class="spinner"></div><div style="margin-top:12px">Loading resources...</div></div>' +
     '</div>' +
 
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=checkin">' +
-    '<span class="nav-icon">✅</span>Check In</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=resources">' +
-    '<span class="nav-icon">📚</span>Learn</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=selfservice">' +
-    '<span class="nav-icon">👤</span>My Info</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    _getBottomNavHTML_(baseUrl, _MEMBER_NAV_, 'resources') +
 
     '<script>' +
     getClientSideEscapeHtml() +
@@ -4416,18 +4194,7 @@ function getWebAppCheckInHtml() {
 
     '</div>' +
 
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">📊</span>Home</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=checkin">' +
-    '<span class="nav-icon">✅</span>Check In</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=resources">' +
-    '<span class="nav-icon">📚</span>Learn</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=selfservice">' +
-    '<span class="nav-icon">👤</span>My Info</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">🔗</span>Links</a>' +
-    '</nav>' +
+    _getBottomNavHTML_(baseUrl, _MEMBER_NAV_, 'checkin') +
 
     '<script>' +
     'var selectedMeetingId=null;' +
@@ -4799,19 +4566,8 @@ function getDeadlineCalendarHtml() {
 
     '</div>' +
 
-    // Bottom navigation
-    '<nav class="bottom-nav">' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '">' +
-    '<span class="nav-icon">&#x1F4CA;</span>Home</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=grievances">' +
-    '<span class="nav-icon">&#x1F4CB;</span>Cases</a>' +
-    '<a class="nav-item active" href="' + escapeHtml(baseUrl) + '?page=deadlines">' +
-    '<span class="nav-icon">&#x1F4C5;</span>Deadlines</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=search">' +
-    '<span class="nav-icon">&#x1F50D;</span>Search</a>' +
-    '<a class="nav-item" href="' + escapeHtml(baseUrl) + '?page=links">' +
-    '<span class="nav-icon">&#x1F517;</span>Links</a>' +
-    '</nav>' +
+    // Bottom navigation (M-DUP-1: extracted to helper)
+    _getBottomNavHTML_(baseUrl, _DEADLINE_NAV_, 'deadlines') +
 
     '<script>' +
 
@@ -5115,16 +4871,20 @@ function getWebAppNotificationCount(userEmail, userRole) {
  * @param {string} userEmail — the user dismissing
  * @returns {Object} { success: boolean, message: string }
  */
-function dismissWebAppNotification(notificationId, userEmail) {
+function dismissWebAppNotification(notificationId) {
   try {
+    // CR-AUTH-4: Use server-side identity instead of client-supplied email (IDOR fix)
+    var userEmail = '';
+    try { userEmail = Session.getActiveUser().getEmail(); } catch (_e) { /* SSO unavailable */ }
+    userEmail = (userEmail || '').toLowerCase().trim();
+    if (!userEmail) return { success: false, message: 'Authentication required' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
     if (!sheet) return { success: false, message: 'Notifications sheet not found' };
 
     var data = sheet.getDataRange().getValues();
     var C = NOTIFICATIONS_COLS;
-    userEmail = (userEmail || '').toLowerCase().trim();
-    if (!userEmail) return { success: false, message: 'No email provided' };
 
     for (var i = 1; i < data.length; i++) {
       var rowId = String(data[i][C.NOTIFICATION_ID - 1] || '').trim();
@@ -5155,6 +4915,10 @@ function dismissWebAppNotification(notificationId, userEmail) {
  */
 function sendWebAppNotification(data) {
   try {
+    // CR-AUTH-6: Verify steward role before allowing notification creation
+    var auth = checkWebAppAuthorization('steward');
+    if (!auth.isAuthorized) return { success: false, message: 'Steward access required.' };
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.NOTIFICATIONS);
     if (!sheet) {
@@ -5191,18 +4955,19 @@ function sendWebAppNotification(data) {
     var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
 
     // Build row (must match NOTIFICATIONS_HEADER_MAP_ order)
+    // CR-FORMULA: Escape all user-supplied fields to prevent formula injection
     var newRow = [
       nextId,
-      data.recipient || 'All Members',
-      data.type || 'Steward Message',
-      data.title,
-      data.message,
-      data.priority || 'Normal',
+      escapeForFormula(data.recipient || 'All Members'),
+      escapeForFormula(data.type || 'Steward Message'),
+      escapeForFormula(data.title),
+      escapeForFormula(data.message),
+      escapeForFormula(data.priority || 'Normal'),
       stewardEmail,
-      stewardName,
+      escapeForFormula(stewardName),
       today,
-      data.expiresDate || '',   // blank = no expiry
-      '',                        // Dismissed_By starts empty
+      escapeForFormula(data.expiresDate || ''),
+      '',
       'Active'
     ];
 
@@ -5478,6 +5243,9 @@ function getWebAppNotificationsHtml() {
   p.push('var selGroup="All Members";');
   p.push('var selMems={};');
 
+  // CR-XSS-6: Client-side HTML escaping for dynamic content
+  p.push('function _esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/\x27/g,"&#x27;");}');
+
   // Render notifications
   p.push('function renderN(){');
   p.push('var el=document.getElementById("nList");');
@@ -5491,14 +5259,14 @@ function getWebAppNotificationsHtml() {
   p.push('h+=\'<div class="nc\'+u+\'" style="animation-delay:\'+i*0.06+\'s" id="n-\'+n.id+\'">\';');
   p.push('h+=\'<button class="dbtn" onclick="dismissN(\\x27\'+n.id+\'\\x27)">\\u2715</button>\';');
   p.push('h+=\'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">\';');
-  p.push('h+=\'<div><span class="tbdg" style="background:\'+t.bg+\';color:\'+t.c+\'">\'+n.type+\'</span>\';');
+  p.push('h+=\'<div><span class="tbdg" style="background:\'+t.bg+\';color:\'+t.c+\'">\'+_esc(n.type)+\'</span>\';');
   p.push('if(n.priority==="Urgent")h+=\'<span class="tbdg" style="background:#fef2f2;color:#dc2626">URGENT</span>\';');
-  p.push('h+=\'</div><span style="font-size:11px;color:#a8a29e">\'+n.createdDate+\'</span></div>\';');
-  p.push('h+=\'<h3>\'+n.title+\'</h3>\';');
-  p.push('h+=\'<div class="msg">\'+n.message+\'</div>\';');
+  p.push('h+=\'</div><span style="font-size:11px;color:#a8a29e">\'+_esc(n.createdDate)+\'</span></div>\';');
+  p.push('h+=\'<h3>\'+_esc(n.title)+\'</h3>\';');
+  p.push('h+=\'<div class="msg">\'+_esc(n.message)+\'</div>\';');
   p.push('h+=\'<div class="meta">\';');
-  p.push('if(n.sentBy)h+=\'<span>From: \'+n.sentBy+\'</span>\';');
-  p.push('if(n.expiresDate)h+=\'<span>Expires: \'+n.expiresDate+\'</span>\';');
+  p.push('if(n.sentBy)h+=\'<span>From: \'+_esc(n.sentBy)+\'</span>\';');
+  p.push('if(n.expiresDate)h+=\'<span>Expires: \'+_esc(n.expiresDate)+\'</span>\';');
   p.push('h+=\'</div></div>\';');
   p.push('}');
   p.push('el.innerHTML=h;}');
@@ -5565,12 +5333,12 @@ function getWebAppNotificationsHtml() {
     p.push('var h="";');
     p.push('for(var j=0;j<fl.length;j++){');
     p.push('var m=fl[j];var s=!!selMems[m.email];');
-    p.push('h+=\'<div class="mrow\'+(s?" sel":"")+\'" onclick="togM(\\x27\'+m.email+\'\\x27,\\x27\'+m.name.replace(/\\x27/g,"\\\\\\x27")+\'\\x27)">\';');
+    p.push('h+=\'<div class="mrow\'+(s?" sel":"")+\'" onclick="togM(\\x27\'+_esc(m.email)+\'\\x27,\\x27\'+_esc(m.name).replace(/\\x27/g,"\\\\\\x27")+\'\\x27)">\';');
     p.push('h+=\'<div class="mchk\'+(s?" on":"")+"\">"+(s?"\\u2713":"")+"</div>";');
-    p.push('h+=\'<div style="flex:1;min-width:0"><div class="mname">\'+m.name+\'</div>\';');
-    p.push('h+=\'<div class="mdtl">\'+m.email;');
-    p.push('if(m.location)h+=" \\u00b7 "+m.location;');
-    p.push('if(m.department)h+=" \\u00b7 "+m.department;');
+    p.push('h+=\'<div style="flex:1;min-width:0"><div class="mname">\'+_esc(m.name)+\'</div>\';');
+    p.push('h+=\'<div class="mdtl">\'+_esc(m.email);');
+    p.push('if(m.location)h+=" \\u00b7 "+_esc(m.location);');
+    p.push('if(m.department)h+=" \\u00b7 "+_esc(m.department);');
     p.push('h+=\'</div></div></div>\';}');
     p.push('el.innerHTML=h;updCnt();}');
 

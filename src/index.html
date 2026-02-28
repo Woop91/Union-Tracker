@@ -116,7 +116,10 @@
 
       function getTheme(role, isDark) {
         var base = themes[role] || themes.member;
-        var t = isDark ? base.dark : base.light;
+        // H-5 fix: Shallow copy to avoid mutating shared theme objects
+        var src = isDark ? base.dark : base.light;
+        var t = {};
+        for (var k in src) { if (src.hasOwnProperty(k)) t[k] = src[k]; }
         // Merge accent colors
         for (var key in palette) {
           t[key] = palette[key];
@@ -309,12 +312,9 @@
     }
 
     function handleLogout() {
+      // H-3 fix: Remove duplicate authLogout call — use only the async version with handlers
       var token = localStorage.getItem('dashboardSessionToken');
-      if (token) {
-        google.script.run.authLogout(token);
-        localStorage.removeItem('dashboardSessionToken');
-      }
-      // Reload the page — will show auth screen since no valid session
+      localStorage.removeItem('dashboardSessionToken');
       google.script.run
         .withSuccessHandler(function() { window.top.location.reload(); })
         .withFailureHandler(function() { window.top.location.reload(); })

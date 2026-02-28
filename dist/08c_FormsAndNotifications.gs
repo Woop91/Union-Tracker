@@ -387,10 +387,13 @@ function onContactFormSubmit(e) {
       if (state) updates.push({ col: MEMBER_COLS.STATE, value: escapeForFormula(state) });
       if (zipCode) updates.push({ col: MEMBER_COLS.ZIP_CODE, value: escapeForFormula(zipCode) });
 
-      // Apply updates
+      // M-PERF: Batch write — read row, apply all updates, write back in single call
+      var totalCols = memberSheet.getLastColumn();
+      var rowData = memberSheet.getRange(memberRow, 1, 1, totalCols).getValues()[0];
       for (var j = 0; j < updates.length; j++) {
-        memberSheet.getRange(memberRow, updates[j].col).setValue(updates[j].value);
+        rowData[updates[j].col - 1] = updates[j].value;
       }
+      memberSheet.getRange(memberRow, 1, 1, totalCols).setValues([rowData]);
 
       // Mask name in logs for privacy
       var maskedUpdateName = typeof maskName === 'function' ? maskName(firstName + ' ' + lastName) : '[REDACTED]';
@@ -1787,11 +1790,15 @@ function updateSurveyTrackingOnSubmit_(matchedMemberId) {
   var data = trackingSheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (data[i][SURVEY_TRACKING_COLS.MEMBER_ID - 1] === matchedMemberId) {
+      // M-PERF: Batch write — read row, modify 3 cells, write back in single call
       var rowNum = i + 1;
-      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.CURRENT_STATUS).setValue('Completed');
-      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.COMPLETED_DATE).setValue(new Date());
+      var totalCols = trackingSheet.getLastColumn();
+      var rowData = trackingSheet.getRange(rowNum, 1, 1, totalCols).getValues()[0];
+      rowData[SURVEY_TRACKING_COLS.CURRENT_STATUS - 1] = 'Completed';
+      rowData[SURVEY_TRACKING_COLS.COMPLETED_DATE - 1] = new Date();
       var prevCompleted = parseInt(data[i][SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1]) || 0;
-      trackingSheet.getRange(rowNum, SURVEY_TRACKING_COLS.TOTAL_COMPLETED).setValue(prevCompleted + 1);
+      rowData[SURVEY_TRACKING_COLS.TOTAL_COMPLETED - 1] = prevCompleted + 1;
+      trackingSheet.getRange(rowNum, 1, 1, totalCols).setValues([rowData]);
       Logger.log('Survey tracking updated for member: ' + matchedMemberId);
       return;
     }
@@ -2118,10 +2125,9 @@ function submitSurveyResponse(hashedEmail, responses) {
     var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
     if (!sheet) return { success: false, message: 'Survey sheet not found.' };
 
-    // Hash the email server-side for vault storage
-    var emailHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
-      hashedEmail.toLowerCase().trim())
-      .map(function(b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+    // CR-DATA-2: Use standard hashForVault_() instead of ad-hoc SHA-256
+    // to match the hash algorithm used elsewhere (HMAC-style double hash with salt)
+    var emailHash = hashForVault_(hashedEmail);
 
     // Check vault for duplicate
     var vaultSheet = ss.getSheetByName(SHEETS.SURVEY_VAULT || '_Survey_Vault');
@@ -2135,10 +2141,11 @@ function submitSurveyResponse(hashedEmail, responses) {
     }
 
     // Build response row — Timestamp + question values in order
+    // CR-FORMULA: Escape all user responses to prevent formula injection
     var row = [new Date()];
     var questionIds = ['q1','q2','q3','q4','q5','q6','q7','q8','q9','q10','q11','q12','q13','q14','q15','q16','q17','q18','q19','q20','q21','q22','q23','q26','q27','q31','q_comment'];
     for (var i = 0; i < questionIds.length; i++) {
-      row.push(responses[questionIds[i]] || '');
+      row.push(escapeForFormula(responses[questionIds[i]] || ''));
     }
 
     sheet.appendRow(row);
@@ -2155,8 +2162,12 @@ function submitSurveyResponse(hashedEmail, responses) {
       for (var t = 1; t < trackData.length; t++) {
         var tEmail = String(trackData[t][1] || '').toLowerCase().trim();
         if (tEmail === hashedEmail.toLowerCase().trim()) {
-          trackSheet.getRange(t + 1, 3).setValue('Completed');
-          trackSheet.getRange(t + 1, 4).setValue(new Date());
+          // M-PERF: Batch write — read row, modify 2 cells, write back
+          var ttotalCols = trackSheet.getLastColumn();
+          var trowData = trackSheet.getRange(t + 1, 1, 1, ttotalCols).getValues()[0];
+          trowData[2] = 'Completed';
+          trowData[3] = new Date();
+          trackSheet.getRange(t + 1, 1, 1, ttotalCols).setValues([trowData]);
           break;
         }
       }

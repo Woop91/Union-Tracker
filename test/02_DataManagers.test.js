@@ -868,12 +868,13 @@ describe('resolveGrievance', () => {
     const setValueCalls = {};
     const mockRange = {
       setValue: jest.fn(function(val) { return val; }),
+      setValues: jest.fn(),
       getValue: jest.fn(() => ''),
-      getValues: jest.fn(() => data),
+      getValues: jest.fn(() => [grievanceRow]),
       getRow: jest.fn(() => 2),
       getColumn: jest.fn(() => 1),
-      getNumRows: jest.fn(() => data.length),
-      getNumColumns: jest.fn(() => 40),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 41),
       getA1Notation: jest.fn(() => 'A2'),
       getSheet: jest.fn()
     };
@@ -884,7 +885,7 @@ describe('resolveGrievance', () => {
       getRow: jest.fn(() => 1),
       getColumn: jest.fn(() => 1),
       getNumRows: jest.fn(() => data.length),
-      getNumColumns: jest.fn(() => 40)
+      getNumColumns: jest.fn(() => 41)
     });
     sheet.getRange.mockReturnValue(mockRange);
 
@@ -915,10 +916,10 @@ describe('resolveGrievance', () => {
 
     resolveGrievance('GRV-2026-0001', 'Settled', 'Partial agreement reached', '');
 
-    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    // Source writes combined resolution text: "Settled: Partial agreement reached"
-    expect(setValueArgs).toContainEqual(expect.stringContaining('Partial agreement reached'));
-    expect(setValueArgs).toContain(GRIEVANCE_STATUS.RESOLVED);   // status = 'Settled'
+    // Batch write: setValues([rowData]) writes entire row at once
+    const rowData = mockRange.setValues.mock.calls[0][0][0];
+    expect(rowData[GRIEVANCE_COLS.RESOLUTION - 1]).toContain('Partial agreement reached');
+    expect(rowData[GRIEVANCE_COLS.STATUS - 1]).toBe(GRIEVANCE_STATUS.RESOLVED);
   });
 
   test('returns error when grievance ID not found', () => {
@@ -950,11 +951,11 @@ describe('resolveGrievance', () => {
 
     resolveGrievance('GRV-2026-0001', 'Won', 'Full remedy', 'Victory!');
 
-    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    // Source builds combined text: "Won: Full remedy\n[timestamp] Victory!"
-    const resolutionArg = setValueArgs.find(v => typeof v === 'string' && v.includes('Victory!'));
-    expect(resolutionArg).toContain('Won');
-    expect(resolutionArg).toContain('Victory!');
+    // Batch write: check the resolution column in the written row
+    const rowData = mockRange.setValues.mock.calls[0][0][0];
+    const resolutionValue = rowData[GRIEVANCE_COLS.RESOLUTION - 1];
+    expect(resolutionValue).toContain('Won');
+    expect(resolutionValue).toContain('Victory!');
   });
 });
 
@@ -979,12 +980,13 @@ describe('advanceGrievanceStep', () => {
 
     const mockRange = {
       setValue: jest.fn(),
+      setValues: jest.fn(),
       getValue: jest.fn(() => ''),
-      getValues: jest.fn(() => data),
+      getValues: jest.fn(() => [grievanceRow]),
       getRow: jest.fn(() => 2),
       getColumn: jest.fn(() => 1),
-      getNumRows: jest.fn(() => data.length),
-      getNumColumns: jest.fn(() => 40),
+      getNumRows: jest.fn(() => 1),
+      getNumColumns: jest.fn(() => 41),
       getA1Notation: jest.fn(() => 'A2'),
       getSheet: jest.fn()
     };
@@ -995,7 +997,7 @@ describe('advanceGrievanceStep', () => {
       getRow: jest.fn(() => 1),
       getColumn: jest.fn(() => 1),
       getNumRows: jest.fn(() => data.length),
-      getNumColumns: jest.fn(() => 40)
+      getNumColumns: jest.fn(() => 41)
     });
     sheet.getRange.mockReturnValue(mockRange);
 
@@ -1062,8 +1064,9 @@ describe('advanceGrievanceStep', () => {
 
     advanceGrievanceStep('GRV-2026-0001', {});
 
-    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    expect(setValueArgs).toContain(GRIEVANCE_STATUS.APPEALED);
+    // Batch write: check status column in the written row
+    const rowData = mockRange.setValues.mock.calls[0][0][0];
+    expect(rowData[GRIEVANCE_COLS.STATUS - 1]).toBe(GRIEVANCE_STATUS.APPEALED);
   });
 
   test('updates status to In Arbitration for step 3 advance', () => {
@@ -1071,8 +1074,9 @@ describe('advanceGrievanceStep', () => {
 
     advanceGrievanceStep('GRV-2026-0001', {});
 
-    const setValueArgs = mockRange.setValue.mock.calls.map(c => c[0]);
-    expect(setValueArgs).toContain(GRIEVANCE_STATUS.AT_ARBITRATION);
+    // Batch write: check status column in the written row
+    const rowData = mockRange.setValues.mock.calls[0][0][0];
+    expect(rowData[GRIEVANCE_COLS.STATUS - 1]).toBe(GRIEVANCE_STATUS.AT_ARBITRATION);
   });
 
   test('logs audit event with step details', () => {

@@ -1452,51 +1452,7 @@ var GEMINI_CONFIG = {
 // GEMINI v4.0 LEGAL & PDF SIGNATURE ENGINE
 // ============================================================================
 
-/**
- * Gemini v4.0 Form Submission Handler (Legacy - use onGrievanceFormSubmit in 05_Integrations.gs instead)
- * NOTE: Renamed to avoid duplicate function definition conflict.
- * The primary implementation is in 05_Integrations.gs
- *
- * @param {Object} e - Form submission event object
- * @deprecated Use onGrievanceFormSubmit in 05_Integrations.gs
- */
-function onGrievanceFormSubmit_Legacy_(e) {
-  try {
-    var responses = e.namedValues;
-    var data = {
-      name: responses['Member Name'] ? responses['Member Name'][0] : "Unknown",
-      id: responses['Member ID'] ? responses['Member ID'][0] : "000",
-      details: responses['Details'] ? responses['Details'][0] : "No details provided."
-    };
-
-    // Get or create member-specific folder
-    var memberFolder = getOrCreateMemberFolder(data.name, data.id);
-
-    // Create signature-ready PDF
-    var pdfFile = createGrievancePDF(memberFolder, data);
-
-    // Log PDF URL to Grievance Log
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var logSheet = ss.getSheetByName(SHEETS.GRIEVANCE_LOG) ||
-                   ss.getSheetByName(GEMINI_CONFIG.LOG_SHEET_NAME);
-
-    if (logSheet && logSheet.getLastRow() > 1) {
-      // Update Drive Folder URL column
-      logSheet.getRange(logSheet.getLastRow(), GRIEVANCE_COLS.DRIVE_FOLDER_URL).setValue(pdfFile.getUrl());
-    }
-
-    // Log the action
-    logAuditEvent('GRIEVANCE_PDF_CREATED', {
-      memberId: data.id,
-      memberName: data.name,
-      pdfUrl: pdfFile.getUrl()
-    });
-
-  } catch (error) {
-    console.error('Form submission error: ' + error.message);
-    logAuditEvent('FORM_SUBMISSION_ERROR', { error: error.message });
-  }
-}
+// Dead code removed: onGrievanceFormSubmit_Legacy_ — replaced by onGrievanceFormSubmit in 05_Integrations.gs
 
 /**
  * Gemini v4.0 Signature-Ready PDF Generator
@@ -2046,68 +2002,8 @@ function autoPopulateGrievanceFromOCR_(text, grievanceId) {
   }
 }
 
-/**
- * Quick OCR function - simplified wrapper for common use cases
- * @param {string} fileId - Google Drive file ID
- * @returns {string} Extracted text, or error message
- */
-function wgerQuick(fileId) {
-  var result = wger(fileId, { mode: 'TEXT' });
-  if (result.success) {
-    return result.text;
-  }
-  return 'Error: ' + result.message;
-}
-
-/**
- * OCR with handwriting optimization
- * @param {string} fileId - Google Drive file ID
- * @returns {Object} Full result object
- */
-function wgerHandwriting(fileId) {
-  return wger(fileId, { mode: 'HANDWRITING' });
-}
-
-/**
- * OCR with document layout preservation
- * @param {string} fileId - Google Drive file ID
- * @returns {Object} Full result object
- */
-function wgerDocument(fileId) {
-  return wger(fileId, { mode: 'DOCUMENT' });
-}
-
-/**
- * EXTENSION: CLOUD VISION OCR HOOK (Legacy - calls wger)
- * Prepares the system for future Google Cloud Vision integration.
- * Requires: Enabling 'Cloud Vision API' in Google Cloud Console.
- *
- * @param {string} fileId - Google Drive file ID of the image to transcribe
- * @returns {Object} Status object with transcription placeholder
- * @deprecated Use wger() instead
- */
-function transcribeHandwrittenForm(fileId) {
-  // Use the new wger OCR function
-  var result = wger(fileId, { mode: 'HANDWRITING' });
-
-  // Return in legacy format for backward compatibility
-  if (result.success) {
-    return {
-      status: 'SUCCESS',
-      message: 'OCR completed via wger function',
-      fileId: fileId,
-      fileName: result.fileName,
-      text: result.text
-    };
-  }
-
-  return {
-    status: result.status || 'ERROR',
-    message: result.message,
-    fileId: fileId,
-    fileName: result.fileName || ''
-  };
-}
+// Dead code removed: wgerQuick, wgerHandwriting, wgerDocument, transcribeHandwrittenForm
+// — unused convenience wrappers. Use wger(fileId, {mode:'TEXT'|'HANDWRITING'|'DOCUMENT'}) directly.
 
 /**
  * EXTENSION: SENTIMENT CORRELATION HOOK

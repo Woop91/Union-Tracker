@@ -226,12 +226,6 @@ var Auth = (function () {
         return null;
       }
 
-      // Reject already-used tokens (one-time use)
-      if (data.used) {
-        props.deleteProperty(TOKEN_PREFIX + token);
-        return null;
-      }
-
       // Mark as used
       data.used = true;
       props.setProperty(TOKEN_PREFIX + token, JSON.stringify(data));

@@ -661,7 +661,7 @@ function applyStepHighlighting() {
 
   // H14: Filter out existing step-highlighting rules targeting our columns before adding new ones.
   // This prevents rule accumulation when the function is called multiple times.
-  var stepHighlightCols = [
+  stepHighlightCols = [
     GRIEVANCE_COLS.STEP1_DUE, GRIEVANCE_COLS.STEP2_APPEAL_DUE,
     GRIEVANCE_COLS.STEP3_APPEAL_DUE, GRIEVANCE_COLS.DAYS_TO_DEADLINE,
     GRIEVANCE_COLS.NEXT_ACTION_DUE, GRIEVANCE_COLS.STATUS

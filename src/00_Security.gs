@@ -245,6 +245,22 @@ function safeSheetNameForFormula(sheetName) {
 }
 
 /**
+ * Sanitizes a value for use inside a Google Visualization API query string.
+ * Escapes single quotes (doubled) and backslashes (doubled).
+ * @param {*} value - The value to sanitize
+ * @returns {string} Sanitized string safe for query embedding
+ */
+function sanitizeForQuery(value) {
+  if (value === null || value === undefined) return '';
+  var str = String(value);
+  if (!str) return '';
+  // Google Visualization API: escape backslashes first, then single quotes
+  str = str.replace(/\\/g, '\\\\');
+  str = str.replace(/'/g, "''");
+  return str;
+}
+
+/**
  * Safely creates a QUERY formula with sanitized parameters
  * @param {string} sheetName - The sheet name
  * @param {string} query - The query string
@@ -280,9 +296,11 @@ function buildSafeQuery(sheetName, query, headers, range) {
   }
 
   // Sanitize the query - remove potentially dangerous characters
+  // CR-DATA-4: Google Visualization API QUERY strings use doubled-quote ("") escaping,
+  // not backslash-quote (\") which would produce a literal backslash in the formula.
   var safeQuery = String(query)
     .replace(/'/g, "''")
-    .replace(/"/g, '\\"');
+    .replace(/"/g, '""');
 
   // Reject queries that could break out of the QUERY string context
   // Blocks: IMPORTRANGE, IMPORTDATA, IMPORTFEED, IMPORTHTML, IMAGE, QUERY, INDIRECT, OFFSET

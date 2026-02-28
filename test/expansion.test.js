@@ -119,6 +119,9 @@ describe('getGrievanceStats', () => {
   });
 
   test('returns available: false when fewer than 10 records', () => {
+    // Clear IIFE in-memory cache so re-mocked spreadsheet is used
+    DataService._invalidateSheetCache('Grievance Log');
+
     const headers = ['Grievance ID', 'Member Email', 'Status', 'Step', 'Filed'];
     const data = [headers,
       ['G001', 'a@test.com', 'Active', 'Step I', '2025-06-01'],
@@ -139,6 +142,9 @@ describe('getGrievanceStats', () => {
 
 describe('getGrievanceHotSpots', () => {
   test('returns locations with 3+ grievances', () => {
+    // Clear IIFE in-memory cache so re-mocked spreadsheet is used
+    DataService._invalidateSheetCache('Grievance Log');
+
     const headers = ['Grievance ID', 'Unit'];
     const data = [headers,
       ['G1', 'Hot Unit'], ['G2', 'Hot Unit'], ['G3', 'Hot Unit'],
@@ -155,6 +161,8 @@ describe('getGrievanceHotSpots', () => {
   });
 
   test('returns empty when no unit has 3+ cases', () => {
+    DataService._invalidateSheetCache('Grievance Log');
+
     const headers = ['Grievance ID', 'Unit'];
     const data = [headers, ['G1', 'A'], ['G2', 'B']];
     const mockSheet = createMockSheet('Grievance Log', data);
@@ -271,9 +279,14 @@ describe('dataMarkWelcomeDismissed', () => {
     expect(dismissKey).toBeTruthy();
   });
 
-  test('returns failure for empty email', () => {
-    const result = dataMarkWelcomeDismissed('');
+  test('returns failure when no authenticated user', () => {
+    // Mock Session to return empty email (unauthenticated)
+    const origGetEmail = Session.getActiveUser().getEmail;
+    Session.getActiveUser = jest.fn(() => ({ getEmail: jest.fn(() => '') }));
+    const result = dataMarkWelcomeDismissed();
     expect(result.success).toBe(false);
+    // Restore
+    Session.getActiveUser = jest.fn(() => ({ getEmail: origGetEmail }));
   });
 });
 
@@ -312,6 +325,15 @@ describe('dataGetBroadcastFilterOptions', () => {
   });
 
   test('returns filter options from member directory', () => {
+    // Clear IIFE in-memory cache so re-mocked spreadsheet is used
+    DataService._invalidateSheetCache('Member Directory');
+
+    // Mock steward auth check (CR-AUTH-3 moved to server-side identity)
+    const origAuth = global.checkWebAppAuthorization;
+    global.checkWebAppAuthorization = jest.fn(() => ({
+      isAuthorized: true, email: 'steward@test.com', role: 'steward'
+    }));
+
     const headers = ['Email', 'Name', 'Work Location', 'Office Days', 'Dues Status', 'Role', 'Assigned Steward'];
     const data = [headers,
       ['a@test.com', 'Alice', 'Office A', 'Mon-Wed', 'Active', 'Member', 'steward@test.com'],
@@ -322,11 +344,14 @@ describe('dataGetBroadcastFilterOptions', () => {
     const mockSS = createMockSpreadsheet([mockSheet]);
     SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSS);
 
-    const filters = dataGetBroadcastFilterOptions('steward@test.com');
+    const filters = dataGetBroadcastFilterOptions();
     expect(filters).toBeDefined();
     expect(filters.locations).toBeDefined();
     expect(Array.isArray(filters.locations)).toBe(true);
     expect(filters.locations).toContain('Office A');
     expect(filters.locations).toContain('Office B');
+
+    // Restore original auth function
+    global.checkWebAppAuthorization = origAuth;
   });
 });

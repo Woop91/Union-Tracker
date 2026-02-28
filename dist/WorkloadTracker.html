@@ -927,10 +927,20 @@
       _remindersOnly: true
     };
 
-    // NOTE: The server processForm will save reminder prefs as a side effect.
-    // To avoid creating a dummy vault row, we just show a success message.
-    // In a future version, we could add a dedicated setReminder endpoint.
-    showAlert('reminderAlert', 'info', 'Reminder preferences will be saved with your next workload submission.');
+    // H-1 fix: Actually send reminder preferences to server
+    showAlert('reminderAlert', 'info', 'Saving reminder preferences...');
+    google.script.run
+      .withSuccessHandler(function(r) {
+        if (r && r.success) {
+          showAlert('reminderAlert', 'success', 'Reminder preferences saved.');
+        } else {
+          showAlert('reminderAlert', 'error', (r && r.message) || 'Failed to save preferences.');
+        }
+      })
+      .withFailureHandler(function(err) {
+        showAlert('reminderAlert', 'error', 'Error: ' + err);
+      })
+      .processWorkloadForm(formObj);
   }
 
   // ── Tabs ──────────────────────────────────────────────────────────────

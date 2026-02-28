@@ -2794,20 +2794,9 @@ function generateNameBasedId(prefix, firstName, lastName, existingIds) {
  * @private
  */
 function generateUUID_() {
-  var chars = '0123456789abcdef';
-  var uuid = '';
-  for (var i = 0; i < 36; i++) {
-    if (i === 8 || i === 13 || i === 18 || i === 23) {
-      uuid += '-';
-    } else if (i === 14) {
-      uuid += '4'; // UUID version 4
-    } else if (i === 19) {
-      uuid += chars.charAt((Math.random() * 4) | 8); // Variant bits
-    } else {
-      uuid += chars.charAt(Math.floor(Math.random() * 16));
-    }
-  }
-  return uuid;
+  // CR-OTHER-1: Use Utilities.getUuid() for cryptographically secure UUIDs
+  // instead of Math.random() which has insufficient entropy
+  return Utilities.getUuid();
 }
 
 // ============================================================================
@@ -3348,25 +3337,27 @@ function getHapticFeedbackScript() {
         'observer.observe(document.body,{childList:true,subtree:true});' +
       '}' +
 
-      '/* Provide success/error feedback for google.script.run callbacks */' +
+      '/* H-4 fix: Haptic feedback for google.script.run — preserves fluent chaining */' +
       'var origRun=google.script&&google.script.run;' +
       'if(origRun){' +
         'var origSuccess=origRun.withSuccessHandler;' +
         'var origFailure=origRun.withFailureHandler;' +
         'if(origSuccess){' +
           'google.script.run.withSuccessHandler=function(fn){' +
-            'return origSuccess.call(this,function(){' +
+            'var result=origSuccess.call(this,function(){' +
               'hapticFeedback("success");' +
               'if(fn)fn.apply(this,arguments);' +
             '});' +
+            'return result||this;' +
           '};' +
         '}' +
         'if(origFailure){' +
           'google.script.run.withFailureHandler=function(fn){' +
-            'return origFailure.call(this,function(){' +
+            'var result=origFailure.call(this,function(){' +
               'hapticFeedback("error");' +
               'if(fn)fn.apply(this,arguments);' +
             '});' +
+            'return result||this;' +
           '};' +
         '}' +
       '}' +

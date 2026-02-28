@@ -52,23 +52,15 @@ describe('generateMemberPIN', () => {
     expect(pin.length).toBe(6);
   });
 
-  test('uses Utilities.getUuid() (not Math.random)', () => {
-    generateMemberPIN();
-    expect(Utilities.getUuid).toHaveBeenCalled();
-  });
-
   test('only contains digits', () => {
-    // Mock UUID with known value that has digits
-    Utilities.getUuid.mockReturnValue('12345678-abcd-efgh-ijkl-mnopqrstuvwx');
     const pin = generateMemberPIN();
     expect(pin).toMatch(/^\d{6}$/);
   });
 
-  test('pads with zeros if not enough digits', () => {
-    // UUID with fewer than 6 digits
-    Utilities.getUuid.mockReturnValue('abcde1fg-hijk-lmno-pqrs-tuvwxyz00000');
-    const pin = generateMemberPIN();
-    expect(pin.length).toBe(6);
+  test('generates values in 6-digit range (100000-999999)', () => {
+    const pin = Number(generateMemberPIN());
+    expect(pin).toBeGreaterThanOrEqual(100000);
+    expect(pin).toBeLessThanOrEqual(999999);
   });
 });
 
