@@ -275,7 +275,7 @@ var Auth = (function () {
     var hue = config.accentHue || 250;
     var accent = 'hsl(' + hue + ', 70%, 55%)';
     var _accentLight = 'hsl(' + hue + ', 70%, 95%)';
-
+    
     return '<!DOCTYPE html><html><body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin:0; padding:40px 20px; background:#f5f5f5;">'
       + '<div style="max-width:480px; margin:0 auto; background:#fff; border-radius:16px; padding:40px 32px; box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
       + '<div style="text-align:center; margin-bottom:24px;">'

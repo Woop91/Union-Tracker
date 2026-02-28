@@ -166,10 +166,10 @@ function SEED_SAMPLE_DATA() {
   }
   if (!isDemoSafeToRun_()) return;
 
-  var ui = SpreadsheetApp.getUi();
+  ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  var response = ui.alert(
+  response = ui.alert(
     '🚀 Seed Sample Data',
     'This will seed:\n' +
     '• Config dropdowns (Job Titles, Locations, etc.)\n' +
@@ -644,7 +644,7 @@ function seedSatisfactionData() {
 
   var maxCol = SATISFACTION_COLS.Q67_ADDITIONAL; // last seeded column
 
-  for (var i = 0; i < 50; i++) {
+  for (i = 0; i < 50; i++) {
     // Spread responses over last 60 days
     var daysAgo = Math.floor(Math.random() * 60);
     var timestamp = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
@@ -936,6 +936,7 @@ function restoreConfigFromSheetData_() {
  * @param {number} grievancePercent - Percentage of members to give grievances (0-100, default 30)
  */
 function SEED_MEMBERS(count, grievancePercent) {
+  if (!isDemoSafeToRun_()) return;
   count = Math.min(count || 50, 2000);
   grievancePercent = (grievancePercent !== undefined) ? grievancePercent : 30; // Default 30% get grievances
 
@@ -1106,6 +1107,7 @@ function SEED_MEMBERS(count, grievancePercent) {
  * @param {number} count - Number of members to seed (max 2000)
  */
 function SEED_MEMBERS_ONLY(count) {
+  if (!isDemoSafeToRun_()) return;
   count = Math.min(count || 50, 2000);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1305,6 +1307,7 @@ function generateSingleMemberRow(memberId, firstName, lastName, jobTitle, locati
  * @param {number} count - Number of grievances to seed (max 300)
  */
 function SEED_GRIEVANCES(count) {
+  if (!isDemoSafeToRun_()) return;
   count = Math.min(count || 25, 300);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -1835,7 +1838,7 @@ function seedWeeklyQuestions() {
     };
 
     var responseRows = [];
-    var now = new Date();
+    now = new Date();
     Object.keys(sampleResponses).forEach(function(qId) {
       sampleResponses[qId].forEach(function(resp, idx) {
         var fakeHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, 'seed-user-' + idx + '-' + qId)
@@ -2232,6 +2235,16 @@ function NUKE_SEEDED_DATA() {
   var ui = SpreadsheetApp.getUi();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  // F39: Create backup before destructive operation
+  try {
+    if (typeof createGrievanceSnapshot === 'function') {
+      var preNukeBackup = createGrievanceSnapshot();
+      PropertiesService.getScriptProperties().setProperty('PRE_NUKE_SNAPSHOT', JSON.stringify(preNukeBackup));
+    }
+  } catch (_backupErr) {
+    Logger.log('Pre-nuke backup skipped: ' + _backupErr.message);
+  }
+
   // Check if already disabled
   if (isDemoModeDisabled()) {
     ui.alert('Demo Mode Disabled', 'Demo mode has already been disabled. The Demo menu will be removed on next refresh.', ui.ButtonSet.OK);
@@ -2554,6 +2567,7 @@ function NUKE_SEEDED_DATA() {
  * Clear only Config dropdown values (user-populated columns)
  */
 function NUKE_CONFIG_DROPDOWNS() {
+  if (!isDemoSafeToRun_()) return;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEETS.CONFIG);
 
@@ -3074,7 +3088,7 @@ function onEditValidation(e) {
       else { e.range.clearNote(); e.range.setBackground(null); }
     }
     if (col === MEMBER_COLS.PHONE) {
-      var r = validatePhoneNumber(val);
+      r = validatePhoneNumber(val);
       if (!r.valid) { e.range.setNote('⚠️ ' + r.message); e.range.setBackground('#fff3e0'); }
       else { e.range.clearNote(); e.range.setBackground(null); if (r.formatted !== val) e.range.setValue(r.formatted); }
     }
@@ -3670,11 +3684,13 @@ function showTestDashboard() {
 
   var testRows = results.results.map(function(r) {
     var status = r.passed ? '✅' : '❌';
-    var errorMsg = r.error ? '<span style="color:#ef4444">' + escapeHtml(r.error) + '</span>' : '-';
+    var safeName = escapeHtml(String(r.name || ''));
+    var safeError = r.error ? escapeHtml(String(r.error)) : '';
+    var errorMsg = safeError ? '<span style="color:#ef4444">' + safeError + '</span>' : '-';
     return '<tr>' +
       '<td>' + status + '</td>' +
-      '<td>' + escapeHtml(r.name) + '</td>' +
-      '<td>' + escapeHtml(r.duration) + 'ms</td>' +
+      '<td>' + safeName + '</td>' +
+      '<td>' + r.duration + 'ms</td>' +
       '<td>' + errorMsg + '</td>' +
       '</tr>';
   }).join('');

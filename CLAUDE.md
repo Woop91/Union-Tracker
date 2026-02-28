@@ -9,6 +9,16 @@
 5. **`dist/` contains individual `.gs` + `.html` files for clasp push.** Never edit dist/ directly. Edit `src/*.gs` and `src/*.html`, then copy to dist/. **Do NOT use the consolidated single-file build** (`ConsolidatedDashboard.gs`) — clasp must push individual files because GAS needs separate `.html` files for `HtmlService.createTemplateFromFile()` and `createHtmlOutputFromFile()`.
 6. **After any merge/work to Main:** remind user to run `clasp push` from the repo root. Agent cannot run clasp remotely.
 
+## Permissions
+
+Claude has **full, pre-authorized access** to read, edit, create, and delete any files in both the **DDS-Dashboard** and **Union-Tracker** repositories — local and GitHub remotes. Claude will not ask for permission for any operation within these two repos, including:
+- Editing, creating, or deleting source files
+- Git operations (commit, push, pull, branch, merge, etc.)
+- Running `clasp push` to deploy either repo to Google Apps Script
+- Running build, lint, test, and deploy scripts
+
+For **any file or directory outside** the DDS-Dashboard and Union-Tracker repos, Claude **must ask the user for permission** before reading or modifying.
+
 ## Repos & Sync
 
 - **DDS-Dashboard** (private): Primary repo. Default branch: `Main` (capital M). Branches: Main, dev, staging.

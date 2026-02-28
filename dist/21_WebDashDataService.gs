@@ -158,7 +158,7 @@ var DataService = (function () {
    */
   function getStewardKPIs(stewardEmail) {
     var cases = getStewardCases(stewardEmail);
-
+    
     var total = cases.length;
     var overdue = 0;
     var dueSoon = 0;
@@ -906,8 +906,8 @@ var DataService = (function () {
     } else if (deadlineRaw) {
       var parsed = new Date(deadlineRaw);
       if (!isNaN(parsed.getTime())) {
-        var now = new Date();
-        var diff = parsed.getTime() - now.getTime();
+        now = new Date();
+        diff = parsed.getTime() - now.getTime();
         deadlineDays = Math.ceil(diff / (24 * 60 * 60 * 1000));
         deadlineFormatted = _formatDate(parsed);
       }
@@ -920,7 +920,7 @@ var DataService = (function () {
       filedFormatted = _formatDate(filedRaw);
       filedTimestamp = filedRaw.getTime();
     } else if (filedRaw) {
-      var parsed = new Date(filedRaw);
+      parsed = new Date(filedRaw);
       if (!isNaN(parsed.getTime())) {
         filedFormatted = _formatDate(parsed);
         filedTimestamp = parsed.getTime();

@@ -59,7 +59,7 @@ function statStdDev_(arr) {
  */
 function pearsonCorrelation_(x, y) {
   var n = Math.min(x.length, y.length);
-  if (n < 3) return 0; // Need at least 3 pairs for meaningful correlation
+  if (n < 5) return 0; // Need at least 5 pairs for meaningful correlation
 
   var meanX = statMean_(x.slice(0, n));
   var meanY = statMean_(y.slice(0, n));
