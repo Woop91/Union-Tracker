@@ -32,9 +32,11 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
 ### ⚠️ MODIFY for UT (add typeof guards)
 | File | Lines | What to guard |
 |------|-------|---------------|
-| `src/03_UIComponents.gs` | 85-94 | `📊 Workload Tracker` submenu — wrap in typeof check |
-| `src/index.html` | 370, 389 | `workload` nav item and route — guard or remove |
-| `src/member_view.html` | 792, 881-1129 | `renderWorkloadTracker` function + SSO calls — guard |
+| `src/03_UIComponents.gs` | 107-175 | Break menu chain into `toolsMenu_` var; wrap WT submenu in `if (typeof initWorkloadTrackerSheets === 'function')` |
+| `src/index.html` | 499, 507, 525 | Workload tab: `.concat(typeof renderWorkloadTracker ...)` pattern; switch case typeof guard |
+| `src/member_view.html` | 1142-1144 | More menu: `.concat(typeof renderWorkloadTracker ...)` pattern for workload item |
+| `build.js` | 56, 73 | Remove `18_WorkloadTracker.gs` and `WorkloadTracker.html` from BUILD_ORDER/HTML_FILES |
+| `test/architecture.test.js` | 57, 206 | Remove `18_WorkloadTracker.gs` from loadSources and BUILD_ORDER arrays |
 
 ### ✅ KEEP in UT (already safe)
 | File | Why safe |
@@ -56,4 +58,5 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
 | Date | Agent | DDS Commit | UT Commit | Files Synced | Exclusions Applied | Notes |
 |------|-------|------------|-----------|-------------|-------------------|-------|
 | 2026-02-25 | Claude (claude.ai) | — | — | SYNC-LOG.md, AI-REFERENCE.md | N/A | Initial setup files |
+| 2026-02-28 | Claude (claude-code) | `d1e51fb` | `b119401` | 102 files (40 .gs, 8 .html, tests, build) | 18_WorkloadTracker.gs, WorkloadTracker.html excluded; typeof guards on 03_UIComponents.gs, index.html, member_view.html; build.js BUILD_ORDER updated; architecture.test.js updated | Full sync: Batches 1-10 code review fixes (auth, XSS, formula injection, perf, dead code) |
 
