@@ -1,7 +1,7 @@
 # SYNC-LOG.md — DDS-Dashboard → Union-Tracker
 
 ## Purpose
-Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
+Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `Main`.
 
 ---
 
@@ -12,8 +12,8 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
 - **Manually entered data**: Anything imported by users via the import function, or typed directly into cells by a user. **Must never be deleted or overwritten by any function.**
 
 ### Sync Rules
-- Source: DDS `Main` → Target: UT `staging`
-- User manages: UT `staging` → UT `dev` → UT `main`
+- Source: DDS `Main` → Target: UT `Main`
+- **Single branch policy: Both repos use `Main` only.**
 - **Excluded from UT:**
   - DDS Apps Script ID (`18hHHX-4E_ykGCqu_EDwKCwqY9ycyRgPtOmguacsxnVZ4YsRh-YETODiu`)
   - Workload Tracker-exclusive files (see registry below)
@@ -57,4 +57,5 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
 |------|-------|------------|-----------|-------------|-------------------|-------|
 | 2026-02-25 | Claude (claude.ai) | — | — | SYNC-LOG.md, AI-REFERENCE.md | N/A | Initial setup files |
 | 2026-02-28 | Claude (claude-code) | `d1e51fb` | `b119401` | 102 files (40 .gs, 8 .html, tests, build) | 18_WorkloadTracker.gs, WorkloadTracker.html excluded; typeof guards applied | Full sync: Batches 1-10 code review fixes |
+| 2026-03-02 | Claude (claude-code) | `efffbfd` | `d675259` | 22 files (10 src + 11 dist + CHANGELOG.md + package.json) | 18_WorkloadTracker.gs, WorkloadTracker.html excluded; typeof guards preserved in index.html, member_view.html | v4.19.0 sync: QA bug fixes & resilience (Issues 1-12), sign-out fix, security hardening (rate limiting, token cleanup, timing-attack prevention) |
 
