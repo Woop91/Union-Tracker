@@ -29,6 +29,9 @@ var Auth = (function () {
   function resolveUser(e) {
     var params = e ? e.parameter || {} : {};
 
+    // 0. Explicit logout — bypass all auth methods
+    if (params.loggedout === '1') return null;
+
     // 1. Check for session token (returning user with "remember me")
     if (params.sessionToken) {
       var sessionEmail = _validateSessionToken(params.sessionToken);
@@ -68,11 +71,21 @@ var Auth = (function () {
   function sendMagicLink(email, rememberMe) {
     email = String(email).trim().toLowerCase();
 
+    // Rate limiting — max 3 magic links per email per 15 minutes
+    var cache = CacheService.getScriptCache();
+    var rateKey = 'MAGIC_RATE_' + email;
+    var count = parseInt(cache.get(rateKey) || '0', 10);
+    if (count >= 3) {
+      return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
+    }
+    cache.put(rateKey, String(count + 1), 900);
+
     // Validate email exists in directory
     var userRecord = DataService.findUserByEmail(email);
     if (!userRecord) {
       // Don't reveal whether email exists — security best practice
-      // But still return success to prevent enumeration
+      // Simulate processing time to prevent timing-based enumeration
+      Utilities.sleep(500 + Math.floor(Math.random() * 500));
       return { success: true, message: 'If this email is in our directory, you will receive a sign-in link.' };
     }
 
@@ -359,4 +372,35 @@ function initWebDashboardAuth() {
   Logger.log('Config tab found: ' + (configSheet !== null));
 
   Logger.log('Auth module ready.');
+}
+
+/**
+ * Global wrapper: Clean up expired auth tokens.
+ * Called by daily time-based trigger.
+ */
+function authCleanupExpiredTokens() {
+  return Auth.cleanupExpiredTokens();
+}
+
+/**
+ * Installs a daily trigger to auto-clean expired auth tokens.
+ * Run once from the Apps Script editor. Idempotent — removes existing trigger first.
+ */
+function installTokenCleanupTrigger() {
+  // Remove any existing cleanup triggers to prevent duplicates
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'authCleanupExpiredTokens') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  // Create new daily trigger (runs between 2-3 AM in script timezone)
+  ScriptApp.newTrigger('authCleanupExpiredTokens')
+    .timeBased()
+    .everyDays(1)
+    .atHour(2)
+    .create();
+
+  Logger.log('Token cleanup trigger installed — runs daily at ~2 AM.');
 }

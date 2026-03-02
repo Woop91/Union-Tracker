@@ -245,7 +245,7 @@ var DataService = (function () {
     var memberCol = _findColumn(colMap, HEADERS.grievanceMemberEmail);
     if (memberCol === -1) return { success: true, history: [] };
 
-    var closedStatuses = ['settled', 'won', 'denied', 'withdrawn', 'closed'];
+    var closedStatuses = GRIEVANCE_CLOSED_STATUSES.map(function(s) { return s.toLowerCase(); });
     var history = [];
 
     for (var i = 1; i < data.length; i++) {
@@ -1344,9 +1344,9 @@ var DataService = (function () {
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] === taskId && String(data[i][1]).toLowerCase().trim() === stewardEmail.toLowerCase().trim()) {
-        if (updates.status) sheet.getRange(i + 1, 7).setValue(updates.status);
-        if (updates.priority) sheet.getRange(i + 1, 6).setValue(updates.priority);
-        if (updates.title) sheet.getRange(i + 1, 3).setValue(updates.title.substring(0, 200));
+        if (updates.status) sheet.getRange(i + 1, 7).setValue(escapeForFormula(updates.status));
+        if (updates.priority) sheet.getRange(i + 1, 6).setValue(escapeForFormula(updates.priority));
+        if (updates.title) sheet.getRange(i + 1, 3).setValue(escapeForFormula(updates.title.substring(0, 200)));
         return { success: true };
       }
     }
@@ -1520,7 +1520,12 @@ var DataService = (function () {
 
   function getStewardMemberStats(stewardEmail) {
     var members = getStewardMembers(stewardEmail);
-    if (members.length === 0) return { total: 0, byLocation: {}, byDues: {} };
+    var scope = 'assigned';
+    if (members.length === 0) {
+      members = getAllMembers();
+      scope = 'all';
+    }
+    if (members.length === 0) return { total: 0, byLocation: {}, byDues: {}, scope: scope };
     var byLocation = {};
     var byDues = {};
     members.forEach(function(m) {
@@ -1529,7 +1534,7 @@ var DataService = (function () {
       var dues = m.duesStatus || 'Unknown';
       byDues[dues] = (byDues[dues] || 0) + 1;
     });
-    return { total: members.length, byLocation: byLocation, byDues: byDues };
+    return { total: members.length, byLocation: byLocation, byDues: byDues, scope: scope };
   }
 
   // ═══════════════════════════════════════
@@ -1755,7 +1760,7 @@ var DataService = (function () {
         _sheetDataCache[sheetName] = parsed;
         return parsed;
       }
-    } catch (e) { /* cache miss or parse error — read from sheet */ }
+    } catch (_e) { /* cache miss or parse error — read from sheet */ }
 
     var sheet = _getSheet(sheetName);
     if (!sheet) return null;
@@ -1779,7 +1784,7 @@ var DataService = (function () {
       if (json.length < 95000) {
         cache.put(cacheKey, json, SHEET_CACHE_TTL);
       }
-    } catch (e) { /* non-fatal — in-memory cache still works */ }
+    } catch (_e) { /* non-fatal — in-memory cache still works */ }
 
     return result;
   }
@@ -1793,7 +1798,7 @@ var DataService = (function () {
     try {
       var cacheKey = 'SD_' + sheetName.replace(/\s/g, '_');
       CacheService.getScriptCache().remove(cacheKey);
-    } catch (e) { /* non-fatal */ }
+    } catch (_e) { /* non-fatal */ }
   }
 
   // ═══════════════════════════════════════
@@ -1829,7 +1834,7 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, 'member');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (e) { /* non-fatal */ }
+    } catch (_e) { /* non-fatal */ }
 
     return {
       grievances: grievances,
@@ -1851,7 +1856,7 @@ var DataService = (function () {
         var nc = getWebAppNotificationCount(email, 'steward');
         notifCount = (nc && nc.count) || 0;
       }
-    } catch (e) { /* non-fatal */ }
+    } catch (_e) { /* non-fatal */ }
 
     return {
       cases: cases,
@@ -1974,7 +1979,7 @@ var DataService = (function () {
     }
     return polls;
     } catch (e) {
-      Logger.log('getActivePolls error: ' + e.message);
+      Logger.log('getActivePolls error: ' + e.message + '\n' + (e.stack || ''));
       return [];
     }
   }
@@ -2049,7 +2054,7 @@ var DataService = (function () {
     minutes.forEach(function(m) { delete m.meetingDateTs; });
     return minutes.slice(0, limit);
     } catch (e) {
-      Logger.log('getMeetingMinutes error: ' + e.message);
+      Logger.log('getMeetingMinutes error: ' + e.message + '\n' + (e.stack || ''));
       return [];
     }
   }
@@ -2219,7 +2224,7 @@ function dataGetSurveyStatus() { var e = _resolveCallerEmail(); return e ? DataS
 function dataGetOrgLinks() { return DataService.getOrgLinks(); }
 function dataGetStewardMembers() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardMembers(s); }
 function dataGetAllMembers() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllMembers(); }
-function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardSurveyTracking(s, scope); }
+function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireStewardAuth(); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
 function dataSendBroadcast(ignoredEmail, filter, msg) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg); }
 function dataGetSurveyResults() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getSurveyResults(); }
 
@@ -2237,8 +2242,8 @@ function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, de
 function dataGetTasks(ignoredStewardEmail, statusFilter) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getTasks(s, statusFilter); }
 function dataUpdateTask(ignoredStewardEmail, taskId, updates) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.updateTask(s, taskId, updates); }
 function dataCompleteTask(ignoredStewardEmail, taskId) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.completeTask(s, taskId); }
-function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); return e ? DataService.getStewardMemberStats(e) : {}; }
-function dataGetStewardDirectory() { return DataService.getStewardDirectory(); }
+function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
+function dataGetStewardDirectory() { try { return DataService.getStewardDirectory(); } catch (e) { Logger.log('dataGetStewardDirectory error: ' + e.message + '\n' + (e.stack || '')); return []; } }
 function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
 function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
 function dataGetMembershipStats() { return DataService.getMembershipStats(); }
@@ -2279,26 +2284,32 @@ function dataGetBatchData(ignoredEmail, role) { var e = _resolveCallerEmail(); r
 function dataGetBroadcastFilterOptions() {
   var s = _requireStewardAuth();
   if (!s) return { locations: [], officeDays: [], duesStatuses: [], totalMembers: 0 };
-  var members = DataService.getAllMembers();
-  var locations = {};
-  var officeDays = {};
-  var duesStatuses = {};
-  members.forEach(function(m) {
-    if (m.workLocation) locations[m.workLocation] = true;
-    if (m.officeDays) {
-      m.officeDays.split(/[,;]/).forEach(function(d) {
-        var day = d.trim();
-        if (day) officeDays[day] = true;
-      });
-    }
-    if (m.duesStatus) duesStatuses[m.duesStatus] = true;
-  });
-  return {
-    locations: Object.keys(locations).sort(),
-    officeDays: Object.keys(officeDays).sort(),
-    duesStatuses: Object.keys(duesStatuses).sort(),
-    totalMembers: members.length
-  };
+  try {
+    var members = DataService.getAllMembers();
+    var locations = {};
+    var officeDays = {};
+    var duesStatuses = {};
+    members.forEach(function(m) {
+      if (m.workLocation) locations[m.workLocation] = true;
+      var days = String(m.officeDays || '');
+      if (days) {
+        days.split(/[,;]/).forEach(function(d) {
+          var day = d.trim();
+          if (day) officeDays[day] = true;
+        });
+      }
+      if (m.duesStatus) duesStatuses[m.duesStatus] = true;
+    });
+    return {
+      locations: Object.keys(locations).sort(),
+      officeDays: Object.keys(officeDays).sort(),
+      duesStatuses: Object.keys(duesStatuses).sort(),
+      totalMembers: members.length
+    };
+  } catch (e) {
+    Logger.log('dataGetBroadcastFilterOptions error: ' + e.message + '\n' + (e.stack || ''));
+    return { locations: [], officeDays: [], duesStatuses: [], totalMembers: 0 };
+  }
 }
 
 // Engagement stats — reads seeded union stats from Script Properties

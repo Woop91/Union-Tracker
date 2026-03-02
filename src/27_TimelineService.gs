@@ -46,6 +46,7 @@ var TimelineService = (function () {
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.TIMELINE_EVENTS);
+    if (!sheet) { sheet = initTimelineSheet(); }
     if (!sheet || sheet.getLastRow() <= 1) return { events: [], total: 0, page: page, pageSize: pageSize };
 
     var data = sheet.getDataRange().getValues();
@@ -238,7 +239,7 @@ var TimelineService = (function () {
       try {
         var file = DriveApp.getFileById(idsArr[f]);
         namesArr.push(file.getName());
-      } catch (e) {
+      } catch (_e) {
         namesArr.push('Unknown');
       }
     }

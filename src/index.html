@@ -44,13 +44,18 @@
 
     // On auth page: try to restore session from localStorage
     if (CURRENT_VIEW === 'auth' && WEB_APP_URL) {
-      var storedToken = localStorage.getItem('dashboardSessionToken');
-      if (storedToken && !PAGE_DATA.tokenChecked) {
-        // Redirect to web app URL with stored session token so server can validate
-        window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
-      } else if (PAGE_DATA.tokenChecked && storedToken) {
-        // Server already rejected this token — clear it
+      if (PAGE_DATA.error === 'loggedout') {
+        // User just signed out — clear any stored session token
         localStorage.removeItem('dashboardSessionToken');
+      } else {
+        var storedToken = localStorage.getItem('dashboardSessionToken');
+        if (storedToken && !PAGE_DATA.tokenChecked) {
+          // Redirect to web app URL with stored session token so server can validate
+          window.top.location.href = WEB_APP_URL + '?sessionToken=' + encodeURIComponent(storedToken);
+        } else if (PAGE_DATA.tokenChecked && storedToken) {
+          // Server already rejected this token — clear it
+          localStorage.removeItem('dashboardSessionToken');
+        }
       }
     }
 
@@ -312,32 +317,28 @@
     }
 
     function handleLogout() {
-      // H-3 fix: Remove duplicate authLogout call — use only the async version with handlers
       var token = localStorage.getItem('dashboardSessionToken');
       localStorage.removeItem('dashboardSessionToken');
 
-      function _doReload() {
-        // Try multiple reload strategies for GAS iframe compatibility
-        try { window.top.location.reload(); } catch (_e) {}
-        try { window.location.reload(); } catch (_e2) {}
-        // Final fallback: navigate to the published web app URL (strips auth params)
-        try {
-          google.script.run.withSuccessHandler(function(url) {
-            if (url) { window.top.location.href = url; }
-          }).getWebAppUrl();
-        } catch (_e3) {}
+      function _redirectToLogout() {
+        // Redirect to web app URL with loggedout flag — bypasses SSO auto-re-auth
+        if (WEB_APP_URL) {
+          try { window.top.location.href = WEB_APP_URL + '?loggedout=1'; } catch (_e) {
+            window.location.href = WEB_APP_URL + '?loggedout=1';
+          }
+        } else {
+          try { window.top.location.reload(); } catch (_e2) { window.location.reload(); }
+        }
       }
 
       if (token) {
         google.script.run
-          .withSuccessHandler(function() { _doReload(); })
-          .withFailureHandler(function() { _doReload(); })
+          .withSuccessHandler(function() { _redirectToLogout(); })
+          .withFailureHandler(function() { _redirectToLogout(); })
           .authLogout(token);
       } else {
-        _doReload();
+        _redirectToLogout();
       }
-      // Final fallback timer
-      setTimeout(_doReload, 1500);
     }
 
     // ═══════════════════════════════════════

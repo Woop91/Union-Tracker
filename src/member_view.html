@@ -2319,6 +2319,9 @@ function renderWeeklyQuestionsPage(appContainer, role) {
           }
           target.appendChild(qCard);
         });
+      }).withFailureHandler(function() {
+        target.innerHTML = '';
+        target.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load questions.'));
       }).wqGetActiveQuestions(CURRENT_USER.email);
     }
 
@@ -2437,6 +2440,9 @@ function renderEventsPage(appContainer) {
         }, '\uD83D\uDCC5 Add to My Calendar'));
         content.appendChild(card);
       });
+    }).withFailureHandler(function() {
+      content.innerHTML = '';
+      content.appendChild(el('div', { style: { textAlign: 'center', padding: '30px 0', color: 'var(--danger)' } }, 'Failed to load events.'));
     }).dataGetUpcomingEvents(20);
   });
 }

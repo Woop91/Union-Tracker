@@ -5,6 +5,22 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.0] - 2026-03-02
+
+### Fixed
+- **Issue 8:** Member detail panel — click-to-expand with info row (email, location, office days, dues), "Full Profile" button loading additional fields, and "Log Contact" navigation
+- **Issue 9:** By Location chart falls back to all members when steward has no assigned members; chart label updates to indicate scope
+- **Issue 10:** Sign-out now returns to login page with "Signed out" message (completed in Phase 2)
+- **Issue 11:** Contact log autocomplete `.withFailureHandler()` prevents silent breakage when `dataGetAllMembers` fails
+- **Issue 12:** QA Forum and Timeline sheets auto-initialize on first access when missing
+
+### Added
+- `withFailureHandler` on Events and Weekly Questions render calls in `member_view.html`
+- `scope` field on `getStewardMemberStats()` return object (`'assigned'` or `'all'`)
+
+### Changed
+- Server-side error handling improvements for all DataService methods (Issues 1-7, completed in Phase 1)
+
 ## [4.18.0] - 2026-02-26
 
 ### Added

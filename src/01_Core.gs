@@ -549,7 +549,7 @@ function clearErrorLog() {
 var COMMAND_CONFIG = {
   // System Identity — reads from Config sheet at runtime, falls back to defaults
   get SYSTEM_NAME() { return getSystemName_(); },
-  VERSION: "4.18.1",
+  VERSION: "4.19.0",
 
   // Document Templates (configure these with your Drive IDs)
   TEMPLATE_ID: '',  // Google Doc template ID for grievance PDFs
@@ -701,12 +701,12 @@ function getLocalNumberFromConfig_() {
  */
 var VERSION_INFO = {
   MAJOR: 4,
-  MINOR: 18,
-  PATCH: 1,
-  BUILD: 'v4.18.1',
-  CURRENT: '4.18.1',
-  BUILD_DATE: '2026-02-26',
-  CODENAME: 'SPA Fixes, Seed Phasing & View Enhancements'
+  MINOR: 19,
+  PATCH: 0,
+  BUILD: 'v4.19.0',
+  CURRENT: '4.19.0',
+  BUILD_DATE: '2026-03-02',
+  CODENAME: 'QA Bug Fixes & Resilience'
 };
 
 /**
@@ -716,6 +716,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.19.0', date: '2026-03-02', codename: 'QA Bug Fixes & Resilience', changes: 'Server-side error handling for all DataService methods (Issues 1-7). Sign-out fix returns to login page (Issue 10). Member detail panel with expand/collapse and Full Profile loading (Issue 8). By Location chart falls back to all members when none assigned (Issue 9). Contact log autocomplete failure handler (Issue 11). Auto-initialize QA Forum and Timeline sheets on first access (Issue 12). Empty state messages and failure handlers for Events and Weekly Questions.' },
   { version: '4.18.0', date: '2026-02-26', codename: 'SPA Fixes, Seed Phasing & View Enhancements', changes: 'Split SEED_SAMPLE_DATA into 3 phased runners to avoid GAS 6-min timeout. 5 new seed functions (tasks, polls, minutes, check-ins, timeline events). Steward view: org-wide KPI fallback, all-contacts members tab, comma formatting, contact log autocomplete, survey tracking scope toggles, 6 new More menu items. Member view: Know Your Rights card, Contact-Directory nav, 1hr localStorage notification dismiss, meetings+minutes merge, 7 new More menu items. Backend globals: getAllMembers, startGrievanceDraft, createGrievanceDriveFolder. Broadcast uses all contacts. build.js BUILD_ORDER updated for 26_QAForum.gs, 27_TimelineService.gs, 28_FailsafeService.gs.' },
   { version: '4.17.0', date: '2026-02-26', codename: 'Q&A Forum, Timeline & Failsafe Services', changes: 'Q&A Forum (26_QAForum.gs, 389 lines) with _QA_Forum and _QA_Answers hidden sheets. Timeline Service (27_TimelineService.gs, 317 lines) with _Timeline_Events hidden sheet. Failsafe Service (28_FailsafeService.gs, 425 lines) with _Failsafe_Config hidden sheet. 08a_SheetSetup.gs updated for Q&A, Timeline, and Failsafe auto-creation. DataService methods for Q&A, Timeline, and Failsafe in 21_WebDashDataService.gs.' },
   { version: '4.16.0', date: '2026-02-26', codename: 'Wire 7 Unwired Sheets to SPA', changes: '15 new DataService methods (541 lines) in 21_WebDashDataService.gs wiring 7 previously unwired sheets to SPA. 15 global wrapper functions + 3 batch data fields. New SPA pages: Meetings, Polls, Minutes, Feedback. Insights page with Performance KPIs + Satisfaction Trends. Case detail views with checklist support. Per-question text scores with color-coding. questionTexts arrays for all 11 SATISFACTION_SECTIONS. Expansion test suite (332 lines). Removed Since N/A text, Dues Status charts. Fixed 122 test failures (1,363 tests passing across 23 suites).' },
@@ -817,7 +818,6 @@ var SHEETS = {
   GETTING_STARTED: '📚 Getting Started',
   FAQ: '❓ FAQ',
   CONFIG_GUIDE: '📖 Config Guide',
-  FEATURES_REFERENCE: '📋 Features Reference',
   // Aliases for backward compatibility (some code uses these alternate names)
   GRIEVANCE_TRACKER: 'Grievance Log',
   MEMBER_DIRECTORY: 'Member Directory',
@@ -1960,6 +1960,7 @@ function resolveColumnsFromSheet_(sheetName, headerMap, options) {
 
     return cols;
   } catch (_e) {
+    Logger.log('detectColumnLayout_ error: ' + _e.message);
     return null;
   }
 }
@@ -2423,6 +2424,20 @@ var GRIEVANCE_STATUS = {
   CLOSED: 'Closed',
   RESOLVED: 'Settled'  // Alias for backward compatibility
 };
+
+/**
+ * Statuses that indicate a grievance is no longer active.
+ * Used to filter open/closed grievances across dashboards and web views.
+ * Values are Title Case for sheet comparisons; lowercase with .map(s => s.toLowerCase()) when needed.
+ * @const {string[]}
+ */
+var GRIEVANCE_CLOSED_STATUSES = [
+  GRIEVANCE_STATUS.CLOSED,
+  GRIEVANCE_STATUS.SETTLED,
+  GRIEVANCE_STATUS.WITHDRAWN,
+  GRIEVANCE_STATUS.DENIED,
+  GRIEVANCE_STATUS.WON
+];
 
 /**
  * Grievance outcome constants for programmatic access
