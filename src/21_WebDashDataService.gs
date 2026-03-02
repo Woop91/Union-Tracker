@@ -1516,7 +1516,12 @@ var DataService = (function () {
 
   function getStewardMemberStats(stewardEmail) {
     var members = getStewardMembers(stewardEmail);
-    if (members.length === 0) return { total: 0, byLocation: {}, byDues: {} };
+    var scope = 'assigned';
+    if (members.length === 0) {
+      members = getAllMembers();
+      scope = 'all';
+    }
+    if (members.length === 0) return { total: 0, byLocation: {}, byDues: {}, scope: scope };
     var byLocation = {};
     var byDues = {};
     members.forEach(function(m) {
@@ -1525,7 +1530,7 @@ var DataService = (function () {
       var dues = m.duesStatus || 'Unknown';
       byDues[dues] = (byDues[dues] || 0) + 1;
     });
-    return { total: members.length, byLocation: byLocation, byDues: byDues };
+    return { total: members.length, byLocation: byLocation, byDues: byDues, scope: scope };
   }
 
   // ═══════════════════════════════════════
@@ -1970,7 +1975,7 @@ var DataService = (function () {
     }
     return polls;
     } catch (e) {
-      Logger.log('getActivePolls error: ' + e.message);
+      Logger.log('getActivePolls error: ' + e.message + '\n' + (e.stack || ''));
       return [];
     }
   }
@@ -2045,7 +2050,7 @@ var DataService = (function () {
     minutes.forEach(function(m) { delete m.meetingDateTs; });
     return minutes.slice(0, limit);
     } catch (e) {
-      Logger.log('getMeetingMinutes error: ' + e.message);
+      Logger.log('getMeetingMinutes error: ' + e.message + '\n' + (e.stack || ''));
       return [];
     }
   }
@@ -2596,7 +2601,7 @@ function dataStartGrievanceDraft(ignoredEmail, data) { var e = _resolveCallerEma
 function dataCreateGrievanceDrive() { var e = _resolveCallerEmail(); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetSurveyStatus() { var e = _resolveCallerEmail(); return e ? DataService.getMemberSurveyStatus(e) : null; }
 function dataGetAllMembers() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllMembers(); }
-function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardSurveyTracking(s, scope); }
+function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireStewardAuth(); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
 function dataSendBroadcast(ignoredEmail, filter, msg) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg); }
 function dataGetSurveyResults() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getSurveyResults(); }
 
@@ -2613,8 +2618,8 @@ function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, de
 }
 function dataGetTasks(ignoredStewardEmail, statusFilter) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getTasks(s, statusFilter); }
 function dataCompleteTask(ignoredStewardEmail, taskId) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.completeTask(s, taskId); }
-function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); return e ? DataService.getStewardMemberStats(e) : {}; }
-function dataGetStewardDirectory() { return DataService.getStewardDirectory(); }
+function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
+function dataGetStewardDirectory() { try { return DataService.getStewardDirectory(); } catch (e) { Logger.log('dataGetStewardDirectory error: ' + e.message + '\n' + (e.stack || '')); return []; } }
 function dataGetGrievanceStats() { return DataService.getGrievanceStats(); }
 function dataGetGrievanceHotSpots() { return DataService.getGrievanceHotSpots(); }
 function dataGetMembershipStats() { return DataService.getMembershipStats(); }
@@ -2651,26 +2656,32 @@ function dataGetBatchData(ignoredEmail, role) { var e = _resolveCallerEmail(); r
 function dataGetBroadcastFilterOptions() {
   var s = _requireStewardAuth();
   if (!s) return { locations: [], officeDays: [], duesStatuses: [], totalMembers: 0 };
-  var members = DataService.getAllMembers();
-  var locations = {};
-  var officeDays = {};
-  var duesStatuses = {};
-  members.forEach(function(m) {
-    if (m.workLocation) locations[m.workLocation] = true;
-    if (m.officeDays) {
-      m.officeDays.split(/[,;]/).forEach(function(d) {
-        var day = d.trim();
-        if (day) officeDays[day] = true;
-      });
-    }
-    if (m.duesStatus) duesStatuses[m.duesStatus] = true;
-  });
-  return {
-    locations: Object.keys(locations).sort(),
-    officeDays: Object.keys(officeDays).sort(),
-    duesStatuses: Object.keys(duesStatuses).sort(),
-    totalMembers: members.length
-  };
+  try {
+    var members = DataService.getAllMembers();
+    var locations = {};
+    var officeDays = {};
+    var duesStatuses = {};
+    members.forEach(function(m) {
+      if (m.workLocation) locations[m.workLocation] = true;
+      var days = String(m.officeDays || '');
+      if (days) {
+        days.split(/[,;]/).forEach(function(d) {
+          var day = d.trim();
+          if (day) officeDays[day] = true;
+        });
+      }
+      if (m.duesStatus) duesStatuses[m.duesStatus] = true;
+    });
+    return {
+      locations: Object.keys(locations).sort(),
+      officeDays: Object.keys(officeDays).sort(),
+      duesStatuses: Object.keys(duesStatuses).sort(),
+      totalMembers: members.length
+    };
+  } catch (e) {
+    Logger.log('dataGetBroadcastFilterOptions error: ' + e.message + '\n' + (e.stack || ''));
+    return { locations: [], officeDays: [], duesStatuses: [], totalMembers: 0 };
+  }
 }
 
 // Engagement stats — reads seeded union stats from Script Properties

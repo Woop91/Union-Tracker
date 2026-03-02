@@ -57,6 +57,10 @@ function doGetWebDashboard(e) {
     var user = Auth.resolveUser(e);
 
     if (!user) {
+      // Explicit logout — show login page with signed-out message
+      if (e.parameter.loggedout === '1') {
+        return _serveAuth(config, e, 'loggedout');
+      }
       // If the user explicitly clicked "Continue with Google" (sso=1 param)
       // but SSO failed, redirect back with an error flag so the login page
       // can display a helpful message.

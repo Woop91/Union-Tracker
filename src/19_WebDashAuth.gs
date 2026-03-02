@@ -29,6 +29,9 @@ var Auth = (function () {
   function resolveUser(e) {
     var params = e ? e.parameter || {} : {};
 
+    // 0. Explicit logout — bypass all auth methods
+    if (params.loggedout === '1') return null;
+
     // 1. Check for session token (returning user with "remember me")
     if (params.sessionToken) {
       var sessionEmail = _validateSessionToken(params.sessionToken);

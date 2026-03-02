@@ -449,7 +449,8 @@ function renderStewardMembers(appContainer) {
           if (!stats || !stats.byLocation) return;
           // Location bar
           var locCard = el('div', { className: 'card', style: { padding: '12px', marginBottom: '14px' } });
-          locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, 'By Location'));
+          var locLabel = stats.scope === 'all' ? 'All Members by Location' : 'By Location';
+          locCard.appendChild(el('div', { style: { fontFamily: 'var(--fontDisplay)', fontSize: '12px', fontWeight: '600', color: 'var(--text)', marginBottom: '6px' } }, locLabel));
           var lLabels = Object.keys(stats.byLocation);
           var lData = lLabels.map(function(k) { return stats.byLocation[k]; });
           ChartHelper.createHorizontalBarChart(locCard, 'members-loc-chart', lLabels, lData);
@@ -533,6 +534,7 @@ function renderStewardMembers(appContainer) {
 
 var _memberListPage = 0;
 var _memberPageSize = 25;
+var _expandedMemberEmail = null;
 
 function renderFilteredMembers(container, members, query) {
   container.innerHTML = '';
@@ -557,7 +559,7 @@ function renderFilteredMembers(container, members, query) {
   var pageItems = filtered.slice(start, start + _memberPageSize);
 
   pageItems.forEach(function(m) {
-    var item = el('div', { className: 'member-list-item' });
+    var item = el('div', { className: 'member-list-item', style: { cursor: 'pointer' } });
     item.appendChild(el('div', { className: 'member-list-avatar' }, (m.name || 'M').charAt(0).toUpperCase()));
     var info = el('div', { className: 'member-list-info' });
     info.appendChild(el('div', { className: 'member-list-name' }, m.name || m.email));
@@ -570,6 +572,16 @@ function renderFilteredMembers(container, members, query) {
     if (m.hasOpenGrievance) badges.appendChild(el('div', { className: 'status-dot active', title: 'Has open grievance' }));
     item.appendChild(badges);
     container.appendChild(item);
+
+    // Click handler — toggle inline detail panel
+    item.addEventListener('click', function() {
+      _toggleMemberDetail(container, item, m);
+    });
+
+    // If this member was previously expanded, re-expand
+    if (_expandedMemberEmail === (m.email || '').toLowerCase()) {
+      _showMemberDetail(container, item, m);
+    }
   });
 
   // Pagination controls
@@ -591,6 +603,99 @@ function renderFilteredMembers(container, members, query) {
     pager.appendChild(nextBtn);
     container.appendChild(pager);
   }
+}
+
+// ═══════════════════════════════════════
+// MEMBER DETAIL PANEL
+// ═══════════════════════════════════════
+
+function _toggleMemberDetail(container, itemEl, member) {
+  var email = (member.email || '').toLowerCase();
+  var existing = container.querySelector('.member-detail-panel');
+  // Collapse if same member clicked
+  if (existing && _expandedMemberEmail === email) {
+    existing.remove();
+    _expandedMemberEmail = null;
+    return;
+  }
+  // Remove any existing panel
+  if (existing) existing.remove();
+  _expandedMemberEmail = email;
+  _showMemberDetail(container, itemEl, member);
+}
+
+function _showMemberDetail(container, itemEl, member) {
+  var panel = el('div', { className: 'member-detail-panel', style: { background: 'var(--raised)', padding: '12px 16px', borderRadius: '8px', marginBottom: '8px', borderLeft: '3px solid var(--accent)' } });
+
+  // Info row — label+value pairs
+  var infoRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '12px 20px', marginBottom: '12px' } });
+  var infoFields = [
+    { label: 'Email', value: member.email || '—' },
+    { label: 'Location', value: member.workLocation || '—' },
+    { label: 'Office Days', value: member.officeDays || '—' },
+    { label: 'Dues', value: member.duesStatus || '—' }
+  ];
+  infoFields.forEach(function(f) {
+    var pair = el('div', { style: { minWidth: '100px' } });
+    pair.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, f.label));
+    pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
+    infoRow.appendChild(pair);
+  });
+  panel.appendChild(infoRow);
+
+  // Action buttons
+  var btnRow = el('div', { style: { display: 'flex', gap: '8px' } });
+  var profileArea = el('div');
+
+  var profileBtn = el('button', {
+    style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--accentBg)', border: '1px solid var(--accentBorder)', color: 'var(--accent)', fontWeight: '600', cursor: 'pointer' },
+    onClick: function() {
+      profileBtn.disabled = true;
+      profileBtn.textContent = 'Loading...';
+      google.script.run
+        .withSuccessHandler(function(profile) {
+          profileBtn.remove();
+          profileArea.innerHTML = '';
+          if (!profile) {
+            profileArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '8px' } }, 'Profile not found.'));
+            return;
+          }
+          var extraRow = el('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '12px 20px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)' } });
+          var extraFields = [
+            { label: 'Job Title', value: profile.jobTitle || '—' },
+            { label: 'Supervisor', value: profile.supervisor || '—' },
+            { label: 'Joined', value: profile.joined || '—' },
+            { label: 'City/State', value: ((profile.city || '') + (profile.city && profile.state ? ', ' : '') + (profile.state || '')) || '—' }
+          ];
+          extraFields.forEach(function(f) {
+            var pair = el('div', { style: { minWidth: '100px' } });
+            pair.appendChild(el('div', { style: { fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' } }, f.label));
+            pair.appendChild(el('div', { style: { fontSize: '13px', color: 'var(--text)', fontWeight: '500' } }, f.value));
+            extraRow.appendChild(pair);
+          });
+          profileArea.appendChild(extraRow);
+        })
+        .withFailureHandler(function() {
+          profileBtn.disabled = false;
+          profileBtn.textContent = 'Full Profile';
+          profileArea.innerHTML = '';
+          profileArea.appendChild(el('div', { style: { fontSize: '12px', color: 'var(--danger)', marginTop: '4px' } }, 'Failed to load profile.'));
+        })
+        .dataGetFullProfile(member.email);
+    }
+  }, 'Full Profile');
+
+  var contactBtn = el('button', {
+    style: { fontSize: '12px', padding: '6px 14px', borderRadius: '6px', background: 'var(--raised)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: '600', cursor: 'pointer' },
+    onClick: function() { _handleTabNav('steward', 'contactlog'); }
+  }, 'Log Contact');
+
+  btnRow.appendChild(profileBtn);
+  btnRow.appendChild(contactBtn);
+  panel.appendChild(btnRow);
+  panel.appendChild(profileArea);
+
+  itemEl.parentNode.insertBefore(panel, itemEl.nextSibling);
 }
 
 // ═══════════════════════════════════════
@@ -1487,10 +1592,10 @@ function _renderContactForm(container) {
   var _acMembers = null;
   function _loadAcMembers(cb) {
     if (_acMembers) { cb(_acMembers); return; }
-    google.script.run.withSuccessHandler(function(m) {
-      _acMembers = m || [];
-      cb(_acMembers);
-    }).dataGetAllMembers();
+    google.script.run
+      .withSuccessHandler(function(m) { _acMembers = m || []; cb(_acMembers); })
+      .withFailureHandler(function() { _acMembers = []; cb(_acMembers); })
+      .dataGetAllMembers();
   }
   memberInput.addEventListener('input', function() {
     var q = memberInput.value.toLowerCase().trim();

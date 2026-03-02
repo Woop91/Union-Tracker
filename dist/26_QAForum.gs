@@ -57,6 +57,10 @@ var QAForum = (function () {
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEETS.QA_FORUM);
+    if (!sheet) {
+      initQAForumSheets();
+      sheet = ss.getSheetByName(SHEETS.QA_FORUM);
+    }
     if (!sheet || sheet.getLastRow() <= 1) return { questions: [], total: 0, page: page, pageSize: pageSize };
 
     var data = sheet.getDataRange().getValues();
