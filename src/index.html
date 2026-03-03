@@ -471,7 +471,7 @@
         { id: 'notifications', icon: '\uD83D\uDD14', label: 'Notifications' },
         { id: 'events', icon: '\uD83D\uDCC5', label: 'Events' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org Chart' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'surveytrack', icon: '\uD83D\uDCCA', label: 'Survey Tracking' },
         { id: 'polls', icon: '\uD83D\uDDF3', label: 'Polls' },
@@ -494,7 +494,7 @@
         { id: 'minutes', icon: '\uD83D\uDCDD', label: 'Minutes' },
         { id: 'unionstats', icon: '\uD83D\uDCCA', label: 'Union Stats' },
         { id: 'stewarddirectory', icon: '\uD83D\uDC65', label: CONFIG.stewardLabel + ' Directory' },
-        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org Chart' },
+        { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
         { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
@@ -506,6 +506,30 @@
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
       ];
+    }
+
+    function renderOrgChart(appContainer, role) {
+      renderPageLayout(appContainer, role, 'orgchart', function(container) {
+        showLoading(container);
+        google.script.run
+          .withSuccessHandler(function(html) {
+            container.innerHTML = '';
+            var wrap = el('div');
+            wrap.innerHTML = html;
+            container.appendChild(wrap);
+            // Re-execute any <script> tags from org_chart.html
+            wrap.querySelectorAll('script').forEach(function(old) {
+              var s = document.createElement('script');
+              s.textContent = old.textContent;
+              old.parentNode.replaceChild(s, old);
+            });
+          })
+          .withFailureHandler(function(err) {
+            container.innerHTML = '';
+            container.appendChild(el('div', { className: 'empty-state' }, 'Failed to load org chart.'));
+          })
+          .getOrgChartHtml();
+      });
     }
 
     function _handleTabNav(role, tabId) {
