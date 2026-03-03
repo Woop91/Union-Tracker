@@ -343,6 +343,32 @@ describe('Auth.sendMagicLink', function () {
     var emailArgs = MailApp.sendEmail.mock.calls[0][0];
     expect(emailArgs.htmlBody).not.toContain('remember=1');
   });
+
+  test('handles quota check failure gracefully and proceeds to send', function () {
+    MailApp.getRemainingDailyQuota = jest.fn(function () {
+      throw new Error('Quota check unavailable');
+    });
+    // sendEmail should still be called since quota check failure is caught
+    var result = Auth.sendMagicLink('user@test.com', false);
+    expect(MailApp.sendEmail).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(true);
+  });
+
+  test('email body uses escapeHtml for config values', function () {
+    global.ConfigReader = {
+      getConfig: jest.fn(function () {
+        return Object.assign({}, defaultConfig, {
+          orgName: 'Org <script>alert("xss")</script>',
+          logoInitials: '<b>XSS</b>'
+        });
+      })
+    };
+    Auth.sendMagicLink('user@test.com', false);
+    var emailArgs = MailApp.sendEmail.mock.calls[0][0];
+    // HTML entities should be escaped — raw tags should not appear
+    expect(emailArgs.htmlBody).not.toContain('<script>alert');
+    expect(emailArgs.htmlBody).not.toContain('<b>XSS</b>');
+  });
 });
 
 // ============================================================================
@@ -580,6 +606,17 @@ describe('Global wrappers', function () {
 
     installTokenCleanupTrigger();
     expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(existingTrigger);
+    expect(ScriptApp.newTrigger).toHaveBeenCalledWith('authCleanupExpiredTokens');
+  });
+
+  test('installTokenCleanupTrigger does not remove unrelated triggers', function () {
+    var unrelatedTrigger = {
+      getHandlerFunction: jest.fn(function () { return 'onEditHandler'; })
+    };
+    ScriptApp.getProjectTriggers = jest.fn(function () { return [unrelatedTrigger]; });
+
+    installTokenCleanupTrigger();
+    expect(ScriptApp.deleteTrigger).not.toHaveBeenCalledWith(unrelatedTrigger);
     expect(ScriptApp.newTrigger).toHaveBeenCalledWith('authCleanupExpiredTokens');
   });
 
