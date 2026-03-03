@@ -348,6 +348,75 @@ describe('A4: No inline escapeHtml duplicates in source files', () => {
 });
 
 // ============================================================================
+// A5: WEB APP ERROR RESILIENCE
+// ============================================================================
+
+describe('A5: Web app doGet() error resilience', () => {
+  const webAppSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '22_WebDashApp.gs'), 'utf8'
+  );
+
+  test('doGet() wraps its entire body in a try/catch', () => {
+    // Extract the doGet function body (between the first { and its matching })
+    const doGetMatch = webAppSrc.match(/function doGet\s*\([^)]*\)\s*\{/);
+    expect(doGetMatch).not.toBeNull();
+
+    // The function must contain a try block
+    const afterDoGet = webAppSrc.slice(doGetMatch.index);
+    expect(afterDoGet).toMatch(/function doGet[^]*?try\s*\{/);
+  });
+
+  test('doGet() catch block calls _serveFatalError (zero-dependency fallback)', () => {
+    // The catch in doGet must call _serveFatalError, NOT _serveError
+    // _serveError depends on ConfigReader which may be the source of the error
+    const doGetMatch = webAppSrc.match(/function doGet\s*\([^)]*\)\s*\{/);
+    const afterDoGet = webAppSrc.slice(doGetMatch.index);
+    // Find the catch block that belongs to doGet (the top-level one)
+    expect(afterDoGet).toMatch(/\}\s*catch\s*\(\w+\)\s*\{[^}]*_serveFatalError/);
+  });
+
+  test('_serveFatalError() exists and does not call ConfigReader or DataService', () => {
+    expect(typeof global._serveFatalError).toBe('function');
+
+    // Extract the function body from source
+    const fnMatch = webAppSrc.match(/function _serveFatalError[\s\S]*?\nfunction /);
+    expect(fnMatch).not.toBeNull();
+    const fnBody = fnMatch[0];
+
+    // Must NOT depend on ConfigReader, DataService, SpreadsheetApp, or sheet access
+    expect(fnBody).not.toContain('ConfigReader');
+    expect(fnBody).not.toContain('DataService');
+    expect(fnBody).not.toContain('SpreadsheetApp');
+    expect(fnBody).not.toContain('getActiveSpreadsheet');
+    expect(fnBody).not.toContain('createTemplateFromFile');
+  });
+
+  test('doGetWebDashboard() catch block does not call ConfigReader.getConfig() without its own try/catch', () => {
+    // Extract the catch block from doGetWebDashboard
+    const fnStart = webAppSrc.indexOf('function doGetWebDashboard');
+    const fnBody = webAppSrc.slice(fnStart);
+
+    // Find the catch block
+    const catchMatch = fnBody.match(/\}\s*catch\s*\(\w+\)\s*\{([\s\S]*?)\n\}/);
+    expect(catchMatch).not.toBeNull();
+
+    const catchBody = catchMatch[1];
+
+    // If ConfigReader.getConfig() appears in the catch, it MUST be inside its own try
+    if (catchBody.includes('ConfigReader.getConfig()')) {
+      expect(catchBody).toMatch(/try\s*\{[\s\S]*?ConfigReader\.getConfig\(\)/);
+    }
+  });
+
+  test('_serveFatalError returns HtmlOutput (HtmlService.createHtmlOutput)', () => {
+    const fnMatch = webAppSrc.match(/function _serveFatalError[\s\S]*?\nfunction /);
+    expect(fnMatch[0]).toContain('HtmlService.createHtmlOutput');
+    // Must NOT use createTemplateFromFile (requires external file)
+    expect(fnMatch[0]).not.toContain('createTemplateFromFile');
+  });
+});
+
+// ============================================================================
 // A3: NO EMPTY FUNCTION STUBS
 // ============================================================================
 
