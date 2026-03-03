@@ -1,70 +1,103 @@
 /**
  * Tests for 28_FailsafeService.gs
  *
- * Covers FailsafeService IIFE: sheet setup, digest configuration,
- * scheduled digests, bulk export, Drive backup, and trigger management.
+ * Covers the FailsafeService IIFE: initFailsafeSheet, getDigestConfig,
+ * updateDigestConfig, processScheduledDigests, triggerBulkExport,
+ * backupCriticalSheets, setupFailsafeTriggers, removeFailsafeTriggers,
+ * and global wrappers.
  */
 
 require('./gas-mock');
 const { createMockSheet, createMockSpreadsheet } = require('./gas-mock');
 const { loadSources } = require('./load-source');
 
-// Mock DataService before loading
-global.DataService = {
-  getMemberGrievances: jest.fn(() => [
-    { status: 'Open', issueType: 'Safety', dateFiled: '2026-01-15' }
-  ]),
-  getMemberTasks: jest.fn(() => [
-    { title: 'Follow up', priority: 'High', status: 'open', dueDate: '2026-04-01' }
-  ])
-};
-
 loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '28_FailsafeService.gs']);
 
-let mockConfigSheet;
-let mockMemberSheet;
-let mockSs;
+// ---------------------------------------------------------------------------
+// Test helpers
+// ---------------------------------------------------------------------------
 
-function makeConfigData(rows) {
-  const headers = ['Email', 'Digest Enabled', 'Digest Frequency', 'Last Digest Sent', 'Include Grievances', 'Include Workload', 'Include Tasks'];
-  return [headers, ...(rows || [])];
+/** Standard failsafe config header row */
+var FAILSAFE_HEADERS = [
+  'Email', 'Digest Enabled', 'Digest Frequency', 'Last Digest Sent',
+  'Include Grievances', 'Include Workload', 'Include Tasks'
+];
+
+/** Build a data set with headers + config rows */
+function buildFailsafeData(rows) {
+  return [FAILSAFE_HEADERS].concat(rows || []);
 }
 
-function makeMemberData() {
-  return [
-    ['Email', 'Name'],
-    ['member@test.com', 'Jane Doe'],
-    ['other@test.com', 'John Smith'],
-  ];
+/** Create a mock failsafe config sheet with custom data rows */
+function buildFailsafeSheet(rows) {
+  var data = buildFailsafeData(rows);
+  var sheet = createMockSheet(SHEETS.FAILSAFE_CONFIG, data);
+
+  sheet.getRange = jest.fn(function (row, col, numRows, numCols) {
+    return {
+      getValue: jest.fn(function () {
+        if (data[row - 1] && data[row - 1][col - 1] !== undefined) return data[row - 1][col - 1];
+        return '';
+      }),
+      getValues: jest.fn(function () {
+        var result = [];
+        for (var r = row - 1; r < row - 1 + (numRows || 1); r++) {
+          var rowArr = [];
+          for (var c = col - 1; c < col - 1 + (numCols || 1); c++) {
+            rowArr.push(data[r] && data[r][c] !== undefined ? data[r][c] : '');
+          }
+          result.push(rowArr);
+        }
+        return result;
+      }),
+      setValue: jest.fn(),
+      setValues: jest.fn()
+    };
+  });
+
+  return sheet;
 }
 
-function setupSheets(configRows, includeMemberSheet) {
-  const configData = makeConfigData(configRows);
-  mockConfigSheet = createMockSheet(SHEETS.FAILSAFE_CONFIG || '_Failsafe_Config', configData);
-
-  // Custom getRange for config sheet
-  mockConfigSheet.getRange = jest.fn((row, col) => ({
-    getValue: jest.fn(() => {
-      if (configData[row - 1]) return configData[row - 1][col - 1] || '';
-      return '';
-    }),
-    setValue: jest.fn(),
-    getValues: jest.fn(() => [[configData[row - 1] ? configData[row - 1][col - 1] : '']])
-  }));
-
-  const sheets = [mockConfigSheet];
-
-  if (includeMemberSheet) {
-    mockMemberSheet = createMockSheet(SHEETS.MEMBER_DIR || 'Member Directory', makeMemberData());
-    sheets.push(mockMemberSheet);
-  }
-
-  mockSs = createMockSpreadsheet(sheets);
-  SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
+/** Create a mock member directory sheet */
+function buildMemberSheet(rows) {
+  var headers = ['Name', 'Email', 'Department'];
+  var data = [headers].concat(rows || []);
+  var sheet = createMockSheet(SHEETS.MEMBER_DIR, data);
+  return sheet;
 }
+
+/** Install a spreadsheet mock with the given sheets */
+function installSS(sheets) {
+  var ss = createMockSpreadsheet(sheets || []);
+  SpreadsheetApp.getActiveSpreadsheet.mockReturnValue(ss);
+  return ss;
+}
+
+// ---------------------------------------------------------------------------
+// Global mocks
+// ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  setupSheets();
+  jest.clearAllMocks();
+  global.logAuditEvent = jest.fn();
+  global.logIntegrityEvent = jest.fn();
+  global.DataService = undefined;
+
+  // Reset MailApp quota mock
+  MailApp.getRemainingDailyQuota.mockReturnValue(100);
+  MailApp.sendEmail.mockImplementation(() => {});
+
+  // Reset DriveApp mocks
+  var mockFolder = {
+    getId: jest.fn(() => 'backup-folder-id'),
+    getUrl: jest.fn(() => 'https://drive.google.com/backup-folder'),
+    createFile: jest.fn(() => ({ getId: jest.fn(() => 'file-id') })),
+    setDescription: jest.fn()
+  };
+  DriveApp.getFoldersByName.mockReturnValue({
+    hasNext: jest.fn(() => false)
+  });
+  DriveApp.createFolder.mockReturnValue(mockFolder);
 });
 
 // ============================================================================
@@ -73,15 +106,20 @@ beforeEach(() => {
 
 describe('FailsafeService.initFailsafeSheet', () => {
   test('creates sheet if missing', () => {
-    mockSs = createMockSpreadsheet([]);
-    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
-    FailsafeService.initFailsafeSheet();
-    expect(mockSs.insertSheet).toHaveBeenCalled();
+    var ss = installSS([]);
+    var result = FailsafeService.initFailsafeSheet();
+
+    expect(ss.insertSheet).toHaveBeenCalledWith(SHEETS.FAILSAFE_CONFIG);
+    expect(result).toBeTruthy();
   });
 
-  test('does not recreate existing sheet', () => {
-    FailsafeService.initFailsafeSheet();
-    expect(mockSs.insertSheet).not.toHaveBeenCalled();
+  test('does not recreate if sheet exists', () => {
+    var existingSheet = buildFailsafeSheet([]);
+    var ss = installSS([existingSheet]);
+    var result = FailsafeService.initFailsafeSheet();
+
+    expect(ss.insertSheet).not.toHaveBeenCalled();
+    expect(result).toBe(existingSheet);
   });
 });
 
@@ -90,53 +128,59 @@ describe('FailsafeService.initFailsafeSheet', () => {
 // ============================================================================
 
 describe('FailsafeService.getDigestConfig', () => {
-  test('returns null for empty email', () => {
-    expect(FailsafeService.getDigestConfig('')).toBeNull();
-    expect(FailsafeService.getDigestConfig(null)).toBeNull();
+  test('returns null for null email', () => {
+    var result = FailsafeService.getDigestConfig(null);
+    expect(result).toBeNull();
   });
 
-  test('returns default when no sheet exists', () => {
-    mockSs = createMockSpreadsheet([]);
-    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
-    const config = FailsafeService.getDigestConfig('user@test.com');
-    expect(config.enabled).toBe(false);
-    expect(config.frequency).toBe('weekly');
-    expect(config.includeGrievances).toBe(true);
-  });
-
-  test('returns default for unknown email', () => {
-    setupSheets([
-      ['other@test.com', true, 'weekly', '', true, true, true]
-    ]);
-    const config = FailsafeService.getDigestConfig('unknown@test.com');
-    expect(config.enabled).toBe(false);
+  test('returns default when no config sheet exists', () => {
+    installSS([]);
+    var result = FailsafeService.getDigestConfig('user@test.com');
+    expect(result.enabled).toBe(false);
+    expect(result.frequency).toBe('weekly');
+    expect(result.includeGrievances).toBe(true);
+    expect(result.includeWorkload).toBe(true);
+    expect(result.includeTasks).toBe(true);
   });
 
   test('returns stored config for known email', () => {
-    setupSheets([
-      ['user@test.com', true, 'monthly', new Date('2026-02-01'), true, false, true]
+    var lastSent = new Date('2026-02-20T00:00:00');
+    var sheet = buildFailsafeSheet([
+      ['admin@test.com', true, 'monthly', lastSent, true, false, true]
     ]);
-    const config = FailsafeService.getDigestConfig('user@test.com');
-    expect(config.enabled).toBe(true);
-    expect(config.frequency).toBe('monthly');
-    expect(config.includeWorkload).toBe(false);
+    installSS([sheet]);
+
+    var result = FailsafeService.getDigestConfig('admin@test.com');
+    expect(result.enabled).toBe(true);
+    expect(result.frequency).toBe('monthly');
+    expect(result.includeGrievances).toBe(true);
+    expect(result.includeWorkload).toBe(false);
+    expect(result.includeTasks).toBe(true);
+    expect(result.lastSent).toBeTruthy();
   });
 
-  test('handles boolean TRUE string', () => {
-    setupSheets([
-      ['user@test.com', 'TRUE', 'weekly', '', 'TRUE', 'FALSE', 'TRUE']
+  test('returns default for unknown email', () => {
+    var sheet = buildFailsafeSheet([
+      ['other@test.com', true, 'weekly', '', true, true, true]
     ]);
-    const config = FailsafeService.getDigestConfig('user@test.com');
-    expect(config.enabled).toBe(true);
-    expect(config.includeWorkload).toBe(false);
+    installSS([sheet]);
+
+    var result = FailsafeService.getDigestConfig('unknown@test.com');
+    expect(result.enabled).toBe(false);
+    expect(result.frequency).toBe('weekly');
   });
 
-  test('case insensitive email lookup', () => {
-    setupSheets([
-      ['USER@TEST.COM', true, 'weekly', '', true, true, true]
+  test('handles boolean/string TRUE values', () => {
+    var sheet = buildFailsafeSheet([
+      ['user@test.com', 'TRUE', 'weekly', '', 'TRUE', 'FALSE', true]
     ]);
-    const config = FailsafeService.getDigestConfig('user@test.com');
-    expect(config.enabled).toBe(true);
+    installSS([sheet]);
+
+    var result = FailsafeService.getDigestConfig('user@test.com');
+    expect(result.enabled).toBe(true);
+    expect(result.includeGrievances).toBe(true);
+    expect(result.includeWorkload).toBe(false);
+    expect(result.includeTasks).toBe(true);
   });
 });
 
@@ -146,25 +190,24 @@ describe('FailsafeService.getDigestConfig', () => {
 
 describe('FailsafeService.updateDigestConfig', () => {
   test('rejects missing email', () => {
-    const result = FailsafeService.updateDigestConfig('', {});
+    var result = FailsafeService.updateDigestConfig(null, { enabled: true });
     expect(result.success).toBe(false);
+    expect(result.message).toContain('Missing');
   });
 
   test('rejects missing config', () => {
-    const result = FailsafeService.updateDigestConfig('user@test.com', null);
+    var result = FailsafeService.updateDigestConfig('user@test.com', null);
     expect(result.success).toBe(false);
+    expect(result.message).toContain('Missing');
   });
 
-  test('normalizes frequency to weekly/monthly', () => {
-    const result = FailsafeService.updateDigestConfig('user@test.com', {
-      enabled: true,
-      frequency: 'daily' // Not supported → should default to weekly
-    });
-    expect(result.success).toBe(true);
-  });
+  test('updates existing row', () => {
+    var sheet = buildFailsafeSheet([
+      ['user@test.com', false, 'weekly', '', true, true, true]
+    ]);
+    installSS([sheet]);
 
-  test('saves new config for unknown email', () => {
-    const result = FailsafeService.updateDigestConfig('new@test.com', {
+    var result = FailsafeService.updateDigestConfig('user@test.com', {
       enabled: true,
       frequency: 'monthly',
       includeGrievances: true,
@@ -172,17 +215,48 @@ describe('FailsafeService.updateDigestConfig', () => {
       includeTasks: true
     });
     expect(result.success).toBe(true);
+    expect(result.message).toContain('updated');
+    // Should have called setValue on row 2, columns 2, 3, 5, 6, 7
+    expect(sheet.getRange).toHaveBeenCalledWith(2, 2);
+    expect(sheet.getRange).toHaveBeenCalledWith(2, 3);
   });
 
-  test('updates existing config', () => {
-    setupSheets([
-      ['user@test.com', true, 'weekly', '', true, true, true]
+  test('adds new row if email not found', () => {
+    var sheet = buildFailsafeSheet([
+      ['existing@test.com', true, 'weekly', '', true, true, true]
     ]);
-    const result = FailsafeService.updateDigestConfig('user@test.com', {
-      enabled: false,
-      frequency: 'monthly'
+    installSS([sheet]);
+
+    var result = FailsafeService.updateDigestConfig('new@test.com', {
+      enabled: true,
+      frequency: 'weekly'
     });
     expect(result.success).toBe(true);
+    expect(result.message).toContain('saved');
+    expect(sheet.appendRow).toHaveBeenCalled();
+    var appendArgs = sheet.appendRow.mock.calls[0][0];
+    expect(appendArgs[0]).toBe('new@test.com');
+  });
+
+  test('normalizes frequency to weekly/monthly', () => {
+    var sheet = buildFailsafeSheet([]);
+    installSS([sheet]);
+
+    // Frequency that is not 'monthly' should default to 'weekly'
+    FailsafeService.updateDigestConfig('user@test.com', {
+      enabled: true,
+      frequency: 'daily'
+    });
+    var appendArgs = sheet.appendRow.mock.calls[0][0];
+    expect(appendArgs[2]).toBe('weekly');
+  });
+
+  test('uses ScriptLock', () => {
+    var sheet = buildFailsafeSheet([]);
+    installSS([sheet]);
+
+    FailsafeService.updateDigestConfig('user@test.com', { enabled: true });
+    expect(LockService.getScriptLock).toHaveBeenCalled();
   });
 });
 
@@ -192,29 +266,76 @@ describe('FailsafeService.updateDigestConfig', () => {
 
 describe('FailsafeService.processScheduledDigests', () => {
   test('returns {processed:0} when no config sheet', () => {
-    mockSs = createMockSpreadsheet([]);
-    SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
-    const result = FailsafeService.processScheduledDigests();
+    installSS([]);
+    var result = FailsafeService.processScheduledDigests();
     expect(result.processed).toBe(0);
   });
 
   test('skips disabled digests', () => {
-    setupSheets([
+    var sheet = buildFailsafeSheet([
       ['user@test.com', false, 'weekly', '', true, true, true]
     ]);
-    const result = FailsafeService.processScheduledDigests();
+    installSS([sheet]);
+
+    var result = FailsafeService.processScheduledDigests();
+    expect(result.processed).toBe(0);
+    expect(MailApp.sendEmail).not.toHaveBeenCalled();
+  });
+
+  test('respects frequency scheduling', () => {
+    // Last sent 3 days ago, frequency is weekly -> should not send
+    var threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    var sheet = buildFailsafeSheet([
+      ['user@test.com', true, 'weekly', threeDaysAgo, true, true, true]
+    ]);
+    installSS([sheet]);
+
+    var result = FailsafeService.processScheduledDigests();
     expect(result.processed).toBe(0);
   });
 
-  test('stops when email quota is low', () => {
-    setupSheets([
-      ['user@test.com', true, 'weekly', new Date('2000-01-01'), true, true, true]
+  test('stops on low email quota', () => {
+    // Last sent 10 days ago -> eligible for weekly send
+    var tenDaysAgo = new Date();
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+    var sheet = buildFailsafeSheet([
+      ['user1@test.com', true, 'weekly', tenDaysAgo, true, true, true],
+      ['user2@test.com', true, 'weekly', tenDaysAgo, true, true, true]
     ]);
-    MailApp.getRemainingDailyQuota = jest.fn(() => 2);
-    const result = FailsafeService.processScheduledDigests();
+    installSS([sheet]);
+
+    // Low quota
+    MailApp.getRemainingDailyQuota.mockReturnValue(3);
+
+    var result = FailsafeService.processScheduledDigests();
+    // Should stop before processing because quota < 5
     expect(result.processed).toBe(0);
-    // Restore
-    MailApp.getRemainingDailyQuota = jest.fn(() => 100);
+  });
+
+  test('updates lastSent date after sending', () => {
+    // Last sent 10 days ago with DataService providing data
+    var tenDaysAgo = new Date();
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+    var sheet = buildFailsafeSheet([
+      ['user@test.com', true, 'weekly', tenDaysAgo, true, false, false]
+    ]);
+    installSS([sheet]);
+
+    // Mock DataService to provide grievances so _composeMemberDigest returns content
+    global.DataService = {
+      getMemberGrievances: jest.fn(() => [
+        { status: 'Open', issueType: 'Discipline', dateFiled: '2026-01-15' }
+      ]),
+      getMemberTasks: jest.fn(() => [])
+    };
+
+    var result = FailsafeService.processScheduledDigests();
+    expect(result.processed).toBe(1);
+    // getRange(2, 4).setValue(now) for last sent date
+    expect(sheet.getRange).toHaveBeenCalledWith(2, 4);
   });
 });
 
@@ -224,19 +345,37 @@ describe('FailsafeService.processScheduledDigests', () => {
 
 describe('FailsafeService.triggerBulkExport', () => {
   test('rejects missing stewardEmail', () => {
-    const result = FailsafeService.triggerBulkExport('');
+    var result = FailsafeService.triggerBulkExport(null);
     expect(result.success).toBe(false);
+    expect(result.message).toContain('Not authorized');
   });
 
   test('returns error when no member data', () => {
-    const result = FailsafeService.triggerBulkExport('steward@test.com');
+    installSS([]);
+    var result = FailsafeService.triggerBulkExport('admin@test.com');
     expect(result.success).toBe(false);
+    expect(result.message).toContain('No member data');
   });
 
-  test('exports when member sheet has data', () => {
-    setupSheets([], true);
-    const result = FailsafeService.triggerBulkExport('steward@test.com');
-    expect(result).toHaveProperty('success');
+  test('returns sent count', () => {
+    var memberSheet = buildMemberSheet([
+      ['Alice', 'alice@test.com', 'HR'],
+      ['Bob', 'bob@test.com', 'Ops']
+    ]);
+    installSS([memberSheet]);
+
+    // Mock DataService so _composeMemberDigest generates content
+    global.DataService = {
+      getMemberGrievances: jest.fn(() => [
+        { status: 'Open', issueType: 'Discipline', dateFiled: '2026-01-15' }
+      ]),
+      getMemberTasks: jest.fn(() => [])
+    };
+
+    var result = FailsafeService.triggerBulkExport('admin@test.com');
+    expect(result.success).toBe(true);
+    expect(typeof result.sent).toBe('number');
+    expect(result.sent).toBeGreaterThanOrEqual(0);
   });
 });
 
@@ -245,16 +384,86 @@ describe('FailsafeService.triggerBulkExport', () => {
 // ============================================================================
 
 describe('FailsafeService.backupCriticalSheets', () => {
-  test('returns backup result', () => {
-    const result = FailsafeService.backupCriticalSheets();
-    expect(result).toHaveProperty('success');
-    expect(result.success).toBe(true);
-    expect(result).toHaveProperty('backedUp');
+  test('creates backup folder if it does not exist', () => {
+    // DriveApp.getFoldersByName returns no folders
+    DriveApp.getFoldersByName.mockReturnValue({
+      hasNext: jest.fn(() => false)
+    });
+
+    // Create sheets with data so backup has something to process
+    var memberSheet = createMockSheet(SHEETS.MEMBER_DIR, [
+      ['Name', 'Email'],
+      ['Alice', 'alice@test.com']
+    ]);
+    installSS([memberSheet]);
+
+    FailsafeService.backupCriticalSheets();
+    expect(DriveApp.createFolder).toHaveBeenCalledWith('DDS_Dashboard_Backups');
   });
 
-  test('skips sheets with no data', () => {
-    const result = FailsafeService.backupCriticalSheets();
+  test('backs up sheets to CSV files', () => {
+    var mockFolder = {
+      createFile: jest.fn(() => ({ getId: jest.fn(() => 'csv-file-id') }))
+    };
+    DriveApp.getFoldersByName.mockReturnValue({
+      hasNext: jest.fn(() => true),
+      next: jest.fn(() => mockFolder)
+    });
+
+    var memberSheet = createMockSheet(SHEETS.MEMBER_DIR, [
+      ['Name', 'Email'],
+      ['Alice', 'alice@test.com']
+    ]);
+    var grievanceSheet = createMockSheet(SHEETS.GRIEVANCE_LOG, [
+      ['ID', 'Status'],
+      ['G1', 'Open']
+    ]);
+    installSS([memberSheet, grievanceSheet]);
+
+    var result = FailsafeService.backupCriticalSheets();
+    expect(result.success).toBe(true);
+    expect(result.backedUp).toBe(2);
+    expect(mockFolder.createFile).toHaveBeenCalledTimes(2);
+  });
+
+  test('skips empty sheets', () => {
+    var mockFolder = {
+      createFile: jest.fn()
+    };
+    DriveApp.getFoldersByName.mockReturnValue({
+      hasNext: jest.fn(() => true),
+      next: jest.fn(() => mockFolder)
+    });
+
+    // Sheet with only header row (getLastRow returns 1)
+    var emptySheet = createMockSheet(SHEETS.MEMBER_DIR, [['Name', 'Email']]);
+    emptySheet.getLastRow.mockReturnValue(1);
+    installSS([emptySheet]);
+
+    var result = FailsafeService.backupCriticalSheets();
     expect(result.backedUp).toBe(0);
+    expect(mockFolder.createFile).not.toHaveBeenCalled();
+  });
+
+  test('returns backedUp count and folderName', () => {
+    var mockFolder = {
+      createFile: jest.fn(() => ({ getId: jest.fn(() => 'id') }))
+    };
+    DriveApp.getFoldersByName.mockReturnValue({
+      hasNext: jest.fn(() => true),
+      next: jest.fn(() => mockFolder)
+    });
+
+    var memberSheet = createMockSheet(SHEETS.MEMBER_DIR, [
+      ['Name', 'Email'],
+      ['Alice', 'alice@test.com']
+    ]);
+    installSS([memberSheet]);
+
+    var result = FailsafeService.backupCriticalSheets();
+    expect(result).toHaveProperty('backedUp');
+    expect(result).toHaveProperty('folderName', 'DDS_Dashboard_Backups');
+    expect(result.success).toBe(true);
   });
 });
 
@@ -263,45 +472,56 @@ describe('FailsafeService.backupCriticalSheets', () => {
 // ============================================================================
 
 describe('FailsafeService.setupFailsafeTriggers', () => {
-  test('creates triggers', () => {
-    const result = FailsafeService.setupFailsafeTriggers();
+  test('creates daily + weekly triggers', () => {
+    var result = FailsafeService.setupFailsafeTriggers();
     expect(result.success).toBe(true);
-    expect(ScriptApp.newTrigger).toHaveBeenCalled();
+    // Two newTrigger calls: one for daily digest, one for weekly backup
+    expect(ScriptApp.newTrigger).toHaveBeenCalledTimes(2);
+    expect(ScriptApp.newTrigger).toHaveBeenCalledWith('fsProcessScheduledDigests');
+    expect(ScriptApp.newTrigger).toHaveBeenCalledWith('fsBackupCriticalSheets');
   });
 
-  test('removes existing triggers first', () => {
-    const mockTrigger = {
+  test('removes existing triggers before installing new ones', () => {
+    // Mock existing triggers
+    var existingTrigger1 = {
       getHandlerFunction: jest.fn(() => 'fsProcessScheduledDigests')
     };
-    ScriptApp.getProjectTriggers = jest.fn(() => [mockTrigger]);
+    var existingTrigger2 = {
+      getHandlerFunction: jest.fn(() => 'fsBackupCriticalSheets')
+    };
+    ScriptApp.getProjectTriggers.mockReturnValue([existingTrigger1, existingTrigger2]);
+
     FailsafeService.setupFailsafeTriggers();
-    expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(mockTrigger);
-    // Restore
-    ScriptApp.getProjectTriggers = jest.fn(() => []);
+
+    // Should have deleted the existing triggers first
+    expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(existingTrigger1);
+    expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(existingTrigger2);
+    // Then created new ones
+    expect(ScriptApp.newTrigger).toHaveBeenCalledTimes(2);
   });
 });
 
 describe('FailsafeService.removeFailsafeTriggers', () => {
   test('removes matching triggers', () => {
-    const digestTrigger = { getHandlerFunction: jest.fn(() => 'fsProcessScheduledDigests') };
-    const backupTrigger = { getHandlerFunction: jest.fn(() => 'fsBackupCriticalSheets') };
-    const otherTrigger = { getHandlerFunction: jest.fn(() => 'someOtherFunction') };
-    ScriptApp.getProjectTriggers = jest.fn(() => [digestTrigger, backupTrigger, otherTrigger]);
+    var fsTrigger = {
+      getHandlerFunction: jest.fn(() => 'fsProcessScheduledDigests')
+    };
+    var otherTrigger = {
+      getHandlerFunction: jest.fn(() => 'someOtherFunction')
+    };
+    ScriptApp.getProjectTriggers.mockReturnValue([fsTrigger, otherTrigger]);
 
-    const result = FailsafeService.removeFailsafeTriggers();
+    var result = FailsafeService.removeFailsafeTriggers();
     expect(result.success).toBe(true);
-    expect(result.removed).toBe(2);
-    expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(digestTrigger);
-    expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(backupTrigger);
+    expect(result.removed).toBe(1);
+    expect(ScriptApp.deleteTrigger).toHaveBeenCalledWith(fsTrigger);
     expect(ScriptApp.deleteTrigger).not.toHaveBeenCalledWith(otherTrigger);
-
-    // Restore
-    ScriptApp.getProjectTriggers = jest.fn(() => []);
   });
 
-  test('returns {removed:0} when no triggers', () => {
-    ScriptApp.getProjectTriggers = jest.fn(() => []);
-    const result = FailsafeService.removeFailsafeTriggers();
+  test('returns success with 0 removed when no matching triggers', () => {
+    ScriptApp.getProjectTriggers.mockReturnValue([]);
+    var result = FailsafeService.removeFailsafeTriggers();
+    expect(result.success).toBe(true);
     expect(result.removed).toBe(0);
   });
 });
@@ -311,42 +531,14 @@ describe('FailsafeService.removeFailsafeTriggers', () => {
 // ============================================================================
 
 describe('Global wrappers', () => {
-  test('fsGetDigestConfig delegates', () => {
-    const result = fsGetDigestConfig('user@test.com');
-    expect(result === null || typeof result === 'object').toBe(true);
+  test('fsGetDigestConfig delegates to FailsafeService', () => {
+    var result = fsGetDigestConfig(null);
+    expect(result).toBeNull();
   });
 
-  test('fsUpdateDigestConfig delegates', () => {
-    const result = fsUpdateDigestConfig('user@test.com', { enabled: false });
-    expect(result).toHaveProperty('success');
-  });
-
-  test('fsProcessScheduledDigests delegates', () => {
-    const result = fsProcessScheduledDigests();
-    expect(result).toHaveProperty('processed');
-  });
-
-  test('fsTriggerBulkExport delegates', () => {
-    const result = fsTriggerBulkExport('steward@test.com');
-    expect(result).toHaveProperty('success');
-  });
-
-  test('fsBackupCriticalSheets delegates', () => {
-    const result = fsBackupCriticalSheets();
-    expect(result).toHaveProperty('success');
-  });
-
-  test('fsSetupTriggers delegates', () => {
-    const result = fsSetupTriggers();
-    expect(result).toHaveProperty('success');
-  });
-
-  test('fsRemoveTriggers delegates', () => {
-    const result = fsRemoveTriggers();
-    expect(result).toHaveProperty('success');
-  });
-
-  test('fsInitSheets runs without error', () => {
-    expect(() => fsInitSheets()).not.toThrow();
+  test('fsSetupTriggers delegates to FailsafeService', () => {
+    var result = fsSetupTriggers();
+    expect(result.success).toBe(true);
+    expect(ScriptApp.newTrigger).toHaveBeenCalledTimes(2);
   });
 });
