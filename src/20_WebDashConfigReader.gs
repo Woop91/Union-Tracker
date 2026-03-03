@@ -38,6 +38,9 @@ var ConfigReader = (function () {
 
     // Read from sheet — column-based layout via CONFIG_COLS
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      throw new Error('Spreadsheet binding broken — getActiveSpreadsheet() returned null. Is this script bound to a spreadsheet?');
+    }
     var sheet = ss.getSheetByName(SHEETS.CONFIG);
 
     if (!sheet) {

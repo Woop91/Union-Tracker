@@ -462,3 +462,115 @@ describe('A3: No empty JSDoc-only stubs in form handler files', () => {
     expect(lineCount).toBeLessThan(1150);
   });
 });
+
+// ============================================================================
+// A6: getActiveSpreadsheet() NULL SAFETY IN WEB APP CHAIN
+// ============================================================================
+
+describe('A6: getActiveSpreadsheet() null safety in web app files', () => {
+  // Web app files where getActiveSpreadsheet() returning null would be fatal
+  const webAppFiles = [
+    '20_WebDashConfigReader.gs',
+    '21_WebDashDataService.gs',
+    '23_PortalSheets.gs',
+    '24_WeeklyQuestions.gs',
+    '25_WorkloadService.gs',
+  ];
+
+  webAppFiles.forEach(file => {
+    test(`${file}: every getActiveSpreadsheet() call has a null guard`, () => {
+      const content = fs.readFileSync(
+        path.resolve(__dirname, '..', 'src', file), 'utf8'
+      );
+      const lines = content.split('\n');
+      const issues = [];
+
+      lines.forEach((line, idx) => {
+        // Find lines that call getActiveSpreadsheet()
+        if (line.includes('getActiveSpreadsheet()')) {
+          const lineNum = idx + 1;
+          // Pattern 1: chained call — ss never stored, so no null check possible
+          // e.g. SpreadsheetApp.getActiveSpreadsheet().getSheetByName(...)
+          if (line.includes('getActiveSpreadsheet().get') ||
+              line.includes('getActiveSpreadsheet().insert')) {
+            issues.push('Line ' + lineNum + ': chained call without null check: ' + line.trim());
+          }
+          // Pattern 2: stored in var — next few lines must check if (!ss)
+          const varMatch = line.match(/var\s+(\w+)\s*=\s*SpreadsheetApp\.getActiveSpreadsheet/);
+          if (varMatch) {
+            const varName = varMatch[1];
+            // Check next 3 lines for a null guard
+            const nextLines = lines.slice(idx + 1, idx + 4).join('\n');
+            const hasGuard = nextLines.includes('if (!' + varName + ')') ||
+                             nextLines.includes(varName + ' ?') ||
+                             nextLines.includes(varName + ' &&');
+            if (!hasGuard) {
+              issues.push('Line ' + lineNum + ': var ' + varName + ' assigned but no null check in next 3 lines');
+            }
+          }
+        }
+      });
+
+      expect(issues).toEqual([]);
+    });
+  });
+});
+
+// ============================================================================
+// A7: GAS TRIGGER ENTRY POINTS MUST HAVE TRY/CATCH
+// ============================================================================
+
+describe('A7: GAS trigger entry points have try/catch', () => {
+  // These functions are called directly by GAS triggers — unhandled throws
+  // cause silent failures or cryptic error dialogs
+  const triggerEntryPoints = [
+    { file: '10_Main.gs', fn: 'onOpen' },
+    { file: '10_Main.gs', fn: 'onEdit' },
+    { file: '08a_SheetSetup.gs', fn: 'onEditMultiSelect' },
+    { file: '08a_SheetSetup.gs', fn: 'onSelectionChangeMultiSelect' },
+  ];
+
+  triggerEntryPoints.forEach(({ file, fn }) => {
+    test(`${file}: ${fn}() wraps body in try/catch`, () => {
+      const content = fs.readFileSync(
+        path.resolve(__dirname, '..', 'src', file), 'utf8'
+      );
+      // Find the function
+      const fnRegex = new RegExp('function ' + fn + '\\s*\\([^)]*\\)\\s*\\{');
+      const fnMatch = content.match(fnRegex);
+      expect(fnMatch).not.toBeNull();
+
+      // Extract 40 lines after function start to check for try
+      const afterFn = content.slice(fnMatch.index, fnMatch.index + 1500);
+      // Must contain a try block (allow early returns like if (!e) return; before the try)
+      expect(afterFn).toMatch(/try\s*\{/);
+    });
+  });
+});
+
+// ============================================================================
+// A8: CLIENT-SIDE serverCall() HELPER EXISTS
+// ============================================================================
+
+describe('A8: Client-side serverCall() helper for safe google.script.run', () => {
+  const indexHtml = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', 'index.html'), 'utf8'
+  );
+
+  test('index.html defines serverCall() function', () => {
+    expect(indexHtml).toMatch(/function serverCall\s*\(\)/);
+  });
+
+  test('serverCall() attaches a default withFailureHandler', () => {
+    expect(indexHtml).toMatch(/serverCall[\s\S]*?withFailureHandler/);
+  });
+
+  test('DataCache.cachedCall always attaches a withFailureHandler', () => {
+    // The cachedCall function must always chain .withFailureHandler, not conditionally
+    const cachedCallMatch = indexHtml.match(/function cachedCall[\s\S]*?\n {6}\}/);
+    expect(cachedCallMatch).not.toBeNull();
+    expect(cachedCallMatch[0]).toContain('.withFailureHandler(');
+    // Must NOT have the old conditional pattern: if (onFailure) runner = runner.withFailureHandler
+    expect(cachedCallMatch[0]).not.toMatch(/if\s*\(onFailure\)\s*runner/);
+  });
+});

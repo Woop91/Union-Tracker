@@ -101,6 +101,9 @@ var PORTAL_SHEET_NAMES_ = {
  */
 function portalGetOrCreateSheet_(name, headers, hidden) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) {
+    throw new Error('portalGetOrCreateSheet_: getActiveSpreadsheet() returned null for sheet "' + name + '"');
+  }
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);

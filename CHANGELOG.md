@@ -5,6 +5,18 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.3] - 2026-03-03
+
+### Fixed
+- **Null guards on `getActiveSpreadsheet()`** in all web app chain files: `ConfigReader`, `DataService._getSheet()`, `PortalSheets`, `WeeklyQuestions._getSheet()`, `WorkloadService._getTimezone()/_getUserSharingStartDate()/_setUserSharingStartDate()`. Prevents "Cannot call method of null" crashes if the script binding breaks.
+- **Trigger entry point try/catch:** `onEditMultiSelect()` and `onSelectionChangeMultiSelect()` now wrap their bodies in try/catch to prevent silent trigger failures.
+
+### Added
+- **`serverCall()` client-side wrapper** (`index.html`): Drop-in replacement for `google.script.run` that attaches a default `.withFailureHandler()` — prevents silent spinner-forever failures for all 92+ unprotected server calls.
+- **`DataCache.cachedCall` always attaches failure handler** — no longer conditional.
+- **Architecture tests A6–A8:** Enforce null safety on `getActiveSpreadsheet()` in web app files, try/catch on trigger entry points, and `serverCall()` helper presence.
+- **CLAUDE.md error handling rules:** Four mandatory patterns documented to prevent future regressions.
+
 ## [4.19.2] - 2026-03-03
 
 ### Fixed

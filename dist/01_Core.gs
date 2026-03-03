@@ -654,11 +654,11 @@ function getLocalNumberFromConfig_() {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 19,
-  PATCH: 2,
-  BUILD: 'v4.19.2',
-  CURRENT: '4.19.2',
+  PATCH: 3,
+  BUILD: 'v4.19.3',
+  CURRENT: '4.19.3',
   BUILD_DATE: '2026-03-03',
-  CODENAME: 'Fatal Error Guard'
+  CODENAME: 'Error Resilience Hardening'
 };
 
 /**
@@ -668,6 +668,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.19.3', date: '2026-03-03', codename: 'Error Resilience Hardening', changes: 'Null guards on getActiveSpreadsheet() in all web app chain files (ConfigReader, DataService, PortalSheets, WeeklyQuestions, WorkloadService). Try/catch on onEditMultiSelect and onSelectionChangeMultiSelect trigger handlers. Client-side serverCall() wrapper with default withFailureHandler. Architecture tests A6-A8 enforce null safety, trigger try/catch, and failure handlers. CLAUDE.md error handling rules.' },
   { version: '4.19.2', date: '2026-03-03', codename: 'Fatal Error Guard', changes: 'Top-level try/catch in doGet() prevents generic Google "unable to open file" page. Safe config fallback in doGetWebDashboard error handler avoids error cascade when ConfigReader throws. Minimal _serveFatalError() page with zero external dependencies.' },
   { version: '4.19.1', date: '2026-03-02', codename: 'Org Chart Wiring', changes: 'Implement missing renderOrgChart() function — Org. Chart tab was throwing JS error on click. Renamed tab label to "Org. Chart" in both steward and member sidebars. Script re-execution for org_chart.html interactive toggles.' },
   { version: '4.19.0', date: '2026-03-02', codename: 'QA Bug Fixes & Resilience', changes: 'Server-side error handling for all DataService methods (Issues 1-7). Sign-out fix returns to login page (Issue 10). Member detail panel with expand/collapse and Full Profile loading (Issue 8). By Location chart falls back to all members when none assigned (Issue 9). Contact log autocomplete failure handler (Issue 11). Auto-initialize QA Forum and Timeline sheets on first access (Issue 12). Empty state messages and failure handlers for Events and Weekly Questions.' },

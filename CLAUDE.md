@@ -130,6 +130,80 @@ Files are numbered to control Google Apps Script's execution order:
 
 **Rule:** For `getRange()` calls, use `*_COLS` directly. For array access, subtract 1.
 
+## Error Handling Patterns — MANDATORY
+
+These rules are enforced by architecture tests (A5–A8) and **must** be followed.
+
+### 1. GAS Entry Points — Always Wrap in try/catch
+`doGet()`, `onOpen()`, `onEdit()`, and all trigger functions are called directly by GAS. An unhandled throw produces either a generic Google error page (web app) or a silent trigger failure.
+
+```javascript
+// GOOD
+function doGet(e) {
+  try {
+    return doGetWebDashboard(e);
+  } catch (err) {
+    return _serveFatalError(err.message); // zero-dependency fallback
+  }
+}
+
+// BAD — unhandled throw → Google shows "Sorry, unable to open the file"
+function doGet(e) {
+  return doGetWebDashboard(e);
+}
+```
+
+### 2. Error Handlers Must Not Cascade
+Never call a function in a `catch` block that could throw the same error that was caught. Wrap secondary calls in their own try/catch or use hardcoded fallback values.
+
+```javascript
+// GOOD
+catch (err) {
+  var cfg;
+  try { cfg = ConfigReader.getConfig(); } catch (_) { cfg = { orgName: 'Dashboard' }; }
+  return _serveError(cfg, err.message);
+}
+
+// BAD — if ConfigReader threw, this re-throws in the catch
+catch (err) {
+  return _serveError(ConfigReader.getConfig(), err.message);
+}
+```
+
+### 3. `getActiveSpreadsheet()` — Always Null-Guard in Web App Files
+In files 19_–28_ (web app chain), always check the return value before calling methods on it. It returns null if the script binding breaks.
+
+```javascript
+// GOOD
+var ss = SpreadsheetApp.getActiveSpreadsheet();
+if (!ss) return null; // or throw with a clear message
+var sheet = ss.getSheetByName(name);
+
+// BAD — crashes with "Cannot call method of null"
+var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+```
+
+### 4. `google.script.run` — Always Attach a Failure Handler
+Use `serverCall()` (defined in `index.html`) instead of bare `google.script.run` to get a default `.withFailureHandler()`. Without one, server errors cause infinite loading spinners.
+
+```javascript
+// GOOD — uses serverCall() which has a default failure handler
+serverCall()
+  .withSuccessHandler(function(data) { renderResults(data); })
+  .myServerFunction(args);
+
+// ACCEPTABLE — explicit failure handler
+google.script.run
+  .withSuccessHandler(onSuccess)
+  .withFailureHandler(onError)
+  .myServerFunction(args);
+
+// BAD — no failure handler, spinner forever on error
+google.script.run
+  .withSuccessHandler(onSuccess)
+  .myServerFunction(args);
+```
+
 ## Security Patterns
 
 ### HTML Output — MANDATORY
