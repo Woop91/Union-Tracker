@@ -5,6 +5,26 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.5] - 2026-03-03
+
+### Added
+- **535 new unit tests** across 14 test files, increasing total test count from 1,146 to 1,681 (+46.6%):
+  - `15_EventBus.test.js` (34 tests) — EventBus IIFE: subscribe, emit, wildcard, once, priority, logging, bridge functions
+  - `16_DashboardEnhancements.test.js` (50 tests) — date presets, Drive export, scheduled reports, notifications, shared views, presets, filtering, drill-down
+  - `17_CorrelationEngine.test.js` (52 tests) — statMean_, statStdDev_, pearsonCorrelation_, spearmanCorrelation_, toRanks_, chiSquareTest_, classifyCorrelation_, extractPairs_, generateInsight_
+  - `18_WorkloadTracker.test.js` (53 tests) — config constants, column constants, sanitizeString, rate limiting, withLock, authenticateWorkloadMember_
+  - `19_WebDashAuth.test.js` (50 tests) — Auth.resolveUser, Auth.sendMagicLink, Auth.createSessionToken, Auth.invalidateSession, Auth.cleanupExpiredTokens, magic token security
+  - `20_WebDashConfigReader.test.js` (32 tests) — ConfigReader.getConfig, getConfigJSON, refreshConfig, validateConfig, derived initials/abbreviations
+  - `21_WebDashDataService.test.js` (30 tests) — DataService.findUserByEmail, getUserRole, getMemberData, getMemberGrievances, getStewardDashboardData
+  - `22_WebDashApp.test.js` (20 tests) — doGet entry point, _serveFatalError, _serveError, _serveLogin, routing, error handling
+  - `23_PortalSheets.test.js` (24 tests) — portal column constants, portalGetOrCreateSheet_, all 8 getOrCreate functions, initPortalSheets
+  - `24_WeeklyQuestions.test.js` (27 tests) — WeeklyQuestionService IIFE: initSheets, addQuestion, submitResponse, activateQuestion, global wrappers
+  - `25_WorkloadService.test.js` (36 tests) — WorkloadService IIFE: submitWorkload, getHistory, getDashboardData, reminders, privacy, global wrappers
+  - `26_QAForum.test.js` (54 tests) — QAForum IIFE: initSheets, getQuestions, submitQuestion, submitAnswer, upvoteQuestion, moderateQuestion, getFlaggedContent
+  - `27_TimelineService.test.js` (40 tests) — TimelineService IIFE: CRUD operations, calendar import, Drive file attachment, filtering, pagination
+  - `28_FailsafeService.test.js` (33 tests) — FailsafeService IIFE: digest config, scheduled digests, bulk export, Drive backup, trigger management
+- **Enhanced gas-mock.js** with `createTemplateFromFile`, `createHtmlOutputFromFile`, `MimeType`, `ScriptApp.WeekDay`, `ScriptApp.getService`, `MailApp.getRemainingDailyQuota`, `Utilities.base64EncodeWebSafe`, `Utilities.newBlob`, `Utilities.base64Decode`, `DriveApp.getFileById`, corrected `XFrameOptionsMode` enum (DEFAULT instead of DENY)
+
 ## [4.19.4] - 2026-03-03
 
 ### Fixed

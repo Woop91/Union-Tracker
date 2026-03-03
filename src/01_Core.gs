@@ -654,11 +654,11 @@ function getLocalNumberFromConfig_() {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 19,
-  PATCH: 4,
-  BUILD: 'v4.19.4',
-  CURRENT: '4.19.4',
+  PATCH: 5,
+  BUILD: 'v4.19.5',
+  CURRENT: '4.19.5',
   BUILD_DATE: '2026-03-03',
-  CODENAME: 'Regression Test Suite'
+  CODENAME: 'Full Coverage Expansion'
 };
 
 /**
@@ -668,6 +668,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.19.5', date: '2026-03-03', codename: 'Full Coverage Expansion', changes: '535 new unit tests across 14 test files covering all previously untested source modules: EventBus (15), DashboardEnhancements (16), CorrelationEngine (17), WorkloadTracker (18), WebDashAuth (19), WebDashConfigReader (20), WebDashDataService (21), WebDashApp (22), PortalSheets (23), WeeklyQuestions (24), WorkloadService (25), QAForum (26), TimelineService (27), FailsafeService (28). Test count increased from 1146 to 1681 (+46.6%). Gas-mock.js enhanced with createTemplateFromFile, MimeType, ScriptApp.WeekDay, MailApp.getRemainingDailyQuota, and corrected XFrameOptionsMode enum.' },
   { version: '4.19.4', date: '2026-03-03', codename: 'Regression Test Suite', changes: 'Architecture tests A9-A15 covering UI tab wiring, formula injection, auth enforcement, XSS prevention, google.script.run failure handler tracking, GAS enum validation, and error handler cascade detection. Fixed XFrameOptionsMode.DENY bug in 00_Security.gs (DENY is not a valid GAS enum — changed to DEFAULT).' },
   { version: '4.19.3', date: '2026-03-03', codename: 'Error Resilience Hardening', changes: 'Null guards on getActiveSpreadsheet() in all web app chain files (ConfigReader, DataService, PortalSheets, WeeklyQuestions, WorkloadService). Try/catch on onEditMultiSelect and onSelectionChangeMultiSelect trigger handlers. Client-side serverCall() wrapper with default withFailureHandler. Architecture tests A6-A8 enforce null safety, trigger try/catch, and failure handlers. CLAUDE.md error handling rules.' },
   { version: '4.19.2', date: '2026-03-03', codename: 'Fatal Error Guard', changes: 'Top-level try/catch in doGet() prevents generic Google "unable to open file" page. Safe config fallback in doGetWebDashboard error handler avoids error cascade when ConfigReader throws. Minimal _serveFatalError() page with zero external dependencies.' },
