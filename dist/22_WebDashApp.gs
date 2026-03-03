@@ -22,13 +22,21 @@
 function doGet(e) {
   e = e || { parameter: {} };
 
-  // Workload portal — standalone, PIN-authenticated (no session required)
-  if (e.parameter.page === 'workload') {
-    var cfg = ConfigReader.getConfig();
-    return _serveWorkloadPortal(cfg);
-  }
+  try {
+    // Workload portal — standalone, PIN-authenticated (no session required)
+    if (e.parameter.page === 'workload') {
+      var cfg = ConfigReader.getConfig();
+      return _serveWorkloadPortal(cfg);
+    }
 
-  return doGetWebDashboard(e);
+    return doGetWebDashboard(e);
+  } catch (fatalErr) {
+    // Top-level fallback — return a minimal error page that does NOT depend
+    // on ConfigReader, DataService, or any sheet access.  This prevents the
+    // generic Google "Sorry, unable to open the file" page from appearing.
+    Logger.log('doGet FATAL: ' + fatalErr.message + '\n' + fatalErr.stack);
+    return _serveFatalError(fatalErr.message);
+  }
 }
 
 /**
@@ -115,7 +123,15 @@ function doGetWebDashboard(e) {
 
   } catch (err) {
     Logger.log('WebApp doGet error: ' + err.message + '\n' + err.stack);
-    return _serveError(ConfigReader.getConfig(), 'error', err.message);
+    // Safe config fetch — if ConfigReader itself threw, fall back to defaults
+    // so _serveError can still render a page.
+    var safeConfig;
+    try {
+      safeConfig = ConfigReader.getConfig();
+    } catch (_cfgErr) {
+      safeConfig = { orgName: 'Dashboard', orgAbbrev: '', logoInitials: '', accentHue: 250, stewardLabel: 'Steward', memberLabel: 'Member' };
+    }
+    return _serveError(safeConfig, 'error', err.message);
   }
 }
 
@@ -234,6 +250,40 @@ function _sanitizeConfig(config) {
     surveyFormUrl: config.satisfactionFormUrl || '',
     orgWebsite: config.orgWebsite || '',
   };
+}
+
+/**
+ * Last-resort error page — zero external dependencies.
+ * Rendered when doGet() itself throws (e.g. ConfigReader unavailable,
+ * missing sheets, deployment misconfiguration).  Uses only HtmlService
+ * so the user sees a helpful message instead of the generic Google
+ * "Sorry, unable to open the file" page.
+ * @param {string} detail - Internal error detail (logged, NOT shown to user)
+ * @returns {HtmlOutput}
+ */
+function _serveFatalError(detail) {
+  if (detail) Logger.log('_serveFatalError detail: ' + detail);
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    + '<title>Dashboard — Error</title>'
+    + '<style>'
+    + 'body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
+    + 'font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#141414;color:#e0e0e0}'
+    + '.card{max-width:440px;padding:40px 32px;background:#1e1e1e;border-radius:16px;text-align:center}'
+    + 'h1{font-size:20px;margin:0 0 12px}p{color:#888;font-size:14px;line-height:1.6;margin:0 0 20px}'
+    + 'a{display:inline-block;padding:10px 24px;background:hsl(250,70%,68%);color:#fff;'
+    + 'border-radius:8px;text-decoration:none;font-weight:600}'
+    + '</style></head><body><div class="card">'
+    + '<h1>Something went wrong</h1>'
+    + '<p>The dashboard could not load. This is usually temporary &mdash; '
+    + 'please wait a moment and try again.</p>'
+    + '<a href="javascript:location.reload()">Reload</a>'
+    + '</div></body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Dashboard — Error')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
 }
 
 /**
