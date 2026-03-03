@@ -135,19 +135,8 @@ describe('verifyPIN', () => {
   });
 });
 
-// ============================================================================
-// MEMBER_PIN_COLS
-// ============================================================================
-
-describe('MEMBER_PIN_COLS', () => {
-  test('PIN_HASH matches PIN_CONFIG.PIN_COLUMN', () => {
-    expect(MEMBER_PIN_COLS.PIN_HASH).toBe(PIN_CONFIG.PIN_COLUMN);
-  });
-
-  test('PIN_HASH matches MEMBER_COLS.PIN_HASH', () => {
-    expect(MEMBER_PIN_COLS.PIN_HASH).toBe(MEMBER_COLS.PIN_HASH);
-  });
-});
+// NOTE: MEMBER_PIN_COLS↔MEMBER_COLS consistency is already verified in
+// columns.test.js (Header map → COLS consistency) and PIN_CONFIG above.
 
 // ============================================================================
 // completePINReset validation
