@@ -702,11 +702,11 @@ function getLocalNumberFromConfig_() {
 var VERSION_INFO = {
   MAJOR: 4,
   MINOR: 19,
-  PATCH: 0,
-  BUILD: 'v4.19.0',
-  CURRENT: '4.19.0',
+  PATCH: 1,
+  BUILD: 'v4.19.1',
+  CURRENT: '4.19.1',
   BUILD_DATE: '2026-03-02',
-  CODENAME: 'QA Bug Fixes & Resilience'
+  CODENAME: 'Org Chart Wiring'
 };
 
 /**
@@ -716,6 +716,7 @@ var VERSION_INFO = {
  * @const {Array<Object>}
  */
 var VERSION_HISTORY = [
+  { version: '4.19.1', date: '2026-03-02', codename: 'Org Chart Wiring', changes: 'Implement missing renderOrgChart() function — Org. Chart tab was throwing JS error on click. Renamed tab label to "Org. Chart" in both steward and member sidebars. Script re-execution for org_chart.html interactive toggles.' },
   { version: '4.19.0', date: '2026-03-02', codename: 'QA Bug Fixes & Resilience', changes: 'Server-side error handling for all DataService methods (Issues 1-7). Sign-out fix returns to login page (Issue 10). Member detail panel with expand/collapse and Full Profile loading (Issue 8). By Location chart falls back to all members when none assigned (Issue 9). Contact log autocomplete failure handler (Issue 11). Auto-initialize QA Forum and Timeline sheets on first access (Issue 12). Empty state messages and failure handlers for Events and Weekly Questions.' },
   { version: '4.18.0', date: '2026-02-26', codename: 'SPA Fixes, Seed Phasing & View Enhancements', changes: 'Split SEED_SAMPLE_DATA into 3 phased runners to avoid GAS 6-min timeout. 5 new seed functions (tasks, polls, minutes, check-ins, timeline events). Steward view: org-wide KPI fallback, all-contacts members tab, comma formatting, contact log autocomplete, survey tracking scope toggles, 6 new More menu items. Member view: Know Your Rights card, Contact-Directory nav, 1hr localStorage notification dismiss, meetings+minutes merge, 7 new More menu items. Backend globals: getAllMembers, startGrievanceDraft, createGrievanceDriveFolder. Broadcast uses all contacts. build.js BUILD_ORDER updated for 26_QAForum.gs, 27_TimelineService.gs, 28_FailsafeService.gs.' },
   { version: '4.17.0', date: '2026-02-26', codename: 'Q&A Forum, Timeline & Failsafe Services', changes: 'Q&A Forum (26_QAForum.gs, 389 lines) with _QA_Forum and _QA_Answers hidden sheets. Timeline Service (27_TimelineService.gs, 317 lines) with _Timeline_Events hidden sheet. Failsafe Service (28_FailsafeService.gs, 425 lines) with _Failsafe_Config hidden sheet. 08a_SheetSetup.gs updated for Q&A, Timeline, and Failsafe auto-creation. DataService methods for Q&A, Timeline, and Failsafe in 21_WebDashDataService.gs.' },

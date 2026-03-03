@@ -5,6 +5,11 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.1] - 2026-03-02
+
+### Fixed
+- **Org. Chart tab:** Implemented missing `renderOrgChart()` function — tab was throwing JS error on click. Renamed label to "Org. Chart" in both steward and member sidebars.
+
 ## [4.19.0] - 2026-03-02
 
 ### Fixed
