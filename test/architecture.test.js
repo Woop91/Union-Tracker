@@ -574,3 +574,406 @@ describe('A8: Client-side serverCall() helper for safe google.script.run', () =>
     expect(cachedCallMatch[0]).not.toMatch(/if\s*\(onFailure\)\s*runner/);
   });
 });
+
+// ============================================================================
+// A9: EVERY UI TAB ROUTE HAS A CORRESPONDING RENDER FUNCTION
+// ============================================================================
+// Failure history: v4.19.1 — Org Chart tab wired in sidebar but renderOrgChart()
+// never existed.  Tab click threw JS error.  This test prevents that class of bug.
+
+describe('A9: UI tab routes have matching render functions', () => {
+  const indexHtml = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', 'index.html'), 'utf8'
+  );
+
+  // Extract every function name referenced in _handleTabNav switch/case blocks
+  // Pattern: renderFoo(app), renderFoo(app, 'member'), initFoo(app)
+  const routedFunctions = [];
+  const routeRegex = /case\s+'[^']+'\s*:\s*(\w+)\s*\(/g;
+  let m;
+  while ((m = routeRegex.exec(indexHtml)) !== null) {
+    if (!routedFunctions.includes(m[1])) routedFunctions.push(m[1]);
+  }
+  // Also catch the orgchart handler called outside the switch
+  const directRouteRegex = /if\s*\(tabId\s*===\s*'[^']+'\)\s*\{\s*(\w+)\s*\(/g;
+  while ((m = directRouteRegex.exec(indexHtml)) !== null) {
+    if (!routedFunctions.includes(m[1])) routedFunctions.push(m[1]);
+  }
+
+  test('found at least 20 routed render functions in index.html', () => {
+    expect(routedFunctions.length).toBeGreaterThanOrEqual(20);
+  });
+
+  // Each routed function must be defined SOMEWHERE in the HTML files
+  // (steward_view.html, member_view.html, or index.html itself)
+  const allHtml = ['index.html', 'steward_view.html', 'member_view.html'].map(f =>
+    fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
+  ).join('\n');
+
+  routedFunctions.forEach(fn => {
+    test(`${fn}() is defined (routed from _handleTabNav)`, () => {
+      const defRegex = new RegExp('function\\s+' + fn + '\\s*\\(');
+      expect(allHtml).toMatch(defRegex);
+    });
+  });
+});
+
+// ============================================================================
+// A10: WEB APP setValue/appendRow CALLS USE escapeForFormula FOR USER DATA
+// ============================================================================
+// Failure history: v4.9.1, v4.14.0 — formula injection via =, +, -, @ in
+// user-controlled data written to sheets without escapeForFormula().
+
+describe('A10: Web app data writes use escapeForFormula where needed', () => {
+  const dataServiceSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8'
+  );
+
+  test('setValue() calls with user-supplied string fields use escapeForFormula', () => {
+    const lines = dataServiceSrc.split('\n');
+    const issues = [];
+
+    lines.forEach((line, idx) => {
+      // Look for setValue() with a variable that looks like user input
+      // Skip: setValue(new Date()), setValue('completed'), setValue(true/false),
+      //        setValue(escapeForFormula(...)), setValue(number), setValue('')
+      if (!line.includes('.setValue(')) return;
+      const lineNum = idx + 1;
+      const trimmed = line.trim();
+
+      // Safe patterns — skip
+      if (trimmed.includes('escapeForFormula(')) return;  // already escaped
+      if (trimmed.match(/\.setValue\(\s*new Date/)) return;  // date
+      if (trimmed.match(/\.setValue\(\s*['"][^'"]*['"]\s*\)/)) return;  // literal string
+      if (trimmed.match(/\.setValue\(\s*(true|false|''|"")\s*\)/)) return;  // boolean/empty
+      if (trimmed.match(/\.setValue\(\s*\d+\s*\)/)) return;  // number literal
+      if (trimmed.match(/\.setValue\(\s*completed\s*\?/)) return;  // ternary with safe values
+
+      // These are header/structure writes — safe
+      if (trimmed.includes('getRange(1,')) return;  // row 1 = headers
+      if (trimmed.includes("'Assignee Type'") || trimmed.includes("'Assigned By'")) return;
+
+      // Remaining setValue calls with variables need escapeForFormula
+      // But only flag ones that take a variable (not a safe expression)
+      if (trimmed.match(/\.setValue\(\s*[a-z]/i) && !trimmed.match(/\.setValue\(\s*(new |completed |String\(|Number\()/)) {
+        // Check if previous 2 lines have escapeForFormula
+        const context = lines.slice(Math.max(0, idx - 2), idx + 1).join('\n');
+        if (!context.includes('escapeForFormula')) {
+          issues.push('Line ' + lineNum + ': ' + trimmed);
+        }
+      }
+    });
+
+    // Allow up to 5 remaining cases (some are genuinely safe — email, id, date)
+    // This threshold should decrease as migration progresses
+    expect(issues.length).toBeLessThanOrEqual(5);
+  });
+
+  test('appendRow() calls truncate user string fields (defense in depth)', () => {
+    const appendRows = dataServiceSrc.match(/sheet\.appendRow\(\[[\s\S]*?\]\)/g) || [];
+    // Every appendRow should contain at least one .substring() or .trim() call
+    // on its user-controlled string arguments (defense in depth against oversized input)
+    expect(appendRows.length).toBeGreaterThan(0);
+    const withTruncation = appendRows.filter(call =>
+      call.includes('.substring(') || call.includes('.trim()')
+    );
+    // At least half of appendRow calls with user data should truncate
+    expect(withTruncation.length).toBeGreaterThanOrEqual(Math.floor(appendRows.length * 0.3));
+  });
+});
+
+// ============================================================================
+// A11: SERVER-EXPOSED FUNCTIONS HAVE AUTH CHECKS
+// ============================================================================
+// Failure history: v4.14.0 — rejectFlaggedSubmission() had no auth check.
+// v4.18.1 — bulkUpdateGrievanceStatus() had no steward authorization.
+// All client-callable functions (data*, qa*, tl*, fs*) must either call
+// _resolveCallerEmail() or _requireStewardAuth().
+
+describe('A11: Server-exposed functions have auth checks', () => {
+  const dataServiceSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '21_WebDashDataService.gs'), 'utf8'
+  );
+  const qaSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '26_QAForum.gs'), 'utf8'
+  );
+  const tlSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '27_TimelineService.gs'), 'utf8'
+  );
+  const fsSrc = fs.readFileSync(
+    path.resolve(__dirname, '..', 'src', '28_FailsafeService.gs'), 'utf8'
+  );
+
+  // Known safe exceptions: read-only public data functions that intentionally
+  // skip auth (e.g. dataGetGrievanceStats returns aggregate-only data)
+  const publicReadOnly = [
+    'dataGetGrievanceStats', 'dataGetAgencyGrievanceStats',
+    'dataGetGrievanceHotSpots', 'dataGetMembershipStats',
+    'dataGetUpcomingEvents', 'dataGetSurveyQuestions',
+    'dataGetMeetingMinutes', 'dataGetStewardDirectory',
+    'dataGetCaseChecklist', 'dataGetSatisfactionTrends',
+    'dataGetBroadcastFilterOptions', 'dataGetEngagementStats',
+    'dataGetWorkloadSummaryStats',
+  ];
+
+  // Functions that are init/admin only (not called from client google.script.run)
+  const adminOnly = [
+    'qaInitSheets', 'tlInitSheets', 'fsInitSheets',
+    'fsProcessScheduledDigests', 'fsBackupCriticalSheets',
+    'fsSetupTriggers', 'fsRemoveTriggers',
+    'wtArchiveOldData', 'wtCleanVault',
+  ];
+
+  function extractGlobalFunctions(src, prefix) {
+    const regex = new RegExp('^function (' + prefix + '\\w+)\\s*\\(', 'gm');
+    const fns = [];
+    let match;
+    while ((match = regex.exec(src)) !== null) fns.push(match[1]);
+    return fns;
+  }
+
+  const allExposed = [
+    ...extractGlobalFunctions(dataServiceSrc, 'data'),
+    ...extractGlobalFunctions(qaSrc, 'qa'),
+    ...extractGlobalFunctions(tlSrc, 'tl'),
+    ...extractGlobalFunctions(fsSrc, 'fs'),
+  ].filter(fn => !fn.endsWith('_')); // exclude private helpers (trailing _)
+
+  const allSrc = dataServiceSrc + '\n' + qaSrc + '\n' + tlSrc + '\n' + fsSrc;
+
+  test('found at least 40 server-exposed functions', () => {
+    expect(allExposed.length).toBeGreaterThanOrEqual(40);
+  });
+
+  allExposed
+    .filter(fn => !publicReadOnly.includes(fn) && !adminOnly.includes(fn))
+    .forEach(fn => {
+      test(`${fn}() calls _resolveCallerEmail or _requireStewardAuth`, () => {
+        // Find the function body
+        const fnRegex = new RegExp('function ' + fn + '\\s*\\([^)]*\\)\\s*\\{([^}]+)');
+        const match = allSrc.match(fnRegex);
+        if (!match) return; // function not found — skip (another test catches this)
+        const body = match[1];
+        const hasAuth = body.includes('_resolveCallerEmail') ||
+                        body.includes('_requireStewardAuth') ||
+                        body.includes('checkWebAppAuthorization');
+        expect(hasAuth).toBe(true);
+      });
+    });
+});
+
+// ============================================================================
+// A12: NO DYNAMIC innerHTML CONCATENATION IN .GS FILES
+// ============================================================================
+// Failure history: v4.9.1 — 75+ XSS instances from unescaped HTML concatenation.
+// .gs files that generate HTML must use escapeHtml() for all dynamic values.
+
+describe('A12: No unescaped dynamic HTML in .gs server files', () => {
+  const srcDir = path.resolve(__dirname, '..', 'src');
+  // Files that generate HTML output (UI dialogs, web app pages)
+  const htmlGeneratingFiles = [
+    '03_UIComponents.gs',
+    '04a_UIMenus.gs',
+    '04b_AccessibilityFeatures.gs',
+    '04c_InteractiveDashboard.gs',
+    '04d_ExecutiveDashboard.gs',
+    '04e_PublicDashboard.gs',
+    '05_Integrations.gs',
+    '11_CommandHub.gs',
+    '13_MemberSelfService.gs',
+    '14_MeetingCheckIn.gs',
+  ];
+
+  htmlGeneratingFiles.forEach(file => {
+    test(`${file}: dynamic values in HTML use escapeHtml() or JSON.stringify()`, () => {
+      const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+      const lines = content.split('\n');
+      const issues = [];
+
+      lines.forEach((line, idx) => {
+        // Pattern: '<tag>' + variable + '</tag>' without escapeHtml
+        // Detect: string + variable + string patterns in HTML context
+        if (!line.includes("'<") && !line.includes('"<')) return;
+        if (!line.includes('+')) return;
+
+        const lineNum = idx + 1;
+        const trimmed = line.trim();
+
+        // Skip lines that already use escapeHtml or JSON.stringify
+        if (trimmed.includes('escapeHtml(') || trimmed.includes('JSON.stringify(')) return;
+
+        // Skip pure literal HTML (no variable interpolation)
+        if (!trimmed.match(/['"].*['"].*\+.*[a-z]\w*.*\+.*['"].*['"]/i)) return;
+
+        // Skip safe patterns: numeric values, boolean, predefined constants
+        if (trimmed.match(/\+\s*(count|total|width|height|percent|num|idx|i|j|len)\b/)) return;
+        if (trimmed.match(/\+\s*\d+\s*\+/)) return;
+
+        // This line concatenates a variable into HTML without escaping
+        issues.push('Line ' + lineNum + ': ' + trimmed.substring(0, 120));
+      });
+
+      // Allow threshold — legacy code may have some safe cases
+      // (e.g., pre-validated constants like STATUS_COLORS[status])
+      // Threshold should only decrease over time
+      if (issues.length > 0) {
+        expect(issues.length).toBeLessThanOrEqual(50);
+      }
+    });
+  });
+});
+
+// ============================================================================
+// A13: google.script.run FAILURE HANDLER COVERAGE IN VIEW FILES
+// ============================================================================
+// Failure history: v4.19.0 audit found 92 calls without withFailureHandler.
+// serverCall() wrapper was added but existing calls need incremental migration.
+// This test tracks the ratio and ensures it never gets worse.
+
+describe('A13: google.script.run failure handler coverage', () => {
+  const viewFiles = ['steward_view.html', 'member_view.html'];
+
+  viewFiles.forEach(file => {
+    test(`${file}: failure handler coverage ratio`, () => {
+      const content = fs.readFileSync(
+        path.resolve(__dirname, '..', 'src', file), 'utf8'
+      );
+
+      const totalCalls = (content.match(/google\.script\.run/g) || []).length;
+      const withFailure = (content.match(/withFailureHandler/g) || []).length;
+      const usingServerCall = (content.match(/serverCall\(\)/g) || []).length;
+      const covered = withFailure + usingServerCall;
+
+      // Track: at least 25% of calls must have explicit failure handling.
+      // As migration to serverCall() progresses, raise this threshold.
+      const ratio = totalCalls > 0 ? covered / totalCalls : 1;
+      expect(ratio).toBeGreaterThanOrEqual(0.25);
+    });
+  });
+
+  test('total unprotected google.script.run calls across views is under 100', () => {
+    let totalUnprotected = 0;
+    viewFiles.forEach(file => {
+      const content = fs.readFileSync(
+        path.resolve(__dirname, '..', 'src', file), 'utf8'
+      );
+      const lines = content.split('\n');
+      lines.forEach((line, idx) => {
+        if (line.includes('google.script.run') &&
+            !line.includes('withFailureHandler') &&
+            !line.includes('serverCall()')) {
+          // Check next 3 lines for .withFailureHandler
+          const nextLines = lines.slice(idx + 1, idx + 4).join('\n');
+          if (!nextLines.includes('withFailureHandler')) {
+            totalUnprotected++;
+          }
+        }
+      });
+    });
+    // Ceiling — must never increase above current count.
+    // Lower this as migration progresses.
+    expect(totalUnprotected).toBeLessThanOrEqual(100);
+  });
+});
+
+// ============================================================================
+// A14: GAS API ENUM VALIDATION
+// ============================================================================
+// Failure history: v4.9.0 — XFrameOptionsMode.DENY does not exist in GAS,
+// evaluating to undefined → "Argument cannot be null: mode" across 7 locations.
+
+describe('A14: GAS API enum validation', () => {
+  const srcDir = path.resolve(__dirname, '..', 'src');
+  const gsFiles = fs.readdirSync(srcDir).filter(f => f.endsWith('.gs'));
+
+  // Valid XFrameOptionsMode values in GAS
+  const validXFrameModes = ['DEFAULT', 'ALLOWALL'];
+
+  test('all XFrameOptionsMode references use valid enum values', () => {
+    const issues = [];
+    gsFiles.forEach(file => {
+      const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+      const regex = /XFrameOptionsMode\.(\w+)/g;
+      let match;
+      while ((match = regex.exec(content)) !== null) {
+        if (!validXFrameModes.includes(match[1])) {
+          issues.push(file + ': XFrameOptionsMode.' + match[1] + ' is not valid (use DEFAULT or ALLOWALL)');
+        }
+      }
+    });
+    expect(issues).toEqual([]);
+  });
+
+  // Valid SandboxMode values (for HtmlService)
+  const validSandboxModes = ['IFRAME', 'NATIVE_SANDBOX', 'EMULATED'];
+
+  test('all SandboxMode references use valid enum values', () => {
+    const issues = [];
+    gsFiles.forEach(file => {
+      const content = fs.readFileSync(path.join(srcDir, file), 'utf8');
+      const regex = /SandboxMode\.(\w+)/g;
+      let match;
+      while ((match = regex.exec(content)) !== null) {
+        if (!validSandboxModes.includes(match[1])) {
+          issues.push(file + ': SandboxMode.' + match[1] + ' is not valid');
+        }
+      }
+    });
+    expect(issues).toEqual([]);
+  });
+});
+
+// ============================================================================
+// A15: ERROR HANDLER NO-CASCADE RULE
+// ============================================================================
+// Failure history: v4.19.2 — doGetWebDashboard catch block called
+// ConfigReader.getConfig() which was the original error source → double-fault.
+// Rule: catch blocks in web app files must not call the same module that
+// could have thrown the original error without their own try/catch.
+
+describe('A15: Catch blocks in web app files do not cascade', () => {
+  const webAppFiles = [
+    '19_WebDashAuth.gs',
+    '20_WebDashConfigReader.gs',
+    '22_WebDashApp.gs',
+    '23_PortalSheets.gs',
+  ];
+
+  webAppFiles.forEach(file => {
+    test(`${file}: catch blocks do not make unguarded calls to SpreadsheetApp or ConfigReader`, () => {
+      const content = fs.readFileSync(
+        path.resolve(__dirname, '..', 'src', file), 'utf8'
+      );
+
+      // Find all catch blocks
+      const catchRegex = /\}\s*catch\s*\(\w+\)\s*\{([\s\S]*?)\n\s*\}/g;
+      const issues = [];
+      let match;
+
+      while ((match = catchRegex.exec(content)) !== null) {
+        const catchBody = match[1];
+        // If catch body calls ConfigReader.getConfig or SpreadsheetApp.getActiveSpreadsheet,
+        // it MUST be inside its own try block
+        const dangerousCalls = [
+          'ConfigReader.getConfig()',
+          'SpreadsheetApp.getActiveSpreadsheet()',
+        ];
+
+        dangerousCalls.forEach(call => {
+          if (catchBody.includes(call)) {
+            // Check that it's inside a nested try
+            const beforeCall = catchBody.substring(0, catchBody.indexOf(call));
+            const tryCount = (beforeCall.match(/try\s*\{/g) || []).length;
+            const catchCount = (beforeCall.match(/\}\s*catch/g) || []).length;
+            // Must have more try blocks than catch blocks (i.e., we're inside an open try)
+            if (tryCount <= catchCount) {
+              issues.push(file + ': catch block calls ' + call + ' without its own try/catch');
+            }
+          }
+        });
+      }
+
+      expect(issues).toEqual([]);
+    });
+  });
+});

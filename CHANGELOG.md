@@ -5,6 +5,21 @@ All notable changes to the Union Dashboard project will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.4] - 2026-03-03
+
+### Fixed
+- **`XFrameOptionsMode.DENY` bug:** `serveAccessDenied()` in `00_Security.gs` used `XFrameOptionsMode.DENY` which is not a valid GAS enum value (only DEFAULT and ALLOWALL exist). Changed to DEFAULT. This would cause a runtime error when serving an access-denied page.
+
+### Added
+- **Architecture tests A9–A15** — 7 new regression test suites covering every major historical failure category:
+  - **A9:** UI tab routes have matching render functions — prevents "tab does nothing" bugs
+  - **A10:** `escapeForFormula()` used on `setValue()`/`appendRow()` in web app files — prevents formula injection
+  - **A11:** Server-exposed functions have auth checks (`_resolveCallerEmail` / `_requireStewardAuth`) — prevents unauthenticated access
+  - **A12:** No unescaped dynamic HTML concatenation in `.gs` files — prevents XSS
+  - **A13:** `google.script.run` failure handler migration tracking — caps unprotected calls at 100 with ≥25% coverage threshold
+  - **A14:** GAS API enum validation — ensures only valid `XFrameOptionsMode` and `SandboxMode` values are used
+  - **A15:** Error handler no-cascade rule — catch blocks in web app files must not make unguarded calls to `SpreadsheetApp` or `ConfigReader`
+
 ## [4.19.3] - 2026-03-03
 
 ### Fixed
