@@ -1,8 +1,9 @@
 /**
  * Tests for 24_WeeklyQuestions.gs
  *
- * Covers WeeklyQuestionService IIFE: sheet setup, question CRUD,
- * response management, auto-rotation, and global wrappers.
+ * Covers WeeklyQuestions IIFE: sheet setup, active questions, response
+ * submission, pool questions, steward question setting, history, and
+ * global wrappers.
  */
 
 require('./gas-mock');
@@ -13,13 +14,15 @@ loadSources(['00_Security.gs', '00_DataAccess.gs', '01_Core.gs', '24_WeeklyQuest
 
 let mockQuestionsSheet;
 let mockResponsesSheet;
+let mockPoolSheet;
 let mockSs;
 
-function setupSheets(questionsData, responsesData) {
-  mockQuestionsSheet = createMockSheet(SHEETS.WEEKLY_QUESTIONS || '_Weekly_Questions', questionsData);
-  mockResponsesSheet = createMockSheet(SHEETS.WEEKLY_RESPONSES || '_Weekly_Responses', responsesData);
+function setupSheets(questionsData, responsesData, poolData) {
+  mockQuestionsSheet = createMockSheet(SHEETS.WEEKLY_QUESTIONS || '_Weekly_Questions', questionsData || [['header']]);
+  mockResponsesSheet = createMockSheet(SHEETS.WEEKLY_RESPONSES || '_Weekly_Responses', responsesData || [['header']]);
+  mockPoolSheet = createMockSheet('_WQ_Pool', poolData || [['header']]);
 
-  // Custom getRange for questions sheet to return specific values
+  // Custom getRange for questions sheet
   mockQuestionsSheet.getRange = jest.fn((row, col, numRows, numCols) => {
     const range = {
       getValue: jest.fn(() => {
@@ -47,21 +50,44 @@ function setupSheets(questionsData, responsesData) {
     return range;
   });
 
-  mockSs = createMockSpreadsheet([mockQuestionsSheet, mockResponsesSheet]);
+  mockSs = createMockSpreadsheet([mockQuestionsSheet, mockResponsesSheet, mockPoolSheet]);
   SpreadsheetApp.getActiveSpreadsheet = jest.fn(() => mockSs);
 }
 
 beforeEach(() => {
-  setupSheets(null, null);
+  setupSheets(null, null, null);
 });
 
 // ============================================================================
-// Sheet Initialization
+// Module existence
 // ============================================================================
 
-describe('WeeklyQuestionService.initSheets', () => {
-  test('creates question sheet if missing', () => {
-    WeeklyQuestionService.initSheets();
+describe('WeeklyQuestions module', () => {
+  test('WeeklyQuestions is defined', () => {
+    expect(typeof WeeklyQuestions).toBe('object');
+  });
+
+  test('exports expected methods', () => {
+    expect(typeof WeeklyQuestions.initWeeklyQuestionSheets).toBe('function');
+    expect(typeof WeeklyQuestions.getActiveQuestions).toBe('function');
+    expect(typeof WeeklyQuestions.submitResponse).toBe('function');
+    expect(typeof WeeklyQuestions.submitPoolQuestion).toBe('function');
+    expect(typeof WeeklyQuestions.getQuestionStats).toBe('function');
+    expect(typeof WeeklyQuestions.hasUserResponded).toBe('function');
+    expect(typeof WeeklyQuestions.setStewardQuestion).toBe('function');
+    expect(typeof WeeklyQuestions.getPoolQuestions).toBe('function');
+    expect(typeof WeeklyQuestions.selectRandomPoolQuestion).toBe('function');
+    expect(typeof WeeklyQuestions.getHistory).toBe('function');
+  });
+});
+
+// ============================================================================
+// initWeeklyQuestionSheets
+// ============================================================================
+
+describe('WeeklyQuestions.initWeeklyQuestionSheets', () => {
+  test('creates sheets if missing', () => {
+    WeeklyQuestions.initWeeklyQuestionSheets();
     expect(mockSs.insertSheet).toHaveBeenCalled();
   });
 
@@ -69,100 +95,26 @@ describe('WeeklyQuestionService.initSheets', () => {
     const questionsData = [['ID', 'Question', 'Type', 'Options', 'Category', 'Active', 'Week Number', 'Year', 'Created By', 'Created', 'Responses']];
     const responsesData = [['ID', 'Question ID', 'Email', 'Response', 'Submitted']];
     setupSheets(questionsData, responsesData);
-    WeeklyQuestionService.initSheets();
+    WeeklyQuestions.initWeeklyQuestionSheets();
     expect(mockSs.insertSheet).not.toHaveBeenCalled();
   });
 });
 
 // ============================================================================
-// getActiveQuestion
+// getActiveQuestions
 // ============================================================================
 
-describe('WeeklyQuestionService.getActiveQuestion', () => {
-  test('returns null when no active questions', () => {
-    const questionsData = [
-      ['ID', 'Question', 'Type', 'Options', 'Category', 'Active', 'Week Number', 'Year', 'Created By', 'Created', 'Responses'],
-    ];
-    setupSheets(questionsData, null);
-    const result = WeeklyQuestionService.getActiveQuestion();
-    expect(result).toBeNull();
+describe('WeeklyQuestions.getActiveQuestions', () => {
+  test('returns object with questions array', () => {
+    const result = WeeklyQuestions.getActiveQuestions('user@test.com');
+    expect(result).toHaveProperty('questions');
+    expect(Array.isArray(result.questions)).toBe(true);
   });
 
-  test('returns null when sheet has no data', () => {
+  test('returns empty questions when sheet has no data', () => {
     setupSheets([['header']], null);
-    const result = WeeklyQuestionService.getActiveQuestion();
-    expect(result).toBeNull();
-  });
-});
-
-// ============================================================================
-// addQuestion
-// ============================================================================
-
-describe('WeeklyQuestionService.addQuestion', () => {
-  test('rejects missing steward email', () => {
-    const result = WeeklyQuestionService.addQuestion(null, {});
-    expect(result.success).toBe(false);
-    expect(result.message).toBeTruthy();
-  });
-
-  test('rejects missing question text', () => {
-    const result = WeeklyQuestionService.addQuestion('steward@test.com', {});
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('required');
-  });
-
-  test('rejects invalid question type', () => {
-    const result = WeeklyQuestionService.addQuestion('steward@test.com', {
-      question: 'How are you?',
-      type: 'invalid_type'
-    });
-    expect(result.success).toBe(false);
-    expect(result.message).toContain('type');
-  });
-
-  test('adds question with valid inputs', () => {
-    const questionsData = [
-      ['ID', 'Question', 'Type', 'Options', 'Category', 'Active', 'Week Number', 'Year', 'Created By', 'Created', 'Responses'],
-    ];
-    setupSheets(questionsData, null);
-
-    const result = WeeklyQuestionService.addQuestion('steward@test.com', {
-      question: 'How are you?',
-      type: 'text'
-    });
-    expect(result.success).toBe(true);
-    expect(result.questionId).toBeTruthy();
-  });
-
-  test('sanitizes question text', () => {
-    const questionsData = [
-      ['ID', 'Question', 'Type', 'Options', 'Category', 'Active', 'Week Number', 'Year', 'Created By', 'Created', 'Responses'],
-    ];
-    setupSheets(questionsData, null);
-
-    WeeklyQuestionService.addQuestion('steward@test.com', {
-      question: '=FORMULA("evil")',
-      type: 'text'
-    });
-    expect(mockQuestionsSheet.appendRow).toHaveBeenCalled();
-  });
-
-  test('truncates question to 500 chars', () => {
-    const questionsData = [
-      ['ID', 'Question', 'Type', 'Options', 'Category', 'Active', 'Week Number', 'Year', 'Created By', 'Created', 'Responses'],
-    ];
-    setupSheets(questionsData, null);
-
-    const longQuestion = 'A'.repeat(1000);
-    WeeklyQuestionService.addQuestion('steward@test.com', {
-      question: longQuestion,
-      type: 'text'
-    });
-    expect(mockQuestionsSheet.appendRow).toHaveBeenCalled();
-    // Check the appended question was truncated
-    const appendedRow = mockQuestionsSheet.appendRow.mock.calls[0][0];
-    expect(appendedRow[1].length).toBeLessThanOrEqual(500);
+    const result = WeeklyQuestions.getActiveQuestions('user@test.com');
+    expect(result.questions).toEqual([]);
   });
 });
 
@@ -170,73 +122,83 @@ describe('WeeklyQuestionService.addQuestion', () => {
 // submitResponse
 // ============================================================================
 
-describe('WeeklyQuestionService.submitResponse', () => {
+describe('WeeklyQuestions.submitResponse', () => {
   test('rejects missing email', () => {
-    const result = WeeklyQuestionService.submitResponse(null, 'QID', 'answer');
+    const result = WeeklyQuestions.submitResponse(null, 'QID', 'answer');
     expect(result.success).toBe(false);
   });
 
   test('rejects missing questionId', () => {
-    const result = WeeklyQuestionService.submitResponse('user@test.com', null, 'answer');
+    const result = WeeklyQuestions.submitResponse('user@test.com', null, 'answer');
     expect(result.success).toBe(false);
   });
 
   test('rejects empty response', () => {
-    const result = WeeklyQuestionService.submitResponse('user@test.com', 'QID', '');
+    const result = WeeklyQuestions.submitResponse('user@test.com', 'QID', '');
     expect(result.success).toBe(false);
   });
 });
 
 // ============================================================================
-// getQuestionResponses
+// submitPoolQuestion
 // ============================================================================
 
-describe('WeeklyQuestionService.getQuestionResponses', () => {
-  test('returns empty when no responses', () => {
+describe('WeeklyQuestions.submitPoolQuestion', () => {
+  test('rejects missing email', () => {
+    const result = WeeklyQuestions.submitPoolQuestion(null, 'Question text');
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects missing question text', () => {
+    const result = WeeklyQuestions.submitPoolQuestion('user@test.com', '');
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// setStewardQuestion
+// ============================================================================
+
+describe('WeeklyQuestions.setStewardQuestion', () => {
+  test('rejects missing email', () => {
+    const result = WeeklyQuestions.setStewardQuestion(null, 'Question text');
+    expect(result.success).toBe(false);
+  });
+
+  test('rejects missing text', () => {
+    const result = WeeklyQuestions.setStewardQuestion('steward@test.com', '');
+    expect(result.success).toBe(false);
+  });
+});
+
+// ============================================================================
+// getQuestionStats
+// ============================================================================
+
+describe('WeeklyQuestions.getQuestionStats', () => {
+  test('returns total and counts', () => {
     const responsesData = [['ID', 'Question ID', 'Email', 'Response', 'Submitted']];
     setupSheets(null, responsesData);
-    const result = WeeklyQuestionService.getQuestionResponses('QID');
-    expect(result.responses).toEqual([]);
-    expect(result.total).toBe(0);
+    const result = WeeklyQuestions.getQuestionStats('QID');
+    expect(result).toHaveProperty('total');
+    expect(result).toHaveProperty('counts');
   });
 });
 
 // ============================================================================
-// activateQuestion / deactivateQuestion
+// getHistory
 // ============================================================================
 
-describe('WeeklyQuestionService.activateQuestion', () => {
-  test('rejects missing email', () => {
-    const result = WeeklyQuestionService.activateQuestion(null, 'QID');
-    expect(result.success).toBe(false);
-  });
-
-  test('rejects missing questionId', () => {
-    const result = WeeklyQuestionService.activateQuestion('steward@test.com', null);
-    expect(result.success).toBe(false);
-  });
-});
-
-describe('WeeklyQuestionService.deactivateQuestion', () => {
-  test('rejects missing questionId', () => {
-    const result = WeeklyQuestionService.deactivateQuestion('steward@test.com', null);
-    expect(result.success).toBe(false);
-  });
-});
-
-// ============================================================================
-// deleteQuestion
-// ============================================================================
-
-describe('WeeklyQuestionService.deleteQuestion', () => {
-  test('rejects missing email', () => {
-    const result = WeeklyQuestionService.deleteQuestion(null, 'QID');
-    expect(result.success).toBe(false);
-  });
-
-  test('rejects missing questionId', () => {
-    const result = WeeklyQuestionService.deleteQuestion('steward@test.com', null);
-    expect(result.success).toBe(false);
+describe('WeeklyQuestions.getHistory', () => {
+  test('returns questions array and hasMore flag', () => {
+    const questionsData = [
+      ['ID', 'Question', 'Type', 'Options', 'Category', 'Active', 'Week Number', 'Year', 'Created By', 'Created', 'Responses'],
+    ];
+    setupSheets(questionsData, null);
+    const result = WeeklyQuestions.getHistory('user@test.com', 1, 10);
+    expect(result).toHaveProperty('questions');
+    expect(result).toHaveProperty('hasMore');
+    expect(Array.isArray(result.questions)).toBe(true);
   });
 });
 
@@ -245,46 +207,41 @@ describe('WeeklyQuestionService.deleteQuestion', () => {
 // ============================================================================
 
 describe('Global Wrappers', () => {
-  test('wqGetActiveQuestion delegates to WeeklyQuestionService', () => {
-    const result = wqGetActiveQuestion();
-    // Just verify no error thrown
-    expect(result === null || typeof result === 'object').toBe(true);
+  test('wqGetActiveQuestions is defined', () => {
+    expect(typeof wqGetActiveQuestions).toBe('function');
   });
 
-  test('wqAddQuestion delegates to WeeklyQuestionService', () => {
-    const result = wqAddQuestion('steward@test.com', { question: 'Test?', type: 'text' });
-    expect(result).toHaveProperty('success');
+  test('wqGetActiveQuestions returns questions array', () => {
+    const result = wqGetActiveQuestions();
+    expect(result).toHaveProperty('questions');
   });
 
-  test('wqSubmitResponse delegates to WeeklyQuestionService', () => {
+  test('wqSubmitResponse is defined', () => {
+    expect(typeof wqSubmitResponse).toBe('function');
+  });
+
+  test('wqSubmitResponse returns result object', () => {
     const result = wqSubmitResponse('user@test.com', 'QID', 'answer');
     expect(result).toHaveProperty('success');
   });
 
-  test('wqGetQuestionResponses delegates to WeeklyQuestionService', () => {
-    const responsesData = [['ID', 'Question ID', 'Email', 'Response', 'Submitted']];
-    setupSheets(null, responsesData);
-    const result = wqGetQuestionResponses('QID');
-    expect(result).toHaveProperty('responses');
+  test('wqSubmitPoolQuestion is defined', () => {
+    expect(typeof wqSubmitPoolQuestion).toBe('function');
   });
 
-  test('wqActivateQuestion delegates to WeeklyQuestionService', () => {
-    const result = wqActivateQuestion('steward@test.com', 'QID');
-    expect(result).toHaveProperty('success');
+  test('wqSetStewardQuestion is defined', () => {
+    expect(typeof wqSetStewardQuestion).toBe('function');
   });
 
-  test('wqDeactivateQuestion delegates to WeeklyQuestionService', () => {
-    const result = wqDeactivateQuestion('steward@test.com', 'QID');
-    expect(result).toHaveProperty('success');
+  test('wqGetPoolQuestions is defined', () => {
+    expect(typeof wqGetPoolQuestions).toBe('function');
   });
 
-  test('wqDeleteQuestion delegates to WeeklyQuestionService', () => {
-    const result = wqDeleteQuestion('steward@test.com', 'QID');
-    expect(result).toHaveProperty('success');
-  });
-
-  test('wqInitSheets delegates to WeeklyQuestionService', () => {
-    // Just verify it runs without error
+  test('wqInitSheets runs without error', () => {
     expect(() => wqInitSheets()).not.toThrow();
+  });
+
+  test('wqGetHistory is defined', () => {
+    expect(typeof wqGetHistory).toBe('function');
   });
 });

@@ -167,34 +167,42 @@ describe('_serveError', () => {
 });
 
 // ============================================================================
-// _serveLogin
+// _serveAuth (login/auth page)
 // ============================================================================
 
-describe('_serveLogin', () => {
+describe('_serveAuth', () => {
   test('returns HtmlOutput', () => {
-    const output = _serveLogin(ConfigReader.getConfig(), {});
+    const output = _serveAuth(ConfigReader.getConfig(), { parameter: {} });
     expect(output).toBeDefined();
   });
 
   test('does not throw', () => {
-    expect(() => _serveLogin(ConfigReader.getConfig(), {})).not.toThrow();
+    expect(() => _serveAuth(ConfigReader.getConfig(), { parameter: {} })).not.toThrow();
   });
 });
 
 // ============================================================================
-// _serveMemberView / _serveStewardView
+// _serveDashboard (member and steward views)
 // ============================================================================
 
-describe('_serveMemberView', () => {
-  test('does not throw', () => {
-    const user = { email: 'member@test.com', name: 'Member', method: 'sso' };
-    expect(() => _serveMemberView(ConfigReader.getConfig(), user)).not.toThrow();
+describe('_serveDashboard', () => {
+  test('does not throw for member role', () => {
+    const user = { email: 'member@test.com', name: 'Member', firstName: 'Jane', lastName: 'Doe' };
+    expect(() => _serveDashboard(ConfigReader.getConfig(), user, 'member', 'tok123')).not.toThrow();
+  });
+
+  test('does not throw for steward role', () => {
+    const user = { email: 'steward@test.com', name: 'Steward', firstName: 'John', lastName: 'Smith' };
+    expect(() => _serveDashboard(ConfigReader.getConfig(), user, 'steward', 'tok456')).not.toThrow();
   });
 });
 
-describe('_serveStewardView', () => {
+// ============================================================================
+// _serveWorkloadPortal
+// ============================================================================
+
+describe('_serveWorkloadPortal', () => {
   test('does not throw', () => {
-    const user = { email: 'steward@test.com', name: 'Steward', method: 'sso' };
-    expect(() => _serveStewardView(ConfigReader.getConfig(), user)).not.toThrow();
+    expect(() => _serveWorkloadPortal(ConfigReader.getConfig())).not.toThrow();
   });
 });

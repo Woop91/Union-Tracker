@@ -44,6 +44,11 @@ function setupSheets() {
 }
 
 beforeEach(() => {
+  // Clear the DataService IIFE in-memory cache so each test gets fresh data
+  if (typeof DataService !== 'undefined' && DataService._invalidateSheetCache) {
+    DataService._invalidateSheetCache('Grievance Log');
+    DataService._invalidateSheetCache('Member Directory');
+  }
   setupSheets();
 });
 
@@ -308,6 +313,7 @@ describe('DataService.getGrievanceStats', () => {
 
 describe('DataService.getGrievanceHotSpots', () => {
   test('returns locations with 3+ grievances', () => {
+    DataService._invalidateSheetCache('Grievance Log');
     const headers = ['Grievance ID', 'Unit'];
     const data = [headers,
       ['G1', 'Hot Unit'], ['G2', 'Hot Unit'], ['G3', 'Hot Unit'],
@@ -325,6 +331,7 @@ describe('DataService.getGrievanceHotSpots', () => {
   });
 
   test('returns empty when no unit has 3+ cases', () => {
+    DataService._invalidateSheetCache('Grievance Log');
     const headers = ['Grievance ID', 'Unit'];
     const data = [headers, ['G1', 'A'], ['G2', 'B']];
     const grievSheet = createMockSheet('Grievance Log', data);
@@ -342,6 +349,7 @@ describe('DataService.getGrievanceHotSpots', () => {
 
 describe('DataService.getStewardDirectory', () => {
   test('returns steward records sorted by name', () => {
+    DataService._invalidateSheetCache('Member Directory');
     const headers = ['Email', 'Name', 'Role', 'Work Location', 'Office Days', 'Phone', 'Unit'];
     const data = [headers,
       ['z@test.com', 'Zara', 'Steward', 'Office B', 'Mon-Fri', '555-0001', 'Unit 1'],
@@ -431,6 +439,7 @@ describe('dataGetBroadcastFilterOptions', () => {
   });
 
   test('returns filter options from member directory', () => {
+    DataService._invalidateSheetCache('Member Directory');
     const origAuth = global.checkWebAppAuthorization;
     global.checkWebAppAuthorization = jest.fn(() => ({
       isAuthorized: true, email: 'steward@test.com', role: 'steward'
