@@ -2,7 +2,7 @@
  * WebApp.gs
  * Main entry point for the web app dashboard.
  *
- * doGetWebDashboard(e) handles:
+ * doGet(e) handles:
  *   1. Auth resolution (SSO / magic link / session token)
  *   2. Role lookup from Member Directory
  *   3. Routing to the correct view (auth, steward, member)
@@ -12,44 +12,17 @@
  *   - Execute as: Me (the script owner)
  *   - Who has access: Anyone (or anyone within org)
  *   - Note: Users arrive via Bitly redirect, not the raw URL
+ *
+ * Deep-link support: ?page=workload (or any tab name) opens the SPA
+ * at that tab after authentication.
  */
 
 /**
- * GAS web app entry point — routes to the correct handler.
+ * GAS web app entry point — serves the single-page app.
  * @param {Object} e - Event object with URL parameters
  * @returns {HtmlOutput}
  */
 function doGet(e) {
-  e = e || { parameter: {} };
-
-  // Workload portal — standalone, PIN-authenticated (no session required)
-  if (e.parameter.page === 'workload') {
-    var cfg = ConfigReader.getConfig();
-    return _serveWorkloadPortal(cfg);
-  }
-
-  return doGetWebDashboard(e);
-}
-
-/**
- * Serves the Workload Tracker standalone portal.
- * @param {Object} config
- * @returns {HtmlOutput}
- */
-function _serveWorkloadPortal(config) {
-  var htmlStr = getWorkloadTrackerPortalHtml();
-  return HtmlService.createHtmlOutput(htmlStr)
-    .setTitle((config.orgName || 'DDS') + ' — Workload Tracker')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
-}
-
-/**
- * Main dashboard handler — serves the single-page app.
- * @param {Object} e - Event object with URL parameters
- * @returns {HtmlOutput}
- */
-function doGetWebDashboard(e) {
   e = e || { parameter: {} };
 
   try {

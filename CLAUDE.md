@@ -36,14 +36,13 @@ DDS Main (GitHub) → UT Main (GitHub)
          ↕
   Local DDS repo (fallback)
 ```
-- Every commit to DDS Main must be synced to UT Main with Workload Tracker exclusions applied.
+- Every commit to DDS Main must be synced to UT Main.
 - Before any push, check the local DDS repo for changes not yet on GitHub. If found, pull or merge them first.
 
 ### Repo Differences
-DDS and UT are **identical** except:
-- DDS includes `src/18_WorkloadTracker.gs` and `src/WorkloadTracker.html` (Workload Tracker module).
-- UT excludes these files and uses `typeof` guards where they're referenced.
-- No other differences should exist. If drift is found, it's a bug — fix it.
+DDS and UT are **identical**. No file exclusions remain (the standalone Workload Tracker portal was removed in v4.20.0 — the workload tracker is now fully integrated into the SPA in both repos).
+- `typeof` guards in `index.html`, `member_view.html`, and `03_UIComponents.gs` are kept as defensive coding.
+- If drift is found, it's a bug — fix it.
 
 ### Fallback (GitHub unreachable)
 Work on local DDS repo. **Mandatory:** add a timestamped note in `AI_REFERENCE.md` explaining:
@@ -68,12 +67,11 @@ Work on local DDS repo. **Mandatory:** add a timestamped note in `AI_REFERENCE.m
 - If prior work (by this agent or a previous one) contains assumptions: re-examine, correct, and document in `AI_REFERENCE.md`.
 - Every repo-altering action must be logged: what changed, why, and resulting version.
 
-### Workload Tracker Exclusion (UT only)
-- **EXCLUDE from UT:** `src/18_WorkloadTracker.gs`, `src/WorkloadTracker.html`
-- **MODIFY for UT (add typeof guards):** `src/03_UIComponents.gs`, `src/index.html`, `src/member_view.html`
-- **Already safe:** `src/05_Integrations.gs`, `src/08a_SheetSetup.gs` (typeof guards exist)
+### Workload Tracker
+- The standalone portal (`18_WorkloadTracker.gs`, `WorkloadTracker.html`) was removed in v4.20.0.
+- The workload tracker is now fully integrated into the SPA via `25_WorkloadService.gs` + `member_view.html`.
+- Both DDS and UT are identical — no exclusions remain. `typeof` guards are kept as defensive coding.
 - **Keep all "steward workload" references** — those are grievance case counts, not the WT module.
-- If excluding WT would cause errors in UT, include the minimum needed to prevent breakage.
 
 ### Fallback
 If GitHub is unreachable, work on local repo. Add a note in `AI_REFERENCE.md`: what was done, what needs pushing. Resolve on reconnection.
@@ -112,8 +110,7 @@ Files are numbered to control Google Apps Script's execution order:
 | `09_` | Dashboards | Dashboard rendering |
 | `10_-10d` | Business logic | Main entry, sheet creation, forms, sync |
 | `11_-17_` | Features | CommandHub, features, self-service, meetings, events, enhancements, correlation |
-| `18_` | Workload Tracker | **DDS ONLY** — member caseload reporting |
-| `19_-24_` | Web Dashboard | Auth, config reader, data service, app, portal sheets, weekly questions |
+| `19_-28_` | Web Dashboard | Auth, config reader, data service, app, portal sheets, weekly questions, workload service, QA forum, timeline, failsafe |
 
 ### Build Pipeline
 

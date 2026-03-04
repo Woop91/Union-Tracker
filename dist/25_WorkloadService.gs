@@ -837,7 +837,7 @@ var WorkloadService = (function() {
     var dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     var currentDay = dayNames[now.getDay()];
 
-    var portalUrl = PropertiesService.getScriptProperties().getProperty('WT_PORTAL_URL') || '';
+    var portalUrl = ScriptApp.getService().getUrl();
 
     for (var i = 1; i < data.length; i++) {
       try {
