@@ -877,14 +877,16 @@ describe('Global wrappers', () => {
 
     var spy = jest.spyOn(QAForum, 'getQuestions');
     qaGetQuestions('user@test.com', 1, 10, 'recent');
-    expect(spy).toHaveBeenCalledWith('user@test.com', 1, 10, 'recent');
+    // Wrapper resolves email via _resolveCallerEmail() — passes resolved email, not param
+    expect(spy).toHaveBeenCalledWith('test@example.com', 1, 10, 'recent');
     spy.mockRestore();
   });
 
   test('qaSubmitQuestion delegates to QAForum.submitQuestion', () => {
     var spy = jest.spyOn(QAForum, 'submitQuestion').mockReturnValue({ success: true, questionId: 'QA_test' });
     var result = qaSubmitQuestion('user@test.com', 'Name', 'Question?', false);
-    expect(spy).toHaveBeenCalledWith('user@test.com', 'Name', 'Question?', false);
+    // Wrapper resolves email via _resolveCallerEmail() — passes resolved email, not param
+    expect(spy).toHaveBeenCalledWith('test@example.com', 'Name', 'Question?', false);
     expect(result.success).toBe(true);
     spy.mockRestore();
   });

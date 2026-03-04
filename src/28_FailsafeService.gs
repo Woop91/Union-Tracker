@@ -411,10 +411,10 @@ var FailsafeService = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function fsGetDigestConfig(email) { return FailsafeService.getDigestConfig(email); }
-function fsUpdateDigestConfig(email, config) { return FailsafeService.updateDigestConfig(email, config); }
+function fsGetDigestConfig(email) { var e = _resolveCallerEmail() || email; return FailsafeService.getDigestConfig(e); }
+function fsUpdateDigestConfig(email, config) { var e = _resolveCallerEmail() || email; return FailsafeService.updateDigestConfig(e, config); }
 function fsProcessScheduledDigests() { return FailsafeService.processScheduledDigests(); }
-function fsTriggerBulkExport(stewardEmail) { return FailsafeService.triggerBulkExport(stewardEmail); }
+function fsTriggerBulkExport(stewardEmail) { var e = _requireStewardAuth(); if (!e) return null; return FailsafeService.triggerBulkExport(e); }
 function fsBackupCriticalSheets() { return FailsafeService.backupCriticalSheets(); }
 function fsSetupTriggers() { return FailsafeService.setupFailsafeTriggers(); }
 function fsRemoveTriggers() { return FailsafeService.removeFailsafeTriggers(); }

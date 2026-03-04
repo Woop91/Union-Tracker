@@ -382,12 +382,12 @@ var QAForum = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function qaGetQuestions(email, page, pageSize, sort) { return QAForum.getQuestions(email, page, pageSize, sort); }
-function qaGetQuestionDetail(email, questionId) { return QAForum.getQuestionDetail(email, questionId); }
-function qaSubmitQuestion(email, name, text, isAnonymous) { return QAForum.submitQuestion(email, name, text, isAnonymous); }
-function qaSubmitAnswer(email, name, questionId, text, isSteward) { return QAForum.submitAnswer(email, name, questionId, text, isSteward); }
-function qaUpvoteQuestion(email, questionId) { return QAForum.upvoteQuestion(email, questionId); }
-function qaModerateQuestion(stewardEmail, questionId, action) { return QAForum.moderateQuestion(stewardEmail, questionId, action); }
-function qaModerateAnswer(stewardEmail, answerId, action) { return QAForum.moderateAnswer(stewardEmail, answerId, action); }
-function qaGetFlaggedContent(stewardEmail) { return QAForum.getFlaggedContent(stewardEmail); }
+function qaGetQuestions(email, page, pageSize, sort) { var e = _resolveCallerEmail() || email; return QAForum.getQuestions(e, page, pageSize, sort); }
+function qaGetQuestionDetail(email, questionId) { var e = _resolveCallerEmail() || email; return QAForum.getQuestionDetail(e, questionId); }
+function qaSubmitQuestion(email, name, text, isAnonymous) { var e = _resolveCallerEmail() || email; return QAForum.submitQuestion(e, name, text, isAnonymous); }
+function qaSubmitAnswer(email, name, questionId, text, isSteward) { var e = _resolveCallerEmail() || email; return QAForum.submitAnswer(e, name, questionId, text, isSteward); }
+function qaUpvoteQuestion(email, questionId) { var e = _resolveCallerEmail() || email; return QAForum.upvoteQuestion(e, questionId); }
+function qaModerateQuestion(stewardEmail, questionId, action) { var e = _requireStewardAuth(); if (!e) return null; return QAForum.moderateQuestion(e, questionId, action); }
+function qaModerateAnswer(stewardEmail, answerId, action) { var e = _requireStewardAuth(); if (!e) return null; return QAForum.moderateAnswer(e, answerId, action); }
+function qaGetFlaggedContent(stewardEmail) { var e = _requireStewardAuth(); if (!e) return null; return QAForum.getFlaggedContent(e); }
 function qaInitSheets() { return QAForum.initQAForumSheets(); }

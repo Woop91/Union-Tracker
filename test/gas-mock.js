@@ -180,7 +180,8 @@ function createMockSpreadsheet(sheets) {
     }),
     setActiveSheet: jest.fn(),
     moveActiveSheet: jest.fn(),
-    getOwner: jest.fn(() => ({ getEmail: jest.fn(() => 'owner@example.com') }))
+    getOwner: jest.fn(() => ({ getEmail: jest.fn(() => 'owner@example.com') })),
+    getSpreadsheetTimeZone: jest.fn(() => 'America/New_York')
   };
 }
 
@@ -317,5 +318,11 @@ global.UrlFetchApp = {
     getContentText: jest.fn(() => '{}')
   }))
 };
+
+// --- Auth helpers (defined in 21_WebDashDataService.gs) ---
+// Mocked globally so test files that don't load WebDashDataService can still
+// test wrapper functions in 26_QAForum.gs, 27_TimelineService.gs, 28_FailsafeService.gs.
+global._resolveCallerEmail = jest.fn(() => 'test@example.com');
+global._requireStewardAuth = jest.fn(() => 'steward@example.com');
 
 module.exports = { createMockRange, createMockSheet, createMockSpreadsheet, createMockProtection };

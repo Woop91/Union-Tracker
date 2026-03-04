@@ -49,12 +49,14 @@ describe('_serveFatalError', () => {
     expect(HtmlService.createHtmlOutput).toHaveBeenCalled();
   });
 
-  test('includes error message in output', () => {
+  test('shows generic error message without exposing details', () => {
     _serveFatalError('Something broke');
     const lastCallArg = HtmlService.createHtmlOutput.mock.calls[
       HtmlService.createHtmlOutput.mock.calls.length - 1
     ][0];
-    expect(lastCallArg).toContain('Something broke');
+    // _serveFatalError deliberately does NOT expose the raw error to users (security)
+    expect(lastCallArg).toContain('Something went wrong');
+    expect(lastCallArg).not.toContain('Something broke');
   });
 
   test('does not throw', () => {
@@ -197,12 +199,4 @@ describe('_serveDashboard', () => {
   });
 });
 
-// ============================================================================
-// _serveWorkloadPortal
-// ============================================================================
-
-describe('_serveWorkloadPortal', () => {
-  test('does not throw', () => {
-    expect(() => _serveWorkloadPortal(ConfigReader.getConfig())).not.toThrow();
-  });
-});
+// _serveWorkloadPortal removed in v4.20.0 — workload tracker integrated into SPA

@@ -43,8 +43,8 @@ beforeEach(() => {
     monthlyFilings: []
   }));
   getUnifiedDashboardDataWithDateRange.mockImplementation(() => getUnifiedDashboardData());
-  isTruthyValue.mockImplementation(v => !!v);
-  getUserRole_.mockImplementation(() => 'steward');
+  global.isTruthyValue = jest.fn(v => !!v);
+  global.getUserRole_ = jest.fn(() => 'steward');
 });
 
 // ============================================================================

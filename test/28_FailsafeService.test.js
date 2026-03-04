@@ -532,8 +532,10 @@ describe('FailsafeService.removeFailsafeTriggers', () => {
 
 describe('Global wrappers', () => {
   test('fsGetDigestConfig delegates to FailsafeService', () => {
+    // Auth resolves via _resolveCallerEmail() mock — returns config (not null)
     var result = fsGetDigestConfig(null);
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(typeof result).toBe('object');
   });
 
   test('fsSetupTriggers delegates to FailsafeService', () => {

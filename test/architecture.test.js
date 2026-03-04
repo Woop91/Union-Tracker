@@ -604,8 +604,8 @@ describe('A9: UI tab routes have matching render functions', () => {
   });
 
   // Each routed function must be defined SOMEWHERE in the HTML files
-  // (steward_view.html, member_view.html, or index.html itself)
-  const allHtml = ['index.html', 'steward_view.html', 'member_view.html'].map(f =>
+  // (any of the SPA HTML files, including auth_view.html and error_view.html)
+  const allHtml = ['index.html', 'steward_view.html', 'member_view.html', 'auth_view.html', 'error_view.html'].map(f =>
     fs.readFileSync(path.resolve(__dirname, '..', 'src', f), 'utf8')
   ).join('\n');
 
