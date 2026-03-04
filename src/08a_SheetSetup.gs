@@ -217,7 +217,7 @@ function CREATE_DASHBOARD() {
         '📊 Dashboards are now modal-based (popup windows).\n' +
         'Access via: Union Hub > Dashboards menu.\n\n' +
         'Workload Tracker: Union Hub > 📊 Workload Tracker\n' +
-        'Members submit via: [web app URL]?page=workload\n\n' +
+        'Members submit via the Workload tab in the web dashboard.\n\n' +
         'Plus hidden calculation sheets with self-healing formulas.\n\n' +
         '⚡ Auto-sync trigger installed - dates and deadlines will\n' +
         'update automatically when you edit the sheets.\n\n' +

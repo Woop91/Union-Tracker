@@ -172,7 +172,7 @@ var FailsafeService = (function () {
         if (grievances && grievances.length > 0) {
           var gHtml = '<h3>Your Grievances (' + grievances.length + ')</h3><ul>';
           grievances.forEach(function (g) {
-            gHtml += '<li><strong>' + _escHtml(g.status || 'Open') + '</strong> — ' + _escHtml(g.issueType || g.type || 'Case') + ' (Filed: ' + _escHtml(g.dateFiled || '') + ')</li>';
+            gHtml += '<li><strong>' + escapeHtml(g.status || 'Open') + '</strong> — ' + escapeHtml(g.issueType || g.type || 'Case') + ' (Filed: ' + escapeHtml(g.dateFiled || '') + ')</li>';
           });
           gHtml += '</ul>';
           sections.push(gHtml);
@@ -214,7 +214,7 @@ var FailsafeService = (function () {
           var openTasks = tasks.filter(function (t) { return t.status !== 'completed'; });
           var tHtml = '<h3>Your Assigned Tasks (' + openTasks.length + ' open)</h3><ul>';
           openTasks.forEach(function (t) {
-            tHtml += '<li><strong>' + _escHtml(t.title) + '</strong> — ' + _escHtml(t.priority) + ' priority' + (t.dueDate ? ', due ' + _escHtml(t.dueDate) : '') + '</li>';
+            tHtml += '<li><strong>' + escapeHtml(t.title) + '</strong> — ' + escapeHtml(t.priority) + ' priority' + (t.dueDate ? ', due ' + escapeHtml(t.dueDate) : '') + '</li>';
           });
           tHtml += '</ul>';
           sections.push(tHtml);
@@ -389,10 +389,6 @@ var FailsafeService = (function () {
     return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
   }
 
-  function _escHtml(str) {
-    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
   // ═══════════════════════════════════════
   // Public API
   // ═══════════════════════════════════════
@@ -415,10 +411,10 @@ var FailsafeService = (function () {
 // GLOBAL WRAPPERS (callable from client via google.script.run)
 // ═══════════════════════════════════════
 
-function fsGetDigestConfig(email) { return FailsafeService.getDigestConfig(email); }
-function fsUpdateDigestConfig(email, config) { return FailsafeService.updateDigestConfig(email, config); }
+function fsGetDigestConfig(email) { var e = _resolveCallerEmail() || email; return FailsafeService.getDigestConfig(e); }
+function fsUpdateDigestConfig(email, config) { var e = _resolveCallerEmail() || email; return FailsafeService.updateDigestConfig(e, config); }
 function fsProcessScheduledDigests() { return FailsafeService.processScheduledDigests(); }
-function fsTriggerBulkExport(stewardEmail) { return FailsafeService.triggerBulkExport(stewardEmail); }
+function fsTriggerBulkExport(stewardEmail) { var e = _requireStewardAuth(); if (!e) return null; return FailsafeService.triggerBulkExport(e); }
 function fsBackupCriticalSheets() { return FailsafeService.backupCriticalSheets(); }
 function fsSetupTriggers() { return FailsafeService.setupFailsafeTriggers(); }
 function fsRemoveTriggers() { return FailsafeService.removeFailsafeTriggers(); }

@@ -23,10 +23,9 @@ DDS Main → UT Main (with Workload Tracker exclusions)
 ```
 
 ### Repo Differences
-DDS and UT are **identical** except:
-- UT excludes `src/18_WorkloadTracker.gs` and `src/WorkloadTracker.html`.
-- Files referencing WT use `typeof` guards. See `SYNC-LOG.md` for full exclusion registry.
-- No other differences should exist. Drift = bug → fix it.
+DDS and UT are **identical**. No file exclusions remain (the standalone Workload Tracker portal was removed in v4.20.0 — the workload tracker is now fully integrated into the SPA in both repos).
+- `typeof` guards in `index.html`, `member_view.html`, and `03_UIComponents.gs` are kept as defensive coding.
+- Drift = bug → fix it.
 
 ### Version Tracking — MANDATORY
 - Semver tagging on every meaningful commit. Update `VERSION_INFO` in `src/01_Core.gs`, `package.json`, and `CHANGELOG.md` together.
@@ -34,7 +33,7 @@ DDS and UT are **identical** except:
 
 ### Parity Enforcement
 - After every push: verify GitHub remote and local clone match.
-- UT Main must match DDS Main (minus WT exclusions) after every sync.
+- UT Main must match DDS Main after every sync.
 
 ### No-Assumptions Policy
 - Never assume file contents, function behavior, config values, or repo state. Read first, then act.
@@ -44,12 +43,11 @@ DDS and UT are **identical** except:
 ### Fallback (GitHub unreachable)
 Work on local repo. Add a timestamped note in `AI_REFERENCE.md`: what was done, what needs pushing, enough context for a follow-on agent to resume.
 
-### What's Excluded from UT
-- `src/18_WorkloadTracker.gs` — DDS-only member caseload module
-- `src/WorkloadTracker.html` — DDS-only portal template
-- Files referencing WT use `typeof` guards to handle its absence gracefully.
+### Workload Tracker
+- The standalone portal (`18_WorkloadTracker.gs`, `WorkloadTracker.html`) was removed in v4.20.0.
+- The workload tracker is now fully integrated into the SPA via `25_WorkloadService.gs` + `member_view.html`.
+- Both DDS and UT are identical — no exclusions remain. `typeof` guards are kept as defensive coding.
 - All "steward workload" references (grievance case counts per steward) are kept — core functionality.
-- See `SYNC-LOG.md` for full exclusion registry.
 
 ### Fallback
 If GitHub is unreachable, work on local repo. Add a note in `AI_REFERENCE.md`: what was done, what needs pushing. Resolve on reconnection.

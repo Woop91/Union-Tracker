@@ -89,9 +89,6 @@ function createDashboardMenu() {
     .addItem('📖 Help & Documentation', 'showHelpDialog')
     .addSeparator()
     .addSubMenu(ui.createMenu('📊 Workload Tracker')
-      .addItem('📋 Open Workload Portal', 'showWorkloadPortalUrl')
-      .addItem('🔗 Save Portal Link', 'shareWorkloadPortalLink')
-      .addSeparator()
       .addItem('🔄 Refresh Ledger', 'refreshWorkloadLedger')
       .addItem('💾 Create Backup', 'createWorkloadBackup')
       .addItem('🗄️ Archive Old Data', 'wtArchiveOldData_')
@@ -159,7 +156,7 @@ function createDashboardMenu() {
       .addItem('🔄 Reset Member PIN', 'showResetPINDialog')
       .addItem('📋 Bulk Generate PINs', 'showBulkGeneratePINDialog'));
 
-  // Workload Tracker submenu — DDS-only module (typeof guard for UT)
+  // Workload Tracker submenu — typeof guard for backwards compatibility
   if (typeof initWorkloadTrackerSheets === 'function') {
     toolsMenu_.addSubMenu(ui.createMenu('📊 Workload Tracker')
       .addItem('📊 Refresh Ledger', 'refreshWorkloadLedger')
@@ -168,9 +165,6 @@ function createDashboardMenu() {
       .addItem('🩺 Health Status', 'showWorkloadHealthStatus')
       .addSeparator()
       .addItem('🔔 Setup Reminders', 'setupWorkloadReminderSystem')
-      .addItem('🔗 Show Portal URL', 'showWorkloadPortalUrl')
-      .addItem('📋 Save Portal Link', 'shareWorkloadPortalLink')
-      .addSeparator()
       .addItem('⚙️ Initialize Sheets', 'initWorkloadTrackerSheets'));
   }
 

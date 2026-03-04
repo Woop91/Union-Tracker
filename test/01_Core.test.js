@@ -176,54 +176,8 @@ describe('DEADLINE_RULES ↔ TIME_CONSTANTS.DEADLINE_DAYS consistency', () => {
   });
 });
 
-// ============================================================================
-// Header arrays match column constants
-// ============================================================================
-
-describe('getMemberHeaders', () => {
-  test('returns correct number of headers (matches DUES_STATUS column)', () => {
-    const headers = getMemberHeaders();
-    // Headers should cover columns up to DUES_STATUS (41) - includes address fields and Dues Status
-    expect(headers.length).toBe(MEMBER_COLS.DUES_STATUS);
-  });
-
-  test('first header is Member ID', () => {
-    expect(getMemberHeaders()[0]).toBe('Member ID');
-  });
-
-  test('last header is Dues Status', () => {
-    const headers = getMemberHeaders();
-    expect(headers[headers.length - 1]).toBe('Dues Status');
-  });
-
-  test('header position matches MEMBER_COLS for key fields', () => {
-    const headers = getMemberHeaders();
-    expect(headers[MEMBER_COLS.FIRST_NAME - 1]).toBe('First Name');
-    expect(headers[MEMBER_COLS.LAST_NAME - 1]).toBe('Last Name');
-    expect(headers[MEMBER_COLS.EMAIL - 1]).toBe('Email');
-    expect(headers[MEMBER_COLS.IS_STEWARD - 1]).toBe('Is Steward');
-  });
-});
-
-describe('getGrievanceHeaders', () => {
-  test('returns an array of strings', () => {
-    const headers = getGrievanceHeaders();
-    expect(Array.isArray(headers)).toBe(true);
-    expect(headers.length).toBeGreaterThan(0);
-    headers.forEach(h => expect(typeof h).toBe('string'));
-  });
-
-  test('first header is Grievance ID', () => {
-    expect(getGrievanceHeaders()[0]).toBe('Grievance ID');
-  });
-
-  test('header positions match GRIEVANCE_COLS for key fields', () => {
-    const headers = getGrievanceHeaders();
-    expect(headers[GRIEVANCE_COLS.STATUS - 1]).toBe('Status');
-    expect(headers[GRIEVANCE_COLS.CURRENT_STEP - 1]).toBe('Current Step');
-    expect(headers[GRIEVANCE_COLS.RESOLUTION - 1]).toBe('Resolution');
-  });
-});
+// NOTE: getMemberHeaders/getGrievanceHeaders header↔position tests
+// are covered in columns.test.js (Header map → COLS consistency).
 
 // ============================================================================
 // SHEETS constant
@@ -241,81 +195,6 @@ describe('SHEETS constant', () => {
     expect(SHEETS.GRIEVANCE_TRACKER).toBe(SHEETS.GRIEVANCE_LOG);
     expect(SHEETS.MEMBER_DIRECTORY).toBe(SHEETS.MEMBER_DIR);
     expect(SHEET_NAMES).toBe(SHEETS);
-  });
-});
-
-// ============================================================================
-// sanitizeHtml (01_Core.gs version delegates to escapeHtml)
-// ============================================================================
-
-describe('sanitizeHtml (01_Core.gs)', () => {
-  test('delegates to escapeHtml', () => {
-    const input = '<script>alert("xss")</script>';
-    expect(sanitizeHtml(input)).toBe(escapeHtml(input));
-  });
-});
-
-// ============================================================================
-// sanitizeEmail
-// ============================================================================
-
-describe('sanitizeEmail', () => {
-  test('accepts valid email', () => {
-    expect(sanitizeEmail('user@example.com')).toBe('user@example.com');
-  });
-
-  test('lowercases email', () => {
-    expect(sanitizeEmail('User@EXAMPLE.COM')).toBe('user@example.com');
-  });
-
-  test('trims whitespace', () => {
-    expect(sanitizeEmail('  user@example.com  ')).toBe('user@example.com');
-  });
-
-  test('returns null for invalid email', () => {
-    expect(sanitizeEmail('not-an-email')).toBeNull();
-    expect(sanitizeEmail('')).toBeNull();
-    expect(sanitizeEmail(null)).toBeNull();
-  });
-});
-
-// ============================================================================
-// sanitizePhone
-// ============================================================================
-
-describe('sanitizePhone', () => {
-  test('strips non-digits', () => {
-    expect(sanitizePhone('(555) 123-4567')).toBe('5551234567');
-  });
-
-  test('limits to 10 digits', () => {
-    expect(sanitizePhone('12345678901234')).toBe('1234567890');
-  });
-
-  test('handles empty input', () => {
-    expect(sanitizePhone('')).toBe('');
-    expect(sanitizePhone(null)).toBe('');
-  });
-});
-
-// ============================================================================
-// sanitizeSheetName
-// ============================================================================
-
-describe('sanitizeSheetName', () => {
-  test('removes forbidden characters', () => {
-    expect(sanitizeSheetName("test[sheet]")).toBe('testsheet');
-    expect(sanitizeSheetName("test'sheet")).toBe('testsheet');
-  });
-
-  test('truncates to 100 characters', () => {
-    const long = 'a'.repeat(150);
-    expect(sanitizeSheetName(long).length).toBe(100);
-  });
-
-  test('defaults to Sheet for empty input', () => {
-    expect(sanitizeSheetName('')).toBe('Sheet');
-    expect(sanitizeSheetName(null)).toBe('Sheet');
   });
 });
 

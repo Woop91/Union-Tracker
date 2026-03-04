@@ -156,6 +156,36 @@
     })();
 
     // ═══════════════════════════════════════
+    // SAFE SERVER CALL — default failure handler for google.script.run
+    // ═══════════════════════════════════════
+    /**
+     * Wraps google.script.run so every call automatically gets a
+     * .withFailureHandler() if the caller doesn't supply one.
+     * This prevents silent spinner-forever failures.
+     *
+     * Usage (drop-in replacement for google.script.run):
+     *   serverCall()
+     *     .withSuccessHandler(fn)
+     *     .myServerFunction(args);
+     *
+     * The default failure handler logs the error and hides any
+     * active loading state. Callers can still override with their
+     * own .withFailureHandler() — it will replace the default.
+     */
+    function serverCall() {
+      var runner = google.script.run;
+      runner = runner.withFailureHandler(function(err) {
+        console.error('Server call failed:', err);
+        // Dismiss any loading spinners so the user isn't stuck
+        var spinners = document.querySelectorAll('.loading-spinner');
+        spinners.forEach(function(s) {
+          s.innerHTML = '<div class="empty-state">Something went wrong. Please try again.</div>';
+        });
+      });
+      return runner;
+    }
+
+    // ═══════════════════════════════════════
     // CLIENT-SIDE DATA CACHE — prevents redundant server calls on tab switches
     // ═══════════════════════════════════════
     var DataCache = (function() {
@@ -194,8 +224,10 @@
           .withSuccessHandler(function(result) {
             set(cacheKey, result, ttlMs);
             onSuccess(result);
+          })
+          .withFailureHandler(onFailure || function(err) {
+            console.error('cachedCall(' + fnName + ') failed:', err);
           });
-        if (onFailure) runner = runner.withFailureHandler(onFailure);
         runner[fnName].apply(runner, args || []);
       }
 
@@ -497,7 +529,7 @@
         { id: 'orgchart', icon: '\uD83C\uDFDB', label: 'Org. Chart' },
         { id: 'profile', icon: '\uD83D\uDC64', label: 'Profile' },
         { id: 'resources', icon: '\uD83D\uDCDA', label: 'Resources' },
-      ].concat(typeof renderWorkloadTracker === 'function' ? [{ id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' }] : []).concat([
+        { id: 'workload', icon: '\uD83D\uDCCA', label: 'Workload Tracker' },
         { id: 'weeklyq', icon: '\u2753', label: 'Weekly Questions' },
         { id: 'survey', icon: '\uD83D\uDCC8', label: 'Survey Results' },
         { id: 'feedback', icon: '\uD83D\uDCA1', label: 'Feedback' },
@@ -505,7 +537,7 @@
         { id: 'mytasks', icon: '\u2705', label: 'My Tasks' },
         { id: 'qaforum', icon: '\uD83D\uDCAC', label: 'Q&A Forum' },
         { id: 'timeline', icon: '\uD83D\uDCC5', label: 'Timeline' },
-      ]);
+      ];
     }
 
     function renderOrgChart(appContainer, role) {
@@ -547,7 +579,7 @@
           case 'contact': renderStewardDirectory(app); break;
           case 'profile': renderUpdateProfile(app); break;
           case 'resources': renderMemberResources(app); break;
-          case 'workload': if (typeof renderWorkloadTracker === 'function') renderWorkloadTracker(app); break;
+          case 'workload': renderWorkloadTracker(app); break;
           case 'weeklyq': renderWeeklyQuestionsPage(app, 'member'); break;
           case 'survey': renderSurveyResultsPage(app); break;
           case 'unionstats': renderUnionStatsPage(app); break;

@@ -23,32 +23,23 @@ Tracks all syncs from DDS-Dashboard `Main` to Union-Tracker `staging`.
 
 ## Workload Tracker Exclusion Registry
 
-### ❌ EXCLUDE from UT
-| File | Reason |
+> **Resolved (v4.20.0):** The standalone Workload Tracker portal (`18_WorkloadTracker.gs` + `WorkloadTracker.html`) has been deleted from DDS. The workload tracker is now fully integrated into the SPA via `25_WorkloadService.gs` and the workload tab in `member_view.html`. Both repos are identical — no exclusions remain.
+
+### Previously Excluded (now deleted from both repos)
+| File | Status |
 |------|--------|
-| `src/18_WorkloadTracker.gs` | Core WT module — all 32 WT functions |
-| `src/WorkloadTracker.html` | WT portal HTML template |
+| `src/18_WorkloadTracker.gs` | **Deleted** — replaced by `25_WorkloadService.gs` |
+| `src/WorkloadTracker.html` | **Deleted** — replaced by SPA workload tab in `member_view.html` |
 
-### ⚠️ MODIFY for UT (add typeof guards)
-| File | Lines | What to guard |
-|------|-------|---------------|
-| `src/03_UIComponents.gs` | 107-175 | Break menu chain into `toolsMenu_` var; wrap WT submenu in `if (typeof initWorkloadTrackerSheets === 'function')` |
-| `src/index.html` | 499, 507, 525 | Workload tab: `.concat(typeof renderWorkloadTracker ...)` pattern; switch case typeof guard |
-| `src/member_view.html` | 1142-1144 | More menu: `.concat(typeof renderWorkloadTracker ...)` pattern for workload item |
-| `build.js` | 56, 73 | Remove `18_WorkloadTracker.gs` and `WorkloadTracker.html` from BUILD_ORDER/HTML_FILES |
-| `test/architecture.test.js` | 57, 206 | Remove `18_WorkloadTracker.gs` from loadSources and BUILD_ORDER arrays |
-
-### ✅ KEEP in UT (already safe)
-| File | Why safe |
-|------|----------|
-| `src/05_Integrations.gs` | Already has `typeof getWorkloadTrackerPortalHtml === 'function'` guard |
-| `src/08a_SheetSetup.gs` | Already has `typeof initWorkloadTrackerSheets === 'function'` guard |
-| `src/01_Core.gs` | Sheet constants defined but unused without WT module — inert |
-| `src/styles.html` | WT CSS classes are dead code without module — no errors |
-| All other files | Reference "steward workload" (case counts) not the WT module |
+### typeof Guards (kept as defensive coding)
+| File | Guard | Notes |
+|------|-------|-------|
+| `src/index.html` | `typeof` checks for workload nav | Safe — functions exist in both repos via `25_WorkloadService.gs` |
+| `src/member_view.html` | `typeof` checks for SSO wrappers | Safe — functions exist in both repos via `25_WorkloadService.gs` |
+| `src/03_UIComponents.gs` | `typeof initWorkloadTrackerSheets` guard in Tools menu | Safe — function exists in both repos |
 
 ### Important Distinction
-- **"Workload Tracker"** = member caseload reporting module (18_WorkloadTracker.gs) → EXCLUDE
+- **"Workload Tracker"** = member caseload reporting (now via `25_WorkloadService.gs`) → identical in both repos
 - **"Steward workload"** = grievance case count per steward → KEEP (core functionality)
 
 ---

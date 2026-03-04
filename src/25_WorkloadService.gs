@@ -119,7 +119,8 @@ var WorkloadService = (function() {
   }
 
   function _getTimezone() {
-    return SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    return ss ? ss.getSpreadsheetTimeZone() : 'America/New_York';
   }
 
   // ── Rate Limiting (private) ───────────────────────────────────────────────
@@ -155,7 +156,9 @@ var WorkloadService = (function() {
 
   function _getUserSharingStartDate(email) {
     if (!email) return null;
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_USERMETA);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return null;
+    var sheet = ss.getSheetByName(SHEETS.WORKLOAD_USERMETA);
     if (!sheet) return null;
     var emailLower = email.toLowerCase().trim();
     var data = sheet.getDataRange().getValues();
@@ -171,7 +174,9 @@ var WorkloadService = (function() {
 
   function _setUserSharingStartDate(email, startDate) {
     if (!email) return;
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.WORKLOAD_USERMETA);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) return;
+    var sheet = ss.getSheetByName(SHEETS.WORKLOAD_USERMETA);
     if (!sheet) return;
     var emailLower = email.toLowerCase().trim();
     var data = sheet.getDataRange().getValues();
@@ -837,7 +842,7 @@ var WorkloadService = (function() {
     var dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
     var currentDay = dayNames[now.getDay()];
 
-    var portalUrl = PropertiesService.getScriptProperties().getProperty('WT_PORTAL_URL') || '';
+    var portalUrl = ScriptApp.getService().getUrl();
 
     for (var i = 1; i < data.length; i++) {
       try {

@@ -53,7 +53,6 @@ const BUILD_ORDER = [
   '15_EventBus.gs',
   '16_DashboardEnhancements.gs',
   '17_CorrelationEngine.gs',
-  // 18_WorkloadTracker.gs — excluded from UT (DDS-only module)
   // Web-dashboard SPA modules (load after all DDS modules)
   '19_WebDashAuth.gs',
   '20_WebDashConfigReader.gs',
@@ -70,7 +69,6 @@ const BUILD_ORDER = [
 // .html files — copied as actual GAS HTML files (required for HtmlService.createTemplateFromFile)
 const HTML_FILES = [
   'MultiSelectDialog.html',
-  // WorkloadTracker.html — excluded from UT (DDS-only module)
   // Web-dashboard SPA templates
   'index.html',
   'styles.html',

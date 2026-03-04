@@ -451,10 +451,6 @@ var DataService = (function () {
 
     var data = cached.data;
     var colMap = cached.colMap;
-    var isStewardCol = _findColumn(colMap, HEADERS.memberIsSteward);
-    var roleCol = _findColumn(colMap, HEADERS.memberRole);
-    var locationCol = _findColumn(colMap, HEADERS.memberWorkLocation);
-
     var stewards = [];
     for (var i = 1; i < data.length; i++) {
       var rec = _buildUserRecord(data[i], colMap);
@@ -1016,6 +1012,10 @@ var DataService = (function () {
 
   function _getSheet(name) {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) {
+      Logger.log('DataService: getActiveSpreadsheet() returned null for sheet "' + name + '"');
+      return null;
+    }
     var sheet = ss.getSheetByName(name);
     if (!sheet) {
       Logger.log('DataService: Sheet "' + name + '" not found.');
@@ -2114,6 +2114,371 @@ var DataService = (function () {
     return { success: true, message: 'Poll created.', id: id };
   }
 
+  // ═══════════════════════════════════════
+  // Steward Performance (v4.18.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns performance metrics for a single steward.
+   * @param {string} email - Steward email
+   * @returns {Object} Performance data or empty object
+   */
+  function getStewardPerformance(email) {
+    try {
+      if (!email) return {};
+      email = String(email).trim().toLowerCase();
+
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
+      if (!sheet || sheet.getLastRow() <= 1) return {};
+
+      var data = sheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        var rowEmail = String(data[i][STEWARD_PERF_COLS.STEWARD - 1]).trim().toLowerCase();
+        if (rowEmail !== email) continue;
+        return {
+          steward: rowEmail,
+          totalCases: Number(data[i][STEWARD_PERF_COLS.TOTAL_CASES - 1]) || 0,
+          active: Number(data[i][STEWARD_PERF_COLS.ACTIVE - 1]) || 0,
+          closed: Number(data[i][STEWARD_PERF_COLS.CLOSED - 1]) || 0,
+          won: Number(data[i][STEWARD_PERF_COLS.WON - 1]) || 0,
+          winRate: Number(data[i][STEWARD_PERF_COLS.WIN_RATE - 1]) || 0,
+          avgDays: Number(data[i][STEWARD_PERF_COLS.AVG_DAYS - 1]) || 0,
+          overdue: Number(data[i][STEWARD_PERF_COLS.OVERDUE - 1]) || 0,
+          dueThisWeek: Number(data[i][STEWARD_PERF_COLS.DUE_THIS_WEEK - 1]) || 0,
+          performanceScore: Number(data[i][STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]) || 0,
+        };
+      }
+      return {};
+    } catch (_e) {
+      Logger.log('getStewardPerformance error: ' + _e.message);
+      return {};
+    }
+  }
+
+  /**
+   * Returns performance metrics for all stewards.
+   * @returns {Object[]}
+   */
+  function getAllStewardPerformance() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.STEWARD_PERFORMANCE_CALC);
+      if (!sheet || sheet.getLastRow() <= 1) return [];
+
+      var data = sheet.getDataRange().getValues();
+      var results = [];
+      for (var i = 1; i < data.length; i++) {
+        var steward = String(data[i][STEWARD_PERF_COLS.STEWARD - 1]).trim();
+        if (!steward) continue;
+        results.push({
+          steward: steward.toLowerCase(),
+          totalCases: Number(data[i][STEWARD_PERF_COLS.TOTAL_CASES - 1]) || 0,
+          active: Number(data[i][STEWARD_PERF_COLS.ACTIVE - 1]) || 0,
+          closed: Number(data[i][STEWARD_PERF_COLS.CLOSED - 1]) || 0,
+          won: Number(data[i][STEWARD_PERF_COLS.WON - 1]) || 0,
+          winRate: Number(data[i][STEWARD_PERF_COLS.WIN_RATE - 1]) || 0,
+          avgDays: Number(data[i][STEWARD_PERF_COLS.AVG_DAYS - 1]) || 0,
+          overdue: Number(data[i][STEWARD_PERF_COLS.OVERDUE - 1]) || 0,
+          dueThisWeek: Number(data[i][STEWARD_PERF_COLS.DUE_THIS_WEEK - 1]) || 0,
+          performanceScore: Number(data[i][STEWARD_PERF_COLS.PERFORMANCE_SCORE - 1]) || 0,
+        });
+      }
+      return results;
+    } catch (_e) {
+      Logger.log('getAllStewardPerformance error: ' + _e.message);
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // Case Checklist (v4.18.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns checklist items for a given case.
+   * @param {string} caseId
+   * @returns {Object[]}
+   */
+  function getCaseChecklist(caseId) {
+    try {
+      if (!caseId) return [];
+      caseId = String(caseId).trim();
+
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.CASE_CHECKLIST);
+      if (!sheet || sheet.getLastRow() <= 1) return [];
+
+      var data = sheet.getDataRange().getValues();
+      var items = [];
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][CHECKLIST_COLS.CASE_ID - 1]).trim() !== caseId) continue;
+        var dueDate = data[i][CHECKLIST_COLS.DUE_DATE - 1];
+        var completedDate = data[i][CHECKLIST_COLS.COMPLETED_DATE - 1];
+        items.push({
+          id: String(data[i][CHECKLIST_COLS.CHECKLIST_ID - 1] || ''),
+          caseId: caseId,
+          actionType: String(data[i][CHECKLIST_COLS.ACTION_TYPE - 1] || ''),
+          itemText: String(data[i][CHECKLIST_COLS.ITEM_TEXT - 1] || ''),
+          category: String(data[i][CHECKLIST_COLS.CATEGORY - 1] || ''),
+          required: String(data[i][CHECKLIST_COLS.REQUIRED - 1]).toLowerCase() === 'true',
+          completed: String(data[i][CHECKLIST_COLS.COMPLETED - 1]).toLowerCase() === 'true',
+          completedBy: String(data[i][CHECKLIST_COLS.COMPLETED_BY - 1] || ''),
+          completedDate: completedDate instanceof Date ? _formatDate(completedDate) : '',
+          dueDate: dueDate instanceof Date ? _formatDate(dueDate) : String(dueDate || ''),
+          notes: String(data[i][CHECKLIST_COLS.NOTES - 1] || ''),
+          sortOrder: Number(data[i][CHECKLIST_COLS.SORT_ORDER - 1]) || 0,
+        });
+      }
+      items.sort(function(a, b) { return a.sortOrder - b.sortOrder; });
+      return items;
+    } catch (_e) {
+      Logger.log('getCaseChecklist error: ' + _e.message);
+      return [];
+    }
+  }
+
+  /**
+   * Returns completion progress for a case checklist.
+   * @param {string} caseId
+   * @returns {Object} { total, completed, required, requiredCompleted, percent }
+   */
+  function getCaseChecklistProgress(caseId) {
+    try {
+      var items = getCaseChecklist(caseId);
+      var total = items.length;
+      var completed = 0;
+      var required = 0;
+      var requiredCompleted = 0;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].completed) completed++;
+        if (items[i].required) {
+          required++;
+          if (items[i].completed) requiredCompleted++;
+        }
+      }
+      return {
+        total: total,
+        completed: completed,
+        required: required,
+        requiredCompleted: requiredCompleted,
+        percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+      };
+    } catch (_e) {
+      Logger.log('getCaseChecklistProgress error: ' + _e.message);
+      return { total: 0, completed: 0, required: 0, requiredCompleted: 0, percent: 0 };
+    }
+  }
+
+  /**
+   * Toggles a checklist item's completed state.
+   * @param {string} checklistId
+   * @param {boolean} completed
+   * @param {string} email - Who completed it
+   * @returns {Object} { success, message }
+   */
+  function toggleChecklistItem(checklistId, completed, email) {
+    try {
+      if (!checklistId) return { success: false, message: 'Missing checklist ID.' };
+
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.CASE_CHECKLIST);
+      if (!sheet || sheet.getLastRow() <= 1) return { success: false, message: 'Checklist not found.' };
+
+      var data = sheet.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][CHECKLIST_COLS.CHECKLIST_ID - 1]).trim() !== String(checklistId).trim()) continue;
+        var rowNum = i + 1;
+        sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED).setValue(completed ? 'true' : 'false');
+        sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED_BY).setValue(completed ? String(email || '').toLowerCase().trim() : '');
+        sheet.getRange(rowNum, CHECKLIST_COLS.COMPLETED_DATE).setValue(completed ? new Date() : '');
+
+        if (typeof logAuditEvent === 'function') {
+          logAuditEvent('CHECKLIST_TOGGLED', { checklistId: checklistId, completed: completed, by: email });
+        }
+        return { success: true, message: completed ? 'Item completed.' : 'Item unchecked.' };
+      }
+      return { success: false, message: 'Checklist item not found.' };
+    } catch (_e) {
+      Logger.log('toggleChecklistItem error: ' + _e.message);
+      return { success: false, message: 'Failed to update checklist.' };
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // Member Meetings (v4.18.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns meetings a member has checked into.
+   * @param {string} email
+   * @returns {Object[]}
+   */
+  function getMemberMeetings(email) {
+    try {
+      if (!email) return [];
+      email = String(email).trim().toLowerCase();
+
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+      if (!sheet || sheet.getLastRow() <= 1) return [];
+
+      var data = sheet.getDataRange().getValues();
+      var meetings = [];
+      for (var i = 1; i < data.length; i++) {
+        var rowEmail = String(data[i][MEETING_CHECKIN_COLS.EMAIL - 1]).trim().toLowerCase();
+        if (rowEmail !== email) continue;
+        var meetingDate = data[i][MEETING_CHECKIN_COLS.MEETING_DATE - 1];
+        var checkinTime = data[i][MEETING_CHECKIN_COLS.CHECKIN_TIME - 1];
+        meetings.push({
+          meetingId: String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1] || ''),
+          meetingName: String(data[i][MEETING_CHECKIN_COLS.MEETING_NAME - 1] || ''),
+          meetingDate: meetingDate instanceof Date ? _formatDate(meetingDate) : String(meetingDate || ''),
+          meetingType: String(data[i][MEETING_CHECKIN_COLS.MEETING_TYPE - 1] || ''),
+          checkinTime: checkinTime instanceof Date ? _formatDate(checkinTime) : String(checkinTime || ''),
+        });
+      }
+      meetings.reverse(); // newest first
+      return meetings;
+    } catch (_e) {
+      Logger.log('getMemberMeetings error: ' + _e.message);
+      return [];
+    }
+  }
+
+  /**
+   * Returns aggregate meeting statistics.
+   * @returns {Object} { totalMeetings, totalCheckins, uniqueAttendees, avgAttendance }
+   */
+  function getMeetingStats() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.MEETING_CHECKIN_LOG);
+      if (!sheet || sheet.getLastRow() <= 1) {
+        return { totalMeetings: 0, totalCheckins: 0, uniqueAttendees: 0, avgAttendance: 0 };
+      }
+
+      var data = sheet.getDataRange().getValues();
+      var meetingIds = {};
+      var attendees = {};
+      for (var i = 1; i < data.length; i++) {
+        var mid = String(data[i][MEETING_CHECKIN_COLS.MEETING_ID - 1]).trim();
+        var aemail = String(data[i][MEETING_CHECKIN_COLS.EMAIL - 1]).trim().toLowerCase();
+        if (mid) meetingIds[mid] = true;
+        if (aemail) attendees[aemail] = true;
+      }
+      var totalMeetings = Object.keys(meetingIds).length;
+      var totalCheckins = data.length - 1;
+      var uniqueAttendees = Object.keys(attendees).length;
+      return {
+        totalMeetings: totalMeetings,
+        totalCheckins: totalCheckins,
+        uniqueAttendees: uniqueAttendees,
+        avgAttendance: totalMeetings > 0 ? Math.round(totalCheckins / totalMeetings) : 0,
+      };
+    } catch (_e) {
+      Logger.log('getMeetingStats error: ' + _e.message);
+      return { totalMeetings: 0, totalCheckins: 0, uniqueAttendees: 0, avgAttendance: 0 };
+    }
+  }
+
+  // ═══════════════════════════════════════
+  // Satisfaction & Feedback (v4.18.0)
+  // ═══════════════════════════════════════
+
+  /**
+   * Returns satisfaction survey trend data (aggregated averages).
+   * @returns {Object} { overallSat, stewardRating, stewardAccess, chapter, leadership, contract, representation, communication, memberVoice, valueAction }
+   */
+  function getSatisfactionTrends() {
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.SATISFACTION);
+      if (!sheet || sheet.getLastRow() <= 1) return {};
+
+      var data = sheet.getDataRange().getValues();
+      // Read from summary area if available (pre-computed by sheet formulas)
+      if (data.length > 1 && data[1][SATISFACTION_COLS.AVG_OVERALL_SAT - 1]) {
+        return {
+          overallSat: Number(data[1][SATISFACTION_COLS.AVG_OVERALL_SAT - 1]) || 0,
+          stewardRating: Number(data[1][SATISFACTION_COLS.AVG_STEWARD_RATING - 1]) || 0,
+          stewardAccess: Number(data[1][SATISFACTION_COLS.AVG_STEWARD_ACCESS - 1]) || 0,
+          chapter: Number(data[1][SATISFACTION_COLS.AVG_CHAPTER - 1]) || 0,
+          leadership: Number(data[1][SATISFACTION_COLS.AVG_LEADERSHIP - 1]) || 0,
+          contract: Number(data[1][SATISFACTION_COLS.AVG_CONTRACT - 1]) || 0,
+          representation: Number(data[1][SATISFACTION_COLS.AVG_REPRESENTATION - 1]) || 0,
+          communication: Number(data[1][SATISFACTION_COLS.AVG_COMMUNICATION - 1]) || 0,
+          memberVoice: Number(data[1][SATISFACTION_COLS.AVG_MEMBER_VOICE - 1]) || 0,
+          valueAction: Number(data[1][SATISFACTION_COLS.AVG_VALUE_ACTION - 1]) || 0,
+        };
+      }
+
+      // Fallback: compute from individual responses (Q6-Q16 = satisfaction questions)
+      var sums = { sat: 0, steward: 0, access: 0 };
+      var count = 0;
+      for (var i = 1; i < data.length; i++) {
+        var sat = Number(data[i][SATISFACTION_COLS.Q6_SATISFIED_REP - 1]);
+        if (!sat) continue;
+        count++;
+        sums.sat += sat;
+        sums.steward += Number(data[i][SATISFACTION_COLS.Q7_TRUST_UNION - 1]) || 0;
+        sums.access += Number(data[i][SATISFACTION_COLS.Q18_KNOW_CONTACT - 1]) || 0;
+      }
+      if (count === 0) return {};
+      return {
+        overallSat: Math.round((sums.sat / count) * 10) / 10,
+        stewardRating: Math.round((sums.steward / count) * 10) / 10,
+        stewardAccess: Math.round((sums.access / count) * 10) / 10,
+        responseCount: count,
+      };
+    } catch (_e) {
+      Logger.log('getSatisfactionTrends error: ' + _e.message);
+      return {};
+    }
+  }
+
+  /**
+   * Submits feedback from a member.
+   * @param {string} email - Submitter email
+   * @param {Object} data - { category, type, priority, title, description }
+   * @returns {Object} { success, message }
+   */
+  function submitFeedback(email, feedbackData) {
+    try {
+      if (!email || !feedbackData || !feedbackData.title) {
+        return { success: false, message: 'Missing required fields.' };
+      }
+      email = String(email).trim().toLowerCase();
+
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = ss.getSheetByName(SHEETS.FEEDBACK);
+      if (!sheet) return { success: false, message: 'Feedback sheet not found.' };
+
+      var row = [
+        new Date(),
+        email,
+        String(feedbackData.category || 'General').substring(0, 100),
+        String(feedbackData.type || 'Suggestion').substring(0, 50),
+        String(feedbackData.priority || 'Medium').substring(0, 20),
+        String(feedbackData.title).substring(0, 200),
+        String(feedbackData.description || '').substring(0, 2000),
+        'New',
+        '',
+        '',
+        '',
+      ];
+      sheet.appendRow(row);
+
+      if (typeof logAuditEvent === 'function') {
+        logAuditEvent('FEEDBACK_SUBMITTED', { email: email, title: feedbackData.title.substring(0, 100) });
+      }
+      return { success: true, message: 'Feedback submitted.' };
+    } catch (_e) {
+      Logger.log('submitFeedback error: ' + _e.message);
+      return { success: false, message: 'Failed to submit feedback.' };
+    }
+  }
+
   // Public API
   return {
     findUserByEmail: findUserByEmail,
@@ -2156,6 +2521,28 @@ var DataService = (function () {
     // v4.15.0
     isChiefSteward: isChiefSteward,
     getChiefStewardTaskView: getChiefStewardTaskView,
+    // v4.17.0 - Member Task Assignment
+    createMemberTask: createMemberTask,
+    getMemberTasks: getMemberTasks,
+    completeMemberTask: completeMemberTask,
+    getStewardAssignedMemberTasks: getStewardAssignedMemberTasks,
+    // v4.17.0 - Feedback, Polls, Minutes
+    getMyFeedback: getMyFeedback,
+    getActivePolls: getActivePolls,
+    submitPollVote: submitPollVote,
+    getMeetingMinutes: getMeetingMinutes,
+    addMeetingMinutes: addMeetingMinutes,
+    addPoll: addPoll,
+    // v4.18.0 - Performance, Checklists, Meetings, Satisfaction, Feedback
+    getStewardPerformance: getStewardPerformance,
+    getAllStewardPerformance: getAllStewardPerformance,
+    getCaseChecklist: getCaseChecklist,
+    getCaseChecklistProgress: getCaseChecklistProgress,
+    toggleChecklistItem: toggleChecklistItem,
+    getMemberMeetings: getMemberMeetings,
+    getMeetingStats: getMeetingStats,
+    getSatisfactionTrends: getSatisfactionTrends,
+    submitFeedback: submitFeedback,
     // Perf: batch + cache
     getBatchData: getBatchData,
     _invalidateSheetCache: _invalidateSheetCache,
@@ -2207,9 +2594,6 @@ function dataGetStewardKPIs() { var e = _resolveCallerEmail(); return e ? DataSe
 function dataGetMemberGrievances() { var e = _resolveCallerEmail(); return e ? DataService.getMemberGrievances(e) : []; }
 function dataGetMemberGrievanceHistory() { var e = _resolveCallerEmail(); return e ? DataService.getMemberGrievanceHistory(e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetStewardContact() { var e = _resolveCallerEmail(); return e ? DataService.getStewardContact(e) : null; }
-function dataGetUserRole() { var e = _resolveCallerEmail(); return e ? DataService.getUserRole(e) : null; }
-function dataGetUserProfile() { var e = _resolveCallerEmail(); return e ? DataService.findUserByEmail(e) : null; }
-function dataGetUnits() { return DataService.getUnits(); }
 
 // v4.11.0 — data service wrappers (CR-AUTH-3: server-side identity + role checks)
 function dataGetFullProfile(email) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.getFullMemberProfile(email); }
@@ -2217,12 +2601,9 @@ function dataUpdateProfile(email, updates) { var s = _requireStewardAuth(); if (
 function dataGetAssignedSteward() { var e = _resolveCallerEmail(); return e ? DataService.getAssignedStewardInfo(e) : null; }
 function dataGetAvailableStewards() { var e = _resolveCallerEmail(); return e ? DataService.getAvailableStewards(e) : []; }
 function dataAssignSteward(memberEmail, stewardEmail) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.assignStewardToMember(memberEmail, stewardEmail); }
-function dataGetGrievanceDriveUrl() { var e = _resolveCallerEmail(); return e ? DataService.getMemberGrievanceDriveUrl(e) : null; }
 function dataStartGrievanceDraft(ignoredEmail, data) { var e = _resolveCallerEmail(); return e ? DataService.startGrievanceDraft(e, data) : { success: false, message: 'Not authenticated.' }; }
 function dataCreateGrievanceDrive() { var e = _resolveCallerEmail(); return e ? DataService.createGrievanceDriveFolder(e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetSurveyStatus() { var e = _resolveCallerEmail(); return e ? DataService.getMemberSurveyStatus(e) : null; }
-function dataGetOrgLinks() { return DataService.getOrgLinks(); }
-function dataGetStewardMembers() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardMembers(s); }
 function dataGetAllMembers() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllMembers(); }
 function dataGetStewardSurveyTracking(ignoredEmail, scope) { var s = _requireStewardAuth(); if (!s) return { total: 0, completed: 0, members: [] }; try { return DataService.getStewardSurveyTracking(s, scope); } catch (e) { Logger.log('dataGetStewardSurveyTracking error: ' + e.message + '\n' + (e.stack || '')); return { total: 0, completed: 0, members: [] }; } }
 function dataSendBroadcast(ignoredEmail, filter, msg) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.sendBroadcastMessage(s, filter, msg); }
@@ -2240,7 +2621,6 @@ function dataCreateTaskForSteward(ignoredAssignerEmail, assigneeEmail, title, de
   return DataService.createTask(s, title, desc, memberEmail, priority, dueDate, assigneeEmail);
 }
 function dataGetTasks(ignoredStewardEmail, statusFilter) { var s = _requireStewardAuth(); if (!s) return []; return DataService.getTasks(s, statusFilter); }
-function dataUpdateTask(ignoredStewardEmail, taskId, updates) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.updateTask(s, taskId, updates); }
 function dataCompleteTask(ignoredStewardEmail, taskId) { var s = _requireStewardAuth(); if (!s) return { success: false, message: 'Steward access required.' }; return DataService.completeTask(s, taskId); }
 function dataGetStewardMemberStats() { var e = _resolveCallerEmail(); if (!e) return {}; try { return DataService.getStewardMemberStats(e); } catch (err) { Logger.log('dataGetStewardMemberStats error: ' + err.message + '\n' + (err.stack || '')); return { total: 0, byLocation: {}, byDues: {} }; } }
 function dataGetStewardDirectory() { try { return DataService.getStewardDirectory(); } catch (e) { Logger.log('dataGetStewardDirectory error: ' + e.message + '\n' + (e.stack || '')); return []; } }
@@ -2251,7 +2631,6 @@ function dataGetUpcomingEvents(limit) { return DataService.getUpcomingEvents(lim
 function dataGetSurveyQuestions() { return getSurveyQuestions(); }
 function dataSubmitSurveyResponse(ignoredEmail, responses) { var e = _resolveCallerEmail(); return e ? submitSurveyResponse(e, responses) : { success: false, message: 'Not authenticated.' }; }
 function dataIsChiefSteward() { var e = _resolveCallerEmail(); return e ? DataService.isChiefSteward(e) : false; }
-function dataGetChiefStewardTaskView() { var e = _resolveCallerEmail(); return e ? DataService.getChiefStewardTaskView(e) : { authorized: false, tasks: [] }; }
 function dataGetAgencyGrievanceStats() { return DataService.getGrievanceStats(); }
 
 // v4.17.0 — member task assignment wrappers (CR-AUTH-3: server-side identity)
@@ -2261,13 +2640,10 @@ function dataCompleteMemberTask(ignoredEmail, taskId) { var e = _resolveCallerEm
 function dataGetStewardAssignedMemberTasks() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getStewardAssignedMemberTasks(s); }
 
 // v4.16.0 — unwired sheet wrappers (CR-AUTH-3: server-side identity + role checks)
-function dataGetStewardPerformance() { var s = _requireStewardAuth(); if (!s) return {}; return DataService.getStewardPerformance(s); }
 function dataGetAllStewardPerformance() { var s = _requireStewardAuth(); if (!s) return []; return DataService.getAllStewardPerformance(); }
 function dataGetCaseChecklist(caseId) { return DataService.getCaseChecklist(caseId); }
-function dataGetCaseChecklistProgress(caseId) { return DataService.getCaseChecklistProgress(caseId); }
 function dataToggleChecklistItem(checklistId, completed) { var e = _resolveCallerEmail(); return e ? DataService.toggleChecklistItem(checklistId, completed, e) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMemberMeetings() { var e = _resolveCallerEmail(); return e ? DataService.getMemberMeetings(e) : []; }
-function dataGetMeetingStats() { return DataService.getMeetingStats(); }
 function dataGetSatisfactionTrends() { return DataService.getSatisfactionTrends(); }
 function dataSubmitFeedback(ignoredEmail, data) { var e = _resolveCallerEmail(); return e ? DataService.submitFeedback(e, data) : { success: false, message: 'Not authenticated.' }; }
 function dataGetMyFeedback() { var e = _resolveCallerEmail(); return e ? DataService.getMyFeedback(e) : []; }
